@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/frost"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +14,6 @@ import (
 
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/so/objects"
 )
 
 func TestCreateUserKeyPackage(t *testing.T) {
@@ -322,10 +322,9 @@ func TestPrepareFrostSigningJobsForUserSignedRefund(t *testing.T) {
 func TestPrepareLeafSigningJobs(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
 
-	createTestCommitment := func() *objects.SigningCommitment {
-		nonce, err := objects.RandomSigningNonce()
-		require.NoError(t, err)
-		return nonce.SigningCommitment()
+	createTestCommitment := func() *frost.SigningCommitment {
+		commitment := frost.GenerateSigningNonce().SigningCommitment()
+		return &commitment
 	}
 
 	tests := []struct {
@@ -333,7 +332,7 @@ func TestPrepareLeafSigningJobs(t *testing.T) {
 		leaves                []LeafKeyTweak
 		refundTxs             [][]byte
 		signingResults        map[string]*pbcommon.SigningResult
-		userCommitments       []*objects.SigningCommitment
+		userCommitments       []*frost.SigningCommitment
 		signingCommitments    []*pb.RequestedSigningCommitments
 		expectError           bool
 		expectedErrorContains string
@@ -357,7 +356,7 @@ func TestPrepareLeafSigningJobs(t *testing.T) {
 					SignatureShare: []byte{0x11, 0x22, 0x33},
 				},
 			},
-			userCommitments: []*objects.SigningCommitment{
+			userCommitments: []*frost.SigningCommitment{
 				createTestCommitment(),
 			},
 			signingCommitments: []*pb.RequestedSigningCommitments{
@@ -401,7 +400,7 @@ func TestPrepareLeafSigningJobs(t *testing.T) {
 					SignatureShare: []byte{0x44, 0x55, 0x66},
 				},
 			},
-			userCommitments: []*objects.SigningCommitment{
+			userCommitments: []*frost.SigningCommitment{
 				createTestCommitment(),
 				createTestCommitment(),
 			},
@@ -431,7 +430,7 @@ func TestPrepareLeafSigningJobs(t *testing.T) {
 			leaves:             []LeafKeyTweak{},
 			refundTxs:          [][]byte{},
 			signingResults:     map[string]*pbcommon.SigningResult{},
-			userCommitments:    []*objects.SigningCommitment{},
+			userCommitments:    []*frost.SigningCommitment{},
 			signingCommitments: []*pb.RequestedSigningCommitments{},
 			expectError:        false,
 			expectedJobsCount:  0,
@@ -450,7 +449,7 @@ func TestPrepareLeafSigningJobs(t *testing.T) {
 				{0x01, 0x02, 0x03},
 			},
 			signingResults: map[string]*pbcommon.SigningResult{},
-			userCommitments: []*objects.SigningCommitment{
+			userCommitments: []*frost.SigningCommitment{
 				createTestCommitment(),
 			},
 			signingCommitments: []*pb.RequestedSigningCommitments{
@@ -493,7 +492,7 @@ func TestPrepareLeafSigningJobs(t *testing.T) {
 					SignatureShare: []byte{0x44, 0x55, 0x66},
 				},
 			},
-			userCommitments: []*objects.SigningCommitment{
+			userCommitments: []*frost.SigningCommitment{
 				createTestCommitment(),
 				createTestCommitment(),
 			},
@@ -546,7 +545,7 @@ func TestPrepareLeafSigningJobs(t *testing.T) {
 					SignatureShare: []byte{0x44, 0x55, 0x66},
 				},
 			},
-			userCommitments: []*objects.SigningCommitment{
+			userCommitments: []*frost.SigningCommitment{
 				createTestCommitment(), // Missing second commitment
 			},
 			signingCommitments: []*pb.RequestedSigningCommitments{
@@ -598,7 +597,7 @@ func TestPrepareLeafSigningJobs(t *testing.T) {
 					SignatureShare: []byte{0x44, 0x55, 0x66},
 				},
 			},
-			userCommitments: []*objects.SigningCommitment{
+			userCommitments: []*frost.SigningCommitment{
 				createTestCommitment(),
 				createTestCommitment(),
 			},

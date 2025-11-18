@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/frost"
 	"go.uber.org/zap"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -37,7 +38,6 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
-	"github.com/lightsparkdev/spark/so/objects"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
@@ -921,8 +921,8 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			return nil, fmt.Errorf("unable to calculate sighash from cpfp refund tx: %w", err)
 		}
 
-		cpfpUserNonceCommitment, err := objects.NewSigningCommitment(req.RefundTxSigningJob.SigningNonceCommitment.Binding, req.RefundTxSigningJob.SigningNonceCommitment.Hiding)
-		if err != nil {
+		cpfpUserNonceCommitment := frost.SigningCommitment{}
+		if err := cpfpUserNonceCommitment.UnmarshalProto(req.GetRefundTxSigningJob().GetSigningNonceCommitment()); err != nil {
 			return nil, fmt.Errorf("unable to create cpfp signing commitment: %w", err)
 		}
 		cpfpJobID := uuid.New().String()
@@ -938,7 +938,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 				SigningKeyshareID: signingKeyshare.ID,
 				Message:           cpfpRefundTxSigHash,
 				VerifyingKey:      &leaf.VerifyingPubkey,
-				UserCommitment:    cpfpUserNonceCommitment,
+				UserCommitment:    &cpfpUserNonceCommitment,
 				AdaptorPublicKey:  &cpfpAdaptorPubKey,
 			},
 		)
@@ -961,8 +961,8 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if err != nil {
 				return nil, fmt.Errorf("unable to calculate sighash from direct refund tx: %w", err)
 			}
-			directUserNonceCommitment, err := objects.NewSigningCommitment(req.DirectRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectRefundTxSigningJob.SigningNonceCommitment.Hiding)
-			if err != nil {
+			directUserNonceCommitment := frost.SigningCommitment{}
+			if err := directUserNonceCommitment.UnmarshalProto(req.GetDirectRefundTxSigningJob().GetSigningNonceCommitment()); err != nil {
 				return nil, fmt.Errorf("unable to create direct signing commitment: %w", err)
 			}
 			directJobID := uuid.New().String()
@@ -974,7 +974,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 					SigningKeyshareID: signingKeyshare.ID,
 					Message:           directRefundTxSigHash,
 					VerifyingKey:      &leaf.VerifyingPubkey,
-					UserCommitment:    directUserNonceCommitment,
+					UserCommitment:    &directUserNonceCommitment,
 					AdaptorPublicKey:  &directAdaptorPubKey,
 				},
 			)
@@ -991,12 +991,12 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if err != nil {
 				return nil, fmt.Errorf("unable to calculate sighash from direct from cpfp refund tx: %w", err)
 			}
-			directFromCpfpUserNonceCommitment, err := objects.NewSigningCommitment(req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Hiding)
-			if err != nil {
+
+			directFromCpfpUserNonceCommitment := frost.SigningCommitment{}
+			if err := directFromCpfpUserNonceCommitment.UnmarshalProto(req.GetDirectFromCpfpRefundTxSigningJob().GetSigningNonceCommitment()); err != nil {
 				return nil, fmt.Errorf("unable to create direct from cpfp signing commitment: %w", err)
 			}
 			directFromCpfpJobID := uuid.New().String()
-
 			directFromCpfpSigningJobs = append(
 				directFromCpfpSigningJobs,
 				&helper.SigningJob{
@@ -1004,7 +1004,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 					SigningKeyshareID: signingKeyshare.ID,
 					Message:           directFromCpfpRefundTxSigHash,
 					VerifyingKey:      &leaf.VerifyingPubkey,
-					UserCommitment:    directFromCpfpUserNonceCommitment,
+					UserCommitment:    &directFromCpfpUserNonceCommitment,
 					AdaptorPublicKey:  &directFromCpfpAdaptorPubKey,
 				},
 			)
@@ -1123,9 +1123,8 @@ func SignRefundsWithPregeneratedNonce(
 			return nil, nil, nil, fmt.Errorf("unable to calculate sighash from refund tx: %w", err)
 		}
 
-		userNonceCommitment := objects.SigningCommitment{}
-		err = userNonceCommitment.UnmarshalProto(req.SigningNonceCommitment)
-		if err != nil {
+		userNonceCommitment := frost.SigningCommitment{}
+		if err := userNonceCommitment.UnmarshalProto(req.GetSigningNonceCommitment()); err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to unmarshal signing nonce commitment: %w", err)
 		}
 		cpfpJobID := uuid.New().String()
@@ -1137,17 +1136,16 @@ func SignRefundsWithPregeneratedNonce(
 			return nil, nil, nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
 		}
 
-		round1Packages := make(map[string]objects.SigningCommitment)
+		round1Packages := make(map[string]frost.SigningCommitment)
 		for key, commitment := range req.SigningCommitments.SigningCommitments {
-			obj := objects.SigningCommitment{}
-			err = obj.UnmarshalProto(commitment)
-			if err != nil {
+			obj := frost.SigningCommitment{}
+			if err := obj.UnmarshalProto(commitment); err != nil {
 				return nil, nil, nil, fmt.Errorf("unable to unmarshal signing commitment: %w", err)
 			}
-			round1Packages[key] = obj
-			if len(obj.Hiding) == 0 || len(obj.Binding) == 0 {
+			if obj.IsZero() {
 				return nil, nil, nil, fmt.Errorf("cpfp signing commitment is invalid for key %s: hiding or binding is empty", key)
 			}
+			round1Packages[key] = obj
 		}
 		signingJobs = append(
 			signingJobs,
@@ -1186,9 +1184,8 @@ func SignRefundsWithPregeneratedNonce(
 			return nil, nil, nil, fmt.Errorf("unable to calculate sighash from direct refund tx: %w", err)
 		}
 
-		userNonceCommitment := objects.SigningCommitment{}
-		err = userNonceCommitment.UnmarshalProto(req.SigningNonceCommitment)
-		if err != nil {
+		userNonceCommitment := frost.SigningCommitment{}
+		if err := userNonceCommitment.UnmarshalProto(req.GetSigningNonceCommitment()); err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to unmarshal signing nonce commitment: %w", err)
 		}
 
@@ -1199,10 +1196,10 @@ func SignRefundsWithPregeneratedNonce(
 			return nil, nil, nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
 		}
 
-		round1Packages := make(map[string]objects.SigningCommitment)
+		round1Packages := make(map[string]frost.SigningCommitment)
 		for key, commitment := range req.SigningCommitments.SigningCommitments {
-			obj := objects.SigningCommitment{}
-			if err = obj.UnmarshalProto(commitment); err != nil {
+			obj := frost.SigningCommitment{}
+			if err := obj.UnmarshalProto(commitment); err != nil {
 				return nil, nil, nil, fmt.Errorf("unable to unmarshal signing commitment: %w", err)
 			}
 			round1Packages[key] = obj
@@ -1239,9 +1236,8 @@ func SignRefundsWithPregeneratedNonce(
 			return nil, nil, nil, fmt.Errorf("unable to calculate sighash from direct from cpfp refund tx: %w", err)
 		}
 
-		userNonceCommitment := objects.SigningCommitment{}
-		err = userNonceCommitment.UnmarshalProto(req.SigningNonceCommitment)
-		if err != nil {
+		userNonceCommitment := frost.SigningCommitment{}
+		if err := userNonceCommitment.UnmarshalProto(req.GetSigningNonceCommitment()); err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to unmarshal signing nonce commitment: %w", err)
 		}
 
@@ -1252,10 +1248,10 @@ func SignRefundsWithPregeneratedNonce(
 			return nil, nil, nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
 		}
 
-		round1Packages := make(map[string]objects.SigningCommitment)
-		for key, commitment := range req.SigningCommitments.SigningCommitments {
-			obj := objects.SigningCommitment{}
-			if err = obj.UnmarshalProto(commitment); err != nil {
+		round1Packages := make(map[string]frost.SigningCommitment)
+		for key, commitment := range req.GetSigningCommitments().GetSigningCommitments() {
+			obj := frost.SigningCommitment{}
+			if err := obj.UnmarshalProto(commitment); err != nil {
 				return nil, nil, nil, fmt.Errorf("unable to unmarshal signing commitment: %w", err)
 			}
 			round1Packages[key] = obj
@@ -1280,7 +1276,7 @@ func SignRefundsWithPregeneratedNonce(
 			return nil, nil, nil, fmt.Errorf("signing job %s has empty round1Packages (message: %x)", job.SigningJob.JobID, job.SigningJob.Message)
 		}
 		for key, commitment := range job.Round1Packages {
-			if len(commitment.Hiding) == 0 || len(commitment.Binding) == 0 {
+			if commitment.IsZero() {
 				return nil, nil, nil, fmt.Errorf("signing job %s has invalid commitment for key %s: hiding or binding is empty (message: %x)", job.SigningJob.JobID, key, job.SigningJob.Message)
 			}
 		}

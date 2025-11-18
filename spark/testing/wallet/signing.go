@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/frost"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -15,7 +16,6 @@ import (
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/so/objects"
 )
 
 const (
@@ -44,7 +44,7 @@ func prepareFrostSigningJobsForUserSignedRefund(
 	signingCommitments []*pb.RequestedSigningCommitments,
 	receiverIdentityPubKey keys.Public,
 	adaptorPublicKey keys.Public,
-) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
+) ([]*pbfrost.FrostSigningJob, [][]byte, []*frost.SigningCommitment, error) {
 	return prepareFrostSigningJobsForUserSignedRefundWithType(leaves, signingCommitments, receiverIdentityPubKey, true, adaptorPublicKey)
 }
 
@@ -54,7 +54,7 @@ func prepareFrostSigningJobsForUserSignedRefundDirect(
 	leaves []LeafKeyTweak,
 	signingCommitments []*pb.RequestedSigningCommitments,
 	receiverIdentityPubKey keys.Public,
-) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
+) ([]*pbfrost.FrostSigningJob, [][]byte, []*frost.SigningCommitment, error) {
 	return prepareFrostSigningJobsForUserSignedRefundWithType(leaves, signingCommitments, receiverIdentityPubKey, false, keys.Public{})
 }
 
@@ -64,13 +64,13 @@ func prepareFrostSigningJobsForDirectRefund(
 	leaves []LeafKeyTweak,
 	signingCommitments []*pb.RequestedSigningCommitments,
 	receiverIdentityPubKey keys.Public,
-) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
-	var signingJobs []*pbfrost.FrostSigningJob
-	refundTxs := make([][]byte, len(leaves))
-	userCommitments := make([]*objects.SigningCommitment, len(leaves))
+) ([]*pbfrost.FrostSigningJob, [][]byte, []*frost.SigningCommitment, error) {
 	if len(leaves) != len(signingCommitments) {
 		return nil, nil, nil, fmt.Errorf("mismatched lengths: leaves: %d, commitments: %d", len(leaves), len(signingCommitments))
 	}
+	var signingJobs []*pbfrost.FrostSigningJob
+	refundTxs := make([][]byte, len(leaves))
+	userCommitments := make([]*frost.SigningCommitment, len(leaves))
 	for i, leaf := range leaves {
 		// Parse DirectTx (the parent transaction for direct refunds)
 		directTx, err := common.TxFromRawTxBytes(leaf.Leaf.DirectTx)
@@ -109,19 +109,11 @@ func prepareFrostSigningJobsForDirectRefund(
 			return nil, nil, nil, fmt.Errorf("failed to calculate sighash: %w", err)
 		}
 
-		signingNonce, err := objects.RandomSigningNonce()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		signingNonceProto, err := signingNonce.MarshalProto()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		userCommitmentProto, err := signingNonce.SigningCommitment().MarshalProto()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		userCommitments[i] = signingNonce.SigningCommitment()
+		signingNonce := frost.GenerateSigningNonce()
+		signingNonceProto, _ := signingNonce.MarshalProto()
+		signingCommitment := signingNonce.SigningCommitment()
+		userCommitmentProto, _ := signingCommitment.MarshalProto()
+		userCommitments[i] = &signingCommitment
 
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 
@@ -144,13 +136,13 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 	receiverIdentityPubKey keys.Public,
 	useCPFP bool,
 	adaptorPublicKey keys.Public,
-) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
-	var signingJobs []*pbfrost.FrostSigningJob
-	refundTxs := make([][]byte, len(leaves))
-	userCommitments := make([]*objects.SigningCommitment, len(leaves))
+) ([]*pbfrost.FrostSigningJob, [][]byte, []*frost.SigningCommitment, error) {
 	if len(leaves) != len(signingCommitments) {
 		return nil, nil, nil, fmt.Errorf("mismatched lengths: leaves: %d, commitments: %d", len(leaves), len(signingCommitments))
 	}
+	var signingJobs []*pbfrost.FrostSigningJob
+	refundTxs := make([][]byte, len(leaves))
+	userCommitments := make([]*frost.SigningCommitment, len(leaves))
 	for i, leaf := range leaves {
 		nodeTx, err := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
 		if err != nil {
@@ -195,19 +187,11 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 			return nil, nil, nil, fmt.Errorf("failed to calculate sighash: %w", err)
 		}
 
-		signingNonce, err := objects.RandomSigningNonce()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		signingNonceProto, err := signingNonce.MarshalProto()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		userCommitmentProto, err := signingNonce.SigningCommitment().MarshalProto()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		userCommitments[i] = signingNonce.SigningCommitment()
+		signingNonce := frost.GenerateSigningNonce()
+		signingNonceProto, _ := signingNonce.MarshalProto()
+		signingCommitment := signingNonce.SigningCommitment()
+		userCommitments[i] = &signingCommitment
+		userCommitmentProto, _ := signingCommitment.MarshalProto()
 
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 
@@ -241,13 +225,13 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 	htlcType PrepareFrostSigningJobsForUserSignedRefundHTLCType,
 	network common.Network,
 	paymentHash []byte,
-) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
-	var signingJobs []*pbfrost.FrostSigningJob
-	refundTxs := make([][]byte, len(leaves))
-	userCommitments := make([]*objects.SigningCommitment, len(leaves))
+) ([]*pbfrost.FrostSigningJob, [][]byte, []*frost.SigningCommitment, error) {
 	if len(leaves) != len(signingCommitments) {
 		return nil, nil, nil, fmt.Errorf("mismatched lengths: leaves: %d, commitments: %d", len(leaves), len(signingCommitments))
 	}
+	var signingJobs []*pbfrost.FrostSigningJob
+	refundTxs := make([][]byte, len(leaves))
+	userCommitments := make([]*frost.SigningCommitment, len(leaves))
 	for i, leaf := range leaves {
 		var nodeTx *wire.MsgTx
 		var err error
@@ -311,19 +295,11 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 			return nil, nil, nil, fmt.Errorf("failed to calculate sighash: %w", err)
 		}
 
-		signingNonce, err := objects.RandomSigningNonce()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		signingNonceProto, err := signingNonce.MarshalProto()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		userCommitmentProto, err := signingNonce.SigningCommitment().MarshalProto()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		userCommitments[i] = signingNonce.SigningCommitment()
+		signingNonce := frost.GenerateSigningNonce()
+		signingNonceProto, _ := signingNonce.MarshalProto()
+		signingCommitment := signingNonce.SigningCommitment()
+		userCommitmentProto, _ := signingCommitment.MarshalProto()
+		userCommitments[i] = &signingCommitment
 
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 
@@ -344,7 +320,7 @@ func prepareLeafSigningJobs(
 	leaves []LeafKeyTweak,
 	refundTxs [][]byte,
 	signingResults map[string]*pbcommon.SigningResult,
-	userCommitments []*objects.SigningCommitment,
+	userCommitments []*frost.SigningCommitment,
 	signingCommitments []*pb.RequestedSigningCommitments,
 ) ([]*pb.UserSignedTxSigningJob, error) {
 	if len(leaves) != len(refundTxs) {
@@ -362,10 +338,7 @@ func prepareLeafSigningJobs(
 
 	var leafSigningJobs []*pb.UserSignedTxSigningJob
 	for i, leaf := range leaves {
-		userCommitmentProto, err := userCommitments[i].MarshalProto()
-		if err != nil {
-			return nil, err
-		}
+		userCommitmentProto, _ := userCommitments[i].MarshalProto()
 		leafSigningJobs = append(leafSigningJobs, &pb.UserSignedTxSigningJob{
 			LeafId:                 leaf.Leaf.Id,
 			SigningPublicKey:       leaf.SigningPrivKey.Public().Serialize(),
@@ -385,24 +358,18 @@ func prepareLeafSigningJobs(
 func CreateSigningJobFromTx(
 	tx *wire.MsgTx,
 	signingPrivateKey keys.Private,
-	signingNonces []*objects.SigningNonce,
-) (*pb.SigningJob, []*objects.SigningNonce, error) {
+	signingNonces []*frost.SigningNonce,
+) (*pb.SigningJob, []*frost.SigningNonce, error) {
 	var txBuf bytes.Buffer
 	if err := tx.Serialize(&txBuf); err != nil {
 		return nil, signingNonces, err
 	}
 
-	signingNonce, err := objects.RandomSigningNonce()
-	if err != nil {
-		return nil, signingNonces, err
-	}
+	signingNonce := frost.GenerateSigningNonce()
 
-	signingNonceCommitment, err := signingNonce.SigningCommitment().MarshalProto()
-	if err != nil {
-		return nil, signingNonces, err
-	}
+	signingNonceCommitment, _ := signingNonce.SigningCommitment().MarshalProto()
 
-	signingNonces = append(signingNonces, signingNonce)
+	signingNonces = append(signingNonces, &signingNonce)
 	signingJob := &pb.SigningJob{
 		SigningPublicKey:       signingPrivateKey.Public().Serialize(),
 		RawTx:                  txBuf.Bytes(),
@@ -418,7 +385,7 @@ func SignTransactionWithFrost(
 	frostClient pbfrost.FrostServiceClient,
 	rawTxBytes []byte,
 	prevTxOut *wire.TxOut,
-	signingNonce *objects.SigningNonce,
+	signingNonce *frost.SigningNonce,
 	signingPrivateKey keys.Private,
 	verificationKey keys.Public,
 	signingResult *pb.SigningResult,
@@ -433,15 +400,8 @@ func SignTransactionWithFrost(
 		return nil, err
 	}
 
-	signingNonceCommitment, err := signingNonce.SigningCommitment().MarshalProto()
-	if err != nil {
-		return nil, err
-	}
-
-	signingNonceProto, err := signingNonce.MarshalProto()
-	if err != nil {
-		return nil, err
-	}
+	signingNonceCommitment, _ := signingNonce.SigningCommitment().MarshalProto()
+	signingNonceProto, _ := signingNonce.MarshalProto()
 
 	keyPackage := CreateUserKeyPackage(signingPrivateKey)
 	signingJob := &pbfrost.FrostSigningJob{

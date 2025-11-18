@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark/so/frost"
 )
 
 // SigningNonce is the model entity for the SigningNonce schema.
@@ -23,9 +24,9 @@ type SigningNonce struct {
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// Nonce holds the value of the "nonce" field.
-	Nonce []byte `json:"nonce,omitempty"`
+	Nonce frost.SigningNonce `json:"nonce,omitempty"`
 	// NonceCommitment holds the value of the "nonce_commitment" field.
-	NonceCommitment []byte `json:"nonce_commitment,omitempty"`
+	NonceCommitment frost.SigningCommitment `json:"nonce_commitment,omitempty"`
 	// Message holds the value of the "message" field.
 	//
 	// Deprecated: Field "message" was marked as deprecated in the schema.
@@ -40,8 +41,12 @@ func (*SigningNonce) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case signingnonce.FieldNonce, signingnonce.FieldNonceCommitment, signingnonce.FieldMessage, signingnonce.FieldRetryFingerprint:
+		case signingnonce.FieldMessage, signingnonce.FieldRetryFingerprint:
 			values[i] = new([]byte)
+		case signingnonce.FieldNonceCommitment:
+			values[i] = new(frost.SigningCommitment)
+		case signingnonce.FieldNonce:
+			values[i] = new(frost.SigningNonce)
 		case signingnonce.FieldCreateTime, signingnonce.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case signingnonce.FieldID:
@@ -80,13 +85,13 @@ func (sn *SigningNonce) assignValues(columns []string, values []any) error {
 				sn.UpdateTime = value.Time
 			}
 		case signingnonce.FieldNonce:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*frost.SigningNonce); !ok {
 				return fmt.Errorf("unexpected type %T for field nonce", values[i])
 			} else if value != nil {
 				sn.Nonce = *value
 			}
 		case signingnonce.FieldNonceCommitment:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*frost.SigningCommitment); !ok {
 				return fmt.Errorf("unexpected type %T for field nonce_commitment", values[i])
 			} else if value != nil {
 				sn.NonceCommitment = *value

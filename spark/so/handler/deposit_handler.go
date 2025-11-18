@@ -9,6 +9,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/frost"
 	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/wire"
@@ -30,7 +31,6 @@ import (
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
-	"github.com/lightsparkdev/spark/so/objects"
 	"github.com/lightsparkdev/spark/so/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -650,8 +650,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 	verifyingKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
 
-	userCpfpRootTxNonceCommitment, err := objects.NewSigningCommitment(req.RootTxSigningJob.SigningNonceCommitment.Binding, req.RootTxSigningJob.SigningNonceCommitment.Hiding)
-	if err != nil {
+	userCpfpRootTxNonceCommitment := frost.SigningCommitment{}
+	if err := userCpfpRootTxNonceCommitment.UnmarshalProto(req.GetRootTxSigningJob().GetSigningNonceCommitment()); err != nil {
 		return nil, err
 	}
 
@@ -660,8 +660,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		return nil, err
 	}
 
-	userCpfpRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.RefundTxSigningJob.SigningNonceCommitment.Binding, req.RefundTxSigningJob.SigningNonceCommitment.Hiding)
-	if err != nil {
+	userCpfpRefundTxNonceCommitment := frost.SigningCommitment{}
+	if err := userCpfpRefundTxNonceCommitment.UnmarshalProto(req.GetRefundTxSigningJob().GetSigningNonceCommitment()); err != nil {
 		return nil, err
 	}
 	signingJobs := []*helper.SigningJob{
@@ -670,14 +670,14 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 			SigningKeyshareID: signingKeyShare.ID,
 			Message:           cpfpRootTxSigHash,
 			VerifyingKey:      &verifyingKey,
-			UserCommitment:    userCpfpRootTxNonceCommitment,
+			UserCommitment:    &userCpfpRootTxNonceCommitment,
 		},
 		{
 			JobID:             uuid.New().String(),
 			SigningKeyshareID: signingKeyShare.ID,
 			Message:           cpfpRefundTxSigHash,
 			VerifyingKey:      &verifyingKey,
-			UserCommitment:    userCpfpRefundTxNonceCommitment,
+			UserCommitment:    &userCpfpRefundTxNonceCommitment,
 		},
 	}
 
@@ -690,7 +690,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 			return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
 	} else {
-		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
+		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTxSigningJob.GetRawTx())
 		if err != nil {
 			return nil, err
 		}
@@ -702,8 +702,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		if err != nil {
 			return nil, err
 		}
-		userDirectFromCpfpRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Hiding)
-		if err != nil {
+		userDirectFromCpfpRefundTxNonceCommitment := frost.SigningCommitment{}
+		if err := userDirectFromCpfpRefundTxNonceCommitment.UnmarshalProto(directFromCpfpRefundTxSigningJob.GetSigningNonceCommitment()); err != nil {
 			return nil, err
 		}
 		signingJobs = append(
@@ -713,7 +713,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 				SigningKeyshareID: signingKeyShare.ID,
 				Message:           directFromCpfpRefundTxSigHash,
 				VerifyingKey:      &verifyingKey,
-				UserCommitment:    userDirectFromCpfpRefundTxNonceCommitment,
+				UserCommitment:    &userDirectFromCpfpRefundTxNonceCommitment,
 			},
 		)
 	}
@@ -733,7 +733,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 			return nil, err
 		}
 
-		directRefundTx, err := common.TxFromRawTxBytes(req.DirectRefundTxSigningJob.RawTx)
+		directRefundTx, err := common.TxFromRawTxBytes(directRefundTxSigningJob.GetRawTx())
 		if err != nil {
 			return nil, err
 		}
@@ -745,12 +745,12 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		if err != nil {
 			return nil, err
 		}
-		userDirectRootTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectRootTxSigningJob.SigningNonceCommitment.Binding, req.DirectRootTxSigningJob.SigningNonceCommitment.Hiding)
-		if err != nil {
+		userDirectRootTxNonceCommitment := frost.SigningCommitment{}
+		if err := userDirectRootTxNonceCommitment.UnmarshalProto(directRootTxSigningJob.GetSigningNonceCommitment()); err != nil {
 			return nil, err
 		}
-		userDirectRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectRefundTxSigningJob.SigningNonceCommitment.Hiding)
-		if err != nil {
+		userDirectRefundTxNonceCommitment := frost.SigningCommitment{}
+		if err := userDirectRefundTxNonceCommitment.UnmarshalProto(directRefundTxSigningJob.GetSigningNonceCommitment()); err != nil {
 			return nil, err
 		}
 		signingJobs = append(
@@ -760,14 +760,14 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 				SigningKeyshareID: signingKeyShare.ID,
 				Message:           directRootTxSigHash,
 				VerifyingKey:      &verifyingKey,
-				UserCommitment:    userDirectRootTxNonceCommitment,
+				UserCommitment:    &userDirectRootTxNonceCommitment,
 			},
 			&helper.SigningJob{
 				JobID:             uuid.New().String(),
 				SigningKeyshareID: signingKeyShare.ID,
 				Message:           directRefundTxSigHash,
 				VerifyingKey:      &verifyingKey,
-				UserCommitment:    userDirectRefundTxNonceCommitment,
+				UserCommitment:    &userDirectRefundTxNonceCommitment,
 			},
 		)
 	} else if directRootTxSigningJob != nil || directRefundTxSigningJob != nil {
@@ -992,12 +992,12 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	}
 	verifyingKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
 
-	userCpfpRootTxNonceCommitment, err := objects.NewSigningCommitment(req.RootTxSigningJob.SigningNonceCommitment.Binding, req.RootTxSigningJob.SigningNonceCommitment.Hiding)
-	if err != nil {
+	userCpfpRootTxNonceCommitment := frost.SigningCommitment{}
+	if err := userCpfpRootTxNonceCommitment.UnmarshalProto(req.GetRootTxSigningJob().GetSigningNonceCommitment()); err != nil {
 		return nil, err
 	}
-	userCpfpRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.RefundTxSigningJob.SigningNonceCommitment.Binding, req.RefundTxSigningJob.SigningNonceCommitment.Hiding)
-	if err != nil {
+	userCpfpRefundTxNonceCommitment := frost.SigningCommitment{}
+	if err := userCpfpRefundTxNonceCommitment.UnmarshalProto(req.GetRefundTxSigningJob().GetSigningNonceCommitment()); err != nil {
 		return nil, err
 	}
 
@@ -1007,14 +1007,14 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 			SigningKeyshareID: signingKeyShare.ID,
 			Message:           cpfpRootTxSigHash,
 			VerifyingKey:      &verifyingKey,
-			UserCommitment:    userCpfpRootTxNonceCommitment,
+			UserCommitment:    &userCpfpRootTxNonceCommitment,
 		},
 		{
 			JobID:             uuid.New().String(),
 			SigningKeyshareID: signingKeyShare.ID,
 			Message:           cpfpRefundTxSigHash,
 			VerifyingKey:      &verifyingKey,
-			UserCommitment:    userCpfpRefundTxNonceCommitment,
+			UserCommitment:    &userCpfpRefundTxNonceCommitment,
 		},
 	}
 
@@ -1028,7 +1028,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 			return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
 	} else {
-		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
+		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTxSigningJob.GetRawTx())
 		if err != nil {
 			return nil, err
 		}
@@ -1043,8 +1043,9 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		if err != nil {
 			return nil, err
 		}
-		userDirectFromCpfpRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Hiding)
-		if err != nil {
+
+		userDirectFromCpfpRefundTxNonceCommitment := frost.SigningCommitment{}
+		if err := userDirectFromCpfpRefundTxNonceCommitment.UnmarshalProto(directFromCpfpRefundTxSigningJob.GetSigningNonceCommitment()); err != nil {
 			return nil, err
 		}
 		signingJobs = append(
@@ -1054,7 +1055,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 				SigningKeyshareID: signingKeyShare.ID,
 				Message:           directFromCpfpRefundTxSigHash,
 				VerifyingKey:      &verifyingKey,
-				UserCommitment:    userDirectFromCpfpRefundTxNonceCommitment,
+				UserCommitment:    &userDirectFromCpfpRefundTxNonceCommitment,
 			},
 		)
 	}
@@ -1092,13 +1093,12 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		if err != nil {
 			return nil, err
 		}
-
-		userDirectRootTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectRootTxSigningJob.SigningNonceCommitment.Binding, req.DirectRootTxSigningJob.SigningNonceCommitment.Hiding)
-		if err != nil {
+		userDirectRootTxNonceCommitment := frost.SigningCommitment{}
+		if err := userDirectRootTxNonceCommitment.UnmarshalProto(directRootTxSigningJob.GetSigningNonceCommitment()); err != nil {
 			return nil, err
 		}
-		userDirectRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectRefundTxSigningJob.SigningNonceCommitment.Hiding)
-		if err != nil {
+		userDirectRefundTxNonceCommitment := frost.SigningCommitment{}
+		if err := userDirectRefundTxNonceCommitment.UnmarshalProto(directRefundTxSigningJob.GetSigningNonceCommitment()); err != nil {
 			return nil, err
 		}
 		signingJobs = append(
@@ -1108,14 +1108,14 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 				SigningKeyshareID: signingKeyShare.ID,
 				Message:           directRootTxSigHash,
 				VerifyingKey:      &verifyingKey,
-				UserCommitment:    userDirectRootTxNonceCommitment,
+				UserCommitment:    &userDirectRootTxNonceCommitment,
 			},
 			&helper.SigningJob{
 				JobID:             uuid.New().String(),
 				SigningKeyshareID: signingKeyShare.ID,
 				Message:           directRefundTxSigHash,
 				VerifyingKey:      &verifyingKey,
-				UserCommitment:    userDirectRefundTxNonceCommitment,
+				UserCommitment:    &userDirectRefundTxNonceCommitment,
 			},
 		)
 	} else if directRootTxSigningJob != nil || directRefundTxSigningJob != nil {
@@ -1432,7 +1432,7 @@ func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Client, 
 //   - *pb.SigningResult: Signing result containing a partial FROST signature that can
 //     be aggregated with other signatures.
 //   - error if the operation fails.
-func getSpendTxSigningResult(ctx context.Context, config *so.Config, depositAddress *ent.DepositAddress, targetUtxo *ent.Utxo, spendTxRaw []byte, userSpendTxNonceCommitment *objects.SigningCommitment) (keys.Public, *pb.SigningResult, error) {
+func getSpendTxSigningResult(ctx context.Context, config *so.Config, depositAddress *ent.DepositAddress, targetUtxo *ent.Utxo, spendTxRaw []byte, userSpendTxNonceCommitment *frost.SigningCommitment) (keys.Public, *pb.SigningResult, error) {
 	signingKeyShare, err := depositAddress.QuerySigningKeyshare().Only(ctx)
 	if err != nil {
 		return keys.Public{}, nil, fmt.Errorf("failed to get signing keyshare: %w", err)
@@ -1531,11 +1531,11 @@ func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UT
 
 	// Recover the signature for the utxo spend
 	// Execute signing jobs with all operators and create a refund transaction
-	userRootTxNonceCommitment, err := objects.NewSigningCommitment(spendTxSigningJob.SigningNonceCommitment.Binding, spendTxSigningJob.SigningNonceCommitment.Hiding)
-	if err != nil {
+	userRootTxNonceCommitment := frost.SigningCommitment{}
+	if err := userRootTxNonceCommitment.UnmarshalProto(spendTxSigningJob.GetSigningNonceCommitment()); err != nil {
 		return nil, nil, fmt.Errorf("failed to create signing commitment: %w", err)
 	}
-	verifyingKey, spendTxSigningResult, err := getSpendTxSigningResult(ctx, config, depositAddress, targetUtxo, spendTxSigningJob.RawTx, userRootTxNonceCommitment)
+	verifyingKey, spendTxSigningResult, err := getSpendTxSigningResult(ctx, config, depositAddress, targetUtxo, spendTxSigningJob.RawTx, &userRootTxNonceCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get spend tx signing result: %w", err)
 	}

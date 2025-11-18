@@ -8,11 +8,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/lightsparkdev/spark/so/db"
-	"github.com/lightsparkdev/spark/so/handler/tokens"
-	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/knobs"
-
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/google/uuid"
@@ -21,6 +16,7 @@ import (
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/db"
 	sodkg "github.com/lightsparkdev/spark/so/dkg"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
@@ -36,6 +32,9 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/handler"
+	"github.com/lightsparkdev/spark/so/handler/tokens"
+	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 	tokenslogging "github.com/lightsparkdev/spark/so/tokens"
 )
 

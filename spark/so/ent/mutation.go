@@ -46,6 +46,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/ent/walletsetting"
+	"github.com/lightsparkdev/spark/so/frost"
 )
 
 const (
@@ -7928,7 +7929,7 @@ type SigningCommitmentMutation struct {
 	operator_index    *uint
 	addoperator_index *int
 	status            *schematype.SigningCommitmentStatus
-	nonce_commitment  *[]byte
+	nonce_commitment  *frost.SigningCommitment
 	clearedFields     map[string]struct{}
 	done              bool
 	oldValue          func(context.Context) (*SigningCommitment, error)
@@ -8204,12 +8205,12 @@ func (m *SigningCommitmentMutation) ResetStatus() {
 }
 
 // SetNonceCommitment sets the "nonce_commitment" field.
-func (m *SigningCommitmentMutation) SetNonceCommitment(b []byte) {
-	m.nonce_commitment = &b
+func (m *SigningCommitmentMutation) SetNonceCommitment(fc frost.SigningCommitment) {
+	m.nonce_commitment = &fc
 }
 
 // NonceCommitment returns the value of the "nonce_commitment" field in the mutation.
-func (m *SigningCommitmentMutation) NonceCommitment() (r []byte, exists bool) {
+func (m *SigningCommitmentMutation) NonceCommitment() (r frost.SigningCommitment, exists bool) {
 	v := m.nonce_commitment
 	if v == nil {
 		return
@@ -8220,7 +8221,7 @@ func (m *SigningCommitmentMutation) NonceCommitment() (r []byte, exists bool) {
 // OldNonceCommitment returns the old "nonce_commitment" field's value of the SigningCommitment entity.
 // If the SigningCommitment object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SigningCommitmentMutation) OldNonceCommitment(ctx context.Context) (v []byte, err error) {
+func (m *SigningCommitmentMutation) OldNonceCommitment(ctx context.Context) (v frost.SigningCommitment, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNonceCommitment is only allowed on UpdateOne operations")
 	}
@@ -8364,7 +8365,7 @@ func (m *SigningCommitmentMutation) SetField(name string, value ent.Value) error
 		m.SetStatus(v)
 		return nil
 	case signingcommitment.FieldNonceCommitment:
-		v, ok := value.([]byte)
+		v, ok := value.(frost.SigningCommitment)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -9288,8 +9289,8 @@ type SigningNonceMutation struct {
 	id                *uuid.UUID
 	create_time       *time.Time
 	update_time       *time.Time
-	nonce             *[]byte
-	nonce_commitment  *[]byte
+	nonce             *frost.SigningNonce
+	nonce_commitment  *frost.SigningCommitment
 	message           *[]byte
 	retry_fingerprint *[]byte
 	clearedFields     map[string]struct{}
@@ -9475,12 +9476,12 @@ func (m *SigningNonceMutation) ResetUpdateTime() {
 }
 
 // SetNonce sets the "nonce" field.
-func (m *SigningNonceMutation) SetNonce(b []byte) {
-	m.nonce = &b
+func (m *SigningNonceMutation) SetNonce(fn frost.SigningNonce) {
+	m.nonce = &fn
 }
 
 // Nonce returns the value of the "nonce" field in the mutation.
-func (m *SigningNonceMutation) Nonce() (r []byte, exists bool) {
+func (m *SigningNonceMutation) Nonce() (r frost.SigningNonce, exists bool) {
 	v := m.nonce
 	if v == nil {
 		return
@@ -9491,7 +9492,7 @@ func (m *SigningNonceMutation) Nonce() (r []byte, exists bool) {
 // OldNonce returns the old "nonce" field's value of the SigningNonce entity.
 // If the SigningNonce object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SigningNonceMutation) OldNonce(ctx context.Context) (v []byte, err error) {
+func (m *SigningNonceMutation) OldNonce(ctx context.Context) (v frost.SigningNonce, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNonce is only allowed on UpdateOne operations")
 	}
@@ -9511,12 +9512,12 @@ func (m *SigningNonceMutation) ResetNonce() {
 }
 
 // SetNonceCommitment sets the "nonce_commitment" field.
-func (m *SigningNonceMutation) SetNonceCommitment(b []byte) {
-	m.nonce_commitment = &b
+func (m *SigningNonceMutation) SetNonceCommitment(fc frost.SigningCommitment) {
+	m.nonce_commitment = &fc
 }
 
 // NonceCommitment returns the value of the "nonce_commitment" field in the mutation.
-func (m *SigningNonceMutation) NonceCommitment() (r []byte, exists bool) {
+func (m *SigningNonceMutation) NonceCommitment() (r frost.SigningCommitment, exists bool) {
 	v := m.nonce_commitment
 	if v == nil {
 		return
@@ -9527,7 +9528,7 @@ func (m *SigningNonceMutation) NonceCommitment() (r []byte, exists bool) {
 // OldNonceCommitment returns the old "nonce_commitment" field's value of the SigningNonce entity.
 // If the SigningNonce object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SigningNonceMutation) OldNonceCommitment(ctx context.Context) (v []byte, err error) {
+func (m *SigningNonceMutation) OldNonceCommitment(ctx context.Context) (v frost.SigningCommitment, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNonceCommitment is only allowed on UpdateOne operations")
 	}
@@ -9762,14 +9763,14 @@ func (m *SigningNonceMutation) SetField(name string, value ent.Value) error {
 		m.SetUpdateTime(v)
 		return nil
 	case signingnonce.FieldNonce:
-		v, ok := value.([]byte)
+		v, ok := value.(frost.SigningNonce)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetNonce(v)
 		return nil
 	case signingnonce.FieldNonceCommitment:
-		v, ok := value.([]byte)
+		v, ok := value.(frost.SigningCommitment)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

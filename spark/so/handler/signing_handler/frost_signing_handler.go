@@ -18,7 +18,6 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/frost"
-	"github.com/lightsparkdev/spark/so/objects"
 )
 
 type FrostSigningHandler struct {
@@ -38,31 +37,20 @@ func (h *FrostSigningHandler) GenerateRandomNonces(ctx context.Context, count ui
 	}
 
 	for i := range commitments {
-		nonce, err := objects.RandomSigningNonce()
-		if err != nil {
-			return nil, err
-		}
-
+		nonce := frost.GenerateSigningNonce()
 		commitment := nonce.SigningCommitment()
 
 		entSigningNonces[i] = db.SigningNonce.Create().
-			SetNonce(nonce.MarshalBinary()).
-			SetNonceCommitment(commitment.MarshalBinary())
-
-		commitmentProto, err := nonce.SigningCommitment().MarshalProto()
-		if err != nil {
-			return nil, err
-		}
-		commitments[i] = commitmentProto
+			SetNonce(nonce).
+			SetNonceCommitment(commitment)
+		commitments[i], _ = commitment.MarshalProto()
 	}
 
 	if err := db.SigningNonce.CreateBulk(entSigningNonces...).Exec(ctx); err != nil {
 		return nil, err
 	}
 
-	return &pb.FrostRound1Response{
-		SigningCommitments: commitments,
-	}, nil
+	return &pb.FrostRound1Response{SigningCommitments: commitments}, nil
 }
 
 func (h *FrostSigningHandler) FrostRound1(ctx context.Context, req *pb.FrostRound1Request) (*pb.FrostRound1Response, error) {
@@ -157,20 +145,13 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 			return nil, err
 		}
 		commitment := frost.SigningCommitment{}
-		err = commitment.UnmarshalProto(job.Commitments[h.config.Identifier])
-		if err != nil {
+		if err := commitment.UnmarshalProto(job.Commitments[h.config.Identifier]); err != nil {
 			return nil, err
 		}
+
 		nonceEnt := nonces[commitment]
-		nonceObject := objects.SigningNonce{}
-		err = nonceObject.UnmarshalBinary(nonceEnt.Nonce)
-		if err != nil {
-			return nil, err
-		}
-		nonceProto, err := nonceObject.MarshalProto()
-		if err != nil {
-			return nil, err
-		}
+		nonceObject := nonceEnt.Nonce
+		nonceProto, _ := nonceObject.MarshalProto()
 		signingJobProto := &pbfrost.FrostSigningJob{
 			JobId:            job.JobId,
 			Message:          job.Message,
@@ -200,9 +181,7 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		return nil, err
 	}
 
-	return &pb.FrostRound2Response{
-		Results: round2Response.Results,
-	}, nil
+	return &pb.FrostRound2Response{Results: round2Response.Results}, nil
 }
 
 func retryFingerprint(job *pb.SigningJob) []byte {

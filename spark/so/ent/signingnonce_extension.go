@@ -3,58 +3,42 @@ package ent
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark/so/frost"
-	"github.com/lightsparkdev/spark/so/objects"
 )
 
 // GetSigningNonceFromCommitment returns the signing nonce associated with the given commitment.
-func GetSigningNonceFromCommitment(ctx context.Context, _ *so.Config, commitment objects.SigningCommitment) (*objects.SigningNonce, error) {
-	commitmentBytes := commitment.MarshalBinary()
-
+func GetSigningNonceFromCommitment(ctx context.Context, _ *so.Config, commitment frost.SigningCommitment) (frost.SigningNonce, error) {
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return nil, err
+		return frost.SigningNonce{}, err
 	}
 
-	nonce, err := db.SigningNonce.Query().Where(signingnonce.NonceCommitment(commitmentBytes)).First(ctx)
+	nonce, err := db.SigningNonce.Query().Where(signingnonce.NonceCommitment(commitment)).First(ctx)
 	if err != nil {
-		return nil, err
+		return frost.SigningNonce{}, err
 	}
 
-	signingNonce := objects.SigningNonce{}
-	err = signingNonce.UnmarshalBinary(nonce.Nonce)
-	if err != nil {
-		return nil, err
-	}
-
-	return &signingNonce, nil
+	return nonce.Nonce, nil
 }
 
 // GetSigningNoncesForUpdate returns the signing nonces associated with the given commitments, and locks them for update.
 func GetSigningNoncesForUpdate(ctx context.Context, _ *so.Config, commitments []frost.SigningCommitment) (map[frost.SigningCommitment]*SigningNonce, error) {
-	commitmentBytes := make([][]byte, len(commitments))
-	for i, commitment := range commitments {
-		commitmentBytes[i] = commitment.MarshalBinary()
-	}
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	noncesResult, err := db.SigningNonce.Query().Where(signingnonce.NonceCommitmentIn(commitmentBytes...)).ForUpdate().All(ctx)
+	noncesResult, err := db.SigningNonce.Query().Where(signingnonce.NonceCommitmentIn(commitments...)).ForUpdate().All(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(map[frost.SigningCommitment]*SigningNonce)
+	result := make(map[frost.SigningCommitment]*SigningNonce, len(noncesResult))
 	for _, nonce := range noncesResult {
-		var sc frost.SigningCommitment
-		if err := sc.UnmarshalBinary(nonce.NonceCommitment); err != nil {
-			return nil, err
-		}
-		result[sc] = nonce
+		result[nonce.NonceCommitment] = nonce
 	}
 	return result, nil
 }
@@ -94,13 +78,7 @@ func BulkUpdateRetryFingerprints(ctx context.Context, nonces map[frost.SigningCo
 	// Since all records exist (queried above), OnConflict will always UPDATE, never INSERT.
 	// Batch in chunks to avoid PostgreSQL parameter limit (65535).
 	const maxBatchSize = 1000
-	for i := 0; i < len(builders); i += maxBatchSize {
-		end := i + maxBatchSize
-		if end > len(builders) {
-			end = len(builders)
-		}
-		chunk := builders[i:end]
-
+	for chunk := range slices.Chunk(builders, maxBatchSize) {
 		err = db.SigningNonce.CreateBulk(chunk...).
 			OnConflictColumns(signingnonce.FieldID).
 			Update(func(u *SigningNonceUpsert) {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/so/frost"
+
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
@@ -15,7 +17,6 @@ import (
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/objects"
 )
 
 // TreeExitHandler is a handler for tree exit requests.
@@ -131,12 +132,9 @@ func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 			return nil, fmt.Errorf("unable to calculate sighash from tx: %w", err)
 		}
 
-		userNonceCommitment, err := objects.NewSigningCommitment(
-			exitingTree.UserSigningCommitment.Binding,
-			exitingTree.UserSigningCommitment.Hiding,
-		)
-		if err != nil {
-			return nil, err
+		userNonceCommitment := frost.SigningCommitment{}
+		if err := userNonceCommitment.UnmarshalProto(exitingTree.GetUserSigningCommitment()); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal user nonce commitment: %w", err)
 		}
 
 		jobID := uuid.New().String()
@@ -152,7 +150,7 @@ func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 				SigningKeyshareID: signingKeyshare.ID,
 				Message:           txSigHash,
 				VerifyingKey:      &root.VerifyingPubkey,
-				UserCommitment:    userNonceCommitment,
+				UserCommitment:    &userNonceCommitment,
 			},
 		)
 	}

@@ -39,7 +39,7 @@ func NewSigningNonce(binding, hiding keys.Private) (SigningNonce, error) {
 }
 
 // SigningCommitment returns the [SigningCommitment] for this nonce.
-func (s *SigningNonce) SigningCommitment() SigningCommitment {
+func (s SigningNonce) SigningCommitment() SigningCommitment {
 	return SigningCommitment{binding: s.binding.Public(), hiding: s.hiding.Public()}
 }
 

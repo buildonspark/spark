@@ -191,10 +191,8 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 		// Check if direct TX has a timelock and has parent
 		if directTx.TxIn[0].Sequence <= 0xFFFFFFFE {
 			// Check if parent is confirmed and timelock has expired
-			var parent *ent.TreeNode
-			if node.Edges.Parent != nil {
-				parent = node.Edges.Parent
-			} else {
+			parent := node.Edges.Parent
+			if parent == nil {
 				p, err := node.QueryParent().Only(ctx)
 				if ent.IsNotFound(err) {
 					// Exit gracefully if the node is a root node and has no parent

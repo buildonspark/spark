@@ -9,19 +9,18 @@ import (
 
 	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/frost"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
-	"github.com/lightsparkdev/spark/so"
-	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/handler/signing_handler"
-	"github.com/lightsparkdev/spark/so/objects"
-
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/handler/signing_handler"
 )
 
 var (
@@ -39,7 +38,7 @@ type SigningResult struct {
 	// SignatureShares is the signature shares from all operators.
 	SignatureShares map[string][]byte
 	// SigningCommitments is the signing commitments from all operators.
-	SigningCommitments map[string]objects.SigningCommitment
+	SigningCommitments map[string]frost.SigningCommitment
 	// PublicKeys is the public keys from all operators.
 	PublicKeys map[string][]byte
 	// KeyshareOwnerIdentifiers is the identifiers of the keyshare owners.
@@ -129,7 +128,7 @@ func isGripmock() bool {
 }
 
 // frostRound1 performs the first round of the Frost signing. It gathers the signing commitments from all operators.
-func frostRound1(ctx context.Context, config *so.Config, operatorSelection *OperatorSelection, totalCount uint32, sparkServiceClientFactory SparkServiceFrostSignerFactory) (map[string][]objects.SigningCommitment, error) {
+func frostRound1(ctx context.Context, config *so.Config, operatorSelection *OperatorSelection, totalCount uint32, sparkServiceClientFactory SparkServiceFrostSignerFactory) (map[string][]frost.SigningCommitment, error) {
 	request := &pbinternal.FrostRound1Request{
 		RandomNonceCount: totalCount,
 	}
@@ -139,7 +138,7 @@ func frostRound1(ctx context.Context, config *so.Config, operatorSelection *Oper
 		return nil, err
 	}
 
-	results, err := ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) ([]objects.SigningCommitment, error) {
+	results, err := ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) ([]frost.SigningCommitment, error) {
 		resp, err := signer.CallFrostRound1(ctx, operator, request)
 		if err != nil {
 			return nil, err
@@ -147,7 +146,7 @@ func frostRound1(ctx context.Context, config *so.Config, operatorSelection *Oper
 		if resp == nil {
 			return nil, fmt.Errorf("nil FrostRound1Response")
 		}
-		commitments := make([]objects.SigningCommitment, len(resp.SigningCommitments))
+		commitments := make([]frost.SigningCommitment, len(resp.SigningCommitments))
 		for i, c := range resp.SigningCommitments {
 			if err := commitments[i].UnmarshalProto(c); err != nil {
 				return nil, err
@@ -167,7 +166,7 @@ func frostRound2(
 	ctx context.Context,
 	config *so.Config,
 	jobs []*SigningJob,
-	round1 map[string][]objects.SigningCommitment,
+	round1 map[string][]frost.SigningCommitment,
 	operatorSelection *OperatorSelection,
 	sparkServiceClientFactory SparkServiceFrostSignerFactory,
 ) (map[string]map[string][]byte, error) {
@@ -178,19 +177,11 @@ func frostRound2(
 		for i, job := range jobs {
 			commitments := make(map[string]*pbcommon.SigningCommitment)
 			for operatorID, commitment := range commitmentsArray[i] {
-				commitmentProto, err := commitment.MarshalProto()
-				if err != nil {
-					return nil, err
-				}
-				commitments[operatorID] = commitmentProto
+				commitments[operatorID], _ = commitment.MarshalProto()
 			}
 			var userCommitmentProto *pbcommon.SigningCommitment
 			if job.UserCommitment != nil {
-				var err error
-				userCommitmentProto, err = job.UserCommitment.MarshalProto()
-				if err != nil {
-					return nil, err
-				}
+				userCommitmentProto, _ = job.UserCommitment.MarshalProto()
 			}
 			var adaptorPublicKeyBytes []byte
 			if job.AdaptorPublicKey != nil {
@@ -246,14 +237,14 @@ type SigningJob struct {
 	// VerifyingKey is the verifying key for the message.
 	VerifyingKey *keys.Public
 	// UserCommitment is the user commitment for the message.
-	UserCommitment *objects.SigningCommitment
+	UserCommitment *frost.SigningCommitment
 	// AdaptorPublicKey is the adaptor public key for the message.
 	AdaptorPublicKey *keys.Public
 }
 
 type SigningJobWithPregeneratedNonce struct {
 	SigningJob
-	Round1Packages map[string]objects.SigningCommitment
+	Round1Packages map[string]frost.SigningCommitment
 }
 
 // NewSigningJob creates a new signing job from signing job proto and the keyshare.
@@ -298,9 +289,8 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 	if err != nil {
 		return nil, nil, err
 	}
-	userCommitment := objects.SigningCommitment{}
-	err = userCommitment.UnmarshalProto(proto.SigningNonceCommitment)
-	if err != nil {
+	userCommitment := frost.SigningCommitment{}
+	if err := userCommitment.UnmarshalProto(proto.SigningNonceCommitment); err != nil {
 		return nil, nil, err
 	}
 	job := &SigningJob{
@@ -346,8 +336,8 @@ func NewSigningJobWithPregeneratedNonce(
 	}
 
 	// Create user nonce commitment
-	userNonceCommitment, err := objects.NewSigningCommitment(signingJobProto.SigningNonceCommitment.Binding, signingJobProto.SigningNonceCommitment.Hiding)
-	if err != nil {
+	userNonceCommitment := frost.SigningCommitment{}
+	if err := userNonceCommitment.UnmarshalProto(signingJobProto.GetSigningNonceCommitment()); err != nil {
 		return nil, fmt.Errorf("failed to create user nonce commitment: %w", err)
 	}
 
@@ -368,17 +358,16 @@ func NewSigningJobWithPregeneratedNonce(
 	}
 
 	// Extract round1 packages from user's signing commitments
-	round1Packages := make(map[string]objects.SigningCommitment)
+	round1Packages := make(map[string]frost.SigningCommitment)
 	for key, commitment := range signingJobProto.SigningCommitments.SigningCommitments {
-		obj := objects.SigningCommitment{}
-		err = obj.UnmarshalProto(commitment)
-		if err != nil {
+		obj := frost.SigningCommitment{}
+		if err := obj.UnmarshalProto(commitment); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal signing commitment for key %s: %w", key, err)
 		}
-		round1Packages[key] = obj
-		if len(obj.Hiding) == 0 || len(obj.Binding) == 0 {
+		if obj.IsZero() {
 			return nil, fmt.Errorf("signing commitment is invalid for key %s: hiding or binding is empty", key)
 		}
+		round1Packages[key] = obj
 	}
 
 	jobID := uuid.New().String()
@@ -388,7 +377,7 @@ func NewSigningJobWithPregeneratedNonce(
 			SigningKeyshareID: signingKeyshare.ID,
 			Message:           sigHash,
 			VerifyingKey:      &verifyingPubKey,
-			UserCommitment:    userNonceCommitment,
+			UserCommitment:    &userNonceCommitment,
 		},
 		Round1Packages: round1Packages,
 	}
@@ -421,11 +410,7 @@ func SigningKeyshareIDsFromSigningJobs(jobs []*SigningJob) []uuid.UUID {
 //
 // Returns:
 //   - *SigningResult: the result of the signing, containing the signature shares and signing commitments
-func SignFrost(
-	ctx context.Context,
-	config *so.Config,
-	jobs []*SigningJob,
-) ([]*SigningResult, error) {
+func SignFrost(ctx context.Context, config *so.Config, jobs []*SigningJob) ([]*SigningResult, error) {
 	return SignFrostInternal(ctx, config, jobs, ent.GetKeyPackages, &SparkServiceFrostSignerFactoryImpl{})
 }
 
@@ -474,7 +459,7 @@ func SignFrostWithPregeneratedNonceInternal(ctx context.Context, config *so.Conf
 		return nil, err
 	}
 
-	round1Array := make([]map[string]objects.SigningCommitment, len(jobs))
+	round1Array := make([]map[string]frost.SigningCommitment, len(jobs))
 	for i, job := range jobs {
 		round1Array[i] = job.Round1Packages
 	}
@@ -501,7 +486,7 @@ func prepareResults(
 	selection *OperatorSelection,
 	jobs []*SigningJob,
 	signingKeyshares map[uuid.UUID]*pbfrost.KeyPackage,
-	round1Array []map[string]objects.SigningCommitment,
+	round1Array []map[string]frost.SigningCommitment,
 	round2 map[string]map[string][]byte,
 ) ([]*SigningResult, error) {
 	results := make([]*SigningResult, len(jobs))
@@ -512,7 +497,7 @@ func prepareResults(
 	for i, job := range jobs {
 		allPublicShares := signingKeyshares[job.SigningKeyshareID].PublicShares
 		publicShares := make(map[string][]byte)
-		keyshareOwnerIdentifiers := make([]string, 0)
+		var keyshareOwnerIdentifiers []string
 		for i := range allPublicShares {
 			keyshareOwnerIdentifiers = append(keyshareOwnerIdentifiers, i)
 		}
@@ -535,11 +520,11 @@ func prepareResults(
 }
 
 // GetSigningCommitments gets the signing commitments for the given keyshare ids.
-func GetSigningCommitments(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID, count uint32) (map[string][]objects.SigningCommitment, error) {
+func GetSigningCommitments(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID, count uint32) (map[string][]frost.SigningCommitment, error) {
 	return GetSigningCommitmentsInternal(ctx, config, keyshareIDs, count, &SparkServiceFrostSignerFactoryImpl{})
 }
 
-func GetSigningCommitmentsInternal(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID, count uint32, sparkServiceClientFactory SparkServiceFrostSignerFactory) (map[string][]objects.SigningCommitment, error) {
+func GetSigningCommitmentsInternal(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID, count uint32, sparkServiceClientFactory SparkServiceFrostSignerFactory) (map[string][]frost.SigningCommitment, error) {
 	if count == 0 {
 		return nil, errors.New("count cannot be 0")
 	}

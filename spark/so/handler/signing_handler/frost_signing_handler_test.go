@@ -77,7 +77,7 @@ func TestFrostSigningHandler_GenerateRandomNonces(t *testing.T) {
 			// Verify that each nonce has a corresponding commitment
 			for _, nonce := range nonces {
 				assert.NotEmpty(t, nonce.NonceCommitment, "Nonce commitment should not be empty")
-				assert.Len(t, nonce.Nonce, 64, "Nonce should be 64 bytes (32 binding + 32 hiding)")
+				assert.Len(t, nonce.Nonce.MarshalBinary(), 64, "Nonce should be 64 bytes (32 binding + 32 hiding)")
 			}
 		})
 	}

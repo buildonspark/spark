@@ -930,7 +930,7 @@ func (h *RenewLeafHandler) signRenewRefunds(
 			return nil, fmt.Errorf("signing job %s has empty round1Packages (message: %x)", job.SigningJob.JobID, job.SigningJob.Message)
 		}
 		for key, commitment := range job.Round1Packages {
-			if len(commitment.Hiding) == 0 || len(commitment.Binding) == 0 {
+			if commitment.IsZero() {
 				return nil, fmt.Errorf("signing job %s has invalid commitment for key %s: hiding or binding is empty (message: %x)", job.SigningJob.JobID, key, job.SigningJob.Message)
 			}
 		}

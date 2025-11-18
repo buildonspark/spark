@@ -56,6 +56,10 @@ func (s *SigningCommitment) Scan(src any) error {
 	return nil
 }
 
+func (s SigningCommitment) IsZero() bool {
+	return s == SigningCommitment{}
+}
+
 // MarshalBinary serializes the SigningCommitment into a 66-byte slice.
 func (s SigningCommitment) MarshalBinary() []byte {
 	return append(s.binding.Serialize(), s.hiding.Serialize()...)

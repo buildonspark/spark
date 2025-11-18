@@ -356,10 +356,8 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			return nil, nil, fmt.Errorf("DirectNodeTxSignature is required. Please upgrade to the latest SDK version")
 		}
 		// Node may not have parent if it is the root node
-		var nodeParent *ent.TreeNode
-		if node.Edges.Parent != nil {
-			nodeParent = node.Edges.Parent
-		} else {
+		nodeParent := node.Edges.Parent
+		if node.Edges.Parent == nil {
 			p, err := node.QueryParent().Only(ctx)
 			if err == nil {
 				nodeParent = p

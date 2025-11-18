@@ -224,10 +224,8 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, nodeMap map[string]*pb.TreeNode, isSSP bool) error {
 	var err error
 	// Prefer eager-loaded edge when available
-	var parent *ent.TreeNode
-	if node.Edges.Parent != nil {
-		parent = node.Edges.Parent
-	} else {
+	parent := node.Edges.Parent
+	if parent == nil {
 		parent, err = node.QueryParent().Only(ctx)
 		if err != nil {
 			if !ent.IsNotFound(err) {

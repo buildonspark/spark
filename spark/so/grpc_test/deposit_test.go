@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/frost"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -17,7 +18,6 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/objects"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
@@ -1210,11 +1210,7 @@ func signingJobFromTx(t *testing.T, publicKey keys.Public, tx *wire.MsgTx) *pb.S
 	var txBuf bytes.Buffer
 	require.NoError(t, tx.Serialize(&txBuf))
 
-	nonce, err := objects.RandomSigningNonce()
-	require.NoError(t, err)
-	nonceCommitmentProto, err := nonce.SigningCommitment().MarshalProto()
-	require.NoError(t, err)
-
+	nonceCommitmentProto, _ := frost.GenerateSigningNonce().SigningCommitment().MarshalProto()
 	return &pb.SigningJob{
 		RawTx:                  txBuf.Bytes(),
 		SigningPublicKey:       publicKey.Serialize(),

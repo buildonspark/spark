@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/frost"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -15,7 +16,6 @@ import (
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/so/objects"
 )
 
 // GetConnectorRefundSignatures asks the coordinator to sign refund
@@ -75,16 +75,14 @@ func GetConnectorRefundSignaturesV2(
 func createConnectorRefundTransactionSigningJob(
 	leafID string,
 	signingPubKey keys.Public,
-	nonce *objects.SigningNonce,
+	nonce frost.SigningNonce,
 	refundTx *wire.MsgTx,
 ) (*pb.LeafRefundTxSigningJob, error) {
 	var refundBuf bytes.Buffer
-	err := refundTx.Serialize(&refundBuf)
-	if err != nil {
+	if err := refundTx.Serialize(&refundBuf); err != nil {
 		return nil, fmt.Errorf("failed to serialize refund tx: %w", err)
 	}
 	rawTx := refundBuf.Bytes()
-	// TODO(alec): we don't handle errors for this elsewhere, should we here?
 	refundNonceCommitmentProto, _ := nonce.SigningCommitment().MarshalProto()
 
 	return &pb.LeafRefundTxSigningJob{
@@ -135,7 +133,7 @@ func signCoopExitRefunds(
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create refund transaction: %w", err)
 		}
-		nonce, _ := objects.RandomSigningNonce()
+		nonce := frost.GenerateSigningNonce()
 		signingJob, err := createConnectorRefundTransactionSigningJob(
 			leaf.Leaf.Id, leaf.SigningPrivKey.Public(), nonce, refundTx,
 		)
@@ -149,7 +147,7 @@ func signCoopExitRefunds(
 		leafDataMap[leaf.Leaf.Id] = &LeafRefundSigningData{
 			SigningPrivKey: leaf.SigningPrivKey,
 			RefundTx:       refundTx,
-			Nonce:          nonce,
+			Nonce:          &nonce,
 			Tx:             tx,
 			Vout:           int(leaf.Leaf.Vout),
 		}

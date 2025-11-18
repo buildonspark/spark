@@ -10,6 +10,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/frost"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -22,7 +23,6 @@ import (
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/so/objects"
 )
 
 const (
@@ -271,18 +271,9 @@ func prepareTxSigningArtifacts(tx *wire.MsgTx, prevTxOut *wire.TxOut, signingPub
 		return nil, err
 	}
 
-	nonce, err := objects.RandomSigningNonce()
-	if err != nil {
-		return nil, err
-	}
-	nonceProto, err := nonce.MarshalProto()
-	if err != nil {
-		return nil, err
-	}
-	commitmentProto, err := nonce.SigningCommitment().MarshalProto()
-	if err != nil {
-		return nil, err
-	}
+	nonce := frost.GenerateSigningNonce()
+	nonceProto, _ := nonce.MarshalProto()
+	commitmentProto, _ := nonce.SigningCommitment().MarshalProto()
 
 	sighash, err := common.SigHashFromTx(tx, 0, prevTxOut)
 	if err != nil {
@@ -635,8 +626,7 @@ func RefundStaticDeposit(
 	defer coordinatorConn.Close()
 
 	var spendTxBytes bytes.Buffer
-
-	if err = params.SpendTx.Serialize(&spendTxBytes); err != nil {
+	if err := params.SpendTx.Serialize(&spendTxBytes); err != nil {
 		return nil, err
 	}
 	spendTxSighash, err := common.SigHashFromTx(params.SpendTx, 0, params.PrevTxOut)
@@ -644,23 +634,15 @@ func RefundStaticDeposit(
 		return nil, fmt.Errorf("failed to get sighash: %w", err)
 	}
 
-	hidingPriv := keys.GeneratePrivateKey()
-	bindingPriv := keys.GeneratePrivateKey()
-	hidingPubBytes := hidingPriv.Public().Serialize()
-	bindingPubBytes := bindingPriv.Public().Serialize()
-	spendTxNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
-	if err != nil {
-		return nil, err
-	}
-	spendTxNonceCommitmentProto, err := spendTxNonceCommitment.MarshalProto()
-	if err != nil {
-		return nil, err
-	}
+	userNonce := frost.GenerateSigningNonce()
+	userNonceProto, _ := userNonce.MarshalProto()
+	userNonceCommitment := userNonce.SigningCommitment()
+	userCommitmentProto, _ := userNonceCommitment.MarshalProto()
 
 	signingJob := &pb.SigningJob{
 		RawTx:                  spendTxBytes.Bytes(),
 		SigningPublicKey:       params.DepositAddressSecretKey.Public().Serialize(),
-		SigningNonceCommitment: spendTxNonceCommitmentProto,
+		SigningNonceCommitment: userCommitmentProto,
 	}
 
 	protoNetwork, err := common.ProtoNetworkFromNetwork(params.Network)
@@ -702,20 +684,7 @@ func RefundStaticDeposit(
 		PublicKey:  swapResponse.DepositAddress.VerifyingPublicKey,
 		MinSigners: 1,
 	}
-	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
-	if err != nil {
-		return nil, err
-	}
-	userNonceProto, err := userNonce.MarshalProto()
-	if err != nil {
-		return nil, err
-	}
-	userCommitmentProto, err := userNonce.SigningCommitment().MarshalProto()
-	if err != nil {
-		return nil, err
-	}
 	operatorCommitments := swapResponse.RefundTxSigningResult.SigningNonceCommitments
-
 	userJobID := uuid.NewString()
 	userSigningJobs := []*pbfrost.FrostSigningJob{{
 		JobId:           userJobID,

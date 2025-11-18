@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/frost"
 )
 
 // SigningCommitment is the schema for the signing commitments table.
@@ -33,7 +34,7 @@ func (SigningCommitment) Fields() []ent.Field {
 		field.Enum("status").
 			GoType(schematype.SigningCommitmentStatus("")),
 		field.Bytes("nonce_commitment").
-			Immutable().Unique(),
+			Immutable().Unique().GoType(frost.SigningCommitment{}),
 	}
 }
 

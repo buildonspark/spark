@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/frost"
 )
 
 // ID filters vertices based on their ID field.
@@ -66,12 +67,12 @@ func UpdateTime(v time.Time) predicate.SigningNonce {
 }
 
 // Nonce applies equality check predicate on the "nonce" field. It's identical to NonceEQ.
-func Nonce(v []byte) predicate.SigningNonce {
+func Nonce(v frost.SigningNonce) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldEQ(FieldNonce, v))
 }
 
 // NonceCommitment applies equality check predicate on the "nonce_commitment" field. It's identical to NonceCommitmentEQ.
-func NonceCommitment(v []byte) predicate.SigningNonce {
+func NonceCommitment(v frost.SigningCommitment) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldEQ(FieldNonceCommitment, v))
 }
 
@@ -166,82 +167,82 @@ func UpdateTimeLTE(v time.Time) predicate.SigningNonce {
 }
 
 // NonceEQ applies the EQ predicate on the "nonce" field.
-func NonceEQ(v []byte) predicate.SigningNonce {
+func NonceEQ(v frost.SigningNonce) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldEQ(FieldNonce, v))
 }
 
 // NonceNEQ applies the NEQ predicate on the "nonce" field.
-func NonceNEQ(v []byte) predicate.SigningNonce {
+func NonceNEQ(v frost.SigningNonce) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldNEQ(FieldNonce, v))
 }
 
 // NonceIn applies the In predicate on the "nonce" field.
-func NonceIn(vs ...[]byte) predicate.SigningNonce {
+func NonceIn(vs ...frost.SigningNonce) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldIn(FieldNonce, vs...))
 }
 
 // NonceNotIn applies the NotIn predicate on the "nonce" field.
-func NonceNotIn(vs ...[]byte) predicate.SigningNonce {
+func NonceNotIn(vs ...frost.SigningNonce) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldNotIn(FieldNonce, vs...))
 }
 
 // NonceGT applies the GT predicate on the "nonce" field.
-func NonceGT(v []byte) predicate.SigningNonce {
+func NonceGT(v frost.SigningNonce) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldGT(FieldNonce, v))
 }
 
 // NonceGTE applies the GTE predicate on the "nonce" field.
-func NonceGTE(v []byte) predicate.SigningNonce {
+func NonceGTE(v frost.SigningNonce) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldGTE(FieldNonce, v))
 }
 
 // NonceLT applies the LT predicate on the "nonce" field.
-func NonceLT(v []byte) predicate.SigningNonce {
+func NonceLT(v frost.SigningNonce) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldLT(FieldNonce, v))
 }
 
 // NonceLTE applies the LTE predicate on the "nonce" field.
-func NonceLTE(v []byte) predicate.SigningNonce {
+func NonceLTE(v frost.SigningNonce) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldLTE(FieldNonce, v))
 }
 
 // NonceCommitmentEQ applies the EQ predicate on the "nonce_commitment" field.
-func NonceCommitmentEQ(v []byte) predicate.SigningNonce {
+func NonceCommitmentEQ(v frost.SigningCommitment) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldEQ(FieldNonceCommitment, v))
 }
 
 // NonceCommitmentNEQ applies the NEQ predicate on the "nonce_commitment" field.
-func NonceCommitmentNEQ(v []byte) predicate.SigningNonce {
+func NonceCommitmentNEQ(v frost.SigningCommitment) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldNEQ(FieldNonceCommitment, v))
 }
 
 // NonceCommitmentIn applies the In predicate on the "nonce_commitment" field.
-func NonceCommitmentIn(vs ...[]byte) predicate.SigningNonce {
+func NonceCommitmentIn(vs ...frost.SigningCommitment) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldIn(FieldNonceCommitment, vs...))
 }
 
 // NonceCommitmentNotIn applies the NotIn predicate on the "nonce_commitment" field.
-func NonceCommitmentNotIn(vs ...[]byte) predicate.SigningNonce {
+func NonceCommitmentNotIn(vs ...frost.SigningCommitment) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldNotIn(FieldNonceCommitment, vs...))
 }
 
 // NonceCommitmentGT applies the GT predicate on the "nonce_commitment" field.
-func NonceCommitmentGT(v []byte) predicate.SigningNonce {
+func NonceCommitmentGT(v frost.SigningCommitment) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldGT(FieldNonceCommitment, v))
 }
 
 // NonceCommitmentGTE applies the GTE predicate on the "nonce_commitment" field.
-func NonceCommitmentGTE(v []byte) predicate.SigningNonce {
+func NonceCommitmentGTE(v frost.SigningCommitment) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldGTE(FieldNonceCommitment, v))
 }
 
 // NonceCommitmentLT applies the LT predicate on the "nonce_commitment" field.
-func NonceCommitmentLT(v []byte) predicate.SigningNonce {
+func NonceCommitmentLT(v frost.SigningCommitment) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldLT(FieldNonceCommitment, v))
 }
 
 // NonceCommitmentLTE applies the LTE predicate on the "nonce_commitment" field.
-func NonceCommitmentLTE(v []byte) predicate.SigningNonce {
+func NonceCommitmentLTE(v frost.SigningCommitment) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldLTE(FieldNonceCommitment, v))
 }
 

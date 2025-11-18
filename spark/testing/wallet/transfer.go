@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/frost"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -24,7 +25,6 @@ import (
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
-	"github.com/lightsparkdev/spark/so/objects"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -185,8 +185,8 @@ func PrepareTransferPackage(
 
 	// Create DirectFromCPFP refund transactions (direct refund, with fee deduction)
 	var directFromCpfpLeafSigningJobs []*pb.UserSignedTxSigningJob
-	leavesWithDirectFromCpfp := make([]LeafKeyTweak, 0)
-	leavesWithDirectFromCpfpIndices := make([]int, 0)
+	var leavesWithDirectFromCpfp []LeafKeyTweak
+	var leavesWithDirectFromCpfpIndices []int
 	for i, leaf := range leaves {
 		if len(leaf.Leaf.DirectFromCpfpRefundTx) > 0 {
 			leavesWithDirectFromCpfp = append(leavesWithDirectFromCpfp, leaf)
@@ -594,12 +594,12 @@ func sendTransferSignRefund(
 
 	leafDataMap := make(map[string]*LeafRefundSigningData)
 	for _, leafKey := range leaves {
-		nonce, _ := objects.RandomSigningNonce()
+		nonce := frost.GenerateSigningNonce()
 		tx, _ := common.TxFromRawTxBytes(leafKey.Leaf.NodeTx)
 		leafDataMap[leafKey.Leaf.Id] = &LeafRefundSigningData{
 			SigningPrivKey:  leafKey.SigningPrivKey,
 			ReceivingPubKey: receiverIdentityPubKey,
-			Nonce:           nonce,
+			Nonce:           &nonce,
 			Tx:              tx,
 			Vout:            int(leafKey.Leaf.Vout),
 		}
@@ -1053,13 +1053,13 @@ type LeafRefundSigningData struct {
 	ReceivingPubKey           keys.Public
 	Tx                        *wire.MsgTx
 	RefundTx                  *wire.MsgTx
-	Nonce                     *objects.SigningNonce
+	Nonce                     *frost.SigningNonce
 	Vout                      int
 	DirectTx                  *wire.MsgTx
 	DirectRefundTx            *wire.MsgTx
-	DirectRefundNonce         *objects.SigningNonce
+	DirectRefundNonce         *frost.SigningNonce
 	DirectFromCpfpRefundTx    *wire.MsgTx
-	DirectFromCpfpRefundNonce *objects.SigningNonce
+	DirectFromCpfpRefundNonce *frost.SigningNonce
 }
 
 func ClaimTransferSignRefunds(
@@ -1072,12 +1072,12 @@ func ClaimTransferSignRefunds(
 ) ([]*pb.NodeSignatures, error) {
 	leafDataMap := make(map[string]*LeafRefundSigningData)
 	for _, leafKey := range leafKeys {
-		nonce, _ := objects.RandomSigningNonce()
+		nonce := frost.GenerateSigningNonce()
 		tx, _ := common.TxFromRawTxBytes(leafKey.Leaf.NodeTx)
 		leafDataMap[leafKey.Leaf.Id] = &LeafRefundSigningData{
 			SigningPrivKey:  leafKey.NewSigningPrivKey,
 			ReceivingPubKey: leafKey.NewSigningPrivKey.Public(),
-			Nonce:           nonce,
+			Nonce:           &nonce,
 			Tx:              tx,
 			Vout:            int(leafKey.Leaf.Vout),
 		}
@@ -1379,15 +1379,9 @@ func PrepareRefundSoSigningJobs(
 			}
 
 			// Generate nonce for DirectRefundTx
-			directRefundNonce, err := objects.RandomSigningNonce()
-			if err != nil {
-				return nil, fmt.Errorf("failed to generate direct refund nonce: %w", err)
-			}
-			refundSigningData.DirectRefundNonce = directRefundNonce
-			directRefundNonceCommitmentProto, err := directRefundNonce.SigningCommitment().MarshalProto()
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal direct refund nonce commitment: %w", err)
-			}
+			directRefundNonce := frost.GenerateSigningNonce()
+			refundSigningData.DirectRefundNonce = &directRefundNonce
+			directRefundNonceCommitmentProto, _ := directRefundNonce.SigningCommitment().MarshalProto()
 
 			job.DirectRefundTxSigningJob = &pb.SigningJob{
 				SigningPublicKey:       refundSigningData.SigningPrivKey.Public().Serialize(),
@@ -1408,15 +1402,9 @@ func PrepareRefundSoSigningJobs(
 			}
 
 			// Generate nonce for DirectFromCpfpRefundTx
-			directFromCpfpRefundNonce, err := objects.RandomSigningNonce()
-			if err != nil {
-				return nil, fmt.Errorf("failed to generate direct from cpfp refund nonce: %w", err)
-			}
-			refundSigningData.DirectFromCpfpRefundNonce = directFromCpfpRefundNonce
-			directFromCpfpRefundNonceCommitmentProto, err := directFromCpfpRefundNonce.SigningCommitment().MarshalProto()
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal direct from cpfp refund nonce commitment: %w", err)
-			}
+			directFromCpfpRefundNonce := frost.GenerateSigningNonce()
+			refundSigningData.DirectFromCpfpRefundNonce = &directFromCpfpRefundNonce
+			directFromCpfpRefundNonceCommitmentProto, _ := directFromCpfpRefundNonce.SigningCommitment().MarshalProto()
 
 			job.DirectFromCpfpRefundTxSigningJob = &pb.SigningJob{
 				SigningPublicKey:       refundSigningData.SigningPrivKey.Public().Serialize(),

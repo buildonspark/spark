@@ -15,7 +15,6 @@ import (
 )
 
 // MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.
-// MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.
 func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, error) {
 	signingKeyshare := tn.Edges.SigningKeyshare
 	if signingKeyshare == nil {

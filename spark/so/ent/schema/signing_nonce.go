@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/lightsparkdev/spark/so/frost"
 )
 
 // SigningNonce is the schema for the signing nonces table.
@@ -29,9 +30,11 @@ func (SigningNonce) Indexes() []ent.Index {
 func (SigningNonce) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("nonce").
-			Immutable(),
+			Immutable().
+			GoType(frost.SigningNonce{}),
 		field.Bytes("nonce_commitment").
-			Immutable(),
+			Immutable().
+			GoType(frost.SigningCommitment{}),
 		field.Bytes("message").
 			Optional().
 			Deprecated(),

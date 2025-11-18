@@ -15,8 +15,8 @@ import (
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/frost"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/objects"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,7 +47,7 @@ func TestFrostSign(t *testing.T) {
 
 	// User identifier will not be used in this test, so we can use any string.
 	userIdentifier := "0000000000000000000000000000000000000000000000000000000000000063"
-	userKeyPackage := pbfrost.KeyPackage{
+	userKeyPackage := &pbfrost.KeyPackage{
 		Identifier:  userIdentifier,
 		SecretShare: privKey.Serialize(),
 		PublicShares: map[string][]byte{
@@ -60,17 +60,12 @@ func TestFrostSign(t *testing.T) {
 	// Step 5: Generate user side of nonce.
 	hidingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
 	bindingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
-	hidingPubBytes := hidingPriv.Public().Serialize()
-	bindingPubBytes := bindingPriv.Public().Serialize()
 
-	userNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
+	userNonce, err := frost.NewSigningNonce(bindingPriv, hidingPriv)
 	require.NoError(t, err)
-	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
-	require.NoError(t, err)
-	userNonceProto, err := userNonce.MarshalProto()
-	require.NoError(t, err)
-	userNonceCommitmentProto, err := userNonceCommitment.MarshalProto()
-	require.NoError(t, err)
+	userNonceCommitment := userNonce.SigningCommitment()
+	userNonceProto, _ := userNonce.MarshalProto()
+	userNonceCommitmentProto, _ := userNonceCommitment.MarshalProto()
 
 	// Step 6: Operator signing
 	signingJobs := []*helper.SigningJob{
@@ -79,14 +74,14 @@ func TestFrostSign(t *testing.T) {
 			SigningKeyshareID: operatorKeyShare.ID,
 			Message:           msgHash[:],
 			VerifyingKey:      &verifyingKey,
-			UserCommitment:    userNonceCommitment,
+			UserCommitment:    &userNonceCommitment,
 		},
 		{
 			JobID:             uuid.New().String(),
 			SigningKeyshareID: operatorKeyShare.ID,
 			Message:           msgHash[:],
 			VerifyingKey:      &verifyingKey,
-			UserCommitment:    userNonceCommitment,
+			UserCommitment:    &userNonceCommitment,
 		},
 	}
 	signingResult, err := helper.SignFrost(ctx, config, signingJobs)
@@ -94,9 +89,7 @@ func TestFrostSign(t *testing.T) {
 	operatorCommitments := signingResult[0].SigningCommitments
 	operatorCommitmentsProto := make(map[string]*pbcommon.SigningCommitment)
 	for id, commitment := range operatorCommitments {
-		commitmentProto, err := commitment.MarshalProto()
-		require.NoError(t, err)
-		operatorCommitmentsProto[id] = commitmentProto
+		operatorCommitmentsProto[id], _ = commitment.MarshalProto()
 	}
 
 	// Step 7: User signing
@@ -109,7 +102,7 @@ func TestFrostSign(t *testing.T) {
 	userSigningJobs := []*pbfrost.FrostSigningJob{{
 		JobId:           userJobID,
 		Message:         msgHash[:],
-		KeyPackage:      &userKeyPackage,
+		KeyPackage:      userKeyPackage,
 		VerifyingKey:    verifyingKey.Serialize(),
 		Nonce:           userNonceProto,
 		Commitments:     operatorCommitmentsProto,
@@ -201,9 +194,7 @@ func TestFrostWithoutUserSign(t *testing.T) {
 	operatorCommitments := signingResult[0].SigningCommitments
 	operatorCommitmentsProto := make(map[string]*pbcommon.SigningCommitment)
 	for id, commitment := range operatorCommitments {
-		commitmentProto, err := commitment.MarshalProto()
-		require.NoError(t, err)
-		operatorCommitmentsProto[id] = commitmentProto
+		operatorCommitmentsProto[id], _ = commitment.MarshalProto()
 	}
 
 	// Step 5: Signature aggregation
@@ -276,17 +267,12 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	// Step 5: Generate user side of nonce.
 	hidingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
 	bindingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
-	hidingPubBytes := hidingPriv.Public().Serialize()
-	bindingPubBytes := bindingPriv.Public().Serialize()
 
-	userNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
+	userNonce, err := frost.NewSigningNonce(bindingPriv, hidingPriv)
 	require.NoError(t, err)
-	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
-	require.NoError(t, err)
-	userNonceProto, err := userNonce.MarshalProto()
-	require.NoError(t, err)
-	userNonceCommitmentProto, err := userNonceCommitment.MarshalProto()
-	require.NoError(t, err)
+	userNonceCommitment := userNonce.SigningCommitment()
+	userNonceProto, _ := userNonce.MarshalProto()
+	userNonceCommitmentProto, _ := userNonceCommitment.MarshalProto()
 
 	// Step 6: Operator signing
 	signingJobs := []*helper.SigningJob{{
@@ -294,7 +280,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 		SigningKeyshareID: operatorKeyShare.ID,
 		Message:           msgHash[:],
 		VerifyingKey:      &verifyingKey,
-		UserCommitment:    userNonceCommitment,
+		UserCommitment:    &userNonceCommitment,
 		AdaptorPublicKey:  &adaptorPub,
 	}}
 	signingResult, err := helper.SignFrost(ctx, config, signingJobs)
@@ -302,9 +288,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	operatorCommitments := signingResult[0].SigningCommitments
 	operatorCommitmentsProto := make(map[string]*pbcommon.SigningCommitment)
 	for id, commitment := range operatorCommitments {
-		commitmentProto, err := commitment.MarshalProto()
-		require.NoError(t, err)
-		operatorCommitmentsProto[id] = commitmentProto
+		operatorCommitmentsProto[id], _ = commitment.MarshalProto()
 	}
 
 	// Step 7: User signing
@@ -415,17 +399,12 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 	// Step 5: Generate user side of nonce.
 	hidingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
 	bindingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
-	hidingPubBytes := hidingPriv.Public().Serialize()
-	bindingPubBytes := bindingPriv.Public().Serialize()
 
-	userNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
+	userNonce, err := frost.NewSigningNonce(bindingPriv, hidingPriv)
 	require.NoError(t, err)
-	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
-	require.NoError(t, err)
-	userNonceProto, err := userNonce.MarshalProto()
-	require.NoError(t, err)
-	userNonceCommitmentProto, err := userNonceCommitment.MarshalProto()
-	require.NoError(t, err)
+	userNonceCommitment := userNonce.SigningCommitment()
+	userNonceProto, _ := userNonce.MarshalProto()
+	userNonceCommitmentProto, _ := userNonceCommitment.MarshalProto()
 
 	// Step 6: Generate operator side of nonce.
 	operatorNonceCommitments, err := helper.GetSigningCommitments(ctx, config, []uuid.UUID{operatorKeyShare.ID}, 1)
@@ -433,9 +412,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 	operatorNonceCommitmentArray := collections.MapOfArrayToArrayOfMap(operatorNonceCommitments)
 	operatorCommitmentsProto := make(map[string]*pbcommon.SigningCommitment)
 	for id, commitment := range operatorNonceCommitmentArray[0] {
-		commitmentProto, err := commitment.MarshalProto()
-		require.NoError(t, err)
-		operatorCommitmentsProto[id] = commitmentProto
+		operatorCommitmentsProto[id], _ = commitment.MarshalProto()
 	}
 
 	// Step 7: User signing
@@ -466,7 +443,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 			SigningKeyshareID: operatorKeyShare.ID,
 			Message:           msgHash[:],
 			VerifyingKey:      &verifyingKey,
-			UserCommitment:    userNonceCommitment,
+			UserCommitment:    &userNonceCommitment,
 		},
 		Round1Packages: operatorNonceCommitmentArray[0],
 	}}

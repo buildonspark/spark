@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingcommitment"
+	"github.com/lightsparkdev/spark/so/frost"
 )
 
 // SigningCommitmentCreate is the builder for creating a SigningCommitment entity.
@@ -66,8 +67,8 @@ func (scc *SigningCommitmentCreate) SetStatus(scs schematype.SigningCommitmentSt
 }
 
 // SetNonceCommitment sets the "nonce_commitment" field.
-func (scc *SigningCommitmentCreate) SetNonceCommitment(b []byte) *SigningCommitmentCreate {
-	scc.mutation.SetNonceCommitment(b)
+func (scc *SigningCommitmentCreate) SetNonceCommitment(fc frost.SigningCommitment) *SigningCommitmentCreate {
+	scc.mutation.SetNonceCommitment(fc)
 	return scc
 }
 

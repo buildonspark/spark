@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark/so/frost"
 )
 
 // SigningNonceCreate is the builder for creating a SigningNonce entity.
@@ -53,14 +54,14 @@ func (snc *SigningNonceCreate) SetNillableUpdateTime(t *time.Time) *SigningNonce
 }
 
 // SetNonce sets the "nonce" field.
-func (snc *SigningNonceCreate) SetNonce(b []byte) *SigningNonceCreate {
-	snc.mutation.SetNonce(b)
+func (snc *SigningNonceCreate) SetNonce(fn frost.SigningNonce) *SigningNonceCreate {
+	snc.mutation.SetNonce(fn)
 	return snc
 }
 
 // SetNonceCommitment sets the "nonce_commitment" field.
-func (snc *SigningNonceCreate) SetNonceCommitment(b []byte) *SigningNonceCreate {
-	snc.mutation.SetNonceCommitment(b)
+func (snc *SigningNonceCreate) SetNonceCommitment(fc frost.SigningCommitment) *SigningNonceCreate {
+	snc.mutation.SetNonceCommitment(fc)
 	return snc
 }
 

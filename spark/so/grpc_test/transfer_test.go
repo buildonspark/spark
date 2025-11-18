@@ -1550,8 +1550,7 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	_, err = sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
 		Network: network,
 	})
-	require.Error(t, err, "Expected error when neither Participant nor TransferIds are specified")
-	require.Contains(t, err.Error(), "must specify either filter.Participant or filter.TransferIds")
+	require.ErrorContains(t, err, "must specify either filter.Participant or filter.TransferIds")
 
 	// Test that QueryAllTransfers fails when both Participant and TransferIds are missing
 	network, err = common.ProtoNetworkFromNetwork(config.Network)
@@ -1561,8 +1560,7 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 		Limit:   10,
 		Offset:  0,
 	})
-	require.Error(t, err, "Expected error when neither Participant nor TransferIds are specified")
-	require.Contains(t, err.Error(), "must specify either filter.Participant or filter.TransferIds")
+	require.ErrorContains(t, err, "must specify either filter.Participant or filter.TransferIds")
 
 	// Test that providing Participant makes the query succeed (even if no transfers exist)
 	network, err = common.ProtoNetworkFromNetwork(config.Network)

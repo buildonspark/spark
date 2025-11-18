@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingcommitment"
+	"github.com/lightsparkdev/spark/so/frost"
 )
 
 // SigningCommitment is the model entity for the SigningCommitment schema.
@@ -28,7 +29,7 @@ type SigningCommitment struct {
 	// Status holds the value of the "status" field.
 	Status schematype.SigningCommitmentStatus `json:"status,omitempty"`
 	// NonceCommitment holds the value of the "nonce_commitment" field.
-	NonceCommitment []byte `json:"nonce_commitment,omitempty"`
+	NonceCommitment frost.SigningCommitment `json:"nonce_commitment,omitempty"`
 	selectValues    sql.SelectValues
 }
 
@@ -38,7 +39,7 @@ func (*SigningCommitment) scanValues(columns []string) ([]any, error) {
 	for i := range columns {
 		switch columns[i] {
 		case signingcommitment.FieldNonceCommitment:
-			values[i] = new([]byte)
+			values[i] = new(frost.SigningCommitment)
 		case signingcommitment.FieldOperatorIndex:
 			values[i] = new(sql.NullInt64)
 		case signingcommitment.FieldStatus:
@@ -93,7 +94,7 @@ func (sc *SigningCommitment) assignValues(columns []string, values []any) error 
 				sc.Status = schematype.SigningCommitmentStatus(value.String)
 			}
 		case signingcommitment.FieldNonceCommitment:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*frost.SigningCommitment); !ok {
 				return fmt.Errorf("unexpected type %T for field nonce_commitment", values[i])
 			} else if value != nil {
 				sc.NonceCommitment = *value
