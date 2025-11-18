@@ -678,6 +678,7 @@ func init() {
 	treenodeHooks := schema.TreeNode{}.Hooks()
 	treenode.Hooks[0] = treenodeHooks[0]
 	treenode.Hooks[1] = treenodeHooks[1]
+	treenode.Hooks[2] = treenodeHooks[2]
 	treenodeMixinFields0 := treenodeMixin[0].Fields()
 	_ = treenodeMixinFields0
 	treenodeFields := schema.TreeNode{}.Fields()

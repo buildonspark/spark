@@ -109,6 +109,31 @@ func (TreeNode) Indexes() []ent.Index {
 
 func (TreeNode) Hooks() []ent.Hook {
 	return []ent.Hook{
+		// Validate that the tree_node's network matches the network of its parent tree
+		hook.On(
+			func(next ent.Mutator) ent.Mutator {
+				return hook.TreeNodeFunc(func(ctx context.Context, m *gen.TreeNodeMutation) (ent.Value, error) {
+					network, hasNetwork := m.Network()
+					treeID, hasTree := m.TreeID()
+
+					if !hasNetwork || !hasTree {
+						return nil, fmt.Errorf("tree node mutation must contain network and tree ID")
+					}
+
+					tree, err := m.Client().Tree.Get(ctx, treeID)
+					if err != nil {
+						return nil, fmt.Errorf("failed to fetch tree: %w", err)
+					}
+
+					if tree.Network != network {
+						return nil, fmt.Errorf("tree_node network (%s) does not match tree network (%s)", network, tree.Network)
+					}
+
+					return next.Mutate(ctx, m)
+				})
+			},
+			ent.OpCreate,
+		),
 		// Define helper hooks that will populate TXIDs for the tranactions in the mutation.
 		// Clearing a field will also clear a corresponding TXID.
 		// If a transaction is set to nil the corresponding TXID will be cleared.
