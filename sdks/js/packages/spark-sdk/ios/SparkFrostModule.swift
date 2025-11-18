@@ -303,8 +303,110 @@ class SparkFrostModule: NSObject, RCTBridgeModule {
             reject("ERROR_DECRYPT_ECIES", error.localizedDescription, error)
         }
     }
-    
-    @objc
+
+    @objc(verifySignature:resolve:reject:)
+    func rn_verifySignature(_ params: [String: Any],
+                       resolve: @escaping RCTPromiseResolveBlock,
+                       reject: @escaping RCTPromiseRejectBlock) {
+        print("SparkFrostModule.swift: verifySignature called with params: \(params)")
+        do {
+            guard let signatureArray = params["signature"] as? [Any],
+                  let signature = arrayToData(signatureArray) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid signature format for verifySignature"])
+            }
+            guard let messageArray = params["message"] as? [Any],
+                  let message = arrayToData(messageArray) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid message format for verifySignature"])
+            }
+            guard let publicKeyArray = params["publicKey"] as? [Any],
+                  let publicKey = arrayToData(publicKeyArray) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid publicKey format for verifySignature"])
+            }
+
+            let result = try verifySignatureBytes(signature: signature, message: message, pubkey: publicKey)
+
+            print("SparkFrostModule.swift: verifySignature about to resolve")
+            resolve(result)
+            print("SparkFrostModule.swift: verifySignature resolve was called.")
+        } catch {
+            print("SparkFrostModule.swift: Error in verifySignature: \(error.localizedDescription)")
+            reject("ERROR_VERIFY_SIGNATURE", error.localizedDescription, error)
+        }
+    }
+
+    @objc(getPublicKey:resolve:reject:)
+    func rn_getPublicKey(_ params: [String: Any],
+                       resolve: @escaping RCTPromiseResolveBlock,
+                       reject: @escaping RCTPromiseRejectBlock) {
+        print("SparkFrostModule.swift: getPublicKey called with params: \(params)")
+        do {
+            guard let privateKeyArray = params["privateKey"] as? [Any],
+                  let privateKey = arrayToData(privateKeyArray) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid privateKey format for getPublicKey"])
+            }
+            guard let compressed = params["compressed"] as? Bool else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid compressed format for getPublicKey"])
+            }
+
+            let result = try getPublicKeyBytes(privateKeyBytes: privateKey, compressed: compressed)
+
+            print("SparkFrostModule.swift: getPublicKey about to resolve")
+            resolve(dataToArray(result))
+            print("SparkFrostModule.swift: getPublicKey resolve was called.")
+        } catch {
+            print("SparkFrostModule.swift: Error in getPublicKey: \(error.localizedDescription)")
+            reject("ERROR_GET_PUBLIC_KEY", error.localizedDescription, error)
+        }
+    }
+
+    @objc(batchGetPublicKeys:resolve:reject:)
+    func rn_batchGetPublicKeys(_ params: [String: Any],
+                       resolve: @escaping RCTPromiseResolveBlock,
+                       reject: @escaping RCTPromiseRejectBlock) {
+        print("SparkFrostModule.swift: batchGetPublicKeys called with params: \(params)")
+        do {
+            guard let privateKeysArray = params["privateKeys"] as? [[Any]] else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid privateKeys format for batchGetPublicKeys; expected an array of byte arrays"])
+            }
+            guard let compressed = params["compressed"] as? Bool else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid compressed format for batchGetPublicKeys"])
+            }
+
+            var results: [[Int]] = []
+            results.reserveCapacity(privateKeysArray.count)
+
+            for (idx, keyBytesAny) in privateKeysArray.enumerated() {
+                guard let keyData = arrayToData(keyBytesAny) else {
+                    throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid privateKey at index \(idx); expected a byte array"])
+                }
+                let pubKey = try getPublicKeyBytes(privateKeyBytes: keyData, compressed: compressed)
+                results.append(dataToArray(pubKey))
+            }
+
+            print("SparkFrostModule.swift: batchGetPublicKeys about to resolve")
+            resolve(results)
+            print("SparkFrostModule.swift: batchGetPublicKeys resolve was called.")
+        } catch {
+            print("SparkFrostModule.swift: Error in batchGetPublicKeys: \(error.localizedDescription)")
+            reject("ERROR_BATCH_GET_PUBLIC_KEYS", error.localizedDescription, error)
+        }
+    }
+
+    @objc(getRandomPrivateKey:reject:)
+    func rn_getRandomPrivateKey(_ resolve: @escaping RCTPromiseResolveBlock,
+                       reject: @escaping RCTPromiseRejectBlock) {
+        print("SparkFrostModule.swift: getRandomPrivateKey called")
+        do {
+            let result = try randomSecretKeyBytes()
+            print("SparkFrostModule.swift: getRandomPrivateKey about to resolve")
+            resolve(dataToArray(result))
+            print("SparkFrostModule.swift: getRandomPrivateKey resolve was called.")
+        } catch {
+            print("SparkFrostModule.swift: Error in getRandomPrivateKey: \(error.localizedDescription)")
+            reject("ERROR_GET_RANDOM_PRIVATE_KEY", error.localizedDescription, error)
+        }
+    }
+
     func constantsToExport() -> [AnyHashable : Any]! {
         return [:]
     }

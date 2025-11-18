@@ -150,6 +150,41 @@ class SparkFrostReactNative extends SparkFrostBase {
     });
     return toUint8Array(result);
   }
+
+  static async getPublicKey(
+    privateKey: Uint8Array,
+    compressed: boolean = true,
+  ): Promise<Uint8Array> {
+    const result = await SparkFrostModule.getPublicKey({
+      privateKey: toNumberArray(privateKey),
+      compressed,
+    });
+    return toUint8Array(result);
+  }
+
+  static async batchGetPublicKeys(
+    privateKeys: Uint8Array[],
+    compressed: boolean = true,
+  ): Promise<Uint8Array[]> {
+    const result = await SparkFrostModule.batchGetPublicKeys({
+      privateKeys: privateKeys.map(toNumberArray),
+      compressed,
+    });
+    return result.map(toUint8Array);
+  }
+
+  static async verifySignature(
+    signature: Uint8Array,
+    message: Uint8Array,
+    publicKey: Uint8Array,
+  ): Promise<boolean> {
+    const result = await SparkFrostModule.verifySignature({
+      signature: toNumberArray(signature),
+      message: toNumberArray(message),
+      publicKey: toNumberArray(publicKey),
+    });
+    return result;
+  }
 }
 
 export { type DummyTx, SparkFrostReactNative as SparkFrost };

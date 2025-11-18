@@ -60,17 +60,17 @@ class SparkFrostModule(reactContext: ReactApplicationContext) : ReactContextBase
 
             val statechainCommitmentsMap = params.getMap("statechainCommitments")
                 ?: throw Exception("StatechainCommitments is required")
-            
+
             val statechainCommitments = mutableMapOf<String, SigningCommitment>()
             statechainCommitmentsMap.toHashMap().forEach { (key, value) ->
                 val commitMap = value as? Map<*, *>
                     ?: throw Exception("Invalid statechain commitment format")
-                
+
                 val hidingArray = (commitMap["hiding"] as? List<*>)?.map { (it as Number).toByte() }?.toByteArray()
                     ?: throw Exception("Invalid statechain commitment hiding format")
                 val bindingArray = (commitMap["binding"] as? List<*>)?.map { (it as Number).toByte() }?.toByteArray()
                     ?: throw Exception("Invalid statechain commitment binding format")
-                
+
                 statechainCommitments[key] = SigningCommitment(
                     hiding = hidingArray,
                     binding = bindingArray
@@ -105,12 +105,12 @@ class SparkFrostModule(reactContext: ReactApplicationContext) : ReactContextBase
             statechainCommitmentsMap.toHashMap().forEach { (key, value) ->
                 val commitMap = value as? Map<*, *>
                     ?: throw Exception("Invalid statechain commitment format")
-                
+
                 val hidingArray = (commitMap["hiding"] as? List<*>)?.map { (it as Number).toByte() }?.toByteArray()
                     ?: throw Exception("Invalid statechain commitment hiding format")
                 val bindingArray = (commitMap["binding"] as? List<*>)?.map { (it as Number).toByte() }?.toByteArray()
                     ?: throw Exception("Invalid statechain commitment binding format")
-                
+
                 statechainCommitments[key] = SigningCommitment(
                     hiding = hidingArray,
                     binding = bindingArray
@@ -186,12 +186,12 @@ class SparkFrostModule(reactContext: ReactApplicationContext) : ReactContextBase
                 address = address,
                 amountSats = amountSats
             )
-            
+
             val map = Arguments.createMap().apply {
                 putString("txid", result.txid)
                 putArray("tx", result.tx.toWritableArray())
             }
-            
+
             promise.resolve(map)
         } catch (e: Exception) {
             promise.reject("ERROR", e)
@@ -233,6 +233,91 @@ class SparkFrostModule(reactContext: ReactApplicationContext) : ReactContextBase
             )
 
             promise.resolve(result.toWritableArray())
+        } catch (e: Exception) {
+            promise.reject("ERROR", e)
+        }
+    }
+
+    @ReactMethod
+    fun getPublicKey(params: ReadableMap, promise: Promise) {
+        try {
+            val privateKey = params.getArray("privateKey")?.toByteArray()
+                ?: throw Exception("Invalid privateKey format")
+
+            val compressed = params.getBoolean("compressed")
+                ?: throw Exception("Invalid compressed format")
+
+            val result = uniffi.spark_frost.getPublicKeyBytes(
+                privateKey = privateKey,
+                compressed = compressed
+            )
+
+            promise.resolve(result.toWritableArray())
+        } catch (e: Exception) {
+            promise.reject("ERROR", e)
+        }
+    }
+
+    @ReactMethod
+    fun batchGetPublicKeys(params: ReadableMap, promise: Promise) {
+        try {
+            val privateKeysArray = params.getArray("privateKeys")
+                ?: throw Exception("Invalid privateKeys format")
+            
+            val compressed = params.getBoolean("compressed")
+                ?: throw Exception("Invalid compressed format")
+            
+            val resultsArray = Arguments.createArray()
+            
+            for (i in 0 until privateKeysArray.size()) {
+                val privateKeyArray = privateKeysArray.getArray(i)
+                    ?: throw Exception("Invalid privateKey format at index $i")
+                
+                val privateKey = privateKeyArray.toByteArray()
+                
+                val publicKey = uniffi.spark_frost.getPublicKeyBytes(
+                    privateKey = privateKey,
+                    compressed = compressed
+                )
+                
+                resultsArray.pushArray(publicKey.toWritableArray())
+            }
+            
+            promise.resolve(resultsArray)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e)
+        }
+    }
+
+    @ReactMethod
+    fun getRandomPrivateKey(promise: Promise) {
+        try {
+            val result = uniffi.spark_frost.randomSecretKeyBytes()
+            promise.resolve(result.toWritableArray())
+        } catch (e: Exception) {
+            promise.reject("ERROR", e)
+        }
+    }
+
+    @ReactMethod
+    fun verifySignature(params: ReadableMap, promise: Promise) {
+        try {
+            val signature = params.getArray("signature")?.toByteArray()
+                ?: throw Exception("Invalid signature format")
+
+            val message = params.getArray("message")?.toByteArray()
+                ?: throw Exception("Invalid message format")
+
+            val publicKey = params.getArray("publicKey")?.toByteArray()
+                ?: throw Exception("Invalid publicKey format")
+
+            val result = uniffi.spark_frost.verifySignatureBytes(
+                signature = signature,
+                message = message,
+                pubkey = publicKey
+            )
+
+            promise.resolve(result)
         } catch (e: Exception) {
             promise.reject("ERROR", e)
         }
