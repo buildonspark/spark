@@ -600,23 +600,47 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				Name:         "purge_event_messages",
 				RunInTestEnv: true,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
-					tx, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
-
 					cutoffTime := time.Now().Add(-1 * time.Hour)
-					numDeleted, err := tx.EventMessage.Delete().
-						Where(eventmessage.CreateTimeLT(cutoffTime)).
-						Exec(ctx)
-					if err != nil {
-						logger.Error("Failed to purge old event messages", zap.Error(err))
-						return err
-					}
+					const batchSize = 10000
 
-					if numDeleted > 0 {
-						logger.Sugar().Infof("Purged %d event messages older than %s", numDeleted, cutoffTime)
+					for {
+						db, err := ent.GetTxFromContext(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to get or create current tx for request: %w", err)
+						}
+
+						// Query for IDs to delete (with limit)
+						idsToDelete, err := db.EventMessage.Query().
+							Where(eventmessage.CreateTimeLT(cutoffTime)).
+							Limit(batchSize).
+							IDs(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to query event messages to purge: %w", err)
+						}
+
+						// If no more rows to delete, we're done
+						if len(idsToDelete) == 0 {
+							break
+						}
+
+						// Delete the batch
+						_, err = db.EventMessage.Delete().
+							Where(eventmessage.IDIn(idsToDelete...)).
+							Exec(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to purge event messages: %w", err)
+						}
+
+						// Commit the batch by returning nil, which triggers middleware commit
+						// Then continue to next batch
+						if err := db.Commit(); err != nil {
+							return fmt.Errorf("failed to commit batch: %w", err)
+						}
+
+						// If we got fewer than the batch size, we're done
+						if len(idsToDelete) < batchSize {
+							break
+						}
 					}
 
 					return nil
