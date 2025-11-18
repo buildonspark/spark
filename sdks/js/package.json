@@ -9,6 +9,7 @@
     "build-no-cache": "yarn build --force",
     "build": "turbo run build",
     "build:packages": "turbo run build --filter='./packages/*'",
+    "build:packages:watch": "yarn turbo watch build --filter='./packages/*'",
     "checks": "yarn deps:check && turbo run lint format test circular-deps package:checks",
     "postinstall": "./postinstall.sh",
     "circular-deps": "turbo run circular-deps",
