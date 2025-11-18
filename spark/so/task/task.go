@@ -595,7 +595,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 1 * time.Hour,
+			ExecutionInterval: 30 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "purge_event_messages",
 				RunInTestEnv: true,
