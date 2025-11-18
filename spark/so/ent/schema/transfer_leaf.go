@@ -94,6 +94,38 @@ func (TransferLeaf) Indexes() []ent.Index {
 
 func (TransferLeaf) Hooks() []ent.Hook {
 	return []ent.Hook{
+		// Validate that the network in the tree matches the network in the transfer
+		hook.On(
+			func(next ent.Mutator) ent.Mutator {
+				return hook.TransferLeafFunc(func(ctx context.Context, m *gen.TransferLeafMutation) (ent.Value, error) {
+					transferID, transferExists := m.TransferID()
+					leafID, leafExists := m.LeafID()
+
+					if !transferExists || !leafExists {
+						return nil, fmt.Errorf("transfer leaf mutation must contain transfer ID and leaf ID")
+					}
+
+					client := m.Client()
+
+					transfer, err := client.Transfer.Get(ctx, transferID)
+					if err != nil {
+						return nil, fmt.Errorf("failed to fetch transfer: %w", err)
+					}
+
+					leaf, err := client.TreeNode.Get(ctx, leafID)
+					if err != nil {
+						return nil, fmt.Errorf("failed to fetch leaf: %w", err)
+					}
+
+					if transfer.Network != leaf.Network {
+						return nil, fmt.Errorf("network mismatch: transfer network %s does not match leaf network %s", transfer.Network, leaf.Network)
+					}
+
+					return next.Mutate(ctx, m)
+				})
+			},
+			ent.OpCreate,
+		),
 		// Define helper hooks that will populate TXIDs for the transactions in the mutation.
 		// Clearing a field will also clear a corresponding TXID.
 		// Be mindful that updates on transactions are slower because the DB indexes on TXIDs are also updated.

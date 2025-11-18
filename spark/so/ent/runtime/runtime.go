@@ -621,6 +621,7 @@ func init() {
 	transferleafHooks := schema.TransferLeaf{}.Hooks()
 	transferleaf.Hooks[0] = transferleafHooks[0]
 	transferleaf.Hooks[1] = transferleafHooks[1]
+	transferleaf.Hooks[2] = transferleafHooks[2]
 	transferleafMixinFields0 := transferleafMixin[0].Fields()
 	_ = transferleafMixinFields0
 	transferleafFields := schema.TransferLeaf{}.Fields()
