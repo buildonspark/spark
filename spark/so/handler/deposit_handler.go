@@ -1569,7 +1569,7 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 		return nil, fmt.Errorf("failed to get schema network: %w", err)
 	}
 
-	if !utils.IsBitcoinAddressForNetwork(req.Address, *network) {
+	if !utils.IsBitcoinAddressForNetwork(req.Address, network) {
 		return nil, fmt.Errorf("deposit address is not aligned with the requested network")
 	}
 

@@ -33,18 +33,16 @@ func MaybeApplyFee(amount int64) int64 {
 	return amount
 }
 
-func DetermineNetwork(protoNetwork pb.Network) (*Network, error) {
-	var network Network
+func DetermineNetwork(protoNetwork pb.Network) (Network, error) {
 	if protoNetwork == pb.Network_UNSPECIFIED {
-		network = Mainnet
-	} else {
-		var err error
-		network, err = NetworkFromProtoNetwork(protoNetwork)
-		if err != nil {
-			return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to convert proto network to common network: %w", err))
-		}
+		return Mainnet, nil
 	}
-	return &network, nil
+
+	network, err := NetworkFromProtoNetwork(protoNetwork)
+	if err != nil {
+		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to convert proto network to common network: %w", err))
+	}
+	return network, nil
 }
 
 const (

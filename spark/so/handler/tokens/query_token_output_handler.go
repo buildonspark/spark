@@ -113,7 +113,7 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputsToken(ctx context.Context, r
 		IssuerPublicKeys:           issuerPubKeys,
 		TokenIdentifiers:           tokenIdentifiers,
 		IncludeExpiredTransactions: true,
-		Network:                    *network,
+		Network:                    network,
 		AfterID:                    afterID,
 		BeforeID:                   beforeID,
 		Limit:                      queryLimit,
