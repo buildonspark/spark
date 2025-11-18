@@ -27,6 +27,11 @@ func (WalletSetting) Fields() []ent.Field {
 			GoType(keys.Public{}).
 			Comment("Signing public key of the owner of the deposit address."),
 		field.Bool("private_enabled").Default(false),
+		field.Bytes("master_identity_public_key").
+			Nillable().
+			Optional().
+			GoType(keys.Public{}).
+			Comment("The master identity public key that is allowed to bypass the privacy and read the wallet."),
 	}
 }
 
@@ -34,5 +39,6 @@ func (WalletSetting) Fields() []ent.Field {
 func (WalletSetting) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("owner_identity_public_key"),
+		index.Fields("master_identity_public_key"),
 	}
 }

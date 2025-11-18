@@ -1287,6 +1287,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "owner_identity_public_key", Type: field.TypeBytes, Unique: true},
 		{Name: "private_enabled", Type: field.TypeBool, Default: false},
+		{Name: "master_identity_public_key", Type: field.TypeBytes, Nullable: true},
 	}
 	// WalletSettingsTable holds the schema information for the "wallet_settings" table.
 	WalletSettingsTable = &schema.Table{
@@ -1298,6 +1299,11 @@ var (
 				Name:    "walletsetting_owner_identity_public_key",
 				Unique:  false,
 				Columns: []*schema.Column{WalletSettingsColumns[3]},
+			},
+			{
+				Name:    "walletsetting_master_identity_public_key",
+				Unique:  false,
+				Columns: []*schema.Column{WalletSettingsColumns[5]},
 			},
 		},
 	}

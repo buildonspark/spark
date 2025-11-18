@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/walletsetting"
 )
@@ -46,6 +47,26 @@ func (wsu *WalletSettingUpdate) SetNillablePrivateEnabled(b *bool) *WalletSettin
 	if b != nil {
 		wsu.SetPrivateEnabled(*b)
 	}
+	return wsu
+}
+
+// SetMasterIdentityPublicKey sets the "master_identity_public_key" field.
+func (wsu *WalletSettingUpdate) SetMasterIdentityPublicKey(k keys.Public) *WalletSettingUpdate {
+	wsu.mutation.SetMasterIdentityPublicKey(k)
+	return wsu
+}
+
+// SetNillableMasterIdentityPublicKey sets the "master_identity_public_key" field if the given value is not nil.
+func (wsu *WalletSettingUpdate) SetNillableMasterIdentityPublicKey(k *keys.Public) *WalletSettingUpdate {
+	if k != nil {
+		wsu.SetMasterIdentityPublicKey(*k)
+	}
+	return wsu
+}
+
+// ClearMasterIdentityPublicKey clears the value of the "master_identity_public_key" field.
+func (wsu *WalletSettingUpdate) ClearMasterIdentityPublicKey() *WalletSettingUpdate {
+	wsu.mutation.ClearMasterIdentityPublicKey()
 	return wsu
 }
 
@@ -111,6 +132,12 @@ func (wsu *WalletSettingUpdate) sqlSave(ctx context.Context) (n int, err error) 
 	if value, ok := wsu.mutation.PrivateEnabled(); ok {
 		_spec.SetField(walletsetting.FieldPrivateEnabled, field.TypeBool, value)
 	}
+	if value, ok := wsu.mutation.MasterIdentityPublicKey(); ok {
+		_spec.SetField(walletsetting.FieldMasterIdentityPublicKey, field.TypeBytes, value)
+	}
+	if wsu.mutation.MasterIdentityPublicKeyCleared() {
+		_spec.ClearField(walletsetting.FieldMasterIdentityPublicKey, field.TypeBytes)
+	}
 	_spec.AddModifiers(wsu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, wsu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -150,6 +177,26 @@ func (wsuo *WalletSettingUpdateOne) SetNillablePrivateEnabled(b *bool) *WalletSe
 	if b != nil {
 		wsuo.SetPrivateEnabled(*b)
 	}
+	return wsuo
+}
+
+// SetMasterIdentityPublicKey sets the "master_identity_public_key" field.
+func (wsuo *WalletSettingUpdateOne) SetMasterIdentityPublicKey(k keys.Public) *WalletSettingUpdateOne {
+	wsuo.mutation.SetMasterIdentityPublicKey(k)
+	return wsuo
+}
+
+// SetNillableMasterIdentityPublicKey sets the "master_identity_public_key" field if the given value is not nil.
+func (wsuo *WalletSettingUpdateOne) SetNillableMasterIdentityPublicKey(k *keys.Public) *WalletSettingUpdateOne {
+	if k != nil {
+		wsuo.SetMasterIdentityPublicKey(*k)
+	}
+	return wsuo
+}
+
+// ClearMasterIdentityPublicKey clears the value of the "master_identity_public_key" field.
+func (wsuo *WalletSettingUpdateOne) ClearMasterIdentityPublicKey() *WalletSettingUpdateOne {
+	wsuo.mutation.ClearMasterIdentityPublicKey()
 	return wsuo
 }
 
@@ -244,6 +291,12 @@ func (wsuo *WalletSettingUpdateOne) sqlSave(ctx context.Context) (_node *WalletS
 	}
 	if value, ok := wsuo.mutation.PrivateEnabled(); ok {
 		_spec.SetField(walletsetting.FieldPrivateEnabled, field.TypeBool, value)
+	}
+	if value, ok := wsuo.mutation.MasterIdentityPublicKey(); ok {
+		_spec.SetField(walletsetting.FieldMasterIdentityPublicKey, field.TypeBytes, value)
+	}
+	if wsuo.mutation.MasterIdentityPublicKeyCleared() {
+		_spec.ClearField(walletsetting.FieldMasterIdentityPublicKey, field.TypeBytes)
 	}
 	_spec.AddModifiers(wsuo.modifiers...)
 	_node = &WalletSetting{config: wsuo.config}

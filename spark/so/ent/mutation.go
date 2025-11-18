@@ -27564,17 +27564,18 @@ func (m *UtxoSwapMutation) ResetEdge(name string) error {
 // WalletSettingMutation represents an operation that mutates the WalletSetting nodes in the graph.
 type WalletSettingMutation struct {
 	config
-	op                        Op
-	typ                       string
-	id                        *uuid.UUID
-	create_time               *time.Time
-	update_time               *time.Time
-	owner_identity_public_key *keys.Public
-	private_enabled           *bool
-	clearedFields             map[string]struct{}
-	done                      bool
-	oldValue                  func(context.Context) (*WalletSetting, error)
-	predicates                []predicate.WalletSetting
+	op                         Op
+	typ                        string
+	id                         *uuid.UUID
+	create_time                *time.Time
+	update_time                *time.Time
+	owner_identity_public_key  *keys.Public
+	private_enabled            *bool
+	master_identity_public_key *keys.Public
+	clearedFields              map[string]struct{}
+	done                       bool
+	oldValue                   func(context.Context) (*WalletSetting, error)
+	predicates                 []predicate.WalletSetting
 }
 
 var _ ent.Mutation = (*WalletSettingMutation)(nil)
@@ -27825,6 +27826,55 @@ func (m *WalletSettingMutation) ResetPrivateEnabled() {
 	m.private_enabled = nil
 }
 
+// SetMasterIdentityPublicKey sets the "master_identity_public_key" field.
+func (m *WalletSettingMutation) SetMasterIdentityPublicKey(k keys.Public) {
+	m.master_identity_public_key = &k
+}
+
+// MasterIdentityPublicKey returns the value of the "master_identity_public_key" field in the mutation.
+func (m *WalletSettingMutation) MasterIdentityPublicKey() (r keys.Public, exists bool) {
+	v := m.master_identity_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMasterIdentityPublicKey returns the old "master_identity_public_key" field's value of the WalletSetting entity.
+// If the WalletSetting object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WalletSettingMutation) OldMasterIdentityPublicKey(ctx context.Context) (v *keys.Public, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMasterIdentityPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMasterIdentityPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMasterIdentityPublicKey: %w", err)
+	}
+	return oldValue.MasterIdentityPublicKey, nil
+}
+
+// ClearMasterIdentityPublicKey clears the value of the "master_identity_public_key" field.
+func (m *WalletSettingMutation) ClearMasterIdentityPublicKey() {
+	m.master_identity_public_key = nil
+	m.clearedFields[walletsetting.FieldMasterIdentityPublicKey] = struct{}{}
+}
+
+// MasterIdentityPublicKeyCleared returns if the "master_identity_public_key" field was cleared in this mutation.
+func (m *WalletSettingMutation) MasterIdentityPublicKeyCleared() bool {
+	_, ok := m.clearedFields[walletsetting.FieldMasterIdentityPublicKey]
+	return ok
+}
+
+// ResetMasterIdentityPublicKey resets all changes to the "master_identity_public_key" field.
+func (m *WalletSettingMutation) ResetMasterIdentityPublicKey() {
+	m.master_identity_public_key = nil
+	delete(m.clearedFields, walletsetting.FieldMasterIdentityPublicKey)
+}
+
 // Where appends a list predicates to the WalletSettingMutation builder.
 func (m *WalletSettingMutation) Where(ps ...predicate.WalletSetting) {
 	m.predicates = append(m.predicates, ps...)
@@ -27859,7 +27909,7 @@ func (m *WalletSettingMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *WalletSettingMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.create_time != nil {
 		fields = append(fields, walletsetting.FieldCreateTime)
 	}
@@ -27871,6 +27921,9 @@ func (m *WalletSettingMutation) Fields() []string {
 	}
 	if m.private_enabled != nil {
 		fields = append(fields, walletsetting.FieldPrivateEnabled)
+	}
+	if m.master_identity_public_key != nil {
+		fields = append(fields, walletsetting.FieldMasterIdentityPublicKey)
 	}
 	return fields
 }
@@ -27888,6 +27941,8 @@ func (m *WalletSettingMutation) Field(name string) (ent.Value, bool) {
 		return m.OwnerIdentityPublicKey()
 	case walletsetting.FieldPrivateEnabled:
 		return m.PrivateEnabled()
+	case walletsetting.FieldMasterIdentityPublicKey:
+		return m.MasterIdentityPublicKey()
 	}
 	return nil, false
 }
@@ -27905,6 +27960,8 @@ func (m *WalletSettingMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldOwnerIdentityPublicKey(ctx)
 	case walletsetting.FieldPrivateEnabled:
 		return m.OldPrivateEnabled(ctx)
+	case walletsetting.FieldMasterIdentityPublicKey:
+		return m.OldMasterIdentityPublicKey(ctx)
 	}
 	return nil, fmt.Errorf("unknown WalletSetting field %s", name)
 }
@@ -27942,6 +27999,13 @@ func (m *WalletSettingMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPrivateEnabled(v)
 		return nil
+	case walletsetting.FieldMasterIdentityPublicKey:
+		v, ok := value.(keys.Public)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMasterIdentityPublicKey(v)
+		return nil
 	}
 	return fmt.Errorf("unknown WalletSetting field %s", name)
 }
@@ -27971,7 +28035,11 @@ func (m *WalletSettingMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *WalletSettingMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(walletsetting.FieldMasterIdentityPublicKey) {
+		fields = append(fields, walletsetting.FieldMasterIdentityPublicKey)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -27984,6 +28052,11 @@ func (m *WalletSettingMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *WalletSettingMutation) ClearField(name string) error {
+	switch name {
+	case walletsetting.FieldMasterIdentityPublicKey:
+		m.ClearMasterIdentityPublicKey()
+		return nil
+	}
 	return fmt.Errorf("unknown WalletSetting nullable field %s", name)
 }
 
@@ -28002,6 +28075,9 @@ func (m *WalletSettingMutation) ResetField(name string) error {
 		return nil
 	case walletsetting.FieldPrivateEnabled:
 		m.ResetPrivateEnabled()
+		return nil
+	case walletsetting.FieldMasterIdentityPublicKey:
+		m.ResetMasterIdentityPublicKey()
 		return nil
 	}
 	return fmt.Errorf("unknown WalletSetting field %s", name)

@@ -27,7 +27,9 @@ type WalletSetting struct {
 	OwnerIdentityPublicKey keys.Public `json:"owner_identity_public_key,omitempty"`
 	// PrivateEnabled holds the value of the "private_enabled" field.
 	PrivateEnabled bool `json:"private_enabled,omitempty"`
-	selectValues   sql.SelectValues
+	// The master identity public key that is allowed to bypass the privacy and read the wallet.
+	MasterIdentityPublicKey *keys.Public `json:"master_identity_public_key,omitempty"`
+	selectValues            sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -35,6 +37,8 @@ func (*WalletSetting) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case walletsetting.FieldMasterIdentityPublicKey:
+			values[i] = &sql.NullScanner{S: new(keys.Public)}
 		case walletsetting.FieldOwnerIdentityPublicKey:
 			values[i] = new(keys.Public)
 		case walletsetting.FieldPrivateEnabled:
@@ -88,6 +92,13 @@ func (ws *WalletSetting) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ws.PrivateEnabled = value.Bool
 			}
+		case walletsetting.FieldMasterIdentityPublicKey:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field master_identity_public_key", values[i])
+			} else if value.Valid {
+				ws.MasterIdentityPublicKey = new(keys.Public)
+				*ws.MasterIdentityPublicKey = *value.S.(*keys.Public)
+			}
 		default:
 			ws.selectValues.Set(columns[i], values[i])
 		}
@@ -135,6 +146,11 @@ func (ws *WalletSetting) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("private_enabled=")
 	builder.WriteString(fmt.Sprintf("%v", ws.PrivateEnabled))
+	builder.WriteString(", ")
+	if v := ws.MasterIdentityPublicKey; v != nil {
+		builder.WriteString("master_identity_public_key=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

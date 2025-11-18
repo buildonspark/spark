@@ -22,6 +22,8 @@ const (
 	FieldOwnerIdentityPublicKey = "owner_identity_public_key"
 	// FieldPrivateEnabled holds the string denoting the private_enabled field in the database.
 	FieldPrivateEnabled = "private_enabled"
+	// FieldMasterIdentityPublicKey holds the string denoting the master_identity_public_key field in the database.
+	FieldMasterIdentityPublicKey = "master_identity_public_key"
 	// Table holds the table name of the walletsetting in the database.
 	Table = "wallet_settings"
 )
@@ -33,6 +35,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldOwnerIdentityPublicKey,
 	FieldPrivateEnabled,
+	FieldMasterIdentityPublicKey,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).

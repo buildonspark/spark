@@ -73,6 +73,20 @@ func (wsc *WalletSettingCreate) SetNillablePrivateEnabled(b *bool) *WalletSettin
 	return wsc
 }
 
+// SetMasterIdentityPublicKey sets the "master_identity_public_key" field.
+func (wsc *WalletSettingCreate) SetMasterIdentityPublicKey(k keys.Public) *WalletSettingCreate {
+	wsc.mutation.SetMasterIdentityPublicKey(k)
+	return wsc
+}
+
+// SetNillableMasterIdentityPublicKey sets the "master_identity_public_key" field if the given value is not nil.
+func (wsc *WalletSettingCreate) SetNillableMasterIdentityPublicKey(k *keys.Public) *WalletSettingCreate {
+	if k != nil {
+		wsc.SetMasterIdentityPublicKey(*k)
+	}
+	return wsc
+}
+
 // SetID sets the "id" field.
 func (wsc *WalletSettingCreate) SetID(u uuid.UUID) *WalletSettingCreate {
 	wsc.mutation.SetID(u)
@@ -206,6 +220,10 @@ func (wsc *WalletSettingCreate) createSpec() (*WalletSetting, *sqlgraph.CreateSp
 		_spec.SetField(walletsetting.FieldPrivateEnabled, field.TypeBool, value)
 		_node.PrivateEnabled = value
 	}
+	if value, ok := wsc.mutation.MasterIdentityPublicKey(); ok {
+		_spec.SetField(walletsetting.FieldMasterIdentityPublicKey, field.TypeBytes, value)
+		_node.MasterIdentityPublicKey = &value
+	}
 	return _node, _spec
 }
 
@@ -279,6 +297,24 @@ func (u *WalletSettingUpsert) SetPrivateEnabled(v bool) *WalletSettingUpsert {
 // UpdatePrivateEnabled sets the "private_enabled" field to the value that was provided on create.
 func (u *WalletSettingUpsert) UpdatePrivateEnabled() *WalletSettingUpsert {
 	u.SetExcluded(walletsetting.FieldPrivateEnabled)
+	return u
+}
+
+// SetMasterIdentityPublicKey sets the "master_identity_public_key" field.
+func (u *WalletSettingUpsert) SetMasterIdentityPublicKey(v keys.Public) *WalletSettingUpsert {
+	u.Set(walletsetting.FieldMasterIdentityPublicKey, v)
+	return u
+}
+
+// UpdateMasterIdentityPublicKey sets the "master_identity_public_key" field to the value that was provided on create.
+func (u *WalletSettingUpsert) UpdateMasterIdentityPublicKey() *WalletSettingUpsert {
+	u.SetExcluded(walletsetting.FieldMasterIdentityPublicKey)
+	return u
+}
+
+// ClearMasterIdentityPublicKey clears the value of the "master_identity_public_key" field.
+func (u *WalletSettingUpsert) ClearMasterIdentityPublicKey() *WalletSettingUpsert {
+	u.SetNull(walletsetting.FieldMasterIdentityPublicKey)
 	return u
 }
 
@@ -361,6 +397,27 @@ func (u *WalletSettingUpsertOne) SetPrivateEnabled(v bool) *WalletSettingUpsertO
 func (u *WalletSettingUpsertOne) UpdatePrivateEnabled() *WalletSettingUpsertOne {
 	return u.Update(func(s *WalletSettingUpsert) {
 		s.UpdatePrivateEnabled()
+	})
+}
+
+// SetMasterIdentityPublicKey sets the "master_identity_public_key" field.
+func (u *WalletSettingUpsertOne) SetMasterIdentityPublicKey(v keys.Public) *WalletSettingUpsertOne {
+	return u.Update(func(s *WalletSettingUpsert) {
+		s.SetMasterIdentityPublicKey(v)
+	})
+}
+
+// UpdateMasterIdentityPublicKey sets the "master_identity_public_key" field to the value that was provided on create.
+func (u *WalletSettingUpsertOne) UpdateMasterIdentityPublicKey() *WalletSettingUpsertOne {
+	return u.Update(func(s *WalletSettingUpsert) {
+		s.UpdateMasterIdentityPublicKey()
+	})
+}
+
+// ClearMasterIdentityPublicKey clears the value of the "master_identity_public_key" field.
+func (u *WalletSettingUpsertOne) ClearMasterIdentityPublicKey() *WalletSettingUpsertOne {
+	return u.Update(func(s *WalletSettingUpsert) {
+		s.ClearMasterIdentityPublicKey()
 	})
 }
 
@@ -610,6 +667,27 @@ func (u *WalletSettingUpsertBulk) SetPrivateEnabled(v bool) *WalletSettingUpsert
 func (u *WalletSettingUpsertBulk) UpdatePrivateEnabled() *WalletSettingUpsertBulk {
 	return u.Update(func(s *WalletSettingUpsert) {
 		s.UpdatePrivateEnabled()
+	})
+}
+
+// SetMasterIdentityPublicKey sets the "master_identity_public_key" field.
+func (u *WalletSettingUpsertBulk) SetMasterIdentityPublicKey(v keys.Public) *WalletSettingUpsertBulk {
+	return u.Update(func(s *WalletSettingUpsert) {
+		s.SetMasterIdentityPublicKey(v)
+	})
+}
+
+// UpdateMasterIdentityPublicKey sets the "master_identity_public_key" field to the value that was provided on create.
+func (u *WalletSettingUpsertBulk) UpdateMasterIdentityPublicKey() *WalletSettingUpsertBulk {
+	return u.Update(func(s *WalletSettingUpsert) {
+		s.UpdateMasterIdentityPublicKey()
+	})
+}
+
+// ClearMasterIdentityPublicKey clears the value of the "master_identity_public_key" field.
+func (u *WalletSettingUpsertBulk) ClearMasterIdentityPublicKey() *WalletSettingUpsertBulk {
+	return u.Update(func(s *WalletSettingUpsert) {
+		s.ClearMasterIdentityPublicKey()
 	})
 }
 

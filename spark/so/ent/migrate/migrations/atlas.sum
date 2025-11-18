@@ -1,4 +1,4 @@
-h1:pvhF+xE0x+qZ/meOXUdpKQ9DWonVpUaXKcGgqM/M278=
+h1:NwNJt91P2DGP79dvuUdTg7t94QQPT8bU3vLbAcux2EI=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -94,3 +94,4 @@ h1:pvhF+xE0x+qZ/meOXUdpKQ9DWonVpUaXKcGgqM/M278=
 20251114220255_tree_node_transfer_network_idx.sql h1:nNP6Y7EjDIEk+gJSLYBo4ZlTh4SdLud3S0LoQL5Xu90=
 20251114232945_tree_node_network_non_null.sql h1:hDYEIKmAy3JI8efhh/9wU1HYQ+MFKcll8spB1dkojR4=
 20251116052840_transfer_network_non_null.sql h1:lmb4wIiTxgiDsb7zyuqH/eTUDMzCV92UWCR4cAnrBPE=
+20251117232507_add_master_public_key_to_wallet_setting.sql h1:gRa0ZGpI9/JWX4ZaHdYpxSES0iawgqYIZBzC+dE0znA=

@@ -76,6 +76,11 @@ func PrivateEnabled(v bool) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldEQ(FieldPrivateEnabled, v))
 }
 
+// MasterIdentityPublicKey applies equality check predicate on the "master_identity_public_key" field. It's identical to MasterIdentityPublicKeyEQ.
+func MasterIdentityPublicKey(v keys.Public) predicate.WalletSetting {
+	return predicate.WalletSetting(sql.FieldEQ(FieldMasterIdentityPublicKey, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldEQ(FieldCreateTime, v))
@@ -204,6 +209,56 @@ func PrivateEnabledEQ(v bool) predicate.WalletSetting {
 // PrivateEnabledNEQ applies the NEQ predicate on the "private_enabled" field.
 func PrivateEnabledNEQ(v bool) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldNEQ(FieldPrivateEnabled, v))
+}
+
+// MasterIdentityPublicKeyEQ applies the EQ predicate on the "master_identity_public_key" field.
+func MasterIdentityPublicKeyEQ(v keys.Public) predicate.WalletSetting {
+	return predicate.WalletSetting(sql.FieldEQ(FieldMasterIdentityPublicKey, v))
+}
+
+// MasterIdentityPublicKeyNEQ applies the NEQ predicate on the "master_identity_public_key" field.
+func MasterIdentityPublicKeyNEQ(v keys.Public) predicate.WalletSetting {
+	return predicate.WalletSetting(sql.FieldNEQ(FieldMasterIdentityPublicKey, v))
+}
+
+// MasterIdentityPublicKeyIn applies the In predicate on the "master_identity_public_key" field.
+func MasterIdentityPublicKeyIn(vs ...keys.Public) predicate.WalletSetting {
+	return predicate.WalletSetting(sql.FieldIn(FieldMasterIdentityPublicKey, vs...))
+}
+
+// MasterIdentityPublicKeyNotIn applies the NotIn predicate on the "master_identity_public_key" field.
+func MasterIdentityPublicKeyNotIn(vs ...keys.Public) predicate.WalletSetting {
+	return predicate.WalletSetting(sql.FieldNotIn(FieldMasterIdentityPublicKey, vs...))
+}
+
+// MasterIdentityPublicKeyGT applies the GT predicate on the "master_identity_public_key" field.
+func MasterIdentityPublicKeyGT(v keys.Public) predicate.WalletSetting {
+	return predicate.WalletSetting(sql.FieldGT(FieldMasterIdentityPublicKey, v))
+}
+
+// MasterIdentityPublicKeyGTE applies the GTE predicate on the "master_identity_public_key" field.
+func MasterIdentityPublicKeyGTE(v keys.Public) predicate.WalletSetting {
+	return predicate.WalletSetting(sql.FieldGTE(FieldMasterIdentityPublicKey, v))
+}
+
+// MasterIdentityPublicKeyLT applies the LT predicate on the "master_identity_public_key" field.
+func MasterIdentityPublicKeyLT(v keys.Public) predicate.WalletSetting {
+	return predicate.WalletSetting(sql.FieldLT(FieldMasterIdentityPublicKey, v))
+}
+
+// MasterIdentityPublicKeyLTE applies the LTE predicate on the "master_identity_public_key" field.
+func MasterIdentityPublicKeyLTE(v keys.Public) predicate.WalletSetting {
+	return predicate.WalletSetting(sql.FieldLTE(FieldMasterIdentityPublicKey, v))
+}
+
+// MasterIdentityPublicKeyIsNil applies the IsNil predicate on the "master_identity_public_key" field.
+func MasterIdentityPublicKeyIsNil() predicate.WalletSetting {
+	return predicate.WalletSetting(sql.FieldIsNull(FieldMasterIdentityPublicKey))
+}
+
+// MasterIdentityPublicKeyNotNil applies the NotNil predicate on the "master_identity_public_key" field.
+func MasterIdentityPublicKeyNotNil() predicate.WalletSetting {
+	return predicate.WalletSetting(sql.FieldNotNull(FieldMasterIdentityPublicKey))
 }
 
 // And groups predicates with the AND operator between them.
