@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.4.6
+
+### Patch Changes
+
+- - Use generated bindings for ecies encryption/decryption
+
 ## 0.4.5
 
 ### Patch Changes
