@@ -720,9 +720,6 @@ func main() {
 	)
 
 	mux := http.NewServeMux()
-	mux.Handle("/-/ready", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.Handle("/",
 		otelhttp.NewHandler(
