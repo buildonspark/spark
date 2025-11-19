@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/lightsparkdev/spark/so/grpcutil"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/stats"
@@ -23,6 +24,7 @@ func NewInstrumentedStatsHandler(wrapped stats.Handler) stats.Handler {
 type RPCTimings struct {
 	TagRPCTime    time.Time
 	LastEventTime time.Time
+	MethodName    string
 }
 
 // endSpanAndUpdateTiming ends the span and updates the last event time
@@ -30,6 +32,20 @@ func endSpanAndUpdateTiming(span trace.Span, timings *RPCTimings) {
 	span.End()
 	if timings != nil {
 		timings.LastEventTime = time.Now()
+	}
+}
+
+// setRPCMethodAttributes sets the RPC method attributes on a span
+func setRPCMethodAttributes(span trace.Span, timings *RPCTimings, additionalAttrs ...attribute.KeyValue) {
+	if timings == nil {
+		return
+	}
+	attrs := additionalAttrs
+	if methodAttrs := grpcutil.ParseFullMethod(timings.MethodName); methodAttrs != nil {
+		attrs = append(attrs, methodAttrs...)
+	}
+	if len(attrs) > 0 {
+		span.SetAttributes(attrs...)
 	}
 }
 
@@ -43,6 +59,7 @@ func (h *instrumentedStatsHandler) TagRPC(ctx context.Context, info *stats.RPCTa
 	timings := &RPCTimings{
 		TagRPCTime:    now,
 		LastEventTime: now,
+		MethodName:    info.FullMethodName,
 	}
 	ctx = context.WithValue(ctx, RPCTimingsContextKey, timings)
 
@@ -60,10 +77,12 @@ func (h *instrumentedStatsHandler) HandleRPC(ctx context.Context, s stats.RPCSta
 			now := time.Now()
 			_, gapSpan := tracer.Start(ctx, "grpc.gap.BeforeInHeader",
 				trace.WithTimestamp(timings.LastEventTime))
+			setRPCMethodAttributes(gapSpan, timings)
 			gapSpan.End(trace.WithTimestamp(now))
 		}
 
 		_, span := tracer.Start(ctx, "grpc.InHeader")
+		setRPCMethodAttributes(span, timings)
 		defer endSpanAndUpdateTiming(span, timings)
 
 	case *stats.InPayload:
@@ -71,22 +90,25 @@ func (h *instrumentedStatsHandler) HandleRPC(ctx context.Context, s stats.RPCSta
 			now := time.Now()
 			_, gapSpan := tracer.Start(ctx, "grpc.gap.BeforeInPayload",
 				trace.WithTimestamp(timings.LastEventTime))
+			setRPCMethodAttributes(gapSpan, timings)
 			gapSpan.End(trace.WithTimestamp(now))
 		}
 
 		_, span := tracer.Start(ctx, "grpc.InPayload")
 		defer endSpanAndUpdateTiming(span, timings)
-		span.SetAttributes(attribute.Int("payload.length", stat.Length))
+		setRPCMethodAttributes(span, timings, attribute.Int("payload.length", stat.Length))
 
 	case *stats.Begin:
 		if timings != nil {
 			now := time.Now()
 			_, gapSpan := tracer.Start(ctx, "grpc.gap.BeforeBegin",
 				trace.WithTimestamp(timings.LastEventTime))
+			setRPCMethodAttributes(gapSpan, timings)
 			gapSpan.End(trace.WithTimestamp(now))
 		}
 
 		_, span := tracer.Start(ctx, "grpc.Begin")
+		setRPCMethodAttributes(span, timings)
 		defer endSpanAndUpdateTiming(span, timings)
 	}
 
