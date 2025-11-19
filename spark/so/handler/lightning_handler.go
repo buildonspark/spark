@@ -593,6 +593,7 @@ func (h *LightningHandler) storeUserSignedTransactions(
 	transfer *ent.Transfer,
 	status st.PreimageRequestStatus,
 	receiverIdentityPubKey keys.Public,
+	senderIdentityPubKey keys.Public,
 ) (*ent.PreimageRequest, error) {
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -602,7 +603,8 @@ func (h *LightningHandler) storeUserSignedTransactions(
 		SetPaymentHash(paymentHash).
 		SetReceiverIdentityPubkey(receiverIdentityPubKey).
 		SetTransfers(transfer).
-		SetStatus(status)
+		SetStatus(status).
+		SetSenderIdentityPubkey(senderIdentityPubKey)
 	if preimageShare != nil {
 		preimageRequestMutator.SetPreimageShares(preimageShare)
 	}
@@ -821,6 +823,7 @@ func (h *LightningHandler) GetPreimageShare(
 		transfer,
 		status,
 		receiverIdentityPubKey,
+		ownerIdentityPubKey,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions: %w", err)
@@ -1257,6 +1260,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		transfer,
 		status,
 		receiverIdentityPubKey,
+		ownerIdentityPubKey,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
