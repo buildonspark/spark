@@ -14,6 +14,13 @@ func RequireGripMock(t testing.TB) {
 	}
 }
 
+func RequireMinikube(t testing.TB) {
+	t.Helper()
+	if !IsMinikube() {
+		t.Skipf("skipping %s because it requires Minikube; to enable it, set MINIKUBE_IP=$(minikube ip)", t.Name())
+	}
+}
+
 // PostgresTestsEnabled returns true if the SKIP_POSTGRES_TESTS environment variable is not set.
 func PostgresTestsEnabled() bool {
 	return os.Getenv("SKIP_POSTGRES_TESTS") != "true"

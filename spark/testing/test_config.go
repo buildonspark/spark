@@ -19,7 +19,7 @@ const (
 	signingOperatorPrefix = "000000000000000000000000000000000000000000000000000000000000000"
 )
 
-func isMinikube() bool {
+func IsMinikube() bool {
 	return os.Getenv("MINIKUBE_IP") != ""
 }
 
@@ -78,7 +78,7 @@ func operatorCount(tb testing.TB) int {
 func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 	opCount := operatorCount(tb)
 
-	isMinikube, isGripmock := isMinikube(), IsGripmock()
+	isMinikube, isGripmock := IsMinikube(), IsGripmock()
 	if isMinikube && isGripmock {
 		tb.Fatal("Cannot set both MINIKUBE_IP and GRIPMOCK environment variables")
 	}
@@ -115,14 +115,14 @@ func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 }
 
 func GetTestDatabasePath(operatorIndex int) string {
-	if isMinikube() {
+	if IsMinikube() {
 		return fmt.Sprintf("postgresql://postgres@localhost:15432/sparkoperator_%d?sslmode=disable", operatorIndex)
 	}
 	return fmt.Sprintf("postgresql://:@127.0.0.1:5432/sparkoperator_%d?sslmode=disable", operatorIndex)
 }
 
 func GetLocalFrostSignerAddress(tb testing.TB) string {
-	isMinikube, isGripmock := isMinikube(), IsGripmock()
+	isMinikube, isGripmock := IsMinikube(), IsGripmock()
 	if isMinikube && isGripmock {
 		tb.Fatal("Cannot set both MINIKUBE_IP and GRIPMOCK environment variables")
 	}

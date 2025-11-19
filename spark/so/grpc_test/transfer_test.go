@@ -147,6 +147,8 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 }
 
 func TestTransferInterrupt(t *testing.T) {
+	sparktesting.RequireMinikube(t)
+
 	// Sender initiates transfer
 	senderConfig := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
