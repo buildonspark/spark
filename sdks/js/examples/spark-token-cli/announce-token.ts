@@ -13,6 +13,13 @@ Object.defineProperty(globalThis, "fetch", {
   value: fetch,
 });
 
+const MAX_BROADCAST_RETRIES = 3;
+const RETRY_DELAY_MS = 1_000;
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export const isHermeticTest = Boolean(
   typeof process !== "undefined" && process?.env?.MINIKUBE_IP,
 );
@@ -104,11 +111,31 @@ async function announceTokenL1(
     feeRateSatsPerVb,
   );
 
-  const txId = await lrc20Wallet!.broadcastRawBtcTransaction(
-    tx.bitcoin_tx.toHex(),
-  );
+  let lastError: unknown;
 
-  return txId;
+  for (let attempt = 0; attempt < MAX_BROADCAST_RETRIES; attempt++) {
+    try {
+      const txId = await lrc20Wallet!.broadcastRawBtcTransaction(
+        tx.bitcoin_tx.toHex(),
+      );
+
+      return txId;
+    } catch (err) {
+      lastError = err;
+      console.warn(
+        `broadcastRawBtcTransaction failed (attempt ${
+          attempt + 1
+        }/${MAX_BROADCAST_RETRIES})`,
+        err,
+      );
+
+      if (attempt < MAX_BROADCAST_RETRIES - 1) {
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 main().catch((err) => {
