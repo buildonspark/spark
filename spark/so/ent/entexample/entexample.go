@@ -810,6 +810,7 @@ type L1TokenCreateExample struct {
 	MaxSupply       *[]byte
 	IsFreezable     *bool
 	Network         *btcnetwork.Network
+	ExtraMetadata   *[]byte
 	TokenIdentifier *[]byte
 	TransactionID   *schematype.TxID
 
@@ -863,6 +864,12 @@ func (lc *L1TokenCreateExample) SetIsFreezable(v bool) *L1TokenCreateExample {
 // SetNetwork sets the network field.
 func (lc *L1TokenCreateExample) SetNetwork(v btcnetwork.Network) *L1TokenCreateExample {
 	lc.Network = &v
+	return lc
+}
+
+// SetExtraMetadata sets the extra_metadata field.
+func (lc *L1TokenCreateExample) SetExtraMetadata(v []byte) *L1TokenCreateExample {
+	lc.ExtraMetadata = &v
 	return lc
 }
 
@@ -925,6 +932,10 @@ func (lc *L1TokenCreateExample) MustExec(ctx context.Context) *ent.L1TokenCreate
 	} else {
 		// Use default from annotation
 		create.SetNetwork(2)
+	}
+	if lc.ExtraMetadata != nil {
+		create.SetExtraMetadata(*lc.ExtraMetadata)
+	} else {
 	}
 	if lc.TokenIdentifier != nil {
 		create.SetTokenIdentifier(*lc.TokenIdentifier)
@@ -1000,6 +1011,10 @@ func (lc *L1TokenCreateExample) Exec(ctx context.Context) (*ent.L1TokenCreate, e
 	} else {
 		// Use default from annotation
 		create.SetNetwork(2)
+	}
+	if lc.ExtraMetadata != nil {
+		create.SetExtraMetadata(*lc.ExtraMetadata)
+	} else {
 	}
 	if lc.TokenIdentifier != nil {
 		create.SetTokenIdentifier(*lc.TokenIdentifier)
@@ -2107,6 +2122,7 @@ type TokenCreateExample struct {
 	MaxSupply                       *[]byte
 	IsFreezable                     *bool
 	Network                         *btcnetwork.Network
+	ExtraMetadata                   *[]byte
 	TokenIdentifier                 *[]byte
 	IssuerSignature                 *[]byte
 	OperatorSpecificIssuerSignature *[]byte
@@ -2167,6 +2183,12 @@ func (tc *TokenCreateExample) SetIsFreezable(v bool) *TokenCreateExample {
 // SetNetwork sets the network field.
 func (tc *TokenCreateExample) SetNetwork(v btcnetwork.Network) *TokenCreateExample {
 	tc.Network = &v
+	return tc
+}
+
+// SetExtraMetadata sets the extra_metadata field.
+func (tc *TokenCreateExample) SetExtraMetadata(v []byte) *TokenCreateExample {
+	tc.ExtraMetadata = &v
 	return tc
 }
 
@@ -2290,6 +2312,10 @@ func (tc *TokenCreateExample) MustExec(ctx context.Context) *ent.TokenCreate {
 		// Use default from annotation
 		create.SetNetwork(2)
 	}
+	if tc.ExtraMetadata != nil {
+		create.SetExtraMetadata(*tc.ExtraMetadata)
+	} else {
+	}
 	if tc.TokenIdentifier != nil {
 		create.SetTokenIdentifier(*tc.TokenIdentifier)
 	} else {
@@ -2393,6 +2419,10 @@ func (tc *TokenCreateExample) Exec(ctx context.Context) (*ent.TokenCreate, error
 	} else {
 		// Use default from annotation
 		create.SetNetwork(2)
+	}
+	if tc.ExtraMetadata != nil {
+		create.SetExtraMetadata(*tc.ExtraMetadata)
+	} else {
 	}
 	if tc.TokenIdentifier != nil {
 		create.SetTokenIdentifier(*tc.TokenIdentifier)

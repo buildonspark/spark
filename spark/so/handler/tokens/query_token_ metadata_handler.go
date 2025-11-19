@@ -45,6 +45,7 @@ func (h *QueryTokenMetadataHandler) QueryTokenMetadata(ctx context.Context, req 
 		tokencreate.FieldIsFreezable,
 		tokencreate.FieldCreationEntityPublicKey,
 		tokencreate.FieldNetwork,
+		tokencreate.FieldExtraMetadata,
 	}
 
 	var conditions []predicate.TokenCreate

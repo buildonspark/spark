@@ -103,6 +103,7 @@ func CreateStartedTransactionEntities(
 			SetDecimals(uint8(createInput.GetDecimals())).
 			SetMaxSupply(createInput.GetMaxSupply()).
 			SetIsFreezable(createInput.GetIsFreezable()).
+			SetExtraMetadata(createInput.GetExtraMetadata()).
 			SetCreationEntityPublicKey(creationEntityPubKey).
 			SetNetwork(network).
 			SetTokenIdentifier(computedTokenIdentifier).

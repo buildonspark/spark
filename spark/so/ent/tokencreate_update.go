@@ -269,6 +269,9 @@ func (tcu *TokenCreateUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tcu.mutation.UpdateTime(); ok {
 		_spec.SetField(tokencreate.FieldUpdateTime, field.TypeTime, value)
 	}
+	if tcu.mutation.ExtraMetadataCleared() {
+		_spec.ClearField(tokencreate.FieldExtraMetadata, field.TypeBytes)
+	}
 	if value, ok := tcu.mutation.IssuerSignature(); ok {
 		_spec.SetField(tokencreate.FieldIssuerSignature, field.TypeBytes, value)
 	}
@@ -734,6 +737,9 @@ func (tcuo *TokenCreateUpdateOne) sqlSave(ctx context.Context) (_node *TokenCrea
 	}
 	if value, ok := tcuo.mutation.UpdateTime(); ok {
 		_spec.SetField(tokencreate.FieldUpdateTime, field.TypeTime, value)
+	}
+	if tcuo.mutation.ExtraMetadataCleared() {
+		_spec.ClearField(tokencreate.FieldExtraMetadata, field.TypeBytes)
 	}
 	if value, ok := tcuo.mutation.IssuerSignature(); ok {
 		_spec.SetField(tokencreate.FieldIssuerSignature, field.TypeBytes, value)

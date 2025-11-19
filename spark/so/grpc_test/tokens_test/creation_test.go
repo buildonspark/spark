@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
@@ -67,6 +68,25 @@ func TestQueryTokenMetadataNativeSparkToken(t *testing.T) {
 		name:             "Native Test Token",
 		ticker:           "NATIVE",
 		maxSupply:        5000000,
+	}
+
+	err := createNativeToken(t, nativeTokenParams)
+	require.NoError(t, err, "failed to create native token")
+
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, nativeTokenParams.issuerPrivateKey)
+	require.NoError(t, err, "failed to create wallet config")
+
+	queryAndVerifyTokenMetadata(t, config, nativeTokenParams)
+}
+
+func TestQueryTokenMetadataNativeSparkTokenWithExtensions(t *testing.T) {
+	nativeTokenParams := sparkTokenCreationTestParams{
+		issuerPrivateKey: keys.GeneratePrivateKey(),
+		name:             "Native Test Token",
+		ticker:           "NATIVE",
+		maxSupply:        5000000,
+		extraMetadata:    make([]byte, common.MaxExtraMetadataLength),
+		expectedError:    false,
 	}
 
 	err := createNativeToken(t, nativeTokenParams)
@@ -216,6 +236,39 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 				name:             testTokenName,
 				ticker:           "TOOLONG",
 				maxSupply:        testTokenMaxSupply,
+				expectedError:    true,
+			},
+		},
+		{
+			name: "create token with extra metadata should succeed",
+			firstTokenParams: &sparkTokenCreationTestParams{
+				issuerPrivateKey: keys.GeneratePrivateKey(),
+				name:             testTokenName,
+				ticker:           "EXTMD",
+				maxSupply:        testTokenMaxSupply,
+				extraMetadata:    make([]byte, common.MaxExtraMetadataLength),
+				expectedError:    false,
+			},
+		},
+		{
+			name: "create token with extra metadata shorter than allowed length should succeed",
+			firstTokenParams: &sparkTokenCreationTestParams{
+				issuerPrivateKey: keys.GeneratePrivateKey(),
+				name:             testTokenName,
+				ticker:           "<EXTMD",
+				maxSupply:        testTokenMaxSupply,
+				extraMetadata:    make([]byte, common.MaxExtraMetadataLength-1),
+				expectedError:    false,
+			},
+		},
+		{
+			name: "create token with extra metadata longer than allowed length should fail",
+			firstTokenParams: &sparkTokenCreationTestParams{
+				issuerPrivateKey: keys.GeneratePrivateKey(),
+				name:             testTokenName,
+				ticker:           ">EXTMD",
+				maxSupply:        testTokenMaxSupply,
+				extraMetadata:    make([]byte, common.MaxExtraMetadataLength+1),
 				expectedError:    true,
 			},
 		},

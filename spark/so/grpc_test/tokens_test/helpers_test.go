@@ -123,6 +123,7 @@ type sparkTokenCreationTestParams struct {
 	name             string
 	ticker           string
 	maxSupply        uint64
+	extraMetadata    []byte
 	expectedError    bool // optional, defaults to false
 }
 
@@ -557,6 +558,7 @@ func createTestCoordinatedTokenCreateTransactionWithParams(config *wallet.TestWa
 				Decimals:        testTokenDecimals,
 				MaxSupply:       getTokenMaxSupplyBytes(params.maxSupply),
 				IsFreezable:     testTokenIsFreezable,
+				ExtraMetadata:   params.extraMetadata,
 			},
 		},
 		TokenOutputs:                    []*tokenpb.TokenOutput{},
@@ -581,6 +583,7 @@ func verifyTokenMetadata(t *testing.T, metadata *tokenpb.TokenMetadata, expected
 	require.Equal(t, testTokenIsFreezable, metadata.IsFreezable, "%s: token freezable flag should match, expected: %t, found: %t", queryMethod, testTokenIsFreezable, metadata.IsFreezable)
 	require.True(t, bytes.Equal(issuerPublicKey, metadata.IssuerPublicKey), "%s: issuer public key should match, expected: %x, found: %x", queryMethod, issuerPublicKey, metadata.IssuerPublicKey)
 	require.True(t, bytes.Equal(getTokenMaxSupplyBytes(expectedParams.maxSupply), metadata.MaxSupply), "%s: max supply should match, expected: %x, found: %x", queryMethod, getTokenMaxSupplyBytes(expectedParams.maxSupply), metadata.MaxSupply)
+	require.True(t, bytes.Equal(expectedParams.extraMetadata, metadata.ExtraMetadata), "%s: extra metadata should match, expected: %x, found: %x", queryMethod, expectedParams.extraMetadata, metadata.ExtraMetadata)
 }
 
 // createNativeToken creates a native token (no verification)

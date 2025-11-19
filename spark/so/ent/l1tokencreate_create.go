@@ -97,6 +97,12 @@ func (lcc *L1TokenCreateCreate) SetNetwork(b btcnetwork.Network) *L1TokenCreateC
 	return lcc
 }
 
+// SetExtraMetadata sets the "extra_metadata" field.
+func (lcc *L1TokenCreateCreate) SetExtraMetadata(b []byte) *L1TokenCreateCreate {
+	lcc.mutation.SetExtraMetadata(b)
+	return lcc
+}
+
 // SetTokenIdentifier sets the "token_identifier" field.
 func (lcc *L1TokenCreateCreate) SetTokenIdentifier(b []byte) *L1TokenCreateCreate {
 	lcc.mutation.SetTokenIdentifier(b)
@@ -304,6 +310,10 @@ func (lcc *L1TokenCreateCreate) createSpec() (*L1TokenCreate, *sqlgraph.CreateSp
 		_spec.SetField(l1tokencreate.FieldNetwork, field.TypeEnum, value)
 		_node.Network = value
 	}
+	if value, ok := lcc.mutation.ExtraMetadata(); ok {
+		_spec.SetField(l1tokencreate.FieldExtraMetadata, field.TypeBytes, value)
+		_node.ExtraMetadata = value
+	}
 	if value, ok := lcc.mutation.TokenIdentifier(); ok {
 		_spec.SetField(l1tokencreate.FieldTokenIdentifier, field.TypeBytes, value)
 		_node.TokenIdentifier = value
@@ -416,6 +426,9 @@ func (u *L1TokenCreateUpsertOne) UpdateNewValues() *L1TokenCreateUpsertOne {
 		}
 		if _, exists := u.create.mutation.Network(); exists {
 			s.SetIgnore(l1tokencreate.FieldNetwork)
+		}
+		if _, exists := u.create.mutation.ExtraMetadata(); exists {
+			s.SetIgnore(l1tokencreate.FieldExtraMetadata)
 		}
 		if _, exists := u.create.mutation.TokenIdentifier(); exists {
 			s.SetIgnore(l1tokencreate.FieldTokenIdentifier)
@@ -674,6 +687,9 @@ func (u *L1TokenCreateUpsertBulk) UpdateNewValues() *L1TokenCreateUpsertBulk {
 			}
 			if _, exists := b.mutation.Network(); exists {
 				s.SetIgnore(l1tokencreate.FieldNetwork)
+			}
+			if _, exists := b.mutation.ExtraMetadata(); exists {
+				s.SetIgnore(l1tokencreate.FieldExtraMetadata)
 			}
 			if _, exists := b.mutation.TokenIdentifier(); exists {
 				s.SetIgnore(l1tokencreate.FieldTokenIdentifier)

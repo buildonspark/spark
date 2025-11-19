@@ -200,6 +200,7 @@ var (
 		{Name: "max_supply", Type: field.TypeBytes},
 		{Name: "is_freezable", Type: field.TypeBool},
 		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "extra_metadata", Type: field.TypeBytes, Nullable: true},
 		{Name: "token_identifier", Type: field.TypeBytes, Unique: true},
 		{Name: "transaction_id", Type: field.TypeBytes, Unique: true},
 	}
@@ -436,6 +437,7 @@ var (
 		{Name: "max_supply", Type: field.TypeBytes},
 		{Name: "is_freezable", Type: field.TypeBool},
 		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "extra_metadata", Type: field.TypeBytes, Nullable: true},
 		{Name: "token_identifier", Type: field.TypeBytes, Unique: true},
 		{Name: "issuer_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
 		{Name: "operator_specific_issuer_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
@@ -451,7 +453,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "token_creates_l1token_creates_l1_token_create",
-				Columns:    []*schema.Column{TokenCreatesColumns[15]},
+				Columns:    []*schema.Column{TokenCreatesColumns[16]},
 				RefColumns: []*schema.Column{L1tokenCreatesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

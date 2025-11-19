@@ -4304,6 +4304,7 @@ type L1TokenCreateMutation struct {
 	max_supply        *[]byte
 	is_freezable      *bool
 	network           *btcnetwork.Network
+	extra_metadata    *[]byte
 	token_identifier  *[]byte
 	transaction_id    *schematype.TxID
 	clearedFields     map[string]struct{}
@@ -4760,6 +4761,55 @@ func (m *L1TokenCreateMutation) ResetNetwork() {
 	m.network = nil
 }
 
+// SetExtraMetadata sets the "extra_metadata" field.
+func (m *L1TokenCreateMutation) SetExtraMetadata(b []byte) {
+	m.extra_metadata = &b
+}
+
+// ExtraMetadata returns the value of the "extra_metadata" field in the mutation.
+func (m *L1TokenCreateMutation) ExtraMetadata() (r []byte, exists bool) {
+	v := m.extra_metadata
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExtraMetadata returns the old "extra_metadata" field's value of the L1TokenCreate entity.
+// If the L1TokenCreate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1TokenCreateMutation) OldExtraMetadata(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExtraMetadata is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExtraMetadata requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExtraMetadata: %w", err)
+	}
+	return oldValue.ExtraMetadata, nil
+}
+
+// ClearExtraMetadata clears the value of the "extra_metadata" field.
+func (m *L1TokenCreateMutation) ClearExtraMetadata() {
+	m.extra_metadata = nil
+	m.clearedFields[l1tokencreate.FieldExtraMetadata] = struct{}{}
+}
+
+// ExtraMetadataCleared returns if the "extra_metadata" field was cleared in this mutation.
+func (m *L1TokenCreateMutation) ExtraMetadataCleared() bool {
+	_, ok := m.clearedFields[l1tokencreate.FieldExtraMetadata]
+	return ok
+}
+
+// ResetExtraMetadata resets all changes to the "extra_metadata" field.
+func (m *L1TokenCreateMutation) ResetExtraMetadata() {
+	m.extra_metadata = nil
+	delete(m.clearedFields, l1tokencreate.FieldExtraMetadata)
+}
+
 // SetTokenIdentifier sets the "token_identifier" field.
 func (m *L1TokenCreateMutation) SetTokenIdentifier(b []byte) {
 	m.token_identifier = &b
@@ -4866,7 +4916,7 @@ func (m *L1TokenCreateMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *L1TokenCreateMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.create_time != nil {
 		fields = append(fields, l1tokencreate.FieldCreateTime)
 	}
@@ -4893,6 +4943,9 @@ func (m *L1TokenCreateMutation) Fields() []string {
 	}
 	if m.network != nil {
 		fields = append(fields, l1tokencreate.FieldNetwork)
+	}
+	if m.extra_metadata != nil {
+		fields = append(fields, l1tokencreate.FieldExtraMetadata)
 	}
 	if m.token_identifier != nil {
 		fields = append(fields, l1tokencreate.FieldTokenIdentifier)
@@ -4926,6 +4979,8 @@ func (m *L1TokenCreateMutation) Field(name string) (ent.Value, bool) {
 		return m.IsFreezable()
 	case l1tokencreate.FieldNetwork:
 		return m.Network()
+	case l1tokencreate.FieldExtraMetadata:
+		return m.ExtraMetadata()
 	case l1tokencreate.FieldTokenIdentifier:
 		return m.TokenIdentifier()
 	case l1tokencreate.FieldTransactionID:
@@ -4957,6 +5012,8 @@ func (m *L1TokenCreateMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldIsFreezable(ctx)
 	case l1tokencreate.FieldNetwork:
 		return m.OldNetwork(ctx)
+	case l1tokencreate.FieldExtraMetadata:
+		return m.OldExtraMetadata(ctx)
 	case l1tokencreate.FieldTokenIdentifier:
 		return m.OldTokenIdentifier(ctx)
 	case l1tokencreate.FieldTransactionID:
@@ -5033,6 +5090,13 @@ func (m *L1TokenCreateMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetNetwork(v)
 		return nil
+	case l1tokencreate.FieldExtraMetadata:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExtraMetadata(v)
+		return nil
 	case l1tokencreate.FieldTokenIdentifier:
 		v, ok := value.([]byte)
 		if !ok {
@@ -5091,7 +5155,11 @@ func (m *L1TokenCreateMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *L1TokenCreateMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(l1tokencreate.FieldExtraMetadata) {
+		fields = append(fields, l1tokencreate.FieldExtraMetadata)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -5104,6 +5172,11 @@ func (m *L1TokenCreateMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *L1TokenCreateMutation) ClearField(name string) error {
+	switch name {
+	case l1tokencreate.FieldExtraMetadata:
+		m.ClearExtraMetadata()
+		return nil
+	}
 	return fmt.Errorf("unknown L1TokenCreate nullable field %s", name)
 }
 
@@ -5137,6 +5210,9 @@ func (m *L1TokenCreateMutation) ResetField(name string) error {
 		return nil
 	case l1tokencreate.FieldNetwork:
 		m.ResetNetwork()
+		return nil
+	case l1tokencreate.FieldExtraMetadata:
+		m.ResetExtraMetadata()
 		return nil
 	case l1tokencreate.FieldTokenIdentifier:
 		m.ResetTokenIdentifier()
@@ -10760,6 +10836,7 @@ type TokenCreateMutation struct {
 	max_supply                         *[]byte
 	is_freezable                       *bool
 	network                            *btcnetwork.Network
+	extra_metadata                     *[]byte
 	token_identifier                   *[]byte
 	issuer_signature                   *[]byte
 	operator_specific_issuer_signature *[]byte
@@ -11229,6 +11306,55 @@ func (m *TokenCreateMutation) OldNetwork(ctx context.Context) (v btcnetwork.Netw
 // ResetNetwork resets all changes to the "network" field.
 func (m *TokenCreateMutation) ResetNetwork() {
 	m.network = nil
+}
+
+// SetExtraMetadata sets the "extra_metadata" field.
+func (m *TokenCreateMutation) SetExtraMetadata(b []byte) {
+	m.extra_metadata = &b
+}
+
+// ExtraMetadata returns the value of the "extra_metadata" field in the mutation.
+func (m *TokenCreateMutation) ExtraMetadata() (r []byte, exists bool) {
+	v := m.extra_metadata
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExtraMetadata returns the old "extra_metadata" field's value of the TokenCreate entity.
+// If the TokenCreate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenCreateMutation) OldExtraMetadata(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExtraMetadata is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExtraMetadata requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExtraMetadata: %w", err)
+	}
+	return oldValue.ExtraMetadata, nil
+}
+
+// ClearExtraMetadata clears the value of the "extra_metadata" field.
+func (m *TokenCreateMutation) ClearExtraMetadata() {
+	m.extra_metadata = nil
+	m.clearedFields[tokencreate.FieldExtraMetadata] = struct{}{}
+}
+
+// ExtraMetadataCleared returns if the "extra_metadata" field was cleared in this mutation.
+func (m *TokenCreateMutation) ExtraMetadataCleared() bool {
+	_, ok := m.clearedFields[tokencreate.FieldExtraMetadata]
+	return ok
+}
+
+// ResetExtraMetadata resets all changes to the "extra_metadata" field.
+func (m *TokenCreateMutation) ResetExtraMetadata() {
+	m.extra_metadata = nil
+	delete(m.clearedFields, tokencreate.FieldExtraMetadata)
 }
 
 // SetTokenIdentifier sets the "token_identifier" field.
@@ -11706,7 +11832,7 @@ func (m *TokenCreateMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenCreateMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 15)
 	if m.create_time != nil {
 		fields = append(fields, tokencreate.FieldCreateTime)
 	}
@@ -11733,6 +11859,9 @@ func (m *TokenCreateMutation) Fields() []string {
 	}
 	if m.network != nil {
 		fields = append(fields, tokencreate.FieldNetwork)
+	}
+	if m.extra_metadata != nil {
+		fields = append(fields, tokencreate.FieldExtraMetadata)
 	}
 	if m.token_identifier != nil {
 		fields = append(fields, tokencreate.FieldTokenIdentifier)
@@ -11775,6 +11904,8 @@ func (m *TokenCreateMutation) Field(name string) (ent.Value, bool) {
 		return m.IsFreezable()
 	case tokencreate.FieldNetwork:
 		return m.Network()
+	case tokencreate.FieldExtraMetadata:
+		return m.ExtraMetadata()
 	case tokencreate.FieldTokenIdentifier:
 		return m.TokenIdentifier()
 	case tokencreate.FieldIssuerSignature:
@@ -11812,6 +11943,8 @@ func (m *TokenCreateMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldIsFreezable(ctx)
 	case tokencreate.FieldNetwork:
 		return m.OldNetwork(ctx)
+	case tokencreate.FieldExtraMetadata:
+		return m.OldExtraMetadata(ctx)
 	case tokencreate.FieldTokenIdentifier:
 		return m.OldTokenIdentifier(ctx)
 	case tokencreate.FieldIssuerSignature:
@@ -11893,6 +12026,13 @@ func (m *TokenCreateMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetNetwork(v)
+		return nil
+	case tokencreate.FieldExtraMetadata:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExtraMetadata(v)
 		return nil
 	case tokencreate.FieldTokenIdentifier:
 		v, ok := value.([]byte)
@@ -11986,6 +12126,9 @@ func (m *TokenCreateMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *TokenCreateMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(tokencreate.FieldExtraMetadata) {
+		fields = append(fields, tokencreate.FieldExtraMetadata)
+	}
 	if m.FieldCleared(tokencreate.FieldIssuerSignature) {
 		fields = append(fields, tokencreate.FieldIssuerSignature)
 	}
@@ -12009,6 +12152,9 @@ func (m *TokenCreateMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *TokenCreateMutation) ClearField(name string) error {
 	switch name {
+	case tokencreate.FieldExtraMetadata:
+		m.ClearExtraMetadata()
+		return nil
 	case tokencreate.FieldIssuerSignature:
 		m.ClearIssuerSignature()
 		return nil
@@ -12052,6 +12198,9 @@ func (m *TokenCreateMutation) ResetField(name string) error {
 		return nil
 	case tokencreate.FieldNetwork:
 		m.ResetNetwork()
+		return nil
+	case tokencreate.FieldExtraMetadata:
+		m.ResetExtraMetadata()
 		return nil
 	case tokencreate.FieldTokenIdentifier:
 		m.ResetTokenIdentifier()

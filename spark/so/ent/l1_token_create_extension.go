@@ -14,6 +14,7 @@ func (r *L1TokenCreate) ToTokenMetadata() (*common.TokenMetadata, error) {
 		MaxSupply:               r.MaxSupply,
 		IsFreezable:             r.IsFreezable,
 		Network:                 r.Network,
+		ExtraMetadata:           r.ExtraMetadata,
 		CreationEntityPublicKey: keys.Public{}, // L1 creation entity public key denoted by nil value
 	}, nil
 }

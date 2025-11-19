@@ -218,7 +218,7 @@ func init() {
 	// l1tokencreate.MaxSupplyValidator is a validator for the "max_supply" field. It is called by the builders before save.
 	l1tokencreate.MaxSupplyValidator = l1tokencreateDescMaxSupply.Validators[0].(func([]byte) error)
 	// l1tokencreateDescTokenIdentifier is the schema descriptor for token_identifier field.
-	l1tokencreateDescTokenIdentifier := l1tokencreateMixinFields1[7].Descriptor()
+	l1tokencreateDescTokenIdentifier := l1tokencreateMixinFields1[8].Descriptor()
 	// l1tokencreate.TokenIdentifierValidator is a validator for the "token_identifier" field. It is called by the builders before save.
 	l1tokencreate.TokenIdentifierValidator = l1tokencreateDescTokenIdentifier.Validators[0].(func([]byte) error)
 	// l1tokencreateDescID is the schema descriptor for id field.
@@ -433,7 +433,7 @@ func init() {
 	// tokencreate.MaxSupplyValidator is a validator for the "max_supply" field. It is called by the builders before save.
 	tokencreate.MaxSupplyValidator = tokencreateDescMaxSupply.Validators[0].(func([]byte) error)
 	// tokencreateDescTokenIdentifier is the schema descriptor for token_identifier field.
-	tokencreateDescTokenIdentifier := tokencreateMixinFields1[7].Descriptor()
+	tokencreateDescTokenIdentifier := tokencreateMixinFields1[8].Descriptor()
 	// tokencreate.TokenIdentifierValidator is a validator for the "token_identifier" field. It is called by the builders before save.
 	tokencreate.TokenIdentifierValidator = tokencreateDescTokenIdentifier.Validators[0].(func([]byte) error)
 	// tokencreateDescIssuerSignature is the schema descriptor for issuer_signature field.

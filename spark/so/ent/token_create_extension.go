@@ -14,5 +14,6 @@ func (tc *TokenCreate) ToTokenMetadata() (*common.TokenMetadata, error) {
 		IsFreezable:             tc.IsFreezable,
 		Network:                 tc.Network,
 		CreationEntityPublicKey: tc.CreationEntityPublicKey,
+		ExtraMetadata:           tc.ExtraMetadata,
 	}, nil
 }

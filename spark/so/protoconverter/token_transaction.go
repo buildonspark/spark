@@ -346,6 +346,7 @@ func ConvertV2TxShapeToPartial(legacy *tokenpb.TokenTransaction) (*tokenpb.Parti
 				Decimals:        ci.GetDecimals(),
 				MaxSupply:       ci.GetMaxSupply(),
 				IsFreezable:     ci.GetIsFreezable(),
+				ExtraMetadata:   ci.GetExtraMetadata(),
 				// CreationEntityPublicKey intentionally omitted (partial transaction)
 			},
 		}

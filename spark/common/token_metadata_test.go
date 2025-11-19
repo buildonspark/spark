@@ -349,6 +349,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 			IsFreezable:             true,
 			CreationEntityPublicKey: keys.Public{},
 			Network:                 btcnetwork.Regtest,
+			ExtraMetadata:           make([]byte, MaxExtraMetadataLength),
 		}
 
 		err := tm.Validate()

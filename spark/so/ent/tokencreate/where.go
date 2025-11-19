@@ -98,6 +98,11 @@ func IsFreezable(v bool) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldEQ(FieldIsFreezable, v))
 }
 
+// ExtraMetadata applies equality check predicate on the "extra_metadata" field. It's identical to ExtraMetadataEQ.
+func ExtraMetadata(v []byte) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldEQ(FieldExtraMetadata, v))
+}
+
 // TokenIdentifier applies equality check predicate on the "token_identifier" field. It's identical to TokenIdentifierEQ.
 func TokenIdentifier(v []byte) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldEQ(FieldTokenIdentifier, v))
@@ -481,6 +486,56 @@ func NetworkIn(vs ...btcnetwork.Network) predicate.TokenCreate {
 // NetworkNotIn applies the NotIn predicate on the "network" field.
 func NetworkNotIn(vs ...btcnetwork.Network) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldNotIn(FieldNetwork, vs...))
+}
+
+// ExtraMetadataEQ applies the EQ predicate on the "extra_metadata" field.
+func ExtraMetadataEQ(v []byte) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldEQ(FieldExtraMetadata, v))
+}
+
+// ExtraMetadataNEQ applies the NEQ predicate on the "extra_metadata" field.
+func ExtraMetadataNEQ(v []byte) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldNEQ(FieldExtraMetadata, v))
+}
+
+// ExtraMetadataIn applies the In predicate on the "extra_metadata" field.
+func ExtraMetadataIn(vs ...[]byte) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldIn(FieldExtraMetadata, vs...))
+}
+
+// ExtraMetadataNotIn applies the NotIn predicate on the "extra_metadata" field.
+func ExtraMetadataNotIn(vs ...[]byte) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldNotIn(FieldExtraMetadata, vs...))
+}
+
+// ExtraMetadataGT applies the GT predicate on the "extra_metadata" field.
+func ExtraMetadataGT(v []byte) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldGT(FieldExtraMetadata, v))
+}
+
+// ExtraMetadataGTE applies the GTE predicate on the "extra_metadata" field.
+func ExtraMetadataGTE(v []byte) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldGTE(FieldExtraMetadata, v))
+}
+
+// ExtraMetadataLT applies the LT predicate on the "extra_metadata" field.
+func ExtraMetadataLT(v []byte) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldLT(FieldExtraMetadata, v))
+}
+
+// ExtraMetadataLTE applies the LTE predicate on the "extra_metadata" field.
+func ExtraMetadataLTE(v []byte) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldLTE(FieldExtraMetadata, v))
+}
+
+// ExtraMetadataIsNil applies the IsNil predicate on the "extra_metadata" field.
+func ExtraMetadataIsNil() predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldIsNull(FieldExtraMetadata))
+}
+
+// ExtraMetadataNotNil applies the NotNil predicate on the "extra_metadata" field.
+func ExtraMetadataNotNil() predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldNotNull(FieldExtraMetadata))
 }
 
 // TokenIdentifierEQ applies the EQ predicate on the "token_identifier" field.

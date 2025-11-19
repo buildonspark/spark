@@ -94,6 +94,9 @@ func (lcu *L1TokenCreateUpdate) sqlSave(ctx context.Context) (n int, err error) 
 	if value, ok := lcu.mutation.UpdateTime(); ok {
 		_spec.SetField(l1tokencreate.FieldUpdateTime, field.TypeTime, value)
 	}
+	if lcu.mutation.ExtraMetadataCleared() {
+		_spec.ClearField(l1tokencreate.FieldExtraMetadata, field.TypeBytes)
+	}
 	_spec.AddModifiers(lcu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, lcu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -210,6 +213,9 @@ func (lcuo *L1TokenCreateUpdateOne) sqlSave(ctx context.Context) (_node *L1Token
 	}
 	if value, ok := lcuo.mutation.UpdateTime(); ok {
 		_spec.SetField(l1tokencreate.FieldUpdateTime, field.TypeTime, value)
+	}
+	if lcuo.mutation.ExtraMetadataCleared() {
+		_spec.ClearField(l1tokencreate.FieldExtraMetadata, field.TypeBytes)
 	}
 	_spec.AddModifiers(lcuo.modifiers...)
 	_node = &L1TokenCreate{config: lcuo.config}

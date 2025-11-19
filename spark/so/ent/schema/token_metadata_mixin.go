@@ -45,6 +45,10 @@ func (TokenMetadataMixin) Fields() []ent.Field {
 			GoType(btcnetwork.Unspecified).
 			Immutable().
 			Annotations(entexample.Default(btcnetwork.Regtest)),
+		field.Bytes("extra_metadata").
+			Optional().
+			Immutable().
+			Comment("Extra metadata is used to store user-defined metadata about the token."),
 		// Token identifier is derived from the above token metadata fields.
 		// Despite that, we store it explicitly to enable efficient indexed lookups.
 		// The .Unique() generates an index on the token_identifier

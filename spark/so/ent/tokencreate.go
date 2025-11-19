@@ -39,6 +39,8 @@ type TokenCreate struct {
 	IsFreezable bool `json:"is_freezable,omitempty"`
 	// Network holds the value of the "network" field.
 	Network btcnetwork.Network `json:"network,omitempty"`
+	// Extra metadata is used to store user-defined metadata about the token.
+	ExtraMetadata []byte `json:"extra_metadata,omitempty"`
 	// TokenIdentifier holds the value of the "token_identifier" field.
 	TokenIdentifier []byte `json:"token_identifier,omitempty"`
 	// IssuerSignature holds the value of the "issuer_signature" field.
@@ -116,7 +118,7 @@ func (*TokenCreate) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokencreate.FieldMaxSupply, tokencreate.FieldTokenIdentifier, tokencreate.FieldIssuerSignature, tokencreate.FieldOperatorSpecificIssuerSignature:
+		case tokencreate.FieldMaxSupply, tokencreate.FieldExtraMetadata, tokencreate.FieldTokenIdentifier, tokencreate.FieldIssuerSignature, tokencreate.FieldOperatorSpecificIssuerSignature:
 			values[i] = new([]byte)
 		case tokencreate.FieldNetwork:
 			values[i] = new(btcnetwork.Network)
@@ -208,6 +210,12 @@ func (tc *TokenCreate) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field network", values[i])
 			} else if value != nil {
 				tc.Network = *value
+			}
+		case tokencreate.FieldExtraMetadata:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field extra_metadata", values[i])
+			} else if value != nil {
+				tc.ExtraMetadata = *value
 			}
 		case tokencreate.FieldTokenIdentifier:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -328,6 +336,9 @@ func (tc *TokenCreate) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("network=")
 	builder.WriteString(fmt.Sprintf("%v", tc.Network))
+	builder.WriteString(", ")
+	builder.WriteString("extra_metadata=")
+	builder.WriteString(fmt.Sprintf("%v", tc.ExtraMetadata))
 	builder.WriteString(", ")
 	builder.WriteString("token_identifier=")
 	builder.WriteString(fmt.Sprintf("%v", tc.TokenIdentifier))

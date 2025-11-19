@@ -1021,8 +1021,10 @@ func validateBaseCreateTransaction(
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to create token metadata: %w", err))
 	}
 	if err := tokenMetadata.ValidatePartial(); err != nil {
-		// Wrap internal error to an InvalidArgumentMalformedField error because this is direct user-provided data.
-		return fmt.Errorf("failed to validate token metadata: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to validate token metadata: %w", err))
+	}
+	if err := tokenMetadata.ValidateExtensions(); err != nil {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to validate token metadata extensions: %w", err))
 	}
 
 	return nil

@@ -35,6 +35,8 @@ const (
 	FieldIsFreezable = "is_freezable"
 	// FieldNetwork holds the string denoting the network field in the database.
 	FieldNetwork = "network"
+	// FieldExtraMetadata holds the string denoting the extra_metadata field in the database.
+	FieldExtraMetadata = "extra_metadata"
 	// FieldTokenIdentifier holds the string denoting the token_identifier field in the database.
 	FieldTokenIdentifier = "token_identifier"
 	// FieldIssuerSignature holds the string denoting the issuer_signature field in the database.
@@ -97,6 +99,7 @@ var Columns = []string{
 	FieldMaxSupply,
 	FieldIsFreezable,
 	FieldNetwork,
+	FieldExtraMetadata,
 	FieldTokenIdentifier,
 	FieldIssuerSignature,
 	FieldOperatorSpecificIssuerSignature,
