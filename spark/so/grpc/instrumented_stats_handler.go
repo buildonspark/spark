@@ -25,15 +25,24 @@ type RPCTimings struct {
 	LastEventTime time.Time
 }
 
+// endSpanAndUpdateTiming ends the span and updates the last event time
+func endSpanAndUpdateTiming(span trace.Span, timings *RPCTimings) {
+	span.End()
+	if timings != nil {
+		timings.LastEventTime = time.Now()
+	}
+}
+
 // TagRPC is called at the start of an RPC
 func (h *instrumentedStatsHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context {
 	// Let the wrapped handler (otelgrpc) create its span first
 	ctx = h.wrapped.TagRPC(ctx, info)
 
+	now := time.Now()
 	// Store timings for gap measurement
 	timings := &RPCTimings{
-		TagRPCTime:    time.Now(),
-		LastEventTime: time.Now(),
+		TagRPCTime:    now,
+		LastEventTime: now,
 	}
 	ctx = context.WithValue(ctx, RPCTimingsContextKey, timings)
 
@@ -48,39 +57,37 @@ func (h *instrumentedStatsHandler) HandleRPC(ctx context.Context, s stats.RPCSta
 	switch stat := s.(type) {
 	case *stats.InHeader:
 		if timings != nil {
+			now := time.Now()
 			_, gapSpan := tracer.Start(ctx, "grpc.gap.BeforeInHeader",
 				trace.WithTimestamp(timings.LastEventTime))
-			gapSpan.End(trace.WithTimestamp(time.Now()))
-			timings.LastEventTime = time.Now()
+			gapSpan.End(trace.WithTimestamp(now))
 		}
 
 		_, span := tracer.Start(ctx, "grpc.InHeader")
-		defer span.End()
+		defer endSpanAndUpdateTiming(span, timings)
 
 	case *stats.InPayload:
 		if timings != nil {
-			gapStart := timings.LastEventTime
+			now := time.Now()
 			_, gapSpan := tracer.Start(ctx, "grpc.gap.BeforeInPayload",
-				trace.WithTimestamp(gapStart))
-			gapSpan.End(trace.WithTimestamp(time.Now()))
-			timings.LastEventTime = time.Now()
+				trace.WithTimestamp(timings.LastEventTime))
+			gapSpan.End(trace.WithTimestamp(now))
 		}
 
 		_, span := tracer.Start(ctx, "grpc.InPayload")
-		defer span.End()
+		defer endSpanAndUpdateTiming(span, timings)
 		span.SetAttributes(attribute.Int("payload.length", stat.Length))
 
 	case *stats.Begin:
 		if timings != nil {
-			gapStart := timings.LastEventTime
+			now := time.Now()
 			_, gapSpan := tracer.Start(ctx, "grpc.gap.BeforeBegin",
-				trace.WithTimestamp(gapStart))
-			gapSpan.End(trace.WithTimestamp(time.Now()))
-			timings.LastEventTime = time.Now()
+				trace.WithTimestamp(timings.LastEventTime))
+			gapSpan.End(trace.WithTimestamp(now))
 		}
 
 		_, span := tracer.Start(ctx, "grpc.Begin")
-		defer span.End()
+		defer endSpanAndUpdateTiming(span, timings)
 	}
 
 	h.wrapped.HandleRPC(ctx, s)
