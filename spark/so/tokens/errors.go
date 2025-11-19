@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -111,6 +112,36 @@ func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.Token
 	return fmt.Errorf("%s %s", msg, formatted)
 }
 
+func FormatErrorWithTransactionHashAndSpentOutputs(msg string, tokenTransaction *tokenpb.TokenTransaction, err error) error {
+	formatted := formatTokenTransactionHashes(tokenTransaction)
+	txType, inferTxTypeErr := utils.InferTokenTransactionType(tokenTransaction)
+	if inferTxTypeErr != nil {
+		return fmt.Errorf("Error inferring token txType for error format: %w, original err: %s %s: %w", inferTxTypeErr, msg, formatted, err)
+	}
+
+	type readableSpentOutput struct {
+		PrevHash string `json:"prev_hash"`
+		Vout     uint32 `json:"vout"`
+	}
+
+	var spentOutputs []readableSpentOutput
+	if txType == utils.TokenTransactionTypeTransfer {
+		outputsToSpend := tokenTransaction.GetTransferInput().GetOutputsToSpend()
+		spentOutputs = make([]readableSpentOutput, len(outputsToSpend))
+		for i, output := range outputsToSpend {
+			spentOutputs[i] = readableSpentOutput{
+				PrevHash: hex.EncodeToString(output.GetPrevTokenTransactionHash()),
+				Vout:     output.GetPrevTokenTransactionVout(),
+			}
+		}
+	}
+
+	if err != nil {
+		return fmt.Errorf("%s %s, spent_outputs: %+v: %w", msg, formatted, spentOutputs, err)
+	}
+	return fmt.Errorf("%s %s, spent_outputs: %+v", msg, formatted, spentOutputs)
+}
+
 func FormatErrorWithTransactionProtoAndSparkInvoice(msg string, tokenTransaction *tokenpb.TokenTransaction, sparkInvoice string, err error) error {
 	formatted := formatTokenTransactionHashes(tokenTransaction)
 	if err != nil {
@@ -120,7 +151,7 @@ func FormatErrorWithTransactionProtoAndSparkInvoice(msg string, tokenTransaction
 }
 
 func NewTransactionPreemptedError(tokenTransaction *tokenpb.TokenTransaction, reason, details string) error {
-	formattedError := FormatErrorWithTransactionProto(
+	formattedError := FormatErrorWithTransactionHashAndSpentOutputs(
 		fmt.Sprintf(ErrTransactionPreemptedByExisting, reason, details),
 		tokenTransaction,
 		sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("Inputs cannot be spent: token transaction with these inputs is already in progress or finalized")),

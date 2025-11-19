@@ -150,7 +150,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 
 		err = h.validateTransferTokenTransactionUsingPreviousTransactionDataAndFinalizeCreatedSignedOutputsIfPossible(ctx, finalTokenTX, req.GetTokenTransactionSignatures(), inputTtxos, h.config.Lrc20Configs[finalTokenTX.Network.String()].TransactionExpiryDuration)
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("error validating transfer using previous output data", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("error validating transfer using previous output data: %w", err)))
+			return nil, tokens.FormatErrorWithTransactionHashAndSpentOutputs("error validating transfer using previous output data", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("error validating transfer using previous output data: %w", err)))
 		}
 		if anyTtxosHaveSpentTransactions(inputTtxos) {
 			if err := preemptOrRejectTransactionsWithInputEnts(ctx, finalTokenTX, inputTtxos); err != nil {
