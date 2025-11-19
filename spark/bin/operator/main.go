@@ -57,6 +57,7 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 )
 
@@ -414,16 +415,6 @@ func main() {
 		_ = dbClient.Close()
 	}()
 
-	readinessLogger := logger.With(zap.String("component", "db_readiness"))
-	if err := waitForDatabaseReady(errCtx, dbClient, readinessLogger); err != nil {
-		if errCtx.Err() != nil {
-			readinessLogger.Info("Context canceled before database became ready")
-			return
-		}
-		logger.Fatal("Database readiness check failed", zap.Error(err))
-	}
-	readinessLogger.Info("Database connection verified")
-
 	if dbDriver == "sqlite3" {
 		sqliteDb, _ := sql.Open("sqlite3", config.DatabasePath)
 		if _, err := sqliteDb.ExecContext(errCtx, "PRAGMA journal_mode=WAL;"); err != nil {
@@ -710,6 +701,9 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to register all gRPC servers", zap.Error(err))
 	}
+
+	healthServer := sparkgrpc.NewHealthServer(errCtx, dbClient)
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 
 	// Web compatibility layer
 	wrappedGrpc := grpcweb.WrapServer(grpcServer,

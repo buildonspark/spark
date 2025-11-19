@@ -21,8 +21,6 @@ import (
 	events "github.com/lightsparkdev/spark/so/stream"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
-	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func RegisterGrpcServers(
@@ -75,11 +73,6 @@ func RegisterGrpcServers(
 		return fmt.Errorf("failed to create authentication server: %w", err)
 	}
 	pbauthn.RegisterSparkAuthnServiceServer(grpcServer, authnServer)
-
-	// Healthcheck endpoint
-	healthService := health.NewServer()
-	grpc_health_v1.RegisterHealthServer(grpcServer, healthService)
-	healthService.SetServingStatus("spark-operator", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	return nil
 }
