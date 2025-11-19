@@ -116,6 +116,7 @@ run_frost_signers_tmux() {
 # Function to build the Go operator
 build_go_operator() {
     local run_dir=$1
+    local use_lightspark=$2
     echo "=== Building Go operator ==="
 
     cd spark || {
@@ -123,8 +124,13 @@ build_go_operator() {
         return 1
     }
 
-    # Build the operator
-    go build -tags=lightspark -o "${run_dir}/bin/operator" ./bin/operator
+    # Build the operator with optional lightspark tag
+    if [ "$use_lightspark" = true ]; then
+        echo "Building with -tags=lightspark"
+        go build -tags=lightspark -o "${run_dir}/bin/operator" ./bin/operator
+    else
+        go build -o "${run_dir}/bin/operator" ./bin/operator
+    fi
     build_status=$?
 
     cd - > /dev/null
@@ -540,12 +546,17 @@ create_private_key_files() {
 # Initialize flags
 WIPE=false
 TLS=true
+LIGHTSPARK=false
 
 # Parse command line arguments
 for arg in "$@"; do
     case $arg in
         --wipe)
             WIPE=true
+            shift
+            ;;
+        --lightspark)
+            LIGHTSPARK=true
             shift
             ;;
     esac
@@ -571,7 +582,7 @@ fi
 run_frost_signers_tmux "$run_dir"
 
 # Build SOs
-build_go_operator "$run_dir" || {
+build_go_operator "$run_dir" "$LIGHTSPARK" || {
     echo "Build failed, exiting"
     exit 1
 }
