@@ -8,6 +8,7 @@
   "scripts": {
     "build-no-cache": "yarn build --force",
     "build": "turbo run build",
+    "build:sdk": "turbo run build --filter='./packages/*-sdk'",
     "build:packages": "turbo run build --filter='./packages/*'",
     "build:packages:watch": "yarn turbo watch build --filter='./packages/*'",
     "checks": "yarn deps:check && turbo run lint format test circular-deps package:checks",
