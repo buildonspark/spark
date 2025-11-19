@@ -29,6 +29,7 @@ import (
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/staticdeposit"
+	transferHelper "github.com/lightsparkdev/spark/so/transfer"
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
@@ -692,18 +693,14 @@ func CompleteUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {
 			}
 		}
 
-		// Validate transfer is in a valid state for completion
+		// Validate transfer is in a valid state for UTXO swap completion
 		if transfer.Status == st.TransferStatusExpired || transfer.Status == st.TransferStatusReturned {
 			return fmt.Errorf("transfer is expired or returned")
 		}
-		if transfer.Status == st.TransferStatusCompleted {
-			return nil
-		}
-		// Only allow completion from valid intermediate states
-		if transfer.Status != st.TransferStatusSenderKeyTweaked &&
-			transfer.Status != st.TransferStatusReceiverKeyTweakApplied &&
-			transfer.Status != st.TransferStatusReceiverRefundSigned {
-			return fmt.Errorf("transfer cannot be completed from status %s", transfer.Status)
+
+		// Only allow UTXO swap completion from valid intermediate states
+		if !transferHelper.IsTransferSent(transfer) {
+			return fmt.Errorf("UTXO swap cannot be completed from transfer status %s: transfer is not sent", transfer.Status)
 		}
 	}
 	if _, err := utxoSwap.Update().SetStatus(st.UtxoSwapStatusCompleted).Save(ctx); err != nil {
