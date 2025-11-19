@@ -23,7 +23,8 @@ func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T)
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
 			tokenPrivKey := config.IdentityPrivateKey
-			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
 			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
@@ -53,9 +54,9 @@ func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T)
 				},
 				TokenOutputs: []*tokenpb.TokenOutput{
 					{
-						OwnerPublicKey: userOutput1PrivKey.Public().Serialize(),
-						TokenPublicKey: tokenPrivKey.Public().Serialize(),
-						TokenAmount:    int64ToUint128Bytes(0, testTransferOutput1Amount),
+						OwnerPublicKey:  userOutput1PrivKey.Public().Serialize(),
+						TokenIdentifier: tokenIdentifier,
+						TokenAmount:     int64ToUint128Bytes(0, testTransferOutput1Amount),
 					},
 				},
 				Network:                         config.ProtoNetwork(),
@@ -79,7 +80,8 @@ func TestCoordinatedBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
 			tokenPrivKey := config.IdentityPrivateKey
-			issueTokenTransaction, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+			issueTokenTransaction, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 			issueTokenTransaction.Network = sparkpb.Network_UNSPECIFIED
 
@@ -100,7 +102,8 @@ func TestCoordinatedBroadcastTokenTransactionTooLongValidityDuration(t *testing.
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
 			tokenPrivKey := config.IdentityPrivateKey
-			issueTokenTransaction, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+			issueTokenTransaction, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 			issueTokenTransaction.Network = sparkpb.Network_UNSPECIFIED
 
@@ -121,7 +124,8 @@ func TestCoordinatedBroadcastTokenTransactionTooShortValidityDuration(t *testing
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
 			tokenPrivKey := config.IdentityPrivateKey
-			issueTokenTransaction, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+			issueTokenTransaction, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 			issueTokenTransaction.Network = sparkpb.Network_UNSPECIFIED
 
@@ -141,7 +145,8 @@ func TestCoordinatedQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t 
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
 			tokenPrivKey := config.IdentityPrivateKey
-			issueTokenTransaction, userOutput1PrivKey, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+			issueTokenTransaction, userOutput1PrivKey, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
 			_, err = wallet.BroadcastTokenTransfer(
@@ -205,7 +210,8 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 		{
 			name: "mint transaction with revocation commitment should fail",
 			setupTx: func() (*tokenpb.TokenTransaction, []keys.Private) {
-				tx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey)
+				tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenIdentityPubKey)
+				tx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey, tokenIdentifier)
 				require.NoError(t, err)
 				return tx, []keys.Private{config.IdentityPrivateKey}
 			},
@@ -217,7 +223,8 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 		{
 			name: "mint transaction with withdraw bond sats should fail",
 			setupTx: func() (*tokenpb.TokenTransaction, []keys.Private) {
-				tx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey)
+				tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenIdentityPubKey)
+				tx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey, tokenIdentifier)
 				require.NoError(t, err)
 				return tx, []keys.Private{config.IdentityPrivateKey}
 			},
@@ -230,7 +237,8 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 		{
 			name: "mint transaction with output ID should fail",
 			setupTx: func() (*tokenpb.TokenTransaction, []keys.Private) {
-				tx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey)
+				tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenIdentityPubKey)
+				tx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey, tokenIdentifier)
 				require.NoError(t, err)
 				return tx, []keys.Private{config.IdentityPrivateKey}
 			},
@@ -298,6 +306,8 @@ func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.
 	finalIssueTokenTransactionHashSecondBatch, err := utils.HashTokenTransaction(finalIssueTokenTransactionSecondBatch, false)
 	require.NoError(t, err, "failed to hash second issuance token transaction")
 
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+
 	consolidatedOutputPrivKey := keys.GeneratePrivateKey()
 
 	outputsToSpendTooMany := make([]*tokenpb.TokenOutputToSpend, 2*maxInputOrOutputTokenTransactionOutputsForTests)
@@ -322,9 +332,9 @@ func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{
 			{
-				OwnerPublicKey: consolidatedOutputPrivKey.Public().Serialize(),
-				TokenPublicKey: tokenPrivKey.Public().Serialize(),
-				TokenAmount:    int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(manyOutputsCount)),
+				OwnerPublicKey:  consolidatedOutputPrivKey.Public().Serialize(),
+				TokenIdentifier: tokenIdentifier,
+				TokenAmount:     int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(manyOutputsCount)),
 			},
 		},
 		Network:                         config.ProtoNetwork(),
@@ -351,6 +361,8 @@ func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 	require.NoError(t, err, "failed to hash first issuance token transaction")
 
@@ -370,9 +382,9 @@ func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{
 			{
-				OwnerPublicKey: consolidatedOutputPrivKey.Public().Serialize(),
-				TokenPublicKey: tokenPrivKey.Public().Serialize(),
-				TokenAmount:    int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(maxInputOrOutputTokenTransactionOutputsForTests)),
+				OwnerPublicKey:  consolidatedOutputPrivKey.Public().Serialize(),
+				TokenIdentifier: tokenIdentifier,
+				TokenAmount:     int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(maxInputOrOutputTokenTransactionOutputsForTests)),
 			},
 		},
 		Network:                         config.ProtoNetwork(),

@@ -1063,9 +1063,8 @@ func validateBaseCreateTransaction(
 func validateBaseMintTransaction(
 	tokenTransaction *tokenpb.TokenTransaction,
 	inputSignatures []*tokenpb.SignatureWithIndex,
-	requireTokenIdentifierForMints bool,
 ) error {
-	err := validateBaseTokenOutputs(tokenTransaction, requireTokenIdentifierForMints)
+	err := validateBaseTokenOutputs(tokenTransaction)
 	if err != nil {
 		return fmt.Errorf("token output consistency validation failed: %w", err)
 	}
@@ -1083,28 +1082,15 @@ func validateBaseMintTransaction(
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("mint outputs to create cannot be empty"))
 	}
 
-	if requireTokenIdentifierForMints {
-		if mintInput.GetTokenIdentifier() == nil || len(mintInput.GetTokenIdentifier()) != 32 {
-			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("token identifier cannot be nil and must be 32 bytes"))
-		}
+	if mintInput.GetTokenIdentifier() == nil || len(mintInput.GetTokenIdentifier()) != 32 {
+		return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("token identifier cannot be nil and must be 32 bytes"))
 	}
 
-	hasTokenIdentifier := tokenTransaction.TokenOutputs[0].GetTokenIdentifier() != nil
-	if hasTokenIdentifier {
-		// Validate that all output token identifiers match the mint input
-		expectedTokenIdentifier := mintInput.GetTokenIdentifier()
-		for i, output := range tokenTransaction.TokenOutputs {
-			if !bytes.Equal(output.GetTokenIdentifier(), expectedTokenIdentifier) {
-				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token identifier must match mint input token identifier: %x != %x", i, output.GetTokenIdentifier(), expectedTokenIdentifier))
-			}
-		}
-	} else {
-		// When using token public key, validate all output token public keys match the issuer public key
-		expectedTokenPublicKey := mintInput.GetIssuerPublicKey()
-		for i, output := range tokenTransaction.TokenOutputs {
-			if !bytes.Equal(output.GetTokenPublicKey(), expectedTokenPublicKey) {
-				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token public key must match mint input issuer public key", i))
-			}
+	// Validate that all output token identifiers match the mint input
+	expectedTokenIdentifier := mintInput.GetTokenIdentifier()
+	for i, output := range tokenTransaction.TokenOutputs {
+		if !bytes.Equal(output.GetTokenIdentifier(), expectedTokenIdentifier) {
+			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token identifier must match mint input token identifier: %x != %x", i, output.GetTokenIdentifier(), expectedTokenIdentifier))
 		}
 	}
 
@@ -1123,9 +1109,8 @@ func validateBaseMintTransaction(
 func validateBaseTransferTransaction(
 	tokenTransaction *tokenpb.TokenTransaction,
 	inputSignatures []*tokenpb.SignatureWithIndex,
-	requireTokenIdentifierForTransfers bool,
 ) error {
-	err := validateBaseTokenOutputs(tokenTransaction, requireTokenIdentifierForTransfers)
+	err := validateBaseTokenOutputs(tokenTransaction)
 	if err != nil {
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token output consistency validation failed: %w", err))
 	}
@@ -1150,11 +1135,9 @@ func validateBaseTransferTransaction(
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("number of signatures must match number of outputs to spend"))
 	}
 
-	if requireTokenIdentifierForTransfers {
-		for _, output := range tokenTransaction.TokenOutputs {
-			if output.GetTokenIdentifier() == nil {
-				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token identifier cannot be nil"))
-			}
+	for _, output := range tokenTransaction.TokenOutputs {
+		if output.GetTokenIdentifier() == nil {
+			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token identifier cannot be nil"))
 		}
 	}
 
@@ -1169,16 +1152,12 @@ func ValidatePartialTokenTransaction(
 	inputSignatures []*tokenpb.SignatureWithIndex,
 	sparkOperatorsFromConfig map[string]*sparkpb.SigningOperatorInfo,
 	supportedNetworks []common.Network,
-	requireTokenIdentifierForMints bool,
-	requireTokenIdentifierForTransfers bool,
 ) error {
 	err := validateBaseTokenTransaction(
 		tokenTransaction,
 		inputSignatures,
 		sparkOperatorsFromConfig,
 		supportedNetworks,
-		requireTokenIdentifierForMints,
-		requireTokenIdentifierForTransfers,
 	)
 	if err != nil {
 		return err
@@ -1221,7 +1200,7 @@ func ValidatePartialTokenTransaction(
 	return nil
 }
 
-func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction, requireTokenIdentifier bool) error {
+func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction) error {
 	if len(tokenTransaction.TokenOutputs) == 0 {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token outputs cannot be empty for mint and transfer transactions"))
 	}
@@ -1237,39 +1216,20 @@ func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction, requir
 		}
 	}
 
-	hasTokenIdentifier := tokenTransaction.TokenOutputs[0].GetTokenIdentifier() != nil
-	if requireTokenIdentifier && !hasTokenIdentifier {
-		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token identifier must be set when token identifier is required"))
-	}
-	if hasTokenIdentifier {
-		// Validate each output has a valid token identifier and no token public key
-		// Multiple token types are allowed in a single transaction
-		for i, output := range tokenTransaction.TokenOutputs {
-			if output.GetTokenIdentifier() == nil {
-				return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("output %d missing token identifier", i))
-			}
-			if len(output.GetTokenIdentifier()) != 32 {
-				return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("output %d token identifier must be exactly 32 bytes, got %d", i, len(output.GetTokenIdentifier())))
-			}
-			if output.GetTokenPublicKey() != nil {
-				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d cannot have token public key when token identifier is set", i))
-			}
+	// Validate each output has a valid token identifier and no token public key
+	// Multiple token types are allowed in a single transaction
+	for i, output := range tokenTransaction.TokenOutputs {
+		if output.GetTokenIdentifier() == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("output %d missing token identifier", i))
 		}
-	} else {
-		// If token identifier is not set, conduct legacy validation logic of token public key.
-		expectedTokenPublicKey := tokenTransaction.TokenOutputs[0].GetTokenPublicKey()
-		if expectedTokenPublicKey == nil {
-			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token public key cannot be nil when token identifier is not set"))
+		if len(output.GetTokenIdentifier()) != 32 {
+			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("output %d token identifier must be exactly 32 bytes, got %d", i, len(output.GetTokenIdentifier())))
 		}
-		for i, output := range tokenTransaction.TokenOutputs {
-			if output.GetTokenPublicKey() == nil {
-				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token public key cannot be nil when token identifier is not set", i))
-			}
-			if !bytes.Equal(output.GetTokenPublicKey(), expectedTokenPublicKey) {
-				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("all outputs must have the same token public key"))
-			}
+		if output.GetTokenPublicKey() != nil {
+			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d cannot have token public key when token identifier is set", i))
 		}
 	}
+
 	return nil
 }
 
@@ -1435,8 +1395,6 @@ func validateBaseTokenTransaction(
 	inputSignatures []*tokenpb.SignatureWithIndex,
 	expectedSparkOperators map[string]*sparkpb.SigningOperatorInfo,
 	supportedNetworks []common.Network,
-	requireTokenIdentifierForMints bool,
-	requireTokenIdentifierForTransfers bool,
 ) error {
 	if tokenTransaction == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token transaction cannot be nil"))
@@ -1483,11 +1441,11 @@ func validateBaseTokenTransaction(
 			return err
 		}
 	case TokenTransactionTypeMint:
-		if err := validateBaseMintTransaction(tokenTransaction, inputSignatures, requireTokenIdentifierForMints); err != nil {
+		if err := validateBaseMintTransaction(tokenTransaction, inputSignatures); err != nil {
 			return err
 		}
 	case TokenTransactionTypeTransfer:
-		if err := validateBaseTransferTransaction(tokenTransaction, inputSignatures, requireTokenIdentifierForTransfers); err != nil {
+		if err := validateBaseTransferTransaction(tokenTransaction, inputSignatures); err != nil {
 			return err
 		}
 	default:
@@ -1538,14 +1496,12 @@ func validateBaseTokenTransaction(
 
 // FinalValidationConfig contains the configuration parameters for validating final token transactions
 type FinalValidationConfig struct {
-	ExpectedSparkOperators             map[string]*sparkpb.SigningOperatorInfo
-	SupportedNetworks                  []common.Network
-	RequireTokenIdentifierForMints     bool
-	RequireTokenIdentifierForTransfers bool
-	ExpectedRevocationPublicKeys       []keys.Public
-	ExpectedBondSats                   uint64
-	ExpectedRelativeBlockLocktime      uint64
-	ExpectedCreationEntityPublicKey    keys.Public
+	ExpectedSparkOperators          map[string]*sparkpb.SigningOperatorInfo
+	SupportedNetworks               []common.Network
+	ExpectedRevocationPublicKeys    []keys.Public
+	ExpectedBondSats                uint64
+	ExpectedRelativeBlockLocktime   uint64
+	ExpectedCreationEntityPublicKey keys.Public
 }
 
 // ValidateFinalTokenTransaction validates that the final token transaction
@@ -1560,8 +1516,6 @@ func ValidateFinalTokenTransaction(
 		signaturesWithIndex,
 		config.ExpectedSparkOperators,
 		config.SupportedNetworks,
-		config.RequireTokenIdentifierForMints,
-		config.RequireTokenIdentifierForTransfers,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to validate shared token transaction structure: %w", err)

@@ -86,7 +86,9 @@ func TestCoordinatedTokenTransferPreemption(t *testing.T) {
 				)
 			}
 
-			mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config1, tokenIdentityPubKey)
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config1, tokenIdentityPubKey)
+
+			mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config1, tokenIdentityPubKey, tokenIdentifier)
 			require.NoError(t, err, "failed to create mint transaction for transfer test")
 
 			finalMintTransaction, err := wallet.BroadcastTokenTransfer(
@@ -98,10 +100,10 @@ func TestCoordinatedTokenTransferPreemption(t *testing.T) {
 			finalMintTransactionHash, err := utils.HashTokenTransaction(finalMintTransaction, false)
 			require.NoError(t, err, "failed to hash mint transaction")
 
-			transaction1, _, err := createTestTokenTransferTransactionTokenPb(t, config1, finalMintTransactionHash, tokenIdentityPubKey)
+			transaction1, _, err := createTestTokenTransferTransactionTokenPb(t, config1, finalMintTransactionHash, tokenIdentityPubKey, tokenIdentifier)
 			require.NoError(t, err, "failed to create first transfer transaction")
 
-			transaction2, _, err := createTestTokenTransferTransactionTokenPb(t, config2, finalMintTransactionHash, tokenIdentityPubKey)
+			transaction2, _, err := createTestTokenTransferTransactionTokenPb(t, config2, finalMintTransactionHash, tokenIdentityPubKey, tokenIdentifier)
 			require.NoError(t, err, "failed to create second transfer transaction")
 
 			setTransactionTimestamps(transaction1, transaction2, tc.timestampMode)
@@ -174,7 +176,8 @@ func TestCoordinatedTokenTransferPreemptionPreventionRevealed(t *testing.T) {
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKey := tokenPrivKey.Public()
 
-	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey)
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenIdentityPubKey)
+	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey, tokenIdentifier)
 	require.NoError(t, err, "failed to create mint transaction for transfer test")
 
 	finalMintTransaction, err := wallet.BroadcastTokenTransfer(
@@ -186,7 +189,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionRevealed(t *testing.T) {
 	finalMintTransactionHash, err := utils.HashTokenTransaction(finalMintTransaction, false)
 	require.NoError(t, err, "failed to hash mint transaction")
 
-	transaction1, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey)
+	transaction1, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey, tokenIdentifier)
 	require.NoError(t, err, "failed to create first transfer transaction")
 
 	finalTransferTransaction1, err := wallet.BroadcastTokenTransfer(
@@ -204,7 +207,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionRevealed(t *testing.T) {
 
 	setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, t.Context(), entClient, finalTxHash1)
 
-	transaction2, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey)
+	transaction2, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey, tokenIdentifier)
 	require.NoError(t, err, "failed to create second transfer transaction")
 
 	earlierTime := time.Now().Add(-1 * time.Hour)
@@ -223,7 +226,8 @@ func TestCoordinatedTokenTransferPreemptionPreventionFinalized(t *testing.T) {
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKey := tokenPrivKey.Public()
 
-	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey)
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenIdentityPubKey)
+	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey, tokenIdentifier)
 	require.NoError(t, err, "failed to create mint transaction for transfer test")
 
 	finalMintTransaction, err := wallet.BroadcastTokenTransfer(
@@ -235,7 +239,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionFinalized(t *testing.T) {
 	finalMintTransactionHash, err := utils.HashTokenTransaction(finalMintTransaction, false)
 	require.NoError(t, err, "failed to hash mint transaction")
 
-	transaction1, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey)
+	transaction1, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey, tokenIdentifier)
 	require.NoError(t, err, "failed to create first transfer transaction")
 
 	_, err = wallet.BroadcastTokenTransfer(
@@ -244,7 +248,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionFinalized(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to broadcast first transfer transaction")
 
-	transaction2, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey)
+	transaction2, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey, tokenIdentifier)
 	require.NoError(t, err, "failed to create second transfer transaction")
 
 	earlierTime := time.Now().Add(-1 * time.Hour)

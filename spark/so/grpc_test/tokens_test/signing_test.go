@@ -27,9 +27,7 @@ func testCoordinatedTransactionSigningScenarios(
 	expectedCommitError bool,
 ) *tokenpb.TokenTransaction {
 	converted := make([]keys.Private, len(startOwnerPrivateKeys))
-	for i, key := range startOwnerPrivateKeys {
-		converted[i] = key
-	}
+	copy(converted, startOwnerPrivateKeys)
 	startResp, finalTxHash, startErr := wallet.StartTokenTransaction(
 		t.Context(), config, tokenTransaction, converted, TestValidityDurationSecs*time.Second, nil,
 	)
@@ -139,10 +137,9 @@ func testCoordinatedTransactionSigningScenarios(
 
 // testCoordinatedMintTransactionSigningScenarios tests mint transaction signing scenarios
 func testCoordinatedMintTransactionSigningScenarios(t *testing.T, config *wallet.TestWalletConfig,
+	tokenIdentifier []byte,
 	startIssuerPrivateKeys []keys.Private,
 	commitIssuerPrivateKeys []keys.Private,
-	isNativeSparkToken bool,
-	useTokenIdentifier bool,
 	doubleStartSameTx bool,
 	doubleStartDifferentTx bool,
 	doubleCommit bool,
@@ -160,8 +157,7 @@ func testCoordinatedMintTransactionSigningScenarios(t *testing.T, config *wallet
 
 	tokenTransaction, userOutputPrivKeys, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 		TokenIdentityPubKey: config.IdentityPrivateKey.Public(),
-		IsNativeSparkToken:  isNativeSparkToken,
-		UseTokenIdentifier:  useTokenIdentifier,
+		TokenIdentifier:     tokenIdentifier,
 		NumOutputs:          2,
 		OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
 	})
@@ -196,8 +192,6 @@ func testCoordinatedTransferTransactionSigningScenarios(t *testing.T, config *wa
 	finalIssueTokenTransaction *tokenpb.TokenTransaction,
 	startOwnerPrivateKeys []keys.Private,
 	commitOwnerPrivateKeys []keys.Private,
-	isNativeSparkToken bool,
-	useTokenIdentifier bool,
 	doubleStartSameTx bool,
 	doubleStartDifferentTx bool,
 	doubleCommit bool,
@@ -208,10 +202,10 @@ func testCoordinatedTransferTransactionSigningScenarios(t *testing.T, config *wa
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 	require.NoError(t, err, "failed to hash final issuance token transaction")
 
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, config.IdentityPrivateKey.Public())
 	transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 		TokenIdentityPubKey:            config.IdentityPrivateKey.Public(),
-		IsNativeSparkToken:             isNativeSparkToken,
-		UseTokenIdentifier:             useTokenIdentifier,
+		TokenIdentifier:                tokenIdentifier,
 		FinalIssueTokenTransactionHash: finalIssueTokenTransactionHash,
 		NumOutputs:                     1,
 		OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
@@ -241,7 +235,7 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 		issuerCommitPrivateKeys  []keys.Private
 		explicitWalletPrivateKey keys.Private
 		createNativeSparkToken   bool
-		useTokenIdentifier       bool
+		useBadTokenIdentifier    bool
 		expectedStartError       bool
 		expectedCommitError      bool
 		doubleStartSameTx        bool
@@ -250,27 +244,18 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 		expiredCommit            bool
 	}{
 		{
-			name: "mint should succeed with l1 token without token identifier",
+			name: "mint should succeed with l1 token",
 		},
 		{
-			name:               "mint should succeed with l1 token with token identifier",
-			useTokenIdentifier: true,
-		},
-		{
-			name:                     "mint should succeed with native spark token without token identifier",
+			name:                     "mint should succeed with native spark token",
 			createNativeSparkToken:   true,
-			explicitWalletPrivateKey: keys.GeneratePrivateKey(),
-		},
-		{
-			name:                     "mint should succeed with native spark token with token identifier",
-			createNativeSparkToken:   true,
-			useTokenIdentifier:       true,
 			explicitWalletPrivateKey: keys.GeneratePrivateKey(),
 		},
 		{
 			name:                     "mint should fail with no associated token create",
 			explicitWalletPrivateKey: keys.GeneratePrivateKey(),
 			expectedStartError:       true,
+			useBadTokenIdentifier:    true,
 		},
 		{
 			name: "mint should fail with too many issuer start signing keys",
@@ -299,9 +284,8 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 			expectedCommitError:     true,
 		},
 		{
-			name:               "double start mint should succeed with same transaction",
-			doubleStartSameTx:  true,
-			useTokenIdentifier: true,
+			name:              "double start mint should succeed with same transaction",
+			doubleStartSameTx: true,
 		},
 		{
 			name:                   "double start mint should succeed with different transaction",
@@ -339,18 +323,24 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 				require.NoError(t, err, "failed to create native spark token")
 			}
 
+			var tokenIdentifier []byte
+			if tc.useBadTokenIdentifier {
+				tokenIdentifier = make([]byte, 32)
+			} else {
+				tokenIdentifier = queryTokenIdentifierOrFail(t, config, issuerPrivateKey.Public())
+			}
+
 			testCoordinatedMintTransactionSigningScenarios(
-				t, config,
+				t, config, tokenIdentifier,
 				tc.issuerStartPrivateKeys,
 				tc.issuerCommitPrivateKeys,
-				tc.createNativeSparkToken,
-				tc.useTokenIdentifier,
 				tc.doubleStartSameTx,
 				tc.doubleStartDifferentTx,
 				tc.doubleCommit,
 				tc.expiredCommit,
 				tc.expectedStartError,
-				tc.expectedCommitError)
+				tc.expectedCommitError,
+			)
 		})
 	}
 }
@@ -362,7 +352,6 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 		startOwnerPrivateKeysModifier  func([]keys.Private) []keys.Private
 		explicitWalletPrivateKey       keys.Private
 		createNativeSparkToken         bool
-		useTokenIdentifier             bool
 		commitOwnerPrivateKeysModifier func([]keys.Private) []keys.Private
 		expectedStartError             bool
 		expectedCommitError            bool
@@ -375,14 +364,8 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 			name: "transfer should succeed with l1 token",
 		},
 		{
-			name:                     "transfer should succeed with native spark token without token identifier",
+			name:                     "transfer should succeed with native spark token",
 			createNativeSparkToken:   true,
-			explicitWalletPrivateKey: keys.GeneratePrivateKey(),
-		},
-		{
-			name:                     "transfer should succeed with native spark token with token identifier",
-			createNativeSparkToken:   true,
-			useTokenIdentifier:       true,
 			explicitWalletPrivateKey: keys.GeneratePrivateKey(),
 		},
 		{
@@ -421,9 +404,8 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 			expectedCommitError: true,
 		},
 		{
-			name:               "double start transfer should succeed with same transaction",
-			doubleStartSameTx:  true,
-			useTokenIdentifier: true,
+			name:              "double start transfer should succeed with same transaction",
+			doubleStartSameTx: true,
 		},
 		{
 			name:                   "double start transfer should succeed with different transaction",
@@ -459,8 +441,10 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 				require.NoError(t, err, "failed to create native spark token")
 			}
 
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, config.IdentityPrivateKey.Public())
+
 			finalIssueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey := testCoordinatedMintTransactionSigningScenarios(
-				t, config, nil, nil, tc.createNativeSparkToken, tc.useTokenIdentifier, false, false, false, false, false, false)
+				t, config, tokenIdentifier, nil, nil, false, false, false, false, false, false)
 
 			defaultStartingOwnerPrivateKeys := []keys.Private{userOutput1PrivKey, userOutput2PrivKey}
 
@@ -477,8 +461,6 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 				t, config, finalIssueTokenTransaction,
 				startingOwnerPrivKeys,
 				commitOwnerPrivKeys,
-				tc.createNativeSparkToken,
-				tc.useTokenIdentifier,
 				tc.doubleStartSameTx,
 				tc.doubleStartDifferentTx,
 				tc.doubleCommit,

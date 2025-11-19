@@ -19,8 +19,9 @@ func TestCoordinatedL1TokenMint(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			tokenPrivKey := config.IdentityPrivateKey
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
 
-			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
+			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
 			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
@@ -42,8 +43,9 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, config.IdentityPrivateKey.Public())
 			tokenPrivKey := config.IdentityPrivateKey
-			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
+			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
 			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey})
@@ -64,6 +66,7 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 			transferTokenTransaction, userOutput3PrivKey, err := createTestTokenTransferTransactionTokenPb(t, config,
 				finalIssueTokenTransactionHash,
 				tokenPrivKey.Public(),
+				tokenIdentifier,
 			)
 			require.NoError(t, err, "failed to create test token transfer transaction")
 			transferTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
@@ -94,10 +97,10 @@ func TestCoordinatedTokenMintV3(t *testing.T) {
 			})
 			require.NoError(t, err, "failed to create native spark token")
 
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
 			issueTokenTransaction, userPrivKeys, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 				TokenIdentityPubKey: issuerPrivKey.Public(),
-				IsNativeSparkToken:  true,
-				UseTokenIdentifier:  true,
+				TokenIdentifier:     tokenIdentifier,
 				NumOutputs:          2,
 				OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
 				Version:             TokenTransactionVersion3,
@@ -135,10 +138,10 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 			})
 			require.NoError(t, err, "failed to create native spark token")
 
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
 			issueTokenTransaction, userPrivKeys, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 				TokenIdentityPubKey: issuerPrivKey.Public(),
-				IsNativeSparkToken:  true,
-				UseTokenIdentifier:  true,
+				TokenIdentifier:     tokenIdentifier,
 				NumOutputs:          2,
 				OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
 				Version:             TokenTransactionVersion3,
@@ -159,7 +162,7 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 
 			transferTokenTransaction, userOutput3PrivKey, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 				TokenIdentityPubKey:            issuerPrivKey.Public(),
-				UseTokenIdentifier:             true,
+				TokenIdentifier:                tokenIdentifier,
 				FinalIssueTokenTransactionHash: finalIssueTokenTransactionHash,
 				Version:                        TokenTransactionVersion3,
 			})

@@ -2,7 +2,6 @@ package tokens_test
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"math/big"
 	"sort"
@@ -88,8 +87,7 @@ func getTokenMaxSupplyBytes(maxSupply uint64) []byte {
 // Parameter structs for WithParams functions
 type tokenTransactionParams struct {
 	TokenIdentityPubKey            keys.Public
-	IsNativeSparkToken             bool
-	UseTokenIdentifier             bool
+	TokenIdentifier                []byte
 	FinalIssueTokenTransactionHash []byte   // Only used for transfers, nil for mints
 	NumOutputs                     int      // Number of outputs to create (defaults to 2 for backward compatibility)
 	OutputAmounts                  []uint64 // Exact amounts for each output (must match NumOutputs length)
@@ -197,9 +195,9 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 		}
 
 		tokenOutputs[i] = &tokenpb.TokenOutput{
-			OwnerPublicKey: pubKey.Serialize(),
-			TokenPublicKey: params.TokenIdentityPubKey.Serialize(),
-			TokenAmount:    int64ToUint128Bytes(0, outputAmounts[i]),
+			OwnerPublicKey:  pubKey.Serialize(),
+			TokenAmount:     int64ToUint128Bytes(0, outputAmounts[i]),
+			TokenIdentifier: params.TokenIdentifier,
 		}
 	}
 
@@ -227,27 +225,18 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 		})
 	}
 
-	if params.UseTokenIdentifier {
-		tokenIdentifier, err := getTokenIdentifierFromMetadata(t.Context(), config, params.TokenIdentityPubKey)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get token identifier from metadata: %w", err)
-		}
-		mintTokenTransaction.GetMintInput().TokenIdentifier = tokenIdentifier
-		for _, output := range mintTokenTransaction.TokenOutputs {
-			output.TokenIdentifier = tokenIdentifier
-			output.TokenPublicKey = nil
-		}
+	mintTokenTransaction.GetMintInput().TokenIdentifier = params.TokenIdentifier
+	for _, output := range mintTokenTransaction.TokenOutputs {
+		output.TokenIdentifier = params.TokenIdentifier
 	}
-
 	return mintTokenTransaction, userOutputPrivKeys, nil
 }
 
 // createTestTokenMintTransactionTokenPb creates a test token mint transaction with default parameters
-func createTestTokenMintTransactionTokenPb(t *testing.T, config *wallet.TestWalletConfig, tokenIdentityPubKey keys.Public) (*tokenpb.TokenTransaction, keys.Private, keys.Private, error) {
+func createTestTokenMintTransactionTokenPb(t *testing.T, config *wallet.TestWalletConfig, tokenIdentityPubKey keys.Public, tokenIdentifier []byte) (*tokenpb.TokenTransaction, keys.Private, keys.Private, error) {
 	tx, privKeys, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 		TokenIdentityPubKey: tokenIdentityPubKey,
-		IsNativeSparkToken:  false,
-		UseTokenIdentifier:  true,
+		TokenIdentifier:     tokenIdentifier,
 		NumOutputs:          2,
 		OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
 	})
@@ -290,9 +279,9 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{
 			{
-				OwnerPublicKey: userOutput3PrivKey.Public().Serialize(),
-				TokenPublicKey: params.TokenIdentityPubKey.Serialize(),
-				TokenAmount:    int64ToUint128Bytes(0, testTransferOutput1Amount),
+				OwnerPublicKey:  userOutput3PrivKey.Public().Serialize(),
+				TokenAmount:     int64ToUint128Bytes(0, testTransferOutput1Amount),
+				TokenIdentifier: params.TokenIdentifier,
 			},
 		},
 		Network:                         config.ProtoNetwork(),
@@ -307,14 +296,7 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 		})
 	}
 
-	if params.UseTokenIdentifier {
-		tokenIdentifier, err := getTokenIdentifierFromMetadata(t.Context(), config, params.TokenIdentityPubKey)
-		if err != nil {
-			return nil, keys.Private{}, fmt.Errorf("failed to get token identifier from metadata: %w", err)
-		}
-		transferTokenTransaction.TokenOutputs[0].TokenIdentifier = tokenIdentifier
-		transferTokenTransaction.TokenOutputs[0].TokenPublicKey = nil
-	}
+	transferTokenTransaction.TokenOutputs[0].TokenIdentifier = params.TokenIdentifier
 	return transferTokenTransaction, userOutput3PrivKey, nil
 }
 
@@ -324,11 +306,11 @@ func createTestTokenTransferTransactionTokenPb(
 	config *wallet.TestWalletConfig,
 	finalIssueTokenTransactionHash []byte,
 	tokenIdentityPubKey keys.Public,
+	tokenIdentifier []byte,
 ) (*tokenpb.TokenTransaction, keys.Private, error) {
 	return createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 		TokenIdentityPubKey:            tokenIdentityPubKey,
-		IsNativeSparkToken:             false,
-		UseTokenIdentifier:             true,
+		TokenIdentifier:                tokenIdentifier,
 		FinalIssueTokenTransactionHash: finalIssueTokenTransactionHash,
 		NumOutputs:                     1,
 		OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
@@ -345,10 +327,10 @@ func createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t *testing.T,
 		outputAmounts[i] = uint64(testIssueMultiplePerOutputAmount)
 	}
 
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenIdentityPubKey)
 	return createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 		TokenIdentityPubKey: tokenIdentityPubKey,
-		IsNativeSparkToken:  false,
-		UseTokenIdentifier:  true,
+		TokenIdentifier:     tokenIdentifier,
 		NumOutputs:          numOutputs,
 		OutputAmounts:       outputAmounts,
 	})
@@ -366,6 +348,10 @@ func testCoordinatedCreateNativeSparkTokenWithParams(t *testing.T, config *walle
 		createTx,
 		[]keys.Private{params.issuerPrivateKey},
 	)
+	if err != nil {
+		return err
+	}
+	queryTokenIdentifierOrFail(t, config, params.issuerPrivateKey.Public())
 	return err
 }
 
@@ -447,25 +433,6 @@ func queryAndVerifyTokenOutputs(t *testing.T, coordinatorIdentifiers []string, f
 // queryAndVerifyNoTokenOutputs verifies that no token outputs are queryable for the ownerPrivateKey
 func queryAndVerifyNoTokenOutputs(t *testing.T, coordinatorIdentifiers []string, ownerPrivateKey keys.Private) {
 	queryAndVerifyTokenOutputs(t, coordinatorIdentifiers, &tokenpb.TokenTransaction{TokenOutputs: []*tokenpb.TokenOutput{}}, ownerPrivateKey)
-}
-
-// getTokenIdentifierFromMetadata retrieves token identifier by querying token metadata
-func getTokenIdentifierFromMetadata(ctx context.Context, config *wallet.TestWalletConfig, issuerPubKey keys.Public) ([]byte, error) {
-	response, err := wallet.QueryTokenMetadata(
-		ctx,
-		config,
-		nil,
-		[]keys.Public{issuerPubKey},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query token metadata: %w", err)
-	}
-
-	if len(response.TokenMetadata) == 0 {
-		return nil, fmt.Errorf("no token metadata found for issuer public key")
-	}
-
-	return response.TokenMetadata[0].TokenIdentifier, nil
 }
 
 // verifyMultipleTokenIdentifiersQuery verifies querying for multiple token identifiers in a single RPC call
@@ -592,15 +559,10 @@ func setupNativeTokenWithMint(
 		return nil, fmt.Errorf("failed to create native spark token: %w", err)
 	}
 
-	tokenIdentifier, err := getTokenIdentifierFromMetadata(t.Context(), config, issuerPrivKey.Public())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get token identifier: %w", err)
-	}
-
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
 	mintTxBeforeBroadcast, outputOwners, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 		TokenIdentityPubKey: issuerPrivKey.Public(),
-		IsNativeSparkToken:  true,
-		UseTokenIdentifier:  true,
+		TokenIdentifier:     tokenIdentifier,
 		NumOutputs:          len(mintOutputAmounts),
 		OutputAmounts:       mintOutputAmounts,
 	})
@@ -653,4 +615,21 @@ func verifyTokenBalance(
 
 	amount := bytesToBigInt(outputs.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
 	require.Equal(t, uint64ToBigInt(expectedAmount), amount, "%s should have %d tokens", description, expectedAmount)
+}
+
+func queryTokenIdentifierFromCoordinator(t *testing.T, config *wallet.TestWalletConfig, issuerPubKey keys.Public) ([]byte, error) {
+	resp, err := wallet.QueryTokenMetadata(t.Context(), config, nil, []keys.Public{issuerPubKey})
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.TokenMetadata) == 0 {
+		return nil, fmt.Errorf("no token metadata found for issuer public key %x", issuerPubKey.Serialize())
+	}
+	return resp.TokenMetadata[0].TokenIdentifier, nil
+}
+
+func queryTokenIdentifierOrFail(t *testing.T, config *wallet.TestWalletConfig, issuerPubKey keys.Public) []byte {
+	tokenIdentifier, err := queryTokenIdentifierFromCoordinator(t, config, issuerPubKey)
+	require.NoError(t, err, "failed to query token identifier")
+	return tokenIdentifier
 }

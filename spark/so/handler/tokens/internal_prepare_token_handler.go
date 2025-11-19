@@ -627,14 +627,12 @@ func validateFinalTokenTransaction(
 	sparkOperatorsFromConfig := config.GetSigningOperatorList()
 
 	validationConfig := &utils.FinalValidationConfig{
-		ExpectedSparkOperators:             sparkOperatorsFromConfig,
-		SupportedNetworks:                  config.SupportedNetworks,
-		RequireTokenIdentifierForMints:     config.Token.RequireTokenIdentifierForMints,
-		RequireTokenIdentifierForTransfers: config.Token.RequireTokenIdentifierForTransfers,
-		ExpectedRevocationPublicKeys:       expectedRevocationPublicKeys,
-		ExpectedBondSats:                   expectedBondSats,
-		ExpectedRelativeBlockLocktime:      expectedRelativeBlockLocktime,
-		ExpectedCreationEntityPublicKey:    expectedCreationEntityPublicKey,
+		ExpectedSparkOperators:          sparkOperatorsFromConfig,
+		SupportedNetworks:               config.SupportedNetworks,
+		ExpectedRevocationPublicKeys:    expectedRevocationPublicKeys,
+		ExpectedBondSats:                expectedBondSats,
+		ExpectedRelativeBlockLocktime:   expectedRelativeBlockLocktime,
+		ExpectedCreationEntityPublicKey: expectedCreationEntityPublicKey,
 	}
 
 	err = utils.ValidateFinalTokenTransaction(tokenTransaction, signaturesWithIndex, validationConfig)

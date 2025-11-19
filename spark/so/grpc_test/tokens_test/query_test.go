@@ -43,7 +43,8 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	require.NoError(t, err, "failed to create native spark token")
 
 	tokenPrivKey := config.IdentityPrivateKey
-	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
@@ -67,6 +68,7 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 		config,
 		finalIssueTokenTransactionHash,
 		tokenPrivKey.Public(),
+		tokenIdentifier,
 	)
 	require.NoError(t, err, "failed to create test token transfer transaction")
 	userOutput3PubKeyBytes := userOutput3PrivKey.Public().Serialize()
@@ -190,8 +192,9 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to create native spark token")
 
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
 	// Create first mint transaction with 2 outputs
-	mintTransaction1, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	mintTransaction1, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create first mint transaction")
 
 	finalMintTx1, err := wallet.BroadcastTokenTransfer(
@@ -203,7 +206,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	require.NoError(t, err, "failed to hash first mint transaction")
 
 	// Create second mint transaction with 2 outputs
-	mintTransaction2, userOutput3PrivKey, userOutput4PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	mintTransaction2, userOutput3PrivKey, userOutput4PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create second mint transaction")
 
 	finalMintTx2, err := wallet.BroadcastTokenTransfer(
@@ -215,7 +218,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	require.NoError(t, err, "failed to hash second mint transaction")
 
 	// Create a transfer transaction
-	transferTx, userOutput5PrivKey, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash1, issuerPrivKey.Public())
+	transferTx, userOutput5PrivKey, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash1, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create transfer transaction")
 
 	finalTransferTx, err := wallet.BroadcastTokenTransfer(
@@ -226,9 +229,6 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 
 	transferTxHash, err := utils.HashTokenTransaction(finalTransferTx, false)
 	require.NoError(t, err, "failed to hash transfer transaction")
-
-	tokenIdentifier, err := getTokenIdentifierFromMetadata(t.Context(), config, issuerPrivKey.Public())
-	require.NoError(t, err, "failed to get token identifier")
 
 	// Create a SECOND token with different identifier to test token identifier filtering
 	issuer2PrivKey := keys.GeneratePrivateKey()
@@ -242,8 +242,9 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to create second native spark token")
 
-	// Create mint transaction for second token
-	mintTransaction3, userOutput6PrivKey, _, err := createTestTokenMintTransactionTokenPb(t, config2, issuer2PrivKey.Public())
+	tokenIdentifier2 := queryTokenIdentifierOrFail(t, config2, issuer2PrivKey.Public())
+
+	mintTransaction3, userOutput6PrivKey, _, err := createTestTokenMintTransactionTokenPb(t, config2, issuer2PrivKey.Public(), tokenIdentifier2)
 	require.NoError(t, err, "failed to create third mint transaction")
 
 	finalMintTx3, err := wallet.BroadcastTokenTransfer(
@@ -253,9 +254,6 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 
 	mintTxHash3, err := utils.HashTokenTransaction(finalMintTx3, false)
 	require.NoError(t, err, "failed to hash third mint transaction")
-
-	tokenIdentifier2, err := getTokenIdentifierFromMetadata(t.Context(), config2, issuer2PrivKey.Public())
-	require.NoError(t, err, "failed to get second token identifier")
 
 	// Collect output IDs
 	mintTx1Output1ID := *finalMintTx1.TokenOutputs[0].Id
@@ -648,7 +646,8 @@ func TestQueryTokenOutputsWithStartTransaction(t *testing.T) {
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
 			issuerPrivKey := config.IdentityPrivateKey
-			mintTx, owner1PrivKey, owner2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
+			mintTx, owner1PrivKey, owner2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create mint transaction")
 
 			finalTokenTransaction, err := wallet.BroadcastTokenTransfer(
@@ -661,6 +660,7 @@ func TestQueryTokenOutputsWithStartTransaction(t *testing.T) {
 
 			transferTx, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 				TokenIdentityPubKey:            issuerPrivKey.Public(),
+				TokenIdentifier:                tokenIdentifier,
 				FinalIssueTokenTransactionHash: mintTxHash,
 				NumOutputs:                     1,
 				OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
@@ -699,7 +699,8 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 
 	var transactionHashes [][]byte
 
-	mintTx1, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
+	mintTx1, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create first mint transaction")
 
 	finalMintTx1, err := wallet.BroadcastTokenTransfer(
@@ -713,7 +714,7 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	mintTx2, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	mintTx2, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create second mint transaction")
 
 	finalMintTx2, err := wallet.BroadcastTokenTransfer(
@@ -727,7 +728,7 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	mintTx3, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	mintTx3, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create third mint transaction")
 
 	finalMintTx3, err := wallet.BroadcastTokenTransfer(
@@ -794,7 +795,8 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to create native spark token")
 
-	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
+	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create mint transaction")
 
 	finalMintTx, err := wallet.BroadcastTokenTransfer(
@@ -853,7 +855,7 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 
 	t.Run("StartTransaction", func(t *testing.T) {
 		var header metadata.MD
-		transferTransaction, _, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash, issuerPrivKey.Public())
+		transferTransaction, _, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash, issuerPrivKey.Public(), tokenIdentifier)
 		require.NoError(t, err, "failed to create transfer transaction")
 
 		ownerPrivateKeys := []keys.Private{userOutput1PrivKey, userOutput2PrivKey}
@@ -882,10 +884,21 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 
 	t.Run("CommitTransaction", func(t *testing.T) {
 		var header metadata.MD
-		transferTransaction, _, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash, issuerPrivKey.Public())
+		mintTransaction2, newOwnerOutput1PrivKey, newOwnerOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
+		require.NoError(t, err, "failed to create mint transaction 2")
+
+		finalMintTx2, err := wallet.BroadcastTokenTransfer(
+			t.Context(), config, mintTransaction2, []keys.Private{issuerPrivKey},
+		)
+		require.NoError(t, err, "failed to broadcast mint transaction 2")
+
+		mintTxHash2, err := utils.HashTokenTransaction(finalMintTx2, false)
+		require.NoError(t, err, "failed to hash mint transaction 2")
+
+		transferTransaction, _, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash2, issuerPrivKey.Public(), tokenIdentifier)
 		require.NoError(t, err, "failed to create transfer transaction")
 
-		ownerPrivateKeys := []keys.Private{userOutput1PrivKey, userOutput2PrivKey}
+		ownerPrivateKeys := []keys.Private{newOwnerOutput1PrivKey, newOwnerOutput2PrivKey}
 		startResp, finalTxHash, err := wallet.StartTokenTransaction(
 			t.Context(), config, transferTransaction, ownerPrivateKeys, 180*time.Second, nil,
 		)

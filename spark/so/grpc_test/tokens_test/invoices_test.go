@@ -145,10 +145,10 @@ func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
 			})
 			require.NoError(t, err, "failed to create native spark token")
 
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivateKey.Public())
 			issueTokenTransaction, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 				TokenIdentityPubKey: tokenPrivKey.Public(),
-				IsNativeSparkToken:  false,
-				UseTokenIdentifier:  true,
+				TokenIdentifier:     tokenIdentifier,
 				NumOutputs:          2,
 				OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
 				MintToSelf:          true,
@@ -186,8 +186,7 @@ func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
 func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, config *wallet.TestWalletConfig, finalIssueTokenTransaction *tokenpb.TokenTransaction, tokenIdentityPubKey keys.Public, batchTransfer bool, mismatchedIdentifier bool, mismatchedOwner bool, emptyInvoiceAmount bool, invoiceAmountGreaterThanCreatedOutputs bool, invoiceAmountLessThanCreatedOutputs bool, expiredInvoice bool, satsInvoice bool, expiredAtSign bool, transferFailsIfUnexpiredTransactionExists bool, signedInvoice bool, invalidSignature bool, mismatchedSenderPublicKey bool, emptySenderPublicKey bool, mismatchedNetwork bool) {
 	finalMintTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 	require.NoError(t, err, "failed to hash final issue token transaction")
-	tokenIdentifier, err := getTokenIdentifierFromMetadata(t.Context(), config, tokenIdentityPubKey)
-	require.NoError(t, err, "failed to get token identifier from metadata")
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenIdentityPubKey)
 	receiver1 := keys.GeneratePrivateKey()
 	receiver1PubKey := receiver1.Public()
 	receiver2 := keys.GeneratePrivateKey()
@@ -205,8 +204,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 	if !batchTransfer {
 		transferTransaction, nonBatchReceiver, err = createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 			TokenIdentityPubKey:            tokenIdentityPubKey,
-			IsNativeSparkToken:             true,
-			UseTokenIdentifier:             true,
+			TokenIdentifier:                tokenIdentifier,
 			FinalIssueTokenTransactionHash: finalMintTransactionHash,
 			NumOutputs:                     1,
 			OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
@@ -374,8 +372,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 	if transferFailsIfUnexpiredTransactionExists {
 		issueTokenTransaction, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 			TokenIdentityPubKey: tokenIdentityPubKey,
-			IsNativeSparkToken:  false,
-			UseTokenIdentifier:  true,
+			TokenIdentifier:     tokenIdentifier,
 			NumOutputs:          2,
 			OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
 			MintToSelf:          true,
@@ -391,7 +388,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 
 		var shouldFailTransfer *tokenpb.TokenTransaction
 		if !batchTransfer {
-			shouldFailTransfer, _, err = createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey)
+			shouldFailTransfer, _, err = createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey, tokenIdentifier)
 			require.NoError(t, err, "failed to create transfer transaction")
 		} else {
 			shouldFailTransfer = &tokenpb.TokenTransaction{
@@ -456,7 +453,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 	}
 	require.NoError(t, err, "failed to sign and commit transaction")
 
-	queryTokenTransactionParms := wallet.QueryTokenTransactionsParams{
+	queryTokenTransactionParams := wallet.QueryTokenTransactionsParams{
 		IssuerPublicKeys:  nil,
 		OwnerPublicKeys:   nil,
 		OutputIDs:         nil,
@@ -467,7 +464,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 	tokenTransactionResponse, err := wallet.QueryTokenTransactions(
 		t.Context(),
 		config,
-		queryTokenTransactionParms,
+		queryTokenTransactionParams,
 	)
 	require.NoError(t, err, "failed to query token transactions")
 	require.Len(t, tokenTransactionResponse.TokenTransactionsWithStatus, 1, "expected 1 token transaction")

@@ -17,7 +17,8 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
 			tokenPrivKey := config.IdentityPrivateKey
-			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
 			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
@@ -55,7 +56,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			require.NoError(t, err, "failed to hash final transfer token transaction")
 
 			transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPb(
-				t, config, finalIssueTokenTransactionHash, tokenPrivKey.Public(),
+				t, config, finalIssueTokenTransactionHash, tokenPrivKey.Public(), tokenIdentifier,
 			)
 			require.NoError(t, err, "failed to create test token transfer transaction")
 

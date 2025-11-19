@@ -140,10 +140,6 @@ func (c *Config) DatabaseDriver() string {
 
 // TokenConfig contains token-related configuration settings.
 type TokenConfig struct {
-	// RequireTokenIdentifierForMints determines if token mints must specify a token identifier in the outputs.
-	RequireTokenIdentifierForMints bool `yaml:"require_token_identifier_for_mints"`
-	// RequireTokenIdentifierForTransfers determines if token transfers must specify a token identifier in its input + outputs
-	RequireTokenIdentifierForTransfers bool `yaml:"require_token_identifier_for_transfers"`
 	// DisconnectLRC20Node turns on operator enforcement of announce and max supply and disables all LRC20 node communication.
 	DisconnectLRC20Node bool `yaml:"disconnect_lrc20_node"`
 	// DisableSparkTokenCreationForL1TokenAnnouncements disables logic creating a spark native token in response to finding a token announcement on L1.

@@ -57,7 +57,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrIdentityPublicKeyAuthFailed, req.PartialTokenTransaction, err)
 	}
 
-	if err := utils.ValidatePartialTokenTransaction(req.PartialTokenTransaction, req.PartialTokenTransactionOwnerSignatures, h.config.GetSigningOperatorList(), h.config.SupportedNetworks, h.config.Token.RequireTokenIdentifierForMints, h.config.Token.RequireTokenIdentifierForTransfers); err != nil {
+	if err := utils.ValidatePartialTokenTransaction(req.PartialTokenTransaction, req.PartialTokenTransactionOwnerSignatures, h.config.GetSigningOperatorList(), h.config.SupportedNetworks); err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrInvalidPartialTokenTransaction, req.PartialTokenTransaction, err)
 	}
 

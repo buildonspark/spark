@@ -319,13 +319,13 @@ func TestCoordinatedNativeTokenMaxSupplyEnforcement(t *testing.T) {
 		})
 		require.NoError(t, err, "failed to create native spark token with max supply %d", tc.maxSupply)
 
+		tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
 		for i, mintAmount := range tc.mintAmounts {
 			expectedResult := tc.expectedResults[i]
 
 			mintTransaction, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 				TokenIdentityPubKey: tokenPrivKey.Public(),
-				IsNativeSparkToken:  true,
-				UseTokenIdentifier:  true,
+				TokenIdentifier:     tokenIdentifier,
 				NumOutputs:          1,
 				OutputAmounts:       []uint64{mintAmount},
 			})
