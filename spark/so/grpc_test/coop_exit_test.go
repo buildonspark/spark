@@ -424,79 +424,90 @@ func TestCoopExitCannotCancelAfterBroadcast(t *testing.T) {
 
 // This test starts a coop exit, fails for one operator on the sync, and verifies that no transfer was created across all operators
 func TestCoopExitFailureToSync(t *testing.T) {
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
+	// TODO(mhr): Figure out why this test hangs sometimes.
+	sparktesting.WithTimeout(t, 1*time.Minute, func(t *testing.T) {
+		coin, err := faucet.Fund()
+		require.NoError(t, err)
 
-	amountSats := int64(100_000)
-	config, sspConfig, transferNode := setupUsers(t, amountSats)
+		amountSats := int64(100_000)
+		config, sspConfig, transferNode := setupUsers(t, amountSats)
 
-	// Create gRPC client for V2 function
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
-	require.NoError(t, err, "failed to create grpc connection")
-	defer conn.Close()
-
-	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
-	require.NoError(t, err, "failed to authenticate sender")
-	tmpCtx := wallet.ContextWithToken(t.Context(), authToken)
-
-	// SSP creates transactions
-	withdrawPrivKey := keys.GeneratePrivateKey()
-	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
-		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
-	)
-
-	soController, err := sparktesting.NewSparkOperatorController(t)
-	require.NoError(t, err, "failed to create operator controller")
-
-	err = soController.DisableOperator(t, 2)
-	require.NoError(t, err, "failed to disable operator 2")
-
-	// User creates transfer to SSP on the condition that the tx is confirmed
-	exitTxID, err := hex.DecodeString(exitTx.TxID())
-	require.NoError(t, err)
-	_, _, err = wallet.GetConnectorRefundSignaturesV2(
-		tmpCtx,
-		config,
-		[]wallet.LeafKeyTweak{transferNode},
-		exitTxID,
-		connectorOutputs,
-		sspConfig.IdentityPublicKey(),
-		time.Now().Add(24*time.Hour),
-	)
-	require.Error(t, err)
-
-	err = soController.EnableOperator(t, 2)
-	require.NoError(t, err, "failed to enable operator 2")
-
-	// Verify that any new transfers created during this test have the correct status
-	for id, op := range config.SigningOperators {
-		conn, err := op.NewOperatorGRPCConnection()
-		require.NoError(t, err, "connect to %s", id)
+		// Create gRPC client for V2 function
+		conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+		require.NoError(t, err, "failed to create grpc connection")
 		defer conn.Close()
 
-		token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
-		require.NoError(t, err, "auth token for %s", id)
+		authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
+		require.NoError(t, err, "failed to authenticate sender")
+		tmpCtx := wallet.ContextWithToken(t.Context(), authToken)
 
-		ctxWithToken := wallet.ContextWithToken(t.Context(), token)
-		client := pb.NewSparkServiceClient(conn)
+		// SSP creates transactions
+		withdrawPrivKey := keys.GeneratePrivateKey()
+		exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
+			t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
+		)
 
-		resp, err := client.QueryAllTransfers(ctxWithToken, &pb.TransferFilter{
-			Network: pb.Network_REGTEST,
-			Participant: &pb.TransferFilter_SenderOrReceiverIdentityPublicKey{
-				SenderOrReceiverIdentityPublicKey: config.IdentityPublicKey().Serialize(),
-			},
-			Types: []pb.TransferType{pb.TransferType_COOPERATIVE_EXIT},
-		})
-		require.NoError(t, err, "query transfers on %s", id)
+		soController, err := sparktesting.NewSparkOperatorController(t)
+		require.NoError(t, err, "failed to create operator controller")
 
-		// Check only new transfers that weren't present before this test for their status
-		for _, tr := range resp.Transfers {
-			if tr.Type == pb.TransferType_COOPERATIVE_EXIT {
-				// This is a new transfer created during this test - it should have correct status
-				if tr.Status != pb.TransferStatus_TRANSFER_STATUS_RETURNED {
-					t.Fatalf("operator %s has new transfer %s with wrong status (want RETURNED/EXPIRED/COMPLETED) got %s", id, tr.Id, tr.Status)
+		t.Log("Disabling operator 2 to simulate failure during sync...")
+
+		err = soController.DisableOperator(t, 2)
+		require.NoError(t, err, "failed to disable operator 2")
+
+		t.Log("Operator 2 disabled!")
+
+		// User creates transfer to SSP on the condition that the tx is confirmed
+		exitTxID, err := hex.DecodeString(exitTx.TxID())
+		require.NoError(t, err)
+		_, _, err = wallet.GetConnectorRefundSignaturesV2(
+			tmpCtx,
+			config,
+			[]wallet.LeafKeyTweak{transferNode},
+			exitTxID,
+			connectorOutputs,
+			sspConfig.IdentityPublicKey(),
+			time.Now().Add(24*time.Hour),
+		)
+		require.Error(t, err)
+
+		t.Log("Re-enabling operator 2...")
+
+		err = soController.EnableOperator(t, 2)
+		require.NoError(t, err, "failed to enable operator 2")
+
+		t.Log("Operator 2 re-enabled!")
+
+		// Verify that any new transfers created during this test have the correct status
+		for id, op := range config.SigningOperators {
+			conn, err := op.NewOperatorGRPCConnection()
+			require.NoError(t, err, "connect to %s", id)
+			defer conn.Close()
+
+			token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+			require.NoError(t, err, "auth token for %s", id)
+
+			ctxWithToken := wallet.ContextWithToken(t.Context(), token)
+			client := pb.NewSparkServiceClient(conn)
+
+			resp, err := client.QueryAllTransfers(ctxWithToken, &pb.TransferFilter{
+				Network: pb.Network_REGTEST,
+				Participant: &pb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+					SenderOrReceiverIdentityPublicKey: config.IdentityPublicKey().Serialize(),
+				},
+				Types: []pb.TransferType{pb.TransferType_COOPERATIVE_EXIT},
+			})
+			require.NoError(t, err, "query transfers on %s", id)
+
+			// Check only new transfers that weren't present before this test for their status
+			for _, tr := range resp.Transfers {
+				if tr.Type == pb.TransferType_COOPERATIVE_EXIT {
+					// This is a new transfer created during this test - it should have correct status
+					if tr.Status != pb.TransferStatus_TRANSFER_STATUS_RETURNED {
+						t.Fatalf("operator %s has new transfer %s with wrong status (want RETURNED/EXPIRED/COMPLETED) got %s", id, tr.Id, tr.Status)
+					}
 				}
 			}
 		}
-	}
+	})
 }
