@@ -93,6 +93,26 @@ func (pru *PreimageRequestUpdate) ClearPreimage() *PreimageRequestUpdate {
 	return pru
 }
 
+// SetSenderIdentityPubkey sets the "sender_identity_pubkey" field.
+func (pru *PreimageRequestUpdate) SetSenderIdentityPubkey(k keys.Public) *PreimageRequestUpdate {
+	pru.mutation.SetSenderIdentityPubkey(k)
+	return pru
+}
+
+// SetNillableSenderIdentityPubkey sets the "sender_identity_pubkey" field if the given value is not nil.
+func (pru *PreimageRequestUpdate) SetNillableSenderIdentityPubkey(k *keys.Public) *PreimageRequestUpdate {
+	if k != nil {
+		pru.SetSenderIdentityPubkey(*k)
+	}
+	return pru
+}
+
+// ClearSenderIdentityPubkey clears the value of the "sender_identity_pubkey" field.
+func (pru *PreimageRequestUpdate) ClearSenderIdentityPubkey() *PreimageRequestUpdate {
+	pru.mutation.ClearSenderIdentityPubkey()
+	return pru
+}
+
 // AddTransactionIDs adds the "transactions" edge to the UserSignedTransaction entity by IDs.
 func (pru *PreimageRequestUpdate) AddTransactionIDs(ids ...uuid.UUID) *PreimageRequestUpdate {
 	pru.mutation.AddTransactionIDs(ids...)
@@ -274,6 +294,12 @@ func (pru *PreimageRequestUpdate) sqlSave(ctx context.Context) (n int, err error
 	if pru.mutation.PreimageCleared() {
 		_spec.ClearField(preimagerequest.FieldPreimage, field.TypeBytes)
 	}
+	if value, ok := pru.mutation.SenderIdentityPubkey(); ok {
+		_spec.SetField(preimagerequest.FieldSenderIdentityPubkey, field.TypeBytes, value)
+	}
+	if pru.mutation.SenderIdentityPubkeyCleared() {
+		_spec.ClearField(preimagerequest.FieldSenderIdentityPubkey, field.TypeBytes)
+	}
 	if pru.mutation.TransactionsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -454,6 +480,26 @@ func (pruo *PreimageRequestUpdateOne) SetPreimage(b []byte) *PreimageRequestUpda
 // ClearPreimage clears the value of the "preimage" field.
 func (pruo *PreimageRequestUpdateOne) ClearPreimage() *PreimageRequestUpdateOne {
 	pruo.mutation.ClearPreimage()
+	return pruo
+}
+
+// SetSenderIdentityPubkey sets the "sender_identity_pubkey" field.
+func (pruo *PreimageRequestUpdateOne) SetSenderIdentityPubkey(k keys.Public) *PreimageRequestUpdateOne {
+	pruo.mutation.SetSenderIdentityPubkey(k)
+	return pruo
+}
+
+// SetNillableSenderIdentityPubkey sets the "sender_identity_pubkey" field if the given value is not nil.
+func (pruo *PreimageRequestUpdateOne) SetNillableSenderIdentityPubkey(k *keys.Public) *PreimageRequestUpdateOne {
+	if k != nil {
+		pruo.SetSenderIdentityPubkey(*k)
+	}
+	return pruo
+}
+
+// ClearSenderIdentityPubkey clears the value of the "sender_identity_pubkey" field.
+func (pruo *PreimageRequestUpdateOne) ClearSenderIdentityPubkey() *PreimageRequestUpdateOne {
+	pruo.mutation.ClearSenderIdentityPubkey()
 	return pruo
 }
 
@@ -667,6 +713,12 @@ func (pruo *PreimageRequestUpdateOne) sqlSave(ctx context.Context) (_node *Preim
 	}
 	if pruo.mutation.PreimageCleared() {
 		_spec.ClearField(preimagerequest.FieldPreimage, field.TypeBytes)
+	}
+	if value, ok := pruo.mutation.SenderIdentityPubkey(); ok {
+		_spec.SetField(preimagerequest.FieldSenderIdentityPubkey, field.TypeBytes, value)
+	}
+	if pruo.mutation.SenderIdentityPubkeyCleared() {
+		_spec.ClearField(preimagerequest.FieldSenderIdentityPubkey, field.TypeBytes)
 	}
 	if pruo.mutation.TransactionsCleared() {
 		edge := &sqlgraph.EdgeSpec{

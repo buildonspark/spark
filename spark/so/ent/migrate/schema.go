@@ -264,6 +264,7 @@ var (
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"WAITING_FOR_PREIMAGE", "PREIMAGE_SHARED", "RETURNED"}},
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes, Nullable: true},
 		{Name: "preimage", Type: field.TypeBytes, Nullable: true},
+		{Name: "sender_identity_pubkey", Type: field.TypeBytes, Nullable: true},
 		{Name: "preimage_request_transfers", Type: field.TypeUUID, Nullable: true},
 	}
 	// PreimageRequestsTable holds the schema information for the "preimage_requests" table.
@@ -274,7 +275,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "preimage_requests_transfers_transfers",
-				Columns:    []*schema.Column{PreimageRequestsColumns[7]},
+				Columns:    []*schema.Column{PreimageRequestsColumns[8]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -286,9 +287,14 @@ var (
 				Columns: []*schema.Column{PreimageRequestsColumns[3], PreimageRequestsColumns[5]},
 			},
 			{
-				Name:    "preimagerequest_preimage_request_transfers",
+				Name:    "preimagerequest_sender_identity_pubkey",
 				Unique:  false,
 				Columns: []*schema.Column{PreimageRequestsColumns[7]},
+			},
+			{
+				Name:    "preimagerequest_preimage_request_transfers",
+				Unique:  false,
+				Columns: []*schema.Column{PreimageRequestsColumns[8]},
 			},
 		},
 	}

@@ -29,6 +29,8 @@ const (
 	FieldReceiverIdentityPubkey = "receiver_identity_pubkey"
 	// FieldPreimage holds the string denoting the preimage field in the database.
 	FieldPreimage = "preimage"
+	// FieldSenderIdentityPubkey holds the string denoting the sender_identity_pubkey field in the database.
+	FieldSenderIdentityPubkey = "sender_identity_pubkey"
 	// EdgeTransactions holds the string denoting the transactions edge name in mutations.
 	EdgeTransactions = "transactions"
 	// EdgePreimageShares holds the string denoting the preimage_shares edge name in mutations.
@@ -69,6 +71,7 @@ var Columns = []string{
 	FieldStatus,
 	FieldReceiverIdentityPubkey,
 	FieldPreimage,
+	FieldSenderIdentityPubkey,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "preimage_requests"

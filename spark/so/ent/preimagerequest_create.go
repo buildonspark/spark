@@ -89,6 +89,20 @@ func (prc *PreimageRequestCreate) SetPreimage(b []byte) *PreimageRequestCreate {
 	return prc
 }
 
+// SetSenderIdentityPubkey sets the "sender_identity_pubkey" field.
+func (prc *PreimageRequestCreate) SetSenderIdentityPubkey(k keys.Public) *PreimageRequestCreate {
+	prc.mutation.SetSenderIdentityPubkey(k)
+	return prc
+}
+
+// SetNillableSenderIdentityPubkey sets the "sender_identity_pubkey" field if the given value is not nil.
+func (prc *PreimageRequestCreate) SetNillableSenderIdentityPubkey(k *keys.Public) *PreimageRequestCreate {
+	if k != nil {
+		prc.SetSenderIdentityPubkey(*k)
+	}
+	return prc
+}
+
 // SetID sets the "id" field.
 func (prc *PreimageRequestCreate) SetID(u uuid.UUID) *PreimageRequestCreate {
 	prc.mutation.SetID(u)
@@ -289,6 +303,10 @@ func (prc *PreimageRequestCreate) createSpec() (*PreimageRequest, *sqlgraph.Crea
 		_spec.SetField(preimagerequest.FieldPreimage, field.TypeBytes, value)
 		_node.Preimage = value
 	}
+	if value, ok := prc.mutation.SenderIdentityPubkey(); ok {
+		_spec.SetField(preimagerequest.FieldSenderIdentityPubkey, field.TypeBytes, value)
+		_node.SenderIdentityPubkey = value
+	}
 	if nodes := prc.mutation.TransactionsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -462,6 +480,24 @@ func (u *PreimageRequestUpsert) ClearPreimage() *PreimageRequestUpsert {
 	return u
 }
 
+// SetSenderIdentityPubkey sets the "sender_identity_pubkey" field.
+func (u *PreimageRequestUpsert) SetSenderIdentityPubkey(v keys.Public) *PreimageRequestUpsert {
+	u.Set(preimagerequest.FieldSenderIdentityPubkey, v)
+	return u
+}
+
+// UpdateSenderIdentityPubkey sets the "sender_identity_pubkey" field to the value that was provided on create.
+func (u *PreimageRequestUpsert) UpdateSenderIdentityPubkey() *PreimageRequestUpsert {
+	u.SetExcluded(preimagerequest.FieldSenderIdentityPubkey)
+	return u
+}
+
+// ClearSenderIdentityPubkey clears the value of the "sender_identity_pubkey" field.
+func (u *PreimageRequestUpsert) ClearSenderIdentityPubkey() *PreimageRequestUpsert {
+	u.SetNull(preimagerequest.FieldSenderIdentityPubkey)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -594,6 +630,27 @@ func (u *PreimageRequestUpsertOne) UpdatePreimage() *PreimageRequestUpsertOne {
 func (u *PreimageRequestUpsertOne) ClearPreimage() *PreimageRequestUpsertOne {
 	return u.Update(func(s *PreimageRequestUpsert) {
 		s.ClearPreimage()
+	})
+}
+
+// SetSenderIdentityPubkey sets the "sender_identity_pubkey" field.
+func (u *PreimageRequestUpsertOne) SetSenderIdentityPubkey(v keys.Public) *PreimageRequestUpsertOne {
+	return u.Update(func(s *PreimageRequestUpsert) {
+		s.SetSenderIdentityPubkey(v)
+	})
+}
+
+// UpdateSenderIdentityPubkey sets the "sender_identity_pubkey" field to the value that was provided on create.
+func (u *PreimageRequestUpsertOne) UpdateSenderIdentityPubkey() *PreimageRequestUpsertOne {
+	return u.Update(func(s *PreimageRequestUpsert) {
+		s.UpdateSenderIdentityPubkey()
+	})
+}
+
+// ClearSenderIdentityPubkey clears the value of the "sender_identity_pubkey" field.
+func (u *PreimageRequestUpsertOne) ClearSenderIdentityPubkey() *PreimageRequestUpsertOne {
+	return u.Update(func(s *PreimageRequestUpsert) {
+		s.ClearSenderIdentityPubkey()
 	})
 }
 
@@ -896,6 +953,27 @@ func (u *PreimageRequestUpsertBulk) UpdatePreimage() *PreimageRequestUpsertBulk 
 func (u *PreimageRequestUpsertBulk) ClearPreimage() *PreimageRequestUpsertBulk {
 	return u.Update(func(s *PreimageRequestUpsert) {
 		s.ClearPreimage()
+	})
+}
+
+// SetSenderIdentityPubkey sets the "sender_identity_pubkey" field.
+func (u *PreimageRequestUpsertBulk) SetSenderIdentityPubkey(v keys.Public) *PreimageRequestUpsertBulk {
+	return u.Update(func(s *PreimageRequestUpsert) {
+		s.SetSenderIdentityPubkey(v)
+	})
+}
+
+// UpdateSenderIdentityPubkey sets the "sender_identity_pubkey" field to the value that was provided on create.
+func (u *PreimageRequestUpsertBulk) UpdateSenderIdentityPubkey() *PreimageRequestUpsertBulk {
+	return u.Update(func(s *PreimageRequestUpsert) {
+		s.UpdateSenderIdentityPubkey()
+	})
+}
+
+// ClearSenderIdentityPubkey clears the value of the "sender_identity_pubkey" field.
+func (u *PreimageRequestUpsertBulk) ClearSenderIdentityPubkey() *PreimageRequestUpsertBulk {
+	return u.Update(func(s *PreimageRequestUpsert) {
+		s.ClearSenderIdentityPubkey()
 	})
 }
 

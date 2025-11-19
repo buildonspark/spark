@@ -34,6 +34,8 @@ type PreimageRequest struct {
 	ReceiverIdentityPubkey keys.Public `json:"receiver_identity_pubkey,omitempty"`
 	// Preimage holds the value of the "preimage" field.
 	Preimage []byte `json:"preimage,omitempty"`
+	// SenderIdentityPubkey holds the value of the "sender_identity_pubkey" field.
+	SenderIdentityPubkey keys.Public `json:"sender_identity_pubkey,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PreimageRequestQuery when eager-loading is set.
 	Edges                      PreimageRequestEdges `json:"edges"`
@@ -92,7 +94,7 @@ func (*PreimageRequest) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case preimagerequest.FieldPaymentHash, preimagerequest.FieldPreimage:
 			values[i] = new([]byte)
-		case preimagerequest.FieldReceiverIdentityPubkey:
+		case preimagerequest.FieldReceiverIdentityPubkey, preimagerequest.FieldSenderIdentityPubkey:
 			values[i] = new(keys.Public)
 		case preimagerequest.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -158,6 +160,12 @@ func (pr *PreimageRequest) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field preimage", values[i])
 			} else if value != nil {
 				pr.Preimage = *value
+			}
+		case preimagerequest.FieldSenderIdentityPubkey:
+			if value, ok := values[i].(*keys.Public); !ok {
+				return fmt.Errorf("unexpected type %T for field sender_identity_pubkey", values[i])
+			} else if value != nil {
+				pr.SenderIdentityPubkey = *value
 			}
 		case preimagerequest.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -234,6 +242,9 @@ func (pr *PreimageRequest) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("preimage=")
 	builder.WriteString(fmt.Sprintf("%v", pr.Preimage))
+	builder.WriteString(", ")
+	builder.WriteString("sender_identity_pubkey=")
+	builder.WriteString(fmt.Sprintf("%v", pr.SenderIdentityPubkey))
 	builder.WriteByte(')')
 	return builder.String()
 }

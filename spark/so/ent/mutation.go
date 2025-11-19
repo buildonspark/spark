@@ -6317,6 +6317,7 @@ type PreimageRequestMutation struct {
 	status                   *schematype.PreimageRequestStatus
 	receiver_identity_pubkey *keys.Public
 	preimage                 *[]byte
+	sender_identity_pubkey   *keys.Public
 	clearedFields            map[string]struct{}
 	transactions             map[uuid.UUID]struct{}
 	removedtransactions      map[uuid.UUID]struct{}
@@ -6676,6 +6677,55 @@ func (m *PreimageRequestMutation) ResetPreimage() {
 	delete(m.clearedFields, preimagerequest.FieldPreimage)
 }
 
+// SetSenderIdentityPubkey sets the "sender_identity_pubkey" field.
+func (m *PreimageRequestMutation) SetSenderIdentityPubkey(k keys.Public) {
+	m.sender_identity_pubkey = &k
+}
+
+// SenderIdentityPubkey returns the value of the "sender_identity_pubkey" field in the mutation.
+func (m *PreimageRequestMutation) SenderIdentityPubkey() (r keys.Public, exists bool) {
+	v := m.sender_identity_pubkey
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSenderIdentityPubkey returns the old "sender_identity_pubkey" field's value of the PreimageRequest entity.
+// If the PreimageRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PreimageRequestMutation) OldSenderIdentityPubkey(ctx context.Context) (v keys.Public, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSenderIdentityPubkey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSenderIdentityPubkey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSenderIdentityPubkey: %w", err)
+	}
+	return oldValue.SenderIdentityPubkey, nil
+}
+
+// ClearSenderIdentityPubkey clears the value of the "sender_identity_pubkey" field.
+func (m *PreimageRequestMutation) ClearSenderIdentityPubkey() {
+	m.sender_identity_pubkey = nil
+	m.clearedFields[preimagerequest.FieldSenderIdentityPubkey] = struct{}{}
+}
+
+// SenderIdentityPubkeyCleared returns if the "sender_identity_pubkey" field was cleared in this mutation.
+func (m *PreimageRequestMutation) SenderIdentityPubkeyCleared() bool {
+	_, ok := m.clearedFields[preimagerequest.FieldSenderIdentityPubkey]
+	return ok
+}
+
+// ResetSenderIdentityPubkey resets all changes to the "sender_identity_pubkey" field.
+func (m *PreimageRequestMutation) ResetSenderIdentityPubkey() {
+	m.sender_identity_pubkey = nil
+	delete(m.clearedFields, preimagerequest.FieldSenderIdentityPubkey)
+}
+
 // AddTransactionIDs adds the "transactions" edge to the UserSignedTransaction entity by ids.
 func (m *PreimageRequestMutation) AddTransactionIDs(ids ...uuid.UUID) {
 	if m.transactions == nil {
@@ -6842,7 +6892,7 @@ func (m *PreimageRequestMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PreimageRequestMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 7)
 	if m.create_time != nil {
 		fields = append(fields, preimagerequest.FieldCreateTime)
 	}
@@ -6860,6 +6910,9 @@ func (m *PreimageRequestMutation) Fields() []string {
 	}
 	if m.preimage != nil {
 		fields = append(fields, preimagerequest.FieldPreimage)
+	}
+	if m.sender_identity_pubkey != nil {
+		fields = append(fields, preimagerequest.FieldSenderIdentityPubkey)
 	}
 	return fields
 }
@@ -6881,6 +6934,8 @@ func (m *PreimageRequestMutation) Field(name string) (ent.Value, bool) {
 		return m.ReceiverIdentityPubkey()
 	case preimagerequest.FieldPreimage:
 		return m.Preimage()
+	case preimagerequest.FieldSenderIdentityPubkey:
+		return m.SenderIdentityPubkey()
 	}
 	return nil, false
 }
@@ -6902,6 +6957,8 @@ func (m *PreimageRequestMutation) OldField(ctx context.Context, name string) (en
 		return m.OldReceiverIdentityPubkey(ctx)
 	case preimagerequest.FieldPreimage:
 		return m.OldPreimage(ctx)
+	case preimagerequest.FieldSenderIdentityPubkey:
+		return m.OldSenderIdentityPubkey(ctx)
 	}
 	return nil, fmt.Errorf("unknown PreimageRequest field %s", name)
 }
@@ -6953,6 +7010,13 @@ func (m *PreimageRequestMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPreimage(v)
 		return nil
+	case preimagerequest.FieldSenderIdentityPubkey:
+		v, ok := value.(keys.Public)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSenderIdentityPubkey(v)
+		return nil
 	}
 	return fmt.Errorf("unknown PreimageRequest field %s", name)
 }
@@ -6989,6 +7053,9 @@ func (m *PreimageRequestMutation) ClearedFields() []string {
 	if m.FieldCleared(preimagerequest.FieldPreimage) {
 		fields = append(fields, preimagerequest.FieldPreimage)
 	}
+	if m.FieldCleared(preimagerequest.FieldSenderIdentityPubkey) {
+		fields = append(fields, preimagerequest.FieldSenderIdentityPubkey)
+	}
 	return fields
 }
 
@@ -7008,6 +7075,9 @@ func (m *PreimageRequestMutation) ClearField(name string) error {
 		return nil
 	case preimagerequest.FieldPreimage:
 		m.ClearPreimage()
+		return nil
+	case preimagerequest.FieldSenderIdentityPubkey:
+		m.ClearSenderIdentityPubkey()
 		return nil
 	}
 	return fmt.Errorf("unknown PreimageRequest nullable field %s", name)
@@ -7034,6 +7104,9 @@ func (m *PreimageRequestMutation) ResetField(name string) error {
 		return nil
 	case preimagerequest.FieldPreimage:
 		m.ResetPreimage()
+		return nil
+	case preimagerequest.FieldSenderIdentityPubkey:
+		m.ResetSenderIdentityPubkey()
 		return nil
 	}
 	return fmt.Errorf("unknown PreimageRequest field %s", name)
