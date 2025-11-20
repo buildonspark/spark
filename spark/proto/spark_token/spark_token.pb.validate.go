@@ -789,6 +789,285 @@ var _ interface {
 	ErrorName() string
 } = TokenOutputValidationError{}
 
+// Validate checks the field values on PartialTokenOutput with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *PartialTokenOutput) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on PartialTokenOutput with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// PartialTokenOutputMultiError, or nil if none found.
+func (m *PartialTokenOutput) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *PartialTokenOutput) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetOwnerPublicKey()) != 33 {
+		err := PartialTokenOutputValidationError{
+			field:  "OwnerPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for WithdrawBondSats
+
+	// no validation rules for WithdrawRelativeBlockLocktime
+
+	if len(m.GetTokenIdentifier()) != 32 {
+		err := PartialTokenOutputValidationError{
+			field:  "TokenIdentifier",
+			reason: "value length must be 32 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetTokenAmount()) != 16 {
+		err := PartialTokenOutputValidationError{
+			field:  "TokenAmount",
+			reason: "value length must be 16 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return PartialTokenOutputMultiError(errors)
+	}
+
+	return nil
+}
+
+// PartialTokenOutputMultiError is an error wrapping multiple validation errors
+// returned by PartialTokenOutput.ValidateAll() if the designated constraints
+// aren't met.
+type PartialTokenOutputMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m PartialTokenOutputMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m PartialTokenOutputMultiError) AllErrors() []error { return m }
+
+// PartialTokenOutputValidationError is the validation error returned by
+// PartialTokenOutput.Validate if the designated constraints aren't met.
+type PartialTokenOutputValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e PartialTokenOutputValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e PartialTokenOutputValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e PartialTokenOutputValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e PartialTokenOutputValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e PartialTokenOutputValidationError) ErrorName() string {
+	return "PartialTokenOutputValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e PartialTokenOutputValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sPartialTokenOutput.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = PartialTokenOutputValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = PartialTokenOutputValidationError{}
+
+// Validate checks the field values on FinalTokenOutput with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *FinalTokenOutput) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on FinalTokenOutput with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// FinalTokenOutputMultiError, or nil if none found.
+func (m *FinalTokenOutput) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *FinalTokenOutput) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetPartialTokenOutput()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FinalTokenOutputValidationError{
+					field:  "PartialTokenOutput",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FinalTokenOutputValidationError{
+					field:  "PartialTokenOutput",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetPartialTokenOutput()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FinalTokenOutputValidationError{
+				field:  "PartialTokenOutput",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(m.GetRevocationCommitment()) != 33 {
+		err := FinalTokenOutputValidationError{
+			field:  "RevocationCommitment",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return FinalTokenOutputMultiError(errors)
+	}
+
+	return nil
+}
+
+// FinalTokenOutputMultiError is an error wrapping multiple validation errors
+// returned by FinalTokenOutput.ValidateAll() if the designated constraints
+// aren't met.
+type FinalTokenOutputMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m FinalTokenOutputMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m FinalTokenOutputMultiError) AllErrors() []error { return m }
+
+// FinalTokenOutputValidationError is the validation error returned by
+// FinalTokenOutput.Validate if the designated constraints aren't met.
+type FinalTokenOutputValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e FinalTokenOutputValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e FinalTokenOutputValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e FinalTokenOutputValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e FinalTokenOutputValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e FinalTokenOutputValidationError) ErrorName() string { return "FinalTokenOutputValidationError" }
+
+// Error satisfies the builtin error interface
+func (e FinalTokenOutputValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sFinalTokenOutput.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = FinalTokenOutputValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = FinalTokenOutputValidationError{}
+
 // Validate checks the field values on TokenTransaction with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
@@ -1175,6 +1454,803 @@ var _ interface {
 var _TokenTransaction_Network_NotInLookup = map[spark.Network]struct{}{
 	0: {},
 }
+
+// Validate checks the field values on TokenTransactionMetadata with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *TokenTransactionMetadata) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TokenTransactionMetadata with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// TokenTransactionMetadataMultiError, or nil if none found.
+func (m *TokenTransactionMetadata) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TokenTransactionMetadata) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetSparkOperatorIdentityPublicKeys() {
+		_, _ = idx, item
+
+		if len(item) != 33 {
+			err := TokenTransactionMetadataValidationError{
+				field:  fmt.Sprintf("SparkOperatorIdentityPublicKeys[%v]", idx),
+				reason: "value length must be 33 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if _, ok := _TokenTransactionMetadata_Network_NotInLookup[m.GetNetwork()]; ok {
+		err := TokenTransactionMetadataValidationError{
+			field:  "Network",
+			reason: "value must not be in list [UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetClientCreatedTimestamp()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TokenTransactionMetadataValidationError{
+					field:  "ClientCreatedTimestamp",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TokenTransactionMetadataValidationError{
+					field:  "ClientCreatedTimestamp",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetClientCreatedTimestamp()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TokenTransactionMetadataValidationError{
+				field:  "ClientCreatedTimestamp",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if val := m.GetValidityDurationSeconds(); val < 1 || val > 300 {
+		err := TokenTransactionMetadataValidationError{
+			field:  "ValidityDurationSeconds",
+			reason: "value must be inside range [1, 300]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetInvoiceAttachments() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TokenTransactionMetadataValidationError{
+						field:  fmt.Sprintf("InvoiceAttachments[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TokenTransactionMetadataValidationError{
+						field:  fmt.Sprintf("InvoiceAttachments[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TokenTransactionMetadataValidationError{
+					field:  fmt.Sprintf("InvoiceAttachments[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return TokenTransactionMetadataMultiError(errors)
+	}
+
+	return nil
+}
+
+// TokenTransactionMetadataMultiError is an error wrapping multiple validation
+// errors returned by TokenTransactionMetadata.ValidateAll() if the designated
+// constraints aren't met.
+type TokenTransactionMetadataMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TokenTransactionMetadataMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TokenTransactionMetadataMultiError) AllErrors() []error { return m }
+
+// TokenTransactionMetadataValidationError is the validation error returned by
+// TokenTransactionMetadata.Validate if the designated constraints aren't met.
+type TokenTransactionMetadataValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TokenTransactionMetadataValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TokenTransactionMetadataValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TokenTransactionMetadataValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TokenTransactionMetadataValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TokenTransactionMetadataValidationError) ErrorName() string {
+	return "TokenTransactionMetadataValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e TokenTransactionMetadataValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTokenTransactionMetadata.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TokenTransactionMetadataValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TokenTransactionMetadataValidationError{}
+
+var _TokenTransactionMetadata_Network_NotInLookup = map[spark.Network]struct{}{
+	0: {},
+}
+
+// Validate checks the field values on PartialTokenTransaction with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *PartialTokenTransaction) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on PartialTokenTransaction with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// PartialTokenTransactionMultiError, or nil if none found.
+func (m *PartialTokenTransaction) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *PartialTokenTransaction) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Version
+
+	if all {
+		switch v := interface{}(m.GetTokenTransactionMetadata()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, PartialTokenTransactionValidationError{
+					field:  "TokenTransactionMetadata",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, PartialTokenTransactionValidationError{
+					field:  "TokenTransactionMetadata",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTokenTransactionMetadata()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return PartialTokenTransactionValidationError{
+				field:  "TokenTransactionMetadata",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	for idx, item := range m.GetPartialTokenOutputs() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, PartialTokenTransactionValidationError{
+						field:  fmt.Sprintf("PartialTokenOutputs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, PartialTokenTransactionValidationError{
+						field:  fmt.Sprintf("PartialTokenOutputs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PartialTokenTransactionValidationError{
+					field:  fmt.Sprintf("PartialTokenOutputs[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	switch v := m.TokenInputs.(type) {
+	case *PartialTokenTransaction_MintInput:
+		if v == nil {
+			err := PartialTokenTransactionValidationError{
+				field:  "TokenInputs",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetMintInput()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, PartialTokenTransactionValidationError{
+						field:  "MintInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, PartialTokenTransactionValidationError{
+						field:  "MintInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetMintInput()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PartialTokenTransactionValidationError{
+					field:  "MintInput",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *PartialTokenTransaction_TransferInput:
+		if v == nil {
+			err := PartialTokenTransactionValidationError{
+				field:  "TokenInputs",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetTransferInput()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, PartialTokenTransactionValidationError{
+						field:  "TransferInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, PartialTokenTransactionValidationError{
+						field:  "TransferInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTransferInput()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PartialTokenTransactionValidationError{
+					field:  "TransferInput",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *PartialTokenTransaction_CreateInput:
+		if v == nil {
+			err := PartialTokenTransactionValidationError{
+				field:  "TokenInputs",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetCreateInput()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, PartialTokenTransactionValidationError{
+						field:  "CreateInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, PartialTokenTransactionValidationError{
+						field:  "CreateInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetCreateInput()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PartialTokenTransactionValidationError{
+					field:  "CreateInput",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return PartialTokenTransactionMultiError(errors)
+	}
+
+	return nil
+}
+
+// PartialTokenTransactionMultiError is an error wrapping multiple validation
+// errors returned by PartialTokenTransaction.ValidateAll() if the designated
+// constraints aren't met.
+type PartialTokenTransactionMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m PartialTokenTransactionMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m PartialTokenTransactionMultiError) AllErrors() []error { return m }
+
+// PartialTokenTransactionValidationError is the validation error returned by
+// PartialTokenTransaction.Validate if the designated constraints aren't met.
+type PartialTokenTransactionValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e PartialTokenTransactionValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e PartialTokenTransactionValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e PartialTokenTransactionValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e PartialTokenTransactionValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e PartialTokenTransactionValidationError) ErrorName() string {
+	return "PartialTokenTransactionValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e PartialTokenTransactionValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sPartialTokenTransaction.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = PartialTokenTransactionValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = PartialTokenTransactionValidationError{}
+
+// Validate checks the field values on FinalTokenTransaction with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *FinalTokenTransaction) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on FinalTokenTransaction with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// FinalTokenTransactionMultiError, or nil if none found.
+func (m *FinalTokenTransaction) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *FinalTokenTransaction) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Version
+
+	if all {
+		switch v := interface{}(m.GetTokenTransactionMetadata()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FinalTokenTransactionValidationError{
+					field:  "TokenTransactionMetadata",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FinalTokenTransactionValidationError{
+					field:  "TokenTransactionMetadata",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTokenTransactionMetadata()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FinalTokenTransactionValidationError{
+				field:  "TokenTransactionMetadata",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	for idx, item := range m.GetFinalTokenOutputs() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, FinalTokenTransactionValidationError{
+						field:  fmt.Sprintf("FinalTokenOutputs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, FinalTokenTransactionValidationError{
+						field:  fmt.Sprintf("FinalTokenOutputs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return FinalTokenTransactionValidationError{
+					field:  fmt.Sprintf("FinalTokenOutputs[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	switch v := m.TokenInputs.(type) {
+	case *FinalTokenTransaction_MintInput:
+		if v == nil {
+			err := FinalTokenTransactionValidationError{
+				field:  "TokenInputs",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetMintInput()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, FinalTokenTransactionValidationError{
+						field:  "MintInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, FinalTokenTransactionValidationError{
+						field:  "MintInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetMintInput()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return FinalTokenTransactionValidationError{
+					field:  "MintInput",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *FinalTokenTransaction_TransferInput:
+		if v == nil {
+			err := FinalTokenTransactionValidationError{
+				field:  "TokenInputs",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetTransferInput()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, FinalTokenTransactionValidationError{
+						field:  "TransferInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, FinalTokenTransactionValidationError{
+						field:  "TransferInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTransferInput()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return FinalTokenTransactionValidationError{
+					field:  "TransferInput",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *FinalTokenTransaction_CreateInput:
+		if v == nil {
+			err := FinalTokenTransactionValidationError{
+				field:  "TokenInputs",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetCreateInput()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, FinalTokenTransactionValidationError{
+						field:  "CreateInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, FinalTokenTransactionValidationError{
+						field:  "CreateInput",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetCreateInput()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return FinalTokenTransactionValidationError{
+					field:  "CreateInput",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return FinalTokenTransactionMultiError(errors)
+	}
+
+	return nil
+}
+
+// FinalTokenTransactionMultiError is an error wrapping multiple validation
+// errors returned by FinalTokenTransaction.ValidateAll() if the designated
+// constraints aren't met.
+type FinalTokenTransactionMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m FinalTokenTransactionMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m FinalTokenTransactionMultiError) AllErrors() []error { return m }
+
+// FinalTokenTransactionValidationError is the validation error returned by
+// FinalTokenTransaction.Validate if the designated constraints aren't met.
+type FinalTokenTransactionValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e FinalTokenTransactionValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e FinalTokenTransactionValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e FinalTokenTransactionValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e FinalTokenTransactionValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e FinalTokenTransactionValidationError) ErrorName() string {
+	return "FinalTokenTransactionValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e FinalTokenTransactionValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sFinalTokenTransaction.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = FinalTokenTransactionValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = FinalTokenTransactionValidationError{}
 
 // Validate checks the field values on InvoiceAttachment with the rules defined
 // in the proto definition for this message. If any rules are violated, the
@@ -2341,6 +3417,346 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = CommitTransactionResponseValidationError{}
+
+// Validate checks the field values on BroadcastTransactionRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *BroadcastTransactionRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on BroadcastTransactionRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// BroadcastTransactionRequestMultiError, or nil if none found.
+func (m *BroadcastTransactionRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *BroadcastTransactionRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetIdentityPublicKey()) != 33 {
+		err := BroadcastTransactionRequestValidationError{
+			field:  "IdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetPartialTokenTransaction()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, BroadcastTransactionRequestValidationError{
+					field:  "PartialTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, BroadcastTransactionRequestValidationError{
+					field:  "PartialTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetPartialTokenTransaction()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return BroadcastTransactionRequestValidationError{
+				field:  "PartialTokenTransaction",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	for idx, item := range m.GetTokenTransactionOwnerSignatures() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, BroadcastTransactionRequestValidationError{
+						field:  fmt.Sprintf("TokenTransactionOwnerSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, BroadcastTransactionRequestValidationError{
+						field:  fmt.Sprintf("TokenTransactionOwnerSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return BroadcastTransactionRequestValidationError{
+					field:  fmt.Sprintf("TokenTransactionOwnerSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return BroadcastTransactionRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// BroadcastTransactionRequestMultiError is an error wrapping multiple
+// validation errors returned by BroadcastTransactionRequest.ValidateAll() if
+// the designated constraints aren't met.
+type BroadcastTransactionRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m BroadcastTransactionRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m BroadcastTransactionRequestMultiError) AllErrors() []error { return m }
+
+// BroadcastTransactionRequestValidationError is the validation error returned
+// by BroadcastTransactionRequest.Validate if the designated constraints
+// aren't met.
+type BroadcastTransactionRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e BroadcastTransactionRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e BroadcastTransactionRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e BroadcastTransactionRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e BroadcastTransactionRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e BroadcastTransactionRequestValidationError) ErrorName() string {
+	return "BroadcastTransactionRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e BroadcastTransactionRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sBroadcastTransactionRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = BroadcastTransactionRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = BroadcastTransactionRequestValidationError{}
+
+// Validate checks the field values on BroadcastTransactionResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *BroadcastTransactionResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on BroadcastTransactionResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// BroadcastTransactionResponseMultiError, or nil if none found.
+func (m *BroadcastTransactionResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *BroadcastTransactionResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetFinalTokenTransaction()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, BroadcastTransactionResponseValidationError{
+					field:  "FinalTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, BroadcastTransactionResponseValidationError{
+					field:  "FinalTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetFinalTokenTransaction()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return BroadcastTransactionResponseValidationError{
+				field:  "FinalTokenTransaction",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for CommitStatus
+
+	if all {
+		switch v := interface{}(m.GetCommitProgress()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, BroadcastTransactionResponseValidationError{
+					field:  "CommitProgress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, BroadcastTransactionResponseValidationError{
+					field:  "CommitProgress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCommitProgress()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return BroadcastTransactionResponseValidationError{
+				field:  "CommitProgress",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return BroadcastTransactionResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// BroadcastTransactionResponseMultiError is an error wrapping multiple
+// validation errors returned by BroadcastTransactionResponse.ValidateAll() if
+// the designated constraints aren't met.
+type BroadcastTransactionResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m BroadcastTransactionResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m BroadcastTransactionResponseMultiError) AllErrors() []error { return m }
+
+// BroadcastTransactionResponseValidationError is the validation error returned
+// by BroadcastTransactionResponse.Validate if the designated constraints
+// aren't met.
+type BroadcastTransactionResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e BroadcastTransactionResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e BroadcastTransactionResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e BroadcastTransactionResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e BroadcastTransactionResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e BroadcastTransactionResponseValidationError) ErrorName() string {
+	return "BroadcastTransactionResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e BroadcastTransactionResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sBroadcastTransactionResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = BroadcastTransactionResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = BroadcastTransactionResponseValidationError{}
 
 // Validate checks the field values on QueryTokenMetadataRequest with the rules
 // defined in the proto definition for this message. If any rules are

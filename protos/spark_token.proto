@@ -28,6 +28,10 @@ service SparkTokenService {
         returns (QueryTokenOutputsResponse) {}
 
     rpc freeze_tokens(FreezeTokensRequest) returns (FreezeTokensResponse) {}
+
+    // Replaces start_transaction and commit_transaction in single phase transaction flow.
+    rpc broadcast_transaction(BroadcastTransactionRequest)
+        returns (BroadcastTransactionResponse) {}
 }
 
 // This proto is constructed by the wallet to specify leaves it wants to spend
@@ -73,6 +77,20 @@ message TokenOutput {
 
 }
 
+message PartialTokenOutput {
+    bytes owner_public_key = 1 [(validate.rules).bytes.len = 33];
+    uint64 withdraw_bond_sats = 2;
+    uint64 withdraw_relative_block_locktime = 3;
+    bytes token_identifier = 4 [(validate.rules).bytes.len = 32];
+    bytes token_amount = 5
+        [(validate.rules).bytes.len = 16];  // Decoded uint128
+}
+
+message FinalTokenOutput {
+    PartialTokenOutput partial_token_output = 1;
+    bytes revocation_commitment = 2 [(validate.rules).bytes.len = 33];
+}
+
 enum TokenTransactionType {
     TOKEN_TRANSACTION_TYPE_UNSPECIFIED = 0;
     TOKEN_TRANSACTION_TYPE_CREATE = 1;
@@ -96,7 +114,7 @@ message TokenTransaction {
     }
     repeated TokenOutput token_outputs                 = 4;
     repeated bytes spark_operator_identity_public_keys = 5
-        [(validate.rules).repeated .items.bytes.len = 33];
+    [(validate.rules).repeated .items.bytes.len = 33];
     // Server-set expiry time. The server calculates this by adding the client's
     // requested validity_duration_seconds to the server's current time when
     // creating the final transaction.
@@ -108,6 +126,46 @@ message TokenTransaction {
     google.protobuf.Timestamp client_created_timestamp = 9;
     // The spark invoices this transaction fulfills.
     repeated InvoiceAttachment invoice_attachments = 10;
+}
+
+message TokenTransactionMetadata {
+    repeated bytes spark_operator_identity_public_keys = 2
+    [(validate.rules).repeated .items.bytes.len = 33];
+    spark.Network network = 3 [(validate.rules).enum = { not_in: [ 0 ] }];
+    // The timestamp of when the client created the transaction. This is used to
+    // determine which transaction should win in a race condition. Earlier
+    // timestamps win over later ones.
+    google.protobuf.Timestamp client_created_timestamp = 4;
+    // How long the transaction should be valid for, in seconds.
+    // The server will set the actual expiry_time in the final transaction based
+    // on this duration. Must be within [1, 300] seconds.
+    uint64 validity_duration_seconds = 5
+        [(validate.rules).uint64 = { gte: 1, lte: 300 }];
+    // The spark invoices this transaction fulfills.
+    repeated InvoiceAttachment invoice_attachments = 6;
+}
+
+message PartialTokenTransaction {
+    uint32 version = 1;
+    TokenTransactionMetadata token_transaction_metadata = 2;
+    oneof token_inputs {
+        TokenMintInput mint_input = 3;
+        TokenTransferInput transfer_input = 4;
+        TokenCreateInput create_input = 5;
+    }
+    repeated PartialTokenOutput partial_token_outputs = 6;
+    
+}
+
+message FinalTokenTransaction {
+    uint32 version = 1;
+    TokenTransactionMetadata token_transaction_metadata = 2;
+    oneof token_inputs {
+        TokenMintInput mint_input = 3;
+        TokenTransferInput transfer_input = 4;
+        TokenCreateInput create_input = 5;
+    }
+    repeated FinalTokenOutput final_token_outputs = 6;
 }
 
 message InvoiceAttachment {
@@ -138,8 +196,8 @@ message StartTransactionRequest {
     TokenTransaction partial_token_transaction = 2;
     // Filled by signing the partial token transaction hash with the
     // owner/issuer private key. For mint transactions this will be one
-    // signature for the input issuer_public_key For transfer transactions this
-    // will be one for each output for the output owner_public_key
+    // signature for the input issuer_public_key. For transfer transactions this
+    // will be one signature for each input to be sepnt.
     repeated SignatureWithIndex partial_token_transaction_owner_signatures = 3;
     // How long the transaction should be valid for, in seconds.
     // The server will set the actual expiry_time in the final transaction based
@@ -176,6 +234,24 @@ message CommitTransactionResponse {
     CommitStatus commit_status = 1;
     CommitProgress commit_progress = 2;
 }
+
+
+message BroadcastTransactionRequest {
+    bytes identity_public_key = 1 [(validate.rules).bytes.len = 33];
+    PartialTokenTransaction partial_token_transaction = 2;
+    // Filled by signing the partial token transaction hash with the
+    // owner/issuer private key. For mint transactions this will be one
+    // signature for the input issuer_public_key. For transfer transactions this
+    // will be one signature for each input to be spent.
+    repeated SignatureWithIndex token_transaction_owner_signatures = 3;
+}
+
+message BroadcastTransactionResponse {
+    FinalTokenTransaction final_token_transaction = 1;
+    CommitStatus commit_status = 2;
+    CommitProgress commit_progress = 3;
+}
+
 
 message QueryTokenMetadataRequest {
     repeated bytes token_identifiers = 1 [(validate.rules).repeated .items.bytes.len = 32];

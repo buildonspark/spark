@@ -25,6 +25,7 @@ const (
 	SparkTokenService_QueryTokenTransactions_FullMethodName = "/spark_token.SparkTokenService/query_token_transactions"
 	SparkTokenService_QueryTokenOutputs_FullMethodName      = "/spark_token.SparkTokenService/query_token_outputs"
 	SparkTokenService_FreezeTokens_FullMethodName           = "/spark_token.SparkTokenService/freeze_tokens"
+	SparkTokenService_BroadcastTransaction_FullMethodName   = "/spark_token.SparkTokenService/broadcast_transaction"
 )
 
 // SparkTokenServiceClient is the client API for SparkTokenService service.
@@ -41,6 +42,8 @@ type SparkTokenServiceClient interface {
 	QueryTokenTransactions(ctx context.Context, in *QueryTokenTransactionsRequest, opts ...grpc.CallOption) (*QueryTokenTransactionsResponse, error)
 	QueryTokenOutputs(ctx context.Context, in *QueryTokenOutputsRequest, opts ...grpc.CallOption) (*QueryTokenOutputsResponse, error)
 	FreezeTokens(ctx context.Context, in *FreezeTokensRequest, opts ...grpc.CallOption) (*FreezeTokensResponse, error)
+	// Replaces start_transaction and commit_transaction in single phase transaction flow.
+	BroadcastTransaction(ctx context.Context, in *BroadcastTransactionRequest, opts ...grpc.CallOption) (*BroadcastTransactionResponse, error)
 }
 
 type sparkTokenServiceClient struct {
@@ -111,6 +114,16 @@ func (c *sparkTokenServiceClient) FreezeTokens(ctx context.Context, in *FreezeTo
 	return out, nil
 }
 
+func (c *sparkTokenServiceClient) BroadcastTransaction(ctx context.Context, in *BroadcastTransactionRequest, opts ...grpc.CallOption) (*BroadcastTransactionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BroadcastTransactionResponse)
+	err := c.cc.Invoke(ctx, SparkTokenService_BroadcastTransaction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkTokenServiceServer is the server API for SparkTokenService service.
 // All implementations must embed UnimplementedSparkTokenServiceServer
 // for forward compatibility.
@@ -125,6 +138,8 @@ type SparkTokenServiceServer interface {
 	QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error)
 	QueryTokenOutputs(context.Context, *QueryTokenOutputsRequest) (*QueryTokenOutputsResponse, error)
 	FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error)
+	// Replaces start_transaction and commit_transaction in single phase transaction flow.
+	BroadcastTransaction(context.Context, *BroadcastTransactionRequest) (*BroadcastTransactionResponse, error)
 	mustEmbedUnimplementedSparkTokenServiceServer()
 }
 
@@ -152,6 +167,9 @@ func (UnimplementedSparkTokenServiceServer) QueryTokenOutputs(context.Context, *
 }
 func (UnimplementedSparkTokenServiceServer) FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FreezeTokens not implemented")
+}
+func (UnimplementedSparkTokenServiceServer) BroadcastTransaction(context.Context, *BroadcastTransactionRequest) (*BroadcastTransactionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BroadcastTransaction not implemented")
 }
 func (UnimplementedSparkTokenServiceServer) mustEmbedUnimplementedSparkTokenServiceServer() {}
 func (UnimplementedSparkTokenServiceServer) testEmbeddedByValue()                           {}
@@ -282,6 +300,24 @@ func _SparkTokenService_FreezeTokens_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkTokenService_BroadcastTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BroadcastTransactionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkTokenServiceServer).BroadcastTransaction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkTokenService_BroadcastTransaction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkTokenServiceServer).BroadcastTransaction(ctx, req.(*BroadcastTransactionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkTokenService_ServiceDesc is the grpc.ServiceDesc for SparkTokenService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -312,6 +348,10 @@ var SparkTokenService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "freeze_tokens",
 			Handler:    _SparkTokenService_FreezeTokens_Handler,
+		},
+		{
+			MethodName: "broadcast_transaction",
+			Handler:    _SparkTokenService_BroadcastTransaction_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
