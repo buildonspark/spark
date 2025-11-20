@@ -3,7 +3,7 @@ plugins { id("com.facebook.react.settings") }
 extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> 
   ex.autolinkLibrariesFromCommand(
     ["node", "-e", "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"],
-    settings.layout.rootDirectory.dir("../").asFile
+    settings.layout.rootDirectory.dir("../../../").asFile
   )
 }
 rootProject.name = 'SparkReactNativeApp'

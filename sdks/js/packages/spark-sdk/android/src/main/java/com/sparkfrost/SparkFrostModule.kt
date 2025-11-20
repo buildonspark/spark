@@ -248,7 +248,7 @@ class SparkFrostModule(reactContext: ReactApplicationContext) : ReactContextBase
                 ?: throw Exception("Invalid compressed format")
 
             val result = uniffi.spark_frost.getPublicKeyBytes(
-                privateKey = privateKey,
+                privateKeyBytes = privateKey,
                 compressed = compressed
             )
 
@@ -276,7 +276,7 @@ class SparkFrostModule(reactContext: ReactApplicationContext) : ReactContextBase
                 val privateKey = privateKeyArray.toByteArray()
                 
                 val publicKey = uniffi.spark_frost.getPublicKeyBytes(
-                    privateKey = privateKey,
+                    privateKeyBytes = privateKey,
                     compressed = compressed
                 )
                 

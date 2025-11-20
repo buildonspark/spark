@@ -7,6 +7,12 @@ describe('Spark React Native App', () => {
     await device.launchApp({
       newInstance: true,
     });
+
+    await element(by.id('open-test-screen-button')).tap();
+
+    await waitFor(element(by.id('connect-wallet-button')))
+      .toBeVisible()
+      .withTimeout(5000);
   });
 
   it('should show all buttons on app launch', async () => {
