@@ -90,6 +90,7 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
     decimals: number,
     maxSupply: bigint,
     isFreezable: boolean,
+    extraMetadata: Uint8Array | undefined,
   ): Promise<TokenTransaction> {
     return {
       version: 2,
@@ -103,6 +104,7 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
           decimals: decimals,
           maxSupply: numberToBytesBE(maxSupply, 16),
           isFreezable: isFreezable,
+          extraMetadata: extraMetadata,
         },
       },
       tokenOutputs: [],
@@ -121,6 +123,7 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
     decimals: number,
     maxSupply: bigint,
     isFreezable: boolean,
+    extraMetadata?: Uint8Array,
   ): Promise<PartialTokenTransaction> {
     return {
       version: 3,
@@ -142,6 +145,7 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
           decimals: decimals,
           maxSupply: numberToBytesBE(maxSupply, 16),
           isFreezable: isFreezable,
+          extraMetadata: extraMetadata,
         },
       },
       partialTokenOutputs: [],

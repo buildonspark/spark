@@ -97,6 +97,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
         decimals: metadata.decimals,
         maxSupply: bytesToNumberBE(metadata.maxSupply),
         isFreezable: metadata.isFreezable,
+        extraMetadata: metadata.extraMetadata,
       };
     }
 
@@ -135,6 +136,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
         decimals: metadata.decimals,
         maxSupply: bytesToNumberBE(metadata.maxSupply),
         isFreezable: metadata.isFreezable,
+        extraMetadata: metadata.extraMetadata,
       };
     } catch (error) {
       throw new SparkRequestError("Failed to fetch token metadata", { error });
@@ -164,6 +166,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
    * @param params.decimals - The number of decimal places for the token.
    * @param params.isFreezable - Whether the token can be frozen.
    * @param [params.maxSupply=0n] - (Optional) The maximum supply of the token. Defaults to <code>0n</code>.
+   * @param params.extraMetadata - (Optional) This can be used to store additional bytes data to be associated with a token, like image data.
    *
    * @returns The transaction ID of the announcement.
    *
@@ -176,14 +179,22 @@ export abstract class IssuerSparkWallet extends SparkWallet {
     decimals,
     isFreezable,
     maxSupply = 0n,
+    extraMetadata,
   }: {
     tokenName: string;
     tokenTicker: string;
     decimals: number;
     isFreezable: boolean;
     maxSupply?: bigint;
+    extraMetadata?: Uint8Array;
   }): Promise<string> {
-    validateTokenParameters(tokenName, tokenTicker, decimals, maxSupply);
+    validateTokenParameters(
+      tokenName,
+      tokenTicker,
+      decimals,
+      maxSupply,
+      extraMetadata,
+    );
 
     const issuerPublicKey = await super.getIdentityPublicKey();
 
@@ -196,6 +207,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
           decimals,
           maxSupply,
           isFreezable,
+          extraMetadata,
         );
 
       return await this.issuerTokenTransactionService.broadcastTokenTransaction(
@@ -210,6 +222,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
           decimals,
           maxSupply,
           isFreezable,
+          extraMetadata,
         );
 
       return await this.issuerTokenTransactionService.broadcastTokenTransactionV3(

@@ -34,6 +34,8 @@ export type IssuerTokenMetadata = {
   maxSupply: bigint;
   /** Whether the token is freezable */
   isFreezable: boolean;
+  /** Extra metadata of the token */
+  extraMetadata?: Uint8Array;
 };
 
 export interface TokenDistribution {

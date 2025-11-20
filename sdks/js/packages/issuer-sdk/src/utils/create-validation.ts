@@ -18,12 +18,14 @@ const MIN_SYMBOL_SIZE = 3; // bytes
 const MAX_SYMBOL_SIZE = 6; // bytes
 const MAX_DECIMALS = 255; // fits into single byte
 const MAXIMUM_MAX_SUPPLY = (1n << 128n) - 1n; // fits into 16 bytes (u128)
+export const MAX_TOKEN_CONTENT_SIZE = 1024; // fits into 1024 bytes
 
 export function validateTokenParameters(
   tokenName: string,
   tokenTicker: string,
   decimals: number,
   maxSupply: bigint,
+  extraMetadata?: Uint8Array,
 ) {
   if (!isNfcNormalized(tokenName)) {
     throw new SparkValidationError("Token name must be NFC-normalised UTF-8", {
@@ -91,5 +93,16 @@ export function validateTokenParameters(
       value: maxSupply.toString(),
       expected: `>=0 and <=${MAXIMUM_MAX_SUPPLY.toString()}`,
     });
+  }
+
+  if (extraMetadata && extraMetadata.length > MAX_TOKEN_CONTENT_SIZE) {
+    throw new SparkValidationError(
+      `Extra metadata must be less than ${MAX_TOKEN_CONTENT_SIZE} bytes`,
+      {
+        field: "extraMetadata",
+        value: extraMetadata.length,
+        expected: `<${MAX_TOKEN_CONTENT_SIZE}`,
+      },
+    );
   }
 }

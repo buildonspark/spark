@@ -707,7 +707,7 @@ async function runCLI() {
   burntokens <amount>                                                 - Burn tokens
   freezetokens <sparkAddress>                                         - Freeze tokens for a specific address
   unfreezetokens <sparkAddress>                                       - Unfreeze tokens for a specific address
-  createtoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> - Create a new token.
+  createtoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> <extraMetadata> - Create a new token.
   decodetokenidentifier <tokenIdentifier>                             - Returns the raw token identifier as a hex string
 
   enablelogging <true|false>                                          - Enable or disable logging
@@ -1991,14 +1991,23 @@ async function runCLI() {
             console.log("Please initialize a wallet first");
             break;
           }
-          const [tokenName, tokenTicker, decimals, maxSupply, isFreezable] =
-            args;
+          const [
+            tokenName,
+            tokenTicker,
+            decimals,
+            maxSupply,
+            isFreezable,
+            extraMetadata,
+          ] = args;
           const result = await wallet.createToken({
             tokenName,
             tokenTicker,
             decimals: parseInt(decimals),
             maxSupply: BigInt(maxSupply),
             isFreezable: isFreezable.toLowerCase() === "true",
+            extraMetadata: extraMetadata
+              ? hexToBytes(extraMetadata)
+              : undefined,
           });
           console.log("Create Token Transaction ID:", result);
           break;
