@@ -494,11 +494,55 @@ export abstract class ConnectionManager {
       call: ClientMiddlewareCall<Req, Res>,
       options: SparkCallOptions,
     ) {
+      const methodName =
+        // nice-grpc / nice-grpc-web
+        (call as any)?.method?.path ?? (call as any)?.method?.name ?? "unknown";
+
+      const startTime = Date.now();
+      console.log(
+        `[SparkSDK gRPC] Executing auth RPC ${JSON.stringify({
+          method: methodName,
+        })}`,
+      );
+
       const metadata = this.prepareMetadata(Metadata(options.metadata));
-      return yield* call.next(call.request as Req, {
+      const generator = call.next(call.request as Req, {
         ...options,
         metadata,
       });
+
+      let result = await generator.next();
+      while (!result.done) {
+        console.log(
+          `[SparkSDK gRPC] Received auth RPC message ${JSON.stringify({
+            method: methodName,
+            durationMs: Date.now() - startTime,
+          })}`,
+        );
+        yield result.value;
+        result = await generator.next();
+      }
+
+      if (result.value !== undefined) {
+        console.log(
+          `[SparkSDK gRPC] Auth RPC completed ${JSON.stringify({
+            method: methodName,
+            durationMs: Date.now() - startTime,
+          })}`,
+        );
+        return result.value;
+      }
+
+      console.log(
+        `[SparkSDK gRPC] Auth RPC completed with no body ${JSON.stringify({
+          method: methodName,
+          durationMs: Date.now() - startTime,
+        })}`,
+      );
+
+      // Explicit return for noImplicitReturns, even though generators implicitly
+      // return at the end of execution.
+      return;
     }.bind(this) as <Req, Res>(
       call: ClientMiddlewareCall<Req, Res>,
       options: SparkCallOptions,
@@ -511,9 +555,21 @@ export abstract class ConnectionManager {
       call: ClientMiddlewareCall<Req, Res>,
       options: SparkCallOptions,
     ) {
+      const methodName =
+        // nice-grpc / nice-grpc-web
+        (call as any)?.method?.path ?? (call as any)?.method?.name ?? "unknown";
+
       const metadata = this.prepareMetadata(Metadata(options.metadata));
       const authToken = await this.authenticate(address);
       const sendTime = this.getMonotonicTime();
+      const startTime = Date.now();
+
+      console.log(
+        `[SparkSDK gRPC] Executing RPC ${JSON.stringify({
+          method: methodName,
+          address,
+        })}`,
+      );
 
       try {
         const generator = call.next(call.request as Req, {
@@ -525,6 +581,14 @@ export abstract class ConnectionManager {
         let result = await generator.next();
 
         while (!result.done) {
+          console.log(
+            `[SparkSDK gRPC] Received RPC message ${JSON.stringify({
+              method: methodName,
+              address,
+              durationMs: Date.now() - startTime,
+            })}`,
+          );
+
           if (firstResponse) {
             firstResponse = this.processResponseForTimeSync(
               result,
@@ -541,9 +605,39 @@ export abstract class ConnectionManager {
           if (firstResponse) {
             this.processResponseForTimeSync(result, firstResponse, sendTime);
           }
+          console.log(
+            `[SparkSDK gRPC] RPC completed ${JSON.stringify({
+              method: methodName,
+              address,
+              durationMs: Date.now() - startTime,
+            })}`,
+          );
           return result.value;
         }
+
+        console.log(
+          `[SparkSDK gRPC] RPC completed with no body ${JSON.stringify({
+            method: methodName,
+            address,
+            durationMs: Date.now() - startTime,
+          })}`,
+        );
+
+        // Explicit return for noImplicitReturns.
+        return;
       } catch (error: unknown) {
+        const errorPayload = {
+          method: methodName,
+          address,
+          durationMs: Date.now() - startTime,
+          error:
+            error instanceof Error
+              ? { name: error.name, message: error.message }
+              : String(error),
+        };
+        console.warn(
+          `[SparkSDK gRPC] RPC error ${JSON.stringify(errorPayload)}`,
+        );
         return yield* this.handleMiddlewareError(
           error,
           address,
