@@ -1,4 +1,4 @@
-import { CurrencyUnit, isObject } from "@lightsparkdev/core";
+import { CurrencyUnit } from "@lightsparkdev/core";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
@@ -13,7 +13,8 @@ import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { Mutex } from "async-mutex";
 import { uuidv7, uuidv7obj } from "uuidv7";
-import { clientEnv, isReactNative } from "../constants.js";
+import { isReactNative } from "../constants.js";
+import { SparkSDKError } from "../errors/base.js";
 import {
   ConfigurationError,
   InternalValidationError,
@@ -100,9 +101,8 @@ import {
 } from "../utils/network.js";
 import { sumAvailableTokens } from "../utils/token-transactions.js";
 import { doesTxnNeedRenewed, isZeroTimelock } from "../utils/transaction.js";
-
 import { sha256 } from "@noble/hashes/sha2";
-import { trace, Tracer } from "@opentelemetry/api";
+import { type Tracer } from "@opentelemetry/api";
 import {
   ConsoleSpanExporter,
   SimpleSpanProcessor,
@@ -154,6 +154,7 @@ import type {
   FulfillSparkInvoiceResponse,
   GroupSparkInvoicesResult,
   InitWalletResponse,
+  HandlePublicMethodErrorParams,
   InvalidInvoice,
   PayLightningInvoiceParams,
   SparkWalletEvents,
@@ -170,6 +171,7 @@ import type {
   WithdrawParams,
 } from "./types.js";
 import { SparkWalletEvent } from "./types.js";
+import { Interval } from "../types/index.js";
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
@@ -178,43 +180,32 @@ import { SparkWalletEvent } from "./types.js";
  */
 export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   protected config: WalletConfigService;
-
   protected connectionManager: ConnectionManager;
-  protected transferService: TransferService;
-  protected tracerId = "spark-sdk";
-
+  protected coopExitService: CoopExitService;
   protected depositService: DepositService;
   protected lightningService: LightningService;
-  protected coopExitService: CoopExitService;
   protected signingService: SigningService;
+  protected sspClient: SspClient | null = null;
   protected tokenTransactionService: TokenTransactionService;
+  protected transferService: TransferService;
 
   private claimTransferMutex = new Mutex();
+  private claimTransfersInterval: Interval | null = null;
   private leavesMutex = new Mutex();
-  private tokenOutputsMutex = new Mutex();
-  private optimizationInProgress = false;
-  private tokenOptimizationInProgress = false;
-  private sspClient: SspClient | null = null;
-
   private mutexes: Map<string, Mutex> = new Map();
-
+  private optimizationInProgress = false;
   private pendingWithdrawnOutputIds: string[] = [];
-
   private sparkAddress: SparkAddressFormat | undefined;
-
   private streamController: AbortController | null = null;
+  private tokenOptimizationInProgress = false;
+  private tokenOptimizationInterval: Interval | null = null;
+  private tokenOutputsMutex = new Mutex();
 
   protected leaves: TreeNode[] = [];
-
   protected tokenMetadata: TokenMetadataMap = new Map();
   protected tokenOutputs: TokenOutputsMap = new Map();
-
-  // Add this property near the top of the class with other private properties
-  private claimTransfersInterval: ReturnType<typeof setInterval> | null = null;
-  private tokenOptimizationInterval: ReturnType<typeof setInterval> | null =
-    null;
-
-  private tracer: Tracer | null = null;
+  protected tracer: Tracer | null = null;
+  protected tracerId = "spark-sdk";
 
   protected abstract buildConnectionManager(
     config: WalletConfigService,
@@ -222,7 +213,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   constructor(options?: ConfigOptions, signerArg?: SparkSigner) {
     super();
-
     const signer = signerArg || new DefaultSparkSigner();
     this.config = new WalletConfigService(options, signer);
     const events = this.config.getEvents();
@@ -260,21 +250,32 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       this.signingService,
     );
 
-    this.tracer = trace.getTracer(this.tracerId);
-    this.wrapSparkWalletMethodsWithTracing();
-    this.initializeTracer(this);
+    if (this.getTracer()) {
+      this.initializeTracer(this);
+    }
+    this.wrapPublicMethods();
   }
 
   public static async initialize<T extends SparkWallet>(
     this: new (options?: ConfigOptions, signer?: SparkSigner) => T,
     { mnemonicOrSeed, accountNumber, signer, options = {} }: SparkWalletProps,
   ): Promise<InitWalletResponse<T>> {
-    const wallet = new this(options, signer);
-    const initWalletResponse = await wallet.initWallet(
-      mnemonicOrSeed,
-      accountNumber,
-      options,
+    let wallet: T;
+
+    try {
+      wallet = new this(options, signer);
+    } catch (error) {
+      const err = await SparkWallet.handlePublicMethodError(error);
+      throw err;
+    }
+
+    const wrappedInit = SparkWallet.wrapMethod(
+      "initialize",
+      () => wallet.initWallet(mnemonicOrSeed, accountNumber, options),
+      wallet,
     );
+
+    const initWalletResponse = await wrappedInit();
     return initWalletResponse as InitWalletResponse<T>;
   }
 
@@ -5268,6 +5269,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     wallet.initializeTracerEnv({ spanProcessors, traceUrls });
   }
 
+  protected getTracer(): Tracer | null {
+    return null;
+  }
+
   protected initializeTracerEnv({
     spanProcessors,
     traceUrls,
@@ -5279,110 +5284,193 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
        incompatible dependencies in both */
   }
 
-  protected wrapWithOtelSpan<A extends unknown[], R>(
-    name: string,
-    fn: (...args: A) => Promise<R>,
+  protected static async handlePublicMethodError(
+    error: unknown,
+    { wallet, traceId }: HandlePublicMethodErrorParams = {},
   ) {
-    return async (...args: A) => {
-      if (!this.tracer) {
-        throw new Error("Tracer not initialized");
-      }
+    const context: Record<string, unknown> = {};
 
-      return await this.tracer.startActiveSpan(name, async (span) => {
-        const traceId = span.spanContext().traceId;
-        try {
-          const result = await fn(...args);
-          return result;
-        } catch (error) {
-          if (error instanceof Error) {
-            try {
-              const identityPublicKey = bytesToHex(
-                await this.config.signer.getIdentityPublicKey(),
-              );
-              error.message += ` [traceId: ${traceId}] [idPubKey: ${identityPublicKey}] [${clientEnv}]`;
-            } catch (keyError) {
-              error.message += ` [traceId: ${traceId}] [${clientEnv}]`;
-            }
-          } else if (isObject(error)) {
-            error["traceId"] = traceId;
-          }
-          throw error;
-        } finally {
-          span.end();
-        }
-      });
-    };
+    if (typeof traceId === "string" && traceId.length > 0) {
+      context.traceId = traceId;
+    }
+
+    if (wallet) {
+      try {
+        const keyBytes = await wallet.config.signer.getIdentityPublicKey();
+        context.idPubKey = bytesToHex(keyBytes);
+      } catch (keyError) {
+        /* Signer not initialized yet, ignore */
+      }
+    }
+
+    if (error instanceof SparkSDKError) {
+      if (Object.keys(context).length > 0) {
+        error.update({ context });
+      }
+      return error;
+    }
+
+    if (error instanceof Error) {
+      return new SparkSDKError(error.message, context, error);
+    }
+
+    /* Non-Error throwables: coerce to string and wrap */
+    const message = String(error);
+    return new SparkSDKError(message, context);
   }
 
   protected getTraceName(methodName: string) {
     return `SparkWallet.${methodName}`;
   }
 
-  private wrapPublicSparkWalletMethodWithOtelSpan<M extends keyof SparkWallet>(
-    methodName: M,
+  protected static wrapMethod(
+    methodName: string,
+    originalFn: (...args: unknown[]) => Promise<unknown>,
+    wallet: SparkWallet,
   ) {
+    const tracer = wallet.getTracer();
+    let wrapped: (...args: unknown[]) => Promise<unknown>;
+
+    if (tracer) {
+      wrapped = async (...args: unknown[]) => {
+        const activeTracer = wallet.getTracer();
+        if (!activeTracer) {
+          throw new Error("Tracer not initialized");
+        }
+        return activeTracer.startActiveSpan(
+          wallet.getTraceName(methodName),
+          async (span) => {
+            const traceId = span.spanContext().traceId;
+            try {
+              const result = await originalFn.apply(wallet, args);
+              return result;
+            } catch (error) {
+              const err = await SparkWallet.handlePublicMethodError(error, {
+                wallet,
+                traceId,
+              });
+              throw err;
+            } finally {
+              span.end();
+            }
+          },
+        );
+      };
+    } else {
+      wrapped = async (...args: unknown[]) => {
+        try {
+          const result = await originalFn.apply(wallet, args);
+          return result;
+        } catch (error) {
+          const err = await SparkWallet.handlePublicMethodError(error, {
+            wallet,
+          });
+          throw err;
+        }
+      };
+    }
+    return wrapped;
+  }
+
+  protected wrapPublicMethod<M extends keyof SparkWallet>(methodName: M) {
     const original = this[methodName];
 
     if (typeof original !== "function") {
       throw new Error(`Method ${methodName} is not a function on SparkWallet.`);
     }
 
-    const wrapped = this.wrapWithOtelSpan(
-      this.getTraceName(methodName),
-      original.bind(this) as (...args: unknown[]) => Promise<unknown>,
+    const originalFn = original as (...args: unknown[]) => Promise<unknown>;
+    const wrapped = SparkWallet.wrapMethod(
+      String(methodName),
+      originalFn,
+      this,
     ) as SparkWallet[M];
-
     (this as SparkWallet)[methodName] = wrapped;
   }
 
-  private wrapSparkWalletMethodsWithTracing() {
-    const methods = [
-      "getLeaves",
-      "getIdentityPublicKey",
-      "getSparkAddress",
-      "createSatsInvoice",
-      "createTokensInvoice",
-      "getSwapFeeEstimate",
-      "getTransfers",
-      "getBalance",
-      "getSingleUseDepositAddress",
-      "getStaticDepositAddress",
-      "queryStaticDepositAddresses",
-      "getClaimStaticDepositQuote",
-      "claimStaticDeposit",
-      "refundStaticDeposit",
-      "getUnusedDepositAddresses",
-      "getUtxosForDepositAddress",
-      "claimDeposit",
-      "advancedDeposit",
-      "transfer",
-      "createLightningInvoice",
-      "payLightningInvoice",
-      "getLightningSendFeeEstimate",
-      "withdraw",
-      "getWithdrawalFeeQuote",
-      "getTransferFromSsp",
-      "getTransfer",
-      "transferTokens",
-      "batchTransferTokens",
-      "queryTokenTransactions",
-      "getLightningReceiveRequest",
-      "getLightningSendRequest",
-      "getCoopExitRequest",
-      "checkTimelock",
-      "setPrivacyEnabled",
-      "getWalletSettings",
-    ] as const;
-
-    methods.forEach((m) => this.wrapPublicSparkWalletMethodWithOtelSpan(m));
-
-    /* Private methods can't be indexed on `this` and need to be wrapped individually: */
-    this.initWallet = this.wrapWithOtelSpan(
-      this.getTraceName("initWallet"),
-      this.initWallet.bind(this),
+  private wrapPublicMethods() {
+    PUBLIC_SPARK_WALLET_METHODS.forEach((methodName) =>
+      this.wrapPublicMethod(methodName),
     );
   }
 }
+
+type AssertNever<T extends never> = T;
+
+type SparkWalletFunctionKeys = Extract<
+  {
+    [K in keyof SparkWallet]: SparkWallet[K] extends (
+      ...args: any[]
+    ) => PromiseLike<unknown>
+      ? K
+      : never;
+  }[keyof SparkWallet],
+  string
+>;
+
+type WrappableSparkWalletMethod = Exclude<
+  SparkWalletFunctionKeys,
+  "constructor"
+>;
+
+const PUBLIC_SPARK_WALLET_METHODS = [
+  "advancedDeposit",
+  "batchTransferTokens",
+  "checkTimelock",
+  "claimDeposit",
+  "claimStaticDeposit",
+  "claimStaticDepositWithMaxFee",
+  "cleanupConnections",
+  "createLightningInvoice",
+  "createSatsInvoice",
+  "createTokensInvoice",
+  "fulfillSparkInvoice",
+  "getBalance",
+  "getClaimStaticDepositQuote",
+  "getCoopExitRequest",
+  "getIdentityPublicKey",
+  "getLeaves",
+  "getLightningReceiveRequest",
+  "getLightningSendFeeEstimate",
+  "getLightningSendRequest",
+  "getSingleUseDepositAddress",
+  "getSparkAddress",
+  "getStaticDepositAddress",
+  "getSwapFeeEstimate",
+  "getTokenL1Address",
+  "getTransfer",
+  "getTransferFromSsp",
+  "getTransfers",
+  "getUnusedDepositAddresses",
+  "getUserRequests",
+  "getUtxosForDepositAddress",
+  "getWalletSettings",
+  "getWithdrawalFeeQuote",
+  "isOptimizationInProgress",
+  "isTokenOptimizationInProgress",
+  "optimizeTokenOutputs",
+  "payLightningInvoice",
+  "querySparkInvoices",
+  "queryStaticDepositAddresses",
+  "queryTokenTransactions",
+  "refundAndBroadcastStaticDeposit",
+  "refundStaticDeposit",
+  "setPrivacyEnabled",
+  "signMessageWithIdentityKey",
+  "signTransaction",
+  "transfer",
+  "transferTokens",
+  "validateMessageWithIdentityKey",
+  "withdraw",
+] as const satisfies readonly WrappableSparkWalletMethod[];
+
+/* Type guard to ensure all public methods are in PUBLIC_SPARK_WALLET_METHODS */
+type _AllWrappableMethodsCovered = AssertNever<
+  Exclude<
+    WrappableSparkWalletMethod,
+    (typeof PUBLIC_SPARK_WALLET_METHODS)[number]
+  >
+>;
 
 function isConnectedStreamEvent(
   event: SubscribeToEventsResponse["event"],

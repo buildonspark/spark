@@ -1,58 +1,50 @@
 import { SparkSDKError } from "../errors/base.js";
+import { clientEnv } from "../constants.js";
 
 describe("SparkSDKError", () => {
-  it("should not throw and should stringify BigInt values in context", () => {
-    const bigNumber = 123n;
+  it("stringifies BigInt values in context", () => {
+    const err = new SparkSDKError("Test BigInt", { big: 123n });
 
-    const err = new SparkSDKError("Test BigInt", { big: bigNumber });
-
-    expect(err.message).toContain("Context:");
-    // BigInt should be converted to a string representation
-    expect(err.message).toContain('big: "123"');
+    expect(err.message).toBe(`Test BigInt [big: 123, clientEnv: ${clientEnv}]`);
   });
 
-  it("should stringify regular primitives correctly", () => {
+  it("stringifies primitive context values and strips punctuation", () => {
     const err = new SparkSDKError("Test primitives", {
       num: 1,
       str: "abc",
       bool: true,
     });
 
-    expect(err.message).toContain("num: 1");
-    expect(err.message).toContain('str: "abc"');
-    expect(err.message).toContain("bool: true");
+    expect(err.message).toBe(
+      `Test primitives [num: 1, str: abc, bool: true, clientEnv: ${clientEnv}]`,
+    );
   });
 
-  it("should include original error message when provided", () => {
+  it("includes original error message when provided", () => {
     const original = new Error("something broke");
-    const err = new SparkSDKError("Wrapper error", {}, original);
+    const err = new SparkSDKError("Wrapper error.", {}, original);
 
-    expect(err.message).toContain("Original Error: something broke");
+    expect(err.message).toBe(
+      `Wrapper error: something broke [clientEnv: ${clientEnv}]`,
+    );
   });
 
-  it("should stringify Uint8Array values correctly", () => {
+  it("stringifies Uint8Array values", () => {
     const bytes = new Uint8Array([1, 2, 3]);
     const err = new SparkSDKError("Uint8Array test", { bytes });
 
-    expect(err.message).toContain("bytes:");
-    expect(err.message).toMatch(/Uint8Array\(0x010203\)/);
+    expect(err.message).toBe(
+      `Uint8Array test [bytes: Uint8Array(0x010203), clientEnv: ${clientEnv}]`,
+    );
   });
 
-  it("should generate the correct full error message", () => {
-    const original = new Error("root cause");
-    const context = {
-      big: 123n,
-      bytes: new Uint8Array([1, 2, 3]),
-      num: 42,
-    } as const;
+  it("merges context via update", () => {
+    const err = new SparkSDKError("Needs update.", { foo: "bar" });
 
-    const err = new SparkSDKError("Something went wrong", context, original);
+    err.update({ context: { traceId: "abc123" } });
 
-    const expectedMessage =
-      "SparkSDKError: Something went wrong\n" +
-      'Context: big: "123", bytes: "Uint8Array(0x010203)", num: 42\n' +
-      "Original Error: root cause";
-
-    expect(err.message).toBe(expectedMessage);
+    expect(err.message).toBe(
+      `Needs update [foo: bar, clientEnv: ${clientEnv}, traceId: abc123]`,
+    );
   });
 });

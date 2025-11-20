@@ -16,6 +16,5 @@ setSparkFrostOnce(new SparkFrost());
 export * from "./index-shared.js";
 
 export { SparkWalletBrowser as SparkWallet } from "./spark-wallet/spark-wallet.browser.js";
-export { initializeTracerEnv } from "./otel/initializeTracerEnv.browser.js";
 export { ConnectionManagerBrowser as ConnectionManager } from "./services/connection/connection.browser.js";
 export { type ConnectionManager as BaseConnectionManager } from "./services/connection/connection.js";

@@ -46,7 +46,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
       this.config,
       this.connectionManager,
     );
-    this.wrapIssuerSparkWalletMethodsWithTracing();
+    this.wrapIssuerSparkWalletMethods();
   }
 
   /**
@@ -335,9 +335,9 @@ export abstract class IssuerSparkWallet extends SparkWallet {
     return `IssuerSparkWallet.${methodName}`;
   }
 
-  private wrapPublicIssuerSparkWalletMethodWithOtelSpan<
-    M extends keyof IssuerSparkWallet,
-  >(methodName: M) {
+  private wrapIssuerPublicMethod<M extends keyof IssuerSparkWallet>(
+    methodName: M,
+  ) {
     const original = this[methodName];
 
     if (typeof original !== "function") {
@@ -346,29 +346,55 @@ export abstract class IssuerSparkWallet extends SparkWallet {
       );
     }
 
-    const wrapped = this.wrapWithOtelSpan(
-      this.getTraceName(methodName),
-      original.bind(this) as (...args: unknown[]) => Promise<unknown>,
+    const originalFn = original as (...args: unknown[]) => Promise<unknown>;
+    const wrapped = SparkWallet.wrapMethod(
+      String(methodName),
+      originalFn,
+      this,
     ) as IssuerSparkWallet[M];
 
     (this as IssuerSparkWallet)[methodName] = wrapped;
   }
 
-  private wrapIssuerSparkWalletMethodsWithTracing() {
-    const methods = [
-      "getIssuerTokenBalance",
-      "getIssuerTokenMetadata",
-      "getIssuerTokenIdentifier",
-      "createToken",
-      "mintTokens",
-      "burnTokens",
-      "freezeTokens",
-      "unfreezeTokens",
-      "getIssuerTokenDistribution",
-    ] as const;
-
-    methods.forEach((m) =>
-      this.wrapPublicIssuerSparkWalletMethodWithOtelSpan(m),
+  private wrapIssuerSparkWalletMethods() {
+    PUBLIC_ISSUER_SPARK_WALLET_METHODS.forEach((m) =>
+      this.wrapIssuerPublicMethod(m),
     );
   }
 }
+
+type AssertNever<T extends never> = T;
+
+type IssuerSparkWalletFunctionKeys = Extract<
+  {
+    [K in keyof IssuerSparkWallet]: IssuerSparkWallet[K] extends (
+      ...args: any[]
+    ) => PromiseLike<unknown>
+      ? /* Exclude SparkWallet methods that are already wrapped by the base class: */
+        K extends keyof SparkWallet
+        ? never
+        : K
+      : never;
+  }[keyof IssuerSparkWallet],
+  string
+>;
+
+const PUBLIC_ISSUER_SPARK_WALLET_METHODS = [
+  "getIssuerTokenBalance",
+  "getIssuerTokenMetadata",
+  "getIssuerTokenIdentifier",
+  "createToken",
+  "mintTokens",
+  "burnTokens",
+  "freezeTokens",
+  "unfreezeTokens",
+  "getIssuerTokenDistribution",
+] as const satisfies readonly IssuerSparkWalletFunctionKeys[];
+
+/* Type guard to ensure all public methods are in PUBLIC_ISSUER_SPARK_WALLET_METHODS */
+type _AllIssuerMethodsCovered = AssertNever<
+  Exclude<
+    IssuerSparkWalletFunctionKeys,
+    (typeof PUBLIC_ISSUER_SPARK_WALLET_METHODS)[number]
+  >
+>;

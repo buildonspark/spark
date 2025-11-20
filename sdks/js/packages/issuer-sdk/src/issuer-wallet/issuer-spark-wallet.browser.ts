@@ -1,6 +1,5 @@
 import { IssuerSparkWallet as BaseIssuerSparkWallet } from "./issuer-spark-wallet.js";
 import {
-  initializeTracerEnv as initializeTracerEnvBrowser,
   ConnectionManager,
   type WalletConfigService,
 } from "@buildonspark/spark-sdk";
@@ -8,13 +7,6 @@ import {
 export class IssuerSparkWalletBrowser extends BaseIssuerSparkWallet {
   protected buildConnectionManager(config: WalletConfigService) {
     return new ConnectionManager(config);
-  }
-
-  protected initializeTracerEnv({
-    spanProcessors,
-    traceUrls,
-  }: Parameters<BaseIssuerSparkWallet["initializeTracerEnv"]>[0]) {
-    initializeTracerEnvBrowser({ spanProcessors, traceUrls });
   }
 }
 

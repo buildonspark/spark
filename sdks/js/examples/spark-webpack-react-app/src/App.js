@@ -9,17 +9,13 @@ function App() {
   const [dummyTx, setDummyTx] = useState(null);
 
   const initializeSpark = async () => {
-    try {
-      const { wallet } = await SparkWallet.initialize({
-        options: {
-          network: "REGTEST",
-        },
-      });
-      setSparkWallet(wallet);
-      console.log("Spark client initialized successfully!");
-    } catch (error) {
-      console.error("Failed to initialize Spark client:", error);
-    }
+    const { wallet } = await SparkWallet.initialize({
+      options: {
+        network: "REGTEST",
+      },
+    });
+    setSparkWallet(wallet);
+    console.log("Spark client initialized successfully!");
   };
 
   const createInvoice = async () => {

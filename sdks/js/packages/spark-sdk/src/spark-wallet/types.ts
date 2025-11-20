@@ -166,6 +166,11 @@ export interface SparkWalletProps {
   options?: ConfigOptions;
 }
 
+export type HandlePublicMethodErrorParams = {
+  traceId?: string;
+  wallet?: SparkWallet;
+};
+
 export const SparkWalletEvent = {
   All: "*",
   TransferClaimed: "transfer:claimed",
