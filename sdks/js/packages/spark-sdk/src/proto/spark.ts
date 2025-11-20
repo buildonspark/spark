@@ -110,6 +110,7 @@ export enum TransferStatus {
   TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR = 8,
   TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED = 9,
   TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED = 10,
+  TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK = 11,
   UNRECOGNIZED = -1,
 }
 
@@ -148,6 +149,9 @@ export function transferStatusFromJSON(object: any): TransferStatus {
     case 10:
     case "TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED":
       return TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED;
+    case 11:
+    case "TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK":
+      return TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -179,6 +183,8 @@ export function transferStatusToJSON(object: TransferStatus): string {
       return "TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED";
     case TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED:
       return "TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED";
+    case TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK:
+      return "TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK";
     case TransferStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -321,6 +327,39 @@ export function preimageRequestStatusToJSON(object: PreimageRequestStatus): stri
     case PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_RETURNED:
       return "PREIMAGE_REQUEST_STATUS_RETURNED";
     case PreimageRequestStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum PreimageRequestRole {
+  PREIMAGE_REQUEST_ROLE_RECEIVER = 0,
+  PREIMAGE_REQUEST_ROLE_SENDER = 1,
+  UNRECOGNIZED = -1,
+}
+
+export function preimageRequestRoleFromJSON(object: any): PreimageRequestRole {
+  switch (object) {
+    case 0:
+    case "PREIMAGE_REQUEST_ROLE_RECEIVER":
+      return PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER;
+    case 1:
+    case "PREIMAGE_REQUEST_ROLE_SENDER":
+      return PreimageRequestRole.PREIMAGE_REQUEST_ROLE_SENDER;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return PreimageRequestRole.UNRECOGNIZED;
+  }
+}
+
+export function preimageRequestRoleToJSON(object: PreimageRequestRole): string {
+  switch (object) {
+    case PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER:
+      return "PREIMAGE_REQUEST_ROLE_RECEIVER";
+    case PreimageRequestRole.PREIMAGE_REQUEST_ROLE_SENDER:
+      return "PREIMAGE_REQUEST_ROLE_SENDER";
+    case PreimageRequestRole.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -1665,6 +1704,7 @@ export interface PreimageRequestWithTransfer {
     | undefined;
   /** Preimage data (if available) */
   preimage?: Uint8Array | undefined;
+  senderIdentityPubkey: Uint8Array;
 }
 
 export interface QueryHtlcRequest {
@@ -1677,6 +1717,9 @@ export interface QueryHtlcRequest {
   limit: number;
   /** defaults to 0 if not set. */
   offset: number;
+  transferIds: string[];
+  /** defaults to PREIMAGE_REQUEST_ROLE_RECEIVER if not set. */
+  matchRole: PreimageRequestRole;
 }
 
 export interface QueryHtlcResponse {
@@ -14643,6 +14686,7 @@ function createBasePreimageRequestWithTransfer(): PreimageRequestWithTransfer {
     createdTime: undefined,
     transfer: undefined,
     preimage: undefined,
+    senderIdentityPubkey: new Uint8Array(0),
   };
 }
 
@@ -14665,6 +14709,9 @@ export const PreimageRequestWithTransfer: MessageFns<PreimageRequestWithTransfer
     }
     if (message.preimage !== undefined) {
       writer.uint32(50).bytes(message.preimage);
+    }
+    if (message.senderIdentityPubkey.length !== 0) {
+      writer.uint32(58).bytes(message.senderIdentityPubkey);
     }
     return writer;
   },
@@ -14724,6 +14771,14 @@ export const PreimageRequestWithTransfer: MessageFns<PreimageRequestWithTransfer
           message.preimage = reader.bytes();
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.senderIdentityPubkey = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -14743,6 +14798,9 @@ export const PreimageRequestWithTransfer: MessageFns<PreimageRequestWithTransfer
       createdTime: isSet(object.createdTime) ? fromJsonTimestamp(object.createdTime) : undefined,
       transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined,
       preimage: isSet(object.preimage) ? bytesFromBase64(object.preimage) : undefined,
+      senderIdentityPubkey: isSet(object.senderIdentityPubkey)
+        ? bytesFromBase64(object.senderIdentityPubkey)
+        : new Uint8Array(0),
     };
   },
 
@@ -14766,6 +14824,9 @@ export const PreimageRequestWithTransfer: MessageFns<PreimageRequestWithTransfer
     if (message.preimage !== undefined) {
       obj.preimage = base64FromBytes(message.preimage);
     }
+    if (message.senderIdentityPubkey.length !== 0) {
+      obj.senderIdentityPubkey = base64FromBytes(message.senderIdentityPubkey);
+    }
     return obj;
   },
 
@@ -14782,12 +14843,21 @@ export const PreimageRequestWithTransfer: MessageFns<PreimageRequestWithTransfer
       ? Transfer.fromPartial(object.transfer)
       : undefined;
     message.preimage = object.preimage ?? undefined;
+    message.senderIdentityPubkey = object.senderIdentityPubkey ?? new Uint8Array(0);
     return message;
   },
 };
 
 function createBaseQueryHtlcRequest(): QueryHtlcRequest {
-  return { paymentHashes: [], identityPublicKey: new Uint8Array(0), status: undefined, limit: 0, offset: 0 };
+  return {
+    paymentHashes: [],
+    identityPublicKey: new Uint8Array(0),
+    status: undefined,
+    limit: 0,
+    offset: 0,
+    transferIds: [],
+    matchRole: 0,
+  };
 }
 
 export const QueryHtlcRequest: MessageFns<QueryHtlcRequest> = {
@@ -14806,6 +14876,12 @@ export const QueryHtlcRequest: MessageFns<QueryHtlcRequest> = {
     }
     if (message.offset !== 0) {
       writer.uint32(40).int64(message.offset);
+    }
+    for (const v of message.transferIds) {
+      writer.uint32(50).string(v!);
+    }
+    if (message.matchRole !== 0) {
+      writer.uint32(56).int32(message.matchRole);
     }
     return writer;
   },
@@ -14857,6 +14933,22 @@ export const QueryHtlcRequest: MessageFns<QueryHtlcRequest> = {
           message.offset = longToNumber(reader.int64());
           continue;
         }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.transferIds.push(reader.string());
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.matchRole = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -14877,6 +14969,10 @@ export const QueryHtlcRequest: MessageFns<QueryHtlcRequest> = {
       status: isSet(object.status) ? preimageRequestStatusFromJSON(object.status) : undefined,
       limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
       offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+      transferIds: globalThis.Array.isArray(object?.transferIds)
+        ? object.transferIds.map((e: any) => globalThis.String(e))
+        : [],
+      matchRole: isSet(object.matchRole) ? preimageRequestRoleFromJSON(object.matchRole) : 0,
     };
   },
 
@@ -14897,6 +14993,12 @@ export const QueryHtlcRequest: MessageFns<QueryHtlcRequest> = {
     if (message.offset !== 0) {
       obj.offset = Math.round(message.offset);
     }
+    if (message.transferIds?.length) {
+      obj.transferIds = message.transferIds;
+    }
+    if (message.matchRole !== 0) {
+      obj.matchRole = preimageRequestRoleToJSON(message.matchRole);
+    }
     return obj;
   },
 
@@ -14910,6 +15012,8 @@ export const QueryHtlcRequest: MessageFns<QueryHtlcRequest> = {
     message.status = object.status ?? undefined;
     message.limit = object.limit ?? 0;
     message.offset = object.offset ?? 0;
+    message.transferIds = object.transferIds?.map((e) => e) || [];
+    message.matchRole = object.matchRole ?? 0;
     return message;
   },
 };

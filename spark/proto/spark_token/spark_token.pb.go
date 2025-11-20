@@ -691,7 +691,7 @@ type TokenTransaction struct {
 	InvoiceAttachments []*InvoiceAttachment `protobuf:"bytes,10,rep,name=invoice_attachments,json=invoiceAttachments,proto3" json:"invoice_attachments,omitempty"`
 	// Should NOT be set explicitly on V2 transactions (protected with validation).
 	// Provided here to enable cross-conversion between v3 token transaction protos during migration.
-	ValidityDurationSeconds uint64 `protobuf:"varint,11,opt,name=validity_duration_seconds,json=validityDurationSeconds,proto3" json:"validity_duration_seconds,omitempty"`
+	ValidityDurationSeconds *uint64 `protobuf:"varint,11,opt,name=validity_duration_seconds,json=validityDurationSeconds,proto3,oneof" json:"validity_duration_seconds,omitempty"`
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -810,8 +810,8 @@ func (x *TokenTransaction) GetInvoiceAttachments() []*InvoiceAttachment {
 }
 
 func (x *TokenTransaction) GetValidityDurationSeconds() uint64 {
-	if x != nil {
-		return x.ValidityDurationSeconds
+	if x != nil && x.ValidityDurationSeconds != nil {
+		return *x.ValidityDurationSeconds
 	}
 	return 0
 }
@@ -2700,7 +2700,7 @@ const file_spark_token_proto_rawDesc = "" +
 	"\ftoken_amount\x18\x05 \x01(\fB\a\xfaB\x04z\x02h\x10R\vtokenAmount\"\xa3\x01\n" +
 	"\x10FinalTokenOutput\x12Q\n" +
 	"\x14partial_token_output\x18\x01 \x01(\v2\x1f.spark_token.PartialTokenOutputR\x12partialTokenOutput\x12<\n" +
-	"\x15revocation_commitment\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x14revocationCommitment\"\xf7\x05\n" +
+	"\x15revocation_commitment\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x14revocationCommitment\"\x9a\x06\n" +
 	"\x10TokenTransaction\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12<\n" +
 	"\n" +
@@ -2714,9 +2714,10 @@ const file_spark_token_proto_rawDesc = "" +
 	"\anetwork\x18\a \x01(\x0e2\x0e.spark.NetworkB\b\xfaB\x05\x82\x01\x02 \x00R\anetwork\x12T\n" +
 	"\x18client_created_timestamp\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\x16clientCreatedTimestamp\x12O\n" +
 	"\x13invoice_attachments\x18\n" +
-	" \x03(\v2\x1e.spark_token.InvoiceAttachmentR\x12invoiceAttachments\x12:\n" +
-	"\x19validity_duration_seconds\x18\v \x01(\x04R\x17validityDurationSecondsB\x0e\n" +
-	"\ftoken_inputs\"\x99\x03\n" +
+	" \x03(\v2\x1e.spark_token.InvoiceAttachmentR\x12invoiceAttachments\x12?\n" +
+	"\x19validity_duration_seconds\x18\v \x01(\x04H\x01R\x17validityDurationSeconds\x88\x01\x01B\x0e\n" +
+	"\ftoken_inputsB\x1c\n" +
+	"\x1a_validity_duration_seconds\"\x99\x03\n" +
 	"\x18TokenTransactionMetadata\x12Z\n" +
 	"#spark_operator_identity_public_keys\x18\x02 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x1fsparkOperatorIdentityPublicKeys\x122\n" +
 	"\anetwork\x18\x03 \x01(\x0e2\x0e.spark.NetworkB\b\xfaB\x05\x82\x01\x02 \x00R\anetwork\x12T\n" +

@@ -1245,8 +1245,6 @@ func (m *TokenTransaction) validate(all bool) error {
 
 	}
 
-	// no validation rules for ValidityDurationSeconds
-
 	switch v := m.TokenInputs.(type) {
 	case *TokenTransaction_MintInput:
 		if v == nil {
@@ -1373,6 +1371,10 @@ func (m *TokenTransaction) validate(all bool) error {
 
 	default:
 		_ = v // ensures v is used
+	}
+
+	if m.ValidityDurationSeconds != nil {
+		// no validation rules for ValidityDurationSeconds
 	}
 
 	if len(errors) > 0 {

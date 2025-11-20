@@ -126,9 +126,9 @@ message TokenTransaction {
     google.protobuf.Timestamp client_created_timestamp = 9;
     // The spark invoices this transaction fulfills.
     repeated InvoiceAttachment invoice_attachments = 10;
-    // Should NOT be set explicitly on V2 transactions (protected with validation). 
+    // Should NOT be set explicitly on V2 transactions (protected with validation).
     // Provided here to enable cross-conversion between v3 token transaction protos during migration.
-    uint64 validity_duration_seconds = 11;
+    optional uint64 validity_duration_seconds = 11;
 }
 
 message TokenTransactionMetadata {
@@ -157,7 +157,7 @@ message PartialTokenTransaction {
         TokenCreateInput create_input = 5;
     }
     repeated PartialTokenOutput partial_token_outputs = 6;
-    
+
 }
 
 message FinalTokenTransaction {
@@ -344,7 +344,7 @@ message TokenTransactionWithStatus {
     TokenTransactionConfirmationMetadata confirmation_metadata = 3;
     // In rare cases the above reconstructed token transaction may not match the original token transaction due to:
     // a) a pre-empted transfer transaction having its input TTXOs remapped to the newer transaction
-    // b) proto migrations or field deprecations resulting in missing/swapped fields (eg. token public key -> token identifier) 
+    // b) proto migrations or field deprecations resulting in missing/swapped fields (eg. token public key -> token identifier)
     // Include the original hash to ensure clients can reconcile this transaction with the original if needed.
     bytes token_transaction_hash = 4 [(validate.rules).bytes.len = 32];
 }

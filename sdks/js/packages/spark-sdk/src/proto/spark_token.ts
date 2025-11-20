@@ -220,6 +220,20 @@ export interface TokenOutput {
   tokenAmount: Uint8Array;
 }
 
+export interface PartialTokenOutput {
+  ownerPublicKey: Uint8Array;
+  withdrawBondSats: number;
+  withdrawRelativeBlockLocktime: number;
+  tokenIdentifier: Uint8Array;
+  /** Decoded uint128 */
+  tokenAmount: Uint8Array;
+}
+
+export interface FinalTokenOutput {
+  partialTokenOutput: PartialTokenOutput | undefined;
+  revocationCommitment: Uint8Array;
+}
+
 /**
  * This proto is constructed by the wallet and is the core transaction data
  * structure. This proto is deterministically hashed to generate the
@@ -257,6 +271,54 @@ export interface TokenTransaction {
     | undefined;
   /** The spark invoices this transaction fulfills. */
   invoiceAttachments: InvoiceAttachment[];
+  /**
+   * Should NOT be set explicitly on V2 transactions (protected with validation).
+   * Provided here to enable cross-conversion between v3 token transaction protos during migration.
+   */
+  validityDurationSeconds?: number | undefined;
+}
+
+export interface TokenTransactionMetadata {
+  sparkOperatorIdentityPublicKeys: Uint8Array[];
+  network: Network;
+  /**
+   * The timestamp of when the client created the transaction. This is used to
+   * determine which transaction should win in a race condition. Earlier
+   * timestamps win over later ones.
+   */
+  clientCreatedTimestamp:
+    | Date
+    | undefined;
+  /**
+   * How long the transaction should be valid for, in seconds.
+   * The server will set the actual expiry_time in the final transaction based
+   * on this duration. Must be within [1, 300] seconds.
+   */
+  validityDurationSeconds: number;
+  /** The spark invoices this transaction fulfills. */
+  invoiceAttachments: InvoiceAttachment[];
+}
+
+export interface PartialTokenTransaction {
+  version: number;
+  tokenTransactionMetadata: TokenTransactionMetadata | undefined;
+  tokenInputs?:
+    | { $case: "mintInput"; mintInput: TokenMintInput }
+    | { $case: "transferInput"; transferInput: TokenTransferInput }
+    | { $case: "createInput"; createInput: TokenCreateInput }
+    | undefined;
+  partialTokenOutputs: PartialTokenOutput[];
+}
+
+export interface FinalTokenTransaction {
+  version: number;
+  tokenTransactionMetadata: TokenTransactionMetadata | undefined;
+  tokenInputs?:
+    | { $case: "mintInput"; mintInput: TokenMintInput }
+    | { $case: "transferInput"; transferInput: TokenTransferInput }
+    | { $case: "createInput"; createInput: TokenCreateInput }
+    | undefined;
+  finalTokenOutputs: FinalTokenOutput[];
 }
 
 export interface InvoiceAttachment {
@@ -291,8 +353,8 @@ export interface StartTransactionRequest {
   /**
    * Filled by signing the partial token transaction hash with the
    * owner/issuer private key. For mint transactions this will be one
-   * signature for the input issuer_public_key For transfer transactions this
-   * will be one for each output for the output owner_public_key
+   * signature for the input issuer_public_key. For transfer transactions this
+   * will be one signature for each input to be sepnt.
    */
   partialTokenTransactionOwnerSignatures: SignatureWithIndex[];
   /**
@@ -321,6 +383,26 @@ export interface CommitProgress {
 }
 
 export interface CommitTransactionResponse {
+  commitStatus: CommitStatus;
+  commitProgress: CommitProgress | undefined;
+}
+
+export interface BroadcastTransactionRequest {
+  identityPublicKey: Uint8Array;
+  partialTokenTransaction:
+    | PartialTokenTransaction
+    | undefined;
+  /**
+   * Filled by signing the partial token transaction hash with the
+   * owner/issuer private key. For mint transactions this will be one
+   * signature for the input issuer_public_key. For transfer transactions this
+   * will be one signature for each input to be spent.
+   */
+  tokenTransactionOwnerSignatures: SignatureWithIndex[];
+}
+
+export interface BroadcastTransactionResponse {
+  finalTokenTransaction: FinalTokenTransaction | undefined;
   commitStatus: CommitStatus;
   commitProgress: CommitProgress | undefined;
 }
@@ -1008,6 +1090,220 @@ export const TokenOutput: MessageFns<TokenOutput> = {
   },
 };
 
+function createBasePartialTokenOutput(): PartialTokenOutput {
+  return {
+    ownerPublicKey: new Uint8Array(0),
+    withdrawBondSats: 0,
+    withdrawRelativeBlockLocktime: 0,
+    tokenIdentifier: new Uint8Array(0),
+    tokenAmount: new Uint8Array(0),
+  };
+}
+
+export const PartialTokenOutput: MessageFns<PartialTokenOutput> = {
+  encode(message: PartialTokenOutput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.ownerPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.ownerPublicKey);
+    }
+    if (message.withdrawBondSats !== 0) {
+      writer.uint32(16).uint64(message.withdrawBondSats);
+    }
+    if (message.withdrawRelativeBlockLocktime !== 0) {
+      writer.uint32(24).uint64(message.withdrawRelativeBlockLocktime);
+    }
+    if (message.tokenIdentifier.length !== 0) {
+      writer.uint32(34).bytes(message.tokenIdentifier);
+    }
+    if (message.tokenAmount.length !== 0) {
+      writer.uint32(42).bytes(message.tokenAmount);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PartialTokenOutput {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePartialTokenOutput();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.ownerPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.withdrawBondSats = longToNumber(reader.uint64());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.withdrawRelativeBlockLocktime = longToNumber(reader.uint64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.tokenIdentifier = reader.bytes();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.tokenAmount = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PartialTokenOutput {
+    return {
+      ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : new Uint8Array(0),
+      withdrawBondSats: isSet(object.withdrawBondSats) ? globalThis.Number(object.withdrawBondSats) : 0,
+      withdrawRelativeBlockLocktime: isSet(object.withdrawRelativeBlockLocktime)
+        ? globalThis.Number(object.withdrawRelativeBlockLocktime)
+        : 0,
+      tokenIdentifier: isSet(object.tokenIdentifier) ? bytesFromBase64(object.tokenIdentifier) : new Uint8Array(0),
+      tokenAmount: isSet(object.tokenAmount) ? bytesFromBase64(object.tokenAmount) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: PartialTokenOutput): unknown {
+    const obj: any = {};
+    if (message.ownerPublicKey.length !== 0) {
+      obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
+    }
+    if (message.withdrawBondSats !== 0) {
+      obj.withdrawBondSats = Math.round(message.withdrawBondSats);
+    }
+    if (message.withdrawRelativeBlockLocktime !== 0) {
+      obj.withdrawRelativeBlockLocktime = Math.round(message.withdrawRelativeBlockLocktime);
+    }
+    if (message.tokenIdentifier.length !== 0) {
+      obj.tokenIdentifier = base64FromBytes(message.tokenIdentifier);
+    }
+    if (message.tokenAmount.length !== 0) {
+      obj.tokenAmount = base64FromBytes(message.tokenAmount);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<PartialTokenOutput>): PartialTokenOutput {
+    return PartialTokenOutput.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<PartialTokenOutput>): PartialTokenOutput {
+    const message = createBasePartialTokenOutput();
+    message.ownerPublicKey = object.ownerPublicKey ?? new Uint8Array(0);
+    message.withdrawBondSats = object.withdrawBondSats ?? 0;
+    message.withdrawRelativeBlockLocktime = object.withdrawRelativeBlockLocktime ?? 0;
+    message.tokenIdentifier = object.tokenIdentifier ?? new Uint8Array(0);
+    message.tokenAmount = object.tokenAmount ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseFinalTokenOutput(): FinalTokenOutput {
+  return { partialTokenOutput: undefined, revocationCommitment: new Uint8Array(0) };
+}
+
+export const FinalTokenOutput: MessageFns<FinalTokenOutput> = {
+  encode(message: FinalTokenOutput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.partialTokenOutput !== undefined) {
+      PartialTokenOutput.encode(message.partialTokenOutput, writer.uint32(10).fork()).join();
+    }
+    if (message.revocationCommitment.length !== 0) {
+      writer.uint32(18).bytes(message.revocationCommitment);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FinalTokenOutput {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFinalTokenOutput();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.partialTokenOutput = PartialTokenOutput.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.revocationCommitment = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): FinalTokenOutput {
+    return {
+      partialTokenOutput: isSet(object.partialTokenOutput)
+        ? PartialTokenOutput.fromJSON(object.partialTokenOutput)
+        : undefined,
+      revocationCommitment: isSet(object.revocationCommitment)
+        ? bytesFromBase64(object.revocationCommitment)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: FinalTokenOutput): unknown {
+    const obj: any = {};
+    if (message.partialTokenOutput !== undefined) {
+      obj.partialTokenOutput = PartialTokenOutput.toJSON(message.partialTokenOutput);
+    }
+    if (message.revocationCommitment.length !== 0) {
+      obj.revocationCommitment = base64FromBytes(message.revocationCommitment);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<FinalTokenOutput>): FinalTokenOutput {
+    return FinalTokenOutput.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<FinalTokenOutput>): FinalTokenOutput {
+    const message = createBaseFinalTokenOutput();
+    message.partialTokenOutput = (object.partialTokenOutput !== undefined && object.partialTokenOutput !== null)
+      ? PartialTokenOutput.fromPartial(object.partialTokenOutput)
+      : undefined;
+    message.revocationCommitment = object.revocationCommitment ?? new Uint8Array(0);
+    return message;
+  },
+};
+
 function createBaseTokenTransaction(): TokenTransaction {
   return {
     version: 0,
@@ -1018,6 +1314,7 @@ function createBaseTokenTransaction(): TokenTransaction {
     network: 0,
     clientCreatedTimestamp: undefined,
     invoiceAttachments: [],
+    validityDurationSeconds: undefined,
   };
 }
 
@@ -1054,6 +1351,9 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     }
     for (const v of message.invoiceAttachments) {
       InvoiceAttachment.encode(v!, writer.uint32(82).fork()).join();
+    }
+    if (message.validityDurationSeconds !== undefined) {
+      writer.uint32(88).uint64(message.validityDurationSeconds);
     }
     return writer;
   },
@@ -1148,6 +1448,14 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
           message.invoiceAttachments.push(InvoiceAttachment.decode(reader, reader.uint32()));
           continue;
         }
+        case 11: {
+          if (tag !== 88) {
+            break;
+          }
+
+          message.validityDurationSeconds = longToNumber(reader.uint64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1181,6 +1489,9 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
       invoiceAttachments: globalThis.Array.isArray(object?.invoiceAttachments)
         ? object.invoiceAttachments.map((e: any) => InvoiceAttachment.fromJSON(e))
         : [],
+      validityDurationSeconds: isSet(object.validityDurationSeconds)
+        ? globalThis.Number(object.validityDurationSeconds)
+        : undefined,
     };
   },
 
@@ -1213,6 +1524,9 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     }
     if (message.invoiceAttachments?.length) {
       obj.invoiceAttachments = message.invoiceAttachments.map((e) => InvoiceAttachment.toJSON(e));
+    }
+    if (message.validityDurationSeconds !== undefined) {
+      obj.validityDurationSeconds = Math.round(message.validityDurationSeconds);
     }
     return obj;
   },
@@ -1258,6 +1572,505 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     message.network = object.network ?? 0;
     message.clientCreatedTimestamp = object.clientCreatedTimestamp ?? undefined;
     message.invoiceAttachments = object.invoiceAttachments?.map((e) => InvoiceAttachment.fromPartial(e)) || [];
+    message.validityDurationSeconds = object.validityDurationSeconds ?? undefined;
+    return message;
+  },
+};
+
+function createBaseTokenTransactionMetadata(): TokenTransactionMetadata {
+  return {
+    sparkOperatorIdentityPublicKeys: [],
+    network: 0,
+    clientCreatedTimestamp: undefined,
+    validityDurationSeconds: 0,
+    invoiceAttachments: [],
+  };
+}
+
+export const TokenTransactionMetadata: MessageFns<TokenTransactionMetadata> = {
+  encode(message: TokenTransactionMetadata, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.sparkOperatorIdentityPublicKeys) {
+      writer.uint32(18).bytes(v!);
+    }
+    if (message.network !== 0) {
+      writer.uint32(24).int32(message.network);
+    }
+    if (message.clientCreatedTimestamp !== undefined) {
+      Timestamp.encode(toTimestamp(message.clientCreatedTimestamp), writer.uint32(34).fork()).join();
+    }
+    if (message.validityDurationSeconds !== 0) {
+      writer.uint32(40).uint64(message.validityDurationSeconds);
+    }
+    for (const v of message.invoiceAttachments) {
+      InvoiceAttachment.encode(v!, writer.uint32(50).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenTransactionMetadata {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenTransactionMetadata();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.sparkOperatorIdentityPublicKeys.push(reader.bytes());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.clientCreatedTimestamp = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.validityDurationSeconds = longToNumber(reader.uint64());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.invoiceAttachments.push(InvoiceAttachment.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenTransactionMetadata {
+    return {
+      sparkOperatorIdentityPublicKeys: globalThis.Array.isArray(object?.sparkOperatorIdentityPublicKeys)
+        ? object.sparkOperatorIdentityPublicKeys.map((e: any) => bytesFromBase64(e))
+        : [],
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+      clientCreatedTimestamp: isSet(object.clientCreatedTimestamp)
+        ? fromJsonTimestamp(object.clientCreatedTimestamp)
+        : undefined,
+      validityDurationSeconds: isSet(object.validityDurationSeconds)
+        ? globalThis.Number(object.validityDurationSeconds)
+        : 0,
+      invoiceAttachments: globalThis.Array.isArray(object?.invoiceAttachments)
+        ? object.invoiceAttachments.map((e: any) => InvoiceAttachment.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: TokenTransactionMetadata): unknown {
+    const obj: any = {};
+    if (message.sparkOperatorIdentityPublicKeys?.length) {
+      obj.sparkOperatorIdentityPublicKeys = message.sparkOperatorIdentityPublicKeys.map((e) => base64FromBytes(e));
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
+    }
+    if (message.clientCreatedTimestamp !== undefined) {
+      obj.clientCreatedTimestamp = message.clientCreatedTimestamp.toISOString();
+    }
+    if (message.validityDurationSeconds !== 0) {
+      obj.validityDurationSeconds = Math.round(message.validityDurationSeconds);
+    }
+    if (message.invoiceAttachments?.length) {
+      obj.invoiceAttachments = message.invoiceAttachments.map((e) => InvoiceAttachment.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenTransactionMetadata>): TokenTransactionMetadata {
+    return TokenTransactionMetadata.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenTransactionMetadata>): TokenTransactionMetadata {
+    const message = createBaseTokenTransactionMetadata();
+    message.sparkOperatorIdentityPublicKeys = object.sparkOperatorIdentityPublicKeys?.map((e) => e) || [];
+    message.network = object.network ?? 0;
+    message.clientCreatedTimestamp = object.clientCreatedTimestamp ?? undefined;
+    message.validityDurationSeconds = object.validityDurationSeconds ?? 0;
+    message.invoiceAttachments = object.invoiceAttachments?.map((e) => InvoiceAttachment.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBasePartialTokenTransaction(): PartialTokenTransaction {
+  return { version: 0, tokenTransactionMetadata: undefined, tokenInputs: undefined, partialTokenOutputs: [] };
+}
+
+export const PartialTokenTransaction: MessageFns<PartialTokenTransaction> = {
+  encode(message: PartialTokenTransaction, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.version !== 0) {
+      writer.uint32(8).uint32(message.version);
+    }
+    if (message.tokenTransactionMetadata !== undefined) {
+      TokenTransactionMetadata.encode(message.tokenTransactionMetadata, writer.uint32(18).fork()).join();
+    }
+    switch (message.tokenInputs?.$case) {
+      case "mintInput":
+        TokenMintInput.encode(message.tokenInputs.mintInput, writer.uint32(26).fork()).join();
+        break;
+      case "transferInput":
+        TokenTransferInput.encode(message.tokenInputs.transferInput, writer.uint32(34).fork()).join();
+        break;
+      case "createInput":
+        TokenCreateInput.encode(message.tokenInputs.createInput, writer.uint32(42).fork()).join();
+        break;
+    }
+    for (const v of message.partialTokenOutputs) {
+      PartialTokenOutput.encode(v!, writer.uint32(50).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PartialTokenTransaction {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePartialTokenTransaction();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.version = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tokenTransactionMetadata = TokenTransactionMetadata.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.tokenInputs = { $case: "mintInput", mintInput: TokenMintInput.decode(reader, reader.uint32()) };
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.tokenInputs = {
+            $case: "transferInput",
+            transferInput: TokenTransferInput.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.tokenInputs = { $case: "createInput", createInput: TokenCreateInput.decode(reader, reader.uint32()) };
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.partialTokenOutputs.push(PartialTokenOutput.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PartialTokenTransaction {
+    return {
+      version: isSet(object.version) ? globalThis.Number(object.version) : 0,
+      tokenTransactionMetadata: isSet(object.tokenTransactionMetadata)
+        ? TokenTransactionMetadata.fromJSON(object.tokenTransactionMetadata)
+        : undefined,
+      tokenInputs: isSet(object.mintInput)
+        ? { $case: "mintInput", mintInput: TokenMintInput.fromJSON(object.mintInput) }
+        : isSet(object.transferInput)
+        ? { $case: "transferInput", transferInput: TokenTransferInput.fromJSON(object.transferInput) }
+        : isSet(object.createInput)
+        ? { $case: "createInput", createInput: TokenCreateInput.fromJSON(object.createInput) }
+        : undefined,
+      partialTokenOutputs: globalThis.Array.isArray(object?.partialTokenOutputs)
+        ? object.partialTokenOutputs.map((e: any) => PartialTokenOutput.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: PartialTokenTransaction): unknown {
+    const obj: any = {};
+    if (message.version !== 0) {
+      obj.version = Math.round(message.version);
+    }
+    if (message.tokenTransactionMetadata !== undefined) {
+      obj.tokenTransactionMetadata = TokenTransactionMetadata.toJSON(message.tokenTransactionMetadata);
+    }
+    if (message.tokenInputs?.$case === "mintInput") {
+      obj.mintInput = TokenMintInput.toJSON(message.tokenInputs.mintInput);
+    } else if (message.tokenInputs?.$case === "transferInput") {
+      obj.transferInput = TokenTransferInput.toJSON(message.tokenInputs.transferInput);
+    } else if (message.tokenInputs?.$case === "createInput") {
+      obj.createInput = TokenCreateInput.toJSON(message.tokenInputs.createInput);
+    }
+    if (message.partialTokenOutputs?.length) {
+      obj.partialTokenOutputs = message.partialTokenOutputs.map((e) => PartialTokenOutput.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<PartialTokenTransaction>): PartialTokenTransaction {
+    return PartialTokenTransaction.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<PartialTokenTransaction>): PartialTokenTransaction {
+    const message = createBasePartialTokenTransaction();
+    message.version = object.version ?? 0;
+    message.tokenTransactionMetadata =
+      (object.tokenTransactionMetadata !== undefined && object.tokenTransactionMetadata !== null)
+        ? TokenTransactionMetadata.fromPartial(object.tokenTransactionMetadata)
+        : undefined;
+    switch (object.tokenInputs?.$case) {
+      case "mintInput": {
+        if (object.tokenInputs?.mintInput !== undefined && object.tokenInputs?.mintInput !== null) {
+          message.tokenInputs = {
+            $case: "mintInput",
+            mintInput: TokenMintInput.fromPartial(object.tokenInputs.mintInput),
+          };
+        }
+        break;
+      }
+      case "transferInput": {
+        if (object.tokenInputs?.transferInput !== undefined && object.tokenInputs?.transferInput !== null) {
+          message.tokenInputs = {
+            $case: "transferInput",
+            transferInput: TokenTransferInput.fromPartial(object.tokenInputs.transferInput),
+          };
+        }
+        break;
+      }
+      case "createInput": {
+        if (object.tokenInputs?.createInput !== undefined && object.tokenInputs?.createInput !== null) {
+          message.tokenInputs = {
+            $case: "createInput",
+            createInput: TokenCreateInput.fromPartial(object.tokenInputs.createInput),
+          };
+        }
+        break;
+      }
+    }
+    message.partialTokenOutputs = object.partialTokenOutputs?.map((e) => PartialTokenOutput.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseFinalTokenTransaction(): FinalTokenTransaction {
+  return { version: 0, tokenTransactionMetadata: undefined, tokenInputs: undefined, finalTokenOutputs: [] };
+}
+
+export const FinalTokenTransaction: MessageFns<FinalTokenTransaction> = {
+  encode(message: FinalTokenTransaction, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.version !== 0) {
+      writer.uint32(8).uint32(message.version);
+    }
+    if (message.tokenTransactionMetadata !== undefined) {
+      TokenTransactionMetadata.encode(message.tokenTransactionMetadata, writer.uint32(18).fork()).join();
+    }
+    switch (message.tokenInputs?.$case) {
+      case "mintInput":
+        TokenMintInput.encode(message.tokenInputs.mintInput, writer.uint32(26).fork()).join();
+        break;
+      case "transferInput":
+        TokenTransferInput.encode(message.tokenInputs.transferInput, writer.uint32(34).fork()).join();
+        break;
+      case "createInput":
+        TokenCreateInput.encode(message.tokenInputs.createInput, writer.uint32(42).fork()).join();
+        break;
+    }
+    for (const v of message.finalTokenOutputs) {
+      FinalTokenOutput.encode(v!, writer.uint32(50).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FinalTokenTransaction {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFinalTokenTransaction();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.version = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tokenTransactionMetadata = TokenTransactionMetadata.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.tokenInputs = { $case: "mintInput", mintInput: TokenMintInput.decode(reader, reader.uint32()) };
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.tokenInputs = {
+            $case: "transferInput",
+            transferInput: TokenTransferInput.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.tokenInputs = { $case: "createInput", createInput: TokenCreateInput.decode(reader, reader.uint32()) };
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.finalTokenOutputs.push(FinalTokenOutput.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): FinalTokenTransaction {
+    return {
+      version: isSet(object.version) ? globalThis.Number(object.version) : 0,
+      tokenTransactionMetadata: isSet(object.tokenTransactionMetadata)
+        ? TokenTransactionMetadata.fromJSON(object.tokenTransactionMetadata)
+        : undefined,
+      tokenInputs: isSet(object.mintInput)
+        ? { $case: "mintInput", mintInput: TokenMintInput.fromJSON(object.mintInput) }
+        : isSet(object.transferInput)
+        ? { $case: "transferInput", transferInput: TokenTransferInput.fromJSON(object.transferInput) }
+        : isSet(object.createInput)
+        ? { $case: "createInput", createInput: TokenCreateInput.fromJSON(object.createInput) }
+        : undefined,
+      finalTokenOutputs: globalThis.Array.isArray(object?.finalTokenOutputs)
+        ? object.finalTokenOutputs.map((e: any) => FinalTokenOutput.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: FinalTokenTransaction): unknown {
+    const obj: any = {};
+    if (message.version !== 0) {
+      obj.version = Math.round(message.version);
+    }
+    if (message.tokenTransactionMetadata !== undefined) {
+      obj.tokenTransactionMetadata = TokenTransactionMetadata.toJSON(message.tokenTransactionMetadata);
+    }
+    if (message.tokenInputs?.$case === "mintInput") {
+      obj.mintInput = TokenMintInput.toJSON(message.tokenInputs.mintInput);
+    } else if (message.tokenInputs?.$case === "transferInput") {
+      obj.transferInput = TokenTransferInput.toJSON(message.tokenInputs.transferInput);
+    } else if (message.tokenInputs?.$case === "createInput") {
+      obj.createInput = TokenCreateInput.toJSON(message.tokenInputs.createInput);
+    }
+    if (message.finalTokenOutputs?.length) {
+      obj.finalTokenOutputs = message.finalTokenOutputs.map((e) => FinalTokenOutput.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<FinalTokenTransaction>): FinalTokenTransaction {
+    return FinalTokenTransaction.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<FinalTokenTransaction>): FinalTokenTransaction {
+    const message = createBaseFinalTokenTransaction();
+    message.version = object.version ?? 0;
+    message.tokenTransactionMetadata =
+      (object.tokenTransactionMetadata !== undefined && object.tokenTransactionMetadata !== null)
+        ? TokenTransactionMetadata.fromPartial(object.tokenTransactionMetadata)
+        : undefined;
+    switch (object.tokenInputs?.$case) {
+      case "mintInput": {
+        if (object.tokenInputs?.mintInput !== undefined && object.tokenInputs?.mintInput !== null) {
+          message.tokenInputs = {
+            $case: "mintInput",
+            mintInput: TokenMintInput.fromPartial(object.tokenInputs.mintInput),
+          };
+        }
+        break;
+      }
+      case "transferInput": {
+        if (object.tokenInputs?.transferInput !== undefined && object.tokenInputs?.transferInput !== null) {
+          message.tokenInputs = {
+            $case: "transferInput",
+            transferInput: TokenTransferInput.fromPartial(object.tokenInputs.transferInput),
+          };
+        }
+        break;
+      }
+      case "createInput": {
+        if (object.tokenInputs?.createInput !== undefined && object.tokenInputs?.createInput !== null) {
+          message.tokenInputs = {
+            $case: "createInput",
+            createInput: TokenCreateInput.fromPartial(object.tokenInputs.createInput),
+          };
+        }
+        break;
+      }
+    }
+    message.finalTokenOutputs = object.finalTokenOutputs?.map((e) => FinalTokenOutput.fromPartial(e)) || [];
     return message;
   },
 };
@@ -1963,6 +2776,213 @@ export const CommitTransactionResponse: MessageFns<CommitTransactionResponse> = 
   },
   fromPartial(object: DeepPartial<CommitTransactionResponse>): CommitTransactionResponse {
     const message = createBaseCommitTransactionResponse();
+    message.commitStatus = object.commitStatus ?? 0;
+    message.commitProgress = (object.commitProgress !== undefined && object.commitProgress !== null)
+      ? CommitProgress.fromPartial(object.commitProgress)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseBroadcastTransactionRequest(): BroadcastTransactionRequest {
+  return {
+    identityPublicKey: new Uint8Array(0),
+    partialTokenTransaction: undefined,
+    tokenTransactionOwnerSignatures: [],
+  };
+}
+
+export const BroadcastTransactionRequest: MessageFns<BroadcastTransactionRequest> = {
+  encode(message: BroadcastTransactionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    if (message.partialTokenTransaction !== undefined) {
+      PartialTokenTransaction.encode(message.partialTokenTransaction, writer.uint32(18).fork()).join();
+    }
+    for (const v of message.tokenTransactionOwnerSignatures) {
+      SignatureWithIndex.encode(v!, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BroadcastTransactionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBroadcastTransactionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.partialTokenTransaction = PartialTokenTransaction.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.tokenTransactionOwnerSignatures.push(SignatureWithIndex.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BroadcastTransactionRequest {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+      partialTokenTransaction: isSet(object.partialTokenTransaction)
+        ? PartialTokenTransaction.fromJSON(object.partialTokenTransaction)
+        : undefined,
+      tokenTransactionOwnerSignatures: globalThis.Array.isArray(object?.tokenTransactionOwnerSignatures)
+        ? object.tokenTransactionOwnerSignatures.map((e: any) => SignatureWithIndex.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: BroadcastTransactionRequest): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    if (message.partialTokenTransaction !== undefined) {
+      obj.partialTokenTransaction = PartialTokenTransaction.toJSON(message.partialTokenTransaction);
+    }
+    if (message.tokenTransactionOwnerSignatures?.length) {
+      obj.tokenTransactionOwnerSignatures = message.tokenTransactionOwnerSignatures.map((e) =>
+        SignatureWithIndex.toJSON(e)
+      );
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BroadcastTransactionRequest>): BroadcastTransactionRequest {
+    return BroadcastTransactionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BroadcastTransactionRequest>): BroadcastTransactionRequest {
+    const message = createBaseBroadcastTransactionRequest();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    message.partialTokenTransaction =
+      (object.partialTokenTransaction !== undefined && object.partialTokenTransaction !== null)
+        ? PartialTokenTransaction.fromPartial(object.partialTokenTransaction)
+        : undefined;
+    message.tokenTransactionOwnerSignatures =
+      object.tokenTransactionOwnerSignatures?.map((e) => SignatureWithIndex.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseBroadcastTransactionResponse(): BroadcastTransactionResponse {
+  return { finalTokenTransaction: undefined, commitStatus: 0, commitProgress: undefined };
+}
+
+export const BroadcastTransactionResponse: MessageFns<BroadcastTransactionResponse> = {
+  encode(message: BroadcastTransactionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.finalTokenTransaction !== undefined) {
+      FinalTokenTransaction.encode(message.finalTokenTransaction, writer.uint32(10).fork()).join();
+    }
+    if (message.commitStatus !== 0) {
+      writer.uint32(16).int32(message.commitStatus);
+    }
+    if (message.commitProgress !== undefined) {
+      CommitProgress.encode(message.commitProgress, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BroadcastTransactionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBroadcastTransactionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.finalTokenTransaction = FinalTokenTransaction.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.commitStatus = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.commitProgress = CommitProgress.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BroadcastTransactionResponse {
+    return {
+      finalTokenTransaction: isSet(object.finalTokenTransaction)
+        ? FinalTokenTransaction.fromJSON(object.finalTokenTransaction)
+        : undefined,
+      commitStatus: isSet(object.commitStatus) ? commitStatusFromJSON(object.commitStatus) : 0,
+      commitProgress: isSet(object.commitProgress) ? CommitProgress.fromJSON(object.commitProgress) : undefined,
+    };
+  },
+
+  toJSON(message: BroadcastTransactionResponse): unknown {
+    const obj: any = {};
+    if (message.finalTokenTransaction !== undefined) {
+      obj.finalTokenTransaction = FinalTokenTransaction.toJSON(message.finalTokenTransaction);
+    }
+    if (message.commitStatus !== 0) {
+      obj.commitStatus = commitStatusToJSON(message.commitStatus);
+    }
+    if (message.commitProgress !== undefined) {
+      obj.commitProgress = CommitProgress.toJSON(message.commitProgress);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BroadcastTransactionResponse>): BroadcastTransactionResponse {
+    return BroadcastTransactionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BroadcastTransactionResponse>): BroadcastTransactionResponse {
+    const message = createBaseBroadcastTransactionResponse();
+    message.finalTokenTransaction =
+      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
+        ? FinalTokenTransaction.fromPartial(object.finalTokenTransaction)
+        : undefined;
     message.commitStatus = object.commitStatus ?? 0;
     message.commitProgress = (object.commitProgress !== undefined && object.commitProgress !== null)
       ? CommitProgress.fromPartial(object.commitProgress)
@@ -3532,6 +4552,15 @@ export const SparkTokenServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** Replaces start_transaction and commit_transaction in single phase transaction flow. */
+    broadcast_transaction: {
+      name: "broadcast_transaction",
+      requestType: BroadcastTransactionRequest,
+      requestStream: false,
+      responseType: BroadcastTransactionResponse,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
 
@@ -3568,6 +4597,11 @@ export interface SparkTokenServiceImplementation<CallContextExt = {}> {
     request: FreezeTokensRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<FreezeTokensResponse>>;
+  /** Replaces start_transaction and commit_transaction in single phase transaction flow. */
+  broadcast_transaction(
+    request: BroadcastTransactionRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<BroadcastTransactionResponse>>;
 }
 
 export interface SparkTokenServiceClient<CallOptionsExt = {}> {
@@ -3603,6 +4637,11 @@ export interface SparkTokenServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<FreezeTokensRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<FreezeTokensResponse>;
+  /** Replaces start_transaction and commit_transaction in single phase transaction flow. */
+  broadcast_transaction(
+    request: DeepPartial<BroadcastTransactionRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<BroadcastTransactionResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {
