@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	_ "net/http/pprof" // Add pprof support
 	"os"
@@ -72,6 +73,8 @@ type args struct {
 	Threshold                  uint64
 	SignerAddress              string
 	Port                       uint64
+	HttpPort                   uint64
+	GrpcPort                   uint64
 	DatabasePath               string
 	RunningLocally             bool
 	ChallengeTimeout           time.Duration
@@ -121,7 +124,9 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.OperatorsFilePath, "operators", "", "Path to operators file")
 	flag.Uint64Var(&args.Threshold, "threshold", 0, "Threshold value")
 	flag.StringVar(&args.SignerAddress, "signer", "", "Signer address")
-	flag.Uint64Var(&args.Port, "port", 0, "Port value")
+	flag.Uint64Var(&args.Port, "port", 0, "DEPRECATED: Use --http-port instead. HTTP port (grpc-web + metrics)")
+	flag.Uint64Var(&args.HttpPort, "http-port", 0, "HTTP port (grpc-web + metrics)")
+	flag.Uint64Var(&args.GrpcPort, "grpc-port", 0, "Native gRPC port (if 0 or same as http-port, uses ServeHTTP multiplexing)")
 	flag.StringVar(&args.DatabasePath, "database", "", "Path to database file")
 	flag.BoolVar(&args.RunningLocally, "local", false, "Running locally")
 	flag.DurationVar(&args.ChallengeTimeout, "challenge-timeout", time.Minute, "Challenge timeout")
@@ -152,8 +157,15 @@ func loadArgs() (*args, error) {
 		return nil, errors.New("signer address is required")
 	}
 
-	if args.Port == 0 {
-		return nil, errors.New("port is required")
+	if args.HttpPort == 0 && args.Port == 0 {
+		return nil, errors.New("http-port (or deprecated --port) is required")
+	}
+	if args.HttpPort == 0 && args.Port != 0 {
+		args.HttpPort = args.Port
+		fmt.Fprintf(os.Stderr, "WARNING: --port is deprecated, use --http-port instead\n")
+	}
+	if args.HttpPort != 0 && args.Port != 0 && args.HttpPort != args.Port {
+		fmt.Fprintf(os.Stderr, "WARNING: Both --port (%d) and --http-port (%d) specified; using --http-port value\n", args.Port, args.HttpPort)
 	}
 
 	return args, nil
@@ -713,54 +725,83 @@ func main() {
 		grpcweb.WithCorsForRegisteredEndpointsOnly(false),
 	)
 
+	// Determine if we should serve native gRPC separately or use ServeHTTP multiplexing
+	useNativeGRPC := args.GrpcPort != 0 && args.GrpcPort != args.HttpPort
+
 	mux := http.NewServeMux()
 	mux.Handle("/-/ready", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/",
-		otelhttp.NewHandler(
-			http.HandlerFunc(
-				func(w http.ResponseWriter, r *http.Request) {
-					// The gRPC server doesn't read the request body until EOF before processing
-					// the request. This can result in the HTTP server receiving a DATA(END_FRAME)
-					// frame after sending the response, which elicits a RST_STREAM(STREAM_CLOSED)
-					// frame. ALB and nginx then respond to the client with RST_STREAM(INTERNAL_ERROR)
-					// which causes the request to fail. The workaround is to buffer the entire
-					// request body before passing to the gRPC server.
-					r.Body = NewBufferedBody(r.Body)
 
-					if strings.ToLower(r.Header.Get("Content-Type")) == "application/grpc" {
-						grpcServer.ServeHTTP(w, r)
-						return
+	var grpcListener net.Listener
+	if useNativeGRPC {
+		logger.Info("Starting with separate gRPC + HTTP servers",
+			zap.Uint64("grpc_port", args.GrpcPort),
+			zap.Uint64("http_port", args.HttpPort))
+
+		var err error
+		grpcListener, err = net.Listen("tcp", fmt.Sprintf(":%d", args.GrpcPort))
+		if err != nil {
+			logger.Fatal("Failed to create gRPC listener", zap.Error(err))
+		}
+
+		errGrp.Go(func() error {
+			logger.Info("Native gRPC server listening", zap.Uint64("port", args.GrpcPort))
+			if err := grpcServer.Serve(grpcListener); err != nil {
+				logger.Error("Native gRPC server failed", zap.Error(err))
+				return err
+			}
+			return nil
+		})
+
+		mux.Handle("/", wrappedGrpc)
+	} else {
+		logger.Info("Starting with ServeHTTP multiplexing",
+			zap.Uint64("port", args.HttpPort))
+
+		mux.Handle("/",
+			otelhttp.NewHandler(
+				http.HandlerFunc(
+					func(w http.ResponseWriter, r *http.Request) {
+						// The gRPC server doesn't read the request body until EOF before processing
+						// the request. This can result in the HTTP server receiving a DATA(END_FRAME)
+						// frame after sending the response, which elicits a RST_STREAM(STREAM_CLOSED)
+						// frame. ALB and nginx then respond to the client with RST_STREAM(INTERNAL_ERROR)
+						// which causes the request to fail. The workaround is to buffer the entire
+						// request body before passing to the gRPC server.
+						r.Body = NewBufferedBody(r.Body)
+
+						if strings.ToLower(r.Header.Get("Content-Type")) == "application/grpc" {
+							grpcServer.ServeHTTP(w, r)
+							return
+						}
+						wrappedGrpc.ServeHTTP(w, r)
+					},
+				),
+				"server",
+				otelhttp.WithTracerProvider(noop.TracerProvider{}), // Disable tracing, let gRPC server handle it.
+				otelhttp.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
+					return []attribute.KeyValue{
+						attribute.String(string(semconv.HTTPRouteKey), r.URL.Path),
 					}
-					wrappedGrpc.ServeHTTP(w, r)
-				},
+				}),
 			),
-			"server",
-			otelhttp.WithTracerProvider(noop.TracerProvider{}), // Disable tracing, let gRPC server handle it.
-			otelhttp.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
-				return []attribute.KeyValue{
-					// Technically we shouldn't be using the path here because of cardinality, but since we know
-					// this is just routing to the gRPC server, we can assume the path is reasonable.
-					attribute.String(string(semconv.HTTPRouteKey), r.URL.Path),
-				}
-			}),
-		),
-	)
+		)
+	}
 
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", args.Port),
+		Addr:      fmt.Sprintf(":%d", args.HttpPort),
 		Handler:   mux,
 		TLSConfig: &tlsConfig,
 	}
 
 	errGrp.Go(func() error {
+		logger.Info("HTTP server listening", zap.Uint64("port", args.HttpPort))
 		if err := server.ListenAndServeTLS("", ""); !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("HTTP server failed", zap.Error(err))
 			return err
 		}
-
 		return nil
 	})
 
@@ -775,6 +816,12 @@ func main() {
 
 	logger.Info("Stopping gRPC server...")
 	grpcServer.GracefulStop()
+	if grpcListener != nil {
+		err = grpcListener.Close()
+		if err != nil {
+			logger.Error("Failed to close gRPC listener", zap.Error(err))
+		}
+	}
 	logger.Info("gRPC server stopped")
 
 	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 30*time.Second)
