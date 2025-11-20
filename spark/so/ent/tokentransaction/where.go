@@ -104,6 +104,11 @@ func Version(v schematype.TokenTransactionVersion) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldEQ(FieldVersion, vc))
 }
 
+// ValidityDurationSeconds applies equality check predicate on the "validity_duration_seconds" field. It's identical to ValidityDurationSecondsEQ.
+func ValidityDurationSeconds(v uint64) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldEQ(FieldValidityDurationSeconds, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldEQ(FieldCreateTime, v))
@@ -556,6 +561,56 @@ func VersionLT(v schematype.TokenTransactionVersion) predicate.TokenTransaction 
 func VersionLTE(v schematype.TokenTransactionVersion) predicate.TokenTransaction {
 	vc := int(v)
 	return predicate.TokenTransaction(sql.FieldLTE(FieldVersion, vc))
+}
+
+// ValidityDurationSecondsEQ applies the EQ predicate on the "validity_duration_seconds" field.
+func ValidityDurationSecondsEQ(v uint64) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldEQ(FieldValidityDurationSeconds, v))
+}
+
+// ValidityDurationSecondsNEQ applies the NEQ predicate on the "validity_duration_seconds" field.
+func ValidityDurationSecondsNEQ(v uint64) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNEQ(FieldValidityDurationSeconds, v))
+}
+
+// ValidityDurationSecondsIn applies the In predicate on the "validity_duration_seconds" field.
+func ValidityDurationSecondsIn(vs ...uint64) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldIn(FieldValidityDurationSeconds, vs...))
+}
+
+// ValidityDurationSecondsNotIn applies the NotIn predicate on the "validity_duration_seconds" field.
+func ValidityDurationSecondsNotIn(vs ...uint64) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNotIn(FieldValidityDurationSeconds, vs...))
+}
+
+// ValidityDurationSecondsGT applies the GT predicate on the "validity_duration_seconds" field.
+func ValidityDurationSecondsGT(v uint64) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldGT(FieldValidityDurationSeconds, v))
+}
+
+// ValidityDurationSecondsGTE applies the GTE predicate on the "validity_duration_seconds" field.
+func ValidityDurationSecondsGTE(v uint64) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldGTE(FieldValidityDurationSeconds, v))
+}
+
+// ValidityDurationSecondsLT applies the LT predicate on the "validity_duration_seconds" field.
+func ValidityDurationSecondsLT(v uint64) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldLT(FieldValidityDurationSeconds, v))
+}
+
+// ValidityDurationSecondsLTE applies the LTE predicate on the "validity_duration_seconds" field.
+func ValidityDurationSecondsLTE(v uint64) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldLTE(FieldValidityDurationSeconds, v))
+}
+
+// ValidityDurationSecondsIsNil applies the IsNil predicate on the "validity_duration_seconds" field.
+func ValidityDurationSecondsIsNil() predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldIsNull(FieldValidityDurationSeconds))
+}
+
+// ValidityDurationSecondsNotNil applies the NotNil predicate on the "validity_duration_seconds" field.
+func ValidityDurationSecondsNotNil() predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNotNull(FieldValidityDurationSeconds))
 }
 
 // HasSpentOutput applies the HasEdge predicate on the "spent_output" edge.

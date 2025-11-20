@@ -148,6 +148,20 @@ func (ttc *TokenTransactionCreate) SetNillableVersion(stv *schematype.TokenTrans
 	return ttc
 }
 
+// SetValidityDurationSeconds sets the "validity_duration_seconds" field.
+func (ttc *TokenTransactionCreate) SetValidityDurationSeconds(u uint64) *TokenTransactionCreate {
+	ttc.mutation.SetValidityDurationSeconds(u)
+	return ttc
+}
+
+// SetNillableValidityDurationSeconds sets the "validity_duration_seconds" field if the given value is not nil.
+func (ttc *TokenTransactionCreate) SetNillableValidityDurationSeconds(u *uint64) *TokenTransactionCreate {
+	if u != nil {
+		ttc.SetValidityDurationSeconds(*u)
+	}
+	return ttc
+}
+
 // SetID sets the "id" field.
 func (ttc *TokenTransactionCreate) SetID(u uuid.UUID) *TokenTransactionCreate {
 	ttc.mutation.SetID(u)
@@ -472,6 +486,10 @@ func (ttc *TokenTransactionCreate) createSpec() (*TokenTransaction, *sqlgraph.Cr
 		_spec.SetField(tokentransaction.FieldVersion, field.TypeInt, value)
 		_node.Version = value
 	}
+	if value, ok := ttc.mutation.ValidityDurationSeconds(); ok {
+		_spec.SetField(tokentransaction.FieldValidityDurationSeconds, field.TypeUint64, value)
+		_node.ValidityDurationSeconds = value
+	}
 	if nodes := ttc.mutation.SpentOutputIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -781,6 +799,30 @@ func (u *TokenTransactionUpsert) AddVersion(v schematype.TokenTransactionVersion
 	return u
 }
 
+// SetValidityDurationSeconds sets the "validity_duration_seconds" field.
+func (u *TokenTransactionUpsert) SetValidityDurationSeconds(v uint64) *TokenTransactionUpsert {
+	u.Set(tokentransaction.FieldValidityDurationSeconds, v)
+	return u
+}
+
+// UpdateValidityDurationSeconds sets the "validity_duration_seconds" field to the value that was provided on create.
+func (u *TokenTransactionUpsert) UpdateValidityDurationSeconds() *TokenTransactionUpsert {
+	u.SetExcluded(tokentransaction.FieldValidityDurationSeconds)
+	return u
+}
+
+// AddValidityDurationSeconds adds v to the "validity_duration_seconds" field.
+func (u *TokenTransactionUpsert) AddValidityDurationSeconds(v uint64) *TokenTransactionUpsert {
+	u.Add(tokentransaction.FieldValidityDurationSeconds, v)
+	return u
+}
+
+// ClearValidityDurationSeconds clears the value of the "validity_duration_seconds" field.
+func (u *TokenTransactionUpsert) ClearValidityDurationSeconds() *TokenTransactionUpsert {
+	u.SetNull(tokentransaction.FieldValidityDurationSeconds)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -979,6 +1021,34 @@ func (u *TokenTransactionUpsertOne) AddVersion(v schematype.TokenTransactionVers
 func (u *TokenTransactionUpsertOne) UpdateVersion() *TokenTransactionUpsertOne {
 	return u.Update(func(s *TokenTransactionUpsert) {
 		s.UpdateVersion()
+	})
+}
+
+// SetValidityDurationSeconds sets the "validity_duration_seconds" field.
+func (u *TokenTransactionUpsertOne) SetValidityDurationSeconds(v uint64) *TokenTransactionUpsertOne {
+	return u.Update(func(s *TokenTransactionUpsert) {
+		s.SetValidityDurationSeconds(v)
+	})
+}
+
+// AddValidityDurationSeconds adds v to the "validity_duration_seconds" field.
+func (u *TokenTransactionUpsertOne) AddValidityDurationSeconds(v uint64) *TokenTransactionUpsertOne {
+	return u.Update(func(s *TokenTransactionUpsert) {
+		s.AddValidityDurationSeconds(v)
+	})
+}
+
+// UpdateValidityDurationSeconds sets the "validity_duration_seconds" field to the value that was provided on create.
+func (u *TokenTransactionUpsertOne) UpdateValidityDurationSeconds() *TokenTransactionUpsertOne {
+	return u.Update(func(s *TokenTransactionUpsert) {
+		s.UpdateValidityDurationSeconds()
+	})
+}
+
+// ClearValidityDurationSeconds clears the value of the "validity_duration_seconds" field.
+func (u *TokenTransactionUpsertOne) ClearValidityDurationSeconds() *TokenTransactionUpsertOne {
+	return u.Update(func(s *TokenTransactionUpsert) {
+		s.ClearValidityDurationSeconds()
 	})
 }
 
@@ -1347,6 +1417,34 @@ func (u *TokenTransactionUpsertBulk) AddVersion(v schematype.TokenTransactionVer
 func (u *TokenTransactionUpsertBulk) UpdateVersion() *TokenTransactionUpsertBulk {
 	return u.Update(func(s *TokenTransactionUpsert) {
 		s.UpdateVersion()
+	})
+}
+
+// SetValidityDurationSeconds sets the "validity_duration_seconds" field.
+func (u *TokenTransactionUpsertBulk) SetValidityDurationSeconds(v uint64) *TokenTransactionUpsertBulk {
+	return u.Update(func(s *TokenTransactionUpsert) {
+		s.SetValidityDurationSeconds(v)
+	})
+}
+
+// AddValidityDurationSeconds adds v to the "validity_duration_seconds" field.
+func (u *TokenTransactionUpsertBulk) AddValidityDurationSeconds(v uint64) *TokenTransactionUpsertBulk {
+	return u.Update(func(s *TokenTransactionUpsert) {
+		s.AddValidityDurationSeconds(v)
+	})
+}
+
+// UpdateValidityDurationSeconds sets the "validity_duration_seconds" field to the value that was provided on create.
+func (u *TokenTransactionUpsertBulk) UpdateValidityDurationSeconds() *TokenTransactionUpsertBulk {
+	return u.Update(func(s *TokenTransactionUpsert) {
+		s.UpdateValidityDurationSeconds()
+	})
+}
+
+// ClearValidityDurationSeconds clears the value of the "validity_duration_seconds" field.
+func (u *TokenTransactionUpsertBulk) ClearValidityDurationSeconds() *TokenTransactionUpsertBulk {
+	return u.Update(func(s *TokenTransactionUpsert) {
+		s.ClearValidityDurationSeconds()
 	})
 }
 

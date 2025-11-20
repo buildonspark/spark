@@ -41,6 +41,7 @@ func (TokenTransaction) Fields() []ent.Field {
 			}
 			return nil
 		}),
+		field.Uint64("validity_duration_seconds").Optional(),
 	}
 }
 

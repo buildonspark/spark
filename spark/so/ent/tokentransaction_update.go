@@ -149,6 +149,33 @@ func (ttu *TokenTransactionUpdate) AddVersion(stv schematype.TokenTransactionVer
 	return ttu
 }
 
+// SetValidityDurationSeconds sets the "validity_duration_seconds" field.
+func (ttu *TokenTransactionUpdate) SetValidityDurationSeconds(u uint64) *TokenTransactionUpdate {
+	ttu.mutation.ResetValidityDurationSeconds()
+	ttu.mutation.SetValidityDurationSeconds(u)
+	return ttu
+}
+
+// SetNillableValidityDurationSeconds sets the "validity_duration_seconds" field if the given value is not nil.
+func (ttu *TokenTransactionUpdate) SetNillableValidityDurationSeconds(u *uint64) *TokenTransactionUpdate {
+	if u != nil {
+		ttu.SetValidityDurationSeconds(*u)
+	}
+	return ttu
+}
+
+// AddValidityDurationSeconds adds u to the "validity_duration_seconds" field.
+func (ttu *TokenTransactionUpdate) AddValidityDurationSeconds(u int64) *TokenTransactionUpdate {
+	ttu.mutation.AddValidityDurationSeconds(u)
+	return ttu
+}
+
+// ClearValidityDurationSeconds clears the value of the "validity_duration_seconds" field.
+func (ttu *TokenTransactionUpdate) ClearValidityDurationSeconds() *TokenTransactionUpdate {
+	ttu.mutation.ClearValidityDurationSeconds()
+	return ttu
+}
+
 // AddSpentOutputIDs adds the "spent_output" edge to the TokenOutput entity by IDs.
 func (ttu *TokenTransactionUpdate) AddSpentOutputIDs(ids ...uuid.UUID) *TokenTransactionUpdate {
 	ttu.mutation.AddSpentOutputIDs(ids...)
@@ -535,6 +562,15 @@ func (ttu *TokenTransactionUpdate) sqlSave(ctx context.Context) (n int, err erro
 	}
 	if value, ok := ttu.mutation.AddedVersion(); ok {
 		_spec.AddField(tokentransaction.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := ttu.mutation.ValidityDurationSeconds(); ok {
+		_spec.SetField(tokentransaction.FieldValidityDurationSeconds, field.TypeUint64, value)
+	}
+	if value, ok := ttu.mutation.AddedValidityDurationSeconds(); ok {
+		_spec.AddField(tokentransaction.FieldValidityDurationSeconds, field.TypeUint64, value)
+	}
+	if ttu.mutation.ValidityDurationSecondsCleared() {
+		_spec.ClearField(tokentransaction.FieldValidityDurationSeconds, field.TypeUint64)
 	}
 	if ttu.mutation.SpentOutputCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -981,6 +1017,33 @@ func (ttuo *TokenTransactionUpdateOne) AddVersion(stv schematype.TokenTransactio
 	return ttuo
 }
 
+// SetValidityDurationSeconds sets the "validity_duration_seconds" field.
+func (ttuo *TokenTransactionUpdateOne) SetValidityDurationSeconds(u uint64) *TokenTransactionUpdateOne {
+	ttuo.mutation.ResetValidityDurationSeconds()
+	ttuo.mutation.SetValidityDurationSeconds(u)
+	return ttuo
+}
+
+// SetNillableValidityDurationSeconds sets the "validity_duration_seconds" field if the given value is not nil.
+func (ttuo *TokenTransactionUpdateOne) SetNillableValidityDurationSeconds(u *uint64) *TokenTransactionUpdateOne {
+	if u != nil {
+		ttuo.SetValidityDurationSeconds(*u)
+	}
+	return ttuo
+}
+
+// AddValidityDurationSeconds adds u to the "validity_duration_seconds" field.
+func (ttuo *TokenTransactionUpdateOne) AddValidityDurationSeconds(u int64) *TokenTransactionUpdateOne {
+	ttuo.mutation.AddValidityDurationSeconds(u)
+	return ttuo
+}
+
+// ClearValidityDurationSeconds clears the value of the "validity_duration_seconds" field.
+func (ttuo *TokenTransactionUpdateOne) ClearValidityDurationSeconds() *TokenTransactionUpdateOne {
+	ttuo.mutation.ClearValidityDurationSeconds()
+	return ttuo
+}
+
 // AddSpentOutputIDs adds the "spent_output" edge to the TokenOutput entity by IDs.
 func (ttuo *TokenTransactionUpdateOne) AddSpentOutputIDs(ids ...uuid.UUID) *TokenTransactionUpdateOne {
 	ttuo.mutation.AddSpentOutputIDs(ids...)
@@ -1397,6 +1460,15 @@ func (ttuo *TokenTransactionUpdateOne) sqlSave(ctx context.Context) (_node *Toke
 	}
 	if value, ok := ttuo.mutation.AddedVersion(); ok {
 		_spec.AddField(tokentransaction.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := ttuo.mutation.ValidityDurationSeconds(); ok {
+		_spec.SetField(tokentransaction.FieldValidityDurationSeconds, field.TypeUint64, value)
+	}
+	if value, ok := ttuo.mutation.AddedValidityDurationSeconds(); ok {
+		_spec.AddField(tokentransaction.FieldValidityDurationSeconds, field.TypeUint64, value)
+	}
+	if ttuo.mutation.ValidityDurationSecondsCleared() {
+		_spec.ClearField(tokentransaction.FieldValidityDurationSeconds, field.TypeUint64)
 	}
 	if ttuo.mutation.SpentOutputCleared() {
 		edge := &sqlgraph.EdgeSpec{

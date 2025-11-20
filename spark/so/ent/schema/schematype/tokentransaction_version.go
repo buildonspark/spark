@@ -13,7 +13,9 @@ const (
 	// 1) Adds invoice attachments
 	TokenTransactionVersionV2
 	// TokenTransactionVersionV3 is the version of the token transaction that
-	// implements token transaction autohashing and sorting of list fields
+	// implements 1) token transaction autohashing and 2) required sorting of list fields
+	// 3) splits partial and final token transactions into different proto messages
+	// 4) explicitly stores validity duration seconds instead of expiry time.
 	TokenTransactionVersionV3
 )
 

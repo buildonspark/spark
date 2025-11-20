@@ -685,6 +685,7 @@ var (
 		{Name: "coordinator_public_key", Type: field.TypeBytes, Nullable: true},
 		{Name: "client_created_timestamp", Type: field.TypeTime, Nullable: true},
 		{Name: "version", Type: field.TypeInt, Default: 0},
+		{Name: "validity_duration_seconds", Type: field.TypeUint64, Nullable: true},
 		{Name: "token_transaction_mint", Type: field.TypeUUID, Nullable: true},
 		{Name: "token_transaction_create", Type: field.TypeUUID, Nullable: true},
 		{Name: "token_transaction_payment_intent", Type: field.TypeUUID, Nullable: true},
@@ -697,19 +698,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "token_transactions_token_mints_mint",
-				Columns:    []*schema.Column{TokenTransactionsColumns[11]},
+				Columns:    []*schema.Column{TokenTransactionsColumns[12]},
 				RefColumns: []*schema.Column{TokenMintsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "token_transactions_token_creates_create",
-				Columns:    []*schema.Column{TokenTransactionsColumns[12]},
+				Columns:    []*schema.Column{TokenTransactionsColumns[13]},
 				RefColumns: []*schema.Column{TokenCreatesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "token_transactions_payment_intents_payment_intent",
-				Columns:    []*schema.Column{TokenTransactionsColumns[13]},
+				Columns:    []*schema.Column{TokenTransactionsColumns[14]},
 				RefColumns: []*schema.Column{PaymentIntentsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

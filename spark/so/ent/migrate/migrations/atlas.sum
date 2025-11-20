@@ -1,4 +1,4 @@
-h1:IysQ6pEJCtu5UWiOZYcI4LOKJzc4eGvIwZhOaefoXWc=
+h1:vUo8aEElmaeJO6YkX/pzpGwuc4MzCffQTDZ1BMIBY1A=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -96,3 +96,4 @@ h1:IysQ6pEJCtu5UWiOZYcI4LOKJzc4eGvIwZhOaefoXWc=
 20251116052840_transfer_network_non_null.sql h1:lmb4wIiTxgiDsb7zyuqH/eTUDMzCV92UWCR4cAnrBPE=
 20251117232507_add_master_public_key_to_wallet_setting.sql h1:gRa0ZGpI9/JWX4ZaHdYpxSES0iawgqYIZBzC+dE0znA=
 20251119031032_sender_preimage_request.sql h1:YgPWW1KWM38jji3DZN0HkuSP/tdRRHLGeeOB+f8eEUc=
+20251119202509_validity_duration.sql h1:btL49ljk7P/UMVxtlgOVY4WG7e3NvCuchvRWwBjfSR4=

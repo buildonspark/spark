@@ -16552,6 +16552,8 @@ type TokenTransactionMutation struct {
 	client_created_timestamp         *time.Time
 	version                          *schematype.TokenTransactionVersion
 	addversion                       *schematype.TokenTransactionVersion
+	validity_duration_seconds        *uint64
+	addvalidity_duration_seconds     *int64
 	clearedFields                    map[string]struct{}
 	spent_output                     map[uuid.UUID]struct{}
 	removedspent_output              map[uuid.UUID]struct{}
@@ -17128,6 +17130,76 @@ func (m *TokenTransactionMutation) ResetVersion() {
 	m.addversion = nil
 }
 
+// SetValidityDurationSeconds sets the "validity_duration_seconds" field.
+func (m *TokenTransactionMutation) SetValidityDurationSeconds(u uint64) {
+	m.validity_duration_seconds = &u
+	m.addvalidity_duration_seconds = nil
+}
+
+// ValidityDurationSeconds returns the value of the "validity_duration_seconds" field in the mutation.
+func (m *TokenTransactionMutation) ValidityDurationSeconds() (r uint64, exists bool) {
+	v := m.validity_duration_seconds
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldValidityDurationSeconds returns the old "validity_duration_seconds" field's value of the TokenTransaction entity.
+// If the TokenTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenTransactionMutation) OldValidityDurationSeconds(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldValidityDurationSeconds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldValidityDurationSeconds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldValidityDurationSeconds: %w", err)
+	}
+	return oldValue.ValidityDurationSeconds, nil
+}
+
+// AddValidityDurationSeconds adds u to the "validity_duration_seconds" field.
+func (m *TokenTransactionMutation) AddValidityDurationSeconds(u int64) {
+	if m.addvalidity_duration_seconds != nil {
+		*m.addvalidity_duration_seconds += u
+	} else {
+		m.addvalidity_duration_seconds = &u
+	}
+}
+
+// AddedValidityDurationSeconds returns the value that was added to the "validity_duration_seconds" field in this mutation.
+func (m *TokenTransactionMutation) AddedValidityDurationSeconds() (r int64, exists bool) {
+	v := m.addvalidity_duration_seconds
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearValidityDurationSeconds clears the value of the "validity_duration_seconds" field.
+func (m *TokenTransactionMutation) ClearValidityDurationSeconds() {
+	m.validity_duration_seconds = nil
+	m.addvalidity_duration_seconds = nil
+	m.clearedFields[tokentransaction.FieldValidityDurationSeconds] = struct{}{}
+}
+
+// ValidityDurationSecondsCleared returns if the "validity_duration_seconds" field was cleared in this mutation.
+func (m *TokenTransactionMutation) ValidityDurationSecondsCleared() bool {
+	_, ok := m.clearedFields[tokentransaction.FieldValidityDurationSeconds]
+	return ok
+}
+
+// ResetValidityDurationSeconds resets all changes to the "validity_duration_seconds" field.
+func (m *TokenTransactionMutation) ResetValidityDurationSeconds() {
+	m.validity_duration_seconds = nil
+	m.addvalidity_duration_seconds = nil
+	delete(m.clearedFields, tokentransaction.FieldValidityDurationSeconds)
+}
+
 // AddSpentOutputIDs adds the "spent_output" edge to the TokenOutput entity by ids.
 func (m *TokenTransactionMutation) AddSpentOutputIDs(ids ...uuid.UUID) {
 	if m.spent_output == nil {
@@ -17549,7 +17621,7 @@ func (m *TokenTransactionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenTransactionMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m.create_time != nil {
 		fields = append(fields, tokentransaction.FieldCreateTime)
 	}
@@ -17580,6 +17652,9 @@ func (m *TokenTransactionMutation) Fields() []string {
 	if m.version != nil {
 		fields = append(fields, tokentransaction.FieldVersion)
 	}
+	if m.validity_duration_seconds != nil {
+		fields = append(fields, tokentransaction.FieldValidityDurationSeconds)
+	}
 	return fields
 }
 
@@ -17608,6 +17683,8 @@ func (m *TokenTransactionMutation) Field(name string) (ent.Value, bool) {
 		return m.ClientCreatedTimestamp()
 	case tokentransaction.FieldVersion:
 		return m.Version()
+	case tokentransaction.FieldValidityDurationSeconds:
+		return m.ValidityDurationSeconds()
 	}
 	return nil, false
 }
@@ -17637,6 +17714,8 @@ func (m *TokenTransactionMutation) OldField(ctx context.Context, name string) (e
 		return m.OldClientCreatedTimestamp(ctx)
 	case tokentransaction.FieldVersion:
 		return m.OldVersion(ctx)
+	case tokentransaction.FieldValidityDurationSeconds:
+		return m.OldValidityDurationSeconds(ctx)
 	}
 	return nil, fmt.Errorf("unknown TokenTransaction field %s", name)
 }
@@ -17716,6 +17795,13 @@ func (m *TokenTransactionMutation) SetField(name string, value ent.Value) error 
 		}
 		m.SetVersion(v)
 		return nil
+	case tokentransaction.FieldValidityDurationSeconds:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetValidityDurationSeconds(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction field %s", name)
 }
@@ -17727,6 +17813,9 @@ func (m *TokenTransactionMutation) AddedFields() []string {
 	if m.addversion != nil {
 		fields = append(fields, tokentransaction.FieldVersion)
 	}
+	if m.addvalidity_duration_seconds != nil {
+		fields = append(fields, tokentransaction.FieldValidityDurationSeconds)
+	}
 	return fields
 }
 
@@ -17737,6 +17826,8 @@ func (m *TokenTransactionMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case tokentransaction.FieldVersion:
 		return m.AddedVersion()
+	case tokentransaction.FieldValidityDurationSeconds:
+		return m.AddedValidityDurationSeconds()
 	}
 	return nil, false
 }
@@ -17752,6 +17843,13 @@ func (m *TokenTransactionMutation) AddField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddVersion(v)
+		return nil
+	case tokentransaction.FieldValidityDurationSeconds:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddValidityDurationSeconds(v)
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction numeric field %s", name)
@@ -17775,6 +17873,9 @@ func (m *TokenTransactionMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(tokentransaction.FieldClientCreatedTimestamp) {
 		fields = append(fields, tokentransaction.FieldClientCreatedTimestamp)
+	}
+	if m.FieldCleared(tokentransaction.FieldValidityDurationSeconds) {
+		fields = append(fields, tokentransaction.FieldValidityDurationSeconds)
 	}
 	return fields
 }
@@ -17804,6 +17905,9 @@ func (m *TokenTransactionMutation) ClearField(name string) error {
 		return nil
 	case tokentransaction.FieldClientCreatedTimestamp:
 		m.ClearClientCreatedTimestamp()
+		return nil
+	case tokentransaction.FieldValidityDurationSeconds:
+		m.ClearValidityDurationSeconds()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction nullable field %s", name)
@@ -17842,6 +17946,9 @@ func (m *TokenTransactionMutation) ResetField(name string) error {
 		return nil
 	case tokentransaction.FieldVersion:
 		m.ResetVersion()
+		return nil
+	case tokentransaction.FieldValidityDurationSeconds:
+		m.ResetValidityDurationSeconds()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction field %s", name)

@@ -126,6 +126,9 @@ message TokenTransaction {
     google.protobuf.Timestamp client_created_timestamp = 9;
     // The spark invoices this transaction fulfills.
     repeated InvoiceAttachment invoice_attachments = 10;
+    // Should NOT be set explicitly on V2 transactions (protected with validation). 
+    // Provided here to enable cross-conversion between v3 token transaction protos during migration.
+    uint64 validity_duration_seconds = 11;
 }
 
 message TokenTransactionMetadata {
