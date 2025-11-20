@@ -6,6 +6,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -96,6 +97,9 @@ func (TokenOutput) Indexes() []ent.Index {
 	return []ent.Index{
 		// Optimized for GetOwnedTokenOutputs query
 		index.Fields("owner_public_key", "status", "network"),
+		// Optimized for GetTokenTransactions query
+		index.Fields("owner_public_key", "token_identifier", "status").Annotations(entsql.IncludeColumns("token_output_output_created_token_transaction", "token_output_output_spent_token_transaction")),
+		// Defensive index for GetTokenTransactions (in case someone queries by just the token identifier)
 		index.Fields("token_identifier", "status"),
 		// Enables quick unmarking of withdrawn outputs in response to block reorgs.
 		index.Fields("confirmed_withdraw_block_hash"),
