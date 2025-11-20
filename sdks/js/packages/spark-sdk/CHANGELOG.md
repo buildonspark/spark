@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.4.7
+
+### Patch Changes
+
+- - Fix variable name in android module
+
 ## 0.4.6
 
 ### Patch Changes
