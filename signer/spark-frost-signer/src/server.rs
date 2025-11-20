@@ -63,7 +63,7 @@ impl FrostService for FrostServer {
         })?;
         let min_signers = req.min_signers as u16;
         let max_signers = req.max_signers as u16;
-        let rng = &mut rand::thread_rng();
+        let key_count = req.key_count as usize;
 
         let mut dkg_state = self.dkg_state.lock().unwrap();
 
@@ -71,22 +71,29 @@ impl FrostService for FrostServer {
             return Err(Status::internal("DKG state is not None"));
         }
 
-        let mut result_secret_packages = Vec::new();
-        let mut result_packages = Vec::new();
+        let round1_results: Result<Vec<_>, Status> = (0..key_count)
+            .into_par_iter()
+            .map(|_| {
+                let mut rng = rand::thread_rng();
+                let (round1_secret_packages, round1_packages) =
+                    frost_secp256k1_tr::keys::dkg::part1(
+                        identifier,
+                        max_signers,
+                        min_signers,
+                        &mut rng,
+                    )
+                    .map_err(|e| {
+                        Status::internal(format!("Failed to generate DKG round 1: {e:?}"))
+                    })?;
+                let serialized = round1_packages.serialize().map_err(|e| {
+                    Status::internal(format!("Failed to serialize DKG round 1 package: {e:?}"))
+                })?;
+                Ok((round1_secret_packages, serialized))
+            })
+            .collect();
 
-        for _ in 0..req.key_count {
-            let (round1_secret_packages, round1_packages) = frost_secp256k1_tr::keys::dkg::part1(
-                identifier,
-                max_signers,
-                min_signers,
-                &mut *rng,
-            )
-            .map_err(|e| Status::internal(format!("Failed to generate DKG round 1: {e:?}")))?;
-            result_secret_packages.push(round1_secret_packages);
-            result_packages.push(round1_packages.serialize().map_err(|e| {
-                Status::internal(format!("Failed to serialize DKG round 1 package: {e:?}"))
-            })?);
-        }
+        let (result_secret_packages, result_packages): (Vec<_>, Vec<_>) =
+            round1_results?.into_iter().unzip();
 
         dkg_state.state.insert(
             req.request_id.clone(),
