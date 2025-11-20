@@ -12,7 +12,7 @@ tracing = { workspace = true }
 rand = { workspace = true }
 bitcoin = "0.32.5"
 ecies = { workspace = true }
-rayon = "1.10.0"
+rayon = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tonic = { workspace = true }
@@ -27,4 +27,3 @@ harness = false
 [build-dependencies]
 tonic-build = { workspace = true }
 prost-build = "0.11"
-

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use frost_service_server::FrostService;
+use rayon::prelude::*;
 use spark_frost::hex_string_to_identifier;
 use spark_frost::proto::common::*;
 use spark_frost::proto::frost::*;
@@ -119,30 +120,40 @@ impl FrostService for FrostServer {
             ));
         }
 
-        let mut result_packages = Vec::new();
-        let mut result_secret_packages = Vec::new();
-        for (round1_secret, round1_packages_map) in
-            round1_secrets.iter().zip(round1_packages_maps.iter())
-        {
-            let (round2_secret, round2_packages) =
-                frost_secp256k1_tr::keys::dkg::part2(round1_secret.clone(), round1_packages_map)
-                    .map_err(|e| {
-                        Status::internal(format!("Failed to generate DKG round 2: {e:?}"))
-                    })?;
+        let parallel_results: Result<Vec<_>, Status> = round1_secrets
+            .par_iter()
+            .zip(round1_packages_maps.par_iter())
+            .map(|(round1_secret, round1_packages_map)| {
+                let (round2_secret, round2_packages) = frost_secp256k1_tr::keys::dkg::part2(
+                    round1_secret.clone(),
+                    round1_packages_map,
+                )
+                .map_err(|e| Status::internal(format!("Failed to generate DKG round 2: {e:?}")))?;
 
+                let packages_map = round2_packages
+                    .into_iter()
+                    .map(|(id, pkg)| {
+                        let serialized =
+                            pkg.serialize().expect("Failed to serialize round2 package");
+                        (hex::encode(id.serialize()), serialized)
+                    })
+                    .collect::<HashMap<String, Vec<u8>>>();
+
+                Ok((
+                    round2_secret,
+                    PackageMap {
+                        packages: packages_map,
+                    },
+                ))
+            })
+            .collect();
+
+        let parallel_results = parallel_results?;
+        let mut result_secret_packages = Vec::with_capacity(parallel_results.len());
+        let mut result_packages = Vec::with_capacity(parallel_results.len());
+        for (round2_secret, package_map) in parallel_results {
             result_secret_packages.push(round2_secret);
-
-            let packages_map = round2_packages
-                .into_iter()
-                .map(|(id, pkg)| {
-                    let serialized = pkg.serialize().expect("Failed to serialize round2 package");
-                    (hex::encode(id.serialize()), serialized)
-                })
-                .collect::<HashMap<String, Vec<u8>>>();
-
-            result_packages.push(PackageMap {
-                packages: packages_map,
-            });
+            result_packages.push(package_map);
         }
 
         dkg_state.state.insert(
@@ -190,28 +201,27 @@ impl FrostService for FrostServer {
             ));
         }
 
-        let mut key_packages = Vec::new();
-        for ((round2_secret, round1_packages), round2_packages) in round2_secrets
-            .iter()
-            .zip(round1_packages_maps.iter())
-            .zip(round2_packages_maps.iter())
-        {
-            let (secret_package, public_package) = frost_secp256k1_tr::keys::dkg::part3(
-                &round2_secret.clone(),
-                round1_packages,
-                round2_packages,
-            )
-            .map_err(|e| Status::internal(format!("Failed to generate DKG round 3: {e:?}")))?;
+        let key_packages: Vec<_> = (0..round2_secrets.len())
+            .into_par_iter()
+            .map(|idx| {
+                let round2_secret = round2_secrets[idx].clone();
+                let round1_packages = &round1_packages_maps[idx];
+                let round2_packages = &round2_packages_maps[idx];
 
-            let key_package =
+                let (secret_package, public_package) = frost_secp256k1_tr::keys::dkg::part3(
+                    &round2_secret,
+                    round1_packages,
+                    round2_packages,
+                )
+                .map_err(|e| Status::internal(format!("Failed to generate DKG round 3: {e:?}")))?;
+
                 key_package_from_dkg_result(secret_package, public_package).map_err(|e| {
                     Status::internal(format!(
                         "Failed to convert DKG result to key package: {e:?}"
                     ))
-                })?;
-
-            key_packages.push(key_package);
-        }
+                })
+            })
+            .collect::<Result<Vec<_>, Status>>()?;
 
         dkg_state.state.remove(&request.request_id);
 
