@@ -744,9 +744,9 @@ var (
 				Columns: []*schema.Column{TokenTransactionsColumns[7], TokenTransactionsColumns[6]},
 			},
 			{
-				Name:    "tokentransaction_update_time",
+				Name:    "tokentransaction_create_time",
 				Unique:  false,
-				Columns: []*schema.Column{TokenTransactionsColumns[2]},
+				Columns: []*schema.Column{TokenTransactionsColumns[1]},
 			},
 		},
 	}
