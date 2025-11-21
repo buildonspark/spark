@@ -1,12 +1,15 @@
 package schematype
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"testing"
 
 	"entgo.io/ent/schema/field"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/stretchr/testify/require"
 )
 
 // TxID is a wrapper around chainhash.Hash that implements field.ValueScanner
@@ -110,4 +113,14 @@ func (t *TxID) Scan(src any) error {
 	default:
 		return fmt.Errorf("unexpected type for TxID: %T", src)
 	}
+}
+
+// NewRandomTxID generates a random TxID for testing purposes.
+func NewRandomTxIDForTesting(t *testing.T) TxID {
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	require.NoError(t, err, "failed to generate random bytes")
+	txid, err := NewTxIDFromBytes(b)
+	require.NoError(t, err, "failed to create TxID")
+	return txid
 }
