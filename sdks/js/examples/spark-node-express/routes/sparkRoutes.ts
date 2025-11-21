@@ -132,7 +132,8 @@ export const createSparkRouter = (
       res.json({
         data: {
           message: "Wallet initialized",
-          ...response,
+          mnemonic: response?.mnemonic,
+          sparkAddress: await response?.wallet?.getSparkAddress(),
         },
       });
     } catch (error) {
