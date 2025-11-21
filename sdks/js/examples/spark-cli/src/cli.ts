@@ -666,7 +666,7 @@ async function runCLI() {
   Token Holder Commands:
     transfertokens <tokenIdentifier> <receiverAddress> <amount>        - Transfer tokens. If the token was created with 2 decimals, transfertokens _ _ 1 would transfer 0.01 tokens.
     batchtransfertokens <tokenIdentifier> <receiverAddress1:amount1> <receiverAddress2:amount2> ... - Transfer tokens with multiple outputs
-    querytokentransactions [--ownerPublicKeys] [--issuerPublicKeys] [--tokenTransactionHashes] [--tokenIdentifiers] [--outputIds] [--sortOrder] - Query token transaction history
+    querytokentransactions [--sparkAddresses] [--issuerPublicKeys] [--tokenTransactionHashes] [--tokenIdentifiers] [--outputIds] [--sortOrder] - Query token transaction history
 
   Token Issuer Commands:
   gettokenl1address                                                   - Get the L1 address for on-chain token operations
