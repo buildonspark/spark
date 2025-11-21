@@ -126,6 +126,7 @@ func TestHTLC(t *testing.T) {
 		leavesToTransfer[:],
 		receiverPrivKey.Public(),
 		paymentHash[:],
+		time.Now().Add(10*time.Minute),
 	)
 	require.NoError(t, err)
 

@@ -1508,6 +1508,7 @@ func InitiatePreimageSwapV3(
 	leaves []LeafKeyTweak,
 	receiverIdentityPubkey keys.Public,
 	paymentHash []byte,
+	expiryTime time.Time,
 ) (*pb.Transfer, error) {
 	sparkConn, err := config.NewCoordinatorGRPCConnection()
 	if err != nil {
@@ -1587,11 +1588,13 @@ func InitiatePreimageSwapV3(
 			LeavesToSend:              leavesToSend,
 			ReceiverIdentityPublicKey: receiverIdentityPubkey.Serialize(),
 			OwnerIdentityPublicKey:    config.IdentityPrivateKey.Public().Serialize(),
+			ExpiryTime:                timestamppb.New(expiryTime),
 		},
 		ReceiverIdentityPublicKey: receiverIdentityPubkey.Serialize(),
 		InvoiceAmount: &pb.InvoiceAmount{
 			ValueSats: value,
 		},
+		Reason: pb.InitiatePreimageSwapRequest_REASON_SEND,
 	})
 	if err != nil {
 		return nil, err
