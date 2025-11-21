@@ -23,7 +23,12 @@ import {
   validateSparkInvoiceSignature,
   WalletConfig,
 } from "@buildonspark/spark-sdk";
-import { InvoiceStatus, TreeNode } from "@buildonspark/spark-sdk/proto/spark";
+import {
+  InvoiceStatus,
+  PreimageRequestRole,
+  PreimageRequestStatus,
+  TreeNode,
+} from "@buildonspark/spark-sdk/proto/spark";
 import { TokenTransactionStatus } from "@buildonspark/spark-sdk/proto/spark_token";
 import {
   BitcoinNetwork,
@@ -326,6 +331,7 @@ const commands = [
   "payinvoice",
   "createhtlc",
   "claimhtlc",
+  "queryhtlc",
   "createhtlcsenderspendtx",
   "createhtlcreceiverspendtx",
   "sendtransfer",
@@ -643,6 +649,7 @@ async function runCLI() {
   createsparkinvoice <asset("btc" | tokenIdentifier)> [amount] [memo] [senderPublicKey] [expiryTime] - Create a spark payment request. Amount is optional. Use _ for empty optional fields eg createsparkinvoice btc _ memo _ _
   createhtlc <receiverSparkAddress> <amountSats> <expiryTimeMinutes> <preimage> - Create a HTLC
   claimhtlc <preimage>                                                - Claim a HTLC
+  queryhtlc <paymentHashes> <status> <transferIds> <matchRole>        - Query a HTLC
   createhtlcsenderspendtx <htlcTx> <sequence> <hash> <hashLockDestinationPubkey> <sequenceLockDestinationPubkey> <satsPerVbyteFee> - Create a sender spend transaction for a HTLC
   createhtlcreceiverspendtx <htlcTx> <hash> <hashLockDestinationPubkey> <sequenceLockDestinationPubkey> <preimage> <satsPerVbyteFee> - Create a receiver spend transaction for a HTLC
   sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
@@ -1362,6 +1369,44 @@ async function runCLI() {
           }
           const htlc = await wallet.claimHTLC(args[0]);
           console.log(htlc);
+          break;
+        case "queryhtlc":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          let status: PreimageRequestStatus | undefined;
+          switch (args[1]) {
+            case "waiting_for_preimage":
+              status =
+                PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE;
+              break;
+            case "preimage_shared":
+              status =
+                PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED;
+              break;
+            case "returned":
+              status = PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_RETURNED;
+              break;
+            case "null":
+              status = undefined;
+              break;
+          }
+          let matchRole: PreimageRequestRole | undefined;
+          switch (args[3]) {
+            case "sender":
+              matchRole = PreimageRequestRole.PREIMAGE_REQUEST_ROLE_SENDER;
+              break;
+            default:
+              matchRole = PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER;
+          }
+          const queriedHtlcs = await wallet.queryHTLC({
+            paymentHashes: args[0] === "null" ? [] : args[0].split(","),
+            status: status,
+            transferIds: args[2] === "null" ? [] : args[2].split(","),
+            matchRole: matchRole,
+          });
+          console.log(queriedHtlcs);
           break;
         case "createhtlcsenderspendtx":
           if (!wallet) {

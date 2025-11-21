@@ -46,6 +46,9 @@ import {
 import {
   ConnectedEvent,
   DepositAddressQueryResult,
+  PreimageRequestRole,
+  PreimageRequestStatus,
+  QueryHtlcResponse,
   QueryNodesRequest,
   QueryNodesResponse,
   QuerySparkInvoicesResponse,
@@ -4033,6 +4036,50 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return spendTx.hex;
   }
 
+  async queryHTLC({
+    paymentHashes,
+    status,
+    transferIds,
+    matchRole = PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER,
+    limit = 100,
+    offset = 0,
+  }: {
+    paymentHashes?: string[];
+    status?: PreimageRequestStatus;
+    transferIds?: string[];
+    matchRole?: PreimageRequestRole;
+    limit?: number;
+    offset?: number;
+  }): Promise<QueryHtlcResponse> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    let response: QueryHtlcResponse;
+    const identityPublicKey = await this.config.signer.getIdentityPublicKey();
+    try {
+      response = await sparkClient.query_htlc({
+        paymentHashes: paymentHashes?.map((hash) => hexToBytes(hash)) ?? [],
+        status,
+        transferIds: transferIds ?? [],
+        matchRole,
+        identityPublicKey,
+        limit,
+        offset,
+      });
+    } catch (error) {
+      throw new NetworkError(
+        "Failed to query HTLC",
+        {
+          operation: "query_htlc",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error as Error,
+      );
+    }
+    return response;
+  }
+
   /**
    * Fulfills one or more Spark invoices.
    *
@@ -5670,6 +5717,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "createHTLC",
   "getHTLCPreimage",
   "claimHTLC",
+  "queryHTLC",
   "createHTLCSenderSpendTx",
   "createHTLCReceiverSpendTx",
   "createLightningInvoice",
