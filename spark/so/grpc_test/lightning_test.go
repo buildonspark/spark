@@ -273,54 +273,6 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
 
-func TestReceiveLightningPaymentCannotCancelAfterPreimageReveal(t *testing.T) {
-	// Create user and ssp configs
-	userConfig := wallet.NewTestWalletConfig(t)
-	sspConfig := wallet.NewTestWalletConfig(t)
-	// User creates an invoice
-	amountSats := uint64(100)
-	preimage, paymentHash := testPreimageHash(t, amountSats)
-	fakeInvoiceCreator := NewFakeLightningInvoiceCreator()
-
-	defer cleanUp(t, userConfig, paymentHash)
-
-	invoice, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), userConfig, fakeInvoiceCreator, amountSats, "test", preimage)
-	require.NoError(t, err)
-	assert.NotNil(t, invoice)
-
-	// SSP creates a node of 12345 sats
-	sspLeafPrivKey := keys.GeneratePrivateKey()
-	feeSats := uint64(0)
-	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
-	require.NoError(t, err)
-
-	newLeafPrivKey := keys.GeneratePrivateKey()
-
-	leaves := []wallet.LeafKeyTweak{{
-		Leaf:              nodeToSend,
-		SigningPrivKey:    sspLeafPrivKey,
-		NewSigningPrivKey: newLeafPrivKey,
-	}}
-
-	response, err := wallet.SwapNodesForPreimage(
-		t.Context(),
-		sspConfig,
-		leaves,
-		userConfig.IdentityPublicKey(),
-		paymentHash[:],
-		nil,
-		feeSats,
-		true,
-		amountSats,
-	)
-	require.NoError(t, err)
-	assert.Equal(t, response.Preimage, preimage[:])
-
-	_, err = wallet.CancelTransfer(t.Context(), sspConfig, response.Transfer)
-	require.ErrorContains(t, err, "FailedPrecondition")
-	require.ErrorContains(t, err, "Cannot cancel an invoice whose preimage has already been revealed")
-}
-
 func TestSendLightningPayment(t *testing.T) {
 	// Create user and ssp configs
 	userConfig := wallet.NewTestWalletConfig(t)

@@ -567,17 +567,6 @@ func StartSwapSignRefund(
 	return senderTransfer, senderRefundSignatureMap, leafDataMap, err
 }
 
-func CounterSwapSignRefund(
-	ctx context.Context,
-	config *TestWalletConfig,
-	leaves []LeafKeyTweak,
-	receiverIdentityPubKey keys.Public,
-	expiryTime time.Time,
-	adaptorPublicKey keys.Public,
-) (*pb.Transfer, map[string][]byte, map[string]*LeafRefundSigningData, []*pb.LeafRefundTxSigningResult, error) {
-	return sendTransferSignRefund(ctx, config, leaves, receiverIdentityPubKey, expiryTime, true, adaptorPublicKey)
-}
-
 func sendTransferSignRefund(
 	ctx context.Context,
 	config *TestWalletConfig,
@@ -1490,7 +1479,6 @@ func InitiateSwapPrimaryTransfer(
 	directAdaptorPublicKey keys.Public,
 	directFromCpfpAdaptorPublicKey keys.Public,
 ) (*pb.InitiateSwapPrimaryTransferResponse, error) {
-
 	startTransferRequest := &pb.StartTransferRequest{
 		TransferId:                transferId.String(),
 		OwnerIdentityPublicKey:    config.IdentityPublicKey().Serialize(),
