@@ -21880,7 +21880,7 @@ type TreeMutation struct {
 	owner_identity_pubkey  *keys.Public
 	status                 *schematype.TreeStatus
 	network                *schematype.Network
-	base_txid              *[]byte
+	base_txid              *schematype.TxID
 	vout                   *int16
 	addvout                *int16
 	clearedFields          map[string]struct{}
@@ -22181,12 +22181,12 @@ func (m *TreeMutation) ResetNetwork() {
 }
 
 // SetBaseTxid sets the "base_txid" field.
-func (m *TreeMutation) SetBaseTxid(b []byte) {
-	m.base_txid = &b
+func (m *TreeMutation) SetBaseTxid(si schematype.TxID) {
+	m.base_txid = &si
 }
 
 // BaseTxid returns the value of the "base_txid" field in the mutation.
-func (m *TreeMutation) BaseTxid() (r []byte, exists bool) {
+func (m *TreeMutation) BaseTxid() (r schematype.TxID, exists bool) {
 	v := m.base_txid
 	if v == nil {
 		return
@@ -22197,7 +22197,7 @@ func (m *TreeMutation) BaseTxid() (r []byte, exists bool) {
 // OldBaseTxid returns the old "base_txid" field's value of the Tree entity.
 // If the Tree object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeMutation) OldBaseTxid(ctx context.Context) (v []byte, err error) {
+func (m *TreeMutation) OldBaseTxid(ctx context.Context) (v schematype.TxID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldBaseTxid is only allowed on UpdateOne operations")
 	}
@@ -22550,7 +22550,7 @@ func (m *TreeMutation) SetField(name string, value ent.Value) error {
 		m.SetNetwork(v)
 		return nil
 	case tree.FieldBaseTxid:
-		v, ok := value.([]byte)
+		v, ok := value.(schematype.TxID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

@@ -615,10 +615,11 @@ func handleBlock(
 			logger.Sugar().Infof("Expected tree status to be pending (was: %s)", nodeTree.Status)
 			continue
 		}
-		if _, ok := confirmedTxHashSet[[32]byte(nodeTree.BaseTxid)]; !ok {
-			logger.Sugar().Debugf("Base txid %s not found in confirmed txids", chainhash.Hash(nodeTree.BaseTxid).String())
+		baseTxidHash := nodeTree.BaseTxid.Hash()
+		if _, ok := confirmedTxHashSet[baseTxidHash]; !ok {
+			logger.Sugar().Debugf("Base txid %s not found in confirmed txids", baseTxidHash.String())
 			for txid := range confirmedTxHashSet {
-				logger.Sugar().Debugf("Found confirmed txid %s", chainhash.Hash(txid).String())
+				logger.Sugar().Debugf("Found confirmed txid %s", chainhash.Hash(txid))
 			}
 			continue
 		}

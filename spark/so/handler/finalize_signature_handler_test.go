@@ -183,8 +183,8 @@ func createTestTree(t *testing.T, ctx context.Context, network st.Network, statu
 	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	testID := uuid.New()
-	baseTxid := []byte("base_txid_" + testID.String())
+	baseTxid := st.NewRandomTxIDForTesting(t)
+
 	rng := rand.NewChaCha8([32]byte{})
 	ownerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
 	verifyingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -634,8 +634,9 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 	// This creates the mismatch that triggers the old bug path: the tree's base
 	// txid is "non_root_deposit_txid" but the deposit address confirmation txid
 	// is "other_non_root_deposit_txid"
+	nonRootTxid := st.NewRandomTxIDForTesting(t)
 	_, err = tree.Update().
-		SetBaseTxid([]byte("non_root_deposit_txid_" + testID)).
+		SetBaseTxid(nonRootTxid).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -739,8 +740,9 @@ func TestFinalizeTreeWithInsufficientConfirmations(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
+	depositTxid := st.NewRandomTxIDForTesting(t)
 	_, err = tree.Update().
-		SetBaseTxid([]byte("deposit_txid_" + testID)).
+		SetBaseTxid(depositTxid).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -851,8 +853,9 @@ func TestFinalizeTreeWithNoBlockHeight(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
+	depositTxid2 := st.NewRandomTxIDForTesting(t)
 	_, err = tree.Update().
-		SetBaseTxid([]byte("deposit_txid_" + testID)).
+		SetBaseTxid(depositTxid2).
 		Save(ctx)
 	require.NoError(t, err)
 

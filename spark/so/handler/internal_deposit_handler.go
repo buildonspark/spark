@@ -232,7 +232,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			Create().
 			SetID(treeID).
 			SetOwnerIdentityPubkey(ownerIDPubKey).
-			SetBaseTxid(txid[:]).
+			SetBaseTxid(st.NewTxID(txid)).
 			SetVout(int16(nodeTx.TxIn[0].PreviousOutPoint.Index)).
 			SetNetwork(schemaNetwork).
 			SetDepositAddress(address)

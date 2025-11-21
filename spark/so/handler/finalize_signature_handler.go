@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -120,13 +119,8 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 				if numConfirmations < requiredConfirmations {
 					return nil, errors.FailedPreconditionInsufficientConfirmations(fmt.Errorf("expected at least %d confirmations, got %d", requiredConfirmations, numConfirmations))
 				}
-				if len(address.ConfirmationTxid) > 0 {
-					var baseHash chainhash.Hash
-					// Convert the tree.BaseTxid back to chainhash so it matches the format of address.ConfirmationTxid
-					copy(baseHash[:], nodeTree.BaseTxid)
-					if address.ConfirmationTxid != baseHash.String() {
-						return nil, fmt.Errorf("confirmation txid does not match tree base txid")
-					}
+				if len(address.ConfirmationTxid) > 0 && address.ConfirmationTxid != nodeTree.BaseTxid.String() {
+					return nil, fmt.Errorf("confirmation txid does not match tree base txid")
 				}
 				_, err = nodeTree.Update().SetStatus(st.TreeStatusAvailable).Save(ctx)
 				if err != nil {
@@ -311,7 +305,6 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		WithTree().
 		WithSigningKeyshare().
 		Only(ctx)
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get node in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 	}

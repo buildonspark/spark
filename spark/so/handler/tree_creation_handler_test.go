@@ -119,10 +119,13 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 				require.NoError(t, err)
 
 				txHash := tx.TxHash()
+				baseTxid, err := st.NewTxIDFromBytes(txHash[:])
+				require.NoError(t, err)
+
 				_, err = dbTX.Tree.Create().
 					SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 					SetNetwork(st.NetworkRegtest).
-					SetBaseTxid(txHash[:]).
+					SetBaseTxid(baseTxid).
 					SetVout(0).
 					SetStatus(st.TreeStatusPending).
 					Save(ctx)
@@ -169,10 +172,12 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a tree
+	baseTxid := st.NewRandomTxIDForTesting(t)
+
 	tree, err := dbTX.Tree.Create().
 		SetOwnerIdentityPubkey(identityPrivKey.Public()).
 		SetNetwork(st.NetworkRegtest).
-		SetBaseTxid(make([]byte, 32)).
+		SetBaseTxid(baseTxid).
 		SetVout(0).
 		SetStatus(st.TreeStatusAvailable).
 		Save(ctx)
@@ -573,10 +578,12 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a tree
+	baseTxid := st.NewRandomTxIDForTesting(t)
+
 	tree, err := dbTX.Tree.Create().
 		SetOwnerIdentityPubkey(identityPrivKey.Public()).
 		SetNetwork(st.NetworkRegtest).
-		SetBaseTxid(make([]byte, 32)).
+		SetBaseTxid(baseTxid).
 		SetVout(0).
 		SetStatus(st.TreeStatusAvailable).
 		Save(ctx)
@@ -1062,12 +1069,14 @@ func TestTreeNodeDbHooks(t *testing.T) {
 	require.NoError(t, err)
 	nodeDirectFromCpfpRefundTxid := nodeDirectFromCpfpRefundTx.TxHash()
 
+	baseTxid := st.NewRandomTxIDForTesting(t)
+
 	_, err = tx.Tree.Create().
 		SetID(treeID).
 		SetOwnerIdentityPubkey(ownerIdentityPubkey).
 		SetNetwork(st.NetworkRegtest).
 		SetStatus(st.TreeStatusAvailable).
-		SetBaseTxid([]byte{1, 2, 3}).
+		SetBaseTxid(baseTxid).
 		SetVout(int16(0)).
 		Save(ctx)
 	require.NoError(t, err)
@@ -1145,10 +1154,7 @@ func TestTreeNodeDbHooks(t *testing.T) {
 	require.Equal(t, treeNode.DirectRefundTxid.Hash(), nodeDirectRefundTxid2)
 	require.NotNil(t, treeNode.DirectRefundTx)
 
-	dummyTxidBytes := make([]byte, 32)
-	copy(dummyTxidBytes, []byte{1, 2, 3})
-	dummyTxid, err := st.NewTxIDFromBytes(dummyTxidBytes)
-	require.NoError(t, err)
+	dummyTxid := st.NewRandomTxIDForTesting(t)
 	err = tx.TreeNode.Update().
 		Where(enttreenode.ID(treeNode.ID)).
 		SetDirectRefundTxid(dummyTxid).

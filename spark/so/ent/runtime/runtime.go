@@ -663,10 +663,6 @@ func init() {
 	tree.DefaultUpdateTime = treeDescUpdateTime.Default.(func() time.Time)
 	// tree.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tree.UpdateDefaultUpdateTime = treeDescUpdateTime.UpdateDefault.(func() time.Time)
-	// treeDescBaseTxid is the schema descriptor for base_txid field.
-	treeDescBaseTxid := treeFields[3].Descriptor()
-	// tree.BaseTxidValidator is a validator for the "base_txid" field. It is called by the builders before save.
-	tree.BaseTxidValidator = treeDescBaseTxid.Validators[0].(func([]byte) error)
 	// treeDescVout is the schema descriptor for vout field.
 	treeDescVout := treeFields[4].Descriptor()
 	// tree.VoutValidator is a validator for the "vout" field. It is called by the builders before save.

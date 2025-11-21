@@ -126,11 +126,12 @@ func TestFinalizeTransfer(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create test tree
+		baseTxid := st.NewRandomTxIDForTesting(t)
 		tree, err := dbCtx.Client.Tree.Create().
 			SetStatus(st.TreeStatusAvailable).
 			SetNetwork(st.NetworkRegtest).
 			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
-			SetBaseTxid([]byte("test_base_txid")).
+			SetBaseTxid(baseTxid).
 			SetVout(0).
 			Save(ctx)
 		require.NoError(t, err)
@@ -318,11 +319,12 @@ func TestApplySignatures(t *testing.T) {
 	require.NoError(t, err)
 
 	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	baseTxid2 := st.NewRandomTxIDForTesting(t)
 	tree, err := dbCtx.Client.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
 		SetNetwork(st.NetworkRegtest).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
-		SetBaseTxid([]byte("test_base_txid")).
+		SetBaseTxid(baseTxid2).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)
@@ -400,7 +402,7 @@ func TestApplySignatures(t *testing.T) {
 	copy(invalidAdaptorSig, signature)
 	invalidAdaptorSig[0] = ^invalidAdaptorSig[0] // Flip first byte
 
-	var tests = []struct {
+	tests := []struct {
 		name                   string
 		leafId                 string
 		rawRefundTx            []byte
@@ -491,7 +493,6 @@ func TestApplySignatures(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			req.DirectRefundSignatures = tt.directRefundSignatures
 			req.Leaves = []*pbinternal.InitiateTransferLeaf{{
 				LeafId:         tt.leafId,
@@ -509,7 +510,6 @@ func TestApplySignatures(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-
 }
 
 func getTxOutputSignature(t *testing.T, directTx, directRefundTx []byte, tweakedPriv keys.Private) []byte {
@@ -594,11 +594,12 @@ func TestUpdateTransferLeavesSignatures(t *testing.T) {
 		require.NoError(t, err)
 
 		ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		baseTxid := st.NewRandomTxIDForTesting(t)
 		tree, err := dbCtx.Client.Tree.Create().
 			SetStatus(st.TreeStatusAvailable).
 			SetNetwork(st.NetworkRegtest).
 			SetOwnerIdentityPubkey(ownerIdentityPubKey).
-			SetBaseTxid([]byte("test_base_txid")).
+			SetBaseTxid(baseTxid).
 			SetVout(0).
 			Save(ctx)
 		require.NoError(t, err)

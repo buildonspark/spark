@@ -825,7 +825,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		Create().
 		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 		SetNetwork(schemaNetwork).
-		SetBaseTxid(txid[:]).
+		SetBaseTxid(st.NewTxID(txid)).
 		SetVout(int16(req.OnChainUtxo.Vout)).
 		SetDepositAddress(depositAddress)
 	if txConfirmed {
@@ -1165,7 +1165,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 
 	// Check if a tree already exists for this deposit
 	existingTree, err := db.Tree.Query().
-		Where(tree.BaseTxid(txid[:])).
+		Where(tree.BaseTxid(st.NewTxID(txid))).
 		Where(tree.Vout(int16(req.OnChainUtxo.Vout))).
 		First(ctx)
 
@@ -1189,7 +1189,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 			Create().
 			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 			SetNetwork(schemaNetwork).
-			SetBaseTxid(txid[:]).
+			SetBaseTxid(st.NewTxID(txid)).
 			SetVout(int16(req.OnChainUtxo.Vout)).
 			SetDepositAddress(depositAddress)
 

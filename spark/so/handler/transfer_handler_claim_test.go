@@ -105,11 +105,13 @@ func createTestSigningKeyshare(t *testing.T, ctx context.Context, rng io.Reader,
 }
 
 func createTestTreeForClaim(t *testing.T, ctx context.Context, ownerIdentityPubKey keys.Public, client *ent.Client) *ent.Tree {
+	baseTxid := st.NewRandomTxIDForTesting(t)
+
 	tree, err := client.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
 		SetNetwork(st.NetworkRegtest).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
-		SetBaseTxid([]byte("test_base_txid")).
+		SetBaseTxid(baseTxid).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)

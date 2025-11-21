@@ -116,11 +116,13 @@ func TestQueryNodes_StatusField(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create tree
+	baseTxid := st.NewRandomTxIDForTesting(t)
+
 	tree, err := tx.Tree.Create().
 		SetOwnerIdentityPubkey(identityPubKey).
 		SetNetwork(st.NetworkRegtest).
 		SetStatus(st.TreeStatusAvailable).
-		SetBaseTxid([]byte{1, 2, 3, 4}).
+		SetBaseTxid(baseTxid).
 		SetVout(1).
 		Save(ctx)
 	require.NoError(t, err)
@@ -381,11 +383,13 @@ func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOw
 	require.NoError(t, err)
 
 	// Create tree
+	baseTxid := st.NewRandomTxIDForTesting(t)
+
 	tree, err := tx.Tree.Create().
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetNetwork(st.NetworkRegtest).
 		SetStatus(st.TreeStatusAvailable).
-		SetBaseTxid([]byte{1, 2, 3, 4}).
+		SetBaseTxid(baseTxid).
 		SetVout(1).
 		Save(ctx)
 	require.NoError(t, err)

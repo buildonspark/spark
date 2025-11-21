@@ -148,12 +148,13 @@ func createTestRenewTree(t *testing.T, ctx context.Context, ownerIdentityPubKey 
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
+	// Simply setting random bytes for unique tree
+	baseTxid := st.NewRandomTxIDForTesting(t)
 	tree, err := tx.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
 		SetNetwork(st.NetworkRegtest).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
-		// Simply setting random bytes for unique tree
-		SetBaseTxid(ownerIdentityPubKey.ToBTCEC().SerializeCompressed()).
+		SetBaseTxid(baseTxid).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)
@@ -472,7 +473,6 @@ func TestConstructRenewZeroNodeTransactions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			// Create test data
 			ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 			keyshare := createTestRenewSigningKeyshare(t, ctx, rng)

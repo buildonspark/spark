@@ -794,11 +794,12 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a tree first
+		baseTxid := st.NewRandomTxIDForTesting(t)
 		tree, err := tx.Tree.Create().
 			SetOwnerIdentityPubkey(validPubKey).
 			SetStatus(st.TreeStatusAvailable).
 			SetNetwork(st.NetworkMainnet).
-			SetBaseTxid([]byte("test_base_txid_32_bytes_long____")).
+			SetBaseTxid(baseTxid).
 			SetVout(0).
 			Save(authenticatedCtx)
 		require.NoError(t, err)
@@ -892,11 +893,12 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
+	baseTxid2 := st.NewRandomTxIDForTesting(t)
 	tree, err := tx.Tree.Create().
 		SetOwnerIdentityPubkey(validPubKey).
 		SetStatus(st.TreeStatusAvailable).
 		SetNetwork(st.NetworkMainnet).
-		SetBaseTxid([]byte("test_base_txid_32_bytes_long____")).
+		SetBaseTxid(baseTxid2).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)

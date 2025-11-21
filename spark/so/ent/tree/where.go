@@ -74,7 +74,7 @@ func OwnerIdentityPubkey(v keys.Public) predicate.Tree {
 }
 
 // BaseTxid applies equality check predicate on the "base_txid" field. It's identical to BaseTxidEQ.
-func BaseTxid(v []byte) predicate.Tree {
+func BaseTxid(v schematype.TxID) predicate.Tree {
 	return predicate.Tree(sql.FieldEQ(FieldBaseTxid, v))
 }
 
@@ -264,42 +264,42 @@ func NetworkNotIn(vs ...schematype.Network) predicate.Tree {
 }
 
 // BaseTxidEQ applies the EQ predicate on the "base_txid" field.
-func BaseTxidEQ(v []byte) predicate.Tree {
+func BaseTxidEQ(v schematype.TxID) predicate.Tree {
 	return predicate.Tree(sql.FieldEQ(FieldBaseTxid, v))
 }
 
 // BaseTxidNEQ applies the NEQ predicate on the "base_txid" field.
-func BaseTxidNEQ(v []byte) predicate.Tree {
+func BaseTxidNEQ(v schematype.TxID) predicate.Tree {
 	return predicate.Tree(sql.FieldNEQ(FieldBaseTxid, v))
 }
 
 // BaseTxidIn applies the In predicate on the "base_txid" field.
-func BaseTxidIn(vs ...[]byte) predicate.Tree {
+func BaseTxidIn(vs ...schematype.TxID) predicate.Tree {
 	return predicate.Tree(sql.FieldIn(FieldBaseTxid, vs...))
 }
 
 // BaseTxidNotIn applies the NotIn predicate on the "base_txid" field.
-func BaseTxidNotIn(vs ...[]byte) predicate.Tree {
+func BaseTxidNotIn(vs ...schematype.TxID) predicate.Tree {
 	return predicate.Tree(sql.FieldNotIn(FieldBaseTxid, vs...))
 }
 
 // BaseTxidGT applies the GT predicate on the "base_txid" field.
-func BaseTxidGT(v []byte) predicate.Tree {
+func BaseTxidGT(v schematype.TxID) predicate.Tree {
 	return predicate.Tree(sql.FieldGT(FieldBaseTxid, v))
 }
 
 // BaseTxidGTE applies the GTE predicate on the "base_txid" field.
-func BaseTxidGTE(v []byte) predicate.Tree {
+func BaseTxidGTE(v schematype.TxID) predicate.Tree {
 	return predicate.Tree(sql.FieldGTE(FieldBaseTxid, v))
 }
 
 // BaseTxidLT applies the LT predicate on the "base_txid" field.
-func BaseTxidLT(v []byte) predicate.Tree {
+func BaseTxidLT(v schematype.TxID) predicate.Tree {
 	return predicate.Tree(sql.FieldLT(FieldBaseTxid, v))
 }
 
 // BaseTxidLTE applies the LTE predicate on the "base_txid" field.
-func BaseTxidLTE(v []byte) predicate.Tree {
+func BaseTxidLTE(v schematype.TxID) predicate.Tree {
 	return predicate.Tree(sql.FieldLTE(FieldBaseTxid, v))
 }
 

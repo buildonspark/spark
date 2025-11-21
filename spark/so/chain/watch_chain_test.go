@@ -203,9 +203,11 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	validIssuerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// The node needs a dummy tree to satisfy foreign key constraints.
+	dummyTxid := schematype.NewRandomTxIDForTesting(t)
+
 	tree, err := dbTx.Tree.Create().
 		SetStatus(schematype.TreeStatusPending).
-		SetBaseTxid([]byte("dummytxid")).
+		SetBaseTxid(dummyTxid).
 		SetOwnerIdentityPubkey(ownerIDPubKey).
 		SetNetwork(common.SchemaNetwork(common.Testnet)).
 		SetVout(0).
@@ -424,9 +426,11 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	// Create a tree
+	treeTxid := schematype.NewRandomTxIDForTesting(t)
+
 	tree, err := dbTx.Tree.Create().
 		SetStatus(schematype.TreeStatusAvailable).
-		SetBaseTxid([]byte("tree_base_txid")).
+		SetBaseTxid(treeTxid).
 		SetOwnerIdentityPubkey(ownerIDPubKey).
 		SetNetwork(common.SchemaNetwork(common.Testnet)).
 		SetVout(0).
@@ -599,5 +603,4 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "is not available to transfer")
 	}
-
 }

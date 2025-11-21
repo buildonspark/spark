@@ -83,8 +83,16 @@ func (tu *TreeUpdate) SetNillableNetwork(s *schematype.Network) *TreeUpdate {
 }
 
 // SetBaseTxid sets the "base_txid" field.
-func (tu *TreeUpdate) SetBaseTxid(b []byte) *TreeUpdate {
-	tu.mutation.SetBaseTxid(b)
+func (tu *TreeUpdate) SetBaseTxid(si schematype.TxID) *TreeUpdate {
+	tu.mutation.SetBaseTxid(si)
+	return tu
+}
+
+// SetNillableBaseTxid sets the "base_txid" field if the given value is not nil.
+func (tu *TreeUpdate) SetNillableBaseTxid(si *schematype.TxID) *TreeUpdate {
+	if si != nil {
+		tu.SetBaseTxid(*si)
+	}
 	return tu
 }
 
@@ -246,11 +254,6 @@ func (tu *TreeUpdate) check() error {
 	if v, ok := tu.mutation.Network(); ok {
 		if err := tree.NetworkValidator(v); err != nil {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
-		}
-	}
-	if v, ok := tu.mutation.BaseTxid(); ok {
-		if err := tree.BaseTxidValidator(v); err != nil {
-			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
 		}
 	}
 	if v, ok := tu.mutation.Vout(); ok {
@@ -474,8 +477,16 @@ func (tuo *TreeUpdateOne) SetNillableNetwork(s *schematype.Network) *TreeUpdateO
 }
 
 // SetBaseTxid sets the "base_txid" field.
-func (tuo *TreeUpdateOne) SetBaseTxid(b []byte) *TreeUpdateOne {
-	tuo.mutation.SetBaseTxid(b)
+func (tuo *TreeUpdateOne) SetBaseTxid(si schematype.TxID) *TreeUpdateOne {
+	tuo.mutation.SetBaseTxid(si)
+	return tuo
+}
+
+// SetNillableBaseTxid sets the "base_txid" field if the given value is not nil.
+func (tuo *TreeUpdateOne) SetNillableBaseTxid(si *schematype.TxID) *TreeUpdateOne {
+	if si != nil {
+		tuo.SetBaseTxid(*si)
+	}
 	return tuo
 }
 
@@ -650,11 +661,6 @@ func (tuo *TreeUpdateOne) check() error {
 	if v, ok := tuo.mutation.Network(); ok {
 		if err := tree.NetworkValidator(v); err != nil {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
-		}
-	}
-	if v, ok := tuo.mutation.BaseTxid(); ok {
-		if err := tree.BaseTxidValidator(v); err != nil {
-			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
 		}
 	}
 	if v, ok := tuo.mutation.Vout(); ok {

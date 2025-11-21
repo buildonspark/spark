@@ -33,7 +33,7 @@ type Tree struct {
 	// Network holds the value of the "network" field.
 	Network schematype.Network `json:"network,omitempty"`
 	// BaseTxid holds the value of the "base_txid" field.
-	BaseTxid []byte `json:"base_txid,omitempty"`
+	BaseTxid schematype.TxID `json:"base_txid,omitempty"`
 	// Vout holds the value of the "vout" field.
 	Vout int16 `json:"vout,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -93,10 +93,10 @@ func (*Tree) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tree.FieldBaseTxid:
-			values[i] = new([]byte)
 		case tree.FieldOwnerIdentityPubkey:
 			values[i] = new(keys.Public)
+		case tree.FieldBaseTxid:
+			values[i] = new(schematype.TxID)
 		case tree.FieldVout:
 			values[i] = new(sql.NullInt64)
 		case tree.FieldStatus, tree.FieldNetwork:
@@ -161,7 +161,7 @@ func (t *Tree) assignValues(columns []string, values []any) error {
 				t.Network = schematype.Network(value.String)
 			}
 		case tree.FieldBaseTxid:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*schematype.TxID); !ok {
 				return fmt.Errorf("unexpected type %T for field base_txid", values[i])
 			} else if value != nil {
 				t.BaseTxid = *value

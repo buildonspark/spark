@@ -75,8 +75,8 @@ func (tc *TreeCreate) SetNetwork(s schematype.Network) *TreeCreate {
 }
 
 // SetBaseTxid sets the "base_txid" field.
-func (tc *TreeCreate) SetBaseTxid(b []byte) *TreeCreate {
-	tc.mutation.SetBaseTxid(b)
+func (tc *TreeCreate) SetBaseTxid(si schematype.TxID) *TreeCreate {
+	tc.mutation.SetBaseTxid(si)
 	return tc
 }
 
@@ -231,11 +231,6 @@ func (tc *TreeCreate) check() error {
 	}
 	if _, ok := tc.mutation.BaseTxid(); !ok {
 		return &ValidationError{Name: "base_txid", err: errors.New(`ent: missing required field "Tree.base_txid"`)}
-	}
-	if v, ok := tc.mutation.BaseTxid(); ok {
-		if err := tree.BaseTxidValidator(v); err != nil {
-			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
-		}
 	}
 	if _, ok := tc.mutation.Vout(); !ok {
 		return &ValidationError{Name: "vout", err: errors.New(`ent: missing required field "Tree.vout"`)}
@@ -460,7 +455,7 @@ func (u *TreeUpsert) UpdateNetwork() *TreeUpsert {
 }
 
 // SetBaseTxid sets the "base_txid" field.
-func (u *TreeUpsert) SetBaseTxid(v []byte) *TreeUpsert {
+func (u *TreeUpsert) SetBaseTxid(v schematype.TxID) *TreeUpsert {
 	u.Set(tree.FieldBaseTxid, v)
 	return u
 }
@@ -597,7 +592,7 @@ func (u *TreeUpsertOne) UpdateNetwork() *TreeUpsertOne {
 }
 
 // SetBaseTxid sets the "base_txid" field.
-func (u *TreeUpsertOne) SetBaseTxid(v []byte) *TreeUpsertOne {
+func (u *TreeUpsertOne) SetBaseTxid(v schematype.TxID) *TreeUpsertOne {
 	return u.Update(func(s *TreeUpsert) {
 		s.SetBaseTxid(v)
 	})
@@ -906,7 +901,7 @@ func (u *TreeUpsertBulk) UpdateNetwork() *TreeUpsertBulk {
 }
 
 // SetBaseTxid sets the "base_txid" field.
-func (u *TreeUpsertBulk) SetBaseTxid(v []byte) *TreeUpsertBulk {
+func (u *TreeUpsertBulk) SetBaseTxid(v schematype.TxID) *TreeUpsertBulk {
 	return u.Update(func(s *TreeUpsert) {
 		s.SetBaseTxid(v)
 	})

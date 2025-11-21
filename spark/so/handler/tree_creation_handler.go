@@ -47,7 +47,7 @@ func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 	txHash := tx.TxHash()
-	query := db.Tree.Query().Where(tree.BaseTxid(txHash[:]))
+	query := db.Tree.Query().Where(tree.BaseTxid(st.NewTxID(txHash)))
 	count, err := query.Count(ctx)
 	if err != nil {
 		return nil, err
@@ -566,7 +566,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				Create().
 				SetOwnerIdentityPubkey(userIDPubKey).
 				SetNetwork(schemaNetwork).
-				SetBaseTxid(txid[:]).
+				SetBaseTxid(st.NewTxID(txid)).
 				SetVout(int16(req.GetOnChainUtxo().Vout)).
 				SetDepositAddress(depositAddress)
 			if onChain {

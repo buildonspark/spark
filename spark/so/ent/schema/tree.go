@@ -27,7 +27,7 @@ func (Tree) Fields() []ent.Field {
 		field.Bytes("owner_identity_pubkey").GoType(keys.Public{}),
 		field.Enum("status").GoType(st.TreeStatus("")),
 		field.Enum("network").GoType(st.Network("")),
-		field.Bytes("base_txid").NotEmpty(),
+		field.Bytes("base_txid").GoType(st.TxID{}),
 		field.Int16("vout").NonNegative(),
 	}
 }
