@@ -41,7 +41,7 @@ type L1TokenCreate struct {
 	// TokenIdentifier holds the value of the "token_identifier" field.
 	TokenIdentifier []byte `json:"token_identifier,omitempty"`
 	// TransactionID holds the value of the "transaction_id" field.
-	TransactionID []byte `json:"transaction_id,omitempty"`
+	TransactionID schematype.TxID `json:"transaction_id,omitempty"`
 	selectValues  sql.SelectValues
 }
 
@@ -50,10 +50,12 @@ func (*L1TokenCreate) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case l1tokencreate.FieldMaxSupply, l1tokencreate.FieldTokenIdentifier, l1tokencreate.FieldTransactionID:
+		case l1tokencreate.FieldMaxSupply, l1tokencreate.FieldTokenIdentifier:
 			values[i] = new([]byte)
 		case l1tokencreate.FieldIssuerPublicKey:
 			values[i] = new(keys.Public)
+		case l1tokencreate.FieldTransactionID:
+			values[i] = new(schematype.TxID)
 		case l1tokencreate.FieldIsFreezable:
 			values[i] = new(sql.NullBool)
 		case l1tokencreate.FieldDecimals:
@@ -146,7 +148,7 @@ func (lc *L1TokenCreate) assignValues(columns []string, values []any) error {
 				lc.TokenIdentifier = *value
 			}
 		case l1tokencreate.FieldTransactionID:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*schematype.TxID); !ok {
 				return fmt.Errorf("unexpected type %T for field transaction_id", values[i])
 			} else if value != nil {
 				lc.TransactionID = *value

@@ -103,8 +103,8 @@ func (lcc *L1TokenCreateCreate) SetTokenIdentifier(b []byte) *L1TokenCreateCreat
 }
 
 // SetTransactionID sets the "transaction_id" field.
-func (lcc *L1TokenCreateCreate) SetTransactionID(b []byte) *L1TokenCreateCreate {
-	lcc.mutation.SetTransactionID(b)
+func (lcc *L1TokenCreateCreate) SetTransactionID(si schematype.TxID) *L1TokenCreateCreate {
+	lcc.mutation.SetTransactionID(si)
 	return lcc
 }
 
@@ -230,11 +230,6 @@ func (lcc *L1TokenCreateCreate) check() error {
 	}
 	if _, ok := lcc.mutation.TransactionID(); !ok {
 		return &ValidationError{Name: "transaction_id", err: errors.New(`ent: missing required field "L1TokenCreate.transaction_id"`)}
-	}
-	if v, ok := lcc.mutation.TransactionID(); ok {
-		if err := l1tokencreate.TransactionIDValidator(v); err != nil {
-			return &ValidationError{Name: "transaction_id", err: fmt.Errorf(`ent: validator failed for field "L1TokenCreate.transaction_id": %w`, err)}
-		}
 	}
 	return nil
 }

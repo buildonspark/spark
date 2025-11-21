@@ -221,10 +221,6 @@ func init() {
 	l1tokencreateDescTokenIdentifier := l1tokencreateMixinFields1[7].Descriptor()
 	// l1tokencreate.TokenIdentifierValidator is a validator for the "token_identifier" field. It is called by the builders before save.
 	l1tokencreate.TokenIdentifierValidator = l1tokencreateDescTokenIdentifier.Validators[0].(func([]byte) error)
-	// l1tokencreateDescTransactionID is the schema descriptor for transaction_id field.
-	l1tokencreateDescTransactionID := l1tokencreateFields[0].Descriptor()
-	// l1tokencreate.TransactionIDValidator is a validator for the "transaction_id" field. It is called by the builders before save.
-	l1tokencreate.TransactionIDValidator = l1tokencreateDescTransactionID.Validators[0].(func([]byte) error)
 	// l1tokencreateDescID is the schema descriptor for id field.
 	l1tokencreateDescID := l1tokencreateMixinFields0[0].Descriptor()
 	// l1tokencreate.DefaultID holds the default value on creation for the id field.

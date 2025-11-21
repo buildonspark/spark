@@ -20,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"golang.org/x/text/unicode/norm"
 )
@@ -221,6 +222,10 @@ func createL1TokenEntity(ctx context.Context, dbClient *ent.Client, tokenMetadat
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert network to schema network: %w", err)
 	}
+	txidSchema, err := st.NewTxIDFromBytes(txid.CloneBytes())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create TxID: %w", err)
+	}
 	// This entity represents the raw parsed L1 announcement data.
 	l1TokenCreate, err := dbClient.L1TokenCreate.Create().
 		SetIssuerPublicKey(tokenMetadata.IssuerPublicKey).
@@ -230,7 +235,7 @@ func createL1TokenEntity(ctx context.Context, dbClient *ent.Client, tokenMetadat
 		SetMaxSupply(tokenMetadata.MaxSupply).
 		SetIsFreezable(tokenMetadata.IsFreezable).
 		SetNetwork(schemaNetwork).
-		SetTransactionID(txid.CloneBytes()).
+		SetTransactionID(txidSchema).
 		SetTokenIdentifier(tokenIdentifier).
 		Save(ctx)
 	if err != nil {

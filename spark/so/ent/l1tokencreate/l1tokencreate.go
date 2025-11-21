@@ -83,8 +83,6 @@ var (
 	MaxSupplyValidator func([]byte) error
 	// TokenIdentifierValidator is a validator for the "token_identifier" field. It is called by the builders before save.
 	TokenIdentifierValidator func([]byte) error
-	// TransactionIDValidator is a validator for the "transaction_id" field. It is called by the builders before save.
-	TransactionIDValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )

@@ -103,7 +103,7 @@ func TokenIdentifier(v []byte) predicate.L1TokenCreate {
 }
 
 // TransactionID applies equality check predicate on the "transaction_id" field. It's identical to TransactionIDEQ.
-func TransactionID(v []byte) predicate.L1TokenCreate {
+func TransactionID(v schematype.TxID) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldEQ(FieldTransactionID, v))
 }
 
@@ -518,42 +518,42 @@ func TokenIdentifierLTE(v []byte) predicate.L1TokenCreate {
 }
 
 // TransactionIDEQ applies the EQ predicate on the "transaction_id" field.
-func TransactionIDEQ(v []byte) predicate.L1TokenCreate {
+func TransactionIDEQ(v schematype.TxID) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldEQ(FieldTransactionID, v))
 }
 
 // TransactionIDNEQ applies the NEQ predicate on the "transaction_id" field.
-func TransactionIDNEQ(v []byte) predicate.L1TokenCreate {
+func TransactionIDNEQ(v schematype.TxID) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldNEQ(FieldTransactionID, v))
 }
 
 // TransactionIDIn applies the In predicate on the "transaction_id" field.
-func TransactionIDIn(vs ...[]byte) predicate.L1TokenCreate {
+func TransactionIDIn(vs ...schematype.TxID) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldIn(FieldTransactionID, vs...))
 }
 
 // TransactionIDNotIn applies the NotIn predicate on the "transaction_id" field.
-func TransactionIDNotIn(vs ...[]byte) predicate.L1TokenCreate {
+func TransactionIDNotIn(vs ...schematype.TxID) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldNotIn(FieldTransactionID, vs...))
 }
 
 // TransactionIDGT applies the GT predicate on the "transaction_id" field.
-func TransactionIDGT(v []byte) predicate.L1TokenCreate {
+func TransactionIDGT(v schematype.TxID) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldGT(FieldTransactionID, v))
 }
 
 // TransactionIDGTE applies the GTE predicate on the "transaction_id" field.
-func TransactionIDGTE(v []byte) predicate.L1TokenCreate {
+func TransactionIDGTE(v schematype.TxID) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldGTE(FieldTransactionID, v))
 }
 
 // TransactionIDLT applies the LT predicate on the "transaction_id" field.
-func TransactionIDLT(v []byte) predicate.L1TokenCreate {
+func TransactionIDLT(v schematype.TxID) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldLT(FieldTransactionID, v))
 }
 
 // TransactionIDLTE applies the LTE predicate on the "transaction_id" field.
-func TransactionIDLTE(v []byte) predicate.L1TokenCreate {
+func TransactionIDLTE(v schematype.TxID) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldLTE(FieldTransactionID, v))
 }
 

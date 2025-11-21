@@ -4304,7 +4304,7 @@ type L1TokenCreateMutation struct {
 	is_freezable      *bool
 	network           *schematype.Network
 	token_identifier  *[]byte
-	transaction_id    *[]byte
+	transaction_id    *schematype.TxID
 	clearedFields     map[string]struct{}
 	done              bool
 	oldValue          func(context.Context) (*L1TokenCreate, error)
@@ -4796,12 +4796,12 @@ func (m *L1TokenCreateMutation) ResetTokenIdentifier() {
 }
 
 // SetTransactionID sets the "transaction_id" field.
-func (m *L1TokenCreateMutation) SetTransactionID(b []byte) {
-	m.transaction_id = &b
+func (m *L1TokenCreateMutation) SetTransactionID(si schematype.TxID) {
+	m.transaction_id = &si
 }
 
 // TransactionID returns the value of the "transaction_id" field in the mutation.
-func (m *L1TokenCreateMutation) TransactionID() (r []byte, exists bool) {
+func (m *L1TokenCreateMutation) TransactionID() (r schematype.TxID, exists bool) {
 	v := m.transaction_id
 	if v == nil {
 		return
@@ -4812,7 +4812,7 @@ func (m *L1TokenCreateMutation) TransactionID() (r []byte, exists bool) {
 // OldTransactionID returns the old "transaction_id" field's value of the L1TokenCreate entity.
 // If the L1TokenCreate object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *L1TokenCreateMutation) OldTransactionID(ctx context.Context) (v []byte, err error) {
+func (m *L1TokenCreateMutation) OldTransactionID(ctx context.Context) (v schematype.TxID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldTransactionID is only allowed on UpdateOne operations")
 	}
@@ -5040,7 +5040,7 @@ func (m *L1TokenCreateMutation) SetField(name string, value ent.Value) error {
 		m.SetTokenIdentifier(v)
 		return nil
 	case l1tokencreate.FieldTransactionID:
-		v, ok := value.([]byte)
+		v, ok := value.(schematype.TxID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
