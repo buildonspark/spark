@@ -107,41 +107,46 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		uuid.Nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create transfer for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
+		return nil, fmt.Errorf("failed to create transfer %s: %w", req.Transfer.TransferId, err)
 	}
 
 	exitUUID, err := uuid.Parse(req.ExitId)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse exit_id %s in request %s: %w", req.ExitId, logging.FormatProto("cooperative_exit_request", req), err)
+		return nil, fmt.Errorf("unable to parse exit_id %x: %w", req.ExitId, err)
 	}
 
 	if len(req.ExitTxid) != 32 {
-		return nil, fmt.Errorf("exit_txid is not 32 bytes in request %s: %x", logging.FormatProto("cooperative_exit_request", req), req.ExitTxid)
+		return nil, fmt.Errorf("exit_txid %x is not 32 bytes", req.ExitTxid)
 	}
 
 	db, err = ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
+		return nil, fmt.Errorf("failed to get or create current tx for transfer id %s exit txid %x: %w", req.Transfer.TransferId, req.ExitTxid, err)
+	}
+
+	exitTxid, err := st.NewTxIDFromBytes(req.ExitTxid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse exit txid for transfer id %s exit txid %x: %w", req.Transfer.TransferId, req.ExitTxid, err)
 	}
 
 	_, err = db.CooperativeExit.Create().
 		SetID(exitUUID).
 		SetTransfer(transfer).
-		SetExitTxid(req.ExitTxid).
+		SetExitTxid(exitTxid).
 		// ConfirmationHeight is nil since the transaction is not confirmed yet.
 		Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cooperative exit for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
+		return nil, fmt.Errorf("failed to create cooperative exit for exit id %s exit txid %s: %w", req.ExitId, exitTxid.String(), err)
 	}
 
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal transfer for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
+		return nil, fmt.Errorf("failed to marshal transfer for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
 	}
 
 	signingResults, err := signRefunds(ctx, h.config, req.Transfer, leafMap, keys.Public{}, keys.Public{}, keys.Public{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign refund transactions for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
+		return nil, fmt.Errorf("failed to sign refund transactions for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
 	}
 
 	err = transferHandler.syncCoopExitInit(ctx, req)
@@ -149,10 +154,10 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 
 		cancelErr := transferHandler.CreateCancelTransferGossipMessage(ctx, req.Transfer.TransferId)
 		if cancelErr != nil {
-			return nil, fmt.Errorf("failed to create cancel transfer gossip message for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
+			return nil, fmt.Errorf("failed to create cancel transfer gossip message for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
 		}
 
-		return nil, fmt.Errorf("failed to sync transfer init for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
+		return nil, fmt.Errorf("failed to sync transfer init for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
 	}
 
 	response := &pb.CooperativeExitResponse{

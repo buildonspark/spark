@@ -527,9 +527,10 @@ func handleBlock(
 	}
 	for _, coopExit := range pendingCoopExits {
 		txHash := coopExit.ExitTxid
-		reversedHash := slices.Clone(txHash)
+		txHashBytes := txHash.Bytes()
+		reversedHash := slices.Clone(txHashBytes)
 		slices.Reverse(reversedHash)
-		_, found := confirmedTxHashSet[[32]byte(txHash)]
+		_, found := confirmedTxHashSet[[32]byte(txHashBytes)]
 		_, reverseFound := confirmedTxHashSet[[32]byte(reversedHash)]
 		if found {
 			logger.Sugar().Debug("Found BE coop exit tx at tx hash %s", txHash)

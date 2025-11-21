@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 )
 
@@ -24,7 +25,7 @@ type CooperativeExit struct {
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// ExitTxid holds the value of the "exit_txid" field.
-	ExitTxid []byte `json:"exit_txid,omitempty"`
+	ExitTxid schematype.TxID `json:"exit_txid,omitempty"`
 	// ConfirmationHeight holds the value of the "confirmation_height" field.
 	ConfirmationHeight int64 `json:"confirmation_height,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -60,7 +61,7 @@ func (*CooperativeExit) scanValues(columns []string) ([]any, error) {
 	for i := range columns {
 		switch columns[i] {
 		case cooperativeexit.FieldExitTxid:
-			values[i] = new([]byte)
+			values[i] = new(schematype.TxID)
 		case cooperativeexit.FieldConfirmationHeight:
 			values[i] = new(sql.NullInt64)
 		case cooperativeexit.FieldCreateTime, cooperativeexit.FieldUpdateTime:
@@ -103,7 +104,7 @@ func (ce *CooperativeExit) assignValues(columns []string, values []any) error {
 				ce.UpdateTime = value.Time
 			}
 		case cooperativeexit.FieldExitTxid:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*schematype.TxID); !ok {
 				return fmt.Errorf("unexpected type %T for field exit_txid", values[i])
 			} else if value != nil {
 				ce.ExitTxid = *value

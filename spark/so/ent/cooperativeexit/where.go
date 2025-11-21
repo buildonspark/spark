@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 // ID filters vertices based on their ID field.
@@ -67,7 +68,7 @@ func UpdateTime(v time.Time) predicate.CooperativeExit {
 }
 
 // ExitTxid applies equality check predicate on the "exit_txid" field. It's identical to ExitTxidEQ.
-func ExitTxid(v []byte) predicate.CooperativeExit {
+func ExitTxid(v schematype.TxID) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldEQ(FieldExitTxid, v))
 }
 
@@ -157,42 +158,42 @@ func UpdateTimeLTE(v time.Time) predicate.CooperativeExit {
 }
 
 // ExitTxidEQ applies the EQ predicate on the "exit_txid" field.
-func ExitTxidEQ(v []byte) predicate.CooperativeExit {
+func ExitTxidEQ(v schematype.TxID) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldEQ(FieldExitTxid, v))
 }
 
 // ExitTxidNEQ applies the NEQ predicate on the "exit_txid" field.
-func ExitTxidNEQ(v []byte) predicate.CooperativeExit {
+func ExitTxidNEQ(v schematype.TxID) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldNEQ(FieldExitTxid, v))
 }
 
 // ExitTxidIn applies the In predicate on the "exit_txid" field.
-func ExitTxidIn(vs ...[]byte) predicate.CooperativeExit {
+func ExitTxidIn(vs ...schematype.TxID) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldIn(FieldExitTxid, vs...))
 }
 
 // ExitTxidNotIn applies the NotIn predicate on the "exit_txid" field.
-func ExitTxidNotIn(vs ...[]byte) predicate.CooperativeExit {
+func ExitTxidNotIn(vs ...schematype.TxID) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldNotIn(FieldExitTxid, vs...))
 }
 
 // ExitTxidGT applies the GT predicate on the "exit_txid" field.
-func ExitTxidGT(v []byte) predicate.CooperativeExit {
+func ExitTxidGT(v schematype.TxID) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldGT(FieldExitTxid, v))
 }
 
 // ExitTxidGTE applies the GTE predicate on the "exit_txid" field.
-func ExitTxidGTE(v []byte) predicate.CooperativeExit {
+func ExitTxidGTE(v schematype.TxID) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldGTE(FieldExitTxid, v))
 }
 
 // ExitTxidLT applies the LT predicate on the "exit_txid" field.
-func ExitTxidLT(v []byte) predicate.CooperativeExit {
+func ExitTxidLT(v schematype.TxID) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldLT(FieldExitTxid, v))
 }
 
 // ExitTxidLTE applies the LTE predicate on the "exit_txid" field.
-func ExitTxidLTE(v []byte) predicate.CooperativeExit {
+func ExitTxidLTE(v schematype.TxID) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldLTE(FieldExitTxid, v))
 }
 

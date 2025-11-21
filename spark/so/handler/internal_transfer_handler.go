@@ -483,10 +483,16 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
+
+	exitTxid, err := st.NewTxIDFromBytes(req.ExitTxid)
+	if err != nil {
+		return fmt.Errorf("failed to parse exit txid for transfer id: %s. exit id: %s and error: %w", transferReq.TransferId, req.ExitId, err)
+	}
+
 	_, err = db.CooperativeExit.Create().
 		SetID(exitID).
 		SetTransfer(transfer).
-		SetExitTxid(req.ExitTxid).
+		SetExitTxid(exitTxid).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create cooperative exit in db for transfer id: %s. exit id: %s and error: %w", transferReq.TransferId, req.ExitId, err)

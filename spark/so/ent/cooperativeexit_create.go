@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 )
 
@@ -54,8 +55,8 @@ func (cec *CooperativeExitCreate) SetNillableUpdateTime(t *time.Time) *Cooperati
 }
 
 // SetExitTxid sets the "exit_txid" field.
-func (cec *CooperativeExitCreate) SetExitTxid(b []byte) *CooperativeExitCreate {
-	cec.mutation.SetExitTxid(b)
+func (cec *CooperativeExitCreate) SetExitTxid(si schematype.TxID) *CooperativeExitCreate {
+	cec.mutation.SetExitTxid(si)
 	return cec
 }
 

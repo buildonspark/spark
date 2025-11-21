@@ -628,7 +628,7 @@ type CooperativeExitMutation struct {
 	id                     *uuid.UUID
 	create_time            *time.Time
 	update_time            *time.Time
-	exit_txid              *[]byte
+	exit_txid              *schematype.TxID
 	confirmation_height    *int64
 	addconfirmation_height *int64
 	clearedFields          map[string]struct{}
@@ -816,12 +816,12 @@ func (m *CooperativeExitMutation) ResetUpdateTime() {
 }
 
 // SetExitTxid sets the "exit_txid" field.
-func (m *CooperativeExitMutation) SetExitTxid(b []byte) {
-	m.exit_txid = &b
+func (m *CooperativeExitMutation) SetExitTxid(si schematype.TxID) {
+	m.exit_txid = &si
 }
 
 // ExitTxid returns the value of the "exit_txid" field in the mutation.
-func (m *CooperativeExitMutation) ExitTxid() (r []byte, exists bool) {
+func (m *CooperativeExitMutation) ExitTxid() (r schematype.TxID, exists bool) {
 	v := m.exit_txid
 	if v == nil {
 		return
@@ -832,7 +832,7 @@ func (m *CooperativeExitMutation) ExitTxid() (r []byte, exists bool) {
 // OldExitTxid returns the old "exit_txid" field's value of the CooperativeExit entity.
 // If the CooperativeExit object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *CooperativeExitMutation) OldExitTxid(ctx context.Context) (v []byte, err error) {
+func (m *CooperativeExitMutation) OldExitTxid(ctx context.Context) (v schematype.TxID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldExitTxid is only allowed on UpdateOne operations")
 	}
@@ -1064,7 +1064,7 @@ func (m *CooperativeExitMutation) SetField(name string, value ent.Value) error {
 		m.SetUpdateTime(v)
 		return nil
 	case cooperativeexit.FieldExitTxid:
-		v, ok := value.([]byte)
+		v, ok := value.(schematype.TxID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
