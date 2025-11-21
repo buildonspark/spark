@@ -605,3 +605,7 @@ if ! check_operators_ready "$run_dir"; then
     echo "Failed to start all operators"
     exit 1
 fi
+
+bitcoin-cli -regtest -rpcport=8332 -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" createwallet ""
+ADDR=$(bitcoin-cli -regtest -rpcport=8332 -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" getnewaddress)
+bitcoin-cli -regtest -rpcport=8332 -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" generatetoaddress 101 $ADDR
