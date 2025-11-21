@@ -184,6 +184,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						transfer.Or(
 							transfer.And(
 								transfer.StatusEQ(st.TransferStatusSenderInitiated),
+								transfer.TypeNEQ(st.TransferTypeCounterSwap),
 								transfer.ExpiryTimeLT(time.Now()),
 								transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
 							),
