@@ -258,13 +258,13 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(req *tokenpb.QueryTo
 	var queryBuilder strings.Builder
 	queryBuilder.WriteString("WITH ")
 	queryBuilder.WriteString(cte)
-	queryBuilder.WriteString(" SELECT * FROM (")
+	queryBuilder.WriteString(" SELECT DISTINCT * FROM (")
 
 	// UNION: transactions that created the filtered outputs OR spent the filtered outputs
 	queryBuilder.WriteString("SELECT tt.id, tt.create_time FROM token_transactions tt ")
 	queryBuilder.WriteString("JOIN filtered_outputs ON tt.id = filtered_outputs.token_output_output_created_token_transaction")
 	queryBuilder.WriteString(txHashFilter)
-	queryBuilder.WriteString(" UNION ")
+	queryBuilder.WriteString(" UNION ALL ")
 	queryBuilder.WriteString("SELECT tt.id, tt.create_time FROM token_transactions tt ")
 	queryBuilder.WriteString("JOIN filtered_outputs ON tt.id = filtered_outputs.token_output_output_spent_token_transaction")
 	queryBuilder.WriteString(txHashFilter)
