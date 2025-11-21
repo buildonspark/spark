@@ -12,7 +12,6 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/handler"
-	"github.com/lightsparkdev/spark/so/knobs"
 	events "github.com/lightsparkdev/spark/so/stream"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -58,11 +57,7 @@ func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCr
 
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
 func (s *SparkServer) FinalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) (*pb.FinalizeNodeSignaturesResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	finalizeSignatureHandler := handler.NewFinalizeSignatureHandler(s.config)
-	return finalizeSignatureHandler.FinalizeNodeSignatures(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // FinalizeNodeSignaturesV2 verifies the node signatures and updates the node.
@@ -73,11 +68,7 @@ func (s *SparkServer) FinalizeNodeSignaturesV2(ctx context.Context, req *pb.Fina
 
 // StartTransfer initiates a transfer from sender.
 func (s *SparkServer) StartTransfer(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.StartTransfer(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // StartTransferV2 initiates a transfer from sender.
@@ -98,11 +89,7 @@ func (s *SparkServer) FinalizeTransferWithTransferPackage(ctx context.Context, r
 
 // CancelTransfer cancels a transfer from sender before key is tweaked.
 func (s *SparkServer) CancelTransfer(ctx context.Context, req *pb.CancelTransferRequest) (*pb.CancelTransferResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.CancelTransfer(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // QueryPendingTransfers queries the pending transfers to claim.
@@ -125,11 +112,7 @@ func (s *SparkServer) ClaimTransferSignRefundsV2(ctx context.Context, req *pb.Cl
 
 // ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
 func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.ClaimTransferSignRefunds(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // StorePreimageShare stores the preimage share for the given payment hash.
@@ -146,11 +129,7 @@ func (s *SparkServer) GetSigningCommitments(ctx context.Context, req *pb.GetSign
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (s *SparkServer) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	lightningHandler := handler.NewLightningHandler(s.config)
-	return lightningHandler.InitiatePreimageSwap(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
@@ -168,11 +147,7 @@ func (s *SparkServer) InitiatePreimageSwapV3(ctx context.Context, req *pb.Initia
 // CooperativeExit asks for signatures for refund transactions spending leaves
 // and connector outputs on another user's L1 transaction.
 func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	coopExitHandler := handler.NewCooperativeExitHandler(s.config)
-	return coopExitHandler.CooperativeExit(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // CooperativeExitV2 is the same as CooperativeExit, but enforces use of direct transactions for unilateral exits
@@ -183,11 +158,7 @@ func (s *SparkServer) CooperativeExitV2(ctx context.Context, req *pb.Cooperative
 
 // StartLeafSwap initiates a swap of leaves between two users.
 func (s *SparkServer) StartLeafSwap(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.StartLeafSwap(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // StartLeafSwapV2 initiates a swap of leaves between two users.
@@ -205,20 +176,12 @@ func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.CounterLeafSwapReque
 
 // CounterLeafSwap starts the reverse side of a swap of leaves between two users.
 func (s *SparkServer) CounterLeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.CounterLeafSwap(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // CounterLeafSwapV2 starts the reverse side of a swap of leaves between two users.
 func (s *SparkServer) CounterLeafSwapV2(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.CounterLeafSwapV2(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // RefreshTimelock refreshes the timelocks of a leaf and its ancestors.
@@ -356,12 +319,4 @@ func (s *SparkServer) UpdateWalletSetting(ctx context.Context, req *pb.UpdateWal
 func (s *SparkServer) QueryWalletSetting(ctx context.Context, req *pb.QueryWalletSettingRequest) (*pb.QueryWalletSettingResponse, error) {
 	walletSettingHandler := handler.NewWalletSettingHandler(s.config)
 	return walletSettingHandler.QueryWalletSetting(ctx, req)
-}
-
-func errIfOctoberDeprecationEnabled(ctx context.Context) error {
-	knobsService := knobs.GetKnobsService(ctx)
-	if knobsService.GetValue(knobs.KnobOctoberDeprecationEnabled, 0) >= 1 {
-		return errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
-	}
-	return nil
 }

@@ -180,9 +180,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		}
 
 		// Validate that TransferTypeTransfer requires a transfer package when October deprecation is enabled
-		if knobService.GetValue(knobs.KnobOctoberDeprecationEnabled, 0) >= 1 &&
-			req.TransferPackage == nil &&
-			transferType == st.TransferTypeTransfer {
+		if req.TransferPackage == nil && transferType == st.TransferTypeTransfer {
 			return nil, status.Errorf(codes.InvalidArgument, "transfer package is required for TransferTypeTransfer")
 		}
 	}

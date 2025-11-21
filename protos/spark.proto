@@ -19,26 +19,43 @@ service SparkService {
     rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {
         option deprecated = true;
     }
-    rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
+    rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {
+        option deprecated = true;
+    }
 
-    rpc start_transfer(StartTransferRequest) returns (StartTransferResponse) {}
+
+    rpc start_transfer(StartTransferRequest) returns (StartTransferResponse) {
+        option deprecated = true;
+    }
+
     // This is deprecated, please use finalize_transfer_with_transfer_package instead.
     rpc finalize_transfer(FinalizeTransferRequest) returns (FinalizeTransferResponse) {
         option deprecated = true;
     }
     rpc finalize_transfer_with_transfer_package(FinalizeTransferWithTransferPackageRequest) returns (FinalizeTransferResponse) {}
-    rpc cancel_transfer(CancelTransferRequest) returns (CancelTransferResponse) {}
+    rpc cancel_transfer(CancelTransferRequest) returns (CancelTransferResponse) {
+        option deprecated = true;
+    }
+
 
     rpc query_pending_transfers(TransferFilter) returns (QueryTransfersResponse) {}
     rpc query_all_transfers(TransferFilter) returns (QueryTransfersResponse) {}
     rpc claim_transfer_tweak_keys(ClaimTransferTweakKeysRequest) returns (google.protobuf.Empty) {}
-    rpc claim_transfer_sign_refunds(ClaimTransferSignRefundsRequest) returns (ClaimTransferSignRefundsResponse) {}
+    rpc claim_transfer_sign_refunds(ClaimTransferSignRefundsRequest) returns (ClaimTransferSignRefundsResponse) {
+        option deprecated = true;
+    }
+
     rpc store_preimage_share(StorePreimageShareRequest) returns (google.protobuf.Empty) {}
     // Gets a specified number of signing commmitments for a set of nodes, which can be used as
     // part of a transfer package.
     rpc get_signing_commitments(GetSigningCommitmentsRequest) returns (GetSigningCommitmentsResponse) {}
-    rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {}
-    rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
+    rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {
+        option deprecated = true;
+    }
+    rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {
+        option deprecated = true;
+    }
+
     rpc provide_preimage(ProvidePreimageRequest) returns (ProvidePreimageResponse) {}
     rpc query_htlc(QueryHtlcRequest) returns (QueryHtlcResponse) {}
     // This is the exact same as start_transfer, but expresses to the SO
@@ -50,7 +67,9 @@ service SparkService {
     }
     // This is the exact same as start_leaf_swap, but signs with
     // an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
-    rpc counter_leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {}
+    rpc counter_leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {
+        option deprecated = true;
+    }
     rpc refresh_timelock(RefreshTimelockRequest) returns (RefreshTimelockResponse) {
       option deprecated = true;
     }
@@ -69,8 +88,12 @@ service SparkService {
     rpc get_signing_operator_list(google.protobuf.Empty) returns (GetSigningOperatorListResponse) {}
 
     rpc query_nodes(QueryNodesRequest) returns (QueryNodesResponse) {}
-    rpc query_nodes_distribution(QueryNodesDistributionRequest) returns (QueryNodesDistributionResponse) {}
-    rpc query_nodes_by_value(QueryNodesByValueRequest) returns (QueryNodesByValueResponse) {}
+    rpc query_nodes_distribution(QueryNodesDistributionRequest) returns (QueryNodesDistributionResponse) {
+        option deprecated = true;
+    }
+    rpc query_nodes_by_value(QueryNodesByValueRequest) returns (QueryNodesByValueResponse) {
+        option deprecated = true;
+    }
 
     rpc query_balance(QueryBalanceRequest) returns (QueryBalanceResponse) {}
 
@@ -109,7 +132,9 @@ service SparkService {
     rpc initiate_preimage_swap_v2(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc initiate_preimage_swap_v3(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc start_leaf_swap_v2(StartTransferRequest) returns (StartTransferResponse) {}
-    rpc counter_leaf_swap_v2(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {}
+    rpc counter_leaf_swap_v2(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {
+        option deprecated = true;
+    }
     rpc start_transfer_v2(StartTransferRequest) returns (StartTransferResponse) {}
     rpc refresh_timelock_v2(RefreshTimelockRequest) returns (RefreshTimelockResponse) {
       option deprecated = true;

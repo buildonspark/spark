@@ -85,22 +85,28 @@ type SparkServiceClient interface {
 	// Deprecated: Do not use.
 	// This is deprecated, please use start_deposit_tree_creation instead.
 	StartTreeCreation(ctx context.Context, in *StartTreeCreationRequest, opts ...grpc.CallOption) (*StartTreeCreationResponse, error)
+	// Deprecated: Do not use.
 	FinalizeNodeSignatures(ctx context.Context, in *FinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*FinalizeNodeSignaturesResponse, error)
+	// Deprecated: Do not use.
 	StartTransfer(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
 	// Deprecated: Do not use.
 	// This is deprecated, please use finalize_transfer_with_transfer_package instead.
 	FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*FinalizeTransferResponse, error)
 	FinalizeTransferWithTransferPackage(ctx context.Context, in *FinalizeTransferWithTransferPackageRequest, opts ...grpc.CallOption) (*FinalizeTransferResponse, error)
+	// Deprecated: Do not use.
 	CancelTransfer(ctx context.Context, in *CancelTransferRequest, opts ...grpc.CallOption) (*CancelTransferResponse, error)
 	QueryPendingTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
 	QueryAllTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(ctx context.Context, in *ClaimTransferTweakKeysRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Deprecated: Do not use.
 	ClaimTransferSignRefunds(ctx context.Context, in *ClaimTransferSignRefundsRequest, opts ...grpc.CallOption) (*ClaimTransferSignRefundsResponse, error)
 	StorePreimageShare(ctx context.Context, in *StorePreimageShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Gets a specified number of signing commmitments for a set of nodes, which can be used as
 	// part of a transfer package.
 	GetSigningCommitments(ctx context.Context, in *GetSigningCommitmentsRequest, opts ...grpc.CallOption) (*GetSigningCommitmentsResponse, error)
+	// Deprecated: Do not use.
 	CooperativeExit(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error)
+	// Deprecated: Do not use.
 	InitiatePreimageSwap(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(ctx context.Context, in *ProvidePreimageRequest, opts ...grpc.CallOption) (*ProvidePreimageResponse, error)
 	QueryHtlc(ctx context.Context, in *QueryHtlcRequest, opts ...grpc.CallOption) (*QueryHtlcResponse, error)
@@ -110,6 +116,7 @@ type SparkServiceClient interface {
 	// Deprecated: Do not use.
 	// This is deprecated, please use counter_leaf_swap instead.
 	LeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
+	// Deprecated: Do not use.
 	// This is the exact same as start_leaf_swap, but signs with
 	// an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
 	CounterLeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
@@ -125,7 +132,9 @@ type SparkServiceClient interface {
 	RenewLeaf(ctx context.Context, in *RenewLeafRequest, opts ...grpc.CallOption) (*RenewLeafResponse, error)
 	GetSigningOperatorList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetSigningOperatorListResponse, error)
 	QueryNodes(ctx context.Context, in *QueryNodesRequest, opts ...grpc.CallOption) (*QueryNodesResponse, error)
+	// Deprecated: Do not use.
 	QueryNodesDistribution(ctx context.Context, in *QueryNodesDistributionRequest, opts ...grpc.CallOption) (*QueryNodesDistributionResponse, error)
+	// Deprecated: Do not use.
 	QueryNodesByValue(ctx context.Context, in *QueryNodesByValueRequest, opts ...grpc.CallOption) (*QueryNodesByValueResponse, error)
 	QueryBalance(ctx context.Context, in *QueryBalanceRequest, opts ...grpc.CallOption) (*QueryBalanceResponse, error)
 	QueryUserSignedRefunds(ctx context.Context, in *QueryUserSignedRefundsRequest, opts ...grpc.CallOption) (*QueryUserSignedRefundsResponse, error)
@@ -154,6 +163,7 @@ type SparkServiceClient interface {
 	InitiatePreimageSwapV2(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	InitiatePreimageSwapV3(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	StartLeafSwapV2(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
+	// Deprecated: Do not use.
 	CounterLeafSwapV2(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
 	StartTransferV2(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
 	// Deprecated: Do not use.
@@ -217,6 +227,7 @@ func (c *sparkServiceClient) StartTreeCreation(ctx context.Context, in *StartTre
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) FinalizeNodeSignatures(ctx context.Context, in *FinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*FinalizeNodeSignaturesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(FinalizeNodeSignaturesResponse)
@@ -227,6 +238,7 @@ func (c *sparkServiceClient) FinalizeNodeSignatures(ctx context.Context, in *Fin
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) StartTransfer(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(StartTransferResponse)
@@ -258,6 +270,7 @@ func (c *sparkServiceClient) FinalizeTransferWithTransferPackage(ctx context.Con
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) CancelTransfer(ctx context.Context, in *CancelTransferRequest, opts ...grpc.CallOption) (*CancelTransferResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CancelTransferResponse)
@@ -298,6 +311,7 @@ func (c *sparkServiceClient) ClaimTransferTweakKeys(ctx context.Context, in *Cla
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) ClaimTransferSignRefunds(ctx context.Context, in *ClaimTransferSignRefundsRequest, opts ...grpc.CallOption) (*ClaimTransferSignRefundsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ClaimTransferSignRefundsResponse)
@@ -328,6 +342,7 @@ func (c *sparkServiceClient) GetSigningCommitments(ctx context.Context, in *GetS
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) CooperativeExit(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CooperativeExitResponse)
@@ -338,6 +353,7 @@ func (c *sparkServiceClient) CooperativeExit(ctx context.Context, in *Cooperativ
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) InitiatePreimageSwap(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(InitiatePreimageSwapResponse)
@@ -389,6 +405,7 @@ func (c *sparkServiceClient) LeafSwap(ctx context.Context, in *CounterLeafSwapRe
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) CounterLeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CounterLeafSwapResponse)
@@ -451,6 +468,7 @@ func (c *sparkServiceClient) QueryNodes(ctx context.Context, in *QueryNodesReque
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) QueryNodesDistribution(ctx context.Context, in *QueryNodesDistributionRequest, opts ...grpc.CallOption) (*QueryNodesDistributionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryNodesDistributionResponse)
@@ -461,6 +479,7 @@ func (c *sparkServiceClient) QueryNodesDistribution(ctx context.Context, in *Que
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) QueryNodesByValue(ctx context.Context, in *QueryNodesByValueRequest, opts ...grpc.CallOption) (*QueryNodesByValueResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryNodesByValueResponse)
@@ -632,6 +651,7 @@ func (c *sparkServiceClient) StartLeafSwapV2(ctx context.Context, in *StartTrans
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) CounterLeafSwapV2(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CounterLeafSwapResponse)
@@ -724,22 +744,28 @@ type SparkServiceServer interface {
 	// Deprecated: Do not use.
 	// This is deprecated, please use start_deposit_tree_creation instead.
 	StartTreeCreation(context.Context, *StartTreeCreationRequest) (*StartTreeCreationResponse, error)
+	// Deprecated: Do not use.
 	FinalizeNodeSignatures(context.Context, *FinalizeNodeSignaturesRequest) (*FinalizeNodeSignaturesResponse, error)
+	// Deprecated: Do not use.
 	StartTransfer(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
 	// Deprecated: Do not use.
 	// This is deprecated, please use finalize_transfer_with_transfer_package instead.
 	FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*FinalizeTransferResponse, error)
 	FinalizeTransferWithTransferPackage(context.Context, *FinalizeTransferWithTransferPackageRequest) (*FinalizeTransferResponse, error)
+	// Deprecated: Do not use.
 	CancelTransfer(context.Context, *CancelTransferRequest) (*CancelTransferResponse, error)
 	QueryPendingTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
 	QueryAllTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error)
+	// Deprecated: Do not use.
 	ClaimTransferSignRefunds(context.Context, *ClaimTransferSignRefundsRequest) (*ClaimTransferSignRefundsResponse, error)
 	StorePreimageShare(context.Context, *StorePreimageShareRequest) (*emptypb.Empty, error)
 	// Gets a specified number of signing commmitments for a set of nodes, which can be used as
 	// part of a transfer package.
 	GetSigningCommitments(context.Context, *GetSigningCommitmentsRequest) (*GetSigningCommitmentsResponse, error)
+	// Deprecated: Do not use.
 	CooperativeExit(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error)
+	// Deprecated: Do not use.
 	InitiatePreimageSwap(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error)
 	QueryHtlc(context.Context, *QueryHtlcRequest) (*QueryHtlcResponse, error)
@@ -749,6 +775,7 @@ type SparkServiceServer interface {
 	// Deprecated: Do not use.
 	// This is deprecated, please use counter_leaf_swap instead.
 	LeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
+	// Deprecated: Do not use.
 	// This is the exact same as start_leaf_swap, but signs with
 	// an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
 	CounterLeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
@@ -764,7 +791,9 @@ type SparkServiceServer interface {
 	RenewLeaf(context.Context, *RenewLeafRequest) (*RenewLeafResponse, error)
 	GetSigningOperatorList(context.Context, *emptypb.Empty) (*GetSigningOperatorListResponse, error)
 	QueryNodes(context.Context, *QueryNodesRequest) (*QueryNodesResponse, error)
+	// Deprecated: Do not use.
 	QueryNodesDistribution(context.Context, *QueryNodesDistributionRequest) (*QueryNodesDistributionResponse, error)
+	// Deprecated: Do not use.
 	QueryNodesByValue(context.Context, *QueryNodesByValueRequest) (*QueryNodesByValueResponse, error)
 	QueryBalance(context.Context, *QueryBalanceRequest) (*QueryBalanceResponse, error)
 	QueryUserSignedRefunds(context.Context, *QueryUserSignedRefundsRequest) (*QueryUserSignedRefundsResponse, error)
@@ -793,6 +822,7 @@ type SparkServiceServer interface {
 	InitiatePreimageSwapV2(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	InitiatePreimageSwapV3(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	StartLeafSwapV2(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
+	// Deprecated: Do not use.
 	CounterLeafSwapV2(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
 	StartTransferV2(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
 	// Deprecated: Do not use.

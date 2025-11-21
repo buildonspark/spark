@@ -79,8 +79,6 @@ const (
 	// Number of confirmations required before finalizing tree creation
 	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
 
-	KnobOctoberDeprecationEnabled = "spark.so.october_deprecation_enabled"
-
 	KnobPrivacyEnabled = "spark.so.privacy.enabled"
 
 	KnobReadOnlyEndpoints = "spark.so.ro_session"

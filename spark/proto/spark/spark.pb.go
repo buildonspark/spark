@@ -11634,39 +11634,39 @@ const file_spark_proto_rawDesc = "" +
 	"\x1bTREE_NODE_STATUS_AGGREGATED\x10\x06\x12\x1d\n" +
 	"\x19TREE_NODE_STATUS_ON_CHAIN\x10\a\x12#\n" +
 	"\x1fTREE_NODE_STATUS_AGGREGATE_LOCK\x10\b\x12\x1b\n" +
-	"\x17TREE_NODE_STATUS_EXITED\x10\t2\xf5&\n" +
+	"\x17TREE_NODE_STATUS_EXITED\x10\t2\x93'\n" +
 	"\fSparkService\x12i\n" +
 	"\x18generate_deposit_address\x12$.spark.GenerateDepositAddressRequest\x1a%.spark.GenerateDepositAddressResponse\"\x00\x12|\n" +
 	"\x1fgenerate_static_deposit_address\x12*.spark.GenerateStaticDepositAddressRequest\x1a+.spark.GenerateStaticDepositAddressResponse\"\x00\x12p\n" +
 	"\x1bstart_deposit_tree_creation\x12&.spark.StartDepositTreeCreationRequest\x1a'.spark.StartDepositTreeCreationResponse\"\x00\x12]\n" +
-	"\x13start_tree_creation\x12\x1f.spark.StartTreeCreationRequest\x1a .spark.StartTreeCreationResponse\"\x03\x88\x02\x01\x12i\n" +
-	"\x18finalize_node_signatures\x12$.spark.FinalizeNodeSignaturesRequest\x1a%.spark.FinalizeNodeSignaturesResponse\"\x00\x12M\n" +
-	"\x0estart_transfer\x12\x1b.spark.StartTransferRequest\x1a\x1c.spark.StartTransferResponse\"\x00\x12Y\n" +
+	"\x13start_tree_creation\x12\x1f.spark.StartTreeCreationRequest\x1a .spark.StartTreeCreationResponse\"\x03\x88\x02\x01\x12l\n" +
+	"\x18finalize_node_signatures\x12$.spark.FinalizeNodeSignaturesRequest\x1a%.spark.FinalizeNodeSignaturesResponse\"\x03\x88\x02\x01\x12P\n" +
+	"\x0estart_transfer\x12\x1b.spark.StartTransferRequest\x1a\x1c.spark.StartTransferResponse\"\x03\x88\x02\x01\x12Y\n" +
 	"\x11finalize_transfer\x12\x1e.spark.FinalizeTransferRequest\x1a\x1f.spark.FinalizeTransferResponse\"\x03\x88\x02\x01\x12\x7f\n" +
-	"'finalize_transfer_with_transfer_package\x121.spark.FinalizeTransferWithTransferPackageRequest\x1a\x1f.spark.FinalizeTransferResponse\"\x00\x12P\n" +
-	"\x0fcancel_transfer\x12\x1c.spark.CancelTransferRequest\x1a\x1d.spark.CancelTransferResponse\"\x00\x12Q\n" +
+	"'finalize_transfer_with_transfer_package\x121.spark.FinalizeTransferWithTransferPackageRequest\x1a\x1f.spark.FinalizeTransferResponse\"\x00\x12S\n" +
+	"\x0fcancel_transfer\x12\x1c.spark.CancelTransferRequest\x1a\x1d.spark.CancelTransferResponse\"\x03\x88\x02\x01\x12Q\n" +
 	"\x17query_pending_transfers\x12\x15.spark.TransferFilter\x1a\x1d.spark.QueryTransfersResponse\"\x00\x12M\n" +
 	"\x13query_all_transfers\x12\x15.spark.TransferFilter\x1a\x1d.spark.QueryTransfersResponse\"\x00\x12[\n" +
-	"\x19claim_transfer_tweak_keys\x12$.spark.ClaimTransferTweakKeysRequest\x1a\x16.google.protobuf.Empty\"\x00\x12p\n" +
-	"\x1bclaim_transfer_sign_refunds\x12&.spark.ClaimTransferSignRefundsRequest\x1a'.spark.ClaimTransferSignRefundsResponse\"\x00\x12R\n" +
+	"\x19claim_transfer_tweak_keys\x12$.spark.ClaimTransferTweakKeysRequest\x1a\x16.google.protobuf.Empty\"\x00\x12s\n" +
+	"\x1bclaim_transfer_sign_refunds\x12&.spark.ClaimTransferSignRefundsRequest\x1a'.spark.ClaimTransferSignRefundsResponse\"\x03\x88\x02\x01\x12R\n" +
 	"\x14store_preimage_share\x12 .spark.StorePreimageShareRequest\x1a\x16.google.protobuf.Empty\"\x00\x12f\n" +
-	"\x17get_signing_commitments\x12#.spark.GetSigningCommitmentsRequest\x1a$.spark.GetSigningCommitmentsResponse\"\x00\x12S\n" +
-	"\x10cooperative_exit\x12\x1d.spark.CooperativeExitRequest\x1a\x1e.spark.CooperativeExitResponse\"\x00\x12c\n" +
-	"\x16initiate_preimage_swap\x12\".spark.InitiatePreimageSwapRequest\x1a#.spark.InitiatePreimageSwapResponse\"\x00\x12S\n" +
+	"\x17get_signing_commitments\x12#.spark.GetSigningCommitmentsRequest\x1a$.spark.GetSigningCommitmentsResponse\"\x00\x12V\n" +
+	"\x10cooperative_exit\x12\x1d.spark.CooperativeExitRequest\x1a\x1e.spark.CooperativeExitResponse\"\x03\x88\x02\x01\x12f\n" +
+	"\x16initiate_preimage_swap\x12\".spark.InitiatePreimageSwapRequest\x1a#.spark.InitiatePreimageSwapResponse\"\x03\x88\x02\x01\x12S\n" +
 	"\x10provide_preimage\x12\x1d.spark.ProvidePreimageRequest\x1a\x1e.spark.ProvidePreimageResponse\"\x00\x12A\n" +
 	"\n" +
 	"query_htlc\x12\x17.spark.QueryHtlcRequest\x1a\x18.spark.QueryHtlcResponse\"\x00\x12N\n" +
 	"\x0fstart_leaf_swap\x12\x1b.spark.StartTransferRequest\x1a\x1c.spark.StartTransferResponse\"\x00\x12O\n" +
-	"\tleaf_swap\x12\x1d.spark.CounterLeafSwapRequest\x1a\x1e.spark.CounterLeafSwapResponse\"\x03\x88\x02\x01\x12T\n" +
-	"\x11counter_leaf_swap\x12\x1d.spark.CounterLeafSwapRequest\x1a\x1e.spark.CounterLeafSwapResponse\"\x00\x12V\n" +
+	"\tleaf_swap\x12\x1d.spark.CounterLeafSwapRequest\x1a\x1e.spark.CounterLeafSwapResponse\"\x03\x88\x02\x01\x12W\n" +
+	"\x11counter_leaf_swap\x12\x1d.spark.CounterLeafSwapRequest\x1a\x1e.spark.CounterLeafSwapResponse\"\x03\x88\x02\x01\x12V\n" +
 	"\x10refresh_timelock\x12\x1d.spark.RefreshTimelockRequest\x1a\x1e.spark.RefreshTimelockResponse\"\x03\x88\x02\x01\x12G\n" +
 	"\vextend_leaf\x12\x18.spark.ExtendLeafRequest\x1a\x19.spark.ExtendLeafResponse\"\x03\x88\x02\x01\x12A\n" +
 	"\n" +
 	"renew_leaf\x12\x17.spark.RenewLeafRequest\x1a\x18.spark.RenewLeafResponse\"\x00\x12\\\n" +
 	"\x19get_signing_operator_list\x12\x16.google.protobuf.Empty\x1a%.spark.GetSigningOperatorListResponse\"\x00\x12D\n" +
-	"\vquery_nodes\x12\x18.spark.QueryNodesRequest\x1a\x19.spark.QueryNodesResponse\"\x00\x12i\n" +
-	"\x18query_nodes_distribution\x12$.spark.QueryNodesDistributionRequest\x1a%.spark.QueryNodesDistributionResponse\"\x00\x12[\n" +
-	"\x14query_nodes_by_value\x12\x1f.spark.QueryNodesByValueRequest\x1a .spark.QueryNodesByValueResponse\"\x00\x12J\n" +
+	"\vquery_nodes\x12\x18.spark.QueryNodesRequest\x1a\x19.spark.QueryNodesResponse\"\x00\x12l\n" +
+	"\x18query_nodes_distribution\x12$.spark.QueryNodesDistributionRequest\x1a%.spark.QueryNodesDistributionResponse\"\x03\x88\x02\x01\x12^\n" +
+	"\x14query_nodes_by_value\x12\x1f.spark.QueryNodesByValueRequest\x1a .spark.QueryNodesByValueResponse\"\x03\x88\x02\x01\x12J\n" +
 	"\rquery_balance\x12\x1a.spark.QueryBalanceRequest\x1a\x1b.spark.QueryBalanceResponse\"\x00\x12j\n" +
 	"\x19query_user_signed_refunds\x12$.spark.QueryUserSignedRefundsRequest\x1a%.spark.QueryUserSignedRefundsResponse\"\x00\x12y\n" +
 	"\x1equery_unused_deposit_addresses\x12).spark.QueryUnusedDepositAddressesRequest\x1a*.spark.QueryUnusedDepositAddressesResponse\"\x00\x12y\n" +
@@ -11681,8 +11681,8 @@ const file_spark_proto_rawDesc = "" +
 	"\x1bfinalize_node_signatures_v2\x12$.spark.FinalizeNodeSignaturesRequest\x1a%.spark.FinalizeNodeSignaturesResponse\"\x00\x12f\n" +
 	"\x19initiate_preimage_swap_v2\x12\".spark.InitiatePreimageSwapRequest\x1a#.spark.InitiatePreimageSwapResponse\"\x00\x12f\n" +
 	"\x19initiate_preimage_swap_v3\x12\".spark.InitiatePreimageSwapRequest\x1a#.spark.InitiatePreimageSwapResponse\"\x00\x12Q\n" +
-	"\x12start_leaf_swap_v2\x12\x1b.spark.StartTransferRequest\x1a\x1c.spark.StartTransferResponse\"\x00\x12W\n" +
-	"\x14counter_leaf_swap_v2\x12\x1d.spark.CounterLeafSwapRequest\x1a\x1e.spark.CounterLeafSwapResponse\"\x00\x12P\n" +
+	"\x12start_leaf_swap_v2\x12\x1b.spark.StartTransferRequest\x1a\x1c.spark.StartTransferResponse\"\x00\x12Z\n" +
+	"\x14counter_leaf_swap_v2\x12\x1d.spark.CounterLeafSwapRequest\x1a\x1e.spark.CounterLeafSwapResponse\"\x03\x88\x02\x01\x12P\n" +
 	"\x11start_transfer_v2\x12\x1b.spark.StartTransferRequest\x1a\x1c.spark.StartTransferResponse\"\x00\x12Y\n" +
 	"\x13refresh_timelock_v2\x12\x1d.spark.RefreshTimelockRequest\x1a\x1e.spark.RefreshTimelockResponse\"\x03\x88\x02\x01\x12^\n" +
 	"\x15get_utxos_for_address\x12 .spark.GetUtxosForAddressRequest\x1a!.spark.GetUtxosForAddressResponse\"\x00\x12]\n" +
