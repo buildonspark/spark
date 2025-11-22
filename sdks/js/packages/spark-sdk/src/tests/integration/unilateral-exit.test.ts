@@ -5,7 +5,7 @@ import { RPCError } from "../../errors/types.js";
 import { Network } from "../../utils/network.js";
 import { SparkWalletTestingIntegration } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
-import { waitForClaim } from "../utils/utils.js";
+import { testMinikubeOnly, waitForClaim } from "../utils/utils.js";
 import {
   constructUnilateralExitFeeBumpPackages,
   hash160,
@@ -14,7 +14,7 @@ import { signPsbtWithExternalKey } from "../utils/signing.js";
 import { TreeNode } from "../../proto/spark.js";
 
 describe("unilateral exit", () => {
-  it("should unilateral exit", async () => {
+  testMinikubeOnly("should unilateral exit", async () => {
     const faucet = BitcoinFaucet.getInstance();
 
     const { wallet: userWallet } =
