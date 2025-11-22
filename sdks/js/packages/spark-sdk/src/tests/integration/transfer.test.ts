@@ -20,8 +20,7 @@ import {
   SparkWalletTestingIntegrationWithStream,
 } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
-
-const testLocalOnly = process.env.GITHUB_ACTIONS ? it.skip : it;
+import { testMinikubeAndLocalOnly } from "../utils/utils.js";
 
 describe.each(walletTypes)(
   "Transfer with name",
@@ -121,7 +120,7 @@ describe.each(walletTypes)(
       expect(balance.balance).toBe(1000n);
     }, 30000);
 
-    testLocalOnly(`${name} - test transfer with separate`, async () => {
+    testMinikubeAndLocalOnly(`${name} - test transfer with separate`, async () => {
       const faucet = BitcoinFaucet.getInstance();
 
       const options: ConfigOptions = {
@@ -252,7 +251,7 @@ describe.each(walletTypes)(
       );
     });
 
-    testLocalOnly(
+    testMinikubeAndLocalOnly(
       `${name} - test that when the receiver has tweaked the key on some SOs, we can still claim the transfer`,
       async () => {
         const faucet = BitcoinFaucet.getInstance();
