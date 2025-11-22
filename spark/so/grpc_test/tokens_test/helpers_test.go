@@ -185,6 +185,7 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 
 	for i := range numOutputs {
 		var pubKey keys.Public
+
 		if params.MintToSelf {
 			pubKey = params.TokenIdentityPubKey
 			userOutputPrivKeys[i] = config.IdentityPrivateKey
@@ -202,10 +203,11 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 	}
 
 	now := time.Now()
-	version := uint32(TokenTransactionVersion2)
-	if params.Version != 0 {
-		version = uint32(params.Version)
+	effectiveVersion := params.Version
+	if effectiveVersion == 0 {
+		effectiveVersion = TokenTransactionVersion2
 	}
+	version := uint32(effectiveVersion)
 	mintTokenTransaction := &tokenpb.TokenTransaction{
 		Version: version,
 		TokenInputs: &tokenpb.TokenTransaction_MintInput{
@@ -223,6 +225,13 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 		sort.Slice(mintTokenTransaction.SparkOperatorIdentityPublicKeys, func(i, j int) bool {
 			return bytes.Compare(mintTokenTransaction.SparkOperatorIdentityPublicKeys[i], mintTokenTransaction.SparkOperatorIdentityPublicKeys[j]) < 0
 		})
+
+		withdrawalBondSats := uint64(withdrawalBondSatsInConfig)
+		withdrawRelativeBlockLocktime := uint64(withdrawalRelativeBlockLocktimeInConfig)
+		for _, output := range mintTokenTransaction.TokenOutputs {
+			output.WithdrawBondSats = &withdrawalBondSats
+			output.WithdrawRelativeBlockLocktime = &withdrawRelativeBlockLocktime
+		}
 	}
 
 	mintTokenTransaction.GetMintInput().TokenIdentifier = params.TokenIdentifier
@@ -291,6 +300,13 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 	}
 
 	if version >= 3 {
+		transferTokenTransaction.ValidityDurationSeconds = proto.Uint64(uint64(wallet.DefaultValidityDuration.Seconds()))
+		for _, o := range transferTokenTransaction.TokenOutputs {
+			bond := uint64(withdrawalBondSatsInConfig)
+			lock := uint64(withdrawalRelativeBlockLocktimeInConfig)
+			o.WithdrawBondSats = &bond
+			o.WithdrawRelativeBlockLocktime = &lock
+		}
 		sort.Slice(transferTokenTransaction.SparkOperatorIdentityPublicKeys, func(i, j int) bool {
 			return bytes.Compare(transferTokenTransaction.SparkOperatorIdentityPublicKeys[i], transferTokenTransaction.SparkOperatorIdentityPublicKeys[j]) < 0
 		})

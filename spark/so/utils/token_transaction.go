@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/protohash"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -101,50 +100,19 @@ func HashTokenTransactionV3(tokenTransaction *tokenpb.TokenTransaction, partialH
 	}
 
 	if partialHash {
-		// Clone to avoid mutating the caller's message.
-		cloned, ok := proto.Clone(tokenTransaction).(*tokenpb.TokenTransaction)
-		if !ok || cloned == nil {
-			return nil, sparkerrors.InternalObjectNull(fmt.Errorf("failed to clone token transaction for hashing"))
-		}
-		cloned.ExpiryTime = nil
-
-		inputType, err := InferTokenTransactionType(cloned)
+		converted, err := protoconverter.ConvertV2TxShapeToPartial(tokenTransaction)
 		if err != nil {
-			return nil, err
+			return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to convert legacy token transaction to partial: %w", err))
 		}
-		switch inputType {
-		case TokenTransactionTypeCreate:
-			if ci := cloned.GetCreateInput(); ci != nil {
-				ci.CreationEntityPublicKey = nil
-			}
-		case TokenTransactionTypeMint, TokenTransactionTypeTransfer:
-			for i := range cloned.TokenOutputs {
-				out := cloned.TokenOutputs[i]
-				if out == nil {
-					continue
-				}
-				out.Id = nil
-				out.RevocationCommitment = nil
-				out.WithdrawBondSats = nil
-				out.WithdrawRelativeBlockLocktime = nil
-			}
-		case TokenTransactionTypeUnknown:
-		default:
-			return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("unsupported token transaction type: %s", inputType))
-		}
-
-		txHash, err := protohash.Hash(cloned)
-		if err != nil {
-			return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to hash partial token transaction: %w", err))
-		}
-		return txHash, nil
+		return protohash.Hash(converted)
 	} else {
-		txHash, err := protohash.Hash(tokenTransaction)
+		converted, err := protoconverter.ConvertV2TxShapeToFinal(tokenTransaction)
 		if err != nil {
-			return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to hash final token transaction: %w", err))
+			return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to convert legacy token transaction to final: %w", err))
 		}
-		return txHash, nil
+		return protohash.Hash(converted)
 	}
+
 }
 
 func HashTokenTransactionV2(tokenTransaction *tokenpb.TokenTransaction, partialHash bool) ([]byte, error) {
@@ -1152,6 +1120,8 @@ func ValidatePartialTokenTransaction(
 	inputSignatures []*tokenpb.SignatureWithIndex,
 	sparkOperatorsFromConfig map[string]*sparkpb.SigningOperatorInfo,
 	supportedNetworks []common.Network,
+	expectedWithdrawBondSats uint64,
+	expectedWithdrawRelativeBlockLocktime uint64,
 ) error {
 	err := validateBaseTokenTransaction(
 		tokenTransaction,
@@ -1164,7 +1134,7 @@ func ValidatePartialTokenTransaction(
 	}
 
 	if tokenTransaction.ExpiryTime != nil {
-		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("expiry time should not be set by the client"))
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expiry time should not be set by the client"))
 	}
 
 	inputType, err := InferTokenTransactionType(tokenTransaction)
@@ -1184,11 +1154,20 @@ func ValidatePartialTokenTransaction(
 			if output.GetRevocationCommitment() != nil {
 				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d revocation commitment will be added by the SO - do not set this field when starting transactions", i))
 			}
-			if output.WithdrawBondSats != nil {
-				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw bond sats will be added by the SO - do not set this field when starting transactions", i))
-			}
-			if output.WithdrawRelativeBlockLocktime != nil {
-				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw relative block locktime will be added by the SO - do not set this field when starting transactions", i))
+			if tokenTransaction.Version < 3 {
+				if output.WithdrawBondSats != nil {
+					return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw bond sats will be added by the SO - do not set this field when starting transactions", i))
+				}
+				if output.WithdrawRelativeBlockLocktime != nil {
+					return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw relative block locktime will be added by the SO - do not set this field when starting transactions", i))
+				}
+			} else {
+				if output.WithdrawBondSats == nil || *output.WithdrawBondSats != expectedWithdrawBondSats {
+					return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw bond sats must equal configured value for network", i))
+				}
+				if output.WithdrawRelativeBlockLocktime == nil || *output.WithdrawRelativeBlockLocktime != expectedWithdrawRelativeBlockLocktime {
+					return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw relative block locktime must equal configured value for network", i))
+				}
 			}
 			if output.Id != nil && *output.Id != "" {
 				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d ID will be added by the SO - do not set this field when starting transactions", i))

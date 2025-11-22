@@ -129,6 +129,7 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			issuerPrivKey := keys.GeneratePrivateKey()
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
 			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 				issuerPrivateKey: issuerPrivKey,

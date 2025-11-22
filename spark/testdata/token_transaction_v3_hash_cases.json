@@ -4,7 +4,7 @@
     {
       "name": "mint_v3_full",
       "description": "Full mint transaction V3 with all fields including expiry time",
-      "expectedHash": "efec0369b7105fda210543a249640f895e7702dd1814015802800cf267c491d0",
+      "expectedHash": "fd28b274ab3c46724bf461dee23d9ab23c9c218af7f884bec028dd7ca1f4aa09",
       "tokenTransaction": {
         "version": 3,
         "mintInput": {
@@ -26,7 +26,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "REGTEST",
-        "expiryTime": "1970-01-01T00:00:00Z",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": []
       }
@@ -34,7 +34,7 @@
     {
       "name": "create_v3_full",
       "description": "Full create transaction V3 with creation entity public key",
-      "expectedHash": "c1f432222fe523277d61d773a7b103d3303c4de5cf6b27da8bf1f18a85f0fa19",
+      "expectedHash": "7f48e28da1ac5b8d71efce66d76948d33c146aa54f9d0d67735a82c08dcf5a22",
       "tokenTransaction": {
         "version": 3,
         "createInput": {
@@ -51,7 +51,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "REGTEST",
-        "expiryTime": "1970-01-01T00:00:00Z",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": []
       }
@@ -59,7 +59,7 @@
     {
       "name": "transfer_v3_full",
       "description": "Full transfer transaction V3 without invoice attachments",
-      "expectedHash": "30b7cb674656ace8dc5e7c15eb2778c172e5f490120653eaad4c88690ea915b4",
+      "expectedHash": "7fb13e81a55269d585491ec0fca9b6d3087cb5b3191fead481f8e8b0efb36b64",
       "tokenTransaction": {
         "version": 3,
         "transferInput": {
@@ -85,7 +85,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "REGTEST",
-        "expiryTime": "1970-01-01T00:00:00Z",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": []
       }
@@ -93,7 +93,7 @@
     {
       "name": "transfer_v3_with_invoice_attachments",
       "description": "Full transfer transaction V3 with invoice attachments",
-      "expectedHash": "580343da4873d5e8f2926803de022b1aac4bffd9c58bb4eba1b965db4a665be0",
+      "expectedHash": "b815658acfac749ab1336ec1f920df30a103a1c44031479e34a9080b0bcf5181",
       "tokenTransaction": {
         "version": 3,
         "transferInput": {
@@ -119,7 +119,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "REGTEST",
-        "expiryTime": "1970-01-01T00:00:00Z",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": [
           {
@@ -134,7 +134,7 @@
     {
       "name": "partial_mint_v3",
       "description": "Partial mint transaction V3 - no expiry time, no output ID/revocation/withdrawal fields",
-      "expectedHash": "8b0c13fd329040a6cac4f3e8efca8a00a5096445299ae84ebd1b3fb1e557cfd4",
+      "expectedHash": "335e5d1afd02b4bcc37fa74f068097b37859198111a653d827d73f95351da799",
       "tokenTransaction": {
         "version": 3,
         "mintInput": {
@@ -152,6 +152,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "REGTEST",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": []
       }
@@ -159,7 +160,7 @@
     {
       "name": "partial_create_v3",
       "description": "Partial create transaction V3 - no expiry time, no creation entity public key",
-      "expectedHash": "ddeba6afaaebe9c6212eb71bdb6fd83c3ed01e2a212b32fceb55516bd3df6fb2",
+      "expectedHash": "f7fe6ee3b97adc78f79ef356757c58de519c585a06a3b3fe269ce28dba925b06",
       "tokenTransaction": {
         "version": 3,
         "createInput": {
@@ -175,6 +176,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "REGTEST",
+        "validityDurationSeconds": 60,
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": []
       }
@@ -182,7 +184,7 @@
     {
       "name": "mint_v3_multiple_outputs",
       "description": "Mint transaction with multiple token outputs",
-      "expectedHash": "629fe397530362605e64edcc09f6db691146fff030df30b6977fc4e1f58dda75",
+      "expectedHash": "50c90ae5308bb30aaef02efcf58a3c19f1b27b6221d60d42df7dbd30a2a7ce0c",
       "tokenTransaction": {
         "version": 3,
         "mintInput": {
@@ -213,7 +215,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "REGTEST",
-        "expiryTime": "1970-01-01T00:00:00Z",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": []
       }
@@ -221,7 +223,7 @@
     {
       "name": "transfer_v3_multiple_inputs",
       "description": "Transfer transaction with multiple inputs to spend",
-      "expectedHash": "b5e5f91fa0b1de88c0998595fa23181b473edcb8413a286accdc9a3ce16df91e",
+      "expectedHash": "caf12b034ae0777fff7775c0c2063057e1cf4bb6e384aa28451424445f827fff",
       "tokenTransaction": {
         "version": 3,
         "transferInput": {
@@ -251,7 +253,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "REGTEST",
-        "expiryTime": "1970-01-01T00:00:00Z",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": []
       }
@@ -259,7 +261,7 @@
     {
       "name": "create_v3_with_max_supply_zero",
       "description": "Create transaction with max supply set to zero (unlimited)",
-      "expectedHash": "d70a94ec7b8ff3ffe4e28dd7ee7697ddb1e5f912238c443bebd701ac7f0b99f4",
+      "expectedHash": "0013c450369e52db308da26e7845a0430b88a50924360d06509ce88daf4fcb36",
       "tokenTransaction": {
         "version": 3,
         "createInput": {
@@ -276,7 +278,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "REGTEST",
-        "expiryTime": "1970-01-01T00:00:00Z",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": []
       }
@@ -284,7 +286,7 @@
     {
       "name": "create_v3_freezable",
       "description": "Create transaction for a freezable token",
-      "expectedHash": "e1a90cab8ca39a36d1742c01223957d045caa1ad2cada50d5d8b6dcc60df1e7d",
+      "expectedHash": "2a2c45a3689b9e4ab202382c54da75646c0abafddb37fcf2c9ad8edb8dd691ee",
       "tokenTransaction": {
         "version": 3,
         "createInput": {
@@ -301,7 +303,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "REGTEST",
-        "expiryTime": "1970-01-01T00:00:00Z",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": []
       }
@@ -309,7 +311,7 @@
     {
       "name": "mint_v3_mainnet",
       "description": "Mint transaction on MAINNET network",
-      "expectedHash": "2c1f7306d32256f5c29f32d2b41d394d75d262bcdf67beea10cc462acdc46088",
+      "expectedHash": "79b70d9eac8cc94c0e3ac5507a3ccf25ae2b97b69f2bf29e993c7e9b331a646e",
       "tokenTransaction": {
         "version": 3,
         "mintInput": {
@@ -331,7 +333,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "MAINNET",
-        "expiryTime": "1970-01-01T00:00:00Z",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": []
       }
@@ -339,7 +341,7 @@
     {
       "name": "mint_v3_testnet",
       "description": "Mint transaction on TESTNET network",
-      "expectedHash": "c366ab4d5a15395a1682cb62df912b538e8187b0e78125b6344b5f1547e62b57",
+      "expectedHash": "4430a6dd17c486bbec4232aa6da8240a2fae87ef8b5a839fc70e72bde0f2c9bf",
       "tokenTransaction": {
         "version": 3,
         "mintInput": {
@@ -361,7 +363,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "TESTNET",
-        "expiryTime": "1970-01-01T00:00:00Z",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": []
       }
@@ -369,7 +371,7 @@
     {
       "name": "partial_mint_v3_with_invoice_attachments",
       "description": "Partial mint transaction with invoice attachments (should be sorted)",
-      "expectedHash": "49fc6e5080623665ba8043b1bc144439b48368a0caf4f48d3d139db975d61491",
+      "expectedHash": "a0b96be6da802e274671e3feea900bee28e4a7f5a3e9bcd08a8a3dbb9c3f8478",
       "tokenTransaction": {
         "version": 3,
         "mintInput": {
@@ -387,6 +389,7 @@
           "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
         ],
         "network": "REGTEST",
+        "validityDurationSeconds": "60",
         "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
         "invoiceAttachments": [
           {

@@ -67,3 +67,9 @@ func (s *SparkTokenServer) FreezeTokens(
 	freezeTokenHandler := tokens.NewFreezeTokenHandler(s.soConfig)
 	return freezeTokenHandler.FreezeTokens(ctx, req)
 }
+
+func (s *SparkTokenServer) BroadcastTransaction(ctx context.Context, req *tokenpb.BroadcastTransactionRequest) (*tokenpb.BroadcastTransactionResponse, error) {
+	broadcastTokenTransactionHandler := tokens.NewBroadcastTokenHandler(s.soConfig)
+	resp, err := broadcastTokenTransactionHandler.BroadcastTokenTransaction(ctx, req)
+	return resp, err
+}

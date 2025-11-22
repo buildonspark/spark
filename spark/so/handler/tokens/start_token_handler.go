@@ -57,7 +57,20 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrIdentityPublicKeyAuthFailed, req.PartialTokenTransaction, err)
 	}
 
-	if err := utils.ValidatePartialTokenTransaction(req.PartialTokenTransaction, req.PartialTokenTransactionOwnerSignatures, h.config.GetSigningOperatorList(), h.config.SupportedNetworks); err != nil {
+	network, err := common.NetworkFromProtoNetwork(req.PartialTokenTransaction.Network)
+	if err != nil {
+		return nil, tokens.FormatErrorWithTransactionProto("failed to get network from proto network", req.PartialTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get network from proto network: %w", err)))
+	}
+	expectedBondSats := h.config.Lrc20Configs[network.String()].WithdrawBondSats
+	expectedRelativeBlockLocktime := h.config.Lrc20Configs[network.String()].WithdrawRelativeBlockLocktime
+	if err := utils.ValidatePartialTokenTransaction(
+		req.PartialTokenTransaction,
+		req.PartialTokenTransactionOwnerSignatures,
+		h.config.GetSigningOperatorList(),
+		h.config.SupportedNetworks,
+		expectedBondSats,
+		expectedRelativeBlockLocktime,
+	); err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrInvalidPartialTokenTransaction, req.PartialTokenTransaction, err)
 	}
 
