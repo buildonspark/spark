@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"runtime/debug"
 
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/grpcutil"
@@ -43,8 +42,8 @@ func PanicRecoveryInterceptor(returnDetailedPanicErrors bool) grpc.UnaryServerIn
 		defer func() {
 			if r := recover(); r != nil {
 				logger.Error("Panic in handler",
-					zap.String("panic", fmt.Sprintf("%v", r)),  // TODO(mhr): Probably a better way to do this.
-					zap.String("stack", string(debug.Stack())), // TODO(mhr): zap.ByteString?
+					zap.Any("panic", r),
+					zap.Stack("stack"),
 				)
 
 				globalPanicCounter.Add(
@@ -79,8 +78,8 @@ func PanicRecoveryStreamInterceptor() grpc.StreamServerInterceptor {
 		defer func() {
 			if r := recover(); r != nil {
 				logger.Error("Panic in handler",
-					zap.String("panic", fmt.Sprintf("%v", r)),  // TODO(mhr): Probably a better way to do this.
-					zap.String("stack", string(debug.Stack())), // TODO(mhr): zap.ByteString?
+					zap.Any("panic", r),
+					zap.Stack("stack"),
 				)
 
 				globalPanicCounter.Add(

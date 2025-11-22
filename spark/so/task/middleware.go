@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime/debug"
 	"time"
 
 	"github.com/google/uuid"
@@ -143,8 +142,8 @@ func PanicRecoveryMiddleware() TaskMiddleware {
 		defer func() {
 			if r := recover(); r != nil {
 				logger.Error("Panic in task execution",
-					zap.String("panic", fmt.Sprintf("%v", r)),  // TODO(mhr): Probably a better way to do this.
-					zap.String("stack", string(debug.Stack())), // TODO(mhr): zap.ByteString?
+					zap.Any("panic", r),
+					zap.Stack("stack"),
 				)
 				err = errTaskPanic
 			}

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"maps"
-	"runtime/debug"
 	"slices"
 	"strings"
 	"time"
@@ -182,8 +181,8 @@ func scanChainUpdates(
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Error("Panic recovered in scanChainUpdates",
-				zap.String("panic", fmt.Sprintf("%v", r)),  // TODO(mh): Probably a better way to do this.
-				zap.String("stack", string(debug.Stack())), // TODO(mhr): zap.ByteString?
+				zap.Any("panic", r),
+				zap.Stack("stack"),
 			)
 		}
 	}()
