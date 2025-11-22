@@ -245,7 +245,16 @@ func main() {
 	if err != nil {
 		zap.S().Fatalf("Failed to build logger: %v", err)
 	}
-	defer func() { _ = logger.Sync() }()
+	defer func() {
+		// Try to make sure we log any panics that occur.
+		if r := recover(); r != nil {
+			logger.Error("Panic in main",
+				zap.Any("panic", r),
+				zap.Stack("stack"),
+			)
+		}
+		_ = logger.Sync()
+	}()
 
 	// Now we can start using the logger itself.
 	logger = logger.WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
@@ -729,6 +738,9 @@ func main() {
 	useNativeGRPC := args.GrpcPort != 0 && args.GrpcPort != args.HttpPort
 
 	mux := http.NewServeMux()
+
+	// This health check isn't used by k8s, which uses the gRPC health check. However, it
+	// is used by ALB for checking the health of the HTTP server, so we need to keep it.
 	mux.Handle("/-/ready", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
