@@ -621,6 +621,25 @@ var (
 				Name:    "tokenoutput_token_identifier_status",
 				Unique:  false,
 				Columns: []*schema.Column{TokenOutputsColumns[18], TokenOutputsColumns[3]},
+				Annotation: &entsql.IndexAnnotation{
+					IncludeColumns: []string{
+						TokenOutputsColumns[21].Name,
+
+						TokenOutputsColumns[22].Name,
+					},
+				},
+			},
+			{
+				Name:    "tokenoutput_token_public_key_status",
+				Unique:  false,
+				Columns: []*schema.Column{TokenOutputsColumns[8], TokenOutputsColumns[3]},
+				Annotation: &entsql.IndexAnnotation{
+					IncludeColumns: []string{
+						TokenOutputsColumns[21].Name,
+
+						TokenOutputsColumns[22].Name,
+					},
+				},
 			},
 			{
 				Name:    "tokenoutput_confirmed_withdraw_block_hash",

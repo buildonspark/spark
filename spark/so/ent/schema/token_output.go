@@ -98,9 +98,9 @@ func (TokenOutput) Indexes() []ent.Index {
 		// Optimized for GetOwnedTokenOutputs query
 		index.Fields("owner_public_key", "status", "network"),
 		// Optimized for GetTokenTransactions query
-		index.Fields("owner_public_key", "token_identifier", "status").Annotations(entsql.IncludeColumns("token_output_output_created_token_transaction", "token_output_output_spent_token_transaction")),
-		// Defensive index for GetTokenTransactions (in case someone queries by just the token identifier)
-		index.Fields("token_identifier", "status"),
+		index.Fields("owner_public_key", "token_identifier", "status").Annotations(tokenTxIncludeAnnotations()),
+		index.Fields("token_identifier", "status").Annotations(tokenTxIncludeAnnotations()),
+		index.Fields("token_public_key", "status").Annotations(tokenTxIncludeAnnotations()),
 		// Enables quick unmarking of withdrawn outputs in response to block reorgs.
 		index.Fields("confirmed_withdraw_block_hash"),
 		// Optimize pre-emption queries by indexing the spent transaction relationship
@@ -110,6 +110,13 @@ func (TokenOutput) Indexes() []ent.Index {
 		index.Edges("output_created_token_transaction").Fields("created_transaction_output_vout").Unique(),
 		index.Fields("token_create_id"),
 	}
+}
+
+func tokenTxIncludeAnnotations() *entsql.IndexAnnotation {
+	return entsql.IncludeColumns(
+		"token_output_output_created_token_transaction",
+		"token_output_output_spent_token_transaction",
+	)
 }
 
 func (TokenOutput) Hooks() []ent.Hook {
