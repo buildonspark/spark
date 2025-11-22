@@ -4118,6 +4118,56 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
+   * Queries HTLCs (Hash Time Locked Contracts) by payment hashes.
+   *
+   * @param {Uint8Array[]} paymentHashes - Array of payment hashes to query
+   * @param {number} [offset] - Optional offset for pagination
+   * @returns {Promise<PreimageRequest[]>} Array of preimage requests
+   */
+  public async queryHTLCs(paymentHashes: Uint8Array[], offset?: number) {
+    return await this.transferService.queryHTLCs(paymentHashes, offset);
+  }
+
+  /**
+   * Creates an HTLC (Hash Time Locked Contract) transfer.
+   *
+   * @param {LeafKeyTweak[]} leaves - Array of leaf key tweaks to transfer
+   * @param {Uint8Array} receiverIdentityPubkey - Public key of the receiver
+   * @param {Uint8Array} paymentHash - Hash of the payment preimage
+   * @returns {Promise<Transfer>} The created transfer
+   */
+  public async createHTLC(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    paymentHash: Uint8Array,
+  ) {
+    return await this.transferService.createHTLC(
+      leaves,
+      receiverIdentityPubkey,
+      paymentHash,
+    );
+  }
+
+  /**
+   * Claims an HTLC (Hash Time Locked Contract) by providing the preimage.
+   *
+   * @param {Uint8Array} preimage - The preimage that hashes to the payment hash
+   * @returns {Promise<Transfer>} The claimed transfer
+   */
+  public async claimHTLC(preimage: Uint8Array) {
+    return await this.transferService.claimHTLC(preimage);
+  }
+
+  /**
+   * Generates a random 32-byte preimage for HTLC operations.
+   *
+   * @returns {Uint8Array} A random 32-byte preimage
+   */
+  public generateRandomPreimage(): Uint8Array {
+    return this.transferService.generateRandomPreimage();
+  }
+
+  /**
    * Gets fee estimate for sending Lightning payments.
    *
    * @param {LightningSendFeeEstimateInput} params - Input parameters for fee estimation
@@ -5418,9 +5468,11 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "batchTransferTokens",
   "checkTimelock",
   "claimDeposit",
+  "claimHTLC",
   "claimStaticDeposit",
   "claimStaticDepositWithMaxFee",
   "cleanupConnections",
+  "createHTLC",
   "createLightningInvoice",
   "createSatsInvoice",
   "createTokensInvoice",
@@ -5450,6 +5502,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "isTokenOptimizationInProgress",
   "optimizeTokenOutputs",
   "payLightningInvoice",
+  "queryHTLCs",
   "querySparkInvoices",
   "queryStaticDepositAddresses",
   "queryTokenTransactions",
