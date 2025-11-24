@@ -18,6 +18,7 @@ import (
 )
 
 const (
+	defaultVersion       = 3
 	testTimeLock         = 1000
 	testSourceValue      = 100000
 	expectedCpfpTimelock = testTimeLock - spark.TimeLockInterval
@@ -221,6 +222,24 @@ func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit22Set(t *testi
 	require.ErrorContains(t, err, "client sequence has bit 22 set")
 }
 
+// Verifies that a version 2 transaction is accepted.
+func TestVerifyTransactionWithDatabase_Success_Version2(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: dbLeaf.RawTxid.Hash(), Index: 0},
+		Sequence:         expectedCpfpTimelock,
+	})
+	tx.AddTxOut(&wire.TxOut{Value: testSourceValue, PkScript: userScript})
+	tx.AddTxOut(common.EphemeralAnchorOutput())
+	clientRawTx := serializeTx(t, tx)
+
+	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey))
+}
+
 // Errors when client timelock does not match expected.
 func TestVerifyTransactionWithDatabase_Error_TimelockMismatch(t *testing.T) {
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
@@ -303,7 +322,7 @@ func TestVerifyTransactionWithDatabase_Error_UnknownTxType(t *testing.T) {
 func TestConstructExpectedTransaction_UnknownTransactionType(t *testing.T) {
 	// Errors when constructing expected transaction with unknown type.
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
-	_, err := constructExpectedTransaction(dbLeaf, RefundTxType(99), refundDestPubkey, 0)
+	_, err := constructExpectedTransaction(dbLeaf, RefundTxType(99), refundDestPubkey, 0, defaultVersion)
 	require.ErrorContains(t, err, "unknown transaction type: 99")
 }
 
@@ -311,7 +330,7 @@ func TestConstructExpectedTransaction_P2TRScriptCreationFailure(t *testing.T) {
 	// Errors when constructing expected transaction with a zero public key.
 	dbLeaf, _ := newTestLeafNode(t)
 	var invalidPubKey keys.Public
-	_, err := constructExpectedTransaction(dbLeaf, RefundTxTypeCPFP, invalidPubKey, expectedCpfpTimelock)
+	_, err := constructExpectedTransaction(dbLeaf, RefundTxTypeCPFP, invalidPubKey, expectedCpfpTimelock, defaultVersion)
 	require.ErrorContains(t, err, "public key is zero")
 }
 
@@ -431,7 +450,7 @@ func TestValidateSequence_ServerSequenceConstruction(t *testing.T) {
 			assert.Equal(t, expectedServerSeq, serverSeq)
 
 			// The constructed transaction should use exactly the server-generated sequence
-			tx, err := constructExpectedTransaction(dbLeaf, tc.txType, refundDestPubkey, clientSeq)
+			tx, err := constructExpectedTransaction(dbLeaf, tc.txType, refundDestPubkey, clientSeq, defaultVersion)
 			require.NoError(t, err)
 			require.Len(t, tx.TxIn, 1)
 			assert.Equal(t, expectedServerSeq, tx.TxIn[0].Sequence)
@@ -477,7 +496,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedVersion(t *testing.T) {
 	clientRawTx := serializeTx(t, tx)
 
 	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
-	require.ErrorContains(t, err, "expected version")
+	require.ErrorContains(t, err, "unsupported transaction version")
 }
 
 // Errors when the client tx has a different number of inputs than expected.
