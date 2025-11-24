@@ -388,7 +388,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 	}
 
 	// Create new split node
-	mut := db.
+	splitNode, err := db.
 		TreeNode.
 		Create().
 		SetTreeID(tree.ID).
@@ -401,11 +401,9 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		SetSigningKeyshareID(signingKeyshare.ID).
 		SetRawTx(splitNodeTxBytes).
 		SetDirectTx(directSplitNodeTxBytes).
-		SetVout(leaf.Vout)
-	if leaf.Edges.Parent != nil {
-		mut.SetParentID(leaf.Edges.Parent.ID)
-	}
-	splitNode, err := mut.Save(ctx)
+		SetVout(leaf.Vout).
+		SetParentID(parentLeaf.ID).
+		Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new node: %w", err)
 	}
