@@ -19661,6 +19661,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     finalize_node_signatures: {
       name: "finalize_node_signatures",
       requestType: FinalizeNodeSignaturesRequest,
@@ -19669,6 +19670,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     start_transfer: {
       name: "start_transfer",
       requestType: StartTransferRequest,
@@ -19698,6 +19700,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     cancel_transfer: {
       name: "cancel_transfer",
       requestType: CancelTransferRequest,
@@ -19730,6 +19733,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     claim_transfer_sign_refunds: {
       name: "claim_transfer_sign_refunds",
       requestType: ClaimTransferSignRefundsRequest,
@@ -19758,6 +19762,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     cooperative_exit: {
       name: "cooperative_exit",
       requestType: CooperativeExitRequest,
@@ -19766,6 +19771,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     initiate_preimage_swap: {
       name: "initiate_preimage_swap",
       requestType: InitiatePreimageSwapRequest,
@@ -19818,6 +19824,8 @@ export const SparkServiceDefinition = {
     /**
      * This is the exact same as start_leaf_swap, but signs with
      * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+     *
+     * @deprecated
      */
     counter_leaf_swap: {
       name: "counter_leaf_swap",
@@ -19876,6 +19884,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     query_nodes_distribution: {
       name: "query_nodes_distribution",
       requestType: QueryNodesDistributionRequest,
@@ -19884,6 +19893,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     query_nodes_by_value: {
       name: "query_nodes_by_value",
       requestType: QueryNodesByValueRequest,
@@ -20031,6 +20041,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     counter_leaf_swap_v2: {
       name: "counter_leaf_swap_v2",
       requestType: CounterLeafSwapRequest,
@@ -20127,10 +20138,12 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartTreeCreationRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartTreeCreationResponse>>;
+  /** @deprecated */
   finalize_node_signatures(
     request: FinalizeNodeSignaturesRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<FinalizeNodeSignaturesResponse>>;
+  /** @deprecated */
   start_transfer(
     request: StartTransferRequest,
     context: CallContext & CallContextExt,
@@ -20148,6 +20161,7 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: FinalizeTransferWithTransferPackageRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<FinalizeTransferResponse>>;
+  /** @deprecated */
   cancel_transfer(
     request: CancelTransferRequest,
     context: CallContext & CallContextExt,
@@ -20164,6 +20178,7 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: ClaimTransferTweakKeysRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<Empty>>;
+  /** @deprecated */
   claim_transfer_sign_refunds(
     request: ClaimTransferSignRefundsRequest,
     context: CallContext & CallContextExt,
@@ -20180,10 +20195,12 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: GetSigningCommitmentsRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<GetSigningCommitmentsResponse>>;
+  /** @deprecated */
   cooperative_exit(
     request: CooperativeExitRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<CooperativeExitResponse>>;
+  /** @deprecated */
   initiate_preimage_swap(
     request: InitiatePreimageSwapRequest,
     context: CallContext & CallContextExt,
@@ -20213,6 +20230,8 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
   /**
    * This is the exact same as start_leaf_swap, but signs with
    * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+   *
+   * @deprecated
    */
   counter_leaf_swap(
     request: CounterLeafSwapRequest,
@@ -20244,10 +20263,12 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: QueryNodesRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryNodesResponse>>;
+  /** @deprecated */
   query_nodes_distribution(
     request: QueryNodesDistributionRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryNodesDistributionResponse>>;
+  /** @deprecated */
   query_nodes_by_value(
     request: QueryNodesByValueRequest,
     context: CallContext & CallContextExt,
@@ -20331,6 +20352,7 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartTransferRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartTransferResponse>>;
+  /** @deprecated */
   counter_leaf_swap_v2(
     request: CounterLeafSwapRequest,
     context: CallContext & CallContextExt,
@@ -20394,10 +20416,12 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartTreeCreationRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartTreeCreationResponse>;
+  /** @deprecated */
   finalize_node_signatures(
     request: DeepPartial<FinalizeNodeSignaturesRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<FinalizeNodeSignaturesResponse>;
+  /** @deprecated */
   start_transfer(
     request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -20415,6 +20439,7 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<FinalizeTransferWithTransferPackageRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<FinalizeTransferResponse>;
+  /** @deprecated */
   cancel_transfer(
     request: DeepPartial<CancelTransferRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -20431,6 +20456,7 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<ClaimTransferTweakKeysRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<Empty>;
+  /** @deprecated */
   claim_transfer_sign_refunds(
     request: DeepPartial<ClaimTransferSignRefundsRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -20447,10 +20473,12 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<GetSigningCommitmentsRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<GetSigningCommitmentsResponse>;
+  /** @deprecated */
   cooperative_exit(
     request: DeepPartial<CooperativeExitRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<CooperativeExitResponse>;
+  /** @deprecated */
   initiate_preimage_swap(
     request: DeepPartial<InitiatePreimageSwapRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -20483,6 +20511,8 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
   /**
    * This is the exact same as start_leaf_swap, but signs with
    * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+   *
+   * @deprecated
    */
   counter_leaf_swap(
     request: DeepPartial<CounterLeafSwapRequest>,
@@ -20517,10 +20547,12 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QueryNodesRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryNodesResponse>;
+  /** @deprecated */
   query_nodes_distribution(
     request: DeepPartial<QueryNodesDistributionRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryNodesDistributionResponse>;
+  /** @deprecated */
   query_nodes_by_value(
     request: DeepPartial<QueryNodesByValueRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -20604,6 +20636,7 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartTransferResponse>;
+  /** @deprecated */
   counter_leaf_swap_v2(
     request: DeepPartial<CounterLeafSwapRequest>,
     options?: CallOptions & CallOptionsExt,
