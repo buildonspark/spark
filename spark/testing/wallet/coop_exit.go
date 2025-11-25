@@ -18,32 +18,6 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
-// GetConnectorRefundSignatures asks the coordinator to sign refund
-// transactions for leaves, spending connector outputs.
-// Deprecated: use GetConnectorRefundSignaturesV2 instead.
-func GetConnectorRefundSignatures(
-	ctx context.Context,
-	config *TestWalletConfig,
-	leaves []LeafKeyTweak,
-	exitTxid []byte,
-	connectorOutputs []*wire.OutPoint,
-	receiverPubKey keys.Public,
-	expiryTime time.Time,
-) (*pb.Transfer, map[string][]byte, error) {
-	transfer, signaturesMap, err := signCoopExitRefunds(
-		ctx, config, leaves, exitTxid, connectorOutputs, receiverPubKey, expiryTime,
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to sign refund transactions: %w", err)
-	}
-
-	transfer, err = SendTransferTweakKey(ctx, config, transfer, leaves, signaturesMap)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to send transfer: %w", err)
-	}
-
-	return transfer, signaturesMap, nil
-}
 
 // GetConnectorRefundSignaturesV2 asks the coordinator to sign refund
 // transactions for leaves, spending connector outputs.
