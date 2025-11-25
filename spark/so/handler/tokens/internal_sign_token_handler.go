@@ -25,6 +25,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -65,6 +66,7 @@ func (h *InternalSignTokenHandler) getRequiredParticipatingOperatorsCount() int 
 func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 	ctx context.Context,
 	tokenTransaction *ent.TokenTransaction,
+	finalTokenTransaction *tokenpb.TokenTransaction,
 	finalTokenTransactionHash []byte,
 	ownerSignatures []*tokenpb.SignatureWithIndex,
 ) ([]byte, error) {
@@ -81,12 +83,15 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 		return signature, nil
 	}
 
-	if err := validateTokenTransactionForSigning(ctx, h.config, tokenTransaction); err != nil {
+	if err := validateTokenTransactionForSigning(ctx, h.config, tokenTransaction, finalTokenTransaction); err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), tokenTransaction, err)
 	}
 
-	if err := validateOperatorSpecificOwnerSignatures(h.config.IdentityPublicKey(), ownerSignatures, tokenTransaction, finalTokenTransactionHash); err != nil {
-		return nil, err
+	// V3+ does NOT require operator-specific owner signatures. The initial user signature on 'Start' is sufficient.
+	if tokenTransaction.Version < schematype.TokenTransactionVersionV3 {
+		if err := validateOperatorSpecificOwnerSignatures(h.config.IdentityPublicKey(), ownerSignatures, tokenTransaction, finalTokenTransactionHash); err != nil {
+			return nil, err
+		}
 	}
 
 	operatorSignature := ecdsa.Sign(h.config.IdentityPrivateKey.ToBTCEC(), finalTokenTransactionHash)
@@ -101,7 +106,12 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 	for i := 0; i < len(ownerSignatureMap); i++ {
 		ownerSignaturesArr[i] = ownerSignatureMap[i]
 	}
-	if err := ent.UpdateSignedTransaction(ctx, tokenTransaction, ownerSignaturesArr, operatorSignature.Serialize()); err != nil {
+	if err := ent.UpdateSignedTransaction(
+		ctx,
+		tokenTransaction,
+		ownerSignaturesArr,
+		operatorSignature.Serialize(),
+	); err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to update outputs after signing", tokenTransaction, err)
 	}
 
@@ -221,7 +231,7 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		if lockErr != nil {
 			return nil, tokens.FormatErrorWithTransactionEnt("failed to refetch transaction with lock", tokenTransaction, lockErr)
 		}
-		if err := validateTokenTransactionForSigning(ctx, h.config, lockedTx); err != nil {
+		if err := validateTokenTransactionForSigning(ctx, h.config, lockedTx, req.FinalTokenTransaction); err != nil {
 			return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), lockedTx, err)
 		}
 		err = h.validateAndSignTransactionWithProvidedOwnSignature(ctx, lockedTx, operatorSignatures[h.config.Identifier])

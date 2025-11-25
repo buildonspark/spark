@@ -74,6 +74,7 @@ func CreateStartedTransactionEntities(
 	if err != nil {
 		return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to infer token transaction type: %w", err))
 	}
+
 	switch tokenTransactionType {
 	case utils.TokenTransactionTypeCreate:
 		createInput := tokenTransaction.GetCreateInput()
@@ -116,8 +117,9 @@ func CreateStartedTransactionEntities(
 			SetCoordinatorPublicKey(coordinatorPublicKey).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version)).
 			SetCreateID(tokenCreateEnt.ID)
-		if tokenTransaction.ExpiryTime != nil {
-			txBuilder = txBuilder.SetExpiryTime(tokenTransaction.ExpiryTime.AsTime())
+		txBuilder, err = setTokenTransactionTimingFields(txBuilder, tokenTransaction)
+		if err != nil {
+			return nil, err
 		}
 		tokenTransactionEnt, err = txBuilder.Save(ctx)
 		if err != nil {
@@ -143,11 +145,11 @@ func CreateStartedTransactionEntities(
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
 			SetStatus(st.TokenTransactionStatusStarted).
 			SetCoordinatorPublicKey(coordinatorPublicKey).
-			SetClientCreatedTimestamp(tokenTransaction.ClientCreatedTimestamp.AsTime()).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version)).
 			SetMintID(tokenMintEnt.ID)
-		if tokenTransaction.ExpiryTime != nil && tokenTransaction.Version != 0 {
-			txMintBuilder = txMintBuilder.SetExpiryTime(tokenTransaction.ExpiryTime.AsTime())
+		txMintBuilder, err = setTokenTransactionTimingFields(txMintBuilder, tokenTransaction)
+		if err != nil {
+			return nil, err
 		}
 		tokenTransactionEnt, err = txMintBuilder.Save(ctx)
 		if err != nil {
@@ -166,10 +168,10 @@ func CreateStartedTransactionEntities(
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
 			SetStatus(st.TokenTransactionStatusStarted).
 			SetCoordinatorPublicKey(coordinatorPublicKey).
-			SetClientCreatedTimestamp(tokenTransaction.ClientCreatedTimestamp.AsTime()).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version))
-		if tokenTransaction.ExpiryTime != nil && tokenTransaction.Version != 0 {
-			txTransferBuilder = txTransferBuilder.SetExpiryTime(tokenTransaction.ExpiryTime.AsTime())
+		txTransferBuilder, err = setTokenTransactionTimingFields(txTransferBuilder, tokenTransaction)
+		if err != nil {
+			return nil, err
 		}
 		tokenTransactionEnt, err = txTransferBuilder.Save(ctx)
 		if err != nil {
@@ -428,18 +430,19 @@ func UpdateSignedTransaction(
 		// is not necessary for mint.
 		newInputStatus = st.TokenOutputStatusSpentFinalized
 		newOutputLeafStatus = st.TokenOutputStatusCreatedFinalized
-		if len(operatorSpecificOwnershipSignatures) != 1 {
-			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf(
-				"expected 1 ownership signature for mint, got %d",
-				len(operatorSpecificOwnershipSignatures),
-			))
-		}
-
-		_, err := db.TokenMint.UpdateOne(tokenTransactionEnt.Edges.Mint).
-			SetOperatorSpecificIssuerSignature(operatorSpecificOwnershipSignatures[0]).
-			Save(ctx)
-		if err != nil {
-			return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update mint with signature: %w", err))
+		if tokenTransactionEnt.Version < 3 {
+			if len(operatorSpecificOwnershipSignatures) != 1 {
+				return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf(
+					"expected 1 ownership signature for mint, got %d",
+					len(operatorSpecificOwnershipSignatures),
+				))
+			}
+			_, err := db.TokenMint.UpdateOne(tokenTransactionEnt.Edges.Mint).
+				SetOperatorSpecificIssuerSignature(operatorSpecificOwnershipSignatures[0]).
+				Save(ctx)
+			if err != nil {
+				return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update mint with signature: %w", err))
+			}
 		}
 	}
 
@@ -449,22 +452,34 @@ func UpdateSignedTransaction(
 		if len(spentOutputs) == 0 {
 			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no spent outputs found for transfer transaction. cannot sign"))
 		}
-		// Validate that we have the right number of spent outputs.
-		if len(operatorSpecificOwnershipSignatures) != len(spentOutputs) {
-			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf(
-				"number of operator specific ownership signatures (%d) does not match number of spent outputs (%d)",
-				len(operatorSpecificOwnershipSignatures),
-				len(spentOutputs),
-			))
-		}
-		for _, outputToSpendEnt := range tokenTransactionEnt.Edges.SpentOutput {
-			inputIndex := outputToSpendEnt.SpentTransactionInputVout
-			_, err := db.TokenOutput.UpdateOne(outputToSpendEnt).
-				SetStatus(newInputStatus).
-				SetSpentOperatorSpecificOwnershipSignature(operatorSpecificOwnershipSignatures[inputIndex]).
-				Save(ctx)
-			if err != nil {
-				return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update spent output to signed: %w", err))
+		if tokenTransactionEnt.Version < 3 {
+			// Validate that we have the right number of spent outputs.
+			if len(operatorSpecificOwnershipSignatures) != len(spentOutputs) {
+				return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf(
+					"number of operator specific ownership signatures (%d) does not match number of spent outputs (%d)",
+					len(operatorSpecificOwnershipSignatures),
+					len(spentOutputs),
+				))
+			}
+
+			for _, outputToSpendEnt := range tokenTransactionEnt.Edges.SpentOutput {
+				inputIndex := outputToSpendEnt.SpentTransactionInputVout
+				_, err := db.TokenOutput.UpdateOne(outputToSpendEnt).
+					SetStatus(newInputStatus).
+					SetSpentOperatorSpecificOwnershipSignature(operatorSpecificOwnershipSignatures[inputIndex]).
+					Save(ctx)
+				if err != nil {
+					return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update spent output to signed: %w", err))
+				}
+			}
+		} else {
+			for _, outputToSpendEnt := range tokenTransactionEnt.Edges.SpentOutput {
+				_, err := db.TokenOutput.UpdateOne(outputToSpendEnt).
+					SetStatus(newInputStatus).
+					Save(ctx)
+				if err != nil {
+					return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update spent output to signed: %w", err))
+				}
 			}
 		}
 	}
@@ -827,11 +842,14 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 		TokenOutputs: make([]*tokenpb.TokenOutput, len(t.Edges.CreatedOutput)),
 		// Get all operator identity public keys from the config
 		SparkOperatorIdentityPublicKeys: operatorPublicKeys,
-		ExpiryTime:                      timestamppb.New(t.ExpiryTime),
 		InvoiceAttachments:              invoiceAttachments,
 	}
 	if !t.ClientCreatedTimestamp.IsZero() {
 		tokenTransaction.ClientCreatedTimestamp = timestamppb.New(t.ClientCreatedTimestamp)
+	}
+
+	if !t.ExpiryTime.IsZero() {
+		tokenTransaction.ExpiryTime = timestamppb.New(t.ExpiryTime)
 	}
 
 	network, err := t.GetNetworkFromEdges()
@@ -843,6 +861,10 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 		return nil, err
 	}
 	tokenTransaction.Network = networkProto
+
+	if t.Version >= 3 {
+		tokenTransaction.ValidityDurationSeconds = proto.Uint64(t.ValidityDurationSeconds)
+	}
 
 	// Sort outputs to match the original token transaction using CreatedTransactionOutputVout
 	sortedCreatedOutputs := slices.SortedFunc(slices.Values(t.Edges.CreatedOutput), func(a, b *TokenOutput) int {
@@ -934,6 +956,42 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 	return tokenTransaction, nil
 }
 
+func setTokenTransactionTimingFields(
+	builder *TokenTransactionCreate,
+	tokenTransaction *tokenpb.TokenTransaction,
+) (*TokenTransactionCreate, error) {
+	if tokenTransaction.Version >= 3 {
+		if tokenTransaction.ClientCreatedTimestamp == nil {
+			return nil, sparkerrors.InternalObjectMissingField(
+				fmt.Errorf("v3+ token transaction missing client_created_timestamp"),
+			)
+		}
+		builder = builder.SetClientCreatedTimestamp(tokenTransaction.ClientCreatedTimestamp.AsTime())
+
+		if tokenTransaction.GetValidityDurationSeconds() == 0 {
+			return nil, sparkerrors.InternalObjectMissingField(
+				fmt.Errorf("v3+ token transaction missing validity_duration_seconds"),
+			)
+		}
+		builder = builder.SetValidityDurationSeconds(tokenTransaction.GetValidityDurationSeconds())
+		expiryTime := tokenTransaction.ClientCreatedTimestamp.AsTime().Add(
+			time.Duration(tokenTransaction.GetValidityDurationSeconds()) * time.Second,
+		)
+		builder = builder.SetExpiryTime(expiryTime)
+		return builder, nil
+	}
+
+	if tokenTransaction.ClientCreatedTimestamp != nil {
+		builder = builder.SetClientCreatedTimestamp(tokenTransaction.ClientCreatedTimestamp.AsTime())
+	}
+
+	if tokenTransaction.ExpiryTime != nil {
+		builder = builder.SetExpiryTime(tokenTransaction.ExpiryTime.AsTime())
+	}
+
+	return builder, nil
+}
+
 func (t *TokenTransaction) GetNetworkFromEdges() (st.Network, error) {
 	txType := t.InferTokenTransactionTypeEnt()
 	switch txType {
@@ -965,32 +1023,21 @@ func (t *TokenTransaction) InferTokenTransactionTypeEnt() utils.TokenTransaction
 }
 
 // ValidateNotExpired checks if a token transaction has expired and returns an error if it has.
-func (t *TokenTransaction) ValidateNotExpired(defaultV0TransactionExpiryDuration time.Duration) error {
+func (t *TokenTransaction) ValidateNotExpired() error {
 	now := time.Now().UTC()
-	if !t.ExpiryTime.IsZero() {
-		if now.After(t.ExpiryTime.UTC()) {
+	switch {
+	case t.Version == 1 || t.Version == 2:
+		if !t.ExpiryTime.IsZero() && now.After(t.ExpiryTime.UTC()) {
 			return sparkerrors.FailedPreconditionExpired(fmt.Errorf("signing failed because token transaction %s has expired at %s, current time: %s", t.ID, t.ExpiryTime.UTC().Format(time.RFC3339), now.Format(time.RFC3339)))
 		}
-	} else if t.Version == 0 {
-		v0ComputedExpirationTime := t.CreateTime.Add(defaultV0TransactionExpiryDuration)
-		if now.After(v0ComputedExpirationTime) {
-			return sparkerrors.FailedPreconditionExpired(fmt.Errorf("signing failed because v0 token transaction %s has computed expiration time %s, current time: %s", t.ID, v0ComputedExpirationTime.Format(time.RFC3339), now.Format(time.RFC3339)))
+	case t.Version >= 3:
+		validity := time.Duration(t.ValidityDurationSeconds) * time.Second
+		if now.After(t.ClientCreatedTimestamp.Add(validity)) {
+			return sparkerrors.FailedPreconditionExpired(fmt.Errorf("signing failed because v3+ token transaction %s has expired at %s, current time: %s", t.ID, t.ClientCreatedTimestamp.Add(validity).Format(time.RFC3339), now.Format(time.RFC3339)))
 		}
+	case t.Version == 0:
+	default:
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("unsupported token transaction version: %d", t.Version))
 	}
 	return nil
-}
-
-// IsExpired checks if a token transaction has expired at the given time.
-func (t *TokenTransaction) IsExpired(requestTime time.Time, defaultV0TransactionExpiryDuration time.Duration) bool {
-	if t.Status != st.TokenTransactionStatusStarted && t.Status != st.TokenTransactionStatusSigned {
-		return false
-	}
-
-	if !t.ExpiryTime.IsZero() {
-		return requestTime.After(t.ExpiryTime)
-	} else if t.Version == 0 {
-		v0ComputedExpirationTime := t.CreateTime.Add(defaultV0TransactionExpiryDuration)
-		return requestTime.After(v0ComputedExpirationTime)
-	}
-	return false
 }

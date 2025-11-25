@@ -222,6 +222,16 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 	}
 
 	if version >= 3 {
+		// V3 requires validity duration to be set by the client in the partial transaction
+		mintTokenTransaction.ValidityDurationSeconds = proto.Uint64(uint64(wallet.DefaultValidityDuration.Seconds()))
+		// V3 requires withdraw parameters to be provided in the partial outputs
+		for _, o := range mintTokenTransaction.TokenOutputs {
+			bond := uint64(withdrawalBondSatsInConfig)
+			lock := uint64(withdrawalRelativeBlockLocktimeInConfig)
+			o.WithdrawBondSats = &bond
+			o.WithdrawRelativeBlockLocktime = &lock
+		}
+		// V3 requires sorted the operator public keys for deterministic hashing
 		sort.Slice(mintTokenTransaction.SparkOperatorIdentityPublicKeys, func(i, j int) bool {
 			return bytes.Compare(mintTokenTransaction.SparkOperatorIdentityPublicKeys[i], mintTokenTransaction.SparkOperatorIdentityPublicKeys[j]) < 0
 		})

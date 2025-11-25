@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -70,24 +70,18 @@ func validateInputStatuses(outputs []*ent.TokenOutput, expectedStatuses ...st.To
 
 // validateTokenTransactionForSigning validates a token transaction for signing.
 // It verifies status, non-expiration, spent and created output statuses, and transaction specific conditions.
-func validateTokenTransactionForSigning(ctx context.Context, config *so.Config, tokenTransactionEnt *ent.TokenTransaction) error {
+func validateTokenTransactionForSigning(
+	ctx context.Context,
+	config *so.Config,
+	tokenTransactionEnt *ent.TokenTransaction,
+	tokenTransactionProto *tokenpb.TokenTransaction,
+) error {
 	if tokenTransactionEnt.Status != st.TokenTransactionStatusStarted &&
 		tokenTransactionEnt.Status != st.TokenTransactionStatusSigned {
 		return fmt.Errorf("signing failed because transaction is not in correct state, expected %s or %s, current status: %s", st.TokenTransactionStatusStarted, st.TokenTransactionStatusSigned, tokenTransactionEnt.Status)
 	}
 
-	// Get the network-specific transaction expiry duration
-	schemaNetwork, err := tokenTransactionEnt.GetNetworkFromEdges()
-	if err != nil {
-		return err
-	}
-	network, err := common.NetworkFromSchemaNetwork(schemaNetwork)
-	if err != nil {
-		return err
-	}
-	transactionV0ExpiryDuration := config.Lrc20Configs[network.String()].TransactionExpiryDuration
-
-	if err := tokenTransactionEnt.ValidateNotExpired(transactionV0ExpiryDuration); err != nil {
+	if err := tokenTransactionEnt.ValidateNotExpired(); err != nil {
 		return err
 	}
 
@@ -121,6 +115,18 @@ func validateTokenTransactionForSigning(ctx context.Context, config *so.Config, 
 		invalidInputs := validateInputStatuses(tokenTransactionEnt.Edges.SpentOutput, st.TokenOutputStatusSpentStarted, st.TokenOutputStatusSpentSigned)
 		if len(invalidInputs) > 0 {
 			return fmt.Errorf("%s: %w", tokens.ErrInvalidInputs, stderrors.Join(invalidInputs...))
+		}
+
+		if tokenTransactionProto == nil || tokenTransactionProto.GetTransferInput() == nil {
+			return sparkerrors.InternalObjectMalformedField(fmt.Errorf("final token transaction proto missing transfer input for version >=3 transfer"))
+		}
+		protoOutputs := tokenTransactionProto.GetTransferInput().GetOutputsToSpend()
+		if len(protoOutputs) != len(tokenTransactionEnt.Edges.SpentOutput) {
+			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf(
+				"number of outputs to spend in proto (%d) does not match number of spent outputs (%d)",
+				len(protoOutputs),
+				len(tokenTransactionEnt.Edges.SpentOutput),
+			))
 		}
 
 		// Collect owner public keys for freeze check.

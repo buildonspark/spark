@@ -77,10 +77,11 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		return response, err
 	}
 
-	if err := validateTokenTransactionForSigning(ctx, h.config, tokenTransaction); err != nil {
+	if err := validateTokenTransactionForSigning(ctx, h.config, tokenTransaction, req.FinalTokenTransaction); err != nil {
 		return nil, err
 	}
 
+	requireInputSignatures := req.GetFinalTokenTransaction().GetVersion() < 3
 	inputSignaturesByOperatorHex := make(map[string]*tokenpb.InputTtxoSignaturesPerOperator, len(req.InputTtxoSignaturesPerOperator))
 	for _, opSigs := range req.InputTtxoSignaturesPerOperator {
 		if opSigs == nil || len(opSigs.OperatorIdentityPublicKey) == 0 {
@@ -89,8 +90,8 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		inputSignaturesByOperatorHex[hex.EncodeToString(opSigs.OperatorIdentityPublicKey)] = opSigs
 	}
 	selfHex := h.config.IdentityPublicKey().ToHex()
-	selfSignatures, ok := inputSignaturesByOperatorHex[selfHex]
-	if !ok {
+	operatorSpecificSignatures := inputSignaturesByOperatorHex[selfHex]
+	if operatorSpecificSignatures == nil && requireInputSignatures {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no signatures found for local operator %s", h.config.Identifier))
 	}
 
@@ -99,7 +100,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, error) {
 			opHex := operator.IdentityPublicKey.ToHex()
 			foundOperatorSignatures := inputSignaturesByOperatorHex[opHex]
-			if foundOperatorSignatures == nil {
+			if requireInputSignatures && foundOperatorSignatures == nil {
 				return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no signatures found for operator %s", operator.Identifier))
 			}
 			conn, err := operator.NewOperatorGRPCConnection()
@@ -125,10 +126,16 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 	if err != nil {
 		return nil, err
 	}
-	if err := validateTokenTransactionForSigning(ctx, h.config, lockedTokenTransaction); err != nil {
+	if err := validateTokenTransactionForSigning(ctx, h.config, lockedTokenTransaction, req.FinalTokenTransaction); err != nil {
 		return nil, err
 	}
-	localResp, err := h.localSignAndCommitTransaction(ctx, selfSignatures, req.FinalTokenTransactionHash, lockedTokenTransaction)
+	localResp, err := h.localSignAndCommitTransaction(
+		ctx,
+		operatorSpecificSignatures,
+		req.FinalTokenTransactionHash,
+		lockedTokenTransaction,
+		req.FinalTokenTransaction,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -543,11 +550,22 @@ func (h *SignTokenHandler) localSignAndCommitTransaction(
 	foundOperatorSignatures *tokenpb.InputTtxoSignaturesPerOperator,
 	finalTokenTransactionHash []byte,
 	tokenTransaction *ent.TokenTransaction,
+	finalTokenTransaction *tokenpb.TokenTransaction,
 ) (*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, error) {
 	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.localSignAndCommitTransaction", GetEntTokenTransactionTraceAttributes(ctx, tokenTransaction))
 	defer span.End()
 	internalSignTokenHandler := NewInternalSignTokenHandler(h.config)
-	sigBytes, err := internalSignTokenHandler.SignAndPersistTokenTransaction(ctx, tokenTransaction, finalTokenTransactionHash, foundOperatorSignatures.TtxoSignatures)
+	var ttxoSignatures []*tokenpb.SignatureWithIndex
+	if foundOperatorSignatures != nil {
+		ttxoSignatures = foundOperatorSignatures.TtxoSignatures
+	}
+	sigBytes, err := internalSignTokenHandler.SignAndPersistTokenTransaction(
+		ctx,
+		tokenTransaction,
+		finalTokenTransaction,
+		finalTokenTransactionHash,
+		ttxoSignatures,
+	)
 	if err != nil {
 		return nil, err
 	}

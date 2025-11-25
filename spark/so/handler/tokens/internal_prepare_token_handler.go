@@ -84,6 +84,12 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 		}
 	}
 
+	if finalTokenTX.Version >= 3 {
+		if err := validateClientCreatedTimestamp(finalTokenTX); err != nil {
+			return nil, err
+		}
+	}
+
 	txType, err := utils.InferTokenTransactionType(finalTokenTX)
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to check token transaction type: %w", err))
@@ -584,11 +590,15 @@ func validateOutputIsSpendable(ctx context.Context, index int, output *ent.Token
 			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: status must be %s or %s (was %s), or have been spent by an expired or pre-emptable transaction (none found)",
 				index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status))
 		}
-		if !spentTx.IsExpired(time.Now(), v0DefaultTransactionExpiryDuration) {
-			canPreemptSpentTx := false
-			var cannotPreemptErr error
-			cannotPreemptErr = preemptOrRejectTransaction(ctx, tokenTransaction, spentTx)
-			canPreemptSpentTx = cannotPreemptErr == nil
+
+		// If the previous transaction has expired, we allow the output to be spent again.
+		// ValidateNotExpired only fails when the transaction is expired, so any error
+		// here means the previous transaction should automatically lose.
+		err := spentTx.ValidateNotExpired()
+		if err == nil {
+			// Previous transaction is still active; ensure it is actually pre-emptable.
+			cannotPreemptErr := preemptOrRejectTransaction(ctx, tokenTransaction, spentTx)
+			canPreemptSpentTx := cannotPreemptErr == nil
 			if !canPreemptSpentTx {
 				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: status must be %s or %s (was %s) , or have been spent by an expired or pre-emptable transaction (transaction was not expired or pre-emptable, id: %s, final_hash: %s, error: %w)",
 					index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status, spentTx.ID, hex.EncodeToString(spentTx.FinalizedTokenTransactionHash), cannotPreemptErr))
@@ -866,6 +876,28 @@ func getCreatedOutputAmountMapAndTokenIdentifier(tokenTransaction *tokenpb.Token
 		createdOutputMap[owner][amount]++
 	}
 	return createdOutputMap, tokenIdentifier, nil
+}
+
+func validateClientCreatedTimestamp(tokenTransaction *tokenpb.TokenTransaction) error {
+	if tokenTransaction.GetClientCreatedTimestamp() == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("client created timestamp cannot be nil"))
+	}
+	now := time.Now().UTC()
+	clientTimestamp := tokenTransaction.GetClientCreatedTimestamp().AsTime().UTC()
+	// The client created timestamp must be within the validity duration seconds otherwise this transaction
+	// is expired.
+	oldestAllowed := now.Add(-time.Duration(tokenTransaction.GetValidityDurationSeconds()) * time.Second)
+	// The client created timestamp must be within 1 minute of the current time otherwise this transaction
+	// is too far in the future. The clients clock is either not synced or the client is intending to
+	// construct a transaction with a longer than allowed validity duration.
+	latestAllowed := now.Add(1 * time.Minute)
+	if clientTimestamp.Before(oldestAllowed) {
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("client created timestamp too old: %s, oldest allowed: %s", clientTimestamp.Format(time.RFC3339), oldestAllowed.Format(time.RFC3339)))
+	}
+	if clientTimestamp.After(latestAllowed) {
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("client created timestamp too far in the future: %s, latest allowed: %s", clientTimestamp.Format(time.RFC3339), latestAllowed.Format(time.RFC3339)))
+	}
+	return nil
 }
 
 func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) error {

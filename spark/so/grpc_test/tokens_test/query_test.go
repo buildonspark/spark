@@ -796,7 +796,7 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 	require.NoError(t, err, "failed to create native spark token")
 
 	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
-	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
+	mintTransaction, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create mint transaction")
 
 	finalMintTx, err := wallet.BroadcastTokenTransfer(
@@ -815,9 +815,6 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 	tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
 	network, err := common.ProtoNetworkFromNetwork(config.Network)
 	require.NoError(t, err, "failed to convert network")
-
-	mintTxHash, err := utils.HashTokenTransaction(finalMintTx, false)
-	require.NoError(t, err, "failed to hash mint transaction")
 
 	ownerPubKey := finalMintTx.TokenOutputs[0].OwnerPublicKey
 	issuerPubKey := issuerPrivKey.Public().Serialize()
@@ -855,10 +852,21 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 
 	t.Run("StartTransaction", func(t *testing.T) {
 		var header metadata.MD
-		transferTransaction, _, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash, issuerPrivKey.Public(), tokenIdentifier)
+		mintTxForStart, userOutput1PrivKeyForStart, userOutput2PrivKeyForStart, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
+		require.NoError(t, err, "failed to create mint transaction for StartTransaction subtest")
+
+		finalMintTxForStart, err := wallet.BroadcastTokenTransfer(
+			t.Context(), config, mintTxForStart, []keys.Private{issuerPrivKey},
+		)
+		require.NoError(t, err, "failed to broadcast mint transaction for StartTransaction subtest")
+
+		mintTxHashForStart, err := utils.HashTokenTransaction(finalMintTxForStart, false)
+		require.NoError(t, err, "failed to hash mint transaction for StartTransaction subtest")
+
+		transferTransaction, _, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHashForStart, issuerPrivKey.Public(), tokenIdentifier)
 		require.NoError(t, err, "failed to create transfer transaction")
 
-		ownerPrivateKeys := []keys.Private{userOutput1PrivKey, userOutput2PrivKey}
+		ownerPrivateKeys := []keys.Private{userOutput1PrivKeyForStart, userOutput2PrivKeyForStart}
 		partialTokenTransactionHash, err := utils.HashTokenTransaction(transferTransaction, true)
 		require.NoError(t, err, "failed to hash partial token transaction")
 

@@ -6,6 +6,7 @@ import (
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/utils"
@@ -46,6 +47,11 @@ func (h *BroadcastTokenHandler) BroadcastTokenTransaction(
 	startResponse, err := h.startTokenHandler.StartTokenTransaction(ctx, startReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+
+	// Persist the Start operation right away so later failures don't roll back the prepared state.
+	if err := ent.DbCommit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit start transaction: %w", err)
 	}
 
 	finalTx := startResponse.GetFinalTokenTransaction()

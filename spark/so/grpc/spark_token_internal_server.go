@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/lightsparkdev/spark/common/logging"
-	"github.com/lightsparkdev/spark/so/handler/tokens"
-
+	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/handler/tokens"
 	sotokens "github.com/lightsparkdev/spark/so/tokens"
 )
 
@@ -43,7 +43,17 @@ func (s *SparkTokenInternalServer) SignTokenTransactionFromCoordination(
 	}
 
 	internalSignTokenHandler := tokens.NewInternalSignTokenHandler(s.soConfig)
-	sigBytes, err := internalSignTokenHandler.SignAndPersistTokenTransaction(ctx, tx, req.FinalTokenTransactionHash, req.InputTtxoSignaturesPerOperator.TtxoSignatures)
+	var ttxoSignatures []*tokenpb.SignatureWithIndex
+	if req.InputTtxoSignaturesPerOperator != nil {
+		ttxoSignatures = req.InputTtxoSignaturesPerOperator.TtxoSignatures
+	}
+	sigBytes, err := internalSignTokenHandler.SignAndPersistTokenTransaction(
+		ctx,
+		tx,
+		req.FinalTokenTransaction,
+		req.FinalTokenTransactionHash,
+		ttxoSignatures,
+	)
 	if err != nil {
 		return nil, err
 	}

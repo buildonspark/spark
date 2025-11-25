@@ -298,8 +298,10 @@ func preemptOrRejectTransactionsWithInputEnts(
 				continue
 			}
 
-			// Skip expired transactions (they automatically lose)
-			if !competingTx.ExpiryTime.IsZero() && competingTx.ExpiryTime.Before(time.Now()) {
+			// Skip expired transactions (they automatically lose).
+			if err := competingTx.ValidateNotExpired(); err != nil {
+				// Any expiry failure means the existing transaction is expired and should
+				// automatically lose to the new transaction.
 				continue
 			}
 
