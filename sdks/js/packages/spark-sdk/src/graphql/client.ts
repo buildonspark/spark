@@ -142,13 +142,18 @@ export default class SspClient {
     query: Query<T>,
     needsAuth: boolean = true,
   ): Promise<T | null> {
+    console.log("executeRawQuery");
+
     if (needsAuth && !(await this.authProvider.isAuthorized())) {
+      console.log("executeRawQuery: needsAuth && !(await this.authProvider.isAuthorized())");
       await this.authenticate();
+      console.log("executeRawQuery: authenticate done");
     }
 
     try {
       return await this.requester.executeQuery(query);
     } catch (error) {
+      console.log("executeRawQuery: error", error);
       if (
         error instanceof Error &&
         error.message.toLowerCase().includes("unauthorized")

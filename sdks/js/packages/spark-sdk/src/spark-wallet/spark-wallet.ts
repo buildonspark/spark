@@ -3419,6 +3419,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     receiverIdentityPubkey,
     descriptionHash,
   }: CreateLightningInvoiceParams): Promise<LightningReceiveRequest> {
+    console.log("createLightningInvoice", { amountSats, memo, expirySeconds, includeSparkAddress, receiverIdentityPubkey, descriptionHash });
+    
     const sspClient = this.getSspClient();
 
     if (isNaN(amountSats) || amountSats < 0) {
@@ -3479,6 +3481,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       receiverIdentityPubkey?: string,
       descriptionHash?: string,
     ) => {
+      console.log("requestLightningInvoice");
+      
       const network = this.config.getNetwork();
       let bitcoinNetwork: BitcoinNetwork = BitcoinNetwork.REGTEST;
       if (network === Network.MAINNET) {
@@ -3497,6 +3501,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         receiverIdentityPubkey,
         descriptionHash,
       });
+      console.log("requestLightningInvoice: invoice", invoice);
 
       if (!invoice) {
         throw new Error("Failed to create lightning invoice");
@@ -3601,6 +3606,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     preferSpark = false,
     amountSatsToSend,
   }: PayLightningInvoiceParams) {
+    console.log("payLightningInvoice", { invoice, maxFeeSats, preferSpark, amountSatsToSend });
+    
     invoice = invoice.toLowerCase();
 
     const invoiceNetwork = getNetworkFromInvoice(invoice);
@@ -3688,6 +3695,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     // Pay over Lightning
     return await this.withLeaves(async () => {
+      console.log("payLightningInvoice: withLeaves");
+      
       // Make expiry time 16 days from now.
       const expiryTime = new Date(Date.now() + 16 * 24 * 60 * 60 * 1000);
       const sspClient = this.getSspClient();
@@ -3697,6 +3706,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         encodedInvoice: invoice,
         amountSats: isZeroAmountInvoice ? amountSatsToSend! : undefined,
       });
+      console.log("payLightningInvoice: feeEstimate", feeEstimate);
 
       if (maxFeeSats < feeEstimate) {
         throw new ValidationError("maxFeeSats does not cover fee estimate", {
@@ -3720,11 +3730,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       const selectedLeaves = (await this.selectLeaves([totalAmount])).get(
         totalAmount,
       )!;
+      console.log("payLightningInvoice: selectedLeaves.length", selectedLeaves.length);
+      
       let leaves = this.popOrThrow(
         selectedLeaves,
         `no leaves for ${totalAmount}`,
       );
       leaves = await this.checkRenewLeaves(leaves);
+      console.log("payLightningInvoice: checkRenewLeaves done leaves.length", leaves.length);
 
       const leavesToSend: LeafKeyTweak[] = await Promise.all(
         leaves.map(async (leaf) => ({
@@ -3738,6 +3751,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           },
         })),
       );
+      console.log("payLightningInvoice: leavesToSend.length", leavesToSend.length);
 
       const transferID = uuidv7();
 
@@ -3749,7 +3763,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           expiryTime,
           transferID,
         );
-
+      console.log("payLightningInvoice: startTransferRequest.transferId", startTransferRequest.transferId);
+      
       const swapResponse = await this.lightningService.swapNodesForPreimage({
         leaves: leavesToSend,
         receiverIdentityPubkey: hexToBytes(
@@ -3764,6 +3779,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         expiryTime,
         transferID,
       });
+      console.log("payLightningInvoice: swapResponse.transfer.id", swapResponse.transfer?.id);
 
       if (!swapResponse.transfer) {
         throw new Error("Failed to swap nodes for preimage");
@@ -3774,6 +3790,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         amountSats: isZeroAmountInvoice ? amountSatsToSend! : undefined,
         userOutboundTransferExternalId: swapResponse.transfer.id,
       });
+      console.log("payLightningInvoice: sspResponse.encodedInvoice", sspResponse.encodedInvoice);
 
       if (!sspResponse) {
         throw new Error("Failed to contact SSP");

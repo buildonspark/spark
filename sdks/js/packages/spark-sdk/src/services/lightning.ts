@@ -78,12 +78,14 @@ export class LightningService {
     receiverIdentityPubkey,
     descriptionHash,
   }: CreateLightningInvoiceParams): Promise<LightningReceiveRequest> {
+    console.log("lightningService.createLightningInvoice");
     const crypto = getCrypto();
     const randBytes = crypto.getRandomValues(new Uint8Array(32));
     const preimage = numberToBytesBE(
       bytesToNumberBE(randBytes) % secp256k1.CURVE.n,
       32,
     );
+    console.log("lightningService.createLightningInvoice: got preimage");
     return await this.createLightningInvoiceWithPreImage({
       invoiceCreator,
       amountSats,
