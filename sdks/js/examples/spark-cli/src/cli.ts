@@ -332,6 +332,7 @@ const commands = [
   "createhtlc",
   "claimhtlc",
   "queryhtlc",
+  "gethtlcpreimage",
   "createhtlcsenderspendtx",
   "createhtlcreceiverspendtx",
   "sendtransfer",
@@ -650,6 +651,7 @@ async function runCLI() {
   createhtlc <receiverSparkAddress> <amountSats> <expiryTimeMinutes> <preimage> - Create a HTLC
   claimhtlc <preimage>                                                - Claim a HTLC
   queryhtlc <paymentHashes> <status> <transferIds> <matchRole>        - Query a HTLC
+  getHTLCPreimage <transferID>                                        - Get the preimage for a HTLC
   createhtlcsenderspendtx <htlcTx> <sequence> <hash> <hashLockDestinationPubkey> <sequenceLockDestinationPubkey> <satsPerVbyteFee> - Create a sender spend transaction for a HTLC
   createhtlcreceiverspendtx <htlcTx> <hash> <hashLockDestinationPubkey> <sequenceLockDestinationPubkey> <preimage> <satsPerVbyteFee> - Create a receiver spend transaction for a HTLC
   sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
@@ -1369,6 +1371,14 @@ async function runCLI() {
           }
           const htlc = await wallet.claimHTLC(args[0]);
           console.log(htlc);
+          break;
+        case "gethtlcpreimage":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          const preimage = await wallet.getHTLCPreimage(args[0]);
+          console.log(bytesToHex(preimage));
           break;
         case "queryhtlc":
           if (!wallet) {
