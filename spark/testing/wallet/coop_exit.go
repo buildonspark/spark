@@ -18,7 +18,6 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
-
 // GetConnectorRefundSignaturesV2 asks the coordinator to sign refund
 // transactions for leaves, spending connector outputs.
 // This version takes a client parameter and uses DeliverTransferPackage.
