@@ -826,16 +826,6 @@ func main() {
 		logger.Error("Shutting down due to error...")
 	}
 
-	logger.Info("Stopping gRPC server...")
-	grpcServer.GracefulStop()
-	if grpcListener != nil {
-		err = grpcListener.Close()
-		if err != nil {
-			logger.Error("Failed to close gRPC listener", zap.Error(err))
-		}
-	}
-	logger.Info("gRPC server stopped")
-
 	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownRelease()
 
@@ -845,6 +835,16 @@ func main() {
 	} else {
 		logger.Info("HTTP server stopped")
 	}
+
+	logger.Info("Stopping gRPC server...")
+	grpcServer.GracefulStop()
+	if grpcListener != nil {
+		err = grpcListener.Close()
+		if err != nil {
+			logger.Error("Failed to close gRPC listener", zap.Error(err))
+		}
+	}
+	logger.Info("gRPC server stopped")
 
 	if pprofServer != nil {
 		logger.Info("Stopping profiling server...")
