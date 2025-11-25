@@ -7,6 +7,7 @@ import (
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/utils"
@@ -37,6 +38,16 @@ func (h *BroadcastTokenHandler) BroadcastTokenTransaction(
 	knobService := knobs.GetKnobsService(ctx)
 	if knobService != nil && !knobService.RolloutRandom(knobs.KnobTokenTransactionV3Enabled, 0) {
 		return nil, status.Error(codes.Unimplemented, "BroadcastTokenTransaction is not enabled")
+	}
+
+	partial := req.GetPartialTokenTransaction()
+	if partial == nil {
+		return nil, status.Error(codes.InvalidArgument, "partial token transaction is required")
+	}
+	if partial.GetVersion() < 3 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(
+			fmt.Errorf("broadcast transaction requires version 3+ partial token transaction, got %d", partial.GetVersion()),
+		)
 	}
 
 	startReq, err := protoconverter.ConvertBroadcastToStart(req)
