@@ -8,7 +8,20 @@ export {
   UnsafeStatelessSparkSigner,
   type SparkSigner,
 } from "./signer/signer.js";
-export * from "./signer/types.js";
+export {
+  type SigningCommitmentWithOptionalNonce,
+  type SigningNonce,
+  type SigningCommitment,
+  type KeyDerivationType,
+  type KeyDerivation,
+  type SignFrostParams,
+  type AggregateFrostParams,
+  type SplitSecretWithProofsParams,
+  type DerivedHDKey,
+  type KeyPair,
+  type SubtractSplitAndEncryptParams,
+  type SubtractSplitAndEncryptResult,
+} from "./signer/types.js";
 
 export { type IKeyPackage, type DummyTx } from "./spark-bindings/types.js";
 export * from "./spark-wallet/types.js";
