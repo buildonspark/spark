@@ -986,9 +986,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     } as const;
     const senderPublicKey = senderSparkAddress
       ? hexToBytes(
-          decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
-            .identityPublicKey,
-        )
+        decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
+          .identityPublicKey,
+      )
       : undefined;
     const invoiceFields = {
       version: 1,
@@ -1064,9 +1064,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     } as const;
     const senderPublicKey = senderSparkAddress
       ? hexToBytes(
-          decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
-            .identityPublicKey,
-        )
+        decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
+          .identityPublicKey,
+      )
       : undefined;
     const invoiceFields = {
       version: 1,
@@ -3380,13 +3380,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       if (
         transfer.status !== TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED &&
         transfer.status !==
-          TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED &&
+        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED &&
         transfer.status !==
-          TransferStatus.TRANSFER_STATUS_RECEIVER_REFUND_SIGNED &&
+        TransferStatus.TRANSFER_STATUS_RECEIVER_REFUND_SIGNED &&
         transfer.status !==
-          TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED &&
+        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED &&
         transfer.status !==
-          TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED
+        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED
       ) {
         continue;
       }
@@ -3867,17 +3867,17 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       await this.syncTokenOutputs();
       const tokenTransferTasks: Promise<
         | {
-            ok: true;
-            tokenIdentifier: Bech32mTokenIdentifier;
-            invoices: SparkAddressFormat[];
-            txid: string;
-          }
+          ok: true;
+          tokenIdentifier: Bech32mTokenIdentifier;
+          invoices: SparkAddressFormat[];
+          txid: string;
+        }
         | {
-            ok: false;
-            tokenIdentifier: Bech32mTokenIdentifier;
-            invoices: SparkAddressFormat[];
-            error: Error;
-          }
+          ok: false;
+          tokenIdentifier: Bech32mTokenIdentifier;
+          invoices: SparkAddressFormat[];
+          error: Error;
+        }
       >[] = [];
       for (const [identifierHex, decodedInvoices] of tokenInvoices.entries()) {
         const tokenIdentifier = hexToBytes(identifierHex);
@@ -4377,11 +4377,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     if (deductFeeFromWithdrawalAmount) {
       leavesToSendToSsp = targetAmountSats
         ? this.popOrThrow(
-            (await this.selectLeaves([targetAmountSats])).get(
-              targetAmountSats,
-            )!,
-            `no leaves for ${targetAmountSats}`,
-          )
+          (await this.selectLeaves([targetAmountSats])).get(
+            targetAmountSats,
+          )!,
+          `no leaves for ${targetAmountSats}`,
         )
         : this.leaves;
 
@@ -5518,8 +5517,8 @@ type SparkWalletFunctionKeys = Extract<
     [K in keyof SparkWallet]: SparkWallet[K] extends (
       ...args: any[]
     ) => PromiseLike<unknown>
-      ? K
-      : never;
+    ? K
+    : never;
   }[keyof SparkWallet],
   string
 >;
