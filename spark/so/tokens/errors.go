@@ -82,7 +82,7 @@ func FormatErrorWithTransactionEnt(msg string, tokenTransaction *ent.TokenTransa
 		err)
 }
 
-func formatTokenTransactionHashes(tokenTransaction *tokenpb.TokenTransaction) string {
+func FormatTokenTransactionHashes(tokenTransaction *tokenpb.TokenTransaction) string {
 	if tokenTransaction == nil {
 		return "transaction: <nil>"
 	}
@@ -105,7 +105,7 @@ func formatTokenTransactionHashes(tokenTransaction *tokenpb.TokenTransaction) st
 }
 
 func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.TokenTransaction, err error) error {
-	formatted := formatTokenTransactionHashes(tokenTransaction)
+	formatted := FormatTokenTransactionHashes(tokenTransaction)
 	if err != nil {
 		return fmt.Errorf("%s %s: %w", msg, formatted, err)
 	}
@@ -113,7 +113,7 @@ func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.Token
 }
 
 func FormatErrorWithTransactionHashAndSpentOutputs(msg string, tokenTransaction *tokenpb.TokenTransaction, err error) error {
-	formatted := formatTokenTransactionHashes(tokenTransaction)
+	formatted := FormatTokenTransactionHashes(tokenTransaction)
 	txType, inferTxTypeErr := utils.InferTokenTransactionType(tokenTransaction)
 	if inferTxTypeErr != nil {
 		return fmt.Errorf("Error inferring token txType for error format: %w, original err: %s %s: %w", inferTxTypeErr, msg, formatted, err)
@@ -143,7 +143,7 @@ func FormatErrorWithTransactionHashAndSpentOutputs(msg string, tokenTransaction 
 }
 
 func FormatErrorWithTransactionProtoAndSparkInvoice(msg string, tokenTransaction *tokenpb.TokenTransaction, sparkInvoice string, err error) error {
-	formatted := formatTokenTransactionHashes(tokenTransaction)
+	formatted := FormatTokenTransactionHashes(tokenTransaction)
 	if err != nil {
 		return fmt.Errorf("%s %s, spark invoice: %s: %w", msg, formatted, sparkInvoice, err)
 	}
