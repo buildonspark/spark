@@ -1,7 +1,7 @@
 import type { Transaction } from "@scure/btc-signer";
 import {
-  OutputWithPreviousTransactionData,
   TokenMetadata,
+  OutputWithPreviousTransactionData,
 } from "../proto/spark_token.js";
 import { ConfigOptions } from "../services/wallet-config.js";
 import type { SparkSigner } from "../signer/signer.js";

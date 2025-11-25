@@ -7,6 +7,8 @@ import {
   TokenTransaction,
   TokenTransactionType,
   InvoiceAttachment,
+  PartialTokenTransaction,
+  FinalTokenTransaction,
 } from "../proto/spark_token.js";
 import { createProtoHasher } from "../spark-wallet/proto-hash.js";
 
@@ -1088,7 +1090,7 @@ function inferTokenTransactionType(
   }
 }
 
-function sortInvoiceAttachments(
+export function sortInvoiceAttachments(
   attachments: InvoiceAttachment[] | undefined,
 ): InvoiceAttachment[] | undefined {
   if (!attachments || attachments.length === 0) {
@@ -1164,18 +1166,13 @@ export async function hashTokenTransactionV3(
 
   const hasher = createProtoHasher();
 
-  // Always sort invoice attachments for deterministic hashing
-  const sortedInvoices = sortInvoiceAttachments(
-    tokenTransaction.invoiceAttachments,
-  );
-
   if (partialHash) {
     const cloned: TokenTransaction = {
       ...tokenTransaction,
       expiryTime: undefined,
       tokenInputs: tokenTransaction.tokenInputs,
       tokenOutputs: tokenTransaction.tokenOutputs,
-      invoiceAttachments: sortedInvoices || [],
+      invoiceAttachments: tokenTransaction.invoiceAttachments || [],
     };
 
     const inputType = inferTokenTransactionType(cloned);
@@ -1224,10 +1221,44 @@ export async function hashTokenTransactionV3(
 
   const txWithSortedInvoices: TokenTransaction = {
     ...tokenTransaction,
-    invoiceAttachments: sortedInvoices || [],
+    invoiceAttachments: tokenTransaction.invoiceAttachments || [],
   };
 
   return hasher.hashProto(txWithSortedInvoices, "spark_token.TokenTransaction");
+}
+
+export async function hashPartialTokenTransaction(
+  partialTokenTransaction: PartialTokenTransaction,
+): Promise<Uint8Array> {
+  if (!partialTokenTransaction) {
+    throw new ValidationError("partial token transaction cannot be nil", {
+      field: "partialTokenTransaction",
+    });
+  }
+
+  const hasher = createProtoHasher();
+
+  return hasher.hashProto(
+    partialTokenTransaction,
+    "spark_token.PartialTokenTransaction",
+  );
+}
+
+export async function hashFinalTokenTransaction(
+  finalTokenTransaction: FinalTokenTransaction,
+): Promise<Uint8Array> {
+  if (!finalTokenTransaction) {
+    throw new ValidationError("final token transaction cannot be nil", {
+      field: "finalTokenTransaction",
+    });
+  }
+
+  const hasher = createProtoHasher();
+
+  return hasher.hashProto(
+    finalTokenTransaction,
+    "spark_token.FinalTokenTransaction",
+  );
 }
 
 export function hashOperatorSpecificTokenTransactionSignablePayload(

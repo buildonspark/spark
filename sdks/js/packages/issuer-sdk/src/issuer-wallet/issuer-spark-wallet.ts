@@ -8,7 +8,6 @@ import {
   NotImplementedError,
   SparkSigner,
   SparkWallet,
-  SparkWalletProps,
   ValidationError,
   type ConfigOptions,
 } from "@buildonspark/spark-sdk";
@@ -191,19 +190,35 @@ export abstract class IssuerSparkWallet extends SparkWallet {
 
     const issuerPublicKey = await super.getIdentityPublicKey();
 
-    const tokenTransaction =
-      await this.issuerTokenTransactionService.constructCreateTokenTransaction(
-        hexToBytes(issuerPublicKey),
-        tokenName,
-        tokenTicker,
-        decimals,
-        maxSupply,
-        isFreezable,
-      );
+    if (this.config.getTokenTransactionVersion() === "V2") {
+      const tokenTransaction =
+        await this.issuerTokenTransactionService.constructCreateTokenTransaction(
+          hexToBytes(issuerPublicKey),
+          tokenName,
+          tokenTicker,
+          decimals,
+          maxSupply,
+          isFreezable,
+        );
 
-    return await this.issuerTokenTransactionService.broadcastTokenTransaction(
-      tokenTransaction,
-    );
+      return await this.issuerTokenTransactionService.broadcastTokenTransaction(
+        tokenTransaction,
+      );
+    } else {
+      const partialTokenTransaction =
+        await this.issuerTokenTransactionService.constructPartialCreateTokenTransaction(
+          hexToBytes(issuerPublicKey),
+          tokenName,
+          tokenTicker,
+          decimals,
+          maxSupply,
+          isFreezable,
+        );
+
+      return await this.issuerTokenTransactionService.broadcastTokenTransactionV3(
+        partialTokenTransaction,
+      );
+    }
   }
 
   /**
@@ -218,16 +233,29 @@ export abstract class IssuerSparkWallet extends SparkWallet {
     const tokenMetadata = await this.getIssuerTokenMetadata();
     const rawTokenIdentifier: Uint8Array = tokenMetadata.rawTokenIdentifier;
 
-    const tokenTransaction =
-      await this.issuerTokenTransactionService.constructMintTokenTransaction(
-        rawTokenIdentifier,
-        issuerTokenPublicKeyBytes,
-        tokenAmount,
-      );
+    if (this.config.getTokenTransactionVersion() === "V2") {
+      const tokenTransaction =
+        await this.issuerTokenTransactionService.constructMintTokenTransaction(
+          rawTokenIdentifier,
+          issuerTokenPublicKeyBytes,
+          tokenAmount,
+        );
 
-    return await this.issuerTokenTransactionService.broadcastTokenTransaction(
-      tokenTransaction,
-    );
+      return await this.issuerTokenTransactionService.broadcastTokenTransaction(
+        tokenTransaction,
+      );
+    } else {
+      const partialTokenTransaction =
+        await this.issuerTokenTransactionService.constructPartialMintTokenTransaction(
+          rawTokenIdentifier,
+          issuerTokenPublicKeyBytes,
+          tokenAmount,
+        );
+
+      return await this.issuerTokenTransactionService.broadcastTokenTransactionV3(
+        partialTokenTransaction,
+      );
+    }
   }
 
   /**

@@ -137,4 +137,8 @@ export class WalletConfigService implements HasSspClientOptions {
   public getTokenOptimizationOptions(): TokenOptimizationOptions {
     return this.config.tokenOptimizationOptions;
   }
+
+  public getTokenTransactionVersion(): "V2" | "V3" {
+    return this.config.tokenTransactionVersion;
+  }
 }

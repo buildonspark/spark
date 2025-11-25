@@ -3,7 +3,10 @@ import {
   WalletConfigService,
   type BaseConnectionManager,
 } from "@buildonspark/spark-sdk";
-import { TokenTransaction } from "@buildonspark/spark-sdk/proto/spark_token";
+import {
+  PartialTokenTransaction,
+  TokenTransaction,
+} from "@buildonspark/spark-sdk/proto/spark_token";
 import { numberToBytesBE } from "@noble/curves/utils";
 
 export class IssuerTokenTransactionService extends TokenTransactionService {
@@ -44,6 +47,42 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
     };
   }
 
+  async constructPartialMintTokenTransaction(
+    rawTokenIdentifierBytes: Uint8Array,
+    issuerTokenPublicKey: Uint8Array,
+    tokenAmount: bigint,
+  ): Promise<PartialTokenTransaction> {
+    return {
+      version: 3,
+      tokenTransactionMetadata: {
+        network: this.config.getNetworkProto(),
+        sparkOperatorIdentityPublicKeys:
+          this.collectOperatorIdentityPublicKeys(),
+        validityDurationSeconds:
+          await this.config.getTokenValidityDurationSeconds(),
+        clientCreatedTimestamp: this.connectionManager.getCurrentServerTime(),
+        invoiceAttachments: [],
+      },
+      tokenInputs: {
+        $case: "mintInput",
+        mintInput: {
+          issuerPublicKey: issuerTokenPublicKey,
+          tokenIdentifier: rawTokenIdentifierBytes,
+        },
+      },
+      partialTokenOutputs: [
+        {
+          ownerPublicKey: issuerTokenPublicKey,
+          tokenIdentifier: rawTokenIdentifierBytes,
+          withdrawBondSats: this.config.getExpectedWithdrawBondSats(),
+          withdrawRelativeBlockLocktime:
+            this.config.getExpectedWithdrawRelativeBlockLocktime(),
+          tokenAmount: numberToBytesBE(tokenAmount, 16),
+        },
+      ],
+    };
+  }
+
   async constructCreateTokenTransaction(
     tokenPublicKey: Uint8Array,
     tokenName: string,
@@ -72,6 +111,40 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
         super.collectOperatorIdentityPublicKeys(),
       expiryTime: undefined,
       invoiceAttachments: [],
+    };
+  }
+
+  async constructPartialCreateTokenTransaction(
+    tokenPublicKey: Uint8Array,
+    tokenName: string,
+    tokenTicker: string,
+    decimals: number,
+    maxSupply: bigint,
+    isFreezable: boolean,
+  ): Promise<PartialTokenTransaction> {
+    return {
+      version: 3,
+      tokenTransactionMetadata: {
+        network: this.config.getNetworkProto(),
+        sparkOperatorIdentityPublicKeys:
+          this.collectOperatorIdentityPublicKeys(),
+        validityDurationSeconds:
+          await this.config.getTokenValidityDurationSeconds(),
+        clientCreatedTimestamp: this.connectionManager.getCurrentServerTime(),
+        invoiceAttachments: [],
+      },
+      tokenInputs: {
+        $case: "createInput",
+        createInput: {
+          issuerPublicKey: tokenPublicKey,
+          tokenName: tokenName,
+          tokenTicker: tokenTicker,
+          decimals: decimals,
+          maxSupply: numberToBytesBE(maxSupply, 16),
+          isFreezable: isFreezable,
+        },
+      },
+      partialTokenOutputs: [],
     };
   }
 }

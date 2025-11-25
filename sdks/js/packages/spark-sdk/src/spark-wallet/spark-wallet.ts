@@ -59,8 +59,8 @@ import {
   UtxoSwapRequestType,
 } from "../proto/spark.js";
 import {
-  OutputWithPreviousTransactionData,
   QueryTokenTransactionsResponse,
+  OutputWithPreviousTransactionData,
 } from "../proto/spark_token.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection/connection.js";

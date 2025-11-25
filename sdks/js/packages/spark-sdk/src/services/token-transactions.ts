@@ -18,6 +18,8 @@ import {
   SignatureWithIndex,
   TokenOutput,
   TokenTransaction,
+  PartialTokenTransaction,
+  PartialTokenOutput,
 } from "../proto/spark_token.js";
 import { TokenOutputsMap } from "../spark-wallet/types.js";
 import { SparkCallOptions } from "../types/grpc.js";
@@ -26,10 +28,12 @@ import {
   SparkAddressFormat,
   isValidPublicKey,
 } from "../utils/address.js";
-import { collectResponses } from "../utils/response-validation.js";
 import {
   hashOperatorSpecificTokenTransactionSignablePayload,
   hashTokenTransaction,
+  hashPartialTokenTransaction,
+  hashFinalTokenTransaction,
+  sortInvoiceAttachments,
 } from "../utils/token-hashing.js";
 import {
   Bech32mTokenIdentifier,
@@ -190,19 +194,35 @@ export class TokenTransactionService {
       };
     });
 
-    const tokenTransaction = await this.constructTransferTokenTransaction(
-      outputsToUse,
-      tokenOutputData,
-      sparkInvoices,
-    );
+    if (this.config.getTokenTransactionVersion() === "V2") {
+      const tokenTransaction = await this.constructTransferTokenTransaction(
+        outputsToUse,
+        tokenOutputData,
+        sparkInvoices,
+      );
 
-    const txId = await this.broadcastTokenTransaction(
-      tokenTransaction,
-      outputsToUse.map((output) => output.output!.ownerPublicKey),
-      outputsToUse.map((output) => output.output!.revocationCommitment!),
-    );
+      const txId = await this.broadcastTokenTransaction(
+        tokenTransaction,
+        outputsToUse.map((output) => output.output!.ownerPublicKey),
+        outputsToUse.map((output) => output.output!.revocationCommitment!),
+      );
 
-    return txId;
+      return txId;
+    } else {
+      const partialTokenTransaction =
+        await this.constructPartialTransferTokenTransaction(
+          outputsToUse,
+          tokenOutputData,
+          sparkInvoices,
+        );
+
+      const txId = await this.broadcastTokenTransactionV3(
+        partialTokenTransaction,
+        outputsToUse.map((output) => output.output!.ownerPublicKey),
+      );
+
+      return txId;
+    }
   }
 
   public async constructTransferTokenTransaction(
@@ -243,6 +263,12 @@ export class TokenTransactionService {
       });
     }
 
+    const sortedInvoiceAttachments = sparkInvoices
+      ? sortInvoiceAttachments(
+          sparkInvoices.map((invoice) => ({ sparkInvoice: invoice })),
+        )
+      : [];
+
     return {
       version: 2,
       network: this.config.getNetworkProto(),
@@ -259,9 +285,81 @@ export class TokenTransactionService {
       sparkOperatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
       expiryTime: undefined,
       clientCreatedTimestamp: this.connectionManager.getCurrentServerTime(),
-      invoiceAttachments: sparkInvoices
-        ? sparkInvoices.map((invoice) => ({ sparkInvoice: invoice }))
-        : [],
+      invoiceAttachments: sortedInvoiceAttachments!,
+    };
+  }
+
+  public async constructPartialTransferTokenTransaction(
+    selectedOutputs: OutputWithPreviousTransactionData[],
+    tokenOutputData: Array<{
+      receiverPublicKey: Uint8Array;
+      rawTokenIdentifier: Uint8Array;
+      tokenAmount: bigint;
+    }>,
+    sparkInvoices?: SparkAddressFormat[],
+  ): Promise<PartialTokenTransaction> {
+    selectedOutputs.sort(
+      (a, b) => a.previousTransactionVout - b.previousTransactionVout,
+    );
+
+    const availableTokenAmount = sumAvailableTokens(selectedOutputs);
+    const totalRequestedAmount = tokenOutputData.reduce(
+      (sum, output) => sum + output.tokenAmount,
+      0n,
+    );
+
+    const partialTokenOutputs: PartialTokenOutput[] = tokenOutputData.map(
+      (output): PartialTokenOutput => ({
+        ownerPublicKey: output.receiverPublicKey,
+        tokenIdentifier: output.rawTokenIdentifier,
+        withdrawBondSats: this.config.getExpectedWithdrawBondSats(),
+        withdrawRelativeBlockLocktime:
+          this.config.getExpectedWithdrawRelativeBlockLocktime(),
+        tokenAmount: numberToBytesBE(output.tokenAmount, 16),
+      }),
+    );
+
+    if (availableTokenAmount > totalRequestedAmount) {
+      const changeAmount = availableTokenAmount - totalRequestedAmount;
+      const firstTokenIdentifierBytes = tokenOutputData[0]!!.rawTokenIdentifier;
+
+      partialTokenOutputs.push({
+        ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
+        tokenIdentifier: firstTokenIdentifierBytes,
+        withdrawBondSats: this.config.getExpectedWithdrawBondSats(),
+        withdrawRelativeBlockLocktime:
+          this.config.getExpectedWithdrawRelativeBlockLocktime(),
+        tokenAmount: numberToBytesBE(changeAmount, 16),
+      });
+    }
+
+    const sortedInvoiceAttachments = sparkInvoices
+      ? sortInvoiceAttachments(
+          sparkInvoices.map((invoice) => ({ sparkInvoice: invoice })),
+        )
+      : [];
+
+    return {
+      version: 3,
+      tokenTransactionMetadata: {
+        network: this.config.getNetworkProto(),
+        sparkOperatorIdentityPublicKeys:
+          this.collectOperatorIdentityPublicKeys(),
+        validityDurationSeconds:
+          await this.config.getTokenValidityDurationSeconds(),
+        clientCreatedTimestamp: this.connectionManager.getCurrentServerTime(),
+        invoiceAttachments: sortedInvoiceAttachments!,
+      },
+      tokenInputs: {
+        $case: "transferInput",
+        transferInput: {
+          outputsToSpend: selectedOutputs.map((output) => ({
+            prevTokenTransactionHash: output.previousTransactionHash,
+            prevTokenTransactionVout: output.previousTransactionVout,
+          })),
+        },
+      },
+      partialTokenOutputs,
     };
   }
 
@@ -272,6 +370,16 @@ export class TokenTransactionService {
     )) {
       operatorKeys.push(hexToBytes(operator.identityPublicKey));
     }
+
+    operatorKeys.sort((a, b) => {
+      const minLength = Math.min(a.length, b.length);
+      for (let i = 0; i < minLength; i++) {
+        if (a[i] !== b[i]) {
+          return a[i]! - b[i]!;
+        }
+      }
+      return a.length - b.length;
+    });
 
     return operatorKeys;
   }
@@ -298,6 +406,111 @@ export class TokenTransactionService {
     );
 
     return bytesToHex(finalTokenTransactionHash);
+  }
+
+  public async broadcastTokenTransactionV3(
+    partialTokenTransaction: PartialTokenTransaction,
+    outputsToSpendSigningPublicKeys?: Uint8Array[],
+  ): Promise<string> {
+    const sparkClient = await this.connectionManager.createSparkTokenClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    const partialTokenTransactionHash = await hashPartialTokenTransaction(
+      partialTokenTransaction,
+    );
+
+    const ownerSignaturesWithIndex: SignatureWithIndex[] = [];
+
+    if (partialTokenTransaction.tokenInputs?.$case === "mintInput") {
+      const ownerPubkey =
+        partialTokenTransaction.partialTokenOutputs[0]?.ownerPublicKey;
+      if (!ownerPubkey) {
+        throw new ValidationError("Invalid mint input", {
+          field: "ownerPubkey",
+          value: null,
+          expected: "Non-null ownerPubkey",
+        });
+      }
+
+      const ownerSignature = await this.signMessageWithKey(
+        partialTokenTransactionHash,
+        ownerPubkey,
+      );
+
+      ownerSignaturesWithIndex.push({
+        signature: ownerSignature,
+        inputIndex: 0,
+      });
+    } else if (partialTokenTransaction.tokenInputs?.$case === "createInput") {
+      const issuerPublicKey =
+        partialTokenTransaction.tokenInputs.createInput.issuerPublicKey;
+      if (!issuerPublicKey) {
+        throw new ValidationError("Invalid create input", {
+          field: "issuerPublicKey",
+          value: null,
+          expected: "Non-null issuer public key",
+        });
+      }
+
+      const ownerSignature = await this.signMessageWithKey(
+        partialTokenTransactionHash,
+        issuerPublicKey,
+      );
+
+      ownerSignaturesWithIndex.push({
+        signature: ownerSignature,
+        inputIndex: 0,
+      });
+    } else if (partialTokenTransaction.tokenInputs?.$case === "transferInput") {
+      if (!outputsToSpendSigningPublicKeys) {
+        throw new ValidationError("Invalid transfer input", {
+          field: "outputsToSpend",
+          value: {
+            signingPublicKeys: outputsToSpendSigningPublicKeys,
+          },
+          expected: "Non-null signing public keys",
+        });
+      }
+
+      for (const [i, key] of outputsToSpendSigningPublicKeys.entries()) {
+        if (!key) {
+          throw new ValidationError("Invalid signing key", {
+            field: "outputsToSpendSigningPublicKeys",
+            value: i,
+            expected: "Non-null signing key",
+          });
+        }
+        const ownerSignature = await this.signMessageWithKey(
+          partialTokenTransactionHash,
+          key,
+        );
+
+        ownerSignaturesWithIndex.push({
+          signature: ownerSignature,
+          inputIndex: i,
+        });
+      }
+    }
+
+    const broadcastResponse = await sparkClient.broadcast_transaction(
+      {
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        partialTokenTransaction,
+        tokenTransactionOwnerSignatures: ownerSignaturesWithIndex,
+      },
+      {
+        retry: true,
+        retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED", "INTERNAL"],
+        retryMaxAttempts: 3,
+      } as SparkCallOptions,
+    );
+
+    const finalHash = await hashFinalTokenTransaction(
+      broadcastResponse.finalTokenTransaction!,
+    );
+
+    return bytesToHex(finalHash);
   }
 
   private async startTokenTransaction(

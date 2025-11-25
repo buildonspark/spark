@@ -132,6 +132,7 @@ export type ConfigOptions = MayHaveSspClientOptions & {
   readonly events?: Partial<SparkWalletEvents>;
   readonly optimizationOptions?: OptimizationOptions;
   readonly tokenOptimizationOptions?: TokenOptimizationOptions;
+  readonly tokenTransactionVersion?: "V2" | "V3";
 };
 
 const PROD_PUBKEYS = [
@@ -175,6 +176,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
     intervalMs: 300000, // 5 minutes
     minOutputsThreshold: 50,
   },
+  tokenTransactionVersion: "V2",
 };
 
 const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
