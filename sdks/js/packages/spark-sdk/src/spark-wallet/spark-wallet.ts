@@ -3790,7 +3790,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         amountSats: isZeroAmountInvoice ? amountSatsToSend! : undefined,
         userOutboundTransferExternalId: swapResponse.transfer.id,
       });
-      console.log("payLightningInvoice: sspResponse.encodedInvoice", sspResponse.encodedInvoice);
+      console.log("payLightningInvoice: sspResponse.encodedInvoice", sspResponse?.encodedInvoice);
 
       if (!sspResponse) {
         throw new Error("Failed to contact SSP");
