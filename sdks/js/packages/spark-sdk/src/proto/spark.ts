@@ -1703,7 +1703,10 @@ export interface PreimageRequestWithTransfer {
     | Transfer
     | undefined;
   /** Preimage data (if available) */
-  preimage?: Uint8Array | undefined;
+  preimage?:
+    | Uint8Array
+    | undefined;
+  /** The identity public key of the sender can potentially be null for old preimage requests. */
   senderIdentityPubkey: Uint8Array;
 }
 

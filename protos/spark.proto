@@ -1221,7 +1221,8 @@ message PreimageRequestWithTransfer {
 
     // Preimage data (if available)
     optional bytes preimage = 6;
-    bytes sender_identity_pubkey = 7 [(validate.rules).bytes.len = 33];
+    // The identity public key of the sender can potentially be null for old preimage requests.
+    bytes sender_identity_pubkey = 7;
 }
 
 message QueryHtlcRequest {

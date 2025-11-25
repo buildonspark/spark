@@ -7800,7 +7800,8 @@ type PreimageRequestWithTransfer struct {
 	// Associated transfer (if exists)
 	Transfer *Transfer `protobuf:"bytes,5,opt,name=transfer,proto3,oneof" json:"transfer,omitempty"`
 	// Preimage data (if available)
-	Preimage             []byte `protobuf:"bytes,6,opt,name=preimage,proto3,oneof" json:"preimage,omitempty"`
+	Preimage []byte `protobuf:"bytes,6,opt,name=preimage,proto3,oneof" json:"preimage,omitempty"`
+	// The identity public key of the sender can potentially be null for old preimage requests.
 	SenderIdentityPubkey []byte `protobuf:"bytes,7,opt,name=sender_identity_pubkey,json=senderIdentityPubkey,proto3" json:"sender_identity_pubkey,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
@@ -11346,15 +11347,15 @@ const file_spark_proto_rawDesc = "" +
 	"\x13identity_public_key\x18\x02 \x01(\fR\x11identityPublicKey\"\x9c\x01\n" +
 	"\x1eQueryUserSignedRefundsResponse\x12G\n" +
 	"\x13user_signed_refunds\x18\x01 \x03(\v2\x17.spark.UserSignedRefundR\x11userSignedRefunds\x12+\n" +
-	"\btransfer\x18\x03 \x01(\v2\x0f.spark.TransferR\btransferJ\x04\b\x02\x10\x03\"\xad\x03\n" +
+	"\btransfer\x18\x03 \x01(\v2\x0f.spark.TransferR\btransferJ\x04\b\x02\x10\x03\"\xa4\x03\n" +
 	"\x1bPreimageRequestWithTransfer\x12*\n" +
 	"\fpayment_hash\x18\x01 \x01(\fB\a\xfaB\x04z\x02h R\vpaymentHash\x12A\n" +
 	"\x18receiver_identity_pubkey\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x16receiverIdentityPubkey\x124\n" +
 	"\x06status\x18\x03 \x01(\x0e2\x1c.spark.PreimageRequestStatusR\x06status\x12=\n" +
 	"\fcreated_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\vcreatedTime\x120\n" +
 	"\btransfer\x18\x05 \x01(\v2\x0f.spark.TransferH\x00R\btransfer\x88\x01\x01\x12\x1f\n" +
-	"\bpreimage\x18\x06 \x01(\fH\x01R\bpreimage\x88\x01\x01\x12=\n" +
-	"\x16sender_identity_pubkey\x18\a \x01(\fB\a\xfaB\x04z\x02h!R\x14senderIdentityPubkeyB\v\n" +
+	"\bpreimage\x18\x06 \x01(\fH\x01R\bpreimage\x88\x01\x01\x124\n" +
+	"\x16sender_identity_pubkey\x18\a \x01(\fR\x14senderIdentityPubkeyB\v\n" +
 	"\t_transferB\v\n" +
 	"\t_preimage\"\xc4\x02\n" +
 	"\x10QueryHtlcRequest\x12%\n" +

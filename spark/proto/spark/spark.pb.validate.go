@@ -16588,16 +16588,7 @@ func (m *PreimageRequestWithTransfer) validate(all bool) error {
 		}
 	}
 
-	if len(m.GetSenderIdentityPubkey()) != 33 {
-		err := PreimageRequestWithTransferValidationError{
-			field:  "SenderIdentityPubkey",
-			reason: "value length must be 33 bytes",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
+	// no validation rules for SenderIdentityPubkey
 
 	if m.Transfer != nil {
 
