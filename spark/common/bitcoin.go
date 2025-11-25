@@ -356,7 +356,7 @@ func SigHashFromMultiPrevOutTx(tx *wire.MsgTx, inputIndex int, prevOutputs map[w
 	return sigHash, nil
 }
 
-// UpdateTxWithSignature verifies the signature and update the transaction with the signature.
+// UpdateTxWithSignature applies the signature to the transaction.
 // Callsites should verify the signature using `VerifySignature` after calling this function.
 func UpdateTxWithSignature(rawTxBytes []byte, vin int, signature []byte) ([]byte, error) {
 	tx, err := TxFromRawTxBytes(rawTxBytes)
