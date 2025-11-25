@@ -433,7 +433,6 @@ func RunDKGIfNeeded(ctx context.Context, config *so.Config) error {
 	count, err := db.SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(st.KeyshareStatusAvailable),
 		signingkeyshare.CoordinatorIndexEQ(config.Index),
-		signingkeyshare.IDGT(uuid.MustParse("01954639-8d50-7e47-b3f0-ddb307fab7c2")),
 	).Count(ctx)
 	if err != nil {
 		return err
