@@ -36,6 +36,7 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	tokenslogging "github.com/lightsparkdev/spark/so/tokens"
+	transferHelper "github.com/lightsparkdev/spark/so/transfer"
 )
 
 var (
@@ -472,6 +473,9 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					query := tx.UtxoSwap.Query().
 						Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
 						Where(utxoswap.CoordinatorIdentityPublicKeyEQ(config.IdentityPublicKey())).
+						// Only try to auto complete utxo swaps older than 300 seconds
+						// allowing the core flow to complete the utxo swap first.
+						Where(utxoswap.CreateTimeLT(time.Now().Add(-5 * time.Minute))).
 						Order(utxoswap.ByCreateTime(sql.OrderDesc())).
 						Limit(100)
 
@@ -490,7 +494,14 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							logger.Sugar().Debugf("No transfer found for a non-refund utxo swap %s", utxoSwap.ID)
 							continue
 						}
-						if utxoSwap.RequestType == st.UtxoSwapRequestTypeRefund || dbTransfer.Status == st.TransferStatusCompleted {
+
+						// If the utxo swap is a refund or the transfer is sent, mark the utxo swap as completed.
+						// Generally, if utxo swap has a transfer, then it means the transfer is sent,
+						// we just double check that it was not accidentally cancelled.
+						// Checking if the transfer is Completed is not enough because the
+						// transfer can be not yet claimed by the user, but utxo swap is
+						// completed as far as the SE is concerned.
+						if utxoSwap.RequestType == st.UtxoSwapRequestTypeRefund || transferHelper.IsTransferSent(dbTransfer) {
 							logger.Sugar().Debugf("Marking utxo swap %s as completed", utxoSwap.ID)
 
 							utxo, err := utxoSwap.QueryUtxo().Only(ctx)
