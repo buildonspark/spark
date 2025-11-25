@@ -85,7 +85,7 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 		return nil, fmt.Errorf("failed to get network for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 	}
 
-	if nodeTree.Status != st.TreeStatusAvailable {
+	if nodeTree.Status == st.TreeStatusPending {
 		for _, nodeSignatures := range req.NodeSignatures {
 			nodeID, err := uuid.Parse(nodeSignatures.NodeId)
 			if err != nil {
