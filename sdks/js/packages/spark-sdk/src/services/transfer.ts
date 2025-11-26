@@ -15,9 +15,14 @@ import {
   ClaimLeafKeyTweak,
   ClaimTransferSignRefundsResponse,
   CounterLeafSwapResponse,
+  GetSigningCommitmentsResponse,
+  InitiatePreimageSwapResponse,
   LeafRefundTxSigningJob,
   LeafRefundTxSigningResult,
   NodeSignatures,
+  PreimageRequestRole,
+  ProvidePreimageResponse,
+  QueryHtlcResponse,
   QueryTransfersResponse,
   RenewNodeZeroTimelockSigningJob,
   RenewRefundTimelockSigningJob,
@@ -1909,5 +1914,156 @@ export class TransferService extends BaseTransferService {
     });
 
     return signingJobs;
+  }
+
+  async createHTLC(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    paymentHash: Uint8Array,
+  ): Promise<Transfer> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    // Get signing commitments for all transaction types in one coordinated call
+    let signingCommitments: GetSigningCommitmentsResponse;
+    try {
+      signingCommitments = await sparkClient.get_signing_commitments({
+        nodeIds: leaves.map((leaf) => leaf.leaf.id),
+        count: 3,
+      });
+    } catch (error) {
+      throw new NetworkError(
+        "Failed to get signing commitments",
+        {
+          operation: "get_signing_commitments",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error as Error,
+      );
+    }
+
+    const {
+      cpfpLeafSigningJobs,
+    } = await this.signingService.signRefunds(
+      leaves,
+      receiverIdentityPubkey,
+      signingCommitments.signingCommitments.slice(0, leaves.length),
+      signingCommitments.signingCommitments.slice(
+        leaves.length,
+        2 * leaves.length,
+      ),
+      signingCommitments.signingCommitments.slice(2 * leaves.length),
+    );
+
+    const transferID = uuidv7();
+
+    let response: InitiatePreimageSwapResponse;
+
+    let value = 0;
+
+    for (const leaf of leaves) {
+      value += leaf.leaf.value;
+    }
+
+    try {
+      response = await sparkClient.initiate_preimage_swap_v3({
+        paymentHash: paymentHash,
+        transfer: {
+          transferId: transferID,
+          leavesToSend: cpfpLeafSigningJobs,
+          receiverIdentityPublicKey: receiverIdentityPubkey,
+          ownerIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey()
+        },
+        receiverIdentityPublicKey: receiverIdentityPubkey,
+        invoiceAmount: {
+          valueSats: value
+        }
+      });
+    } catch (error) {
+      throw new NetworkError(
+        "Failed to initiate preimage swap",
+        {
+          method: "POST",
+        },
+        error as Error,
+      );
+    }
+
+    if (!response.transfer) {
+      throw new ValidationError("No transfer response from operator");
+    }
+
+    return response.transfer;
+  }
+
+  async queryHTLCs(paymentHashes: Uint8Array[], offset?: number) {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    let response: QueryHtlcResponse;
+
+    try {
+      response = await sparkClient.query_htlc({
+        paymentHashes,
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        matchRole: PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER, // ?
+        limit: 100,
+        offset: offset
+      });
+    } catch (error) {
+      throw new NetworkError(
+        "Failed to query htlc",
+        {
+          method: "POST",
+        },
+        error as Error,
+      );
+    }
+
+    return response.preimageRequests;
+  }
+
+  async claimHTLC(preimage: Uint8Array): Promise<Transfer> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    const paymentHash = sha256(preimage);
+
+    let response: ProvidePreimageResponse;
+
+    try {
+      response = await sparkClient.provide_preimage({
+        preimage,
+        paymentHash,
+        identityPublicKey: await this.config.signer.getIdentityPublicKey()
+      });
+    } catch (error) {
+      throw new NetworkError(
+        "Failed to provide preimage",
+        {
+          method: "POST",
+        },
+        error as Error,
+      );
+    }
+
+    if (!response.transfer) {
+      throw new ValidationError("No transfer response from operator");
+    }
+
+    return response.transfer;
+  }
+
+  generateRandomPreimage(): Uint8Array {
+    const preimage = new Uint8Array(32);
+    
+    crypto.getRandomValues(preimage);
+
+    return preimage;
   }
 }

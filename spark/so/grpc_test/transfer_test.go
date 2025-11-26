@@ -91,6 +91,102 @@ func TestTransfer(t *testing.T) {
 	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
 }
 
+func TestHTLC(t *testing.T) {
+	// Sender initiates transfer
+	senderConfig := wallet.NewTestWalletConfig(t)
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	receiverPrivKey := keys.GeneratePrivateKey()
+
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}
+	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(senderConfig.CoordinatorAddress(), nil)
+	require.NoError(t, err, "failed to create grpc connection")
+	defer conn.Close()
+
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
+	require.NoError(t, err, "failed to authenticate sender")
+	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
+
+	preimage := []byte("test_payment_hash_32_bytes_long_")
+	paymentHash := sha256.Sum256(preimage)
+
+	// Create the HTLC.
+	transfer, err := wallet.InitiatePreimageSwapV3(
+		senderCtx,
+		senderConfig,
+		leavesToTransfer[:],
+		receiverPrivKey.Public(),
+		paymentHash[:],
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err)
+
+	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
+	require.NoError(t, err, "failed to create wallet config")
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+
+	// Claim the HTLC.
+	_, err = wallet.ProvidePreimage(receiverCtx, receiverConfig, preimage)
+	require.NoError(t, err)
+
+	// Sender delivers the transfer package.
+	_, err = wallet.DeliverTransferPackage(
+		senderCtx,
+		senderConfig,
+		transfer,
+		leavesToTransfer[:],
+		nil,
+	)
+	require.NoError(t, err)
+
+	// Receiver queries the transfer.
+	pendingTransfers, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err)
+	require.Len(t, pendingTransfers.Transfers, 1)
+	receiverTransfer := pendingTransfers.Transfers[0]
+
+	// Decrypt the transferred private key.
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
+	require.NoError(t, err)
+	require.Len(t, leafPrivKeyMap, 1)
+
+	// Get the transferred private key for the leaf.
+	transferredPrivKey, ok := leafPrivKeyMap[receiverTransfer.Leaves[0].Leaf.Id]
+	require.True(t, ok, "expected to find private key for leaf")
+
+	newLeafPrivKey = keys.GeneratePrivateKey()
+
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    transferredPrivKey, // Use the decrypted transferred key
+		NewSigningPrivKey: newLeafPrivKey,
+	}
+
+	claimedNodes, err := wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		receiverConfig,
+		[]wallet.LeafKeyTweak{claimingNode},
+	)
+
+	require.NoError(t, err)
+	require.Len(t, claimedNodes, 1)
+	require.Equal(t, uint64(amountSatsToSend), claimedNodes[0].Value)
+
+	t.Logf("Receiver successfully claimed %d sats", claimedNodes[0].Value)
+}
+
 func TestQueryPendingTransferByNetwork(t *testing.T) {
 	senderConfig := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()

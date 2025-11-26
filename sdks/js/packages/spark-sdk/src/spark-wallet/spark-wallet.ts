@@ -986,9 +986,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     } as const;
     const senderPublicKey = senderSparkAddress
       ? hexToBytes(
-          decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
-            .identityPublicKey,
-        )
+        decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
+          .identityPublicKey,
+      )
       : undefined;
     const invoiceFields = {
       version: 1,
@@ -1064,9 +1064,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     } as const;
     const senderPublicKey = senderSparkAddress
       ? hexToBytes(
-          decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
-            .identityPublicKey,
-        )
+        decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
+          .identityPublicKey,
+      )
       : undefined;
     const invoiceFields = {
       version: 1,
@@ -2918,6 +2918,34 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return outcome.transfer;
   }
 
+  // Select and renew leaves for a transfer.
+  private async selectAndRenewLeaves(amountSatsArray: number[]): Promise<Map<number, TreeNode[][]>> {
+    const selectLeaves: Map<number, TreeNode[][]> =
+      await this.selectLeaves(amountSatsArray);
+
+    // Renew leaves as necessary.
+    for (const [amount, selection] of selectLeaves) {
+      for (let groupIndex = 0; groupIndex < selection.length; groupIndex++) {
+        const group = selection[groupIndex];
+        if (!group) {
+          throw new ValidationError(
+            `TreeNode group at index ${groupIndex} not found for amount ${amount} after selection`,
+          );
+        }
+        const available = await this.checkRenewLeaves(group);
+
+        if (available.length < group.length) {
+          throw new Error(
+            `Not enough available nodes after refresh/extend. Expected ${group.length}, got ${available.length}`,
+          );
+        }
+        selection[groupIndex] = available;
+      }
+    }
+
+    return selectLeaves;
+  }
+
   /**
    * Transfers with optional invoices.
    * Does not parse/validate invoices or enforce amount-vs-invoice.
@@ -2953,26 +2981,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     return await this.withLeaves(async () => {
       const selectLeavesToSendMap: Map<number, TreeNode[][]> =
-        await this.selectLeaves(amountSatsArray);
-
-      for (const [amount, selection] of selectLeavesToSendMap) {
-        for (let groupIndex = 0; groupIndex < selection.length; groupIndex++) {
-          const group = selection[groupIndex];
-          if (!group) {
-            throw new ValidationError(
-              `TreeNode group at index ${groupIndex} not found for amount ${amount} after selection`,
-            );
-          }
-          const available = await this.checkRenewLeaves(group);
-
-          if (available.length < group.length) {
-            throw new Error(
-              `Not enough available nodes after refresh/extend. Expected ${group.length}, got ${available.length}`,
-            );
-          }
-          selection[groupIndex] = available;
-        }
-      }
+        await this.selectAndRenewLeaves(amountSatsArray);
 
       const tweaksByAmount = this.buildTweaksByAmount(selectLeavesToSendMap);
 
@@ -3371,13 +3380,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       if (
         transfer.status !== TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED &&
         transfer.status !==
-          TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED &&
+        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED &&
         transfer.status !==
-          TransferStatus.TRANSFER_STATUS_RECEIVER_REFUND_SIGNED &&
+        TransferStatus.TRANSFER_STATUS_RECEIVER_REFUND_SIGNED &&
         transfer.status !==
-          TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED &&
+        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED &&
         transfer.status !==
-          TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED
+        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED
       ) {
         continue;
       }
@@ -3858,17 +3867,17 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       await this.syncTokenOutputs();
       const tokenTransferTasks: Promise<
         | {
-            ok: true;
-            tokenIdentifier: Bech32mTokenIdentifier;
-            invoices: SparkAddressFormat[];
-            txid: string;
-          }
+          ok: true;
+          tokenIdentifier: Bech32mTokenIdentifier;
+          invoices: SparkAddressFormat[];
+          txid: string;
+        }
         | {
-            ok: false;
-            tokenIdentifier: Bech32mTokenIdentifier;
-            invoices: SparkAddressFormat[];
-            error: Error;
-          }
+          ok: false;
+          tokenIdentifier: Bech32mTokenIdentifier;
+          invoices: SparkAddressFormat[];
+          error: Error;
+        }
       >[] = [];
       for (const [identifierHex, decodedInvoices] of tokenInvoices.entries()) {
         const tokenIdentifier = hexToBytes(identifierHex);
@@ -4118,6 +4127,112 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
+   * Queries HTLCs (Hash Time Locked Contracts) by payment hashes.
+   *
+   * @param {Uint8Array[]} paymentHashes - Array of payment hashes to query
+   * @param {number} [offset] - Optional offset for pagination
+   * @returns {Promise<PreimageRequest[]>} Array of preimage requests
+   */
+  public async queryHTLCs(paymentHashes: Uint8Array[], offset?: number) {
+    return await this.transferService.queryHTLCs(paymentHashes, offset);
+  }
+
+  /**
+   * Creates an HTLC (Hash Time Locked Contract) transfer.
+   *
+   * @param {CreateHTLCParams} params - Parameters for the transfer
+   * @param {string} params.receiverSparkAddress - The recipient's Spark address
+   * @param {number} params.amountSats - Amount to send in satoshis
+   * @param {Uint8Array} params.paymentHash - Payment hash of the HTLC
+   * @returns {Promise<WalletTransfer>} The completed transfer details
+   */
+  public async createHTLC({
+    receiverSparkAddress,
+    amountSats,
+    paymentHash,
+  }: {
+    receiverSparkAddress: string;
+    amountSats: number;
+    paymentHash: Uint8Array;
+  }): Promise<Transfer> {
+    const { identityPublicKey: receiverIdentityPubkey } = decodeSparkAddress(
+      receiverSparkAddress,
+      this.config.getNetworkType(),
+    );
+
+    return await this.withLeaves(async () => {
+      const selectLeavesToSendMap: Map<number, TreeNode[][]> =
+        await this.selectAndRenewLeaves([amountSats]);
+
+      const tweaksByAmount = this.buildTweaksByAmount(selectLeavesToSendMap);
+
+      const leafKeyTweaks = this.popOrThrow(
+        tweaksByAmount.get(amountSats),
+        `no leaves key tweaks for ${amountSats}`,
+      );
+
+      return await this.transferService.createHTLC(
+        leafKeyTweaks,
+        hexToBytes(receiverIdentityPubkey),
+        paymentHash,
+      );
+    });
+  }
+
+  /**
+   * Claims an HTLC (Hash Time Locked Contract) by providing the preimage.
+   *
+   * @param {Uint8Array} preimage - The preimage that hashes to the payment hash
+   * @returns {Promise<Transfer>} The claimed transfer
+   */
+  public async claimHTLC(preimage: Uint8Array): Promise<Transfer> {
+    return await this.transferService.claimHTLC(preimage);
+  }
+
+  /**
+   * Generates a random 32-byte preimage for HTLC operations.
+   *
+   * @returns {Uint8Array} A random 32-byte preimage
+   */
+  public generateRandomPreimage(): Uint8Array {
+    return this.transferService.generateRandomPreimage();
+  }
+
+  /**
+   * Delivers the transfer package for an HTLC transfer.
+   * This should be called after the receiver has claimed the HTLC (revealed the preimage).
+   *
+   * @param {Transfer} transfer - The transfer to deliver the package for
+   * @returns {Promise<Transfer>} The updated transfer
+   */
+  public async deliverTransferPackage(transfer: Transfer): Promise<Transfer> {
+    return await this.withLeaves(async () => {
+      const leaves: LeafKeyTweak[] = [];
+      for (const transferLeaf of transfer.leaves) {
+        if (!transferLeaf.leaf) {
+          throw new ValidationError("Transfer leaf missing node data");
+        }
+        leaves.push({
+          leaf: transferLeaf.leaf,
+          keyDerivation: {
+            type: KeyDerivationType.LEAF,
+            path: transferLeaf.leaf.id,
+          },
+          newKeyDerivation: { type: KeyDerivationType.RANDOM },
+        });
+      }
+
+      return await this.transferService.deliverTransferPackage(
+        transfer,
+        leaves,
+        new Map(),
+        new Map(),
+        new Map(),
+      );
+    });
+  }
+
+  /**
    * Gets fee estimate for sending Lightning payments.
    *
    * @param {LightningSendFeeEstimateInput} params - Input parameters for fee estimation
@@ -4262,11 +4377,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     if (deductFeeFromWithdrawalAmount) {
       leavesToSendToSsp = targetAmountSats
         ? this.popOrThrow(
-            (await this.selectLeaves([targetAmountSats])).get(
-              targetAmountSats,
-            )!,
-            `no leaves for ${targetAmountSats}`,
-          )
+          (await this.selectLeaves([targetAmountSats])).get(
+            targetAmountSats,
+          )!,
+          `no leaves for ${targetAmountSats}`,
+        )
         : this.leaves;
 
       if (
@@ -5402,8 +5517,8 @@ type SparkWalletFunctionKeys = Extract<
     [K in keyof SparkWallet]: SparkWallet[K] extends (
       ...args: any[]
     ) => PromiseLike<unknown>
-      ? K
-      : never;
+    ? K
+    : never;
   }[keyof SparkWallet],
   string
 >;
@@ -5418,12 +5533,15 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "batchTransferTokens",
   "checkTimelock",
   "claimDeposit",
+  "claimHTLC",
   "claimStaticDeposit",
   "claimStaticDepositWithMaxFee",
   "cleanupConnections",
+  "createHTLC",
   "createLightningInvoice",
   "createSatsInvoice",
   "createTokensInvoice",
+  "deliverTransferPackage",
   "fulfillSparkInvoice",
   "getBalance",
   "getClaimStaticDepositQuote",
@@ -5450,6 +5568,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "isTokenOptimizationInProgress",
   "optimizeTokenOutputs",
   "payLightningInvoice",
+  "queryHTLCs",
   "querySparkInvoices",
   "queryStaticDepositAddresses",
   "queryTokenTransactions",

@@ -1337,3 +1337,104 @@ func InitiateSwapPrimaryTransfer(
 	}
 	return response, nil
 }
+
+func InitiatePreimageSwapV3(
+	ctx context.Context,
+	config *TestWalletConfig,
+	leaves []LeafKeyTweak,
+	receiverIdentityPubkey keys.Public,
+	paymentHash []byte,
+	expiryTime time.Time,
+) (*pb.Transfer, error) {
+	sparkConn, err := config.NewCoordinatorGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer sparkConn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate with server: %w", err)
+	}
+	authCtx := ContextWithToken(ctx, token)
+
+	client := pb.NewSparkServiceClient(sparkConn)
+
+	transferID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate transfer id: %w", err)
+	}
+
+	// Get signing commitments from the server
+	nodes := make([]string, len(leaves))
+	for i, leaf := range leaves {
+		nodes[i] = leaf.Leaf.Id
+	}
+	signingCommitments, err := client.GetSigningCommitments(authCtx, &pb.GetSigningCommitmentsRequest{
+		NodeIds: nodes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing commitments: %w", err)
+	}
+
+	// Create FROST signer connection
+	signerConn, err := config.NewFrostGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer signerConn.Close()
+	signerClient := pbfrost.NewFrostServiceClient(signerConn)
+
+	// Create CPFP refund transactions and sign them
+	cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, signingCommitments.SigningCommitments, receiverIdentityPubkey, keys.Public{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare signing jobs: %w", err)
+	}
+
+	cpfpSigningResults, err := signerClient.SignFrost(authCtx, &pbfrost.SignFrostRequest{
+		SigningJobs: cpfpSigningJobs,
+		Role:        pbfrost.SigningRole_USER,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign refund transactions: %w", err)
+	}
+
+	// Prepare leaf signing jobs with all required fields
+	leavesToSend, err := prepareLeafSigningJobs(
+		leaves,
+		cpfpRefundTxs,
+		cpfpSigningResults.Results,
+		cpfpUserCommitments,
+		signingCommitments.SigningCommitments,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare leaf signing jobs: %w", err)
+	}
+
+	var value uint64
+
+	for _, leaf := range leaves {
+		value += leaf.Leaf.Value
+	}
+
+	resp, err := client.InitiatePreimageSwapV3(authCtx, &pb.InitiatePreimageSwapRequest{
+		PaymentHash: paymentHash,
+		Transfer: &pb.StartUserSignedTransferRequest{
+			TransferId:                transferID.String(),
+			LeavesToSend:              leavesToSend,
+			ReceiverIdentityPublicKey: receiverIdentityPubkey.Serialize(),
+			OwnerIdentityPublicKey:    config.IdentityPrivateKey.Public().Serialize(),
+			ExpiryTime:                timestamppb.New(expiryTime),
+		},
+		ReceiverIdentityPublicKey: receiverIdentityPubkey.Serialize(),
+		InvoiceAmount: &pb.InvoiceAmount{
+			ValueSats: value,
+		},
+		Reason: pb.InitiatePreimageSwapRequest_REASON_SEND,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Transfer, nil
+}
