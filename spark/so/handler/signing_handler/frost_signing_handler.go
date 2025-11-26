@@ -113,6 +113,10 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 			return nil, err
 		}
 		nonceEnt := nonces[commitment]
+		if nonceEnt == nil {
+			commitmentHex := hex.EncodeToString(commitment.MarshalBinary())
+			return nil, fmt.Errorf("signing nonce for commitment %s not found", commitmentHex)
+		}
 		// TODO(zhenlu): Add a test for this (LIG-7596).
 		jobRetryFingerprint := retryFingerprint(job)
 		if len(nonceEnt.RetryFingerprint) > 0 {
