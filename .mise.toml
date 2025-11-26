@@ -179,5 +179,5 @@ run = "make clean"
 activate_aggressive = true
 disable_backends = ["asdf"]
 experimental = true
-idiomatic_version_file_enable_tools = ["rust"]
+idiomatic_version_file_enable_tools = ["go", "rust"]
 lockfile = true
