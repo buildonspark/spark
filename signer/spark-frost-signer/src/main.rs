@@ -86,7 +86,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let stream = tokio_stream::wrappers::TcpListenerStream::new(listener);
             Server::builder()
                 .add_service(frost_service_server::FrostServiceServer::new(frost_server))
-                .serve_with_incoming(stream)
+                .serve_with_incoming_shutdown(stream, async {
+                    shutdown_rx.recv().await;
+                    tracing::info!("Shutting down");
+                })
                 .await?;
         }
         (None, Some(unix)) => {

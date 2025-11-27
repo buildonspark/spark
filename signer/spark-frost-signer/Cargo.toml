@@ -18,6 +18,7 @@ clap = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 rayon = { workspace = true }
+uuid = { workspace = true }
 
 [build-dependencies]
 tonic-build = { workspace = true }

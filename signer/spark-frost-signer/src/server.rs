@@ -7,6 +7,7 @@ use spark_frost::hex_string_to_identifier;
 use spark_frost::proto::common::*;
 use spark_frost::proto::frost::*;
 use tonic::{Request, Response, Status};
+use tracing::{info, instrument};
 
 use crate::dkg::{
     key_package_from_dkg_result, round1_package_maps_from_package_maps,
@@ -245,13 +246,15 @@ impl FrostService for FrostServer {
         Ok(Response::new(response))
     }
 
+    #[instrument(fields(trace_id = %uuid::Uuid::new_v4()), skip(self, request))]
     async fn sign_frost(
         &self,
         request: Request<SignFrostRequest>,
     ) -> Result<Response<SignFrostResponse>, Status> {
-        tracing::info!("Received frost sign request");
+        info!("Received frost sign request");
         let response =
             spark_frost::signing::sign_frost(request.get_ref()).map_err(Status::internal)?;
+        info!("Returning frost sign request");
         Ok(Response::new(response))
     }
 
