@@ -3,9 +3,11 @@ package tokens
 import (
 	"bytes"
 	"crypto/rand"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -23,9 +25,9 @@ func randomBytes(n int) []byte {
 }
 
 func makeMinimalV3MintProto() *tokenpb.TokenTransaction {
-	issuer := randomBytes(33)
-	owner := randomBytes(33)
-	operator := randomBytes(33)
+	issuer := keys.GeneratePrivateKey()
+	owner := keys.GeneratePrivateKey()
+	operator := keys.GeneratePrivateKey()
 	tokenID := randomBytes(32)
 	amount := randomBytes(16)
 	revocation := randomBytes(33)
@@ -37,20 +39,20 @@ func makeMinimalV3MintProto() *tokenpb.TokenTransaction {
 		Version: 3,
 		TokenInputs: &tokenpb.TokenTransaction_MintInput{
 			MintInput: &tokenpb.TokenMintInput{
-				IssuerPublicKey: issuer,
+				IssuerPublicKey: issuer.Public().Serialize(),
 				TokenIdentifier: tokenID,
 			},
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{{
 			Id:                            &outputID,
-			OwnerPublicKey:                owner,
+			OwnerPublicKey:                owner.Public().Serialize(),
 			RevocationCommitment:          revocation,
 			TokenIdentifier:               tokenID,
 			TokenAmount:                   amount,
 			WithdrawBondSats:              &bondSats,
 			WithdrawRelativeBlockLocktime: &locktime,
 		}},
-		SparkOperatorIdentityPublicKeys: [][]byte{operator},
+		SparkOperatorIdentityPublicKeys: [][]byte{operator.Public().Serialize()},
 		Network:                         sparkpb.Network_MAINNET,
 		ClientCreatedTimestamp:          timestamppb.Now(),
 		ExpiryTime:                      timestamppb.Now(),
@@ -58,26 +60,26 @@ func makeMinimalV3MintProto() *tokenpb.TokenTransaction {
 }
 
 func makeMinimalV3CreateProto() *tokenpb.TokenTransaction {
-	issuer := randomBytes(33)
-	operator := randomBytes(33)
-	creationEntity := randomBytes(33)
+	issuer := keys.GeneratePrivateKey()
+	operator := keys.GeneratePrivateKey()
+	creationEntity := keys.GeneratePrivateKey()
 	maxSupply := randomBytes(16)
 
 	return &tokenpb.TokenTransaction{
 		Version: 3,
 		TokenInputs: &tokenpb.TokenTransaction_CreateInput{
 			CreateInput: &tokenpb.TokenCreateInput{
-				IssuerPublicKey:         issuer,
+				IssuerPublicKey:         issuer.Public().Serialize(),
 				TokenName:               "TEST",
 				TokenTicker:             "TST",
 				Decimals:                8,
 				MaxSupply:               maxSupply,
 				IsFreezable:             true,
-				CreationEntityPublicKey: creationEntity,
+				CreationEntityPublicKey: creationEntity.Public().Serialize(),
 			},
 		},
 		TokenOutputs:                    []*tokenpb.TokenOutput{},
-		SparkOperatorIdentityPublicKeys: [][]byte{operator},
+		SparkOperatorIdentityPublicKeys: [][]byte{operator.Public().Serialize()},
 		Network:                         sparkpb.Network_MAINNET,
 		ClientCreatedTimestamp:          timestamppb.Now(),
 		ExpiryTime:                      timestamppb.Now(),
@@ -85,8 +87,8 @@ func makeMinimalV3CreateProto() *tokenpb.TokenTransaction {
 }
 
 func makeMinimalV3TransferProto(prevTxHash []byte, useTokenIdentifier bool) *tokenpb.TokenTransaction {
-	receiver := randomBytes(33)
-	operator := randomBytes(33)
+	receiver := keys.GeneratePrivateKey()
+	operator := keys.GeneratePrivateKey()
 	tokenID := randomBytes(32)
 	amount := randomBytes(16)
 	revocation := randomBytes(33)
@@ -96,7 +98,7 @@ func makeMinimalV3TransferProto(prevTxHash []byte, useTokenIdentifier bool) *tok
 
 	out := &tokenpb.TokenOutput{
 		Id:                            &outputID,
-		OwnerPublicKey:                receiver,
+		OwnerPublicKey:                receiver.Public().Serialize(),
 		RevocationCommitment:          revocation,
 		TokenAmount:                   amount,
 		TokenIdentifier:               tokenID,
@@ -115,7 +117,7 @@ func makeMinimalV3TransferProto(prevTxHash []byte, useTokenIdentifier bool) *tok
 			},
 		},
 		TokenOutputs:                    []*tokenpb.TokenOutput{out},
-		SparkOperatorIdentityPublicKeys: [][]byte{operator},
+		SparkOperatorIdentityPublicKeys: [][]byte{operator.Public().Serialize()},
 		Network:                         sparkpb.Network_MAINNET,
 		ClientCreatedTimestamp:          timestamppb.Now(),
 		ExpiryTime:                      timestamppb.Now(),
@@ -123,9 +125,9 @@ func makeMinimalV3TransferProto(prevTxHash []byte, useTokenIdentifier bool) *tok
 }
 
 func makePartialV3MintProto() *tokenpb.TokenTransaction {
-	issuer := randomBytes(33)
-	owner := randomBytes(33)
-	operator := randomBytes(33)
+	issuer := keys.GeneratePrivateKey()
+	owner := keys.GeneratePrivateKey()
+	operator := keys.GeneratePrivateKey()
 	tokenID := randomBytes(32)
 	amount := randomBytes(16)
 
@@ -133,17 +135,17 @@ func makePartialV3MintProto() *tokenpb.TokenTransaction {
 		Version: 3,
 		TokenInputs: &tokenpb.TokenTransaction_MintInput{
 			MintInput: &tokenpb.TokenMintInput{
-				IssuerPublicKey: issuer,
+				IssuerPublicKey: issuer.Public().Serialize(),
 				TokenIdentifier: tokenID,
 			},
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{{
-			OwnerPublicKey:  owner,
+			OwnerPublicKey:  owner.Public().Serialize(),
 			TokenIdentifier: tokenID,
 			TokenAmount:     amount,
 			// Missing SO-filled fields: Id, RevocationCommitment, WithdrawBondSats, WithdrawRelativeBlockLocktime
 		}},
-		SparkOperatorIdentityPublicKeys: [][]byte{operator},
+		SparkOperatorIdentityPublicKeys: [][]byte{operator.Public().Serialize()},
 		Network:                         sparkpb.Network_MAINNET,
 		ClientCreatedTimestamp:          timestamppb.Now(),
 		// Missing SO-filled field: ExpiryTime
@@ -180,6 +182,7 @@ func TestGetTokenTxAttrStringsFromProto_V3Minimal(t *testing.T) {
 	require.Len(t, attrs.PartialHashHex, 64)
 	// Now has all SO-filled fields (expiry_time, revocation_commitment, etc.), so final hash computes
 	require.Len(t, attrs.FinalHashHex, 64)
+	require.True(t, strings.HasPrefix(attrs.Bech32mTokenIdentifiers, "btkn"))
 }
 
 func TestGetTokenTxAttrStringsFromProto_CreateType(t *testing.T) {
@@ -189,6 +192,7 @@ func TestGetTokenTxAttrStringsFromProto_CreateType(t *testing.T) {
 	require.Len(t, attrs.PartialHashHex, 64)
 	// Now has all SO-filled fields (expiry_time, creation_entity_public_key), so final hash computes
 	require.Len(t, attrs.FinalHashHex, 64)
+	require.True(t, strings.HasPrefix(attrs.Bech32mTokenIdentifiers, "btkn"))
 }
 
 func TestGetTokenTxAttrStringsFromProto_TransferType(t *testing.T) {
@@ -199,6 +203,7 @@ func TestGetTokenTxAttrStringsFromProto_TransferType(t *testing.T) {
 	require.Len(t, attrs.PartialHashHex, 64)
 	// Now has all SO-filled fields (expiry_time, revocation_commitment, etc.), so final hash computes
 	require.Len(t, attrs.FinalHashHex, 64)
+	require.True(t, strings.HasPrefix(attrs.Bech32mTokenIdentifiers, "btkn"))
 }
 
 func TestGetTokenTxAttrStringsFromProto_PartialTransaction(t *testing.T) {
@@ -209,4 +214,5 @@ func TestGetTokenTxAttrStringsFromProto_PartialTransaction(t *testing.T) {
 	require.Equal(t, "MINT", attrs.Type)
 	require.Len(t, attrs.PartialHashHex, 64, "Partial hash should compute for partial transaction")
 	require.Equal(t, "unknown", attrs.FinalHashHex, "Final hash should be unknown for partial transaction")
+	require.True(t, strings.HasPrefix(attrs.Bech32mTokenIdentifiers, "btkn"))
 }

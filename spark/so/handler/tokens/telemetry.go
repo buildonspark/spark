@@ -14,9 +14,10 @@ import (
 var tracer = otel.Tracer("handler.tokens")
 
 const (
-	transactionTypeKey        = attribute.Key("token_transaction_type")
-	transactionPartialHashKey = attribute.Key("token_transaction_partial_hash")
-	transactionFullHashKey    = attribute.Key("token_transaction_full_hash")
+	transactionTypeKey            = attribute.Key("token_transaction_type")
+	transactionPartialHashKey     = attribute.Key("token_transaction_partial_hash")
+	transactionFullHashKey        = attribute.Key("token_transaction_full_hash")
+	transactionTokenIdentifierKey = attribute.Key("token_identifier")
 )
 
 func GetTracer() trace.Tracer {
@@ -32,12 +33,13 @@ func GetEntTokenTransactionTraceAttributes(ctx context.Context, tokenTransaction
 }
 
 func buildTraceAttributes(attrs tokens.TokenTransactionAttributes) trace.SpanStartEventOption {
-	transactionTypeAttribute := transactionTypeKey.String(attrs.Type)
-	transactionPartialHashAttribute := transactionPartialHashKey.String(attrs.PartialHashHex)
-	transactionFullHashAttribute := transactionFullHashKey.String(attrs.FinalHashHex)
-	return trace.WithAttributes(
-		transactionTypeAttribute,
-		transactionPartialHashAttribute,
-		transactionFullHashAttribute,
-	)
+	traceAttrs := []attribute.KeyValue{
+		transactionTypeKey.String(attrs.Type),
+		transactionPartialHashKey.String(attrs.PartialHashHex),
+		transactionFullHashKey.String(attrs.FinalHashHex),
+	}
+	if attrs.Bech32mTokenIdentifiers != "" && attrs.Bech32mTokenIdentifiers != "unknown" {
+		traceAttrs = append(traceAttrs, transactionTokenIdentifierKey.String(attrs.Bech32mTokenIdentifiers))
+	}
+	return trace.WithAttributes(traceAttrs...)
 }
