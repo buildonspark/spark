@@ -155,6 +155,10 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 				sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to fetch all leaves to spend: got %d leaves, expected %d", len(inputTtxos), len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()))))
 		}
 
+		if err := validateNoActiveFreezesForOutputs(ctx, inputTtxos); err != nil {
+			return nil, err
+		}
+
 		err = h.validateTransferTokenTransactionUsingPreviousTransactionDataAndFinalizeCreatedSignedOutputsIfPossible(ctx, finalTokenTX, req.GetTokenTransactionSignatures(), inputTtxos, h.config.Lrc20Configs[finalTokenTX.Network.String()].TransactionExpiryDuration)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionHashAndSpentOutputs("error validating transfer using previous output data", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("error validating transfer using previous output data: %w", err)))
