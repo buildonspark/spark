@@ -88,6 +88,9 @@ const (
 	KnobResumeSendTransferLimit = "spark.so.resume_send_transfer.limit"
 
 	KnobTransferBackfillBatchSize = "spark.so.transfer_backfill.batch_size"
+
+	// Enable more rigorous checks for finalize signature requests. See SPARK-236
+	KnobEnableStrictFinalizeSignature = "spark.so.enable_strict_finalize_signature"
 )
 
 type Config struct {

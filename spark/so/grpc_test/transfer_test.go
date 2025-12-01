@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -425,6 +426,20 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
 
+// Enable strict finalize signature knob for double claim transfer test
+type TestDoubleClaimTransferKnobProvider struct{}
+
+func (TestDoubleClaimTransferKnobProvider) GetValue(key string, defaultValue float64) float64 {
+	return defaultValue
+}
+
+func (TestDoubleClaimTransferKnobProvider) RolloutRandom(key string, defaultValue float64) bool {
+	if key == knobs.KnobEnableStrictFinalizeSignature {
+		return true
+	}
+	return false
+}
+
 func TestDoubleClaimTransfer(t *testing.T) {
 	// Sender initiates transfer
 	senderConfig := wallet.NewTestWalletConfig(t)
@@ -454,7 +469,10 @@ func TestDoubleClaimTransfer(t *testing.T) {
 	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
-	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+	receiverCtxTmp := wallet.ContextWithToken(t.Context(), receiverToken)
+
+	receiverCtx := knobs.InjectKnobsService(receiverCtxTmp, knobs.New(TestDoubleClaimTransferKnobProvider{}))
+
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
 	require.Len(t, pendingTransfer.Transfers, 1)
