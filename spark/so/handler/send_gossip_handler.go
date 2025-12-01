@@ -51,7 +51,8 @@ func (h *SendGossipHandler) postSendingGossipMessage(
 				status.Code(err) == codes.Canceled ||
 				strings.Contains(err.Error(), "context canceled") ||
 				strings.Contains(err.Error(), "unexpected HTTP status code") ||
-				strings.Contains(err.Error(), "SQLSTATE") {
+				(strings.Contains(err.Error(), "SQLSTATE") && !strings.Contains(err.Error(), "23505")) {
+				// Do not retry for pkey violation
 				return nil, err
 			}
 		}
@@ -78,7 +79,8 @@ func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, 
 			status.Code(err) == codes.Canceled ||
 			strings.Contains(err.Error(), "context canceled") ||
 			strings.Contains(err.Error(), "unexpected HTTP status code") ||
-			strings.Contains(err.Error(), "SQLSTATE") {
+			(strings.Contains(err.Error(), "SQLSTATE") && !strings.Contains(err.Error(), "23505")) {
+			// Do not retry for pkey violation
 			return err
 		}
 
