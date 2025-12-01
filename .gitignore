@@ -45,6 +45,3 @@ _data/
 /.cursor*
 
 *.code-workspace
-
-# Claude Code files
-.claude
