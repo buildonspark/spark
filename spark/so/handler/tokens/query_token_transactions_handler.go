@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
 
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 
 	"github.com/google/uuid"
@@ -28,6 +29,8 @@ type QueryTokenTransactionsHandler struct {
 	includeExpiredTransactions bool
 }
 
+const MaxTokenTransactionFilterValues = 500
+
 // NewQueryTokenTransactionsHandler creates a new QueryTokenTransactionsHandler.
 func NewQueryTokenTransactionsHandler(config *so.Config) *QueryTokenTransactionsHandler {
 	return &QueryTokenTransactionsHandler{
@@ -36,7 +39,7 @@ func NewQueryTokenTransactionsHandler(config *so.Config) *QueryTokenTransactions
 	}
 }
 
-// QueryTokenTransactions returns SO provided data about specific token transactions along with their status.
+// QueryTokenTransactions returns SO provided data about specific token transactions alosng with their status.
 // Allows caller to specify data to be returned related to:
 // a) transactions associated with a particular set of output ids
 // b) transactions associated with a particular set of transaction hashes
@@ -44,6 +47,11 @@ func NewQueryTokenTransactionsHandler(config *so.Config) *QueryTokenTransactions
 func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Context, req *tokenpb.QueryTokenTransactionsRequest) (*tokenpb.QueryTokenTransactionsResponse, error) {
 	ctx, span := GetTracer().Start(ctx, "QueryTokenTransactionsHandler.queryTokenTransactionsInternal")
 	defer span.End()
+
+	if err := validateQueryTokenTransactionsRequest(req); err != nil {
+		return nil, err
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -66,6 +74,40 @@ func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Conte
 	}
 
 	return h.convertTransactionsToResponse(ctx, transactions, req)
+}
+
+func validateQueryTokenTransactionsRequest(req *tokenpb.QueryTokenTransactionsRequest) error {
+	if len(req.OutputIds) > MaxTokenTransactionFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many output ids in filter: got %d, max %d", len(req.OutputIds), MaxTokenTransactionFilterValues),
+		)
+	}
+
+	if len(req.OwnerPublicKeys) > MaxTokenTransactionFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.OwnerPublicKeys), MaxTokenTransactionFilterValues),
+		)
+	}
+
+	if len(req.IssuerPublicKeys) > MaxTokenTransactionFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.IssuerPublicKeys), MaxTokenTransactionFilterValues),
+		)
+	}
+
+	if len(req.TokenIdentifiers) > MaxTokenTransactionFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.TokenIdentifiers), MaxTokenTransactionFilterValues),
+		)
+	}
+
+	if len(req.TokenTransactionHashes) > MaxTokenTransactionFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.TokenTransactionHashes), MaxTokenTransactionFilterValues),
+		)
+	}
+
+	return nil
 }
 
 // shouldUseOptimizedQuery determines if we should use the optimized UNION-based query

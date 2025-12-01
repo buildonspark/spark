@@ -19,7 +19,30 @@ import (
 const (
 	DefaultTokenOutputPageSize = 500
 	MaxTokenOutputPageSize     = 500
+	MaxTokenOutputFilterValues = 500
 )
+
+func validateQueryTokenOutputsRequest(req *tokenpb.QueryTokenOutputsRequest) error {
+	if len(req.OwnerPublicKeys) > MaxTokenOutputFilterValues {
+		return errors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.OwnerPublicKeys), MaxTokenOutputFilterValues),
+		)
+	}
+
+	if len(req.IssuerPublicKeys) > MaxTokenOutputFilterValues {
+		return errors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.IssuerPublicKeys), MaxTokenOutputFilterValues),
+		)
+	}
+
+	if len(req.TokenIdentifiers) > MaxTokenOutputFilterValues {
+		return errors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.TokenIdentifiers), MaxTokenOutputFilterValues),
+		)
+	}
+
+	return nil
+}
 
 type QueryTokenOutputsHandler struct {
 	config                     *so.Config
@@ -43,6 +66,13 @@ func NewQueryTokenOutputsHandlerWithExpiredTransactions(config *so.Config) *Quer
 
 // QueryTokenOutputsToken is the native tokenpb endpoint for SparkTokenService.
 func (h *QueryTokenOutputsHandler) QueryTokenOutputsToken(ctx context.Context, req *tokenpb.QueryTokenOutputsRequest) (*tokenpb.QueryTokenOutputsResponse, error) {
+	ctx, span := GetTracer().Start(ctx, "QueryTokenOutputsHandler.queryTokenOutputsInternal")
+	defer span.End()
+
+	if err := validateQueryTokenOutputsRequest(req); err != nil {
+		return nil, err
+	}
+
 	network, err := common.DetermineNetwork(req.GetNetwork())
 	if err != nil {
 		return nil, err

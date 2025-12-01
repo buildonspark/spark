@@ -237,4 +237,47 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 
 		assert.Len(t, resp.OutputsWithPreviousTransactionData, 7)
 	})
+
+	t.Run("filter value limits", func(t *testing.T) {
+		t.Run("owner public keys over limit", func(t *testing.T) {
+			req := &tokenpb.QueryTokenOutputsRequest{
+				OwnerPublicKeys: make([][]byte, MaxTokenOutputFilterValues+1),
+			}
+
+			err := validateQueryTokenOutputsRequest(req)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "too many owner public keys in filter")
+		})
+
+		t.Run("issuer public keys over limit", func(t *testing.T) {
+			req := &tokenpb.QueryTokenOutputsRequest{
+				IssuerPublicKeys: make([][]byte, MaxTokenOutputFilterValues+1),
+			}
+
+			err := validateQueryTokenOutputsRequest(req)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "too many issuer public keys in filter")
+		})
+
+		t.Run("token identifiers over limit", func(t *testing.T) {
+			req := &tokenpb.QueryTokenOutputsRequest{
+				TokenIdentifiers: make([][]byte, MaxTokenOutputFilterValues+1),
+			}
+
+			err := validateQueryTokenOutputsRequest(req)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "too many token identifiers in filter")
+		})
+
+		t.Run("within limits succeeds", func(t *testing.T) {
+			req := &tokenpb.QueryTokenOutputsRequest{
+				OwnerPublicKeys:  make([][]byte, MaxTokenOutputFilterValues),
+				IssuerPublicKeys: make([][]byte, MaxTokenOutputFilterValues),
+				TokenIdentifiers: make([][]byte, MaxTokenOutputFilterValues),
+			}
+
+			err := validateQueryTokenOutputsRequest(req)
+			require.NoError(t, err)
+		})
+	})
 }
