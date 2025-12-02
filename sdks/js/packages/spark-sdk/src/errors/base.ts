@@ -1,7 +1,7 @@
 import { bytesToHex } from "@noble/hashes/utils";
 import { clientEnv } from "../constants.js";
 
-export class SparkSDKError extends Error {
+export class SparkError extends Error {
   private context: Record<string, unknown>;
   private readonly initialMessage: string;
   public readonly originalError?: Error;

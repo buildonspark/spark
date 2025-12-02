@@ -1,6 +1,6 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToHex, equalBytes } from "@noble/curves/utils";
-import { ValidationError } from "../errors/index.js";
+import { SparkValidationError } from "../errors/index.js";
 import { getCrypto } from "./crypto.js";
 
 type Polynomial = {
@@ -54,7 +54,7 @@ export function modInverse(a: bigint, m: bigint): bigint {
   }
 
   if (old_r !== 1n) {
-    throw new ValidationError("Modular inverse does not exist", {
+    throw new SparkValidationError("Modular inverse does not exist", {
       field: "modInverse",
       value: `a: ${a}, m: ${m}`,
       expected: "a and m must be coprime",
@@ -70,7 +70,7 @@ export function evaluatePolynomial(polynomial: Polynomial, x: bigint): bigint {
   for (let i = 0; i < polynomial.coefficients.length; i++) {
     const coeff = polynomial.coefficients[i];
     if (!coeff) {
-      throw new ValidationError("Coefficient is undefined", {
+      throw new SparkValidationError("Coefficient is undefined", {
         field: "coefficient",
         value: "undefined",
         expected: "A valid bigint coefficient",
@@ -91,7 +91,7 @@ export function fieldDiv(
   fieldModulus: bigint,
 ): bigint {
   if (denominator === 0n) {
-    throw new ValidationError("Division by zero", {
+    throw new SparkValidationError("Division by zero", {
       field: "denominator",
       value: "0",
       expected: "Non-zero value",
@@ -111,7 +111,7 @@ export function computerLagrangeCoefficients(
   let denominator = 1n;
   let fieldModulus = points[0]?.fieldModulus;
   if (!fieldModulus) {
-    throw new ValidationError("Field modulus is undefined", {
+    throw new SparkValidationError("Field modulus is undefined", {
       field: "fieldModulus",
       value: "undefined",
       expected: "A valid field modulus",
@@ -217,7 +217,7 @@ export function recoverSecret(shares: VerifiableSecretShare[]) {
   const fieldModulus = shares[0]?.fieldModulus;
 
   if (!threshold || !fieldModulus) {
-    throw new ValidationError("Shares are not valid", {
+    throw new SparkValidationError("Shares are not valid", {
       field: "shares",
       value: "Missing threshold or fieldModulus",
       expected: "Valid shares with threshold and fieldModulus",
@@ -225,7 +225,7 @@ export function recoverSecret(shares: VerifiableSecretShare[]) {
   }
 
   if (shares.length < threshold) {
-    throw new ValidationError("Not enough shares to recover secret", {
+    throw new SparkValidationError("Not enough shares to recover secret", {
       field: "shares",
       value: shares.length,
       expected: `At least ${threshold} shares`,
@@ -251,7 +251,7 @@ export function validateShare(share: VerifiableSecretShare) {
 
   let resultPubkey = share.proofs[0];
   if (!resultPubkey) {
-    throw new ValidationError("Result pubkey is not valid", {
+    throw new SparkValidationError("Result pubkey is not valid", {
       field: "resultPubkey",
       value: "null",
       expected: "Valid public key bytes",
@@ -261,7 +261,7 @@ export function validateShare(share: VerifiableSecretShare) {
   for (let i = 1; i < share.proofs.length; i++) {
     const pubkey = share.proofs[i];
     if (!pubkey) {
-      throw new ValidationError("Pubkey is not valid", {
+      throw new SparkValidationError("Pubkey is not valid", {
         field: "pubkey",
         value: "null",
         expected: "Valid public key bytes",
@@ -276,7 +276,7 @@ export function validateShare(share: VerifiableSecretShare) {
   }
 
   if (!equalBytes(resultPubkey, targetPubkey)) {
-    throw new ValidationError("Share is not valid", {
+    throw new SparkValidationError("Share is not valid", {
       field: "share",
       value: "Invalid proof",
       expected: "Valid share with matching proofs",

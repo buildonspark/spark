@@ -1,5 +1,5 @@
 import { expect } from "@jest/globals";
-import { ValidationError } from "../../../errors/types.js";
+import { SparkValidationError } from "../../../errors/types.js";
 import { ExitSpeed } from "../../../types/index.js";
 import { getNewAddress } from "../../utils/regtest-test-faucet.js";
 import {
@@ -145,7 +145,7 @@ describe("SSP coop exit basic validation", () => {
         deductFeeFromWithdrawalAmount: true,
       }),
     ).rejects.toMatchObject({
-      name: ValidationError.name,
+      name: SparkValidationError.name,
       message: expect.stringContaining(
         "The fee for the withdrawal is greater than the target withdrawal amount",
       ),
@@ -171,7 +171,7 @@ describe("SSP coop exit basic validation", () => {
         deductFeeFromWithdrawalAmount: false,
       }),
     ).rejects.toMatchObject({
-      name: ValidationError.name,
+      name: SparkValidationError.name,
       message: expect.stringContaining("Invalid exit speed"),
       context: expect.objectContaining({
         field: "exitSpeed",

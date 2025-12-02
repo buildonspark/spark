@@ -11,7 +11,7 @@ import { HDKey } from "@scure/bip32";
 import { generateMnemonic, mnemonicToSeed } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Transaction } from "@scure/btc-signer";
-import { ConfigurationError, ValidationError } from "../errors/types.js";
+import { SparkError, SparkValidationError } from "../errors/index.js";
 import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
 import {
   AggregateFrostBindingParams,
@@ -71,7 +71,7 @@ class DefaultSparkKeysGenerator implements SparkKeysGenerator {
     const hdkey = HDKey.fromMasterSeed(seed);
 
     if (!hdkey.privateKey || !hdkey.publicKey) {
-      throw new ValidationError("Failed to derive keys from seed", {
+      throw new SparkValidationError("Failed to derive keys from seed", {
         field: "hdkey",
         value: seed,
       });
@@ -94,7 +94,7 @@ class DefaultSparkKeysGenerator implements SparkKeysGenerator {
       !htlcPreimageKey.privateKey ||
       !htlcPreimageKey.publicKey
     ) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Failed to derive all required keys from seed",
         {
           field: "derivedKeys",
@@ -146,7 +146,7 @@ class DerivationPathKeysGenerator implements SparkKeysGenerator {
     const hdkey = HDKey.fromMasterSeed(seed);
 
     if (!hdkey.privateKey || !hdkey.publicKey) {
-      throw new ValidationError("Failed to derive keys from seed", {
+      throw new SparkValidationError("Failed to derive keys from seed", {
         field: "hdkey",
         value: seed,
       });
@@ -174,7 +174,7 @@ class DerivationPathKeysGenerator implements SparkKeysGenerator {
       !htlcPreimageKey.privateKey ||
       !htlcPreimageKey.publicKey
     ) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Failed to derive all required keys from seed",
         {
           field: "derivedKeys",
@@ -300,7 +300,7 @@ class DefaultSparkSigner implements SparkSigner {
 
   private deriveSigningKey(hash: Uint8Array): Uint8Array {
     if (!this.signingKey) {
-      throw new ValidationError("Private key not initialized", {
+      throw new SparkValidationError("Private key not initialized", {
         field: "signingKey",
       });
     }
@@ -312,7 +312,7 @@ class DefaultSparkSigner implements SparkSigner {
     const newPrivateKey = this.signingKey?.deriveChild(amount).privateKey;
 
     if (!newPrivateKey) {
-      throw new ValidationError("Failed to recover signing key", {
+      throw new SparkValidationError("Failed to recover signing key", {
         field: "privateKey",
       });
     }
@@ -324,9 +324,7 @@ class DefaultSparkSigner implements SparkSigner {
     ciphertext: Uint8Array,
   ): Promise<Uint8Array> {
     if (!this.identityKey?.privateKey) {
-      throw new ConfigurationError("Identity key not initialized", {
-        configKey: "identityKey",
-      });
+      throw new SparkError("identityKey not initialized");
     }
     const sparkFrost = getSparkFrost();
     const privateKey = await sparkFrost.decryptEcies(
@@ -356,7 +354,7 @@ class DefaultSparkSigner implements SparkSigner {
 
   async signSchnorrWithIdentityKey(message: Uint8Array): Promise<Uint8Array> {
     if (!this.identityKey?.privateKey) {
-      throw new ValidationError("Private key not set", {
+      throw new SparkValidationError("Private key not set", {
         field: "identityKey",
       });
     }
@@ -368,7 +366,7 @@ class DefaultSparkSigner implements SparkSigner {
 
   async getIdentityPublicKey(): Promise<Uint8Array> {
     if (!this.identityKey?.publicKey) {
-      throw new ValidationError("Private key is not set", {
+      throw new SparkValidationError("Private key is not set", {
         field: "identityKey",
       });
     }
@@ -378,7 +376,7 @@ class DefaultSparkSigner implements SparkSigner {
 
   async getDepositSigningKey(): Promise<Uint8Array> {
     if (!this.depositKey?.publicKey) {
-      throw new ValidationError("Deposit key is not set", {
+      throw new SparkValidationError("Deposit key is not set", {
         field: "depositKey",
       });
     }
@@ -393,7 +391,7 @@ class DefaultSparkSigner implements SparkSigner {
 
   async getStaticDepositSecretKey(idx: number): Promise<Uint8Array> {
     if (!this.staticDepositKey) {
-      throw new ValidationError("Static deposit key is not set", {
+      throw new SparkValidationError("Static deposit key is not set", {
         field: "staticDepositKey",
       });
     }
@@ -403,7 +401,7 @@ class DefaultSparkSigner implements SparkSigner {
     );
 
     if (!staticDepositKey?.privateKey) {
-      throw new ValidationError("Static deposit key is not set", {
+      throw new SparkValidationError("Static deposit key is not set", {
         field: "staticDepositKey",
       });
     }
@@ -538,14 +536,14 @@ class DefaultSparkSigner implements SparkSigner {
       await this.getSigningPrivateKeyFromDerivation(keyDerivation);
 
     if (!signingPrivateKey) {
-      throw new ValidationError("Private key not found for public key", {
+      throw new SparkValidationError("Private key not found for public key", {
         field: "privateKey",
       });
     }
 
     const nonce = this.getNonceForSelfCommitment(selfCommitment);
     if (!nonce) {
-      throw new ValidationError("Nonce not found for commitment", {
+      throw new SparkValidationError("Nonce not found for commitment", {
         field: "nonce",
       });
     }
@@ -668,7 +666,7 @@ class DefaultSparkSigner implements SparkSigner {
     compact?: boolean,
   ): Promise<Uint8Array> {
     if (!this.identityKey?.privateKey) {
-      throw new ConfigurationError("Identity key not initialized", {
+      throw new SparkError("Identity key not initialized", {
         configKey: "identityKey",
       });
     }
@@ -684,9 +682,7 @@ class DefaultSparkSigner implements SparkSigner {
 
   async decryptEcies(ciphertext: Uint8Array): Promise<Uint8Array> {
     if (!this.identityKey?.privateKey) {
-      throw new ConfigurationError("Identity key not initialized", {
-        configKey: "identityKey",
-      });
+      throw new SparkError("identityKey not initialized");
     }
     const sparkFrost = getSparkFrost();
     const privateKey = await sparkFrost.decryptEcies(
@@ -712,9 +708,7 @@ class DefaultSparkSigner implements SparkSigner {
     signature: Uint8Array,
   ): Promise<boolean> {
     if (!this.identityKey?.publicKey) {
-      throw new ConfigurationError("Identity key not initialized", {
-        configKey: "identityKey",
-      });
+      throw new SparkError("identityKey not initialized");
     }
 
     return secp256k1.verify(signature, message, this.identityKey.publicKey);
@@ -738,7 +732,7 @@ class DefaultSparkSigner implements SparkSigner {
     }
 
     if (!privateKey) {
-      throw new ValidationError("Private key not found for public key", {
+      throw new SparkValidationError("Private key not found for public key", {
         field: "privateKey",
         value: bytesToHex(publicKey),
       });
@@ -749,7 +743,7 @@ class DefaultSparkSigner implements SparkSigner {
 
   async htlcHMAC(transferID: string): Promise<Uint8Array> {
     if (!this.htlcPreimageKey?.privateKey) {
-      throw new ConfigurationError("HTLC preimage key not initialized", {
+      throw new SparkError("HTLC preimage key not initialized", {
         configKey: "htlcPreimageKey",
       });
     }

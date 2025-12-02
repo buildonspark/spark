@@ -8,7 +8,10 @@ import {
   Requester,
 } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha2";
-import { AuthenticationError, NetworkError } from "../errors/index.js";
+import {
+  SparkAuthenticationError,
+  SparkRequestError,
+} from "../errors/index.js";
 import { SparkSigner } from "../signer/signer.js";
 import { UserRequestType } from "../types/sdk-types.js";
 import { getFetch } from "../utils/fetch.js";
@@ -157,7 +160,7 @@ export default class SspClient {
           await this.authenticate();
           return await this.requester.executeQuery(query);
         } catch (authError) {
-          throw new AuthenticationError(
+          throw new SparkAuthenticationError(
             "Failed to authenticate after unauthorized response",
             {
               endpoint: "graphql",
@@ -167,7 +170,7 @@ export default class SspClient {
           );
         }
       }
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to execute GraphQL query",
         {
           method: "POST",

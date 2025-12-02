@@ -3,7 +3,7 @@ import { sha256 } from "@noble/hashes/sha2";
 import { hexToBytes } from "@noble/hashes/utils";
 import { p2tr, Transaction } from "@scure/btc-signer";
 import { equalBytes } from "@scure/btc-signer/utils";
-import { NetworkError, ValidationError } from "../errors/types.js";
+import { SparkRequestError, SparkValidationError } from "../errors/types.js";
 import { SignatureIntent } from "../proto/common.js";
 import {
   Address,
@@ -68,7 +68,7 @@ export class DepositService {
       !address.depositAddressProof.proofOfPossessionSignature ||
       !address.depositAddressProof.addressSignatures
     ) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Proof of possession signature or address signatures is null",
         {
           field: "depositAddressProof",
@@ -97,7 +97,7 @@ export class DepositService {
     );
 
     if (!isVerified) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Proof of possession signature verification failed",
         {
           field: "proofOfPossessionSignature",
@@ -119,7 +119,7 @@ export class DepositService {
       const operatorSig =
         address.depositAddressProof.addressSignatures[operator.identifier];
       if (!operatorSig) {
-        throw new ValidationError("Operator signature not found", {
+        throw new SparkValidationError("Operator signature not found", {
           field: "addressSignatures",
           value: operator.identifier,
         });
@@ -132,10 +132,13 @@ export class DepositService {
         operatorPubkey,
       );
       if (!isVerified) {
-        throw new ValidationError("Operator signature verification failed", {
-          field: "operatorSignature",
-          value: operatorSig,
-        });
+        throw new SparkValidationError(
+          "Operator signature verification failed",
+          {
+            field: "operatorSignature",
+            value: operatorSig,
+          },
+        );
       }
     }
   }
@@ -155,7 +158,7 @@ export class DepositService {
         network: this.config.getNetworkProto(),
       });
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to generate static deposit address",
         {
           operation: "generate_static_deposit_address",
@@ -167,7 +170,7 @@ export class DepositService {
     }
 
     if (!depositResp.depositAddress) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "No static deposit address response from coordinator",
         {
           field: "depositAddress",
@@ -204,7 +207,7 @@ export class DepositService {
         isStatic: isStatic,
       });
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to generate deposit address",
         {
           operation: "generate_deposit_address",
@@ -216,7 +219,7 @@ export class DepositService {
     }
 
     if (!depositResp.depositAddress) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "No deposit address response from coordinator",
         {
           field: "depositAddress",
@@ -242,7 +245,7 @@ export class DepositService {
     // Create root transactions (CPFP and direct)
     const output = depositTx.getOutput(vout);
     if (!output) {
-      throw new ValidationError("Invalid deposit transaction output", {
+      throw new SparkValidationError("Invalid deposit transaction output", {
         field: "vout",
         value: vout,
         expected: "Valid output index",
@@ -291,7 +294,7 @@ export class DepositService {
     );
 
     if (!directRefundTx || !directFromCpfpRefundTx) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Expected direct refund transactions for tree creation",
         {
           field: "directRefundTx",
@@ -353,7 +356,7 @@ export class DepositService {
         },
       });
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to start deposit tree creation",
         {
           operation: "start_deposit_tree_creation",
@@ -365,18 +368,21 @@ export class DepositService {
     }
 
     if (!treeResp.rootNodeSignatureShares?.verifyingKey) {
-      throw new ValidationError("No verifying key found in tree response", {
-        field: "verifyingKey",
-        value: treeResp.rootNodeSignatureShares,
-        expected: "Non-null verifying key",
-      });
+      throw new SparkValidationError(
+        "No verifying key found in tree response",
+        {
+          field: "verifyingKey",
+          value: treeResp.rootNodeSignatureShares,
+          expected: "Non-null verifying key",
+        },
+      );
     }
 
     if (
       !treeResp.rootNodeSignatureShares.nodeTxSigningResult
         ?.signingNonceCommitments
     ) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "No signing nonce commitments found in tree response",
         {
           field: "nodeTxSigningResult.signingNonceCommitments",
@@ -390,7 +396,7 @@ export class DepositService {
       !treeResp.rootNodeSignatureShares.refundTxSigningResult
         ?.signingNonceCommitments
     ) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "No signing nonce commitments found in tree response",
         {
           field: "refundTxSigningResult.signingNonceCommitments",
@@ -402,7 +408,7 @@ export class DepositService {
       !treeResp.rootNodeSignatureShares.directNodeTxSigningResult
         ?.signingNonceCommitments
     ) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "No direct node signing nonce commitments found in tree response",
         {
           field: "directNodeTxSigningResult.signingNonceCommitments",
@@ -414,7 +420,7 @@ export class DepositService {
       !treeResp.rootNodeSignatureShares.directRefundTxSigningResult
         ?.signingNonceCommitments
     ) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "No direct refund signing nonce commitments found in tree response",
         {
           field: "directRefundTxSigningResult.signingNonceCommitments",
@@ -426,7 +432,7 @@ export class DepositService {
       !treeResp.rootNodeSignatureShares.directFromCpfpRefundTxSigningResult
         ?.signingNonceCommitments
     ) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "No direct from CPFP refund signing nonce commitments found in tree response",
         {
           field: "directFromCpfpRefundTxSigningResult.signingNonceCommitments",
@@ -437,7 +443,7 @@ export class DepositService {
     if (
       !equalBytes(treeResp.rootNodeSignatureShares.verifyingKey, verifyingKey)
     ) {
-      throw new ValidationError("Verifying key mismatch", {
+      throw new SparkValidationError("Verifying key mismatch", {
         field: "verifyingKey",
         value: treeResp.rootNodeSignatureShares.verifyingKey,
         expected: verifyingKey,
@@ -607,7 +613,7 @@ export class DepositService {
         ],
       });
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to finalize node signatures",
         {
           operation: "finalize_node_signatures",

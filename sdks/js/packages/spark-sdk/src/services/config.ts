@@ -10,7 +10,7 @@ import {
   OptimizationOptions,
   TokenOptimizationOptions,
 } from "./wallet-config.js";
-import { ConfigurationError } from "../errors/types.js";
+import { SparkError } from "../errors/index.js";
 import { SparkWalletEvents } from "../spark-wallet/types.js";
 
 export class WalletConfigService implements HasSspClientOptions {
@@ -45,12 +45,7 @@ export class WalletConfigService implements HasSspClientOptions {
     const coordinator =
       this.config.signingOperators[this.config.coordinatorIdentifier];
     if (!coordinator) {
-      throw new ConfigurationError(
-        "Coordinator not found in signing operators",
-        {
-          configKey: "signingOperators",
-        },
-      );
+      throw new SparkError("coordinator not found in signing operators");
     }
     return coordinator.address;
   }

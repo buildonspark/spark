@@ -4,12 +4,7 @@ import { sha256 } from "@noble/hashes/sha2";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionOutput } from "@scure/btc-signer/psbt";
 import { uuidv7 } from "uuidv7";
-import {
-  NetworkError,
-  RPCError,
-  SparkSDKError,
-  ValidationError,
-} from "../errors/index.js";
+import { SparkRequestError, SparkValidationError } from "../errors/index.js";
 import { SignatureIntent } from "../proto/common.js";
 import {
   ClaimLeafKeyTweak,
@@ -149,7 +144,7 @@ export class BaseTransferService {
     )) {
       const tweaks = keyTweakInputMap.get(key);
       if (!tweaks) {
-        throw new ValidationError("No tweaks for operator", {
+        throw new SparkValidationError("No tweaks for operator", {
           field: "operator",
           value: key,
         });
@@ -174,7 +169,7 @@ export class BaseTransferService {
     });
 
     if (!response.transfer) {
-      throw new ValidationError("No transfer response from operator");
+      throw new SparkValidationError("No transfer response from operator");
     }
 
     return response.transfer;
@@ -253,7 +248,7 @@ export class BaseTransferService {
         sparkInvoice,
       });
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to start transfer",
         {
           method: "POST",
@@ -263,7 +258,7 @@ export class BaseTransferService {
     }
 
     if (!response.transfer) {
-      throw new ValidationError("No transfer response from operator");
+      throw new SparkValidationError("No transfer response from operator");
     }
 
     return response.transfer;
@@ -316,7 +311,7 @@ export class BaseTransferService {
 
       const operator = this.config.getSigningOperators()[key];
       if (!operator) {
-        throw new ValidationError("Operator not found");
+        throw new SparkValidationError("Operator not found");
       }
 
       const encryptedProto = await sparkFrost.encryptEcies(
@@ -395,7 +390,7 @@ export class BaseTransferService {
 
       const operator = this.config.getSigningOperators()[key];
       if (!operator) {
-        throw new ValidationError("Operator not found");
+        throw new SparkValidationError("Operator not found");
       }
 
       const encryptedProto = await sparkFrost.encryptEcies(
@@ -1058,7 +1053,7 @@ export class TransferService extends BaseTransferService {
 
       const currentSequence = currRefundTx.getInput(0).sequence;
       if (!currentSequence) {
-        throw new ValidationError("Invalid refund transaction", {
+        throw new SparkValidationError("Invalid refund transaction", {
           field: "sequence",
           value: currRefundTx.getInput(0),
           expected: "Non-null sequence",
@@ -1140,10 +1135,10 @@ export class TransferService extends BaseTransferService {
         const leavesToReceive = leavesTweaksMap.get(identifier);
         if (!leavesToReceive) {
           errors.push(
-            new ValidationError("No leaves to receive for operator", {
+            new SparkValidationError("No leaves to receive for operator", {
               field: "operator",
               value: identifier,
-            }) as SparkSDKError,
+            }),
           );
           return;
         }
@@ -1157,7 +1152,7 @@ export class TransferService extends BaseTransferService {
           });
         } catch (error: any) {
           errors.push(
-            new RPCError(
+            new SparkRequestError(
               "Failed to claim transfer tweak keys",
               {
                 method: "POST",
@@ -1248,10 +1243,10 @@ export class TransferService extends BaseTransferService {
     }
 
     if (!shares[0]?.proofs) {
-      throw new ValidationError("Proofs not found", {
+      throw new SparkValidationError("Proofs not found", {
         field: "proofs",
         value: shares[0]?.proofs,
-      }) as SparkSDKError;
+      });
     }
 
     return { leafKeyTweaks: leafTweaksMap, proofs: shares[0].proofs };
@@ -1313,7 +1308,7 @@ export class TransferService extends BaseTransferService {
         signingJobs,
       });
     } catch (error: any) {
-      throw new RPCError(
+      throw new SparkRequestError(
         "Failed to claim transfer sign refunds",
         {
           method: "POST",
@@ -1411,7 +1406,7 @@ export class TransferService extends BaseTransferService {
       response.renewResult?.$case !== "renewRefundTimelockResult" ||
       !response.renewResult?.renewRefundTimelockResult.node
     ) {
-      throw new ValidationError("Unexpected renew result", {
+      throw new SparkValidationError("Unexpected renew result", {
         field: "renewResult",
         value: response.renewResult,
       });
@@ -1469,7 +1464,7 @@ export class TransferService extends BaseTransferService {
       response.renewResult?.$case !== "renewNodeTimelockResult" ||
       !response.renewResult?.renewNodeTimelockResult.node
     ) {
-      throw new ValidationError("Unexpected renew result", {
+      throw new SparkValidationError("Unexpected renew result", {
         field: "renewResult",
         value: response.renewResult,
       });
@@ -1787,7 +1782,7 @@ export class TransferService extends BaseTransferService {
         statechainCommitments.signingCommitments[index]
           ?.signingNonceCommitments;
       if (!signingNonceCommitments) {
-        throw new ValidationError("Signing nonce commitments not found", {
+        throw new SparkValidationError("Signing nonce commitments not found", {
           field: "signingNonceCommitments",
           value: signingNonceCommitments,
         });
@@ -1821,7 +1816,7 @@ export class TransferService extends BaseTransferService {
       response.renewResult?.$case !== "renewNodeZeroTimelockResult" ||
       !response.renewResult?.renewNodeZeroTimelockResult.node
     ) {
-      throw new ValidationError("Unexpected renew result", {
+      throw new SparkValidationError("Unexpected renew result", {
         field: "renewResult",
         value: response.renewResult,
       });

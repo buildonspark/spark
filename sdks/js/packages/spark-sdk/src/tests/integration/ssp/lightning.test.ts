@@ -5,7 +5,7 @@ import {
   CurrencyUnit,
   LightningReceiveRequestStatus,
 } from "../../../types/index.js";
-import { ValidationError } from "../../../errors/types.js";
+import { SparkValidationError } from "../../../errors/types.js";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
 import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
 import { waitForClaim } from "../../utils/utils.js";
@@ -128,7 +128,7 @@ describe("Lightning Network provider", () => {
           memo: "test",
         }),
       ).rejects.toMatchObject({
-        name: ValidationError.name,
+        name: SparkValidationError.name,
         message: expect.stringContaining("Invalid amount"),
         context: expect.objectContaining({
           field: "amountSats",
@@ -145,7 +145,7 @@ describe("Lightning Network provider", () => {
           expirySeconds: -1,
         }),
       ).rejects.toMatchObject({
-        name: ValidationError.name,
+        name: SparkValidationError.name,
         message: expect.stringContaining("Invalid expiration time"),
         context: expect.objectContaining({
           field: "expirySeconds",
@@ -161,7 +161,7 @@ describe("Lightning Network provider", () => {
           memo: "test".repeat(1000),
         }),
       ).rejects.toMatchObject({
-        name: ValidationError.name,
+        name: SparkValidationError.name,
         message: expect.stringContaining("Invalid memo size"),
         context: expect.objectContaining({
           field: "memo",

@@ -81,8 +81,8 @@ async function main() {
  * @param isFreezable - Whether the token can be frozen
  * @param feeRateSatsPerVb - The fee rate in satoshis per virtual byte (default: 4.0)
  * @returns The transaction ID of the announcement
- * @throws {ValidationError} If decimals is not a safe integer
- * @throws {NetworkError} If the announcement transaction cannot be broadcast
+ * @throws {SparkValidationError} If decimals is not a safe integer
+ * @throws {SparkRequestError} If the announcement transaction cannot be broadcast
  */
 async function announceTokenL1(
   lrc20Wallet: LRCWallet,

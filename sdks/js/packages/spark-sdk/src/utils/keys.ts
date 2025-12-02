@@ -1,10 +1,10 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { numberToBytesBE } from "@noble/curves/utils";
-import { ValidationError } from "../errors/index.js";
+import { SparkValidationError } from "../errors/index.js";
 
 export function addPublicKeys(a: Uint8Array, b: Uint8Array): Uint8Array {
   if (a.length !== 33 || b.length !== 33) {
-    throw new ValidationError("Public keys must be 33 bytes", {
+    throw new SparkValidationError("Public keys must be 33 bytes", {
       field: "publicKeys",
       value: `a: ${a.length}, b: ${b.length}`,
       expected: 33,
@@ -20,14 +20,14 @@ export function applyAdditiveTweakToPublicKey(
   tweak: Uint8Array,
 ) {
   if (pubkey.length !== 33) {
-    throw new ValidationError("Public key must be 33 bytes", {
+    throw new SparkValidationError("Public key must be 33 bytes", {
       field: "pubkey",
       value: pubkey.length,
       expected: 33,
     });
   }
   if (tweak.length !== 32) {
-    throw new ValidationError("Tweak must be 32 bytes", {
+    throw new SparkValidationError("Tweak must be 32 bytes", {
       field: "tweak",
       value: tweak.length,
       expected: 32,
@@ -44,7 +44,7 @@ export function applyAdditiveTweakToPublicKey(
 
 export function subtractPublicKeys(a: Uint8Array, b: Uint8Array) {
   if (a.length !== 33 || b.length !== 33) {
-    throw new ValidationError("Public keys must be 33 bytes", {
+    throw new SparkValidationError("Public keys must be 33 bytes", {
       field: "publicKeys",
       value: `a: ${a.length}, b: ${b.length}`,
       expected: 33,
@@ -58,7 +58,7 @@ export function subtractPublicKeys(a: Uint8Array, b: Uint8Array) {
 
 export function addPrivateKeys(a: Uint8Array, b: Uint8Array) {
   if (a.length !== 32 || b.length !== 32) {
-    throw new ValidationError("Private keys must be 32 bytes", {
+    throw new SparkValidationError("Private keys must be 32 bytes", {
       field: "privateKeys",
       value: `a: ${a.length}, b: ${b.length}`,
       expected: 32,
@@ -78,7 +78,7 @@ export function addPrivateKeys(a: Uint8Array, b: Uint8Array) {
 
 export function subtractPrivateKeys(a: Uint8Array, b: Uint8Array) {
   if (a.length !== 32 || b.length !== 32) {
-    throw new ValidationError("Private keys must be 32 bytes", {
+    throw new SparkValidationError("Private keys must be 32 bytes", {
       field: "privateKeys",
       value: `a: ${a.length}, b: ${b.length}`,
       expected: 32,
@@ -95,7 +95,7 @@ export function subtractPrivateKeys(a: Uint8Array, b: Uint8Array) {
 export function sumOfPrivateKeys(keys: Uint8Array[]) {
   return keys.reduce((sum, key) => {
     if (key.length !== 32) {
-      throw new ValidationError("Private keys must be 32 bytes", {
+      throw new SparkValidationError("Private keys must be 32 bytes", {
         field: "privateKey",
         value: key.length,
         expected: 32,
@@ -107,7 +107,7 @@ export function sumOfPrivateKeys(keys: Uint8Array[]) {
 
 export function lastKeyWithTarget(target: Uint8Array, keys: Uint8Array[]) {
   if (target.length !== 32) {
-    throw new ValidationError("Target must be 32 bytes", {
+    throw new SparkValidationError("Target must be 32 bytes", {
       field: "target",
       value: target.length,
       expected: 32,

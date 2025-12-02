@@ -1,5 +1,5 @@
 import { Transaction } from "@scure/btc-signer";
-import { ValidationError } from "../errors/types.js";
+import { SparkValidationError } from "../errors/types.js";
 import { SigningCommitment } from "../proto/common.js";
 import {
   RequestedSigningCommitments,
@@ -43,7 +43,7 @@ export class SigningService {
       await this.config.signer.getRandomSigningCommitment();
 
     if (!signingCommitments) {
-      throw new ValidationError("Invalid signing commitments", {
+      throw new SparkValidationError("Invalid signing commitments", {
         field: "signingNonceCommitments",
         value: signingCommitments,
         expected: "Non-null signing commitments",
@@ -95,7 +95,7 @@ export class SigningService {
     for (let i = 0; i < leaves.length; i++) {
       const leaf = leaves[i];
       if (!leaf?.leaf) {
-        throw new ValidationError("Leaf not found in signRefunds", {
+        throw new SparkValidationError("Leaf not found in signRefunds", {
           field: "leaf",
           value: leaf,
           expected: "Non-null leaf",
@@ -108,7 +108,7 @@ export class SigningService {
 
       const amountSats = currRefundTx.getOutput(0).amount;
       if (amountSats === undefined) {
-        throw new ValidationError("Invalid refund transaction", {
+        throw new SparkValidationError("Invalid refund transaction", {
           field: "amount",
           value: currRefundTx.getOutput(0),
           expected: "Non-null amount",
@@ -122,7 +122,7 @@ export class SigningService {
 
       const currentSequence = currRefundTx.getInput(0).sequence;
       if (!currentSequence) {
-        throw new ValidationError("Invalid refund transaction", {
+        throw new SparkValidationError("Invalid refund transaction", {
           field: "sequence",
           value: currRefundTx.getInput(0),
           expected: "Non-null sequence",
@@ -155,7 +155,7 @@ export class SigningService {
       const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
       if (directRefundTx && !isZeroNode) {
         if (!directNodeTx) {
-          throw new ValidationError(
+          throw new SparkValidationError(
             "Direct node transaction undefined while direct refund transaction is defined",
             {
               field: "directNodeTx",
@@ -221,7 +221,7 @@ export class SigningService {
     for (let i = 0; i < leaves.length; i++) {
       const leaf = leaves[i];
       if (!leaf?.leaf) {
-        throw new ValidationError("Leaf not found in signRefunds", {
+        throw new SparkValidationError("Leaf not found in signRefunds", {
           field: "leaf",
           value: leaf,
           expected: "Non-null leaf",
@@ -234,7 +234,7 @@ export class SigningService {
 
       const sequence = currRefundTx.getInput(0).sequence;
       if (!sequence) {
-        throw new ValidationError("Invalid refund transaction", {
+        throw new SparkValidationError("Invalid refund transaction", {
           field: "sequence",
           value: currRefundTx.getInput(0),
           expected: "Non-null sequence",
@@ -243,7 +243,7 @@ export class SigningService {
 
       const amountSats = currRefundTx.getOutput(0).amount;
       if (amountSats === undefined) {
-        throw new ValidationError("Invalid refund transaction", {
+        throw new SparkValidationError("Invalid refund transaction", {
           field: "amount",
           value: currRefundTx.getOutput(0),
           expected: "Non-null amount",
@@ -289,7 +289,7 @@ export class SigningService {
 
       if (directRefundTx) {
         if (!directNodeTx) {
-          throw new ValidationError(
+          throw new SparkValidationError(
             "Direct node transaction undefined while direct refund transaction is defined",
             {
               field: "directNodeTx",

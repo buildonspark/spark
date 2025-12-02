@@ -1,4 +1,4 @@
-import { ValidationError } from "@buildonspark/spark-sdk";
+import { SparkValidationError } from "@buildonspark/spark-sdk";
 
 /**
  * Returns true when the input is already in NFC normalisation form.
@@ -26,7 +26,7 @@ export function validateTokenParameters(
   maxSupply: bigint,
 ) {
   if (!isNfcNormalized(tokenName)) {
-    throw new ValidationError("Token name must be NFC-normalised UTF-8", {
+    throw new SparkValidationError("Token name must be NFC-normalised UTF-8", {
       field: "tokenName",
       value: tokenName,
       expected: "NFC normalised string",
@@ -34,16 +34,19 @@ export function validateTokenParameters(
   }
 
   if (!isNfcNormalized(tokenTicker)) {
-    throw new ValidationError("Token ticker must be NFC-normalised UTF-8", {
-      field: "tokenTicker",
-      value: tokenTicker,
-      expected: "NFC normalised string",
-    });
+    throw new SparkValidationError(
+      "Token ticker must be NFC-normalised UTF-8",
+      {
+        field: "tokenTicker",
+        value: tokenTicker,
+        expected: "NFC normalised string",
+      },
+    );
   }
 
   const nameBytes = Buffer.from(tokenName, "utf-8").length;
   if (nameBytes < MIN_NAME_SIZE || nameBytes > MAX_NAME_SIZE) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       `Token name must be between ${MIN_NAME_SIZE} and ${MAX_NAME_SIZE} bytes`,
       {
         field: "tokenName",
@@ -56,7 +59,7 @@ export function validateTokenParameters(
 
   const tickerBytes = Buffer.from(tokenTicker, "utf-8").length;
   if (tickerBytes < MIN_SYMBOL_SIZE || tickerBytes > MAX_SYMBOL_SIZE) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       `Token ticker must be between ${MIN_SYMBOL_SIZE} and ${MAX_SYMBOL_SIZE} bytes`,
       {
         field: "tokenTicker",
@@ -72,7 +75,7 @@ export function validateTokenParameters(
     decimals < 0 ||
     decimals > MAX_DECIMALS
   ) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       `Decimals must be an integer between 0 and ${MAX_DECIMALS}`,
       {
         field: "decimals",
@@ -83,7 +86,7 @@ export function validateTokenParameters(
   }
 
   if (maxSupply < 0n || maxSupply > MAXIMUM_MAX_SUPPLY) {
-    throw new ValidationError(`maxSupply must be between 0 and 2^128-1`, {
+    throw new SparkValidationError(`maxSupply must be between 0 and 2^128-1`, {
       field: "maxSupply",
       value: maxSupply.toString(),
       expected: `>=0 and <=${MAXIMUM_MAX_SUPPLY.toString()}`,

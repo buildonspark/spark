@@ -1,4 +1,4 @@
-import { NetworkError } from "../errors/index.js";
+import { SparkRequestError } from "../errors/index.js";
 
 export function collectResponses<T>(responses: PromiseSettledResult<T>[]): T[] {
   // Get successful responses
@@ -16,7 +16,7 @@ export function collectResponses<T>(responses: PromiseSettledResult<T>[]): T[] {
 
   if (failedResponses.length > 0) {
     const errors = failedResponses.map((result) => result.reason).join("\n");
-    throw new NetworkError(
+    throw new SparkRequestError(
       `${failedResponses.length} out of ${responses.length} requests failed, please try again`,
       {
         errorCount: failedResponses.length,

@@ -1,7 +1,7 @@
 import { hexToBytes } from "@noble/hashes/utils";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
-import { ValidationError } from "../errors/types.js";
+import { SparkValidationError } from "../errors/types.js";
 import { getP2TRScriptFromPublicKey, getTxId } from "./bitcoin.js";
 import { Network } from "./network.js";
 
@@ -95,7 +95,7 @@ function createNodeTxs({
 } {
   const parentOutput = parentTx.getOutput(vout);
   if (!parentOutput.amount || !parentOutput.script) {
-    throw new ValidationError("Parent output amount or script not found", {
+    throw new SparkValidationError("Parent output amount or script not found", {
       field: "parentOutput",
       value: parentOutput,
     });
@@ -168,7 +168,7 @@ export function createDecrementedTimelockNodeTx(
 ) {
   const currentSequence = currentTx.getInput(0).sequence;
   if (!currentSequence) {
-    throw new ValidationError("Current sequence not found", {
+    throw new SparkValidationError("Current sequence not found", {
       field: "currentSequence",
       value: currentSequence,
     });
@@ -187,7 +187,7 @@ export function createTestUnilateralTimelockNodeTx(
 ) {
   const sequence = nodeTx.getInput(0).sequence;
   if (!sequence) {
-    throw new ValidationError("Sequence not found", {
+    throw new SparkValidationError("Sequence not found", {
       field: "sequence",
       value: sequence,
     });
@@ -257,17 +257,20 @@ export function getNextHTLCTransactionSequence(
   const isBit30Defined = (currSequence || 0) & (1 << 30);
 
   if (isNodeTx && nextTimelock < 0) {
-    throw new ValidationError("timelock interval is less than 0", {
+    throw new SparkValidationError("timelock interval is less than 0", {
       field: "nextTimelock",
       value: nextTimelock,
       expected: "Non-negative timelock interval",
     });
   } else if (!isNodeTx && nextTimelock <= 0) {
-    throw new ValidationError("timelock interval is less than or equal to 0", {
-      field: "nextTimelock",
-      value: nextTimelock,
-      expected: "Timelock greater than 0",
-    });
+    throw new SparkValidationError(
+      "timelock interval is less than or equal to 0",
+      {
+        field: "nextTimelock",
+        value: nextTimelock,
+        expected: "Timelock greater than 0",
+      },
+    );
   }
 
   // If bit 30 is defined, we need to add it to the next sequence.
@@ -325,7 +328,7 @@ function createRefundTxs({
 
   const nodeAmountSats = nodeTx.getOutput(0).amount;
   if (nodeAmountSats === undefined) {
-    throw new ValidationError("Node amount not found", {
+    throw new SparkValidationError("Node amount not found", {
       field: "nodeAmountSats",
       value: nodeAmountSats,
     });
@@ -340,7 +343,7 @@ function createRefundTxs({
 
     const directAmountSats = directNodeTx.getOutput(0).amount;
     if (directAmountSats === undefined) {
-      throw new ValidationError("Direct amount not found", {
+      throw new SparkValidationError("Direct amount not found", {
         field: "directAmountSats",
         value: directAmountSats,
       });
@@ -457,7 +460,7 @@ export function checkIfValidSequence(currSequence?: number) {
   // Check bit 31 is active. If not equal to 0, timelock is not active.
   const TIME_LOCK_ACTIVE = (currSequence || 0) & 0x80000000;
   if (TIME_LOCK_ACTIVE !== 0) {
-    throw new ValidationError("Timelock not active", {
+    throw new SparkValidationError("Timelock not active", {
       field: "currSequence",
       value: currSequence,
     });
@@ -466,7 +469,7 @@ export function checkIfValidSequence(currSequence?: number) {
   // Check bit 22 is active. If not equal to 0, block based time lock not active.
   const RELATIVE_TIME_LOCK_ACTIVE = (currSequence || 0) & 0x00400000;
   if (RELATIVE_TIME_LOCK_ACTIVE !== 0) {
-    throw new ValidationError("Block based timelock not active", {
+    throw new SparkValidationError("Block based timelock not active", {
       field: "currSequence",
       value: currSequence,
     });
@@ -509,17 +512,20 @@ export function getNextTransactionSequence(
   const isBit30Defined = (currSequence || 0) & (1 << 30);
 
   if (isNodeTx && nextTimelock < 0) {
-    throw new ValidationError("timelock interval is less than 0", {
+    throw new SparkValidationError("timelock interval is less than 0", {
       field: "nextTimelock",
       value: nextTimelock,
       expected: "Non-negative timelock interval",
     });
   } else if (!isNodeTx && nextTimelock <= 0) {
-    throw new ValidationError("timelock interval is less than or equal to 0", {
-      field: "nextTimelock",
-      value: nextTimelock,
-      expected: "Timelock greater than 0",
-    });
+    throw new SparkValidationError(
+      "timelock interval is less than or equal to 0",
+      {
+        field: "nextTimelock",
+        value: nextTimelock,
+        expected: "Timelock greater than 0",
+      },
+    );
   }
 
   return {

@@ -3,7 +3,7 @@ import { bytesToHex, equalBytes, hexToBytes } from "@noble/curves/utils";
 import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { uuidv7 } from "uuidv7";
-import { RPCError } from "../../errors/types.js";
+import { SparkError } from "../../errors/index.js";
 import { KeyDerivation, KeyDerivationType } from "../../signer/types.js";
 import { SparkWalletEvent } from "../../spark-wallet/types.js";
 import { InvoiceStatus, TransferStatus } from "../../proto/spark.js";
@@ -570,7 +570,7 @@ describe.each(walletTypes)(
       //       }),
       //     ).rejects.toThrow(
       //       expect.objectContaining({
-      //         name: ValidationError.name,
+      //         name: SparkValidationError.name,
       //         message: expect.stringMatching(/Invalid Spark address prefix/),
       //         context: expect.objectContaining({
       //           field: "address",
@@ -605,7 +605,7 @@ describe.each(walletTypes)(
       //       }),
       //     ).rejects.toThrow(
       //       expect.objectContaining({
-      //         name: ValidationError.name,
+      //         name: SparkValidationError.name,
       //         message: expect.stringMatching(/No owned leaves found/),
       //       }),
       //     );
@@ -782,9 +782,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
 
     const depositResp = await sdk.getSingleUseDepositAddress();
     if (!depositResp) {
-      throw new RPCError("Deposit address not found", {
-        method: "getDepositAddress",
-      });
+      throw new SparkError("Deposit address not found");
     }
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
@@ -819,9 +817,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
 
     const depositResp = await sdk.getSingleUseDepositAddress();
     if (!depositResp) {
-      throw new RPCError("Deposit address not found", {
-        method: "getDepositAddress",
-      });
+      throw new SparkError("Deposit address not found");
     }
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
@@ -876,9 +872,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     const depositResp = await sdk.getSingleUseDepositAddress();
 
     if (!depositResp) {
-      throw new RPCError("Deposit address not found", {
-        method: "getDepositAddress",
-      });
+      throw new SparkError("Deposit address not found");
     }
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
@@ -952,9 +946,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     const depositResp = await sdk.getSingleUseDepositAddress();
 
     if (!depositResp) {
-      throw new RPCError("Deposit address not found", {
-        method: "getDepositAddress",
-      });
+      throw new SparkError("Deposit address not found");
     }
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
@@ -1023,9 +1015,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     const depositResp = await alice.getSingleUseDepositAddress();
 
     if (!depositResp) {
-      throw new RPCError("Deposit address not found", {
-        method: "getDepositAddress",
-      });
+      throw new SparkError("Deposit address not found");
     }
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
@@ -1087,9 +1077,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     const depositResp = await alice.getSingleUseDepositAddress();
 
     if (!depositResp) {
-      throw new RPCError("Deposit address not found", {
-        method: "getDepositAddress",
-      });
+      throw new SparkError("Deposit address not found");
     }
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
@@ -1158,21 +1146,15 @@ describe.each(walletTypes)(
 
       const depositAddrOne = await sdk.getSingleUseDepositAddress();
       if (!depositAddrOne) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
-        });
+        throw new SparkError("Deposit address not found");
       }
       const depositAddrTwo = await sdk.getSingleUseDepositAddress();
       if (!depositAddrTwo) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
-        });
+        throw new SparkError("Deposit address not found");
       }
       const depositAddrThree = await sdk.getSingleUseDepositAddress();
       if (!depositAddrThree) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
-        });
+        throw new SparkError("Deposit address not found");
       }
 
       const oneThousand = await faucet.sendToAddress(depositAddrOne, 1_000n);
@@ -1283,9 +1265,7 @@ describe.each(walletTypes)(
 
       const depositAddr = await sdk.getSingleUseDepositAddress();
       if (!depositAddr) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
-        });
+        throw new SparkError("Deposit address not found");
       }
 
       const oneThousand = await faucet.sendToAddress(depositAddr, 1_000n);
@@ -1331,9 +1311,7 @@ describe.each(walletTypes)(
 
       const depositAddr = await sdk.getSingleUseDepositAddress();
       if (!depositAddr) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
-        });
+        throw new SparkError("Deposit address not found");
       }
 
       const oneThousand = await faucet.sendToAddress(depositAddr, 1_000n);
@@ -1380,15 +1358,11 @@ describe.each(walletTypes)(
 
       const depositAddr = await sdk.getSingleUseDepositAddress();
       if (!depositAddr) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
-        });
+        throw new SparkError("Deposit address not found");
       }
       const depositAddrTwo = await sdk.getSingleUseDepositAddress();
       if (!depositAddrTwo) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
-        });
+        throw new SparkError("Deposit address not found");
       }
 
       const deposit = await faucet.sendToAddress(depositAddr, 1_000n);

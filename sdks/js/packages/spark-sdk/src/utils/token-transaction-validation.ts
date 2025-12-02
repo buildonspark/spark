@@ -1,4 +1,4 @@
-import { InternalValidationError } from "../errors/types.js";
+import { SparkError } from "../errors/index.js";
 import {
   TokenTransaction as TokenTransaction,
   TokenOutputToSpend as TokenOutputToSpend,
@@ -25,38 +25,29 @@ export function validateTokenTransaction(
   expectedThreshold: number,
 ) {
   if (finalTokenTransaction.network !== partialTokenTransaction.network) {
-    throw new InternalValidationError(
-      "Network mismatch in response token transaction",
-      {
-        value: finalTokenTransaction.network,
-        expected: partialTokenTransaction.network,
-      },
-    );
+    throw new SparkError("Network mismatch in response token transaction", {
+      value: finalTokenTransaction.network,
+      expected: partialTokenTransaction.network,
+    });
   }
 
   if (!finalTokenTransaction.tokenInputs) {
-    throw new InternalValidationError(
-      "Token inputs missing in final transaction",
-      {
-        value: finalTokenTransaction,
-      },
-    );
+    throw new SparkError("Token inputs missing in final transaction", {
+      value: finalTokenTransaction,
+    });
   }
 
   if (!partialTokenTransaction.tokenInputs) {
-    throw new InternalValidationError(
-      "Token inputs missing in partial transaction",
-      {
-        value: partialTokenTransaction,
-      },
-    );
+    throw new SparkError("Token inputs missing in partial transaction", {
+      value: partialTokenTransaction,
+    });
   }
 
   if (
     finalTokenTransaction.tokenInputs.$case !==
     partialTokenTransaction.tokenInputs.$case
   ) {
-    throw new InternalValidationError(
+    throw new SparkError(
       `Transaction type mismatch: final transaction has ${finalTokenTransaction.tokenInputs.$case}, partial transaction has ${partialTokenTransaction.tokenInputs.$case}`,
       {
         value: finalTokenTransaction.tokenInputs.$case,
@@ -69,14 +60,10 @@ export function validateTokenTransaction(
     finalTokenTransaction.sparkOperatorIdentityPublicKeys.length !==
     partialTokenTransaction.sparkOperatorIdentityPublicKeys.length
   ) {
-    throw new InternalValidationError(
-      "Spark operator identity public keys count mismatch",
-      {
-        value: finalTokenTransaction.sparkOperatorIdentityPublicKeys.length,
-        expected:
-          partialTokenTransaction.sparkOperatorIdentityPublicKeys.length,
-      },
-    );
+    throw new SparkError("Spark operator identity public keys count mismatch", {
+      value: finalTokenTransaction.sparkOperatorIdentityPublicKeys.length,
+      expected: partialTokenTransaction.sparkOperatorIdentityPublicKeys.length,
+    });
   }
 
   if (
@@ -87,22 +74,16 @@ export function validateTokenTransaction(
     const partialMintInput = partialTokenTransaction.tokenInputs.mintInput;
 
     if (!finalMintInput.issuerPublicKey || !partialMintInput.issuerPublicKey) {
-      throw new InternalValidationError(
-        "Issuer public key missing in mint input",
-        {
-          value: finalMintInput.issuerPublicKey,
-          expected: partialMintInput.issuerPublicKey,
-        },
-      );
+      throw new SparkError("Issuer public key missing in mint input", {
+        value: finalMintInput.issuerPublicKey,
+        expected: partialMintInput.issuerPublicKey,
+      });
     }
     if (!finalMintInput.tokenIdentifier || !partialMintInput.tokenIdentifier) {
-      throw new InternalValidationError(
-        "Token identifier missing in mint input",
-        {
-          value: finalMintInput.tokenIdentifier,
-          expected: partialMintInput.tokenIdentifier,
-        },
-      );
+      throw new SparkError("Token identifier missing in mint input", {
+        value: finalMintInput.tokenIdentifier,
+        expected: partialMintInput.tokenIdentifier,
+      });
     }
 
     if (
@@ -111,13 +92,10 @@ export function validateTokenTransaction(
         partialMintInput.issuerPublicKey,
       )
     ) {
-      throw new InternalValidationError(
-        "Issuer public key mismatch in mint input",
-        {
-          value: finalMintInput.issuerPublicKey.toString(),
-          expected: partialMintInput.issuerPublicKey.toString(),
-        },
-      );
+      throw new SparkError("Issuer public key mismatch in mint input", {
+        value: finalMintInput.issuerPublicKey.toString(),
+        expected: partialMintInput.issuerPublicKey.toString(),
+      });
     }
 
     if (
@@ -126,13 +104,10 @@ export function validateTokenTransaction(
         partialMintInput.tokenIdentifier,
       )
     ) {
-      throw new InternalValidationError(
-        "Issuer public key mismatch in mint input",
-        {
-          value: finalMintInput.tokenIdentifier.toString(),
-          expected: partialMintInput.tokenIdentifier.toString(),
-        },
-      );
+      throw new SparkError("Issuer public key mismatch in mint input", {
+        value: finalMintInput.tokenIdentifier.toString(),
+        expected: partialMintInput.tokenIdentifier.toString(),
+      });
     }
   } else if (
     partialTokenTransaction.tokenInputs.$case === "transferInput" &&
@@ -146,7 +121,7 @@ export function validateTokenTransaction(
       finalTransferInput.outputsToSpend.length !==
       partialTransferInput.outputsToSpend.length
     ) {
-      throw new InternalValidationError(
+      throw new SparkError(
         "Outputs to spend count mismatch in transfer input",
         {
           value: finalTransferInput.outputsToSpend.length,
@@ -164,7 +139,7 @@ export function validateTokenTransaction(
       ] as TokenOutputToSpend;
 
       if (!finalOutput) {
-        throw new InternalValidationError(
+        throw new SparkError(
           "Token output to spend missing in final transaction",
           {
             outputIndex: i,
@@ -174,7 +149,7 @@ export function validateTokenTransaction(
       }
 
       if (!partialOutput) {
-        throw new InternalValidationError(
+        throw new SparkError(
           "Token output to spend missing in partial transaction",
           {
             outputIndex: i,
@@ -189,7 +164,7 @@ export function validateTokenTransaction(
           partialOutput.prevTokenTransactionHash,
         )
       ) {
-        throw new InternalValidationError(
+        throw new SparkError(
           "Previous token transaction hash mismatch in transfer input",
           {
             outputIndex: i,
@@ -203,7 +178,7 @@ export function validateTokenTransaction(
         finalOutput.prevTokenTransactionVout !==
         partialOutput.prevTokenTransactionVout
       ) {
-        throw new InternalValidationError(
+        throw new SparkError(
           "Previous token transaction vout mismatch in transfer input",
           {
             outputIndex: i,
@@ -219,7 +194,7 @@ export function validateTokenTransaction(
     finalTokenTransaction.tokenOutputs.length !==
     partialTokenTransaction.tokenOutputs.length
   ) {
-    throw new InternalValidationError("Token outputs count mismatch", {
+    throw new SparkError("Token outputs count mismatch", {
       value: finalTokenTransaction.tokenOutputs.length,
       expected: partialTokenTransaction.tokenOutputs.length,
     });
@@ -230,23 +205,17 @@ export function validateTokenTransaction(
     const partialOutput = partialTokenTransaction.tokenOutputs[i];
 
     if (!finalOutput) {
-      throw new InternalValidationError(
-        "Token output missing in final transaction",
-        {
-          outputIndex: i,
-          value: finalOutput,
-        },
-      );
+      throw new SparkError("Token output missing in final transaction", {
+        outputIndex: i,
+        value: finalOutput,
+      });
     }
 
     if (!partialOutput) {
-      throw new InternalValidationError(
-        "Token output missing in partial transaction",
-        {
-          outputIndex: i,
-          value: partialOutput,
-        },
-      );
+      throw new SparkError("Token output missing in partial transaction", {
+        outputIndex: i,
+        value: partialOutput,
+      });
     }
 
     if (
@@ -255,14 +224,11 @@ export function validateTokenTransaction(
         partialOutput.ownerPublicKey,
       )
     ) {
-      throw new InternalValidationError(
-        "Owner public key mismatch in token output",
-        {
-          outputIndex: i,
-          value: finalOutput.ownerPublicKey.toString(),
-          expected: partialOutput.ownerPublicKey.toString(),
-        },
-      );
+      throw new SparkError("Owner public key mismatch in token output", {
+        outputIndex: i,
+        value: finalOutput.ownerPublicKey.toString(),
+        expected: partialOutput.ownerPublicKey.toString(),
+      });
     }
 
     if (
@@ -273,39 +239,30 @@ export function validateTokenTransaction(
         partialOutput.tokenPublicKey!,
       )
     ) {
-      throw new InternalValidationError(
-        "Token public key mismatch in token output",
-        {
-          outputIndex: i,
-          value: finalOutput.tokenPublicKey!.toString(),
-          expected: partialOutput.tokenPublicKey!.toString(),
-        },
-      );
+      throw new SparkError("Token public key mismatch in token output", {
+        outputIndex: i,
+        value: finalOutput.tokenPublicKey!.toString(),
+        expected: partialOutput.tokenPublicKey!.toString(),
+      });
     }
 
     if (
       !areByteArraysEqual(finalOutput.tokenAmount, partialOutput.tokenAmount)
     ) {
-      throw new InternalValidationError(
-        "Token amount mismatch in token output",
-        {
-          outputIndex: i,
-          value: finalOutput.tokenAmount.toString(),
-          expected: partialOutput.tokenAmount.toString(),
-        },
-      );
+      throw new SparkError("Token amount mismatch in token output", {
+        outputIndex: i,
+        value: finalOutput.tokenAmount.toString(),
+        expected: partialOutput.tokenAmount.toString(),
+      });
     }
 
     if (finalOutput.withdrawBondSats !== undefined) {
       if (finalOutput.withdrawBondSats !== expectedWithdrawBondSats) {
-        throw new InternalValidationError(
-          "Withdraw bond sats mismatch in token output",
-          {
-            outputIndex: i,
-            value: finalOutput.withdrawBondSats,
-            expected: expectedWithdrawBondSats,
-          },
-        );
+        throw new SparkError("Withdraw bond sats mismatch in token output", {
+          outputIndex: i,
+          value: finalOutput.withdrawBondSats,
+          expected: expectedWithdrawBondSats,
+        });
       }
     }
 
@@ -314,7 +271,7 @@ export function validateTokenTransaction(
         finalOutput.withdrawRelativeBlockLocktime !==
         expectedWithdrawRelativeBlockLocktime
       ) {
-        throw new InternalValidationError(
+        throw new SparkError(
           "Withdraw relative block locktime mismatch in token output",
           {
             outputIndex: i,
@@ -326,7 +283,7 @@ export function validateTokenTransaction(
     }
 
     if (keyshareInfo.threshold !== expectedThreshold) {
-      throw new InternalValidationError(
+      throw new SparkError(
         "Threshold mismatch: expected " +
           expectedThreshold +
           " but got " +
@@ -344,7 +301,7 @@ export function validateTokenTransaction(
     keyshareInfo.ownerIdentifiers.length !==
     Object.keys(signingOperators).length
   ) {
-    throw new InternalValidationError(
+    throw new SparkError(
       `Keyshare operator count (${keyshareInfo.ownerIdentifiers.length}) does not match signing operator count (${Object.keys(signingOperators).length})`,
       {
         keyshareInfo: keyshareInfo.ownerIdentifiers.length,
@@ -354,17 +311,14 @@ export function validateTokenTransaction(
   }
 
   if (hasDuplicates(keyshareInfo.ownerIdentifiers)) {
-    throw new InternalValidationError(
-      "Duplicate ownerIdentifiers found in keyshareInfo",
-      {
-        keyshareInfo: keyshareInfo.ownerIdentifiers,
-      },
-    );
+    throw new SparkError("Duplicate ownerIdentifiers found in keyshareInfo", {
+      keyshareInfo: keyshareInfo.ownerIdentifiers,
+    });
   }
 
   for (const identifier of keyshareInfo.ownerIdentifiers) {
     if (!signingOperators[identifier]) {
-      throw new InternalValidationError(
+      throw new SparkError(
         `Keyshare operator ${identifier} not found in signing operator list`,
         {
           keyshareInfo: identifier,
@@ -378,7 +332,7 @@ export function validateTokenTransaction(
     finalTokenTransaction.clientCreatedTimestamp!.getTime() !==
     partialTokenTransaction.clientCreatedTimestamp!.getTime()
   ) {
-    throw new InternalValidationError("Client created timestamp mismatch", {
+    throw new SparkError("Client created timestamp mismatch", {
       value: finalTokenTransaction.clientCreatedTimestamp,
       expected: partialTokenTransaction.clientCreatedTimestamp,
     });

@@ -6,7 +6,7 @@ import {
 } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { uuidv7 } from "uuidv7";
-import { NetworkError, ValidationError } from "../errors/types.js";
+import { SparkRequestError, SparkValidationError } from "../errors/types.js";
 import LightningReceiveRequest from "../graphql/objects/LightningReceiveRequest.js";
 import {
   GetSigningCommitmentsResponse,
@@ -111,7 +111,7 @@ export class LightningService {
       descriptionHash,
     );
     if (!invoice) {
-      throw new ValidationError("Failed to create lightning invoice", {
+      throw new SparkValidationError("Failed to create lightning invoice", {
         field: "invoice",
         value: null,
         expected: "Non-null invoice",
@@ -130,7 +130,7 @@ export class LightningService {
       async ([_, operator]) => {
         const share = shares[operator.id];
         if (!share) {
-          throw new ValidationError("Share not found for operator", {
+          throw new SparkValidationError("Share not found for operator", {
             field: "share",
             value: operator.id,
             expected: "Non-null share",
@@ -165,7 +165,7 @@ export class LightningService {
     await Promise.all(promises);
 
     if (errors.length > 0) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to store preimage shares",
         {
           operation: "store_preimage_share",
@@ -216,7 +216,7 @@ export class LightningService {
         count: 3,
       });
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to get signing commitments",
         {
           operation: "get_signing_commitments",
@@ -257,7 +257,7 @@ export class LightningService {
       const isZeroAmountInvoice = !amountMsats;
 
       if (isZeroAmountInvoice && amountSatsToSend === undefined) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           "Invalid amount. User must specify amountSatsToSend for 0 amount lightning invoice",
           {
             field: "amountSatsToSend",
@@ -272,7 +272,7 @@ export class LightningService {
         : Math.ceil(amountMsats / 1000);
 
       if (isNaN(amountSats) || amountSats <= 0) {
-        throw new ValidationError("Invalid amount", {
+        throw new SparkValidationError("Invalid amount", {
           field: "amountSats",
           value: amountSats,
           expected: "greater than 0",
@@ -317,7 +317,7 @@ export class LightningService {
         transferRequest: startTransferRequest,
       });
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to initiate preimage swap",
         {
           operation: "initiate_preimage_swap",
@@ -345,7 +345,7 @@ export class LightningService {
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
       });
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to query user signed refunds",
         {
           operation: "query_user_signed_refunds",
@@ -379,7 +379,7 @@ export class LightningService {
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
       });
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to provide preimage",
         {
           operation: "provide_preimage",
@@ -391,7 +391,7 @@ export class LightningService {
     }
 
     if (!response.transfer) {
-      throw new ValidationError("No transfer returned from coordinator", {
+      throw new SparkValidationError("No transfer returned from coordinator", {
         field: "transfer",
         value: response,
         expected: "Non-null transfer",

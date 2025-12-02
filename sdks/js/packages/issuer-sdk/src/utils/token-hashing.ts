@@ -1,12 +1,12 @@
 import { sha256 } from "@scure/btc-signer/utils";
 import { FreezeTokensPayload } from "@buildonspark/spark-sdk/proto/spark_token";
-import { ValidationError } from "@buildonspark/spark-sdk";
+import { SparkValidationError } from "@buildonspark/spark-sdk";
 
 export function hashFreezeTokensPayload(
   payload: FreezeTokensPayload,
 ): Uint8Array {
   if (!payload) {
-    throw new ValidationError("Freeze tokens payload cannot be nil", {
+    throw new SparkValidationError("Freeze tokens payload cannot be nil", {
       field: "payload",
       value: payload,
       expected: "valid freeze tokens payload",

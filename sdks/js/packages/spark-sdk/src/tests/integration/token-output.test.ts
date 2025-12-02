@@ -3,7 +3,7 @@ import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { WalletConfigService } from "../../services/config.js";
 import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
 import { TokenTransactionService } from "../../services/token-transactions.js";
-import { ValidationError } from "../../errors/types.js";
+import { SparkValidationError } from "../../errors/types.js";
 
 describe.each(walletTypes)(
   "fetch owned token outputs should fail with invalid inputs",
@@ -37,7 +37,7 @@ describe.each(walletTypes)(
         tokenTransactionService.fetchOwnedTokenOutputs({
           ownerPublicKeys: [],
         }),
-      ).rejects.toThrow(ValidationError);
+      ).rejects.toThrow(SparkValidationError);
     });
 
     it("should fail with malformed owner public key", async () => {
@@ -47,7 +47,7 @@ describe.each(walletTypes)(
         tokenTransactionService.fetchOwnedTokenOutputs({
           ownerPublicKeys: [malformedKey],
         }),
-      ).rejects.toThrow(ValidationError);
+      ).rejects.toThrow(SparkValidationError);
     });
 
     it("should fail with malformed issuer public key", async () => {
@@ -61,7 +61,7 @@ describe.each(walletTypes)(
           ownerPublicKeys: [publicKey],
           issuerPublicKeys: [malformedKey],
         }),
-      ).rejects.toThrow(ValidationError);
+      ).rejects.toThrow(SparkValidationError);
     });
 
     it("should fail with malformed token identifier", async () => {
@@ -76,7 +76,7 @@ describe.each(walletTypes)(
           issuerPublicKeys: [publicKey],
           tokenIdentifiers: [malformedIdentifier],
         }),
-      ).rejects.toThrow(ValidationError);
+      ).rejects.toThrow(SparkValidationError);
     });
   },
 );

@@ -9,7 +9,7 @@ import {
   Status,
 } from "nice-grpc-common";
 import { type Channel as ChannelWeb } from "nice-grpc-web";
-import { AuthenticationError } from "../../errors/types.js";
+import { SparkAuthenticationError } from "../../errors/types.js";
 import {
   SparkServiceClient,
   SparkServiceDefinition,
@@ -25,7 +25,7 @@ import {
 } from "../../proto/spark_token.js";
 import { SparkCallOptions } from "../../types/grpc.js";
 import { WalletConfigService } from "../config.js";
-import { SparkSDKError } from "../../errors/base.js";
+import { SparkError } from "../../errors/base.js";
 import type { RetryOptions } from "nice-grpc-client-middleware-retry";
 import { ServerTimeSync, getMonotonicTime } from "../time-sync.js";
 
@@ -346,7 +346,7 @@ export abstract class ConnectionManager {
             const challenge = protectedChallenge?.challenge;
 
             if (!challenge) {
-              throw new AuthenticationError("Invalid challenge response", {
+              throw new SparkAuthenticationError("Invalid challenge response", {
                 endpoint: "get_challenge",
                 reason: "Missing challenge in response",
               });
@@ -385,7 +385,7 @@ export abstract class ConnectionManager {
                 continue;
               }
 
-              throw new AuthenticationError(
+              throw new SparkAuthenticationError(
                 "Authentication failed",
                 { endpoint: "authenticate", reason: error.message },
                 error,
@@ -398,7 +398,7 @@ export abstract class ConnectionManager {
           }
         }
 
-        throw new AuthenticationError(
+        throw new SparkAuthenticationError(
           "Authentication failed after retrying expired challenges",
           {
             endpoint: "authenticate",
@@ -428,7 +428,7 @@ export abstract class ConnectionManager {
       );
       return client;
     } catch (error) {
-      throw new SparkSDKError(
+      throw new SparkError(
         "Failed to create Spark Authn gRPC connection",
         {},
         error instanceof Error ? error : new Error(String(error)),

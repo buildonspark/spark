@@ -2,7 +2,7 @@ import * as btc from "@scure/btc-signer";
 import { bech32, bech32m } from "@scure/base";
 import { Network as NetworkProto } from "../proto/spark.js";
 import { BitcoinNetwork } from "../graphql/objects/BitcoinNetwork.js";
-import { ValidationError } from "../errors/index.js";
+import { SparkValidationError } from "../errors/index.js";
 
 export enum Network {
   MAINNET,
@@ -75,7 +75,7 @@ export function getNetworkFromAddress(address: string) {
       return BitcoinNetwork.REGTEST;
     }
   } catch (err) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "Invalid Bitcoin address",
       {
         field: "address",

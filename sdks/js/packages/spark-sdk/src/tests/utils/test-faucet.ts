@@ -4,7 +4,7 @@ import * as btc from "@scure/btc-signer";
 import { Address, OutScript, SigHash, Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
 import { taprootTweakPrivKey } from "@scure/btc-signer/utils";
-import { RPCError } from "../../errors/index.js";
+import { SparkRequestError } from "../../errors/index.js";
 import {
   getP2TRAddressFromPkScript,
   getP2TRAddressFromPublicKey,
@@ -342,22 +342,25 @@ export class BitcoinFaucet {
       const data = await response.json();
       if (data.error) {
         console.error(`RPC Error for method ${method}:`, data.error);
-        throw new RPCError(`Bitcoin RPC error: ${data.error.message}`, {
-          method,
-          params,
-          code: data.error.code,
-        });
+        throw new SparkRequestError(
+          `Bitcoin RPC error: ${data.error.message}`,
+          {
+            bitcoinRpcMethod: method,
+            params,
+            code: data.error.code,
+          },
+        );
       }
 
       return data.result;
     } catch (error) {
-      if (error instanceof RPCError) {
+      if (error instanceof SparkRequestError) {
         throw error;
       }
-      throw new RPCError(
+      throw new SparkRequestError(
         "Failed to call Bitcoin RPC",
         {
-          method,
+          bitcoinRpcMethod: method,
           params,
         },
         error as Error,

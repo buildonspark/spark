@@ -4,11 +4,11 @@ import {
   decodeSparkAddress,
   encodeBech32mTokenIdentifier,
   encodeSparkAddress,
-  NetworkError,
-  NotImplementedError,
+  SparkError,
   SparkSigner,
   SparkWallet,
-  ValidationError,
+  SparkRequestError,
+  SparkValidationError,
   type ConfigOptions,
 } from "@buildonspark/spark-sdk";
 import { OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark_token";
@@ -77,7 +77,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
   /**
    * Retrieves information about the issuer's token.
    * @returns An object containing token information including public key, name, symbol, decimals, max supply, and freeze status
-   * @throws {NetworkError} If the token metadata cannot be retrieved
+   * @throws {SparkRequestError} If the token metadata cannot be retrieved
    */
   public async getIssuerTokenMetadata(): Promise<IssuerTokenMetadata> {
     const issuerPublicKey = await super.getIdentityPublicKey();
@@ -109,7 +109,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
         issuerPublicKeys: Array.of(hexToBytes(issuerPublicKey)),
       });
       if (response.tokenMetadata.length === 0) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           "Token metadata not found - If a token has not yet been created, please create it first. Try again in a few seconds.",
           {
             field: "tokenMetadata",
@@ -137,17 +137,14 @@ export abstract class IssuerSparkWallet extends SparkWallet {
         isFreezable: metadata.isFreezable,
       };
     } catch (error) {
-      throw new NetworkError("Failed to fetch token metadata", {
-        errorCount: 1,
-        errors: error instanceof Error ? error.message : String(error),
-      });
+      throw new SparkRequestError("Failed to fetch token metadata", { error });
     }
   }
 
   /**
    * Retrieves the bech32m encoded token identifier for the issuer's token.
    * @returns The bech32m encoded token identifier for the issuer's token
-   * @throws {NetworkError} If the token identifier cannot be retrieved
+   * @throws {SparkRequestError} If the token identifier cannot be retrieved
    */
   public async getIssuerTokenIdentifier(): Promise<Bech32mTokenIdentifier> {
     const tokenMetadata = await this.getIssuerTokenMetadata();
@@ -170,8 +167,8 @@ export abstract class IssuerSparkWallet extends SparkWallet {
    *
    * @returns The transaction ID of the announcement.
    *
-   * @throws {ValidationError} If `decimals` is not a safe integer or other validation fails.
-   * @throws {NetworkError} If the announcement transaction cannot be broadcast.
+   * @throws {SparkValidationError} If `decimals` is not a safe integer or other validation fails.
+   * @throws {SparkRequestError} If the announcement transaction cannot be broadcast.
    */
   public async createToken({
     tokenName,
@@ -353,10 +350,10 @@ export abstract class IssuerSparkWallet extends SparkWallet {
 
   /**
    * Retrieves the distribution information for the issuer's token.
-   * @throws {NotImplementedError} This feature is not yet supported
+   * @throws {SparkError} This feature is not yet supported
    */
   public async getIssuerTokenDistribution(): Promise<TokenDistribution> {
-    throw new NotImplementedError("Token distribution is not yet supported");
+    throw new SparkError("Token distribution is not yet supported");
   }
 
   protected getTraceName(methodName: string) {

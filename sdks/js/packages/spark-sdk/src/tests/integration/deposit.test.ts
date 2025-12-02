@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { RPCError } from "../../errors/types.js";
+import { SparkError } from "../../errors/index.js";
 import { getTxId } from "../../utils/bitcoin.js";
 import { getNetwork, Network } from "../../utils/network.js";
 import { walletTypes } from "../test-utils.js";
@@ -73,9 +73,7 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
 
     const depositResp = await sdk.getSingleUseDepositAddress();
     if (!depositResp) {
-      throw new RPCError("Deposit address not found", {
-        method: "getDepositAddress",
-      });
+      throw new SparkError("Deposit address not found");
     }
 
     const signedTx = await faucet.sendToAddress(depositResp, 100_000n);
@@ -96,9 +94,7 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
     // Generate deposit address
     const depositResp = await sdk.getSingleUseDepositAddress();
     if (!depositResp) {
-      throw new RPCError("Deposit address not found", {
-        method: "getDepositAddress",
-      });
+      throw new SparkError("Deposit address not found");
     }
 
     const signedTx = await faucet.sendToAddress(depositResp, 100_000n);

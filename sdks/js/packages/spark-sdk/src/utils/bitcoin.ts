@@ -4,7 +4,7 @@ import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import * as btc from "@scure/btc-signer";
 import { TransactionOutput } from "@scure/btc-signer/psbt";
-import { ValidationError } from "../errors/index.js";
+import { SparkValidationError } from "../errors/index.js";
 import { getNetwork, Network } from "./network.js";
 
 // const t = tapTweak(pubKey, h); // t = int_from_bytes(tagged_hash("TapTweak", pubkey + h)
@@ -12,7 +12,7 @@ import { getNetwork, Network } from "./network.js";
 // const Q = P.add(Point.fromPrivateKey(t)); // Q = point_add(P, point_mul(G, t))
 export function computeTaprootKeyNoScript(pubkey: Uint8Array): Uint8Array {
   if (pubkey.length !== 32) {
-    throw new ValidationError("Public key must be 32 bytes", {
+    throw new SparkValidationError("Public key must be 32 bytes", {
       field: "pubkey",
       value: pubkey.length,
       expected: 32,
@@ -36,7 +36,7 @@ export function getP2TRScriptFromPublicKey(
   network: Network,
 ): Uint8Array {
   if (pubKey.length !== 33) {
-    throw new ValidationError("Public key must be 33 bytes", {
+    throw new SparkValidationError("Public key must be 33 bytes", {
       field: "pubKey",
       value: pubKey.length,
       expected: 33,
@@ -50,7 +50,7 @@ export function getP2TRScriptFromPublicKey(
     getNetwork(network),
   ).script;
   if (!script) {
-    throw new ValidationError("Failed to get P2TR script", {
+    throw new SparkValidationError("Failed to get P2TR script", {
       field: "script",
       value: "null",
     });
@@ -63,7 +63,7 @@ export function getP2TRAddressFromPublicKey(
   network: Network,
 ): string {
   if (pubKey.length !== 33) {
-    throw new ValidationError("Public key must be 33 bytes", {
+    throw new SparkValidationError("Public key must be 33 bytes", {
       field: "pubKey",
       value: pubKey.length,
       expected: 33,
@@ -77,7 +77,7 @@ export function getP2TRAddressFromPublicKey(
     getNetwork(network),
   ).address;
   if (!address) {
-    throw new ValidationError("Failed to get P2TR address", {
+    throw new SparkValidationError("Failed to get P2TR address", {
       field: "address",
       value: "null",
     });
@@ -90,7 +90,7 @@ export function getP2TRAddressFromPkScript(
   network: Network,
 ): string {
   if (pkScript.length !== 34 || pkScript[0] !== 0x51 || pkScript[1] !== 0x20) {
-    throw new ValidationError("Invalid pkscript", {
+    throw new SparkValidationError("Invalid pkscript", {
       field: "pkScript",
       value: bytesToHex(pkScript),
       expected: "34 bytes starting with 0x51 0x20",
@@ -107,7 +107,7 @@ export function getP2WPKHAddressFromPublicKey(
   network: Network,
 ): string {
   if (pubKey.length !== 33) {
-    throw new ValidationError("Public key must be 33 bytes", {
+    throw new SparkValidationError("Public key must be 33 bytes", {
       field: "pubKey",
       value: pubKey.length,
       expected: 33,
@@ -116,7 +116,7 @@ export function getP2WPKHAddressFromPublicKey(
 
   const address = btc.p2wpkh(pubKey, getNetwork(network)).address;
   if (!address) {
-    throw new ValidationError("Failed to get P2WPKH address", {
+    throw new SparkValidationError("Failed to get P2WPKH address", {
       field: "address",
       value: "null",
     });
@@ -131,7 +131,7 @@ export function getTxFromRawTxHex(rawTxHex: string): btc.Transaction {
   });
 
   if (!tx) {
-    throw new ValidationError("Failed to parse transaction", {
+    throw new SparkValidationError("Failed to parse transaction", {
       field: "tx",
       value: "null",
     });
@@ -144,7 +144,7 @@ export function getTxFromRawTxBytes(rawTxBytes: Uint8Array): btc.Transaction {
     allowUnknownOutputs: true,
   });
   if (!tx) {
-    throw new ValidationError("Failed to parse transaction", {
+    throw new SparkValidationError("Failed to parse transaction", {
       field: "tx",
       value: "null",
     });
@@ -160,7 +160,7 @@ export function getSigHashFromTx(
   // For Taproot, we use preimageWitnessV1 with SIGHASH_DEFAULT (0x00)
   const prevScript = prevOutput.script;
   if (!prevScript) {
-    throw new ValidationError("No script found in prevOutput", {
+    throw new SparkValidationError("No script found in prevOutput", {
       field: "prevScript",
       value: "null",
     });
@@ -168,7 +168,7 @@ export function getSigHashFromTx(
 
   const amount = prevOutput.amount;
   if (!amount) {
-    throw new ValidationError("No amount found in prevOutput", {
+    throw new SparkValidationError("No amount found in prevOutput", {
       field: "amount",
       value: "null",
     });

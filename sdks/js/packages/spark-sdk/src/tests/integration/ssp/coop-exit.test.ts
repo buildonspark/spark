@@ -133,7 +133,7 @@ describe("SSP coop exit integration", () => {
   //       receiverSparkAddress: sparkAddress,
   //     }),
   //   ).rejects.toMatchObject({
-  //     name: ValidationError.name,
+  //     name: SparkValidationError.name,
   //     message: expect.stringContaining("No owned leaves found"),
   //     context: expect.objectContaining({
   //       field: "leaves",

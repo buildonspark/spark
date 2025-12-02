@@ -12,7 +12,7 @@ import {
   type ClientFactory as ClientFactoryWeb,
 } from "nice-grpc-web";
 import { clientEnv } from "../../constants.js";
-import { NetworkError } from "../../errors/types.js";
+import { SparkRequestError } from "../../errors/types.js";
 import type { SparkServiceDefinition } from "../../proto/spark.js";
 import type { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
 import type { SparkTokenServiceDefinition } from "../../proto/spark_token.js";
@@ -47,14 +47,9 @@ export class ConnectionManagerBrowser extends ConnectionManager {
       return createChannel(address, this.transport);
     } catch (error) {
       console.error("Channel creation error:", error);
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to create channel",
-        {
-          url: address,
-          operation: "createChannel",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
+        { url: address },
         error as Error,
       );
     }

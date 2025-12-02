@@ -1,6 +1,6 @@
 import {
   type BaseConnectionManager,
-  NetworkError,
+  SparkRequestError,
   WalletConfigService,
   collectResponses,
 } from "@buildonspark/spark-sdk";
@@ -83,14 +83,9 @@ export class TokenFreezeService {
             response,
           };
         } catch (error) {
-          throw new NetworkError(
+          throw new SparkRequestError(
             `Failed to send a freeze/unfreeze operation to operator: ${operator.address}`,
-            {
-              operation: "freeze_tokens",
-              errorCount: 1,
-              errors: error instanceof Error ? error.message : String(error),
-            },
-            error instanceof Error ? error : undefined,
+            { operation: "freeze_tokens", error },
           );
         }
       }),

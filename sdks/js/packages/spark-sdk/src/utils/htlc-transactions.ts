@@ -13,8 +13,8 @@ import { TaprootControlBlock, TransactionInput } from "@scure/btc-signer/psbt";
 
 import { maybeApplyFee, getEphemeralAnchorOutput } from "./transaction.js";
 import { getTxId } from "../utils/bitcoin.js";
-import { ValidationError } from "../errors/types.js";
 import { tapLeafHash } from "@scure/btc-signer/payment";
+import { SparkValidationError } from "../errors/types.js";
 
 interface CreateLightningRefundTxsInput {
   nodeTx: Transaction;
@@ -93,7 +93,7 @@ export function createRefundTxsForLightning({
       network,
     });
   } else if (directInput && !directSequence) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "directSequence must be provided if directInput is",
       {
         field: "directSequence",
@@ -274,7 +274,7 @@ export function createSenderSpendTx({
   const amount = htlcTx.getOutput(0)?.amount! - BigInt(fee);
 
   if (amount <= 0n) {
-    throw new ValidationError("Fee is greater than the amount", {
+    throw new SparkValidationError("Fee is greater than the amount", {
       field: "fee",
       value: fee,
     });
@@ -369,7 +369,7 @@ export function createReceiverSpendTx({
 
   const amount = htlcTx.getOutput(0)?.amount! - BigInt(fee);
   if (amount <= 0n) {
-    throw new ValidationError("Fee is greater than the amount", {
+    throw new SparkValidationError("Fee is greater than the amount", {
       field: "fee",
       value: fee,
     });

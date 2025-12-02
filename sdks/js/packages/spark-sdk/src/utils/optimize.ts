@@ -1,10 +1,10 @@
-import { InternalValidationError } from "../errors/types.js";
+import { SparkError } from "../errors/index.js";
 
 const DENOMINATIONS: number[] = Array.from({ length: 28 }, (_, i) => 2 ** i);
 
 function assert(condition: boolean, message?: string): asserts condition {
   if (!condition) {
-    throw new InternalValidationError(message || "Assertion failed");
+    throw new SparkError(message || "Assertion failed");
   }
 }
 

@@ -1,5 +1,5 @@
 import { numberToBytesBE, bytesToNumberBE } from "@noble/curves/utils";
-import { ValidationError } from "../errors/types.js";
+import { SparkValidationError } from "../errors/types.js";
 import { OutputWithPreviousTransactionData } from "../proto/spark_token.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection/connection.js";
@@ -159,7 +159,7 @@ describe("select token outputs", () => {
       expect(result[0]!.output!.id).toBe("output1");
     });
 
-    it("should throw ValidationError when tokenAmount is 0", () => {
+    it("should throw SparkValidationError when tokenAmount is 0", () => {
       const tokenOutputs = [createMockTokenOutput("output1", 100n)];
 
       expect(() =>
@@ -168,10 +168,10 @@ describe("select token outputs", () => {
           0n,
           "SMALL_FIRST",
         ),
-      ).toThrow(ValidationError);
+      ).toThrow(SparkValidationError);
     });
 
-    it("should throw ValidationError when available token amount is less than needed", () => {
+    it("should throw SparkValidationError when available token amount is less than needed", () => {
       const tokenOutputs = [
         createMockTokenOutput("output1", 100n),
         createMockTokenOutput("output2", 50n),
@@ -183,7 +183,7 @@ describe("select token outputs", () => {
           500n,
           "SMALL_FIRST",
         ),
-      ).toThrow(ValidationError);
+      ).toThrow(SparkValidationError);
     });
 
     it("should select all outputs if needed", () => {

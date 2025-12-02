@@ -1,7 +1,7 @@
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { uuidv7 } from "uuidv7";
-import { NetworkError, ValidationError } from "../errors/types.js";
+import { SparkRequestError, SparkValidationError } from "../errors/types.js";
 import {
   CooperativeExitResponse,
   LeafRefundTxSigningJob,
@@ -87,7 +87,7 @@ export class CoopExitService extends BaseTransferService {
     directFromCpfpSignaturesMap: Map<string, Uint8Array>;
   }> {
     if (leaves.length !== connectorOutputs.length) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Mismatch between leaves and connector outputs",
         {
           field: "leaves/connectorOutputs",
@@ -106,7 +106,7 @@ export class CoopExitService extends BaseTransferService {
     for (let i = 0; i < leaves.length; i++) {
       const leaf = leaves[i];
       if (!leaf) {
-        throw new ValidationError("Missing leaf", {
+        throw new SparkValidationError("Missing leaf", {
           field: "leaf",
           value: leaf,
           expected: "Valid leaf object",
@@ -114,7 +114,7 @@ export class CoopExitService extends BaseTransferService {
       }
       const connectorOutput = connectorOutputs[i];
       if (!connectorOutput) {
-        throw new ValidationError("Missing connector output", {
+        throw new SparkValidationError("Missing connector output", {
           field: "connectorOutput",
           value: connectorOutput,
           expected: "Valid connector output",
@@ -130,7 +130,7 @@ export class CoopExitService extends BaseTransferService {
 
       const currentRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
       if (!currentRefundTx) {
-        throw new ValidationError("Invalid refund transaction", {
+        throw new SparkValidationError("Invalid refund transaction", {
           field: "currentRefundTx",
           value: currentRefundTx,
           expected: "Non-null refund transaction",
@@ -139,7 +139,7 @@ export class CoopExitService extends BaseTransferService {
 
       const currentSequence = currentRefundTx.getInput(0).sequence;
       if (!currentSequence) {
-        throw new ValidationError("Invalid refund transaction", {
+        throw new SparkValidationError("Invalid refund transaction", {
           field: "sequence",
           value: currentRefundTx.getInput(0),
           expected: "Non-null sequence",
@@ -241,7 +241,7 @@ export class CoopExitService extends BaseTransferService {
         exitTxid: exitTxId,
       });
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to initiate cooperative exit",
         {
           operation: "cooperative_exit",
@@ -253,7 +253,7 @@ export class CoopExitService extends BaseTransferService {
     }
 
     if (!response.transfer) {
-      throw new NetworkError("Failed to initiate cooperative exit", {
+      throw new SparkRequestError("Failed to initiate cooperative exit", {
         operation: "cooperative_exit",
         errors: "No transfer in response",
       });

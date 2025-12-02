@@ -1,7 +1,7 @@
 import { mod } from "@noble/curves/abstract/modular";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/utils";
-import { ValidationError } from "../errors/index.js";
+import { SparkValidationError } from "../errors/index.js";
 
 export function generateSignatureFromExistingAdaptor(
   signature: Uint8Array,
@@ -178,13 +178,13 @@ function parseSignature(signature: Uint8Array): {
   s: Uint8Array;
 } {
   if (signature.length < 64) {
-    throw new ValidationError("Signature too short", {
+    throw new SparkValidationError("Signature too short", {
       expectedLength: 64,
       actualLength: signature.length,
     });
   }
   if (signature.length > 64) {
-    throw new ValidationError("Signature too long", {
+    throw new SparkValidationError("Signature too long", {
       expectedLength: 64,
       actualLength: signature.length,
     });
@@ -194,14 +194,14 @@ function parseSignature(signature: Uint8Array): {
   const s = signature.slice(32, 64);
 
   if (bytesToNumberBE(r) >= secp256k1.CURVE.Fp.ORDER) {
-    throw new ValidationError("Invalid signature: r >= field prime", {
+    throw new SparkValidationError("Invalid signature: r >= field prime", {
       rValue: bytesToNumberBE(r),
       fieldPrime: secp256k1.CURVE.Fp.ORDER,
     });
   }
 
   if (bytesToNumberBE(s) >= secp256k1.CURVE.n) {
-    throw new ValidationError("Invalid signature: s >= group order", {
+    throw new SparkValidationError("Invalid signature: s >= group order", {
       sValue: bytesToNumberBE(s),
       groupOrder: secp256k1.CURVE.n,
     });

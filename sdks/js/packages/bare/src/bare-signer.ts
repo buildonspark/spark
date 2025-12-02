@@ -1,7 +1,7 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import {
   DefaultSparkSigner,
-  ValidationError,
+  SparkValidationError,
   getSparkFrost,
   type SignFrostParams,
   type AggregateFrostParams,
@@ -26,7 +26,7 @@ export class BareSparkSigner extends DefaultSparkSigner {
       await this.getSigningPrivateKeyFromDerivation(keyDerivation);
 
     if (!signingPrivateKey) {
-      throw new ValidationError("Private key not found for public key", {
+      throw new SparkValidationError("Private key not found for public key", {
         field: "privateKey",
       });
     }
@@ -34,7 +34,7 @@ export class BareSparkSigner extends DefaultSparkSigner {
     const commitment = selfCommitment.commitment;
     const nonce = this.commitmentToNonceMap.get(commitment);
     if (!nonce) {
-      throw new ValidationError("Nonce not found for commitment", {
+      throw new SparkValidationError("Nonce not found for commitment", {
         field: "nonce",
       });
     }

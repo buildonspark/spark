@@ -14,7 +14,7 @@ import type { ClientMiddleware } from "nice-grpc-common";
 import { Metadata, Status } from "nice-grpc-common";
 import { openTelemetryClientMiddleware } from "nice-grpc-opentelemetry";
 import { clientEnv } from "../../constants.js";
-import { NetworkError } from "../../errors/types.js";
+import { SparkRequestError } from "../../errors/types.js";
 import { MockServiceClient, MockServiceDefinition } from "../../proto/mock.js";
 import { SparkServiceDefinition } from "../../proto/spark.js";
 import { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
@@ -82,16 +82,10 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
         return ch;
       }
     } catch (error) {
-      console.error("Channel creation error:", error);
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to create channel",
-        {
-          url: address,
-          operation: "createChannel",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
+        { url: address },
+        error instanceof Error ? error : undefined,
       );
     }
   }

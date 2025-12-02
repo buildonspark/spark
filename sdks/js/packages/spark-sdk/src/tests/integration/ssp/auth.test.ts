@@ -3,7 +3,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import SspClient from "../../../graphql/client.js";
 import { ConfigOptions } from "../../../services/wallet-config.js";
 import { SparkWalletTesting } from "../../utils/spark-testing-wallet.js";
-import { AuthenticationError } from "../../../errors/types.js";
+import { SparkAuthenticationError } from "../../../errors/types.js";
 
 const options: ConfigOptions = {
   network: "LOCAL",
@@ -37,7 +37,7 @@ describe("SSP Auth Test", () => {
           amountSats: 1000,
         }),
       ).rejects.toMatchObject({
-        name: AuthenticationError.name,
+        name: SparkAuthenticationError.name,
         context: expect.objectContaining({
           endpoint: "graphql",
         }),

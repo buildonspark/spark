@@ -1,6 +1,6 @@
 import { encodeSparkAddress, SparkAddressFormat } from "./address.js";
 import * as btc from "@scure/btc-signer";
-import { ValidationError } from "../errors/index.js";
+import { SparkValidationError } from "../errors/index.js";
 
 const networkByType = {
   MAINNET: btc.NETWORK,
@@ -32,5 +32,5 @@ export function getSparkAddressFromTaproot(
     } catch (_) {}
   }
 
-  throw new ValidationError("Invalid taproot address");
+  throw new SparkValidationError("Invalid taproot address");
 }

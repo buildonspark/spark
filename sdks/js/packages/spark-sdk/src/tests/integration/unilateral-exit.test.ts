@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { bytesToHex } from "@noble/hashes/utils";
 
-import { RPCError } from "../../errors/types.js";
+import { SparkError } from "../../errors/index.js";
 import { Network } from "../../utils/network.js";
 import { SparkWalletTestingIntegration } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
@@ -27,9 +27,7 @@ describe("unilateral exit", () => {
     const depositResp = await userWallet.getSingleUseDepositAddress();
 
     if (!depositResp) {
-      throw new RPCError("Deposit address not found", {
-        method: "getDepositAddress",
-      });
+      throw new SparkError("Deposit address not found");
     }
 
     const signedTx = await faucet.sendToAddress(depositResp, 100_000n);

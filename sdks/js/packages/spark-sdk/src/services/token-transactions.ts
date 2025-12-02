@@ -4,7 +4,7 @@ import {
   numberToBytesBE,
 } from "@noble/curves/utils";
 import { hexToBytes } from "@noble/hashes/utils";
-import { NetworkError, ValidationError } from "../errors/types.js";
+import { SparkRequestError, SparkValidationError } from "../errors/types.js";
 import {
   Direction,
   OperatorSpecificTokenTransactionSignablePayload,
@@ -97,7 +97,7 @@ export class TokenTransactionService {
     selectedOutputs?: OutputWithPreviousTransactionData[];
   }): Promise<string> {
     if (!Array.isArray(receiverOutputs) || receiverOutputs.length === 0) {
-      throw new ValidationError("No receiver outputs provided", {
+      throw new SparkValidationError("No receiver outputs provided", {
         field: "receiverOutputs",
         value: receiverOutputs,
         expected: "Non-empty array",
@@ -123,7 +123,7 @@ export class TokenTransactionService {
           tokenIdentifier,
         )
       ) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           "One or more selected TTXOs are not available",
           {
             field: "selectedOutputs",
@@ -151,7 +151,7 @@ export class TokenTransactionService {
       const maxOutputsToUse = sortedOutputs.slice(0, MAX_TOKEN_OUTPUTS_TX);
       const maxAmount = sumAvailableTokens(maxOutputsToUse);
 
-      throw new ValidationError(
+      throw new SparkValidationError(
         `Cannot transfer more than ${MAX_TOKEN_OUTPUTS_TX} TTXOs in a single transaction (${outputsToUse.length} selected). Maximum transferable amount is: ${maxAmount}`,
         {
           field: "outputsToUse",
@@ -426,7 +426,7 @@ export class TokenTransactionService {
       const ownerPubkey =
         partialTokenTransaction.partialTokenOutputs[0]?.ownerPublicKey;
       if (!ownerPubkey) {
-        throw new ValidationError("Invalid mint input", {
+        throw new SparkValidationError("Invalid mint input", {
           field: "ownerPubkey",
           value: null,
           expected: "Non-null ownerPubkey",
@@ -446,7 +446,7 @@ export class TokenTransactionService {
       const issuerPublicKey =
         partialTokenTransaction.tokenInputs.createInput.issuerPublicKey;
       if (!issuerPublicKey) {
-        throw new ValidationError("Invalid create input", {
+        throw new SparkValidationError("Invalid create input", {
           field: "issuerPublicKey",
           value: null,
           expected: "Non-null issuer public key",
@@ -464,7 +464,7 @@ export class TokenTransactionService {
       });
     } else if (partialTokenTransaction.tokenInputs?.$case === "transferInput") {
       if (!outputsToSpendSigningPublicKeys) {
-        throw new ValidationError("Invalid transfer input", {
+        throw new SparkValidationError("Invalid transfer input", {
           field: "outputsToSpend",
           value: {
             signingPublicKeys: outputsToSpendSigningPublicKeys,
@@ -475,7 +475,7 @@ export class TokenTransactionService {
 
       for (const [i, key] of outputsToSpendSigningPublicKeys.entries()) {
         if (!key) {
-          throw new ValidationError("Invalid signing key", {
+          throw new SparkValidationError("Invalid signing key", {
             field: "outputsToSpendSigningPublicKeys",
             value: i,
             expected: "Non-null signing key",
@@ -537,7 +537,7 @@ export class TokenTransactionService {
       const tokenIdentifier =
         tokenTransaction.tokenInputs!.mintInput.tokenIdentifier;
       if (!tokenIdentifier) {
-        throw new ValidationError("Invalid mint input", {
+        throw new SparkValidationError("Invalid mint input", {
           field: "tokenIdentifier",
           value: null,
           expected: "Non-null tokenIdentifier",
@@ -545,7 +545,7 @@ export class TokenTransactionService {
       }
       const ownerPubkey = tokenTransaction.tokenOutputs[0]!.ownerPublicKey;
       if (!ownerPubkey) {
-        throw new ValidationError("Invalid mint input", {
+        throw new SparkValidationError("Invalid mint input", {
           field: "ownerPubkey",
           value: null,
           expected: "Non-null ownerPubkey",
@@ -565,7 +565,7 @@ export class TokenTransactionService {
       const issuerPublicKey =
         tokenTransaction.tokenInputs!.createInput.issuerPublicKey;
       if (!issuerPublicKey) {
-        throw new ValidationError("Invalid create input", {
+        throw new SparkValidationError("Invalid create input", {
           field: "issuerPublicKey",
           value: null,
           expected: "Non-null issuer public key",
@@ -583,7 +583,7 @@ export class TokenTransactionService {
       });
     } else if (tokenTransaction.tokenInputs!.$case === "transferInput") {
       if (!outputsToSpendSigningPublicKeys || !outputsToSpendCommitments) {
-        throw new ValidationError("Invalid transfer input", {
+        throw new SparkValidationError("Invalid transfer input", {
           field: "outputsToSpend",
           value: {
             signingPublicKeys: outputsToSpendSigningPublicKeys,
@@ -595,7 +595,7 @@ export class TokenTransactionService {
 
       for (const [i, key] of outputsToSpendSigningPublicKeys.entries()) {
         if (!key) {
-          throw new ValidationError("Invalid signing key", {
+          throw new SparkValidationError("Invalid signing key", {
             field: "outputsToSpendSigningPublicKeys",
             value: i,
             expected: "Non-null signing key",
@@ -696,14 +696,10 @@ export class TokenTransactionService {
         } as SparkCallOptions,
       );
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to sign token transaction",
-        {
-          operation: "sign_token_transaction",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
+        { operation: "commit_transaction" },
+        error instanceof Error ? error : undefined,
       );
     }
   }
@@ -718,7 +714,7 @@ export class TokenTransactionService {
     } = params;
 
     if (ownerPublicKeys.length === 0) {
-      throw new ValidationError("Owner public keys cannot be empty", {
+      throw new SparkValidationError("Owner public keys cannot be empty", {
         field: "ownerPublicKeys",
         value: ownerPublicKeys,
         expected: "Non-empty array",
@@ -732,7 +728,7 @@ export class TokenTransactionService {
     }
     for (const tokenIdentifier of tokenIdentifiers) {
       if (tokenIdentifier.length !== 32) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           "Token identifier must be 32 bytes (64 hex characters) long.",
           {
             field: "tokenIdentifier",
@@ -777,14 +773,10 @@ export class TokenTransactionService {
 
       return allOutputs;
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to fetch owned token outputs",
-        {
-          operation: "spark_token.query_token_outputs",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
+        { operation: "query_token_outputs" },
+        error instanceof Error ? error : undefined,
       );
     }
   }
@@ -841,14 +833,10 @@ export class TokenTransactionService {
     try {
       return await tokenClient.query_token_transactions(queryParams);
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to query token transactions",
-        {
-          operation: "spark_token.query_token_transactions",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
+        { operation: "query_token_transactions" },
+        error instanceof Error ? error : undefined,
       );
     }
   }
@@ -859,7 +847,7 @@ export class TokenTransactionService {
     strategy: "SMALL_FIRST" | "LARGE_FIRST",
   ): OutputWithPreviousTransactionData[] {
     if (tokenAmount <= 0n) {
-      throw new ValidationError("Token amount must be greater than 0", {
+      throw new SparkValidationError("Token amount must be greater than 0", {
         field: "tokenAmount",
         value: tokenAmount,
         expected: "Greater than 0",
@@ -867,7 +855,7 @@ export class TokenTransactionService {
     }
 
     if (sumAvailableTokens(tokenOutputs) < tokenAmount) {
-      throw new ValidationError("Insufficient token amount", {
+      throw new SparkValidationError("Insufficient token amount", {
         field: "tokenAmount",
         value: sumAvailableTokens(tokenOutputs),
         expected: tokenAmount,
@@ -911,7 +899,7 @@ export class TokenTransactionService {
       // If we've gone through all outputs and still don't have enough, check if we have more outputs available
       if (count >= sortedOutputs.length) {
         // No more outputs available - this should have been caught by the earlier check
-        throw new ValidationError("Insufficient funds", {
+        throw new SparkValidationError("Insufficient funds", {
           field: "tokenAmount",
           value: sum,
           expected: tokenAmount,
@@ -949,7 +937,7 @@ export class TokenTransactionService {
       }
 
       if (smallSum < tokenAmount) {
-        throw new ValidationError("Insufficient funds", {
+        throw new SparkValidationError("Insufficient funds", {
           field: "tokenAmount",
           value: smallSum,
           expected: tokenAmount,
@@ -971,7 +959,7 @@ export class TokenTransactionService {
       }
 
       if (remainingAmount > 0n) {
-        throw new ValidationError("Insufficient funds", {
+        throw new SparkValidationError("Insufficient funds", {
           field: "remainingAmount",
           value: remainingAmount,
         });
@@ -1018,7 +1006,7 @@ export class TokenTransactionService {
         return await this.config.signer.signMessageWithIdentityKey(message);
       }
     } else {
-      throw new ValidationError("Invalid public key", {
+      throw new SparkValidationError("Invalid public key", {
         field: "publicKey",
         value: bytesToHex(publicKey),
         expected: bytesToHex(await this.config.signer.getIdentityPublicKey()),
@@ -1040,7 +1028,7 @@ export class TokenTransactionService {
         const issuerPublicKey =
           finalTokenTransaction.tokenInputs!.mintInput.issuerPublicKey;
         if (!issuerPublicKey) {
-          throw new ValidationError("Invalid mint input", {
+          throw new SparkValidationError("Invalid mint input", {
             field: "issuerPublicKey",
             value: null,
             expected: "Non-null issuer public key",
@@ -1068,7 +1056,7 @@ export class TokenTransactionService {
         const issuerPublicKey =
           finalTokenTransaction.tokenInputs!.createInput.issuerPublicKey;
         if (!issuerPublicKey) {
-          throw new ValidationError("Invalid create input", {
+          throw new SparkValidationError("Invalid create input", {
             field: "issuerPublicKey",
             value: null,
             expected: "Non-null issuer public key",

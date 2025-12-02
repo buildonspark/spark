@@ -1,7 +1,7 @@
 import {
   ConfigOptions,
   filterTokenBalanceForTokenIdentifier,
-  RPCError,
+  SparkRequestError,
   WalletConfig,
 } from "@buildonspark/spark-sdk";
 import { jest } from "@jest/globals";
@@ -433,21 +433,15 @@ describe.each(TEST_CONFIGS)(
 
       const depositAddrOne = await sdk.getSingleUseDepositAddress();
       if (!depositAddrOne) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
-        });
+        throw new SparkRequestError("Deposit address not found");
       }
       const depositAddrTwo = await sdk.getSingleUseDepositAddress();
       if (!depositAddrTwo) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
-        });
+        throw new SparkRequestError("Deposit address not found");
       }
       const depositAddrThree = await sdk.getSingleUseDepositAddress();
       if (!depositAddrThree) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
-        });
+        throw new SparkRequestError("Deposit address not found");
       }
 
       const oneThousand = await faucet.sendToAddress(depositAddrOne, 1_000n);

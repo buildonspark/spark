@@ -1,6 +1,6 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { RPCError } from "../errors/types.js";
+import { SparkError } from "../errors/index.js";
 import { FinalizeNodeSignaturesResponse, TreeNode } from "../proto/spark.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
@@ -60,9 +60,9 @@ async function createDeposit(
   });
 
   if (!depositResp.depositAddress) {
-    throw new RPCError("Deposit address not found", {
-      method: "generateDepositAddress",
-      params: { signingPubkey: pubKey, leafId },
+    throw new SparkError("Deposit address not found", {
+      signingPubkey: pubKey,
+      leafId,
     });
   }
 

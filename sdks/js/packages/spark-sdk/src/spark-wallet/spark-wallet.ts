@@ -14,14 +14,11 @@ import { TransactionInput } from "@scure/btc-signer/psbt";
 import { Mutex } from "async-mutex";
 import { uuidv7, uuidv7obj } from "uuidv7";
 import { isReactNative } from "../constants.js";
-import { SparkSDKError } from "../errors/base.js";
 import {
-  ConfigurationError,
-  InternalValidationError,
-  NetworkError,
-  RPCError,
-  ValidationError,
-} from "../errors/types.js";
+  SparkError,
+  SparkRequestError,
+  SparkValidationError,
+} from "../errors/index.js";
 import SspClient, {
   GetUserRequestsParams,
   TransferWithUserRequest,
@@ -308,7 +305,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   private getSspClient() {
     if (!this.sspClient) {
-      throw new ConfigurationError("SSP client not initialized", {
+      throw new SparkError("SSP client not initialized", {
         configKey: "sspClient",
       });
     }
@@ -569,7 +566,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   private popOrThrow<T>(arr: T[] | undefined, msg: string): T {
-    if (!arr || arr.length === 0) throw new ValidationError(msg);
+    if (!arr || arr.length === 0) throw new SparkValidationError(msg);
     return arr.pop() as T;
   }
 
@@ -577,14 +574,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     targetAmounts: number[],
   ): Promise<Map<number, TreeNode[][]>> {
     if (targetAmounts.length === 0) {
-      throw new ValidationError("Target amounts must be non-empty", {
+      throw new SparkValidationError("Target amounts must be non-empty", {
         field: "targetAmounts",
         value: targetAmounts,
       });
     }
 
     if (targetAmounts.some((amount) => amount <= 0)) {
-      throw new ValidationError("Target amount must be positive", {
+      throw new SparkValidationError("Target amount must be positive", {
         field: "targetAmounts",
         value: targetAmounts,
       });
@@ -597,7 +594,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const totalBalance = this.getInternalBalance();
 
     if (totalTargetAmount > totalBalance) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Total target amount exceeds available balance",
         {
           field: "targetAmounts",
@@ -609,7 +606,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     const leaves = await this.getLeaves();
     if (leaves.length === 0) {
-      throw new ValidationError("No owned leaves found", {
+      throw new SparkValidationError("No owned leaves found", {
         field: "leaves",
       });
     }
@@ -716,9 +713,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const multiplicityValue =
       multiplicity ?? this.config.getOptimizationOptions().multiplicity ?? 0;
     if (multiplicityValue < 0) {
-      throw new ValidationError("Multiplicity cannot be negative");
+      throw new SparkValidationError("Multiplicity cannot be negative");
     } else if (multiplicityValue > 5) {
-      throw new ValidationError("Multiplicity cannot be greater than 5");
+      throw new SparkValidationError("Multiplicity cannot be greater than 5");
     }
 
     if (this.optimizationInProgress) {
@@ -767,7 +764,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             const node = nodes.shift()!;
             leavesToSend.push(node);
           } else {
-            throw new InternalValidationError(
+            throw new SparkError(
               `No unused leaf with value ${leafValue} found in leaves`,
             );
           }
@@ -977,7 +974,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }): Promise<SparkAddressFormat> {
     const MAX_SATS_AMOUNT = 2_100_000_000_000_000; // 21_000_000 BTC * 100_000_000 sats/BTC
     if (amount && (amount < 0 || amount > MAX_SATS_AMOUNT)) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         `Amount must be between 0 and ${MAX_SATS_AMOUNT} sats`,
         {
           field: "amount",
@@ -1050,11 +1047,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }): Promise<SparkAddressFormat> {
     const MAX_UINT128 = BigInt(2 ** 128 - 1);
     if (amount && (amount < 0 || amount > MAX_UINT128)) {
-      throw new ValidationError(`Amount must be between 0 and ${MAX_UINT128}`, {
-        field: "amount",
-        value: amount,
-        expected: `greater than or equal to 0 and less than or equal to ${MAX_UINT128}`,
-      });
+      throw new SparkValidationError(
+        `Amount must be between 0 and ${MAX_UINT128}`,
+        {
+          field: "amount",
+          value: amount,
+          expected: `greater than or equal to 0 and less than or equal to ${MAX_UINT128}`,
+        },
+      );
     }
     let decodedTokenIdentifier: Uint8Array | undefined = undefined;
     if (tokenIdentifier) {
@@ -1175,10 +1175,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const identityPublicKey = await this.config.signer.getIdentityPublicKey();
 
     if (!identityPublicKey || identityPublicKey.length === 0) {
-      throw new ValidationError("Identity public key not found in signer", {
-        field: "identityPublicKey",
-        value: identityPublicKey,
-      });
+      throw new SparkValidationError(
+        "Identity public key not found in signer",
+        {
+          field: "identityPublicKey",
+          value: identityPublicKey,
+        },
+      );
     }
 
     this.sparkAddress = encodeSparkAddress({
@@ -1255,7 +1258,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       targetAmounts &&
       targetAmounts.some((amount) => !Number.isSafeInteger(amount))
     ) {
-      throw new ValidationError("targetAmount must be less than 2^53", {
+      throw new SparkValidationError("targetAmount must be less than 2^53", {
         field: "targetAmounts",
         value: targetAmounts,
         expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
@@ -1272,7 +1275,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       const totalBalance = this.getInternalBalance();
 
       if (totalTargetAmount > totalBalance) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           "Total target amount exceeds available balance",
           {
             field: "targetAmounts",
@@ -1798,7 +1801,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             this.tokenMetadata.set(tokenIdentifier, tokenMetadata);
           }
         } catch (error) {
-          throw new NetworkError("Failed to fetch token metadata", {
+          throw new SparkRequestError("Failed to fetch token metadata", {
             errorCount: 1,
             errors: error instanceof Error ? error.message : String(error),
           });
@@ -1877,13 +1880,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const signingPubkey =
       await this.config.signer.getStaticDepositSigningKey(0);
 
-    const address = await this.depositService!.generateStaticDepositAddress({
+    const address = await this.depositService.generateStaticDepositAddress({
       signingPubkey,
     });
     if (!address.depositAddress) {
-      throw new RPCError("Failed to generate static deposit address", {
-        method: "generateStaticDepositAddress",
-        params: { signingPubkey },
+      throw new SparkError("Failed to generate static deposit address", {
+        signingPubkey,
       });
     }
 
@@ -1903,14 +1905,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       path: leafId,
     });
 
-    const address = await this.depositService!.generateDepositAddress({
+    const address = await this.depositService.generateDepositAddress({
       signingPubkey,
       leafId,
     });
     if (!address.depositAddress) {
-      throw new RPCError("Failed to generate deposit address", {
-        method: "generateDepositAddress",
-        params: { signingPubkey, leafId },
+      throw new SparkRequestError("Failed to generate deposit address", {
+        signingPubkey,
+        leafId,
       });
     }
     return address.depositAddress.address;
@@ -1943,7 +1945,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     excludeClaimed: boolean = false,
   ): Promise<{ txid: string; vout: number }[]> {
     if (!depositAddress) {
-      throw new ValidationError("Deposit address cannot be empty", {
+      throw new SparkValidationError("Deposit address cannot be empty", {
         field: "depositAddress",
       });
     }
@@ -1968,7 +1970,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         })) ?? []
       );
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         "Failed to get UTXOs for deposit address",
         {
           operation: "get_utxos_for_address",
@@ -2140,7 +2142,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const feeCharged = depositAmount - creditAmountSats;
 
     if (feeCharged > maxFee) {
-      throw new ValidationError("Fee larger than max fee", {
+      throw new SparkValidationError("Fee larger than max fee", {
         field: "feeCharged",
         value: feeCharged,
       });
@@ -2185,12 +2187,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     satsPerVbyteFee?: number;
   }): Promise<string> {
     if (fee === undefined && satsPerVbyteFee === undefined) {
-      throw new ValidationError("Fee or satsPerVbyteFee must be provided");
+      throw new SparkValidationError("Fee or satsPerVbyteFee must be provided");
     }
 
     // Users can set this to 300 or higher due to our old flow so they may be trained to type in 300 or higher which would make the fee way too high.
     if (satsPerVbyteFee && satsPerVbyteFee > 150) {
-      throw new ValidationError("satsPerVbyteFee must be less than 150");
+      throw new SparkValidationError("satsPerVbyteFee must be less than 150");
     }
 
     const finalFee = satsPerVbyteFee
@@ -2198,7 +2200,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       : fee!;
 
     if (finalFee < 194) {
-      throw new ValidationError("Fee must be at least 194", {
+      throw new SparkValidationError("Fee must be at least 194", {
         field: "fee",
         value: finalFee,
       });
@@ -2221,7 +2223,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const creditAmountSats = Number(totalAmount) - finalFee;
 
     if (creditAmountSats <= 0) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Fee too large. Credit amount must be greater than 0",
         {
           field: "creditAmountSats",
@@ -2370,7 +2372,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    */
   private async broadcastTx(txHex: string): Promise<string> {
     if (!txHex) {
-      throw new ValidationError("Transaction hex cannot be empty", {
+      throw new SparkValidationError("Transaction hex cannot be empty", {
         field: "txHex",
       });
     }
@@ -2514,7 +2516,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   private async getDepositTransaction(txid: string): Promise<Transaction> {
     if (!txid) {
-      throw new ValidationError("Transaction ID cannot be empty", {
+      throw new SparkValidationError("Transaction ID cannot be empty", {
         field: "txid",
       });
     }
@@ -2549,7 +2551,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     if (!/^[0-9A-Fa-f]+$/.test(txHex)) {
-      throw new ValidationError("Invalid transaction hex", {
+      throw new SparkValidationError("Invalid transaction hex", {
         field: "txHex",
         value: txHex,
       });
@@ -2573,7 +2575,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     vout,
   }: DepositParams) {
     if (!Number.isSafeInteger(vout)) {
-      throw new ValidationError("vout must be less than 2^53", {
+      throw new SparkValidationError("vout must be less than 2^53", {
         field: "vout",
         value: vout,
         expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
@@ -2657,7 +2659,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    */
   public async claimDeposit(txid: string): Promise<WalletLeaf[]> {
     if (!txid) {
-      throw new ValidationError("Transaction ID cannot be empty", {
+      throw new SparkValidationError("Transaction ID cannot be empty", {
         field: "txid",
       });
     }
@@ -2699,7 +2701,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       }
 
       if (!/^[0-9A-Fa-f]+$/.test(txHex)) {
-        throw new ValidationError("Invalid transaction hex", {
+        throw new SparkValidationError("Invalid transaction hex", {
           field: "txHex",
           value: txHex,
         });
@@ -2734,10 +2736,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         }
       }
       if (!depositAddress) {
-        throw new ValidationError("Deposit address has already been used", {
-          field: "depositAddress",
-          value: depositAddress,
-        });
+        throw new SparkValidationError(
+          "Deposit address has already been used",
+          {
+            field: "depositAddress",
+            value: depositAddress,
+          },
+        );
       }
 
       let keyDerivation: KeyDerivation;
@@ -2895,7 +2900,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     receiverSparkAddress,
   }: TransferParams): Promise<WalletTransfer> {
     if (!receiverSparkAddress) {
-      throw new ValidationError("Receiver Spark address cannot be empty", {
+      throw new SparkValidationError("Receiver Spark address cannot be empty", {
         field: "receiverSparkAddress",
       });
     }
@@ -2906,7 +2911,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     );
 
     if (receiverAddress.sparkInvoiceFields) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Spark address is a Spark invoice. Use fulfillSparkInvoice instead.",
         {
           field: "receiverSparkAddress",
@@ -2944,14 +2949,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     for (const param of params) {
       const { amountSats } = param;
       if (!Number.isSafeInteger(amountSats)) {
-        throw new ValidationError("Sats amount must be less than 2^53", {
+        throw new SparkValidationError("Sats amount must be less than 2^53", {
           field: "amountSats",
           value: amountSats,
           expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
         });
       }
       if (amountSats <= 0) {
-        throw new ValidationError("Amount must be greater than 0", {
+        throw new SparkValidationError("Amount must be greater than 0", {
           field: "amountSats",
           value: amountSats,
         });
@@ -2967,7 +2972,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         for (let groupIndex = 0; groupIndex < selection.length; groupIndex++) {
           const group = selection[groupIndex];
           if (!group) {
-            throw new ValidationError(
+            throw new SparkValidationError(
               `TreeNode group at index ${groupIndex} not found for amount ${amount} after selection`,
             );
           }
@@ -3064,7 +3069,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         const batch: LeafKeyTweak[] = [];
         for (let i = 0; i < nodes.length; i++) {
           if (!nodes[i]) {
-            throw new ValidationError(
+            throw new SparkValidationError(
               `TreeNode at index ${i} not found for amount ${amount} while building key tweaks by amount`,
             );
           }
@@ -3101,14 +3106,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       const refundSequence = refundTx.getInput(0).sequence;
 
       if (nodeSequence === undefined) {
-        throw new ValidationError("Invalid node transaction", {
+        throw new SparkValidationError("Invalid node transaction", {
           field: "sequence",
           value: nodeTx.getInput(0),
           expected: "Non-null sequence",
         });
       }
       if (!refundSequence) {
-        throw new ValidationError("Invalid refund transaction", {
+        throw new SparkValidationError("Invalid refund transaction", {
           field: "sequence",
           value: refundTx.getInput(0),
           expected: "Non-null sequence",
@@ -3290,7 +3295,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     ): Promise<TreeNode[] | undefined> => {
       const error = context.error;
       if (
-        error instanceof RPCError &&
+        error instanceof SparkRequestError &&
         error.originalError instanceof ClientError &&
         error.originalError.code === Status.ALREADY_EXISTS
       ) {
@@ -3348,12 +3353,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         error,
       );
 
-      throw new NetworkError(
+      throw new SparkError(
         "Failed to claim transfer",
-        {
-          operation: "claimTransfer",
-          errors: error instanceof Error ? error.message : String(error),
-        },
+        {},
         error instanceof Error ? error : undefined,
       );
     }
@@ -3431,7 +3433,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const sspClient = this.getSspClient();
 
     if (isNaN(amountSats) || amountSats < 0) {
-      throw new ValidationError("Invalid amount", {
+      throw new SparkValidationError("Invalid amount", {
         field: "amountSats",
         value: amountSats,
         expected: "non-negative number",
@@ -3439,7 +3441,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     if (!Number.isSafeInteger(amountSats)) {
-      throw new ValidationError("Sats amount must be less than 2^53", {
+      throw new SparkValidationError("Sats amount must be less than 2^53", {
         field: "amountSats",
         value: amountSats,
         expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
@@ -3447,7 +3449,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     if (!Number.isSafeInteger(expirySeconds)) {
-      throw new ValidationError("Expiration time must be less than 2^53", {
+      throw new SparkValidationError("Expiration time must be less than 2^53", {
         field: "expirySeconds",
         value: expirySeconds,
         expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
@@ -3455,7 +3457,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     if (expirySeconds < 0) {
-      throw new ValidationError("Invalid expiration time", {
+      throw new SparkValidationError("Invalid expiration time", {
         field: "expirySeconds",
         value: expirySeconds,
         expected: "Non-negative expiration time",
@@ -3463,7 +3465,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     if (memo && memo.length > 639) {
-      throw new ValidationError("Invalid memo size", {
+      throw new SparkValidationError("Invalid memo size", {
         field: "memo",
         value: memo,
         expected: "Memo size within limits",
@@ -3471,7 +3473,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     if (memo && descriptionHash) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Memo and descriptionHash cannot be provided together. Please provide only one.",
         {
           field: "memo",
@@ -3517,7 +3519,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         invoice.invoice.paymentHash !== bytesToHex(paymentHash) ||
         decodedInvoice.paymentHash !== bytesToHex(paymentHash)
       ) {
-        throw new ValidationError("Payment hash mismatch", {
+        throw new SparkValidationError("Payment hash mismatch", {
           field: "paymentHash",
           value: invoice.invoice.paymentHash,
           expected: bytesToHex(paymentHash),
@@ -3525,7 +3527,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       }
 
       if (decodedInvoice.amountMSats === null && amountSats !== 0) {
-        throw new ValidationError("Amount mismatch", {
+        throw new SparkValidationError("Amount mismatch", {
           field: "amountMSats",
           value: "null",
           expected: amountSats * 1000,
@@ -3536,7 +3538,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         decodedInvoice.amountMSats !== null &&
         decodedInvoice.amountMSats !== BigInt(amountSats * 1000)
       ) {
-        throw new ValidationError("Amount mismatch", {
+        throw new SparkValidationError("Amount mismatch", {
           field: "amountMSats",
           value: decodedInvoice.amountMSats,
           expected: amountSats * 1000,
@@ -3548,7 +3550,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         const sparkFallbackAddress = decodedInvoice.fallbackAddress;
 
         if (!sparkFallbackAddress) {
-          throw new ValidationError(
+          throw new SparkValidationError(
             "No spark fallback address found in lightning invoice",
             {
               field: "sparkFallbackAddress",
@@ -3562,7 +3564,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           receiverIdentityPubkey ?? (await this.getIdentityPublicKey());
 
         if (sparkFallbackAddress !== expectedIdentityPubkey) {
-          throw new ValidationError(
+          throw new SparkValidationError(
             "Mismatch between spark identity embedded in lightning invoice and designated recipient spark identity",
             {
               field: "sparkFallbackAddress",
@@ -3572,7 +3574,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           );
         }
       } else if (decodedInvoice.fallbackAddress !== undefined) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           "Spark fallback address found in lightning invoice but includeSparkAddress is false",
           {
             field: "sparkFallbackAddress",
@@ -3621,7 +3623,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         (walletNetwork === Network.REGTEST || walletNetwork === Network.LOCAL));
 
     if (!isValidNetworkForWallet) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         `Invoice network: ${invoiceNetwork} does not match wallet network: ${walletNetwork}`,
         {
           field: "invoice",
@@ -3637,7 +3639,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     // Check if user is trying to send amountSatsToSend for non 0 amount lightning invoice
     if (!isZeroAmountInvoice && amountSatsToSend !== undefined) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Invalid amount. User can only specify amountSatsToSend for 0 amount lightning invoice",
         {
           field: "amountMSats",
@@ -3649,7 +3651,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     // If 0 amount lightning invoice, check that user has specified amountSatsToSend
     if (isZeroAmountInvoice && amountSatsToSend === undefined) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Invalid amount. User must specify amountSatsToSend for 0 amount lightning invoice",
         {
           field: "amountMSats",
@@ -3664,7 +3666,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       : Math.ceil(Number(amountMSats) / 1000);
 
     if (isNaN(amountSats) || amountSats <= 0) {
-      throw new ValidationError("Invalid amount", {
+      throw new SparkValidationError("Invalid amount", {
         field: "amountSats",
         value: amountSats,
         expected: "greater than 0",
@@ -3708,18 +3710,21 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
 
       if (maxFeeSats < feeEstimate) {
-        throw new ValidationError("maxFeeSats does not cover fee estimate", {
-          field: "maxFeeSats",
-          value: maxFeeSats,
-          expected: `${feeEstimate} sats`,
-        });
+        throw new SparkValidationError(
+          "maxFeeSats does not cover fee estimate",
+          {
+            field: "maxFeeSats",
+            value: maxFeeSats,
+            expected: `${feeEstimate} sats`,
+          },
+        );
       }
 
       const totalAmount = amountSats + feeEstimate;
 
       const internalBalance = this.getInternalBalance();
       if (totalAmount > internalBalance) {
-        throw new ValidationError("Insufficient balance", {
+        throw new SparkValidationError("Insufficient balance", {
           field: "balance",
           value: internalBalance,
           expected: `${totalAmount} sats`,
@@ -3813,7 +3818,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     expiryTime,
   }: CreateHTLCParams): Promise<Transfer> {
     if (expiryTime.getTime() <= Date.now()) {
-      throw new ValidationError("Expiry time must be in the future", {
+      throw new SparkValidationError("Expiry time must be in the future", {
         field: "expiryTime",
         value: expiryTime,
         expected: "greater than 0",
@@ -3823,7 +3828,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return await this.withLeaves(async () => {
       const internalBalance = this.getInternalBalance();
       if (amountSats > internalBalance) {
-        throw new ValidationError("Insufficient balance", {
+        throw new SparkValidationError("Insufficient balance", {
           field: "balance",
           value: internalBalance,
           expected: `${amountSats} sats`,
@@ -3910,7 +3915,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   public async claimHTLC(preimage: string): Promise<Transfer> {
     const bytes = hexToBytes(preimage);
     if (bytes.length !== 32) {
-      throw new ValidationError("Preimage must be 32 bytes", {
+      throw new SparkValidationError("Preimage must be 32 bytes", {
         field: "preimage",
         value: preimage,
         expected: "32 bytes",
@@ -4067,15 +4072,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         offset,
       });
     } catch (error) {
-      throw new NetworkError(
-        "Failed to query HTLC",
-        {
-          operation: "query_htlc",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to query HTLC", {
+        operation: "query_htlc",
+        error,
+      });
     }
     return response;
   }
@@ -4097,7 +4097,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    *
    * @returns Promise<string> A payment or transaction identifier (implementation‑specific).
    *
-   * @throws {ValidationError} If validation fails (malformed invoice, zero/negative amount, unsupported network),
+   * @throws {SparkValidationError} If validation fails (malformed invoice, zero/negative amount, unsupported network),
    *
    * @example
    * await wallet.fulfillSparkInvoice([
@@ -4112,7 +4112,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }[],
   ): Promise<FulfillSparkInvoiceResponse> {
     if (!Array.isArray(sparkInvoices) || sparkInvoices.length === 0) {
-      throw new ValidationError("No Spark invoices provided", {
+      throw new SparkValidationError("No Spark invoices provided", {
         field: "sparkInvoices",
         value: sparkInvoices,
         expected: "Non-empty array",
@@ -4253,7 +4253,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       if (isLegacySparkAddress(invoice)) {
         invalidInvoices.push({
           invoice,
-          error: new ValidationError("Deprecated spark invoice format", {
+          error: new SparkValidationError("Deprecated spark invoice format", {
             field: "invoice",
             value: invoice,
             expected:
@@ -4269,7 +4269,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       if (!addressData.sparkInvoiceFields) {
         invalidInvoices.push({
           invoice,
-          error: new ValidationError("Missing invoice fields", {
+          error: new SparkValidationError("Missing invoice fields", {
             field: "invoice",
             value: invoice,
             expected: "Valid invoice fields",
@@ -4284,7 +4284,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         if (fields.expiryTime.getTime() <= Date.now()) {
           invalidInvoices.push({
             invoice,
-            error: new ValidationError("Invoice expired", {
+            error: new SparkValidationError("Invoice expired", {
               field: "invoice",
               value: fields.expiryTime.getTime(),
               expected: "Expiry time in the future",
@@ -4299,7 +4299,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       ) {
         invalidInvoices.push({
           invoice,
-          error: new ValidationError("Sender public key mismatch", {
+          error: new SparkValidationError("Sender public key mismatch", {
             field: "invoice",
             value: fields.senderPublicKey,
             expected: identityPublicKey,
@@ -4313,7 +4313,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         if (amount && !isSafeForNumber(amount)) {
           invalidInvoices.push({
             invoice,
-            error: new ValidationError("Invalid amount", {
+            error: new SparkValidationError("Invalid amount", {
               field: "invoice",
               value: amount,
               expected: "Safe for number",
@@ -4324,7 +4324,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         if (!encodedAmount && !amount) {
           invalidInvoices.push({
             invoice,
-            error: new ValidationError(
+            error: new SparkValidationError(
               "No amount passed for nil amount invoice",
               {
                 field: "invoice",
@@ -4346,7 +4346,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         if (!tokenIdentifierHex) {
           invalidInvoices.push({
             invoice,
-            error: new ValidationError(
+            error: new SparkValidationError(
               "No token identifier passed for tokens invoice",
               {
                 field: "invoice",
@@ -4360,7 +4360,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         if (!encodedAmount && !amount) {
           invalidInvoices.push({
             invoice,
-            error: new ValidationError(
+            error: new SparkValidationError(
               "No amount passed for nil amount invoice",
               {
                 field: "invoice",
@@ -4389,7 +4389,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       } else {
         invalidInvoices.push({
           invoice,
-          error: new ValidationError("Invalid payment type", {
+          error: new SparkValidationError("Invalid payment type", {
             field: "invoice",
             expected: "sats or tokens invoice",
           }),
@@ -4461,7 +4461,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     deductFeeFromWithdrawalAmount = true,
   }: WithdrawParams) {
     if (!Number.isSafeInteger(amountSats)) {
-      throw new ValidationError("Sats amount must be less than 2^53", {
+      throw new SparkValidationError("Sats amount must be less than 2^53", {
         field: "amountSats",
         value: amountSats,
         expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
@@ -4486,7 +4486,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             (feeQuote.userFeeSlow?.originalValue || 0);
           break;
         default:
-          throw new ValidationError("Invalid exit speed", {
+          throw new SparkValidationError("Invalid exit speed", {
             field: "exitSpeed",
             value: exitSpeed,
             expected: "FAST, MEDIUM, or SLOW",
@@ -4496,14 +4496,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       feeQuoteId = feeQuote.id;
     }
     if (!feeAmountSats) {
-      throw new ValidationError("No fee quote or fee amount provided", {
+      throw new SparkValidationError("No fee quote or fee amount provided", {
         field: "feeQuote",
         value: feeQuote,
       });
     }
 
     if (!feeQuoteId) {
-      throw new ValidationError("No fee quote ID provided", {
+      throw new SparkValidationError("No fee quote ID provided", {
         field: "feeQuoteId",
         value: feeQuoteId,
       });
@@ -4538,7 +4538,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     targetAmountSats?: number,
   ) {
     if (!Number.isSafeInteger(targetAmountSats)) {
-      throw new ValidationError("Sats amount must be less than 2^53", {
+      throw new SparkValidationError("Sats amount must be less than 2^53", {
         field: "targetAmountSats",
         value: targetAmountSats,
         expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
@@ -4566,7 +4566,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         feeAmountSats >
         leavesToSendToSsp.reduce((acc, leaf) => acc + leaf.value, 0)
       ) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           "The fee for the withdrawal is greater than the target withdrawal amount",
           {
             field: "fee",
@@ -4577,7 +4577,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       }
     } else {
       if (!targetAmountSats) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           "targetAmountSats is required when deductFeeFromWithdrawalAmount is false",
           {
             field: "targetAmountSats",
@@ -4702,7 +4702,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const sspClient = this.getSspClient();
 
     if (!Number.isSafeInteger(amountSats)) {
-      throw new ValidationError("Sats amount must be less than 2^53", {
+      throw new SparkValidationError("Sats amount must be less than 2^53", {
         field: "amountSats",
         value: amountSats,
         expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
@@ -4903,7 +4903,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     );
 
     if (addressData.sparkInvoiceFields) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Spark address is a Spark invoice. Use fulfillSparkInvoice instead.",
         {
           field: "receiverSparkAddress",
@@ -4950,16 +4950,19 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     selectedOutputs?: OutputWithPreviousTransactionData[],
   ): Promise<string> {
     if (receiverOutputs.length === 0) {
-      throw new ValidationError("At least one receiver output is required", {
-        field: "receiverOutputs",
-        value: receiverOutputs,
-        expected: "Non-empty array",
-      });
+      throw new SparkValidationError(
+        "At least one receiver output is required",
+        {
+          field: "receiverOutputs",
+          value: receiverOutputs,
+          expected: "Non-empty array",
+        },
+      );
     }
     const firstBech32mTokenIdentifier = receiverOutputs[0]!.tokenIdentifier;
     for (const output of receiverOutputs) {
       if (output.tokenIdentifier !== firstBech32mTokenIdentifier) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           "All receiver outputs must have the same token public key",
           {
             field: "receiverOutputs",
@@ -4969,7 +4972,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         );
       }
       if (output.tokenAmount <= 0n) {
-        throw new ValidationError("Token amount must be greater than 0", {
+        throw new SparkValidationError("Token amount must be greater than 0", {
           field: "receiverOutputs",
           value: receiverOutputs,
           expected: "All outputs must have tokenAmount > 0",
@@ -5158,10 +5161,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             this.config.signer.signTransactionIndex(tx, i, publicKey);
             inputsSigned++;
           } catch (error) {
-            throw new ValidationError(`Failed to sign input ${i}: ${error}`, {
-              field: "input",
-              value: i,
-            });
+            throw new SparkValidationError(
+              `Failed to sign input ${i}: ${error}`,
+              {
+                field: "input",
+                value: i,
+              },
+            );
           }
         }
       }
@@ -5300,7 +5306,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       const node = response.nodes[nodeId];
       if (!node) {
-        throw new ValidationError("Node not found", {
+        throw new SparkValidationError("Node not found", {
           field: "nodeId",
           value: nodeId,
         });
@@ -5311,7 +5317,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       // Validate transaction data exists
       if (!node.nodeTx || node.nodeTx.length === 0) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `Node transaction data is missing or empty for ${isRootNode ? "root" : "non-root"} node`,
           {
             field: "nodeTx",
@@ -5321,7 +5327,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       }
 
       if (!node.refundTx || node.refundTx.length === 0) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `Refund transaction data is missing or empty for ${isRootNode ? "root" : "non-root"} node`,
           {
             field: "refundTx",
@@ -5336,7 +5342,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         // Get the node transaction to check its timelock
         nodeTx = getTxFromRawTxBytes(node.nodeTx);
       } catch (error) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `Failed to parse node transaction for ${isRootNode ? "root" : "non-root"} node: ${error instanceof Error ? error.message : String(error)}`,
           {
             field: "nodeTx",
@@ -5349,7 +5355,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         // Get the refund transaction to check its timelock
         refundTx = getTxFromRawTxBytes(node.refundTx);
       } catch (error) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `Failed to parse refund transaction for ${isRootNode ? "root" : "non-root"} node: ${error instanceof Error ? error.message : String(error)}`,
           {
             field: "refundTx",
@@ -5360,7 +5366,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       const nodeInput = nodeTx.getInput(0);
       if (!nodeInput) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `Node transaction has no inputs for ${isRootNode ? "root" : "non-root"} node`,
           {
             field: "nodeInput",
@@ -5371,7 +5377,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       const refundInput = refundTx.getInput(0);
       if (!refundInput) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `Refund transaction has no inputs for ${isRootNode ? "root" : "non-root"} node`,
           {
             field: "refundInput",
@@ -5381,7 +5387,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       }
 
       if (!refundInput.sequence) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `Refund transaction has no sequence for ${isRootNode ? "root" : "non-root"} node`,
           {
             field: "sequence",
@@ -5399,10 +5405,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         refundTimelock,
       };
     } catch (error) {
-      throw new NetworkError(
+      throw new SparkRequestError(
         `Failed to check timelock for node ${nodeId}`,
         {
-          method: "query_nodes",
+          operation: "query_nodes",
         },
         error as Error,
       );
@@ -5596,7 +5602,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       }
     }
 
-    if (error instanceof SparkSDKError) {
+    if (error instanceof SparkError) {
       if (Object.keys(context).length > 0) {
         error.update({ context });
       }
@@ -5604,12 +5610,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     if (error instanceof Error) {
-      return new SparkSDKError(error.message, context, error);
+      return new SparkError(error.message, context, error);
     }
 
     /* Non-Error throwables: coerce to string and wrap */
     const message = String(error);
-    return new SparkSDKError(message, context);
+    return new SparkError(message, context);
   }
 
   protected getTraceName(methodName: string) {

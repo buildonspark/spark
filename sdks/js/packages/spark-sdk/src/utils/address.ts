@@ -4,7 +4,7 @@ import { bytesToNumberBE } from "@noble/curves/utils";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { bech32m } from "@scure/base";
 import { UUID } from "uuidv7";
-import { ValidationError } from "../errors/index.js";
+import { SparkValidationError } from "../errors/index.js";
 import { Timestamp } from "../proto/google/protobuf/timestamp.js";
 import {
   SatsPayment,
@@ -103,7 +103,7 @@ export function encodeSparkAddressWithSignature(
       words,
     ) as SparkAddressFormat;
   } catch (error) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "Failed to encode Spark address",
       {
         field: "publicKey",
@@ -120,7 +120,7 @@ export function decodeSparkAddress(
 ): DecodedSparkAddressData {
   try {
     if (network !== getNetworkFromSparkAddress(address)) {
-      throw new ValidationError("Invalid Spark address prefix", {
+      throw new SparkValidationError("Invalid Spark address prefix", {
         field: "address",
         value: address,
         expected: `prefix='${AddressNetwork[network]}' or '${LegacyAddressNetwork[network]}'`,
@@ -176,10 +176,10 @@ export function decodeSparkAddress(
       signature: signatureHex,
     };
   } catch (error) {
-    if (error instanceof ValidationError) {
+    if (error instanceof SparkValidationError) {
       throw error;
     }
-    throw new ValidationError(
+    throw new SparkValidationError(
       "Failed to decode Spark address",
       {
         field: "address",
@@ -202,7 +202,7 @@ export function getNetworkFromSparkAddress(address: string): NetworkType {
   const { prefix } = bech32mDecode(address);
   const network = PrefixToNetwork[prefix] ?? LegacyPrefixToNetwork[prefix];
   if (!network) {
-    throw new ValidationError("Invalid Spark address prefix", {
+    throw new SparkValidationError("Invalid Spark address prefix", {
       field: "network",
       value: address,
       expected:
@@ -230,10 +230,10 @@ export function isValidSparkAddress(address: string) {
     decodeSparkAddress(address, network);
     return true;
   } catch (error) {
-    if (error instanceof ValidationError) {
+    if (error instanceof SparkValidationError) {
       throw error;
     }
-    throw new ValidationError(
+    throw new SparkValidationError(
       "Invalid Spark address",
       {
         field: "address",
@@ -249,7 +249,7 @@ export function isValidPublicKey(publicKey: string) {
     const point = secp256k1.Point.fromHex(publicKey);
     point.assertValidity();
   } catch (error) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "Invalid public key",
       {
         field: "publicKey",
@@ -266,7 +266,7 @@ export function validateSparkInvoiceFields(
   const { version, id, paymentType, memo, senderPublicKey } =
     sparkInvoiceFields;
   if (version !== 1) {
-    throw new ValidationError("Version must be 1", {
+    throw new SparkValidationError("Version must be 1", {
       field: "version",
       value: version,
     });
@@ -275,7 +275,7 @@ export function validateSparkInvoiceFields(
   try {
     UUID.ofInner(id);
   } catch (error) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "Invalid id",
       {
         field: "id",
@@ -288,7 +288,7 @@ export function validateSparkInvoiceFields(
     try {
       isValidPublicKey(bytesToHex(senderPublicKey));
     } catch (error) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Invalid sender public key",
         {
           field: "senderPublicKey",
@@ -302,7 +302,7 @@ export function validateSparkInvoiceFields(
     const encoder = new TextEncoder();
     const memoBytes = encoder.encode(memo);
     if (memoBytes.length > 120) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Memo exceeds the maximum allowed byte length of 120.",
         {
           field: "memo",
@@ -319,13 +319,16 @@ export function validateSparkInvoiceFields(
         paymentType.tokensPayment;
       if (tokenIdentifier) {
         if (!(tokenIdentifier instanceof Uint8Array)) {
-          throw new ValidationError("Token identifier must be Uint8Array", {
-            field: "paymentType.tokensPayment.tokenIdentifier",
-            value: tokenIdentifier,
-          });
+          throw new SparkValidationError(
+            "Token identifier must be Uint8Array",
+            {
+              field: "paymentType.tokensPayment.tokenIdentifier",
+              value: tokenIdentifier,
+            },
+          );
         }
         if (tokenIdentifier.length !== 32) {
-          throw new ValidationError("Token identifier must be 32 bytes", {
+          throw new SparkValidationError("Token identifier must be 32 bytes", {
             field: "paymentType.tokensPayment.tokenIdentifier",
             value: tokenIdentifier,
           });
@@ -333,14 +336,14 @@ export function validateSparkInvoiceFields(
       }
       if (tokensAmount) {
         if (tokensAmount.length > 16) {
-          throw new ValidationError("Amount must be less than 16 bytes", {
+          throw new SparkValidationError("Amount must be less than 16 bytes", {
             field: "paymentType.tokensPayment.amount",
             value: tokensAmount,
           });
         }
         const tokensAmountBigInt = bytesToNumberBE(tokensAmount);
         if (tokensAmountBigInt < 0 || tokensAmountBigInt > MAX_UINT128) {
-          throw new ValidationError(
+          throw new SparkValidationError(
             "Asset amount must be between 0 and MAX_UINT128",
             {
               field: "amount",
@@ -354,7 +357,7 @@ export function validateSparkInvoiceFields(
       if (amount) {
         const MAX_SATS_AMOUNT = 2_100_000_000_000_000; // 21_000_000 BTC * 100_000_000 sats/BTC
         if (amount < 0) {
-          throw new ValidationError(
+          throw new SparkValidationError(
             "Amount must be greater than or equal to 0",
             {
               field: "paymentType.satsPayment.amount",
@@ -363,13 +366,13 @@ export function validateSparkInvoiceFields(
           );
         }
         if (amount > MAX_SATS_AMOUNT) {
-          throw new ValidationError(
+          throw new SparkValidationError(
             `Amount must be less than ${MAX_SATS_AMOUNT} sats`,
           );
         }
       }
     } else {
-      throw new ValidationError("Invalid payment type", {
+      throw new SparkValidationError("Invalid payment type", {
         field: "paymentType",
         value: paymentType,
       });
@@ -384,19 +387,19 @@ export function validateSparkInvoiceSignature(invoice: SparkAddressFormat) {
     const payload = SparkAddress.decode(bech32m.fromWords(decoded.words));
     const { identityPublicKey, sparkInvoiceFields, signature } = payload;
     if (!sparkInvoiceFields) {
-      throw new ValidationError("Spark invoice fields are required", {
+      throw new SparkValidationError("Spark invoice fields are required", {
         field: "sparkInvoiceFields",
         value: sparkInvoiceFields,
       });
     }
     if (!signature) {
-      throw new ValidationError("Signature is required", {
+      throw new SparkValidationError("Signature is required", {
         field: "signature",
         value: signature,
       });
     }
     if (!identityPublicKey) {
-      throw new ValidationError("Identity public key is required", {
+      throw new SparkValidationError("Identity public key is required", {
         field: "identityPublicKey",
         value: identityPublicKey,
       });
@@ -411,16 +414,16 @@ export function validateSparkInvoiceSignature(invoice: SparkAddressFormat) {
     const xOnly = compressed.slice(1);
     const isValid = schnorr.verify(signature, hash, xOnly);
     if (!isValid) {
-      throw new ValidationError("Invalid signature", {
+      throw new SparkValidationError("Invalid signature", {
         field: "signature",
         value: signature,
       });
     }
   } catch (error) {
-    if (error instanceof ValidationError) {
+    if (error instanceof SparkValidationError) {
       throw error;
     }
-    throw new ValidationError(
+    throw new SparkValidationError(
       "Failed to validate Spark invoice signature",
       {
         field: "invoice",

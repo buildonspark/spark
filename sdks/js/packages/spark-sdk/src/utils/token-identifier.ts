@@ -1,7 +1,7 @@
 import { bech32m } from "@scure/base";
 
 import { NetworkType } from "../utils/network.js";
-import { ValidationError } from "../errors/index.js";
+import { SparkValidationError } from "../errors/index.js";
 
 const Bech32mTokenIdentifierTokenIdentifierNetworkPrefix: Record<
   NetworkType,
@@ -33,7 +33,7 @@ export function encodeBech32mTokenIdentifier(
     const words = bech32m.toWords(payload.tokenIdentifier);
 
     if (!payload.network) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Network is required to encode bech32m encoded token identifier",
         {
           field: "network",
@@ -48,7 +48,7 @@ export function encodeBech32mTokenIdentifier(
       500,
     ) as Bech32mTokenIdentifier;
   } catch (error) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "Failed to encode bech32m encoded token identifier",
       {
         field: "tokenIdentifier",
@@ -74,7 +74,7 @@ export function decodeBech32mTokenIdentifier(
       decoded.prefix !==
         Bech32mTokenIdentifierTokenIdentifierNetworkPrefix[network]
     ) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         "Invalid bech32m encoded token identifier prefix",
         {
           field: "bech32mTokenIdentifier",
@@ -92,10 +92,10 @@ export function decodeBech32mTokenIdentifier(
         network ?? getNetworkFromBech32mTokenIdentifier(bech32mTokenIdentifier),
     };
   } catch (error) {
-    if (error instanceof ValidationError) {
+    if (error instanceof SparkValidationError) {
       throw error;
     }
-    throw new ValidationError(
+    throw new SparkValidationError(
       "Failed to decode bech32m encoded token identifier",
       {
         field: "bech32mTokenIdentifier",
@@ -111,7 +111,7 @@ export function getNetworkFromBech32mTokenIdentifier(
 ): NetworkType {
   const separatorIndex = bech32mTokenIdentifier.indexOf("1");
   if (separatorIndex === -1) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "Invalid bech32m token identifier: no separator found",
       {
         field: "bech32mTokenIdentifier",
@@ -130,7 +130,7 @@ export function getNetworkFromBech32mTokenIdentifier(
     }
   }
 
-  throw new ValidationError("Unknown bech32m token identifier prefix", {
+  throw new SparkValidationError("Unknown bech32m token identifier prefix", {
     field: "bech32mTokenIdentifier",
     value: bech32mTokenIdentifier,
   });

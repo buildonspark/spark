@@ -1,7 +1,7 @@
 import { decode } from "light-bolt11-decoder";
 
 import { Network } from "../utils/network.js";
-import { ValidationError } from "../errors/index.js";
+import { SparkValidationError } from "../errors/index.js";
 
 // Invoice section interface
 interface Section {
@@ -35,7 +35,9 @@ export function decodeInvoice(invoice: string): DecodedInvoice {
   const network = getNetworkFromInvoice(invoice);
 
   if (network === null) {
-    throw new ValidationError("Invalid network found in invoice: " + invoice);
+    throw new SparkValidationError(
+      "Invalid network found in invoice: " + invoice,
+    );
   }
 
   let paymentSection: Section | undefined;
@@ -73,10 +75,12 @@ export function decodeInvoice(invoice: string): DecodedInvoice {
   }
 
   if (paymentHash === undefined) {
-    throw new ValidationError("No payment hash found in invoice: " + invoice);
+    throw new SparkValidationError(
+      "No payment hash found in invoice: " + invoice,
+    );
   }
   if (paymentSecretSection?.value === undefined) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "Invalid payment secret found in invoice: " + invoice,
     );
   }

@@ -5,7 +5,7 @@ import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 import { trace, type Tracer } from "@opentelemetry/api";
 import { ConfigOptions, SparkWallet } from "../index.node.js";
 import { SparkSigner } from "../signer/signer.js";
-import { SparkSDKError } from "../errors/base.js";
+import { SparkError } from "../errors/base.js";
 
 class TestableWallet extends SparkWalletTesting {
   private static pendingTracerOverride: Tracer | null | undefined;
@@ -80,8 +80,8 @@ describe("wrapPublicMethod", () => {
       await wallet.testThrowError();
       throw new Error("Expected error was not thrown");
     } catch (err) {
-      expect(err).toBeInstanceOf(SparkSDKError);
-      const message = (err as SparkSDKError).message;
+      expect(err).toBeInstanceOf(SparkError);
+      const message = (err as SparkError).message;
       expect(message).toContain("Something went wrong");
       expect(message).toContain(`idPubKey: ${expectedId}`);
       expect(message).toContain("clientEnv:");
@@ -97,8 +97,8 @@ describe("wrapPublicMethod", () => {
       await wallet.testThrowError();
       throw new Error("Expected error was not thrown");
     } catch (err) {
-      expect(err).toBeInstanceOf(SparkSDKError);
-      const message = (err as SparkSDKError).message;
+      expect(err).toBeInstanceOf(SparkError);
+      const message = (err as SparkError).message;
       expect(message).toContain("Something went wrong");
       expect(message).toMatch(/traceId: [a-f0-9]{32}/i);
       expect(message).toContain("clientEnv:");
@@ -107,7 +107,7 @@ describe("wrapPublicMethod", () => {
 
   it("does not duplicate metadata when error is rehandled", async () => {
     const wallet = await makeTestWalletWithoutTracer();
-    const baseError = new SparkSDKError("duplicate test");
+    const baseError = new SparkError("duplicate test");
 
     const first = await SparkWallet["handlePublicMethodError"](baseError, {
       wallet,

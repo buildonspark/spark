@@ -1,5 +1,5 @@
 import { sha256 } from "@noble/hashes/sha2";
-import { ValidationError } from "../errors/types.js";
+import { SparkValidationError } from "../errors/types.js";
 import { bech32m } from "@scure/base";
 import { SparkAddress } from "../proto/spark.js";
 import { OperatorSpecificTokenTransactionSignablePayload } from "../proto/spark.js";
@@ -22,7 +22,7 @@ export function hashTokenTransaction(
     case 2:
       return hashTokenTransactionV2(tokenTransaction, partialHash);
     default:
-      throw new ValidationError("invalid token transaction version", {
+      throw new SparkValidationError("invalid token transaction version", {
         field: "tokenTransaction.version",
         value: tokenTransaction.version,
       });
@@ -34,7 +34,7 @@ export function hashTokenTransactionV1(
   partialHash: boolean = false,
 ): Uint8Array {
   if (!tokenTransaction) {
-    throw new ValidationError("token transaction cannot be nil", {
+    throw new SparkValidationError("token transaction cannot be nil", {
       field: "tokenTransaction",
     });
   }
@@ -64,7 +64,7 @@ export function hashTokenTransactionV1(
   } else if (tokenTransaction.tokenInputs?.$case === "createInput") {
     transactionType = TokenTransactionType.TOKEN_TRANSACTION_TYPE_CREATE;
   } else {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "token transaction must have exactly one input type",
       {
         field: "tokenInputs",
@@ -79,7 +79,7 @@ export function hashTokenTransactionV1(
   // Hash token inputs based on type
   if (tokenTransaction.tokenInputs?.$case === "transferInput") {
     if (!tokenTransaction.tokenInputs.transferInput.outputsToSpend) {
-      throw new ValidationError("outputs to spend cannot be null", {
+      throw new SparkValidationError("outputs to spend cannot be null", {
         field: "tokenInputs.transferInput.outputsToSpend",
       });
     }
@@ -87,7 +87,7 @@ export function hashTokenTransactionV1(
     if (
       tokenTransaction.tokenInputs.transferInput.outputsToSpend.length === 0
     ) {
-      throw new ValidationError("outputs to spend cannot be empty", {
+      throw new SparkValidationError("outputs to spend cannot be empty", {
         field: "tokenInputs.transferInput.outputsToSpend",
       });
     }
@@ -109,7 +109,7 @@ export function hashTokenTransactionV1(
       output,
     ] of tokenTransaction.tokenInputs!.transferInput!.outputsToSpend.entries()) {
       if (!output) {
-        throw new ValidationError(`output cannot be null at index ${i}`, {
+        throw new SparkValidationError(`output cannot be null at index ${i}`, {
           field: `tokenInputs.transferInput.outputsToSpend[${i}]`,
           index: i,
         });
@@ -120,7 +120,7 @@ export function hashTokenTransactionV1(
       if (output.prevTokenTransactionHash) {
         const prevHash = output.prevTokenTransactionHash;
         if (output.prevTokenTransactionHash.length !== 32) {
-          throw new ValidationError(
+          throw new SparkValidationError(
             `invalid previous transaction hash length at index ${i}`,
             {
               field: `tokenInputs.transferInput.outputsToSpend[${i}].prevTokenTransactionHash`,
@@ -151,7 +151,7 @@ export function hashTokenTransactionV1(
       const issuerPubKey: Uint8Array =
         tokenTransaction.tokenInputs.mintInput.issuerPublicKey;
       if (issuerPubKey.length === 0) {
-        throw new ValidationError("issuer public key cannot be empty", {
+        throw new SparkValidationError("issuer public key cannot be empty", {
           field: "tokenInputs.mintInput.issuerPublicKey",
           value: issuerPubKey,
           expectedLength: 1,
@@ -180,9 +180,12 @@ export function hashTokenTransactionV1(
       !createInput.issuerPublicKey ||
       createInput.issuerPublicKey.length === 0
     ) {
-      throw new ValidationError("issuer public key cannot be nil or empty", {
-        field: "tokenInputs.createInput.issuerPublicKey",
-      });
+      throw new SparkValidationError(
+        "issuer public key cannot be nil or empty",
+        {
+          field: "tokenInputs.createInput.issuerPublicKey",
+        },
+      );
     }
     issuerPubKeyHashObj.update(createInput.issuerPublicKey);
     allHashes.push(issuerPubKeyHashObj.digest());
@@ -190,17 +193,20 @@ export function hashTokenTransactionV1(
     // Hash token name
     const tokenNameHashObj = sha256.create();
     if (!createInput.tokenName || createInput.tokenName.length === 0) {
-      throw new ValidationError("token name cannot be empty", {
+      throw new SparkValidationError("token name cannot be empty", {
         field: "tokenInputs.createInput.tokenName",
       });
     }
     if (createInput.tokenName.length > 20) {
-      throw new ValidationError("token name cannot be longer than 20 bytes", {
-        field: "tokenInputs.createInput.tokenName",
-        value: createInput.tokenName,
-        expectedLength: 20,
-        actualLength: createInput.tokenName.length,
-      });
+      throw new SparkValidationError(
+        "token name cannot be longer than 20 bytes",
+        {
+          field: "tokenInputs.createInput.tokenName",
+          value: createInput.tokenName,
+          expectedLength: 20,
+          actualLength: createInput.tokenName.length,
+        },
+      );
     }
     const tokenNameEncoder = new TextEncoder();
     tokenNameHashObj.update(tokenNameEncoder.encode(createInput.tokenName));
@@ -209,17 +215,20 @@ export function hashTokenTransactionV1(
     // Hash token ticker
     const tokenTickerHashObj = sha256.create();
     if (!createInput.tokenTicker || createInput.tokenTicker.length === 0) {
-      throw new ValidationError("token ticker cannot be empty", {
+      throw new SparkValidationError("token ticker cannot be empty", {
         field: "tokenInputs.createInput.tokenTicker",
       });
     }
     if (createInput.tokenTicker.length > 6) {
-      throw new ValidationError("token ticker cannot be longer than 6 bytes", {
-        field: "tokenInputs.createInput.tokenTicker",
-        value: createInput.tokenTicker,
-        expectedLength: 6,
-        actualLength: createInput.tokenTicker.length,
-      });
+      throw new SparkValidationError(
+        "token ticker cannot be longer than 6 bytes",
+        {
+          field: "tokenInputs.createInput.tokenTicker",
+          value: createInput.tokenTicker,
+          expectedLength: 6,
+          actualLength: createInput.tokenTicker.length,
+        },
+      );
     }
     const tokenTickerEncoder = new TextEncoder();
     tokenTickerHashObj.update(
@@ -241,12 +250,12 @@ export function hashTokenTransactionV1(
     // Hash max supply (fixed 16 bytes)
     const maxSupplyHashObj = sha256.create();
     if (!createInput.maxSupply) {
-      throw new ValidationError("max supply cannot be nil", {
+      throw new SparkValidationError("max supply cannot be nil", {
         field: "tokenInputs.createInput.maxSupply",
       });
     }
     if (createInput.maxSupply.length !== 16) {
-      throw new ValidationError("max supply must be exactly 16 bytes", {
+      throw new SparkValidationError("max supply must be exactly 16 bytes", {
         field: "tokenInputs.createInput.maxSupply",
         value: createInput.maxSupply,
         expectedLength: 16,
@@ -273,7 +282,7 @@ export function hashTokenTransactionV1(
 
   // Hash token outputs (length + contents)
   if (!tokenTransaction.tokenOutputs) {
-    throw new ValidationError("token outputs cannot be null", {
+    throw new SparkValidationError("token outputs cannot be null", {
       field: "tokenOutputs",
     });
   }
@@ -291,7 +300,7 @@ export function hashTokenTransactionV1(
 
   for (const [i, output] of tokenTransaction.tokenOutputs.entries()) {
     if (!output) {
-      throw new ValidationError(`output cannot be null at index ${i}`, {
+      throw new SparkValidationError(`output cannot be null at index ${i}`, {
         field: `tokenOutputs[${i}]`,
         index: i,
       });
@@ -302,16 +311,19 @@ export function hashTokenTransactionV1(
     // Only hash ID if it's not empty and not in partial hash mode
     if (output.id && !partialHash) {
       if (output.id.length === 0) {
-        throw new ValidationError(`output ID at index ${i} cannot be empty`, {
-          field: `tokenOutputs[${i}].id`,
-          index: i,
-        });
+        throw new SparkValidationError(
+          `output ID at index ${i} cannot be empty`,
+          {
+            field: `tokenOutputs[${i}].id`,
+            index: i,
+          },
+        );
       }
       hashObj.update(new TextEncoder().encode(output.id));
     }
     if (output.ownerPublicKey) {
       if (output.ownerPublicKey.length === 0) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `owner public key at index ${i} cannot be empty`,
           {
             field: `tokenOutputs[${i}].ownerPublicKey`,
@@ -326,7 +338,7 @@ export function hashTokenTransactionV1(
       const revPubKey = output.revocationCommitment!!;
       if (revPubKey) {
         if (revPubKey.length === 0) {
-          throw new ValidationError(
+          throw new SparkValidationError(
             `revocation commitment at index ${i} cannot be empty`,
             {
               field: `tokenOutputs[${i}].revocationCommitment`,
@@ -370,7 +382,7 @@ export function hashTokenTransactionV1(
 
     if (output.tokenAmount) {
       if (output.tokenAmount.length === 0) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `token amount at index ${i} cannot be empty`,
           {
             field: `tokenOutputs[${i}].tokenAmount`,
@@ -379,7 +391,7 @@ export function hashTokenTransactionV1(
         );
       }
       if (output.tokenAmount.length > 16) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `token amount at index ${i} exceeds maximum length`,
           {
             field: `tokenOutputs[${i}].tokenAmount`,
@@ -397,7 +409,7 @@ export function hashTokenTransactionV1(
   }
 
   if (!tokenTransaction.sparkOperatorIdentityPublicKeys) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "spark operator identity public keys cannot be null",
       {},
     );
@@ -428,7 +440,7 @@ export function hashTokenTransactionV1(
   // Hash spark operator identity public keys
   for (const [i, pubKey] of sortedPubKeys.entries()) {
     if (!pubKey) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         `operator public key at index ${i} cannot be null`,
         {
           field: `sparkOperatorIdentityPublicKeys[${i}]`,
@@ -437,7 +449,7 @@ export function hashTokenTransactionV1(
       );
     }
     if (pubKey.length === 0) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         `operator public key at index ${i} cannot be empty`,
         {
           field: `sparkOperatorIdentityPublicKeys[${i}]`,
@@ -466,7 +478,7 @@ export function hashTokenTransactionV1(
   const clientCreatedTs: Date | undefined = (tokenTransaction as any)
     .clientCreatedTimestamp;
   if (!clientCreatedTs) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "client created timestamp cannot be null for V1 token transactions",
       {
         field: "clientCreatedTimestamp",
@@ -518,7 +530,7 @@ export function hashTokenTransactionV2(
   partialHash: boolean = false,
 ): Uint8Array {
   if (!tokenTransaction) {
-    throw new ValidationError("token transaction cannot be nil", {
+    throw new SparkValidationError("token transaction cannot be nil", {
       field: "tokenTransaction",
     });
   }
@@ -548,7 +560,7 @@ export function hashTokenTransactionV2(
   } else if (tokenTransaction.tokenInputs?.$case === "createInput") {
     transactionType = TokenTransactionType.TOKEN_TRANSACTION_TYPE_CREATE;
   } else {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "token transaction must have exactly one input type",
       {
         field: "tokenInputs",
@@ -563,7 +575,7 @@ export function hashTokenTransactionV2(
   // Hash token inputs based on type
   if (tokenTransaction.tokenInputs?.$case === "transferInput") {
     if (!tokenTransaction.tokenInputs.transferInput.outputsToSpend) {
-      throw new ValidationError("outputs to spend cannot be null", {
+      throw new SparkValidationError("outputs to spend cannot be null", {
         field: "tokenInputs.transferInput.outputsToSpend",
       });
     }
@@ -571,7 +583,7 @@ export function hashTokenTransactionV2(
     if (
       tokenTransaction.tokenInputs.transferInput.outputsToSpend.length === 0
     ) {
-      throw new ValidationError("outputs to spend cannot be empty", {
+      throw new SparkValidationError("outputs to spend cannot be empty", {
         field: "tokenInputs.transferInput.outputsToSpend",
       });
     }
@@ -593,7 +605,7 @@ export function hashTokenTransactionV2(
       output,
     ] of tokenTransaction.tokenInputs!.transferInput!.outputsToSpend.entries()) {
       if (!output) {
-        throw new ValidationError(`output cannot be null at index ${i}`, {
+        throw new SparkValidationError(`output cannot be null at index ${i}`, {
           field: `tokenInputs.transferInput.outputsToSpend[${i}]`,
           index: i,
         });
@@ -604,7 +616,7 @@ export function hashTokenTransactionV2(
       if (output.prevTokenTransactionHash) {
         const prevHash = output.prevTokenTransactionHash;
         if (output.prevTokenTransactionHash.length !== 32) {
-          throw new ValidationError(
+          throw new SparkValidationError(
             `invalid previous transaction hash length at index ${i}`,
             {
               field: `tokenInputs.transferInput.outputsToSpend[${i}].prevTokenTransactionHash`,
@@ -635,7 +647,7 @@ export function hashTokenTransactionV2(
       const issuerPubKey: Uint8Array =
         tokenTransaction.tokenInputs.mintInput.issuerPublicKey;
       if (issuerPubKey.length === 0) {
-        throw new ValidationError("issuer public key cannot be empty", {
+        throw new SparkValidationError("issuer public key cannot be empty", {
           field: "tokenInputs.mintInput.issuerPublicKey",
           value: issuerPubKey,
           expectedLength: 1,
@@ -664,9 +676,12 @@ export function hashTokenTransactionV2(
       !createInput.issuerPublicKey ||
       createInput.issuerPublicKey.length === 0
     ) {
-      throw new ValidationError("issuer public key cannot be nil or empty", {
-        field: "tokenInputs.createInput.issuerPublicKey",
-      });
+      throw new SparkValidationError(
+        "issuer public key cannot be nil or empty",
+        {
+          field: "tokenInputs.createInput.issuerPublicKey",
+        },
+      );
     }
     issuerPubKeyHashObj.update(createInput.issuerPublicKey);
     allHashes.push(issuerPubKeyHashObj.digest());
@@ -674,17 +689,20 @@ export function hashTokenTransactionV2(
     // Hash token name
     const tokenNameHashObj = sha256.create();
     if (!createInput.tokenName || createInput.tokenName.length === 0) {
-      throw new ValidationError("token name cannot be empty", {
+      throw new SparkValidationError("token name cannot be empty", {
         field: "tokenInputs.createInput.tokenName",
       });
     }
     if (createInput.tokenName.length > 20) {
-      throw new ValidationError("token name cannot be longer than 20 bytes", {
-        field: "tokenInputs.createInput.tokenName",
-        value: createInput.tokenName,
-        expectedLength: 20,
-        actualLength: createInput.tokenName.length,
-      });
+      throw new SparkValidationError(
+        "token name cannot be longer than 20 bytes",
+        {
+          field: "tokenInputs.createInput.tokenName",
+          value: createInput.tokenName,
+          expectedLength: 20,
+          actualLength: createInput.tokenName.length,
+        },
+      );
     }
     const tokenNameEncoder = new TextEncoder();
     tokenNameHashObj.update(tokenNameEncoder.encode(createInput.tokenName));
@@ -693,17 +711,20 @@ export function hashTokenTransactionV2(
     // Hash token ticker
     const tokenTickerHashObj = sha256.create();
     if (!createInput.tokenTicker || createInput.tokenTicker.length === 0) {
-      throw new ValidationError("token ticker cannot be empty", {
+      throw new SparkValidationError("token ticker cannot be empty", {
         field: "tokenInputs.createInput.tokenTicker",
       });
     }
     if (createInput.tokenTicker.length > 6) {
-      throw new ValidationError("token ticker cannot be longer than 6 bytes", {
-        field: "tokenInputs.createInput.tokenTicker",
-        value: createInput.tokenTicker,
-        expectedLength: 6,
-        actualLength: createInput.tokenTicker.length,
-      });
+      throw new SparkValidationError(
+        "token ticker cannot be longer than 6 bytes",
+        {
+          field: "tokenInputs.createInput.tokenTicker",
+          value: createInput.tokenTicker,
+          expectedLength: 6,
+          actualLength: createInput.tokenTicker.length,
+        },
+      );
     }
     const tokenTickerEncoder = new TextEncoder();
     tokenTickerHashObj.update(
@@ -725,12 +746,12 @@ export function hashTokenTransactionV2(
     // Hash max supply (fixed 16 bytes)
     const maxSupplyHashObj = sha256.create();
     if (!createInput.maxSupply) {
-      throw new ValidationError("max supply cannot be nil", {
+      throw new SparkValidationError("max supply cannot be nil", {
         field: "tokenInputs.createInput.maxSupply",
       });
     }
     if (createInput.maxSupply.length !== 16) {
-      throw new ValidationError("max supply must be exactly 16 bytes", {
+      throw new SparkValidationError("max supply must be exactly 16 bytes", {
         field: "tokenInputs.createInput.maxSupply",
         value: createInput.maxSupply,
         expectedLength: 16,
@@ -757,7 +778,7 @@ export function hashTokenTransactionV2(
 
   // Hash token outputs (length + contents)
   if (!tokenTransaction.tokenOutputs) {
-    throw new ValidationError("token outputs cannot be null", {
+    throw new SparkValidationError("token outputs cannot be null", {
       field: "tokenOutputs",
     });
   }
@@ -775,7 +796,7 @@ export function hashTokenTransactionV2(
 
   for (const [i, output] of tokenTransaction.tokenOutputs.entries()) {
     if (!output) {
-      throw new ValidationError(`output cannot be null at index ${i}`, {
+      throw new SparkValidationError(`output cannot be null at index ${i}`, {
         field: `tokenOutputs[${i}]`,
         index: i,
       });
@@ -786,16 +807,19 @@ export function hashTokenTransactionV2(
     // Only hash ID if it's not empty and not in partial hash mode
     if (output.id && !partialHash) {
       if (output.id.length === 0) {
-        throw new ValidationError(`output ID at index ${i} cannot be empty`, {
-          field: `tokenOutputs[${i}].id`,
-          index: i,
-        });
+        throw new SparkValidationError(
+          `output ID at index ${i} cannot be empty`,
+          {
+            field: `tokenOutputs[${i}].id`,
+            index: i,
+          },
+        );
       }
       hashObj.update(new TextEncoder().encode(output.id));
     }
     if (output.ownerPublicKey) {
       if (output.ownerPublicKey.length === 0) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `owner public key at index ${i} cannot be empty`,
           {
             field: `tokenOutputs[${i}].ownerPublicKey`,
@@ -810,7 +834,7 @@ export function hashTokenTransactionV2(
       const revPubKey = output.revocationCommitment!!;
       if (revPubKey) {
         if (revPubKey.length === 0) {
-          throw new ValidationError(
+          throw new SparkValidationError(
             `revocation commitment at index ${i} cannot be empty`,
             {
               field: `tokenOutputs[${i}].revocationCommitment`,
@@ -854,7 +878,7 @@ export function hashTokenTransactionV2(
 
     if (output.tokenAmount) {
       if (output.tokenAmount.length === 0) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `token amount at index ${i} cannot be empty`,
           {
             field: `tokenOutputs[${i}].tokenAmount`,
@@ -863,7 +887,7 @@ export function hashTokenTransactionV2(
         );
       }
       if (output.tokenAmount.length > 16) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `token amount at index ${i} exceeds maximum length`,
           {
             field: `tokenOutputs[${i}].tokenAmount`,
@@ -881,7 +905,7 @@ export function hashTokenTransactionV2(
   }
 
   if (!tokenTransaction.sparkOperatorIdentityPublicKeys) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "spark operator identity public keys cannot be null",
       {},
     );
@@ -912,7 +936,7 @@ export function hashTokenTransactionV2(
   // Hash spark operator identity public keys
   for (const [i, pubKey] of sortedPubKeys.entries()) {
     if (!pubKey) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         `operator public key at index ${i} cannot be null`,
         {
           field: `sparkOperatorIdentityPublicKeys[${i}]`,
@@ -921,7 +945,7 @@ export function hashTokenTransactionV2(
       );
     }
     if (pubKey.length === 0) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         `operator public key at index ${i} cannot be empty`,
         {
           field: `sparkOperatorIdentityPublicKeys[${i}]`,
@@ -950,7 +974,7 @@ export function hashTokenTransactionV2(
   const clientCreatedTs: Date | undefined = (tokenTransaction as any)
     .clientCreatedTimestamp;
   if (!clientCreatedTs) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "client created timestamp cannot be null for V1 token transactions",
       {
         field: "clientCreatedTimestamp",
@@ -1004,7 +1028,7 @@ export function hashTokenTransactionV2(
     for (let i = 0; i < attachments.length; i++) {
       const attachment = attachments[i];
       if (!attachment) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `invoice attachment at index ${i} cannot be null`,
           {
             field: `invoiceAttachments[${i}]`,
@@ -1023,7 +1047,7 @@ export function hashTokenTransactionV2(
         }
         idBytes = payload.sparkInvoiceFields.id;
       } catch (err) {
-        throw new ValidationError(
+        throw new SparkValidationError(
           `invalid invoice at ${i}`,
           {
             field: `invoiceAttachments[${i}].sparkInvoice`,
@@ -1034,7 +1058,7 @@ export function hashTokenTransactionV2(
         );
       }
       if (!idBytes || idBytes.length !== 16) {
-        throw new ValidationError(`invalid invoice id at ${i}`, {
+        throw new SparkValidationError(`invalid invoice id at ${i}`, {
           field: `invoiceAttachments[${i}].sparkInvoice`,
           index: i,
         });
@@ -1103,7 +1127,7 @@ export function sortInvoiceAttachments(
   for (let i = 0; i < attachments.length; i++) {
     const attachment = attachments[i];
     if (!attachment) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         `invoice attachment at index ${i} cannot be null`,
         {
           field: `invoiceAttachments[${i}]`,
@@ -1122,7 +1146,7 @@ export function sortInvoiceAttachments(
       }
       idBytes = payload.sparkInvoiceFields.id;
     } catch (err) {
-      throw new ValidationError(
+      throw new SparkValidationError(
         `invalid invoice at ${i}`,
         {
           field: `invoiceAttachments[${i}].sparkInvoice`,
@@ -1133,7 +1157,7 @@ export function sortInvoiceAttachments(
       );
     }
     if (!idBytes || idBytes.length !== 16) {
-      throw new ValidationError(`invalid invoice id at ${i}`, {
+      throw new SparkValidationError(`invalid invoice id at ${i}`, {
         field: `invoiceAttachments[${i}].sparkInvoice`,
         index: i,
       });
@@ -1159,7 +1183,7 @@ export async function hashTokenTransactionV3(
   partialHash: boolean = false,
 ): Promise<Uint8Array> {
   if (!tokenTransaction) {
-    throw new ValidationError("token transaction cannot be nil", {
+    throw new SparkValidationError("token transaction cannot be nil", {
       field: "tokenTransaction",
     });
   }
@@ -1208,7 +1232,7 @@ export async function hashTokenTransactionV3(
         break;
 
       default:
-        throw new ValidationError(
+        throw new SparkValidationError(
           `unsupported token transaction type: ${inputType}`,
           {
             field: "tokenInputs",
@@ -1231,7 +1255,7 @@ export async function hashPartialTokenTransaction(
   partialTokenTransaction: PartialTokenTransaction,
 ): Promise<Uint8Array> {
   if (!partialTokenTransaction) {
-    throw new ValidationError("partial token transaction cannot be nil", {
+    throw new SparkValidationError("partial token transaction cannot be nil", {
       field: "partialTokenTransaction",
     });
   }
@@ -1248,7 +1272,7 @@ export async function hashFinalTokenTransaction(
   finalTokenTransaction: FinalTokenTransaction,
 ): Promise<Uint8Array> {
   if (!finalTokenTransaction) {
-    throw new ValidationError("final token transaction cannot be nil", {
+    throw new SparkValidationError("final token transaction cannot be nil", {
       field: "finalTokenTransaction",
     });
   }
@@ -1265,7 +1289,7 @@ export function hashOperatorSpecificTokenTransactionSignablePayload(
   payload: OperatorSpecificTokenTransactionSignablePayload,
 ): Uint8Array {
   if (!payload) {
-    throw new ValidationError(
+    throw new SparkValidationError(
       "operator specific token transaction signable payload cannot be null",
       {
         field: "payload",
@@ -1279,12 +1303,15 @@ export function hashOperatorSpecificTokenTransactionSignablePayload(
   if (payload.finalTokenTransactionHash) {
     const hashObj = sha256.create();
     if (payload.finalTokenTransactionHash.length !== 32) {
-      throw new ValidationError(`invalid final token transaction hash length`, {
-        field: "finalTokenTransactionHash",
-        value: payload.finalTokenTransactionHash,
-        expectedLength: 32,
-        actualLength: payload.finalTokenTransactionHash.length,
-      });
+      throw new SparkValidationError(
+        `invalid final token transaction hash length`,
+        {
+          field: "finalTokenTransactionHash",
+          value: payload.finalTokenTransactionHash,
+          expectedLength: 32,
+          actualLength: payload.finalTokenTransactionHash.length,
+        },
+      );
     }
     hashObj.update(payload.finalTokenTransactionHash);
     allHashes.push(hashObj.digest());
@@ -1292,15 +1319,21 @@ export function hashOperatorSpecificTokenTransactionSignablePayload(
 
   // Hash operator identity public key
   if (!payload.operatorIdentityPublicKey) {
-    throw new ValidationError("operator identity public key cannot be null", {
-      field: "operatorIdentityPublicKey",
-    });
+    throw new SparkValidationError(
+      "operator identity public key cannot be null",
+      {
+        field: "operatorIdentityPublicKey",
+      },
+    );
   }
 
   if (payload.operatorIdentityPublicKey.length === 0) {
-    throw new ValidationError("operator identity public key cannot be empty", {
-      field: "operatorIdentityPublicKey",
-    });
+    throw new SparkValidationError(
+      "operator identity public key cannot be empty",
+      {
+        field: "operatorIdentityPublicKey",
+      },
+    );
   }
 
   const hashObj = sha256.create();

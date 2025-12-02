@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { Transaction } from "@scure/btc-signer";
-import { ValidationError } from "../errors/types.js";
+import { SparkValidationError } from "../errors/types.js";
 import {
   getP2TRAddressFromPkScript,
   getP2TRAddressFromPublicKey,
@@ -92,7 +92,7 @@ describe("bitcoin", () => {
 
     const prevOutScript = prevTx.getOutput(0).script;
     if (!prevOutScript)
-      throw new ValidationError("No script found in prevOut", {
+      throw new SparkValidationError("No script found in prevOut", {
         field: "prevOutScript",
       });
 
@@ -103,7 +103,7 @@ describe("bitcoin", () => {
 
     const prevOut = prevTx.getOutput(0);
     if (!prevOut)
-      throw new ValidationError("No output found in prevTx", {
+      throw new SparkValidationError("No output found in prevTx", {
         field: "prevOut",
       });
 
