@@ -79,6 +79,7 @@ func RegisterGrpcServers(
 
 func GetProtectedServices() []string {
 	return []string{
+		pbdkg.DKGService_ServiceDesc.ServiceName,
 		pbinternal.SparkInternalService_ServiceDesc.ServiceName,
 		pbtokeninternal.SparkTokenInternalService_ServiceDesc.ServiceName,
 		pbgossip.GossipService_ServiceDesc.ServiceName,
