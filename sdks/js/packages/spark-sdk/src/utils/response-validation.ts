@@ -21,6 +21,7 @@ export function collectResponses<T>(responses: PromiseSettledResult<T>[]): T[] {
       {
         errorCount: failedResponses.length,
         errors,
+        error: failedResponses.map((result) => result.reason),
       },
     );
   }

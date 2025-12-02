@@ -158,15 +158,10 @@ export class DepositService {
         network: this.config.getNetworkProto(),
       });
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to generate static deposit address",
-        {
-          operation: "generate_static_deposit_address",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to generate static deposit address", {
+        operation: "generate_static_deposit_address",
+        error,
+      });
     }
 
     if (!depositResp.depositAddress) {
@@ -207,15 +202,10 @@ export class DepositService {
         isStatic: isStatic,
       });
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to generate deposit address",
-        {
-          operation: "generate_deposit_address",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to generate deposit address", {
+        operation: "generate_deposit_address",
+        error,
+      });
     }
 
     if (!depositResp.depositAddress) {
@@ -356,15 +346,10 @@ export class DepositService {
         },
       });
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to start deposit tree creation",
-        {
-          operation: "start_deposit_tree_creation",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to start deposit tree creation", {
+        operation: "start_deposit_tree_creation",
+        error,
+      });
     }
 
     if (!treeResp.rootNodeSignatureShares?.verifyingKey) {
@@ -613,15 +598,10 @@ export class DepositService {
         ],
       });
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to finalize node signatures",
-        {
-          operation: "finalize_node_signatures",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to finalize node signatures", {
+        operation: "finalize_node_signatures",
+        error,
+      });
     }
 
     return finalizeResp;

@@ -75,15 +75,12 @@ export function getNetworkFromAddress(address: string) {
       return BitcoinNetwork.REGTEST;
     }
   } catch (err) {
-    throw new SparkValidationError(
-      "Invalid Bitcoin address",
-      {
-        field: "address",
-        value: address,
-        expected: "Valid Bech32 address with prefix 'bc' or 'bcrt'",
-      },
-      err instanceof Error ? err : undefined,
-    );
+    throw new SparkValidationError("Invalid Bitcoin address", {
+      field: "address",
+      value: address,
+      expected: "Valid Bech32 address with prefix 'bc' or 'bcrt'",
+      error: err,
+    });
   }
   return null;
 }

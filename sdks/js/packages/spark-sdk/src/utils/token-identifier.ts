@@ -53,8 +53,8 @@ export function encodeBech32mTokenIdentifier(
       {
         field: "tokenIdentifier",
         value: payload.tokenIdentifier,
+        error,
       },
-      error as Error,
     );
   }
 }
@@ -100,8 +100,8 @@ export function decodeBech32mTokenIdentifier(
       {
         field: "bech32mTokenIdentifier",
         value: bech32mTokenIdentifier,
+        error,
       },
-      error as Error,
     );
   }
 }

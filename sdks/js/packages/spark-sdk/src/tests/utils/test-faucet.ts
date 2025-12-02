@@ -348,6 +348,7 @@ export class BitcoinFaucet {
             bitcoinRpcMethod: method,
             params,
             code: data.error.code,
+            error: data.error,
           },
         );
       }
@@ -357,14 +358,11 @@ export class BitcoinFaucet {
       if (error instanceof SparkRequestError) {
         throw error;
       }
-      throw new SparkRequestError(
-        "Failed to call Bitcoin RPC",
-        {
-          bitcoinRpcMethod: method,
-          params,
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to call Bitcoin RPC", {
+        bitcoinRpcMethod: method,
+        params,
+        error,
+      });
     }
   }
 

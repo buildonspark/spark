@@ -165,15 +165,12 @@ export class LightningService {
     await Promise.all(promises);
 
     if (errors.length > 0) {
-      throw new SparkRequestError(
-        "Failed to store preimage shares",
-        {
-          operation: "store_preimage_share",
-          errorCount: errors.length,
-          errors: errors.map((e) => e.message).join(", "),
-        },
-        errors[0],
-      );
+      throw new SparkRequestError("Failed to store preimage shares", {
+        operation: "store_preimage_share",
+        errorCount: errors.length,
+        errors: errors.map((e) => e.message).join(", "),
+        error: errors[0],
+      });
     }
 
     return invoice;
@@ -216,15 +213,10 @@ export class LightningService {
         count: 3,
       });
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to get signing commitments",
-        {
-          operation: "get_signing_commitments",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to get signing commitments", {
+        operation: "get_signing_commitments",
+        error,
+      });
     }
 
     const {
@@ -317,15 +309,10 @@ export class LightningService {
         transferRequest: startTransferRequest,
       });
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to initiate preimage swap",
-        {
-          operation: "initiate_preimage_swap",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to initiate preimage swap", {
+        operation: "initiate_preimage_swap",
+        error,
+      });
     }
 
     return response;
@@ -345,15 +332,10 @@ export class LightningService {
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
       });
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to query user signed refunds",
-        {
-          operation: "query_user_signed_refunds",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to query user signed refunds", {
+        operation: "query_user_signed_refunds",
+        error,
+      });
     }
 
     return response.userSignedRefunds;
@@ -379,15 +361,10 @@ export class LightningService {
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
       });
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to provide preimage",
-        {
-          operation: "provide_preimage",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to provide preimage", {
+        operation: "provide_preimage",
+        error,
+      });
     }
 
     if (!response.transfer) {

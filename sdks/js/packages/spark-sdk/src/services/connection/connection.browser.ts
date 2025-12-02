@@ -46,12 +46,10 @@ export class ConnectionManagerBrowser extends ConnectionManager {
     try {
       return createChannel(address, this.transport);
     } catch (error) {
-      console.error("Channel creation error:", error);
-      throw new SparkRequestError(
-        "Failed to create channel",
-        { url: address },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to create channel", {
+        url: address,
+        error,
+      });
     }
   }
 

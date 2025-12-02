@@ -35,9 +35,9 @@ export function decodeInvoice(invoice: string): DecodedInvoice {
   const network = getNetworkFromInvoice(invoice);
 
   if (network === null) {
-    throw new SparkValidationError(
-      "Invalid network found in invoice: " + invoice,
-    );
+    throw new SparkValidationError("Invalid network found in invoice", {
+      invoice,
+    });
   }
 
   let paymentSection: Section | undefined;
@@ -75,14 +75,14 @@ export function decodeInvoice(invoice: string): DecodedInvoice {
   }
 
   if (paymentHash === undefined) {
-    throw new SparkValidationError(
-      "No payment hash found in invoice: " + invoice,
-    );
+    throw new SparkValidationError("No payment hash found in invoice", {
+      invoice,
+    });
   }
   if (paymentSecretSection?.value === undefined) {
-    throw new SparkValidationError(
-      "Invalid payment secret found in invoice: " + invoice,
-    );
+    throw new SparkValidationError("Invalid payment secret found in invoice", {
+      invoice,
+    });
   }
 
   return { amountMSats, fallbackAddress, paymentHash };

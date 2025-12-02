@@ -1,20 +1,25 @@
 import { bytesToHex } from "@noble/hashes/utils";
 import { clientEnv } from "../constants.js";
 
+export type SparkErrorContextArg = Record<string, unknown> & {
+  error?: unknown;
+};
+
 export class SparkError extends Error {
   private context: Record<string, unknown>;
   private readonly initialMessage: string;
   public readonly originalError?: Error;
 
-  constructor(
-    message: string,
-    contextArg: Record<string, unknown> = {},
-    originalError?: Error,
-  ) {
+  constructor(message: string, contextArg: SparkErrorContextArg = {}) {
     const context = {
       ...contextArg,
       clientEnv,
     };
+    let originalError: Error | undefined;
+    if (context.error) {
+      originalError = getError(context.error);
+      delete context.error;
+    }
     const msg = getMessage(message, context, originalError);
     super(msg);
     this.initialMessage = message;
@@ -121,4 +126,33 @@ function safeStringify(value: unknown): string {
 
 function formatUint8Array(arr: Uint8Array): string {
   return `Uint8Array(0x${bytesToHex(arr)})`;
+}
+
+function getError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return new Error(error.message);
+  }
+
+  if (typeof error === "string") {
+    return new Error(error);
+  }
+
+  let message: string;
+
+  try {
+    message = JSON.stringify(error);
+  } catch {
+    message = String(error);
+  }
+
+  return new Error(message);
 }

@@ -82,11 +82,10 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
         return ch;
       }
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to create channel",
-        { url: address },
-        error instanceof Error ? error : undefined,
-      );
+      throw new SparkRequestError("Failed to create channel", {
+        url: address,
+        error,
+      });
     }
   }
 

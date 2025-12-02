@@ -1802,8 +1802,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           }
         } catch (error) {
           throw new SparkRequestError("Failed to fetch token metadata", {
-            errorCount: 1,
-            errors: error instanceof Error ? error.message : String(error),
+            error,
           });
         }
       }
@@ -1970,15 +1969,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         })) ?? []
       );
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to get UTXOs for deposit address",
-        {
-          operation: "get_utxos_for_address",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to get UTXOs for deposit address", {
+        operation: "get_utxos_for_address",
+        error,
+      });
     }
   }
 
@@ -3353,11 +3347,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         error,
       );
 
-      throw new SparkError(
-        "Failed to claim transfer",
-        {},
-        error instanceof Error ? error : undefined,
-      );
+      throw new SparkError("Failed to claim transfer", { error });
     }
   }
 
@@ -5409,8 +5399,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         `Failed to check timelock for node ${nodeId}`,
         {
           operation: "query_nodes",
+          error,
         },
-        error as Error,
       );
     }
   }
@@ -5610,12 +5600,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     if (error instanceof Error) {
-      return new SparkError(error.message, context, error);
+      return new SparkError(error.message, { ...context, error });
     }
 
     /* Non-Error throwables: coerce to string and wrap */
     const message = String(error);
-    return new SparkError(message, context);
+    return new SparkError(message, { ...context, error });
   }
 
   protected getTraceName(methodName: string) {

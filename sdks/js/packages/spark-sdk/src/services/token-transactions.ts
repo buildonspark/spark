@@ -696,11 +696,10 @@ export class TokenTransactionService {
         } as SparkCallOptions,
       );
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to sign token transaction",
-        { operation: "commit_transaction" },
-        error instanceof Error ? error : undefined,
-      );
+      throw new SparkRequestError("Failed to sign token transaction", {
+        operation: "commit_transaction",
+        error,
+      });
     }
   }
 
@@ -773,11 +772,10 @@ export class TokenTransactionService {
 
       return allOutputs;
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to fetch owned token outputs",
-        { operation: "query_token_outputs" },
-        error instanceof Error ? error : undefined,
-      );
+      throw new SparkRequestError("Failed to fetch owned token outputs", {
+        operation: "query_token_outputs",
+        error,
+      });
     }
   }
 
@@ -833,11 +831,10 @@ export class TokenTransactionService {
     try {
       return await tokenClient.query_token_transactions(queryParams);
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to query token transactions",
-        { operation: "query_token_transactions" },
-        error instanceof Error ? error : undefined,
-      );
+      throw new SparkRequestError("Failed to query token transactions", {
+        operation: "query_token_transactions",
+        error,
+      });
     }
   }
 

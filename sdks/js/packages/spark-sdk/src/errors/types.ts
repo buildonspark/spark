@@ -1,13 +1,12 @@
-import { SparkError } from "./base.js";
 import { type SparkServiceDefinition } from "../proto/spark.js";
 import { type SparkAuthnServiceDefinition } from "../proto/spark_authn.js";
 import { type SparkTokenServiceDefinition } from "../proto/spark_token.js";
+import { SparkError, type SparkErrorContextArg } from "./base.js";
 
 /**
- * SparkRequestError should be used for any errors related to requests or network
- * communication, such as failed HTTP requests, timeouts, or connection issues.
+ * SparkRequestError should be used failed requests due to server errors or network issues.
  * This includes:
- * - Failed API calls
+ * - API calls that failed or returned error(s)
  * - Network timeouts
  * - Connection refused
  * - DNS resolution failures
@@ -16,16 +15,15 @@ import { type SparkTokenServiceDefinition } from "../proto/spark_token.js";
 export class SparkRequestError extends SparkError {
   constructor(
     message: string,
-    context: Record<string, unknown> & {
+    context: SparkErrorContextArg & {
       operation?:
         | keyof SparkServiceDefinition["methods"]
         | keyof SparkAuthnServiceDefinition["methods"]
         | keyof SparkTokenServiceDefinition["methods"];
       method?: "GET" | "POST";
     } = {},
-    originalError?: Error,
   ) {
-    super(message, context, originalError);
+    super(message, context);
   }
 }
 
@@ -39,12 +37,8 @@ export class SparkRequestError extends SparkError {
  * - Data format validation failures
  */
 export class SparkValidationError extends SparkError {
-  constructor(
-    message: string,
-    context: Record<string, unknown> = {},
-    originalError?: Error,
-  ) {
-    super(message, context, originalError);
+  constructor(message: string, context: SparkErrorContextArg = {}) {
+    super(message, context);
   }
 }
 
@@ -59,11 +53,7 @@ export class SparkValidationError extends SparkError {
  * - Authorization failures
  */
 export class SparkAuthenticationError extends SparkError {
-  constructor(
-    message: string,
-    context: Record<string, unknown> = {},
-    originalError?: Error,
-  ) {
-    super(message, context, originalError);
+  constructor(message: string, context: SparkErrorContextArg = {}) {
+    super(message, context);
   }
 }

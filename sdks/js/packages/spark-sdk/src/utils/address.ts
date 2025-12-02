@@ -103,14 +103,11 @@ export function encodeSparkAddressWithSignature(
       words,
     ) as SparkAddressFormat;
   } catch (error) {
-    throw new SparkValidationError(
-      "Failed to encode Spark address",
-      {
-        field: "publicKey",
-        value: payload.identityPublicKey,
-      },
-      error as Error,
-    );
+    throw new SparkValidationError("Failed to encode Spark address", {
+      field: "publicKey",
+      value: payload.identityPublicKey,
+      error,
+    });
   }
 }
 
@@ -179,14 +176,11 @@ export function decodeSparkAddress(
     if (error instanceof SparkValidationError) {
       throw error;
     }
-    throw new SparkValidationError(
-      "Failed to decode Spark address",
-      {
-        field: "address",
-        value: address,
-      },
-      error as Error,
-    );
+    throw new SparkValidationError("Failed to decode Spark address", {
+      field: "address",
+      value: address,
+      error,
+    });
   }
 }
 
@@ -233,14 +227,11 @@ export function isValidSparkAddress(address: string) {
     if (error instanceof SparkValidationError) {
       throw error;
     }
-    throw new SparkValidationError(
-      "Invalid Spark address",
-      {
-        field: "address",
-        value: address,
-      },
-      error as Error,
-    );
+    throw new SparkValidationError("Invalid Spark address", {
+      field: "address",
+      value: address,
+      error,
+    });
   }
 }
 
@@ -249,14 +240,11 @@ export function isValidPublicKey(publicKey: string) {
     const point = secp256k1.Point.fromHex(publicKey);
     point.assertValidity();
   } catch (error) {
-    throw new SparkValidationError(
-      "Invalid public key",
-      {
-        field: "publicKey",
-        value: publicKey,
-      },
-      error as Error,
-    );
+    throw new SparkValidationError("Invalid public key", {
+      field: "publicKey",
+      value: publicKey,
+      error,
+    });
   }
 }
 
@@ -275,27 +263,21 @@ export function validateSparkInvoiceFields(
   try {
     UUID.ofInner(id);
   } catch (error) {
-    throw new SparkValidationError(
-      "Invalid id",
-      {
-        field: "id",
-        value: id,
-      },
-      error as Error,
-    );
+    throw new SparkValidationError("Invalid id", {
+      field: "id",
+      value: id,
+      error,
+    });
   }
   if (senderPublicKey) {
     try {
       isValidPublicKey(bytesToHex(senderPublicKey));
     } catch (error) {
-      throw new SparkValidationError(
-        "Invalid sender public key",
-        {
-          field: "senderPublicKey",
-          value: senderPublicKey,
-        },
-        error as Error,
-      );
+      throw new SparkValidationError("Invalid sender public key", {
+        field: "senderPublicKey",
+        value: senderPublicKey,
+        error,
+      });
     }
   }
   if (memo) {
@@ -428,8 +410,8 @@ export function validateSparkInvoiceSignature(invoice: SparkAddressFormat) {
       {
         field: "invoice",
         value: invoice,
+        error,
       },
-      error as Error,
     );
   }
 }

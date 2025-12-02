@@ -1047,15 +1047,12 @@ export function hashTokenTransactionV2(
         }
         idBytes = payload.sparkInvoiceFields.id;
       } catch (err) {
-        throw new SparkValidationError(
-          `invalid invoice at ${i}`,
-          {
-            field: `invoiceAttachments[${i}].sparkInvoice`,
-            index: i,
-            value: invoice,
-          },
-          err as Error,
-        );
+        throw new SparkValidationError(`invalid invoice at ${i}`, {
+          field: `invoiceAttachments[${i}].sparkInvoice`,
+          index: i,
+          value: invoice,
+          error: err,
+        });
       }
       if (!idBytes || idBytes.length !== 16) {
         throw new SparkValidationError(`invalid invoice id at ${i}`, {
@@ -1146,15 +1143,12 @@ export function sortInvoiceAttachments(
       }
       idBytes = payload.sparkInvoiceFields.id;
     } catch (err) {
-      throw new SparkValidationError(
-        `invalid invoice at ${i}`,
-        {
-          field: `invoiceAttachments[${i}].sparkInvoice`,
-          index: i,
-          value: invoice,
-        },
-        err as Error,
-      );
+      throw new SparkValidationError(`invalid invoice at ${i}`, {
+        field: `invoiceAttachments[${i}].sparkInvoice`,
+        index: i,
+        value: invoice,
+        error: err,
+      });
     }
     if (!idBytes || idBytes.length !== 16) {
       throw new SparkValidationError(`invalid invoice id at ${i}`, {

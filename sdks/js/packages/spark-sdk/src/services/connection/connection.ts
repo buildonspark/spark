@@ -385,11 +385,11 @@ export abstract class ConnectionManager {
                 continue;
               }
 
-              throw new SparkAuthenticationError(
-                "Authentication failed",
-                { endpoint: "authenticate", reason: error.message },
+              throw new SparkAuthenticationError("Authentication failed", {
+                endpoint: "authenticate",
+                reason: error.message,
                 error,
-              );
+              });
             } else {
               lastError = new Error(
                 `Unknown error during authentication: ${String(error)}`,
@@ -403,8 +403,8 @@ export abstract class ConnectionManager {
           {
             endpoint: "authenticate",
             reason: lastError?.message ?? "Unknown error",
+            error: lastError,
           },
-          lastError,
         );
       },
     );
@@ -428,11 +428,9 @@ export abstract class ConnectionManager {
       );
       return client;
     } catch (error) {
-      throw new SparkError(
-        "Failed to create Spark Authn gRPC connection",
-        {},
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      throw new SparkError("Failed to create Spark Authn gRPC connection", {
+        error,
+      });
     }
   }
 

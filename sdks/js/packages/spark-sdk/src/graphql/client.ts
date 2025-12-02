@@ -165,18 +165,15 @@ export default class SspClient {
             {
               endpoint: "graphql",
               reason: error.message,
+              error: authError,
             },
-            authError as Error,
           );
         }
       }
-      throw new SparkRequestError(
-        "Failed to execute GraphQL query",
-        {
-          method: "POST",
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to execute GraphQL query", {
+        method: "POST",
+        error: error,
+      });
     }
   }
 

@@ -248,13 +248,10 @@ export class BaseTransferService {
         sparkInvoice,
       });
     } catch (error) {
-      throw new SparkRequestError(
-        "Failed to start transfer",
-        {
-          method: "POST",
-        },
-        error as Error,
-      );
+      throw new SparkRequestError("Failed to start transfer", {
+        method: "POST",
+        error,
+      });
     }
 
     if (!response.transfer) {
@@ -1152,13 +1149,10 @@ export class TransferService extends BaseTransferService {
           });
         } catch (error: any) {
           errors.push(
-            new SparkRequestError(
-              "Failed to claim transfer tweak keys",
-              {
-                method: "POST",
-              },
+            new SparkRequestError("Failed to claim transfer tweak keys", {
+              method: "POST",
               error,
-            ),
+            }),
           );
           return;
         }
@@ -1308,13 +1302,10 @@ export class TransferService extends BaseTransferService {
         signingJobs,
       });
     } catch (error: any) {
-      throw new SparkRequestError(
-        "Failed to claim transfer sign refunds",
-        {
-          method: "POST",
-        },
+      throw new SparkRequestError("Failed to claim transfer sign refunds", {
+        method: "POST",
         error,
-      );
+      });
     }
     return this.signRefunds(leafDataMap, resp.signingResults);
   }

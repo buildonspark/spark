@@ -22,7 +22,7 @@ describe("SparkError", () => {
 
   it("includes original error message when provided", () => {
     const original = new Error("something broke");
-    const err = new SparkError("Wrapper error.", {}, original);
+    const err = new SparkError("Wrapper error.", { error: original });
 
     expect(err.message).toBe(
       `Wrapper error: something broke [clientEnv: ${clientEnv}]`,
