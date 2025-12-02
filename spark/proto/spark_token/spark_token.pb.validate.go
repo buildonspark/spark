@@ -4501,9 +4501,27 @@ func (m *QueryTokenTransactionsRequest) validate(all bool) error {
 
 	// no validation rules for Order
 
-	// no validation rules for Limit
+	if val := m.GetLimit(); val < 0 || val > 1000 {
+		err := QueryTokenTransactionsRequestValidationError{
+			field:  "Limit",
+			reason: "value must be inside range [0, 1000]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for Offset
+	if m.GetOffset() < 0 {
+		err := QueryTokenTransactionsRequestValidationError{
+			field:  "Offset",
+			reason: "value must be greater than or equal to 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return QueryTokenTransactionsRequestMultiError(errors)

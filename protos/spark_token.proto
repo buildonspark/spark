@@ -299,8 +299,8 @@ message QueryTokenTransactionsRequest {
     // Returns transactions that match the provided transaction hashes.
     repeated bytes token_transaction_hashes = 4 [(validate.rules).repeated.items.bytes.len = 32];
     spark.Order order = 8;
-    int64 limit = 5;
-    int64 offset = 6;
+    int64 limit = 5 [(validate.rules).int64 = { gte: 0, lte: 1000 }];
+    int64 offset = 6 [(validate.rules).int64.gte = 0];
 }
 
 message QueryTokenTransactionsResponse {

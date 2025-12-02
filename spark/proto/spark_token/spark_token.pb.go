@@ -2802,7 +2802,7 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x12issuer_public_keys\x18\x02 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x10issuerPublicKeys\x129\n" +
 	"\x11token_identifiers\x18\x04 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h R\x10tokenIdentifiers\x12(\n" +
 	"\anetwork\x18\x03 \x01(\x0e2\x0e.spark.NetworkR\anetwork\x125\n" +
-	"\fpage_request\x18\x05 \x01(\v2\x12.spark.PageRequestR\vpageRequest\"\x98\x03\n" +
+	"\fpage_request\x18\x05 \x01(\v2\x12.spark.PageRequestR\vpageRequest\"\xad\x03\n" +
 	"\x1dQueryTokenTransactionsRequest\x12,\n" +
 	"\n" +
 	"output_ids\x18\x01 \x03(\tB\r\xfaB\n" +
@@ -2811,9 +2811,10 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x12issuer_public_keys\x18\x03 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x10issuerPublicKeys\x129\n" +
 	"\x11token_identifiers\x18\a \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h R\x10tokenIdentifiers\x12F\n" +
 	"\x18token_transaction_hashes\x18\x04 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h R\x16tokenTransactionHashes\x12\"\n" +
-	"\x05order\x18\b \x01(\x0e2\f.spark.OrderR\x05order\x12\x14\n" +
-	"\x05limit\x18\x05 \x01(\x03R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x06 \x01(\x03R\x06offset\"\xa6\x01\n" +
+	"\x05order\x18\b \x01(\x0e2\f.spark.OrderR\x05order\x12 \n" +
+	"\x05limit\x18\x05 \x01(\x03B\n" +
+	"\xfaB\a\"\x05\x18\xe8\a(\x00R\x05limit\x12\x1f\n" +
+	"\x06offset\x18\x06 \x01(\x03B\a\xfaB\x04\"\x02(\x00R\x06offset\"\xa6\x01\n" +
 	"\x1eQueryTokenTransactionsResponse\x12l\n" +
 	"\x1etoken_transactions_with_status\x18\x01 \x03(\v2'.spark_token.TokenTransactionWithStatusR\x1btokenTransactionsWithStatus\x12\x16\n" +
 	"\x06offset\x18\x02 \x01(\x03R\x06offset\"\xd6\x01\n" +
