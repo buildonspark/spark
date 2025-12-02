@@ -106,14 +106,6 @@ func FormatTokenTransactionHashes(tokenTransaction *tokenpb.TokenTransaction) st
 
 func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.TokenTransaction, err error) error {
 	formatted := FormatTokenTransactionHashes(tokenTransaction)
-	if err != nil {
-		return fmt.Errorf("%s %s: %w", msg, formatted, err)
-	}
-	return fmt.Errorf("%s %s", msg, formatted)
-}
-
-func FormatErrorWithTransactionHashAndSpentOutputs(msg string, tokenTransaction *tokenpb.TokenTransaction, err error) error {
-	formatted := FormatTokenTransactionHashes(tokenTransaction)
 	txType, inferTxTypeErr := utils.InferTokenTransactionType(tokenTransaction)
 	if inferTxTypeErr != nil {
 		return fmt.Errorf("Error inferring token txType for error format: %w, original err: %s %s: %w", inferTxTypeErr, msg, formatted, err)
@@ -127,19 +119,38 @@ func FormatErrorWithTransactionHashAndSpentOutputs(msg string, tokenTransaction 
 	var spentOutputs []readableSpentOutput
 	if txType == utils.TokenTransactionTypeTransfer {
 		outputsToSpend := tokenTransaction.GetTransferInput().GetOutputsToSpend()
-		spentOutputs = make([]readableSpentOutput, len(outputsToSpend))
-		for i, output := range outputsToSpend {
-			spentOutputs[i] = readableSpentOutput{
-				PrevHash: hex.EncodeToString(output.GetPrevTokenTransactionHash()),
-				Vout:     output.GetPrevTokenTransactionVout(),
-			}
+		n := len(outputsToSpend)
+		spentOutputs = []readableSpentOutput{}
+		for i := 0; i < min(n, 5); i++ {
+			spentOutputs = append(spentOutputs, readableSpentOutput{
+				PrevHash: hex.EncodeToString(outputsToSpend[i].GetPrevTokenTransactionHash()),
+				Vout:     outputsToSpend[i].GetPrevTokenTransactionVout(),
+			})
 		}
 	}
 
-	if err != nil {
-		return fmt.Errorf("%s %s, spent_outputs: %+v: %w", msg, formatted, spentOutputs, err)
+	outputMsg := fmt.Sprintf("spent_outputs: %+v", spentOutputs)
+
+	type readableOutput struct {
+		TokenId  string `json:"token_id"`
+		OutputId string `json:"output_id"`
 	}
-	return fmt.Errorf("%s %s, spent_outputs: %+v", msg, formatted, spentOutputs)
+
+	n := len(tokenTransaction.TokenOutputs)
+	if n > 0 {
+		createdOutputs := []readableOutput{}
+
+		for i := 0; i < min(n, 5); i++ {
+			output := tokenTransaction.TokenOutputs[i]
+			createdOutputs = append(createdOutputs, readableOutput{hex.EncodeToString(output.TokenIdentifier), output.GetId()})
+		}
+		outputMsg = fmt.Sprintf("%s, created_outputs: %+v", outputMsg, createdOutputs)
+	}
+
+	if err != nil {
+		return fmt.Errorf("%s %s, %s: %w", msg, formatted, outputMsg, err)
+	}
+	return fmt.Errorf("%s %s, %s", msg, formatted, outputMsg)
 }
 
 func FormatErrorWithTransactionProtoAndSparkInvoice(msg string, tokenTransaction *tokenpb.TokenTransaction, sparkInvoice string, err error) error {
@@ -151,7 +162,7 @@ func FormatErrorWithTransactionProtoAndSparkInvoice(msg string, tokenTransaction
 }
 
 func NewTransactionPreemptedError(tokenTransaction *tokenpb.TokenTransaction, reason, details string) error {
-	formattedError := FormatErrorWithTransactionHashAndSpentOutputs(
+	formattedError := FormatErrorWithTransactionProto(
 		fmt.Sprintf(ErrTransactionPreemptedByExisting, reason, details),
 		tokenTransaction,
 		sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("Inputs cannot be spent: token transaction with these inputs is already in progress or finalized")),
