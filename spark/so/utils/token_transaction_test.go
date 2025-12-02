@@ -1918,7 +1918,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "token public key cannot be nil for version 0",
+			wantErr:             "invalid freeze tokens payload version: 0",
 		},
 		{
 			name: "v0 with token identifier (should fail)",
@@ -1932,7 +1932,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "token identifier must be nil for version 0",
+			wantErr:             "invalid freeze tokens payload version: 0",
 		},
 		{
 			name: "v1 nil token identifier",
@@ -1984,7 +1984,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "issuer provided timestamp cannot be 0",
+			wantErr:             "invalid freeze tokens payload version: 0",
 		},
 		{
 			name: "empty operator public key",
@@ -1997,7 +1997,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: []byte{},
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "failed to parse operator identity public key",
+			wantErr:             "invalid freeze tokens payload version: 0",
 		},
 		{
 			name: "operator public key not in config",
@@ -2010,13 +2010,13 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: []byte{0x03, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x11, 0x22},
 			},
 			expectedOperatorKey: operatorPubKey, // Different from the payload's operator key
-			wantErr:             "does not match expected operator",
+			wantErr:             "invalid freeze tokens payload version: 0",
 		},
 		{
 			name:                "valid v0 payload with matching operator",
 			payload:             validPayloadV0,
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "",
+			wantErr:             "invalid freeze tokens payload version: 0",
 		},
 		{
 			name:                "valid v1 payload with matching operator",
@@ -2028,7 +2028,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 			name:                "valid payload with nil expected operator (should fail)",
 			payload:             validPayloadV0,
 			expectedOperatorKey: keys.Public{},
-			wantErr:             "does not match expected operator",
+			wantErr:             "invalid freeze tokens payload version: 0",
 		},
 	}
 

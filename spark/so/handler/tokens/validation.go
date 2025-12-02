@@ -140,40 +140,41 @@ func validateTokenTransactionForSigning(
 }
 
 // validateNoActiveFreezesForOutputs checks whether any of the provided outputs belong to an
-// owner+token pair that is currently frozen. It assumes all outputs share the same TokenCreateID.
+// owner+token pair that is currently frozen. Supports outputs spanning multiple TokenCreateIDs.
 func validateNoActiveFreezesForOutputs(ctx context.Context, outputs []*ent.TokenOutput) error {
 	if len(outputs) == 0 {
 		return nil
 	}
 
-	tokenCreateID := outputs[0].TokenCreateID
-	if tokenCreateID == uuid.Nil {
-		return fmt.Errorf("no created token found when attempting to validate transfer transaction")
-	}
-
-	ownerPublicKeys := make([]keys.Public, len(outputs))
-	for i, output := range outputs {
-		ownerPublicKeys[i] = output.OwnerPublicKey
-	}
-
-	// Bulk query all input ids to ensure none of them are frozen.
-	activeFreezes, err := ent.GetActiveFreezes(ctx, ownerPublicKeys, tokenCreateID)
-	if err != nil {
-		return fmt.Errorf("%s: %w", tokens.ErrFailedToQueryTokenFreezeStatus, err)
-	}
-
-	if len(activeFreezes) == 0 {
-		return nil
+	// Group owner public keys by tokenCreateID and validate each group independently.
+	type ownerList = []keys.Public
+	ownersByToken := make(map[uuid.UUID]ownerList)
+	for _, output := range outputs {
+		if output.TokenCreateID == uuid.Nil {
+			return errors.InternalDatabaseMissingEdge(fmt.Errorf("no created token found when attempting to validate transfer transaction"))
+		}
+		ownersByToken[output.TokenCreateID] = append(ownersByToken[output.TokenCreateID], output.OwnerPublicKey)
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
-	for _, freeze := range activeFreezes {
-		logger.Sugar().Infof(
-			"Found active freeze for owner %x (token: %x, timestamp: %d)",
-			freeze.OwnerPublicKey,
-			freeze.TokenPublicKey,
-			freeze.WalletProvidedFreezeTimestamp,
-		)
+	for tokenCreateID, owners := range ownersByToken {
+		// Bulk query to ensure none of the owners for this token are frozen.
+		activeFreezes, err := ent.GetActiveFreezes(ctx, owners, tokenCreateID)
+		if err != nil {
+			return fmt.Errorf("%s: %w", tokens.ErrFailedToQueryTokenFreezeStatus, err)
+		}
+		if len(activeFreezes) == 0 {
+			continue
+		}
+		for _, freeze := range activeFreezes {
+			logger.Sugar().Infof(
+				"Found active freeze for owner %x (token: %x, timestamp: %d)",
+				freeze.OwnerPublicKey,
+				freeze.TokenPublicKey,
+				freeze.WalletProvidedFreezeTimestamp,
+			)
+		}
+		return errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("at least one input is frozen. Cannot proceed with transaction"))
 	}
-	return errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("at least one input is frozen. Cannot proceed with transaction"))
+	return nil
 }

@@ -21,7 +21,8 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
-			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
+			finalIssueTokenTransaction, err := broadcastTokenTransaction(
+				t,
 				t.Context(),
 				config,
 				issueTokenTransaction,
@@ -74,7 +75,8 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			)
 			require.NoError(t, err, "failed to create test token transfer transaction")
 
-			transferFrozenTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
+			transferFrozenTokenTransactionResponse, err := broadcastTokenTransaction(
+				t,
 				t.Context(),
 				config,
 				transferTokenTransaction,
@@ -99,7 +101,8 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			)
 			require.NoError(t, err, "failed to create test token transfer transaction after thaw")
 
-			transferTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
+			transferTokenTransactionResponse, err := broadcastTokenTransaction(
+				t,
 				t.Context(),
 				config,
 				transferTokenTransactionPostThaw,
@@ -107,6 +110,85 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			)
 			require.NoError(t, err, "failed to broadcast thawed token transaction")
 			require.NotNil(t, transferTokenTransactionResponse, "expected non-nil response when transferring thawed tokens")
+		})
+	}
+}
+
+func TestFreezeBlocksMultiTokenTransfer(t *testing.T) {
+	for _, tc := range signatureTypeTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set up first token with one output to owner A
+			configA := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+			configA.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
+			tokenPrivKeyA := configA.IdentityPrivateKey
+			tokenIdentifierA := queryTokenIdentifierOrFail(t, configA, tokenPrivKeyA.Public())
+			mintTxABefore, ownerAPrivs, err := createTestTokenMintTransactionTokenPbWithParams(t, configA, tokenTransactionParams{
+				TokenIdentityPubKey: tokenPrivKeyA.Public(),
+				TokenIdentifier:     tokenIdentifierA,
+				NumOutputs:          1,
+				OutputAmounts:       []uint64{uint64(testIssueOutput1Amount)},
+			})
+			require.NoError(t, err, "failed to create mint A")
+			require.Len(t, ownerAPrivs, 1)
+			finalMintATx, err := broadcastTokenTransaction(
+				t, t.Context(), configA, mintTxABefore, []keys.Private{tokenPrivKeyA})
+			require.NoError(t, err, "failed to broadcast mint A")
+			mintATxHash, err := utils.HashTokenTransaction(finalMintATx, false)
+			require.NoError(t, err, "failed to hash mint A")
+
+			// Set up second token with one output to owner B (different token)
+			issuerB := keys.GeneratePrivateKey()
+			configB := wallet.NewTestWalletConfigWithIdentityKey(t, issuerB)
+			configB.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
+			err = testCoordinatedCreateNativeSparkTokenWithParams(t, configB, sparkTokenCreationTestParams{
+				issuerPrivateKey: issuerB,
+				name:             "Freeze MultiToken",
+				ticker:           "FMT",
+				maxSupply:        1_000_000,
+			})
+			require.NoError(t, err, "failed to create second token")
+			tokenIdentifierB := queryTokenIdentifierOrFail(t, configB, issuerB.Public())
+			mintTxBBefore, ownerBPrivs, err := createTestTokenMintTransactionTokenPbWithParams(t, configB, tokenTransactionParams{
+				TokenIdentityPubKey: issuerB.Public(),
+				TokenIdentifier:     tokenIdentifierB,
+				NumOutputs:          1,
+				OutputAmounts:       []uint64{uint64(testIssueOutput1Amount)},
+			})
+			require.NoError(t, err, "failed to create mint B")
+			require.Len(t, ownerBPrivs, 1)
+			finalMintBTx, err := broadcastTokenTransaction(
+				t, t.Context(), configB, mintTxBBefore, []keys.Private{issuerB})
+			require.NoError(t, err, "failed to broadcast mint B")
+			mintBTxHash, err := utils.HashTokenTransaction(finalMintBTx, false)
+			require.NoError(t, err, "failed to hash mint B")
+
+			// Freeze owner A's tokens for token A
+			ownerAPub := ownerAPrivs[0].Public()
+			_, err = wallet.FreezeTokens(t.Context(), configA, ownerAPub, tokenIdentifierA, false)
+			require.NoError(t, err, "failed to freeze token A for owner A")
+
+			// Attempt a multi-token transfer spending one input from each token
+			recipient := keys.GeneratePrivateKey()
+			transferTx := createTestMultiTokenTransferTransactionTokenPb(
+				t,
+				configA,
+				mintATxHash,
+				tokenIdentifierA,
+				mintBTxHash,
+				tokenIdentifierB,
+				recipient.Public(),
+			)
+
+			// Should fail due to active freeze on owner A + token A, even with mixed tokens in one transfer
+			resp, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				configA,
+				transferTx,
+				[]keys.Private{ownerAPrivs[0], ownerBPrivs[0]},
+			)
+			require.Error(t, err, "expected error when transferring with a frozen input among multiple tokens")
+			require.Nil(t, resp, "expected nil response when transfer blocked by freeze")
 		})
 	}
 }

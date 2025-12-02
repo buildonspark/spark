@@ -49,15 +49,6 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 		if err != nil {
 			return nil, fmt.Errorf("failed to get single token for freeze request: %w", err)
 		}
-	} else {
-		tokenPubKey, err := keys.ParsePublicKey(req.GetFreezeTokensPayload().GetTokenPublicKey())
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse token public key: %w", err)
-		}
-		tokenCreateEnt, err = db.TokenCreate.Query().Where(tokencreate.IssuerPublicKey(tokenPubKey)).Only(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get single token for freeze request: %w", err)
-		}
 	}
 	expectedIssuerPublicKey := tokenCreateEnt.IssuerPublicKey
 	if err := utils.ValidateOwnershipSignature(req.IssuerSignature, freezePayloadHash, expectedIssuerPublicKey); err != nil {

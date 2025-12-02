@@ -451,6 +451,53 @@ func createTestTokenTransferTransactionTokenPb(
 	})
 }
 
+// createTestMultiTokenTransferTransactionTokenPb creates a V2 transfer that spends one input from
+// each of two different token transactions (potentially different tokens) and sends outputs
+// to a single recipient preserving per-token identifiers and amounts.
+func createTestMultiTokenTransferTransactionTokenPb(
+	t *testing.T,
+	config *wallet.TestWalletConfig,
+	prevMintHashA []byte,
+	tokenIdentifierA []byte,
+	prevMintHashB []byte,
+	tokenIdentifierB []byte,
+	recipient keys.Public,
+) *tokenpb.TokenTransaction {
+	tx := &tokenpb.TokenTransaction{
+		Version: TokenTransactionVersion2,
+		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+			TransferInput: &tokenpb.TokenTransferInput{
+				OutputsToSpend: []*tokenpb.TokenOutputToSpend{
+					{
+						PrevTokenTransactionHash: prevMintHashA,
+						PrevTokenTransactionVout: 0,
+					},
+					{
+						PrevTokenTransactionHash: prevMintHashB,
+						PrevTokenTransactionVout: 0,
+					},
+				},
+			},
+		},
+		TokenOutputs: []*tokenpb.TokenOutput{
+			{
+				OwnerPublicKey:  recipient.Serialize(),
+				TokenIdentifier: tokenIdentifierA,
+				TokenAmount:     int64ToUint128Bytes(0, testIssueOutput1Amount),
+			},
+			{
+				OwnerPublicKey:  recipient.Serialize(),
+				TokenIdentifier: tokenIdentifierB,
+				TokenAmount:     int64ToUint128Bytes(0, testIssueOutput1Amount),
+			},
+		},
+		Network:                         config.ProtoNetwork(),
+		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
+		ClientCreatedTimestamp:          timestamppb.New(time.Now()),
+	}
+	return tx
+}
+
 // createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb creates a test mint transaction with multiple outputs
 func createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t *testing.T,
 	config *wallet.TestWalletConfig,

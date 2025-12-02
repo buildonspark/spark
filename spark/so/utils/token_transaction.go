@@ -1277,13 +1277,6 @@ func ValidateFreezeTokensPayload(payload *tokenpb.FreezeTokensPayload, expectedS
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("owner public key cannot be empty"))
 	}
 	switch payload.Version {
-	case 0:
-		if payload.GetTokenIdentifier() != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token identifier must be nil for version 0"))
-		}
-		if payload.GetTokenPublicKey() == nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token public key cannot be nil for version 0"))
-		}
 	case 1:
 		if payload.GetTokenPublicKey() != nil {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token public key must be nil for version 1"))
