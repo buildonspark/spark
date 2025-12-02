@@ -56,4 +56,14 @@ export class TransactionResult {
   [Symbol.dispose](): void;
   tx: Uint8Array;
   sighash: Uint8Array;
+  inputs: TxIn[];
+}
+/**
+ * A stand-in for TxIn.
+ */
+export class TxIn {
+  private constructor();
+  free(): void;
+  [Symbol.dispose](): void;
+  sequence: number;
 }

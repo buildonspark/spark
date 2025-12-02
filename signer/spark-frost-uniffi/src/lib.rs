@@ -11,6 +11,7 @@ use bitcoin::{
     hashes::Hash,
     key::Parity,
     key::{Secp256k1, TapTweak},
+    relative,
     secp256k1::{ecdsa::Signature, rand, Message, PublicKey, SecretKey},
     sighash::{Prevouts, SighashCache},
     transaction::Version,
@@ -344,6 +345,40 @@ pub struct TransactionResult {
     pub tx: Vec<u8>,
     #[wasm_bindgen(getter_with_clone)]
     pub sighash: Vec<u8>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub inputs: Vec<TxInResult>,
+}
+
+/// A stand-in for TxIn.
+#[wasm_bindgen(js_name = "TxIn")]
+#[derive(Debug, Clone)]
+pub struct TxInResult {
+    #[wasm_bindgen]
+    pub sequence: u32,
+}
+
+impl From<TxIn> for TxInResult {
+    fn from(value: TxIn) -> Self {
+        Self {
+            sequence: value.sequence.to_consensus_u32(),
+        }
+    }
+}
+
+impl TxInResult {
+    /// Extracts the relative block-based timelock from the transaction input's sequence number.
+    pub fn relative_blocks_timelock(&self) -> Result<u16, Error> {
+        let seq = Sequence::from_consensus(self.sequence);
+        let timelock = seq.to_relative_lock_time().ok_or(Error::Spark(
+            "sequence number is not a relative timelock".to_owned(),
+        ))?;
+        match timelock {
+            relative::LockTime::Blocks(height) => Ok(height.value()),
+            relative::LockTime::Time(_) => {
+                Err(Error::Spark("timelock is not block-based".to_owned()))
+            }
+        }
+    }
 }
 
 // Construct a tx that pays from the tx.out[vout] to the address.
@@ -391,7 +426,7 @@ pub fn construct_node_tx(
     let new_tx = Transaction {
         version: Version::non_standard(3),
         lock_time: LockTime::ZERO,
-        input: vec![input],
+        input: vec![input.clone()],
         output: vec![
             output, // Original output
             TxOut {
@@ -414,6 +449,7 @@ pub fn construct_node_tx(
     Ok(TransactionResult {
         tx: bitcoin::consensus::serialize(&new_tx),
         sighash: sighash.as_raw_hash().to_byte_array().to_vec(),
+        inputs: vec![input.into()],
     })
 }
 
@@ -477,7 +513,7 @@ pub fn construct_refund_tx(
     let new_tx = Transaction {
         version: Version::non_standard(3),
         lock_time: LockTime::ZERO,
-        input: vec![input],
+        input: vec![input.clone()],
         output: vec![
             output,
             TxOut {
@@ -500,6 +536,7 @@ pub fn construct_refund_tx(
     Ok(TransactionResult {
         tx: bitcoin::consensus::serialize(&new_tx),
         sighash: sighash.as_raw_hash().to_byte_array().to_vec(),
+        inputs: vec![input.into()],
     })
 }
 
@@ -551,7 +588,7 @@ pub fn construct_split_tx(
     let new_tx = Transaction {
         version: Version::non_standard(3),
         lock_time: LockTime::ZERO,
-        input: vec![input],
+        input: vec![input.clone()],
         output: outputs,
     };
 
@@ -567,6 +604,7 @@ pub fn construct_split_tx(
     Ok(TransactionResult {
         tx: bitcoin::consensus::serialize(&new_tx),
         sighash: sighash.as_raw_hash().to_byte_array().to_vec(),
+        inputs: vec![input.into()],
     })
 }
 
@@ -640,7 +678,7 @@ pub fn construct_direct_refund_tx(
     let new_tx = Transaction {
         version: Version::non_standard(3),
         lock_time: LockTime::ZERO,
-        input: vec![input],
+        input: vec![input.clone()],
         output: vec![output], // No ephemeral anchor output
     };
 
@@ -656,6 +694,7 @@ pub fn construct_direct_refund_tx(
     Ok(TransactionResult {
         tx: bitcoin::consensus::serialize(&new_tx),
         sighash: sighash.as_raw_hash().to_byte_array().to_vec(),
+        inputs: vec![input.into()],
     })
 }
 

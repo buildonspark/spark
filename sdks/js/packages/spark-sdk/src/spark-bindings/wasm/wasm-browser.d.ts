@@ -56,6 +56,16 @@ export class TransactionResult {
   [Symbol.dispose](): void;
   tx: Uint8Array;
   sighash: Uint8Array;
+  inputs: TxIn[];
+}
+/**
+ * A stand-in for TxIn.
+ */
+export class TxIn {
+  private constructor();
+  free(): void;
+  [Symbol.dispose](): void;
+  sequence: number;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -166,6 +176,11 @@ export interface InitOutput {
   readonly wasm_sign_frost: (a: number, b: number, c: number, d: number, e: number, f: any, g: number, h: number) => [number, number, number, number];
   readonly wasm_aggregate_frost: (a: number, b: number, c: any, d: number, e: any, f: number, g: number, h: any, i: number, j: number, k: number, l: number, m: number, n: number) => [number, number, number, number];
   readonly __wbg_transactionresult_free: (a: number, b: number) => void;
+  readonly __wbg_get_transactionresult_inputs: (a: number) => [number, number];
+  readonly __wbg_set_transactionresult_inputs: (a: number, b: number, c: number) => void;
+  readonly __wbg_txin_free: (a: number, b: number) => void;
+  readonly __wbg_get_txin_sequence: (a: number) => number;
+  readonly __wbg_set_txin_sequence: (a: number, b: number) => void;
   readonly construct_node_tx: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
   readonly construct_refund_tx: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
   readonly construct_split_tx: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
@@ -206,9 +221,10 @@ export interface InitOutput {
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_exn_store: (a: number) => void;
   readonly __externref_table_alloc: () => number;
-  readonly __wbindgen_export_4: WebAssembly.Table;
+  readonly __wbindgen_externrefs: WebAssembly.Table;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __externref_table_dealloc: (a: number) => void;
+  readonly __externref_drop_slice: (a: number, b: number) => void;
   readonly __wbindgen_start: () => void;
 }
 

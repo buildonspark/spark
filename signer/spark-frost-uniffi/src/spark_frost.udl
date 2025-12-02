@@ -73,6 +73,11 @@ dictionary KeyPackage {
 dictionary TransactionResult {
     bytes tx;
     bytes sighash;
+    sequence<TxInResult> inputs;
+};
+
+dictionary TxInResult {
+    u32 sequence;
 };
 
 dictionary DummyTx {
