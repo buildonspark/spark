@@ -3,6 +3,7 @@ package tokens_test
 import (
 	"encoding/binary"
 	"math/rand/v2"
+	"sort"
 	"testing"
 	"time"
 
@@ -132,7 +133,7 @@ func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			issuerPrivateKey := keys.GeneratePrivateKey()
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivateKey)
 
@@ -154,8 +155,11 @@ func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
 				MintToSelf:          true,
 			})
 			require.NoError(t, err, "failed to create test token issuance transaction")
-			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
-				t.Context(), config, issueTokenTransaction,
+			finalIssueTokenTransaction, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				issueTokenTransaction,
 				[]keys.Private{tokenPrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
@@ -327,15 +331,18 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		attachment := &tokenpb.InvoiceAttachment{SparkInvoice: sparkInvoice}
 		invoiceAttachments = append(invoiceAttachments, attachment)
 	}
+	sort.Slice(invoiceAttachments, func(i, j int) bool {
+		return invoiceAttachments[i].GetSparkInvoice() < invoiceAttachments[j].GetSparkInvoice()
+	})
 	transferTransaction.InvoiceAttachments = invoiceAttachments
 
-	startResp, finalTxHash, err := wallet.StartTokenTransaction(
+	startResp, finalTxHash, err := startTokenTransactionOrBroadcast(
+		t,
 		t.Context(),
 		config,
 		transferTransaction,
 		[]keys.Private{config.IdentityPrivateKey, config.IdentityPrivateKey},
 		wallet.DefaultValidityDuration,
-		nil,
 	)
 
 	if mismatchedIdentifier {
@@ -378,8 +385,11 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 			MintToSelf:          true,
 		})
 		require.NoError(t, err, "failed to create test token issuance transaction")
-		finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
-			t.Context(), config, issueTokenTransaction,
+		finalIssueTokenTransaction, err := broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			issueTokenTransaction,
 			[]keys.Private{config.IdentityPrivateKey},
 		)
 		require.NoError(t, err, "failed to broadcast issuance token transaction")
@@ -426,13 +436,13 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		}
 		shouldFailTransfer.InvoiceAttachments = invoiceAttachments
 
-		_, _, err = wallet.StartTokenTransaction(
+		_, _, err = startTokenTransactionOrBroadcast(
+			t,
 			t.Context(),
 			config,
 			shouldFailTransfer,
 			[]keys.Private{config.IdentityPrivateKey, config.IdentityPrivateKey},
 			wallet.DefaultValidityDuration,
-			nil,
 		)
 		require.Error(t, err, "expected error when transfer fails if unexpired transaction exists")
 		return
@@ -443,15 +453,18 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		txFullHash: finalTxHash,
 	}
 
-	if expiredAtSign {
-		time.Sleep(time.Second * 6)
+	// V3 does not have an explicit sign step, so no need to test expiration at sign. Still test queries afterwards.
+	if !broadcastTokenTestsUseV3 {
+		if expiredAtSign {
+			time.Sleep(time.Second * 6)
+		}
+		_, err = signAndCommitTransaction(t, startResponseTransactionResult, []keys.Private{config.IdentityPrivateKey, config.IdentityPrivateKey})
+		if expiredAtSign {
+			require.Error(t, err, "expected error when expired at sign")
+			return
+		}
+		require.NoError(t, err, "failed to sign and commit transaction")
 	}
-	_, err = signAndCommitTransaction(t, startResponseTransactionResult, []keys.Private{config.IdentityPrivateKey, config.IdentityPrivateKey})
-	if expiredAtSign {
-		require.Error(t, err, "expected error when expired at sign")
-		return
-	}
-	require.NoError(t, err, "failed to sign and commit transaction")
 
 	queryTokenTransactionParams := wallet.QueryTokenTransactionsParams{
 		IssuerPublicKeys:  nil,

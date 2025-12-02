@@ -31,6 +31,10 @@ type TestWalletConfig struct {
 	CoordinatorDatabaseURI string
 	// FrostGRPCConnectionFactory is the factory for creating gRPC connections to the Frost signer. Used for subbing in test connections.
 	FrostGRPCConnectionFactory frost.FrostGRPCConnectionFactory
+	// WithdrawBondSats is the expected withdraw bond amount in sats for all outputs on the configured network.
+	WithdrawBondSats uint64
+	// WithdrawRelativeBlockLocktime is the expected withdraw relative block locktime for all outputs on the configured network.
+	WithdrawRelativeBlockLocktime uint64
 }
 
 // CoordinatorAddress returns coordinator address.

@@ -28,6 +28,37 @@ func encodeSparkAddress(pubKey keys.Public, network common.Network) string {
 	return address
 }
 
+func getTransactionOutputsOrFail(
+	t *testing.T,
+	config *wallet.TestWalletConfig,
+	txHash []byte,
+) []*tokenpb.TokenOutput {
+	t.Helper()
+	resp, err := wallet.QueryTokenTransactions(
+		t.Context(),
+		config,
+		wallet.QueryTokenTransactionsParams{
+			TransactionHashes: [][]byte{txHash},
+			Limit:             1,
+		},
+	)
+	require.NoErrorf(t, err, "failed to query token transaction %x", txHash)
+	require.Lenf(t, resp.TokenTransactionsWithStatus, 1, "expected to find token transaction %x", txHash)
+	tx := resp.TokenTransactionsWithStatus[0].TokenTransaction
+	require.NotNilf(t, tx, "token transaction %x missing proto payload", txHash)
+	return tx.TokenOutputs
+}
+
+func getOutputIDOrFail(t *testing.T, outputs []*tokenpb.TokenOutput, outputIndex int, txLabel string) string {
+	t.Helper()
+	require.GreaterOrEqualf(t, len(outputs), outputIndex+1, "expected %s to have at least %d outputs", txLabel, outputIndex+1)
+	output := outputs[outputIndex]
+	require.NotNilf(t, output, "expected %s output %d to be non-nil", txLabel, outputIndex)
+	require.NotNilf(t, output.Id, "expected %s output %d to have id", txLabel, outputIndex)
+	require.NotEmptyf(t, *output.Id, "expected %s output %d id to be non-empty", txLabel, outputIndex)
+	return *output.Id
+}
+
 // TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval tests the full coordinated flow with mint and transfer
 // This test also verifies that upon success that the expected outputs and transactions are retrievable.
 func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.T) {
@@ -47,8 +78,12 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
-	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
+	finalIssueTokenTransaction, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		issueTokenTransaction,
+		[]keys.Private{tokenPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 
@@ -73,8 +108,12 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	require.NoError(t, err, "failed to create test token transfer transaction")
 	userOutput3PubKeyBytes := userOutput3PrivKey.Public().Serialize()
 
-	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, transferTokenTransaction, []keys.Private{userOutput1PrivKey, userOutput2PrivKey},
+	transferTokenTransactionResponse, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		transferTokenTransaction,
+		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
 
@@ -197,8 +236,12 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	mintTransaction1, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create first mint transaction")
 
-	finalMintTx1, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, mintTransaction1, []keys.Private{issuerPrivKey},
+	finalMintTx1, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		mintTransaction1,
+		[]keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast first mint transaction")
 
@@ -209,8 +252,12 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	mintTransaction2, userOutput3PrivKey, userOutput4PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create second mint transaction")
 
-	finalMintTx2, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, mintTransaction2, []keys.Private{issuerPrivKey},
+	finalMintTx2, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		mintTransaction2,
+		[]keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast second mint transaction")
 
@@ -221,8 +268,11 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	transferTx, userOutput5PrivKey, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash1, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create transfer transaction")
 
-	finalTransferTx, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, transferTx,
+	finalTransferTx, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		transferTx,
 		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast transfer transaction")
@@ -247,20 +297,31 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	mintTransaction3, userOutput6PrivKey, _, err := createTestTokenMintTransactionTokenPb(t, config2, issuer2PrivKey.Public(), tokenIdentifier2)
 	require.NoError(t, err, "failed to create third mint transaction")
 
-	finalMintTx3, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config2, mintTransaction3, []keys.Private{issuer2PrivKey},
+	finalMintTx3, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config2,
+		mintTransaction3,
+		[]keys.Private{issuer2PrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast third mint transaction")
 
 	mintTxHash3, err := utils.HashTokenTransaction(finalMintTx3, false)
 	require.NoError(t, err, "failed to hash third mint transaction")
 
-	// Collect output IDs
-	mintTx1Output1ID := *finalMintTx1.TokenOutputs[0].Id
-	mintTx1Output2ID := *finalMintTx1.TokenOutputs[1].Id
-	mintTx2Output1ID := *finalMintTx2.TokenOutputs[0].Id
-	mintTx3Output1ID := *finalMintTx3.TokenOutputs[0].Id
-	transferTxOutputID := *finalTransferTx.TokenOutputs[0].Id
+	// Collect output IDs via query since broadcast responses do not contain IDs in V3 mode.
+	mintTx1Outputs := getTransactionOutputsOrFail(t, config, mintTxHash1)
+	mintTx1Output1ID := getOutputIDOrFail(t, mintTx1Outputs, 0, fmt.Sprintf("mint transaction 1 (%x)", mintTxHash1))
+	mintTx1Output2ID := getOutputIDOrFail(t, mintTx1Outputs, 1, fmt.Sprintf("mint transaction 1 (%x)", mintTxHash1))
+
+	mintTx2Outputs := getTransactionOutputsOrFail(t, config, mintTxHash2)
+	mintTx2Output1ID := getOutputIDOrFail(t, mintTx2Outputs, 0, fmt.Sprintf("mint transaction 2 (%x)", mintTxHash2))
+
+	mintTx3Outputs := getTransactionOutputsOrFail(t, config2, mintTxHash3)
+	mintTx3Output1ID := getOutputIDOrFail(t, mintTx3Outputs, 0, fmt.Sprintf("mint transaction 3 (%x)", mintTxHash3))
+
+	transferTxOutputs := getTransactionOutputsOrFail(t, config, transferTxHash)
+	transferTxOutputID := getOutputIDOrFail(t, transferTxOutputs, 0, fmt.Sprintf("transfer transaction (%x)", transferTxHash))
 
 	testCases := []struct {
 		name                  string
@@ -612,7 +673,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			result, err := wallet.QueryTokenTransactions(
 				t.Context(),
 				config,
@@ -641,7 +702,10 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 // QueryTokenOutputsV2.
 func TestQueryTokenOutputsWithStartTransaction(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
+			if broadcastTokenTestsUseV3 {
+				t.Skip("StartTransaction flow not applicable in V3 mode")
+			}
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
@@ -650,8 +714,12 @@ func TestQueryTokenOutputsWithStartTransaction(t *testing.T) {
 			mintTx, owner1PrivKey, owner2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create mint transaction")
 
-			finalTokenTransaction, err := wallet.BroadcastTokenTransfer(
-				t.Context(), config, mintTx, []keys.Private{issuerPrivKey},
+			finalTokenTransaction, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				mintTx,
+				[]keys.Private{issuerPrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast mint transaction")
 
@@ -703,8 +771,12 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	mintTx1, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create first mint transaction")
 
-	finalMintTx1, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, mintTx1, []keys.Private{issuerPrivKey},
+	finalMintTx1, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		mintTx1,
+		[]keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast first mint transaction")
 
@@ -717,8 +789,12 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	mintTx2, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create second mint transaction")
 
-	finalMintTx2, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, mintTx2, []keys.Private{issuerPrivKey},
+	finalMintTx2, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		mintTx2,
+		[]keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast second mint transaction")
 
@@ -731,8 +807,12 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	mintTx3, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create third mint transaction")
 
-	finalMintTx3, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, mintTx3, []keys.Private{issuerPrivKey},
+	finalMintTx3, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		mintTx3,
+		[]keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast third mint transaction")
 
@@ -799,8 +879,12 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 	mintTransaction, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create mint transaction")
 
-	finalMintTx, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, mintTransaction, []keys.Private{issuerPrivKey},
+	finalMintTx, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		mintTransaction,
+		[]keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast mint transaction")
 
@@ -855,8 +939,12 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 		mintTxForStart, userOutput1PrivKeyForStart, userOutput2PrivKeyForStart, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 		require.NoError(t, err, "failed to create mint transaction for StartTransaction subtest")
 
-		finalMintTxForStart, err := wallet.BroadcastTokenTransfer(
-			t.Context(), config, mintTxForStart, []keys.Private{issuerPrivKey},
+		finalMintTxForStart, err := broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			mintTxForStart,
+			[]keys.Private{issuerPrivKey},
 		)
 		require.NoError(t, err, "failed to broadcast mint transaction for StartTransaction subtest")
 
@@ -891,6 +979,9 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 	})
 
 	t.Run("CommitTransaction", func(t *testing.T) {
+		if broadcastTokenTestsUseV3 {
+			t.Skip("Start/Commit RPC tests not applicable in V3 mode")
+		}
 		var header metadata.MD
 		mintTransaction2, newOwnerOutput1PrivKey, newOwnerOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 		require.NoError(t, err, "failed to create mint transaction 2")

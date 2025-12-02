@@ -16,16 +16,20 @@ import (
 
 func TestCoordinatedL1TokenMint(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 			tokenPrivKey := config.IdentityPrivateKey
 			tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
 
 			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
-			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
-				t.Context(), config, issueTokenTransaction,
+			finalIssueTokenTransaction, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				issueTokenTransaction,
 				[]keys.Private{tokenPrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
@@ -39,7 +43,7 @@ func TestCoordinatedL1TokenMint(t *testing.T) {
 
 func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
@@ -48,7 +52,13 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
-			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey})
+			finalIssueTokenTransaction, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				issueTokenTransaction,
+				[]keys.Private{tokenPrivKey},
+			)
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
 
 			for i, output := range finalIssueTokenTransaction.TokenOutputs {
@@ -69,8 +79,12 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 				tokenIdentifier,
 			)
 			require.NoError(t, err, "failed to create test token transfer transaction")
-			transferTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
-				t.Context(), config, transferTokenTransaction, []keys.Private{userOutput1PrivKey, userOutput2PrivKey},
+			transferTokenTransactionResponse, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				transferTokenTransaction,
+				[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast transfer token transaction")
 
@@ -86,7 +100,7 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 // TestCoordinatedTokenTransferWithMultipleTokenTypes tests transferring multiple token types in a single transaction
 func TestCoordinatedTokenTransferWithMultipleTokenTypes(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
@@ -102,8 +116,11 @@ func TestCoordinatedTokenTransferWithMultipleTokenTypes(t *testing.T) {
 
 			// Re-broadcast token 2's mint with the same user as owner for both tokens
 			token2.MintTxBeforeBroadcast.TokenOutputs[0].OwnerPublicKey = userPrivKey.Public().Serialize()
-			finalMintToken2, err := wallet.BroadcastTokenTransfer(
-				t.Context(), token2.Config, token2.MintTxBeforeBroadcast,
+			finalMintToken2, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				token2.Config,
+				token2.MintTxBeforeBroadcast,
 				[]keys.Private{token2.IssuerPrivateKey},
 			)
 			require.NoError(t, err, "failed to broadcast updated mint transaction for token 2")
@@ -157,8 +174,11 @@ func TestCoordinatedTokenTransferWithMultipleTokenTypes(t *testing.T) {
 				ClientCreatedTimestamp:          timestamppb.New(time.Now()),
 			}
 
-			finalTransferTx, err := wallet.BroadcastTokenTransfer(
-				t.Context(), config, multiTokenTransferTx,
+			finalTransferTx, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				multiTokenTransferTx,
 				[]keys.Private{userPrivKey, userPrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast multi-token transfer transaction")

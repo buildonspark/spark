@@ -12,7 +12,7 @@ import (
 
 func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 

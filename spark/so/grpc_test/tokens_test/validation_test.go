@@ -18,7 +18,7 @@ import (
 
 func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
@@ -27,8 +27,12 @@ func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T)
 			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
-			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
-				t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
+			finalIssueTokenTransaction, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				issueTokenTransaction,
+				[]keys.Private{tokenPrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
 
@@ -63,8 +67,11 @@ func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T)
 				SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
 			}
 
-			_, err = wallet.BroadcastTokenTransfer(
-				t.Context(), config, transferTokenTransaction,
+			_, err = broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				transferTokenTransaction,
 				[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 			)
 
@@ -75,7 +82,7 @@ func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T)
 
 func TestCoordinatedBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
@@ -85,8 +92,11 @@ func TestCoordinatedBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 			require.NoError(t, err, "failed to create test token issuance transaction")
 			issueTokenTransaction.Network = sparkpb.Network_UNSPECIFIED
 
-			_, err = wallet.BroadcastTokenTransfer(
-				t.Context(), config, issueTokenTransaction,
+			_, err = broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				issueTokenTransaction,
 				[]keys.Private{tokenPrivKey},
 			)
 
@@ -97,7 +107,7 @@ func TestCoordinatedBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 
 func TestCoordinatedBroadcastTokenTransactionTooLongValidityDuration(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
@@ -107,8 +117,12 @@ func TestCoordinatedBroadcastTokenTransactionTooLongValidityDuration(t *testing.
 			require.NoError(t, err, "failed to create test token issuance transaction")
 			issueTokenTransaction.Network = sparkpb.Network_UNSPECIFIED
 
-			_, err = wallet.BroadcastTokenTransferWithValidityDuration(
-				t.Context(), config, issueTokenTransaction, TooLongValidityDurationSecs*time.Second,
+			_, err = broadcastTokenTransactionWithValidityDuration(
+				t,
+				t.Context(),
+				config,
+				issueTokenTransaction,
+				TooLongValidityDurationSecs*time.Second,
 				[]keys.Private{tokenPrivKey},
 			)
 
@@ -119,7 +133,7 @@ func TestCoordinatedBroadcastTokenTransactionTooLongValidityDuration(t *testing.
 
 func TestCoordinatedBroadcastTokenTransactionTooShortValidityDuration(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
@@ -129,8 +143,13 @@ func TestCoordinatedBroadcastTokenTransactionTooShortValidityDuration(t *testing
 			require.NoError(t, err, "failed to create test token issuance transaction")
 			issueTokenTransaction.Network = sparkpb.Network_UNSPECIFIED
 
-			_, err = wallet.BroadcastTokenTransferWithValidityDuration(
-				t.Context(), config, issueTokenTransaction, TooShortValidityDurationSecs*time.Second, []keys.Private{tokenPrivKey},
+			_, err = broadcastTokenTransactionWithValidityDuration(
+				t,
+				t.Context(),
+				config,
+				issueTokenTransaction,
+				TooShortValidityDurationSecs*time.Second,
+				[]keys.Private{tokenPrivKey},
 			)
 
 			require.Error(t, err, "expected transaction with 0 validity duration to be rejected")
@@ -140,7 +159,7 @@ func TestCoordinatedBroadcastTokenTransactionTooShortValidityDuration(t *testing
 
 func TestCoordinatedQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
@@ -149,8 +168,12 @@ func TestCoordinatedQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t 
 			issueTokenTransaction, userOutput1PrivKey, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
-			_, err = wallet.BroadcastTokenTransfer(
-				t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
+			_, err = broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				issueTokenTransaction,
+				[]keys.Private{tokenPrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
 
@@ -251,12 +274,21 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		// TODO(CNT-589): Add explicit partial transaction validation integration tests for V3.
+		if broadcastTokenTestsUseV3 {
+			t.Skip("Skipping test for V3 transactions which requires these values be set by the client.")
+		}
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			tokenTransaction, ownerPrivateKeys := tc.setupTx()
 			tc.modifyTx(tokenTransaction)
 
-			_, _, err := wallet.StartTokenTransaction(
-				t.Context(), config, tokenTransaction, ownerPrivateKeys, TestValidityDurationSecs*time.Second, nil,
+			_, _, err := startTokenTransactionOrBroadcast(
+				t,
+				t.Context(),
+				config,
+				tokenTransaction,
+				ownerPrivateKeys,
+				TestValidityDurationSecs*time.Second,
 			)
 
 			require.ErrorContains(t, err, tc.expectedErrorSubstr, "error message should contain expected substring")
@@ -265,142 +297,179 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 }
 
 func TestCoordinatedTokenMintAndTransferTokensTooManyOutputsFails(t *testing.T) {
-	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
+		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+		config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
-	tokenPrivKey := config.IdentityPrivateKey
-	tooBigIssuanceTransaction, _, err := createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t, config,
-		tokenPrivKey.Public(), utils.MaxInputOrOutputTokenTransactionOutputs+1)
-	require.NoError(t, err, "failed to create test token issuance transaction")
+		tokenPrivKey := config.IdentityPrivateKey
+		tooBigIssuanceTransaction, _, err := createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t, config,
+			tokenPrivKey.Public(), utils.MaxInputOrOutputTokenTransactionOutputs+1)
+		require.NoError(t, err, "failed to create test token issuance transaction")
 
-	_, err = wallet.BroadcastTokenTransfer(
-		t.Context(), config, tooBigIssuanceTransaction, []keys.Private{tokenPrivKey},
-	)
-	require.Error(t, err, "expected error when broadcasting issuance transaction with more than utils.MaxInputOrOutputTokenTransactionOutputs=%d outputs", utils.MaxInputOrOutputTokenTransactionOutputs)
+		_, err = broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			tooBigIssuanceTransaction,
+			[]keys.Private{tokenPrivKey},
+		)
+		require.Error(t, err, "expected error when broadcasting issuance transaction with more than utils.MaxInputOrOutputTokenTransactionOutputs=%d outputs", utils.MaxInputOrOutputTokenTransactionOutputs)
+	})
 }
 
 func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.T) {
-	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
-	tokenPrivKey := config.IdentityPrivateKey
-	issueTokenTransactionFirstBatch, userOutputPrivKeysFirstBatch, err := createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t, config,
-		tokenPrivKey.Public(), maxInputOrOutputTokenTransactionOutputsForTests)
-	require.NoError(t, err, "failed to create test token issuance transaction")
+	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
+		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+		config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
+		tokenPrivKey := config.IdentityPrivateKey
+		issueTokenTransactionFirstBatch, userOutputPrivKeysFirstBatch, err := createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t, config,
+			tokenPrivKey.Public(), maxInputOrOutputTokenTransactionOutputsForTests)
+		require.NoError(t, err, "failed to create test token issuance transaction")
 
-	finalIssueTokenTransactionFirstBatch, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, issueTokenTransactionFirstBatch, []keys.Private{tokenPrivKey},
-	)
-	require.NoError(t, err, "failed to broadcast issuance token transaction")
+		finalIssueTokenTransactionFirstBatch, err := broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			issueTokenTransactionFirstBatch,
+			[]keys.Private{tokenPrivKey},
+		)
+		require.NoError(t, err, "failed to broadcast issuance token transaction")
 
-	issueTokenTransactionSecondBatch, userOutputPrivKeysSecondBatch, err := createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t,
-		config,
-		tokenPrivKey.Public(), maxInputOrOutputTokenTransactionOutputsForTests)
-	require.NoError(t, err, "failed to create test token issuance transaction")
+		issueTokenTransactionSecondBatch, userOutputPrivKeysSecondBatch, err := createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t,
+			config,
+			tokenPrivKey.Public(), maxInputOrOutputTokenTransactionOutputsForTests)
+		require.NoError(t, err, "failed to create test token issuance transaction")
 
-	finalIssueTokenTransactionSecondBatch, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, issueTokenTransactionSecondBatch, []keys.Private{tokenPrivKey},
-	)
-	require.NoError(t, err, "failed to broadcast issuance token transaction")
+		finalIssueTokenTransactionSecondBatch, err := broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			issueTokenTransactionSecondBatch,
+			[]keys.Private{tokenPrivKey},
+		)
+		require.NoError(t, err, "failed to broadcast issuance token transaction")
 
-	finalIssueTokenTransactionHashFirstBatch, err := utils.HashTokenTransaction(finalIssueTokenTransactionFirstBatch, false)
-	require.NoError(t, err, "failed to hash first issuance token transaction")
+		finalIssueTokenTransactionHashFirstBatch, err := utils.HashTokenTransaction(finalIssueTokenTransactionFirstBatch, false)
+		require.NoError(t, err, "failed to hash first issuance token transaction")
 
-	finalIssueTokenTransactionHashSecondBatch, err := utils.HashTokenTransaction(finalIssueTokenTransactionSecondBatch, false)
-	require.NoError(t, err, "failed to hash second issuance token transaction")
+		finalIssueTokenTransactionHashSecondBatch, err := utils.HashTokenTransaction(finalIssueTokenTransactionSecondBatch, false)
+		require.NoError(t, err, "failed to hash second issuance token transaction")
 
-	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+		tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
 
-	consolidatedOutputPrivKey := keys.GeneratePrivateKey()
+		consolidatedOutputPrivKey := keys.GeneratePrivateKey()
 
-	outputsToSpendTooMany := make([]*tokenpb.TokenOutputToSpend, 2*maxInputOrOutputTokenTransactionOutputsForTests)
-	for i := range maxInputOrOutputTokenTransactionOutputsForTests {
-		outputsToSpendTooMany[i] = &tokenpb.TokenOutputToSpend{
-			PrevTokenTransactionHash: finalIssueTokenTransactionHashFirstBatch,
-			PrevTokenTransactionVout: uint32(i),
+		outputsToSpendTooMany := make([]*tokenpb.TokenOutputToSpend, 2*maxInputOrOutputTokenTransactionOutputsForTests)
+		for i := range maxInputOrOutputTokenTransactionOutputsForTests {
+			outputsToSpendTooMany[i] = &tokenpb.TokenOutputToSpend{
+				PrevTokenTransactionHash: finalIssueTokenTransactionHashFirstBatch,
+				PrevTokenTransactionVout: uint32(i),
+			}
 		}
-	}
-	for i := range maxInputOrOutputTokenTransactionOutputsForTests {
-		outputsToSpendTooMany[maxInputOrOutputTokenTransactionOutputsForTests+i] = &tokenpb.TokenOutputToSpend{
-			PrevTokenTransactionHash: finalIssueTokenTransactionHashSecondBatch,
-			PrevTokenTransactionVout: uint32(i),
+		for i := range maxInputOrOutputTokenTransactionOutputsForTests {
+			outputsToSpendTooMany[maxInputOrOutputTokenTransactionOutputsForTests+i] = &tokenpb.TokenOutputToSpend{
+				PrevTokenTransactionHash: finalIssueTokenTransactionHashSecondBatch,
+				PrevTokenTransactionVout: uint32(i),
+			}
 		}
-	}
 
-	tooManyTransaction := &tokenpb.TokenTransaction{
-		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
-			TransferInput: &tokenpb.TokenTransferInput{
-				OutputsToSpend: outputsToSpendTooMany,
+		tooManyTransaction := &tokenpb.TokenTransaction{
+			TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+				TransferInput: &tokenpb.TokenTransferInput{
+					OutputsToSpend: outputsToSpendTooMany,
+				},
 			},
-		},
-		TokenOutputs: []*tokenpb.TokenOutput{
-			{
-				OwnerPublicKey:  consolidatedOutputPrivKey.Public().Serialize(),
-				TokenIdentifier: tokenIdentifier,
-				TokenAmount:     int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(manyOutputsCount)),
+			TokenOutputs: []*tokenpb.TokenOutput{
+				{
+					OwnerPublicKey:  consolidatedOutputPrivKey.Public().Serialize(),
+					TokenIdentifier: tokenIdentifier,
+					TokenAmount:     int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(manyOutputsCount)),
+				},
 			},
-		},
-		Network:                         config.ProtoNetwork(),
-		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
-	}
+			Network:                         config.ProtoNetwork(),
+			SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
+		}
 
-	allUserOutputPrivKeys := append(userOutputPrivKeysFirstBatch, userOutputPrivKeysSecondBatch...)
+		allUserOutputPrivKeys := append(userOutputPrivKeysFirstBatch, userOutputPrivKeysSecondBatch...)
 
-	_, err = wallet.BroadcastTokenTransfer(t.Context(), config, tooManyTransaction, allUserOutputPrivKeys)
-	require.Error(t, err, "expected error when broadcasting transfer transaction with more than MaxInputOrOutputTokenTransactionOutputsForTests=%d inputs", maxInputOrOutputTokenTransactionOutputsForTests)
+		_, err = broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			tooManyTransaction,
+			allUserOutputPrivKeys,
+		)
+		require.Error(t, err, "expected error when broadcasting transfer transaction with more than MaxInputOrOutputTokenTransactionOutputsForTests=%d inputs", maxInputOrOutputTokenTransactionOutputsForTests)
+	})
 }
 
 func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
 	sparktesting.SkipIfGithubActions(t)
-	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
+		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+		config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
-	tokenPrivKey := config.IdentityPrivateKey
-	issueTokenTransaction, userOutputPrivKeys, err := createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t, config,
-		tokenPrivKey.Public(), maxInputOrOutputTokenTransactionOutputsForTests)
-	require.NoError(t, err, "failed to create test token issuance transaction")
+		tokenPrivKey := config.IdentityPrivateKey
+		issueTokenTransaction, userOutputPrivKeys, err := createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t, config,
+			tokenPrivKey.Public(), maxInputOrOutputTokenTransactionOutputsForTests)
+		require.NoError(t, err, "failed to create test token issuance transaction")
 
-	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
-	)
-	require.NoError(t, err, "failed to broadcast issuance token transaction")
+		finalIssueTokenTransaction, err := broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			issueTokenTransaction,
+			[]keys.Private{tokenPrivKey},
+		)
+		require.NoError(t, err, "failed to broadcast issuance token transaction")
 
-	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+		tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
 
-	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
-	require.NoError(t, err, "failed to hash first issuance token transaction")
+		finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
+		require.NoError(t, err, "failed to hash first issuance token transaction")
 
-	consolidatedOutputPrivKey := keys.GeneratePrivateKey()
-	outputsToSpend := make([]*tokenpb.TokenOutputToSpend, maxInputOrOutputTokenTransactionOutputsForTests)
-	for i := range outputsToSpend {
-		outputsToSpend[i] = &tokenpb.TokenOutputToSpend{
-			PrevTokenTransactionHash: finalIssueTokenTransactionHash,
-			PrevTokenTransactionVout: uint32(i),
+		consolidatedOutputPrivKey := keys.GeneratePrivateKey()
+		outputsToSpend := make([]*tokenpb.TokenOutputToSpend, maxInputOrOutputTokenTransactionOutputsForTests)
+		for i := range outputsToSpend {
+			outputsToSpend[i] = &tokenpb.TokenOutputToSpend{
+				PrevTokenTransactionHash: finalIssueTokenTransactionHash,
+				PrevTokenTransactionVout: uint32(i),
+			}
 		}
-	}
-	consolidateTransaction := &tokenpb.TokenTransaction{
-		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
-			TransferInput: &tokenpb.TokenTransferInput{
-				OutputsToSpend: outputsToSpend,
+		consolidateTransaction := &tokenpb.TokenTransaction{
+			TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+				TransferInput: &tokenpb.TokenTransferInput{
+					OutputsToSpend: outputsToSpend,
+				},
 			},
-		},
-		TokenOutputs: []*tokenpb.TokenOutput{
-			{
-				OwnerPublicKey:  consolidatedOutputPrivKey.Public().Serialize(),
-				TokenIdentifier: tokenIdentifier,
-				TokenAmount:     int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(maxInputOrOutputTokenTransactionOutputsForTests)),
+
+			TokenOutputs: []*tokenpb.TokenOutput{
+				{
+					OwnerPublicKey:  consolidatedOutputPrivKey.Public().Serialize(),
+					TokenIdentifier: tokenIdentifier,
+					TokenAmount:     int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(maxInputOrOutputTokenTransactionOutputsForTests)),
+				},
 			},
-		},
-		Network:                         config.ProtoNetwork(),
-		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
-		ClientCreatedTimestamp:          timestamppb.New(time.Now()),
-	}
+			Network:                         config.ProtoNetwork(),
+			SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
+			ClientCreatedTimestamp:          timestamppb.New(time.Now()),
+		}
+		_, err = broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			consolidateTransaction,
+			userOutputPrivKeys,
+		)
+		require.NoError(t, err, "failed to broadcast consolidation transaction")
 
-	_, err = wallet.BroadcastTokenTransfer(t.Context(), config, consolidateTransaction, userOutputPrivKeys)
-	require.NoError(t, err, "failed to broadcast consolidation transaction")
-
-	tokenOutputsResponse, err := wallet.QueryTokenOutputs(
-		t.Context(),
-		config,
-		[]keys.Public{consolidatedOutputPrivKey.Public()},
-		[]keys.Public{tokenPrivKey.Public()},
-	)
-	require.NoError(t, err, "failed to get owned token outputs")
-	require.Len(t, tokenOutputsResponse.OutputsWithPreviousTransactionData, 1, "expected 1 consolidated output")
+		tokenOutputsResponse, err := wallet.QueryTokenOutputs(
+			t.Context(),
+			config,
+			[]keys.Public{consolidatedOutputPrivKey.Public()},
+			[]keys.Public{tokenPrivKey.Public()},
+		)
+		require.NoError(t, err, "failed to get owned token outputs")
+		require.Len(t, tokenOutputsResponse.OutputsWithPreviousTransactionData, 1, "expected 1 consolidated output")
+	})
 }

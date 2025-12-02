@@ -10,6 +10,11 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
+const (
+	defaultWithdrawBondSats              = 10000
+	defaultWithdrawRelativeBlockLocktime = 1000
+)
+
 // NewTestWalletConfig returns a wallet configuration that can be used for testing.
 func NewTestWalletConfig(tb testing.TB) *TestWalletConfig {
 	identityPrivKey := keys.GeneratePrivateKey()
@@ -49,6 +54,11 @@ type TestWalletConfigParams struct {
 
 	// Network allows callers to override the default network (Regtest).
 	Network common.Network
+
+	// WithdrawBondSats overrides the expected withdraw bond amount (defaults to the local test config value).
+	WithdrawBondSats uint64
+	// WithdrawRelativeBlockLocktime overrides the expected withdraw locktime (defaults to the local test config value).
+	WithdrawRelativeBlockLocktime uint64
 }
 
 // NewTestWalletConfigWithParams creates a wallet.Config suitable for tests using the provided parameters.
@@ -73,6 +83,16 @@ func NewTestWalletConfigWithParams(tb testing.TB, p TestWalletConfigParams) *Tes
 		network = p.Network
 	}
 
+	withdrawBondSats := p.WithdrawBondSats
+	if withdrawBondSats == 0 {
+		withdrawBondSats = defaultWithdrawBondSats
+	}
+
+	withdrawRelativeBlockLocktime := p.WithdrawRelativeBlockLocktime
+	if withdrawRelativeBlockLocktime == 0 {
+		withdrawRelativeBlockLocktime = defaultWithdrawRelativeBlockLocktime
+	}
+
 	coordinatorIdentifier := fmt.Sprintf("%064d", p.CoordinatorIndex+1)
 	return &TestWalletConfig{
 		Network:                               network,
@@ -85,5 +105,7 @@ func NewTestWalletConfigWithParams(tb testing.TB, p TestWalletConfigParams) *Tes
 		UseTokenTransactionSchnorrSignatures:  p.UseTokenTransactionSchnorrSignatures,
 		CoordinatorDatabaseURI:                sparktesting.GetTestDatabasePath(p.CoordinatorIndex),
 		FrostGRPCConnectionFactory:            &sparktesting.TestGRPCConnectionFactory{},
+		WithdrawBondSats:                      withdrawBondSats,
+		WithdrawRelativeBlockLocktime:         withdrawRelativeBlockLocktime,
 	}
 }

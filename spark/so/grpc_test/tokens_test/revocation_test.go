@@ -23,6 +23,10 @@ import (
 )
 
 func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealed(t *testing.T) {
+	if broadcastTokenTestsUseV3 {
+		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
+	}
+
 	ctx := t.Context()
 	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
@@ -65,6 +69,10 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealed(t *testing.T) {
 }
 
 func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableToSpend(t *testing.T) {
+	if broadcastTokenTestsUseV3 {
+		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
+	}
+
 	testCases := []struct {
 		name                          string
 		nonCoordinatorInitialTxStatus st.TokenTransactionStatus
@@ -93,7 +101,7 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableT
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			ctx := t.Context()
 
 			config, initalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
@@ -171,6 +179,10 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableT
 // txB is not yet expired - fallback to preemption check.
 // If txA wins the preemption check vs txB, finalize successfully.
 func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsIfRemapTxHasNotExpiredButIsNotInitialTxNotPreemptedByRemapTx(t *testing.T) {
+	if broadcastTokenTestsUseV3 {
+		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
+	}
+
 	testCases := []struct {
 		name                          string
 		nonCoordinatorInitialTxStatus st.TokenTransactionStatus
@@ -199,7 +211,7 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsIfRemapTxH
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			ctx := t.Context()
 
 			config, initalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
@@ -277,6 +289,10 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsIfRemapTxH
 // txB is not yet expired - fallback to preemption check.
 // If txA loses the preemption check vs txB, fail to finalize.
 func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasNotExpiredAndIsPreemptedByRemapTx(t *testing.T) {
+	if broadcastTokenTestsUseV3 {
+		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
+	}
+
 	testCases := []struct {
 		name                          string
 		nonCoordinatorInitialTxStatus st.TokenTransactionStatus
@@ -305,7 +321,7 @@ func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasN
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			ctx := t.Context()
 			_, remappedFinalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
 			require.NoError(t, err, "failed to create transfer token transaction")
@@ -362,6 +378,10 @@ func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasN
 }
 
 func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealedWithAllFieldsButStatusRevealed(t *testing.T) {
+	if broadcastTokenTestsUseV3 {
+		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
+	}
+
 	ctx := t.Context()
 	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
@@ -400,6 +420,10 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealedWithAllFieldsButS
 }
 
 func TestRevocationExchangeCronJobSuccessfullyFinalizesStarted(t *testing.T) {
+	if broadcastTokenTestsUseV3 {
+		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
+	}
+
 	ctx := t.Context()
 	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
@@ -444,6 +468,10 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesStarted(t *testing.T) {
 }
 
 func TestRevocationExchangeCronJobDoesNotFinalizeStartedIfSignatureIsInvalid(t *testing.T) {
+	if broadcastTokenTestsUseV3 {
+		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
+	}
+
 	ctx := t.Context()
 	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
@@ -505,6 +533,10 @@ func TestRevocationExchangeCronJobDoesNotFinalizeStartedIfSignatureIsInvalid(t *
 }
 
 func TestRevocationExchangeCronJobSkipsRevealedWithNoSpentOutputs(t *testing.T) {
+	if broadcastTokenTestsUseV3 {
+		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
+	}
+
 	ctx := t.Context()
 	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
@@ -559,6 +591,10 @@ func TestRevocationExchangeCronJobSkipsRevealedWithNoSpentOutputs(t *testing.T) 
 }
 
 func TestJustInTimeFinalizationOfCreatedSignedOutputOnNonCoordinator(t *testing.T) {
+	if broadcastTokenTestsUseV3 {
+		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
+	}
+
 	ctx := t.Context()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	tokenIdentityPubKey := config.IdentityPrivateKey.Public()
@@ -634,8 +670,12 @@ func createTransferTokenTransactionForWallet(t *testing.T, ctx context.Context) 
 	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
-	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
+	finalIssueTokenTransaction, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		issueTokenTransaction,
+		[]keys.Private{tokenPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 
@@ -650,8 +690,11 @@ func createTransferTokenTransactionForWallet(t *testing.T, ctx context.Context) 
 	)
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
-	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
-		ctx, config, transferTokenTransaction,
+	transferTokenTransactionResponse, err := broadcastTokenTransaction(
+		t,
+		ctx,
+		config,
+		transferTokenTransaction,
 		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
@@ -887,6 +930,10 @@ func setAndValidateSuccessfulTokenTransactionToStartedForOperator(t *testing.T, 
 }
 
 func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
+	if broadcastTokenTestsUseV3 {
+		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
+	}
+
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 	issuerPrivKey := config.IdentityPrivateKey
@@ -895,8 +942,12 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 	mintTx, owner1PrivKey, owner2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create mint transaction")
 
-	finalTokenTransaction, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, mintTx, []keys.Private{issuerPrivKey},
+	finalTokenTransaction, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		mintTx,
+		[]keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast mint transaction")
 
@@ -912,7 +963,7 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to create transfer transaction")
 
-	startResp, finalTxHash, err := wallet.StartTokenTransaction(t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, 1*time.Second, nil)
+	startResp, finalTxHash, err := startTokenTransactionOrBroadcast(t, t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, 1*time.Second)
 	require.NoError(t, err, "failed to start transfer transaction")
 	require.NotNil(t, startResp)
 

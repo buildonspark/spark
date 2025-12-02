@@ -12,6 +12,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/protohash"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -20,8 +21,11 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/utils"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const DefaultValidityDuration = 180 * time.Second
@@ -187,6 +191,9 @@ func BroadcastTokenTransferWithValidityDuration(
 	validityDuration time.Duration,
 	ownerPrivateKeys []keys.Private,
 ) (*tokenpb.TokenTransaction, error) {
+	if tokenTransaction.Version >= 3 {
+		return BroadcastTokenTransactionV3(ctx, config, tokenTransaction, ownerPrivateKeys, validityDuration)
+	}
 	startResp, finalTxHash, err := StartTokenTransaction(
 		ctx,
 		config,
@@ -273,6 +280,160 @@ func SignTokenTransactionFromCoordination(
 		InputTtxoSignaturesPerOperator: chosenOperatorSignatures,
 		OwnerIdentityPublicKey:         config.IdentityPublicKey().Serialize(),
 	})
+}
+
+// BroadcastTokenTransactionV3 uses the broadcast_token_handler endpoint to finalize and commit a token transaction.
+func BroadcastTokenTransactionV3(
+	ctx context.Context,
+	config *TestWalletConfig,
+	tokenTransaction *tokenpb.TokenTransaction,
+	ownerPrivateKeys []keys.Private,
+	validityDuration time.Duration,
+) (*tokenpb.TokenTransaction, error) {
+	req, err := convertTokenTransactionToV3Request(config, tokenTransaction, ownerPrivateKeys, validityDuration)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := config.NewCoordinatorGRPCConnection()
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to coordinator: %w", err)
+	}
+	defer conn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, config, conn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate: %w", err)
+	}
+	ctx = ContextWithToken(ctx, token)
+
+	client := tokenpb.NewSparkTokenServiceClient(conn)
+	response, err := client.BroadcastTransaction(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to broadcast token transaction: %w", err)
+	}
+
+	finalTx := response.GetFinalTokenTransaction()
+	if finalTx == nil {
+		return nil, fmt.Errorf("broadcast transaction response missing final transaction")
+	}
+	legacyTx, err := protoconverter.ConvertFinalToV2TxShape(finalTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert final token transaction: %w", err)
+	}
+	return legacyTx, nil
+}
+
+func convertTokenTransactionToV3Request(
+	config *TestWalletConfig,
+	tokenTransaction *tokenpb.TokenTransaction,
+	ownerPrivateKeys []keys.Private,
+	validityDuration time.Duration,
+) (*tokenpb.BroadcastTransactionRequest, error) {
+	if config == nil {
+		return nil, fmt.Errorf("wallet config cannot be nil")
+	}
+	if tokenTransaction == nil {
+		return nil, fmt.Errorf("token transaction cannot be nil")
+	}
+	if validityDuration <= 0 {
+		validityDuration = DefaultValidityDuration
+	}
+	// Set the version to 3 for the broadcast request (to avoid needing to do it upstream in every test)
+	tokenTransaction.Version = 3
+
+	if tokenTransaction.ClientCreatedTimestamp == nil || tokenTransaction.ClientCreatedTimestamp.AsTime().IsZero() {
+		tokenTransaction.ClientCreatedTimestamp = timestamppb.Now()
+	}
+	tokenTransaction.ValidityDurationSeconds = proto.Uint64(uint64(validityDuration.Seconds()))
+
+	if err := ensureV3WithdrawParameters(config, tokenTransaction); err != nil {
+		return nil, err
+	}
+
+	signingKeys := ownerPrivateKeys
+	if len(signingKeys) == 0 {
+		txType, err := utils.InferTokenTransactionType(tokenTransaction)
+		if err != nil {
+			return nil, fmt.Errorf("failed to infer token transaction type: %w", err)
+		}
+		if txType == utils.TokenTransactionTypeCreate || txType == utils.TokenTransactionTypeMint {
+			signingKeys = []keys.Private{config.IdentityPrivateKey}
+		} else {
+			return nil, fmt.Errorf("owner signing keys must be specified for transfer transaction")
+		}
+	}
+
+	partialTx, err := protoconverter.ConvertV2TxShapeToPartial(tokenTransaction)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert legacy token transaction to partial: %w", err)
+	}
+
+	// Hash and sign the PartialTokenTransaction (request payload), not the legacy proto.
+	partialHash, err := protohash.Hash(partialTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash partial token transaction: %w", err)
+	}
+
+	ownerSignatures := make([]*tokenpb.SignatureWithIndex, 0, len(signingKeys))
+	for i, privKey := range signingKeys {
+		sig, err := SignHashSlice(config, privKey, partialHash)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign token transaction input %d: %w", i, err)
+		}
+		ownerSignatures = append(ownerSignatures, &tokenpb.SignatureWithIndex{
+			InputIndex: uint32(i),
+			Signature:  sig,
+		})
+	}
+
+	identityPublicKey := config.IdentityPublicKey().Serialize()
+	if len(identityPublicKey) == 0 {
+		return nil, fmt.Errorf("identity public key must not be empty")
+	}
+
+	return &tokenpb.BroadcastTransactionRequest{
+		IdentityPublicKey:               identityPublicKey,
+		PartialTokenTransaction:         partialTx,
+		TokenTransactionOwnerSignatures: ownerSignatures,
+	}, nil
+}
+
+func ensureV3WithdrawParameters(config *TestWalletConfig, tokenTransaction *tokenpb.TokenTransaction) error {
+	if config == nil {
+		return fmt.Errorf("wallet config cannot be nil")
+	}
+	if config.WithdrawBondSats == 0 {
+		return fmt.Errorf("wallet withdraw bond sats must be configured for v3 transactions")
+	}
+	if config.WithdrawRelativeBlockLocktime == 0 {
+		return fmt.Errorf("wallet withdraw relative block locktime must be configured for v3 transactions")
+	}
+
+	if len(tokenTransaction.TokenOutputs) == 0 {
+		return nil
+	}
+
+	for i, output := range tokenTransaction.TokenOutputs {
+		if output == nil {
+			continue
+		}
+		if output.WithdrawBondSats == nil {
+			bond := config.WithdrawBondSats
+			output.WithdrawBondSats = &bond
+		} else if *output.WithdrawBondSats != config.WithdrawBondSats {
+			return fmt.Errorf("token output %d withdraw bond sats must equal configured value %d", i, config.WithdrawBondSats)
+		}
+
+		if output.WithdrawRelativeBlockLocktime == nil {
+			locktime := config.WithdrawRelativeBlockLocktime
+			output.WithdrawRelativeBlockLocktime = &locktime
+		} else if *output.WithdrawRelativeBlockLocktime != config.WithdrawRelativeBlockLocktime {
+			return fmt.Errorf("token output %d withdraw relative block locktime must equal configured value %d", i, config.WithdrawRelativeBlockLocktime)
+		}
+	}
+
+	return nil
 }
 
 // FreezeTokens sends a request to freeze (or unfreeze) all tokens owned by a specific owner public key.

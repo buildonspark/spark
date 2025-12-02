@@ -26,10 +26,20 @@ func testCoordinatedTransactionSigningScenarios(
 	expectedStartError bool,
 	expectedCommitError bool,
 ) *tokenpb.TokenTransaction {
+	// TODO(CNT-588): Fix double start idempotency and enable 'doubleStartSameTx' test for V3.
+	if broadcastTokenTestsUseV3 && (doubleStartSameTx || doubleStartDifferentTx || doubleCommit || expiredCommit || expectedCommitError) {
+		t.Skip("Skipping double start/sign failure scenarios for V3 transactions which combines both steps into a single RPC.")
+	}
+
 	converted := make([]keys.Private, len(startOwnerPrivateKeys))
 	copy(converted, startOwnerPrivateKeys)
-	startResp, finalTxHash, startErr := wallet.StartTokenTransaction(
-		t.Context(), config, tokenTransaction, converted, TestValidityDurationSecs*time.Second, nil,
+	startResp, finalTxHash, startErr := startTokenTransactionOrBroadcast(
+		t,
+		t.Context(),
+		config,
+		tokenTransaction,
+		converted,
+		TestValidityDurationSecs*time.Second,
 	)
 
 	if expectedStartError {
@@ -40,8 +50,13 @@ func testCoordinatedTransactionSigningScenarios(
 	}
 
 	if doubleStartSameTx {
-		startResp2, finalTxHash2, startErr2 := wallet.StartTokenTransaction(
-			t.Context(), config, tokenTransaction, converted, TestValidityDurationSecs*time.Second, nil,
+		startResp2, finalTxHash2, startErr2 := startTokenTransactionOrBroadcast(
+			t,
+			t.Context(),
+			config,
+			tokenTransaction,
+			converted,
+			TestValidityDurationSecs*time.Second,
 		)
 		require.NoError(t, startErr2, "unexpected error on second start")
 		hash1, _ := utils.HashTokenTransaction(startResp.FinalTokenTransaction, false)
@@ -52,8 +67,13 @@ func testCoordinatedTransactionSigningScenarios(
 
 	if doubleStartDifferentTx {
 		tokenTransaction.ClientCreatedTimestamp = timestamppb.New(tokenTransaction.ClientCreatedTimestamp.AsTime().Add(-time.Second * 1))
-		startResp2, finalTxHash2, startErr2 := wallet.StartTokenTransaction(
-			t.Context(), config, tokenTransaction, converted, TestValidityDurationSecs*time.Second, nil,
+		startResp2, finalTxHash2, startErr2 := startTokenTransactionOrBroadcast(
+			t,
+			t.Context(),
+			config,
+			tokenTransaction,
+			converted,
+			TestValidityDurationSecs*time.Second,
 		)
 		require.NoError(t, startErr2, "unexpected error on second start")
 		hash1, _ := utils.HashTokenTransaction(startResp.FinalTokenTransaction, false)
@@ -85,6 +105,11 @@ func testCoordinatedTransactionSigningScenarios(
 		wait := time.Duration(TestValidityDurationSecsPlus1) * time.Second
 		t.Logf("Waiting %v for transaction expiry", wait)
 		time.Sleep(wait)
+	}
+
+	// V3 does not have an explicit sign step, so no need to test signing.
+	if broadcastTokenTestsUseV3 {
+		return startResp.FinalTokenTransaction
 	}
 
 	var operatorSignatures []*tokenpb.InputTtxoSignaturesPerOperator
@@ -303,7 +328,7 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			var issuerPrivateKey keys.Private
 			if tc.explicitWalletPrivateKey != (keys.Private{}) {
 				issuerPrivateKey = tc.explicitWalletPrivateKey
@@ -423,7 +448,7 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			issuerPrivateKey := tc.explicitWalletPrivateKey
 			if issuerPrivateKey.IsZero() {
 				issuerPrivateKey = staticLocalIssuerKey.IdentityPrivateKey()

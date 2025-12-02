@@ -222,7 +222,7 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			firstTokenConfig := wallet.NewTestWalletConfigWithIdentityKey(t, tc.firstTokenParams.issuerPrivateKey)
 
 			err := createNativeToken(t, *tc.firstTokenParams)
@@ -333,19 +333,26 @@ func TestCoordinatedNativeTokenMaxSupplyEnforcement(t *testing.T) {
 
 			if tc.startExtraMintBefore {
 				mintTransaction.ClientCreatedTimestamp = timestamppb.New(time.Now().Add(-time.Second))
-				_, _, err = wallet.StartTokenTransaction(
-					t.Context(),
-					config,
-					mintTransaction,
-					[]keys.Private{tokenPrivKey},
-					TestValidityDurationSecs*time.Second,
-					nil,
-				)
-				require.NoError(t, err, "failed to start mint transaction before")
+				if broadcastTokenTestsUseV3 {
+					t.Log("skipping extra mint start in V3 flow since broadcast commits immediately")
+				} else {
+					_, _, err = startTokenTransactionOrBroadcast(
+						t,
+						t.Context(),
+						config,
+						mintTransaction,
+						[]keys.Private{tokenPrivKey},
+						TestValidityDurationSecs*time.Second,
+					)
+					require.NoError(t, err, "failed to start mint transaction before")
+				}
 			}
 
-			_, err = wallet.BroadcastTokenTransfer(
-				t.Context(), config, mintTransaction,
+			_, err = broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				mintTransaction,
 				[]keys.Private{tokenPrivKey},
 			)
 

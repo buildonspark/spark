@@ -2,6 +2,7 @@ package tokens_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/big"
 	"sort"
@@ -69,7 +70,28 @@ func getSigningOperatorPublicKeyBytes(config *wallet.TestWalletConfig) [][]byte 
 	for _, operator := range config.SigningOperators {
 		operatorKeys = append(operatorKeys, operator.IdentityPublicKey.Serialize())
 	}
+	// Ensure deterministic ordering which is required for V3+ tests.
+	sort.Slice(operatorKeys, func(i, j int) bool {
+		return bytes.Compare(operatorKeys[i], operatorKeys[j]) < 0
+	})
 	return operatorKeys
+}
+
+// ensureV3DeterministicOrdering sorts fields that must be strictly ordered for V3+ hashing:
+// - spark_operator_identity_public_keys: bytewise ascending
+// - invoice_attachments: lexicographic by spark_invoice
+func ensureV3DeterministicOrdering(tx *tokenpb.TokenTransaction) {
+	if tx == nil || tx.GetVersion() < 3 {
+		return
+	}
+	sort.Slice(tx.SparkOperatorIdentityPublicKeys, func(i, j int) bool {
+		return bytes.Compare(tx.SparkOperatorIdentityPublicKeys[i], tx.SparkOperatorIdentityPublicKeys[j]) < 0
+	})
+	if len(tx.InvoiceAttachments) > 1 {
+		sort.Slice(tx.InvoiceAttachments, func(i, j int) bool {
+			return tx.InvoiceAttachments[i].GetSparkInvoice() < tx.InvoiceAttachments[j].GetSparkInvoice()
+		})
+	}
 }
 
 func bytesToBigInt(value []byte) *big.Int {
@@ -94,7 +116,6 @@ type tokenTransactionParams struct {
 	NumOutputsToSpend              int      // Number of outputs to spend (defaults to 2 for backward compatibility)
 	MintToSelf                     bool
 	InvoiceAttachments             []*tokenpb.InvoiceAttachment
-	Version                        int // Optional explicit token transaction version (defaults to V2 if 0)
 }
 
 type sparkTokenCreationTestParams struct {
@@ -150,10 +171,12 @@ type SecondRequestScenario struct {
 	secondRequestScenario SecondRequestScenarioMode
 }
 
-var signatureTypeTestCases = []struct {
+type signatureTypeTestCase struct {
 	name                 string
 	useSchnorrSignatures bool
-}{
+}
+
+var signatureTypeTestCases = []signatureTypeTestCase{
 	{
 		name:                 "ECDSA signatures",
 		useSchnorrSignatures: false,
@@ -162,6 +185,95 @@ var signatureTypeTestCases = []struct {
 		name:                 "Schnorr signatures",
 		useSchnorrSignatures: true,
 	},
+}
+
+var broadcastTokenTestsUseV3 bool
+
+func currentBroadcastRunLabel() string {
+	if broadcastTokenTestsUseV3 {
+		return "TTV3"
+	}
+	return "TTV2"
+}
+
+func RunWithBroadcastLabel(t *testing.T, fn func(t *testing.T)) {
+	t.Run(currentBroadcastRunLabel(), func(t *testing.T) {
+		fn(t)
+	})
+}
+
+func runSignatureTypeTestCases(t *testing.T, fn func(t *testing.T, tc signatureTypeTestCase)) {
+	for _, tc := range signatureTypeTestCases {
+		tc := tc
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
+			fn(t, tc)
+		})
+	}
+}
+
+func broadcastTokenTransaction(
+	t *testing.T,
+	ctx context.Context,
+	config *wallet.TestWalletConfig,
+	tokenTransaction *tokenpb.TokenTransaction,
+	ownerPrivateKeys []keys.Private,
+) (*tokenpb.TokenTransaction, error) {
+	t.Helper()
+	return broadcastTokenTransactionWithValidityDuration(
+		t,
+		ctx,
+		config,
+		tokenTransaction,
+		wallet.DefaultValidityDuration,
+		ownerPrivateKeys,
+	)
+}
+
+func broadcastTokenTransactionWithValidityDuration(
+	t *testing.T,
+	ctx context.Context,
+	config *wallet.TestWalletConfig,
+	tokenTransaction *tokenpb.TokenTransaction,
+	validityDuration time.Duration,
+	ownerPrivateKeys []keys.Private,
+) (*tokenpb.TokenTransaction, error) {
+	t.Helper()
+	if tokenTransaction == nil {
+		return nil, fmt.Errorf("token transaction cannot be nil")
+	}
+	clonedTx, ok := proto.Clone(tokenTransaction).(*tokenpb.TokenTransaction)
+	if !ok {
+		return nil, fmt.Errorf("failed to clone token transaction")
+	}
+	if broadcastTokenTestsUseV3 {
+		return wallet.BroadcastTokenTransactionV3(ctx, config, clonedTx, ownerPrivateKeys, validityDuration)
+	}
+	return wallet.BroadcastTokenTransferWithValidityDuration(ctx, config, clonedTx, validityDuration, ownerPrivateKeys)
+}
+
+func startTokenTransactionOrBroadcast(
+	t *testing.T,
+	ctx context.Context,
+	config *wallet.TestWalletConfig,
+	tokenTransaction *tokenpb.TokenTransaction,
+	ownerPrivateKeys []keys.Private,
+	validityDuration time.Duration,
+) (*tokenpb.StartTransactionResponse, []byte, error) {
+	t.Helper()
+	if broadcastTokenTestsUseV3 {
+		finalTx, err := wallet.BroadcastTokenTransactionV3(ctx, config, tokenTransaction, ownerPrivateKeys, validityDuration)
+		if err != nil {
+			return nil, nil, err
+		}
+		finalHash, err := utils.HashTokenTransaction(finalTx, false)
+		if err != nil {
+			return nil, nil, err
+		}
+		return &tokenpb.StartTransactionResponse{
+			FinalTokenTransaction: finalTx,
+		}, finalHash, nil
+	}
+	return wallet.StartTokenTransaction(ctx, config, tokenTransaction, ownerPrivateKeys, validityDuration, nil)
 }
 
 // createTestTokenMintTransactionTokenPbWithParams creates a test token mint transaction with custom parameters
@@ -203,13 +315,13 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 	}
 
 	now := time.Now()
-	effectiveVersion := params.Version
-	if effectiveVersion == 0 {
-		effectiveVersion = TokenTransactionVersion2
+	version := TokenTransactionVersion2
+	if broadcastTokenTestsUseV3 {
+		version = TokenTransactionVersion3
 	}
-	version := uint32(effectiveVersion)
+
 	mintTokenTransaction := &tokenpb.TokenTransaction{
-		Version: version,
+		Version: uint32(version),
 		TokenInputs: &tokenpb.TokenTransaction_MintInput{
 			MintInput: &tokenpb.TokenMintInput{
 				IssuerPublicKey: params.TokenIdentityPubKey.Serialize(),
@@ -231,10 +343,8 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 			o.WithdrawBondSats = &bond
 			o.WithdrawRelativeBlockLocktime = &lock
 		}
-		// V3 requires sorted the operator public keys for deterministic hashing
-		sort.Slice(mintTokenTransaction.SparkOperatorIdentityPublicKeys, func(i, j int) bool {
-			return bytes.Compare(mintTokenTransaction.SparkOperatorIdentityPublicKeys[i], mintTokenTransaction.SparkOperatorIdentityPublicKeys[j]) < 0
-		})
+		// V3 requires deterministic ordering for hashing
+		ensureV3DeterministicOrdering(mintTokenTransaction)
 
 		withdrawalBondSats := uint64(withdrawalBondSatsInConfig)
 		withdrawRelativeBlockLocktime := uint64(withdrawalRelativeBlockLocktimeInConfig)
@@ -271,9 +381,9 @@ func createTestTokenMintTransactionTokenPb(t *testing.T, config *wallet.TestWall
 // createTestTokenTransferTransactionTokenPbWithParams creates a test token transfer transaction with custom parameters
 func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *wallet.TestWalletConfig, params tokenTransactionParams) (*tokenpb.TokenTransaction, keys.Private, error) {
 	userOutput3PrivKey := keys.GeneratePrivateKey()
-	version := uint32(TokenTransactionVersion2)
-	if params.Version != 0 {
-		version = uint32(params.Version)
+	version := TokenTransactionVersion2
+	if broadcastTokenTestsUseV3 {
+		version = TokenTransactionVersion3
 	}
 
 	numOutputsToSpend := params.NumOutputsToSpend
@@ -290,7 +400,7 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 	}
 
 	transferTokenTransaction := &tokenpb.TokenTransaction{
-		Version: version,
+		Version: uint32(version),
 		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
 			TransferInput: &tokenpb.TokenTransferInput{
 				OutputsToSpend: outputsToSpend,
@@ -317,9 +427,7 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 			o.WithdrawBondSats = &bond
 			o.WithdrawRelativeBlockLocktime = &lock
 		}
-		sort.Slice(transferTokenTransaction.SparkOperatorIdentityPublicKeys, func(i, j int) bool {
-			return bytes.Compare(transferTokenTransaction.SparkOperatorIdentityPublicKeys[i], transferTokenTransaction.SparkOperatorIdentityPublicKeys[j]) < 0
-		})
+		ensureV3DeterministicOrdering(transferTokenTransaction)
 	}
 
 	transferTokenTransaction.TokenOutputs[0].TokenIdentifier = params.TokenIdentifier
@@ -363,12 +471,17 @@ func createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t *testing.T,
 }
 
 // testCoordinatedCreateNativeSparkTokenWithParams creates a native Spark token with custom parameters
-func testCoordinatedCreateNativeSparkTokenWithParams(t *testing.T, config *wallet.TestWalletConfig, params sparkTokenCreationTestParams) error {
+func testCoordinatedCreateNativeSparkTokenWithParams(
+	t *testing.T,
+	config *wallet.TestWalletConfig,
+	params sparkTokenCreationTestParams,
+) error {
 	createTx, err := createTestCoordinatedTokenCreateTransactionWithParams(config, params)
 	if err != nil {
 		return err
 	}
-	_, err = wallet.BroadcastTokenTransfer(
+	_, err = broadcastTokenTransaction(
+		t,
 		t.Context(),
 		config,
 		createTx,
@@ -383,8 +496,12 @@ func testCoordinatedCreateNativeSparkTokenWithParams(t *testing.T, config *walle
 
 // createTestCoordinatedTokenCreateTransactionWithParams creates a token create transaction
 func createTestCoordinatedTokenCreateTransactionWithParams(config *wallet.TestWalletConfig, params sparkTokenCreationTestParams) (*tokenpb.TokenTransaction, error) {
+	version := TokenTransactionVersion2
+	if broadcastTokenTestsUseV3 {
+		version = TokenTransactionVersion3
+	}
 	createTokenTransaction := &tokenpb.TokenTransaction{
-		Version: TokenTransactionVersion2,
+		Version: uint32(version),
 		TokenInputs: &tokenpb.TokenTransaction_CreateInput{
 			CreateInput: &tokenpb.TokenCreateInput{
 				IssuerPublicKey: params.issuerPrivateKey.Public().Serialize(),
@@ -399,6 +516,11 @@ func createTestCoordinatedTokenCreateTransactionWithParams(config *wallet.TestWa
 		Network:                         config.ProtoNetwork(),
 		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
 		ClientCreatedTimestamp:          timestamppb.New(time.Now()),
+	}
+	if version >= TokenTransactionVersion3 {
+		// V3 requires client-provided validity duration and sorted operator keys for deterministic hashing
+		createTokenTransaction.ValidityDurationSeconds = proto.Uint64(uint64(wallet.DefaultValidityDuration.Seconds()))
+		ensureV3DeterministicOrdering(createTokenTransaction)
 	}
 	return createTokenTransaction, nil
 }
@@ -485,7 +607,8 @@ func setTransactionTimestamps(transaction1, transaction2 *tokenpb.TokenTransacti
 		transaction1.ClientCreatedTimestamp = timestamppb.New(now)
 		transaction2.ClientCreatedTimestamp = timestamppb.New(now)
 	case TimestampScenarioFirstEarlier, TimestampScenarioExpired:
-		transaction1.ClientCreatedTimestamp = timestamppb.New(now.Add(-time.Second))
+		// Use a small duration that is earlier but still a valid client timestamp even when validity duration is set to a small value (eg. even one second)
+		transaction1.ClientCreatedTimestamp = timestamppb.New(now.Add(-100 * time.Millisecond))
 		transaction2.ClientCreatedTimestamp = timestamppb.New(now)
 	case TimestampScenarioSecondEarlier:
 		transaction1.ClientCreatedTimestamp = timestamppb.New(now)
@@ -597,8 +720,11 @@ func setupNativeTokenWithMint(
 	}
 
 	mintTxForBroadcast := proto.Clone(mintTxBeforeBroadcast).(*tokenpb.TokenTransaction)
-	finalMintTx, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, mintTxForBroadcast,
+	finalMintTx, err := broadcastTokenTransaction(
+		t,
+		t.Context(),
+		config,
+		mintTxForBroadcast,
 		[]keys.Private{issuerPrivKey},
 	)
 	if err != nil {
