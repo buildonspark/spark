@@ -11,6 +11,16 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 )
 
+type readableSpentOutput struct {
+	PrevHash string `json:"prev_hash"`
+	Vout     uint32 `json:"vout"`
+}
+
+type readableCreatedOutput struct {
+	OutputId        string `json:"output_id"`
+	TokenIdentifier string `json:"token_identifier"`
+}
+
 const (
 	ErrIdentityPublicKeyAuthFailed        = "identity public key authentication failed"
 	ErrInvalidPartialTokenTransaction     = "invalid partial token transaction"
@@ -75,11 +85,50 @@ func FormatErrorWithTransactionEnt(msg string, tokenTransaction *ent.TokenTransa
 	if tokenTransaction == nil {
 		return fmt.Errorf("nil token transaction in format error with transaction ent: message: %s, error: %w", msg, err)
 	}
-	return fmt.Errorf("%s (uuid: %s, hash: %x): %w",
+
+	outputMsg := ""
+
+	// Format spent outputs if loaded
+	spentOutputs, spentErr := tokenTransaction.Edges.SpentOutputOrErr()
+	if spentErr == nil && len(spentOutputs) > 0 {
+		readable := make([]readableSpentOutput, 0, min(len(spentOutputs), 5))
+		for i := 0; i < min(len(spentOutputs), 5); i++ {
+			readable = append(readable, readableSpentOutput{
+				PrevHash: spentOutputs[i].ID.String(),
+				Vout:     uint32(spentOutputs[i].CreatedTransactionOutputVout),
+			})
+		}
+		outputMsg = fmt.Sprintf(", spent_outputs: %+v", readable)
+	}
+
+	// Format created outputs if loaded
+	createdOutputs, createdErr := tokenTransaction.Edges.CreatedOutputOrErr()
+	if createdErr == nil && len(createdOutputs) > 0 {
+		readable := make([]readableCreatedOutput, 0, min(len(createdOutputs), 5))
+		for i := 0; i < min(len(createdOutputs), 5); i++ {
+			readable = append(readable, readableCreatedOutput{
+				OutputId:        createdOutputs[i].ID.String(),
+				TokenIdentifier: createdOutputs[i].TokenPublicKey.ToHex(),
+			})
+		}
+		outputMsg = fmt.Sprintf("%s, created_outputs: %+v", outputMsg, readable)
+	}
+
+	if err != nil {
+		return fmt.Errorf("%s (uuid: %s, partial_hash: %x, final_hash: %x%s): %w",
+			msg,
+			tokenTransaction.ID.String(),
+			tokenTransaction.PartialTokenTransactionHash,
+			tokenTransaction.FinalizedTokenTransactionHash,
+			outputMsg,
+			err)
+	}
+	return fmt.Errorf("%s (uuid: %s, partial_hash: %x, final_hash: %x%s)",
 		msg,
 		tokenTransaction.ID.String(),
+		tokenTransaction.PartialTokenTransactionHash,
 		tokenTransaction.FinalizedTokenTransactionHash,
-		err)
+		outputMsg)
 }
 
 func FormatTokenTransactionHashes(tokenTransaction *tokenpb.TokenTransaction) string {
@@ -111,11 +160,6 @@ func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.Token
 		return fmt.Errorf("Error inferring token txType for error format: %w, original err: %s %s: %w", inferTxTypeErr, msg, formatted, err)
 	}
 
-	type readableSpentOutput struct {
-		PrevHash string `json:"prev_hash"`
-		Vout     uint32 `json:"vout"`
-	}
-
 	var spentOutputs []readableSpentOutput
 	if txType == utils.TokenTransactionTypeTransfer {
 		outputsToSpend := tokenTransaction.GetTransferInput().GetOutputsToSpend()
@@ -131,18 +175,16 @@ func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.Token
 
 	outputMsg := fmt.Sprintf("spent_outputs: %+v", spentOutputs)
 
-	type readableOutput struct {
-		TokenId  string `json:"token_id"`
-		OutputId string `json:"output_id"`
-	}
-
 	n := len(tokenTransaction.TokenOutputs)
 	if n > 0 {
-		createdOutputs := []readableOutput{}
+		createdOutputs := []readableCreatedOutput{}
 
 		for i := 0; i < min(n, 5); i++ {
 			output := tokenTransaction.TokenOutputs[i]
-			createdOutputs = append(createdOutputs, readableOutput{hex.EncodeToString(output.TokenIdentifier), output.GetId()})
+			createdOutputs = append(createdOutputs, readableCreatedOutput{
+				OutputId:        output.GetId(),
+				TokenIdentifier: hex.EncodeToString(output.TokenIdentifier),
+			})
 		}
 		outputMsg = fmt.Sprintf("%s, created_outputs: %+v", outputMsg, createdOutputs)
 	}
