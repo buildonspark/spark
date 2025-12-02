@@ -46,7 +46,7 @@ Return a comprehensive report of the entire flow containing:
 - **Overview**: High-level summary of what this feature does
 - **Entry Points**: SDK methods and GRPC endpoints (with file paths and line numbers)
 - **Function Call Chain**: Complete trace from SDK → GRPC → Handler → Database/External Services
-- **Key Functions**: List of important functions with their responsibilities and signatures
+- **Key Functions**: List of important functions with their responsibilities and signatures. Explain the purpose of each function within the greater flow.
 - **Database Interactions**: Entities read/written and their relationships
 - **State Machine**: Any status transitions or state changes
 - **Error Handling**: How errors are propagated and handled
