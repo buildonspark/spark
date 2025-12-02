@@ -155,6 +155,12 @@ describe("HTLC create and claim tests", () => {
       expiryTime: new Date(Date.now() + 1 * 60 * 1000),
     });
 
+    await expect(() => bobWallet.queryHTLC({ limit: -1 })).rejects.toThrow();
+
+    await expect(() => bobWallet.queryHTLC({ offset: -1 })).rejects.toThrow();
+
+    await expect(() => bobWallet.queryHTLC({ limit: 101 })).rejects.toThrow();
+
     const queryWithStatus = await bobWallet.queryHTLC({
       matchRole: PreimageRequestRole.PREIMAGE_REQUEST_ROLE_SENDER,
     });

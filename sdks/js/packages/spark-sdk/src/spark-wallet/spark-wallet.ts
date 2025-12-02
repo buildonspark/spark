@@ -4046,6 +4046,26 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     limit?: number;
     offset?: number;
   }): Promise<QueryHtlcResponse> {
+    if (limit && (limit > 100 || limit < 1)) {
+      throw new SparkValidationError(
+        "Limit must be between 1 and 100 if provided.",
+        {
+          field: "limit",
+          value: limit,
+          expected: "between 1 and 100",
+        },
+      );
+    }
+    if (offset !== undefined && offset < 0) {
+      throw new SparkValidationError(
+        "Offset must be non-negative if provided",
+        {
+          field: "offset",
+          value: offset,
+          expected: "non-negative",
+        },
+      );
+    }
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
