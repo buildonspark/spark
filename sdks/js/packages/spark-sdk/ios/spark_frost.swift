@@ -869,12 +869,14 @@ public func FfiConverterTypeSigningNonce_lower(_ value: SigningNonce) -> RustBuf
 public struct TransactionResult {
     public var tx: Data
     public var sighash: Data
+    public var inputs: [TxInResult]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(tx: Data, sighash: Data) {
+    public init(tx: Data, sighash: Data, inputs: [TxInResult]) {
         self.tx = tx
         self.sighash = sighash
+        self.inputs = inputs
     }
 }
 
@@ -888,12 +890,16 @@ extension TransactionResult: Equatable, Hashable {
         if lhs.sighash != rhs.sighash {
             return false
         }
+        if lhs.inputs != rhs.inputs {
+            return false
+        }
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(tx)
         hasher.combine(sighash)
+        hasher.combine(inputs)
     }
 }
 
@@ -906,13 +912,15 @@ public struct FfiConverterTypeTransactionResult: FfiConverterRustBuffer {
         return
             try TransactionResult(
                 tx: FfiConverterData.read(from: &buf), 
-                sighash: FfiConverterData.read(from: &buf)
+                sighash: FfiConverterData.read(from: &buf), 
+                inputs: FfiConverterSequenceTypeTxInResult.read(from: &buf)
         )
     }
 
     public static func write(_ value: TransactionResult, into buf: inout [UInt8]) {
         FfiConverterData.write(value.tx, into: &buf)
         FfiConverterData.write(value.sighash, into: &buf)
+        FfiConverterSequenceTypeTxInResult.write(value.inputs, into: &buf)
     }
 }
 
@@ -929,6 +937,64 @@ public func FfiConverterTypeTransactionResult_lift(_ buf: RustBuffer) throws -> 
 #endif
 public func FfiConverterTypeTransactionResult_lower(_ value: TransactionResult) -> RustBuffer {
     return FfiConverterTypeTransactionResult.lower(value)
+}
+
+
+public struct TxInResult {
+    public var sequence: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(sequence: UInt32) {
+        self.sequence = sequence
+    }
+}
+
+
+
+extension TxInResult: Equatable, Hashable {
+    public static func ==(lhs: TxInResult, rhs: TxInResult) -> Bool {
+        if lhs.sequence != rhs.sequence {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(sequence)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTxInResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TxInResult {
+        return
+            try TxInResult(
+                sequence: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TxInResult, into buf: inout [UInt8]) {
+        FfiConverterUInt32.write(value.sequence, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTxInResult_lift(_ buf: RustBuffer) throws -> TxInResult {
+    return try FfiConverterTypeTxInResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTxInResult_lower(_ value: TxInResult) -> RustBuffer {
+    return FfiConverterTypeTxInResult.lower(value)
 }
 
 
@@ -1030,6 +1096,31 @@ fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterString.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeTxInResult: FfiConverterRustBuffer {
+    typealias SwiftType = [TxInResult]
+
+    public static func write(_ value: [TxInResult], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeTxInResult.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [TxInResult] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [TxInResult]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeTxInResult.read(from: &buf))
         }
         return seq
     }

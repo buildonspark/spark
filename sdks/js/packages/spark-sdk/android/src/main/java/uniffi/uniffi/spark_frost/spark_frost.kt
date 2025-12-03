@@ -1557,6 +1557,7 @@ public object FfiConverterTypeSigningNonce : FfiConverterRustBuffer<SigningNonce
 data class TransactionResult(
   var `tx`: kotlin.ByteArray,
   var `sighash`: kotlin.ByteArray,
+  var `inputs`: List<TxInResult>,
 ) {
   companion object
 }
@@ -1569,12 +1570,14 @@ public object FfiConverterTypeTransactionResult : FfiConverterRustBuffer<Transac
     TransactionResult(
       FfiConverterByteArray.read(buf),
       FfiConverterByteArray.read(buf),
+      FfiConverterSequenceTypeTxInResult.read(buf),
     )
 
   override fun allocationSize(value: TransactionResult) =
     (
       FfiConverterByteArray.allocationSize(value.`tx`) +
-        FfiConverterByteArray.allocationSize(value.`sighash`)
+        FfiConverterByteArray.allocationSize(value.`sighash`) +
+        FfiConverterSequenceTypeTxInResult.allocationSize(value.`inputs`)
     )
 
   override fun write(
@@ -1583,6 +1586,35 @@ public object FfiConverterTypeTransactionResult : FfiConverterRustBuffer<Transac
   ) {
     FfiConverterByteArray.write(value.`tx`, buf)
     FfiConverterByteArray.write(value.`sighash`, buf)
+    FfiConverterSequenceTypeTxInResult.write(value.`inputs`, buf)
+  }
+}
+
+data class TxInResult(
+  var `sequence`: kotlin.UInt,
+) {
+  companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeTxInResult : FfiConverterRustBuffer<TxInResult> {
+  override fun read(buf: ByteBuffer): TxInResult =
+    TxInResult(
+      FfiConverterUInt.read(buf),
+    )
+
+  override fun allocationSize(value: TxInResult) =
+    (
+      FfiConverterUInt.allocationSize(value.`sequence`)
+    )
+
+  override fun write(
+    value: TxInResult,
+    buf: ByteBuffer,
+  ) {
+    FfiConverterUInt.write(value.`sequence`, buf)
   }
 }
 
@@ -1679,6 +1711,34 @@ public object FfiConverterSequenceString : FfiConverterRustBuffer<List<kotlin.St
     buf.putInt(value.size)
     value.iterator().forEach {
       FfiConverterString.write(it, buf)
+    }
+  }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeTxInResult : FfiConverterRustBuffer<List<TxInResult>> {
+  override fun read(buf: ByteBuffer): List<TxInResult> {
+    val len = buf.getInt()
+    return List<TxInResult>(len) {
+      FfiConverterTypeTxInResult.read(buf)
+    }
+  }
+
+  override fun allocationSize(value: List<TxInResult>): ULong {
+    val sizeForLength = 4UL
+    val sizeForItems = value.map { FfiConverterTypeTxInResult.allocationSize(it) }.sum()
+    return sizeForLength + sizeForItems
+  }
+
+  override fun write(
+    value: List<TxInResult>,
+    buf: ByteBuffer,
+  ) {
+    buf.putInt(value.size)
+    value.iterator().forEach {
+      FfiConverterTypeTxInResult.write(it, buf)
     }
   }
 }
