@@ -1176,24 +1176,21 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 
 	// Validate leaf IDs in leaves_to_send
 	for _, leaf := range req.LeavesToSend {
-		_, err := uuid.Parse(leaf.LeafId)
-		if err != nil {
+		if err := uuid.Validate(leaf.LeafId); err != nil {
 			return nil, fmt.Errorf("unable to parse leaf_id as a uuid %s: %w", leaf.LeafId, err)
 		}
 	}
 
 	// Validate leaf IDs in direct_leaves_to_send
 	for _, leaf := range req.DirectLeavesToSend {
-		_, err := uuid.Parse(leaf.LeafId)
-		if err != nil {
+		if err := uuid.Validate(leaf.LeafId); err != nil {
 			return nil, fmt.Errorf("unable to parse direct_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)
 		}
 	}
 
 	// Validate leaf IDs in direct_from_cpfp_leaves_to_send
 	for _, leaf := range req.DirectFromCpfpLeavesToSend {
-		_, err := uuid.Parse(leaf.LeafId)
-		if err != nil {
+		if err := uuid.Validate(leaf.LeafId); err != nil {
 			return nil, fmt.Errorf("unable to parse direct_from_cpfp_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)
 		}
 	}
@@ -1253,8 +1250,7 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 	leafTweaksMap := make(map[string]*pbspark.SendLeafKeyTweak)
 	for _, leafTweak := range leafTweaks.LeavesToSend {
 		// Validate leaf ID in key tweaks
-		_, err := uuid.Parse(leafTweak.LeafId)
-		if err != nil {
+		if err := uuid.Validate(leafTweak.LeafId); err != nil {
 			return nil, fmt.Errorf("unable to parse key tweaks leaf_id as a uuid %s: %w", leafTweak.LeafId, err)
 		}
 

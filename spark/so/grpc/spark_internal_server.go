@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/uuids"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pb "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -31,16 +31,11 @@ func NewSparkInternalServer(config *so.Config) *SparkInternalServer {
 // MarkKeysharesAsUsed marks the keyshares as used.
 // It will return an error if the key is not found or the key is already used.
 func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.MarkKeysharesAsUsedRequest) (*emptypb.Empty, error) {
-	ids := make([]uuid.UUID, len(req.KeyshareId))
-	for i, id := range req.KeyshareId {
-		keyshareID, err := uuid.Parse(id)
-		if err != nil {
-			return nil, err
-		}
-		ids[i] = keyshareID
-	}
-	_, err := ent.MarkSigningKeysharesAsUsed(ctx, s.config, ids)
+	ids, err := uuids.ParseSlice(req.GetKeyshareId())
 	if err != nil {
+		return nil, err
+	}
+	if _, err := ent.MarkSigningKeysharesAsUsed(ctx, s.config, ids); err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil

@@ -12,6 +12,7 @@ import (
 	"slices"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/uuids"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -74,16 +75,11 @@ func (h *FrostSigningHandler) FrostRound1(ctx context.Context, req *pb.FrostRoun
 // FrostRound2 handles FROST signing.
 func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRound2Request) (*pb.FrostRound2Response, error) {
 	// Fetch key packages in one call.
-	uuids := make([]uuid.UUID, len(req.SigningJobs))
-	for i, job := range req.SigningJobs {
-		keyshareID, err := uuid.Parse(job.KeyshareId)
-		if err != nil {
-			return nil, err
-		}
-		uuids[i] = keyshareID
+	keyshareIDs, err := uuids.ParseSliceFunc(req.GetSigningJobs(), (*pb.SigningJob).GetKeyshareId)
+	if err != nil {
+		return nil, err
 	}
-
-	keyPackages, err := ent.GetKeyPackages(ctx, h.config, uuids)
+	keyPackages, err := ent.GetKeyPackages(ctx, h.config, keyshareIDs)
 	if err != nil {
 		return nil, err
 	}

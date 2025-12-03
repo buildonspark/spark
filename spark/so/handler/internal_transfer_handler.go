@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"maps"
 
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uuids"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -183,15 +185,11 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	}
 
 	if len(req.SparkInvoice) > 0 {
-		transferLeaves := req.TransferPackage.LeavesToSend
-		leafIDs := make([]uuid.UUID, len(transferLeaves))
-		for i, leaf := range transferLeaves {
-			leafID, err := uuid.Parse(leaf.LeafId)
-			if err != nil {
-				return fmt.Errorf("failed to parse leaf id: %w", err)
-			}
-			leafIDs[i] = leafID
+		leafIDs, err := uuids.ParseSliceFunc(req.GetTransferPackage().GetLeavesToSend(), (*pb.UserSignedTxSigningJob).GetLeafId)
+		if err != nil {
+			return fmt.Errorf("failed to parse leaf id: %w", err)
 		}
+
 		err = validateSatsSparkInvoice(ctx, req.SparkInvoice, receiverIdentityPubKey, senderIdentityPubKey, leafIDs, false)
 		if err != nil {
 			return fmt.Errorf("failed to validate sats spark invoice: %s for transfer id: %s. error: %w", req.SparkInvoice, req.TransferId, err)
@@ -348,13 +346,9 @@ func applySignaturesToTransactionsAndVerify(ctx context.Context, leafRefundMap m
 	}
 
 	// Collect all leaf UUIDs for batch query
-	leafUUIDs := make([]uuid.UUID, 0, len(refundSignatures))
-	for leafID := range refundSignatures {
-		leafUUID, err := uuid.Parse(leafID)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse leaf id: %w", err)
-		}
-		leafUUIDs = append(leafUUIDs, leafUUID)
+	leafUUIDs, err := uuids.ParseSeq(maps.Keys(refundSignatures))
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse leaf id: %w", err)
 	}
 
 	// Batch query to fetch all tree nodes at once
@@ -526,13 +520,9 @@ func (h *InternalTransferHandler) GetTransfers(ctx context.Context, req *pbinter
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	transferIDs := make([]uuid.UUID, len(req.TransferIds))
-	for i, transferID := range req.TransferIds {
-		transferID, err := uuid.Parse(transferID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse transfer id: %w", err)
-		}
-		transferIDs[i] = transferID
+	transferIDs, err := uuids.ParseSlice(req.GetTransferIds())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse transfer ids: %w", err)
 	}
 	transfers, err := db.Transfer.Query().Where(enttransfer.IDIn(transferIDs...)).All(ctx)
 	if err != nil {

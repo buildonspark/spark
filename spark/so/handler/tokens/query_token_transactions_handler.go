@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uuids"
 	"go.uber.org/zap"
 
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
@@ -236,7 +236,7 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(req *tokenpb.QueryTo
 
 	// Handle OutputIds filter
 	if len(req.OutputIds) > 0 {
-		outputUUIDs, err := collections.StringUUIDArrayToUUIDArray(req.OutputIds)
+		outputUUIDs, err := uuids.ParseSlice(req.OutputIds)
 		if err != nil {
 			return "", nil, fmt.Errorf("invalid output ID format: %w", err)
 		}

@@ -8,7 +8,6 @@ import (
 	"github.com/lightsparkdev/spark/proto/common"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/uuid"
 )
 
 func TestMapOfArrayToArrayOfMap(t *testing.T) {
@@ -209,76 +208,6 @@ func TestConvertObjectMapToProtoMap(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.want, got, protocmp.Transform()); diff != "" {
 				t.Errorf("ConvertObjectMapToProtoMap() mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestStringUUIDArrayToUUIDArray(t *testing.T) {
-	validUUID1 := "550e8400-e29b-41d4-a716-446655440000"
-	validUUID2 := "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
-
-	tests := []struct {
-		name  string
-		input []string
-		want  []uuid.UUID
-	}{
-		{
-			name:  "valid UUIDs",
-			input: []string{validUUID1, validUUID2},
-			want:  []uuid.UUID{uuid.MustParse(validUUID1), uuid.MustParse(validUUID2)},
-		},
-		{
-			name:  "empty array",
-			input: []string{},
-			want:  []uuid.UUID{},
-		},
-		{
-			name:  "single valid UUID",
-			input: []string{validUUID1},
-			want:  []uuid.UUID{uuid.MustParse(validUUID1)},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := StringUUIDArrayToUUIDArray(tt.input)
-			if err != nil {
-				t.Fatalf("StringUUIDArrayToUUIDArray() unexpected error: %v", err)
-			}
-			if diff := cmp.Diff(tt.want, got); diff != "" {
-				t.Errorf("StringUUIDArrayToUUIDArray() mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestStringUUIDArrayToUUIDArray_Errors(t *testing.T) {
-	validUUID1 := "550e8400-e29b-41d4-a716-446655440000"
-	invalidUUID := "invalid-uuid"
-
-	tests := []struct {
-		name  string
-		input []string
-	}{
-		{
-			name:  "invalid UUID",
-			input: []string{invalidUUID},
-		},
-		{
-			name:  "mixed valid and invalid UUIDs",
-			input: []string{validUUID1, invalidUUID},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := StringUUIDArrayToUUIDArray(tt.input)
-			if err == nil {
-				t.Errorf("StringUUIDArrayToUUIDArray() want error but got none")
-			}
-			if got != nil {
-				t.Errorf("StringUUIDArrayToUUIDArray() want nil but got %v", got)
 			}
 		})
 	}

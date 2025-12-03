@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/uuids"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -78,13 +78,9 @@ func (o *MockServer) UpdateNodesStatus(ctx context.Context, req *pbmock.UpdateNo
 		return nil, err
 	}
 
-	nodeUUIDs := make([]uuid.UUID, 0)
-	for _, nodeID := range req.NodeIds {
-		nodeUUID, err := uuid.Parse(nodeID)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse node id %s: %w", nodeID, err)
-		}
-		nodeUUIDs = append(nodeUUIDs, nodeUUID)
+	nodeUUIDs, err := uuids.ParseSlice(req.GetNodeIds())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse node id: %w", err)
 	}
 
 	_, err = db.TreeNode.Update().SetStatus(st.TreeNodeStatus(req.Status)).Where(treenode.IDIn(nodeUUIDs...)).Save(ctx)

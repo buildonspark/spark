@@ -302,7 +302,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
 
 		if node.ParentNodeId != nil {
-			parentID, err := uuid.Parse(*node.ParentNodeId)
+			parentID, err := uuid.Parse(node.GetParentNodeId())
 			if err != nil {
 				return err
 			}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/collections"
+	"github.com/lightsparkdev/spark/common/uuids"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
@@ -84,21 +85,13 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	nodeIDs := make([]uuid.UUID, len(req.NodeIds))
-	for i, nodeID := range req.NodeIds {
-		nodeID, err := uuid.Parse(nodeID)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse node id: %w", err)
-		}
-		nodeIDs[i] = nodeID
+	nodeIDs, err := uuids.ParseSlice(req.GetNodeIds())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse node id: %w", err)
 	}
 
 	knobsService := knobs.GetKnobsService(ctx)
-
-	maxNodeIDs := int(knobsService.GetValue(
-		knobs.KnobSoSigningCommitmentNodeLimit,
-		DefaultMaxSigningCommitmentNodes,
-	))
+	maxNodeIDs := int(knobsService.GetValue(knobs.KnobSoSigningCommitmentNodeLimit, DefaultMaxSigningCommitmentNodes))
 
 	if len(nodeIDs) > maxNodeIDs {
 		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("too many node ids: %d", len(nodeIDs)))

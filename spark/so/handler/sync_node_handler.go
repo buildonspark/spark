@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/common/uuids"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbin "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -36,21 +37,17 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	nodeUuidsToFix := []uuid.UUID{}
-	for _, nodeId := range req.NodeIds {
-		nodeUuid, err := uuid.Parse(nodeId)
-		if err != nil {
-			return fmt.Errorf("unable to parse node id %s: %w", nodeId, err)
-		}
-		nodeUuidsToFix = append(nodeUuidsToFix, nodeUuid)
+	nodeUUIDsToFix, err := uuids.ParseSlice(req.GetNodeIds())
+	if err != nil {
+		return fmt.Errorf("unable to parse node id: %w", err)
 	}
 	localNodes, err := db.TreeNode.Query().
-		Where(treenode.IDIn(nodeUuidsToFix...)).
+		Where(treenode.IDIn(nodeUUIDsToFix...)).
 		WithParent().
 		ForUpdate().
 		All(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to lock tree nodes %v: %w", nodeUuidsToFix, err)
+		return fmt.Errorf("failed to lock tree nodes %v: %w", nodeUUIDsToFix, err)
 	}
 
 	conn, err := h.config.SigningOperatorMap[req.OperatorId].NewOperatorGRPCConnection()
@@ -89,10 +86,10 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 
 	// Phase 1: Create missing split nodes first
 	// This ensures parent nodes exist before we try to update references to them
-	for _, nodeUUID := range nodeUuidsToFix {
+	for _, nodeUUID := range nodeUUIDsToFix {
 		node, ok := goodNodeIDMap[nodeUUID.String()]
 		if !ok {
-			return fmt.Errorf("node %s not found in response", nodeUUID.String())
+			return fmt.Errorf("node %s not found in response", nodeUUID)
 		}
 
 		_, exists := existingNodeMap[nodeUUID]
@@ -115,7 +112,7 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 	for existingNodeId, existingNode := range existingNodeMap {
 		node, ok := goodNodeIDMap[existingNodeId.String()]
 		if !ok {
-			return fmt.Errorf("node %s not found in response", existingNodeId.String())
+			return fmt.Errorf("node %s not found in response", existingNodeId)
 		}
 
 		err = h.updateExistingNode(ctx, existingNode, node, existingNodeId)
@@ -134,48 +131,48 @@ func (h *SyncNodeHandler) updateExistingNode(ctx context.Context, existingNode *
 	// Check and update RawTx if changed
 	if string(existingNode.RawTx) != string(node.NodeTx) {
 		mut.SetRawTx(node.NodeTx)
-		logger.Info("updated field RawTx", zap.String("node_id", nodeUUID.String()))
+		logger.Info("updated field RawTx", zap.Stringer("node_id", nodeUUID))
 	}
 
 	// Check and update RawRefundTx if changed
 	if string(existingNode.RawRefundTx) != string(node.RefundTx) {
 		mut.SetRawRefundTx(node.RefundTx)
-		logger.Info("updated field RawRefundTx", zap.String("node_id", nodeUUID.String()))
+		logger.Info("updated field RawRefundTx", zap.Stringer("node_id", nodeUUID))
 	}
 
 	// Check and update DirectTx if changed
 	if string(existingNode.DirectTx) != string(node.DirectTx) {
 		mut.SetDirectTx(node.DirectTx)
-		logger.Info("updated field DirectTx", zap.String("node_id", nodeUUID.String()))
+		logger.Info("updated field DirectTx", zap.Stringer("node_id", nodeUUID))
 	}
 
 	// Check and update DirectRefundTx if changed
 	if string(existingNode.DirectRefundTx) != string(node.DirectRefundTx) {
 		mut.SetDirectRefundTx(node.DirectRefundTx)
-		logger.Info("updated field DirectRefundTx", zap.String("node_id", nodeUUID.String()))
+		logger.Info("updated field DirectRefundTx", zap.Stringer("node_id", nodeUUID))
 	}
 
 	// Check and update DirectFromCpfpRefundTx if changed
 	if string(existingNode.DirectFromCpfpRefundTx) != string(node.DirectFromCpfpRefundTx) {
 		mut.SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
-		logger.Info("updated field DirectFromCpfpRefundTx", zap.String("node_id", nodeUUID.String()))
+		logger.Info("updated field DirectFromCpfpRefundTx", zap.Stringer("node_id", nodeUUID))
 	}
 
 	// Check and update ParentID if changed
 	if node.ParentNodeId != nil {
-		parentUUID, err := uuid.Parse(*node.ParentNodeId)
+		parentUUID, err := uuid.Parse(node.GetParentNodeId())
 		if err != nil {
-			return fmt.Errorf("unable to parse parent node id %s: %w", *node.ParentNodeId, err)
+			return fmt.Errorf("unable to parse parent node id %s: %w", node.GetParentNodeId(), err)
 		}
 		if existingNode.Edges.Parent == nil || existingNode.Edges.Parent.ID != parentUUID {
 			mut.SetParentID(parentUUID)
-			logger.Info("updated field ParentID", zap.String("node_id", nodeUUID.String()))
+			logger.Info("updated field ParentID", zap.Stringer("node_id", nodeUUID))
 		}
 	}
 
 	_, err := mut.Save(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to update node %s: %w", nodeUUID.String(), err)
+		return fmt.Errorf("unable to update node %s: %w", nodeUUID, err)
 	}
 
 	return nil
@@ -247,9 +244,9 @@ func (h *SyncNodeHandler) createMissingSplitNode(ctx context.Context, db *ent.Cl
 
 	// Set parent if exists
 	if node.ParentNodeId != nil {
-		parentUUID, err := uuid.Parse(*node.ParentNodeId)
+		parentUUID, err := uuid.Parse(node.GetParentNodeId())
 		if err != nil {
-			return fmt.Errorf("unable to parse parent node id %s: %w", *node.ParentNodeId, err)
+			return fmt.Errorf("unable to parse parent node id %s: %w", node.GetParentNodeId(), err)
 		}
 		createBuilder.SetParentID(parentUUID)
 	}
@@ -260,7 +257,7 @@ func (h *SyncNodeHandler) createMissingSplitNode(ctx context.Context, db *ent.Cl
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Created missing split node %d", zap.String("nodeId", nodeUUID.String()))
+	logger.Info("Created missing split node %d", zap.Stringer("nodeId", nodeUUID))
 
 	return nil
 }

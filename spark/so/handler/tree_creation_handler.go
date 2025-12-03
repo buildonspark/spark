@@ -330,7 +330,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	var network common.Network
 	switch req.Source.(type) {
 	case *pb.PrepareTreeAddressRequest_ParentNodeOutput:
-		nodeID, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
+		nodeID, err := uuid.Parse(req.GetParentNodeOutput().GetNodeId())
 		if err != nil {
 			return nil, err
 		}
@@ -444,7 +444,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	var schemaNetwork schematype.Network
 	switch req.Source.(type) {
 	case *pb.CreateTreeRequest_ParentNodeOutput:
-		outputID, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
+		outputID, err := uuid.Parse(req.GetParentNodeOutput().GetNodeId())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -857,7 +857,7 @@ func (h *TreeCreationHandler) updateParentNodeStatus(ctx context.Context, parent
 		return nil
 	}
 
-	parentNodeID, err := uuid.Parse(parentNodeOutput.NodeId)
+	parentNodeID, err := uuid.Parse(parentNodeOutput.GetNodeId())
 	if err != nil {
 		return err
 	}

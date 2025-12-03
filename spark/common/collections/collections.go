@@ -1,7 +1,6 @@
 package collections
 
 import (
-	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"google.golang.org/protobuf/proto"
 )
@@ -73,18 +72,6 @@ func ConvertObjectMapToProtoMap[K comparable, V common.ProtoConvertable[T], T pr
 			return nil, err
 		}
 		results[k] = marshalled
-	}
-	return results, nil
-}
-
-func StringUUIDArrayToUUIDArray(arr []string) ([]uuid.UUID, error) {
-	results := make([]uuid.UUID, len(arr))
-	for i, v := range arr {
-		id, err := uuid.Parse(v)
-		if err != nil {
-			return nil, err
-		}
-		results[i] = id
 	}
 	return results, nil
 }

@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/uuids"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbdkg "github.com/lightsparkdev/spark/proto/dkg"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
@@ -109,13 +110,9 @@ func (s *Server) RoundConfirmation(ctx context.Context, req *pbdkg.RoundConfirma
 	if len(req.KeyIds) > 5000 {
 		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("too many key IDs to confirm: %d", len(req.KeyIds)))
 	}
-	ids := make([]uuid.UUID, 0, len(req.KeyIds))
-	for _, idStr := range req.KeyIds {
-		id, err := uuid.Parse(idStr)
-		if err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
+	ids, err := uuids.ParseSlice(req.GetKeyIds())
+	if err != nil {
+		return nil, err
 	}
 	rows, err := db.SigningKeyshare.Query().
 		Where(

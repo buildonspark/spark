@@ -293,7 +293,7 @@ func CreateStartedTransactionEntities(
 		if err != nil {
 			return nil, err
 		}
-		outputUUID, err := uuid.Parse(*output.Id)
+		outputUUID, err := uuid.Parse(output.GetId())
 		if err != nil {
 			return nil, err
 		}

@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uuids"
 	"github.com/lightsparkdev/spark/so/frost"
 	"go.uber.org/zap"
 
@@ -195,14 +196,11 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	}
 
 	if len(req.SparkInvoice) > 0 {
-		leafIDsToSend := make([]uuid.UUID, len(req.TransferPackage.LeavesToSend))
-		for i, leaf := range req.TransferPackage.LeavesToSend {
-			leafID, err := uuid.Parse(leaf.LeafId)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse leaf id: %w", err)
-			}
-			leafIDsToSend[i] = leafID
+		leafIDsToSend, err := uuids.ParseSliceFunc(req.GetTransferPackage().GetLeavesToSend(), (*pb.UserSignedTxSigningJob).GetLeafId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse leaf id: %w", err)
 		}
+
 		err = validateSatsSparkInvoice(ctx, req.SparkInvoice, receiverIdentityPubKey, reqOwnerIdentityPubKey, leafIDsToSend, true)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate sats spark invoice: %s for transfer id: %s. error: %w", req.SparkInvoice, req.TransferId, err)
@@ -1686,15 +1684,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	}
 
 	if len(filter.TransferIds) > 0 {
-		transferUUIDs := []uuid.UUID{}
-		for _, transferID := range filter.TransferIds {
-			transferUUID, err := uuid.Parse(transferID)
-			if err != nil {
-				return nil, fmt.Errorf("unable to parse transfer id as a uuid %s: %w", transferID, err)
-			}
-			transferUUIDs = append(transferUUIDs, transferUUID)
+		transferUUIDs, err := uuids.ParseSlice(filter.GetTransferIds())
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse transfer IDs as UUIDs: %w", err)
 		}
-		transferPredicate = append([]predicate.Transfer{enttransfer.IDIn(transferUUIDs...)}, transferPredicate...)
+		transferPredicate = append(transferPredicate, enttransfer.IDIn(transferUUIDs...))
 	}
 
 	if len(filter.Types) > 0 {

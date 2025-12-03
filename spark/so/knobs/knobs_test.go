@@ -109,8 +109,7 @@ func TestKnobs_RolloutUUIDConsistent(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.uuidStr, func(t *testing.T) {
-			parsedUUID, err := uuid.Parse(tc.uuidStr)
-			require.NoError(t, err, "Should be able to parse UUID")
+			parsedUUID := uuid.MustParse(tc.uuidStr)
 
 			result := k.RolloutUUID("test", parsedUUID, 50.0)
 			assert.Equal(t, tc.expected, result,

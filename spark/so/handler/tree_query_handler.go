@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uuids"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -98,14 +98,9 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 
 	case *pb.QueryNodesRequest_NodeIds:
 		offset = -1
-
-		nodeIDs := make([]uuid.UUID, len(req.GetNodeIds().NodeIds))
-		for _, nodeID := range req.GetNodeIds().NodeIds {
-			nodeUUID, err := uuid.Parse(nodeID)
-			if err != nil {
-				return nil, fmt.Errorf("unable to parse node id as a uuid %s: %w", nodeID, err)
-			}
-			nodeIDs = append(nodeIDs, nodeUUID)
+		nodeIDs, err := uuids.ParseSlice(req.GetNodeIds().GetNodeIds())
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse node IDs as UUIDs: %w", err)
 		}
 		query = query.Where(treenode.IDIn(nodeIDs...))
 	default:

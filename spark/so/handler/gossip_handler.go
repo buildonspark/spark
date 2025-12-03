@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/common/uuids"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -124,14 +125,9 @@ func (h *GossipHandler) handleMarkTreesExited(ctx context.Context, req *pbgossip
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Handling mark trees exited gossip message for trees %+q", req.TreeIds)
 
-	treeIDs := make([]uuid.UUID, 0)
-	for _, treeID := range req.TreeIds {
-		treeUUID, err := uuid.Parse(treeID)
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("Failed to parse tree ID %s as UUID", treeID)
-			continue
-		}
-		treeIDs = append(treeIDs, treeUUID)
+	treeIDs, err := uuids.ParseSlice(req.GetTreeIds())
+	if err != nil {
+		return fmt.Errorf("failed to parse tree IDs as UUIDs: %w", err)
 	}
 
 	db, err := ent.GetDbFromContext(ctx)

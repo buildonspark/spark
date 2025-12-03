@@ -403,8 +403,7 @@ func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
 	}
 
 	for _, node := range resp.Nodes {
-		_, err := uuid.Parse(node.Id)
-		require.NoError(t, err)
+		require.NoError(t, uuid.Validate(node.Id))
 	}
 }
 
