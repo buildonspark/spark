@@ -57,3 +57,24 @@ export class SparkAuthenticationError extends SparkError {
     super(message, context);
   }
 }
+
+/** @deprecated Use SparkValidationError instead. */
+export const ValidationError = SparkValidationError;
+
+/** @deprecated Use SparkRequestError instead. */
+export const NetworkError = SparkRequestError;
+
+/** @deprecated Use SparkAuthenticationError instead. */
+export const AuthenticationError = SparkAuthenticationError;
+
+/** @deprecated Use SparkError instead. */
+export const ConfigurationError = SparkError;
+
+/** @deprecated Use SparkError instead. */
+export const InternalValidationError = SparkError;
+
+/** @deprecated Use SparkRequestError instead. */
+export const RPCError = SparkRequestError;
+
+/** @deprecated Use SparkError instead. */
+export const SparkSdkError = SparkError;

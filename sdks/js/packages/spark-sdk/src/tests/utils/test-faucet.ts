@@ -342,15 +342,12 @@ export class BitcoinFaucet {
       const data = await response.json();
       if (data.error) {
         console.error(`RPC Error for method ${method}:`, data.error);
-        throw new SparkRequestError(
-          `Bitcoin RPC error: ${data.error.message}`,
-          {
-            bitcoinRpcMethod: method,
-            params,
-            code: data.error.code,
-            error: data.error,
-          },
-        );
+        throw new SparkRequestError(`Bitcoin RPC error`, {
+          bitcoinRpcMethod: method,
+          params,
+          code: data.error.code,
+          error: data.error,
+        });
       }
 
       return data.result;
