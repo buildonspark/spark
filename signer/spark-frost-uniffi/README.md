@@ -73,4 +73,5 @@ EOL
 cd spark/signer/spark-frost-uniffi
 cargo build
 ./build-bindings.sh
+./build-rn-bindings.sh
 ```
