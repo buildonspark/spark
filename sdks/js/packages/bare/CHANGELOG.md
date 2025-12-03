@@ -1,5 +1,14 @@
 # @buildonspark/bare
 
+## 0.0.29
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @buildonspark/spark-frost-bare-addon@0.0.5
+  - @buildonspark/spark-sdk@0.5.0
+
 ## 0.0.28
 
 ### Patch Changes

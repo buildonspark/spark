@@ -1,5 +1,53 @@
 # @buildonspark/spark-sdk
 
+## 0.5.0
+
+### Minor Changes
+
+- - **Error model & handling**
+    - All public errors now derive from `SparkError`, with four concrete types: `SparkError`, `SparkValidationError`, `SparkRequestError`, `SparkAuthenticationError`; older classes like `NetworkError`, `RPCError`, `ValidationError`, `ConfigurationError` are no longer thrown.
+    - `SparkError` accepts a flexible context object where `error` can be any `unknown`; it normalizes and stores the original error and produces concise, structured messages and `toJSON` output.
+    - All public `SparkWallet` methods are now centrally wrapped, so anything thrown by internal code or third‑party libraries is surfaced as a `SparkError` (or subclass) with consistent context, making `instanceof` checks and top‑level error handling reliable and uniform.
+    - OTEL tracing is now **Node‑only**: client‑side tracing is only initialized in `SparkWalletNodeJS`. Error messages in Node may include a `traceId`; browser/React Native environments no longer attempt to set up OTEL spans.
+  - **Simplified error types across the SDK**
+    - Service layers (GraphQL client, connection, signing, deposit, transfer, lightning, coop‑exit, token‑transactions, etc.) now consistently throw `SparkRequestError` for request/transport/API failures and `SparkValidationError` for invalid inputs or state.
+    - Error context now uses strongly‑typed `operation` and `method` where applicable (e.g. RPC name and HTTP method), improving debuggability without requiring multiple bespoke error classes.
+  - **Token transaction v3 support**
+    - A new config flag `tokenTransactionVersion?: "V2" | "V3"` has been added (default `"V2"`).
+    - Token‑related APIs that previously produced v2 `TokenTransaction` objects can now operate in a v3 mode that builds `PartialTokenTransaction` plus metadata and calls a new `broadcastTokenTransactionV3` path.
+    - When `tokenTransactionVersion` is `"V3"`, token transfers/mints/creates will:
+      - Construct partial token transactions including network, operator keys, withdraw bond parameters, and validity duration.
+      - Sign and broadcast via `broadcast_transaction` on the token service, which finalizes the transaction on the coordinator side before returning a hash.
+  - **HTLC (hash time‑locked contract) APIs**
+    - `SparkWallet` now exposes a full HTLC workflow:
+      - `createHTLC({ receiverSparkAddress, amountSats, preimage?, expiryTime })` to open a HTLC using your leaves, validating balance and expiry, and driving the swap flow using a Lightning service.
+      - `claimHTLC(preimage: string)` to provide a preimage, complete the HTLC, and optionally auto‑claim when you are the receiver.
+      - `getHTLCPreimage(transferID: string)` to deterministically compute a preimage from a transfer ID using a dedicated HTLC preimage key.
+      - `createHTLCSenderSpendTx(...)` / `createHTLCReceiverSpendTx(...)` to build sender/receiver on‑chain spend transactions, including signing and final witness construction.
+      - `queryHTLC({ paymentHashes?, status?, transferIds?, matchRole?, limit?, offset? })` to query HTLCs via the gRPC API.
+    - `SparkSigner` now derives and stores an `htlcPreimageKey` when you call `createSparkWalletFromSeed`, and exposes `htlcHMAC(transferID)`—this underpins `getHTLCPreimage` so preimages are reproducible from wallet state.
+    - HTLC timelock helpers and refund‑path helpers (`getNextHTLCTransactionSequence`, refund‑TX utilities) enforce valid timelock sequences, throwing `SparkValidationError` if the next step falls outside allowed intervals.
+  - **HTLC querying validation (client‑side)**
+    - `SparkWallet.queryHTLC` now validates:
+      - `limit` must be between **1 and 100** if provided, otherwise a `SparkValidationError` is thrown.
+      - `offset` must be **non‑negative** if provided, otherwise a `SparkValidationError` is thrown.
+    - This prevents sending malformed pagination parameters to the server and surfaces clear, local validation errors instead.
+  - **Proto & request validation updates**
+    - In the token proto, `TokenTransaction.validity_duration_seconds` is now **optional**; the JS client continues to set it, but it no longer has to be present in all wire payloads.
+    - `QueryTokenTransactionsRequest` adds validation for pagination fields:
+      - `limit` must be in [0, 1000].
+      - `offset` must be ≥ 0.
+    - HTLC‑related proto messages and query types were updated so preimage requests can be made without always supplying sender public keys, matching the new `queryHTLC` API surface.
+  - **(Rust bindings)**
+    - `TransactionResult` now exposes:
+      - `tx: Uint8Array`
+      - `sighash: Uint8Array`
+      - `inputs: TxIn[]` where `TxIn` includes a `sequence` field.
+    - Allows you to inspect per‑input sequences/timelocks when calling helpers like `construct_node_tx`, `construct_refund_tx`, `construct_split_tx`, and `construct_direct_refund_tx`.
+  - **Miscellaneous behavioural tweaks**
+    - HTLC and refund‑sequence utilities now enforce that certain claim‑side timelocks land on specific X00/X50 boundaries, throwing `SparkValidationError` on invalid sequences.
+    - Network/RPC failures in token and UTXO workflows consistently wrap unknown/third‑party errors into `SparkError` subclasses with preserved original error information and structured context.
+
 ## 0.4.7
 
 ### Patch Changes

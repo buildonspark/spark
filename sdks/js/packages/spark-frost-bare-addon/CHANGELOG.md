@@ -1,5 +1,16 @@
 # @buildonspark/spark-frost-bare-addon
 
+## 0.0.5
+
+### Patch Changes
+
+- - **(Rust bindings)**
+    - `TransactionResult` now exposes:
+      - `tx: Uint8Array`
+      - `sighash: Uint8Array`
+      - `inputs: TxIn[]` where `TxIn` includes a `sequence` field.
+    - Allows you to inspect per‑input sequences/timelocks when calling helpers like `construct_node_tx`, `construct_refund_tx`, `construct_split_tx`, and `construct_direct_refund_tx`.
+
 ## 0.0.4
 
 ### Patch Changes

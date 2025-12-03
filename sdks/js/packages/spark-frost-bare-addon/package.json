@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-frost-bare-addon",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Example Bare addon",
   "license": "Apache-2.0",
   "homepage": "https://github.com/buildonspark/spark",

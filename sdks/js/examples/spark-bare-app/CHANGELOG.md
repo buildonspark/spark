@@ -1,5 +1,19 @@
 # @buildonspark/spark-bare-app
 
+## 0.1.0
+
+### Minor Changes
+
+- - **Error consistency**
+    - `BareSparkSigner` now throws `SparkValidationError` (rather than older error types) when required keys or nonces are missing.
+    - This aligns `@buildonspark/bare` error semantics with the updated main SDK, so callers can rely on the same error class hierarchy across both packages.
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.5.0
+  - @buildonspark/bare@0.0.29
+
 ## 0.0.28
 
 ### Patch Changes

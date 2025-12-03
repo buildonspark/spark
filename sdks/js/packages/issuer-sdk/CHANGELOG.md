@@ -1,5 +1,39 @@
 # @buildonspark/issuer-sdk
 
+## 0.1.0
+
+### Minor Changes
+
+- - **Entry points & module resolution**
+    - The package now provides distinct entrypoints:
+      - `index.browser` (default `module`/`import` for browser/bundlers).
+      - `index.node` for Node environments.
+      - `index.react-native` for React Native.
+    - The `exports` map was simplified and modernized so:
+      - `import { IssuerSparkWallet } from "@buildonspark/issuer-sdk"` resolves correctly in Node ESM, bundlers, and React Native without manual path selection.
+      - Type definitions for browser/Node/React Native are correctly wired.
+  - **Shared API surface**
+    - A new `index-shared` consolidates type and helper re‑exports:
+      - Re‑exports signer types (`DefaultSparkSigner`, `UnsafeStatelessSparkSigner`, `SparkSigner` and related Frost types).
+      - Re‑exports `WalletConfig`, `ConfigOptions`, and issuer‑specific types (`IssuerTokenMetadata`, etc.).
+    - Public API usage for typical consumers (importing `IssuerSparkWallet` and issuer types) remains the same; only the internal file layout and `exports` map changed.
+  - **Token transaction v3 support**
+    - `IssuerTokenTransactionService` gained:
+      - `constructPartialCreateTokenTransaction(...)` and `constructPartialMintTokenTransaction(...)` that build v3 `PartialTokenTransaction` objects with metadata and withdraw parameters.
+      - These complement the existing v2 `constructCreateTokenTransaction` and `constructMintTokenTransaction`.
+    - `IssuerSparkWallet.createToken` and `mintTokens` now:
+      - Check `config.getTokenTransactionVersion()`.
+      - Use v2 full transactions and `broadcastTokenTransaction(...)` when `"V2"`.
+      - Use v3 partial transactions and `broadcastTokenTransactionV3(...)` when `"V3"`.
+  - **Error and method wrapping**
+    - Issuer services and `IssuerSparkWallet` now emit the same simplified `SparkError` family used in `spark-sdk`, aligning error handling semantics for issuers with the core wallet.
+    - Public issuer wallet methods are wrapped via `SparkWallet.wrapMethod`, so they benefit from the centralized error‑wrapping and consistent error surface.
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.5.0
+
 ## 0.0.110
 
 ### Patch Changes
