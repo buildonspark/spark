@@ -17,6 +17,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
@@ -2256,7 +2257,15 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		if job.DirectRefundTxSigningJob != nil {
 			directRefundTxSigningJob = job.DirectRefundTxSigningJob
 		} else if !isSwap && requireDirectTx && len(leaf.DirectTx) > 0 {
-			return nil, fmt.Errorf("DirectRefundTxSigningJob is required. Please upgrade to the latest SDK version")
+			ignoreZeroNode := knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnableStrictDirectRefundTxValidation, 0) == 0
+			isZeroNode, err := isZeroNode(leaf)
+			if err != nil {
+				return nil, fmt.Errorf("failed to determine if node is zero node: %w", err)
+			}
+
+			if ignoreZeroNode || !isZeroNode {
+				return nil, fmt.Errorf("DirectRefundTxSigningJob is required. Please upgrade to the latest SDK version")
+			}
 		}
 		if job.DirectFromCpfpRefundTxSigningJob != nil {
 			directFromCpfpRefundTxSigningJob = job.DirectFromCpfpRefundTxSigningJob
@@ -2389,6 +2398,19 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	}
 
 	return &pb.ClaimTransferSignRefundsResponse{SigningResults: signingResultProtos}, nil
+}
+
+func isZeroNode(leaf *ent.TreeNode) (bool, error) {
+	nodeTxBytes := leaf.RawTx
+	nodeTx, err := common.TxFromRawTxBytes(nodeTxBytes)
+	if err != nil {
+		return false, fmt.Errorf("unable to load node tx for leaf %s: %w", leaf.ID.String(), err)
+	}
+	if len(nodeTx.TxIn) == 0 {
+		return false, fmt.Errorf("no tx inputs for node tx %s", leaf.ID.String())
+	}
+	nodeTxTimelock := bitcointransaction.GetTimelockFromSequence(nodeTx.TxIn[0].Sequence)
+	return nodeTxTimelock > 0, nil
 }
 
 func (h *TransferHandler) getRefundTxSigningJobs(ctx context.Context, leaf *ent.TreeNode, cpfpJob *pb.SigningJob, directJob *pb.SigningJob, directFromCpfpJob *pb.SigningJob) (*helper.SigningJob, *helper.SigningJob, *helper.SigningJob, error) {
