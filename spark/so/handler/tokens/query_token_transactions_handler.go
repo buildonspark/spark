@@ -64,37 +64,6 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) *queryPara
 	}
 }
 
-type queryParams struct {
-	outputIds              []string
-	ownerPublicKeys        [][]byte
-	issuerPublicKeys       [][]byte
-	tokenIdentifiers       [][]byte
-	tokenTransactionHashes [][]byte
-	order                  sparkpb.Order
-	limit                  int64
-	offset                 int64
-}
-
-func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) *queryParams {
-	limit := req.GetLimit()
-	if limit == 0 {
-		limit = 100
-	} else if limit > 1000 {
-		limit = 1000
-	}
-
-	return &queryParams{
-		outputIds:              req.OutputIds,
-		ownerPublicKeys:        req.GetOwnerPublicKeys(),
-		issuerPublicKeys:       req.GetIssuerPublicKeys(),
-		tokenIdentifiers:       req.TokenIdentifiers,
-		tokenTransactionHashes: req.TokenTransactionHashes,
-		order:                  req.GetOrder(),
-		limit:                  limit,
-		offset:                 req.Offset,
-	}
-}
-
 // NewQueryTokenTransactionsHandler creates a new QueryTokenTransactionsHandler.
 func NewQueryTokenTransactionsHandler(config *so.Config) *QueryTokenTransactionsHandler {
 	return &QueryTokenTransactionsHandler{
