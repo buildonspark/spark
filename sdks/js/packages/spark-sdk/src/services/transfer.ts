@@ -296,27 +296,29 @@ export class BaseTransferService {
     );
 
     const sparkFrost = getSparkFrost();
-    const encryptedKeyTweaks: { [key: string]: Uint8Array } = {};
-    for (const [key, value] of keyTweakInputMap) {
-      const protoToEncrypt: SendLeafKeyTweaks = {
-        leavesToSend: value,
-      };
+    const encryptedKeyTweaksEntries = await Promise.all(
+      Array.from(keyTweakInputMap.entries()).map(async ([key, value]) => {
+        const protoToEncrypt: SendLeafKeyTweaks = {
+          leavesToSend: value,
+        };
 
-      const protoToEncryptBinary =
-        SendLeafKeyTweaks.encode(protoToEncrypt).finish();
+        const protoToEncryptBinary =
+          SendLeafKeyTweaks.encode(protoToEncrypt).finish();
 
-      const operator = this.config.getSigningOperators()[key];
-      if (!operator) {
-        throw new SparkValidationError("Operator not found");
-      }
+        const operator = this.config.getSigningOperators()[key];
+        if (!operator) {
+          throw new SparkValidationError("Operator not found");
+        }
 
-      const encryptedProto = await sparkFrost.encryptEcies(
-        protoToEncryptBinary,
-        hexToBytes(operator.identityPublicKey),
-      );
-      encryptedKeyTweaks[key] = Uint8Array.from(encryptedProto);
-    }
+        const encryptedProto = await sparkFrost.encryptEcies(
+          protoToEncryptBinary,
+          hexToBytes(operator.identityPublicKey),
+        );
 
+        return [key, Uint8Array.from(encryptedProto)] as const;
+      }),
+    );
+    const encryptedKeyTweaks = Object.fromEntries(encryptedKeyTweaksEntries);
     const transferPackage: TransferPackage = {
       leavesToSend: cpfpLeafSigningJobs,
       keyTweakPackage: encryptedKeyTweaks,
@@ -375,26 +377,29 @@ export class BaseTransferService {
     );
 
     const sparkFrost = getSparkFrost();
-    const encryptedKeyTweaks: { [key: string]: Uint8Array } = {};
-    for (const [key, value] of keyTweakInputMap) {
-      const protoToEncrypt: SendLeafKeyTweaks = {
-        leavesToSend: value,
-      };
+    const encryptedKeyTweaksEntries = await Promise.all(
+      Array.from(keyTweakInputMap.entries()).map(async ([key, value]) => {
+        const protoToEncrypt: SendLeafKeyTweaks = {
+          leavesToSend: value,
+        };
 
-      const protoToEncryptBinary =
-        SendLeafKeyTweaks.encode(protoToEncrypt).finish();
+        const protoToEncryptBinary =
+          SendLeafKeyTweaks.encode(protoToEncrypt).finish();
 
-      const operator = this.config.getSigningOperators()[key];
-      if (!operator) {
-        throw new SparkValidationError("Operator not found");
-      }
+        const operator = this.config.getSigningOperators()[key];
+        if (!operator) {
+          throw new SparkValidationError("Operator not found");
+        }
 
-      const encryptedProto = await sparkFrost.encryptEcies(
-        protoToEncryptBinary,
-        hexToBytes(operator.identityPublicKey),
-      );
-      encryptedKeyTweaks[key] = Uint8Array.from(encryptedProto);
-    }
+        const encryptedProto = await sparkFrost.encryptEcies(
+          protoToEncryptBinary,
+          hexToBytes(operator.identityPublicKey),
+        );
+
+        return [key, Uint8Array.from(encryptedProto)] as const;
+      }),
+    );
+    const encryptedKeyTweaks = Object.fromEntries(encryptedKeyTweaksEntries);
 
     const transferPackage: TransferPackage = {
       leavesToSend: cpfpLeafSigningJobs,
@@ -580,21 +585,27 @@ export class BaseTransferService {
   ): Promise<Map<string, SendLeafKeyTweak[]>> {
     const leavesTweaksMap = new Map<string, SendLeafKeyTweak[]>();
 
-    for (const leaf of leaves) {
-      const cpfpRefundSignature = cpfpRefundSignatureMap.get(leaf.leaf.id);
-      const directRefundSignature = directRefundSignatureMap.get(leaf.leaf.id);
-      const directFromCpfpRefundSignature =
-        directFromCpfpRefundSignatureMap.get(leaf.leaf.id);
+    const results = await Promise.all(
+      leaves.map(async (leaf) => {
+        const cpfpRefundSignature = cpfpRefundSignatureMap.get(leaf.leaf.id);
+        const directRefundSignature = directRefundSignatureMap.get(
+          leaf.leaf.id,
+        );
+        const directFromCpfpRefundSignature =
+          directFromCpfpRefundSignatureMap.get(leaf.leaf.id);
 
-      const leafTweaksMap = await this.prepareSingleSendTransferKeyTweak(
-        transferID,
-        leaf,
-        receiverIdentityPubkey,
-        cpfpRefundSignature,
-        directRefundSignature,
-        directFromCpfpRefundSignature,
-      );
-      for (const [identifier, leafTweak] of leafTweaksMap) {
+        return await this.prepareSingleSendTransferKeyTweak(
+          transferID,
+          leaf,
+          receiverIdentityPubkey,
+          cpfpRefundSignature,
+          directRefundSignature,
+          directFromCpfpRefundSignature,
+        );
+      }),
+    );
+    for (const result of results) {
+      for (const [identifier, leafTweak] of result) {
         leavesTweaksMap.set(identifier, [
           ...(leavesTweaksMap.get(identifier) || []),
           leafTweak,
@@ -780,39 +791,41 @@ export class TransferService extends BaseTransferService {
     transfer: Transfer,
   ): Promise<Map<string, Uint8Array>> {
     const leafPubKeyMap = new Map<string, Uint8Array>();
-    for (const leaf of transfer.leaves) {
-      if (!leaf.leaf) {
-        throw new Error("Leaf is undefined");
-      }
+    await Promise.all(
+      transfer.leaves.map(async (leaf) => {
+        if (!leaf.leaf) {
+          throw new Error("Leaf is undefined");
+        }
 
-      const encoder = new TextEncoder();
-      const leafIdBytes = encoder.encode(leaf.leaf.id);
-      const transferIdBytes = encoder.encode(transfer.id);
+        const encoder = new TextEncoder();
+        const leafIdBytes = encoder.encode(leaf.leaf.id);
+        const transferIdBytes = encoder.encode(transfer.id);
 
-      const payload = new Uint8Array([
-        ...leafIdBytes,
-        ...transferIdBytes,
-        ...leaf.secretCipher,
-      ]);
+        const payload = new Uint8Array([
+          ...leafIdBytes,
+          ...transferIdBytes,
+          ...leaf.secretCipher,
+        ]);
 
-      const payloadHash = sha256(payload);
+        const payloadHash = sha256(payload);
 
-      if (
-        !secp256k1.verify(
-          leaf.signature,
-          payloadHash,
-          transfer.senderIdentityPublicKey,
-        )
-      ) {
-        throw new Error("Signature verification failed");
-      }
+        if (
+          !secp256k1.verify(
+            leaf.signature,
+            payloadHash,
+            transfer.senderIdentityPublicKey,
+          )
+        ) {
+          throw new Error("Signature verification failed");
+        }
 
-      const leafSecret = await this.config.signer.decryptEcies(
-        leaf.secretCipher,
-      );
+        const leafSecret = await this.config.signer.decryptEcies(
+          leaf.secretCipher,
+        );
 
-      leafPubKeyMap.set(leaf.leaf.id, leafSecret);
-    }
+        leafPubKeyMap.set(leaf.leaf.id, leafSecret);
+      }),
+    );
     return leafPubKeyMap;
   }
 
@@ -913,45 +926,47 @@ export class TransferService extends BaseTransferService {
   }> {
     const transferId = uuidv7();
     const leafDataMap = new Map<string, LeafRefundSigningData>();
-    for (const leaf of leaves) {
-      const signingNonceCommitment =
-        await this.config.signer.getRandomSigningCommitment();
-      const directSigningNonceCommitment =
-        await this.config.signer.getRandomSigningCommitment();
-      const directFromCpfpRefundSigningNonceCommitment =
-        await this.config.signer.getRandomSigningCommitment();
+    await Promise.all(
+      leaves.map(async (leaf) => {
+        const signingNonceCommitment =
+          await this.config.signer.getRandomSigningCommitment();
+        const directSigningNonceCommitment =
+          await this.config.signer.getRandomSigningCommitment();
+        const directFromCpfpRefundSigningNonceCommitment =
+          await this.config.signer.getRandomSigningCommitment();
 
-      const tx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
-      const refundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
+        const tx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
+        const refundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
 
-      const directTx =
-        leaf.leaf.directTx.length > 0
-          ? getTxFromRawTxBytes(leaf.leaf.directTx)
-          : undefined;
+        const directTx =
+          leaf.leaf.directTx.length > 0
+            ? getTxFromRawTxBytes(leaf.leaf.directTx)
+            : undefined;
 
-      const directRefundTx =
-        leaf.leaf.directRefundTx.length > 0
-          ? getTxFromRawTxBytes(leaf.leaf.directRefundTx)
-          : undefined;
-      const directFromCpfpRefundTx =
-        leaf.leaf.directFromCpfpRefundTx.length > 0
-          ? getTxFromRawTxBytes(leaf.leaf.directFromCpfpRefundTx)
-          : undefined;
+        const directRefundTx =
+          leaf.leaf.directRefundTx.length > 0
+            ? getTxFromRawTxBytes(leaf.leaf.directRefundTx)
+            : undefined;
+        const directFromCpfpRefundTx =
+          leaf.leaf.directFromCpfpRefundTx.length > 0
+            ? getTxFromRawTxBytes(leaf.leaf.directFromCpfpRefundTx)
+            : undefined;
 
-      leafDataMap.set(leaf.leaf.id, {
-        keyDerivation: leaf.keyDerivation,
-        receivingPubkey: receiverIdentityPubkey,
-        signingNonceCommitment,
-        directSigningNonceCommitment,
-        tx,
-        directTx,
-        refundTx,
-        directRefundTx,
-        directFromCpfpRefundTx,
-        directFromCpfpRefundSigningNonceCommitment,
-        vout: leaf.leaf.vout,
-      });
-    }
+        leafDataMap.set(leaf.leaf.id, {
+          keyDerivation: leaf.keyDerivation,
+          receivingPubkey: receiverIdentityPubkey,
+          signingNonceCommitment,
+          directSigningNonceCommitment,
+          tx,
+          directTx,
+          refundTx,
+          directRefundTx,
+          directFromCpfpRefundTx,
+          directFromCpfpRefundSigningNonceCommitment,
+          vout: leaf.leaf.vout,
+        });
+      }),
+    );
 
     const signingJobs = await this.prepareRefundSoSigningJobs(
       leaves,
@@ -1027,82 +1042,88 @@ export class TransferService extends BaseTransferService {
     isForClaim?: boolean,
   ): Promise<LeafRefundTxSigningJob[]> {
     const signingJobs: LeafRefundTxSigningJob[] = [];
-    for (const leaf of leaves) {
-      const refundSigningData = leafDataMap.get(leaf.leaf.id);
-      if (!refundSigningData) {
-        throw new Error(`Leaf data not found for leaf ${leaf.leaf.id}`);
-      }
+    const results = await Promise.all(
+      leaves.map(async (leaf) => {
+        const refundSigningData = leafDataMap.get(leaf.leaf.id);
+        if (!refundSigningData) {
+          throw new Error(`Leaf data not found for leaf ${leaf.leaf.id}`);
+        }
 
-      const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
+        const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
 
-      let directNodeTx: Transaction | undefined;
-      if (leaf.leaf.directTx.length > 0) {
-        directNodeTx = getTxFromRawTxBytes(leaf.leaf.directTx);
-      }
+        let directNodeTx: Transaction | undefined;
+        if (leaf.leaf.directTx.length > 0) {
+          directNodeTx = getTxFromRawTxBytes(leaf.leaf.directTx);
+        }
 
-      const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
+        const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
 
-      const currentSequence = currRefundTx.getInput(0).sequence;
-      if (!currentSequence) {
-        throw new SparkValidationError("Invalid refund transaction", {
-          field: "sequence",
-          value: currRefundTx.getInput(0),
-          expected: "Non-null sequence",
-        });
-      }
+        const currentSequence = currRefundTx.getInput(0).sequence;
+        if (!currentSequence) {
+          throw new SparkValidationError("Invalid refund transaction", {
+            field: "sequence",
+            value: currRefundTx.getInput(0),
+            expected: "Non-null sequence",
+          });
+        }
 
-      const refundTxsParams = {
-        nodeTx: nodeTx,
-        directNodeTx: directNodeTx,
-        sequence: currentSequence,
-        receivingPubkey: refundSigningData.receivingPubkey,
-        network: this.config.getNetwork(),
-      };
+        const refundTxsParams = {
+          nodeTx: nodeTx,
+          directNodeTx: directNodeTx,
+          sequence: currentSequence,
+          receivingPubkey: refundSigningData.receivingPubkey,
+          network: this.config.getNetwork(),
+        };
 
-      const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-        isForClaim
-          ? createCurrentTimelockRefundTxs(refundTxsParams)
-          : createDecrementedTimelockRefundTxs(refundTxsParams);
+        const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
+          isForClaim
+            ? createCurrentTimelockRefundTxs(refundTxsParams)
+            : createDecrementedTimelockRefundTxs(refundTxsParams);
 
-      refundSigningData.refundTx = cpfpRefundTx;
-      refundSigningData.directRefundTx = directRefundTx;
-      refundSigningData.directFromCpfpRefundTx = directFromCpfpRefundTx;
+        refundSigningData.refundTx = cpfpRefundTx;
+        refundSigningData.directRefundTx = directRefundTx;
+        refundSigningData.directFromCpfpRefundTx = directFromCpfpRefundTx;
 
-      const cpfpRefundNonceCommitmentProto =
-        refundSigningData.signingNonceCommitment;
-      const directRefundNonceCommitmentProto =
-        refundSigningData.directSigningNonceCommitment;
-      const directFromCpfpRefundNonceCommitmentProto =
-        refundSigningData.directFromCpfpRefundSigningNonceCommitment;
+        const cpfpRefundNonceCommitmentProto =
+          refundSigningData.signingNonceCommitment;
+        const directRefundNonceCommitmentProto =
+          refundSigningData.directSigningNonceCommitment;
+        const directFromCpfpRefundNonceCommitmentProto =
+          refundSigningData.directFromCpfpRefundSigningNonceCommitment;
 
-      const signingPublicKey =
-        await this.config.signer.getPublicKeyFromDerivation(
-          refundSigningData.keyDerivation,
-        );
-      signingJobs.push({
-        leafId: leaf.leaf.id,
-        refundTxSigningJob: {
-          signingPublicKey,
-          rawTx: cpfpRefundTx.toBytes(),
-          signingNonceCommitment: cpfpRefundNonceCommitmentProto.commitment,
-        },
-        directRefundTxSigningJob: directRefundTx
-          ? {
-              signingPublicKey,
-              rawTx: directRefundTx.toBytes(),
-              signingNonceCommitment:
-                directRefundNonceCommitmentProto.commitment,
-            }
-          : undefined,
-        directFromCpfpRefundTxSigningJob: directFromCpfpRefundTx
-          ? {
-              signingPublicKey,
-              rawTx: directFromCpfpRefundTx.toBytes(),
-              signingNonceCommitment:
-                directFromCpfpRefundNonceCommitmentProto.commitment,
-            }
-          : undefined,
-      });
+        const signingPublicKey =
+          await this.config.signer.getPublicKeyFromDerivation(
+            refundSigningData.keyDerivation,
+          );
+        return {
+          leafId: leaf.leaf.id,
+          refundTxSigningJob: {
+            signingPublicKey,
+            rawTx: cpfpRefundTx.toBytes(),
+            signingNonceCommitment: cpfpRefundNonceCommitmentProto.commitment,
+          },
+          directRefundTxSigningJob: directRefundTx
+            ? {
+                signingPublicKey,
+                rawTx: directRefundTx.toBytes(),
+                signingNonceCommitment:
+                  directRefundNonceCommitmentProto.commitment,
+              }
+            : undefined,
+          directFromCpfpRefundTxSigningJob: directFromCpfpRefundTx
+            ? {
+                signingPublicKey,
+                rawTx: directFromCpfpRefundTx.toBytes(),
+                signingNonceCommitment:
+                  directFromCpfpRefundNonceCommitmentProto.commitment,
+              }
+            : undefined,
+        };
+      }),
+    );
+
+    for (const result of results) {
+      signingJobs.push(result);
     }
 
     return signingJobs;
@@ -1163,10 +1184,12 @@ export class TransferService extends BaseTransferService {
     leaves: LeafKeyTweak[],
   ): Promise<Map<string, ClaimLeafKeyTweak[]>> {
     const leafDataMap = new Map<string, ClaimLeafKeyTweak[]>();
-    for (const leaf of leaves) {
-      const { leafKeyTweaks: leafData, proofs } =
-        await this.prepareClaimLeafKeyTweaks(leaf);
 
+    const results = await Promise.all(
+      leaves.map((leaf) => this.prepareClaimLeafKeyTweaks(leaf)),
+    );
+
+    for (const { leafKeyTweaks: leafData } of results) {
       for (const [identifier, leafTweak] of leafData) {
         leafDataMap.set(identifier, [
           ...(leafDataMap.get(identifier) || []),
@@ -1174,6 +1197,7 @@ export class TransferService extends BaseTransferService {
         ]);
       }
     }
+
     return leafDataMap;
   }
 
@@ -1239,29 +1263,31 @@ export class TransferService extends BaseTransferService {
     leafKeys: LeafKeyTweak[],
   ): Promise<NodeSignatures[]> {
     const leafDataMap: Map<string, LeafRefundSigningData> = new Map();
-    for (const leafKey of leafKeys) {
-      const tx = getTxFromRawTxBytes(leafKey.leaf.nodeTx);
-      const directTx =
-        leafKey.leaf.directTx.length > 0
-          ? getTxFromRawTxBytes(leafKey.leaf.directTx)
-          : undefined;
+    await Promise.all(
+      leafKeys.map(async (leafKey) => {
+        const tx = getTxFromRawTxBytes(leafKey.leaf.nodeTx);
+        const directTx =
+          leafKey.leaf.directTx.length > 0
+            ? getTxFromRawTxBytes(leafKey.leaf.directTx)
+            : undefined;
 
-      leafDataMap.set(leafKey.leaf.id, {
-        keyDerivation: leafKey.newKeyDerivation,
-        receivingPubkey: await this.config.signer.getPublicKeyFromDerivation(
-          leafKey.newKeyDerivation,
-        ),
-        signingNonceCommitment:
-          await this.config.signer.getRandomSigningCommitment(),
-        directSigningNonceCommitment:
-          await this.config.signer.getRandomSigningCommitment(),
-        directFromCpfpRefundSigningNonceCommitment:
-          await this.config.signer.getRandomSigningCommitment(),
-        tx,
-        directTx,
-        vout: leafKey.leaf.vout,
-      });
-    }
+        leafDataMap.set(leafKey.leaf.id, {
+          keyDerivation: leafKey.newKeyDerivation,
+          receivingPubkey: await this.config.signer.getPublicKeyFromDerivation(
+            leafKey.newKeyDerivation,
+          ),
+          signingNonceCommitment:
+            await this.config.signer.getRandomSigningCommitment(),
+          directSigningNonceCommitment:
+            await this.config.signer.getRandomSigningCommitment(),
+          directFromCpfpRefundSigningNonceCommitment:
+            await this.config.signer.getRandomSigningCommitment(),
+          tx,
+          directTx,
+          vout: leafKey.leaf.vout,
+        });
+      }),
+    );
 
     const signingJobs = await this.prepareRefundSoSigningJobs(
       leafKeys,
