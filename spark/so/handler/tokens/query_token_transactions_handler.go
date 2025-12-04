@@ -30,6 +30,39 @@ type QueryTokenTransactionsHandler struct {
 }
 
 const MaxTokenTransactionFilterValues = 500
+const MaxTokenTransactionPageSize = 100
+const DefaultTokenTransactionPageSize = 50
+
+type queryParams struct {
+	outputIds              []string
+	ownerPublicKeys        [][]byte
+	issuerPublicKeys       [][]byte
+	tokenIdentifiers       [][]byte
+	tokenTransactionHashes [][]byte
+	order                  sparkpb.Order
+	limit                  int64
+	offset                 int64
+}
+
+func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) *queryParams {
+	limit := req.GetLimit()
+	if limit == 0 {
+		limit = DefaultTokenTransactionPageSize
+	} else if limit > MaxTokenTransactionPageSize {
+		limit = MaxTokenTransactionPageSize
+	}
+
+	return &queryParams{
+		outputIds:              req.OutputIds,
+		ownerPublicKeys:        req.GetOwnerPublicKeys(),
+		issuerPublicKeys:       req.GetIssuerPublicKeys(),
+		tokenIdentifiers:       req.TokenIdentifiers,
+		tokenTransactionHashes: req.TokenTransactionHashes,
+		order:                  req.GetOrder(),
+		limit:                  limit,
+		offset:                 req.Offset,
+	}
+}
 
 type queryParams struct {
 	outputIds              []string
