@@ -21,7 +21,7 @@
   "devDependencies": {
     "@types/chrome": "^0.0.276",
     "esbuild": "^0.25.0",
-    "prettier": "^3.6.2",
+    "prettier": "^3.7.4",
     "typescript": "^5.7.3"
   }
 }

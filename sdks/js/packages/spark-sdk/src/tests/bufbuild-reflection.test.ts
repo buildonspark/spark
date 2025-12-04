@@ -97,9 +97,8 @@ describe("@bufbuild/protobuf Reflection Test", () => {
   it("should explore descriptor-based reflection", async () => {
     try {
       // Try importing descriptor types
-      const descriptorModule = await import(
-        "../proto/google/protobuf/descriptor.js"
-      );
+      const descriptorModule =
+        await import("../proto/google/protobuf/descriptor.js");
       console.log("Descriptor module exports:", Object.keys(descriptorModule));
 
       // Check if we can access FileDescriptorSet

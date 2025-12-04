@@ -292,8 +292,7 @@ interface RefundTxWithSequenceParams extends RefundTxParams {
   enforceTimelocks?: boolean;
 }
 
-interface RefundTxWithSequenceAndConnectorOutputParams
-  extends RefundTxWithSequenceParams {
+interface RefundTxWithSequenceAndConnectorOutputParams extends RefundTxWithSequenceParams {
   connectorOutput: TransactionInput;
 }
 
