@@ -2410,7 +2410,7 @@ func isZeroNode(leaf *ent.TreeNode) (bool, error) {
 		return false, fmt.Errorf("no tx inputs for node tx %s", leaf.ID.String())
 	}
 	nodeTxTimelock := bitcointransaction.GetTimelockFromSequence(nodeTx.TxIn[0].Sequence)
-	return nodeTxTimelock > 0, nil
+	return nodeTxTimelock == 0, nil
 }
 
 func (h *TransferHandler) getRefundTxSigningJobs(ctx context.Context, leaf *ent.TreeNode, cpfpJob *pb.SigningJob, directJob *pb.SigningJob, directFromCpfpJob *pb.SigningJob) (*helper.SigningJob, *helper.SigningJob, *helper.SigningJob, error) {
