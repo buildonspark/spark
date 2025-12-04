@@ -1,0 +1,99 @@
+name: "JS SDK unit test"
+description: "Builds and tests the Spark JS SDK"
+inputs:
+  node-version:
+    description: "Node.js version spec passed to actions/setup-node"
+    required: true
+  workspace:
+    description: "Working directory for the JS SDK workspace"
+    required: false
+    default: "sdks/js"
+  proto-package-dir:
+    description: "Path to the spark-sdk package used for proto generation"
+    required: false
+    default: "sdks/js/packages/spark-sdk"
+  repo-token:
+    description: "Token passed to third-party setup actions requiring authentication"
+    required: false
+    default: ""
+runs:
+  using: "composite"
+  steps:
+    - name: "Install system dependencies"
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git clang lld
+
+    - name: "Install Protoc"
+      uses: arduino/setup-protoc@v3
+      with:
+        version: "29.3"
+        repo-token: ${{ inputs.repo-token }}
+
+    - name: "Setup Rust"
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        cache: false
+        rustflags: ""
+
+    - name: "Setup Rust cache"
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: "signer"
+
+    - name: "Setup Node ${{ inputs.node-version }}"
+      uses: actions/setup-node@v4
+      env:
+        SKIP_YARN_COREPACK_CHECK: true
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: "Install dependencies"
+      uses: ./github/actions/yarn-nm-install
+      with:
+        cwd: ${{ inputs.workspace }}
+        install-mode: "install-prevent-lock-update"
+        cache-prefix: unit-test
+        cache-node-modules: ${{ github.event_name == 'pull_request' }}
+
+    - name: "Run build"
+      shell: bash
+      working-directory: ${{ inputs.workspace }}
+      run: yarn run build
+
+    - name: "Verify Android 16kb page size alignment"
+      shell: bash
+      working-directory: ${{ inputs.workspace }}
+      run: |
+        if ! command -v llvm-objdump &> /dev/null; then
+          sudo apt-get update && sudo apt-get install -y llvm
+        fi
+
+        bash ../../scripts/verify-android-page-size.sh
+
+    - name: "Run format"
+      shell: bash
+      working-directory: ${{ inputs.workspace }}
+      run: yarn run format
+
+    - name: "Generate JS proto files"
+      shell: bash
+      working-directory: ${{ inputs.proto-package-dir }}
+      run: yarn generate:proto
+
+    - name: "Check proto files are up to date"
+      shell: bash
+      working-directory: ${{ inputs.workspace }}
+      run: |
+        if ! git diff --quiet; then
+          echo "❌ Proto files are not up to date. Please run 'yarn generate:proto' in ${GITHUB_WORKSPACE}/${{ inputs.proto-package-dir }} and commit the changes."
+          git diff
+          exit 1
+        fi
+        echo "✅ Proto files are up to date"
+
+    - name: "Run tests"
+      shell: bash
+      working-directory: ${{ inputs.workspace }}
+      run: yarn run test
