@@ -863,6 +863,64 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	})
 }
 
+func TestQueryTokenTransactionsLimitCapping(t *testing.T) {
+	issuerPrivKey := keys.GeneratePrivateKey()
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             "Limit Test Token",
+		ticker:           "LMT",
+		maxSupply:        1000000,
+	})
+	require.NoError(t, err, "failed to create native spark token")
+
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
+
+	for i := 0; i < 3; i++ {
+		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
+		require.NoError(t, err, "failed to create mint transaction %d", i+1)
+
+		_, err = broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			mintTx,
+			[]keys.Private{issuerPrivKey},
+		)
+		require.NoError(t, err, "failed to broadcast mint transaction %d", i+1)
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	t.Run("limit exceeds max", func(t *testing.T) {
+		_, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Limit:            5000,
+			},
+		)
+		require.ErrorContains(t, err, "value must be inside range")
+	})
+
+	t.Run("normal limit with exact match", func(t *testing.T) {
+		page1, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Limit:            100,
+				Offset:           0,
+			},
+		)
+		require.NoError(t, err, "failed to query first page with limit 100")
+		require.Len(t, page1.TokenTransactionsWithStatus, 3, "expected 3 transactions in first page")
+		require.Equal(t, int64(-1), page1.Offset, "expected offset -1 when limit matches result count")
+	})
+}
+
 func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
