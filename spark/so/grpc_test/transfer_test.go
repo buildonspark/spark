@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -136,7 +137,7 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 	require.Len(t, pendingTransfer.Transfers, 1)
 
 	incorrectNetworkReceiverConfig := receiverConfig
-	incorrectNetworkReceiverConfig.Network = common.Mainnet
+	incorrectNetworkReceiverConfig.Network = btcnetwork.Mainnet
 	incorrectNetworkReceiverToken, err := wallet.AuthenticateWithServer(t.Context(), incorrectNetworkReceiverConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
 	incorrectNetworkReceiverCtx := wallet.ContextWithToken(t.Context(), incorrectNetworkReceiverToken)
@@ -550,7 +551,7 @@ func TestValidSparkInvoiceTransfer(t *testing.T) {
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	amountSats := &amountToSend
 	expiryTime := &tenMinutesFromNow
@@ -592,7 +593,7 @@ func TestValidSparkInvoiceTransferEmptySenderPublicKey(t *testing.T) {
 	receiverPublicKey := receiverPrivKey.Public()
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	emptySenderPublicKey := keys.Public{}
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
@@ -631,7 +632,7 @@ func TestValidSparkInvoiceTransferEmptyExpiry(t *testing.T) {
 	receiverPublicKey := receiverPrivKey.Public()
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
@@ -668,7 +669,7 @@ func TestValidSparkInvoiceTransferEmptyMemo(t *testing.T) {
 	receiverPublicKey := receiverPrivKey.Public()
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
-	network := common.Regtest
+	network := btcnetwork.Regtest
 	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
@@ -706,7 +707,7 @@ func TestValidSparkInvoiceTransferEmptyAmount(t *testing.T) {
 	memoString := "test memo"
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
-	network := common.Regtest
+	network := btcnetwork.Regtest
 	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
@@ -744,7 +745,7 @@ func TestValidSparkInvoiceTransferEmptySignature(t *testing.T) {
 	memoString := "test memo"
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
-	network := common.Regtest
+	network := btcnetwork.Regtest
 	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
@@ -801,7 +802,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedSender(t *testing.T
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	expiryTime := time.Now().Add(10 * time.Minute)
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	mismatchedSender := keys.MustGeneratePrivateKeyFromRand(rng)
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
@@ -836,7 +837,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedReceiver(t *testing
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	expiryTime := time.Now().Add(10 * time.Minute)
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
@@ -874,7 +875,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountLessThanSentAmou
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	expiryTime := time.Now().Add(10 * time.Minute)
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	lessThanSentAmount := uint64(amountSatsToSend - 1)
 
@@ -908,7 +909,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountGreaterThanSentA
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	expiryTime := time.Now().Add(10 * time.Minute)
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	greaterThanSentAmount := uint64(amountSatsToSend + 1)
 
@@ -943,7 +944,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithExpiredInvoice(t *testing.T) 
 	senderPublicKey := senderPrivKey.Public()
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	expiryInThePast := time.Now().Add(-10 * time.Minute)
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
@@ -978,7 +979,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvalidSignature(t *testing.T
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	expiryTime := time.Now().Add(10 * time.Minute)
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
@@ -1013,7 +1014,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedNetwork(t *testing.
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	expiryTime := time.Now().Add(10 * time.Minute)
-	mismatchedNetwork := common.Mainnet
+	mismatchedNetwork := btcnetwork.Mainnet
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
@@ -1047,7 +1048,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithTokensInvoice(t *testing.T) {
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	expiryTime := time.Now().Add(10 * time.Minute)
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	amountBytes := new(big.Int).SetUint64(*amountSats).Bytes()
 	invoiceFields := common.CreateTokenSparkInvoiceFields(
@@ -1190,7 +1191,7 @@ func TestQuerySparkInvoicesForUnknownInvoiceReturnsNotFound(t *testing.T) {
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	amountSats := &amountToSend
 	expiryTime := &tenMinutesFromNow
@@ -1240,7 +1241,7 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	sparkClient := pb.NewSparkServiceClient(conn)
 
 	// Test that QueryPendingTransfers fails when both Participant and TransferIds are missing
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	network, err := config.Network.ToProtoNetwork()
 	require.NoError(t, err)
 	_, err = sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
 		Network: network,
@@ -1248,7 +1249,7 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	require.ErrorContains(t, err, "must specify either filter.Participant or filter.TransferIds")
 
 	// Test that QueryAllTransfers fails when both Participant and TransferIds are missing
-	network, err = common.ProtoNetworkFromNetwork(config.Network)
+	network, err = config.Network.ToProtoNetwork()
 	require.NoError(t, err)
 	_, err = sparkClient.QueryAllTransfers(ctx, &pb.TransferFilter{
 		Network: network,
@@ -1258,7 +1259,7 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	require.ErrorContains(t, err, "must specify either filter.Participant or filter.TransferIds")
 
 	// Test that providing Participant makes the query succeed (even if no transfers exist)
-	network, err = common.ProtoNetworkFromNetwork(config.Network)
+	network, err = config.Network.ToProtoNetwork()
 	require.NoError(t, err)
 	_, err = sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
 		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
@@ -1269,7 +1270,7 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	require.NoError(t, err, "Expected success when Participant is specified")
 
 	// Test that providing TransferIds makes the query succeed (even if no transfers exist)
-	network, err = common.ProtoNetworkFromNetwork(config.Network)
+	network, err = config.Network.ToProtoNetwork()
 	require.NoError(t, err)
 	_, err = sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
 		TransferIds: []string{uuid.NewString()},

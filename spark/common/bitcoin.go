@@ -5,21 +5,16 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/lightsparkdev/spark/common/keys"
-	sparkerrors "github.com/lightsparkdev/spark/so/errors"
-
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
-
-// Network is the type for Bitcoin networks used with the operator.
-type Network int
 
 // TODO: replace all other code to use this function to create the ephemeral anchor output.
 func EphemeralAnchorOutput() *wire.TxOut {
@@ -33,30 +28,6 @@ func MaybeApplyFee(amount int64) int64 {
 	return amount
 }
 
-func DetermineNetwork(protoNetwork pb.Network) (Network, error) {
-	if protoNetwork == pb.Network_UNSPECIFIED {
-		return Mainnet, nil
-	}
-
-	network, err := NetworkFromProtoNetwork(protoNetwork)
-	if err != nil {
-		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to convert proto network to common network: %w", err))
-	}
-	return network, nil
-}
-
-const (
-	Unspecified Network = iota
-	// Mainnet is the main Bitcoin network.
-	Mainnet Network = 10
-	// Regtest is the regression test network.
-	Regtest Network = 20
-	// Testnet is the test network.
-	Testnet Network = 30
-	// Signet is the signet network.
-	Signet Network = 40
-)
-
 const (
 	// Estimated transaction size in bytes for fee calculation
 	estimatedTxSize = 191
@@ -66,155 +37,19 @@ const (
 	DefaultFeeSats = estimatedTxSize * defaultSatsPerVbyte
 )
 
-func (n Network) String() string {
-	switch n {
-	case Mainnet, Unspecified:
-		return "mainnet"
-	case Regtest:
-		return "regtest"
-	case Testnet:
-		return "testnet"
-	case Signet:
-		return "signet"
-	default:
-		return "mainnet"
-	}
-}
-
-func NetworkFromString(network string) (Network, error) {
-	switch network {
-	case "mainnet":
-		return Mainnet, nil
-	case "regtest":
-		return Regtest, nil
-	case "testnet":
-		return Testnet, nil
-	case "signet":
-		return Signet, nil
-	default:
-		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network: %s", network))
-	}
-}
-
-func NetworkFromProtoNetwork(protoNetwork pb.Network) (Network, error) {
-	switch protoNetwork {
-	case pb.Network_MAINNET:
-		return Mainnet, nil
-	case pb.Network_REGTEST:
-		return Regtest, nil
-	case pb.Network_TESTNET:
-		return Testnet, nil
-	case pb.Network_SIGNET:
-		return Signet, nil
-	default:
-		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network"))
-	}
-}
-
-func NetworkFromSchemaNetwork(schemaNetwork st.Network) (Network, error) {
-	switch schemaNetwork {
-	case st.NetworkMainnet:
-		return Mainnet, nil
-	case st.NetworkRegtest:
-		return Regtest, nil
-	case st.NetworkTestnet:
-		return Testnet, nil
-	case st.NetworkSignet:
-		return Signet, nil
-	case st.NetworkUnspecified:
-		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network"))
-	default:
-		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network"))
-	}
-}
-
-func ProtoNetworkFromSchemaNetwork(schemaNetwork st.Network) (pb.Network, error) {
-	switch schemaNetwork {
-	case st.NetworkMainnet:
-		return pb.Network_MAINNET, nil
-	case st.NetworkRegtest:
-		return pb.Network_REGTEST, nil
-	case st.NetworkTestnet:
-		return pb.Network_TESTNET, nil
-	case st.NetworkSignet:
-		return pb.Network_SIGNET, nil
-	default:
-		return pb.Network_MAINNET, fmt.Errorf("invalid network")
-	}
-}
-
-func SchemaNetworkFromNetwork(network Network) (st.Network, error) {
-	switch network {
-	case Mainnet:
-		return st.NetworkMainnet, nil
-	case Regtest:
-		return st.NetworkRegtest, nil
-	case Testnet:
-		return st.NetworkTestnet, nil
-	case Signet:
-		return st.NetworkSignet, nil
-	default:
-		return st.NetworkUnspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network"))
-	}
-}
-
-func ProtoNetworkFromNetwork(network Network) (pb.Network, error) {
-	switch network {
-	case Mainnet:
-		return pb.Network_MAINNET, nil
-	case Regtest:
-		return pb.Network_REGTEST, nil
-	case Testnet:
-		return pb.Network_TESTNET, nil
-	case Signet:
-		return pb.Network_SIGNET, nil
-	default:
-		return pb.Network_MAINNET, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network"))
-	}
-}
-
-// BitcoinNetworkIdentifier returns the standardized bitcoin network identifier.
-func BitcoinNetworkIdentifierFromNetwork(network Network) (uint32, error) {
-	params := NetworkParams(network)
-	return uint32(params.Net), nil
-}
-
 func SchemaNetworkFromProtoNetwork(protoNetwork pb.Network) (st.Network, error) {
-	switch protoNetwork {
-	case pb.Network_MAINNET:
-		return st.NetworkMainnet, nil
-	case pb.Network_REGTEST:
-		return st.NetworkRegtest, nil
-	case pb.Network_TESTNET:
-		return st.NetworkTestnet, nil
-	case pb.Network_SIGNET:
-		return st.NetworkSignet, nil
-	default:
-		return st.NetworkUnspecified, fmt.Errorf("invalid network")
-	}
+	var schemaNetwork st.Network
+	err := schemaNetwork.UnmarshalProto(protoNetwork)
+	return schemaNetwork, err
 }
 
-// NetworkParams converts a Network to its corresponding chaincfg.Params
-func NetworkParams(network Network) *chaincfg.Params {
+func SchemaNetwork(network btcnetwork.Network) st.Network {
 	switch network {
-	case Mainnet:
-		return &chaincfg.MainNetParams
-	case Regtest:
-		return &chaincfg.RegressionNetParams
-	case Testnet:
-		return &chaincfg.TestNet3Params
-	default:
-		return &chaincfg.MainNetParams
-	}
-}
-
-func SchemaNetwork(network Network) st.Network {
-	switch network {
-	case Mainnet:
+	case btcnetwork.Mainnet:
 		return st.NetworkMainnet
-	case Regtest:
+	case btcnetwork.Regtest:
 		return st.NetworkRegtest
-	case Testnet:
+	case btcnetwork.Testnet:
 		return st.NetworkTestnet
 	default:
 		return st.NetworkMainnet
@@ -227,18 +62,18 @@ func P2TRScriptFromPubKey(pubKey keys.Public) ([]byte, error) {
 	return txscript.PayToTaprootScript(taprootKey)
 }
 
-func P2TRRawAddressFromPublicKey(pubKey keys.Public, network Network) (btcutil.Address, error) {
+func P2TRRawAddressFromPublicKey(pubKey keys.Public, network btcnetwork.Network) (btcutil.Address, error) {
 	// Tweak the internal key with empty merkle root
 	taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey.ToBTCEC())
 	return btcutil.NewAddressTaproot(
 		// Convert a 33 byte public key to a 32 byte x-only public key
 		schnorr.SerializePubKey(taprootKey),
-		NetworkParams(network),
+		network.Params(),
 	)
 }
 
 // P2TRAddressFromPublicKey returns a P2TR address from a public key.
-func P2TRAddressFromPublicKey(pubKey keys.Public, network Network) (string, error) {
+func P2TRAddressFromPublicKey(pubKey keys.Public, network btcnetwork.Network) (string, error) {
 	addrRaw, err := P2TRRawAddressFromPublicKey(pubKey, network)
 	if err != nil {
 		return "", err
@@ -247,13 +82,13 @@ func P2TRAddressFromPublicKey(pubKey keys.Public, network Network) (string, erro
 }
 
 // P2TRAddressFromPkScript returns a P2TR address from a public script.
-func P2TRAddressFromPkScript(pkScript []byte, network Network) (*string, error) {
+func P2TRAddressFromPkScript(pkScript []byte, network btcnetwork.Network) (*string, error) {
 	parsedScript, err := txscript.ParsePkScript(pkScript)
 	if err != nil {
 		return nil, err
 	}
 
-	networkParams := NetworkParams(network)
+	networkParams := network.Params()
 	if parsedScript.Class() == txscript.WitnessV1TaprootTy {
 		address, err := parsedScript.Address(networkParams)
 		if err != nil {
@@ -453,16 +288,6 @@ func VerifyECDSASignature(pubKey keys.Public, signatureBytes []byte, messageHash
 	}
 
 	return nil
-}
-
-// NetworkFromTokenTransaction extracts the Network from a TokenTransaction.
-// It determines the network by examining the transaction's network field.
-func NetworkFromTokenTransaction(tx *pb.TokenTransaction) (Network, error) {
-	if tx == nil {
-		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("token transaction cannot be nil"))
-	}
-
-	return NetworkFromProtoNetwork(tx.Network)
 }
 
 // CompareTransactions compares two Bitcoin transactions for structural equality.

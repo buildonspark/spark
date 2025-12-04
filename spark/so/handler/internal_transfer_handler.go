@@ -633,7 +633,7 @@ func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverPubli
 
 	// Check if the invoice amount matches the amount in the leaves to send.
 	invoiceAmount := decodedInvoice.Payment.SatsPayment.Amount
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(decodedInvoice.Network)
+	schemaNetwork, err := decodedInvoice.Network.ToSchemaNetwork()
 	if err != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get schema network: %w", err))
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/frost"
 
@@ -223,7 +224,7 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 	receiverIdentityPubKey keys.Public,
 	senderIdentityPubKey keys.Public,
 	htlcType PrepareFrostSigningJobsForUserSignedRefundHTLCType,
-	network common.Network,
+	network btcnetwork.Network,
 	paymentHash []byte,
 ) ([]*pbfrost.FrostSigningJob, [][]byte, []*frost.SigningCommitment, error) {
 	if len(leaves) != len(signingCommitments) {

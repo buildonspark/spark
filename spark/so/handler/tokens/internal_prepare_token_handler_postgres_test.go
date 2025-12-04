@@ -9,9 +9,9 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/stretchr/testify/require"
 
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -129,7 +129,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 			for _, op := range handler.config.GetSigningOperatorList() {
 				txProto.SparkOperatorIdentityPublicKeys = append(txProto.SparkOperatorIdentityPublicKeys, op.PublicKey)
 			}
-			netCommon, err := common.NetworkFromProtoNetwork(pbNet)
+			netCommon, err := btcnetwork.FromProtoNetwork(pbNet)
 			require.NoError(t, err)
 			cfgVals := handler.config.Lrc20Configs[netCommon.String()]
 			txProto.TokenOutputs[0].WithdrawBondSats = &cfgVals.WithdrawBondSats

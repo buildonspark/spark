@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 
-	"github.com/lightsparkdev/spark/common"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
@@ -150,7 +150,7 @@ type GetOwnedTokenOutputsParams struct {
 	IssuerPublicKeys           []keys.Public
 	TokenIdentifiers           [][]byte
 	IncludeExpiredTransactions bool
-	Network                    common.Network
+	Network                    btcnetwork.Network
 	// Pagination parameters.
 	// For forward pagination: If AfterID is provided, results will include items with ID greater than AfterID.
 	// For backward pagination: If BeforeID is provided, results will include items with ID less than BeforeID.
@@ -167,7 +167,7 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 		return nil, fmt.Errorf("AfterID and BeforeID are mutually exclusive")
 	}
 
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(params.Network)
+	schemaNetwork, err := params.Network.ToSchemaNetwork()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
 	}
@@ -241,7 +241,7 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 	return outputs, nil
 }
 
-func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys []keys.Public, tokenIdentifier []byte, network common.Network) ([]string, *big.Int, error) {
+func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys []keys.Public, tokenIdentifier []byte, network btcnetwork.Network) ([]string, *big.Int, error) {
 	outputs, err := GetOwnedTokenOutputs(ctx, GetOwnedTokenOutputsParams{
 		OwnerPublicKeys:            ownerPublicKeys,
 		TokenIdentifiers:           [][]byte{tokenIdentifier},

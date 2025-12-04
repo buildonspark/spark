@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -20,7 +21,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 
-	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +37,7 @@ func TestValidateUserSignature(t *testing.T) {
 	userIdentityPubKey := userIdentityPrivKey.Public()
 
 	// Create test data
-	network := common.Regtest
+	network := btcnetwork.Regtest
 	txidStr := "378dd9b575ef72e28f0addbf6c1f4371d1f33b96ffc9aa9c74fb52b31ec7147d"
 	require.NoError(t, err)
 	vout := uint32(1)
@@ -123,7 +123,7 @@ func TestFinalizeTreeCreationErrorCases(t *testing.T) {
 				AddressDkg: "localhost:8081",
 			},
 		},
-		SupportedNetworks:          []common.Network{common.Regtest},
+		SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 	}
 	handler := NewInternalDepositHandler(config)
@@ -289,18 +289,18 @@ func FuzzValidateUserSignature(f *testing.F) {
 			requestType = pb.UtxoSwapRequestType_Refund
 		}
 
-		var network common.Network
+		var network btcnetwork.Network
 		switch networkInt % 5 {
 		case 0:
-			network = common.Unspecified
+			network = btcnetwork.Unspecified
 		case 1:
-			network = common.Mainnet
+			network = btcnetwork.Mainnet
 		case 2:
-			network = common.Regtest
+			network = btcnetwork.Regtest
 		case 3:
-			network = common.Testnet
+			network = btcnetwork.Testnet
 		case 4:
-			network = common.Signet
+			network = btcnetwork.Signet
 		}
 
 		// The function should never panic, regardless of input

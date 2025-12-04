@@ -8,6 +8,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/logging"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -101,7 +102,7 @@ func GetTokenTxAttrStringsFromProto(ctx context.Context, tx *tokenpb.TokenTransa
 		)
 	}
 	if len(rawTokenIdentifiers) > 0 {
-		network, err := common.NetworkFromProtoNetwork(tx.GetNetwork())
+		network, err := btcnetwork.FromProtoNetwork(tx.GetNetwork())
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Failed to convert network to common network when computing attributes from proto. tx: %s",
 				logging.FormatProto("", tx)),
@@ -173,7 +174,7 @@ func GetTokenTxAttrStringsFromEnt(ctx context.Context, tx *ent.TokenTransaction)
 		attrs.Bech32mTokenIdentifiers = bech32mTokenIdentifier
 	} else {
 		if len(tx.Edges.CreatedOutput) > 0 {
-			network, err := common.NetworkFromSchemaNetwork(tx.Edges.CreatedOutput[0].Network)
+			network, err := btcnetwork.FromSchemaNetwork(tx.Edges.CreatedOutput[0].Network)
 			if err != nil {
 				logger.Warn(fmt.Sprintf("Failed to convert network to common network when computing attributes from ent. tx_uuid: %s",
 					tx.ID.String()),
@@ -210,14 +211,14 @@ func GetTokenTxAttrStringsFromEnt(ctx context.Context, tx *ent.TokenTransaction)
 	return attrs
 }
 
-var tokenIdentifierNetworkPrefix = map[common.Network]string{
-	common.Mainnet: "btkn",
-	common.Regtest: "btknrt",
-	common.Testnet: "btknt",
-	common.Signet:  "btkns",
+var tokenIdentifierNetworkPrefix = map[btcnetwork.Network]string{
+	btcnetwork.Mainnet: "btkn",
+	btcnetwork.Regtest: "btknrt",
+	btcnetwork.Testnet: "btknt",
+	btcnetwork.Signet:  "btkns",
 }
 
-func encodeBech32mTokenIdentifier(tokenIdentifier []byte, network common.Network) (string, error) {
+func encodeBech32mTokenIdentifier(tokenIdentifier []byte, network btcnetwork.Network) (string, error) {
 	prefix, exists := tokenIdentifierNetworkPrefix[network]
 	if !exists {
 		return "", fmt.Errorf("unsupported network: %v", network)
@@ -237,7 +238,7 @@ func encodeBech32mTokenIdentifier(tokenIdentifier []byte, network common.Network
 }
 
 func getBech32mTokenIdentifier(tokenIdentifier []byte, network schematype.Network) (string, error) {
-	commonNetwork, err := common.NetworkFromSchemaNetwork(network)
+	commonNetwork, err := btcnetwork.FromSchemaNetwork(network)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert network to common network: %w", err)
 	}

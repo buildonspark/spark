@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,7 +16,7 @@ import (
 
 func TestCreateLightningHTLCTransaction_BuildsExpectedTx(t *testing.T) {
 	// Arrange
-	network := common.Regtest
+	network := btcnetwork.Regtest
 	hash := bytes.Repeat([]byte{0x11}, 32)
 	hashLockPriv := keys.GeneratePrivateKey()
 	sequenceLockPriv := keys.GeneratePrivateKey()
@@ -69,7 +70,7 @@ func TestCreateLightningHTLCTransaction_BuildsExpectedTx(t *testing.T) {
 
 func TestCreateDirectLightningHTLCTransaction_SubtractsFee(t *testing.T) {
 	// Arrange
-	network := common.Regtest
+	network := btcnetwork.Regtest
 	hash := bytes.Repeat([]byte{0x22}, 32)
 	hashLockPriv := keys.GeneratePrivateKey()
 	sequenceLockPriv := keys.GeneratePrivateKey()
@@ -102,7 +103,7 @@ func TestCreateDirectLightningHTLCTransaction_SubtractsFee(t *testing.T) {
 }
 
 func TestCreateLightningHTLCTransaction_BuildsExpectedTxFromExpectedParams(t *testing.T) {
-	network := common.Regtest
+	network := btcnetwork.Regtest
 
 	rawTxHex := "0300000000010180d6e3ba8082893627a42f2770fdb2e900731638258a2d04cd6b8b2f7a982e150000000000d0070040020002000000000000225120d04e30f634945d8b59283c10831cfab354d6d9cb88d1f7adfdba67cb8a7734f500000000000000000451024e730140ebcc474fdc71b83fe5f547976e418e91025ef8b323b572f68e709b82c36c7303496ee315c3b3b710af59c14f8d2aa97b9a0bc40b778385b32c59f7e0f34fabb200000000"
 	rawTx, err := common.TxFromRawTxHex(rawTxHex)
@@ -156,7 +157,7 @@ func TestCreateHTLCTaprootAddress(t *testing.T) {
 	pk2, err := keys.ParsePublicKeyHex("03b66b574670a7b6bea89c0548903f70a6f059fd9abe737dc4c5aafe14a127408f")
 	require.NoError(t, err)
 
-	address, err := CreateLightningHTLCTaprootAddressWithSequence(common.Regtest, hash, pk1, 2160, pk2)
+	address, err := CreateLightningHTLCTaprootAddressWithSequence(btcnetwork.Regtest, hash, pk1, 2160, pk2)
 	require.NoError(t, err)
 
 	require.Equal(t, "bcrt1p0kdvjnm6mz6zzhnkxhhdw6gemt9cjyvmnn48evlfx7s9hn3a8dxqq7g3eg", address.String())

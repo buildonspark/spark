@@ -4,10 +4,11 @@ import (
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 )
 
 func (r *L1TokenCreate) ToTokenMetadata() (*common.TokenMetadata, error) {
-	network, err := common.NetworkFromSchemaNetwork(r.Network)
+	network, err := btcnetwork.FromSchemaNetwork(r.Network)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert network: %w", err)
 	}

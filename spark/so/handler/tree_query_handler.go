@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uuids"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -289,12 +290,12 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 		return nil, err
 	}
 
-	var network common.Network
+	var network btcnetwork.Network
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
-		network = common.Mainnet
+		network = btcnetwork.Mainnet
 	} else {
 		var err error
-		network, err = common.NetworkFromProtoNetwork(req.GetNetwork())
+		network, err = btcnetwork.FromProtoNetwork(req.GetNetwork())
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
 		}
@@ -362,12 +363,12 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 		return nil, err
 	}
 
-	var network common.Network
+	var network btcnetwork.Network
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
-		network = common.Mainnet
+		network = btcnetwork.Mainnet
 	} else {
 		var err error
-		network, err = common.NetworkFromProtoNetwork(req.GetNetwork())
+		network, err = btcnetwork.FromProtoNetwork(req.GetNetwork())
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
 		}

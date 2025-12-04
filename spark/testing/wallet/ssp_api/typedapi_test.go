@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/testing/wallet/ssp_api/mutations"
 
 	"github.com/stretchr/testify/require"
@@ -45,7 +46,7 @@ func TestTypedSparkServiceAPI_CreateInvoice(t *testing.T) {
 
 	result, err := api.CreateInvoice(
 		t.Context(),
-		common.Mainnet,
+		btcnetwork.Mainnet,
 		1000,
 		hash,
 		"test memo",
@@ -63,7 +64,7 @@ func TestTypedSparkServiceAPI_CreateInvoice_NetworkError(t *testing.T) {
 
 	result, err := api.CreateInvoice(
 		t.Context(),
-		common.Mainnet,
+		btcnetwork.Mainnet,
 		1000,
 		hash,
 		"test memo",

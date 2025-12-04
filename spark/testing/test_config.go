@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"google.golang.org/grpc"
 
@@ -161,7 +162,7 @@ func SpecificOperatorTestConfig(tb testing.TB, operatorIndex int) *so.Config {
 		SignerAddress:              GetLocalFrostSignerAddress(tb),
 		DatabasePath:               GetTestDatabasePath(operatorIndex),
 		FrostGRPCConnectionFactory: &TestGRPCConnectionFactory{},
-		SupportedNetworks:          []common.Network{common.Regtest, common.Mainnet},
+		SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest, btcnetwork.Mainnet},
 	}
 	config.Database.DBEventsEnabled = &dbEventsEnabled
 

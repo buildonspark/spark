@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/frost"
@@ -184,7 +185,7 @@ func QueryUnusedDepositAddresses(
 	}
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	network, err := config.Network.ToProtoNetwork()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get proto network: %w", err)
 	}
@@ -232,7 +233,7 @@ func QueryStaticDepositAddresses(
 	}
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	network, err := config.Network.ToProtoNetwork()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get proto network: %w", err)
 	}
@@ -575,7 +576,7 @@ func CreateTreeRoot(
 }
 
 type RefundStaticDepositParams struct {
-	Network                 common.Network
+	Network                 btcnetwork.Network
 	SpendTx                 *wire.MsgTx
 	DepositAddressSecretKey keys.Private
 	UserSignature           []byte
@@ -645,7 +646,7 @@ func RefundStaticDeposit(
 		SigningNonceCommitment: userCommitmentProto,
 	}
 
-	protoNetwork, err := common.ProtoNetworkFromNetwork(params.Network)
+	protoNetwork, err := params.Network.ToProtoNetwork()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get proto network: %w", err)
 	}
@@ -760,7 +761,7 @@ func QueryNodes(
 	}
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	network, err := config.Network.ToProtoNetwork()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get proto network: %w", err)
 	}
@@ -836,7 +837,7 @@ func CreateNewTree(config *TestWalletConfig, faucet *sparktesting.Faucet, privKe
 		return nil, fmt.Errorf("failed to broadcast deposit tx: %w", err)
 	}
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate random address: %w", err)
 	}

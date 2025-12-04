@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
 
@@ -60,18 +61,18 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	var network common.Network
-	for _, networkVariant := range []common.Network{common.Mainnet, common.Regtest, common.Testnet, common.Signet} {
+	var network btcnetwork.Network
+	for _, networkVariant := range []btcnetwork.Network{btcnetwork.Mainnet, btcnetwork.Regtest, btcnetwork.Testnet, btcnetwork.Signet} {
 		if utils.IsBitcoinAddressForNetwork(req.Address, networkVariant) {
 			network = networkVariant
 			break
 		}
 	}
-	if network == common.Unspecified {
+	if network == btcnetwork.Unspecified {
 		return nil, fmt.Errorf("can not determine network for address: %s", req.Address)
 	}
 
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	schemaNetwork, err := network.ToSchemaNetwork()
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +188,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if err != nil {
 			return err
 		}
-		network, err := common.NetworkFromProtoNetwork(req.Network)
+		network, err := btcnetwork.FromProtoNetwork(req.Network)
 		if err != nil {
 			return err
 		}
@@ -217,7 +218,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		}
 		txid := nodeTx.TxIn[0].PreviousOutPoint.Hash
 
-		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+		schemaNetwork, err := network.ToSchemaNetwork()
 		if err != nil {
 			return err
 		}
@@ -379,7 +380,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 		UtxoSwapStatementTypeCreated,
 		hex.EncodeToString(req.OnChainUtxo.Txid),
 		req.OnChainUtxo.Vout,
-		common.Network(req.OnChainUtxo.Network),
+		btcnetwork.Network(req.OnChainUtxo.Network),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create create utxo swap request statement: %w", err)
@@ -406,7 +407,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 	// Validate the request
 	// Check that the on chain utxo is paid to a registered static deposit address and
 	// is confirmed on the blockchain. This logic is implemented in chain watcher.
-	network, err := common.NetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, err
 	}
@@ -615,7 +616,7 @@ func validateTransfer(transferRequest *pb.StartTransferRequest) error {
 }
 
 // validateUserSignature verifies that the user has authorized the UTXO swap by validating their signature.
-func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte, sspSignature []byte, requestType pb.UtxoSwapRequestType, network common.Network, txIdString string, vout uint32, totalAmount uint64) error {
+func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte, sspSignature []byte, requestType pb.UtxoSwapRequestType, network btcnetwork.Network, txIdString string, vout uint32, totalAmount uint64) error {
 	if len(userSignature) == 0 {
 		return fmt.Errorf("user signature is required")
 	}
@@ -638,7 +639,7 @@ func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte,
 func CreateUserStatement(
 	transactionID string,
 	outputIndex uint32,
-	network common.Network,
+	network btcnetwork.Network,
 	requestType pb.UtxoSwapRequestType,
 	creditAmountSats uint64,
 	sspSignature []byte,
@@ -742,7 +743,7 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 		UtxoSwapStatementTypeRollback,
 		hex.EncodeToString(req.OnChainUtxo.Txid),
 		req.OnChainUtxo.Vout,
-		common.Network(req.OnChainUtxo.Network),
+		btcnetwork.Network(req.OnChainUtxo.Network),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rollback utxo swap request statement: %w", err)
@@ -758,7 +759,7 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 			req.Signature,
 			req.OnChainUtxo.Txid,
 			req.OnChainUtxo.Vout,
-			common.Network(req.OnChainUtxo.Network).String(),
+			btcnetwork.Network(req.OnChainUtxo.Network).String(),
 			req.CoordinatorPublicKey,
 			messageHash,
 		)
@@ -805,7 +806,7 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 	return &pbinternal.RollbackUtxoSwapResponse{}, nil
 }
 
-func CreateUtxoSwapStatement(statementType UtxoSwapStatementType, transactionID string, outputIndex uint32, network common.Network) ([]byte, error) {
+func CreateUtxoSwapStatement(statementType UtxoSwapStatementType, transactionID string, outputIndex uint32, network btcnetwork.Network) ([]byte, error) {
 	hasher := sha256.New()
 
 	// Writing to a sha256 never returns an error, so we don't need to check any of the errors below.
@@ -835,7 +836,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	network, err := common.NetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get network: %w", err)
 	}
@@ -895,7 +896,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 }
 
 func CreateCompleteSwapForUtxoRequest(config *so.Config, utxo *pb.UTXO) (*pbinternal.UtxoSwapCompletedRequest, error) {
-	network, err := common.NetworkFromProtoNetwork(utxo.Network)
+	network, err := btcnetwork.FromProtoNetwork(utxo.Network)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get network: %w", err)
 	}
@@ -956,7 +957,7 @@ func CreateCreateSwapForUtxoRequest(config *so.Config, req *pb.InitiateUtxoSwapR
 		UtxoSwapStatementTypeCreated,
 		hex.EncodeToString(req.OnChainUtxo.Txid),
 		req.OnChainUtxo.Vout,
-		common.Network(req.OnChainUtxo.Network),
+		btcnetwork.Network(req.OnChainUtxo.Network),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create utxo swap statement: %w", err)
@@ -1013,7 +1014,7 @@ func (h *InternalDepositHandler) RollbackSwapForAllOperators(ctx context.Context
 		UtxoSwapStatementTypeRollback,
 		hex.EncodeToString(req.OnChainUtxo.Txid),
 		req.OnChainUtxo.Vout,
-		common.Network(req.OnChainUtxo.Network),
+		btcnetwork.Network(req.OnChainUtxo.Network),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create rollback utxo swap statement: %w", err)
@@ -1024,7 +1025,7 @@ func (h *InternalDepositHandler) RollbackSwapForAllOperators(ctx context.Context
 		rollbackUtxoSwapRequestSignature.Serialize(),
 		req.OnChainUtxo.Txid,
 		req.OnChainUtxo.Vout,
-		common.Network(req.OnChainUtxo.Network).String(),
+		btcnetwork.Network(req.OnChainUtxo.Network).String(),
 		config.IdentityPublicKey(),
 		rollbackUtxoSwapRequestMessageHash,
 	)

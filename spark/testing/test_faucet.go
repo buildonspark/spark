@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
 
@@ -116,7 +117,7 @@ func btcToSats(btc json.Number) (int64, error) {
 
 // scanForSpendableUTXOs scans for any spendable UTXOs at the mining address
 func (f *Faucet) scanForSpendableUTXOs() ([]uTXO, int64, error) {
-	miningAddress, err := common.P2TRRawAddressFromPublicKey(staticMiningKey.Public(), common.Regtest)
+	miningAddress, err := common.P2TRRawAddressFromPublicKey(staticMiningKey.Public(), btcnetwork.Regtest)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -209,7 +210,7 @@ func (f *Faucet) Refill() error {
 	} else {
 		// No suitable UTXO found, send some money from the node to our mining address and mine a block
 		// to create a new UTXO that we can split.
-		miningAddress, err := common.P2TRRawAddressFromPublicKey(staticMiningKey.Public(), common.Regtest)
+		miningAddress, err := common.P2TRRawAddressFromPublicKey(staticMiningKey.Public(), btcnetwork.Regtest)
 		if err != nil {
 			return err
 		}
@@ -311,7 +312,7 @@ func (f *Faucet) FeeBumpAndConfirmTx(tx *wire.MsgTx) error {
 		return err
 	}
 
-	miningAddress, err := common.P2TRRawAddressFromPublicKey(staticMiningKey.Public(), common.Regtest)
+	miningAddress, err := common.P2TRRawAddressFromPublicKey(staticMiningKey.Public(), btcnetwork.Regtest)
 	if err != nil {
 		return err
 	}

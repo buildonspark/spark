@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"go.uber.org/zap"
@@ -57,7 +58,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrIdentityPublicKeyAuthFailed, req.PartialTokenTransaction, err)
 	}
 
-	network, err := common.NetworkFromProtoNetwork(req.PartialTokenTransaction.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.PartialTokenTransaction.Network)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto("failed to get network from proto network", req.PartialTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get network from proto network: %w", err)))
 	}
@@ -459,7 +460,7 @@ func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 				keyshareIDs[i] = keyshare.ID
 				keyshareIDStrings[i] = keyshare.ID.String()
 			}
-			network, err := common.NetworkFromProtoNetwork(partialTokenTransaction.Network)
+			network, err := btcnetwork.FromProtoNetwork(partialTokenTransaction.Network)
 			if err != nil {
 				return nil, nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToGetNetworkFromProto, partialTokenTransaction, err)
 			}

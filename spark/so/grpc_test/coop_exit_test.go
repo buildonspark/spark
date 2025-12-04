@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/wire"
@@ -140,7 +141,7 @@ func TestCoopExitBasic(t *testing.T) {
 
 	// Make sure the exit tx gets enough confirmations
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 	// Confirm extra buffer to scan more blocks than needed
 	// So that we don't race the chain watcher in this test
@@ -235,7 +236,7 @@ func TestCoopExitCannotClaimBeforeEnoughConfirmations(t *testing.T) {
 	require.NoError(t, err)
 
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 	// Confirm half the threshold
 	_, err = client.GenerateToAddress(handler.CoopExitConfirmationThreshold/2, randomAddress, nil)

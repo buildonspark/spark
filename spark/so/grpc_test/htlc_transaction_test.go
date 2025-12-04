@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,7 @@ func createNodeTx(t *testing.T, coin *sparktesting.FaucetCoin, amount int64) (*w
 	signingKey := keys.GeneratePrivateKey()
 	publicKey := signingKey.Public()
 
-	taprootAddr, err := common.P2TRRawAddressFromPublicKey(publicKey, common.Regtest)
+	taprootAddr, err := common.P2TRRawAddressFromPublicKey(publicKey, btcnetwork.Regtest)
 	require.NoError(t, err)
 
 	// Create proper P2TR pkScript for the output
@@ -44,7 +45,7 @@ func TestBroadcastAndSenderSpendHTLCTransaction(t *testing.T) {
 	paymentHash := sha256.Sum256(preimage)
 
 	htlcTx, receiverKey, senderKey, minerKey := setupHTLCTransaction(t, preimage, client)
-	minderAddress, err := common.P2TRRawAddressFromPublicKey(minerKey.Public(), common.Regtest)
+	minderAddress, err := common.P2TRRawAddressFromPublicKey(minerKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 	receiverPubKey := receiverKey.Public()
 	// Broadcast HTLC transaction
@@ -74,7 +75,7 @@ func TestBroadcastAndSenderSpendHTLCTransactionWithinSequenceLock(t *testing.T) 
 	paymentHash := sha256.Sum256(preimage)
 
 	htlcTx, receiverKey, senderKey, minerKey := setupHTLCTransaction(t, preimage, client)
-	minderAddress, err := common.P2TRRawAddressFromPublicKey(minerKey.Public(), common.Regtest)
+	minderAddress, err := common.P2TRRawAddressFromPublicKey(minerKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 	receiverPubKey := receiverKey.Public()
 	// Broadcast HTLC transaction
@@ -109,7 +110,7 @@ func TestBroadcastAndReceiverSpendHTLCTransaction(t *testing.T) {
 	paymentHash := sha256.Sum256(preimage)
 
 	htlcTx, receiverKey, senderKey, minerKey := setupHTLCTransaction(t, preimage, client)
-	minderAddress, err := common.P2TRRawAddressFromPublicKey(minerKey.Public(), common.Regtest)
+	minderAddress, err := common.P2TRRawAddressFromPublicKey(minerKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 	senderPubKey := senderKey.Public()
 
@@ -135,7 +136,7 @@ func TestBroadcastAndReceiverSpendHTLCTransaction(t *testing.T) {
 func setupHTLCTransaction(t *testing.T, preimage []byte, client *rpcclient.Client) (*wire.MsgTx, keys.Private, keys.Private, keys.Private) {
 	minerKey := keys.GeneratePrivateKey()
 
-	minderAddress, err := common.P2TRRawAddressFromPublicKey(minerKey.Public(), common.Regtest)
+	minderAddress, err := common.P2TRRawAddressFromPublicKey(minerKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 
 	coin, err := faucet.Fund()
@@ -163,7 +164,7 @@ func setupHTLCTransaction(t *testing.T, preimage []byte, client *rpcclient.Clien
 
 	paymentHash := sha256.Sum256(preimage)
 
-	htlcTx, err := bitcointransaction.CreateLightningHTLCTransactionWithSequence(signedNodeTx, 0, common.Regtest, 0, 5, paymentHash[:], receiverPubKey, senderPubKey, true)
+	htlcTx, err := bitcointransaction.CreateLightningHTLCTransactionWithSequence(signedNodeTx, 0, btcnetwork.Regtest, 0, 5, paymentHash[:], receiverPubKey, senderPubKey, true)
 	require.NoError(t, err)
 
 	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(signedNodeTx.TxOut[0].PkScript, signedNodeTx.TxOut[0].Value)
@@ -197,7 +198,7 @@ func createSenderSpendTx(t *testing.T, htlcTx *wire.MsgTx, senderKey keys.Privat
 	})
 
 	// Send funds back to sender
-	senderAddr, err := common.P2TRRawAddressFromPublicKey(senderPubKey, common.Regtest)
+	senderAddr, err := common.P2TRRawAddressFromPublicKey(senderPubKey, btcnetwork.Regtest)
 	require.NoError(t, err)
 	senderPkScript, err := txscript.PayToAddrScript(senderAddr)
 	require.NoError(t, err)
@@ -261,7 +262,7 @@ func createReceiverSpendTx(t *testing.T, htlcTx *wire.MsgTx, receiverKey keys.Pr
 	})
 
 	// Send funds to receiver
-	receiverAddr, err := common.P2TRRawAddressFromPublicKey(receiverPubKey, common.Regtest)
+	receiverAddr, err := common.P2TRRawAddressFromPublicKey(receiverPubKey, btcnetwork.Regtest)
 	require.NoError(t, err)
 	receiverPkScript, err := txscript.PayToAddrScript(receiverAddr)
 	require.NoError(t, err)

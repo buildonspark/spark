@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -80,7 +81,7 @@ func (h *InternalTreeCreationHandler) createKeyshareMapWithTarget(ctx context.Co
 
 func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(
 	ctx context.Context,
-	network common.Network,
+	network btcnetwork.Network,
 	seKeyshare *ent.SigningKeyshare,
 	userPubkey, identityPubKey keys.Public,
 	save bool,
@@ -95,7 +96,7 @@ func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 		}
-		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+		schemaNetwork, err := network.ToSchemaNetwork()
 		if err != nil {
 			return "", nil, err
 		}
@@ -149,7 +150,7 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 			}
 			selectedSigningKeyshares = append(selectedSigningKeyshares, selectedSigningKeyshare)
 
-			network, err := common.NetworkFromProtoNetwork(req.Network)
+			network, err := btcnetwork.FromProtoNetwork(req.Network)
 			if err != nil {
 				return nil, err
 			}
@@ -181,7 +182,7 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 			return nil, err
 		}
 
-		network, err := common.NetworkFromProtoNetwork(req.Network)
+		network, err := btcnetwork.FromProtoNetwork(req.Network)
 		if err != nil {
 			return nil, err
 		}

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/frost"
 	"go.uber.org/zap"
@@ -71,11 +72,11 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
-	network, err := common.NetworkFromProtoNetwork(req.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.Network)
 	if err != nil {
 		return nil, err
 	}
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	schemaNetwork, err := network.ToSchemaNetwork()
 	if err != nil {
 		return nil, err
 	}
@@ -252,11 +253,11 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 	ctx, span := tracer.Start(ctx, "DepositHandler.GenerateStaticDepositAddress")
 	defer span.End()
 
-	network, err := common.NetworkFromProtoNetwork(req.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.Network)
 	if err != nil {
 		return nil, err
 	}
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	schemaNetwork, err := network.ToSchemaNetwork()
 	if err != nil {
 		return nil, err
 	}
@@ -571,7 +572,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		return nil, fmt.Errorf("utxo index out of bounds for request %s", logging.FormatProto("start_tree_creation_request", req))
 	}
 	onChainOutput := onChainTx.TxOut[req.OnChainUtxo.Vout]
-	network, err := common.NetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get network for request %s: %w", logging.FormatProto("start_tree_creation_request", req), err)
 	}
@@ -816,7 +817,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 
 	// Create the tree
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	schemaNetwork, err := network.ToSchemaNetwork()
 	if err != nil {
 		return nil, err
 	}
@@ -910,7 +911,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, fmt.Errorf("utxo index out of bounds")
 	}
 	onChainOutput := onChainTx.TxOut[req.OnChainUtxo.Vout]
-	network, err := common.NetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, err
 	}
@@ -1157,7 +1158,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		}
 	}
 	// Create the tree
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	schemaNetwork, err := network.ToSchemaNetwork()
 	if err != nil {
 		return nil, err
 	}
@@ -1559,7 +1560,7 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 		return nil, fmt.Errorf("failed to get deposit address: %w", err)
 	}
 
-	network, err := common.DetermineNetwork(req.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.Network)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get schema network: %w", err)
 	}

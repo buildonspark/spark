@@ -10,7 +10,7 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/testing/wallet/ssp_api/mutations"
 )
@@ -28,7 +28,7 @@ func NewTypedSparkServiceAPI(requester *Requester) *TypedSparkServiceAPI {
 
 func (s *TypedSparkServiceAPI) CreateInvoice(
 	ctx context.Context,
-	bitcoinNetwork common.Network,
+	bitcoinNetwork btcnetwork.Network,
 	amountSats int64,
 	paymentHash []byte,
 	memo string,

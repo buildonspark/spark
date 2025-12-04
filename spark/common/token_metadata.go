@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -56,7 +57,7 @@ type TokenMetadata struct {
 	MaxSupply               []byte
 	IsFreezable             bool
 	CreationEntityPublicKey []byte
-	Network                 Network
+	Network                 btcnetwork.Network
 }
 
 var (
@@ -71,7 +72,7 @@ func NewTokenMetadataFromCreateInput(
 	createInput *tokenpb.TokenCreateInput,
 	networkProto pb.Network,
 ) (*TokenMetadata, error) {
-	network, err := NetworkFromProtoNetwork(networkProto)
+	network, err := btcnetwork.FromProtoNetwork(networkProto)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +143,7 @@ func (tm *TokenMetadata) ComputeTokenIdentifierV1() (TokenIdentifier, error) {
 	}
 
 	// Hash network (4 bytes)
-	networkMagic, err := BitcoinNetworkIdentifierFromNetwork(tm.Network)
+	networkMagic, err := tm.Network.ToBitcoinNetworkIdentifier()
 	if err != nil {
 		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("invalid network: %w", err))
 	}
@@ -215,7 +216,7 @@ func (tm *TokenMetadata) ValidatePartial() error {
 		return sparkerrors.InternalObjectMalformedField(fmt.Errorf("%w: got %d", ErrInvalidMaxSupplyLength, len(tm.MaxSupply)))
 	}
 
-	if tm.Network == Unspecified {
+	if tm.Network == btcnetwork.Unspecified {
 		return sparkerrors.InternalObjectMalformedField(fmt.Errorf("%w: got %s", ErrNetworkUnspecified, tm.Network))
 	}
 

@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -288,10 +289,10 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 			senderPublicKey = keys.Public{}
 		}
 		if mismatchedNetwork {
-			if config.Network == common.Mainnet {
-				network = common.Regtest
+			if config.Network == btcnetwork.Mainnet {
+				network = btcnetwork.Regtest
 			} else {
-				network = common.Mainnet
+				network = btcnetwork.Mainnet
 			}
 		}
 
@@ -515,7 +516,7 @@ type createSparkInvoiceParams struct {
 	ExpiryTime        *timestamppb.Timestamp
 	Memo              *string
 	TokenIdentifier   []byte
-	Network           common.Network
+	Network           btcnetwork.Network
 	SatsPayment       bool
 	// Optional: include a signature by the receiver over the invoice fields
 	SignerPrivKey keys.Private

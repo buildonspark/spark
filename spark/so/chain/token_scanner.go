@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
 
@@ -109,7 +110,7 @@ func validatePushBytes(script *bytes.Buffer) error {
 // Construct an L1TokenCreate entity from a token announcement script.
 // Returns nil if the transaction is not detected to be a token announcement (even if malformed).
 // Returns an error if the script is an invalid or malformed LRC20 token announcement.
-func parseTokenAnnouncement(script []byte, network common.Network) (*ent.L1TokenCreate, error) {
+func parseTokenAnnouncement(script []byte, network btcnetwork.Network) (*ent.L1TokenCreate, error) {
 	buf := bytes.NewBuffer(script)
 	if op, err := buf.ReadByte(); err != nil || op != txscript.OP_RETURN {
 		return nil, nil // Not an OP_RETURN script
@@ -218,7 +219,7 @@ func readByte(buf *bytes.Buffer) (byte, error) {
 }
 
 func createL1TokenEntity(ctx context.Context, dbClient *ent.Client, tokenMetadata *common.TokenMetadata, txid chainhash.Hash, tokenIdentifier []byte) (*ent.L1TokenCreate, error) {
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(tokenMetadata.Network)
+	schemaNetwork, err := tokenMetadata.Network.ToSchemaNetwork()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert network to schema network: %w", err)
 	}
@@ -259,7 +260,7 @@ func createNativeSparkTokenEntity(ctx context.Context, dbClient *ent.Client, tok
 	if err != nil {
 		return fmt.Errorf("failed to compute Spark token identifier: %w", err)
 	}
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(tokenMetadata.Network)
+	schemaNetwork, err := tokenMetadata.Network.ToSchemaNetwork()
 	if err != nil {
 		return fmt.Errorf("failed to convert network to schema network: %w", err)
 	}
@@ -283,7 +284,7 @@ func createNativeSparkTokenEntity(ctx context.Context, dbClient *ent.Client, tok
 }
 
 // handleTokenAnnouncements processes any token announcements in the block
-func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *ent.Client, txs []wire.MsgTx, network common.Network) error {
+func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *ent.Client, txs []wire.MsgTx, network btcnetwork.Network) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	type parsedAnnouncement struct {
@@ -403,7 +404,7 @@ func handleTokenUpdatesForBlock(
 	dbClient *ent.Client,
 	txs []wire.MsgTx,
 	blockHeight int64,
-	network common.Network,
+	network btcnetwork.Network,
 ) {
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Checking for token announcements (block height %d)", blockHeight)

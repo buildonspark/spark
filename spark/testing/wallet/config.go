@@ -1,7 +1,7 @@
 package wallet
 
 import (
-	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
@@ -12,7 +12,7 @@ import (
 // TestWalletConfig is the configuration for the wallet.
 type TestWalletConfig struct {
 	// Network is the network to use for the wallet.
-	Network common.Network
+	Network btcnetwork.Network
 	// SigningOperators contains all the signing operators using identifier as key.
 	SigningOperators map[string]*so.SigningOperator
 	// CoordinatorIdentifier is the identifier of the signing operator as the coordinator.
@@ -48,7 +48,7 @@ func (c *TestWalletConfig) IdentityPublicKey() keys.Public {
 }
 
 func (c *TestWalletConfig) ProtoNetwork() pb.Network {
-	network, err := common.ProtoNetworkFromNetwork(c.Network)
+	network, err := c.Network.ToProtoNetwork()
 	if err != nil {
 		panic(err)
 	}

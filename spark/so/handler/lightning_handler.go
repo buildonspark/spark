@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
 
@@ -930,7 +931,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pb.Init
 		return cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, nil
 	}
 
-	var network common.Network
+	var network btcnetwork.Network
 	transferRequest := req.TransferRequest
 	ownerIdentityPubKey, err := keys.ParsePublicKey(transferRequest.OwnerIdentityPublicKey)
 	if err != nil {
@@ -954,12 +955,12 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pb.Init
 			return nil, nil, nil, fmt.Errorf("failed to get tree node: %w", err)
 		}
 
-		if network == common.Unspecified {
+		if network == btcnetwork.Unspecified {
 			tree, err := treeNode.QueryTree().Only(ctx)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to get tree: %w", err)
 			}
-			network, err = common.NetworkFromSchemaNetwork(tree.Network)
+			network, err = btcnetwork.FromSchemaNetwork(tree.Network)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to get network: %w", err)
 			}

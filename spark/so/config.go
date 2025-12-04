@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"google.golang.org/grpc"
@@ -86,7 +87,7 @@ type Config struct {
 	// DKGConfig
 	DKGConfig DkgConfig
 	// SupportedNetworks is the list of networks supported by the signing operator.
-	SupportedNetworks []common.Network
+	SupportedNetworks []btcnetwork.Network
 	// BitcoindConfigs are the configurations for different bitcoin nodes.
 	BitcoindConfigs map[string]BitcoindConfig
 	// ServerCertPath is the path to the server certificate.
@@ -288,7 +289,7 @@ func NewConfig(
 	databasePath string,
 	isRDS bool,
 	authzEnforced bool,
-	supportedNetworks []common.Network,
+	supportedNetworks []btcnetwork.Network,
 	serverCertPath string,
 	serverKeyPath string,
 	runDirectory string,
@@ -398,7 +399,7 @@ func NewConfig(
 	return conf, nil
 }
 
-func (c *Config) IsNetworkSupported(network common.Network) bool {
+func (c *Config) IsNetworkSupported(network btcnetwork.Network) bool {
 	for _, supportedNetwork := range c.SupportedNetworks {
 		if supportedNetwork == network {
 			return true

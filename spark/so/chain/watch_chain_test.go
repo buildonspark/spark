@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -209,7 +210,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 		SetStatus(schematype.TreeStatusPending).
 		SetBaseTxid(dummyTxid).
 		SetOwnerIdentityPubkey(ownerIDPubKey).
-		SetNetwork(common.SchemaNetwork(common.Testnet)).
+		SetNetwork(common.SchemaNetwork(btcnetwork.Testnet)).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)
@@ -315,9 +316,9 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 
 	// Disable LRC20 RPCs because we are only interested in testing SO logic.
 	config := so.Config{
-		SupportedNetworks: []common.Network{common.Testnet},
+		SupportedNetworks: []btcnetwork.Network{btcnetwork.Testnet},
 		Lrc20Configs: map[string]so.Lrc20Config{
-			common.Testnet.String(): {
+			btcnetwork.Testnet.String(): {
 				DisableRpcs: true,
 			},
 		},
@@ -329,7 +330,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	bitcoinClient, err := rpcclient.New(connCfg, nil)
 	require.NoError(t, err)
 	blockHeight := int64(101)
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, txs, blockHeight, common.Testnet)
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, txs, blockHeight, btcnetwork.Testnet)
 	require.NoError(t, err)
 
 	// Both token announcements should be created as L1TokenCreate, but only one TokenCreate should be created
@@ -432,7 +433,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 		SetStatus(schematype.TreeStatusAvailable).
 		SetBaseTxid(treeTxid).
 		SetOwnerIdentityPubkey(ownerIDPubKey).
-		SetNetwork(common.SchemaNetwork(common.Testnet)).
+		SetNetwork(common.SchemaNetwork(btcnetwork.Testnet)).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)
@@ -525,14 +526,14 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 
 	// Create mock config
 	config := so.Config{
-		SupportedNetworks: []common.Network{common.Testnet},
+		SupportedNetworks: []btcnetwork.Network{btcnetwork.Testnet},
 		BitcoindConfigs: map[string]so.BitcoindConfig{
 			"testnet": {
 				ProcessNodesForWatchtowers: func() *bool { b := true; return &b }(),
 			},
 		},
 		Lrc20Configs: map[string]so.Lrc20Config{
-			common.Testnet.String(): {
+			btcnetwork.Testnet.String(): {
 				DisableRpcs: true,
 			},
 		},
@@ -547,7 +548,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 	blockHeight := int64(500)
 
 	// Call handleBlock
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, common.Testnet)
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, btcnetwork.Testnet)
 	require.NoError(t, err)
 
 	// Verify parent node status is updated to OnChain
@@ -579,7 +580,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 	blockHeight = int64(505)
 
 	// Call handleBlock
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, common.Testnet)
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, btcnetwork.Testnet)
 	require.NoError(t, err)
 
 	// Verify parent node status is updated to Exited

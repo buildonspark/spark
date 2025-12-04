@@ -4,10 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/handler"
 )
@@ -15,7 +15,7 @@ import (
 func CreateSspFixedQuoteSignature(
 	transactionID string,
 	outputIndex uint32,
-	network common.Network,
+	network btcnetwork.Network,
 	creditAmountSats uint64,
 	identityPrivateKey keys.Private,
 ) ([]byte, error) {
@@ -49,7 +49,7 @@ func CreateSspFixedQuoteSignature(
 func CreateUserSignature(
 	transactionID string,
 	outputIndex uint32,
-	network common.Network,
+	network btcnetwork.Network,
 	requestType pb.UtxoSwapRequestType,
 	creditAmountSats uint64,
 	sspSignature []byte,

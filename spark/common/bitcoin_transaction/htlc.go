@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 )
 
@@ -20,15 +21,15 @@ var NUMSPoint = func() keys.Public {
 
 var LightningHTLCSequence = uint32(2160)
 
-func CreateLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network common.Network, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public) (*wire.MsgTx, error) {
+func CreateLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network btcnetwork.Network, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public) (*wire.MsgTx, error) {
 	return CreateLightningHTLCTransactionWithSequence(nodeTx, vout, network, transactionSequence, LightningHTLCSequence, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey, false)
 }
 
-func CreateDirectLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network common.Network, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public) (*wire.MsgTx, error) {
+func CreateDirectLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network btcnetwork.Network, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public) (*wire.MsgTx, error) {
 	return CreateLightningHTLCTransactionWithSequence(nodeTx, vout, network, transactionSequence, LightningHTLCSequence, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey, true)
 }
 
-func CreateLightningHTLCTransactionWithSequence(nodeTx *wire.MsgTx, vout uint32, network common.Network, transactionSequence uint32, timelockSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public, includeFee bool) (*wire.MsgTx, error) {
+func CreateLightningHTLCTransactionWithSequence(nodeTx *wire.MsgTx, vout uint32, network btcnetwork.Network, transactionSequence uint32, timelockSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public, includeFee bool) (*wire.MsgTx, error) {
 	htlcTransaction := wire.NewMsgTx(3)
 	previousOutpoint := wire.OutPoint{
 		Hash:  nodeTx.TxHash(),
@@ -63,7 +64,7 @@ func CreateLightningHTLCTransactionWithSequence(nodeTx *wire.MsgTx, vout uint32,
 	return htlcTransaction, nil
 }
 
-func CreateLightningHTLCTaprootAddressWithSequence(network common.Network, hash []byte, hashLockDestinationPubkey keys.Public, sequence uint32, sequenceLockDestinationPubkey keys.Public) (btcutil.Address, error) {
+func CreateLightningHTLCTaprootAddressWithSequence(network btcnetwork.Network, hash []byte, hashLockDestinationPubkey keys.Public, sequence uint32, sequenceLockDestinationPubkey keys.Public) (btcutil.Address, error) {
 	numsKey := NUMSPoint()
 
 	hashLockScript, err := CreateHashLockScript(hash, hashLockDestinationPubkey)
@@ -86,7 +87,7 @@ func CreateLightningHTLCTaprootAddressWithSequence(network common.Network, hash 
 
 	taprootAddr, err := btcutil.NewAddressTaproot(
 		schnorr.SerializePubKey(taprootKey),
-		common.NetworkParams(network),
+		network.Params(),
 	)
 	if err != nil {
 		return nil, err

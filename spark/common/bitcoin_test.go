@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -20,10 +21,10 @@ func TestP2TRAddressFromPublicKey(t *testing.T) {
 	testVectors := []struct {
 		pubKeyHex string
 		p2trAddr  string
-		network   Network
+		network   btcnetwork.Network
 	}{
-		{"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", "bc1pmfr3p9j00pfxjh0zmgp99y8zftmd3s5pmedqhyptwy6lm87hf5sspknck9", Mainnet},
-		{"03797dd653040d344fd048c1ad05d4cbcb2178b30c6a0c4276994795f3e833da41", "tb1p8dlmzllfah294ntwatr8j5uuvcj7yg0dete94ck2krrk0ka2c9qqex96hv", Testnet},
+		{"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", "bc1pmfr3p9j00pfxjh0zmgp99y8zftmd3s5pmedqhyptwy6lm87hf5sspknck9", btcnetwork.Mainnet},
+		{"03797dd653040d344fd048c1ad05d4cbcb2178b30c6a0c4276994795f3e833da41", "tb1p8dlmzllfah294ntwatr8j5uuvcj7yg0dete94ck2krrk0ka2c9qqex96hv", btcnetwork.Testnet},
 	}
 
 	for _, tv := range testVectors {
@@ -40,10 +41,10 @@ func TestP2TRAddressFromPkScript(t *testing.T) {
 	testVectors := []struct {
 		pkScriptHex string
 		p2trAddr    string
-		network     Network
+		network     btcnetwork.Network
 	}{
-		{"51206d2a651074ff19686d4cd4e45aaaad3f85639e90bb24e21b875b174b0635eb30", "bc1pd54x2yr5luvksm2v6nj9424d87zk885shvjwyxu8tvt5kp34avcq024v6k", Mainnet},
-		{"5120d0cd6fade9979fc9e0cc353d8e06a22f43d659cf09c8f909834e80468f4af966", "bcrt1p6rxklt0fj70uncxvx57cup4z9apavkw0p8y0jzvrf6qydr62l9nqd94jkz", Regtest},
+		{"51206d2a651074ff19686d4cd4e45aaaad3f85639e90bb24e21b875b174b0635eb30", "bc1pd54x2yr5luvksm2v6nj9424d87zk885shvjwyxu8tvt5kp34avcq024v6k", btcnetwork.Mainnet},
+		{"5120d0cd6fade9979fc9e0cc353d8e06a22f43d659cf09c8f909834e80468f4af966", "bcrt1p6rxklt0fj70uncxvx57cup4z9apavkw0p8y0jzvrf6qydr62l9nqd94jkz", btcnetwork.Regtest},
 	}
 
 	for _, tv := range testVectors {
@@ -84,7 +85,7 @@ func TestSigHashFromTx(t *testing.T) {
 
 func TestVerifySignature(t *testing.T) {
 	privKey := keys.GeneratePrivateKey()
-	addr, err := P2TRAddressFromPublicKey(privKey.Public(), Regtest)
+	addr, err := P2TRAddressFromPublicKey(privKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 	address, err := btcutil.DecodeAddress(addr, &chaincfg.RegressionNetParams)
 	require.NoError(t, err)

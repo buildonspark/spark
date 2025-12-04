@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -128,7 +129,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 				sparkerrors.NotFoundMissingEntity(fmt.Errorf("no tokencreate entity found for token")))
 		}
 
-		txNet, err := common.NetworkFromProtoNetwork(req.FinalTokenTransaction.Network)
+		txNet, err := btcnetwork.FromProtoNetwork(req.FinalTokenTransaction.Network)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to get network from proto network", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get network from proto network: %w", err)))
 		}
@@ -628,7 +629,7 @@ func validateFinalTokenTransaction(
 	expectedRevocationPublicKeys []keys.Public,
 	expectedCreationEntityPublicKey keys.Public,
 ) error {
-	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
+	network, err := btcnetwork.FromProtoNetwork(tokenTransaction.Network)
 	if err != nil {
 		return err
 	}
@@ -751,71 +752,71 @@ func validateSparkInvoicesForTransaction(ctx context.Context, tokenTransaction *
 	return nil
 }
 
-func validateInvoiceFields(invoiceAttachments []*tokenpb.InvoiceAttachment, tokenIdentifier []byte, transactionExpiry time.Time) (keys.Public, common.Network, error) {
+func validateInvoiceFields(invoiceAttachments []*tokenpb.InvoiceAttachment, tokenIdentifier []byte, transactionExpiry time.Time) (keys.Public, btcnetwork.Network, error) {
 	now := time.Now().UTC()
 	var senderPublicKey keys.Public
-	var network common.Network
+	var network btcnetwork.Network
 	for _, attachment := range invoiceAttachments {
 		invoice := attachment.GetSparkInvoice()
 		decoded, err := common.DecodeSparkAddress(invoice)
 		if err != nil {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark invoice %s: %w", invoice, err))
+			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark invoice %s: %w", invoice, err))
 		}
 		if decoded.SparkAddress == nil || decoded.SparkAddress.GetSparkInvoiceFields() == nil {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no invoice fields in invoice %s", invoice))
+			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no invoice fields in invoice %s", invoice))
 		}
 		_, err = keys.ParsePublicKey(decoded.SparkAddress.GetIdentityPublicKey())
 		if err != nil {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid recipient public key in invoice %s: %w", invoice, err))
+			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid recipient public key in invoice %s: %w", invoice, err))
 		}
 		if decoded.SparkAddress.SparkInvoiceFields.Version != uint32(1) {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("version mismatch in invoice %s", invoice))
+			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("version mismatch in invoice %s", invoice))
 		}
 		if _, ok := decoded.SparkAddress.SparkInvoiceFields.PaymentType.(*sparkpb.SparkInvoiceFields_TokensPayment); !ok {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("not a tokens payment in invoice %s", invoice))
+			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("not a tokens payment in invoice %s", invoice))
 		}
 		payment := decoded.SparkAddress.SparkInvoiceFields.PaymentType.(*sparkpb.SparkInvoiceFields_TokensPayment).TokensPayment
 		// all invoices pay the outputs identifier
 		if !bytes.Equal(tokenIdentifier, payment.TokenIdentifier) {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token identifier mismatch in invoice %s", invoice))
+			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token identifier mismatch in invoice %s", invoice))
 		}
 		if expiry := decoded.SparkAddress.SparkInvoiceFields.GetExpiryTime(); expiry != nil {
 			if err := expiry.CheckValid(); err != nil {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid expiry time in invoice %s: %w", invoice, err))
+				return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid expiry time in invoice %s: %w", invoice, err))
 			}
 			if expiry.AsTime().UTC().Before(now) {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expired in invoice %s", invoice))
+				return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expired in invoice %s", invoice))
 			}
 			if !transactionExpiry.IsZero() && expiry.AsTime().UTC().Before(transactionExpiry) {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice expiration must be >= transaction expiration in invoice %s", invoice))
+				return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice expiration must be >= transaction expiration in invoice %s", invoice))
 			}
 		}
 		// if a sender public key is present, it must be the same across all invoices with a sender public key encoded
 		if decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey != nil {
 			decodedSenderPublicKey, err := keys.ParsePublicKey(decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey)
 			if err != nil {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender public key in invoice %s: %w", invoice, err))
+				return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender public key in invoice %s: %w", invoice, err))
 			}
 			if senderPublicKey == (keys.Public{}) {
 				senderPublicKey = decodedSenderPublicKey
 			} else if !decodedSenderPublicKey.Equals(senderPublicKey) {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender public key mismatch in invoice %s: expected %x, got %x", invoice, senderPublicKey.Serialize(), decodedSenderPublicKey.Serialize()))
+				return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender public key mismatch in invoice %s: expected %x, got %x", invoice, senderPublicKey.Serialize(), decodedSenderPublicKey.Serialize()))
 			}
 		}
-		if network == common.Unspecified {
+		if network == btcnetwork.Unspecified {
 			network = decoded.Network
 		} else if network != decoded.Network {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("network mismatch in invoice %s: expected %s, got %s", invoice, network, decoded.Network))
+			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("network mismatch in invoice %s: expected %s, got %s", invoice, network, decoded.Network))
 		}
 		if decoded.SparkAddress.Signature != nil {
 			err := common.VerifySparkAddressSignature(decoded.SparkAddress, decoded.Network)
 			if err != nil {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid signature in invoice %s: %w", invoice, err))
+				return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid signature in invoice %s: %w", invoice, err))
 			}
 		}
 	}
-	if network == common.Unspecified {
-		return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid network encoded in invoices"))
+	if network == btcnetwork.Unspecified {
+		return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid network encoded in invoices"))
 	}
 	return senderPublicKey, network, nil
 }
@@ -973,12 +974,12 @@ func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, token
 }
 
 // If sender pubkey is present, the owner of the spent outputs must match the expected sender public key.
-func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction, senderPublicKey keys.Public, network common.Network) error {
+func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction, senderPublicKey keys.Public, network btcnetwork.Network) error {
 	var outputsToSpend []*tokenpb.TokenOutputToSpend
 	if tokenTransaction.GetTransferInput() != nil {
 		outputsToSpend = tokenTransaction.GetTransferInput().OutputsToSpend
 	}
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	schemaNetwork, err := network.ToSchemaNetwork()
 	if err != nil {
 		return err
 	}

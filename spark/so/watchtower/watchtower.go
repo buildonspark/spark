@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -90,7 +91,7 @@ func alreadyBroadcasted(err error) bool {
 }
 
 // QueryBroadcastableNodes returns nodes that are eligible for broadcast.
-func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHeight int64, network common.Network) ([]*ent.TreeNode, error) {
+func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHeight int64, network btcnetwork.Network) ([]*ent.TreeNode, error) {
 	var rootNodes, childNodes, refundNodes []*ent.TreeNode
 
 	//1. Child nodes whose parent is confirmed but the node itself is not.
@@ -144,7 +145,7 @@ func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHei
 }
 
 // QueryBroadcastableTransferLeaves returns transfer leaves that are eligible for broadcast.
-func QueryBroadcastableTransferLeaves(ctx context.Context, dbClient *ent.Client, network common.Network) ([]*ent.TransferLeaf, error) {
+func QueryBroadcastableTransferLeaves(ctx context.Context, dbClient *ent.Client, network btcnetwork.Network) ([]*ent.TransferLeaf, error) {
 	eligibleNodeIDs, err := dbClient.TreeNode.Query().
 		Where(
 			treenode.NodeConfirmationHeightNotNil(),
@@ -180,7 +181,7 @@ func QueryBroadcastableTransferLeaves(ctx context.Context, dbClient *ent.Client,
 }
 
 // CheckExpiredTimeLocks checks for TXs with expired time locks and broadcasts them if needed.
-func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client, node *ent.TreeNode, blockHeight int64, network common.Network) error {
+func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client, node *ent.TreeNode, blockHeight int64, network btcnetwork.Network) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	if len(node.DirectTx) > 0 && node.NodeConfirmationHeight == 0 {
@@ -286,7 +287,7 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 }
 
 // BroadcastTransferLeafRefund attempts to broadcast the refund transactions for a transfer leaf.
-func BroadcastTransferLeafRefund(ctx context.Context, bitcoinClient *rpcclient.Client, transferLeaf *ent.TransferLeaf, network common.Network, blockHeight int64) error {
+func BroadcastTransferLeafRefund(ctx context.Context, bitcoinClient *rpcclient.Client, transferLeaf *ent.TransferLeaf, network btcnetwork.Network, blockHeight int64) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	directRefundTimelockExpired := transferLeaf.IntermediateDirectRefundTimelock > 0 && transferLeaf.IntermediateDirectRefundTimelock <= uint64(blockHeight)

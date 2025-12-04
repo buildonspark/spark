@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,6 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/go-cmp/cmp"
-	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"google.golang.org/protobuf/proto"
@@ -1418,44 +1418,44 @@ func TestValidateOwnershipSignatureErrors(t *testing.T) {
 func TestIsNetworkSupported(t *testing.T) {
 	tests := []struct {
 		name              string
-		providedNetwork   common.Network
-		supportedNetworks []common.Network
+		providedNetwork   btcnetwork.Network
+		supportedNetworks []btcnetwork.Network
 		want              bool
 	}{
 		{
 			name:              "unspecified network",
-			providedNetwork:   common.Unspecified,
-			supportedNetworks: []common.Network{common.Mainnet, common.Testnet},
+			providedNetwork:   btcnetwork.Unspecified,
+			supportedNetworks: []btcnetwork.Network{btcnetwork.Mainnet, btcnetwork.Testnet},
 			want:              false,
 		},
 		{
 			name:              "mainnet in list",
-			providedNetwork:   common.Mainnet,
-			supportedNetworks: []common.Network{common.Mainnet, common.Testnet},
+			providedNetwork:   btcnetwork.Mainnet,
+			supportedNetworks: []btcnetwork.Network{btcnetwork.Mainnet, btcnetwork.Testnet},
 			want:              true,
 		},
 		{
 			name:              "testnet in list",
-			providedNetwork:   common.Testnet,
-			supportedNetworks: []common.Network{common.Mainnet, common.Testnet},
+			providedNetwork:   btcnetwork.Testnet,
+			supportedNetworks: []btcnetwork.Network{btcnetwork.Mainnet, btcnetwork.Testnet},
 			want:              true,
 		},
 		{
 			name:              "regtest in list",
-			providedNetwork:   common.Regtest,
-			supportedNetworks: []common.Network{common.Regtest},
+			providedNetwork:   btcnetwork.Regtest,
+			supportedNetworks: []btcnetwork.Network{btcnetwork.Regtest},
 			want:              true,
 		},
 		{
 			name:              "network not in list",
-			providedNetwork:   common.Signet,
-			supportedNetworks: []common.Network{common.Mainnet, common.Testnet},
+			providedNetwork:   btcnetwork.Signet,
+			supportedNetworks: []btcnetwork.Network{btcnetwork.Mainnet, btcnetwork.Testnet},
 			want:              false,
 		},
 		{
 			name:              "empty supported list",
-			providedNetwork:   common.Mainnet,
-			supportedNetworks: []common.Network{},
+			providedNetwork:   btcnetwork.Mainnet,
+			supportedNetworks: []btcnetwork.Network{},
 			want:              false,
 		},
 	}

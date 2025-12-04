@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/txscript"
@@ -32,7 +33,7 @@ func TestValidateUtxoIsNotSpent(t *testing.T) {
 
 	// Spend the faucet transaction and test with a new one
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 
 	pkScript, err := txscript.PayToAddrScript(randomAddress)
@@ -47,7 +48,7 @@ func TestValidateUtxoIsNotSpent(t *testing.T) {
 	// Make sure the deposit tx gets enough confirmations
 	randomKey = keys.GeneratePrivateKey()
 
-	randomAddress, err = common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err = common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 	_, err = bitcoinClient.GenerateToAddress(1, randomAddress, nil)
 	require.NoError(t, err)
@@ -111,7 +112,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 	quoteAmount := uint64(90_000)
 
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 
 	unsignedDepositTx, err := sparktesting.CreateTestDepositTransactionManyOutputs(
@@ -156,7 +157,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 	userSignature := wallet.CreateUserSignature(
 		signedDepositTx.TxHash().String(),
 		uint32(vout),
-		common.Regtest,
+		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		quoteAmount,
 		spendTxSighash,
@@ -171,7 +172,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 			aliceCtx,
 			aliceConfig,
 			wallet.RefundStaticDepositParams{
-				Network:                 common.Regtest,
+				Network:                 btcnetwork.Regtest,
 				SpendTx:                 spendTx,
 				DepositAddressSecretKey: aliceDepositPrivKey,
 				UserSignature:           userSignature,
@@ -201,7 +202,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		wrongUserSignature := wallet.CreateUserSignature(
 			signedDepositTx.TxHash().String(),
 			uint32(vout),
-			common.Regtest,
+			btcnetwork.Regtest,
 			pb.UtxoSwapRequestType_Refund,
 			quoteAmount,
 			spendTxSighash,
@@ -212,7 +213,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 			bobCtx,
 			bobConfig,
 			wallet.RefundStaticDepositParams{
-				Network:                 common.Regtest,
+				Network:                 btcnetwork.Regtest,
 				SpendTx:                 spendTx,
 				DepositAddressSecretKey: aliceDepositPrivKey,
 				UserSignature:           wrongUserSignature,
@@ -230,7 +231,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 			aliceCtx,
 			aliceConfig,
 			wallet.RefundStaticDepositParams{
-				Network:                 common.Regtest,
+				Network:                 btcnetwork.Regtest,
 				SpendTx:                 spendTx,
 				DepositAddressSecretKey: aliceDepositPrivKey,
 				UserSignature:           userSignature,
@@ -266,7 +267,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		userSignature2 := wallet.CreateUserSignature(
 			signedDepositTx.TxHash().String(),
 			uint32(vout),
-			common.Regtest,
+			btcnetwork.Regtest,
 			pb.UtxoSwapRequestType_Refund,
 			quoteAmount,
 			spendTxSighash2,
@@ -277,7 +278,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 			aliceCtx,
 			aliceConfig,
 			wallet.RefundStaticDepositParams{
-				Network:                 common.Regtest,
+				Network:                 btcnetwork.Regtest,
 				SpendTx:                 spendTx2,
 				DepositAddressSecretKey: aliceDepositPrivKey,
 				UserSignature:           userSignature2,
@@ -299,7 +300,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 			handler.UtxoSwapStatementTypeRollback,
 			depositOutPoint.Hash.String(),
 			depositOutPoint.Index,
-			common.Regtest,
+			btcnetwork.Regtest,
 		)
 		require.NoError(t, err)
 		rollbackUtxoSwapRequestSignature := ecdsa.Sign(aliceConfig.IdentityPrivateKey.ToBTCEC(), rollbackUtxoSwapRequestMessageHash)
@@ -337,7 +338,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 			bobCtx,
 			bobConfig,
 			wallet.RefundStaticDepositParams{
-				Network:                 common.Regtest,
+				Network:                 btcnetwork.Regtest,
 				SpendTx:                 spendTx,
 				DepositAddressSecretKey: aliceDepositPrivKey,
 				UserSignature:           userSignature,

@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/distributed-lab/gripmock"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	testutil "github.com/lightsparkdev/spark/testing"
@@ -60,7 +61,7 @@ func TestCreateUtxoSwap_ErrorIfNotCoordinator(t *testing.T) {
 	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
 		utxo.Vout,
-		common.Regtest,
+		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Fixed,
 		1000,
 		testSspSignature,
@@ -175,7 +176,7 @@ func TestCreateUtxoSwap_UtxoNotConfirmed(t *testing.T) {
 	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
 		utxo.Vout,
-		common.Regtest,
+		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Fixed,
 		1000,
 		testSspSignature,
@@ -234,7 +235,7 @@ func TestCreateUtxoSwap_InvalidTransferWrongAmount(t *testing.T) {
 	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
 		utxo.Vout,
-		common.Regtest,
+		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		wrongAmount,
 		testSspSignature,
@@ -292,7 +293,7 @@ func TestCreateUtxoSwap_InvalidTransferWrongRecipient(t *testing.T) {
 	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
 		utxo.Vout,
-		common.Regtest,
+		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		utxo.Amount,
 		testSspSignature,
@@ -350,7 +351,7 @@ func TestCreateUtxoSwap_InvalidTransferWrongNetwork(t *testing.T) {
 	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
 		utxo.Vout,
-		common.Regtest,
+		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		utxo.Amount,
 		testSspSignature,
@@ -499,7 +500,7 @@ func TestCreateUtxoSwap_SuccessfulCallCreatesUtxoSwap(t *testing.T) {
 	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
 		utxo.Vout,
-		common.Regtest,
+		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		spendTxAmount,
 		spendTxSighash,

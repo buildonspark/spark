@@ -5,7 +5,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
@@ -53,7 +53,7 @@ type TestWalletConfigParams struct {
 	UseTokenTransactionSchnorrSignatures bool
 
 	// Network allows callers to override the default network (Regtest).
-	Network common.Network
+	Network btcnetwork.Network
 
 	// WithdrawBondSats overrides the expected withdraw bond amount (defaults to the local test config value).
 	WithdrawBondSats uint64
@@ -78,8 +78,8 @@ func NewTestWalletConfigWithParams(tb testing.TB, p TestWalletConfigParams) *Tes
 
 	signingOperators := sparktesting.GetAllSigningOperators(tb)
 
-	network := common.Regtest
-	if p.Network != common.Unspecified {
+	network := btcnetwork.Regtest
+	if p.Network != btcnetwork.Unspecified {
 		network = p.Network
 	}
 

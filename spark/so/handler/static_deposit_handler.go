@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"go.uber.org/zap"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -80,14 +81,15 @@ func GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx context.Context, co
 	if len(utxo.Txid) == 0 {
 		return nil, fmt.Errorf("txid is required")
 	}
-	if utxo.Network == pb.Network_UNSPECIFIED {
+	network, err := btcnetwork.FromProtoNetwork(utxo.GetNetwork())
+	if err != nil {
 		return nil, fmt.Errorf("network is required")
 	}
 	rollbackUtxoSwapRequestMessageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeRollback,
 		hex.EncodeToString(utxo.Txid),
 		utxo.Vout,
-		common.Network(utxo.Network),
+		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create utxo swap statement: %w", err)
@@ -98,7 +100,7 @@ func GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx context.Context, co
 		rollbackUtxoSwapRequestSignature.Serialize(),
 		utxo.Txid,
 		utxo.Vout,
-		common.Network(utxo.Network).String(),
+		network,
 		config.IdentityPublicKey(),
 		rollbackUtxoSwapRequestMessageHash,
 	)
@@ -328,7 +330,7 @@ func GenerateCreateStaticDepositUtxoRefundRequest(ctx context.Context, config *s
 		UtxoSwapStatementTypeCreated,
 		hex.EncodeToString(req.OnChainUtxo.Txid),
 		req.OnChainUtxo.Vout,
-		common.Network(req.OnChainUtxo.Network),
+		btcnetwork.Network(req.OnChainUtxo.Network),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create utxo swap statement: %w", err)

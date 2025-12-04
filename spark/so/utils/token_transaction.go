@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/protohash"
 
@@ -1119,7 +1120,7 @@ func ValidatePartialTokenTransaction(
 	tokenTransaction *tokenpb.TokenTransaction,
 	inputSignatures []*tokenpb.SignatureWithIndex,
 	sparkOperatorsFromConfig map[string]*sparkpb.SigningOperatorInfo,
-	supportedNetworks []common.Network,
+	supportedNetworks []btcnetwork.Network,
 	expectedWithdrawBondSats uint64,
 	expectedWithdrawRelativeBlockLocktime uint64,
 ) error {
@@ -1329,9 +1330,9 @@ func ValidateRevocationKeys(revocationPrivateKeys []keys.Private, expectedRevoca
 	return nil
 }
 
-func isNetworkSupported(providedNetwork common.Network, networks []common.Network) bool {
+func isNetworkSupported(providedNetwork btcnetwork.Network, networks []btcnetwork.Network) bool {
 	// UNSPECIFIED network should never be considered supported
-	return providedNetwork != common.Unspecified && slices.Contains(networks, providedNetwork)
+	return providedNetwork != btcnetwork.Unspecified && slices.Contains(networks, providedNetwork)
 }
 
 // CalculateMintAmountFromTransaction calculates the total amount being minted
@@ -1384,7 +1385,7 @@ func validateBaseTokenTransaction(
 	tokenTransaction *tokenpb.TokenTransaction,
 	inputSignatures []*tokenpb.SignatureWithIndex,
 	expectedSparkOperators map[string]*sparkpb.SigningOperatorInfo,
-	supportedNetworks []common.Network,
+	supportedNetworks []btcnetwork.Network,
 ) error {
 	if tokenTransaction == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token transaction cannot be nil"))
@@ -1392,7 +1393,7 @@ func validateBaseTokenTransaction(
 	if len(tokenTransaction.TokenOutputs) > MaxInputOrOutputTokenTransactionOutputs {
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("too many token outputs, maximum is %d", MaxInputOrOutputTokenTransactionOutputs))
 	}
-	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
+	network, err := btcnetwork.FromProtoNetwork(tokenTransaction.Network)
 	if err != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert network: %w", err))
 	}
@@ -1487,7 +1488,7 @@ func validateBaseTokenTransaction(
 // FinalValidationConfig contains the configuration parameters for validating final token transactions
 type FinalValidationConfig struct {
 	ExpectedSparkOperators          map[string]*sparkpb.SigningOperatorInfo
-	SupportedNetworks               []common.Network
+	SupportedNetworks               []btcnetwork.Network
 	ExpectedRevocationPublicKeys    []keys.Public
 	ExpectedBondSats                uint64
 	ExpectedRelativeBlockLocktime   uint64

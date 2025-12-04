@@ -748,7 +748,7 @@ func QueryTokenOutputs(
 	tmpCtx := ContextWithToken(ctx, token)
 	tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
 
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	network, err := config.Network.ToProtoNetwork()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert network to proto network: %w", err)
 	}

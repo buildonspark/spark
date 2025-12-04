@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -20,7 +21,7 @@ import (
 )
 
 // encodeSparkAddress is a helper function to encode a public key as a spark address for testing
-func encodeSparkAddress(pubKey keys.Public, network common.Network) string {
+func encodeSparkAddress(pubKey keys.Public, network btcnetwork.Network) string {
 	address, err := common.EncodeSparkAddress(pubKey, network, nil)
 	if err != nil {
 		panic(err)
@@ -955,7 +956,7 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 	tmpCtx := wallet.ContextWithToken(t.Context(), token)
 
 	tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	network, err := config.Network.ToProtoNetwork()
 	require.NoError(t, err, "failed to convert network")
 
 	ownerPubKey := finalMintTx.TokenOutputs[0].OwnerPublicKey

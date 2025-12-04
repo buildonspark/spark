@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/frost"
 
@@ -208,7 +209,7 @@ func TestStartDepositTreeCreationBasic(t *testing.T) {
 	require.NoError(t, err)
 
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err, "failed to get p2tr raw address")
 	_, err = client.GenerateToAddress(1, randomAddress, nil)
 	require.NoError(t, err, "failed to generate to address")
@@ -305,7 +306,7 @@ func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
 	require.NoError(t, err)
 
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
@@ -384,7 +385,7 @@ func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
 	require.NoError(t, err)
 
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
@@ -463,7 +464,7 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 	require.NoError(t, err)
 
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
@@ -644,7 +645,7 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 	require.NoError(t, err)
 
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
@@ -828,7 +829,7 @@ func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 	require.NoError(t, err)
 
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
@@ -942,7 +943,7 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 
 	randomKey := keys.GeneratePrivateKey()
 	randomPubKey := randomKey.Public()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey, common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey, btcnetwork.Regtest)
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
@@ -1078,7 +1079,7 @@ func TestStartDepositTreeCreationWithDirectFromCpfpRefundAlongsideRegularRefund(
 	// require.NoError(t, err)
 
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 	_, err = client.GenerateToAddress(1, randomAddress, nil)
 	require.NoError(t, err)
@@ -1152,7 +1153,7 @@ func TestStartDepositTreeCreationDirectTxValidation(t *testing.T) {
 
 	// Generate a block to ensure the deposit tx is confirmed
 	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 	_, err = client.GenerateToAddress(1, randomAddress, nil)
 	require.NoError(t, err)

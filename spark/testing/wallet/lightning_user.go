@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lightsparkdev/spark/common"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
@@ -20,7 +20,7 @@ import (
 
 // LightningInvoiceCreator is an interface that can be used to create a Lightning invoice.
 type LightningInvoiceCreator interface {
-	CreateInvoice(ctx context.Context, bitcoinNetwork common.Network, amountSats int64, paymentHash []byte, memo string, expiry time.Duration) (string, error)
+	CreateInvoice(ctx context.Context, bitcoinNetwork btcnetwork.Network, amountSats int64, paymentHash []byte, memo string, expiry time.Duration) (string, error)
 }
 
 func CreateLightningInvoiceWithPreimageAndHash(

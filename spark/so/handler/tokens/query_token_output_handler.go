@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -73,7 +73,7 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputsToken(ctx context.Context, r
 		return nil, err
 	}
 
-	network, err := common.DetermineNetwork(req.GetNetwork())
+	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
 	if err != nil {
 		return nil, err
 	}

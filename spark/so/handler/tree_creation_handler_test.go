@@ -7,6 +7,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -431,7 +432,7 @@ func TestGetSigningKeyshareFromOutput_Invalid_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			userPubKey, keyshare, err := handler.getSigningKeyshareFromOutput(ctx, common.Regtest, tt.output)
+			userPubKey, keyshare, err := handler.getSigningKeyshareFromOutput(ctx, btcnetwork.Regtest, tt.output)
 
 			require.Error(t, err)
 			assert.Zero(t, userPubKey)
@@ -799,7 +800,7 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 	// Verify the TXIDs are actually different (sanity check)
 	require.NotEqual(t, legitimateTxHash, maliciousTxHash, "Test setup error: TXIDs should be different")
 
-	outputAddress, err := common.P2TRAddressFromPkScript(legitimateTxOutput.PkScript, common.Regtest)
+	outputAddress, err := common.P2TRAddressFromPkScript(legitimateTxOutput.PkScript, btcnetwork.Regtest)
 	require.NoError(t, err)
 
 	// Create a deposit address that's confirmed with the LEGITIMATE transaction
@@ -931,7 +932,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 			require.NoError(t, err)
 			parentTxHash := parentTx.TxHash()
 
-			parentAddress, err := common.P2TRAddressFromPkScript(parentTxOutput.PkScript, common.Regtest)
+			parentAddress, err := common.P2TRAddressFromPkScript(parentTxOutput.PkScript, btcnetwork.Regtest)
 			require.NoError(t, err)
 
 			_, err = dbTx.DepositAddress.Create().
@@ -976,7 +977,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 
 				maliciousNodeTx.AddTxOut(&wire.TxOut{Value: childValue, PkScript: childScript})
 
-				childAddress, err := common.P2TRAddressFromPkScript(childScript, common.Regtest)
+				childAddress, err := common.P2TRAddressFromPkScript(childScript, btcnetwork.Regtest)
 				require.NoError(t, err)
 
 				_, err = dbTx.DepositAddress.Create().

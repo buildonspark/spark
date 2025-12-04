@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
@@ -19,13 +20,13 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func EncodeSparkAddress(identityPublicKey keys.Public, network Network, sparkInvoiceFields *pb.SparkInvoiceFields) (string, error) {
+func EncodeSparkAddress(identityPublicKey keys.Public, network btcnetwork.Network, sparkInvoiceFields *pb.SparkInvoiceFields) (string, error) {
 	return EncodeSparkAddressWithSignature(identityPublicKey, network, sparkInvoiceFields, nil)
 }
 
 // EncodeSparkAddressWithSignature encodes a SparkAddress including optional signature bytes.
 // If signature is nil or empty, the resulting address will have no signature.
-func EncodeSparkAddressWithSignature(identityPublicKey keys.Public, network Network, sparkInvoiceFields *pb.SparkInvoiceFields, signature []byte) (string, error) {
+func EncodeSparkAddressWithSignature(identityPublicKey keys.Public, network btcnetwork.Network, sparkInvoiceFields *pb.SparkInvoiceFields, signature []byte) (string, error) {
 	if identityPublicKey.IsZero() {
 		return "", fmt.Errorf("identity public key is required")
 	}
@@ -92,7 +93,7 @@ func EncodeSparkAddressWithSignature(identityPublicKey keys.Public, network Netw
 
 type DecodedSparkAddress struct {
 	SparkAddress *pb.SparkAddress
-	Network      Network
+	Network      btcnetwork.Network
 }
 
 func DecodeSparkAddress(address string) (*DecodedSparkAddress, error) {
@@ -102,7 +103,7 @@ func DecodeSparkAddress(address string) (*DecodedSparkAddress, error) {
 	}
 
 	network := HrpToNetwork(hrp)
-	if network == Unspecified {
+	if network == btcnetwork.Unspecified {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unknown network: %s", hrp))
 	}
 
@@ -145,7 +146,7 @@ type ParsedSparkInvoice struct {
 	SenderPublicKey   keys.Public
 	ExpiryTime        *timestamppb.Timestamp
 	Signature         []byte
-	Network           Network
+	Network           btcnetwork.Network
 }
 
 func ParseSparkInvoice(addr string) (*ParsedSparkInvoice, error) {
@@ -236,7 +237,7 @@ func enforceCanonicalBytes(address string, decodedSparkAddr *pb.SparkAddress) er
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark address: %w", err))
 	}
 	decodedNetwork := HrpToNetwork(decodedHrp)
-	if decodedNetwork == Unspecified {
+	if decodedNetwork == btcnetwork.Unspecified {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unknown network: %s", decodedHrp))
 	}
 	canonBytes, err := proto.MarshalOptions{Deterministic: true}.Marshal(decodedSparkAddr)
@@ -310,31 +311,31 @@ func CreateSatsSparkInvoiceFields(id []byte, amount *uint64, memo *string, sende
 	return sparkInvoiceFields
 }
 
-func HrpToNetwork(hrp string) Network {
+func HrpToNetwork(hrp string) btcnetwork.Network {
 	switch hrp {
 	case "sparkl", "spl": // for local testing
-		return Regtest
+		return btcnetwork.Regtest
 	case "sparkrt", "sprt":
-		return Regtest
+		return btcnetwork.Regtest
 	case "sparkt", "spt":
-		return Testnet
+		return btcnetwork.Testnet
 	case "sparks", "sps":
-		return Signet
+		return btcnetwork.Signet
 	case "spark", "sp":
-		return Mainnet
+		return btcnetwork.Mainnet
 	}
-	return Unspecified
+	return btcnetwork.Unspecified
 }
 
-func NetworkToHrp(network Network) (string, error) {
+func NetworkToHrp(network btcnetwork.Network) (string, error) {
 	switch network {
-	case Regtest:
+	case btcnetwork.Regtest:
 		return "sparkrt", nil
-	case Testnet:
+	case btcnetwork.Testnet:
 		return "sparkt", nil
-	case Signet:
+	case btcnetwork.Signet:
 		return "sparks", nil
-	case Mainnet:
+	case btcnetwork.Mainnet:
 		return "spark", nil
 	default:
 		return "", fmt.Errorf("unknown network: %v", network)
@@ -361,7 +362,7 @@ func NetworkToHrp(network Network) (string, error) {
 // 6) memo: raw UTF-8 bytes (empty if nil)
 // 7) sender_public_key: 33 bytes (0-filled if nil)
 // 8) expiry_time (seconds): uint64 big-endian (0 if nil)
-func HashSparkInvoiceFields(f *pb.SparkInvoiceFields, network Network, receiverPublicKey keys.Public) ([]byte, error) {
+func HashSparkInvoiceFields(f *pb.SparkInvoiceFields, network btcnetwork.Network, receiverPublicKey keys.Public) ([]byte, error) {
 	if f == nil {
 		return nil, fmt.Errorf("spark invoice fields cannot be nil")
 	}
@@ -378,7 +379,7 @@ func HashSparkInvoiceFields(f *pb.SparkInvoiceFields, network Network, receiverP
 	}
 
 	// 3) Network (4 bytes)
-	if networkMagic, err := BitcoinNetworkIdentifierFromNetwork(network); err == nil {
+	if networkMagic, err := network.ToBitcoinNetworkIdentifier(); err == nil {
 		all.Write(chainhash.HashB(chainhash.HashB(binary.BigEndian.AppendUint32(nil, networkMagic))))
 	} else {
 		return nil, fmt.Errorf("invalid network: %w", err)
@@ -443,7 +444,7 @@ func HashSparkInvoiceFields(f *pb.SparkInvoiceFields, network Network, receiverP
 // - the signature is present but invalid
 // - the public key cannot be parsed
 // If the signature is nil/empty, this function returns an error.
-func VerifySparkAddressSignature(addr *pb.SparkAddress, network Network) error {
+func VerifySparkAddressSignature(addr *pb.SparkAddress, network btcnetwork.Network) error {
 	if addr == nil {
 		return fmt.Errorf("spark address cannot be nil")
 	}

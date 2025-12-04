@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -55,11 +56,11 @@ func GetTokenMetadataForTokenTransaction(ctx context.Context, tokenTransaction *
 		return nil, err
 	}
 
-	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
+	network, err := btcnetwork.FromProtoNetwork(tokenTransaction.Network)
 	if err != nil {
 		return nil, err
 	}
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	schemaNetwork, err := network.ToSchemaNetwork()
 	if err != nil {
 		return nil, err
 	}

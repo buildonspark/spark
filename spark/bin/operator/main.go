@@ -18,6 +18,7 @@ import (
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
@@ -94,19 +95,19 @@ type args struct {
 
 const operatorPoolKnobRefreshInterval = time.Minute
 
-func (a *args) SupportedNetworksList() []common.Network {
-	var networks []common.Network
+func (a *args) SupportedNetworksList() []btcnetwork.Network {
+	var networks []btcnetwork.Network
 	if strings.Contains(a.SupportedNetworks, "mainnet") || a.SupportedNetworks == "" {
-		networks = append(networks, common.Mainnet)
+		networks = append(networks, btcnetwork.Mainnet)
 	}
 	if strings.Contains(a.SupportedNetworks, "testnet") || a.SupportedNetworks == "" {
-		networks = append(networks, common.Testnet)
+		networks = append(networks, btcnetwork.Testnet)
 	}
 	if strings.Contains(a.SupportedNetworks, "regtest") || a.SupportedNetworks == "" {
-		networks = append(networks, common.Regtest)
+		networks = append(networks, btcnetwork.Regtest)
 	}
 	if strings.Contains(a.SupportedNetworks, "signet") || a.SupportedNetworks == "" {
-		networks = append(networks, common.Signet)
+		networks = append(networks, btcnetwork.Signet)
 	}
 	return networks
 }

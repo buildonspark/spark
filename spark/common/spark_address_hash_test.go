@@ -9,6 +9,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/stretchr/testify/require"
 
 	"github.com/lightsparkdev/spark/common/keys"
@@ -26,7 +27,7 @@ func TestHashSparkInvoiceFields_TokensBasic(t *testing.T) {
 	amount := big.NewInt(1000).Bytes()
 	memo := "memo-1"
 	expiry := time.Now().Add(2 * time.Hour).UTC()
-	network := Regtest
+	network := btcnetwork.Regtest
 
 	f1 := CreateTokenSparkInvoiceFields(id, tokenIdentifier, amount, &memo, senderPublicKey, &expiry)
 
@@ -57,7 +58,7 @@ func TestHashSparkInvoiceFields_SatsBasic(t *testing.T) {
 	var sats uint64 = 1000
 	memo := "sats-memo"
 	expiry := time.Now().Add(1 * time.Hour).UTC()
-	network := Regtest
+	network := btcnetwork.Regtest
 
 	f1 := CreateSatsSparkInvoiceFields(id, &sats, &memo, senderPublicKey, &expiry)
 
@@ -80,7 +81,7 @@ func TestHashSparkInvoiceFields_InvalidInputs(t *testing.T) {
 	uid := uuid.Must(uuid.NewV7())
 	id := uid[:]
 	memo := "m"
-	network := Regtest
+	network := btcnetwork.Regtest
 
 	// nil fields
 	_, err := HashSparkInvoiceFields(nil, network, receiverPublicKey)
@@ -112,7 +113,7 @@ func TestHashSparkInvoiceFields_EmptyAndNilEquivalences(t *testing.T) {
 	senderPublicKey := identityPublicKey
 	uid := uuid.Must(uuid.NewV7())
 	id := uid[:]
-	network := Regtest
+	network := btcnetwork.Regtest
 
 	// tokens: tokenIdentifier nil vs empty slice
 	amt := big.NewInt(123).Bytes()
@@ -166,7 +167,7 @@ func TestVerifySparkAddressSignature_Valid(t *testing.T) {
 	require.NoError(t, err)
 	memo := "invoice-memo"
 	amount := big.NewInt(42).Bytes()
-	network := Regtest
+	network := btcnetwork.Regtest
 
 	fields := CreateTokenSparkInvoiceFields(uid[:], make([]byte, 32), amount, &memo, pubKey, nil)
 	hash, err := HashSparkInvoiceFields(fields, network, pubKey)
@@ -190,7 +191,7 @@ func TestVerifySparkAddressSignature_Errors(t *testing.T) {
 		privKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
 		pubKey := privKey.Public()
 
-		network := Regtest
+		network := btcnetwork.Regtest
 
 		uid, _ := uuid.NewV7()
 		memo := "m"
@@ -208,7 +209,7 @@ func TestVerifySparkAddressSignature_Errors(t *testing.T) {
 		// receiver key (will not match signer)
 		receiverKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
 		receiverPublicKey := receiverKey.Public()
-		network := Regtest
+		network := btcnetwork.Regtest
 
 		uid, _ := uuid.NewV7()
 		memo := "m2"
@@ -232,7 +233,7 @@ func TestVerifySparkAddressSignature_Errors(t *testing.T) {
 		seededRand := rand.NewChaCha8([32]byte{})
 		privKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
 		pubKey := privKey.Public()
-		network := Regtest
+		network := btcnetwork.Regtest
 
 		uid, _ := uuid.NewV7()
 		id := uid[:]
@@ -264,7 +265,7 @@ func TestVerifySparkAddressSignature_Errors(t *testing.T) {
 		receiverPubKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
 		senderPubKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
 		identityPubKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
-		network := Regtest
+		network := btcnetwork.Regtest
 
 		fields := CreateSatsSparkInvoiceFields(uid[:], nil, &memo, senderPubKey, nil)
 		hash, err := HashSparkInvoiceFields(fields, network, receiverPubKey)
@@ -295,7 +296,7 @@ func TestHashSparkInvoiceFieldsProducesKnownHash(t *testing.T) {
 	expiry, err := time.Parse(time.RFC3339Nano, "2025-08-16T22:12:17.791Z")
 	require.NoError(t, err)
 	sparkInvoiceFields := CreateTokenSparkInvoiceFields(uid[:], tokenID, amount, &memo, senderPublicKey, &expiry)
-	network := Regtest
+	network := btcnetwork.Regtest
 
 	hash, err := HashSparkInvoiceFields(sparkInvoiceFields, network, receiverPublicKey)
 	require.NoError(t, err)

@@ -7,6 +7,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,7 @@ func createValidTokenMetadata(rng *rand.ChaCha8) *TokenMetadata {
 		MaxSupply:               make([]byte, 16),
 		IsFreezable:             true,
 		CreationEntityPublicKey: make([]byte, 33),
-		Network:                 Regtest,
+		Network:                 btcnetwork.Regtest,
 	}
 }
 
@@ -339,7 +340,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 			MaxSupply:               make([]byte, 16),
 			IsFreezable:             false,
 			CreationEntityPublicKey: make([]byte, 33),
-			Network:                 Regtest,
+			Network:                 btcnetwork.Regtest,
 		}
 
 		err := tm.Validate()
@@ -366,7 +367,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 			}, // max uint128
 			IsFreezable:             true,
 			CreationEntityPublicKey: make([]byte, 33),
-			Network:                 Regtest,
+			Network:                 btcnetwork.Regtest,
 		}
 
 		err := tm.Validate()
@@ -395,7 +396,7 @@ func TestActualProductionL1TokenIdentifier(t *testing.T) {
 		MaxSupply:               maxSupply,
 		IsFreezable:             false,
 		CreationEntityPublicKey: L1CreationEntityPublicKey,
-		Network:                 Regtest,
+		Network:                 btcnetwork.Regtest,
 	}
 
 	tokenIdentifier, err := tm.ComputeTokenIdentifierV1()
@@ -422,7 +423,7 @@ func TestActualProductionSparkTokenIdentifier(t *testing.T) {
 		MaxSupply:               maxSupply,
 		IsFreezable:             false,
 		CreationEntityPublicKey: creationEntityPublicKey.Serialize(),
-		Network:                 Regtest,
+		Network:                 btcnetwork.Regtest,
 	}
 
 	tokenIdentifier, err := tm.ComputeTokenIdentifierV1()
@@ -462,10 +463,10 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 		{
 			name: "same input produces same hash",
 			modifier1: func(tm *TokenMetadata) {
-				tm.Network = Mainnet
+				tm.Network = btcnetwork.Mainnet
 			},
 			modifier2: func(tm *TokenMetadata) {
-				tm.Network = Mainnet
+				tm.Network = btcnetwork.Mainnet
 			},
 			shouldBeEqual: true,
 		},
@@ -473,7 +474,7 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 			name:      "different networks produce different hashes",
 			modifier1: nil, // tm1 will have default Regtest network
 			modifier2: func(tm *TokenMetadata) {
-				tm.Network = Mainnet
+				tm.Network = btcnetwork.Mainnet
 			},
 			shouldBeEqual: false,
 		},

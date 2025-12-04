@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
@@ -192,9 +193,9 @@ func TestGenerateDepositAddress(t *testing.T) {
 
 	// Setup test configuration using supported networks
 	config := &so.Config{
-		SupportedNetworks: []common.Network{
-			common.Regtest,
-			common.Mainnet,
+		SupportedNetworks: []btcnetwork.Network{
+			btcnetwork.Regtest,
+			btcnetwork.Mainnet,
 		},
 		SigningOperatorMap: map[string]*so.SigningOperator{},
 		BitcoindConfigs: map[string]so.BitcoindConfig{
@@ -240,8 +241,8 @@ func TestGenerateDepositAddress(t *testing.T) {
 		require.NotNil(t, existingAddress)
 
 		testConfig := &so.Config{
-			SupportedNetworks: []common.Network{
-				common.Regtest,
+			SupportedNetworks: []btcnetwork.Network{
+				btcnetwork.Regtest,
 			},
 			SigningOperatorMap:         map[string]*so.SigningOperator{},
 			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
@@ -264,9 +265,9 @@ func TestGenerateDepositAddress(t *testing.T) {
 
 	t.Run("allow static deposit address for same identity on different network", func(t *testing.T) {
 		testConfig := &so.Config{
-			SupportedNetworks: []common.Network{
-				common.Regtest,
-				common.Mainnet,
+			SupportedNetworks: []btcnetwork.Network{
+				btcnetwork.Regtest,
+				btcnetwork.Mainnet,
 			},
 			SigningOperatorMap:         map[string]*so.SigningOperator{},
 			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
@@ -294,7 +295,7 @@ func TestGenerateStaticDepositAddress(t *testing.T) {
 	testSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	// Set up test configuration using supported networks
 	config := &so.Config{
-		SupportedNetworks:  []common.Network{common.Regtest, common.Mainnet},
+		SupportedNetworks:  []btcnetwork.Network{btcnetwork.Regtest, btcnetwork.Mainnet},
 		SigningOperatorMap: map[string]*so.SigningOperator{},
 		BitcoindConfigs: map[string]so.BitcoindConfig{
 			"regtest": {DepositConfirmationThreshold: 1},
@@ -306,7 +307,7 @@ func TestGenerateStaticDepositAddress(t *testing.T) {
 
 	t.Run("allow static deposit address for same identity on different network", func(t *testing.T) {
 		testConfig := &so.Config{
-			SupportedNetworks:          []common.Network{common.Regtest, common.Mainnet},
+			SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest, btcnetwork.Mainnet},
 			SigningOperatorMap:         map[string]*so.SigningOperator{},
 			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 		}
@@ -331,9 +332,9 @@ func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
 			},
 		},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
-		SupportedNetworks: []common.Network{
-			common.Regtest,
-			common.Mainnet,
+		SupportedNetworks: []btcnetwork.Network{
+			btcnetwork.Regtest,
+			btcnetwork.Mainnet,
 		},
 	}
 	ctx, _ := db.NewTestSQLiteContext(t)

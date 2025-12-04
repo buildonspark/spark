@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/wire"
@@ -100,7 +101,7 @@ func TestParseTokenAnnouncement(t *testing.T) {
 				MaxSupply:               maxSupply,
 				IsFreezable:             false,
 				CreationEntityPublicKey: common.L1CreationEntityPublicKey,
-				Network:                 common.Testnet,
+				Network:                 btcnetwork.Testnet,
 			},
 		},
 		{
@@ -165,7 +166,7 @@ func TestParseTokenAnnouncement(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseTokenAnnouncement(tt.script, common.Testnet)
+			result, err := parseTokenAnnouncement(tt.script, btcnetwork.Testnet)
 			require.NoError(t, err)
 
 			if tt.want == nil {
@@ -344,7 +345,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseTokenAnnouncement(tt.script, common.Testnet)
+			result, err := parseTokenAnnouncement(tt.script, btcnetwork.Testnet)
 			require.ErrorContains(t, err, tt.wantErr)
 			assert.Nil(t, result)
 		})
@@ -399,7 +400,7 @@ func createExpectedTokenMetadata() *common.TokenMetadata {
 		MaxSupply:               maxSupply,
 		IsFreezable:             true,
 		CreationEntityPublicKey: common.L1CreationEntityPublicKey,
-		Network:                 common.Testnet,
+		Network:                 btcnetwork.Testnet,
 	}
 }
 
@@ -448,7 +449,7 @@ func createAlternativeTokenData() []byte {
 func processTokenAnnouncements(t *testing.T, ctx context.Context, config *so.Config, dbClient *ent.Client, transactions []wire.MsgTx, messagePrefix string) {
 	t.Helper()
 
-	err := handleTokenAnnouncements(ctx, config, dbClient, transactions, common.Testnet)
+	err := handleTokenAnnouncements(ctx, config, dbClient, transactions, btcnetwork.Testnet)
 	require.NoError(t, err, "%s should succeed", messagePrefix)
 }
 

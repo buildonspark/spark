@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -172,7 +173,7 @@ func createTestRenewTreeNode(t *testing.T, ctx context.Context, rng io.Reader, d
 	nodeTx, err := common.SerializeTx(nodeTxMsg)
 	require.NoError(t, err)
 
-	ownerSigningAddr, err := common.P2TRAddressFromPublicKey(ownerSigningPubKey, common.Regtest)
+	ownerSigningAddr, err := common.P2TRAddressFromPublicKey(ownerSigningPubKey, btcnetwork.Regtest)
 	require.NoError(t, err)
 	refundTxMsg, err := sparktesting.CreateTestP2TRTransaction(ownerSigningAddr, 100000)
 	require.NoError(t, err)

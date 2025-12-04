@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 
-	"github.com/lightsparkdev/spark/common"
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	"github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/testing/wallet"
@@ -58,7 +58,7 @@ func testPreimageHash(t *testing.T, amountSats uint64) ([32]byte, [32]byte) {
 
 // CreateInvoice is a fake implementation of the LightningInvoiceCreator interface.
 // It returns a fake invoice string.
-func (f *FakeLightningInvoiceCreator) CreateInvoice(_ context.Context, _ common.Network, amountSats int64, _ []byte, _ string, _ time.Duration) (string, error) {
+func (f *FakeLightningInvoiceCreator) CreateInvoice(_ context.Context, _ btcnetwork.Network, amountSats int64, _ []byte, _ string, _ time.Duration) (string, error) {
 	var invoice string
 	if amountSats == 0 {
 		invoice = f.zeroInvoice

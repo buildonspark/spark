@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/wire"
@@ -118,7 +119,7 @@ func (h *TreeCreationHandler) findParentOutputFromCreateTreeRequest(ctx context.
 	}
 }
 
-func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, network common.Network, output *wire.TxOut) (keys.Public, *ent.SigningKeyshare, error) {
+func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, network btcnetwork.Network, output *wire.TxOut) (keys.Public, *ent.SigningKeyshare, error) {
 	addressString, err := common.P2TRAddressFromPkScript(output.PkScript, network)
 	if err != nil {
 		return keys.Public{}, nil, err
@@ -141,7 +142,7 @@ func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, 
 	return depositAddress.OwnerSigningPubkey, keyshare, nil
 }
 
-func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, network common.Network, req *pb.PrepareTreeAddressRequest) (keys.Public, *ent.SigningKeyshare, error) {
+func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, network btcnetwork.Network, req *pb.PrepareTreeAddressRequest) (keys.Public, *ent.SigningKeyshare, error) {
 	parentOutput, err := h.findParentOutputFromPrepareTreeAddressRequest(ctx, req)
 	if err != nil {
 		return keys.Public{}, nil, err
@@ -255,7 +256,7 @@ func (h *TreeCreationHandler) applyKeysharesToTree(ctx context.Context, targetKe
 
 func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 	ctx context.Context,
-	network common.Network,
+	network btcnetwork.Network,
 	node *pbinternal.PrepareTreeAddressNode,
 	keysharesMap map[string]*ent.SigningKeyshare,
 	userIdentityPubKey keys.Public,
@@ -278,7 +279,7 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 		}
-		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+		schemaNetwork, err := network.ToSchemaNetwork()
 		if err != nil {
 			return nil, err
 		}
@@ -327,7 +328,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		return nil, err
 	}
 
-	var network common.Network
+	var network btcnetwork.Network
 	switch req.Source.(type) {
 	case *pb.PrepareTreeAddressRequest_ParentNodeOutput:
 		nodeID, err := uuid.Parse(req.GetParentNodeOutput().GetNodeId())
@@ -351,12 +352,12 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		if err != nil {
 			return nil, err
 		}
-		network, err = common.NetworkFromSchemaNetwork(nodeTree.Network)
+		network, err = btcnetwork.FromSchemaNetwork(nodeTree.Network)
 		if err != nil {
 			return nil, err
 		}
 	case *pb.PrepareTreeAddressRequest_OnChainUtxo:
-		network, err = common.NetworkFromProtoNetwork(req.GetOnChainUtxo().Network)
+		network, err = btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().Network)
 		if err != nil {
 			return nil, err
 		}
@@ -403,7 +404,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		defer conn.Close()
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 
-		protoNetwork, err := common.ProtoNetworkFromNetwork(network)
+		protoNetwork, err := network.ToProtoNetwork()
 		if err != nil {
 			return nil, err
 		}
@@ -440,7 +441,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	}
 	var parentNode *ent.TreeNode
 	var vout uint32
-	var network common.Network
+	var network btcnetwork.Network
 	var schemaNetwork schematype.Network
 	switch req.Source.(type) {
 	case *pb.CreateTreeRequest_ParentNodeOutput:
@@ -457,7 +458,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if err != nil {
 			return nil, nil, err
 		}
-		network, err = common.NetworkFromSchemaNetwork(parentTree.Network)
+		network, err = btcnetwork.FromSchemaNetwork(parentTree.Network)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -465,11 +466,11 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	case *pb.CreateTreeRequest_OnChainUtxo:
 		parentNode = nil
 		vout = req.GetOnChainUtxo().Vout
-		network, err = common.NetworkFromProtoNetwork(req.GetOnChainUtxo().Network)
+		network, err = btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().Network)
 		if err != nil {
 			return nil, nil, err
 		}
-		schemaNetwork, err = common.SchemaNetworkFromNetwork(network)
+		schemaNetwork, err = network.ToSchemaNetwork()
 		if err != nil {
 			return nil, nil, err
 		}

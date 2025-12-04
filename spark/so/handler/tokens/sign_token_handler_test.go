@@ -15,6 +15,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -266,7 +267,7 @@ func setupDBCreateTokenTransactionInternalSignFailedScenario(t *testing.T, setup
 		SetIsFreezable(true).
 		SetIssuerPublicKey(setup.coordinatorPubKey).
 		SetCreationEntityPublicKey(creationEntityPubKey).
-		SetNetwork(common.SchemaNetwork(common.Regtest)).
+		SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
 		SetTokenIdentifier(tokenIdentifier).
 		Save(setup.ctx)
 	require.NoError(t, err)
@@ -337,7 +338,7 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 			SetMaxSupply(testTokenMaxSupplyBytes).
 			SetIsFreezable(testTokenIsFreezable).
 			SetCreationEntityPublicKey(setup.coordinatorPubKey).
-			SetNetwork(common.SchemaNetwork(common.Regtest)).
+			SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
 			SetTokenIdentifier(tokenIdentifier).
 			Save(setup.ctx)
 	}
@@ -356,7 +357,7 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 		SetRevocationKeyshare(keyshare).
 		SetTokenIdentifier(tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
-		SetNetwork(common.SchemaNetwork(common.Regtest)).
+		SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
@@ -372,7 +373,7 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 		SetRevocationKeyshare(keyshare).
 		SetTokenIdentifier(tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
-		SetNetwork(common.SchemaNetwork(common.Regtest)).
+		SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
@@ -493,7 +494,7 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 			SetMaxSupply(testTokenMaxSupplyBytes).
 			SetIsFreezable(testTokenIsFreezable).
 			SetCreationEntityPublicKey(setup.coordinatorPubKey).
-			SetNetwork(common.SchemaNetwork(common.Regtest)).
+			SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
 			SetTokenIdentifier(transferData.tokenIdentifier).
 			Save(setup.ctx)
 	}
@@ -512,7 +513,7 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 		SetRevocationKeyshare(transferData.keyshare).
 		SetTokenIdentifier(transferData.tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
-		SetNetwork(common.SchemaNetwork(common.Regtest)).
+		SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
@@ -528,7 +529,7 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 		SetRevocationKeyshare(transferData.keyshare).
 		SetTokenIdentifier(transferData.tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
-		SetNetwork(common.SchemaNetwork(common.Regtest)).
+		SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
@@ -816,7 +817,7 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRem
 			SetRevocationKeyshare(otherKeyshare).
 			SetTokenIdentifier(transferData.tokenIdentifier).
 			SetTokenCreateID(tokenCreate.ID).
-			SetNetwork(common.SchemaNetwork(common.Regtest)).
+			SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
 			SetOutputCreatedTokenTransaction(otherTx).
 			Save(setup.ctx)
 		assert.NoError(t, err)

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/btcjson"
@@ -89,15 +90,15 @@ func init() {
 	}
 }
 
-func pollInterval(network common.Network) time.Duration {
+func pollInterval(network btcnetwork.Network) time.Duration {
 	switch network {
-	case common.Mainnet:
+	case btcnetwork.Mainnet:
 		return 1 * time.Minute
-	case common.Testnet:
+	case btcnetwork.Testnet:
 		return 1 * time.Minute
-	case common.Regtest:
+	case btcnetwork.Regtest:
 		return 3 * time.Second
-	case common.Signet:
+	case btcnetwork.Signet:
 		return 3 * time.Second
 	default:
 		return 1 * time.Minute
@@ -175,7 +176,7 @@ func scanChainUpdates(
 	config *so.Config,
 	dbClient *ent.Client,
 	bitcoinClient *rpcclient.Client,
-	network common.Network,
+	network btcnetwork.Network,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	defer func() {
@@ -259,7 +260,7 @@ func WatchChain(
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	network, err := common.NetworkFromString(bitcoindConfig.Network)
+	network, err := btcnetwork.FromString(bitcoindConfig.Network)
 	if err != nil {
 		return err
 	}
@@ -314,7 +315,7 @@ func WatchChain(
 	}
 }
 
-func disconnectBlocks(_ context.Context, _ *ent.Client, _ []Tip, _ common.Network) error {
+func disconnectBlocks(_ context.Context, _ *ent.Client, _ []Tip, _ btcnetwork.Network) error {
 	// TODO(DL-100): Add handling for disconnected token withdrawal transactions.
 	return nil
 }
@@ -325,7 +326,7 @@ func connectBlocks(
 	dbClient *ent.Client,
 	bitcoinClient *rpcclient.Client,
 	chainTips []Tip,
-	network common.Network,
+	network btcnetwork.Network,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
@@ -448,13 +449,13 @@ func handleBlock(
 	bitcoinClient *rpcclient.Client,
 	txs []wire.MsgTx,
 	blockHeight int64,
-	network common.Network,
+	network btcnetwork.Network,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	start := time.Now()
 	logger.Sugar().Infof("Starting to handle block at height %d", blockHeight)
 
-	networkParams := common.NetworkParams(network)
+	networkParams := network.Params()
 	_, err := dbClient.BlockHeight.Update().
 		SetHeight(blockHeight).
 		Where(blockheight.NetworkEQ(common.SchemaNetwork(network))).
@@ -673,7 +674,7 @@ func handleBlock(
 	return nil
 }
 
-func storeStaticDeposits(ctx context.Context, dbClient *ent.Client, creditedAddresses []string, addressToUtxoMap map[string][]AddressDepositUtxo, network common.Network, blockHeight int64) error {
+func storeStaticDeposits(ctx context.Context, dbClient *ent.Client, creditedAddresses []string, addressToUtxoMap map[string][]AddressDepositUtxo, network btcnetwork.Network, blockHeight int64) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	staticDepositAddresses, err := dbClient.DepositAddress.Query().

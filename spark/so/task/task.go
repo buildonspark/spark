@@ -497,7 +497,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							if err != nil {
 								return fmt.Errorf("unable to get utxo: %w", err)
 							}
-							protoNetwork, err := common.ProtoNetworkFromSchemaNetwork(utxo.Network)
+							protoNetwork, err := utxo.Network.MarshalProto()
 							if err != nil {
 								return fmt.Errorf("unable to get proto network: %w", err)
 							}

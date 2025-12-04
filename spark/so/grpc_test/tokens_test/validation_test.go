@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -189,7 +189,7 @@ func TestCoordinatedQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t 
 			require.Len(t, correctNetworkResponse.OutputsWithPreviousTransactionData, 1, "expected one outputs when using the correct network")
 
 			wrongNetworkConfig := userOneConfig
-			wrongNetworkConfig.Network = common.Mainnet
+			wrongNetworkConfig.Network = btcnetwork.Mainnet
 
 			wrongNetworkResponse, err := wallet.QueryTokenOutputs(
 				t.Context(),

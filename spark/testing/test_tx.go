@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 )
 
@@ -27,7 +28,7 @@ func CreateTestP2TRTransaction(p2trAddress string, amountSats int64) (*wire.MsgT
 // CreateTestP2TRTransactionWithSequence creates a test P2TR transaction with a dummy input (with specified sequence) and output.
 func CreateTestP2TRTransactionWithSequence(t *testing.T, receiverPubKey keys.Public, sequence uint32, amountSats int64) (*wire.MsgTx, error) {
 	// Convert pubkey to P2TR address
-	p2trAddress, err := common.P2TRAddressFromPublicKey(receiverPubKey, common.Regtest)
+	p2trAddress, err := common.P2TRAddressFromPublicKey(receiverPubKey, btcnetwork.Regtest)
 	if err != nil {
 		return nil, fmt.Errorf("error creating P2TR address: %w", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/google/uuid"
@@ -81,7 +82,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		UtxoSwapStatementTypeCreated,
 		hex.EncodeToString(req.OnChainUtxo.Txid),
 		req.OnChainUtxo.Vout,
-		common.Network(req.OnChainUtxo.Network),
+		btcnetwork.Network(req.OnChainUtxo.Network),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create create utxo swap request statement: %w", err)
@@ -109,7 +110,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	// Validate the request
 	// Check that the on chain utxo is paid to a registered static deposit address and
 	// is confirmed on the blockchain. This logic is implemented in chain watcher.
-	network, err := common.NetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +279,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		UtxoSwapStatementTypeCreated,
 		hex.EncodeToString(req.OnChainUtxo.Txid),
 		req.OnChainUtxo.Vout,
-		common.Network(req.OnChainUtxo.Network),
+		btcnetwork.Network(req.OnChainUtxo.Network),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create create utxo swap request statement: %w", err)
@@ -305,7 +306,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	// Validate the request
 	// Check that the on chain utxo is paid to a registered static deposit address and
 	// is confirmed on the blockchain. This logic is implemented in chain watcher.
-	network, err := common.NetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, err
 	}

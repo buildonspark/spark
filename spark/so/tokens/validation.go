@@ -8,7 +8,7 @@ import (
 
 	"entgo.io/ent/dialect"
 	esql "entgo.io/ent/dialect/sql"
-	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/uint128"
@@ -52,11 +52,11 @@ func ValidateMintDoesNotExceedMaxSupply(ctx context.Context, tokenTransaction *t
 		issuerPublicKey = tokenPublicKey
 	}
 
-	commonNetwork, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
+	commonNetwork, err := btcnetwork.FromProtoNetwork(tokenTransaction.Network)
 	if err != nil {
 		return err
 	}
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(commonNetwork)
+	schemaNetwork, err := commonNetwork.ToSchemaNetwork()
 	if err != nil {
 		return err
 	}

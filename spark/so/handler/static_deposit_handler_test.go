@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
@@ -136,7 +137,7 @@ func createOldBitcoinTxBytes(t *testing.T, receiverPubKey keys.Public) []byte {
 func createValidUserSignatureForTest(
 	txid []byte,
 	vout uint32,
-	network common.Network,
+	network btcnetwork.Network,
 	requestType pb.UtxoSwapRequestType,
 	totalAmount uint64,
 	sspSignature []byte,
@@ -202,7 +203,7 @@ func setUpTestConfigWithRegtestNoAuthz(t *testing.T) *so.Config {
 	cfg := testutil.TestConfig(t)
 
 	// Add regtest support and disable authz for tests
-	cfg.SupportedNetworks = []common.Network{common.Regtest}
+	cfg.SupportedNetworks = []btcnetwork.Network{btcnetwork.Regtest}
 	cfg.BitcoindConfigs = map[string]so.BitcoindConfig{
 		"regtest": {DepositConfirmationThreshold: 1},
 	}
@@ -263,7 +264,7 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 
 			// Verify signature is valid
 			// First, recreate the expected message hash
-			network := common.Network(tc.utxo.Network)
+			network := btcnetwork.Network(tc.utxo.Network)
 
 			expectedMessageHash, err := CreateUtxoSwapStatement(
 				UtxoSwapStatementTypeRollback,

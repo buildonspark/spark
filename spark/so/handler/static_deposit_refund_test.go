@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -47,7 +48,7 @@ func createMockInitiateStaticDepositUtxoRefundRequest(
 	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
 		utxo.Vout,
-		common.Regtest,
+		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		uint64(totalAmount),
 		spendTxSigHash,
@@ -123,7 +124,7 @@ func TestCreateStaticDepositUtxoRefundWithRollback_Success(t *testing.T) {
 	userSignature := createValidUserSignatureForTest(
 		testUtxo.Txid,
 		testUtxo.Vout,
-		common.Regtest,
+		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		uint64(totalAmount),
 		spendTxSigHash,

@@ -636,7 +636,7 @@ func QueryPendingTransfers(
 		return nil, err
 	}
 	defer sparkConn.Close()
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	network, err := config.Network.ToProtoNetwork()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert network to proto network: %w", err)
 	}
@@ -658,7 +658,7 @@ func QueryPendingTransfersBySender(
 		return nil, err
 	}
 	defer sparkConn.Close()
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	network, err := config.Network.ToProtoNetwork()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert network to proto network: %w", err)
 	}
@@ -1283,7 +1283,7 @@ func QueryAllTransfersWithTypes(ctx context.Context, config *TestWalletConfig, l
 		return nil, 0, fmt.Errorf("failed to authenticate with server: %w", err)
 	}
 	authCtx := ContextWithToken(ctx, token)
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	network, err := config.Network.ToProtoNetwork()
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to convert network to proto network: %w", err)
 	}
