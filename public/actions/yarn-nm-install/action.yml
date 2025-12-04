@@ -6,7 +6,7 @@
 # Usage in workflows steps:                                                            #
 #                                                                                      #
 #      - name: 📥 Monorepo install                                                     #
-#        uses: ./public/.github/actions/yarn-nm-install                                       #
+#        uses: ./public/actions/yarn-nm-install                                       #
 #        with:                                                                         #
 #          enable-corepack: false                   # (default = 'false')              #
 #          cwd: ${{ github.workspace }}/apps/my-app # (default = '.')                  #
