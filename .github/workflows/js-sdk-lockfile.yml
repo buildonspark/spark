@@ -1,0 +1,54 @@
+name: "JS SDK Lockfile Maintenance"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "sdks/js/**"
+      - ".github/workflows/js-sdk-lockfile.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: js-sdk-lockfile-${{ github.ref }}
+
+jobs:
+  update-lockfile:
+    # Only run for Copybara-originated sync commits from the private repo.
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'GitOrigin-RevId')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Setup Node"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "yarn"
+          cache-dependency-path: "sdks/js/yarn.lock"
+
+      - name: "Update JS SDK lockfile"
+        working-directory: sdks/js
+        run: |
+          corepack enable
+          yarn install --mode update-lockfile
+
+      - name: "Commit lockfile changes"
+        run: |
+          if git diff --quiet -- sdks/js/yarn.lock; then
+            echo "No lockfile changes to commit."
+            exit 0
+          fi
+
+          git config user.name "Lightspark Eng"
+          git config user.email "engineering@lightspark.com"
+
+          git add sdks/js/yarn.lock
+          git commit -m "[js] Update lockfile for synced public dependency changes"
+          git push
