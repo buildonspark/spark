@@ -45,3 +45,6 @@ _data/
 /.cursor*
 
 *.code-workspace
+
+# Claude Code settings
+.claude/settings.local.json
