@@ -13,10 +13,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 )
 
-const (
-	defaultVersion = 3
-)
-
 // RefundTxType represents the type of refund transaction expected
 type RefundTxType int
 
@@ -38,8 +34,13 @@ func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode
 		return fmt.Errorf("failed to validate user sequence: %w", err)
 	}
 
+	// Allow only V2 or V3 client transactions and use the client's version for construction.
+	if clientTx.Version != 2 && clientTx.Version != 3 {
+		return fmt.Errorf("unsupported transaction version: %d", clientTx.Version)
+	}
+
 	// Construct the expected transaction based on the type
-	expectedTx, err := constructExpectedTransaction(dbLeaf, txType, refundDestPubkey, clientSequence)
+	expectedTx, err := constructExpectedTransaction(dbLeaf, txType, refundDestPubkey, clientSequence, clientTx.Version)
 	if err != nil {
 		return fmt.Errorf("failed to construct expected transaction for leaf %s: %w", dbLeaf.ID, err)
 	}
@@ -65,7 +66,7 @@ func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode
 }
 
 // constructExpectedTransaction constructs the expected Bitcoin transaction based on leaf data from DB and transaction type
-func constructExpectedTransaction(dbLeaf *ent.TreeNode, txType RefundTxType, refundDestPubkey keys.Public, clientSequence uint32) (*wire.MsgTx, error) {
+func constructExpectedTransaction(dbLeaf *ent.TreeNode, txType RefundTxType, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
 	// Validate transaction type early
 	if txType != RefundTxTypeCPFP && txType != RefundTxTypeDirect && txType != RefundTxTypeDirectFromCPFP {
 		return nil, fmt.Errorf("unknown transaction type: %d", txType)
@@ -79,11 +80,11 @@ func constructExpectedTransaction(dbLeaf *ent.TreeNode, txType RefundTxType, ref
 
 	switch txType {
 	case RefundTxTypeCPFP:
-		return constructCPFPRefundTransaction(dbLeaf, refundDestPubkey, serverSequence)
+		return constructCPFPRefundTransaction(dbLeaf, refundDestPubkey, serverSequence, txVersion)
 	case RefundTxTypeDirect:
-		return constructDirectRefundTransaction(dbLeaf, refundDestPubkey, serverSequence)
+		return constructDirectRefundTransaction(dbLeaf, refundDestPubkey, serverSequence, txVersion)
 	case RefundTxTypeDirectFromCPFP:
-		return constructDirectFromCPFPRefundTransaction(dbLeaf, refundDestPubkey, serverSequence)
+		return constructDirectFromCPFPRefundTransaction(dbLeaf, refundDestPubkey, serverSequence, txVersion)
 	default:
 		return nil, fmt.Errorf("unknown transaction type: %d", txType)
 	}
@@ -96,6 +97,7 @@ func constructRefundTransactionGeneric(
 	sourceTxRaw []byte,
 	refundDestPubkey keys.Public,
 	clientSequence uint32,
+	txVersion int32,
 	watchtowerTxs bool,
 	parseTxName string,
 ) (*wire.MsgTx, error) {
@@ -104,7 +106,7 @@ func constructRefundTransactionGeneric(
 		return nil, fmt.Errorf("invalid public key is zero")
 	}
 
-	tx := wire.NewMsgTx(defaultVersion)
+	tx := wire.NewMsgTx(txVersion)
 
 	// Add input spending the provided prevTxHash at index 0
 	tx.AddTxIn(&wire.TxIn{
@@ -149,12 +151,13 @@ func constructRefundTransactionGeneric(
 
 // constructCPFPRefundTransaction constructs a CPFP refund transaction
 // Format: 1 input (spending the leaf UTXO), 2 outputs (refund to user + ephemeral anchor)
-func constructCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32) (*wire.MsgTx, error) {
+func constructCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
 	tx, err := constructRefundTransactionGeneric(
 		dbLeaf.RawTxid.Hash(),
 		dbLeaf.RawTx,
 		refundDestPubkey,
 		clientSequence,
+		txVersion,
 		/*watchtowerTxs=*/ false,
 		/*parseTxName=*/ "node tx",
 	)
@@ -166,12 +169,13 @@ func constructCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.
 
 // constructDirectRefundTransaction constructs a direct refund transaction
 // Format: 1 input (spending DirectTx), 1 output (refund to user)
-func constructDirectRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32) (*wire.MsgTx, error) {
+func constructDirectRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
 	tx, err := constructRefundTransactionGeneric(
 		dbLeaf.DirectTxid.Hash(),
 		dbLeaf.DirectTx,
 		refundDestPubkey,
 		clientSequence,
+		txVersion,
 		/*watchtowerTxs=*/ true,
 		/*parseTxName=*/ "direct tx",
 	)
@@ -183,12 +187,13 @@ func constructDirectRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey key
 
 // constructDirectFromCPFPRefundTransaction constructs a DirectFromCPFP refund transaction
 // Format: 1 input (spending from NodeTx), 1 output (refund to user)
-func constructDirectFromCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32) (*wire.MsgTx, error) {
+func constructDirectFromCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
 	tx, err := constructRefundTransactionGeneric(
 		dbLeaf.RawTxid.Hash(),
 		dbLeaf.RawTx,
 		refundDestPubkey,
 		clientSequence,
+		txVersion,
 		/*watchtowerTxs=*/ true,
 		/*parseTxName=*/ "node tx",
 	)

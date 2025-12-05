@@ -22,10 +22,9 @@ npm i -g bare bare-make
 From the Spark JS workspaces you can test running spark-sdk in bare from our [spark-bare-app](https://github.com/buildonspark/spark/tree/main/sdks/js/examples/spark-bare-app) example scripts or install it in your project and import from the @buildonspark/bare package:
 
 ```js
-import {
-  SparkWallet,
-  BareSparkSigner,
-} from "@buildonspark/bare" with { imports: "./imports.json" };
+import { SparkWallet, BareSparkSigner } from "@buildonspark/bare" with {
+  imports: "./imports.json",
+};
 
 let { wallet, mnemonic } = await SparkWallet.initialize({
   signer: new BareSparkSigner(),

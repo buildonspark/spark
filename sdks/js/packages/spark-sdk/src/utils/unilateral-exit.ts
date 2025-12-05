@@ -66,26 +66,26 @@ export function isEphemeralAnchorOutput(
 ): boolean {
   return Boolean(
     amount === 0n &&
-      script &&
-      // Pattern 1: Bare OP_TRUE (single byte 0x51)
-      ((script.length === 1 && script[0] === 0x51) ||
-        // Pattern 2: Push OP_TRUE (two bytes 0x01 0x51) - MALFORMED but we detect it
-        (script.length === 2 && script[0] === 0x01 && script[1] === 0x51) ||
-        // Pattern 3: Bitcoin v29 ephemeral anchor script (7 bytes: 015152014e0173)
-        (script.length === 7 &&
-          script[0] === 0x01 &&
-          script[1] === 0x51 &&
-          script[2] === 0x52 &&
-          script[3] === 0x01 &&
-          script[4] === 0x4e &&
-          script[5] === 0x01 &&
-          script[6] === 0x73) ||
-        // Pattern 4: Bitcoin ephemeral anchor OP_1 + push 2 bytes (4 bytes: 51024e73)
-        (script.length === 4 &&
-          script[0] === 0x51 &&
-          script[1] === 0x02 &&
-          script[2] === 0x4e &&
-          script[3] === 0x73)),
+    script &&
+    // Pattern 1: Bare OP_TRUE (single byte 0x51)
+    ((script.length === 1 && script[0] === 0x51) ||
+      // Pattern 2: Push OP_TRUE (two bytes 0x01 0x51) - MALFORMED but we detect it
+      (script.length === 2 && script[0] === 0x01 && script[1] === 0x51) ||
+      // Pattern 3: Bitcoin v29 ephemeral anchor script (7 bytes: 015152014e0173)
+      (script.length === 7 &&
+        script[0] === 0x01 &&
+        script[1] === 0x51 &&
+        script[2] === 0x52 &&
+        script[3] === 0x01 &&
+        script[4] === 0x4e &&
+        script[5] === 0x01 &&
+        script[6] === 0x73) ||
+      // Pattern 4: Bitcoin ephemeral anchor OP_1 + push 2 bytes (4 bytes: 51024e73)
+      (script.length === 4 &&
+        script[0] === 0x51 &&
+        script[1] === 0x02 &&
+        script[2] === 0x4e &&
+        script[3] === 0x73)),
   );
 }
 
