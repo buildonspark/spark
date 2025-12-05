@@ -44,7 +44,6 @@ const (
 	SparkInternalService_InitiateSettleReceiverKeyTweak_FullMethodName     = "/spark_internal.SparkInternalService/initiate_settle_receiver_key_tweak"
 	SparkInternalService_SettleReceiverKeyTweak_FullMethodName             = "/spark_internal.SparkInternalService/settle_receiver_key_tweak"
 	SparkInternalService_SettleSenderKeyTweak_FullMethodName               = "/spark_internal.SparkInternalService/settle_sender_key_tweak"
-	SparkInternalService_CreateUtxoSwap_FullMethodName                     = "/spark_internal.SparkInternalService/create_utxo_swap"
 	SparkInternalService_CreateStaticDepositUtxoSwap_FullMethodName        = "/spark_internal.SparkInternalService/create_static_deposit_utxo_swap"
 	SparkInternalService_CreateStaticDepositUtxoRefund_FullMethodName      = "/spark_internal.SparkInternalService/create_static_deposit_utxo_refund"
 	SparkInternalService_RollbackUtxoSwap_FullMethodName                   = "/spark_internal.SparkInternalService/rollback_utxo_swap"
@@ -88,9 +87,6 @@ type SparkInternalServiceClient interface {
 	InitiateSettleReceiverKeyTweak(ctx context.Context, in *InitiateSettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SettleReceiverKeyTweak(ctx context.Context, in *SettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SettleSenderKeyTweak(ctx context.Context, in *SettleSenderKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// Deprecated: Do not use.
-	// DEPRECATED: Use create_static_deposit_utxo_swap() instead.
-	CreateUtxoSwap(ctx context.Context, in *CreateUtxoSwapRequest, opts ...grpc.CallOption) (*CreateUtxoSwapResponse, error)
 	// Create UTXO swap record to claim UTXO by SSP in the static deposit flow
 	CreateStaticDepositUtxoSwap(ctx context.Context, in *CreateStaticDepositUtxoSwapRequest, opts ...grpc.CallOption) (*CreateStaticDepositUtxoSwapResponse, error)
 	// Create UTXO swap record to refund UTXO to the user in the static deposit flow
@@ -354,17 +350,6 @@ func (c *sparkInternalServiceClient) SettleSenderKeyTweak(ctx context.Context, i
 	return out, nil
 }
 
-// Deprecated: Do not use.
-func (c *sparkInternalServiceClient) CreateUtxoSwap(ctx context.Context, in *CreateUtxoSwapRequest, opts ...grpc.CallOption) (*CreateUtxoSwapResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateUtxoSwapResponse)
-	err := c.cc.Invoke(ctx, SparkInternalService_CreateUtxoSwap_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *sparkInternalServiceClient) CreateStaticDepositUtxoSwap(ctx context.Context, in *CreateStaticDepositUtxoSwapRequest, opts ...grpc.CallOption) (*CreateStaticDepositUtxoSwapResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateStaticDepositUtxoSwapResponse)
@@ -514,9 +499,6 @@ type SparkInternalServiceServer interface {
 	InitiateSettleReceiverKeyTweak(context.Context, *InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
 	SettleReceiverKeyTweak(context.Context, *SettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
 	SettleSenderKeyTweak(context.Context, *SettleSenderKeyTweakRequest) (*emptypb.Empty, error)
-	// Deprecated: Do not use.
-	// DEPRECATED: Use create_static_deposit_utxo_swap() instead.
-	CreateUtxoSwap(context.Context, *CreateUtxoSwapRequest) (*CreateUtxoSwapResponse, error)
 	// Create UTXO swap record to claim UTXO by SSP in the static deposit flow
 	CreateStaticDepositUtxoSwap(context.Context, *CreateStaticDepositUtxoSwapRequest) (*CreateStaticDepositUtxoSwapResponse, error)
 	// Create UTXO swap record to refund UTXO to the user in the static deposit flow
@@ -616,9 +598,6 @@ func (UnimplementedSparkInternalServiceServer) SettleReceiverKeyTweak(context.Co
 }
 func (UnimplementedSparkInternalServiceServer) SettleSenderKeyTweak(context.Context, *SettleSenderKeyTweakRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SettleSenderKeyTweak not implemented")
-}
-func (UnimplementedSparkInternalServiceServer) CreateUtxoSwap(context.Context, *CreateUtxoSwapRequest) (*CreateUtxoSwapResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateUtxoSwap not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) CreateStaticDepositUtxoSwap(context.Context, *CreateStaticDepositUtxoSwapRequest) (*CreateStaticDepositUtxoSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateStaticDepositUtxoSwap not implemented")
@@ -1091,24 +1070,6 @@ func _SparkInternalService_SettleSenderKeyTweak_Handler(srv interface{}, ctx con
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkInternalService_CreateUtxoSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateUtxoSwapRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).CreateUtxoSwap(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkInternalService_CreateUtxoSwap_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).CreateUtxoSwap(ctx, req.(*CreateUtxoSwapRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkInternalService_CreateStaticDepositUtxoSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateStaticDepositUtxoSwapRequest)
 	if err := dec(in); err != nil {
@@ -1423,10 +1384,6 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "settle_sender_key_tweak",
 			Handler:    _SparkInternalService_SettleSenderKeyTweak_Handler,
-		},
-		{
-			MethodName: "create_utxo_swap",
-			Handler:    _SparkInternalService_CreateUtxoSwap_Handler,
 		},
 		{
 			MethodName: "create_static_deposit_utxo_swap",

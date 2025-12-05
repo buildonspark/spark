@@ -47,10 +47,6 @@ service SparkInternalService {
     rpc settle_receiver_key_tweak(SettleReceiverKeyTweakRequest) returns (google.protobuf.Empty) {}
     rpc settle_sender_key_tweak(SettleSenderKeyTweakRequest) returns (google.protobuf.Empty) {}
 
-    // DEPRECATED: Use create_static_deposit_utxo_swap() instead.
-    rpc create_utxo_swap(CreateUtxoSwapRequest) returns (CreateUtxoSwapResponse) {
-        option deprecated = true;
-    }
     // Create UTXO swap record to claim UTXO by SSP in the static deposit flow
     rpc create_static_deposit_utxo_swap(CreateStaticDepositUtxoSwapRequest) returns (CreateStaticDepositUtxoSwapResponse) {}
     // Create UTXO swap record to refund UTXO to the user in the static deposit flow
@@ -300,16 +296,6 @@ message SettleReceiverKeyTweakRequest {
 message SettleSenderKeyTweakRequest {
     string transfer_id = 1;
     SettleKeyTweakAction action = 2;
-}
-
-message CreateUtxoSwapRequest {
-    spark.InitiateUtxoSwapRequest request = 1;
-    bytes signature = 2;
-    bytes coordinator_public_key = 3;
-}
-
-message CreateUtxoSwapResponse {
-    string UtxoDepositAddress = 1;
 }
 
 message InitiateStaticDepositUtxoSwapRequest {

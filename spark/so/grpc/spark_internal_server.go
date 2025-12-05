@@ -166,12 +166,6 @@ func (s *SparkInternalServer) SettleSenderKeyTweak(ctx context.Context, req *pb.
 	return &emptypb.Empty{}, transferHandler.SettleSenderKeyTweak(ctx, req)
 }
 
-// Register a utxo swap in all SEs so they can not be called concurrently to spend the same utxo
-func (s *SparkInternalServer) CreateUtxoSwap(ctx context.Context, req *pb.CreateUtxoSwapRequest) (*pb.CreateUtxoSwapResponse, error) {
-	depositHandler := handler.NewInternalDepositHandler(s.config)
-	return depositHandler.CreateUtxoSwap(ctx, s.config, req)
-}
-
 func (s *SparkInternalServer) CreateStaticDepositUtxoSwap(ctx context.Context, req *pb.CreateStaticDepositUtxoSwapRequest) (*pb.CreateStaticDepositUtxoSwapResponse, error) {
 	depositHandler := handler.NewStaticDepositInternalHandler(s.config)
 	return depositHandler.CreateStaticDepositUtxoSwap(ctx, s.config, req)
