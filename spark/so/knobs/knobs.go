@@ -78,21 +78,16 @@ const (
 	KnobTokenTransactionV3Enabled               = "spark.so.tokens.token_transaction_v3_enabled"
 
 	// Number of confirmations required before finalizing tree creation
-	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
-
-	KnobPrivacyEnabled = "spark.so.privacy.enabled"
-
-	KnobReadOnlyEndpoints = "spark.so.ro_session"
-
-	KnobGossipLimit             = "spark.so.gossip.limit"
-	KnobResumeSendTransferLimit = "spark.so.resume_send_transfer.limit"
-
+	KnobNumRequiredConfirmations  = "spark.so.num_required_confirmations"
+	KnobPrivacyEnabled            = "spark.so.privacy.enabled"
+	KnobReadOnlyEndpoints         = "spark.so.ro_session"
+	KnobGossipLimit               = "spark.so.gossip.limit"
+	KnobResumeSendTransferLimit   = "spark.so.resume_send_transfer.limit"
 	KnobTransferBackfillBatchSize = "spark.so.transfer_backfill.batch_size"
-
 	// Enable more rigorous checks for finalize signature requests. See SPARK-236
-	KnobEnableStrictFinalizeSignature = "spark.so.enable_strict_finalize_signature"
-
+	KnobEnableStrictFinalizeSignature        = "spark.so.enable_strict_finalize_signature"
 	KnobEnableStrictDirectRefundTxValidation = "spark.so.enable_strict_direct_refund_tx_validation"
+	KnobSoEnhancedBitcoinTxValidation        = "spark.so.enhanced_bitcoin_tx_validation"
 )
 
 type Config struct {

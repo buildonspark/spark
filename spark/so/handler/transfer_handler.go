@@ -243,6 +243,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	}
 	transfer, leafMap, err := h.createTransfer(
 		ctx,
+		req,
 		req.TransferId,
 		transferType,
 		req.ExpiryTime.AsTime(),

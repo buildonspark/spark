@@ -263,6 +263,7 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 
 	_, _, err = h.createTransfer(
 		ctx,
+		nil,
 		req.TransferId,
 		transferType,
 		req.ExpiryTime.AsTime(),
@@ -450,6 +451,7 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 	}
 	transfer, _, err := h.createTransfer(
 		ctx,
+		nil,
 		transferReq.TransferId,
 		st.TransferTypeCooperativeExit,
 		transferReq.ExpiryTime.AsTime(),

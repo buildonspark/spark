@@ -92,6 +92,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 
 	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
+		nil,
 		req.Transfer.TransferId,
 		st.TransferTypeCooperativeExit,
 		req.Transfer.ExpiryTime.AsTime(),

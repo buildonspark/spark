@@ -122,6 +122,7 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 
 	_, _, err = h.createTransfer(
 		ctx,
+		nil,
 		transferID,
 		st.TransferTypeTransfer,
 		expiry,
@@ -224,6 +225,7 @@ func TestCreateTransfer_FailsWithWrongPrevOutpoint(t *testing.T) {
 	h := NewBaseTransferHandler(config)
 	_, _, err = h.createTransfer(
 		ctx,
+		nil,
 		uuid.NewString(),
 		st.TransferTypeTransfer,
 		time.Now().Add(10*time.Minute),

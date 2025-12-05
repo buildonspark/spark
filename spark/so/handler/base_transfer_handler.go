@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
@@ -412,6 +413,7 @@ func validateSendLeafRefundTxs(ctx context.Context, leaf *ent.TreeNode, rawRefun
 
 func (h *BaseTransferHandler) createTransfer(
 	ctx context.Context,
+	req *pb.StartTransferRequest,
 	transferID string,
 	transferType st.TransferType,
 	expiryTime time.Time,
@@ -498,6 +500,12 @@ func (h *BaseTransferHandler) createTransfer(
 	leaves, network, err := loadLeavesWithLock(ctx, db, leafCpfpRefundMap)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to load leaves: %w", err)
+	}
+
+	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeSwap || transferType == st.TransferTypeCounterSwap {
+		if err := h.validateAndConstructBitcoinTransactions(ctx, req, transferType, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	transfer, err := transferCreate.SetNetwork(*network).Save(ctx)
@@ -1323,6 +1331,257 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 	return leafTweaksMap, nil
 }
 
+func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
+	ctx context.Context,
+	req *pb.StartTransferRequest,
+	transferType st.TransferType,
+	leaves []*ent.TreeNode,
+	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
+	refundDestPubkey keys.Public,
+) error {
+	if req == nil {
+		return nil
+	}
+
+	enhancedValidationEnabled := knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoEnhancedBitcoinTxValidation, 0) > 0
+	if !enhancedValidationEnabled {
+		return nil
+	}
+
+	nodesByID := leavesToMap(leaves)
+
+	switch transferType {
+	case st.TransferTypeTransfer:
+		if req.TransferPackage == nil {
+			return validateLegacyLeavesToSend_transfer(nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
+		}
+		return validateLeaves_transfer(req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
+
+	case st.TransferTypeSwap, st.TransferTypeCounterSwap:
+		return validateLeaves_swap(nodesByID, leafCpfpRefundMap, refundDestPubkey)
+
+	default:
+		return fmt.Errorf("invalid transfer type: %s", transferType)
+	}
+}
+
+// validateSingleLeafRefundTxs validates all refund transactions for a single leaf.
+// It enforces that:
+// - CPFP refund tx is always present and valid
+// - DirectFromCpfp refund tx is always present and valid on transfers
+// - Direct refund tx is present and valid only if needsDirectRefundTx returns true
+func validateSingleLeafRefundTxs(
+	node *ent.TreeNode,
+	cpfpRefundTx []byte,
+	directFromCpfpRefundTx []byte,
+	directRefundTx []byte,
+	refundDestPubkey keys.Public,
+	transferType st.TransferType,
+) error {
+	if len(cpfpRefundTx) == 0 {
+		return fmt.Errorf("missing required CPFP refund tx for leaf")
+	}
+
+	if err := bitcointransaction.VerifyTransactionWithDatabase(
+		cpfpRefundTx,
+		node,
+		bitcointransaction.RefundTxTypeCPFP,
+		refundDestPubkey,
+	); err != nil {
+		return fmt.Errorf("CPFP refund tx validation failed for leaf: %w", err)
+	}
+
+	if transferType == st.TransferTypeTransfer {
+		if len(directFromCpfpRefundTx) == 0 {
+			return fmt.Errorf("missing required direct from CPFP refund tx for leaf")
+		}
+
+		if err := bitcointransaction.VerifyTransactionWithDatabase(
+			directFromCpfpRefundTx,
+			node,
+			bitcointransaction.RefundTxTypeDirectFromCPFP,
+			refundDestPubkey,
+		); err != nil {
+			return fmt.Errorf("direct from CPFP refund tx validation failed for leaf: %w", err)
+		}
+
+		// Conditionally validate Direct refund transaction
+		hasDirectRefundTx := len(directRefundTx) > 0
+
+		if needsDirectRefundTx(node) {
+			if !hasDirectRefundTx {
+				return fmt.Errorf("missing required direct refund tx for leaf")
+			}
+
+			if err := bitcointransaction.VerifyTransactionWithDatabase(
+				directRefundTx,
+				node,
+				bitcointransaction.RefundTxTypeDirect,
+				refundDestPubkey,
+			); err != nil {
+				return fmt.Errorf("direct refund tx validation failed for leaf: %w", err)
+			}
+		} else {
+			if hasDirectRefundTx {
+				return fmt.Errorf("unexpected direct refund tx for leaf (node tx has timelock == 0)")
+			}
+		}
+	}
+
+	return nil
+}
+
+func leavesToMap(leaves []*ent.TreeNode) map[string]*ent.TreeNode {
+	nodesByID := make(map[string]*ent.TreeNode, len(leaves))
+	for _, node := range leaves {
+		nodesByID[node.ID.String()] = node
+	}
+	return nodesByID
+}
+
+func validateLegacyLeavesToSend_transfer(
+	nodesByID map[string]*ent.TreeNode,
+	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
+	refundDestPubkey keys.Public,
+) error {
+	for leafID := range leafCpfpRefundMap {
+		node, exists := nodesByID[leafID]
+		if !exists {
+			return fmt.Errorf("leaf %s not found in loaded leaves", leafID)
+		}
+
+		cpfpRefundTx := leafCpfpRefundMap[leafID]
+		directFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leafID]
+		directRefundTx := leafDirectRefundMap[leafID]
+
+		if err := validateSingleLeafRefundTxs(
+			node,
+			cpfpRefundTx,
+			directFromCpfpRefundTx,
+			directRefundTx,
+			refundDestPubkey,
+			st.TransferTypeTransfer,
+		); err != nil {
+			return fmt.Errorf("leaf %s validation for legacy transfer failed: %w", leafID, err)
+		}
+	}
+	return nil
+}
+
+func validateLeaves_transfer(
+	req *pb.StartTransferRequest,
+	nodesByID map[string]*ent.TreeNode,
+	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
+	refundDestPubkey keys.Public,
+) error {
+	leavesToSendByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.LeavesToSend))
+	for _, leaf := range req.TransferPackage.LeavesToSend {
+		parsed, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
+			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
+		}
+		leafID := parsed.String()
+		if _, exists := leavesToSendByID[leafID]; exists {
+			return fmt.Errorf("duplicate leaf id: %s", leafID)
+		}
+		leavesToSendByID[leafID] = leaf
+	}
+
+	directLeavesByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.DirectLeavesToSend))
+	for _, leaf := range req.TransferPackage.DirectLeavesToSend {
+		parsed, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
+			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
+		}
+		directLeafID := parsed.String()
+		if _, ok := leavesToSendByID[directLeafID]; !ok {
+			return fmt.Errorf("found orphan leaf in DirectLeavesToSend with ID %s that does not correspond to any leaf in LeavesToSend", leaf.LeafId)
+		}
+		if _, exists := directLeavesByID[directLeafID]; exists {
+			return fmt.Errorf("duplicate leaf id: %s", directLeafID)
+		}
+		directLeavesByID[directLeafID] = leaf
+	}
+
+	if len(req.TransferPackage.LeavesToSend) != len(req.TransferPackage.DirectFromCpfpLeavesToSend) {
+		return fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(req.TransferPackage.LeavesToSend), len(req.TransferPackage.DirectFromCpfpLeavesToSend))
+	}
+
+	directFromCpfpLeavesByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.DirectFromCpfpLeavesToSend))
+	for _, leaf := range req.TransferPackage.DirectFromCpfpLeavesToSend {
+		parsed, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
+			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
+		}
+		directFromCpfpLeafID := parsed.String()
+		if _, ok := leavesToSendByID[directFromCpfpLeafID]; !ok {
+			return fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s which is not in LeavesToSend", leaf.LeafId)
+		}
+		if _, exists := directFromCpfpLeavesByID[directFromCpfpLeafID]; exists {
+			return fmt.Errorf("duplicate leaf id: %s", directFromCpfpLeafID)
+		}
+		directFromCpfpLeavesByID[directFromCpfpLeafID] = leaf
+	}
+
+	for leafID := range leafCpfpRefundMap {
+		node, exists := nodesByID[leafID]
+		if !exists {
+			return fmt.Errorf("leaf %s not found in loaded leaves", leafID)
+		}
+
+		cpfpRefundTx := leafCpfpRefundMap[leafID]
+		directFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leafID]
+		directRefundTx := leafDirectRefundMap[leafID]
+
+		if err := validateSingleLeafRefundTxs(
+			node,
+			cpfpRefundTx,
+			directFromCpfpRefundTx,
+			directRefundTx,
+			refundDestPubkey,
+			st.TransferTypeTransfer,
+		); err != nil {
+			return fmt.Errorf("leaf %s validation for transfer failed: %w", leafID, err)
+		}
+	}
+
+	return nil
+}
+
+func validateLeaves_swap(
+	nodesByID map[string]*ent.TreeNode,
+	leafCpfpRefundMap map[string][]byte,
+	refundDestPubkey keys.Public,
+) error {
+	for leafID := range leafCpfpRefundMap {
+		node, exists := nodesByID[leafID]
+		if !exists {
+			return fmt.Errorf("leaf %s not found in loaded leaves", leafID)
+		}
+
+		cpfpRefundTx := leafCpfpRefundMap[leafID]
+
+		if err := validateSingleLeafRefundTxs(
+			node,
+			cpfpRefundTx,
+			nil,
+			nil,
+			refundDestPubkey,
+			st.TransferTypeSwap,
+		); err != nil {
+			return fmt.Errorf("leaf %s validation for swap failed: %w", leafID, err)
+		}
+	}
+
+	return nil
+}
+
 func (h *BaseTransferHandler) validateKeyTweakProofs(ctx context.Context, transfer *ent.Transfer, senderKeyTweakProofs map[string]*pbspark.SecretProof) error {
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
@@ -1451,4 +1710,20 @@ func (h *BaseTransferHandler) CommitSwapKeyTweaks(
 	logger.Sugar().Infof("Successfully tweaked keys for primary transfer %s (status: %s) and counter transfer %s (status: %s)", primaryTransfer.ID, primaryTransfer.Status, counterTransfer.ID, counterTransfer.Status)
 
 	return nil
+}
+
+// If the node tx has a timelock > 0, we need to send a direct refund tx
+func needsDirectRefundTx(leaf *ent.TreeNode) bool {
+	nodeTxBytes := leaf.RawTx
+	nodeTx, err := common.TxFromRawTxBytes(nodeTxBytes)
+	if err != nil {
+		return false
+	}
+
+	if len(nodeTx.TxIn) == 0 {
+		return false
+	}
+	nodeTxTimelock := bitcointransaction.GetTimelockFromSequence(nodeTx.TxIn[0].Sequence)
+
+	return nodeTxTimelock > 0
 }
