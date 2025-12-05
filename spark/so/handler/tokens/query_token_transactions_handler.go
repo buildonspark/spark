@@ -29,14 +29,16 @@ type QueryTokenTransactionsHandler struct {
 	includeExpiredTransactions bool
 }
 
-const MaxTokenTransactionFilterValues = 500
-const MaxTokenTransactionPageSize = 100
-const DefaultTokenTransactionPageSize = 50
+const (
+	maxTokenTransactionFilterValues = 500
+	maxTokenTransactionPageSize     = 100
+	defaultTokenTransactionPageSize = 50
+)
 
 type queryParams struct {
-	outputIds              []string
-	ownerPublicKeys        [][]byte
-	issuerPublicKeys       [][]byte
+	outputIDs              []string
+	ownerPublicKeys        []keys.Public
+	issuerPublicKeys       []keys.Public
 	tokenIdentifiers       [][]byte
 	tokenTransactionHashes [][]byte
 	order                  sparkpb.Order
@@ -44,24 +46,34 @@ type queryParams struct {
 	offset                 int64
 }
 
-func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) *queryParams {
+func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryParams, error) {
 	limit := req.GetLimit()
 	if limit == 0 {
-		limit = DefaultTokenTransactionPageSize
-	} else if limit > MaxTokenTransactionPageSize {
-		limit = MaxTokenTransactionPageSize
+		limit = defaultTokenTransactionPageSize
+	} else if limit > maxTokenTransactionPageSize {
+		limit = maxTokenTransactionPageSize
+	}
+
+	ownerPubKeys, err := keys.ParsePublicKeys(req.GetOwnerPublicKeys())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner public keys: %w", err)
+	}
+
+	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner public keys: %w", err)
 	}
 
 	return &queryParams{
-		outputIds:              req.OutputIds,
-		ownerPublicKeys:        req.GetOwnerPublicKeys(),
-		issuerPublicKeys:       req.GetIssuerPublicKeys(),
-		tokenIdentifiers:       req.TokenIdentifiers,
-		tokenTransactionHashes: req.TokenTransactionHashes,
+		outputIDs:              req.OutputIds,
+		ownerPublicKeys:        ownerPubKeys,
+		issuerPublicKeys:       issuerPubKeys,
+		tokenIdentifiers:       req.GetTokenIdentifiers(),
+		tokenTransactionHashes: req.GetTokenTransactionHashes(),
 		order:                  req.GetOrder(),
 		limit:                  limit,
 		offset:                 req.Offset,
-	}
+	}, nil
 }
 
 // NewQueryTokenTransactionsHandler creates a new QueryTokenTransactionsHandler.
@@ -90,7 +102,10 @@ func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Conte
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	params := normalizeQueryParams(req)
+	params, err := normalizeQueryParams(req)
+	if err != nil {
+		return nil, err
+	}
 	var transactions []*ent.TokenTransaction
 
 	// Check if we should use the optimized UNION query
@@ -111,33 +126,33 @@ func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Conte
 }
 
 func validateQueryTokenTransactionsRequest(req *tokenpb.QueryTokenTransactionsRequest) error {
-	if len(req.OutputIds) > MaxTokenTransactionFilterValues {
+	if len(req.OutputIds) > maxTokenTransactionFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many output ids in filter: got %d, max %d", len(req.OutputIds), MaxTokenTransactionFilterValues),
+			fmt.Errorf("too many output ids in filter: got %d, max %d", len(req.OutputIds), maxTokenTransactionFilterValues),
 		)
 	}
 
-	if len(req.OwnerPublicKeys) > MaxTokenTransactionFilterValues {
+	if len(req.OwnerPublicKeys) > maxTokenTransactionFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.OwnerPublicKeys), MaxTokenTransactionFilterValues),
+			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.OwnerPublicKeys), maxTokenTransactionFilterValues),
 		)
 	}
 
-	if len(req.IssuerPublicKeys) > MaxTokenTransactionFilterValues {
+	if len(req.IssuerPublicKeys) > maxTokenTransactionFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.IssuerPublicKeys), MaxTokenTransactionFilterValues),
+			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.IssuerPublicKeys), maxTokenTransactionFilterValues),
 		)
 	}
 
-	if len(req.TokenIdentifiers) > MaxTokenTransactionFilterValues {
+	if len(req.TokenIdentifiers) > maxTokenTransactionFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.TokenIdentifiers), MaxTokenTransactionFilterValues),
+			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.TokenIdentifiers), maxTokenTransactionFilterValues),
 		)
 	}
 
-	if len(req.TokenTransactionHashes) > MaxTokenTransactionFilterValues {
+	if len(req.TokenTransactionHashes) > maxTokenTransactionFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.TokenTransactionHashes), MaxTokenTransactionFilterValues),
+			fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.TokenTransactionHashes), maxTokenTransactionFilterValues),
 		)
 	}
 
@@ -147,7 +162,7 @@ func validateQueryTokenTransactionsRequest(req *tokenpb.QueryTokenTransactionsRe
 // shouldUseOptimizedQuery determines if we should use the optimized UNION-based query
 func (h *QueryTokenTransactionsHandler) shouldUseOptimizedQuery(params *queryParams) bool {
 	// Use optimized query when we have filters that require token_outputs joins
-	hasOutputFilters := len(params.outputIds) > 0 ||
+	hasOutputFilters := len(params.outputIDs) > 0 ||
 		len(params.ownerPublicKeys) > 0 ||
 		len(params.issuerPublicKeys) > 0 ||
 		len(params.tokenIdentifiers) > 0
@@ -244,33 +259,16 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(params *queryParams)
 		argIndex: 1,
 	}
 
-	// Parse owner public keys if provided
-	var ownerPubKeys []keys.Public
-	if len(params.ownerPublicKeys) > 0 {
-		var err error
-		ownerPubKeys, err = keys.ParsePublicKeys(params.ownerPublicKeys)
-		if err != nil {
-			return "", nil, fmt.Errorf("failed to parse owner public key: %w", err)
-		}
-	}
-
-	// Parse issuer public keys if provided
-	var issuerPubKeys []keys.Public
-	if len(params.issuerPublicKeys) > 0 {
-		var err error
-		issuerPubKeys, err = keys.ParsePublicKeys(params.issuerPublicKeys)
-		if err != nil {
-			return "", nil, fmt.Errorf("failed to parse issuer public key: %w", err)
-		}
-	}
+	ownerPubKeys := params.ownerPublicKeys
+	issuerPubKeys := params.issuerPublicKeys
 
 	// Build a single CTE with ALL filters combined
 	// This ensures the same output satisfies all conditions
 	var whereConditions []string
 
 	// Handle OutputIds filter
-	if len(params.outputIds) > 0 {
-		outputUUIDs, err := uuids.ParseSlice(params.outputIds)
+	if len(params.outputIDs) > 0 {
+		outputUUIDs, err := uuids.ParseSlice(params.outputIDs)
 		if err != nil {
 			return "", nil, fmt.Errorf("invalid output ID format: %w", err)
 		}
