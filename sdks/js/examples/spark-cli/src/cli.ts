@@ -1086,14 +1086,15 @@ async function runCLI() {
           const balanceInfo = await wallet.getBalance();
           console.log("Sats Balance: " + balanceInfo.balance);
           if (balanceInfo.tokenBalances && balanceInfo.tokenBalances.size > 0) {
-            console.log("\nToken Balances:");
+            console.log(
+              "\nToken Balances: [<tokenIdentifier> (<issuerPublicKey>)]",
+            );
             for (const [
               bech32mTokenIdentifier,
               tokenInfo,
             ] of balanceInfo.tokenBalances.entries()) {
-              console.log(`  Token Identifier (${bech32mTokenIdentifier}):`);
               console.log(
-                `    Token Public Key: ${tokenInfo.tokenMetadata.tokenPublicKey}`,
+                `  ${bech32mTokenIdentifier} (${tokenInfo.tokenMetadata.tokenPublicKey}):`,
               );
               console.log(`    Balance: ${tokenInfo.balance}`);
             }
@@ -2045,16 +2046,18 @@ async function runCLI() {
                   new Uint8Array(0),
               );
             }
-            console.log(`  Raw Token Identifier: ${tokenIdentifier}`);
-            console.log(
-              tokenIdentifier && network !== undefined
-                ? `  Bech32m Token Identifier: ${encodeBech32mTokenIdentifier({
-                    tokenIdentifier: hexToBytes(tokenIdentifier),
-                    network: Network[network] as NetworkType,
-                  })}`
-                : "",
-            );
-            console.log(`  Issuer Public Key: ${issuerPublicKey}`);
+            if (tokenIdentifier) {
+              console.log(`  Raw Token Identifier: ${tokenIdentifier}`);
+              if (network !== undefined) {
+                const bech32mIdentifier = encodeBech32mTokenIdentifier({
+                  tokenIdentifier: hexToBytes(tokenIdentifier),
+                  network: Network[network] as NetworkType,
+                });
+                console.log(`  Token Identifier: ${bech32mIdentifier}`);
+              }
+            } else {
+              console.log(`  Issuer Public Key: ${issuerPublicKey}`);
+            }
 
             if (tx.tokenTransaction?.tokenInputs) {
               const input = tx.tokenTransaction.tokenInputs;
