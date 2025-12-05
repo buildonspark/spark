@@ -443,82 +443,53 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to verify cpfprefund tx signature: %w", err)
 		}
-		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDirectFromCPFPRefund, 0) > 0 {
-			if len(nodeSignatures.DirectRefundTxSignature) > 0 {
-				directRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectRefundTx, 0, nodeSignatures.DirectRefundTxSignature)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
-				}
-				directRefundTx, err := common.TxFromRawTxBytes(directRefundTxBytes)
-				if err != nil {
-					return nil, nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
-				}
-				directTreeNodeTx, err := common.TxFromRawTxBytes(directNodeTxBytes)
-				if err != nil {
-					return nil, nil, fmt.Errorf("unable to deserialize direct leaf tx: %w", err)
-				}
-				if len(directTreeNodeTx.TxOut) <= 0 {
-					return nil, nil, fmt.Errorf("direct vout out of bounds")
-				}
-				err = common.VerifySignatureSingleInput(directRefundTx, 0, directTreeNodeTx.TxOut[0])
-				if err != nil {
-					return nil, nil, fmt.Errorf("unable to verify direct refund tx signature: %w", err)
-				}
-			} else if requireDirectTx && len(node.DirectTx) > 0 {
+		if len(nodeSignatures.DirectRefundTxSignature) > 0 {
+			directRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectRefundTx, 0, nodeSignatures.DirectRefundTxSignature)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+			}
+			directRefundTx, err := common.TxFromRawTxBytes(directRefundTxBytes)
+			if err != nil {
+				return nil, nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+			}
+			directTreeNodeTx, err := common.TxFromRawTxBytes(directNodeTxBytes)
+			if err != nil {
+				return nil, nil, fmt.Errorf("unable to deserialize direct leaf tx: %w", err)
+			}
+			if len(directTreeNodeTx.TxOut) <= 0 {
+				return nil, nil, fmt.Errorf("direct vout out of bounds")
+			}
+			err = common.VerifySignatureSingleInput(directRefundTx, 0, directTreeNodeTx.TxOut[0])
+			if err != nil {
+				return nil, nil, fmt.Errorf("unable to verify direct refund tx signature: %w", err)
+			}
+		} else if requireDirectTx && len(node.DirectTx) > 0 {
+			ignoreZeroNode := knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnableStrictDirectRefundTxValidation, 0) == 0
+
+			isZeroNode, err := isZeroNode(node)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to determine if node is zero node: %w", err)
+			}
+
+			if ignoreZeroNode || !isZeroNode {
 				return nil, nil, fmt.Errorf("DirectRefundTxSignature is required. Please upgrade to the latest SDK version")
 			}
-			if len(nodeSignatures.DirectFromCpfpRefundTxSignature) > 0 {
-				directFromCpfpRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectFromCpfpRefundTx, 0, nodeSignatures.DirectFromCpfpRefundTxSignature)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
-				}
-				directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTxBytes)
-				if err != nil {
-					return nil, nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
-				}
-				err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, cpfpTreeNodeTx.TxOut[0])
-				if err != nil {
-					return nil, nil, fmt.Errorf("unable to verify direct from cpfp refund tx signature: %w", err)
-				}
-			} else if requireDirectTx {
-				return nil, nil, fmt.Errorf("DirectFromCpfpRefundTxSignature is required. Please upgrade to the latest SDK version")
+		}
+		if len(nodeSignatures.DirectFromCpfpRefundTxSignature) > 0 {
+			directFromCpfpRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectFromCpfpRefundTx, 0, nodeSignatures.DirectFromCpfpRefundTxSignature)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 			}
-		} else {
-			if len(nodeSignatures.DirectRefundTxSignature) > 0 && len(nodeSignatures.DirectFromCpfpRefundTxSignature) > 0 {
-				directRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectRefundTx, 0, nodeSignatures.DirectRefundTxSignature)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
-				}
-				directFromCpfpRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectFromCpfpRefundTx, 0, nodeSignatures.DirectFromCpfpRefundTxSignature)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
-				}
-				directRefundTx, err := common.TxFromRawTxBytes(directRefundTxBytes)
-				if err != nil {
-					return nil, nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
-				}
-				directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTxBytes)
-				if err != nil {
-					return nil, nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
-				}
-				directTreeNodeTx, err := common.TxFromRawTxBytes(directNodeTxBytes)
-				if err != nil {
-					return nil, nil, fmt.Errorf("unable to deserialize direct leaf tx: %w", err)
-				}
-				if len(directTreeNodeTx.TxOut) <= 0 {
-					return nil, nil, fmt.Errorf("direct vout out of bounds")
-				}
-				err = common.VerifySignatureSingleInput(directRefundTx, 0, directTreeNodeTx.TxOut[0])
-				if err != nil {
-					return nil, nil, fmt.Errorf("unable to verify direct refund tx signature: %w", err)
-				}
-				err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, cpfpTreeNodeTx.TxOut[0])
-				if err != nil {
-					return nil, nil, fmt.Errorf("unable to verify direct from cpfp refund tx signature: %w", err)
-				}
-			} else if requireDirectTx && len(node.DirectTx) > 0 {
-				return nil, nil, fmt.Errorf("fields DirectRefundTxSignature and DirectFromCpfpRefundTxSignature are required. Please upgrade to the latest SDK version")
+			directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTxBytes)
+			if err != nil {
+				return nil, nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 			}
+			err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, cpfpTreeNodeTx.TxOut[0])
+			if err != nil {
+				return nil, nil, fmt.Errorf("unable to verify direct from cpfp refund tx signature: %w", err)
+			}
+		} else if requireDirectTx && (knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDirectFromCPFPRefund, 0) > 0 || len(node.DirectTx) > 0) {
+			return nil, nil, fmt.Errorf("DirectFromCpfpRefundTxSignature is required. Please upgrade to the latest SDK version")
 		}
 	} else {
 		cpfpRefundTxBytes = node.RawRefundTx
