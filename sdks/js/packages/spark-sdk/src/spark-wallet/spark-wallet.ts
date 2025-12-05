@@ -5020,7 +5020,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @param tokenIdentifiers - Optional array of token identifiers to filter by
    * @param outputIds - Optional array of output IDs to filter by
    * @param order - Optional order for results ("ASCENDING" or "DESCENDING", defaults to "DESCENDING")
-   * @param pageSize - Optional page size (defaults to 100)
+   * @param pageSize - Optional page size (defaults to 50)
    * @param offset - Optional offset for pagination (defaults to 0)
    * @returns Promise resolving to array of token transactions with their current status
    */
@@ -5057,7 +5057,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       tokenIdentifiers,
       outputIds,
       order,
-      pageSize: pageSize ?? 100,
+      pageSize: pageSize ?? 50,
       offset: offset ?? 0,
     });
   }
