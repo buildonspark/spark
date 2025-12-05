@@ -367,6 +367,7 @@ func TestQueryWalletSetting_Existing(t *testing.T) {
 
 	// Generate test identity public key
 	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	masterPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Create existing wallet setting
 	client, err := ent.GetDbFromContext(ctx)
@@ -376,6 +377,7 @@ func TestQueryWalletSetting_Existing(t *testing.T) {
 		Create().
 		SetOwnerIdentityPublicKey(identityPubKey).
 		SetPrivateEnabled(true).
+		SetMasterIdentityPublicKey(masterPubKey).
 		Save(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, existingSetting)
@@ -391,6 +393,7 @@ func TestQueryWalletSetting_Existing(t *testing.T) {
 
 	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
 	assert.True(t, resp.WalletSetting.PrivateEnabled)
+	assert.Equal(t, masterPubKey.Serialize(), resp.WalletSetting.MasterIdentityPublicKey)
 }
 
 func TestQueryWalletSetting_NotExisting(t *testing.T) {
@@ -410,7 +413,8 @@ func TestQueryWalletSetting_NotExisting(t *testing.T) {
 	require.NotNil(t, resp.WalletSetting)
 
 	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
-	assert.False(t, resp.WalletSetting.PrivateEnabled) // default value from schema
+	assert.False(t, resp.WalletSetting.PrivateEnabled)        // default value from schema
+	assert.Nil(t, resp.WalletSetting.MasterIdentityPublicKey) // nil by default
 
 	// Verify it was saved to database
 	database, err := ent.GetDbFromContext(ctx)
@@ -421,5 +425,242 @@ func TestQueryWalletSetting_NotExisting(t *testing.T) {
 		Only(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, identityPubKey, savedSetting.OwnerIdentityPublicKey)
-	assert.False(t, savedSetting.PrivateEnabled) // default value from schema
+	assert.False(t, savedSetting.PrivateEnabled)        // default value from schema
+	assert.Nil(t, savedSetting.MasterIdentityPublicKey) // nil by default
+}
+
+func TestUpdateWalletSetting_SetMasterIdentityPublicKey_CreateNew(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key
+	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	masterPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Set up session context
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+
+	// Test creating new wallet setting with master_identity_public_key
+	request := &pb.UpdateWalletSettingRequest{
+		MasterIdentityPublicKey: &pb.UpdateWalletSettingRequest_SetMasterIdentityPublicKey{
+			SetMasterIdentityPublicKey: masterPubKey.Serialize(),
+		},
+	}
+
+	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.WalletSetting)
+	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
+	assert.Equal(t, masterPubKey.Serialize(), resp.WalletSetting.MasterIdentityPublicKey)
+
+	// Verify it was saved to database
+	database, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	savedSetting, err := database.WalletSetting.
+		Query().
+		Where(walletsetting.OwnerIdentityPublicKey(identityPubKey)).
+		Only(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, identityPubKey, savedSetting.OwnerIdentityPublicKey)
+	assert.NotNil(t, savedSetting.MasterIdentityPublicKey)
+	assert.Equal(t, masterPubKey, *savedSetting.MasterIdentityPublicKey)
+}
+
+func TestUpdateWalletSetting_SetMasterIdentityPublicKey_UpdateExisting(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key
+	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	masterPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Set up session context
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+
+	// Create existing wallet setting without master key
+	database, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	existingSetting, err := database.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(identityPubKey).
+		SetPrivateEnabled(false).
+		Save(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, existingSetting)
+	assert.Nil(t, existingSetting.MasterIdentityPublicKey)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+
+	// Test updating existing wallet setting with master_identity_public_key
+	request := &pb.UpdateWalletSettingRequest{
+		MasterIdentityPublicKey: &pb.UpdateWalletSettingRequest_SetMasterIdentityPublicKey{
+			SetMasterIdentityPublicKey: masterPubKey.Serialize(),
+		},
+	}
+
+	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.WalletSetting)
+
+	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
+	assert.Equal(t, masterPubKey.Serialize(), resp.WalletSetting.MasterIdentityPublicKey)
+
+	// Verify it was updated in database
+	updatedSetting, err := database.WalletSetting.
+		Query().
+		Where(walletsetting.OwnerIdentityPublicKey(identityPubKey)).
+		Only(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, identityPubKey, updatedSetting.OwnerIdentityPublicKey)
+	assert.NotNil(t, updatedSetting.MasterIdentityPublicKey)
+	assert.Equal(t, masterPubKey, *updatedSetting.MasterIdentityPublicKey)
+	assert.Equal(t, existingSetting.ID, updatedSetting.ID) // Same record
+}
+
+func TestUpdateWalletSetting_ClearMasterIdentityPublicKey(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key
+	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	masterPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Set up session context
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+
+	// Create existing wallet setting with master key
+	database, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	existingSetting, err := database.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(identityPubKey).
+		SetPrivateEnabled(false).
+		SetMasterIdentityPublicKey(masterPubKey).
+		Save(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, existingSetting)
+	assert.NotNil(t, existingSetting.MasterIdentityPublicKey)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+
+	// Test clearing master_identity_public_key
+	request := &pb.UpdateWalletSettingRequest{
+		MasterIdentityPublicKey: &pb.UpdateWalletSettingRequest_ClearMasterIdentityPublicKey{
+			ClearMasterIdentityPublicKey: true,
+		},
+	}
+
+	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.WalletSetting)
+
+	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
+	assert.Nil(t, resp.WalletSetting.MasterIdentityPublicKey)
+
+	// Verify it was cleared in database
+	updatedSetting, err := database.WalletSetting.
+		Query().
+		Where(walletsetting.OwnerIdentityPublicKey(identityPubKey)).
+		Only(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, identityPubKey, updatedSetting.OwnerIdentityPublicKey)
+	assert.Nil(t, updatedSetting.MasterIdentityPublicKey)
+	assert.Equal(t, existingSetting.ID, updatedSetting.ID) // Same record
+}
+
+func TestUpdateWalletSetting_UpdateBothFields(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key
+	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	masterPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Set up session context
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+
+	// Create existing wallet setting
+	database, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	existingSetting, err := database.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(identityPubKey).
+		SetPrivateEnabled(false).
+		Save(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, existingSetting)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+
+	// Test updating both private_enabled and master_identity_public_key
+	privateEnabled := true
+	request := &pb.UpdateWalletSettingRequest{
+		PrivateEnabled: &privateEnabled,
+		MasterIdentityPublicKey: &pb.UpdateWalletSettingRequest_SetMasterIdentityPublicKey{
+			SetMasterIdentityPublicKey: masterPubKey.Serialize(),
+		},
+	}
+
+	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.WalletSetting)
+
+	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
+	assert.True(t, resp.WalletSetting.PrivateEnabled)
+	assert.Equal(t, masterPubKey.Serialize(), resp.WalletSetting.MasterIdentityPublicKey)
+
+	// Verify both fields were updated in database
+	updatedSetting, err := database.WalletSetting.
+		Query().
+		Where(walletsetting.OwnerIdentityPublicKey(identityPubKey)).
+		Only(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, identityPubKey, updatedSetting.OwnerIdentityPublicKey)
+	assert.True(t, updatedSetting.PrivateEnabled)
+	assert.NotNil(t, updatedSetting.MasterIdentityPublicKey)
+	assert.Equal(t, masterPubKey, *updatedSetting.MasterIdentityPublicKey)
+	assert.Equal(t, existingSetting.ID, updatedSetting.ID) // Same record
+}
+
+func TestUpdateWalletSetting_NoFieldsProvided_WithOneof(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key
+	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Set up session context
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+
+	// Test with no fields provided (oneof not set)
+	request := &pb.UpdateWalletSettingRequest{
+		// PrivateEnabled is nil
+		// MasterIdentityPublicKey is nil (oneof not set)
+	}
+
+	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
+	require.Error(t, err)
+	require.Nil(t, resp)
+
+	grpcErr, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcErr.Code())
+	assert.Contains(t, grpcErr.Message(), "at least one field must be provided for update")
 }

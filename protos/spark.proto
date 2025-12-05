@@ -1551,10 +1551,15 @@ enum TreeNodeStatus {
 message WalletSetting {
     bytes owner_identity_public_key = 1 [(validate.rules).bytes.len = 33];
     bool private_enabled = 2;
+    optional bytes master_identity_public_key = 3 [(validate.rules).bytes.len = 33];
 }
 
 message UpdateWalletSettingRequest {
     optional bool private_enabled = 1;
+    oneof master_identity_public_key {
+        bytes set_master_identity_public_key = 2;
+        bool clear_master_identity_public_key = 3;
+    }
 }
 
 message UpdateWalletSettingResponse {

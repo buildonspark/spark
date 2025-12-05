@@ -2053,10 +2053,15 @@ export interface AdaptorPublicKeyPackage {
 export interface WalletSetting {
   ownerIdentityPublicKey: Uint8Array;
   privateEnabled: boolean;
+  masterIdentityPublicKey?: Uint8Array | undefined;
 }
 
 export interface UpdateWalletSettingRequest {
   privateEnabled?: boolean | undefined;
+  masterIdentityPublicKey?: { $case: "setMasterIdentityPublicKey"; setMasterIdentityPublicKey: Uint8Array } | {
+    $case: "clearMasterIdentityPublicKey";
+    clearMasterIdentityPublicKey: boolean;
+  } | undefined;
 }
 
 export interface UpdateWalletSettingResponse {
@@ -19323,7 +19328,7 @@ export const AdaptorPublicKeyPackage: MessageFns<AdaptorPublicKeyPackage> = {
 };
 
 function createBaseWalletSetting(): WalletSetting {
-  return { ownerIdentityPublicKey: new Uint8Array(0), privateEnabled: false };
+  return { ownerIdentityPublicKey: new Uint8Array(0), privateEnabled: false, masterIdentityPublicKey: undefined };
 }
 
 export const WalletSetting: MessageFns<WalletSetting> = {
@@ -19333,6 +19338,9 @@ export const WalletSetting: MessageFns<WalletSetting> = {
     }
     if (message.privateEnabled !== false) {
       writer.uint32(16).bool(message.privateEnabled);
+    }
+    if (message.masterIdentityPublicKey !== undefined) {
+      writer.uint32(26).bytes(message.masterIdentityPublicKey);
     }
     return writer;
   },
@@ -19360,6 +19368,14 @@ export const WalletSetting: MessageFns<WalletSetting> = {
           message.privateEnabled = reader.bool();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.masterIdentityPublicKey = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -19375,6 +19391,9 @@ export const WalletSetting: MessageFns<WalletSetting> = {
         ? bytesFromBase64(object.ownerIdentityPublicKey)
         : new Uint8Array(0),
       privateEnabled: isSet(object.privateEnabled) ? globalThis.Boolean(object.privateEnabled) : false,
+      masterIdentityPublicKey: isSet(object.masterIdentityPublicKey)
+        ? bytesFromBase64(object.masterIdentityPublicKey)
+        : undefined,
     };
   },
 
@@ -19386,6 +19405,9 @@ export const WalletSetting: MessageFns<WalletSetting> = {
     if (message.privateEnabled !== false) {
       obj.privateEnabled = message.privateEnabled;
     }
+    if (message.masterIdentityPublicKey !== undefined) {
+      obj.masterIdentityPublicKey = base64FromBytes(message.masterIdentityPublicKey);
+    }
     return obj;
   },
 
@@ -19396,18 +19418,27 @@ export const WalletSetting: MessageFns<WalletSetting> = {
     const message = createBaseWalletSetting();
     message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
     message.privateEnabled = object.privateEnabled ?? false;
+    message.masterIdentityPublicKey = object.masterIdentityPublicKey ?? undefined;
     return message;
   },
 };
 
 function createBaseUpdateWalletSettingRequest(): UpdateWalletSettingRequest {
-  return { privateEnabled: undefined };
+  return { privateEnabled: undefined, masterIdentityPublicKey: undefined };
 }
 
 export const UpdateWalletSettingRequest: MessageFns<UpdateWalletSettingRequest> = {
   encode(message: UpdateWalletSettingRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.privateEnabled !== undefined) {
       writer.uint32(8).bool(message.privateEnabled);
+    }
+    switch (message.masterIdentityPublicKey?.$case) {
+      case "setMasterIdentityPublicKey":
+        writer.uint32(18).bytes(message.masterIdentityPublicKey.setMasterIdentityPublicKey);
+        break;
+      case "clearMasterIdentityPublicKey":
+        writer.uint32(24).bool(message.masterIdentityPublicKey.clearMasterIdentityPublicKey);
+        break;
     }
     return writer;
   },
@@ -19427,6 +19458,28 @@ export const UpdateWalletSettingRequest: MessageFns<UpdateWalletSettingRequest> 
           message.privateEnabled = reader.bool();
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.masterIdentityPublicKey = {
+            $case: "setMasterIdentityPublicKey",
+            setMasterIdentityPublicKey: reader.bytes(),
+          };
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.masterIdentityPublicKey = {
+            $case: "clearMasterIdentityPublicKey",
+            clearMasterIdentityPublicKey: reader.bool(),
+          };
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -19437,13 +19490,31 @@ export const UpdateWalletSettingRequest: MessageFns<UpdateWalletSettingRequest> 
   },
 
   fromJSON(object: any): UpdateWalletSettingRequest {
-    return { privateEnabled: isSet(object.privateEnabled) ? globalThis.Boolean(object.privateEnabled) : undefined };
+    return {
+      privateEnabled: isSet(object.privateEnabled) ? globalThis.Boolean(object.privateEnabled) : undefined,
+      masterIdentityPublicKey: isSet(object.setMasterIdentityPublicKey)
+        ? {
+          $case: "setMasterIdentityPublicKey",
+          setMasterIdentityPublicKey: bytesFromBase64(object.setMasterIdentityPublicKey),
+        }
+        : isSet(object.clearMasterIdentityPublicKey)
+        ? {
+          $case: "clearMasterIdentityPublicKey",
+          clearMasterIdentityPublicKey: globalThis.Boolean(object.clearMasterIdentityPublicKey),
+        }
+        : undefined,
+    };
   },
 
   toJSON(message: UpdateWalletSettingRequest): unknown {
     const obj: any = {};
     if (message.privateEnabled !== undefined) {
       obj.privateEnabled = message.privateEnabled;
+    }
+    if (message.masterIdentityPublicKey?.$case === "setMasterIdentityPublicKey") {
+      obj.setMasterIdentityPublicKey = base64FromBytes(message.masterIdentityPublicKey.setMasterIdentityPublicKey);
+    } else if (message.masterIdentityPublicKey?.$case === "clearMasterIdentityPublicKey") {
+      obj.clearMasterIdentityPublicKey = message.masterIdentityPublicKey.clearMasterIdentityPublicKey;
     }
     return obj;
   },
@@ -19454,6 +19525,32 @@ export const UpdateWalletSettingRequest: MessageFns<UpdateWalletSettingRequest> 
   fromPartial(object: DeepPartial<UpdateWalletSettingRequest>): UpdateWalletSettingRequest {
     const message = createBaseUpdateWalletSettingRequest();
     message.privateEnabled = object.privateEnabled ?? undefined;
+    switch (object.masterIdentityPublicKey?.$case) {
+      case "setMasterIdentityPublicKey": {
+        if (
+          object.masterIdentityPublicKey?.setMasterIdentityPublicKey !== undefined &&
+          object.masterIdentityPublicKey?.setMasterIdentityPublicKey !== null
+        ) {
+          message.masterIdentityPublicKey = {
+            $case: "setMasterIdentityPublicKey",
+            setMasterIdentityPublicKey: object.masterIdentityPublicKey.setMasterIdentityPublicKey,
+          };
+        }
+        break;
+      }
+      case "clearMasterIdentityPublicKey": {
+        if (
+          object.masterIdentityPublicKey?.clearMasterIdentityPublicKey !== undefined &&
+          object.masterIdentityPublicKey?.clearMasterIdentityPublicKey !== null
+        ) {
+          message.masterIdentityPublicKey = {
+            $case: "clearMasterIdentityPublicKey",
+            clearMasterIdentityPublicKey: object.masterIdentityPublicKey.clearMasterIdentityPublicKey,
+          };
+        }
+        break;
+      }
+    }
     return message;
   },
 };

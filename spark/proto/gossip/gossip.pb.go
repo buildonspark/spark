@@ -1026,8 +1026,13 @@ type GossipMessageUpdateWalletSetting struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	OwnerIdentityPublicKey []byte                 `protobuf:"bytes,1,opt,name=owner_identity_public_key,json=ownerIdentityPublicKey,proto3" json:"owner_identity_public_key,omitempty"`
 	PrivateEnabled         *bool                  `protobuf:"varint,2,opt,name=private_enabled,json=privateEnabled,proto3,oneof" json:"private_enabled,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Types that are valid to be assigned to MasterIdentityPublicKey:
+	//
+	//	*GossipMessageUpdateWalletSetting_SetMasterIdentityPublicKey
+	//	*GossipMessageUpdateWalletSetting_ClearMasterIdentityPublicKey
+	MasterIdentityPublicKey isGossipMessageUpdateWalletSetting_MasterIdentityPublicKey `protobuf_oneof:"master_identity_public_key"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *GossipMessageUpdateWalletSetting) Reset() {
@@ -1072,6 +1077,49 @@ func (x *GossipMessageUpdateWalletSetting) GetPrivateEnabled() bool {
 		return *x.PrivateEnabled
 	}
 	return false
+}
+
+func (x *GossipMessageUpdateWalletSetting) GetMasterIdentityPublicKey() isGossipMessageUpdateWalletSetting_MasterIdentityPublicKey {
+	if x != nil {
+		return x.MasterIdentityPublicKey
+	}
+	return nil
+}
+
+func (x *GossipMessageUpdateWalletSetting) GetSetMasterIdentityPublicKey() []byte {
+	if x != nil {
+		if x, ok := x.MasterIdentityPublicKey.(*GossipMessageUpdateWalletSetting_SetMasterIdentityPublicKey); ok {
+			return x.SetMasterIdentityPublicKey
+		}
+	}
+	return nil
+}
+
+func (x *GossipMessageUpdateWalletSetting) GetClearMasterIdentityPublicKey() bool {
+	if x != nil {
+		if x, ok := x.MasterIdentityPublicKey.(*GossipMessageUpdateWalletSetting_ClearMasterIdentityPublicKey); ok {
+			return x.ClearMasterIdentityPublicKey
+		}
+	}
+	return false
+}
+
+type isGossipMessageUpdateWalletSetting_MasterIdentityPublicKey interface {
+	isGossipMessageUpdateWalletSetting_MasterIdentityPublicKey()
+}
+
+type GossipMessageUpdateWalletSetting_SetMasterIdentityPublicKey struct {
+	SetMasterIdentityPublicKey []byte `protobuf:"bytes,3,opt,name=set_master_identity_public_key,json=setMasterIdentityPublicKey,proto3,oneof"`
+}
+
+type GossipMessageUpdateWalletSetting_ClearMasterIdentityPublicKey struct {
+	ClearMasterIdentityPublicKey bool `protobuf:"varint,4,opt,name=clear_master_identity_public_key,json=clearMasterIdentityPublicKey,proto3,oneof"`
+}
+
+func (*GossipMessageUpdateWalletSetting_SetMasterIdentityPublicKey) isGossipMessageUpdateWalletSetting_MasterIdentityPublicKey() {
+}
+
+func (*GossipMessageUpdateWalletSetting_ClearMasterIdentityPublicKey) isGossipMessageUpdateWalletSetting_MasterIdentityPublicKey() {
 }
 
 var File_gossip_proto protoreflect.FileDescriptor
@@ -1142,10 +1190,13 @@ const file_gossip_proto_rawDesc = "" +
 	"\bpreimage\x18\x01 \x01(\fR\bpreimage\x12!\n" +
 	"\fpayment_hash\x18\x02 \x01(\fR\vpaymentHash\"Q\n" +
 	"\x1fGossipMessageSettleSwapKeyTweak\x12.\n" +
-	"\x13counter_transfer_id\x18\x01 \x01(\tR\x11counterTransferId\"\x9f\x01\n" +
+	"\x13counter_transfer_id\x18\x01 \x01(\tR\x11counterTransferId\"\xcd\x02\n" +
 	" GossipMessageUpdateWalletSetting\x129\n" +
 	"\x19owner_identity_public_key\x18\x01 \x01(\fR\x16ownerIdentityPublicKey\x12,\n" +
-	"\x0fprivate_enabled\x18\x02 \x01(\bH\x00R\x0eprivateEnabled\x88\x01\x01B\x12\n" +
+	"\x0fprivate_enabled\x18\x02 \x01(\bH\x01R\x0eprivateEnabled\x88\x01\x01\x12D\n" +
+	"\x1eset_master_identity_public_key\x18\x03 \x01(\fH\x00R\x1asetMasterIdentityPublicKey\x12H\n" +
+	" clear_master_identity_public_key\x18\x04 \x01(\bH\x00R\x1cclearMasterIdentityPublicKeyB\x1c\n" +
+	"\x1amaster_identity_public_keyB\x12\n" +
 	"\x10_private_enabled2H\n" +
 	"\rGossipService\x127\n" +
 	"\x06gossip\x12\x15.gossip.GossipMessage\x1a\x16.google.protobuf.EmptyB-Z+github.com/lightsparkdev/spark/proto/gossipb\x06proto3"
@@ -1247,7 +1298,10 @@ func file_gossip_proto_init() {
 		(*GossipMessage_SettleSwapKeyTweak)(nil),
 		(*GossipMessage_UpdateWalletSetting)(nil),
 	}
-	file_gossip_proto_msgTypes[15].OneofWrappers = []any{}
+	file_gossip_proto_msgTypes[15].OneofWrappers = []any{
+		(*GossipMessageUpdateWalletSetting_SetMasterIdentityPublicKey)(nil),
+		(*GossipMessageUpdateWalletSetting_ClearMasterIdentityPublicKey)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

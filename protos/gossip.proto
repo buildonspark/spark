@@ -116,4 +116,8 @@ message GossipMessageSettleSwapKeyTweak {
 message GossipMessageUpdateWalletSetting {
     bytes owner_identity_public_key = 1;
     optional bool private_enabled = 2;
+    oneof master_identity_public_key {
+        bytes set_master_identity_public_key = 3;
+        bool clear_master_identity_public_key = 4;
+    }
 }

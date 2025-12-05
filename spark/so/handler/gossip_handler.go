@@ -371,7 +371,7 @@ func (h *GossipHandler) handleUpdateWalletSettingGossipMessage(ctx context.Conte
 	logger.Sugar().Infof("Handling wallet setting update gossip message for identity public key %s", ownerIdentityPubKey)
 
 	walletSettingHandler := NewWalletSettingHandler(h.config)
-	_, err = walletSettingHandler.UpdateWalletSettingInternal(ctx, ownerIdentityPubKey, updateWalletSetting.GetPrivateEnabled())
+	_, err = walletSettingHandler.UpdateWalletSettingInternal(ctx, ownerIdentityPubKey, updateWalletSetting.PrivateEnabled, updateWalletSetting)
 	if err != nil {
 		logger.Error("failed to update wallet setting from gossip message", zap.Error(err))
 		return err

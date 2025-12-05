@@ -10561,11 +10561,12 @@ func (x *AdaptorPublicKeyPackage) GetDirectFromCpfpAdaptorPublicKey() []byte {
 }
 
 type WalletSetting struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	OwnerIdentityPublicKey []byte                 `protobuf:"bytes,1,opt,name=owner_identity_public_key,json=ownerIdentityPublicKey,proto3" json:"owner_identity_public_key,omitempty"`
-	PrivateEnabled         bool                   `protobuf:"varint,2,opt,name=private_enabled,json=privateEnabled,proto3" json:"private_enabled,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	OwnerIdentityPublicKey  []byte                 `protobuf:"bytes,1,opt,name=owner_identity_public_key,json=ownerIdentityPublicKey,proto3" json:"owner_identity_public_key,omitempty"`
+	PrivateEnabled          bool                   `protobuf:"varint,2,opt,name=private_enabled,json=privateEnabled,proto3" json:"private_enabled,omitempty"`
+	MasterIdentityPublicKey []byte                 `protobuf:"bytes,3,opt,name=master_identity_public_key,json=masterIdentityPublicKey,proto3,oneof" json:"master_identity_public_key,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *WalletSetting) Reset() {
@@ -10612,11 +10613,23 @@ func (x *WalletSetting) GetPrivateEnabled() bool {
 	return false
 }
 
+func (x *WalletSetting) GetMasterIdentityPublicKey() []byte {
+	if x != nil {
+		return x.MasterIdentityPublicKey
+	}
+	return nil
+}
+
 type UpdateWalletSettingRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	PrivateEnabled *bool                  `protobuf:"varint,1,opt,name=private_enabled,json=privateEnabled,proto3,oneof" json:"private_enabled,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Types that are valid to be assigned to MasterIdentityPublicKey:
+	//
+	//	*UpdateWalletSettingRequest_SetMasterIdentityPublicKey
+	//	*UpdateWalletSettingRequest_ClearMasterIdentityPublicKey
+	MasterIdentityPublicKey isUpdateWalletSettingRequest_MasterIdentityPublicKey `protobuf_oneof:"master_identity_public_key"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *UpdateWalletSettingRequest) Reset() {
@@ -10654,6 +10667,49 @@ func (x *UpdateWalletSettingRequest) GetPrivateEnabled() bool {
 		return *x.PrivateEnabled
 	}
 	return false
+}
+
+func (x *UpdateWalletSettingRequest) GetMasterIdentityPublicKey() isUpdateWalletSettingRequest_MasterIdentityPublicKey {
+	if x != nil {
+		return x.MasterIdentityPublicKey
+	}
+	return nil
+}
+
+func (x *UpdateWalletSettingRequest) GetSetMasterIdentityPublicKey() []byte {
+	if x != nil {
+		if x, ok := x.MasterIdentityPublicKey.(*UpdateWalletSettingRequest_SetMasterIdentityPublicKey); ok {
+			return x.SetMasterIdentityPublicKey
+		}
+	}
+	return nil
+}
+
+func (x *UpdateWalletSettingRequest) GetClearMasterIdentityPublicKey() bool {
+	if x != nil {
+		if x, ok := x.MasterIdentityPublicKey.(*UpdateWalletSettingRequest_ClearMasterIdentityPublicKey); ok {
+			return x.ClearMasterIdentityPublicKey
+		}
+	}
+	return false
+}
+
+type isUpdateWalletSettingRequest_MasterIdentityPublicKey interface {
+	isUpdateWalletSettingRequest_MasterIdentityPublicKey()
+}
+
+type UpdateWalletSettingRequest_SetMasterIdentityPublicKey struct {
+	SetMasterIdentityPublicKey []byte `protobuf:"bytes,2,opt,name=set_master_identity_public_key,json=setMasterIdentityPublicKey,proto3,oneof"`
+}
+
+type UpdateWalletSettingRequest_ClearMasterIdentityPublicKey struct {
+	ClearMasterIdentityPublicKey bool `protobuf:"varint,3,opt,name=clear_master_identity_public_key,json=clearMasterIdentityPublicKey,proto3,oneof"`
+}
+
+func (*UpdateWalletSettingRequest_SetMasterIdentityPublicKey) isUpdateWalletSettingRequest_MasterIdentityPublicKey() {
+}
+
+func (*UpdateWalletSettingRequest_ClearMasterIdentityPublicKey) isUpdateWalletSettingRequest_MasterIdentityPublicKey() {
 }
 
 type UpdateWalletSettingResponse struct {
@@ -11558,12 +11614,17 @@ const file_spark_proto_rawDesc = "" +
 	"\x17AdaptorPublicKeyPackage\x12,\n" +
 	"\x12adaptor_public_key\x18\x01 \x01(\fR\x10adaptorPublicKey\x129\n" +
 	"\x19direct_adaptor_public_key\x18\x02 \x01(\fR\x16directAdaptorPublicKey\x12K\n" +
-	"#direct_from_cpfp_adaptor_public_key\x18\x03 \x01(\fR\x1edirectFromCpfpAdaptorPublicKey\"|\n" +
+	"#direct_from_cpfp_adaptor_public_key\x18\x03 \x01(\fR\x1edirectFromCpfpAdaptorPublicKey\"\xe6\x01\n" +
 	"\rWalletSetting\x12B\n" +
 	"\x19owner_identity_public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\x16ownerIdentityPublicKey\x12'\n" +
-	"\x0fprivate_enabled\x18\x02 \x01(\bR\x0eprivateEnabled\"^\n" +
+	"\x0fprivate_enabled\x18\x02 \x01(\bR\x0eprivateEnabled\x12I\n" +
+	"\x1amaster_identity_public_key\x18\x03 \x01(\fB\a\xfaB\x04z\x02h!H\x00R\x17masterIdentityPublicKey\x88\x01\x01B\x1d\n" +
+	"\x1b_master_identity_public_key\"\x8c\x02\n" +
 	"\x1aUpdateWalletSettingRequest\x12,\n" +
-	"\x0fprivate_enabled\x18\x01 \x01(\bH\x00R\x0eprivateEnabled\x88\x01\x01B\x12\n" +
+	"\x0fprivate_enabled\x18\x01 \x01(\bH\x01R\x0eprivateEnabled\x88\x01\x01\x12D\n" +
+	"\x1eset_master_identity_public_key\x18\x02 \x01(\fH\x00R\x1asetMasterIdentityPublicKey\x12H\n" +
+	" clear_master_identity_public_key\x18\x03 \x01(\bH\x00R\x1cclearMasterIdentityPublicKeyB\x1c\n" +
+	"\x1amaster_identity_public_keyB\x12\n" +
 	"\x10_private_enabled\"Z\n" +
 	"\x1bUpdateWalletSettingResponse\x12;\n" +
 	"\x0ewallet_setting\x18\x01 \x01(\v2\x14.spark.WalletSettingR\rwalletSetting\"\x1b\n" +
@@ -12314,7 +12375,11 @@ func file_spark_proto_init() {
 		(*InvoiceResponse_SatsTransfer)(nil),
 		(*InvoiceResponse_TokenTransfer)(nil),
 	}
-	file_spark_proto_msgTypes[148].OneofWrappers = []any{}
+	file_spark_proto_msgTypes[147].OneofWrappers = []any{}
+	file_spark_proto_msgTypes[148].OneofWrappers = []any{
+		(*UpdateWalletSettingRequest_SetMasterIdentityPublicKey)(nil),
+		(*UpdateWalletSettingRequest_ClearMasterIdentityPublicKey)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

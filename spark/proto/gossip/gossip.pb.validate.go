@@ -2588,6 +2588,35 @@ func (m *GossipMessageUpdateWalletSetting) validate(all bool) error {
 
 	// no validation rules for OwnerIdentityPublicKey
 
+	switch v := m.MasterIdentityPublicKey.(type) {
+	case *GossipMessageUpdateWalletSetting_SetMasterIdentityPublicKey:
+		if v == nil {
+			err := GossipMessageUpdateWalletSettingValidationError{
+				field:  "MasterIdentityPublicKey",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for SetMasterIdentityPublicKey
+	case *GossipMessageUpdateWalletSetting_ClearMasterIdentityPublicKey:
+		if v == nil {
+			err := GossipMessageUpdateWalletSettingValidationError{
+				field:  "MasterIdentityPublicKey",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for ClearMasterIdentityPublicKey
+	default:
+		_ = v // ensures v is used
+	}
+
 	if m.PrivateEnabled != nil {
 		// no validation rules for PrivateEnabled
 	}

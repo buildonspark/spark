@@ -22668,6 +22668,21 @@ func (m *WalletSetting) validate(all bool) error {
 
 	// no validation rules for PrivateEnabled
 
+	if m.MasterIdentityPublicKey != nil {
+
+		if len(m.GetMasterIdentityPublicKey()) != 33 {
+			err := WalletSettingValidationError{
+				field:  "MasterIdentityPublicKey",
+				reason: "value length must be 33 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return WalletSettingMultiError(errors)
 	}
@@ -22767,6 +22782,35 @@ func (m *UpdateWalletSettingRequest) validate(all bool) error {
 	}
 
 	var errors []error
+
+	switch v := m.MasterIdentityPublicKey.(type) {
+	case *UpdateWalletSettingRequest_SetMasterIdentityPublicKey:
+		if v == nil {
+			err := UpdateWalletSettingRequestValidationError{
+				field:  "MasterIdentityPublicKey",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for SetMasterIdentityPublicKey
+	case *UpdateWalletSettingRequest_ClearMasterIdentityPublicKey:
+		if v == nil {
+			err := UpdateWalletSettingRequestValidationError{
+				field:  "MasterIdentityPublicKey",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for ClearMasterIdentityPublicKey
+	default:
+		_ = v // ensures v is used
+	}
 
 	if m.PrivateEnabled != nil {
 		// no validation rules for PrivateEnabled
