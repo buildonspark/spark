@@ -424,6 +424,12 @@ function showQueryTokenTransactionsHelp() {
   console.log(
     "  --sortOrder <order>          Sort order: 'asc' or 'desc' (default: desc)",
   );
+  console.log(
+    "  --pageSize <size>            Number of results per page (default: 10, max: 100)",
+  );
+  console.log(
+    "  --offset <offset>            Number of results to skip (default: 0)",
+  );
   console.log("  --help                        Show this help message");
   console.log("");
   console.log("Examples:");
@@ -435,6 +441,12 @@ function showQueryTokenTransactionsHelp() {
     "  querytokentransactions --sparkAddresses addr1,addr2 --tokenIdentifiers id1,id2",
   );
   console.log("  querytokentransactions --pageSize 10 --offset 0");
+  console.log(
+    "  querytokentransactions --pageSize 25 --offset 50 --sortOrder asc",
+  );
+  console.log(
+    "  querytokentransactions --issuerPublicKeys 02abc123... --pageSize 5",
+  );
   console.log("  querytokentransactions --sortOrder desc");
 }
 
