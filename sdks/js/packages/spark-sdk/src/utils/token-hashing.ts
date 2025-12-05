@@ -1118,58 +1118,11 @@ export function sortInvoiceAttachments(
     return attachments;
   }
 
-  type Keyed = { id: Uint8Array; attachment: InvoiceAttachment };
-  const keyed: Keyed[] = [];
-
-  for (let i = 0; i < attachments.length; i++) {
-    const attachment = attachments[i];
-    if (!attachment) {
-      throw new SparkValidationError(
-        `invoice attachment at index ${i} cannot be null`,
-        {
-          field: `invoiceAttachments[${i}]`,
-          index: i,
-        },
-      );
-    }
-    const invoice = attachment.sparkInvoice;
-
-    let idBytes: Uint8Array | undefined;
-    try {
-      const decoded = bech32m.decode(invoice as any, 500);
-      const payload = SparkAddress.decode(bech32m.fromWords(decoded.words));
-      if (!payload.sparkInvoiceFields || !payload.sparkInvoiceFields.id) {
-        throw new Error("missing spark invoice fields or id");
-      }
-      idBytes = payload.sparkInvoiceFields.id;
-    } catch (err) {
-      throw new SparkValidationError(`invalid invoice at ${i}`, {
-        field: `invoiceAttachments[${i}].sparkInvoice`,
-        index: i,
-        value: invoice,
-        error: err,
-      });
-    }
-    if (!idBytes || idBytes.length !== 16) {
-      throw new SparkValidationError(`invalid invoice id at ${i}`, {
-        field: `invoiceAttachments[${i}].sparkInvoice`,
-        index: i,
-      });
-    }
-    keyed.push({ id: idBytes, attachment });
-  }
-
-  // Sort by UUID bytes (lexicographically)
-  keyed.sort((a, b) => {
-    for (let j = 0; j < a.id.length && j < b.id.length; j++) {
-      const av = a.id[j] as number;
-      const bv = b.id[j] as number;
-      if (av !== bv) return av - bv;
-    }
-    return a.id.length - b.id.length;
+  return [...attachments].sort((a, b) => {
+    const invoiceA = a.sparkInvoice;
+    const invoiceB = b.sparkInvoice;
+    return invoiceA < invoiceB ? -1 : invoiceA > invoiceB ? 1 : 0;
   });
-
-  return keyed.map((k) => k.attachment);
 }
 
 export async function hashTokenTransactionV3(

@@ -4,6 +4,7 @@ import { Network } from "../proto/spark.js";
 import {
   hashTokenTransactionV1,
   hashTokenTransactionV2,
+  sortInvoiceAttachments,
 } from "../utils/token-hashing.js";
 
 // Test constants for consistent test data across all hash tests - matching Go test data
@@ -314,5 +315,96 @@ describe("Hash Token Transaction V2", () => {
       0x34, 0x42, 0x5c, 0xab, 0xe2, 0x23, 0x0d, 0x4f, 0x7b, 0xa4, 0x3c, 0xf2,
       0xa3, 0x2c, 0x27, 0xf0, 0x31, 0xae, 0x08, 0x83,
     ]);
+  });
+});
+
+describe("sortInvoiceAttachments", () => {
+  it("should sort by bech32m string (lexicographic) not by UUID bytes", () => {
+    const attachments = [
+      {
+        sparkInvoice:
+          "sparkl1pgssx2r8ytpwc4exthzsg7ss7a7m69ty8p6s32j0rw65wmd38eamutyezf2ssqgjzqqe4mhekkjh9h58tq0k0522j0uj5zjfdemx76trv5szxvf6psygmq73eyrpps8zctwsyx39pgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjq9h35spgdegtqzfc4uc8c5jcydzhrtv9dznjkwvv66835cxzr60zaczrapxfps6nlk7kqpa4xahmrm4yfm57jxu0l4326rnv4psuwr3ggk582jf9azn",
+      },
+      {
+        sparkInvoice:
+          "sparkl1pgssx2r8ytpwc4exthzsg7ss7a7m69ty8p6s32j0rw65wmd38eamutyezf2ssqgjzqqe4mhekknhnldmyjqdka8ajjdz5zjfdemx76trv5szxv36psygmq73eyrpps8thn0qyx39pgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjq80p5s82syz0gr60at4yv2szssqyr9r8jlh57aa8jan0xskmkv2jqd93zty4vef3lc32ksxfq5c57hpw2j542dnjpjnya3lad2muqcqz26jcj2a9qkf",
+      },
+      {
+        sparkInvoice:
+          "sparkl1pgss9e7ld3nw57ejatjwq64xawwf9akm0yzn09ywfyj5wmr99t5fwrt8zftqsqgjzqqe4mhekk58qsvlkfqd7qlqthvz5zjfdemx76trv5szxve6psygmq73eyrppq8sl80qyx3xpgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjqgq56xjqesr97xccw4u8qn8k68sddsk7rzcs5ctg27pqfu8v0mkfh350tkt4e3g8qr3qyqzcd99recq7ud6yhtvfhtj948a9944zz7q9xxrjhvgp58ut6",
+      },
+    ];
+
+    const sorted = sortInvoiceAttachments(attachments);
+
+    expect(sorted).toEqual([
+      {
+        sparkInvoice:
+          "sparkl1pgss9e7ld3nw57ejatjwq64xawwf9akm0yzn09ywfyj5wmr99t5fwrt8zftqsqgjzqqe4mhekk58qsvlkfqd7qlqthvz5zjfdemx76trv5szxve6psygmq73eyrppq8sl80qyx3xpgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjqgq56xjqesr97xccw4u8qn8k68sddsk7rzcs5ctg27pqfu8v0mkfh350tkt4e3g8qr3qyqzcd99recq7ud6yhtvfhtj948a9944zz7q9xxrjhvgp58ut6",
+      },
+      {
+        sparkInvoice:
+          "sparkl1pgssx2r8ytpwc4exthzsg7ss7a7m69ty8p6s32j0rw65wmd38eamutyezf2ssqgjzqqe4mhekkjh9h58tq0k0522j0uj5zjfdemx76trv5szxvf6psygmq73eyrpps8zctwsyx39pgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjq9h35spgdegtqzfc4uc8c5jcydzhrtv9dznjkwvv66835cxzr60zaczrapxfps6nlk7kqpa4xahmrm4yfm57jxu0l4326rnv4psuwr3ggk582jf9azn",
+      },
+      {
+        sparkInvoice:
+          "sparkl1pgssx2r8ytpwc4exthzsg7ss7a7m69ty8p6s32j0rw65wmd38eamutyezf2ssqgjzqqe4mhekknhnldmyjqdka8ajjdz5zjfdemx76trv5szxv36psygmq73eyrpps8thn0qyx39pgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjq80p5s82syz0gr60at4yv2szssqyr9r8jlh57aa8jan0xskmkv2jqd93zty4vef3lc32ksxfq5c57hpw2j542dnjpjnya3lad2muqcqz26jcj2a9qkf",
+      },
+    ]);
+  });
+
+  it("should verify sorted invoices are in correct order", () => {
+    const attachments = [
+      {
+        sparkInvoice:
+          "sparkl1pgssx2r8ytpwc4exthzsg7ss7a7m69ty8p6s32j0rw65wmd38eamutyezf2ssqgjzqqe4mhekkjh9h58tq0k0522j0uj5zjfdemx76trv5szxvf6psygmq73eyrpps8zctwsyx39pgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjq9h35spgdegtqzfc4uc8c5jcydzhrtv9dznjkwvv66835cxzr60zaczrapxfps6nlk7kqpa4xahmrm4yfm57jxu0l4326rnv4psuwr3ggk582jf9azn",
+      },
+      {
+        sparkInvoice:
+          "sparkl1pgssx2r8ytpwc4exthzsg7ss7a7m69ty8p6s32j0rw65wmd38eamutyezf2ssqgjzqqe4mhekknhnldmyjqdka8ajjdz5zjfdemx76trv5szxv36psygmq73eyrpps8thn0qyx39pgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjq80p5s82syz0gr60at4yv2szssqyr9r8jlh57aa8jan0xskmkv2jqd93zty4vef3lc32ksxfq5c57hpw2j542dnjpjnya3lad2muqcqz26jcj2a9qkf",
+      },
+      {
+        sparkInvoice:
+          "sparkl1pgss9e7ld3nw57ejatjwq64xawwf9akm0yzn09ywfyj5wmr99t5fwrt8zftqsqgjzqqe4mhekk58qsvlkfqd7qlqthvz5zjfdemx76trv5szxve6psygmq73eyrppq8sl80qyx3xpgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjqgq56xjqesr97xccw4u8qn8k68sddsk7rzcs5ctg27pqfu8v0mkfh350tkt4e3g8qr3qyqzcd99recq7ud6yhtvfhtj948a9944zz7q9xxrjhvgp58ut6",
+      },
+    ];
+
+    const sorted = sortInvoiceAttachments(attachments);
+
+    expect(sorted).toEqual([
+      {
+        sparkInvoice:
+          "sparkl1pgss9e7ld3nw57ejatjwq64xawwf9akm0yzn09ywfyj5wmr99t5fwrt8zftqsqgjzqqe4mhekk58qsvlkfqd7qlqthvz5zjfdemx76trv5szxve6psygmq73eyrppq8sl80qyx3xpgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjqgq56xjqesr97xccw4u8qn8k68sddsk7rzcs5ctg27pqfu8v0mkfh350tkt4e3g8qr3qyqzcd99recq7ud6yhtvfhtj948a9944zz7q9xxrjhvgp58ut6",
+      },
+      {
+        sparkInvoice:
+          "sparkl1pgssx2r8ytpwc4exthzsg7ss7a7m69ty8p6s32j0rw65wmd38eamutyezf2ssqgjzqqe4mhekkjh9h58tq0k0522j0uj5zjfdemx76trv5szxvf6psygmq73eyrpps8zctwsyx39pgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjq9h35spgdegtqzfc4uc8c5jcydzhrtv9dznjkwvv66835cxzr60zaczrapxfps6nlk7kqpa4xahmrm4yfm57jxu0l4326rnv4psuwr3ggk582jf9azn",
+      },
+      {
+        sparkInvoice:
+          "sparkl1pgssx2r8ytpwc4exthzsg7ss7a7m69ty8p6s32j0rw65wmd38eamutyezf2ssqgjzqqe4mhekknhnldmyjqdka8ajjdz5zjfdemx76trv5szxv36psygmq73eyrpps8thn0qyx39pgsy3dytxng6g6dmenc45enqtuc03ml2ryqn5wlxkgtkd4tnckaaj6cjq80p5s82syz0gr60at4yv2szssqyr9r8jlh57aa8jan0xskmkv2jqd93zty4vef3lc32ksxfq5c57hpw2j542dnjpjnya3lad2muqcqz26jcj2a9qkf",
+      },
+    ]);
+  });
+
+  it("should return undefined for undefined input", () => {
+    expect(sortInvoiceAttachments(undefined)).toBeUndefined();
+  });
+
+  it("should return empty array for empty input", () => {
+    expect(sortInvoiceAttachments([])).toEqual([]);
+  });
+
+  it("should handle single invoice", () => {
+    const testInvoice = TEST_INVOICE_ATTACHMENTS[0];
+    if (!testInvoice) throw new Error("Test invoice not found");
+
+    const single = [
+      {
+        sparkInvoice: testInvoice.sparkInvoice,
+      },
+    ];
+    const sorted = sortInvoiceAttachments(single);
+    expect(sorted).toEqual(single);
   });
 });

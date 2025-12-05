@@ -1,27 +1,9 @@
-import {
-  ConfigOptions,
-  filterTokenBalanceForTokenIdentifier,
-  WalletConfig,
-} from "@buildonspark/spark-sdk";
+import { filterTokenBalanceForTokenIdentifier } from "@buildonspark/spark-sdk";
 import { jest } from "@jest/globals";
 import { bytesToHex } from "@noble/curves/utils";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { SparkWalletTesting } from "@buildonspark/spark-sdk/test-utils";
-
-export const TOKENS_SCHNORR_CONFIG: Required<ConfigOptions> = {
-  ...WalletConfig.LOCAL,
-  tokenSignatures: "SCHNORR",
-};
-
-export const TOKENS_ECDSA_CONFIG: Required<ConfigOptions> = {
-  ...WalletConfig.LOCAL,
-  tokenSignatures: "ECDSA",
-};
-
-const TEST_CONFIGS = [
-  { name: "TE", config: TOKENS_ECDSA_CONFIG },
-  { name: "TS", config: TOKENS_SCHNORR_CONFIG },
-];
+import { TEST_CONFIGS } from "./test-configs.js";
 
 describe.each(TEST_CONFIGS)(
   "token monitoring tests - $name",

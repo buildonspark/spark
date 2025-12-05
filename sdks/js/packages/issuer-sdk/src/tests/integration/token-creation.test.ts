@@ -1,21 +1,6 @@
-import { ConfigOptions, WalletConfig } from "@buildonspark/spark-sdk";
 import { jest } from "@jest/globals";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
-
-export const TOKENS_SCHNORR_CONFIG: Required<ConfigOptions> = {
-  ...WalletConfig.LOCAL,
-  tokenSignatures: "SCHNORR",
-};
-
-export const TOKENS_ECDSA_CONFIG: Required<ConfigOptions> = {
-  ...WalletConfig.LOCAL,
-  tokenSignatures: "ECDSA",
-};
-
-const TEST_CONFIGS = [
-  { name: "TE", config: TOKENS_ECDSA_CONFIG },
-  { name: "TS", config: TOKENS_SCHNORR_CONFIG },
-];
+import { TEST_CONFIGS } from "./test-configs.js";
 
 describe.each(TEST_CONFIGS)(
   "token creation tests - $name",
