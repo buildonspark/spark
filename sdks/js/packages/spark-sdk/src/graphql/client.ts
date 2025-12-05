@@ -91,6 +91,39 @@ export interface SspClientOptions {
   schemaEndpoint?: string;
 }
 
+// HTTP status codes that indicate transient errors worth retrying
+const RETRYABLE_STATUS_CODES = new Set([
+  502, // Bad Gateway
+  503, // Service Unavailable
+  504, // Gateway Timeout
+]);
+
+function createRetryFetch(
+  baseFetch: typeof globalThis.fetch,
+  maxRetries: number = 5,
+  baseDelayMs: number = 1000,
+): typeof globalThis.fetch {
+  return async (input, init) => {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const response = await baseFetch(input, init);
+
+      if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < maxRetries) {
+        const delay = Math.min(baseDelayMs * Math.pow(2, attempt), 10000);
+        console.warn(
+          `[SspClient] HTTP ${response.status} (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+
+      return response;
+    }
+
+    // This shouldn't be reached, but TypeScript needs it
+    throw new Error("Retry loop exited unexpectedly");
+  };
+}
+
 export interface TransferWithUserRequest extends Transfer {
   userRequest?: UserRequestType;
 }
@@ -129,6 +162,8 @@ export default class SspClient {
     const { fetch } = getFetch();
     const options = config.sspClientOptions;
 
+    const retryFetch = createRetryFetch(fetch as typeof globalThis.fetch);
+
     this.requester = new Requester(
       new NodeKeyCache(DefaultCrypto),
       options.schemaEndpoint || `graphql/spark/2025-03-19`,
@@ -137,7 +172,7 @@ export default class SspClient {
       options.baseUrl,
       DefaultCrypto,
       undefined,
-      fetch as typeof globalThis.fetch,
+      retryFetch,
     );
   }
 
