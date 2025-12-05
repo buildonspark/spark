@@ -1137,6 +1137,7 @@ enum PreimageRequestStatus {
 enum PreimageRequestRole {
     PREIMAGE_REQUEST_ROLE_RECEIVER = 0;
     PREIMAGE_REQUEST_ROLE_SENDER = 1;
+    PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER = 2;
 }
 
 message PreimageRequestWithTransfer {

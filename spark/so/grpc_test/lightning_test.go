@@ -1180,4 +1180,47 @@ func TestQueryHTLCWithRoleFilter(t *testing.T) {
 	require.Equal(t, spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE, htlcs2.PreimageRequests[0].Status)
 	require.Equal(t, transferId, htlcs2.PreimageRequests[0].Transfer.Id)
 	require.Equal(t, int64(-1), htlcs2.Offset)
+
+	// Test a second htlc by swapping the receiver and sender role
+	amountSats2 := uint64(2000)
+	preimage2, err := hex.DecodeString("02")
+	require.NoError(t, err)
+	paymentHash2 := sha256.Sum256(preimage2)
+
+	defer cleanUp(t, receiverConfig, paymentHash2)
+
+	userLeafPrivKey2 := keys.GeneratePrivateKey()
+	nodeToSend2, err := wallet.CreateNewTree(receiverConfig, faucet, userLeafPrivKey2, 2000)
+	require.NoError(t, err)
+
+	newLeafPrivKey2 := keys.GeneratePrivateKey()
+	require.NoError(t, err)
+
+	leaves2 := []wallet.LeafKeyTweak{{
+		Leaf:              nodeToSend2,
+		SigningPrivKey:    userLeafPrivKey2,
+		NewSigningPrivKey: newLeafPrivKey2,
+	}}
+
+	response2, err := wallet.SwapNodesForPreimage(
+		t.Context(),
+		receiverConfig,
+		leaves2,
+		userConfig.IdentityPublicKey(),
+		paymentHash2[:],
+		nil,
+		feeSats,
+		false,
+		amountSats2,
+	)
+	require.NoError(t, err)
+
+	transfer2, err := wallet.DeliverTransferPackage(t.Context(), receiverConfig, response2.Transfer, leaves2, nil)
+	require.NoError(t, err)
+	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer2.Status)
+
+	receiverAndSenderRole := spark.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER
+	htlcsReceiverAndSenderRole, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, nil, nil, &receiverAndSenderRole)
+	require.NoError(t, err, "failed to query htlcs")
+	require.Len(t, htlcsReceiverAndSenderRole.PreimageRequests, 2)
 }

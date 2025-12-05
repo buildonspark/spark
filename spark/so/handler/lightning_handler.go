@@ -1585,6 +1585,11 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pb.QueryHtlcReque
 	// Default to receiver role if not provided
 	if req.MatchRole == pb.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_SENDER {
 		conditions = append(conditions, preimagerequest.SenderIdentityPubkeyEQ(reqIdentityPubKey))
+	} else if req.MatchRole == pb.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER {
+		conditions = append(conditions, preimagerequest.Or(
+			preimagerequest.SenderIdentityPubkeyEQ(reqIdentityPubKey),
+			preimagerequest.ReceiverIdentityPubkeyEQ(reqIdentityPubKey),
+		))
 	} else {
 		conditions = append(conditions, preimagerequest.ReceiverIdentityPubkeyEQ(reqIdentityPubKey))
 	}

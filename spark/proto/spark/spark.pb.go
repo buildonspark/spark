@@ -366,8 +366,9 @@ func (PreimageRequestStatus) EnumDescriptor() ([]byte, []int) {
 type PreimageRequestRole int32
 
 const (
-	PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER PreimageRequestRole = 0
-	PreimageRequestRole_PREIMAGE_REQUEST_ROLE_SENDER   PreimageRequestRole = 1
+	PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER            PreimageRequestRole = 0
+	PreimageRequestRole_PREIMAGE_REQUEST_ROLE_SENDER              PreimageRequestRole = 1
+	PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER PreimageRequestRole = 2
 )
 
 // Enum value maps for PreimageRequestRole.
@@ -375,10 +376,12 @@ var (
 	PreimageRequestRole_name = map[int32]string{
 		0: "PREIMAGE_REQUEST_ROLE_RECEIVER",
 		1: "PREIMAGE_REQUEST_ROLE_SENDER",
+		2: "PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER",
 	}
 	PreimageRequestRole_value = map[string]int32{
-		"PREIMAGE_REQUEST_ROLE_RECEIVER": 0,
-		"PREIMAGE_REQUEST_ROLE_SENDER":   1,
+		"PREIMAGE_REQUEST_ROLE_RECEIVER":            0,
+		"PREIMAGE_REQUEST_ROLE_SENDER":              1,
+		"PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER": 2,
 	}
 )
 
@@ -11674,10 +11677,11 @@ const file_spark_proto_rawDesc = "" +
 	"\x15PreimageRequestStatus\x120\n" +
 	",PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE\x10\x00\x12+\n" +
 	"'PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED\x10\x01\x12$\n" +
-	" PREIMAGE_REQUEST_STATUS_RETURNED\x10\x02*[\n" +
+	" PREIMAGE_REQUEST_STATUS_RETURNED\x10\x02*\x8a\x01\n" +
 	"\x13PreimageRequestRole\x12\"\n" +
 	"\x1ePREIMAGE_REQUEST_ROLE_RECEIVER\x10\x00\x12 \n" +
-	"\x1cPREIMAGE_REQUEST_ROLE_SENDER\x10\x01*8\n" +
+	"\x1cPREIMAGE_REQUEST_ROLE_SENDER\x10\x01\x12-\n" +
+	")PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER\x10\x02*8\n" +
 	"\x13UtxoSwapRequestType\x12\t\n" +
 	"\x05Fixed\x10\x00\x12\n" +
 	"\n" +

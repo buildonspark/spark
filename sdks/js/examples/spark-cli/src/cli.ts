@@ -1420,6 +1420,10 @@ async function runCLI() {
             case "sender":
               matchRole = PreimageRequestRole.PREIMAGE_REQUEST_ROLE_SENDER;
               break;
+            case "both":
+              matchRole =
+                PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER;
+              break;
             default:
               matchRole = PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER;
           }

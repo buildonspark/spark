@@ -335,6 +335,7 @@ export function preimageRequestStatusToJSON(object: PreimageRequestStatus): stri
 export enum PreimageRequestRole {
   PREIMAGE_REQUEST_ROLE_RECEIVER = 0,
   PREIMAGE_REQUEST_ROLE_SENDER = 1,
+  PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER = 2,
   UNRECOGNIZED = -1,
 }
 
@@ -346,6 +347,9 @@ export function preimageRequestRoleFromJSON(object: any): PreimageRequestRole {
     case 1:
     case "PREIMAGE_REQUEST_ROLE_SENDER":
       return PreimageRequestRole.PREIMAGE_REQUEST_ROLE_SENDER;
+    case 2:
+    case "PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER":
+      return PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -359,6 +363,8 @@ export function preimageRequestRoleToJSON(object: PreimageRequestRole): string {
       return "PREIMAGE_REQUEST_ROLE_RECEIVER";
     case PreimageRequestRole.PREIMAGE_REQUEST_ROLE_SENDER:
       return "PREIMAGE_REQUEST_ROLE_SENDER";
+    case PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER:
+      return "PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER";
     case PreimageRequestRole.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
