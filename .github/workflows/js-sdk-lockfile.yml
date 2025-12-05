@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: js-sdk-lockfile-${{ github.ref }}
@@ -38,17 +39,28 @@ jobs:
         run: |
           corepack enable
           yarn install --mode update-lockfile
-
-      - name: "Commit lockfile changes"
+      - name: "Check for lockfile changes"
+        id: lockfile
         run: |
           if git diff --quiet -- sdks/js/yarn.lock; then
-            echo "No lockfile changes to commit."
-            exit 0
+            echo "Lockfile unchanged."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Lockfile updated."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-          git config user.name "Lightspark Eng"
-          git config user.email "engineering@lightspark.com"
+      - name: "Create or update JS lockfile PR"
+        if: steps.lockfile.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: "chore/js-lockfile-sync"
+          commit-message: "[js] Update lockfile for synced public dependency changes"
+          title: "[js] Update lockfile for synced public dependency changes"
+          body: |
+            This PR updates `sdks/js/yarn.lock` to match dependency changes synced from the private repository.
 
-          git add sdks/js/yarn.lock
-          git commit -m "[js] Update lockfile for synced public dependency changes"
-          git push
+            - Source commit: ${{ github.sha }}
+          add-paths: |
+            sdks/js/yarn.lock
