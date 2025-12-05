@@ -683,6 +683,12 @@ func main() {
 		grpc.StreamInterceptor(grpcmiddleware.ChainStreamServer(
 			sparkerrors.ErrorStreamingInterceptor(),
 			sparkgrpc.StreamLogInterceptor(logger.With(zap.String("component", "grpc"))),
+			func() grpc.StreamServerInterceptor {
+				return func(srv any, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+					ctx := knobs.InjectKnobsService(ss.Context(), knobsService)
+					return handler(srv, &grpcmiddleware.WrappedServerStream{ServerStream: ss, WrappedContext: ctx})
+				}
+			}(),
 			sparkgrpc.PanicRecoveryStreamInterceptor(),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).StreamAuthnInterceptor,
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
