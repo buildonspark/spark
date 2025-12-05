@@ -50,6 +50,9 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 			return nil, fmt.Errorf("failed to get single token for freeze request: %w", err)
 		}
 	}
+	if !tokenCreateEnt.IsFreezable {
+		return nil, errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("%s: token identifier %x", tokens.ErrTokenNotFreezable, tokenCreateEnt.TokenIdentifier))
+	}
 	expectedIssuerPublicKey := tokenCreateEnt.IssuerPublicKey
 	if err := utils.ValidateOwnershipSignature(req.IssuerSignature, freezePayloadHash, expectedIssuerPublicKey); err != nil {
 		return nil, fmt.Errorf("invalid issuer signature %s to freeze token with identifier %x with issuer public key %v: %w", req.IssuerSignature, req.GetFreezeTokensPayload().GetTokenIdentifier(), expectedIssuerPublicKey, err)

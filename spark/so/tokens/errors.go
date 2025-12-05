@@ -60,6 +60,7 @@ const (
 	ErrTooManyOperatorsSigned             = "transaction has been signed by %d operators, which exceeds the cancellation threshold of %d"
 	ErrInvalidTransactionStatus           = "transaction is in status %s, but must be in %s status to cancel"
 	ErrStoredOperatorSignatureInvalid     = "stored operator signature is invalid"
+	ErrTokenNotFreezable                  = "token is not configured to be freezable"
 	ErrFailedToGetRevocationKeyshares     = "failed to get revocation keyshares for transaction"
 	ErrFailedToConnectToOperatorForCancel = "failed to connect to operator %s"
 	ErrFailedToQueryOperatorForCancel     = "failed to execute query with operator %s"
