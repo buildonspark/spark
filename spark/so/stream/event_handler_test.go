@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"encoding/hex"
 	"math/rand/v2"
 	"sync"
 	"testing"
@@ -9,10 +10,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/knobs"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
@@ -74,7 +78,7 @@ func TestEventRouterConcurrency(t *testing.T) {
 	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
 	dbClient := ctx.Client
 
-	router := NewEventRouter(dbClient, dbEvents, zaptest.NewLogger(t).With(zap.String("component", "events_router")))
+	router := NewEventRouter(dbClient, dbEvents, zaptest.NewLogger(t).With(zap.String("component", "events_router")), &so.Config{})
 	rng := rand.NewChaCha8([32]byte{})
 	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
@@ -140,7 +144,7 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
 	dbClient := ctx.Client
 
-	router := NewEventRouter(dbClient, dbEvents, zaptest.NewLogger(t).With(zap.String("component", "events_router")))
+	router := NewEventRouter(dbClient, dbEvents, zaptest.NewLogger(t).With(zap.String("component", "events_router")), &so.Config{})
 	rng := rand.NewChaCha8([32]byte{})
 	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
@@ -233,7 +237,7 @@ func TestEventRouterTransferNotification(t *testing.T) {
 	dbClient := ctx.Client
 
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
-	router := NewEventRouter(dbClient, dbEvents, logger)
+	router := NewEventRouter(dbClient, dbEvents, logger, &so.Config{})
 	rng := rand.NewChaCha8([32]byte{})
 
 	receiverKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -311,4 +315,188 @@ func TestEventRouterTransferNotification(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("router did not exit after cancel")
 	}
+}
+
+func TestMasterWalletHasReadAccess(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	cfg := sparktesting.TestConfig(t)
+
+	// Enable privacy knob
+	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobPrivacyEnabled: 100, // 100% rollout = always enabled
+	})
+
+	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key for wallet owner
+	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Generate test identity public key for master
+	masterPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Create wallet setting with privacy enabled and master set
+	_, err := dbClient.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(walletOwnerPubKey).
+		SetPrivateEnabled(true).
+		SetMasterIdentityPublicKey(masterPubKey).
+		Save(t.Context())
+	require.NoError(t, err)
+
+	// Set up stream context with master session
+	streamCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	// Inject knobs and session into stream context
+	streamCtx = knobs.InjectKnobsService(streamCtx, fixedKnobs)
+	streamCtx = authn.InjectSessionForTests(streamCtx, hex.EncodeToString(masterPubKey.Serialize()), 9999999999)
+
+	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
+
+	// Subscribe should succeed because master has access
+	err = router.SubscribeToEvents(walletOwnerPubKey, stream)
+	require.NoError(t, err, "Master wallet should have read access")
+
+	// Verify that the stream received the connected event
+	stream.mu.Lock()
+	require.NotEmpty(t, stream.messages, "Stream should have received connected event")
+	require.NotNil(t, stream.messages[0].GetConnected(), "First message should be connected event")
+	stream.mu.Unlock()
+}
+
+func TestEventRouter_PrivacyEnabled_OwnerAccess(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	cfg := sparktesting.TestConfig(t)
+
+	// Enable privacy knob
+	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobPrivacyEnabled: 100,
+	})
+
+	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	rng := rand.NewChaCha8([32]byte{})
+
+	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Create wallet setting with privacy enabled
+	_, err := dbClient.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(walletOwnerPubKey).
+		SetPrivateEnabled(true).
+		Save(t.Context())
+	require.NoError(t, err)
+
+	// Set up stream context with owner session
+	streamCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	streamCtx = knobs.InjectKnobsService(streamCtx, fixedKnobs)
+	streamCtx = authn.InjectSessionForTests(streamCtx, hex.EncodeToString(walletOwnerPubKey.Serialize()), 9999999999)
+
+	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
+
+	// Subscribe should succeed because owner has access
+	err = router.SubscribeToEvents(walletOwnerPubKey, stream)
+	require.NoError(t, err, "Owner should have read access")
+
+	stream.mu.Lock()
+	require.NotEmpty(t, stream.messages, "Stream should have received connected event")
+	stream.mu.Unlock()
+}
+
+func TestEventRouter_PrivacyEnabled_NoAccess(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	cfg := sparktesting.TestConfig(t)
+
+	// Enable privacy knob
+	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobPrivacyEnabled: 100,
+	})
+
+	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	rng := rand.NewChaCha8([32]byte{})
+
+	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	otherUserPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Create wallet setting with privacy enabled
+	_, err := dbClient.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(walletOwnerPubKey).
+		SetPrivateEnabled(true).
+		Save(t.Context())
+	require.NoError(t, err)
+
+	// Set up stream context with different user session (not owner, not master)
+	streamCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	streamCtx = knobs.InjectKnobsService(streamCtx, fixedKnobs)
+	streamCtx = authn.InjectSessionForTests(streamCtx, hex.EncodeToString(otherUserPubKey.Serialize()), 9999999999)
+
+	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
+
+	// Subscribe should fail because user doesn't have access
+	err = router.SubscribeToEvents(walletOwnerPubKey, stream)
+	require.Error(t, err, "Non-owner should not have read access")
+	require.Contains(t, err.Error(), "user does not have read access to the wallet")
+
+	// Stream should not have received any messages
+	stream.mu.Lock()
+	require.Empty(t, stream.messages, "Stream should not have received any messages")
+	stream.mu.Unlock()
+}
+
+func TestEventRouter_PrivacyEnabled_NoSession(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	cfg := sparktesting.TestConfig(t)
+
+	// Enable privacy knob
+	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobPrivacyEnabled: 100,
+	})
+
+	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	rng := rand.NewChaCha8([32]byte{})
+
+	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Create wallet setting with privacy enabled
+	_, err := dbClient.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(walletOwnerPubKey).
+		SetPrivateEnabled(true).
+		Save(t.Context())
+	require.NoError(t, err)
+
+	// Set up stream context with knobs but NO session
+	streamCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	streamCtx = knobs.InjectKnobsService(streamCtx, fixedKnobs)
+	// Note: No authn session injected
+
+	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
+
+	// Subscribe should fail because there's no session
+	err = router.SubscribeToEvents(walletOwnerPubKey, stream)
+	require.Error(t, err, "Should fail without session")
+	require.Contains(t, err.Error(), "user does not have read access to the wallet")
+
+	stream.mu.Lock()
+	require.Empty(t, stream.messages, "Stream should not have received any messages")
+	stream.mu.Unlock()
 }

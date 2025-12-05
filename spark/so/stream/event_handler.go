@@ -7,12 +7,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/handler"
 	"go.uber.org/zap"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -27,19 +29,34 @@ type EventRouter struct {
 	dbEvents *db.DBEvents
 	logger   *zap.Logger
 	dbClient *ent.Client
+	config   *so.Config
 }
 
-func NewEventRouter(dbClient *ent.Client, dbEvents *db.DBEvents, logger *zap.Logger) *EventRouter {
+func NewEventRouter(dbClient *ent.Client, dbEvents *db.DBEvents, logger *zap.Logger, config *so.Config) *EventRouter {
 	defaultRouter := &EventRouter{
 		dbEvents: dbEvents,
 		logger:   logger,
 		dbClient: dbClient,
+		config:   config,
 	}
 
 	return defaultRouter
 }
 
 func (s *EventRouter) SubscribeToEvents(identityPublicKey keys.Public, stream pb.SparkService_SubscribeToEventsServer) error {
+	readCtx := stream.Context()
+	readOnlySession := db.NewReadOnlySession(readCtx, s.dbClient)
+	readCtx = ent.Inject(readCtx, readOnlySession)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(s.config)
+	hasReadAccess, err := walletSettingHandler.HasReadAccessToWallet(readCtx, identityPublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to check read access: %w", err)
+	}
+	if !hasReadAccess {
+		return fmt.Errorf("user does not have read access to the wallet")
+	}
+
 	notificationChan, cleanup := s.createNotificationChannel(identityPublicKey)
 	defer cleanup()
 

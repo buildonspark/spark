@@ -631,7 +631,7 @@ func main() {
 
 	var eventsRouter *events.EventRouter
 	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {
-		eventsRouter = events.NewEventRouter(dbClient, dbEvents, logger.With(zap.String("component", "events_router")))
+		eventsRouter = events.NewEventRouter(dbClient, dbEvents, logger.With(zap.String("component", "events_router")), config)
 	}
 
 	// Add Interceptors aka gRPC middleware
