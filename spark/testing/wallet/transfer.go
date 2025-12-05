@@ -18,8 +18,8 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
@@ -1180,11 +1180,11 @@ func PrepareRefundSoSigningJobs(
 			return nil, fmt.Errorf("failed to parse refund tx: %w", err)
 		}
 		amountSats := nodeTx.TxOut[0].Value
-		nextSequence, err := spark.NextSequence(currRefundTx.TxIn[0].Sequence)
+		nextSequence, nextDirectSequence, err := bitcointransaction.NextSequence(currRefundTx.TxIn[0].Sequence)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get next sequence: %w", err)
 		}
-		cpfpRefundTx, _, err := CreateRefundTxs(nextSequence, &nodeOutPoint, amountSats, refundSigningData.ReceivingPubKey, true)
+		cpfpRefundTx, _, err := CreateRefundTxs(nextSequence, nextDirectSequence, &nodeOutPoint, amountSats, refundSigningData.ReceivingPubKey, true)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create refund tx: %w", err)
 		}
@@ -1216,7 +1216,7 @@ func PrepareRefundSoSigningJobs(
 			directAmountSats := directTx.TxOut[0].Value
 
 			// Create DirectRefundTx (spending from DirectTx)
-			_, directRefundTx, err := CreateRefundTxs(nextSequence, &directOutPoint, directAmountSats, refundSigningData.ReceivingPubKey, true)
+			_, directRefundTx, err := CreateRefundTxs(nextSequence, nextDirectSequence, &directOutPoint, directAmountSats, refundSigningData.ReceivingPubKey, true)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create direct refund tx: %w", err)
 			}
@@ -1239,7 +1239,7 @@ func PrepareRefundSoSigningJobs(
 			}
 
 			// Create DirectFromCpfpRefundTx (spending from NodeTx/CPFP)
-			_, directFromCpfpRefundTx, err := CreateRefundTxs(nextSequence, &nodeOutPoint, amountSats, refundSigningData.ReceivingPubKey, true)
+			_, directFromCpfpRefundTx, err := CreateRefundTxs(nextSequence, nextDirectSequence, &nodeOutPoint, amountSats, refundSigningData.ReceivingPubKey, true)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create direct from cpfp refund tx: %w", err)
 			}

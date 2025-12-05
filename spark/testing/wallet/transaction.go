@@ -51,12 +51,13 @@ func CreateLeafNodeTx(
 
 func CreateRefundTxs(
 	sequence uint32,
+	directSequence uint32,
 	nodeOutPoint *wire.OutPoint,
 	amountSats int64,
 	receivingPubkey keys.Public,
 	shouldCalculateFee bool,
 ) (*wire.MsgTx, *wire.MsgTx, error) {
-	cpfpRefundTx, directFromCpfpRefundTx, _, err := CreateAllRefundTxs(sequence, nodeOutPoint, amountSats, nil, 0, receivingPubkey, shouldCalculateFee)
+	cpfpRefundTx, directFromCpfpRefundTx, _, err := CreateAllRefundTxs(sequence, directSequence, nodeOutPoint, amountSats, nil, 0, receivingPubkey, shouldCalculateFee)
 	return cpfpRefundTx, directFromCpfpRefundTx, err
 }
 
@@ -66,6 +67,7 @@ func CreateRefundTxs(
 // 3. directRefundTx: Spends from directNodeOutPoint (if provided), has fee, no anchor
 func CreateAllRefundTxs(
 	sequence uint32,
+	directSequence uint32,
 	nodeOutPoint *wire.OutPoint,
 	nodeAmountSats int64,
 	directNodeOutPoint *wire.OutPoint, // nil if no DirectNodeTx exists

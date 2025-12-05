@@ -85,7 +85,7 @@ func prepareFrostSigningJobsForDirectRefund(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to parse direct refund tx: %w", err)
 		}
-		nextSequence, err := spark.NextSequence(currDirectRefundTx.TxIn[0].Sequence)
+		nextSequence, nextDirectSequence, err := bitcointransaction.NextSequence(currDirectRefundTx.TxIn[0].Sequence)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to get next sequence: %w", err)
 		}
@@ -93,7 +93,7 @@ func prepareFrostSigningJobsForDirectRefund(
 		amountSats := directTx.TxOut[0].Value
 
 		// Create new direct refund tx with shorter timelock
-		_, directRefundTx, err := CreateRefundTxs(nextSequence, &directOutPoint, amountSats, receiverIdentityPubKey, true)
+		_, directRefundTx, err := CreateRefundTxs(nextSequence, nextDirectSequence, &directOutPoint, amountSats, receiverIdentityPubKey, true)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -155,7 +155,7 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 			return nil, nil, nil, fmt.Errorf("failed to parse refund tx: %w", err)
 		}
 
-		nextNodeSequence, nextDirectNodeSequence, err := bitcointransaction.NextSequence(currRefundTx.TxIn[0].Sequence)
+		nextNodeSequence, nextDirectSequence, err := bitcointransaction.NextSequence(currRefundTx.TxIn[0].Sequence)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to get next sequence: %w", err)
 		}
@@ -164,13 +164,13 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 
 		var refundTx *wire.MsgTx
 		if useCPFP {
-			cpfpRefundTx, _, err := CreateRefundTxs(nextNodeSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, false)
+			cpfpRefundTx, _, err := CreateRefundTxs(nextNodeSequence, nextDirectSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, false)
 			if err != nil {
 				return nil, nil, nil, err
 			}
 			refundTx = cpfpRefundTx
 		} else {
-			_, directRefundTx, err := CreateRefundTxs(nextDirectNodeSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, true)
+			_, directRefundTx, err := CreateRefundTxs(nextNodeSequence, nextDirectSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, true)
 			if err != nil {
 				return nil, nil, nil, err
 			}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -320,7 +321,7 @@ func CreateTreeRoot(
 		return nil, err
 	}
 
-	initialRefundSequence, err := spark.NextSequence(spark.InitialSequence())
+	initialRefundSequence, initialDirectSequence, err := bitcointransaction.NextSequence(spark.InitialSequence())
 	if err != nil {
 		return nil, err
 	}
@@ -328,10 +329,11 @@ func CreateTreeRoot(
 	// Create CPFP refund tx
 	cpfpRefundTx, _, err := CreateRefundTxs(
 		initialRefundSequence,
+		initialDirectSequence,
 		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
 		rootTx.TxOut[0].Value,
 		signingPubKey,
-		false,
+		true,
 	)
 	if err != nil {
 		return nil, err
@@ -354,6 +356,7 @@ func CreateTreeRoot(
 	// Create Direct Refund Tx
 	_, directRefundTx, err := CreateRefundTxs(
 		initialRefundSequence,
+		initialDirectSequence,
 		&wire.OutPoint{Hash: directRootTx.TxHash(), Index: 0},
 		directRootTx.TxOut[0].Value,
 		signingPubKey,
@@ -370,6 +373,7 @@ func CreateTreeRoot(
 	// Create Direct-From-CPFP Refund Tx
 	_, directFromCpfpRefundTx, err := CreateRefundTxs(
 		initialRefundSequence,
+		initialDirectSequence,
 		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
 		rootTx.TxOut[0].Value,
 		signingPubKey,

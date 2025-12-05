@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/frost"
@@ -1098,8 +1099,12 @@ func TestStartDepositTreeCreationWithDirectFromCpfpRefundAlongsideRegularRefund(
 	rootTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}, nil, nil))
 	rootTx.AddTxOut(wire.NewTxOut(depositTx.TxOut[0].Value, depositTx.TxOut[0].PkScript))
 
+	initialRefundSequence, initialDirectSequence, err := bitcointransaction.NextSequence(spark.InitialSequence())
+	require.NoError(t, err)
+
 	refundTx, directFromCpfpRefundTx, err := wallet.CreateRefundTxs(
-		spark.InitialSequence(),
+		initialRefundSequence,
+		initialDirectSequence,
 		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
 		rootTx.TxOut[0].Value,
 		privKey.Public(),
@@ -1165,8 +1170,12 @@ func TestStartDepositTreeCreationDirectTxValidation(t *testing.T) {
 	rootTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}, nil, nil))
 	rootTx.AddTxOut(wire.NewTxOut(depositTx.TxOut[0].Value, depositTx.TxOut[0].PkScript))
 
+	initialRefundSequence, initialDirectSequence, err := bitcointransaction.NextSequence(spark.InitialSequence())
+	require.NoError(t, err)
+
 	refundTx, directFromCpfpRefundTx, err := wallet.CreateRefundTxs(
-		spark.InitialSequence(),
+		initialRefundSequence,
+		initialDirectSequence,
 		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
 		rootTx.TxOut[0].Value,
 		privKey.Public(),
