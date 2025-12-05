@@ -49,6 +49,14 @@ func NewTxIDFromString(s string) (TxID, error) {
 	return TxID{hash: *hash}, nil
 }
 
+func MustParseTxID(s string) TxID {
+	txid, err := NewTxIDFromString(s)
+	if err != nil {
+		panic(err)
+	}
+	return txid
+}
+
 // Hash returns the underlying chainhash.Hash.
 func (t TxID) Hash() chainhash.Hash {
 	return t.hash

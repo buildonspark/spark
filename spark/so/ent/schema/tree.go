@@ -7,6 +7,7 @@ import (
 	"entgo.io/ent/schema/index"
 	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/entexample"
 )
 
 // Tree is the schema for the trees table.
@@ -24,11 +25,21 @@ func (Tree) Mixin() []ent.Mixin {
 // Fields are the fields for the trees table.
 func (Tree) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("owner_identity_pubkey").GoType(keys.Public{}),
-		field.Enum("status").GoType(st.TreeStatus("")),
-		field.Enum("network").GoType(st.Network("")),
-		field.Bytes("base_txid").GoType(st.TxID{}),
-		field.Int16("vout").NonNegative(),
+		field.Bytes("owner_identity_pubkey").
+			GoType(keys.Public{}).
+			Annotations(entexample.Default("028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4")),
+		field.Enum("status").
+			GoType(st.TreeStatus("")).
+			Annotations(entexample.Default(st.TreeStatusAvailable)),
+		field.Enum("network").
+			GoType(st.Network("")).
+			Annotations(entexample.Default(st.NetworkRegtest)),
+		field.Bytes("base_txid").
+			GoType(st.TxID{}).
+			Annotations(entexample.Default("bb736bfae9b0a47584bbdbb27606eedef1b5bb3927d692f339909863c22e27d2")),
+		field.Int16("vout").
+			NonNegative().
+			Annotations(entexample.Default(0)),
 	}
 }
 

@@ -14,6 +14,11 @@ type Uint128 struct{ value *big.Int }
 
 func New() Uint128 { return Uint128{value: new(big.Int)} }
 
+func NewFromUint64(v uint64) Uint128 {
+	bigInt := new(big.Int).SetUint64(v)
+	return Uint128{value: bigInt}
+}
+
 func (u *Uint128) Validate() error {
 	if u.value == nil || u.value.Sign() < 0 || u.value.Cmp(MaxUint128) > 0 {
 		return errors.InvalidArgumentOutOfRange(fmt.Errorf("uint128 out of range"))

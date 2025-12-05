@@ -6,6 +6,7 @@ import (
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/entexample"
 )
 
 // PendingSendTransfer holds the state of a send transfer that is pending.
@@ -25,10 +26,12 @@ func (PendingSendTransfer) Fields() []ent.Field {
 	return []ent.Field{
 		field.UUID("transfer_id", uuid.UUID{}).
 			Unique().
-			Immutable(),
+			Immutable().
+			Annotations(entexample.Default("019a02dd-8468-7bfe-9a73-d9b03681710e")),
 		field.Enum("status").
 			GoType(st.PendingSendTransferStatus("")).
-			Default(string(st.PendingSendTransferStatusPending)),
+			Default(string(st.PendingSendTransferStatusPending)).
+			Annotations(entexample.Default(st.PendingSendTransferStatusPending)),
 	}
 }
 

@@ -2,6 +2,7 @@ package frost
 
 import (
 	"database/sql/driver"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -103,4 +104,16 @@ func (s *SigningCommitment) unmarshalFromBytes(bindingBytes, hidingBytes []byte)
 	s.binding = binding
 	s.hiding = hiding
 	return nil
+}
+
+func MustParseSigningCommitment(signingCommitmentHex string) SigningCommitment {
+	signingCommitmentBytes, err := hex.DecodeString(signingCommitmentHex)
+	if err != nil {
+		panic(fmt.Sprintf("failed to decode signing commitment hex: %v", err))
+	}
+	var signingCommitment SigningCommitment
+	if err := signingCommitment.UnmarshalBinary(signingCommitmentBytes); err != nil {
+		panic(fmt.Sprintf("failed to unmarshal signing commitment: %v", err))
+	}
+	return signingCommitment
 }

@@ -7,6 +7,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/entexample"
 )
 
 type TokenTransactionPeerSignature struct {
@@ -28,8 +29,16 @@ func (TokenTransactionPeerSignature) Annotations() []schema.Annotation {
 
 func (TokenTransactionPeerSignature) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("operator_identity_public_key").GoType(keys.Public{}),
-		field.Bytes("signature").NotEmpty(),
+		field.Bytes("operator_identity_public_key").
+			GoType(keys.Public{}).
+			Annotations(entexample.Default(
+				"0350f07ffc21bfd59d31e0a7a600e2995273938444447cb9bc4c75b8a895dbb853",
+			)),
+		field.Bytes("signature").
+			NotEmpty().
+			Annotations(entexample.Default(
+				"30440220187bd58858cccab1abe381454148ee545c605d9f0e9bbfea80e746ddc5b622da02203679a8259e339802e1c153631700117b0934c9ffe76e9ec3d0d17f1352652915",
+			)),
 	}
 }
 

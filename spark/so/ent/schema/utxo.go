@@ -6,6 +6,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/entexample"
 )
 
 // Utxo contains transaction outputs seen confirmed on chain by chain watcher.
@@ -24,12 +25,29 @@ func (Utxo) Mixin() []ent.Mixin {
 // Fields of the Utxo.
 func (Utxo) Fields() []ent.Field {
 	return []ent.Field{
-		field.Int64("block_height"),
-		field.Bytes("txid").NotEmpty().Immutable(),
-		field.Uint32("vout").Immutable(),
-		field.Uint64("amount").Immutable(),
-		field.Enum("network").GoType(st.Network("")).Immutable(),
-		field.Bytes("pk_script").Immutable(),
+		field.Int64("block_height").
+			Annotations(entexample.Default(2236097)),
+		field.Bytes("txid").
+			NotEmpty().
+			Immutable().
+			Annotations(entexample.Default(
+				"2f9841624fae808464440f897d189ef3f1e14ea86922d6550c49b34d4cb6effd",
+			)),
+		field.Uint32("vout").
+			Immutable().
+			Annotations(entexample.Default(0)),
+		field.Uint64("amount").
+			Immutable().
+			Annotations(entexample.Default(10000)),
+		field.Enum("network").
+			GoType(st.Network("")).
+			Immutable().
+			Annotations(entexample.Default(st.NetworkRegtest)),
+		field.Bytes("pk_script").
+			Immutable().
+			Annotations(entexample.Default(
+				"512089f1097344ab882061ea9aee058ed84910be8e2f92429b8835af58284c0f59d6",
+			)),
 	}
 }
 

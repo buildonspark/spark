@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"time"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
@@ -9,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/entexample"
 )
 
 // Transfer is the schema for the transfer table.
@@ -30,30 +33,35 @@ func (Transfer) Fields() []ent.Field {
 		field.Bytes("sender_identity_pubkey").
 			Immutable().
 			GoType(keys.Public{}).
-			Comment("The identity public key of the sender of the transfer."),
+			Comment("The identity public key of the sender of the transfer.").
+			Annotations(entexample.Default(
+				"02112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3",
+			)),
 		field.Bytes("receiver_identity_pubkey").
 			Immutable().
 			GoType(keys.Public{}).
-			Comment("The identity public key of the receiver of the transfer."),
+			Annotations(entexample.Default(
+				"02e0b8d42c5d3b5fe4c5beb6ea796ab3bc8aaf28a3d3195407482c67e0b58228a5",
+			)),
 		field.Enum("network").
 			Immutable().
 			GoType(st.Network("")).
-			Comment("The network on which the transfer is taking place."),
+			Comment("The network on which the transfer is taking place.").
+			Annotations(entexample.Default(st.NetworkRegtest)),
 		field.Uint64("total_value").
-			Comment("The total value of the transfer in satoshis."),
+			Annotations(entexample.Default(30)),
 		field.Enum("status").
 			GoType(st.TransferStatus("")).
-			Comment("The status of the transfer."),
+			Annotations(entexample.Default(st.TransferStatusCompleted)),
 		field.Enum("type").
 			GoType(st.TransferType("")).
-			Comment("The type of the transfer."),
+			Annotations(entexample.Default(st.TransferTypePreimageSwap)),
 		field.Time("expiry_time").
 			Immutable().
-			Comment("The time when the transfer expires. If the transfer doesn't expire, this will be set to unix epoch."),
+			Annotations(entexample.Default(time.Unix(0, 0))),
 		field.Time("completion_time").
 			Optional().
-			Nillable().
-			Comment("The time when the transfer was completed, if it is in a completed state."),
+			Nillable(),
 		field.UUID("spark_invoice_id", uuid.UUID{}).
 			Optional().
 			Comment("Foreign key to spark_invoice"),

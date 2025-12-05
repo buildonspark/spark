@@ -13,6 +13,7 @@ import (
 	entgen "github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/entexample"
 	"github.com/lightsparkdev/spark/so/errors"
 )
 
@@ -28,20 +29,50 @@ func (TokenTransaction) Mixin() []ent.Mixin {
 
 func (TokenTransaction) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("partial_token_transaction_hash").NotEmpty(),
-		field.Bytes("finalized_token_transaction_hash").NotEmpty().Unique(),
-		field.Bytes("operator_signature").Optional().Unique(),
-		field.Enum("status").GoType(st.TokenTransactionStatus("")).Optional(),
-		field.Time("expiry_time").Optional().Immutable(),
-		field.Bytes("coordinator_public_key").Optional().GoType(keys.Public{}),
-		field.Time("client_created_timestamp").Optional(),
-		field.Int("version").GoType(st.TokenTransactionVersion(0)).Default(int(st.TokenTransactionVersionV0)).Validate(func(v int) error {
-			if !st.TokenTransactionVersion(v).IsValid() {
-				return fmt.Errorf("invalid token transaction version: %d", v)
-			}
-			return nil
-		}),
-		field.Uint64("validity_duration_seconds").Optional(),
+		field.Bytes("partial_token_transaction_hash").
+			NotEmpty().
+			Annotations(entexample.Default(
+				"4a564baefd28df39d7636f4c01d9bb4cf1c2e000fb6f3cf263733ae3b248c01c",
+			)),
+		field.Bytes("finalized_token_transaction_hash").
+			NotEmpty().
+			Unique().
+			Annotations(entexample.Default(
+				"b080d44c77359c710a077d27defc304f35ca29f9a9e2640229932754c280e1f3",
+			)),
+		field.Bytes("operator_signature").
+			Optional().
+			Unique().
+			Annotations(entexample.Default(
+				"3045022100b4c13a5981906feb26537785b20df6a6780a18ebdc5485fac482871a6f046e640220251ec169ec46fa06195577f3549bfcc6d74b5b8dd2ec0b5b595d844bfb53a211",
+			)),
+		field.Enum("status").
+			GoType(st.TokenTransactionStatus("")).
+			Optional().
+			Annotations(entexample.Default(st.TokenTransactionStatusFinalized)),
+		field.Time("expiry_time").
+			Optional().
+			Immutable(),
+		field.Bytes("coordinator_public_key").
+			Optional().
+			GoType(keys.Public{}).
+			Annotations(entexample.Default(
+				"03acd9a5a88db102730ff83dee69d69088cc4c9d93bbee893e90fd5051b7da9651",
+			)),
+		field.Time("client_created_timestamp").
+			Optional(),
+		field.Int("version").
+			GoType(st.TokenTransactionVersion(0)).
+			Default(int(st.TokenTransactionVersionV0)).
+			Validate(func(v int) error {
+				if !st.TokenTransactionVersion(v).IsValid() {
+					return fmt.Errorf("invalid token transaction version: %d", v)
+				}
+				return nil
+			}).
+			Annotations(entexample.Default(st.TokenTransactionVersionV2)),
+		field.Uint64("validity_duration_seconds").
+			Optional(),
 	}
 }
 

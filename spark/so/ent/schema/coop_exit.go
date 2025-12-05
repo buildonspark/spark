@@ -6,6 +6,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/entexample"
 )
 
 type CooperativeExit struct {
@@ -22,8 +23,15 @@ func (CooperativeExit) Mixin() []ent.Mixin {
 // Fields are the fields for the CooperativeExit table.
 func (CooperativeExit) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("exit_txid").Unique().Immutable().GoType(schematype.TxID{}),
-		field.Int64("confirmation_height").Optional(),
+		field.Bytes("exit_txid").
+			Unique().
+			Immutable().
+			GoType(schematype.TxID{}).
+			Annotations(entexample.Default(
+				"6d4924aac6832d44ef06a0056fe6f5bc51faff37fa489518d93c012d675e2556",
+			)),
+		field.Int64("confirmation_height").
+			Optional(),
 	}
 }
 

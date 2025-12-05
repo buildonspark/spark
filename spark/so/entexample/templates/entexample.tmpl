@@ -1,0 +1,237 @@
+{{/* gotype: entgo.io/ent/entc/gen.Graph */}}
+
+{{ define "entexample/entexample" }}
+
+{{- with extend $ "Package" "entexample" -}}
+    {{ template "header" . }}
+{{- end }}
+
+import (
+    "context"
+    "encoding/base64"
+    "fmt"
+    "testing"
+
+    "github.com/lightsparkdev/spark/so/ent"
+)
+
+{{ range $n := $.Nodes }}
+{{ $example := print $n.Name "Example" }}
+{{ $receiver := receiver $n.Name }}
+
+// {{ $example }} is a test fixture builder for {{ $n.Name }}.
+type {{ $example }} struct {
+    client *ent.Client
+    t      *testing.T
+
+    // Fields - use pointers to distinguish between "not set" and "set to zero value"
+    {{- range $f := $n.Fields }}
+    {{- if not $f.Default }}
+    {{ $f.StructField }} *{{ $f.Type }}
+    {{- end }}
+    {{- end }}
+
+    // Edges - if set, use the provided entity; if nil, create a default one
+    {{- range $e := $n.Edges }}
+    {{- if $e.Unique }}
+    {{ $e.StructField }} *ent.{{ $e.Type.Name }}
+    {{- else }}
+    {{ $e.StructField }} []*ent.{{ $e.Type.Name }}
+    {{- end }}
+    {{- end }}
+}
+
+// New{{ $example }} creates a new {{ $example }} for testing.
+func New{{ $example }}(t *testing.T, client *ent.Client) *{{ $example }} {
+    return &{{ $example }}{
+        client: client,
+        t:      t,
+    }
+}
+
+{{- range $f := $n.Fields }}
+{{- if not $f.Default }}
+// Set{{ $f.StructField }} sets the {{ $f.Name }} field.
+func ({{ $receiver }} *{{ $example }}) Set{{ $f.StructField }}(v {{ $f.Type }}) *{{ $example }} {
+    {{ $receiver }}.{{ $f.StructField }} = &v
+    return {{ $receiver }}
+}
+{{- end }}
+{{- end }}
+
+{{- range $e := $n.Edges }}
+{{- if $e.Unique }}
+// Set{{ $e.StructField }} sets the {{ $e.Name }} edge.
+func ({{ $receiver }} *{{ $example }}) Set{{ $e.StructField }}(v *ent.{{ $e.Type.Name }}) *{{ $example }} {
+    {{ $receiver }}.{{ $e.StructField }} = v
+    return {{ $receiver }}
+}
+{{- else }}
+// Add{{ singular $e.StructField }} adds a {{ $e.Type.Name }} to the {{ $e.Name }} edge.
+func ({{ $receiver }} *{{ $example }}) Add{{ singular $e.StructField }}(v *ent.{{ $e.Type.Name }}) *{{ $example }} {
+    {{ $receiver }}.{{ $e.StructField }} = append({{ $receiver }}.{{ $e.StructField }}, v)
+    return {{ $receiver }}
+}
+
+// Set{{ $e.StructField }} sets the {{ $e.Name }} edge.
+func ({{ $receiver }} *{{ $example }}) Set{{ $e.StructField }}(v []*ent.{{ $e.Type.Name }}) *{{ $example }} {
+    {{ $receiver }}.{{ $e.StructField }} = v
+    return {{ $receiver }}
+}
+{{- end }}
+{{- end }}
+
+// MustExec builds and saves the {{ $n.Name }} entity to the database.
+// It panics if the save fails.
+func ({{ $receiver }} *{{ $example }}) MustExec(ctx context.Context) *ent.{{ $n.Name }} {
+    create := {{ $receiver }}.client.{{ $n.Name }}.Create()
+
+    // Set fields
+    {{- range $f := $n.Fields }}
+    {{- if not $f.Default }}
+    if {{ $receiver }}.{{ $f.StructField }} != nil {
+        create.Set{{ $f.StructField }}(*{{ $receiver }}.{{ $f.StructField }})
+    } else {
+        {{- $hasDefault := false }}
+        {{- $defaultValue := "" }}
+        {{- if $f.Annotations }}
+        {{- if $ann := index $f.Annotations "EntExample" }}
+        {{- if $ann.Default }}
+        {{- $hasDefault = true }}
+        {{- $defaultValue = formatDefault $f $ann }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- if $hasDefault }}
+        // Use default from annotation
+        create.Set{{ $f.StructField }}({{ $defaultValue }})
+        {{- else if not $f.Optional }}
+        // No default provided in annotation for required field
+        {{ $receiver }}.t.Helper()
+        {{ $receiver }}.t.Fatalf("{{ $f.Name }} is required but not set (add entexample.Default() annotation)")
+        {{- end }}
+    }
+    {{- end }}
+    {{- end }}
+
+    // Handle edges
+    {{- range $e := $n.Edges }}
+    {{- if not $e.Optional }}
+    {{- if $e.Unique }}
+    if {{ $receiver }}.{{ $e.StructField }} != nil {
+        create.Set{{ $e.StructField }}({{ $receiver }}.{{ $e.StructField }})
+    } else {
+        // Auto-create required edge
+        {{ $receiver }}.t.Helper()
+        {{ $receiver }}.{{ $e.StructField }} = New{{ $e.Type.Name }}Example({{ $receiver }}.t, {{ $receiver }}.client).MustExec(ctx)
+        create.Set{{ $e.StructField }}({{ $receiver }}.{{ $e.StructField }})
+    }
+    {{- else }}
+    if len({{ $receiver }}.{{ $e.StructField }}) == 0 {
+        // Auto-create at least one required edge
+        {{ $receiver }}.t.Helper()
+        defaultEdge := New{{ $e.Type.Name }}Example({{ $receiver }}.t, {{ $receiver }}.client).MustExec(ctx)
+        create.Add{{ singular $e.StructField }}(defaultEdge)
+    } else {
+        create.Add{{ $e.StructField }}({{ $receiver }}.{{ $e.StructField }}...)
+    }
+    {{- end }}
+    {{- else }}
+    {{- if $e.Unique }}
+    if {{ $receiver }}.{{ $e.StructField }} != nil {
+        create.Set{{ $e.StructField }}({{ $receiver }}.{{ $e.StructField }})
+    }
+    {{- else }}
+    if len({{ $receiver }}.{{ $e.StructField }}) > 0 {
+        create.Add{{ $e.StructField }}({{ $receiver }}.{{ $e.StructField }}...)
+    }
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+    entity, err := create.Save(ctx)
+    if err != nil {
+        {{ $receiver }}.t.Helper()
+        {{ $receiver }}.t.Fatalf("failed to create {{ $n.Name }}: %v", err)
+    }
+
+    return entity
+}
+
+// Exec builds and saves the {{ $n.Name }} entity to the database.
+// It returns an error if the save fails.
+func ({{ $receiver }} *{{ $example }}) Exec(ctx context.Context) (*ent.{{ $n.Name }}, error) {
+    create := {{ $receiver }}.client.{{ $n.Name }}.Create()
+
+    // Set fields
+    {{- range $f := $n.Fields }}
+    {{- if not $f.Default }}
+    if {{ $receiver }}.{{ $f.StructField }} != nil {
+        create.Set{{ $f.StructField }}(*{{ $receiver }}.{{ $f.StructField }})
+    } else {
+        {{- $hasDefault := false }}
+        {{- $defaultValue := "" }}
+        {{- if $f.Annotations }}
+        {{- if $ann := index $f.Annotations "EntExample" }}
+        {{- if $ann.Default }}
+        {{- $hasDefault = true }}
+        {{- $defaultValue = formatDefault $f $ann }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- if $hasDefault }}
+        // Use default from annotation
+        create.Set{{ $f.StructField }}({{ $defaultValue }})
+        {{- else if not $f.Optional }}
+        // No default provided in annotation for required field
+        return nil, fmt.Errorf("{{ $f.Name }} is required but not set (add entexample.Default() annotation)")
+        {{- end }}
+    }
+    {{- end }}
+    {{- end }}
+
+    // Handle edges
+    {{- range $e := $n.Edges }}
+    {{- if not $e.Optional }}
+    {{- if $e.Unique }}
+    if {{ $receiver }}.{{ $e.StructField }} != nil {
+        create.Set{{ $e.StructField }}({{ $receiver }}.{{ $e.StructField }})
+    } else {
+        // Auto-create required edge
+        var err error
+        {{ $receiver }}.{{ $e.StructField }}, err = New{{ $e.Type.Name }}Example({{ $receiver }}.t, {{ $receiver }}.client).Exec(ctx)
+        if err != nil {
+            return nil, fmt.Errorf("failed to create {{ $e.Name }}: %w", err)
+        }
+        create.Set{{ $e.StructField }}({{ $receiver }}.{{ $e.StructField }})
+    }
+    {{- else }}
+    if len({{ $receiver }}.{{ $e.StructField }}) == 0 {
+        // Auto-create at least one required edge
+        defaultEdge, err := New{{ $e.Type.Name }}Example({{ $receiver }}.t, {{ $receiver }}.client).Exec(ctx)
+        if err != nil {
+            return nil, fmt.Errorf("failed to create {{ $e.Name }}: %w", err)
+        }
+        create.Add{{ singular $e.StructField }}(defaultEdge)
+    } else {
+        create.Add{{ $e.StructField }}({{ $receiver }}.{{ $e.StructField }}...)
+    }
+    {{- end }}
+    {{- else }}
+    {{- if $e.Unique }}
+    if {{ $receiver }}.{{ $e.StructField }} != nil {
+        create.Set{{ $e.StructField }}({{ $receiver }}.{{ $e.StructField }})
+    }
+    {{- else }}
+    if len({{ $receiver }}.{{ $e.StructField }}) > 0 {
+        create.Add{{ $e.StructField }}({{ $receiver }}.{{ $e.StructField }}...)
+    }
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+    return create.Save(ctx)
+}
+
+{{ end }}
+{{ end }}

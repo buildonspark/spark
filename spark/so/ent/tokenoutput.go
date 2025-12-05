@@ -40,7 +40,7 @@ type TokenOutput struct {
 	WithdrawRevocationCommitment []byte `json:"withdraw_revocation_commitment,omitempty"`
 	// TokenPublicKey holds the value of the "token_public_key" field.
 	TokenPublicKey keys.Public `json:"token_public_key,omitempty"`
-	// The uint128 token amount in this output as a byte array.
+	// TokenAmount holds the value of the "token_amount" field.
 	TokenAmount []byte `json:"token_amount,omitempty"`
 	// The uint128 token amount in this output as a numeric.
 	Amount uint128.Uint128 `json:"amount,omitempty"`

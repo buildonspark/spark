@@ -3,6 +3,7 @@ package frost
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -132,4 +133,17 @@ func getValue(src any) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unexpected input for Scan: %T", src)
 	}
+}
+
+func MustParseSigningNonce(nonceHex string) SigningNonce {
+	nonceBytes, err := hex.DecodeString(nonceHex)
+	if err != nil {
+		panic(fmt.Sprintf("failed to decode signing nonce hex: %v", err))
+	}
+
+	nonce := SigningNonce{}
+	if err := nonce.UnmarshalBinary(nonceBytes); err != nil {
+		panic(fmt.Sprintf("failed to parse signing nonce: %v", err))
+	}
+	return nonce
 }

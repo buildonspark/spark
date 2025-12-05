@@ -17,6 +17,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/entexample"
 	"github.com/lightsparkdev/spark/so/errors"
 )
 
@@ -32,32 +33,73 @@ func (TokenOutput) Mixin() []ent.Mixin {
 
 func (TokenOutput) Fields() []ent.Field {
 	return []ent.Field{
-		field.Enum("status").GoType(st.TokenOutputStatus("")),
-		field.Bytes("owner_public_key").Immutable().GoType(keys.Public{}),
-		field.Uint64("withdraw_bond_sats").Immutable(),
-		field.Uint64("withdraw_relative_block_locktime").Immutable(),
-		field.Bytes("withdraw_revocation_commitment").Immutable(),
-		field.Bytes("token_public_key").Immutable().Optional().GoType(keys.Public{}),
+		field.Enum("status").
+			GoType(st.TokenOutputStatus("")).
+			Annotations(entexample.Default(st.TokenOutputStatusCreatedFinalized)),
+		field.Bytes("owner_public_key").
+			Immutable().
+			GoType(keys.Public{}).
+			Annotations(entexample.Default(
+				"02a28e9787ad87631160d9e59b3ee939e804d592f7f8c75a9b0c8c8647075de9e8",
+			)),
+		field.Uint64("withdraw_bond_sats").
+			Immutable().
+			Annotations(entexample.Default(10000)),
+		field.Uint64("withdraw_relative_block_locktime").
+			Immutable().
+			Annotations(entexample.Default(1000)),
+		field.Bytes("withdraw_revocation_commitment").
+			Immutable().
+			Annotations(entexample.Default(
+				"0340c064753fe86c78d501d4826ca22b499c5b06be5b5dfdd35181548767783829",
+			)),
+		field.Bytes("token_public_key").
+			Immutable().
+			Optional().
+			GoType(keys.Public{}).
+			Annotations(entexample.Default(
+				"02a28e9787ad87631160d9e59b3ee939e804d592f7f8c75a9b0c8c8647075de9e8",
+			)),
 		field.Bytes("token_amount").
 			NotEmpty().
 			Immutable().
-			Comment("The uint128 token amount in this output as a byte array."),
+			Annotations(entexample.Default(
+				"00000000000000000000000000000064",
+			)),
 		field.Other("amount", uint128.Uint128{}).
 			SchemaType(map[string]string{
 				dialect.Postgres: "NUMERIC(39,0)",
 				dialect.SQLite:   "TEXT", // Go driver reads SQLite NUMERIC as float, causing a loss of precision. Use TEXT instead.
 			}).
 			Optional().
-			Comment("The uint128 token amount in this output as a numeric."),
-		field.Int32("created_transaction_output_vout").Immutable(),
-		field.Bytes("spent_ownership_signature").Optional(),
-		field.Bytes("spent_operator_specific_ownership_signature").Optional(),
-		field.Int32("spent_transaction_input_vout").Optional(),
-		field.Bytes("spent_revocation_secret").Optional().GoType(keys.Private{}),
-		field.Bytes("confirmed_withdraw_block_hash").Optional(),
-		field.Enum("network").GoType(st.Network("")).Optional(),
-		field.Bytes("token_identifier").Immutable(),
-		field.UUID("token_create_id", uuid.UUID{}).Immutable(),
+			Comment("The uint128 token amount in this output as a numeric.").
+			Annotations(entexample.Default(100)),
+		field.Int32("created_transaction_output_vout").
+			Immutable().
+			Annotations(entexample.Default(0)),
+		field.Bytes("spent_ownership_signature").
+			Optional(),
+		field.Bytes("spent_operator_specific_ownership_signature").
+			Optional(),
+		field.Int32("spent_transaction_input_vout").
+			Optional(),
+		field.Bytes("spent_revocation_secret").
+			Optional().
+			GoType(keys.Private{}),
+		field.Bytes("confirmed_withdraw_block_hash").
+			Optional(),
+		field.Enum("network").
+			GoType(st.Network("")).
+			Optional().
+			Annotations(entexample.Default(st.NetworkRegtest)),
+		field.Bytes("token_identifier").
+			Immutable().
+			Annotations(entexample.Default(
+				"f88a9e871e6b3324d414ea180f02cd1eae930fa32baf847c4691c9d086bd2e17",
+			)),
+		field.UUID("token_create_id", uuid.UUID{}).
+			Immutable().
+			Annotations(entexample.Default("019a14b9-1783-7109-9fca-1e4f7a6aa539")),
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/schema/field"
 	entgen "github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/hook"
+	"github.com/lightsparkdev/spark/so/entexample"
 )
 
 type PaymentIntent struct {
@@ -26,7 +27,9 @@ func (PaymentIntent) Fields() []ent.Field {
 		field.String("payment_intent").
 			NotEmpty().
 			Immutable().
-			Comment("The original payment intent string"),
+			Comment("The original payment intent string").
+			// TODO(mhr): Figure out what a "real" payment intent looks like.
+			Annotations(entexample.Default("")),
 	}
 }
 

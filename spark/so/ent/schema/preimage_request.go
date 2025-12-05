@@ -7,6 +7,7 @@ import (
 	"entgo.io/ent/schema/index"
 	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/entexample"
 )
 
 // PreimageRequest is the schema for the preimage request table.
@@ -34,17 +35,22 @@ func (PreimageRequest) Indexes() []ent.Index {
 func (PreimageRequest) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("payment_hash").
-			NotEmpty(),
+			NotEmpty().
+			Annotations(entexample.Default("24dc566683c284f01f5f35be83d2946ea315e7986ef435fc9860633de01cda3c")),
 		field.Enum("status").
-			GoType(st.PreimageRequestStatus("")),
+			GoType(st.PreimageRequestStatus("")).
+			Annotations(entexample.Default(st.PreimageRequestStatusPreimageShared)),
 		field.Bytes("receiver_identity_pubkey").
 			Optional().
-			GoType(keys.Public{}),
+			GoType(keys.Public{}).
+			Annotations(entexample.Default("02e0b8d42c5d3b5fe4c5beb6ea796ab3bc8aaf28a3d3195407482c67e0b58228a5")),
 		field.Bytes("preimage").
-			Optional(),
+			Optional().
+			Annotations(entexample.Default("9d8e6f8789f9406b79629e0ad753fcb9e5f8b70c53b660f0a73274b78b7905d3")),
 		field.Bytes("sender_identity_pubkey").
 			Optional().
-			GoType(keys.Public{}),
+			GoType(keys.Public{}).
+			Annotations(entexample.Default("02112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3")),
 	}
 }
 

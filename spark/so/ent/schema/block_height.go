@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/entexample"
 )
 
 // BlockHeight is the last scanned block height for a given network.
@@ -21,8 +22,10 @@ func (BlockHeight) Mixin() []ent.Mixin {
 // Fields are the fields for the Block table.
 func (BlockHeight) Fields() []ent.Field {
 	return []ent.Field{
-		field.Int64("height"),
-		field.Enum("network").GoType(st.Network("")),
+		field.Int64("height").
+			Annotations(entexample.Default(100)),
+		field.Enum("network").GoType(st.Network("")).
+			Annotations(entexample.Default(st.NetworkRegtest)),
 	}
 }
 
