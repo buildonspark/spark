@@ -154,7 +154,8 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to parse refund tx: %w", err)
 		}
-		nextSequence, err := spark.NextSequence(currRefundTx.TxIn[0].Sequence)
+
+		nextNodeSequence, nextDirectNodeSequence, err := bitcointransaction.NextSequence(currRefundTx.TxIn[0].Sequence)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to get next sequence: %w", err)
 		}
@@ -163,13 +164,13 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 
 		var refundTx *wire.MsgTx
 		if useCPFP {
-			cpfpRefundTx, _, err := CreateRefundTxs(nextSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, false)
+			cpfpRefundTx, _, err := CreateRefundTxs(nextNodeSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, false)
 			if err != nil {
 				return nil, nil, nil, err
 			}
 			refundTx = cpfpRefundTx
 		} else {
-			_, directRefundTx, err := CreateRefundTxs(nextSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, true)
+			_, directRefundTx, err := CreateRefundTxs(nextDirectNodeSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, true)
 			if err != nil {
 				return nil, nil, nil, err
 			}

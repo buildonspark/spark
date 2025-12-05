@@ -1327,9 +1327,7 @@ func InitiateSwapPrimaryTransfer(
 	response, err := sparkClient.InitiateSwapPrimaryTransfer(ctx, &pb.InitiateSwapPrimaryTransferRequest{
 		Transfer: startTransferRequest,
 		AdaptorPublicKeys: &pb.AdaptorPublicKeyPackage{
-			AdaptorPublicKey:               adaptorPublicKey.Serialize(),
-			DirectAdaptorPublicKey:         directAdaptorPublicKey.Serialize(),
-			DirectFromCpfpAdaptorPublicKey: directFromCpfpAdaptorPublicKey.Serialize(),
+			AdaptorPublicKey: adaptorPublicKey.Serialize(),
 		},
 	})
 	if err != nil {

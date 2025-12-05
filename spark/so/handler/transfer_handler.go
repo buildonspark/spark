@@ -44,6 +44,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // TransferHandler is a helper struct to handle leaves transfer request.
@@ -233,6 +234,9 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	if swapV3Package != nil {
 		if transferType == st.TransferTypePrimarySwapV3 {
 			tweakKeys = false
+			// Override the expiry time to be double of the safety buffer time so the user have
+			// enough time to call the SSP to create a counter transfer.
+			req.ExpiryTime = timestamppb.New(time.Now().Add(2 * PrimaryTransferExpiryTimeSafetyBuffer))
 		} else {
 			primaryTransferId = swapV3Package.primaryTransferId
 		}
