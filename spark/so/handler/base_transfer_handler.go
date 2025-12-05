@@ -237,7 +237,15 @@ func validateSendLeafRefundTxsNew(leaf *ent.TreeNode, rawRefundTx []byte, direct
 		return fmt.Errorf("unable to load old cpfp refund tx: %w", err)
 	}
 	oldCpfpRefundTxIn := oldCpfpRefundTx.TxIn[0]
-	expectedOutPoint := oldCpfpRefundTxIn.PreviousOutPoint
+
+	nodeTx, err := parseRefundTx(leaf.RawTx)
+	if err != nil {
+		return fmt.Errorf("unable to load node tx: %w", err)
+	}
+	expectedOutPoint := wire.OutPoint{
+		Hash:  nodeTx.TxHash(),
+		Index: 0,
+	}
 	// expectedNewCpfpRefundSequence := oldCpfpRefundTxIn.Sequence - spark.TimeLockInterval
 
 	if err := validateLeafRefundTxInputNew(newCpfpRefundTx, oldCpfpRefundTxIn.Sequence, &expectedOutPoint, expectedInputCount); err != nil {
@@ -373,7 +381,15 @@ func validateSendLeafRefundTxsDeprecated(ctx context.Context, leaf *ent.TreeNode
 		return fmt.Errorf("unable to load old cpfp refund tx: %w", err)
 	}
 	oldCpfpRefundTxIn := oldCpfpRefundTx.TxIn[0]
-	expectedOutPoint := oldCpfpRefundTxIn.PreviousOutPoint
+
+	nodeTx, err := parseRefundTx(leaf.RawTx)
+	if err != nil {
+		return fmt.Errorf("unable to load node tx: %w", err)
+	}
+	expectedOutPoint := wire.OutPoint{
+		Hash:  nodeTx.TxHash(),
+		Index: 0,
+	}
 
 	if err := validateLeafRefundTxInputDeprecated(newCpfpRefundTx, oldCpfpRefundTxIn.Sequence, &expectedOutPoint, expectedInputCount, false); err != nil {
 		return fmt.Errorf("unable to validate cpfp refund tx inputs: %w", err)
