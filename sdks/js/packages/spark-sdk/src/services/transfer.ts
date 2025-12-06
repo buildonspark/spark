@@ -44,6 +44,7 @@ import {
   createInitialTimelockNodeTx,
   createInitialTimelockRefundTxs,
   createZeroTimelockNodeTx,
+  getCurrentTimelock,
 } from "../utils/transaction.js";
 import { getTransferPackageSigningPayload } from "../utils/transfer_package.js";
 import { WalletConfigService } from "./config.js";
@@ -1080,8 +1081,11 @@ export class TransferService extends BaseTransferService {
             ? createCurrentTimelockRefundTxs(refundTxsParams)
             : createDecrementedTimelockRefundTxs(refundTxsParams);
 
+        const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
+
         refundSigningData.refundTx = cpfpRefundTx;
-        refundSigningData.directRefundTx = directRefundTx;
+        refundSigningData.directRefundTx =
+          directRefundTx && !isZeroNode ? directRefundTx : undefined;
         refundSigningData.directFromCpfpRefundTx = directFromCpfpRefundTx;
 
         const cpfpRefundNonceCommitmentProto =
@@ -1102,14 +1106,15 @@ export class TransferService extends BaseTransferService {
             rawTx: cpfpRefundTx.toBytes(),
             signingNonceCommitment: cpfpRefundNonceCommitmentProto.commitment,
           },
-          directRefundTxSigningJob: directRefundTx
-            ? {
-                signingPublicKey,
-                rawTx: directRefundTx.toBytes(),
-                signingNonceCommitment:
-                  directRefundNonceCommitmentProto.commitment,
-              }
-            : undefined,
+          directRefundTxSigningJob:
+            directRefundTx && !isZeroNode
+              ? {
+                  signingPublicKey,
+                  rawTx: directRefundTx.toBytes(),
+                  signingNonceCommitment:
+                    directRefundNonceCommitmentProto.commitment,
+                }
+              : undefined,
           directFromCpfpRefundTxSigningJob: directFromCpfpRefundTx
             ? {
                 signingPublicKey,
