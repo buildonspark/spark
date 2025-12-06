@@ -646,16 +646,14 @@ func (em *EventMessageExample) MustExec(ctx context.Context) *ent.EventMessage {
 	if em.Channel != nil {
 		create.SetChannel(*em.Channel)
 	} else {
-		// No default provided in annotation for required field
-		em.t.Helper()
-		em.t.Fatalf("channel is required but not set (add entexample.Default() annotation)")
+		// Use default from annotation
+		create.SetChannel("transfer")
 	}
 	if em.Payload != nil {
 		create.SetPayload(*em.Payload)
 	} else {
-		// No default provided in annotation for required field
-		em.t.Helper()
-		em.t.Fatalf("payload is required but not set (add entexample.Default() annotation)")
+		// Use default from annotation
+		create.SetPayload("{\"id\":\"019af0a2-8f2d-753e-9dd3-d96d5a56f254\",\"receiver_identity_pubkey\":\"02fa14545dc12d8b64c05bf5f3fba3ba5a9311af11dffd702465142c83e45fd2c4\",\"status\":\"COMPLETED\"}")
 	}
 
 	// Handle edges
@@ -678,14 +676,14 @@ func (em *EventMessageExample) Exec(ctx context.Context) (*ent.EventMessage, err
 	if em.Channel != nil {
 		create.SetChannel(*em.Channel)
 	} else {
-		// No default provided in annotation for required field
-		return nil, fmt.Errorf("channel is required but not set (add entexample.Default() annotation)")
+		// Use default from annotation
+		create.SetChannel("transfer")
 	}
 	if em.Payload != nil {
 		create.SetPayload(*em.Payload)
 	} else {
-		// No default provided in annotation for required field
-		return nil, fmt.Errorf("payload is required but not set (add entexample.Default() annotation)")
+		// Use default from annotation
+		create.SetPayload("{\"id\":\"019af0a2-8f2d-753e-9dd3-d96d5a56f254\",\"receiver_identity_pubkey\":\"02fa14545dc12d8b64c05bf5f3fba3ba5a9311af11dffd702465142c83e45fd2c4\",\"status\":\"COMPLETED\"}")
 	}
 
 	// Handle edges

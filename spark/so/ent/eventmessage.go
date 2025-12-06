@@ -22,9 +22,9 @@ type EventMessage struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Channel holds the value of the "channel" field.
+	// The channel on which the event was emitted.
 	Channel string `json:"channel,omitempty"`
-	// Payload holds the value of the "payload" field.
+	// The JSON payload describing the even that occurred (i.e. the ent that was updated & relevant details).
 	Payload      string `json:"payload,omitempty"`
 	selectValues sql.SelectValues
 }

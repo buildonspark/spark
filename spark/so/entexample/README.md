@@ -150,7 +150,7 @@ See `extension.go` for the complete type registry and rendering logic.
 
 ### Required Fields
 
-- **Required fields without defaults**: Must be set explicitly or will error at runtime
+- **Required fields without defaults**: Must be set explicitly or will error at generation time
 - **Required fields with defaults**: Automatically use the annotation value
 - **Optional fields without defaults**: Can be omitted (will be NULL/zero value)
 - **Optional fields with defaults**: Use the annotation value if not explicitly set
@@ -190,9 +190,7 @@ The extension generates a single file: `so/ent/entexample/entexample.go`
 This file contains builder types for all schemas in your `so/ent/schema/` directory.
 
 ## TODO
-- Ensure all non-optional fields have an `entexample.Default` annotation at code generation time
-  through a hook.
-- Dynamic fixtures values (i.e. for a time field, allow the example to generate 
+- Dynamic fixtures values (i.e. for a time field, allow the example to generate
   `time.Now() + 2 * time.Minute` as the time rather than a fixed value).
 - Everything is generated in `entexample.go`. Ideally we would get separate files for each entity
   (i.e. `blockheight_example.go`) but I couldn't find a way to make it work with the template

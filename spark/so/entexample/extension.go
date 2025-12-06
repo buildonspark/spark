@@ -68,6 +68,54 @@ type Extension struct {
 	entc.DefaultExtension
 }
 
+// Hooks returns hooks for the extension.
+func (e *Extension) Hooks() []gen.Hook {
+	return []gen.Hook{
+		validateEntExampleAnnotations(),
+	}
+}
+
+// validateEntExampleAnnotations validates that all non-optional fields without Ent defaults
+// have entexample.Default annotations.
+func validateEntExampleAnnotations() gen.Hook {
+	return func(next gen.Generator) gen.Generator {
+		return gen.GenerateFunc(func(g *gen.Graph) error {
+			for _, node := range g.Nodes {
+				for _, field := range node.Fields {
+					// Optional fields are allowed to not have examples.
+					if field.Optional {
+						continue
+					}
+
+					// Default fields can also not have examples, and we'll just use the default as the fixture
+					// value.
+					if field.Default {
+						continue
+					}
+
+					hasEntExampleDefault := false
+					if ann := field.Annotations; ann != nil {
+						if annMap, ok := ann["EntExample"].(map[string]any); ok {
+							if _, ok := annMap["Default"]; ok {
+								hasEntExampleDefault = true
+							}
+						}
+					}
+
+					if !hasEntExampleDefault {
+						return fmt.Errorf(
+							"schema %q: field %q is required (non-optional) without an Ent default, but missing entexample.Default() annotation. "+
+								"Add entexample.Default(value) to the field's Annotations() or make the field Optional()",
+							node.Name, field.Name,
+						)
+					}
+				}
+			}
+			return next.Generate(g)
+		})
+	}
+}
+
 // Templates returns the templates for the extension.
 func (e *Extension) Templates() []*gen.Template {
 	tmpl := gen.NewTemplate("entexample/entexample.go").
