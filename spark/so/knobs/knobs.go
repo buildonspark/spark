@@ -76,6 +76,7 @@ const (
 	KnobReclaimRemappedOutputsIfRevealRequested = "spark.so.tokens.reclaim_remapped_outputs_if_reveal_requested"
 	KnobFinalizeCreatedSignedOutputsJustInTime  = "spark.so.tokens.finalize_created_signed_outputs_just_in_time"
 	KnobTokenTransactionV3Enabled               = "spark.so.tokens.token_transaction_v3_enabled"
+	KnobBackfillCreatedFinalizedTxHashEnabled   = "spark.so.tokens.backfill_created_finalized_tx_hash.enabled"
 
 	// Number of confirmations required before finalizing tree creation
 	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
@@ -83,6 +84,7 @@ const (
 	KnobReadOnlyEndpoints        = "spark.so.ro_session"
 	KnobGossipLimit              = "spark.so.gossip.limit"
 	KnobResumeSendTransferLimit  = "spark.so.resume_send_transfer.limit"
+
 	// Enable more rigorous checks for finalize signature requests. See SPARK-236
 	KnobEnableStrictFinalizeSignature        = "spark.so.enable_strict_finalize_signature"
 	KnobEnableStrictDirectRefundTxValidation = "spark.so.enable_strict_direct_refund_tx_validation"

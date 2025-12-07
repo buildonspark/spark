@@ -26,6 +26,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -695,6 +696,13 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				},
 			},
 		},
+		{
+			ExecutionInterval: 30 * time.Second,
+			BaseTaskSpec: BaseTaskSpec{
+				Name: "backfill_created_finalized_tx_hash",
+				Task: backfillCreatedFinalizedTxHash,
+			},
+		},
 	}
 }
 
@@ -882,5 +890,60 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, run
 		}
 	}
 	logger.Info("All startup tasks completed")
+	return nil
+}
+
+const backfillCreatedFinalizedTxHashBatchSize = 1000
+
+// backfillCreatedFinalizedTxHash backfills the created_finalized_tx_hash field on token_outputs
+// by fetching the finalized_token_transaction_hash from the linked token_transaction.
+// This task runs until all outputs have been backfilled, then becomes a no-op.
+// Controlled by knob: spark.so.tokens.backfill_created_finalized_tx_hash.enabled
+func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+	if knobsService.GetValue(knobs.KnobBackfillCreatedFinalizedTxHashEnabled, 0) == 0 {
+		return nil
+	}
+
+	logger := logging.GetLoggerFromContext(ctx)
+	tx, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get db from context: %w", err)
+	}
+
+	outputs, err := tx.TokenOutput.Query().
+		Where(
+			tokenoutput.CreatedTransactionFinalizedHashIsNil(),
+			tokenoutput.HasOutputCreatedTokenTransaction(),
+		).
+		WithOutputCreatedTokenTransaction(func(q *ent.TokenTransactionQuery) {
+			q.Select(tokentransaction.FieldFinalizedTokenTransactionHash)
+		}).
+		Order(tokenoutput.ByID(sql.OrderAsc())).
+		Limit(backfillCreatedFinalizedTxHashBatchSize).
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query outputs for backfill: %w", err)
+	}
+
+	if len(outputs) == 0 {
+		return nil
+	}
+
+	logger.Sugar().Infof("Backfilling created_finalized_tx_hash for %d token outputs", len(outputs))
+
+	for _, output := range outputs {
+		if output.Edges.OutputCreatedTokenTransaction == nil {
+			continue
+		}
+
+		_, err := tx.TokenOutput.UpdateOneID(output.ID).
+			SetCreatedTransactionFinalizedHash(output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update output %s: %w", output.ID, err)
+		}
+	}
+
+	logger.Sugar().Infof("Successfully backfilled %d token outputs", len(outputs))
 	return nil
 }
