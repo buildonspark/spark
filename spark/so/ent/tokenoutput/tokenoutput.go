@@ -40,6 +40,8 @@ const (
 	FieldAmount = "amount"
 	// FieldCreatedTransactionOutputVout holds the string denoting the created_transaction_output_vout field in the database.
 	FieldCreatedTransactionOutputVout = "created_transaction_output_vout"
+	// FieldCreatedTransactionFinalizedHash holds the string denoting the created_transaction_finalized_hash field in the database.
+	FieldCreatedTransactionFinalizedHash = "created_transaction_finalized_hash"
 	// FieldSpentOwnershipSignature holds the string denoting the spent_ownership_signature field in the database.
 	FieldSpentOwnershipSignature = "spent_ownership_signature"
 	// FieldSpentOperatorSpecificOwnershipSignature holds the string denoting the spent_operator_specific_ownership_signature field in the database.
@@ -126,6 +128,7 @@ var Columns = []string{
 	FieldTokenAmount,
 	FieldAmount,
 	FieldCreatedTransactionOutputVout,
+	FieldCreatedTransactionFinalizedHash,
 	FieldSpentOwnershipSignature,
 	FieldSpentOperatorSpecificOwnershipSignature,
 	FieldSpentTransactionInputVout,
@@ -171,7 +174,7 @@ func ValidColumn(column string) bool {
 //
 //	import _ "github.com/lightsparkdev/spark/so/ent/runtime"
 var (
-	Hooks [1]ent.Hook
+	Hooks [2]ent.Hook
 	// DefaultCreateTime holds the default value on creation for the "create_time" field.
 	DefaultCreateTime func() time.Time
 	// DefaultUpdateTime holds the default value on creation for the "update_time" field.

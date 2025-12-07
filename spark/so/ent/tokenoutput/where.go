@@ -109,6 +109,11 @@ func CreatedTransactionOutputVout(v int32) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldCreatedTransactionOutputVout, v))
 }
 
+// CreatedTransactionFinalizedHash applies equality check predicate on the "created_transaction_finalized_hash" field. It's identical to CreatedTransactionFinalizedHashEQ.
+func CreatedTransactionFinalizedHash(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldEQ(FieldCreatedTransactionFinalizedHash, v))
+}
+
 // SpentOwnershipSignature applies equality check predicate on the "spent_ownership_signature" field. It's identical to SpentOwnershipSignatureEQ.
 func SpentOwnershipSignature(v []byte) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldSpentOwnershipSignature, v))
@@ -592,6 +597,56 @@ func CreatedTransactionOutputVoutLT(v int32) predicate.TokenOutput {
 // CreatedTransactionOutputVoutLTE applies the LTE predicate on the "created_transaction_output_vout" field.
 func CreatedTransactionOutputVoutLTE(v int32) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldLTE(FieldCreatedTransactionOutputVout, v))
+}
+
+// CreatedTransactionFinalizedHashEQ applies the EQ predicate on the "created_transaction_finalized_hash" field.
+func CreatedTransactionFinalizedHashEQ(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldEQ(FieldCreatedTransactionFinalizedHash, v))
+}
+
+// CreatedTransactionFinalizedHashNEQ applies the NEQ predicate on the "created_transaction_finalized_hash" field.
+func CreatedTransactionFinalizedHashNEQ(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNEQ(FieldCreatedTransactionFinalizedHash, v))
+}
+
+// CreatedTransactionFinalizedHashIn applies the In predicate on the "created_transaction_finalized_hash" field.
+func CreatedTransactionFinalizedHashIn(vs ...[]byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldIn(FieldCreatedTransactionFinalizedHash, vs...))
+}
+
+// CreatedTransactionFinalizedHashNotIn applies the NotIn predicate on the "created_transaction_finalized_hash" field.
+func CreatedTransactionFinalizedHashNotIn(vs ...[]byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNotIn(FieldCreatedTransactionFinalizedHash, vs...))
+}
+
+// CreatedTransactionFinalizedHashGT applies the GT predicate on the "created_transaction_finalized_hash" field.
+func CreatedTransactionFinalizedHashGT(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldGT(FieldCreatedTransactionFinalizedHash, v))
+}
+
+// CreatedTransactionFinalizedHashGTE applies the GTE predicate on the "created_transaction_finalized_hash" field.
+func CreatedTransactionFinalizedHashGTE(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldGTE(FieldCreatedTransactionFinalizedHash, v))
+}
+
+// CreatedTransactionFinalizedHashLT applies the LT predicate on the "created_transaction_finalized_hash" field.
+func CreatedTransactionFinalizedHashLT(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldLT(FieldCreatedTransactionFinalizedHash, v))
+}
+
+// CreatedTransactionFinalizedHashLTE applies the LTE predicate on the "created_transaction_finalized_hash" field.
+func CreatedTransactionFinalizedHashLTE(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldLTE(FieldCreatedTransactionFinalizedHash, v))
+}
+
+// CreatedTransactionFinalizedHashIsNil applies the IsNil predicate on the "created_transaction_finalized_hash" field.
+func CreatedTransactionFinalizedHashIsNil() predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldIsNull(FieldCreatedTransactionFinalizedHash))
+}
+
+// CreatedTransactionFinalizedHashNotNil applies the NotNil predicate on the "created_transaction_finalized_hash" field.
+func CreatedTransactionFinalizedHashNotNil() predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNotNull(FieldCreatedTransactionFinalizedHash))
 }
 
 // SpentOwnershipSignatureEQ applies the EQ predicate on the "spent_ownership_signature" field.

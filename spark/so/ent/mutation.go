@@ -14000,6 +14000,7 @@ type TokenOutputMutation struct {
 	amount                                         *uint128.Uint128
 	created_transaction_output_vout                *int32
 	addcreated_transaction_output_vout             *int32
+	created_transaction_finalized_hash             *[]byte
 	spent_ownership_signature                      *[]byte
 	spent_operator_specific_ownership_signature    *[]byte
 	spent_transaction_input_vout                   *int32
@@ -14612,6 +14613,55 @@ func (m *TokenOutputMutation) AddedCreatedTransactionOutputVout() (r int32, exis
 func (m *TokenOutputMutation) ResetCreatedTransactionOutputVout() {
 	m.created_transaction_output_vout = nil
 	m.addcreated_transaction_output_vout = nil
+}
+
+// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
+func (m *TokenOutputMutation) SetCreatedTransactionFinalizedHash(b []byte) {
+	m.created_transaction_finalized_hash = &b
+}
+
+// CreatedTransactionFinalizedHash returns the value of the "created_transaction_finalized_hash" field in the mutation.
+func (m *TokenOutputMutation) CreatedTransactionFinalizedHash() (r []byte, exists bool) {
+	v := m.created_transaction_finalized_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedTransactionFinalizedHash returns the old "created_transaction_finalized_hash" field's value of the TokenOutput entity.
+// If the TokenOutput object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenOutputMutation) OldCreatedTransactionFinalizedHash(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedTransactionFinalizedHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedTransactionFinalizedHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedTransactionFinalizedHash: %w", err)
+	}
+	return oldValue.CreatedTransactionFinalizedHash, nil
+}
+
+// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
+func (m *TokenOutputMutation) ClearCreatedTransactionFinalizedHash() {
+	m.created_transaction_finalized_hash = nil
+	m.clearedFields[tokenoutput.FieldCreatedTransactionFinalizedHash] = struct{}{}
+}
+
+// CreatedTransactionFinalizedHashCleared returns if the "created_transaction_finalized_hash" field was cleared in this mutation.
+func (m *TokenOutputMutation) CreatedTransactionFinalizedHashCleared() bool {
+	_, ok := m.clearedFields[tokenoutput.FieldCreatedTransactionFinalizedHash]
+	return ok
+}
+
+// ResetCreatedTransactionFinalizedHash resets all changes to the "created_transaction_finalized_hash" field.
+func (m *TokenOutputMutation) ResetCreatedTransactionFinalizedHash() {
+	m.created_transaction_finalized_hash = nil
+	delete(m.clearedFields, tokenoutput.FieldCreatedTransactionFinalizedHash)
 }
 
 // SetSpentOwnershipSignature sets the "spent_ownership_signature" field.
@@ -15287,7 +15337,7 @@ func (m *TokenOutputMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenOutputMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 20)
 	if m.create_time != nil {
 		fields = append(fields, tokenoutput.FieldCreateTime)
 	}
@@ -15320,6 +15370,9 @@ func (m *TokenOutputMutation) Fields() []string {
 	}
 	if m.created_transaction_output_vout != nil {
 		fields = append(fields, tokenoutput.FieldCreatedTransactionOutputVout)
+	}
+	if m.created_transaction_finalized_hash != nil {
+		fields = append(fields, tokenoutput.FieldCreatedTransactionFinalizedHash)
 	}
 	if m.spent_ownership_signature != nil {
 		fields = append(fields, tokenoutput.FieldSpentOwnershipSignature)
@@ -15375,6 +15428,8 @@ func (m *TokenOutputMutation) Field(name string) (ent.Value, bool) {
 		return m.Amount()
 	case tokenoutput.FieldCreatedTransactionOutputVout:
 		return m.CreatedTransactionOutputVout()
+	case tokenoutput.FieldCreatedTransactionFinalizedHash:
+		return m.CreatedTransactionFinalizedHash()
 	case tokenoutput.FieldSpentOwnershipSignature:
 		return m.SpentOwnershipSignature()
 	case tokenoutput.FieldSpentOperatorSpecificOwnershipSignature:
@@ -15422,6 +15477,8 @@ func (m *TokenOutputMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldAmount(ctx)
 	case tokenoutput.FieldCreatedTransactionOutputVout:
 		return m.OldCreatedTransactionOutputVout(ctx)
+	case tokenoutput.FieldCreatedTransactionFinalizedHash:
+		return m.OldCreatedTransactionFinalizedHash(ctx)
 	case tokenoutput.FieldSpentOwnershipSignature:
 		return m.OldSpentOwnershipSignature(ctx)
 	case tokenoutput.FieldSpentOperatorSpecificOwnershipSignature:
@@ -15523,6 +15580,13 @@ func (m *TokenOutputMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCreatedTransactionOutputVout(v)
+		return nil
+	case tokenoutput.FieldCreatedTransactionFinalizedHash:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedTransactionFinalizedHash(v)
 		return nil
 	case tokenoutput.FieldSpentOwnershipSignature:
 		v, ok := value.([]byte)
@@ -15667,6 +15731,9 @@ func (m *TokenOutputMutation) ClearedFields() []string {
 	if m.FieldCleared(tokenoutput.FieldAmount) {
 		fields = append(fields, tokenoutput.FieldAmount)
 	}
+	if m.FieldCleared(tokenoutput.FieldCreatedTransactionFinalizedHash) {
+		fields = append(fields, tokenoutput.FieldCreatedTransactionFinalizedHash)
+	}
 	if m.FieldCleared(tokenoutput.FieldSpentOwnershipSignature) {
 		fields = append(fields, tokenoutput.FieldSpentOwnershipSignature)
 	}
@@ -15704,6 +15771,9 @@ func (m *TokenOutputMutation) ClearField(name string) error {
 		return nil
 	case tokenoutput.FieldAmount:
 		m.ClearAmount()
+		return nil
+	case tokenoutput.FieldCreatedTransactionFinalizedHash:
+		m.ClearCreatedTransactionFinalizedHash()
 		return nil
 	case tokenoutput.FieldSpentOwnershipSignature:
 		m.ClearSpentOwnershipSignature()
@@ -15763,6 +15833,9 @@ func (m *TokenOutputMutation) ResetField(name string) error {
 		return nil
 	case tokenoutput.FieldCreatedTransactionOutputVout:
 		m.ResetCreatedTransactionOutputVout()
+		return nil
+	case tokenoutput.FieldCreatedTransactionFinalizedHash:
+		m.ResetCreatedTransactionFinalizedHash()
 		return nil
 	case tokenoutput.FieldSpentOwnershipSignature:
 		m.ResetSpentOwnershipSignature()

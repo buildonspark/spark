@@ -75,6 +75,18 @@ func (tou *TokenOutputUpdate) ClearAmount() *TokenOutputUpdate {
 	return tou
 }
 
+// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
+func (tou *TokenOutputUpdate) SetCreatedTransactionFinalizedHash(b []byte) *TokenOutputUpdate {
+	tou.mutation.SetCreatedTransactionFinalizedHash(b)
+	return tou
+}
+
+// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
+func (tou *TokenOutputUpdate) ClearCreatedTransactionFinalizedHash() *TokenOutputUpdate {
+	tou.mutation.ClearCreatedTransactionFinalizedHash()
+	return tou
+}
+
 // SetSpentOwnershipSignature sets the "spent_ownership_signature" field.
 func (tou *TokenOutputUpdate) SetSpentOwnershipSignature(b []byte) *TokenOutputUpdate {
 	tou.mutation.SetSpentOwnershipSignature(b)
@@ -406,6 +418,12 @@ func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if tou.mutation.AmountCleared() {
 		_spec.ClearField(tokenoutput.FieldAmount, field.TypeOther)
 	}
+	if value, ok := tou.mutation.CreatedTransactionFinalizedHash(); ok {
+		_spec.SetField(tokenoutput.FieldCreatedTransactionFinalizedHash, field.TypeBytes, value)
+	}
+	if tou.mutation.CreatedTransactionFinalizedHashCleared() {
+		_spec.ClearField(tokenoutput.FieldCreatedTransactionFinalizedHash, field.TypeBytes)
+	}
 	if value, ok := tou.mutation.SpentOwnershipSignature(); ok {
 		_spec.SetField(tokenoutput.FieldSpentOwnershipSignature, field.TypeBytes, value)
 	}
@@ -652,6 +670,18 @@ func (touo *TokenOutputUpdateOne) SetNillableAmount(u *uint128.Uint128) *TokenOu
 // ClearAmount clears the value of the "amount" field.
 func (touo *TokenOutputUpdateOne) ClearAmount() *TokenOutputUpdateOne {
 	touo.mutation.ClearAmount()
+	return touo
+}
+
+// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
+func (touo *TokenOutputUpdateOne) SetCreatedTransactionFinalizedHash(b []byte) *TokenOutputUpdateOne {
+	touo.mutation.SetCreatedTransactionFinalizedHash(b)
+	return touo
+}
+
+// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
+func (touo *TokenOutputUpdateOne) ClearCreatedTransactionFinalizedHash() *TokenOutputUpdateOne {
+	touo.mutation.ClearCreatedTransactionFinalizedHash()
 	return touo
 }
 
@@ -1015,6 +1045,12 @@ func (touo *TokenOutputUpdateOne) sqlSave(ctx context.Context) (_node *TokenOutp
 	}
 	if touo.mutation.AmountCleared() {
 		_spec.ClearField(tokenoutput.FieldAmount, field.TypeOther)
+	}
+	if value, ok := touo.mutation.CreatedTransactionFinalizedHash(); ok {
+		_spec.SetField(tokenoutput.FieldCreatedTransactionFinalizedHash, field.TypeBytes, value)
+	}
+	if touo.mutation.CreatedTransactionFinalizedHashCleared() {
+		_spec.ClearField(tokenoutput.FieldCreatedTransactionFinalizedHash, field.TypeBytes)
 	}
 	if value, ok := touo.mutation.SpentOwnershipSignature(); ok {
 		_spec.SetField(tokenoutput.FieldSpentOwnershipSignature, field.TypeBytes, value)

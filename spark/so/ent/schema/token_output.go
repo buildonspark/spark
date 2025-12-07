@@ -77,6 +77,9 @@ func (TokenOutput) Fields() []ent.Field {
 		field.Int32("created_transaction_output_vout").
 			Immutable().
 			Annotations(entexample.Default(0)),
+		field.Bytes("created_transaction_finalized_hash").
+			Optional().
+			Comment("Denormalized finalized transaction hash from the output_created_token_transaction edge. Auto-populated by hook."),
 		field.Bytes("spent_ownership_signature").
 			Optional(),
 		field.Bytes("spent_operator_specific_ownership_signature").
@@ -151,6 +154,8 @@ func (TokenOutput) Indexes() []ent.Index {
 		index.Edges("output_created_token_transaction"),
 		index.Edges("output_created_token_transaction").Fields("created_transaction_output_vout").Unique(),
 		index.Fields("token_create_id"),
+		// Optimized for FetchAndLockTokenInputs - direct lookup by (tx_hash, vout) without joining token_transactions
+		index.Fields("created_transaction_finalized_hash", "created_transaction_output_vout").Unique(),
 	}
 }
 
@@ -195,6 +200,33 @@ func (TokenOutput) Hooks() []ent.Hook {
 				return result, nil
 			})
 		},
+		autoPopulateCreatedFinalizedTxHashHook(),
+	}
+}
+
+func autoPopulateCreatedFinalizedTxHashHook() ent.Hook {
+	return func(next ent.Mutator) ent.Mutator {
+		return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+			om, ok := m.(*entgen.TokenOutputMutation)
+			if !ok {
+				return next.Mutate(ctx, m)
+			}
+
+			txIDs := om.OutputCreatedTokenTransactionIDs()
+			if len(txIDs) == 1 {
+				tx, err := om.Client().TokenTransaction.Query().
+					Where(tokentransaction.ID(txIDs[0])).
+					Select(tokentransaction.FieldFinalizedTokenTransactionHash).
+					Only(ctx)
+				if err != nil {
+					return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to fetch transaction for %s: %w", tokenoutput.FieldCreatedTransactionFinalizedHash, err))
+				}
+
+				om.SetCreatedTransactionFinalizedHash(tx.FinalizedTokenTransactionHash)
+			}
+
+			return next.Mutate(ctx, m)
+		})
 	}
 }
 

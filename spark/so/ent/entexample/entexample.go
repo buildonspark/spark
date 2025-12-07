@@ -2841,6 +2841,7 @@ type TokenOutputExample struct {
 	TokenAmount                             *[]byte
 	Amount                                  *uint128.Uint128
 	CreatedTransactionOutputVout            *int32
+	CreatedTransactionFinalizedHash         *[]byte
 	SpentOwnershipSignature                 *[]byte
 	SpentOperatorSpecificOwnershipSignature *[]byte
 	SpentTransactionInputVout               *int32
@@ -2918,6 +2919,12 @@ func (to *TokenOutputExample) SetAmount(v uint128.Uint128) *TokenOutputExample {
 // SetCreatedTransactionOutputVout sets the created_transaction_output_vout field.
 func (to *TokenOutputExample) SetCreatedTransactionOutputVout(v int32) *TokenOutputExample {
 	to.CreatedTransactionOutputVout = &v
+	return to
+}
+
+// SetCreatedTransactionFinalizedHash sets the created_transaction_finalized_hash field.
+func (to *TokenOutputExample) SetCreatedTransactionFinalizedHash(v []byte) *TokenOutputExample {
+	to.CreatedTransactionFinalizedHash = &v
 	return to
 }
 
@@ -3080,6 +3087,10 @@ func (to *TokenOutputExample) MustExec(ctx context.Context) *ent.TokenOutput {
 		// Use default from annotation
 		create.SetCreatedTransactionOutputVout(int32(0))
 	}
+	if to.CreatedTransactionFinalizedHash != nil {
+		create.SetCreatedTransactionFinalizedHash(*to.CreatedTransactionFinalizedHash)
+	} else {
+	}
 	if to.SpentOwnershipSignature != nil {
 		create.SetSpentOwnershipSignature(*to.SpentOwnershipSignature)
 	} else {
@@ -3223,6 +3234,10 @@ func (to *TokenOutputExample) Exec(ctx context.Context) (*ent.TokenOutput, error
 	} else {
 		// Use default from annotation
 		create.SetCreatedTransactionOutputVout(int32(0))
+	}
+	if to.CreatedTransactionFinalizedHash != nil {
+		create.SetCreatedTransactionFinalizedHash(*to.CreatedTransactionFinalizedHash)
+	} else {
 	}
 	if to.SpentOwnershipSignature != nil {
 		create.SetSpentOwnershipSignature(*to.SpentOwnershipSignature)

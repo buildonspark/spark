@@ -493,6 +493,7 @@ func init() {
 	tokenoutputMixin := schema.TokenOutput{}.Mixin()
 	tokenoutputHooks := schema.TokenOutput{}.Hooks()
 	tokenoutput.Hooks[0] = tokenoutputHooks[0]
+	tokenoutput.Hooks[1] = tokenoutputHooks[1]
 	tokenoutputMixinFields0 := tokenoutputMixin[0].Fields()
 	_ = tokenoutputMixinFields0
 	tokenoutputFields := schema.TokenOutput{}.Fields()

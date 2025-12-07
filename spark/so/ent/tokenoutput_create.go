@@ -129,6 +129,12 @@ func (toc *TokenOutputCreate) SetCreatedTransactionOutputVout(i int32) *TokenOut
 	return toc
 }
 
+// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
+func (toc *TokenOutputCreate) SetCreatedTransactionFinalizedHash(b []byte) *TokenOutputCreate {
+	toc.mutation.SetCreatedTransactionFinalizedHash(b)
+	return toc
+}
+
 // SetSpentOwnershipSignature sets the "spent_ownership_signature" field.
 func (toc *TokenOutputCreate) SetSpentOwnershipSignature(b []byte) *TokenOutputCreate {
 	toc.mutation.SetSpentOwnershipSignature(b)
@@ -501,6 +507,10 @@ func (toc *TokenOutputCreate) createSpec() (*TokenOutput, *sqlgraph.CreateSpec) 
 		_spec.SetField(tokenoutput.FieldCreatedTransactionOutputVout, field.TypeInt32, value)
 		_node.CreatedTransactionOutputVout = value
 	}
+	if value, ok := toc.mutation.CreatedTransactionFinalizedHash(); ok {
+		_spec.SetField(tokenoutput.FieldCreatedTransactionFinalizedHash, field.TypeBytes, value)
+		_node.CreatedTransactionFinalizedHash = value
+	}
 	if value, ok := toc.mutation.SpentOwnershipSignature(); ok {
 		_spec.SetField(tokenoutput.FieldSpentOwnershipSignature, field.TypeBytes, value)
 		_node.SpentOwnershipSignature = value
@@ -720,6 +730,24 @@ func (u *TokenOutputUpsert) UpdateAmount() *TokenOutputUpsert {
 // ClearAmount clears the value of the "amount" field.
 func (u *TokenOutputUpsert) ClearAmount() *TokenOutputUpsert {
 	u.SetNull(tokenoutput.FieldAmount)
+	return u
+}
+
+// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
+func (u *TokenOutputUpsert) SetCreatedTransactionFinalizedHash(v []byte) *TokenOutputUpsert {
+	u.Set(tokenoutput.FieldCreatedTransactionFinalizedHash, v)
+	return u
+}
+
+// UpdateCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field to the value that was provided on create.
+func (u *TokenOutputUpsert) UpdateCreatedTransactionFinalizedHash() *TokenOutputUpsert {
+	u.SetExcluded(tokenoutput.FieldCreatedTransactionFinalizedHash)
+	return u
+}
+
+// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
+func (u *TokenOutputUpsert) ClearCreatedTransactionFinalizedHash() *TokenOutputUpsert {
+	u.SetNull(tokenoutput.FieldCreatedTransactionFinalizedHash)
 	return u
 }
 
@@ -961,6 +989,27 @@ func (u *TokenOutputUpsertOne) UpdateAmount() *TokenOutputUpsertOne {
 func (u *TokenOutputUpsertOne) ClearAmount() *TokenOutputUpsertOne {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.ClearAmount()
+	})
+}
+
+// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
+func (u *TokenOutputUpsertOne) SetCreatedTransactionFinalizedHash(v []byte) *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.SetCreatedTransactionFinalizedHash(v)
+	})
+}
+
+// UpdateCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field to the value that was provided on create.
+func (u *TokenOutputUpsertOne) UpdateCreatedTransactionFinalizedHash() *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.UpdateCreatedTransactionFinalizedHash()
+	})
+}
+
+// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
+func (u *TokenOutputUpsertOne) ClearCreatedTransactionFinalizedHash() *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.ClearCreatedTransactionFinalizedHash()
 	})
 }
 
@@ -1388,6 +1437,27 @@ func (u *TokenOutputUpsertBulk) UpdateAmount() *TokenOutputUpsertBulk {
 func (u *TokenOutputUpsertBulk) ClearAmount() *TokenOutputUpsertBulk {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.ClearAmount()
+	})
+}
+
+// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
+func (u *TokenOutputUpsertBulk) SetCreatedTransactionFinalizedHash(v []byte) *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.SetCreatedTransactionFinalizedHash(v)
+	})
+}
+
+// UpdateCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field to the value that was provided on create.
+func (u *TokenOutputUpsertBulk) UpdateCreatedTransactionFinalizedHash() *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.UpdateCreatedTransactionFinalizedHash()
+	})
+}
+
+// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
+func (u *TokenOutputUpsertBulk) ClearCreatedTransactionFinalizedHash() *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.ClearCreatedTransactionFinalizedHash()
 	})
 }
 
