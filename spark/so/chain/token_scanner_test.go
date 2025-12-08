@@ -100,7 +100,7 @@ func TestParseTokenAnnouncement(t *testing.T) {
 				Decimals:                8,
 				MaxSupply:               maxSupply,
 				IsFreezable:             false,
-				CreationEntityPublicKey: common.L1CreationEntityPublicKey,
+				CreationEntityPublicKey: keys.Public{}, // L1 creation entity public key denoted by zero value
 				Network:                 btcnetwork.Testnet,
 			},
 		},
@@ -399,7 +399,7 @@ func createExpectedTokenMetadata() *common.TokenMetadata {
 		Decimals:                8,
 		MaxSupply:               maxSupply,
 		IsFreezable:             true,
-		CreationEntityPublicKey: common.L1CreationEntityPublicKey,
+		CreationEntityPublicKey: keys.Public{}, // L1 creation entity public key denoted by zero value
 		Network:                 btcnetwork.Testnet,
 	}
 }

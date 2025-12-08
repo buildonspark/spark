@@ -4,6 +4,7 @@ package spark_token;
 
 import "spark_token.proto";
 import "validate/validate.proto";
+import "spark.proto";
 
 option go_package = "github.com/lightsparkdev/spark/proto/spark_token_internal";
 
@@ -94,4 +95,17 @@ message OutputToSpend {
         (validate.rules).bytes.min_len = 64,
         (validate.rules).bytes.max_len = 73
     ];
+}
+
+message UnencodedTokenIdentifier {
+    uint32 version = 1; 
+    bytes issuer_public_key = 2 [(validate.rules).bytes.len = 33];
+    string token_name = 3 [(validate.rules).string = {max_len: 20}];  
+    string token_ticker = 4 [(validate.rules).string = {max_len: 6}];
+    uint32 decimals = 5 [(validate.rules).uint32.lte = 255];
+    bytes max_supply = 6 [(validate.rules).bytes.len = 16];
+    bool is_freezable = 7;
+    spark.Network network = 8 [(validate.rules).enum.defined_only = true];
+    bytes creation_entity_public_key = 9 [(validate.rules).bytes.len = 33];
+    optional bytes extra_metadata = 10 [(validate.rules).bytes = {max_len: 1024}];
 }

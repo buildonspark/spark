@@ -513,6 +513,21 @@ func (m *TokenCreateInput) validate(all bool) error {
 
 	}
 
+	if m.ExtraMetadata != nil {
+
+		if len(m.GetExtraMetadata()) > 1024 {
+			err := TokenCreateInputValidationError{
+				field:  "ExtraMetadata",
+				reason: "value length must be at most 1024 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return TokenCreateInputMultiError(errors)
 	}
@@ -3992,6 +4007,21 @@ func (m *TokenMetadata) validate(all bool) error {
 			err := TokenMetadataValidationError{
 				field:  "CreationEntityPublicKey",
 				reason: "value length must be 33 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if m.ExtraMetadata != nil {
+
+		if len(m.GetExtraMetadata()) > 1024 {
+			err := TokenMetadataValidationError{
+				field:  "ExtraMetadata",
+				reason: "value length must be at most 1024 bytes",
 			}
 			if !all {
 				return err

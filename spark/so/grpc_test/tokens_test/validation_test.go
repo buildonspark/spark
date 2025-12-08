@@ -1,6 +1,7 @@
 package tokens_test
 
 import (
+	"math/rand/v2"
 	"testing"
 	"time"
 
@@ -206,6 +207,7 @@ func TestCoordinatedQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t 
 func TestPartialTransactionValidationErrors(t *testing.T) {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	tokenIdentityPubKey := config.IdentityPrivateKey.Public()
+	seededRng := rand.NewChaCha8([32]byte{})
 
 	testCases := []struct {
 		name                string
@@ -226,7 +228,8 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 				return tx, []keys.Private{config.IdentityPrivateKey}
 			},
 			modifyTx: func(tx *tokenpb.TokenTransaction) {
-				tx.GetCreateInput().CreationEntityPublicKey = (&[33]byte{32: 1})[:]
+				privKey := keys.MustGeneratePrivateKeyFromRand(seededRng)
+				tx.GetCreateInput().CreationEntityPublicKey = privKey.Public().Serialize()
 			},
 			expectedErrorSubstr: "creation entity public key will be added by the SO",
 		},

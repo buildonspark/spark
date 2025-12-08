@@ -82,7 +82,7 @@ func CreateStartedTransactionEntities(
 		if err != nil {
 			return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to create token metadata: %w", err))
 		}
-		computedTokenIdentifier, err := tokenMetadata.ComputeTokenIdentifierV1()
+		computedTokenIdentifier, err := tokenMetadata.ComputeTokenIdentifier()
 		if err != nil {
 			return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to compute token identifier: %w", err))
 		}

@@ -12,7 +12,7 @@ func (tc *TokenCreate) ToTokenMetadata() (*common.TokenMetadata, error) {
 		Decimals:                tc.Decimals,
 		MaxSupply:               tc.MaxSupply,
 		IsFreezable:             tc.IsFreezable,
-		CreationEntityPublicKey: tc.CreationEntityPublicKey.Serialize(),
 		Network:                 tc.Network,
+		CreationEntityPublicKey: tc.CreationEntityPublicKey,
 	}, nil
 }

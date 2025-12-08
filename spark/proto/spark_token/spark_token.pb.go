@@ -345,8 +345,10 @@ type TokenCreateInput struct {
 	MaxSupply               []byte                 `protobuf:"bytes,5,opt,name=max_supply,json=maxSupply,proto3" json:"max_supply,omitempty"` // Decoded uint128
 	IsFreezable             bool                   `protobuf:"varint,6,opt,name=is_freezable,json=isFreezable,proto3" json:"is_freezable,omitempty"`
 	CreationEntityPublicKey []byte                 `protobuf:"bytes,7,opt,name=creation_entity_public_key,json=creationEntityPublicKey,proto3,oneof" json:"creation_entity_public_key,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// If any of the fields below are provided, use protohash to generate the token_identifier
+	ExtraMetadata []byte `protobuf:"bytes,8,opt,name=extra_metadata,json=extraMetadata,proto3,oneof" json:"extra_metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TokenCreateInput) Reset() {
@@ -424,6 +426,13 @@ func (x *TokenCreateInput) GetIsFreezable() bool {
 func (x *TokenCreateInput) GetCreationEntityPublicKey() []byte {
 	if x != nil {
 		return x.CreationEntityPublicKey
+	}
+	return nil
+}
+
+func (x *TokenCreateInput) GetExtraMetadata() []byte {
+	if x != nil {
+		return x.ExtraMetadata
 	}
 	return nil
 }
@@ -1804,6 +1813,7 @@ type TokenMetadata struct {
 	IsFreezable             bool                   `protobuf:"varint,6,opt,name=is_freezable,json=isFreezable,proto3" json:"is_freezable,omitempty"`
 	CreationEntityPublicKey []byte                 `protobuf:"bytes,7,opt,name=creation_entity_public_key,json=creationEntityPublicKey,proto3,oneof" json:"creation_entity_public_key,omitempty"`
 	TokenIdentifier         []byte                 `protobuf:"bytes,8,opt,name=token_identifier,json=tokenIdentifier,proto3" json:"token_identifier,omitempty"`
+	ExtraMetadata           []byte                 `protobuf:"bytes,9,opt,name=extra_metadata,json=extraMetadata,proto3,oneof" json:"extra_metadata,omitempty"`
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -1890,6 +1900,13 @@ func (x *TokenMetadata) GetCreationEntityPublicKey() []byte {
 func (x *TokenMetadata) GetTokenIdentifier() []byte {
 	if x != nil {
 		return x.TokenIdentifier
+	}
+	return nil
+}
+
+func (x *TokenMetadata) GetExtraMetadata() []byte {
+	if x != nil {
+		return x.ExtraMetadata
 	}
 	return nil
 }
@@ -2665,7 +2682,7 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x0eTokenMintInput\x123\n" +
 	"\x11issuer_public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\x0fissuerPublicKey\x127\n" +
 	"\x10token_identifier\x18\x02 \x01(\fB\a\xfaB\x04z\x02h H\x00R\x0ftokenIdentifier\x88\x01\x01B\x13\n" +
-	"\x11_token_identifier\"\xf6\x02\n" +
+	"\x11_token_identifier\"\xbf\x03\n" +
 	"\x10TokenCreateInput\x123\n" +
 	"\x11issuer_public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\x0fissuerPublicKey\x12&\n" +
 	"\n" +
@@ -2675,8 +2692,10 @@ const file_spark_token_proto_rawDesc = "" +
 	"\n" +
 	"max_supply\x18\x05 \x01(\fB\a\xfaB\x04z\x02h\x10R\tmaxSupply\x12!\n" +
 	"\fis_freezable\x18\x06 \x01(\bR\visFreezable\x12I\n" +
-	"\x1acreation_entity_public_key\x18\a \x01(\fB\a\xfaB\x04z\x02h!H\x00R\x17creationEntityPublicKey\x88\x01\x01B\x1d\n" +
-	"\x1b_creation_entity_public_key\"\xc7\x04\n" +
+	"\x1acreation_entity_public_key\x18\a \x01(\fB\a\xfaB\x04z\x02h!H\x00R\x17creationEntityPublicKey\x88\x01\x01\x124\n" +
+	"\x0eextra_metadata\x18\b \x01(\fB\b\xfaB\x05z\x03\x18\x80\bH\x01R\rextraMetadata\x88\x01\x01B\x1d\n" +
+	"\x1b_creation_entity_public_keyB\x11\n" +
+	"\x0f_extra_metadata\"\xc7\x04\n" +
 	"\vTokenOutput\x12\x1d\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01H\x00R\x02id\x88\x01\x01\x121\n" +
 	"\x10owner_public_key\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x0eownerPublicKey\x12A\n" +
@@ -2782,7 +2801,7 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x0fcommit_progress\x18\x03 \x01(\v2\x1b.spark_token.CommitProgressR\x0ecommitProgress\"\x92\x01\n" +
 	"\x19QueryTokenMetadataRequest\x129\n" +
 	"\x11token_identifiers\x18\x01 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h R\x10tokenIdentifiers\x12:\n" +
-	"\x12issuer_public_keys\x18\x02 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x10issuerPublicKeys\"\xa7\x03\n" +
+	"\x12issuer_public_keys\x18\x02 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x10issuerPublicKeys\"\xf0\x03\n" +
 	"\rTokenMetadata\x123\n" +
 	"\x11issuer_public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\x0fissuerPublicKey\x12&\n" +
 	"\n" +
@@ -2793,8 +2812,10 @@ const file_spark_token_proto_rawDesc = "" +
 	"max_supply\x18\x05 \x01(\fB\a\xfaB\x04z\x02h\x10R\tmaxSupply\x12!\n" +
 	"\fis_freezable\x18\x06 \x01(\bR\visFreezable\x12I\n" +
 	"\x1acreation_entity_public_key\x18\a \x01(\fB\a\xfaB\x04z\x02h!H\x00R\x17creationEntityPublicKey\x88\x01\x01\x122\n" +
-	"\x10token_identifier\x18\b \x01(\fB\a\xfaB\x04z\x02h R\x0ftokenIdentifierB\x1d\n" +
-	"\x1b_creation_entity_public_key\"_\n" +
+	"\x10token_identifier\x18\b \x01(\fB\a\xfaB\x04z\x02h R\x0ftokenIdentifier\x124\n" +
+	"\x0eextra_metadata\x18\t \x01(\fB\b\xfaB\x05z\x03\x18\x80\bH\x01R\rextraMetadata\x88\x01\x01B\x1d\n" +
+	"\x1b_creation_entity_public_keyB\x11\n" +
+	"\x0f_extra_metadata\"_\n" +
 	"\x1aQueryTokenMetadataResponse\x12A\n" +
 	"\x0etoken_metadata\x18\x01 \x03(\v2\x1a.spark_token.TokenMetadataR\rtokenMetadata\"\xac\x02\n" +
 	"\x18QueryTokenOutputsRequest\x128\n" +

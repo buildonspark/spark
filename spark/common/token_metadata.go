@@ -6,13 +6,16 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"reflect"
 	"unicode/utf8"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/protohash"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"golang.org/x/text/unicode/norm"
 )
@@ -20,6 +23,10 @@ import (
 const (
 	// CreationEntityPublicKeyLength is the required length in bytes for creation entity public keys
 	CreationEntityPublicKeyLength = 33
+	// MaxExtraMetadataLength is the maximum length in bytes for extra metadata
+	MaxExtraMetadataLength = 1024
+	// TokenIdentifierWithExtensionsVersion is the version of the token identifier that includes extensions like extra metadata
+	TokenIdentifierWithExtensionsVersion = 2
 )
 
 var (
@@ -36,8 +43,9 @@ var (
 	ErrTokenTickerLength                    = errors.New("token ticker must be between 3 and 6 bytes")
 	ErrInvalidMaxSupplyLength               = errors.New("max supply must be 16 bytes")
 	ErrCreationEntityPublicKeyEmpty         = errors.New("creation entity public key cannot be empty")
-	ErrInvalidCreationEntityPublicKeyLength = errors.New("creation entity public key must be 33 bytes")
+	ErrInvalidCreationEntityPublicKeyLength = fmt.Errorf("creation entity public key must be %d bytes", CreationEntityPublicKeyLength)
 	ErrNetworkUnspecified                   = errors.New("network must not be unspecified")
+	ErrInvalidExtraMetadataLength           = fmt.Errorf("extra metadata length must be no more than %d bytes", MaxExtraMetadataLength)
 )
 
 // TokenMetadataProvider is an interface for objects that can be converted to TokenMetadata.
@@ -56,8 +64,9 @@ type TokenMetadata struct {
 	Decimals                uint8
 	MaxSupply               []byte
 	IsFreezable             bool
-	CreationEntityPublicKey []byte
+	CreationEntityPublicKey keys.Public
 	Network                 btcnetwork.Network
+	ExtraMetadata           []byte
 }
 
 var (
@@ -80,6 +89,17 @@ func NewTokenMetadataFromCreateInput(
 	if err != nil {
 		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("invalid issuer public key: %w", err))
 	}
+
+	var creationEntityPubKey keys.Public // The zero value of keys.Public represents the L1 creation entity public key
+	creationEntityPubKeyBytes := createInput.GetCreationEntityPublicKey()
+
+	if len(creationEntityPubKeyBytes) > 0 && !bytes.Equal(creationEntityPubKeyBytes, L1CreationEntityPublicKey) {
+		var err error
+		creationEntityPubKey, err = keys.ParsePublicKey(creationEntityPubKeyBytes)
+		if err != nil {
+			return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("invalid creation entity public key: %w", err))
+		}
+	}
 	return &TokenMetadata{
 		IssuerPublicKey:         issuerPubKey,
 		TokenName:               createInput.GetTokenName(),
@@ -87,13 +107,14 @@ func NewTokenMetadataFromCreateInput(
 		Decimals:                uint8(createInput.GetDecimals()),
 		MaxSupply:               createInput.GetMaxSupply(),
 		IsFreezable:             createInput.GetIsFreezable(),
-		CreationEntityPublicKey: createInput.GetCreationEntityPublicKey(),
+		CreationEntityPublicKey: creationEntityPubKey,
 		Network:                 network,
+		ExtraMetadata:           createInput.GetExtraMetadata(),
 	}, nil
 }
 
 func (tm *TokenMetadata) ToTokenMetadataProto() *tokenpb.TokenMetadata {
-	tokenIdentifier, err := tm.ComputeTokenIdentifierV1()
+	tokenIdentifier, err := tm.ComputeTokenIdentifier()
 	if err != nil {
 		return nil
 	}
@@ -104,17 +125,37 @@ func (tm *TokenMetadata) ToTokenMetadataProto() *tokenpb.TokenMetadata {
 		Decimals:                uint32(tm.Decimals),
 		MaxSupply:               tm.MaxSupply,
 		IsFreezable:             tm.IsFreezable,
-		CreationEntityPublicKey: tm.CreationEntityPublicKey,
+		CreationEntityPublicKey: tm.CreationEntityPublicKey.Serialize(),
 		TokenIdentifier:         tokenIdentifier,
+		ExtraMetadata:           tm.ExtraMetadata,
 	}
 }
 
-// ComputeTokenIdentifierV1 computes the token identifier from this metadata and network
-func (tm *TokenMetadata) ComputeTokenIdentifierV1() (TokenIdentifier, error) {
+func (tm *TokenMetadata) ComputeTokenIdentifier() (TokenIdentifier, error) {
 	if err := tm.Validate(); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidTokenMetadata, err)
 	}
 
+	if tm.HasExtensions() {
+		return tm.ComputeTokenIdentifierWithExtensions()
+	}
+	return tm.ComputeTokenIdentifierV1()
+}
+
+func (tm *TokenMetadata) ComputeTokenIdentifierWithExtensions() (TokenIdentifier, error) {
+	unencodedTokenIdentifier, err := tm.ToUnencodedTokenIdentifier()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert token metadata to proto hash: %w", err)
+	}
+	hash, err := protohash.Hash(unencodedTokenIdentifier)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute token identifier: %w", err)
+	}
+	return hash, nil
+}
+
+// ComputeTokenIdentifierV1 computes the token identifier from this metadata and network
+func (tm *TokenMetadata) ComputeTokenIdentifierV1() (TokenIdentifier, error) {
 	h := sha256.New()
 
 	// Hash version (1 byte)
@@ -160,7 +201,13 @@ func (tm *TokenMetadata) ComputeTokenIdentifierV1() (TokenIdentifier, error) {
 	if tokenCreateLayer == TokenCreateLayerL1 {
 		h.Write(chainhash.HashB([]byte{byte(tokenCreateLayer)}))
 	} else {
-		h.Write(chainhash.HashB(append([]byte{byte(tokenCreateLayer)}, tm.CreationEntityPublicKey...)))
+		var creationEntityPublicKeyBytes []byte
+		if tm.CreationEntityPublicKey.IsZero() {
+			creationEntityPublicKeyBytes = L1CreationEntityPublicKey
+		} else {
+			creationEntityPublicKeyBytes = tm.CreationEntityPublicKey.Serialize()
+		}
+		h.Write(chainhash.HashB(append([]byte{byte(tokenCreateLayer)}, creationEntityPublicKeyBytes...)))
 	}
 	return h.Sum(nil), nil
 }
@@ -176,13 +223,7 @@ const (
 // GetTokenCreateLayer returns the layer where the token was created (L1 or Spark).
 // A token is considered L1-created if its CreationEntityPublicKey is all zeros.
 func (tm *TokenMetadata) GetTokenCreateLayer() (TokenCreateLayer, error) {
-	if tm.CreationEntityPublicKey == nil {
-		return TokenCreateLayerUnknown, ErrCreationEntityPublicKeyEmpty
-	}
-	if len(tm.CreationEntityPublicKey) != CreationEntityPublicKeyLength {
-		return TokenCreateLayerUnknown, sparkerrors.InternalObjectMalformedField(fmt.Errorf("%w: creation entity public key must be %d bytes", ErrInvalidCreationEntityPublicKeyLength, CreationEntityPublicKeyLength))
-	}
-	if bytes.Equal(tm.CreationEntityPublicKey, L1CreationEntityPublicKey) {
+	if tm.CreationEntityPublicKey.IsZero() {
 		return TokenCreateLayerL1, nil
 	}
 	return TokenCreateLayerSpark, nil
@@ -223,13 +264,77 @@ func (tm *TokenMetadata) ValidatePartial() error {
 	return nil
 }
 
+func (tm *TokenMetadata) ValidateExtensions() error {
+	if len(tm.ExtraMetadata) > MaxExtraMetadataLength {
+		return sparkerrors.InternalObjectMalformedField(fmt.Errorf("%w: got %d", ErrInvalidExtraMetadataLength, len(tm.ExtraMetadata)))
+	}
+	return nil
+}
+
 // Validate checks if the TokenMetadata has all required fields
 func (tm *TokenMetadata) Validate() error {
 	if err := tm.ValidatePartial(); err != nil {
 		return err
 	}
-	if len(tm.CreationEntityPublicKey) != CreationEntityPublicKeyLength {
-		return sparkerrors.InternalObjectMalformedField(fmt.Errorf("%w: got %d", ErrInvalidCreationEntityPublicKeyLength, len(tm.CreationEntityPublicKey)))
+	if err := tm.ValidateExtensions(); err != nil {
+		return err
 	}
 	return nil
+}
+
+// v1Fields is a map of field names that are part of the v1 token metadata.
+var v1Fields = map[string]struct{}{
+	"IssuerPublicKey":         {},
+	"TokenName":               {},
+	"TokenTicker":             {},
+	"Decimals":                {},
+	"MaxSupply":               {},
+	"IsFreezable":             {},
+	"CreationEntityPublicKey": {},
+	"Network":                 {},
+}
+
+// If TokenMetadata has any fields that are not part of the v1Fields map, it has extensions and should be hashed using the ComputeTokenIdentifierWithExtensions method.
+func (tm *TokenMetadata) HasExtensions() bool {
+	tmValue := reflect.ValueOf(*tm)
+	tmType := tmValue.Type()
+
+	for i := 0; i < tmValue.NumField(); i++ {
+		fieldName := tmType.Field(i).Name
+
+		if _, isV1Field := v1Fields[fieldName]; isV1Field {
+			continue
+		}
+
+		if !tmValue.Field(i).IsZero() {
+			return true
+		}
+	}
+	return false
+}
+
+func (tm *TokenMetadata) ToUnencodedTokenIdentifier() (*tokeninternalpb.UnencodedTokenIdentifier, error) {
+	networkProto, err := tm.Network.ToProtoNetwork()
+	if err != nil {
+		return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to convert network (numerical value: %s) to proto: %w", tm.Network, err))
+	}
+
+	var creationEntityPubKeyBytes []byte
+	if tm.CreationEntityPublicKey.IsZero() {
+		creationEntityPubKeyBytes = L1CreationEntityPublicKey
+	} else {
+		creationEntityPubKeyBytes = tm.CreationEntityPublicKey.Serialize()
+	}
+	return &tokeninternalpb.UnencodedTokenIdentifier{
+		Version:                 uint32(TokenIdentifierWithExtensionsVersion),
+		IssuerPublicKey:         tm.IssuerPublicKey.Serialize(),
+		TokenName:               tm.TokenName,
+		TokenTicker:             tm.TokenTicker,
+		Decimals:                uint32(tm.Decimals),
+		MaxSupply:               tm.MaxSupply,
+		IsFreezable:             tm.IsFreezable,
+		Network:                 networkProto,
+		CreationEntityPublicKey: creationEntityPubKeyBytes,
+		ExtraMetadata:           tm.ExtraMetadata,
+	}, nil
 }

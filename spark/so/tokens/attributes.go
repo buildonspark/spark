@@ -77,7 +77,7 @@ func GetTokenTxAttrStringsFromProto(ctx context.Context, tx *tokenpb.TokenTransa
 				zap.Error(err),
 			)
 		} else {
-			computedTokenIdentifier, err := tokenMetadata.ComputeTokenIdentifierV1()
+			computedTokenIdentifier, err := tokenMetadata.ComputeTokenIdentifier()
 			if err != nil {
 				logger.Warn(fmt.Sprintf("Failed to compute token identifier when computing attributes from proto. tx: %s",
 					logging.FormatProto("", tx)),

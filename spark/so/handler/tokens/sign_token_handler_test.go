@@ -201,7 +201,7 @@ func createCreateTokenTransactionProto(t *testing.T, setup *testSetupCommon) (*t
 
 	metadata, err := common.NewTokenMetadataFromCreateInput(createInput, sparkpb.Network_REGTEST)
 	require.NoError(t, err)
-	tokenIdentifier, err := metadata.ComputeTokenIdentifierV1()
+	tokenIdentifier, err := metadata.ComputeTokenIdentifier()
 	require.NoError(t, err)
 
 	expiryTime := time.Now().Add(10 * time.Minute)

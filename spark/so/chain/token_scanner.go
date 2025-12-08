@@ -251,8 +251,8 @@ func createNativeSparkTokenEntity(ctx context.Context, dbClient *ent.Client, tok
 	// (creation entity key = 0x00..00). For the Spark `token_creates` table we use
 	// the SO entity DKG key as the creation entity key.
 	sparkTokenMetadata := *tokenMetadata
-	sparkTokenMetadata.CreationEntityPublicKey = entityDkgKeyPublicKey.Serialize()
-	sparkTokenIdentifier, err := sparkTokenMetadata.ComputeTokenIdentifierV1()
+	sparkTokenMetadata.CreationEntityPublicKey = entityDkgKeyPublicKey
+	sparkTokenIdentifier, err := sparkTokenMetadata.ComputeTokenIdentifier()
 	if err != nil {
 		return fmt.Errorf("failed to compute Spark token identifier: %w", err)
 	}
@@ -335,7 +335,7 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *
 			continue
 		}
 
-		tokenIdentifier, err := tokenMetadata.ComputeTokenIdentifierV1()
+		tokenIdentifier, err := tokenMetadata.ComputeTokenIdentifier()
 		if err != nil {
 			logger.Error("Failed to compute token identifier", zap.Error(err))
 			continue

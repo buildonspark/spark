@@ -21,9 +21,15 @@ func createValidTokenMetadata(rng *rand.ChaCha8) *TokenMetadata {
 		Decimals:                8,
 		MaxSupply:               make([]byte, 16),
 		IsFreezable:             true,
-		CreationEntityPublicKey: make([]byte, 33),
+		CreationEntityPublicKey: keys.Public{},
 		Network:                 btcnetwork.Regtest,
 	}
+}
+
+func createValidTokenMetadataWithExtensions(rng *rand.ChaCha8) *TokenMetadata {
+	tokenMetadata := createValidTokenMetadata(rng)
+	tokenMetadata.ExtraMetadata = make([]byte, MaxExtraMetadataLength)
+	return tokenMetadata
 }
 
 func TestTokenMetadata_Validate(t *testing.T) {
@@ -34,7 +40,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 		if err != nil {
 			t.Errorf("expected no error for valid metadata, got: %v", err)
 		}
-		_, err = tm.ComputeTokenIdentifierV1()
+		_, err = tm.ComputeTokenIdentifier()
 		if err != nil {
 			t.Errorf("expected no error computing identifier, got: %v", err)
 		}
@@ -47,7 +53,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 		if err != nil {
 			t.Errorf("expected no error for non-ascii token name, got: %v", err)
 		}
-		_, err = tm.ComputeTokenIdentifierV1()
+		_, err = tm.ComputeTokenIdentifier()
 		if err != nil {
 			t.Errorf("expected no error computing identifier, got: %v", err)
 		}
@@ -221,7 +227,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 					t.Errorf("expected no error for valid UTF-8 characters, got: %v", err)
 				}
 				// Test identifier computation for valid UTF-8
-				_, err = tm.ComputeTokenIdentifierV1()
+				_, err = tm.ComputeTokenIdentifier()
 				if err != nil {
 					t.Errorf("expected no error computing identifier, got: %v", err)
 				}
@@ -249,31 +255,6 @@ func TestTokenMetadata_Validate(t *testing.T) {
 				}
 				if !errors.Is(err, ErrInvalidMaxSupplyLength) {
 					t.Errorf("expected error about max supply length, got: %v", err)
-				}
-			})
-		}
-	})
-
-	t.Run("invalid creation entity public key length", func(t *testing.T) {
-		testCases := []struct {
-			name   string
-			length int
-		}{
-			{"empty", 0},
-			{"too short", 32},
-			{"too long", 34},
-		}
-
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				tm := createValidTokenMetadata(rng)
-				tm.CreationEntityPublicKey = make([]byte, tc.length)
-				err := tm.Validate()
-				if err == nil {
-					t.Errorf("expected error for creation entity public key length %d, got none", tc.length)
-				}
-				if !errors.Is(err, ErrInvalidCreationEntityPublicKeyLength) {
-					t.Errorf("expected error about creation entity public key length, got: %v", err)
 				}
 			})
 		}
@@ -339,7 +320,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 			Decimals:                0,     // minimum allowed
 			MaxSupply:               make([]byte, 16),
 			IsFreezable:             false,
-			CreationEntityPublicKey: make([]byte, 33),
+			CreationEntityPublicKey: keys.Public{},
 			Network:                 btcnetwork.Regtest,
 		}
 
@@ -349,7 +330,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 		}
 
 		// Should also be able to compute identifier
-		_, err = tm.ComputeTokenIdentifierV1()
+		_, err = tm.ComputeTokenIdentifier()
 		if err != nil {
 			t.Errorf("expected no error computing identifier, got: %v", err)
 		}
@@ -366,7 +347,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 			}, // max uint128
 			IsFreezable:             true,
-			CreationEntityPublicKey: make([]byte, 33),
+			CreationEntityPublicKey: keys.Public{},
 			Network:                 btcnetwork.Regtest,
 		}
 
@@ -374,9 +355,51 @@ func TestTokenMetadata_Validate(t *testing.T) {
 		if err != nil {
 			t.Errorf("expected no error for maximum boundary values, got: %v", err)
 		}
-		_, err = tm.ComputeTokenIdentifierV1()
+		_, err = tm.ComputeTokenIdentifier()
 		if err != nil {
 			t.Errorf("expected no error computing identifier, got: %v", err)
+		}
+	})
+
+	t.Run("Extra metadata byte length validation", func(t *testing.T) {
+		testCases := []struct {
+			name          string
+			extraMetadata []byte
+			expectError   bool
+		}{
+			{
+				name:          "valid extra metadata length",
+				extraMetadata: make([]byte, MaxExtraMetadataLength),
+				expectError:   false,
+			},
+			{
+				name:          "extra metadata length is less than limit",
+				extraMetadata: make([]byte, MaxExtraMetadataLength-1),
+				expectError:   false,
+			},
+			{
+				name:          "extra metadata length exceeds limit",
+				extraMetadata: make([]byte, MaxExtraMetadataLength+1),
+				expectError:   true,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				tm := createValidTokenMetadata(rng)
+				tm.ExtraMetadata = tc.extraMetadata
+				err := tm.Validate()
+
+				if tc.expectError {
+					if err == nil {
+						t.Errorf("expected error, got none")
+					}
+				} else {
+					if err != nil {
+						t.Errorf("expected no error, got: %v", err)
+					}
+				}
+			})
 		}
 	})
 }
@@ -395,11 +418,11 @@ func TestActualProductionL1TokenIdentifier(t *testing.T) {
 		Decimals:                10,
 		MaxSupply:               maxSupply,
 		IsFreezable:             false,
-		CreationEntityPublicKey: L1CreationEntityPublicKey,
+		CreationEntityPublicKey: keys.Public{},
 		Network:                 btcnetwork.Regtest,
 	}
 
-	tokenIdentifier, err := tm.ComputeTokenIdentifierV1()
+	tokenIdentifier, err := tm.ComputeTokenIdentifier()
 	require.NoError(t, err)
 
 	// IMPORTANT: This expected value should never change!
@@ -422,11 +445,11 @@ func TestActualProductionSparkTokenIdentifier(t *testing.T) {
 		Decimals:                10,
 		MaxSupply:               maxSupply,
 		IsFreezable:             false,
-		CreationEntityPublicKey: creationEntityPublicKey.Serialize(),
+		CreationEntityPublicKey: creationEntityPublicKey,
 		Network:                 btcnetwork.Regtest,
 	}
 
-	tokenIdentifier, err := tm.ComputeTokenIdentifierV1()
+	tokenIdentifier, err := tm.ComputeTokenIdentifier()
 	require.NoError(t, err)
 
 	// IMPORTANT: This expected value should never change!
@@ -439,9 +462,31 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 	// This initial test ensures that a valid metadata object produces a hash of the correct length.
 	t.Run("valid metadata produces hash", func(t *testing.T) {
 		tm := createValidTokenMetadata(rng)
-		hash, err := tm.ComputeTokenIdentifierV1()
+		hash, err := tm.ComputeTokenIdentifier()
 		require.NoError(t, err)
 		assert.Len(t, hash, 32) // SHA256 produces 32-byte hash
+	})
+
+	// This test ensures that a metadata object with extensions produces a hash of the correct length.
+	t.Run("valid metadata with extensions produces hash", func(t *testing.T) {
+		tm := createValidTokenMetadataWithExtensions(rng)
+		hash, err := tm.ComputeTokenIdentifier()
+		require.NoError(t, err)
+		assert.Len(t, hash, 32)
+	})
+
+	// This test ensures that a base metadata object produces a different hash than a similar metadata object with extensions.
+	t.Run("valid base metadata produces different hash from base metadata with extensions", func(t *testing.T) {
+		tm := createValidTokenMetadata(rng)
+		hashBase, err := tm.ComputeTokenIdentifier()
+		require.NoError(t, err)
+		assert.Len(t, hashBase, 32)
+
+		tm.ExtraMetadata = make([]byte, MaxExtraMetadataLength)
+		hashWithExtensions, err := tm.ComputeTokenIdentifier()
+		require.NoError(t, err)
+		assert.Len(t, hashWithExtensions, 32)
+		assert.NotEqual(t, hashBase, hashWithExtensions)
 	})
 
 	// This test case handles invalid metadata and ensures it returns the expected error.
@@ -449,7 +494,7 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 		tm := createValidTokenMetadata(rng)
 		tm.IssuerPublicKey = keys.Public{} // invalid length
 
-		_, err := tm.ComputeTokenIdentifierV1()
+		_, err := tm.ComputeTokenIdentifier()
 		require.ErrorIs(t, err, ErrInvalidTokenMetadata)
 	})
 
@@ -543,10 +588,20 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 		{
 			name: "different creation entity public keys produce different hashes",
 			modifier1: func(tm *TokenMetadata) {
-				tm.CreationEntityPublicKey = bytes.Repeat([]byte{0x01}, 33)
+				tm.CreationEntityPublicKey = keys.MustGeneratePrivateKeyFromRand(rng).Public()
 			},
 			modifier2: func(tm *TokenMetadata) {
-				tm.CreationEntityPublicKey = bytes.Repeat([]byte{0x02}, 33)
+				tm.CreationEntityPublicKey = keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "different extra metadata produces different hashes",
+			modifier1: func(tm *TokenMetadata) {
+				tm.ExtraMetadata = bytes.Repeat([]byte{0x01}, MaxExtraMetadataLength)
+			},
+			modifier2: func(tm *TokenMetadata) {
+				tm.ExtraMetadata = bytes.Repeat([]byte{0x02}, MaxExtraMetadataLength)
 			},
 			shouldBeEqual: false,
 		},
@@ -566,9 +621,9 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 				tc.modifier2(tm2)
 			}
 
-			hash1, err1 := tm1.ComputeTokenIdentifierV1()
+			hash1, err1 := tm1.ComputeTokenIdentifier()
 			require.NoError(t, err1)
-			hash2, err2 := tm2.ComputeTokenIdentifierV1()
+			hash2, err2 := tm2.ComputeTokenIdentifier()
 			require.NoError(t, err2)
 
 			if tc.shouldBeEqual {
