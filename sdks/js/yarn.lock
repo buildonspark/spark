@@ -1909,6 +1909,7 @@ __metadata:
     "@babel/plugin-transform-class-static-block": "npm:^7.28.3"
     "@babel/preset-env": "npm:^7.27.2"
     "@babel/runtime": "npm:^7.25.0"
+    "@buildonspark/issuer-sdk": "npm:0.1.0"
     "@buildonspark/spark-sdk": "npm:0.5.0"
     "@react-native-community/cli": "npm:19.0.0"
     "@react-native-community/cli-platform-android": "npm:19.0.0"
@@ -1991,7 +1992,7 @@ __metadata:
     react-native: "npm:0.79.4"
     react-native-get-random-values: "npm:^1.11.0"
     ts-jest: "npm:^29.2.5"
-    ts-proto: "npm:^2.6.1"
+    ts-proto: "npm:2.8.3"
     tsup: "npm:^8.4.0"
     typescript: "npm:^5.7.3"
     ua-parser-js: "npm:^2.0.6"
@@ -7656,7 +7657,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@wix-pilot/core@npm:^3.4.2":
+"@wix-pilot/core@npm:^3.3.0":
   version: 3.4.2
   resolution: "@wix-pilot/core@npm:3.4.2"
   dependencies:
@@ -7672,7 +7673,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@wix-pilot/detox@npm:^1.0.13":
+"@wix-pilot/detox@npm:^1.0.11":
   version: 1.0.13
   resolution: "@wix-pilot/detox@npm:1.0.13"
   peerDependencies:
@@ -11654,12 +11655,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"detox@npm:^20.39.0":
-  version: 20.46.0
-  resolution: "detox@npm:20.46.0"
+"detox@npm:20.39.0":
+  version: 20.39.0
+  resolution: "detox@npm:20.39.0"
   dependencies:
-    "@wix-pilot/core": "npm:^3.4.2"
-    "@wix-pilot/detox": "npm:^1.0.13"
+    "@wix-pilot/core": "npm:^3.3.0"
+    "@wix-pilot/detox": "npm:^1.0.11"
     ajv: "npm:^8.6.3"
     bunyan: "npm:^1.8.12"
     bunyan-debug-stream: "npm:^3.1.0"
@@ -11671,7 +11672,7 @@ __metadata:
     funpermaproxy: "npm:^1.1.0"
     glob: "npm:^8.0.3"
     ini: "npm:^1.3.4"
-    jest-environment-emit: "npm:^1.2.0"
+    jest-environment-emit: "npm:^1.0.8"
     json-cycle: "npm:^1.3.0"
     lodash: "npm:^4.17.11"
     multi-sort-stream: "npm:^1.0.3"
@@ -11688,7 +11689,7 @@ __metadata:
     stream-json: "npm:^1.7.4"
     strip-ansi: "npm:^6.0.1"
     telnet-client: "npm:1.2.8"
-    tmp: "npm:^0.2.1"
+    tempfile: "npm:^2.0.0"
     trace-event-lib: "npm:^1.3.1"
     which: "npm:^1.3.1"
     ws: "npm:^7.0.0"
@@ -11696,13 +11697,13 @@ __metadata:
     yargs-parser: "npm:^21.0.0"
     yargs-unparser: "npm:^2.0.0"
   peerDependencies:
-    jest: 30.x.x || 29.x.x || 28.x.x || ^27.2.5
+    jest: 29.x.x || 28.x.x || ^27.2.5
   peerDependenciesMeta:
     jest:
       optional: true
   bin:
     detox: local-cli/cli.js
-  checksum: 10/b3bbeea8163105c645081406b4b0b19bbc997cfadbd15ac12ef9e4f58e86d6899bc8f5597a0cf6b1d0b5ad4803150101baf9899d408f4d2e26891ee77306d772
+  checksum: 10/2315874a1bd90695bcfefdc58bb402f6b692e0e077c015c7cff7fdd4c3e49e630fa9fd04ef88287e121a03f6863fcd1d3b5f9abca8392b0c4070d64f586eca8f
   languageName: node
   linkType: hard
 
@@ -15810,7 +15811,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jest-environment-emit@npm:^1.2.0":
+"jest-environment-emit@npm:^1.0.8":
   version: 1.2.0
   resolution: "jest-environment-emit@npm:1.2.0"
   dependencies:
@@ -16276,7 +16277,7 @@ __metadata:
     "@octokit/auth-action": "npm:^4.0.1"
     bare-make: "npm:^1.5.1"
     cmake-bare: "npm:^1.6.5"
-    detox: "npm:^20.39.0"
+    detox: "npm:20.39.0"
     octokit: "npm:^4.0.2"
     ts-prune: "npm:^0.10.3"
     turbo: "npm:^2.4.4"
@@ -22014,10 +22015,27 @@ __metadata:
   languageName: node
   linkType: hard
 
+"temp-dir@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "temp-dir@npm:1.0.0"
+  checksum: 10/cb2b58ddfb12efa83e939091386ad73b425c9a8487ea0095fe4653192a40d49184a771a1beba99045fbd011e389fd563122d79f54f82be86a55620667e08a6b2
+  languageName: node
+  linkType: hard
+
 "temp-dir@npm:~2.0.0":
   version: 2.0.0
   resolution: "temp-dir@npm:2.0.0"
   checksum: 10/cc4f0404bf8d6ae1a166e0e64f3f409b423f4d1274d8c02814a59a5529f07db6cd070a749664141b992b2c1af337fa9bb451a460a43bb9bcddc49f235d3115aa
+  languageName: node
+  linkType: hard
+
+"tempfile@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "tempfile@npm:2.0.0"
+  dependencies:
+    temp-dir: "npm:^1.0.0"
+    uuid: "npm:^3.0.1"
+  checksum: 10/9c8ab891c2af333fdc45404812dbcd71023e220dc90842c54042aafd9830e26ee2c7f4f85f949289f79b5a4b0f8049b01d5989383782d59f0a1713d344a16976
   languageName: node
   linkType: hard
 
@@ -22186,13 +22204,6 @@ __metadata:
   dependencies:
     os-tmpdir: "npm:~1.0.2"
   checksum: 10/09c0abfd165cff29b32be42bc35e80b8c64727d97dedde6550022e88fa9fd39a084660415ed8e3ebaa2aca1ee142f86df8b31d4196d4f81c774a3a20fd4b6abf
-  languageName: node
-  linkType: hard
-
-"tmp@npm:^0.2.1":
-  version: 0.2.5
-  resolution: "tmp@npm:0.2.5"
-  checksum: 10/dd4b78b32385eab4899d3ae296007b34482b035b6d73e1201c4a9aede40860e90997a1452c65a2d21aee73d53e93cd167d741c3db4015d90e63b6d568a93d7ec
   languageName: node
   linkType: hard
 
@@ -22480,7 +22491,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ts-proto@npm:^2.6.1":
+"ts-proto@npm:2.8.3, ts-proto@npm:^2.6.1":
   version: 2.8.3
   resolution: "ts-proto@npm:2.8.3"
   dependencies:
@@ -23233,6 +23244,15 @@ __metadata:
   version: 1.0.1
   resolution: "utils-merge@npm:1.0.1"
   checksum: 10/5d6949693d58cb2e636a84f3ee1c6e7b2f9c16cb1d42d0ecb386d8c025c69e327205aa1c69e2868cc06a01e5e20681fbba55a4e0ed0cce913d60334024eae798
+  languageName: node
+  linkType: hard
+
+"uuid@npm:^3.0.1":
+  version: 3.4.0
+  resolution: "uuid@npm:3.4.0"
+  bin:
+    uuid: ./bin/uuid
+  checksum: 10/4f2b86432b04cc7c73a0dd1bcf11f1fc18349d65d2e4e32dd0fc658909329a1e0cc9244aa93f34c0cccfdd5ae1af60a149251a5f420ec3ac4223a3dab198fb2e
   languageName: node
   linkType: hard
 
