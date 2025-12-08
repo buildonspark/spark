@@ -113,7 +113,6 @@ func HashTokenTransactionV3(tokenTransaction *tokenpb.TokenTransaction, partialH
 		}
 		return protohash.Hash(converted)
 	}
-
 }
 
 func HashTokenTransactionV2(tokenTransaction *tokenpb.TokenTransaction, partialHash bool) ([]byte, error) {
@@ -1333,50 +1332,6 @@ func ValidateRevocationKeys(revocationPrivateKeys []keys.Private, expectedRevoca
 func isNetworkSupported(providedNetwork btcnetwork.Network, networks []btcnetwork.Network) bool {
 	// UNSPECIFIED network should never be considered supported
 	return providedNetwork != btcnetwork.Unspecified && slices.Contains(networks, providedNetwork)
-}
-
-// CalculateMintAmountFromTransaction calculates the total amount being minted
-// in a token transaction by summing all output amounts.
-func CalculateMintAmountFromTransaction(tokenTransaction *tokenpb.TokenTransaction) (*big.Int, error) {
-	if tokenTransaction == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("mint token transaction cannot be nil"))
-	}
-	if len(tokenTransaction.TokenOutputs) == 0 {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("mint token transaction must have outputs"))
-	}
-	totalAmount := new(big.Int)
-	for i, output := range tokenTransaction.TokenOutputs {
-		if output.GetTokenAmount() == nil {
-			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token amount at output %d cannot be nil", i))
-		}
-		amount := new(big.Int).SetBytes(output.GetTokenAmount())
-		totalAmount.Add(totalAmount, amount)
-	}
-	return totalAmount, nil
-}
-
-// ValidateTransactionMintAgainstMaxSupply calculates the mint amount from a transaction
-// and validates it against the current and max supply.
-func ValidateTransactionMintAgainstMaxSupply(tokenTransaction *tokenpb.TokenTransaction, currentSupply, maxSupply *big.Int) error {
-	newMintAmount, err := CalculateMintAmountFromTransaction(tokenTransaction)
-	if err != nil {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to calculate mint amount: %w", err))
-	}
-
-	if currentSupply == nil {
-		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("current supply cannot be nil"))
-	}
-	if maxSupply == nil {
-		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("max supply cannot be nil"))
-	}
-
-	newTotalSupply := new(big.Int).Add(currentSupply, newMintAmount)
-	if newTotalSupply.Cmp(maxSupply) > 0 {
-		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("mint would exceed max supply: total supply after mint (%s) would exceed max supply (%s)",
-			newTotalSupply.String(), maxSupply.String()))
-	}
-
-	return nil
 }
 
 // validateBaseTokenTransaction validates the base structure of token transactions
