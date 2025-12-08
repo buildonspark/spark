@@ -2742,9 +2742,6 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 				return err
 			}
 		}
-
-		// If there's an error, it means some SOs are not online. We can retry later.
-		logger.With(zap.Error(err)).Sugar().Warnf("Failed to settle sender key tweaks for transfer %s", transfer.ID)
 	}
 
 	return nil
