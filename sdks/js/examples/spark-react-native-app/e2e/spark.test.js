@@ -1,18 +1,26 @@
 describe('Spark React Native App', () => {
-  beforeAll(async () => {
-    await device.launchApp();
-  });
-
   beforeEach(async () => {
     await device.launchApp({
       newInstance: true,
     });
+
+    await waitFor(element(by.id('open-test-screen-button')))
+      .toBeVisible()
+      .withTimeout(5000);
+
+    await expect(element(by.id('open-test-screen-button'))).toBeVisible();
 
     await element(by.id('open-test-screen-button')).tap();
 
     await waitFor(element(by.id('connect-wallet-button')))
       .toBeVisible()
       .withTimeout(5000);
+
+    await expect(element(by.id('connect-wallet-button'))).toBeVisible();
+  }, 300000);
+
+  afterEach(async () => {
+    await device.terminateApp();
   });
 
   it('should show all buttons on app launch', async () => {
@@ -26,7 +34,7 @@ describe('Spark React Native App', () => {
     await element(by.id('connect-wallet-button')).tap();
 
     // Wait a moment for the wallet to initialize
-    await waitFor(element(by.id('wallet-status')))
+    await waitFor(element(by.id('create-invoice-button')))
       .toBeVisible()
       .withTimeout(5000);
 
@@ -38,9 +46,11 @@ describe('Spark React Native App', () => {
     // First connect the wallet
     await element(by.id('connect-wallet-button')).tap();
 
-    await waitFor(element(by.id('wallet-status')))
+    await waitFor(element(by.id('create-invoice-button')))
       .toBeVisible()
       .withTimeout(5000);
+
+    await expect(element(by.id('create-invoice-button'))).toBeVisible();
 
     // Then create an invoice
     await element(by.id('create-invoice-button')).tap();
@@ -70,6 +80,8 @@ describe('Spark React Native App', () => {
       .toBeVisible()
       .withTimeout(5000);
 
+    await expect(element(by.id('wallet-status'))).toBeVisible();
+
     await element(by.id('create-test-token-button')).tap();
 
     await waitFor(element(by.id('test-token-tx-id-display')))
@@ -86,6 +98,8 @@ describe('Spark React Native App', () => {
     await waitFor(element(by.id('wallet-status')))
       .toBeVisible()
       .withTimeout(5000);
+
+    await expect(element(by.id('wallet-status'))).toBeVisible();
 
     await element(by.id('create-invoice-button')).tap();
 

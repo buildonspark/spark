@@ -43,7 +43,7 @@
     "@octokit/auth-action": "^4.0.1",
     "bare-make": "^1.5.1",
     "cmake-bare": "^1.6.5",
-    "detox": "^20.39.0",
+    "detox": "20.39.0",
     "octokit": "^4.0.2",
     "ts-prune": "^0.10.3",
     "turbo": "^2.4.4"

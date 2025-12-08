@@ -9,13 +9,17 @@ module.exports = {
       setupTimeout: 120000,
     },
   },
+  synchronization: {
+    waitForIdle: false,
+    waitForAppLaunch: true,
+  },
   apps: {
     'ios.debug': {
       type: 'ios.app',
       binaryPath:
         'ios/build/Build/Products/Debug-iphonesimulator/SparkReactNativeApp.app',
       build:
-        'xcodebuild -workspace ios/SparkReactNativeApp.xcworkspace -scheme SparkReactNativeApp -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build',
+        'xcodebuild -workspace ios/SparkReactNativeApp.xcworkspace -scheme SparkReactNativeApp -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build -jobs $(sysctl -n hw.ncpu) -quiet',
     },
     'ios.release': {
       type: 'ios.app',
