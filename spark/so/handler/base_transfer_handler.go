@@ -1393,7 +1393,7 @@ func validateSingleLeafRefundTxs(
 	if err := bitcointransaction.VerifyTransactionWithDatabase(
 		cpfpRefundTx,
 		node,
-		bitcointransaction.RefundTxTypeCPFP,
+		bitcointransaction.TxTypeRefundCPFP,
 		refundDestPubkey,
 	); err != nil {
 		return fmt.Errorf("CPFP refund tx validation failed for leaf: %w", err)
@@ -1407,7 +1407,7 @@ func validateSingleLeafRefundTxs(
 		if err := bitcointransaction.VerifyTransactionWithDatabase(
 			directFromCpfpRefundTx,
 			node,
-			bitcointransaction.RefundTxTypeDirectFromCPFP,
+			bitcointransaction.TxTypeRefundDirectFromCPFP,
 			refundDestPubkey,
 		); err != nil {
 			return fmt.Errorf("direct from CPFP refund tx validation failed for leaf: %w", err)
@@ -1424,7 +1424,7 @@ func validateSingleLeafRefundTxs(
 			if err := bitcointransaction.VerifyTransactionWithDatabase(
 				directRefundTx,
 				node,
-				bitcointransaction.RefundTxTypeDirect,
+				bitcointransaction.TxTypeRefundDirect,
 				refundDestPubkey,
 			); err != nil {
 				return fmt.Errorf("direct refund tx validation failed for leaf: %w", err)

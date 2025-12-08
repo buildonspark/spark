@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/frost"
@@ -16,6 +17,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -1122,6 +1124,14 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	} else if directRootTxSigningJob != nil || directRefundTxSigningJob != nil {
 		return nil, fmt.Errorf("direct root tx signing job and direct refund tx signing job must both be provided or neither of them")
 	}
+
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnableDepositFlowValidation, 0) > 0 {
+		combinedPublicKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
+		err = o.validateBitcoinTransactions(req, combinedPublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate transaction in tree creation request: %w", err)
+		}
+	}
 	signingResults, err := helper.SignFrost(ctx, config, signingJobs)
 	if err != nil {
 		return nil, err
@@ -1636,4 +1646,64 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 	}
 
 	return &pb.GetUtxosForAddressResponse{Utxos: utxosResult}, nil
+}
+
+// validateBitcoinTransactions validates Bitcoin transactions
+// in the deposit request depending on the knob.
+func (h *DepositHandler) validateBitcoinTransactions(req *pb.StartDepositTreeCreationRequest, rootDestPubkey keys.Public) error {
+	if req == nil {
+		return nil
+	}
+	vout := req.OnChainUtxo.Vout
+	depositTx := req.OnChainUtxo.RawTx
+	cpfpRootTx := req.RootTxSigningJob.RawTx
+	cpfpRefundTx := req.RefundTxSigningJob.RawTx
+
+	// Validate cpfp root tx based on deposit tx
+	err := bitcointransaction.VerifyTransactionWithSource(cpfpRootTx, depositTx, vout, 0, bitcointransaction.TxTypeNodeCPFP, rootDestPubkey)
+	if err != nil {
+		return fmt.Errorf("cpfp root transaction verification failed: %w", err)
+	}
+
+	// Currently we assume that all refund transactions pay to same pubkey
+	refundDestPubkey, err := keys.ParsePublicKey(req.RefundTxSigningJob.SigningPublicKey)
+	if err != nil {
+		return fmt.Errorf("invalid refund tx signing public key: %w", err)
+	}
+
+	// We add TimeLockInterval to ensure that expectedTx has locktime
+	// set to InitialTimeLock
+	cpfpTimelock := spark.InitialTimeLock + spark.TimeLockInterval
+	// Validate cpfp refund tx based on cpfp root tx
+	err = bitcointransaction.VerifyTransactionWithSource(cpfpRefundTx, cpfpRootTx, vout, cpfpTimelock, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey)
+	if err != nil {
+		return fmt.Errorf("cpfp refund transaction verification failed: %w", err)
+	}
+
+	// Validate direct-from-cpfp refund tx based on cpfp root tx (If provided)
+	if req.DirectFromCpfpRefundTxSigningJob != nil {
+		directFromCpfpRefundTx := req.DirectFromCpfpRefundTxSigningJob.RawTx
+
+		err = bitcointransaction.VerifyTransactionWithSource(directFromCpfpRefundTx, cpfpRootTx, vout, cpfpTimelock, bitcointransaction.TxTypeRefundDirectFromCPFP, refundDestPubkey)
+		if err != nil {
+			return fmt.Errorf("direct-from-cpfp refund transaction verification failed: %w", err)
+		}
+	}
+
+	// Only validate direct tx if both are provided
+	// Validate direct refund tx based on direct root tx
+	if req.DirectRootTxSigningJob != nil && req.DirectRefundTxSigningJob != nil {
+		directRootTx := req.DirectRootTxSigningJob.RawTx
+		err = bitcointransaction.VerifyTransactionWithSource(directRootTx, depositTx, vout, 0, bitcointransaction.TxTypeNodeDirect, rootDestPubkey)
+		if err != nil {
+			return fmt.Errorf("direct root transaction verification failed: %w", err)
+		}
+
+		directRefundTx := req.DirectRefundTxSigningJob.RawTx
+		err = bitcointransaction.VerifyTransactionWithSource(directRefundTx, directRootTx, vout, cpfpTimelock, bitcointransaction.TxTypeRefundDirect, refundDestPubkey)
+		if err != nil {
+			return fmt.Errorf("direct refund transaction verification failed: %w", err)
+		}
+	}
+	return nil
 }

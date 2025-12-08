@@ -13,20 +13,49 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 )
 
-// RefundTxType represents the type of refund transaction expected
-type RefundTxType int
+// TxType represents the type of refund transaction expected
+type TxType int
 
 const (
-	RefundTxTypeCPFP RefundTxType = iota
-	RefundTxTypeDirect
-	RefundTxTypeDirectFromCPFP
+	TxTypeRefundCPFP TxType = iota
+	TxTypeRefundDirect
+	TxTypeRefundDirectFromCPFP
+	TxTypeNodeCPFP
+	TxTypeNodeDirect
 )
 
-// VerifyTransactionWithDatabase validates a Bitcoin transaction by reconstructing it
-func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode, txType RefundTxType, refundDestPubkey keys.Public) error {
+// VerifyTransactionWithDatabase validates a Bitcoin transaction by reconstructing it based on node in the database
+func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode, txType TxType, refundDestPubkey keys.Public) error {
+	var sourceRawTxBytes []byte
+
+	cpfpRefundTxTimelock, err := GetCpfpTimelockFromLeaf(dbLeaf)
+	if err != nil {
+		return fmt.Errorf("failed to get CPFP timelock from leaf: %w", err)
+	}
+
+	switch txType {
+	// valid types
+	case TxTypeRefundCPFP:
+		sourceRawTxBytes = dbLeaf.RawTx
+	case TxTypeRefundDirect:
+		sourceRawTxBytes = dbLeaf.DirectTx
+	case TxTypeRefundDirectFromCPFP:
+		sourceRawTxBytes = dbLeaf.RawTx
+	default:
+		return fmt.Errorf("unknown transaction type: %d", txType)
+	}
+	err = VerifyTransactionWithSource(clientRawTxBytes, sourceRawTxBytes, 0, cpfpRefundTxTimelock, txType, refundDestPubkey)
+	if err != nil {
+		return fmt.Errorf("failed to verify transaction of leaf %s: %w", dbLeaf.ID, err)
+	}
+	return nil
+}
+
+// VerifyTransactionWithSource validates a Bitcoin transaction by reconstructing it from a source transaction
+func VerifyTransactionWithSource(clientRawTxBytes []byte, sourceRawTxBytes []byte, vout uint32, cpfpRefundTxTimelock uint32, txType TxType, destPubkey keys.Public) error {
 	clientTx, err := common.TxFromRawTxBytes(clientRawTxBytes)
 	if err != nil {
-		return fmt.Errorf("failed to parse client tx for leaf %s: %w", dbLeaf.ID, err)
+		return fmt.Errorf("failed to parse client tx: %w", err)
 	}
 
 	clientSequence, err := GetAndValidateUserSequence(clientRawTxBytes)
@@ -40,51 +69,52 @@ func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode
 	}
 
 	// Construct the expected transaction based on the type
-	expectedTx, err := constructExpectedTransaction(dbLeaf, txType, refundDestPubkey, clientSequence, clientTx.Version)
+	expectedTx, err := constructExpectedTransaction(sourceRawTxBytes, vout, cpfpRefundTxTimelock, txType, destPubkey, clientSequence, clientTx.Version)
 	if err != nil {
-		return fmt.Errorf("failed to construct expected transaction for leaf %s: %w", dbLeaf.ID, err)
+		return fmt.Errorf("failed to construct expected transaction: %w", err)
 	}
 
 	// Compare the expected and client transactions with CompareTransactions first to return a more helpful error message
 	err = common.CompareTransactions(expectedTx, clientTx)
 	if err != nil {
-		return fmt.Errorf("transaction does not match expected construction for leaf %s: %w", dbLeaf.ID, err)
+		return fmt.Errorf("transaction does not match expected construction: %w", err)
 	}
 
 	// Serialize the expected and client transactions to compare the raw bytes for more extensive validation
 	expectedTxBytes, err := common.SerializeTx(expectedTx)
 	if err != nil {
-		return fmt.Errorf("failed to serialize expected transaction for leaf %s: %w", dbLeaf.ID, err)
+		return fmt.Errorf("failed to serialize expected transaction: %w", err)
 	}
 
 	if !bytes.Equal(expectedTxBytes, clientRawTxBytes) {
 		diff := cmp.Diff(expectedTxBytes, clientRawTxBytes)
-		return fmt.Errorf("transaction does not match expected construction for leaf %s: %s", dbLeaf.ID, diff)
+		return fmt.Errorf("transaction does not match expected construction: %s", diff)
 	}
 
 	return nil
 }
 
-// constructExpectedTransaction constructs the expected Bitcoin transaction based on leaf data from DB and transaction type
-func constructExpectedTransaction(dbLeaf *ent.TreeNode, txType RefundTxType, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
-	// Validate transaction type early
-	if txType != RefundTxTypeCPFP && txType != RefundTxTypeDirect && txType != RefundTxTypeDirectFromCPFP {
-		return nil, fmt.Errorf("unknown transaction type: %d", txType)
-	}
+// constructExpectedTransaction constructs the expected Bitcoin transaction based on source transaction, transaction type and timelock
+func constructExpectedTransaction(sourceRawTxBytes []byte, vout uint32, cpfpRefundTxTimelock uint32, txType TxType, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
 
+	// Parse source tx
+	sourceTx, err := common.TxFromRawTxBytes(sourceRawTxBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse source tx: %w", err)
+	}
 	// Build the server-side sequence (validate timelock and construct sequence bits)
-	serverSequence, err := validateSequence(dbLeaf, txType, clientSequence)
+	serverSequence, err := validateSequence(cpfpRefundTxTimelock, txType, clientSequence)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate client sequence: %w", err)
 	}
 
 	switch txType {
-	case RefundTxTypeCPFP:
-		return constructCPFPRefundTransaction(dbLeaf, refundDestPubkey, serverSequence, txVersion)
-	case RefundTxTypeDirect:
-		return constructDirectRefundTransaction(dbLeaf, refundDestPubkey, serverSequence, txVersion)
-	case RefundTxTypeDirectFromCPFP:
-		return constructDirectFromCPFPRefundTransaction(dbLeaf, refundDestPubkey, serverSequence, txVersion)
+	case TxTypeRefundCPFP, TxTypeNodeCPFP:
+		return constructCPFPRefundTransaction(sourceTx, vout, refundDestPubkey, serverSequence, txVersion)
+	case TxTypeRefundDirect, TxTypeNodeDirect:
+		return constructDirectRefundTransaction(sourceTx, vout, refundDestPubkey, serverSequence, txVersion)
+	case TxTypeRefundDirectFromCPFP:
+		return constructDirectFromCPFPRefundTransaction(sourceTx, vout, refundDestPubkey, serverSequence, txVersion)
 	default:
 		return nil, fmt.Errorf("unknown transaction type: %d", txType)
 	}
@@ -95,6 +125,7 @@ func constructExpectedTransaction(dbLeaf *ent.TreeNode, txType RefundTxType, ref
 func constructRefundTransactionGeneric(
 	prevTxHash chainhash.Hash,
 	sourceTxRaw []byte,
+	vout uint32,
 	refundDestPubkey keys.Public,
 	clientSequence uint32,
 	txVersion int32,
@@ -112,7 +143,7 @@ func constructRefundTransactionGeneric(
 	tx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{
 			Hash:  prevTxHash,
-			Index: uint32(0),
+			Index: vout,
 		},
 		Sequence: clientSequence,
 	})
@@ -129,7 +160,7 @@ func constructRefundTransactionGeneric(
 		return nil, fmt.Errorf("failed to parse %s: %w", parseTxName, err)
 	}
 
-	sourceValue := parsedTx.TxOut[0].Value
+	sourceValue := parsedTx.TxOut[vout].Value
 	var refundAmount int64
 	if watchtowerTxs {
 		refundAmount = common.MaybeApplyFee(sourceValue)
@@ -149,14 +180,18 @@ func constructRefundTransactionGeneric(
 	return tx, nil
 }
 
-// constructCPFPRefundTransaction constructs a CPFP refund transaction
-// Format: 1 input (spending the leaf UTXO), 2 outputs (refund to user + ephemeral anchor)
-func constructCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
+func constructCPFPRefundTransaction(sourceTx *wire.MsgTx, vout uint32, refundDestPubkey keys.Public, expectedSequence uint32, txVersion int32) (*wire.MsgTx, error) {
+	sourceRawTxBytes, err := common.SerializeTx(sourceTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize source tx: %w", err)
+	}
 	tx, err := constructRefundTransactionGeneric(
-		dbLeaf.RawTxid.Hash(),
-		dbLeaf.RawTx,
+		// Does this need reverse?
+		sourceTx.TxHash(),
+		sourceRawTxBytes,
+		vout,
 		refundDestPubkey,
-		clientSequence,
+		expectedSequence,
 		txVersion,
 		/*watchtowerTxs=*/ false,
 		/*parseTxName=*/ "node tx",
@@ -169,12 +204,17 @@ func constructCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.
 
 // constructDirectRefundTransaction constructs a direct refund transaction
 // Format: 1 input (spending DirectTx), 1 output (refund to user)
-func constructDirectRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
+func constructDirectRefundTransaction(sourceTx *wire.MsgTx, vout uint32, refundDestPubkey keys.Public, expectedSequence uint32, txVersion int32) (*wire.MsgTx, error) {
+	sourceRawTxBytes, err := common.SerializeTx(sourceTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize source tx: %w", err)
+	}
 	tx, err := constructRefundTransactionGeneric(
-		dbLeaf.DirectTxid.Hash(),
-		dbLeaf.DirectTx,
+		sourceTx.TxHash(),
+		sourceRawTxBytes,
+		vout,
 		refundDestPubkey,
-		clientSequence,
+		expectedSequence,
 		txVersion,
 		/*watchtowerTxs=*/ true,
 		/*parseTxName=*/ "direct tx",
@@ -187,10 +227,16 @@ func constructDirectRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey key
 
 // constructDirectFromCPFPRefundTransaction constructs a DirectFromCPFP refund transaction
 // Format: 1 input (spending from NodeTx), 1 output (refund to user)
-func constructDirectFromCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
+func constructDirectFromCPFPRefundTransaction(sourceTx *wire.MsgTx, vout uint32, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
+	sourceRawTxBytes, err := common.SerializeTx(sourceTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize source tx: %w", err)
+	}
+
 	tx, err := constructRefundTransactionGeneric(
-		dbLeaf.RawTxid.Hash(),
-		dbLeaf.RawTx,
+		sourceTx.TxHash(),
+		sourceRawTxBytes,
+		vout,
 		refundDestPubkey,
 		clientSequence,
 		txVersion,
@@ -204,35 +250,30 @@ func constructDirectFromCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPu
 }
 
 // validateSequence validates the client's sequence number against existing database transactions
-func validateSequence(dbLeaf *ent.TreeNode, txType RefundTxType, clientSequence uint32) (uint32, error) {
-	rawRefundTx, err := common.TxFromRawTxBytes(dbLeaf.RawRefundTx)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse CPFP refund transaction: %w", err)
+func validateSequence(cpfpTimelock uint32, txType TxType, clientSequence uint32) (uint32, error) {
+
+	var expectedCPFPTimelock uint32
+
+	// For node transaction, we don't need to subtract TimeLockInterval
+	if (txType == TxTypeNodeCPFP) || (txType == TxTypeNodeDirect) {
+		expectedCPFPTimelock = cpfpTimelock
+	} else {
+		// For refund transaction, validate that the timelock is large enough to subtract TimeLockInterval
+		if cpfpTimelock < spark.TimeLockInterval {
+			return 0, fmt.Errorf("current timelock %d in CPFP refund transaction is too small to subtract TimeLockInterval %d",
+				cpfpTimelock, spark.TimeLockInterval)
+		}
+		// Calculate the expected new timelock (should be TimeLockInterval shorter)
+		expectedCPFPTimelock = cpfpTimelock - spark.TimeLockInterval
 	}
-
-	if len(rawRefundTx.TxIn) == 0 {
-		return 0, fmt.Errorf("CPFP refund transaction has no inputs")
-	}
-
-	// Extract the current timelock from the transaction (bits 0-15)
-	cpfpRefundTxTimelock := GetTimelockFromSequence(rawRefundTx.TxIn[0].Sequence)
-
-	// Validate that the timelock is large enough to subtract TimeLockInterval
-	if cpfpRefundTxTimelock < spark.TimeLockInterval {
-		return 0, fmt.Errorf("current timelock %d in CPFP refund transaction is too small to subtract TimeLockInterval %d",
-			cpfpRefundTxTimelock, spark.TimeLockInterval)
-	}
-
-	// Calculate the expected new timelock (should be TimeLockInterval shorter)
-	expectedCPFPRefundTxTimelock := cpfpRefundTxTimelock - spark.TimeLockInterval
 
 	// Get the expected timelock based on transaction type
 	var expectedTimelock uint32
 	switch txType {
-	case RefundTxTypeDirect, RefundTxTypeDirectFromCPFP:
-		expectedTimelock = expectedCPFPRefundTxTimelock + spark.DirectTimelockOffset
-	case RefundTxTypeCPFP:
-		expectedTimelock = expectedCPFPRefundTxTimelock
+	case TxTypeRefundDirect, TxTypeRefundDirectFromCPFP, TxTypeNodeDirect:
+		expectedTimelock = expectedCPFPTimelock + spark.DirectTimelockOffset
+	case TxTypeRefundCPFP, TxTypeNodeCPFP:
+		expectedTimelock = expectedCPFPTimelock
 	default:
 		return 0, fmt.Errorf("unknown transaction type: %d", txType)
 	}
@@ -243,7 +284,7 @@ func validateSequence(dbLeaf *ent.TreeNode, txType RefundTxType, clientSequence 
 	}
 
 	// Validate that the client's timelock (bits 0-15) matches expected
-	err = ValidateSequenceTimelock(clientSequence, expectedTimelock)
+	err := ValidateSequenceTimelock(clientSequence, expectedTimelock)
 	if err != nil {
 		return 0, fmt.Errorf("failed to validate client sequence timelock for tx type %d: %w", txType, err)
 	}
@@ -319,4 +360,13 @@ func NextSequence(currSequence uint32) (nextSequence uint32, nextDirectSequence 
 	nextDirectSequence = nextSequence + spark.DirectTimelockOffset
 
 	return
+}
+
+func GetCpfpTimelockFromLeaf(dbLeaf *ent.TreeNode) (uint32, error) {
+	rawRefundTx, err := common.TxFromRawTxBytes(dbLeaf.RawRefundTx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse CPFP refund transaction: %w", err)
+	}
+	cpfpRefundTxTimelock := GetTimelockFromSequence(rawRefundTx.TxIn[0].Sequence)
+	return cpfpRefundTxTimelock, nil
 }

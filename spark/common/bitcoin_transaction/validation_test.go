@@ -111,7 +111,7 @@ func TestVerifyTransactionWithDatabase_Success_CPFP(t *testing.T) {
 		common.EphemeralAnchorOutput(),
 	)
 
-	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey))
+	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey))
 }
 
 // Verifies Direct refund transaction matches expected construction.
@@ -126,7 +126,7 @@ func TestVerifyTransactionWithDatabase_Success_Direct(t *testing.T) {
 		&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
 	)
 
-	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirect, refundDestPubkey))
+	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirect, refundDestPubkey))
 }
 
 // Verifies Direct-from-CPFP refund transaction matches expected construction.
@@ -141,13 +141,13 @@ func TestVerifyTransactionWithDatabase_Success_DirectFromCPFP(t *testing.T) {
 		&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
 	)
 
-	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirectFromCPFP, refundDestPubkey))
+	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirectFromCPFP, refundDestPubkey))
 }
 
 // Errors on invalid client transaction bytes.
 func TestVerifyTransactionWithDatabase_Error_InvalidClientTxBytes(t *testing.T) {
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
-	err := VerifyTransactionWithDatabase([]byte("invalid tx"), dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err := VerifyTransactionWithDatabase([]byte("invalid tx"), dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "failed to parse client tx")
 }
 
@@ -167,7 +167,7 @@ func TestVerifyTransactionWithDatabase_Error_ClientTxNoInputs(t *testing.T) {
 	tx.TxIn = nil
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "failed to parse client tx")
 }
 
@@ -184,7 +184,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedTransaction(t *testing.T)
 		common.EphemeralAnchorOutput(),
 	)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 }
 
@@ -201,7 +201,7 @@ func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit31Set(t *testi
 		common.EphemeralAnchorOutput(),
 	)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "client sequence has bit 31 set")
 }
 
@@ -218,7 +218,7 @@ func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit22Set(t *testi
 		common.EphemeralAnchorOutput(),
 	)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "client sequence has bit 22 set")
 }
 
@@ -237,7 +237,7 @@ func TestVerifyTransactionWithDatabase_Success_Version2(t *testing.T) {
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey))
+	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey))
 }
 
 // Errors when client timelock does not match expected.
@@ -253,7 +253,7 @@ func TestVerifyTransactionWithDatabase_Error_TimelockMismatch(t *testing.T) {
 		common.EphemeralAnchorOutput(),
 	)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "does not match expected timelock")
 }
 
@@ -273,8 +273,8 @@ func TestVerifyTransactionWithDatabase_Error_CorruptedDBData(t *testing.T) {
 	badLeaf, _ := newTestLeafNode(t)
 	badLeaf.RawTx = []byte("bad raw tx")
 
-	err = VerifyTransactionWithDatabase(clientRawTx, badLeaf, RefundTxTypeCPFP, refundDestPubkey)
-	require.ErrorContains(t, err, "failed to parse node tx")
+	err = VerifyTransactionWithDatabase(clientRawTx, badLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "failed to parse source tx")
 }
 
 // Errors when DB refund timelock is too small to subtract interval.
@@ -297,7 +297,7 @@ func TestVerifyTransactionWithDatabase_Error_InsufficientTimelockInDB(t *testing
 	badRefundTx := newTestTx(testSourceValue, pkScript, spark.TimeLockInterval-1, &nodeTxHash)
 	badLeaf.RawRefundTx = serializeTx(t, badRefundTx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, badLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, badLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "is too small to subtract TimeLockInterval")
 }
 
@@ -314,7 +314,7 @@ func TestVerifyTransactionWithDatabase_Error_UnknownTxType(t *testing.T) {
 		common.EphemeralAnchorOutput(),
 	)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxType(99), refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxType(99), refundDestPubkey)
 	require.ErrorContains(t, err, "unknown transaction type: 99")
 }
 
@@ -322,15 +322,19 @@ func TestVerifyTransactionWithDatabase_Error_UnknownTxType(t *testing.T) {
 func TestConstructExpectedTransaction_UnknownTransactionType(t *testing.T) {
 	// Errors when constructing expected transaction with unknown type.
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
-	_, err := constructExpectedTransaction(dbLeaf, RefundTxType(99), refundDestPubkey, 0, defaultVersion)
+	currTimelock, err := GetCpfpTimelockFromLeaf(dbLeaf)
+	require.NoError(t, err)
+	_, err = constructExpectedTransaction(dbLeaf.RawRefundTx, uint32(0), currTimelock, TxType(99), refundDestPubkey, 0, defaultVersion)
 	require.ErrorContains(t, err, "unknown transaction type: 99")
 }
 
 func TestConstructExpectedTransaction_P2TRScriptCreationFailure(t *testing.T) {
 	// Errors when constructing expected transaction with a zero public key.
 	dbLeaf, _ := newTestLeafNode(t)
+	currTimelock, err := GetCpfpTimelockFromLeaf(dbLeaf)
+	require.NoError(t, err)
 	var invalidPubKey keys.Public
-	_, err := constructExpectedTransaction(dbLeaf, RefundTxTypeCPFP, invalidPubKey, expectedCpfpTimelock, defaultVersion)
+	_, err = constructExpectedTransaction(dbLeaf.RawRefundTx, uint32(0), currTimelock, TxTypeRefundCPFP, invalidPubKey, expectedCpfpTimelock, defaultVersion)
 	require.ErrorContains(t, err, "public key is zero")
 }
 
@@ -422,12 +426,12 @@ func TestValidateSequence_ServerSequenceConstruction(t *testing.T) {
 
 	testCases := []struct {
 		name             string
-		txType           RefundTxType
+		txType           TxType
 		expectedTimelock uint32
 	}{
-		{name: "CPFP", txType: RefundTxTypeCPFP, expectedTimelock: expectedCpfp},
-		{name: "Direct", txType: RefundTxTypeDirect, expectedTimelock: expectedCpfp + spark.DirectTimelockOffset},
-		{name: "DirectFromCPFP", txType: RefundTxTypeDirectFromCPFP, expectedTimelock: expectedCpfp + spark.DirectTimelockOffset},
+		{name: "CPFP", txType: TxTypeRefundCPFP, expectedTimelock: expectedCpfp},
+		{name: "Direct", txType: TxTypeRefundDirect, expectedTimelock: expectedCpfp + spark.DirectTimelockOffset},
+		{name: "DirectFromCPFP", txType: TxTypeRefundDirectFromCPFP, expectedTimelock: expectedCpfp + spark.DirectTimelockOffset},
 	}
 
 	const (
@@ -442,7 +446,7 @@ func TestValidateSequence_ServerSequenceConstruction(t *testing.T) {
 			clientSeq := upperWithForbidden | (tc.expectedTimelock & 0xFFFF)
 
 			// validateSequence should clear the forbidden bits and keep the expected timelock
-			serverSeq, err := validateSequence(dbLeaf, tc.txType, clientSeq)
+			serverSeq, err := validateSequence(currTimelock, tc.txType, clientSeq)
 			require.NoError(t, err)
 
 			sanitizedUpper := (upperWithForbidden & 0xFFFF0000) &^ (disableBit | typeBit)
@@ -450,7 +454,8 @@ func TestValidateSequence_ServerSequenceConstruction(t *testing.T) {
 			assert.Equal(t, expectedServerSeq, serverSeq)
 
 			// The constructed transaction should use exactly the server-generated sequence
-			tx, err := constructExpectedTransaction(dbLeaf, tc.txType, refundDestPubkey, clientSeq, defaultVersion)
+
+			tx, err := constructExpectedTransaction(dbLeaf.RawTx, uint32(0), currTimelock, tc.txType, refundDestPubkey, clientSeq, defaultVersion)
 			require.NoError(t, err)
 			require.Len(t, tx.TxIn, 1)
 			assert.Equal(t, expectedServerSeq, tx.TxIn[0].Sequence)
@@ -475,7 +480,7 @@ func TestValidateSequence_TimelockMismatchErrorContains(t *testing.T) {
 	upperWithForbidden := uint32(0x12340000) | disableBit | typeBit
 	mismatchedClientSeq := upperWithForbidden | ((expectedCpfp + 1) & 0xFFFF)
 
-	_, err = validateSequence(dbLeaf, RefundTxTypeCPFP, mismatchedClientSeq)
+	_, err = validateSequence(currTimelock, TxTypeRefundCPFP, mismatchedClientSeq)
 	require.ErrorContains(t, err, "does not match expected timelock")
 }
 
@@ -495,7 +500,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedVersion(t *testing.T) {
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "unsupported transaction version")
 }
 
@@ -520,7 +525,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_CPFP(t *testing
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 1 inputs, got 2")
 }
@@ -540,7 +545,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_CPFP(t *testin
 	tx.AddTxOut(&wire.TxOut{Value: testSourceValue, PkScript: userScript})
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 2 outputs, got 1")
 }
@@ -561,7 +566,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedPrevTxID(t *testing.T) {
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected previous outpoint")
 }
@@ -583,7 +588,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedLocktime(t *testing.T) {
 	tx.LockTime = 12345
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected locktime 0, got 12345")
 }
@@ -609,7 +614,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_Direct(t *testi
 	tx.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript})
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirect, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirect, refundDestPubkey)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 1 inputs, got 2")
 }
@@ -631,7 +636,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_Direct(t *test
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirect, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirect, refundDestPubkey)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 1 outputs, got 2")
 }
@@ -657,7 +662,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_DirectFromCPFP(
 	tx.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript})
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirectFromCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirectFromCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 1 inputs, got 2")
 }
@@ -679,7 +684,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_DirectFromCPFP
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirectFromCPFP, refundDestPubkey)
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirectFromCPFP, refundDestPubkey)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 1 outputs, got 2")
 }
