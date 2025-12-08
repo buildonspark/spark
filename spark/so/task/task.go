@@ -40,10 +40,11 @@ import (
 )
 
 var (
-	confirmPendingDKGKeysCutoffAge  = 15 * time.Minute
-	defaultTaskTimeout              = 1 * time.Minute
-	dkgTaskTimeout                  = 3 * time.Minute
-	deleteStaleTreeNodesTaskTimeout = 10 * time.Minute
+	confirmPendingDKGKeysCutoffAge        = 15 * time.Minute
+	defaultTaskTimeout                    = 1 * time.Minute
+	dkgTaskTimeout                        = 3 * time.Minute
+	deleteStaleTreeNodesTaskTimeout       = 10 * time.Minute
+	backfillCreatedFinalizedTxHashTimeout = 24 * time.Hour
 )
 
 // Task contains common fields for all task types.
@@ -696,13 +697,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				},
 			},
 		},
-		{
-			ExecutionInterval: 30 * time.Second,
-			BaseTaskSpec: BaseTaskSpec{
-				Name: "backfill_created_finalized_tx_hash",
-				Task: backfillCreatedFinalizedTxHash,
-			},
-		},
 	}
 }
 
@@ -776,6 +770,13 @@ func AllStartupTasks() []StartupTaskSpec {
 					logger.Sugar().Infof("Successfully verified reserved entity DKG key %s in all operators", keyshare.ID)
 					return nil
 				},
+			},
+		},
+		{
+			BaseTaskSpec: BaseTaskSpec{
+				Name:    "backfill_created_finalized_tx_hash",
+				Timeout: &backfillCreatedFinalizedTxHashTimeout,
+				Task:    backfillCreatedFinalizedTxHash,
 			},
 		},
 	}
@@ -893,7 +894,7 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, run
 	return nil
 }
 
-const backfillCreatedFinalizedTxHashBatchSize = 1000
+const backfillCreatedFinalizedTxHashBatchSize = 10000
 
 // backfillCreatedFinalizedTxHash backfills the created_finalized_tx_hash field on token_outputs
 // by fetching the finalized_token_transaction_hash from the linked token_transaction.
@@ -905,45 +906,58 @@ func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knob
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
-	tx, err := ent.GetDbFromContext(ctx)
+	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get db from context: %w", err)
 	}
 
-	outputs, err := tx.TokenOutput.Query().
-		Where(
-			tokenoutput.CreatedTransactionFinalizedHashIsNil(),
-			tokenoutput.HasOutputCreatedTokenTransaction(),
-		).
-		WithOutputCreatedTokenTransaction(func(q *ent.TokenTransactionQuery) {
-			q.Select(tokentransaction.FieldFinalizedTokenTransactionHash)
-		}).
-		Order(tokenoutput.ByID(sql.OrderAsc())).
-		Limit(backfillCreatedFinalizedTxHashBatchSize).
-		All(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to query outputs for backfill: %w", err)
-	}
+	var lastID uuid.UUID
+	totalUpdated := 0
 
-	if len(outputs) == 0 {
-		return nil
-	}
+	for {
+		query := db.TokenOutput.Query().
+			Where(
+				tokenoutput.CreatedTransactionFinalizedHashIsNil(),
+				tokenoutput.HasOutputCreatedTokenTransaction(),
+			).
+			WithOutputCreatedTokenTransaction(func(q *ent.TokenTransactionQuery) {
+				q.Select(tokentransaction.FieldFinalizedTokenTransactionHash)
+			}).
+			Order(tokenoutput.ByID(sql.OrderAsc())).
+			Limit(backfillCreatedFinalizedTxHashBatchSize)
 
-	logger.Sugar().Infof("Backfilling created_finalized_tx_hash for %d token outputs", len(outputs))
-
-	for _, output := range outputs {
-		if output.Edges.OutputCreatedTokenTransaction == nil {
-			continue
+		if lastID != uuid.Nil {
+			query = query.Where(tokenoutput.IDGT(lastID))
 		}
 
-		_, err := tx.TokenOutput.UpdateOneID(output.ID).
-			SetCreatedTransactionFinalizedHash(output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash).
-			Save(ctx)
+		outputs, err := query.All(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to update output %s: %w", output.ID, err)
+			return fmt.Errorf("failed to query outputs for backfill: %w", err)
 		}
+
+		if len(outputs) == 0 {
+			break
+		}
+
+		for _, output := range outputs {
+			if output.Edges.OutputCreatedTokenTransaction == nil {
+				continue
+			}
+			err := db.TokenOutput.UpdateOneID(output.ID).
+				SetCreatedTransactionFinalizedHash(output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash).
+				Exec(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to update output %s: %w", output.ID, err)
+			}
+		}
+
+		totalUpdated += len(outputs)
+		lastID = outputs[len(outputs)-1].ID
+		logger.Sugar().Infof("Backfilled %d token outputs so far (batch of %d)", totalUpdated, len(outputs))
 	}
 
-	logger.Sugar().Infof("Successfully backfilled %d token outputs", len(outputs))
+	if totalUpdated > 0 {
+		logger.Sugar().Infof("Successfully backfilled %d total token outputs", totalUpdated)
+	}
 	return nil
 }
