@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/middleware"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -154,5 +155,5 @@ func (g *GRPCClientInfoProvider) GetClientIP(ctx context.Context) (string, error
 		}
 	}
 
-	return "", fmt.Errorf("no client IP found in header or peer context")
+	return "", errors.InvalidArgumentMissingField(fmt.Errorf("no client IP found in header or peer context"))
 }

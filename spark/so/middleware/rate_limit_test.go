@@ -809,8 +809,11 @@ func TestRateLimiter(t *testing.T) {
 		}
 		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/NotLimited"}
 
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
 		for range 5 {
-			resp, err := interceptor(t.Context(), "request", info, handler)
+			resp, err := interceptor(ctx, "request", info, handler)
 			require.NoError(t, err)
 			assert.Equal(t, "ok", resp)
 		}
@@ -921,12 +924,10 @@ func TestRateLimiter(t *testing.T) {
 			"x-real-ip": "1.2.3.4",
 		}))
 
-		// Should not rate limit since x-real-ip is ignored
-		for range 5 {
-			resp, err := interceptor(ctx, "request", info, handler)
-			require.NoError(t, err)
-			assert.Equal(t, "ok", resp)
-		}
+		// Should be rejected since x-real-ip is not a valid identifier
+		_, err = interceptor(ctx, "request", info, handler)
+		require.Error(t, err)
+		assert.Equal(t, codes.Internal, status.Code(err))
 	})
 
 	t.Run("custom x-forwarded-for client IP position", func(t *testing.T) {
@@ -1839,8 +1840,11 @@ func TestStreamServerInterceptor(t *testing.T) {
 		handler := func(_ any, _ grpc.ServerStream) error { return nil }
 		info := &grpc.StreamServerInfo{FullMethod: "/test.Service/NotLimited"}
 
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
 		for range 5 {
-			err := interceptor(nil, &mockServerStream{ctx: t.Context()}, info, handler)
+			err := interceptor(nil, &mockServerStream{ctx: ctx}, info, handler)
 			require.NoError(t, err)
 		}
 	})
@@ -1881,5 +1885,45 @@ func TestStreamServerInterceptor(t *testing.T) {
 		// At this point, total requests within the 1-minute window is 3. The next request should fail.
 		err = interceptor(nil, stream, info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
+	})
+}
+
+func TestRateLimiter_RejectsRequestsWithNoIdentifier(t *testing.T) {
+	config := &RateLimiterConfig{}
+	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s": 10,
+	})
+	rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+	require.NoError(t, err)
+
+	interceptor := rateLimiter.UnaryServerInterceptor()
+	handler := func(_ context.Context, _ any) (any, error) {
+		return "ok", nil
+	}
+	info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
+
+	t.Run("rejects request with no metadata", func(t *testing.T) {
+		ctx := t.Context()
+		_, err := interceptor(ctx, "request", info, handler)
+		require.Error(t, err)
+		assert.Equal(t, codes.Internal, status.Code(err))
+		assert.Contains(t, status.Convert(err).Message(), "no client identifier")
+	})
+
+	t.Run("rejects request with empty metadata", func(t *testing.T) {
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{}))
+		_, err := interceptor(ctx, "request", info, handler)
+		require.Error(t, err)
+		assert.Equal(t, codes.Internal, status.Code(err))
+		assert.Contains(t, status.Convert(err).Message(), "no client identifier")
+	})
+
+	t.Run("allows request with IP", func(t *testing.T) {
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
+		resp, err := interceptor(ctx, "request", info, handler)
+		require.NoError(t, err)
+		assert.Equal(t, "ok", resp)
 	})
 }

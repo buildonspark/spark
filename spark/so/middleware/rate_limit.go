@@ -492,7 +492,6 @@ type rateLimitDimensionConstraint struct {
 
 // Applies rate limiting across all tiers and dimensions for the given method.
 func (r *RateLimiter) enforceRateLimits(ctx context.Context, fullMethod string, dimensions []rateLimitDimensionConstraint) error {
-	// Nothing to enforce
 	if len(dimensions) == 0 {
 		return nil
 	}
@@ -560,7 +559,7 @@ func (r *RateLimiter) enforceAcrossScopes(ctx context.Context, base rateLimitEnf
 }
 
 // Build potential dimensions based on availability (dimension selection is driven by knob selectors)
-func (r *RateLimiter) buildDimensions(ctx context.Context) []rateLimitDimensionConstraint {
+func (r *RateLimiter) buildDimensions(ctx context.Context) ([]rateLimitDimensionConstraint, error) {
 	var pubkeyBucket, ipBucket string
 	havePubkey, haveIP := false, false
 	var identityHex string
@@ -574,15 +573,24 @@ func (r *RateLimiter) buildDimensions(ctx context.Context) []rateLimitDimensionC
 		clientIP = v
 	}
 
+	// Unconditionally reject requests that have no client identifier at all,
+	// regardless of whether rate limits are configured for the method.
+	// Every request through this interceptor must carry an IP or session —
+	// in production the ALB always sets x-forwarded-for and authenticated RPCs have sessions,
+	// so this should not be reachable under normal operation.
+	if identityHex == "" && clientIP == "" {
+		return nil, status.Errorf(codes.Internal, "no client identifier available for rate limiting")
+	}
+
 	// Check for full exclusions first - these bypass all rate limiting entirely.
 	if identityHex != "" {
 		if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludePubkeys, &identityHex, 0) > 0 {
-			return nil
+			return nil, nil
 		}
 	}
 	if clientIP != "" {
 		if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludeIps, &clientIP, 0) > 0 {
-			return nil
+			return nil, nil
 		}
 	}
 
@@ -603,8 +611,8 @@ func (r *RateLimiter) buildDimensions(ctx context.Context) []rateLimitDimensionC
 	}
 
 	if !havePubkey && !haveIP {
-		// No usable dimension; bypass rate limiting.
-		return nil
+		// Identifiers present but all excluded via dimension-only exclusions — bypass rate limiting.
+		return nil, nil
 	}
 
 	// Build list of available dimensions
@@ -616,12 +624,15 @@ func (r *RateLimiter) buildDimensions(ctx context.Context) []rateLimitDimensionC
 		dimensions = append(dimensions, rateLimitDimensionConstraint{name: dimensionNameIp, bucket: ipBucket})
 	}
 
-	return dimensions
+	return dimensions, nil
 }
 
 func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		dimensions := r.buildDimensions(ctx)
+		dimensions, err := r.buildDimensions(ctx)
+		if err != nil {
+			return nil, err
+		}
 		if err := r.enforceRateLimits(ctx, info.FullMethod, dimensions); err != nil {
 			return nil, err
 		}
@@ -633,7 +644,10 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 func (r *RateLimiter) StreamServerInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := ss.Context()
-		dimensions := r.buildDimensions(ctx)
+		dimensions, err := r.buildDimensions(ctx)
+		if err != nil {
+			return err
+		}
 		if err := r.enforceRateLimits(ctx, info.FullMethod, dimensions); err != nil {
 			return err
 		}
