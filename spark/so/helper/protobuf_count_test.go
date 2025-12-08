@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/proto/common"
-	"github.com/lightsparkdev/spark/proto/lrc20"
 	"github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -40,13 +40,13 @@ func TestCountMessageTypeInProto(t *testing.T) {
 		},
 		{
 			name: "message with repeated message field",
-			message: &lrc20.ListSparkTxsResponse{
-				TokenTransactions: []*lrc20.TokenTransactionResponse{
-					{Finalized: true},
-					{Finalized: true},
+			message: &spark_token.QueryTokenOutputsResponse{
+				OutputsWithPreviousTransactionData: []*spark_token.OutputWithPreviousTransactionData{
+					{},
+					{},
 				},
 			},
-			targetType: "rpc.v1.TokenTransactionResponse",
+			targetType: "spark_token.OutputWithPreviousTransactionData",
 			want:       2,
 		},
 		{
@@ -62,17 +62,17 @@ func TestCountMessageTypeInProto(t *testing.T) {
 		},
 		{
 			name: "deeply nested messages",
-			message: &lrc20.ListSparkTxsResponse{
-				TokenTransactions: []*lrc20.TokenTransactionResponse{
+			message: &spark_token.QueryTokenOutputsResponse{
+				OutputsWithPreviousTransactionData: []*spark_token.OutputWithPreviousTransactionData{
 					{
-						FinalTokenTransaction: &spark.TokenTransaction{},
+						Output: &spark_token.TokenOutput{},
 					},
 					{
-						FinalTokenTransaction: &spark.TokenTransaction{},
+						Output: &spark_token.TokenOutput{},
 					},
 				},
 			},
-			targetType: "spark.TokenTransaction",
+			targetType: "spark_token.TokenOutput",
 			want:       2,
 		},
 		{

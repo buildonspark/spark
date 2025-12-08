@@ -15,67 +15,20 @@ service SparkService {
     rpc generate_static_deposit_address(GenerateStaticDepositAddressRequest) returns (GenerateStaticDepositAddressResponse) {}
 
     rpc start_deposit_tree_creation(StartDepositTreeCreationRequest) returns (StartDepositTreeCreationResponse) {}
-    // This is deprecated, please use start_deposit_tree_creation instead.
-    rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {
-        option deprecated = true;
-    }
-    rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {
-        option deprecated = true;
-    }
-
-
-    rpc start_transfer(StartTransferRequest) returns (StartTransferResponse) {
-        option deprecated = true;
-    }
-
-    // This is deprecated, please use finalize_transfer_with_transfer_package instead.
-    rpc finalize_transfer(FinalizeTransferRequest) returns (FinalizeTransferResponse) {
-        option deprecated = true;
-    }
     rpc finalize_transfer_with_transfer_package(FinalizeTransferWithTransferPackageRequest) returns (FinalizeTransferResponse) {}
-    rpc cancel_transfer(CancelTransferRequest) returns (CancelTransferResponse) {
-        option deprecated = true;
-    }
 
 
     rpc query_pending_transfers(TransferFilter) returns (QueryTransfersResponse) {}
     rpc query_all_transfers(TransferFilter) returns (QueryTransfersResponse) {}
     rpc claim_transfer_tweak_keys(ClaimTransferTweakKeysRequest) returns (google.protobuf.Empty) {}
-    rpc claim_transfer_sign_refunds(ClaimTransferSignRefundsRequest) returns (ClaimTransferSignRefundsResponse) {
-        option deprecated = true;
-    }
 
     rpc store_preimage_share(StorePreimageShareRequest) returns (google.protobuf.Empty) {}
     // Gets a specified number of signing commmitments for a set of nodes, which can be used as
     // part of a transfer package.
     rpc get_signing_commitments(GetSigningCommitmentsRequest) returns (GetSigningCommitmentsResponse) {}
-    rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {
-        option deprecated = true;
-    }
-    rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {
-        option deprecated = true;
-    }
 
     rpc provide_preimage(ProvidePreimageRequest) returns (ProvidePreimageResponse) {}
     rpc query_htlc(QueryHtlcRequest) returns (QueryHtlcResponse) {}
-    // This is the exact same as start_transfer, but expresses to the SO
-    // this transfer is specifically for a leaf swap.
-    rpc start_leaf_swap(StartTransferRequest) returns (StartTransferResponse) {}
-    // This is deprecated, please use counter_leaf_swap instead.
-    rpc leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {
-        option deprecated = true;
-    }
-    // This is the exact same as start_leaf_swap, but signs with
-    // an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
-    rpc counter_leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {
-        option deprecated = true;
-    }
-    rpc refresh_timelock(RefreshTimelockRequest) returns (RefreshTimelockResponse) {
-      option deprecated = true;
-    }
-    rpc extend_leaf(ExtendLeafRequest) returns (ExtendLeafResponse) {
-      option deprecated = true;
-    }
 
 
     // Resets the timelocks for a leaf's transactions. Can be used to reset the
@@ -88,12 +41,6 @@ service SparkService {
     rpc get_signing_operator_list(google.protobuf.Empty) returns (GetSigningOperatorListResponse) {}
 
     rpc query_nodes(QueryNodesRequest) returns (QueryNodesResponse) {}
-    rpc query_nodes_distribution(QueryNodesDistributionRequest) returns (QueryNodesDistributionResponse) {
-        option deprecated = true;
-    }
-    rpc query_nodes_by_value(QueryNodesByValueRequest) returns (QueryNodesByValueResponse) {
-        option deprecated = true;
-    }
 
     rpc query_balance(QueryBalanceRequest) returns (QueryBalanceResponse) {}
 
@@ -110,35 +57,18 @@ service SparkService {
     // the funds. Returns an error if the UTXO has already been claimed.
     rpc initiate_static_deposit_utxo_refund(InitiateStaticDepositUtxoRefundRequest) returns (InitiateStaticDepositUtxoRefundResponse) {}
 
-    // DEPRECATED: This unified method is being split for better clarity and type safety
-    //
-    // For swap operations: Use spark_ssp_internal.initiate_static_deposit_utxo_swap()
-    // For refund operations: Use initiate_static_deposit_utxo_refund()
-    rpc initiate_utxo_swap(InitiateUtxoSwapRequest) returns (InitiateUtxoSwapResponse) {
-        option deprecated = true;
-    }
-
     rpc exit_single_node_trees(ExitSingleNodeTreesRequest) returns (ExitSingleNodeTreesResponse) {}
 
     // The following endpoints enforce inclusion of Direct Transactions used
     // for unilateral exits
     rpc cooperative_exit_v2(CooperativeExitRequest) returns (CooperativeExitResponse) {}
-    rpc extend_leaf_v2(ExtendLeafRequest) returns (ExtendLeafResponse) {
-      option deprecated = true;
-    }
 
     rpc claim_transfer_sign_refunds_v2(ClaimTransferSignRefundsRequest) returns (ClaimTransferSignRefundsResponse) {}
     rpc finalize_node_signatures_v2(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
     rpc initiate_preimage_swap_v2(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc initiate_preimage_swap_v3(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc start_leaf_swap_v2(StartTransferRequest) returns (StartTransferResponse) {}
-    rpc counter_leaf_swap_v2(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {
-        option deprecated = true;
-    }
     rpc start_transfer_v2(StartTransferRequest) returns (StartTransferResponse) {}
-    rpc refresh_timelock_v2(RefreshTimelockRequest) returns (RefreshTimelockResponse) {
-      option deprecated = true;
-    }
 
 
     rpc get_utxos_for_address(GetUtxosForAddressRequest) returns (GetUtxosForAddressResponse) {}
