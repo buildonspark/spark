@@ -502,7 +502,7 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to load leaves: %w", err)
 	}
 
-	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeSwap || transferType == st.TransferTypeCounterSwap {
+	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeSwap || transferType == st.TransferTypeCounterSwap || transferType == st.TransferTypeCooperativeExit {
 		if err := h.validateAndConstructBitcoinTransactions(ctx, req, transferType, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey); err != nil {
 			return nil, nil, err
 		}
@@ -1362,6 +1362,12 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 	case st.TransferTypeSwap, st.TransferTypeCounterSwap:
 		return validateLeaves_swap(nodesByID, leafCpfpRefundMap, refundDestPubkey)
 
+	case st.TransferTypeCooperativeExit:
+		if req.TransferPackage == nil {
+			return validateTransactionCooperativeExitLegacyLeavesToSend(nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
+		}
+		return validateTransactionCooperativeExitLeaves(req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
+
 	default:
 		return fmt.Errorf("invalid transfer type: %s", transferType)
 	}
@@ -1393,7 +1399,7 @@ func validateSingleLeafRefundTxs(
 		return fmt.Errorf("CPFP refund tx validation failed for leaf: %w", err)
 	}
 
-	if transferType == st.TransferTypeTransfer {
+	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeCooperativeExit {
 		if len(directFromCpfpRefundTx) == 0 {
 			return fmt.Errorf("missing required direct from CPFP refund tx for leaf")
 		}
@@ -1439,6 +1445,47 @@ func leavesToMap(leaves []*ent.TreeNode) map[string]*ent.TreeNode {
 		nodesByID[node.ID.String()] = node
 	}
 	return nodesByID
+}
+
+// removeTxIn parse the raw bytes of transaction, remove the input at index vin
+// and return raw bytes of modified transaction.
+func removeTxIn(rawTx []byte, vin int) ([]byte, error) {
+
+	if len(rawTx) == 0 {
+		return nil, fmt.Errorf("raw transaction is empty")
+	}
+
+	parsedTx, err := common.TxFromRawTxBytes(rawTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse raw transaction: %w", err)
+	}
+	// Check for out-of-bounds vin
+	if vin < 0 || vin > len(parsedTx.TxIn)-1 {
+		return nil, fmt.Errorf("out of bounds vin %d for transaction with %d inputs", vin, len(parsedTx.TxIn))
+	}
+
+	// Copy Version, TxOut, and LockTime from the original transaction
+	modifiedTx := wire.NewMsgTx(parsedTx.Version)
+	modifiedTx.TxOut = parsedTx.Copy().TxOut
+	modifiedTx.LockTime = parsedTx.LockTime
+
+	// Copy all TxIn except TxIn[vin]
+	oldTxIn := parsedTx.Copy().TxIn
+	modifiedTxIn := make([]*wire.TxIn, 0, len(parsedTx.TxIn)-1)
+	for i, TxIn := range oldTxIn {
+		if i != vin {
+			modifiedTxIn = append(modifiedTxIn, TxIn)
+		}
+	}
+	modifiedTx.TxIn = modifiedTxIn
+
+	// Serialize the modified transaction and return
+	modifiedTxRaw, err := common.SerializeTx(modifiedTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize modified transaction: %w", err)
+	}
+
+	return modifiedTxRaw, nil
 }
 
 func validateLegacyLeavesToSend_transfer(
@@ -1576,6 +1623,159 @@ func validateLeaves_swap(
 			st.TransferTypeSwap,
 		); err != nil {
 			return fmt.Errorf("leaf %s validation for swap failed: %w", leafID, err)
+		}
+	}
+
+	return nil
+}
+
+func validateTransactionCooperativeExitLegacyLeavesToSend(
+	nodesByID map[string]*ent.TreeNode,
+	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
+	refundDestPubkey keys.Public,
+) error {
+	for leafID := range leafCpfpRefundMap {
+		node, exists := nodesByID[leafID]
+		if !exists {
+			return fmt.Errorf("leaf %s not found in loaded leaves", leafID)
+		}
+
+		cpfpRefundTx := leafCpfpRefundMap[leafID]
+		directFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leafID]
+		directRefundTx := leafDirectRefundMap[leafID]
+
+		// All refund tx in Coop Exit flow has 2 inputs: one from leaf's RawTx and
+		// one from connector tx. SOs only verify 1st input and let SSP verifies 2nd input.
+		modifiedCpfpRefundTx, err := removeTxIn(cpfpRefundTx, 1)
+		if err != nil {
+			return fmt.Errorf("failed to remove second input from CPFP refund tx %x: %w", cpfpRefundTx, err)
+		}
+
+		modifiedDirectFromCpfpRefundTx, err := removeTxIn(directFromCpfpRefundTx, 1)
+		if err != nil {
+			return fmt.Errorf("failed to remove second input from Direct-from-CPFP refund tx %x: %w", cpfpRefundTx, err)
+		}
+
+		var modifiedDirectRefundTx []byte
+		if len(directRefundTx) > 0 {
+			modifiedDirectRefundTx, err = removeTxIn(directRefundTx, 1)
+			if err != nil {
+				return fmt.Errorf("failed to remove second input from Direct refund tx %x: %w", directRefundTx, err)
+			}
+		}
+
+		if err := validateSingleLeafRefundTxs(
+			node,
+			modifiedCpfpRefundTx,
+			modifiedDirectFromCpfpRefundTx,
+			modifiedDirectRefundTx,
+			refundDestPubkey,
+			st.TransferTypeTransfer,
+		); err != nil {
+			return fmt.Errorf("leaf %s validation for legacy transfer failed: %w", leafID, err)
+		}
+	}
+	return nil
+}
+
+func validateTransactionCooperativeExitLeaves(
+	req *pb.StartTransferRequest,
+	nodesByID map[string]*ent.TreeNode,
+	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
+	refundDestPubkey keys.Public,
+) error {
+	leavesToSendByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.LeavesToSend))
+	for _, leaf := range req.TransferPackage.LeavesToSend {
+		parsed, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
+			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
+		}
+		leafID := parsed.String()
+		if _, exists := leavesToSendByID[leafID]; exists {
+			return fmt.Errorf("duplicate leaf id: %s", leafID)
+		}
+		leavesToSendByID[leafID] = leaf
+	}
+
+	directLeavesByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.DirectLeavesToSend))
+	for _, leaf := range req.TransferPackage.DirectLeavesToSend {
+		parsed, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
+			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
+		}
+		directLeafID := parsed.String()
+		if _, ok := leavesToSendByID[directLeafID]; !ok {
+			return fmt.Errorf("found orphan leaf in DirectLeavesToSend with ID %s that does not correspond to any leaf in LeavesToSend", leaf.LeafId)
+		}
+		if _, exists := directLeavesByID[directLeafID]; exists {
+			return fmt.Errorf("duplicate leaf id: %s", directLeafID)
+		}
+		directLeavesByID[directLeafID] = leaf
+	}
+
+	if len(req.TransferPackage.LeavesToSend) != len(req.TransferPackage.DirectFromCpfpLeavesToSend) {
+		return fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(req.TransferPackage.LeavesToSend), len(req.TransferPackage.DirectFromCpfpLeavesToSend))
+	}
+
+	directFromCpfpLeavesByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.DirectFromCpfpLeavesToSend))
+	for _, leaf := range req.TransferPackage.DirectFromCpfpLeavesToSend {
+		parsed, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
+			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
+		}
+		directFromCpfpLeafID := parsed.String()
+		if _, ok := leavesToSendByID[directFromCpfpLeafID]; !ok {
+			return fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s which is not in LeavesToSend", leaf.LeafId)
+		}
+		if _, exists := directFromCpfpLeavesByID[directFromCpfpLeafID]; exists {
+			return fmt.Errorf("duplicate leaf id: %s", directFromCpfpLeafID)
+		}
+		directFromCpfpLeavesByID[directFromCpfpLeafID] = leaf
+	}
+
+	for leafID := range leafCpfpRefundMap {
+		node, exists := nodesByID[leafID]
+		if !exists {
+			return fmt.Errorf("leaf %s not found in loaded leaves", leafID)
+		}
+
+		cpfpRefundTx := leafCpfpRefundMap[leafID]
+		directFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leafID]
+		directRefundTx := leafDirectRefundMap[leafID]
+
+		// All refund tx in Coop Exit flow has 2 inputs: one from leaf's RawTx and
+		// one from connector tx. SOs only verify 1st input and let SSP verifies 2nd input.
+		modifiedCpfpRefundTx, err := removeTxIn(cpfpRefundTx, 1)
+		if err != nil {
+			return fmt.Errorf("failed to remove second input from CPFP refund tx %x: %w", cpfpRefundTx, err)
+		}
+
+		modifiedDirectFromCpfpRefundTx, err := removeTxIn(directFromCpfpRefundTx, 1)
+		if err != nil {
+			return fmt.Errorf("failed to remove second input from Direct-from-CPFP refund tx %x: %w", cpfpRefundTx, err)
+		}
+
+		var modifiedDirectRefundTx []byte
+		if len(directRefundTx) > 0 {
+			modifiedDirectRefundTx, err = removeTxIn(directRefundTx, 1)
+			if err != nil {
+				return fmt.Errorf("failed to remove second input from Direct refund tx %x: %w", directRefundTx, err)
+			}
+		}
+
+		if err := validateSingleLeafRefundTxs(
+			node,
+			modifiedCpfpRefundTx,
+			modifiedDirectFromCpfpRefundTx,
+			modifiedDirectRefundTx,
+			refundDestPubkey,
+			st.TransferTypeTransfer,
+		); err != nil {
+			return fmt.Errorf("leaf %s validation for transfer failed: %w", leafID, err)
 		}
 	}
 
