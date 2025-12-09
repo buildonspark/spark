@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -71,11 +72,6 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 		return nil, fmt.Errorf("can not determine network for address: %s", req.Address)
 	}
 
-	schemaNetwork, err := network.ToSchemaNetwork()
-	if err != nil {
-		return nil, err
-	}
-
 	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
@@ -88,7 +84,7 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 		SetSigningKeyshareID(keyshareID).
 		SetOwnerIdentityPubkey(ownerIDPubKey).
 		SetOwnerSigningPubkey(ownerSigningPubKey).
-		SetNetwork(schemaNetwork).
+		SetNetwork(network).
 		SetAddress(req.Address).
 		SetIsStatic(req.GetIsStatic()).
 		Save(ctx)
@@ -217,11 +213,6 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		}
 		txid := nodeTx.TxIn[0].PreviousOutPoint.Hash
 
-		schemaNetwork, err := network.ToSchemaNetwork()
-		if err != nil {
-			return err
-		}
-
 		if nodeTx.TxIn[0].PreviousOutPoint.Index > math.MaxInt16 {
 			return fmt.Errorf("previous outpoint index overflows int16: %d", nodeTx.TxIn[0].PreviousOutPoint.Index)
 		}
@@ -235,7 +226,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			SetOwnerIdentityPubkey(ownerIDPubKey).
 			SetBaseTxid(st.NewTxID(txid)).
 			SetVout(int16(nodeTx.TxIn[0].PreviousOutPoint.Index)).
-			SetNetwork(schemaNetwork).
+			SetNetwork(network).
 			SetDepositAddress(address)
 
 		if markNodeAsAvailable {
@@ -386,10 +377,10 @@ func CreateUserStatement(
 	sspSignature []byte,
 ) []byte {
 	payload := sha256.New()
-	_, _ = payload.Write([]byte("claim_static_deposit"))        // Action name
-	_, _ = payload.Write([]byte(network.String()))              // Network value as UTF-8 bytes
-	_, _ = payload.Write([]byte(transactionID))                 // Transaction ID as UTF-8 bytes
-	_ = binary.Write(payload, binary.LittleEndian, outputIndex) // Output index as 4-byte unsigned integer (little-endian)
+	_, _ = payload.Write([]byte("claim_static_deposit"))            // Action name
+	_, _ = payload.Write([]byte(strings.ToLower(network.String()))) // Network value as UTF-8 bytes
+	_, _ = payload.Write([]byte(transactionID))                     // Transaction ID as UTF-8 bytes
+	_ = binary.Write(payload, binary.LittleEndian, outputIndex)     // Output index as 4-byte unsigned integer (little-endian)
 
 	requestTypeInt := uint8(0)
 	switch requestType {
@@ -480,11 +471,16 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
+	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
+	if err != nil {
+		return nil, fmt.Errorf("unable to get network: %w", err)
+	}
+
 	messageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeRollback,
 		hex.EncodeToString(req.OnChainUtxo.Txid),
 		req.OnChainUtxo.Vout,
-		btcnetwork.Network(req.OnChainUtxo.Network),
+		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rollback utxo swap request statement: %w", err)
@@ -500,7 +496,7 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 			req.Signature,
 			req.OnChainUtxo.Txid,
 			req.OnChainUtxo.Vout,
-			btcnetwork.Network(req.OnChainUtxo.Network).String(),
+			network,
 			req.CoordinatorPublicKey,
 			messageHash,
 		)
@@ -509,7 +505,7 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 
 	logger.Sugar().Infof("Cancelling UTXO swap for %x:%d", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 
-	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get schema network: %w", err)
 	}
@@ -600,7 +596,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 
 	logger.Sugar().Infof("Marking UTXO swap for %x:%d as COMPLETED", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 
-	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get schema network: %w", err)
 	}

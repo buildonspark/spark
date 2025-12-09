@@ -13,8 +13,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 // BlockHeightCreate is the builder for creating a BlockHeight entity.
@@ -60,8 +60,8 @@ func (bhc *BlockHeightCreate) SetHeight(i int64) *BlockHeightCreate {
 }
 
 // SetNetwork sets the "network" field.
-func (bhc *BlockHeightCreate) SetNetwork(s schematype.Network) *BlockHeightCreate {
-	bhc.mutation.SetNetwork(s)
+func (bhc *BlockHeightCreate) SetNetwork(b btcnetwork.Network) *BlockHeightCreate {
+	bhc.mutation.SetNetwork(b)
 	return bhc
 }
 
@@ -282,7 +282,7 @@ func (u *BlockHeightUpsert) AddHeight(v int64) *BlockHeightUpsert {
 }
 
 // SetNetwork sets the "network" field.
-func (u *BlockHeightUpsert) SetNetwork(v schematype.Network) *BlockHeightUpsert {
+func (u *BlockHeightUpsert) SetNetwork(v btcnetwork.Network) *BlockHeightUpsert {
 	u.Set(blockheight.FieldNetwork, v)
 	return u
 }
@@ -380,7 +380,7 @@ func (u *BlockHeightUpsertOne) UpdateHeight() *BlockHeightUpsertOne {
 }
 
 // SetNetwork sets the "network" field.
-func (u *BlockHeightUpsertOne) SetNetwork(v schematype.Network) *BlockHeightUpsertOne {
+func (u *BlockHeightUpsertOne) SetNetwork(v btcnetwork.Network) *BlockHeightUpsertOne {
 	return u.Update(func(s *BlockHeightUpsert) {
 		s.SetNetwork(v)
 	})
@@ -647,7 +647,7 @@ func (u *BlockHeightUpsertBulk) UpdateHeight() *BlockHeightUpsertBulk {
 }
 
 // SetNetwork sets the "network" field.
-func (u *BlockHeightUpsertBulk) SetNetwork(v schematype.Network) *BlockHeightUpsertBulk {
+func (u *BlockHeightUpsertBulk) SetNetwork(v btcnetwork.Network) *BlockHeightUpsertBulk {
 	return u.Update(func(s *BlockHeightUpsert) {
 		s.SetNetwork(v)
 	})

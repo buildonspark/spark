@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -47,7 +48,7 @@ func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, db *en
 		SetTxid([]byte("test_txid_123456789012345678901234")).
 		SetVout(0).
 		SetAmount(1000).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetPkScript([]byte("test_script")).
 		SetBlockHeight(100).
 		SetDepositAddress(depositAddress).

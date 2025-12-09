@@ -961,10 +961,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pb.Init
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to get tree: %w", err)
 			}
-			network, err = btcnetwork.FromSchemaNetwork(tree.Network)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to get network: %w", err)
-			}
+			network = tree.Network
 		}
 
 		nodeTx, err := common.TxFromRawTxBytes(treeNode.RawTx)

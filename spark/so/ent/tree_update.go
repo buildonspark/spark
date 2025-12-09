@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -69,15 +70,15 @@ func (tu *TreeUpdate) SetNillableStatus(ss *schematype.TreeStatus) *TreeUpdate {
 }
 
 // SetNetwork sets the "network" field.
-func (tu *TreeUpdate) SetNetwork(s schematype.Network) *TreeUpdate {
-	tu.mutation.SetNetwork(s)
+func (tu *TreeUpdate) SetNetwork(b btcnetwork.Network) *TreeUpdate {
+	tu.mutation.SetNetwork(b)
 	return tu
 }
 
 // SetNillableNetwork sets the "network" field if the given value is not nil.
-func (tu *TreeUpdate) SetNillableNetwork(s *schematype.Network) *TreeUpdate {
-	if s != nil {
-		tu.SetNetwork(*s)
+func (tu *TreeUpdate) SetNillableNetwork(b *btcnetwork.Network) *TreeUpdate {
+	if b != nil {
+		tu.SetNetwork(*b)
 	}
 	return tu
 }
@@ -463,15 +464,15 @@ func (tuo *TreeUpdateOne) SetNillableStatus(ss *schematype.TreeStatus) *TreeUpda
 }
 
 // SetNetwork sets the "network" field.
-func (tuo *TreeUpdateOne) SetNetwork(s schematype.Network) *TreeUpdateOne {
-	tuo.mutation.SetNetwork(s)
+func (tuo *TreeUpdateOne) SetNetwork(b btcnetwork.Network) *TreeUpdateOne {
+	tuo.mutation.SetNetwork(b)
 	return tuo
 }
 
 // SetNillableNetwork sets the "network" field if the given value is not nil.
-func (tuo *TreeUpdateOne) SetNillableNetwork(s *schematype.Network) *TreeUpdateOne {
-	if s != nil {
-		tuo.SetNetwork(*s)
+func (tuo *TreeUpdateOne) SetNillableNetwork(b *btcnetwork.Network) *TreeUpdateOne {
+	if b != nil {
+		tuo.SetNetwork(*b)
 	}
 	return tuo
 }

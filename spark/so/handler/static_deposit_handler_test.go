@@ -164,7 +164,7 @@ func createTestUtxo(t *testing.T, ctx context.Context, client *ent.Client, depos
 	txid := validTxBytes[:32] // Mock txid from tx bytes
 
 	testUtxo, err := client.Utxo.Create().
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetTxid(txid).
 		SetVout(0).
 		SetBlockHeight(blockHeight).
@@ -195,7 +195,7 @@ func createTestUtxoSwap(t *testing.T, ctx context.Context, rng io.Reader, client
 }
 
 func createTestBlockHeight(t *testing.T, ctx context.Context, client *ent.Client, height int64) {
-	_, err := client.BlockHeight.Create().SetNetwork(st.NetworkRegtest).SetHeight(height).Save(ctx)
+	_, err := client.BlockHeight.Create().SetNetwork(btcnetwork.Regtest).SetHeight(height).Save(ctx)
 	require.NoError(t, err)
 }
 
@@ -264,7 +264,8 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 
 			// Verify signature is valid
 			// First, recreate the expected message hash
-			network := btcnetwork.Network(tc.utxo.Network)
+			network, err := btcnetwork.FromProtoNetwork(tc.utxo.GetNetwork())
+			require.NoError(t, err)
 
 			expectedMessageHash, err := CreateUtxoSwapStatement(
 				UtxoSwapStatementTypeRollback,

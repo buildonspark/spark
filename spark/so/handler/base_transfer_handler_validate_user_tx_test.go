@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/stretchr/testify/require"
 
 	"github.com/lightsparkdev/spark"
@@ -65,7 +66,7 @@ func createDbLeaf(t *testing.T, ctx context.Context, requireNodeTxTimelock bool)
 	// Minimal tree and keyshare
 	tree, err := tx.Tree.Create().
 		SetID(uuid.New()).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetStatus(st.TreeStatusAvailable).
 		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
 		SetVout(0).
@@ -106,12 +107,12 @@ func createDbLeaf(t *testing.T, ctx context.Context, requireNodeTxTimelock bool)
 		SetID(uuid.New()).
 		SetTree(tree).
 		SetSigningKeyshare(ks).
-		SetValue(uint64(testSourceValue)).
+		SetValue(testSourceValue).
 		SetVerifyingPubkey(secret.Public()).
 		SetOwnerIdentityPubkey(secret.Public()).
 		SetOwnerSigningPubkey(secret.Public()).
 		SetVout(0).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetRawTx(serializeTx(t, nodeTx)).
 		SetDirectTx(serializeTx(t, directTx)).

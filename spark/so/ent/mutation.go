@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
@@ -100,7 +101,7 @@ type BlockHeightMutation struct {
 	update_time   *time.Time
 	height        *int64
 	addheight     *int64
-	network       *schematype.Network
+	network       *btcnetwork.Network
 	clearedFields map[string]struct{}
 	done          bool
 	oldValue      func(context.Context) (*BlockHeight, error)
@@ -340,12 +341,12 @@ func (m *BlockHeightMutation) ResetHeight() {
 }
 
 // SetNetwork sets the "network" field.
-func (m *BlockHeightMutation) SetNetwork(s schematype.Network) {
-	m.network = &s
+func (m *BlockHeightMutation) SetNetwork(b btcnetwork.Network) {
+	m.network = &b
 }
 
 // Network returns the value of the "network" field in the mutation.
-func (m *BlockHeightMutation) Network() (r schematype.Network, exists bool) {
+func (m *BlockHeightMutation) Network() (r btcnetwork.Network, exists bool) {
 	v := m.network
 	if v == nil {
 		return
@@ -356,7 +357,7 @@ func (m *BlockHeightMutation) Network() (r schematype.Network, exists bool) {
 // OldNetwork returns the old "network" field's value of the BlockHeight entity.
 // If the BlockHeight object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *BlockHeightMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+func (m *BlockHeightMutation) OldNetwork(ctx context.Context) (v btcnetwork.Network, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
 	}
@@ -486,7 +487,7 @@ func (m *BlockHeightMutation) SetField(name string, value ent.Value) error {
 		m.SetHeight(v)
 		return nil
 	case blockheight.FieldNetwork:
-		v, ok := value.(schematype.Network)
+		v, ok := value.(btcnetwork.Network)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -1249,7 +1250,7 @@ type DepositAddressMutation struct {
 	create_time             *time.Time
 	update_time             *time.Time
 	address                 *string
-	network                 *schematype.Network
+	network                 *btcnetwork.Network
 	owner_identity_pubkey   *keys.Public
 	owner_signing_pubkey    *keys.Public
 	confirmation_height     *int64
@@ -1489,12 +1490,12 @@ func (m *DepositAddressMutation) ResetAddress() {
 }
 
 // SetNetwork sets the "network" field.
-func (m *DepositAddressMutation) SetNetwork(s schematype.Network) {
-	m.network = &s
+func (m *DepositAddressMutation) SetNetwork(b btcnetwork.Network) {
+	m.network = &b
 }
 
 // Network returns the value of the "network" field in the mutation.
-func (m *DepositAddressMutation) Network() (r schematype.Network, exists bool) {
+func (m *DepositAddressMutation) Network() (r btcnetwork.Network, exists bool) {
 	v := m.network
 	if v == nil {
 		return
@@ -1505,7 +1506,7 @@ func (m *DepositAddressMutation) Network() (r schematype.Network, exists bool) {
 // OldNetwork returns the old "network" field's value of the DepositAddress entity.
 // If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *DepositAddressMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+func (m *DepositAddressMutation) OldNetwork(ctx context.Context) (v btcnetwork.Network, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
 	}
@@ -2307,7 +2308,7 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 		m.SetAddress(v)
 		return nil
 	case depositaddress.FieldNetwork:
-		v, ok := value.(schematype.Network)
+		v, ok := value.(btcnetwork.Network)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -4302,7 +4303,7 @@ type L1TokenCreateMutation struct {
 	adddecimals       *int8
 	max_supply        *[]byte
 	is_freezable      *bool
-	network           *schematype.Network
+	network           *btcnetwork.Network
 	token_identifier  *[]byte
 	transaction_id    *schematype.TxID
 	clearedFields     map[string]struct{}
@@ -4724,12 +4725,12 @@ func (m *L1TokenCreateMutation) ResetIsFreezable() {
 }
 
 // SetNetwork sets the "network" field.
-func (m *L1TokenCreateMutation) SetNetwork(s schematype.Network) {
-	m.network = &s
+func (m *L1TokenCreateMutation) SetNetwork(b btcnetwork.Network) {
+	m.network = &b
 }
 
 // Network returns the value of the "network" field in the mutation.
-func (m *L1TokenCreateMutation) Network() (r schematype.Network, exists bool) {
+func (m *L1TokenCreateMutation) Network() (r btcnetwork.Network, exists bool) {
 	v := m.network
 	if v == nil {
 		return
@@ -4740,7 +4741,7 @@ func (m *L1TokenCreateMutation) Network() (r schematype.Network, exists bool) {
 // OldNetwork returns the old "network" field's value of the L1TokenCreate entity.
 // If the L1TokenCreate object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *L1TokenCreateMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+func (m *L1TokenCreateMutation) OldNetwork(ctx context.Context) (v btcnetwork.Network, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
 	}
@@ -5026,7 +5027,7 @@ func (m *L1TokenCreateMutation) SetField(name string, value ent.Value) error {
 		m.SetIsFreezable(v)
 		return nil
 	case l1tokencreate.FieldNetwork:
-		v, ok := value.(schematype.Network)
+		v, ok := value.(btcnetwork.Network)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -10758,7 +10759,7 @@ type TokenCreateMutation struct {
 	adddecimals                        *int8
 	max_supply                         *[]byte
 	is_freezable                       *bool
-	network                            *schematype.Network
+	network                            *btcnetwork.Network
 	token_identifier                   *[]byte
 	issuer_signature                   *[]byte
 	operator_specific_issuer_signature *[]byte
@@ -11195,12 +11196,12 @@ func (m *TokenCreateMutation) ResetIsFreezable() {
 }
 
 // SetNetwork sets the "network" field.
-func (m *TokenCreateMutation) SetNetwork(s schematype.Network) {
-	m.network = &s
+func (m *TokenCreateMutation) SetNetwork(b btcnetwork.Network) {
+	m.network = &b
 }
 
 // Network returns the value of the "network" field in the mutation.
-func (m *TokenCreateMutation) Network() (r schematype.Network, exists bool) {
+func (m *TokenCreateMutation) Network() (r btcnetwork.Network, exists bool) {
 	v := m.network
 	if v == nil {
 		return
@@ -11211,7 +11212,7 @@ func (m *TokenCreateMutation) Network() (r schematype.Network, exists bool) {
 // OldNetwork returns the old "network" field's value of the TokenCreate entity.
 // If the TokenCreate object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenCreateMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+func (m *TokenCreateMutation) OldNetwork(ctx context.Context) (v btcnetwork.Network, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
 	}
@@ -11887,7 +11888,7 @@ func (m *TokenCreateMutation) SetField(name string, value ent.Value) error {
 		m.SetIsFreezable(v)
 		return nil
 	case tokencreate.FieldNetwork:
-		v, ok := value.(schematype.Network)
+		v, ok := value.(btcnetwork.Network)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -14007,7 +14008,7 @@ type TokenOutputMutation struct {
 	addspent_transaction_input_vout                *int32
 	spent_revocation_secret                        *keys.Private
 	confirmed_withdraw_block_hash                  *[]byte
-	network                                        *schematype.Network
+	network                                        *btcnetwork.Network
 	token_identifier                               *[]byte
 	clearedFields                                  map[string]struct{}
 	revocation_keyshare                            *uuid.UUID
@@ -14931,12 +14932,12 @@ func (m *TokenOutputMutation) ResetConfirmedWithdrawBlockHash() {
 }
 
 // SetNetwork sets the "network" field.
-func (m *TokenOutputMutation) SetNetwork(s schematype.Network) {
-	m.network = &s
+func (m *TokenOutputMutation) SetNetwork(b btcnetwork.Network) {
+	m.network = &b
 }
 
 // Network returns the value of the "network" field in the mutation.
-func (m *TokenOutputMutation) Network() (r schematype.Network, exists bool) {
+func (m *TokenOutputMutation) Network() (r btcnetwork.Network, exists bool) {
 	v := m.network
 	if v == nil {
 		return
@@ -14947,7 +14948,7 @@ func (m *TokenOutputMutation) Network() (r schematype.Network, exists bool) {
 // OldNetwork returns the old "network" field's value of the TokenOutput entity.
 // If the TokenOutput object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenOutputMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+func (m *TokenOutputMutation) OldNetwork(ctx context.Context) (v btcnetwork.Network, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
 	}
@@ -15624,7 +15625,7 @@ func (m *TokenOutputMutation) SetField(name string, value ent.Value) error {
 		m.SetConfirmedWithdrawBlockHash(v)
 		return nil
 	case tokenoutput.FieldNetwork:
-		v, ok := value.(schematype.Network)
+		v, ok := value.(btcnetwork.Network)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -18840,7 +18841,7 @@ type TransferMutation struct {
 	update_time                  *time.Time
 	sender_identity_pubkey       *keys.Public
 	receiver_identity_pubkey     *keys.Public
-	network                      *schematype.Network
+	network                      *btcnetwork.Network
 	total_value                  *uint64
 	addtotal_value               *int64
 	status                       *schematype.TransferStatus
@@ -19114,12 +19115,12 @@ func (m *TransferMutation) ResetReceiverIdentityPubkey() {
 }
 
 // SetNetwork sets the "network" field.
-func (m *TransferMutation) SetNetwork(s schematype.Network) {
-	m.network = &s
+func (m *TransferMutation) SetNetwork(b btcnetwork.Network) {
+	m.network = &b
 }
 
 // Network returns the value of the "network" field in the mutation.
-func (m *TransferMutation) Network() (r schematype.Network, exists bool) {
+func (m *TransferMutation) Network() (r btcnetwork.Network, exists bool) {
 	v := m.network
 	if v == nil {
 		return
@@ -19130,7 +19131,7 @@ func (m *TransferMutation) Network() (r schematype.Network, exists bool) {
 // OldNetwork returns the old "network" field's value of the Transfer entity.
 // If the Transfer object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TransferMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+func (m *TransferMutation) OldNetwork(ctx context.Context) (v btcnetwork.Network, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
 	}
@@ -19791,7 +19792,7 @@ func (m *TransferMutation) SetField(name string, value ent.Value) error {
 		m.SetReceiverIdentityPubkey(v)
 		return nil
 	case transfer.FieldNetwork:
-		v, ok := value.(schematype.Network)
+		v, ok := value.(btcnetwork.Network)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -21952,7 +21953,7 @@ type TreeMutation struct {
 	update_time            *time.Time
 	owner_identity_pubkey  *keys.Public
 	status                 *schematype.TreeStatus
-	network                *schematype.Network
+	network                *btcnetwork.Network
 	base_txid              *schematype.TxID
 	vout                   *int16
 	addvout                *int16
@@ -22218,12 +22219,12 @@ func (m *TreeMutation) ResetStatus() {
 }
 
 // SetNetwork sets the "network" field.
-func (m *TreeMutation) SetNetwork(s schematype.Network) {
-	m.network = &s
+func (m *TreeMutation) SetNetwork(b btcnetwork.Network) {
+	m.network = &b
 }
 
 // Network returns the value of the "network" field in the mutation.
-func (m *TreeMutation) Network() (r schematype.Network, exists bool) {
+func (m *TreeMutation) Network() (r btcnetwork.Network, exists bool) {
 	v := m.network
 	if v == nil {
 		return
@@ -22234,7 +22235,7 @@ func (m *TreeMutation) Network() (r schematype.Network, exists bool) {
 // OldNetwork returns the old "network" field's value of the Tree entity.
 // If the Tree object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+func (m *TreeMutation) OldNetwork(ctx context.Context) (v btcnetwork.Network, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
 	}
@@ -22616,7 +22617,7 @@ func (m *TreeMutation) SetField(name string, value ent.Value) error {
 		m.SetStatus(v)
 		return nil
 	case tree.FieldNetwork:
-		v, ok := value.(schematype.Network)
+		v, ok := value.(btcnetwork.Network)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -22855,7 +22856,7 @@ type TreeNodeMutation struct {
 	update_time                   *time.Time
 	value                         *uint64
 	addvalue                      *int64
-	network                       *schematype.Network
+	network                       *btcnetwork.Network
 	status                        *schematype.TreeNodeStatus
 	verifying_pubkey              *keys.Public
 	owner_identity_pubkey         *keys.Public
@@ -23124,12 +23125,12 @@ func (m *TreeNodeMutation) ResetValue() {
 }
 
 // SetNetwork sets the "network" field.
-func (m *TreeNodeMutation) SetNetwork(s schematype.Network) {
-	m.network = &s
+func (m *TreeNodeMutation) SetNetwork(b btcnetwork.Network) {
+	m.network = &b
 }
 
 // Network returns the value of the "network" field in the mutation.
-func (m *TreeNodeMutation) Network() (r schematype.Network, exists bool) {
+func (m *TreeNodeMutation) Network() (r btcnetwork.Network, exists bool) {
 	v := m.network
 	if v == nil {
 		return
@@ -23140,7 +23141,7 @@ func (m *TreeNodeMutation) Network() (r schematype.Network, exists bool) {
 // OldNetwork returns the old "network" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+func (m *TreeNodeMutation) OldNetwork(ctx context.Context) (v btcnetwork.Network, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
 	}
@@ -24377,7 +24378,7 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		m.SetValue(v)
 		return nil
 	case treenode.FieldNetwork:
-		v, ok := value.(schematype.Network)
+		v, ok := value.(btcnetwork.Network)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -25619,7 +25620,7 @@ type UtxoMutation struct {
 	addvout                *int32
 	amount                 *uint64
 	addamount              *int64
-	network                *schematype.Network
+	network                *btcnetwork.Network
 	pk_script              *[]byte
 	clearedFields          map[string]struct{}
 	deposit_address        *uuid.UUID
@@ -26010,12 +26011,12 @@ func (m *UtxoMutation) ResetAmount() {
 }
 
 // SetNetwork sets the "network" field.
-func (m *UtxoMutation) SetNetwork(s schematype.Network) {
-	m.network = &s
+func (m *UtxoMutation) SetNetwork(b btcnetwork.Network) {
+	m.network = &b
 }
 
 // Network returns the value of the "network" field in the mutation.
-func (m *UtxoMutation) Network() (r schematype.Network, exists bool) {
+func (m *UtxoMutation) Network() (r btcnetwork.Network, exists bool) {
 	v := m.network
 	if v == nil {
 		return
@@ -26026,7 +26027,7 @@ func (m *UtxoMutation) Network() (r schematype.Network, exists bool) {
 // OldNetwork returns the old "network" field's value of the Utxo entity.
 // If the Utxo object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UtxoMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+func (m *UtxoMutation) OldNetwork(ctx context.Context) (v btcnetwork.Network, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
 	}
@@ -26280,7 +26281,7 @@ func (m *UtxoMutation) SetField(name string, value ent.Value) error {
 		m.SetAmount(v)
 		return nil
 	case utxo.FieldNetwork:
-		v, ok := value.(schematype.Network)
+		v, ok := value.(btcnetwork.Network)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

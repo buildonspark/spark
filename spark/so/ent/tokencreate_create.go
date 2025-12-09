@@ -13,9 +13,9 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -95,8 +95,8 @@ func (tcc *TokenCreateCreate) SetIsFreezable(b bool) *TokenCreateCreate {
 }
 
 // SetNetwork sets the "network" field.
-func (tcc *TokenCreateCreate) SetNetwork(s schematype.Network) *TokenCreateCreate {
-	tcc.mutation.SetNetwork(s)
+func (tcc *TokenCreateCreate) SetNetwork(b btcnetwork.Network) *TokenCreateCreate {
+	tcc.mutation.SetNetwork(b)
 	return tcc
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
@@ -798,7 +799,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 		tree, err := tx.Tree.Create().
 			SetOwnerIdentityPubkey(validPubKey).
 			SetStatus(st.TreeStatusAvailable).
-			SetNetwork(st.NetworkMainnet).
+			SetNetwork(btcnetwork.Mainnet).
 			SetBaseTxid(baseTxid).
 			SetVout(0).
 			Save(authenticatedCtx)
@@ -897,7 +898,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	tree, err := tx.Tree.Create().
 		SetOwnerIdentityPubkey(validPubKey).
 		SetStatus(st.TreeStatusAvailable).
-		SetNetwork(st.NetworkMainnet).
+		SetNetwork(btcnetwork.Mainnet).
 		SetBaseTxid(baseTxid2).
 		SetVout(0).
 		Save(ctx)

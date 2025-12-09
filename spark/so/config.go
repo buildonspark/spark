@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -400,12 +401,7 @@ func NewConfig(
 }
 
 func (c *Config) IsNetworkSupported(network btcnetwork.Network) bool {
-	for _, supportedNetwork := range c.SupportedNetworks {
-		if supportedNetwork == network {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(c.SupportedNetworks, network)
 }
 
 func NewRDSAuthToken(ctx context.Context, uri *url.URL) (string, error) {

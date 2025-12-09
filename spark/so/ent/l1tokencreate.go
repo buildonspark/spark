@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -37,7 +38,7 @@ type L1TokenCreate struct {
 	// IsFreezable holds the value of the "is_freezable" field.
 	IsFreezable bool `json:"is_freezable,omitempty"`
 	// Network holds the value of the "network" field.
-	Network schematype.Network `json:"network,omitempty"`
+	Network btcnetwork.Network `json:"network,omitempty"`
 	// TokenIdentifier holds the value of the "token_identifier" field.
 	TokenIdentifier []byte `json:"token_identifier,omitempty"`
 	// TransactionID holds the value of the "transaction_id" field.
@@ -52,6 +53,8 @@ func (*L1TokenCreate) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case l1tokencreate.FieldMaxSupply, l1tokencreate.FieldTokenIdentifier:
 			values[i] = new([]byte)
+		case l1tokencreate.FieldNetwork:
+			values[i] = new(btcnetwork.Network)
 		case l1tokencreate.FieldIssuerPublicKey:
 			values[i] = new(keys.Public)
 		case l1tokencreate.FieldTransactionID:
@@ -60,7 +63,7 @@ func (*L1TokenCreate) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case l1tokencreate.FieldDecimals:
 			values[i] = new(sql.NullInt64)
-		case l1tokencreate.FieldTokenName, l1tokencreate.FieldTokenTicker, l1tokencreate.FieldNetwork:
+		case l1tokencreate.FieldTokenName, l1tokencreate.FieldTokenTicker:
 			values[i] = new(sql.NullString)
 		case l1tokencreate.FieldCreateTime, l1tokencreate.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -136,10 +139,10 @@ func (lc *L1TokenCreate) assignValues(columns []string, values []any) error {
 				lc.IsFreezable = value.Bool
 			}
 		case l1tokencreate.FieldNetwork:
-			if value, ok := values[i].(*sql.NullString); !ok {
+			if value, ok := values[i].(*btcnetwork.Network); !ok {
 				return fmt.Errorf("unexpected type %T for field network", values[i])
-			} else if value.Valid {
-				lc.Network = schematype.Network(value.String)
+			} else if value != nil {
+				lc.Network = *value
 			}
 		case l1tokencreate.FieldTokenIdentifier:
 			if value, ok := values[i].(*[]byte); !ok {

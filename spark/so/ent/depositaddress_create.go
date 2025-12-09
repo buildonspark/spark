@@ -13,9 +13,9 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
@@ -65,15 +65,15 @@ func (dac *DepositAddressCreate) SetAddress(s string) *DepositAddressCreate {
 }
 
 // SetNetwork sets the "network" field.
-func (dac *DepositAddressCreate) SetNetwork(s schematype.Network) *DepositAddressCreate {
-	dac.mutation.SetNetwork(s)
+func (dac *DepositAddressCreate) SetNetwork(b btcnetwork.Network) *DepositAddressCreate {
+	dac.mutation.SetNetwork(b)
 	return dac
 }
 
 // SetNillableNetwork sets the "network" field if the given value is not nil.
-func (dac *DepositAddressCreate) SetNillableNetwork(s *schematype.Network) *DepositAddressCreate {
-	if s != nil {
-		dac.SetNetwork(*s)
+func (dac *DepositAddressCreate) SetNillableNetwork(b *btcnetwork.Network) *DepositAddressCreate {
+	if b != nil {
+		dac.SetNetwork(*b)
 	}
 	return dac
 }

@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	gen "github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/hook"
@@ -36,9 +37,9 @@ func (TreeNode) Fields() []ent.Field {
 			Immutable().
 			Annotations(entexample.Default(2)),
 		field.Enum("network").
-			GoType(st.Network("")).
+			GoType(btcnetwork.Unspecified).
 			Immutable().
-			Annotations(entexample.Default(st.NetworkRegtest)),
+			Annotations(entexample.Default(btcnetwork.Regtest)),
 		field.Enum("status").
 			GoType(st.TreeNodeStatus("")).
 			Annotations(entexample.Default(st.TreeNodeStatusAvailable)),

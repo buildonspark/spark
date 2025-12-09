@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -31,7 +32,7 @@ type Transfer struct {
 	// ReceiverIdentityPubkey holds the value of the "receiver_identity_pubkey" field.
 	ReceiverIdentityPubkey keys.Public `json:"receiver_identity_pubkey,omitempty"`
 	// The network on which the transfer is taking place.
-	Network schematype.Network `json:"network,omitempty"`
+	Network btcnetwork.Network `json:"network,omitempty"`
 	// TotalValue holds the value of the "total_value" field.
 	TotalValue uint64 `json:"total_value,omitempty"`
 	// Status holds the value of the "status" field.
@@ -125,11 +126,13 @@ func (*Transfer) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case transfer.FieldNetwork:
+			values[i] = new(btcnetwork.Network)
 		case transfer.FieldSenderIdentityPubkey, transfer.FieldReceiverIdentityPubkey:
 			values[i] = new(keys.Public)
 		case transfer.FieldTotalValue:
 			values[i] = new(sql.NullInt64)
-		case transfer.FieldNetwork, transfer.FieldStatus, transfer.FieldType:
+		case transfer.FieldStatus, transfer.FieldType:
 			values[i] = new(sql.NullString)
 		case transfer.FieldCreateTime, transfer.FieldUpdateTime, transfer.FieldExpiryTime, transfer.FieldCompletionTime:
 			values[i] = new(sql.NullTime)
@@ -185,10 +188,10 @@ func (t *Transfer) assignValues(columns []string, values []any) error {
 				t.ReceiverIdentityPubkey = *value
 			}
 		case transfer.FieldNetwork:
-			if value, ok := values[i].(*sql.NullString); !ok {
+			if value, ok := values[i].(*btcnetwork.Network); !ok {
 				return fmt.Errorf("unexpected type %T for field network", values[i])
-			} else if value.Valid {
-				t.Network = schematype.Network(value.String)
+			} else if value != nil {
+				t.Network = *value
 			}
 		case transfer.FieldTotalValue:
 			if value, ok := values[i].(*sql.NullInt64); !ok {

@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -182,15 +183,15 @@ func (toc *TokenOutputCreate) SetConfirmedWithdrawBlockHash(b []byte) *TokenOutp
 }
 
 // SetNetwork sets the "network" field.
-func (toc *TokenOutputCreate) SetNetwork(s schematype.Network) *TokenOutputCreate {
-	toc.mutation.SetNetwork(s)
+func (toc *TokenOutputCreate) SetNetwork(b btcnetwork.Network) *TokenOutputCreate {
+	toc.mutation.SetNetwork(b)
 	return toc
 }
 
 // SetNillableNetwork sets the "network" field if the given value is not nil.
-func (toc *TokenOutputCreate) SetNillableNetwork(s *schematype.Network) *TokenOutputCreate {
-	if s != nil {
-		toc.SetNetwork(*s)
+func (toc *TokenOutputCreate) SetNillableNetwork(b *btcnetwork.Network) *TokenOutputCreate {
+	if b != nil {
+		toc.SetNetwork(*b)
 	}
 	return toc
 }
@@ -848,7 +849,7 @@ func (u *TokenOutputUpsert) ClearConfirmedWithdrawBlockHash() *TokenOutputUpsert
 }
 
 // SetNetwork sets the "network" field.
-func (u *TokenOutputUpsert) SetNetwork(v schematype.Network) *TokenOutputUpsert {
+func (u *TokenOutputUpsert) SetNetwork(v btcnetwork.Network) *TokenOutputUpsert {
 	u.Set(tokenoutput.FieldNetwork, v)
 	return u
 }
@@ -1126,7 +1127,7 @@ func (u *TokenOutputUpsertOne) ClearConfirmedWithdrawBlockHash() *TokenOutputUps
 }
 
 // SetNetwork sets the "network" field.
-func (u *TokenOutputUpsertOne) SetNetwork(v schematype.Network) *TokenOutputUpsertOne {
+func (u *TokenOutputUpsertOne) SetNetwork(v btcnetwork.Network) *TokenOutputUpsertOne {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.SetNetwork(v)
 	})
@@ -1574,7 +1575,7 @@ func (u *TokenOutputUpsertBulk) ClearConfirmedWithdrawBlockHash() *TokenOutputUp
 }
 
 // SetNetwork sets the "network" field.
-func (u *TokenOutputUpsertBulk) SetNetwork(v schematype.Network) *TokenOutputUpsertBulk {
+func (u *TokenOutputUpsertBulk) SetNetwork(v btcnetwork.Network) *TokenOutputUpsertBulk {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.SetNetwork(v)
 	})

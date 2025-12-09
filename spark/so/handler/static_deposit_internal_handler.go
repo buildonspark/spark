@@ -74,6 +74,13 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	req := reqWithSignature.Request
 	logger.Sugar().Infof("Start CreateStaticDepositUtxoSwap request for on-chain utxo %x", req.OnChainUtxo.Txid)
 
+	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
+	if err != nil {
+		return nil, err
+	}
+	if !config.IsNetworkSupported(network) {
+		return nil, fmt.Errorf("network %s not supported", network)
+	}
 	// Verify CoordinatorPublicKey is correct. It does not actually prove that the
 	// caller is the coordinator, but that there is a message to create a swap
 	// signed by some identity key. This identity owner will be able to call a
@@ -82,7 +89,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		UtxoSwapStatementTypeCreated,
 		hex.EncodeToString(req.OnChainUtxo.Txid),
 		req.OnChainUtxo.Vout,
-		btcnetwork.Network(req.OnChainUtxo.Network),
+		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create create utxo swap request statement: %w", err)
@@ -110,19 +117,12 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	// Validate the request
 	// Check that the on chain utxo is paid to a registered static deposit address and
 	// is confirmed on the blockchain. This logic is implemented in chain watcher.
-	network, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
-	if err != nil {
-		return nil, err
-	}
-	if !config.IsNetworkSupported(network) {
-		return nil, fmt.Errorf("network %s not supported", network)
-	}
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get db: %w", err)
 	}
-	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("no leaves found")
 	}
 	transferNetwork := leaves[0].QueryTree().OnlyX(ctx).Network
-	if transferNetwork != common.SchemaNetwork(network) {
+	if transferNetwork != network {
 		return nil, fmt.Errorf("transfer network %s does not match utxo network %s", transferNetwork, network)
 	}
 	totalAmount = getTotalTransferValue(leaves)
@@ -274,12 +274,20 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	req := reqWithSignature.Request
 	logger.Sugar().Infof("Start CreateStaticDepositUtxoRefund request for on-chain utxo %x", req.OnChainUtxo.Txid)
 
+	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse network: %w", err)
+	}
+	if !config.IsNetworkSupported(network) {
+		return nil, fmt.Errorf("network %s not supported", network)
+	}
+
 	// Verify CoordinatorPublicKey is correct.
 	messageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeCreated,
 		hex.EncodeToString(req.OnChainUtxo.Txid),
 		req.OnChainUtxo.Vout,
-		btcnetwork.Network(req.OnChainUtxo.Network),
+		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create create utxo swap request statement: %w", err)
@@ -306,19 +314,11 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	// Validate the request
 	// Check that the on chain utxo is paid to a registered static deposit address and
 	// is confirmed on the blockchain. This logic is implemented in chain watcher.
-	network, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
-	if err != nil {
-		return nil, err
-	}
-	if !config.IsNetworkSupported(network) {
-		return nil, fmt.Errorf("network %s not supported", network)
-	}
-
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get db: %w", err)
 	}
-	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, err
 	}

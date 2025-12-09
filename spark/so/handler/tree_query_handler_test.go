@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
@@ -66,7 +67,7 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 		SetOwnerIdentityPubkey(identityPubKey).
 		SetOwnerSigningPubkey(randomPrivKey1.Public()).
 		SetSigningKeyshare(signingKeyshare1).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetIsStatic(true).
 		Save(ctx)
 	require.NoError(t, err)
@@ -75,7 +76,7 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 		SetOwnerIdentityPubkey(identityPubKey).
 		SetOwnerSigningPubkey(randomPrivKey2.Public()).
 		SetSigningKeyshare(signingKeyshare2).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetIsStatic(true).
 		SetIsDefault(false).
 		Save(ctx)
@@ -86,7 +87,7 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 		SetOwnerIdentityPubkey(identityPubKey2).
 		SetOwnerSigningPubkey(randomPrivKey2.Public()).
 		SetSigningKeyshare(signingKeyshare3).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetIsStatic(true).
 		Save(ctx)
 	require.NoError(t, err)
@@ -120,7 +121,7 @@ func TestQueryNodes_StatusField(t *testing.T) {
 
 	tree, err := tx.Tree.Create().
 		SetOwnerIdentityPubkey(identityPubKey).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetStatus(st.TreeStatusAvailable).
 		SetBaseTxid(baseTxid).
 		SetVout(1).
@@ -387,7 +388,7 @@ func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOw
 
 	tree, err := tx.Tree.Create().
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetStatus(st.TreeStatusAvailable).
 		SetBaseTxid(baseTxid).
 		SetVout(1).

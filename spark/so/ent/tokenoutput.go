@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -59,7 +60,7 @@ type TokenOutput struct {
 	// ConfirmedWithdrawBlockHash holds the value of the "confirmed_withdraw_block_hash" field.
 	ConfirmedWithdrawBlockHash []byte `json:"confirmed_withdraw_block_hash,omitempty"`
 	// Network holds the value of the "network" field.
-	Network schematype.Network `json:"network,omitempty"`
+	Network btcnetwork.Network `json:"network,omitempty"`
 	// TokenIdentifier holds the value of the "token_identifier" field.
 	TokenIdentifier []byte `json:"token_identifier,omitempty"`
 	// TokenCreateID holds the value of the "token_create_id" field.
@@ -161,13 +162,15 @@ func (*TokenOutput) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case tokenoutput.FieldWithdrawRevocationCommitment, tokenoutput.FieldTokenAmount, tokenoutput.FieldCreatedTransactionFinalizedHash, tokenoutput.FieldSpentOwnershipSignature, tokenoutput.FieldSpentOperatorSpecificOwnershipSignature, tokenoutput.FieldConfirmedWithdrawBlockHash, tokenoutput.FieldTokenIdentifier:
 			values[i] = new([]byte)
+		case tokenoutput.FieldNetwork:
+			values[i] = new(btcnetwork.Network)
 		case tokenoutput.FieldSpentRevocationSecret:
 			values[i] = new(keys.Private)
 		case tokenoutput.FieldOwnerPublicKey, tokenoutput.FieldTokenPublicKey:
 			values[i] = new(keys.Public)
 		case tokenoutput.FieldWithdrawBondSats, tokenoutput.FieldWithdrawRelativeBlockLocktime, tokenoutput.FieldCreatedTransactionOutputVout, tokenoutput.FieldSpentTransactionInputVout:
 			values[i] = new(sql.NullInt64)
-		case tokenoutput.FieldStatus, tokenoutput.FieldNetwork:
+		case tokenoutput.FieldStatus:
 			values[i] = new(sql.NullString)
 		case tokenoutput.FieldCreateTime, tokenoutput.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -305,10 +308,10 @@ func (to *TokenOutput) assignValues(columns []string, values []any) error {
 				to.ConfirmedWithdrawBlockHash = *value
 			}
 		case tokenoutput.FieldNetwork:
-			if value, ok := values[i].(*sql.NullString); !ok {
+			if value, ok := values[i].(*btcnetwork.Network); !ok {
 				return fmt.Errorf("unexpected type %T for field network", values[i])
-			} else if value.Valid {
-				to.Network = schematype.Network(value.String)
+			} else if value != nil {
+				to.Network = *value
 			}
 		case tokenoutput.FieldTokenIdentifier:
 			if value, ok := values[i].(*[]byte); !ok {

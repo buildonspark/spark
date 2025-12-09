@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -70,7 +71,7 @@ func TestValidateMintDoesNotExceedMaxSupplyEnt(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil, maxSupply)
+			tokenCreate := f.CreateTokenCreate(btcnetwork.Regtest, nil, maxSupply)
 
 			if tc.existingMintValue != nil {
 				_, _ = f.CreateMintTransaction(

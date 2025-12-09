@@ -159,7 +159,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 			return nil, err
 		}
 
-		err = h.validateTransferTokenTransactionUsingPreviousTransactionDataAndFinalizeCreatedSignedOutputsIfPossible(ctx, finalTokenTX, req.GetTokenTransactionSignatures(), inputTtxos, h.config.Lrc20Configs[finalTokenTX.Network.String()].TransactionExpiryDuration)
+		err = h.validateTransferTokenTransactionUsingPreviousTransactionDataAndFinalizeCreatedSignedOutputsIfPossible(ctx, finalTokenTX, req.GetTokenTransactionSignatures(), inputTtxos, h.config.Lrc20Configs[strings.ToLower(finalTokenTX.Network.String())].TransactionExpiryDuration)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("error validating transfer using previous output data", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("error validating transfer using previous output data: %w", err)))
 		}
@@ -451,7 +451,7 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 
 	// TODO(DL-104): For now we allow the network to be nil to support old outputs. In the future we should require it to be set.
 	for i, outputEnt := range outputToSpendEnts {
-		if outputEnt.Network != "" {
+		if outputEnt.Network != btcnetwork.Unspecified {
 			entNetwork, err := outputEnt.Network.MarshalProto()
 			if err != nil {
 				return sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to marshal network: %w", err))
@@ -633,8 +633,9 @@ func validateFinalTokenTransaction(
 	if err != nil {
 		return err
 	}
-	expectedBondSats := config.Lrc20Configs[network.String()].WithdrawBondSats
-	expectedRelativeBlockLocktime := config.Lrc20Configs[network.String()].WithdrawRelativeBlockLocktime
+	lrc20Config := config.Lrc20Configs[strings.ToLower(network.String())]
+	expectedBondSats := lrc20Config.WithdrawBondSats
+	expectedRelativeBlockLocktime := lrc20Config.WithdrawRelativeBlockLocktime
 	sparkOperatorsFromConfig := config.GetSigningOperatorList()
 
 	validationConfig := &utils.FinalValidationConfig{
@@ -979,10 +980,6 @@ func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction 
 	if tokenTransaction.GetTransferInput() != nil {
 		outputsToSpend = tokenTransaction.GetTransferInput().OutputsToSpend
 	}
-	schemaNetwork, err := network.ToSchemaNetwork()
-	if err != nil {
-		return err
-	}
 	if len(outputsToSpend) > 0 {
 		voutsByPrevHash := make(map[string][]int32)
 		hashBytesByKey := make(map[string][]byte)
@@ -1012,7 +1009,7 @@ func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction 
 					tokentransaction.FinalizedTokenTransactionHashEQ(hash),
 				),
 				tokenoutput.CreatedTransactionOutputVoutIn(vouts...),
-				tokenoutput.NetworkEQ(schemaNetwork),
+				tokenoutput.NetworkEQ(network),
 			}
 			if !senderPublicKey.IsZero() {
 				condition = append(condition, tokenoutput.OwnerPublicKeyEQ(senderPublicKey))

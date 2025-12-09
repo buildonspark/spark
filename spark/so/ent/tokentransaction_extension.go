@@ -9,6 +9,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/google/uuid"
@@ -63,9 +64,8 @@ func CreateStartedTransactionEntities(
 		return nil, err
 	}
 
-	var network st.Network
-	err = network.UnmarshalProto(tokenTransaction.Network)
-	if err != nil {
+	var network btcnetwork.Network
+	if err := network.UnmarshalProto(tokenTransaction.Network); err != nil {
 		return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to unmarshal network: %w", err))
 	}
 
@@ -992,20 +992,20 @@ func setTokenTransactionTimingFields(
 	return builder, nil
 }
 
-func (t *TokenTransaction) GetNetworkFromEdges() (st.Network, error) {
+func (t *TokenTransaction) GetNetworkFromEdges() (btcnetwork.Network, error) {
 	txType := t.InferTokenTransactionTypeEnt()
 	switch txType {
 	case utils.TokenTransactionTypeCreate:
 		return t.Edges.Create.Network, nil
 	case utils.TokenTransactionTypeMint, utils.TokenTransactionTypeTransfer:
 		if len(t.Edges.CreatedOutput) == 0 {
-			return st.NetworkUnspecified, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no outputs were found when reconstructing token transaction with ID: %s", t.ID))
+			return btcnetwork.Unspecified, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no outputs were found when reconstructing token transaction with ID: %s", t.ID))
 		}
 		// All token transaction outputs must have the same network (confirmed in validation when signing
 		// the transaction, so its safe to use the first output).
 		return t.Edges.CreatedOutput[0].Network, nil
 	default:
-		return st.NetworkUnspecified, sparkerrors.InternalObjectMissingField(fmt.Errorf("unknown token transaction type: %s", txType))
+		return btcnetwork.Unspecified, sparkerrors.InternalObjectMissingField(fmt.Errorf("unknown token transaction type: %s", txType))
 	}
 }
 

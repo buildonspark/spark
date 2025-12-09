@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -274,33 +275,23 @@ func ValueLTE(v uint64) predicate.TreeNode {
 }
 
 // NetworkEQ applies the EQ predicate on the "network" field.
-func NetworkEQ(v schematype.Network) predicate.TreeNode {
-	vc := v
-	return predicate.TreeNode(sql.FieldEQ(FieldNetwork, vc))
+func NetworkEQ(v btcnetwork.Network) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldNetwork, v))
 }
 
 // NetworkNEQ applies the NEQ predicate on the "network" field.
-func NetworkNEQ(v schematype.Network) predicate.TreeNode {
-	vc := v
-	return predicate.TreeNode(sql.FieldNEQ(FieldNetwork, vc))
+func NetworkNEQ(v btcnetwork.Network) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldNetwork, v))
 }
 
 // NetworkIn applies the In predicate on the "network" field.
-func NetworkIn(vs ...schematype.Network) predicate.TreeNode {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.TreeNode(sql.FieldIn(FieldNetwork, v...))
+func NetworkIn(vs ...btcnetwork.Network) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldNetwork, vs...))
 }
 
 // NetworkNotIn applies the NotIn predicate on the "network" field.
-func NetworkNotIn(vs ...schematype.Network) predicate.TreeNode {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.TreeNode(sql.FieldNotIn(FieldNetwork, v...))
+func NetworkNotIn(vs ...btcnetwork.Network) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldNetwork, vs...))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

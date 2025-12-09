@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -900,33 +901,23 @@ func ConfirmedWithdrawBlockHashNotNil() predicate.TokenOutput {
 }
 
 // NetworkEQ applies the EQ predicate on the "network" field.
-func NetworkEQ(v schematype.Network) predicate.TokenOutput {
-	vc := v
-	return predicate.TokenOutput(sql.FieldEQ(FieldNetwork, vc))
+func NetworkEQ(v btcnetwork.Network) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldEQ(FieldNetwork, v))
 }
 
 // NetworkNEQ applies the NEQ predicate on the "network" field.
-func NetworkNEQ(v schematype.Network) predicate.TokenOutput {
-	vc := v
-	return predicate.TokenOutput(sql.FieldNEQ(FieldNetwork, vc))
+func NetworkNEQ(v btcnetwork.Network) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNEQ(FieldNetwork, v))
 }
 
 // NetworkIn applies the In predicate on the "network" field.
-func NetworkIn(vs ...schematype.Network) predicate.TokenOutput {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.TokenOutput(sql.FieldIn(FieldNetwork, v...))
+func NetworkIn(vs ...btcnetwork.Network) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldIn(FieldNetwork, vs...))
 }
 
 // NetworkNotIn applies the NotIn predicate on the "network" field.
-func NetworkNotIn(vs ...schematype.Network) predicate.TokenOutput {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.TokenOutput(sql.FieldNotIn(FieldNetwork, v...))
+func NetworkNotIn(vs ...btcnetwork.Network) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNotIn(FieldNetwork, vs...))
 }
 
 // NetworkIsNil applies the IsNil predicate on the "network" field.

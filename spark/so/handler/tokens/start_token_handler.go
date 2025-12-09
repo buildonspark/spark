@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	stderrors "errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -62,8 +63,8 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto("failed to get network from proto network", req.PartialTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get network from proto network: %w", err)))
 	}
-	expectedBondSats := h.config.Lrc20Configs[network.String()].WithdrawBondSats
-	expectedRelativeBlockLocktime := h.config.Lrc20Configs[network.String()].WithdrawRelativeBlockLocktime
+	expectedBondSats := h.config.Lrc20Configs[strings.ToLower(network.String())].WithdrawBondSats
+	expectedRelativeBlockLocktime := h.config.Lrc20Configs[strings.ToLower(network.String())].WithdrawRelativeBlockLocktime
 	if err := utils.ValidatePartialTokenTransaction(
 		req.PartialTokenTransaction,
 		req.PartialTokenTransactionOwnerSignatures,
@@ -465,6 +466,8 @@ func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 				return nil, nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToGetNetworkFromProto, partialTokenTransaction, err)
 			}
 
+			lrc20Config := h.config.Lrc20Configs[strings.ToLower(network.String())]
+
 			// Fill revocation commitments and withdrawal bond/locktime for each output.
 			for i, output := range finalTokenTransaction.TokenOutputs {
 				id, err := uuid.NewV7()
@@ -474,16 +477,16 @@ func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 				idStr := id.String()
 				output.Id = &idStr
 				output.RevocationCommitment = keyshares[i].PublicKey.Serialize()
-				withdrawalBondSats := h.config.Lrc20Configs[network.String()].WithdrawBondSats
+				withdrawalBondSats := lrc20Config.WithdrawBondSats
 				output.WithdrawBondSats = &withdrawalBondSats
-				withdrawRelativeBlockLocktime := h.config.Lrc20Configs[network.String()].WithdrawRelativeBlockLocktime
+				withdrawRelativeBlockLocktime := lrc20Config.WithdrawRelativeBlockLocktime
 				output.WithdrawRelativeBlockLocktime = &withdrawRelativeBlockLocktime
 			}
 		}
 
 	default:
 		return nil, nil, tokens.FormatErrorWithTransactionProto("unknown token transaction type", partialTokenTransaction,
-			fmt.Errorf("unsupported transaction type: %s", txType.String()))
+			fmt.Errorf("unsupported transaction type: %s", txType))
 	}
 
 	return finalTokenTransaction, keyshareIDStrings, nil

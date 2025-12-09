@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -259,33 +260,23 @@ func ReceiverIdentityPubkeyLTE(v keys.Public) predicate.Transfer {
 }
 
 // NetworkEQ applies the EQ predicate on the "network" field.
-func NetworkEQ(v schematype.Network) predicate.Transfer {
-	vc := v
-	return predicate.Transfer(sql.FieldEQ(FieldNetwork, vc))
+func NetworkEQ(v btcnetwork.Network) predicate.Transfer {
+	return predicate.Transfer(sql.FieldEQ(FieldNetwork, v))
 }
 
 // NetworkNEQ applies the NEQ predicate on the "network" field.
-func NetworkNEQ(v schematype.Network) predicate.Transfer {
-	vc := v
-	return predicate.Transfer(sql.FieldNEQ(FieldNetwork, vc))
+func NetworkNEQ(v btcnetwork.Network) predicate.Transfer {
+	return predicate.Transfer(sql.FieldNEQ(FieldNetwork, v))
 }
 
 // NetworkIn applies the In predicate on the "network" field.
-func NetworkIn(vs ...schematype.Network) predicate.Transfer {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.Transfer(sql.FieldIn(FieldNetwork, v...))
+func NetworkIn(vs ...btcnetwork.Network) predicate.Transfer {
+	return predicate.Transfer(sql.FieldIn(FieldNetwork, vs...))
 }
 
 // NetworkNotIn applies the NotIn predicate on the "network" field.
-func NetworkNotIn(vs ...schematype.Network) predicate.Transfer {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.Transfer(sql.FieldNotIn(FieldNetwork, v...))
+func NetworkNotIn(vs ...btcnetwork.Network) predicate.Transfer {
+	return predicate.Transfer(sql.FieldNotIn(FieldNetwork, vs...))
 }
 
 // TotalValueEQ applies the EQ predicate on the "total_value" field.

@@ -167,11 +167,6 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 		return nil, fmt.Errorf("AfterID and BeforeID are mutually exclusive")
 	}
 
-	schemaNetwork, err := params.Network.ToSchemaNetwork()
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
-	}
-
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -214,7 +209,7 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 			statusPredicate,
 			tokenoutput.ConfirmedWithdrawBlockHashIsNil(),
 		).
-		Where(tokenoutput.NetworkEQ(schemaNetwork))
+		Where(tokenoutput.NetworkEQ(params.Network))
 	if len(params.IssuerPublicKeys) > 0 {
 		query = query.Where(tokenoutput.TokenPublicKeyIn(params.IssuerPublicKeys...))
 	}

@@ -96,16 +96,12 @@ func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 		}
-		schemaNetwork, err := network.ToSchemaNetwork()
-		if err != nil {
-			return "", nil, err
-		}
 		_, err = db.DepositAddress.Create().
 			SetSigningKeyshareID(seKeyshare.ID).
 			SetOwnerIdentityPubkey(identityPubKey).
 			SetOwnerSigningPubkey(userPubkey).
 			SetAddress(address).
-			SetNetwork(schemaNetwork).
+			SetNetwork(network).
 			Save(ctx)
 		if err != nil {
 			return "", nil, err

@@ -199,14 +199,13 @@ func scanChainUpdates(
 	latestChainTip := NewTip(latestBlockHeight, *latestBlockHash)
 	logger.Sugar().Infof("Latest chain tip height: %d, hash: %s", latestBlockHeight, latestBlockHash.String())
 
-	entNetwork := common.SchemaNetwork(network)
 	dbBlockHeight, err := dbClient.BlockHeight.Query().
-		Where(blockheight.NetworkEQ(entNetwork)).
+		Where(blockheight.NetworkEQ(network)).
 		Only(ctx)
 	if ent.IsNotFound(err) {
 		startHeight := max(0, latestBlockHeight-6)
 		logger.Sugar().Infof("Block height %d not found, creating new entry", startHeight)
-		dbBlockHeight, err = dbClient.BlockHeight.Create().SetHeight(startHeight).SetNetwork(entNetwork).Save(ctx)
+		dbBlockHeight, err = dbClient.BlockHeight.Create().SetHeight(startHeight).SetNetwork(network).Save(ctx)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to query block height: %w", err)
@@ -458,7 +457,7 @@ func handleBlock(
 	networkParams := network.Params()
 	_, err := dbClient.BlockHeight.Update().
 		SetHeight(blockHeight).
-		Where(blockheight.NetworkEQ(common.SchemaNetwork(network))).
+		Where(blockheight.NetworkEQ(network)).
 		Save(ctx)
 	if err != nil {
 		return err
@@ -701,7 +700,7 @@ func storeStaticDeposits(ctx context.Context, dbClient *ent.Client, creditedAddr
 					SetVout(utxo.idx).
 					SetAmount(utxo.amount).
 					SetPkScript(utxo.tx.TxOut[utxo.idx].PkScript).
-					SetNetwork(common.SchemaNetwork(network)).
+					SetNetwork(network).
 					SetBlockHeight(blockHeight).
 					SetDepositAddress(address).
 					OnConflictColumns("network", "txid", "vout").

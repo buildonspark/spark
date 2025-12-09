@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -34,7 +35,7 @@ func TestMarshalProto_V3_SortsOperatorKeysAndInvoices(t *testing.T) {
 				{
 					ID:                           uuid.New(),
 					CreatedTransactionOutputVout: 0,
-					Network:                      st.NetworkMainnet,
+					Network:                      btcnetwork.Mainnet,
 				},
 			},
 			SparkInvoice: []*SparkInvoice{

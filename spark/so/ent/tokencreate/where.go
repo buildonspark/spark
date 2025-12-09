@@ -8,9 +8,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 // ID filters vertices based on their ID field.
@@ -464,33 +464,23 @@ func IsFreezableNEQ(v bool) predicate.TokenCreate {
 }
 
 // NetworkEQ applies the EQ predicate on the "network" field.
-func NetworkEQ(v schematype.Network) predicate.TokenCreate {
-	vc := v
-	return predicate.TokenCreate(sql.FieldEQ(FieldNetwork, vc))
+func NetworkEQ(v btcnetwork.Network) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldEQ(FieldNetwork, v))
 }
 
 // NetworkNEQ applies the NEQ predicate on the "network" field.
-func NetworkNEQ(v schematype.Network) predicate.TokenCreate {
-	vc := v
-	return predicate.TokenCreate(sql.FieldNEQ(FieldNetwork, vc))
+func NetworkNEQ(v btcnetwork.Network) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldNEQ(FieldNetwork, v))
 }
 
 // NetworkIn applies the In predicate on the "network" field.
-func NetworkIn(vs ...schematype.Network) predicate.TokenCreate {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.TokenCreate(sql.FieldIn(FieldNetwork, v...))
+func NetworkIn(vs ...btcnetwork.Network) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldIn(FieldNetwork, vs...))
 }
 
 // NetworkNotIn applies the NotIn predicate on the "network" field.
-func NetworkNotIn(vs ...schematype.Network) predicate.TokenCreate {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.TokenCreate(sql.FieldNotIn(FieldNetwork, v...))
+func NetworkNotIn(vs ...btcnetwork.Network) predicate.TokenCreate {
+	return predicate.TokenCreate(sql.FieldNotIn(FieldNetwork, vs...))
 }
 
 // TokenIdentifierEQ applies the EQ predicate on the "token_identifier" field.

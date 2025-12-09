@@ -153,7 +153,7 @@ func createTestRenewTree(t *testing.T, ctx context.Context, ownerIdentityPubKey 
 	baseTxid := st.NewRandomTxIDForTesting(t)
 	tree, err := tx.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetBaseTxid(baseTxid).
 		SetVout(0).

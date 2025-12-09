@@ -11,9 +11,9 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 )
@@ -30,7 +30,7 @@ type DepositAddress struct {
 	// P2TR address string that pays to the combined public key of SOs and the owner's signing public key.
 	Address string `json:"address,omitempty"`
 	// Network on which the deposit address is valid.
-	Network schematype.Network `json:"network,omitempty"`
+	Network btcnetwork.Network `json:"network,omitempty"`
 	// Identity public key of the owner of the deposit address.
 	OwnerIdentityPubkey keys.Public `json:"owner_identity_pubkey,omitempty"`
 	// Signing public key of the owner of the deposit address.
@@ -118,13 +118,15 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case depositaddress.FieldAddressSignatures, depositaddress.FieldPossessionSignature:
 			values[i] = new([]byte)
+		case depositaddress.FieldNetwork:
+			values[i] = new(btcnetwork.Network)
 		case depositaddress.FieldOwnerIdentityPubkey, depositaddress.FieldOwnerSigningPubkey:
 			values[i] = new(keys.Public)
 		case depositaddress.FieldIsStatic, depositaddress.FieldIsDefault:
 			values[i] = new(sql.NullBool)
 		case depositaddress.FieldConfirmationHeight:
 			values[i] = new(sql.NullInt64)
-		case depositaddress.FieldAddress, depositaddress.FieldNetwork, depositaddress.FieldConfirmationTxid:
+		case depositaddress.FieldAddress, depositaddress.FieldConfirmationTxid:
 			values[i] = new(sql.NullString)
 		case depositaddress.FieldCreateTime, depositaddress.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -172,10 +174,10 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 				da.Address = value.String
 			}
 		case depositaddress.FieldNetwork:
-			if value, ok := values[i].(*sql.NullString); !ok {
+			if value, ok := values[i].(*btcnetwork.Network); !ok {
 				return fmt.Errorf("unexpected type %T for field network", values[i])
-			} else if value.Valid {
-				da.Network = schematype.Network(value.String)
+			} else if value != nil {
+				da.Network = *value
 			}
 		case depositaddress.FieldOwnerIdentityPubkey:
 			if value, ok := values[i].(*keys.Public); !ok {

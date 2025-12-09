@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uuids"
 	"github.com/lightsparkdev/spark/so/frost"
@@ -1709,12 +1710,12 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		transferPredicate = append(transferPredicate, enttransfer.TypeIn(transferTypes...))
 	}
 
-	var network st.Network
+	var network btcnetwork.Network
 	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
-		network = st.NetworkMainnet
+		network = btcnetwork.Mainnet
 	} else {
 		var err error
-		network, err = common.SchemaNetworkFromProtoNetwork(filter.GetNetwork())
+		network, err = btcnetwork.FromProtoNetwork(filter.GetNetwork())
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
 		}

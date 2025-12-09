@@ -29,32 +29,32 @@ import (
 func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 	testCases := []struct {
 		name        string
-		tokenNet    st.Network
-		txNet       st.Network
+		tokenNet    btcnetwork.Network
+		txNet       btcnetwork.Network
 		expectError bool
 	}{
 		{
 			name:        "mainnet token, regtest tx should fail",
-			tokenNet:    st.NetworkMainnet,
-			txNet:       st.NetworkRegtest,
+			tokenNet:    btcnetwork.Mainnet,
+			txNet:       btcnetwork.Regtest,
 			expectError: true,
 		},
 		{
 			name:        "regtest token, mainnet tx should fail",
-			tokenNet:    st.NetworkRegtest,
-			txNet:       st.NetworkMainnet,
+			tokenNet:    btcnetwork.Regtest,
+			txNet:       btcnetwork.Mainnet,
 			expectError: true,
 		},
 		{
 			name:        "mainnet token, mainnet tx should succeed",
-			tokenNet:    st.NetworkMainnet,
-			txNet:       st.NetworkMainnet,
+			tokenNet:    btcnetwork.Mainnet,
+			txNet:       btcnetwork.Mainnet,
 			expectError: false,
 		},
 		{
 			name:        "regtest token, regtest tx should succeed",
-			tokenNet:    st.NetworkRegtest,
-			txNet:       st.NetworkRegtest,
+			tokenNet:    btcnetwork.Regtest,
+			txNet:       btcnetwork.Regtest,
 			expectError: false,
 		},
 	}
@@ -131,7 +131,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 			}
 			netCommon, err := btcnetwork.FromProtoNetwork(pbNet)
 			require.NoError(t, err)
-			cfgVals := handler.config.Lrc20Configs[netCommon.String()]
+			cfgVals := handler.config.Lrc20Configs[strings.ToLower(netCommon.String())]
 			txProto.TokenOutputs[0].WithdrawBondSats = &cfgVals.WithdrawBondSats
 			txProto.TokenOutputs[0].WithdrawRelativeBlockLocktime = &cfgVals.WithdrawRelativeBlockLocktime
 
@@ -158,7 +158,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 			_, err = handler.PrepareTokenTransactionInternal(ctx, req)
 
 			if tc.expectError {
-				require.ErrorContains(t, err, fmt.Sprintf("transaction network %s does not match token network %s", strings.ToLower(string(tc.txNet)), strings.ToLower(string(tc.tokenNet))))
+				require.ErrorContains(t, err, fmt.Sprintf("transaction network %s does not match token network %s", tc.txNet, tc.tokenNet))
 			} else {
 				require.NoError(t, err)
 			}

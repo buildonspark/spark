@@ -8,8 +8,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 // ID filters vertices based on their ID field.
@@ -333,33 +333,23 @@ func AmountLTE(v uint64) predicate.Utxo {
 }
 
 // NetworkEQ applies the EQ predicate on the "network" field.
-func NetworkEQ(v schematype.Network) predicate.Utxo {
-	vc := v
-	return predicate.Utxo(sql.FieldEQ(FieldNetwork, vc))
+func NetworkEQ(v btcnetwork.Network) predicate.Utxo {
+	return predicate.Utxo(sql.FieldEQ(FieldNetwork, v))
 }
 
 // NetworkNEQ applies the NEQ predicate on the "network" field.
-func NetworkNEQ(v schematype.Network) predicate.Utxo {
-	vc := v
-	return predicate.Utxo(sql.FieldNEQ(FieldNetwork, vc))
+func NetworkNEQ(v btcnetwork.Network) predicate.Utxo {
+	return predicate.Utxo(sql.FieldNEQ(FieldNetwork, v))
 }
 
 // NetworkIn applies the In predicate on the "network" field.
-func NetworkIn(vs ...schematype.Network) predicate.Utxo {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.Utxo(sql.FieldIn(FieldNetwork, v...))
+func NetworkIn(vs ...btcnetwork.Network) predicate.Utxo {
+	return predicate.Utxo(sql.FieldIn(FieldNetwork, vs...))
 }
 
 // NetworkNotIn applies the NotIn predicate on the "network" field.
-func NetworkNotIn(vs ...schematype.Network) predicate.Utxo {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.Utxo(sql.FieldNotIn(FieldNetwork, v...))
+func NetworkNotIn(vs ...btcnetwork.Network) predicate.Utxo {
+	return predicate.Utxo(sql.FieldNotIn(FieldNetwork, vs...))
 }
 
 // PkScriptEQ applies the EQ predicate on the "pk_script" field.

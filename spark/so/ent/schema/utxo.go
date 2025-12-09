@@ -5,7 +5,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
-	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/entexample"
 )
 
@@ -40,9 +40,9 @@ func (Utxo) Fields() []ent.Field {
 			Immutable().
 			Annotations(entexample.Default(10000)),
 		field.Enum("network").
-			GoType(st.Network("")).
+			GoType(btcnetwork.Unspecified).
 			Immutable().
-			Annotations(entexample.Default(st.NetworkRegtest)),
+			Annotations(entexample.Default(btcnetwork.Regtest)),
 		field.Bytes("pk_script").
 			Immutable().
 			Annotations(entexample.Default(

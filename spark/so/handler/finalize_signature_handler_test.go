@@ -8,6 +8,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -179,7 +180,7 @@ func TestFinalizeSignatureHandler_ErrorCases(t *testing.T) {
 	}
 }
 
-func createTestTree(t *testing.T, ctx context.Context, network st.Network, status st.TreeStatus) (*ent.Tree, *ent.TreeNode) {
+func createTestTree(t *testing.T, ctx context.Context, network btcnetwork.Network, status st.TreeStatus) (*ent.Tree, *ent.TreeNode) {
 	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -256,7 +257,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignatures_InvalidIntent(t *testin
 	}
 	handler := NewFinalizeSignatureHandler(config)
 
-	_, node := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
+	_, node := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
 
 	req := &pb.FinalizeNodeSignaturesRequest{
 		NodeSignatures: []*pb.NodeSignatures{
@@ -281,7 +282,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignatures_EmptyOperatorsMap(t *te
 	}
 	handler := NewFinalizeSignatureHandler(config)
 
-	_, node := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
+	_, node := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
 
 	req := &pb.FinalizeNodeSignaturesRequest{
 		NodeSignatures: []*pb.NodeSignatures{
@@ -325,7 +326,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 	config := &so.Config{}
 	handler := NewFinalizeSignatureHandler(config)
 
-	tree, parentNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
+	tree, parentNode := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
 
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -404,7 +405,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithoutRefundTxStatus(t *testin
 	config := &so.Config{}
 	handler := NewFinalizeSignatureHandler(config)
 
-	_, leafNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
+	_, leafNode := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
 
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -437,7 +438,7 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 	config := &so.Config{}
 	handler := NewFinalizeSignatureHandler(config)
 
-	tree, parentNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
+	tree, parentNode := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
 	rng := rand.NewChaCha8([32]byte{})
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -527,7 +528,7 @@ func TestFinalizeSignatureHandler_UpdateNode_TreeNotAvailableStatus(t *testing.T
 	handler := NewFinalizeSignatureHandler(config)
 
 	// Create a tree with Pending status (not Available)
-	_, leafNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusPending)
+	_, leafNode := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusPending)
 
 	// Test: Node in non-Available tree should not have its status changed by the children logic
 	nodeSignatures := &pb.NodeSignatures{
@@ -568,7 +569,7 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 	handler := NewFinalizeSignatureHandler(config)
 
 	// Create a tree in a not-yet-finalized (PENDING) state
-	tree, rootNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusPending)
+	tree, rootNode := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusPending)
 
 	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -612,7 +613,7 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 		// This txid is different from the tree's base txid, which is the core of the issue.
 		SetConfirmationTxid("other_non_root_deposit_txid_" + testID).
 		SetSigningKeyshare(keyshare).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -625,7 +626,7 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 		SetTxid([]byte("non_root_deposit_txid_" + testID)).
 		SetVout(0).
 		SetAmount(65536).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetPkScript([]byte("pk_script_" + testID)).
 		SetDepositAddress(depositAddress).
 		Save(ctx)
@@ -643,7 +644,7 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 	// Create a block height record for the regtest network
 	_, err = dbTX.BlockHeight.Create().
 		SetID(uuid.New()).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetHeight(103).
 		Save(ctx)
 	require.NoError(t, err)
@@ -680,7 +681,7 @@ func TestFinalizeTreeWithInsufficientConfirmations(t *testing.T) {
 	handler := NewFinalizeSignatureHandler(config)
 
 	// Create a tree in a not-yet-finalized (PENDING) state
-	tree, rootNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusPending)
+	tree, rootNode := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusPending)
 
 	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -722,7 +723,7 @@ func TestFinalizeTreeWithInsufficientConfirmations(t *testing.T) {
 		SetConfirmationHeight(100).
 		SetConfirmationTxid("deposit_txid_" + testID).
 		SetSigningKeyshare(keyshare).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -734,7 +735,7 @@ func TestFinalizeTreeWithInsufficientConfirmations(t *testing.T) {
 		SetTxid([]byte("deposit_txid_" + testID)).
 		SetVout(0).
 		SetAmount(65536).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetPkScript([]byte("pk_script_" + testID)).
 		SetDepositAddress(depositAddress).
 		Save(ctx)
@@ -750,7 +751,7 @@ func TestFinalizeTreeWithInsufficientConfirmations(t *testing.T) {
 	// This gives only 2 confirmations (102 - 100 = 2), which is less than the required 3
 	_, err = dbTX.BlockHeight.Create().
 		SetID(uuid.New()).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetHeight(102).
 		Save(ctx)
 	require.NoError(t, err)
@@ -793,7 +794,7 @@ func TestFinalizeTreeWithNoBlockHeight(t *testing.T) {
 	handler := NewFinalizeSignatureHandler(config)
 
 	// Create a tree in a not-yet-finalized (PENDING) state
-	tree, rootNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusPending)
+	tree, rootNode := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusPending)
 
 	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -835,7 +836,7 @@ func TestFinalizeTreeWithNoBlockHeight(t *testing.T) {
 		SetConfirmationHeight(100).
 		SetConfirmationTxid("deposit_txid_" + testID).
 		SetSigningKeyshare(keyshare).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -847,7 +848,7 @@ func TestFinalizeTreeWithNoBlockHeight(t *testing.T) {
 		SetTxid([]byte("deposit_txid_" + testID)).
 		SetVout(0).
 		SetAmount(65536).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetPkScript([]byte("pk_script_" + testID)).
 		SetDepositAddress(depositAddress).
 		Save(ctx)
@@ -887,7 +888,7 @@ func TestFinalizeSignatureHandler_UpdateNode_TreeNodeExitingStatus(t *testing.T)
 			require.NoError(t, err)
 			dbClient := entTx.Client()
 
-			_, treeNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
+			_, treeNode := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
 
 			// Set the tree node to a final status
 			treeNode, err = treeNode.Update().

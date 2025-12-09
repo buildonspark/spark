@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -91,8 +92,8 @@ func (lcc *L1TokenCreateCreate) SetIsFreezable(b bool) *L1TokenCreateCreate {
 }
 
 // SetNetwork sets the "network" field.
-func (lcc *L1TokenCreateCreate) SetNetwork(s schematype.Network) *L1TokenCreateCreate {
-	lcc.mutation.SetNetwork(s)
+func (lcc *L1TokenCreateCreate) SetNetwork(b btcnetwork.Network) *L1TokenCreateCreate {
+	lcc.mutation.SetNetwork(b)
 	return lcc
 }
 

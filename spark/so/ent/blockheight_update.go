@@ -11,9 +11,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 // BlockHeightUpdate is the builder for updating BlockHeight entities.
@@ -58,15 +58,15 @@ func (bhu *BlockHeightUpdate) AddHeight(i int64) *BlockHeightUpdate {
 }
 
 // SetNetwork sets the "network" field.
-func (bhu *BlockHeightUpdate) SetNetwork(s schematype.Network) *BlockHeightUpdate {
-	bhu.mutation.SetNetwork(s)
+func (bhu *BlockHeightUpdate) SetNetwork(b btcnetwork.Network) *BlockHeightUpdate {
+	bhu.mutation.SetNetwork(b)
 	return bhu
 }
 
 // SetNillableNetwork sets the "network" field if the given value is not nil.
-func (bhu *BlockHeightUpdate) SetNillableNetwork(s *schematype.Network) *BlockHeightUpdate {
-	if s != nil {
-		bhu.SetNetwork(*s)
+func (bhu *BlockHeightUpdate) SetNillableNetwork(b *btcnetwork.Network) *BlockHeightUpdate {
+	if b != nil {
+		bhu.SetNetwork(*b)
 	}
 	return bhu
 }
@@ -202,15 +202,15 @@ func (bhuo *BlockHeightUpdateOne) AddHeight(i int64) *BlockHeightUpdateOne {
 }
 
 // SetNetwork sets the "network" field.
-func (bhuo *BlockHeightUpdateOne) SetNetwork(s schematype.Network) *BlockHeightUpdateOne {
-	bhuo.mutation.SetNetwork(s)
+func (bhuo *BlockHeightUpdateOne) SetNetwork(b btcnetwork.Network) *BlockHeightUpdateOne {
+	bhuo.mutation.SetNetwork(b)
 	return bhuo
 }
 
 // SetNillableNetwork sets the "network" field if the given value is not nil.
-func (bhuo *BlockHeightUpdateOne) SetNillableNetwork(s *schematype.Network) *BlockHeightUpdateOne {
-	if s != nil {
-		bhuo.SetNetwork(*s)
+func (bhuo *BlockHeightUpdateOne) SetNillableNetwork(b *btcnetwork.Network) *BlockHeightUpdateOne {
+	if b != nil {
+		bhuo.SetNetwork(*b)
 	}
 	return bhuo
 }

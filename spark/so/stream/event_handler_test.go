@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
@@ -262,7 +263,7 @@ func TestEventRouterTransferNotification(t *testing.T) {
 	tx, err := session.GetOrBeginTx(mutationCtx)
 	require.NoError(t, err)
 	transfer, err := tx.Transfer.Create().
-		SetNetwork(schematype.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetSenderIdentityPubkey(senderKey).
 		SetReceiverIdentityPubkey(receiverKey).
 		SetStatus(schematype.TransferStatusSenderKeyTweaked).

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"go.uber.org/zap"
@@ -618,7 +619,7 @@ func createAndLockSparkInvoice(ctx context.Context, sparkInvoice string) (uuid.U
 	return storedInvoice.ID, nil
 }
 
-func loadLeavesWithLock(ctx context.Context, db *ent.Client, leafRefundMap map[string][]byte) ([]*ent.TreeNode, *st.Network, error) {
+func loadLeavesWithLock(ctx context.Context, db *ent.Client, leafRefundMap map[string][]byte) ([]*ent.TreeNode, *btcnetwork.Network, error) {
 	leafUUIDs := make([]uuid.UUID, 0, len(leafRefundMap))
 	for leafID := range leafRefundMap {
 		leafUUID, err := uuid.Parse(leafID)
@@ -640,7 +641,7 @@ func loadLeavesWithLock(ctx context.Context, db *ent.Client, leafRefundMap map[s
 		return nil, nil, fmt.Errorf("some leaves not found")
 	}
 
-	var network *st.Network
+	var network *btcnetwork.Network
 	for _, leaf := range leaves {
 		tree := leaf.Edges.Tree
 		if tree == nil {

@@ -10,8 +10,8 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 // BlockHeight is the model entity for the BlockHeight schema.
@@ -26,7 +26,7 @@ type BlockHeight struct {
 	// Height holds the value of the "height" field.
 	Height int64 `json:"height,omitempty"`
 	// Network holds the value of the "network" field.
-	Network      schematype.Network `json:"network,omitempty"`
+	Network      btcnetwork.Network `json:"network,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -35,10 +35,10 @@ func (*BlockHeight) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case blockheight.FieldNetwork:
+			values[i] = new(btcnetwork.Network)
 		case blockheight.FieldHeight:
 			values[i] = new(sql.NullInt64)
-		case blockheight.FieldNetwork:
-			values[i] = new(sql.NullString)
 		case blockheight.FieldCreateTime, blockheight.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case blockheight.FieldID:
@@ -83,10 +83,10 @@ func (bh *BlockHeight) assignValues(columns []string, values []any) error {
 				bh.Height = value.Int64
 			}
 		case blockheight.FieldNetwork:
-			if value, ok := values[i].(*sql.NullString); !ok {
+			if value, ok := values[i].(*btcnetwork.Network); !ok {
 				return fmt.Errorf("unexpected type %T for field network", values[i])
-			} else if value.Valid {
-				bh.Network = schematype.Network(value.String)
+			} else if value != nil {
+				bh.Network = *value
 			}
 		default:
 			bh.selectValues.Set(columns[i], values[i])

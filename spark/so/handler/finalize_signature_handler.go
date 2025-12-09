@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
-	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
@@ -81,11 +80,6 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tree for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 	}
-	network, err := btcnetwork.FromSchemaNetwork(nodeTree.Network)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get network for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
-	}
-
 	if nodeTree.Status == st.TreeStatusPending {
 		for _, nodeSignatures := range req.NodeSignatures {
 			nodeID, err := uuid.Parse(nodeSignatures.NodeId)
@@ -164,7 +158,7 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 
 	switch req.Intent {
 	case pbcommon.SignatureIntent_CREATION:
-		protoNetwork, err := network.ToProtoNetwork()
+		protoNetwork, err := nodeTree.Network.ToProtoNetwork()
 		if err != nil {
 			return nil, err
 		}

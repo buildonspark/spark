@@ -267,7 +267,7 @@ func setupDBCreateTokenTransactionInternalSignFailedScenario(t *testing.T, setup
 		SetIsFreezable(true).
 		SetIssuerPublicKey(setup.coordinatorPubKey).
 		SetCreationEntityPublicKey(creationEntityPubKey).
-		SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
+		SetNetwork(btcnetwork.Regtest).
 		SetTokenIdentifier(tokenIdentifier).
 		Save(setup.ctx)
 	require.NoError(t, err)
@@ -338,7 +338,7 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 			SetMaxSupply(testTokenMaxSupplyBytes).
 			SetIsFreezable(testTokenIsFreezable).
 			SetCreationEntityPublicKey(setup.coordinatorPubKey).
-			SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
+			SetNetwork(btcnetwork.Regtest).
 			SetTokenIdentifier(tokenIdentifier).
 			Save(setup.ctx)
 	}
@@ -357,7 +357,7 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 		SetRevocationKeyshare(keyshare).
 		SetTokenIdentifier(tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
-		SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
+		SetNetwork(btcnetwork.Regtest).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
@@ -373,7 +373,7 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 		SetRevocationKeyshare(keyshare).
 		SetTokenIdentifier(tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
-		SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
+		SetNetwork(btcnetwork.Regtest).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
@@ -494,7 +494,7 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 			SetMaxSupply(testTokenMaxSupplyBytes).
 			SetIsFreezable(testTokenIsFreezable).
 			SetCreationEntityPublicKey(setup.coordinatorPubKey).
-			SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
+			SetNetwork(btcnetwork.Regtest).
 			SetTokenIdentifier(transferData.tokenIdentifier).
 			Save(setup.ctx)
 	}
@@ -513,7 +513,7 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 		SetRevocationKeyshare(transferData.keyshare).
 		SetTokenIdentifier(transferData.tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
-		SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
+		SetNetwork(btcnetwork.Regtest).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
@@ -529,7 +529,7 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 		SetRevocationKeyshare(transferData.keyshare).
 		SetTokenIdentifier(transferData.tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
-		SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
+		SetNetwork(btcnetwork.Regtest).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
@@ -817,7 +817,7 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRem
 			SetRevocationKeyshare(otherKeyshare).
 			SetTokenIdentifier(transferData.tokenIdentifier).
 			SetTokenCreateID(tokenCreate.ID).
-			SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
+			SetNetwork(btcnetwork.Regtest).
 			SetOutputCreatedTokenTransaction(otherTx).
 			Save(setup.ctx)
 		assert.NoError(t, err)

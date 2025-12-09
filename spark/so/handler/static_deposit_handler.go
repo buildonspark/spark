@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -85,6 +84,7 @@ func GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx context.Context, co
 	if err != nil {
 		return nil, fmt.Errorf("network is required")
 	}
+
 	rollbackUtxoSwapRequestMessageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeRollback,
 		hex.EncodeToString(utxo.Txid),
@@ -198,7 +198,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 	if err != nil {
 		return nil, fmt.Errorf("failed to get db: %w", err)
 	}
-	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, err
 	}
@@ -326,11 +326,15 @@ func (o *StaticDepositHandler) createStaticDepositUtxoRefundWithRollback(ctx con
 }
 
 func GenerateCreateStaticDepositUtxoRefundRequest(ctx context.Context, config *so.Config, req *pb.InitiateStaticDepositUtxoRefundRequest) (*pbinternal.CreateStaticDepositUtxoRefundRequest, error) {
+	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
+	if err != nil {
+		return nil, err
+	}
 	createUtxoSwapRequestMessageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeCreated,
 		hex.EncodeToString(req.OnChainUtxo.Txid),
 		req.OnChainUtxo.Vout,
-		btcnetwork.Network(req.OnChainUtxo.Network),
+		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create utxo swap statement: %w", err)

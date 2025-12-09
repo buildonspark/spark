@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/so/db"
@@ -43,7 +44,7 @@ func TestTweakLeafKey(t *testing.T) {
 	tree, err := dbClient.Tree.Create().
 		SetOwnerIdentityPubkey(ownerPub).
 		SetStatus(schematype.TreeStatusAvailable).
-		SetNetwork(schematype.NetworkMainnet).
+		SetNetwork(btcnetwork.Mainnet).
 		SetBaseTxid(baseTxid).
 		SetVout(0).
 		Save(ctx)
@@ -140,7 +141,7 @@ func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
 	tree, err := dbClient.Tree.Create().
 		SetOwnerIdentityPubkey(ownerPub).
 		SetStatus(schematype.TreeStatusAvailable).
-		SetNetwork(schematype.NetworkMainnet).
+		SetNetwork(btcnetwork.Mainnet).
 		SetBaseTxid(baseTxid).
 		SetVout(0).
 		Save(ctx)

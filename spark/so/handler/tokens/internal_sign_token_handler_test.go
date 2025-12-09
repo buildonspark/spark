@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -104,7 +105,7 @@ func TestExchangeRevocationSecretsShares(t *testing.T) {
 		SetDecimals(8).
 		SetMaxSupply([]byte{1}).
 		SetIsFreezable(true).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetTokenIdentifier([]byte("token_identifier")).
 		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 		SaveX(ctx)
@@ -190,7 +191,7 @@ func TestValidateSignaturesPackageAndPersistPeerSignatures_RequireThresholdOpera
 		SetDecimals(8).
 		SetMaxSupply([]byte{1}).
 		SetIsFreezable(true).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetTokenIdentifier([]byte("token_identifier")).
 		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 		SaveX(ctx)

@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
@@ -29,7 +30,7 @@ type TreeNode struct {
 	// Value holds the value of the "value" field.
 	Value uint64 `json:"value,omitempty"`
 	// Network holds the value of the "network" field.
-	Network schematype.Network `json:"network,omitempty"`
+	Network btcnetwork.Network `json:"network,omitempty"`
 	// Status holds the value of the "status" field.
 	Status schematype.TreeNodeStatus `json:"status,omitempty"`
 	// VerifyingPubkey holds the value of the "verifying_pubkey" field.
@@ -137,13 +138,15 @@ func (*TreeNode) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case treenode.FieldRawTx, treenode.FieldDirectTx, treenode.FieldDirectFromCpfpRefundTx, treenode.FieldRawRefundTx, treenode.FieldDirectRefundTx:
 			values[i] = new([]byte)
+		case treenode.FieldNetwork:
+			values[i] = new(btcnetwork.Network)
 		case treenode.FieldVerifyingPubkey, treenode.FieldOwnerIdentityPubkey, treenode.FieldOwnerSigningPubkey:
 			values[i] = new(keys.Public)
 		case treenode.FieldRawTxid, treenode.FieldDirectTxid, treenode.FieldDirectFromCpfpRefundTxid, treenode.FieldRawRefundTxid, treenode.FieldDirectRefundTxid:
 			values[i] = new(schematype.TxID)
 		case treenode.FieldValue, treenode.FieldVout, treenode.FieldNodeConfirmationHeight, treenode.FieldRefundConfirmationHeight:
 			values[i] = new(sql.NullInt64)
-		case treenode.FieldNetwork, treenode.FieldStatus:
+		case treenode.FieldStatus:
 			values[i] = new(sql.NullString)
 		case treenode.FieldCreateTime, treenode.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -195,10 +198,10 @@ func (tn *TreeNode) assignValues(columns []string, values []any) error {
 				tn.Value = uint64(value.Int64)
 			}
 		case treenode.FieldNetwork:
-			if value, ok := values[i].(*sql.NullString); !ok {
+			if value, ok := values[i].(*btcnetwork.Network); !ok {
 				return fmt.Errorf("unexpected type %T for field network", values[i])
-			} else if value.Valid {
-				tn.Network = schematype.Network(value.String)
+			} else if value != nil {
+				tn.Network = *value
 			}
 		case treenode.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {

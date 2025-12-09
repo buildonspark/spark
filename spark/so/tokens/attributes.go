@@ -12,7 +12,6 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/utils"
 	"go.uber.org/zap"
 )
@@ -150,7 +149,7 @@ func GetTokenTxAttrStringsFromEnt(ctx context.Context, tx *ent.TokenTransaction)
 
 	if tx.Edges.Mint != nil {
 		if len(tx.Edges.CreatedOutput) > 0 {
-			bech32mTokenIdentifier, err := getBech32mTokenIdentifier(tx.Edges.Mint.TokenIdentifier, tx.Edges.CreatedOutput[0].Network)
+			bech32mTokenIdentifier, err := encodeBech32mTokenIdentifier(tx.Edges.Mint.TokenIdentifier, tx.Edges.CreatedOutput[0].Network)
 			if err != nil {
 				logger.Warn(fmt.Sprintf("Failed to encode bech32m token identifier when computing attributes from ent. tx_uuid: %s",
 					tx.ID.String()),
@@ -164,7 +163,7 @@ func GetTokenTxAttrStringsFromEnt(ctx context.Context, tx *ent.TokenTransaction)
 			attrs.Bech32mTokenIdentifiers = "unknown"
 		}
 	} else if tx.Edges.Create != nil {
-		bech32mTokenIdentifier, err := getBech32mTokenIdentifier(tx.Edges.Create.TokenIdentifier, tx.Edges.Create.Network)
+		bech32mTokenIdentifier, err := encodeBech32mTokenIdentifier(tx.Edges.Create.TokenIdentifier, tx.Edges.Create.Network)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Failed to encode bech32m token identifier when computing attributes from ent. tx_uuid: %s",
 				tx.ID.String()),
@@ -174,14 +173,7 @@ func GetTokenTxAttrStringsFromEnt(ctx context.Context, tx *ent.TokenTransaction)
 		attrs.Bech32mTokenIdentifiers = bech32mTokenIdentifier
 	} else {
 		if len(tx.Edges.CreatedOutput) > 0 {
-			network, err := btcnetwork.FromSchemaNetwork(tx.Edges.CreatedOutput[0].Network)
-			if err != nil {
-				logger.Warn(fmt.Sprintf("Failed to convert network to common network when computing attributes from ent. tx_uuid: %s",
-					tx.ID.String()),
-					zap.Error(err),
-				)
-			}
-
+			network := tx.Edges.CreatedOutput[0].Network
 			uniqueRawTokenIdentifiers := make(map[string]bool)
 			var rawTokenIdentifiers [][]byte
 			var bech32mTokenIdentifiers []string
@@ -235,12 +227,4 @@ func encodeBech32mTokenIdentifier(tokenIdentifier []byte, network btcnetwork.Net
 	}
 
 	return encoded, nil
-}
-
-func getBech32mTokenIdentifier(tokenIdentifier []byte, network schematype.Network) (string, error) {
-	commonNetwork, err := btcnetwork.FromSchemaNetwork(network)
-	if err != nil {
-		return "", fmt.Errorf("failed to convert network to common network: %w", err)
-	}
-	return encodeBech32mTokenIdentifier(tokenIdentifier, commonNetwork)
 }

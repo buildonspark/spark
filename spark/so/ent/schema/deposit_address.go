@@ -7,8 +7,8 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
-	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/entexample"
 )
 
@@ -47,11 +47,11 @@ func (DepositAddress) Fields() []ent.Field {
 			Annotations(entexample.Default(
 				"bcrt1pkvkqsq52a8uprpdzlwj2m8r3lhp2zqtp08h7sp5skfydqxkytkeqp0mxzf",
 			)),
-		field.Enum("network").GoType(st.Network("")).
+		field.Enum("network").GoType(btcnetwork.Unspecified).
 			Immutable().
 			Comment("Network on which the deposit address is valid.").
 			Optional().
-			Annotations(entexample.Default(st.NetworkRegtest)),
+			Annotations(entexample.Default(btcnetwork.Regtest)),
 		field.Bytes("owner_identity_pubkey").
 			Immutable().
 			GoType(keys.Public{}).

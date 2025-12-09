@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/errors"
 
 	"github.com/lightsparkdev/spark/common/keys"
@@ -94,14 +93,10 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 		}
 	}
 	// Collect information about the frozen outputs.
-	tokenNetwork, err := btcnetwork.FromSchemaNetwork(tokenCreateEnt.Network)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get token network: %w", err)
-	}
 	outputIDs, totalAmount, err := ent.GetOwnedTokenOutputStats(ctx,
 		[]keys.Public{ownerPubKey},
 		tokenCreateEnt.TokenIdentifier,
-		tokenNetwork,
+		tokenCreateEnt.Network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToGetOwnedOutputStats, err)

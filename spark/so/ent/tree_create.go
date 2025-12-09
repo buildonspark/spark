@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -69,8 +70,8 @@ func (tc *TreeCreate) SetStatus(ss schematype.TreeStatus) *TreeCreate {
 }
 
 // SetNetwork sets the "network" field.
-func (tc *TreeCreate) SetNetwork(s schematype.Network) *TreeCreate {
-	tc.mutation.SetNetwork(s)
+func (tc *TreeCreate) SetNetwork(b btcnetwork.Network) *TreeCreate {
+	tc.mutation.SetNetwork(b)
 	return tc
 }
 
@@ -443,7 +444,7 @@ func (u *TreeUpsert) UpdateStatus() *TreeUpsert {
 }
 
 // SetNetwork sets the "network" field.
-func (u *TreeUpsert) SetNetwork(v schematype.Network) *TreeUpsert {
+func (u *TreeUpsert) SetNetwork(v btcnetwork.Network) *TreeUpsert {
 	u.Set(tree.FieldNetwork, v)
 	return u
 }
@@ -578,7 +579,7 @@ func (u *TreeUpsertOne) UpdateStatus() *TreeUpsertOne {
 }
 
 // SetNetwork sets the "network" field.
-func (u *TreeUpsertOne) SetNetwork(v schematype.Network) *TreeUpsertOne {
+func (u *TreeUpsertOne) SetNetwork(v btcnetwork.Network) *TreeUpsertOne {
 	return u.Update(func(s *TreeUpsert) {
 		s.SetNetwork(v)
 	})
@@ -887,7 +888,7 @@ func (u *TreeUpsertBulk) UpdateStatus() *TreeUpsertBulk {
 }
 
 // SetNetwork sets the "network" field.
-func (u *TreeUpsertBulk) SetNetwork(v schematype.Network) *TreeUpsertBulk {
+func (u *TreeUpsertBulk) SetNetwork(v btcnetwork.Network) *TreeUpsertBulk {
 	return u.Update(func(s *TreeUpsert) {
 		s.SetNetwork(v)
 	})

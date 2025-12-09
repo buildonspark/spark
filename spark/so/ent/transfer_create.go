@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -70,8 +71,8 @@ func (tc *TransferCreate) SetReceiverIdentityPubkey(k keys.Public) *TransferCrea
 }
 
 // SetNetwork sets the "network" field.
-func (tc *TransferCreate) SetNetwork(s schematype.Network) *TransferCreate {
-	tc.mutation.SetNetwork(s)
+func (tc *TransferCreate) SetNetwork(b btcnetwork.Network) *TransferCreate {
+	tc.mutation.SetNetwork(b)
 	return tc
 }
 

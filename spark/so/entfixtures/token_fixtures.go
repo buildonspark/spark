@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -42,7 +43,7 @@ func OutputSpecsWithOwner(owner keys.Public, amounts ...*big.Int) []OutputSpec {
 }
 
 // CreateTokenCreate creates a test TokenCreate entity
-func (f *Fixtures) CreateTokenCreate(network st.Network, tokenIdentifier []byte, maxSupply *big.Int) *ent.TokenCreate {
+func (f *Fixtures) CreateTokenCreate(network btcnetwork.Network, tokenIdentifier []byte, maxSupply *big.Int) *ent.TokenCreate {
 	if tokenIdentifier == nil {
 		tokenIdentifier = f.RandomBytes(32)
 	}

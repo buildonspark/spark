@@ -8,6 +8,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	sparkProto "github.com/lightsparkdev/spark/proto/spark"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -129,7 +130,7 @@ func TestFinalizeTransfer(t *testing.T) {
 		baseTxid := st.NewRandomTxIDForTesting(t)
 		tree, err := dbCtx.Client.Tree.Create().
 			SetStatus(st.TreeStatusAvailable).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
 			SetBaseTxid(baseTxid).
 			SetVout(0).
@@ -322,7 +323,7 @@ func TestApplySignatures(t *testing.T) {
 	baseTxid2 := st.NewRandomTxIDForTesting(t)
 	tree, err := dbCtx.Client.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetBaseTxid(baseTxid2).
 		SetVout(0).
@@ -597,7 +598,7 @@ func TestUpdateTransferLeavesSignatures(t *testing.T) {
 		baseTxid := st.NewRandomTxIDForTesting(t)
 		tree, err := dbCtx.Client.Tree.Create().
 			SetStatus(st.TreeStatusAvailable).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetOwnerIdentityPubkey(ownerIdentityPubKey).
 			SetBaseTxid(baseTxid).
 			SetVout(0).

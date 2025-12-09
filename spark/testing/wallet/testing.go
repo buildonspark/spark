@@ -26,6 +26,7 @@ func NewTestWalletConfig(tb testing.TB) *TestWalletConfig {
 func NewTestWalletConfigWithIdentityKey(tb testing.TB, identityPrivKey keys.Private) *TestWalletConfig {
 	return NewTestWalletConfigWithParams(tb,
 		TestWalletConfigParams{
+			Network:            btcnetwork.Regtest,
 			IdentityPrivateKey: identityPrivKey,
 		})
 }
@@ -34,6 +35,7 @@ func NewTestWalletConfigWithIdentityKey(tb testing.TB, identityPrivKey keys.Priv
 func NewTestWalletConfigWithIdentityKeyAndCoordinator(tb testing.TB, identityPrivKey keys.Private, coordinatorIndex int) *TestWalletConfig {
 	return NewTestWalletConfigWithParams(tb,
 		TestWalletConfigParams{
+			Network:            btcnetwork.Regtest,
 			IdentityPrivateKey: identityPrivKey,
 			CoordinatorIndex:   coordinatorIndex,
 		})

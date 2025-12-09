@@ -168,7 +168,7 @@ func TestCompareTransactions(t *testing.T) {
 		tx2 := createBasicTx()
 
 		err := CompareTransactions(tx1, tx2)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("identical transactions except witness and signature script should pass", func(t *testing.T) {
@@ -180,7 +180,7 @@ func TestCompareTransactions(t *testing.T) {
 		tx2.TxIn[0].SignatureScript = []byte{0x08, 0x09, 0x0a}
 
 		err := CompareTransactions(tx1, tx2)
-		assert.NoError(t, err) // transactions should be considered equal despite different witness and signature script
+		require.NoError(t, err) // transactions should be considered equal despite different witness and signature script
 	})
 
 	t.Run("different version should fail", func(t *testing.T) {
@@ -340,12 +340,12 @@ func TestValidateBitcoinTxVersion(t *testing.T) {
 	t.Run("accepts version 2 transactions", func(t *testing.T) {
 		tx := wire.NewMsgTx(2)
 		err := ValidateBitcoinTxVersion(tx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("accepts version 3 transactions", func(t *testing.T) {
 		tx := wire.NewMsgTx(3)
 		err := ValidateBitcoinTxVersion(tx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 }

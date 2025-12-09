@@ -18,7 +18,6 @@ import (
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
@@ -279,16 +278,12 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 		}
-		schemaNetwork, err := network.ToSchemaNetwork()
-		if err != nil {
-			return nil, err
-		}
 		_, err = db.DepositAddress.Create().
 			SetSigningKeyshareID(signingKeyshare.ID).
 			SetOwnerIdentityPubkey(userIdentityPubKey).
 			SetOwnerSigningPubkey(nodeUserPubKey).
 			SetAddress(depositAddress).
-			SetNetwork(schemaNetwork).
+			SetNetwork(network).
 			Save(ctx)
 		if err != nil {
 			return nil, err
@@ -329,7 +324,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	}
 
 	var network btcnetwork.Network
-	switch req.Source.(type) {
+	switch reqSource := req.Source.(type) {
 	case *pb.PrepareTreeAddressRequest_ParentNodeOutput:
 		nodeID, err := uuid.Parse(req.GetParentNodeOutput().GetNodeId())
 		if err != nil {
@@ -352,12 +347,9 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		if err != nil {
 			return nil, err
 		}
-		network, err = btcnetwork.FromSchemaNetwork(nodeTree.Network)
-		if err != nil {
-			return nil, err
-		}
+		network = nodeTree.Network
 	case *pb.PrepareTreeAddressRequest_OnChainUtxo:
-		network, err = btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().Network)
+		network, err = btcnetwork.FromProtoNetwork(reqSource.OnChainUtxo.GetNetwork())
 		if err != nil {
 			return nil, err
 		}
@@ -442,7 +434,6 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	var parentNode *ent.TreeNode
 	var vout uint32
 	var network btcnetwork.Network
-	var schemaNetwork schematype.Network
 	switch req.Source.(type) {
 	case *pb.CreateTreeRequest_ParentNodeOutput:
 		outputID, err := uuid.Parse(req.GetParentNodeOutput().GetNodeId())
@@ -458,19 +449,11 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if err != nil {
 			return nil, nil, err
 		}
-		network, err = btcnetwork.FromSchemaNetwork(parentTree.Network)
-		if err != nil {
-			return nil, nil, err
-		}
-		schemaNetwork = parentTree.Network
+		network = parentTree.Network
 	case *pb.CreateTreeRequest_OnChainUtxo:
 		parentNode = nil
 		vout = req.GetOnChainUtxo().Vout
 		network, err = btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().Network)
-		if err != nil {
-			return nil, nil, err
-		}
-		schemaNetwork, err = network.ToSchemaNetwork()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -566,7 +549,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			treeMutator := db.Tree.
 				Create().
 				SetOwnerIdentityPubkey(userIDPubKey).
-				SetNetwork(schemaNetwork).
+				SetNetwork(network).
 				SetBaseTxid(st.NewTxID(txid)).
 				SetVout(int16(req.GetOnChainUtxo().Vout)).
 				SetDepositAddress(depositAddress)
@@ -617,7 +600,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 
 		createNode := db.TreeNode.Create().
 			SetTree(savedTree).
-			SetNetwork(schemaNetwork).
+			SetNetwork(network).
 			SetStatus(st.TreeNodeStatusCreating).
 			SetOwnerIdentityPubkey(userIDPubKey).
 			SetOwnerSigningPubkey(currentElement.userPubKey).

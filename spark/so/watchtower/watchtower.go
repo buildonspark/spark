@@ -104,7 +104,7 @@ func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHei
 				),
 			),
 			treenode.NodeConfirmationHeightIsNil(),
-			treenode.NetworkEQ(common.SchemaNetwork(network)),
+			treenode.NetworkEQ(network),
 		).
 		WithParent().
 		All(ctx)
@@ -117,7 +117,7 @@ func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHei
 		Where(
 			treenode.NodeConfirmationHeightNotNil(),
 			treenode.RefundConfirmationHeightIsNil(),
-			treenode.NetworkEQ(common.SchemaNetwork(network)),
+			treenode.NetworkEQ(network),
 		).
 		WithParent().
 		All(ctx)
@@ -150,7 +150,7 @@ func QueryBroadcastableTransferLeaves(ctx context.Context, dbClient *ent.Client,
 		Where(
 			treenode.NodeConfirmationHeightNotNil(),
 			treenode.RefundConfirmationHeightIsNil(),
-			treenode.NetworkEQ(common.SchemaNetwork(network)),
+			treenode.NetworkEQ(network),
 		).
 		IDs(ctx)
 	if err != nil {

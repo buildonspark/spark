@@ -78,10 +78,6 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	if err != nil {
 		return nil, err
 	}
-	schemaNetwork, err := network.ToSchemaNetwork()
-	if err != nil {
-		return nil, err
-	}
 	if !config.IsNetworkSupported(network) {
 		return nil, fmt.Errorf("network not supported")
 	}
@@ -164,7 +160,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		SetSigningKeyshareID(keyshare.ID).
 		SetOwnerIdentityPubkey(reqIDPubKey).
 		SetOwnerSigningPubkey(reqSigningPubKey).
-		SetNetwork(schemaNetwork).
+		SetNetwork(network).
 		SetAddress(depositAddress)
 	// Confirmation height is not set since nothing has been confirmed yet.
 
@@ -259,11 +255,6 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 	if err != nil {
 		return nil, err
 	}
-	schemaNetwork, err := network.ToSchemaNetwork()
-	if err != nil {
-		return nil, err
-	}
-
 	if !config.IsNetworkSupported(network) {
 		return nil, fmt.Errorf("network not supported")
 	}
@@ -287,7 +278,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 			depositaddress.OwnerIdentityPubkey(idPubKey),
 			depositaddress.IsStatic(true),
 			depositaddress.IsDefault(true),
-			depositaddress.NetworkEQ(schemaNetwork),
+			depositaddress.NetworkEQ(network),
 		).
 		Only(ctx)
 	if err != nil && !ent.IsNotFound(err) {
@@ -375,7 +366,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		SetSigningKeyshareID(keyshare.ID).
 		SetOwnerIdentityPubkey(idPubKey).
 		SetOwnerSigningPubkey(reqSigningPubKey).
-		SetNetwork(schemaNetwork).
+		SetNetwork(network).
 		SetAddress(depositAddressString).
 		SetIsDefault(true).
 		SetIsStatic(true)
@@ -819,15 +810,11 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 
 	// Create the tree
-	schemaNetwork, err := network.ToSchemaNetwork()
-	if err != nil {
-		return nil, err
-	}
 	txid := onChainTx.TxHash()
 	treeMutator := db.Tree.
 		Create().
 		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
-		SetNetwork(schemaNetwork).
+		SetNetwork(network).
 		SetBaseTxid(st.NewTxID(txid)).
 		SetVout(int16(req.OnChainUtxo.Vout)).
 		SetDepositAddress(depositAddress)
@@ -1168,10 +1155,6 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		}
 	}
 	// Create the tree
-	schemaNetwork, err := network.ToSchemaNetwork()
-	if err != nil {
-		return nil, err
-	}
 	txid := onChainTx.TxHash()
 
 	// Check if a tree already exists for this deposit
@@ -1199,7 +1182,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		treeMutator := db.Tree.
 			Create().
 			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
-			SetNetwork(schemaNetwork).
+			SetNetwork(network).
 			SetBaseTxid(st.NewTxID(txid)).
 			SetVout(int16(req.OnChainUtxo.Vout)).
 			SetDepositAddress(depositAddress)
@@ -1397,15 +1380,15 @@ func NewValidatedTxID(b []byte) (validatedTxID, error) {
 }
 
 // Verifies that an UTXO is confirmed on the blockchain and has sufficient confirmations.
-func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Client, schemaNetwork st.Network, txid validatedTxID, vout uint32) (*ent.Utxo, error) {
+func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Client, network btcnetwork.Network, txid validatedTxID, vout uint32) (*ent.Utxo, error) {
 	blockHeight, err := db.BlockHeight.Query().Where(
-		blockheight.NetworkEQ(schemaNetwork),
+		blockheight.NetworkEQ(network),
 	).Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find block height: %w", err)
 	}
 	targetUtxo, err := db.Utxo.Query().
-		Where(entutxo.NetworkEQ(schemaNetwork)).
+		Where(entutxo.NetworkEQ(network)).
 		Where(entutxo.Txid(txid[:])).
 		Where(entutxo.Vout(vout)).
 		Only(ctx)
@@ -1417,7 +1400,7 @@ func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Client, 
 	}
 
 	threshold := DefaultDepositConfirmationThreshold
-	if bitcoinConfig, ok := config.BitcoindConfigs[strings.ToLower(string(schemaNetwork))]; ok {
+	if bitcoinConfig, ok := config.BitcoindConfigs[strings.ToLower(network.String())]; ok {
 		threshold = bitcoinConfig.DepositConfirmationThreshold
 	}
 	if blockHeight.Height-targetUtxo.BlockHeight+1 < int64(threshold) {
@@ -1522,7 +1505,7 @@ func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UT
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(utxo.Network)
+	network, err := btcnetwork.FromProtoNetwork(utxo.GetNetwork())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get schema network: %w", err)
 	}
@@ -1531,7 +1514,7 @@ func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UT
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to validate UTXO txid: %w", err)
 	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, targetUtxoTxId, utxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, network, targetUtxoTxId, utxo.Vout)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1575,22 +1558,17 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 		return nil, fmt.Errorf("failed to get schema network: %w", err)
 	}
 
-	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(req.Network)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get schema network: %w", err)
-	}
-
 	if !utils.IsBitcoinAddressForNetwork(req.Address, network) {
 		return nil, fmt.Errorf("deposit address is not aligned with the requested network")
 	}
 
-	currentBlockHeight, err := db.BlockHeight.Query().Where(blockheight.NetworkEQ(schemaNetwork)).Only(ctx)
+	currentBlockHeight, err := db.BlockHeight.Query().Where(blockheight.NetworkEQ(network)).Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current block height: %w", err)
 	}
 
 	threshold := DefaultDepositConfirmationThreshold
-	if bitcoinConfig, ok := o.config.BitcoindConfigs[strings.ToLower(string(schemaNetwork))]; ok {
+	if bitcoinConfig, ok := o.config.BitcoindConfigs[strings.ToLower(network.String())]; ok {
 		threshold = bitcoinConfig.DepositConfirmationThreshold
 	}
 

@@ -635,10 +635,6 @@ func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverPubli
 
 	// Check if the invoice amount matches the amount in the leaves to send.
 	invoiceAmount := decodedInvoice.Payment.SatsPayment.Amount
-	schemaNetwork, err := decodedInvoice.Network.ToSchemaNetwork()
-	if err != nil {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get schema network: %w", err))
-	}
 	var agg []struct {
 		Count int
 		Sum   sql.NullInt64
@@ -646,7 +642,7 @@ func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverPubli
 	err = db.TreeNode.
 		Query().
 		Where(treenode.IDIn(dedupLeafIDs...)).
-		Where(treenode.NetworkEQ(schemaNetwork)).
+		Where(treenode.NetworkEQ(decodedInvoice.Network)).
 		Aggregate(
 			ent.As(ent.Count(), "count"),
 			ent.As(ent.Sum(treenode.FieldValue), "sum"),
@@ -657,7 +653,7 @@ func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverPubli
 	}
 	if agg[0].Count != len(dedupLeafIDs) {
 		// Either the leaf ID was not found, or there was a network mismatch.
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("one or more leaves not found on expected network: %s", schemaNetwork))
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("one or more leaves not found on expected network: %s", decodedInvoice.Network))
 	}
 	if invoiceAmount != nil {
 		totalAmount := uint64(0)

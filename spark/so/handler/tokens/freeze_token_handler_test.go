@@ -58,7 +58,7 @@ func createFreezeTestTokenCreate(t *testing.T, ctx context.Context, client *ent.
 		SetMaxSupply(testTokenMaxSupplyBytes).
 		SetIsFreezable(isFreezable).
 		SetCreationEntityPublicKey(creationEntityPubKey).
-		SetNetwork(common.SchemaNetwork(btcnetwork.Regtest)).
+		SetNetwork(btcnetwork.Regtest).
 		SetTokenIdentifier(tokenIdentifier).
 		Save(ctx)
 	require.NoError(t, err)

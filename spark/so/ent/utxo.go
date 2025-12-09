@@ -10,8 +10,8 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 )
 
@@ -33,7 +33,7 @@ type Utxo struct {
 	// Amount holds the value of the "amount" field.
 	Amount uint64 `json:"amount,omitempty"`
 	// Network holds the value of the "network" field.
-	Network schematype.Network `json:"network,omitempty"`
+	Network btcnetwork.Network `json:"network,omitempty"`
 	// PkScript holds the value of the "pk_script" field.
 	PkScript []byte `json:"pk_script,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -70,10 +70,10 @@ func (*Utxo) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case utxo.FieldTxid, utxo.FieldPkScript:
 			values[i] = new([]byte)
+		case utxo.FieldNetwork:
+			values[i] = new(btcnetwork.Network)
 		case utxo.FieldBlockHeight, utxo.FieldVout, utxo.FieldAmount:
 			values[i] = new(sql.NullInt64)
-		case utxo.FieldNetwork:
-			values[i] = new(sql.NullString)
 		case utxo.FieldCreateTime, utxo.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case utxo.FieldID:
@@ -138,10 +138,10 @@ func (u *Utxo) assignValues(columns []string, values []any) error {
 				u.Amount = uint64(value.Int64)
 			}
 		case utxo.FieldNetwork:
-			if value, ok := values[i].(*sql.NullString); !ok {
+			if value, ok := values[i].(*btcnetwork.Network); !ok {
 				return fmt.Errorf("unexpected type %T for field network", values[i])
-			} else if value.Valid {
-				u.Network = schematype.Network(value.String)
+			} else if value != nil {
+				u.Network = *value
 			}
 		case utxo.FieldPkScript:
 			if value, ok := values[i].(*[]byte); !ok {

@@ -125,7 +125,7 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 
 				_, err = dbTX.Tree.Create().
 					SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
-					SetNetwork(st.NetworkRegtest).
+					SetNetwork(btcnetwork.Regtest).
 					SetBaseTxid(baseTxid).
 					SetVout(0).
 					SetStatus(st.TreeStatusPending).
@@ -177,7 +177,7 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 
 	tree, err := dbTX.Tree.Create().
 		SetOwnerIdentityPubkey(identityPrivKey.Public()).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetBaseTxid(baseTxid).
 		SetVout(0).
 		SetStatus(st.TreeStatusAvailable).
@@ -583,7 +583,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 
 	tree, err := dbTX.Tree.Create().
 		SetOwnerIdentityPubkey(identityPrivKey.Public()).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetBaseTxid(baseTxid).
 		SetVout(0).
 		SetStatus(st.TreeStatusAvailable).
@@ -811,7 +811,7 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 		SetSigningKeyshare(signingKeyshare).
 		SetConfirmationHeight(100).                     // Confirmed at height 100
 		SetConfirmationTxid(legitimateTxHash.String()). // CONFIRMED with legitimate TX
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -942,7 +942,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 				SetSigningKeyshare(signingKeyshare).
 				SetConfirmationHeight(0). // Not confirmed, so no txid validation
 				// Don't set confirmation txid to bypass the validation
-				SetNetwork(st.NetworkRegtest).
+				SetNetwork(btcnetwork.Regtest).
 				Save(ctx)
 			require.NoError(t, err)
 
@@ -985,7 +985,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 					SetOwnerIdentityPubkey(identityPrivkey.Public()).
 					SetOwnerSigningPubkey(childKeyshare.PublicKey).
 					SetSigningKeyshare(childKeyshare).
-					SetNetwork(st.NetworkRegtest).
+					SetNetwork(btcnetwork.Regtest).
 					Save(ctx)
 				require.NoError(t, err)
 
@@ -1075,7 +1075,7 @@ func TestTreeNodeDbHooks(t *testing.T) {
 	_, err = tx.Tree.Create().
 		SetID(treeID).
 		SetOwnerIdentityPubkey(ownerIdentityPubkey).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetStatus(st.TreeStatusAvailable).
 		SetBaseTxid(baseTxid).
 		SetVout(int16(0)).
@@ -1100,7 +1100,7 @@ func TestTreeNodeDbHooks(t *testing.T) {
 		Create().
 		SetID(nodeID).
 		SetTreeID(treeID).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetOwnerIdentityPubkey(ownerIdentityPubkey).
 		SetOwnerSigningPubkey(ownerSigningPubkey).

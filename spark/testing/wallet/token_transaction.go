@@ -206,11 +206,7 @@ func BroadcastTokenTransferWithValidityDuration(
 		return nil, fmt.Errorf("failed to start token transaction: %w", err)
 	}
 
-	operatorSignatures, err := CreateOperatorSpecificSignatures(
-		config,
-		ownerPrivateKeys,
-		finalTxHash,
-	)
+	operatorSignatures, err := CreateOperatorSpecificSignatures(config, ownerPrivateKeys, finalTxHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create operator-specific signatures: %w", err)
 	}

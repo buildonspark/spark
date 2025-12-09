@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
 	entgen "github.com/lightsparkdev/spark/so/ent"
@@ -92,9 +93,9 @@ func (TokenOutput) Fields() []ent.Field {
 		field.Bytes("confirmed_withdraw_block_hash").
 			Optional(),
 		field.Enum("network").
-			GoType(st.Network("")).
+			GoType(btcnetwork.Unspecified).
 			Optional().
-			Annotations(entexample.Default(st.NetworkRegtest)),
+			Annotations(entexample.Default(btcnetwork.Regtest)),
 		field.Bytes("token_identifier").
 			Immutable().
 			Annotations(entexample.Default(

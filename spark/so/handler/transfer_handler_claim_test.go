@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -109,7 +110,7 @@ func createTestTreeForClaim(t *testing.T, ctx context.Context, ownerIdentityPubK
 
 	tree, err := client.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetBaseTxid(baseTxid).
 		SetVout(0).
@@ -158,7 +159,7 @@ func createTestTransfer(t *testing.T, ctx context.Context, rng io.Reader, client
 	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	transfer, err := client.Transfer.Create().
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetStatus(status).
 		SetType(st.TransferTypeTransfer).
 		SetSenderIdentityPubkey(senderPubKey).

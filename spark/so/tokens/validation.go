@@ -52,16 +52,11 @@ func ValidateMintDoesNotExceedMaxSupply(ctx context.Context, tokenTransaction *t
 		issuerPublicKey = tokenPublicKey
 	}
 
-	commonNetwork, err := btcnetwork.FromProtoNetwork(tokenTransaction.Network)
+	network, err := btcnetwork.FromProtoNetwork(tokenTransaction.Network)
 	if err != nil {
 		return err
 	}
-	schemaNetwork, err := commonNetwork.ToSchemaNetwork()
-	if err != nil {
-		return err
-	}
-
-	return validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey, schemaNetwork)
+	return validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey, network)
 }
 
 // ValidateMintDoesNotExceedMaxSupplyEnt validates that a mint transaction doesn't exceed the token's max supply.
@@ -88,7 +83,7 @@ func ValidateMintDoesNotExceedMaxSupplyEnt(ctx context.Context, tokenTransaction
 }
 
 // validateMintAgainstMaxSupplyCore contains the core validation logic that both proto and Ent versions can use.
-func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, tokenIdentifier []byte, issuerPublicKey keys.Public, network st.Network) error {
+func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, tokenIdentifier []byte, issuerPublicKey keys.Public, network btcnetwork.Network) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {

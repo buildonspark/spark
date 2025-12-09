@@ -10,9 +10,9 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 )
 
@@ -38,7 +38,7 @@ type TokenCreate struct {
 	// IsFreezable holds the value of the "is_freezable" field.
 	IsFreezable bool `json:"is_freezable,omitempty"`
 	// Network holds the value of the "network" field.
-	Network schematype.Network `json:"network,omitempty"`
+	Network btcnetwork.Network `json:"network,omitempty"`
 	// TokenIdentifier holds the value of the "token_identifier" field.
 	TokenIdentifier []byte `json:"token_identifier,omitempty"`
 	// IssuerSignature holds the value of the "issuer_signature" field.
@@ -118,13 +118,15 @@ func (*TokenCreate) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case tokencreate.FieldMaxSupply, tokencreate.FieldTokenIdentifier, tokencreate.FieldIssuerSignature, tokencreate.FieldOperatorSpecificIssuerSignature:
 			values[i] = new([]byte)
+		case tokencreate.FieldNetwork:
+			values[i] = new(btcnetwork.Network)
 		case tokencreate.FieldIssuerPublicKey, tokencreate.FieldCreationEntityPublicKey:
 			values[i] = new(keys.Public)
 		case tokencreate.FieldIsFreezable:
 			values[i] = new(sql.NullBool)
 		case tokencreate.FieldDecimals, tokencreate.FieldWalletProvidedTimestamp:
 			values[i] = new(sql.NullInt64)
-		case tokencreate.FieldTokenName, tokencreate.FieldTokenTicker, tokencreate.FieldNetwork:
+		case tokencreate.FieldTokenName, tokencreate.FieldTokenTicker:
 			values[i] = new(sql.NullString)
 		case tokencreate.FieldCreateTime, tokencreate.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -202,10 +204,10 @@ func (tc *TokenCreate) assignValues(columns []string, values []any) error {
 				tc.IsFreezable = value.Bool
 			}
 		case tokencreate.FieldNetwork:
-			if value, ok := values[i].(*sql.NullString); !ok {
+			if value, ok := values[i].(*btcnetwork.Network); !ok {
 				return fmt.Errorf("unexpected type %T for field network", values[i])
-			} else if value.Valid {
-				tc.Network = schematype.Network(value.String)
+			} else if value != nil {
+				tc.Network = *value
 			}
 		case tokencreate.FieldTokenIdentifier:
 			if value, ok := values[i].(*[]byte); !ok {

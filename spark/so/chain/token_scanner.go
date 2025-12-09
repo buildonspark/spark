@@ -175,7 +175,7 @@ func parseTokenAnnouncement(script []byte, network btcnetwork.Network) (*ent.L1T
 		Decimals:        decimal,
 		MaxSupply:       maxSupply,
 		IsFreezable:     isFreezable != 0,
-		Network:         common.SchemaNetwork(network),
+		Network:         network,
 	}, nil
 }
 
@@ -219,10 +219,6 @@ func readByte(buf *bytes.Buffer) (byte, error) {
 }
 
 func createL1TokenEntity(ctx context.Context, dbClient *ent.Client, tokenMetadata *common.TokenMetadata, txid chainhash.Hash, tokenIdentifier []byte) (*ent.L1TokenCreate, error) {
-	schemaNetwork, err := tokenMetadata.Network.ToSchemaNetwork()
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert network to schema network: %w", err)
-	}
 	txidSchema, err := st.NewTxIDFromBytes(txid.CloneBytes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TxID: %w", err)
@@ -235,7 +231,7 @@ func createL1TokenEntity(ctx context.Context, dbClient *ent.Client, tokenMetadat
 		SetDecimals(tokenMetadata.Decimals).
 		SetMaxSupply(tokenMetadata.MaxSupply).
 		SetIsFreezable(tokenMetadata.IsFreezable).
-		SetNetwork(schemaNetwork).
+		SetNetwork(tokenMetadata.Network).
 		SetTransactionID(txidSchema).
 		SetTokenIdentifier(tokenIdentifier).
 		Save(ctx)
@@ -260,10 +256,6 @@ func createNativeSparkTokenEntity(ctx context.Context, dbClient *ent.Client, tok
 	if err != nil {
 		return fmt.Errorf("failed to compute Spark token identifier: %w", err)
 	}
-	schemaNetwork, err := tokenMetadata.Network.ToSchemaNetwork()
-	if err != nil {
-		return fmt.Errorf("failed to convert network to schema network: %w", err)
-	}
 
 	_, err = dbClient.TokenCreate.Create().
 		SetIssuerPublicKey(tokenMetadata.IssuerPublicKey).
@@ -272,7 +264,7 @@ func createNativeSparkTokenEntity(ctx context.Context, dbClient *ent.Client, tok
 		SetDecimals(tokenMetadata.Decimals).
 		SetMaxSupply(tokenMetadata.MaxSupply).
 		SetIsFreezable(tokenMetadata.IsFreezable).
-		SetNetwork(schemaNetwork).
+		SetNetwork(tokenMetadata.Network).
 		SetCreationEntityPublicKey(entityDkgKeyPublicKey).
 		SetTokenIdentifier(sparkTokenIdentifier).
 		SetL1TokenCreateID(l1TokenCreateID).

@@ -3,9 +3,9 @@ package entexample_test
 import (
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent/entexample"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,7 +18,7 @@ func TestBlockHeightExample_DefaultValues(t *testing.T) {
 
 	require.NotNil(t, blockHeight)
 	require.Equal(t, int64(100), blockHeight.Height)
-	require.Equal(t, schematype.Network("REGTEST"), blockHeight.Network)
+	require.Equal(t, btcnetwork.Regtest, blockHeight.Network)
 }
 
 func TestBlockHeightExample_CustomValues(t *testing.T) {
@@ -27,12 +27,12 @@ func TestBlockHeightExample_CustomValues(t *testing.T) {
 	// Create a block height with custom values
 	blockHeight := entexample.NewBlockHeightExample(t, tc.Client).
 		SetHeight(850000).
-		SetNetwork(schematype.NetworkMainnet).
+		SetNetwork(btcnetwork.Mainnet).
 		MustExec(ctx)
 
 	require.NotNil(t, blockHeight)
 	require.Equal(t, int64(850000), blockHeight.Height)
-	require.Equal(t, schematype.NetworkMainnet, blockHeight.Network)
+	require.Equal(t, btcnetwork.Mainnet, blockHeight.Network)
 }
 
 func TestBlockHeightExample_PartialOverride(t *testing.T) {
@@ -45,7 +45,7 @@ func TestBlockHeightExample_PartialOverride(t *testing.T) {
 
 	require.NotNil(t, blockHeight)
 	require.Equal(t, int64(123456), blockHeight.Height)
-	require.Equal(t, schematype.Network("REGTEST"), blockHeight.Network)
+	require.Equal(t, btcnetwork.Regtest, blockHeight.Network)
 }
 
 func TestBlockHeightExample_ExecReturnsError(t *testing.T) {
@@ -54,12 +54,12 @@ func TestBlockHeightExample_ExecReturnsError(t *testing.T) {
 	// Use Exec() instead of MustExec() to get error handling
 	blockHeight, err := entexample.NewBlockHeightExample(t, tc.Client).
 		SetHeight(999999).
-		SetNetwork(schematype.NetworkTestnet).
+		SetNetwork(btcnetwork.Regtest).
 		Exec(ctx)
 
 	// This should succeed
 	require.NoError(t, err)
 	require.NotNil(t, blockHeight)
 	require.Equal(t, int64(999999), blockHeight.Height)
-	require.Equal(t, schematype.NetworkTestnet, blockHeight.Network)
+	require.Equal(t, btcnetwork.Regtest, blockHeight.Network)
 }

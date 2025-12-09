@@ -10,6 +10,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,7 +70,7 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, dbClient
 		SetWithdrawRelativeBlockLocktime(1).
 		SetWithdrawRevocationCommitment(secretPriv.Public().Serialize()).
 		SetCreatedTransactionOutputVout(0).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetTokenIdentifier([]byte("token_identifier")).
 		SetTokenCreateID(tokenCreateID).
 		SetSpentTransactionInputVout(0).
@@ -134,7 +135,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SetDecimals(8).
 		SetMaxSupply([]byte{1}).
 		SetIsFreezable(true).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetTokenIdentifier([]byte("token_identifier")).
 		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 		SaveX(ctx)
@@ -151,7 +152,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SetWithdrawRelativeBlockLocktime(1).
 		SetWithdrawRevocationCommitment(withdrawRevocationCommitment.Serialize()).
 		SetCreatedTransactionOutputVout(0).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetTokenIdentifier([]byte("token_identifier")).
 		SetTokenCreateID(tokenCreate.ID).
 		SaveX(ctx)
@@ -244,7 +245,7 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 		SetDecimals(8).
 		SetMaxSupply([]byte{1}).
 		SetIsFreezable(true).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetTokenIdentifier([]byte("token_identifier")).
 		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 		SaveX(ctx)

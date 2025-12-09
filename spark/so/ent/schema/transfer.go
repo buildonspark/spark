@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/entexample"
@@ -45,9 +46,9 @@ func (Transfer) Fields() []ent.Field {
 			)),
 		field.Enum("network").
 			Immutable().
-			GoType(st.Network("")).
+			GoType(btcnetwork.Unspecified).
 			Comment("The network on which the transfer is taking place.").
-			Annotations(entexample.Default(st.NetworkRegtest)),
+			Annotations(entexample.Default(btcnetwork.Regtest)),
 		field.Uint64("total_value").
 			Annotations(entexample.Default(30)),
 		field.Enum("status").

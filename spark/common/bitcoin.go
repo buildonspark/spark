@@ -12,8 +12,6 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
-	pb "github.com/lightsparkdev/spark/proto/spark"
-	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 // TODO: replace all other code to use this function to create the ephemeral anchor output.
@@ -36,25 +34,6 @@ const (
 	// DefaultFeeSats is the default fee in satoshis (estimatedTxSize * defaultSatsPerVbyte)
 	DefaultFeeSats = estimatedTxSize * defaultSatsPerVbyte
 )
-
-func SchemaNetworkFromProtoNetwork(protoNetwork pb.Network) (st.Network, error) {
-	var schemaNetwork st.Network
-	err := schemaNetwork.UnmarshalProto(protoNetwork)
-	return schemaNetwork, err
-}
-
-func SchemaNetwork(network btcnetwork.Network) st.Network {
-	switch network {
-	case btcnetwork.Mainnet:
-		return st.NetworkMainnet
-	case btcnetwork.Regtest:
-		return st.NetworkRegtest
-	case btcnetwork.Testnet:
-		return st.NetworkTestnet
-	default:
-		return st.NetworkMainnet
-	}
-}
 
 // P2TRScriptFromPubKey returns a P2TR script from a public key.
 func P2TRScriptFromPubKey(pubKey keys.Public) ([]byte, error) {

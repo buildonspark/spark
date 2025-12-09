@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand/v2"
-	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -16,7 +15,6 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	_ "github.com/mattn/go-sqlite3"
@@ -40,13 +38,13 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 
 	// Create block height records for both networks
 	_, err = tx.BlockHeight.Create().
-		SetNetwork(st.NetworkMainnet).
+		SetNetwork(btcnetwork.Mainnet).
 		SetHeight(int64(blockHeight)).
 		Save(ctx)
 	require.NoError(t, err)
 
 	_, err = tx.BlockHeight.Create().
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetHeight(int64(blockHeight)).
 		Save(ctx)
 	require.NoError(t, err)
@@ -60,7 +58,6 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 			},
 			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 		}
-		require.Equal(t, "regtest", strings.ToLower(string(schematype.NetworkRegtest)))
 
 		testSecretKey := keys.MustGeneratePrivateKeyFromRand(rng)
 		testPublicKey := testSecretKey.Public()
@@ -85,14 +82,14 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 			SetOwnerIdentityPubkey(testIdentityKey.Public()).
 			SetOwnerSigningPubkey(testSigningKey.Public()).
 			SetSigningKeyshare(signingKeyshare).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
 		// Create UTXO with sufficient confirmations
 		utxoBlockHeight := blockHeight - int(config.BitcoindConfigs["regtest"].DepositConfirmationThreshold) + 1
 		utxo, err := tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid(txid[:]).
 			SetVout(vout).
 			SetBlockHeight(int64(utxoBlockHeight)).
@@ -103,13 +100,13 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test verification
-		verifiedUtxo, err := VerifiedTargetUtxo(ctx, config, tx, st.NetworkRegtest, txid, vout)
+		verifiedUtxo, err := VerifiedTargetUtxo(ctx, config, tx, btcnetwork.Regtest, txid, vout)
 		require.NoError(t, err)
 		assert.Equal(t, utxo.ID, verifiedUtxo.ID)
 		assert.Equal(t, utxo.BlockHeight, verifiedUtxo.BlockHeight)
 
 		// Test verification in mainnet (should fail)
-		_, err = VerifiedTargetUtxo(ctx, config, tx, st.NetworkMainnet, txid, vout)
+		_, err = VerifiedTargetUtxo(ctx, config, tx, btcnetwork.Mainnet, txid, vout)
 		require.ErrorContains(t, err, "utxo not found")
 	})
 
@@ -146,7 +143,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 			SetOwnerIdentityPubkey(testIdentityKey2.Public()).
 			SetOwnerSigningPubkey(testSigningKey2.Public()).
 			SetSigningKeyshare(signingKeyshare).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -154,7 +151,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test verification with not yet mined utxo
-		_, err = VerifiedTargetUtxo(ctx, config, tx, st.NetworkRegtest, testTxid2, 1)
+		_, err = VerifiedTargetUtxo(ctx, config, tx, btcnetwork.Regtest, testTxid2, 1)
 		require.Error(t, err)
 		grpcError, ok := status.FromError(err)
 		require.True(t, ok)
@@ -164,7 +161,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		// Create UTXO with insufficient confirmations
 		utxoBlockHeight := blockHeight - int(config.BitcoindConfigs["regtest"].DepositConfirmationThreshold) + 2
 		_, err = tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid(testTxid2[:]).
 			SetVout(1).
 			SetBlockHeight(int64(utxoBlockHeight)).
@@ -175,7 +172,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test verification
-		_, err = VerifiedTargetUtxo(ctx, config, tx, st.NetworkRegtest, testTxid2, 1)
+		_, err = VerifiedTargetUtxo(ctx, config, tx, btcnetwork.Regtest, testTxid2, 1)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "deposit tx doesn't have enough confirmations")
 	})
@@ -235,15 +232,13 @@ func TestGenerateDepositAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, existingAddress)
 
 		testConfig := &so.Config{
-			SupportedNetworks: []btcnetwork.Network{
-				btcnetwork.Regtest,
-			},
+			SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest},
 			SigningOperatorMap:         map[string]*so.SigningOperator{},
 			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 		}
@@ -363,7 +358,7 @@ func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
 		SetOwnerIdentityPubkey(testIdentityPrivKey.Public()).
 		SetOwnerSigningPubkey(testSigningPrivKey.Public()).
 		SetSigningKeyshare(signingKeyshare1).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetIsStatic(true).
 		SetIsDefault(true).
 		SetAddressSignatures(map[string][]byte{"test": []byte("test_address_signature2")}).
@@ -389,7 +384,7 @@ func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
 		SetOwnerIdentityPubkey(testIdentityPrivKey.Public()).
 		SetOwnerSigningPubkey(testSigningPrivKey.Public()).
 		SetSigningKeyshare(signingKeyshare2).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetIsStatic(true).
 		SetIsDefault(false).
 		SetAddressSignatures(map[string][]byte{"test": []byte("test_address_signature2")}).
@@ -420,13 +415,13 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 	// Create block height records for both networks
 	_, err = tx.BlockHeight.Create().
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetHeight(200).
 		Save(ctx)
 	require.NoError(t, err)
 
 	_, err = tx.BlockHeight.Create().
-		SetNetwork(st.NetworkMainnet).
+		SetNetwork(btcnetwork.Mainnet).
 		SetHeight(200).
 		Save(ctx)
 	require.NoError(t, err)
@@ -458,13 +453,13 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
 		// Create some UTXOs for this address with sufficient confirmations
 		_, err = tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid([]byte("test_txid_1")).
 			SetVout(0).
 			SetBlockHeight(100).
@@ -475,7 +470,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid([]byte("test_txid_2")).
 			SetVout(1).
 			SetBlockHeight(101).
@@ -518,7 +513,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(noUtxoTestSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -546,7 +541,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetIsStatic(false).
 			SetConfirmationTxid(confirmationTxid).
 			SetConfirmationHeight(195). // Set confirmation height to satisfy threshold (current height 200 - 3 = 197, so <= 197)
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -572,7 +567,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(false).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -612,14 +607,14 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(paginationLimitTestSigningPubkey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
 		// Create multiple UTXOs with sufficient confirmations
 		for i := 0; i < 5; i++ {
 			_, err := tx.Utxo.Create().
-				SetNetwork(st.NetworkRegtest).
+				SetNetwork(btcnetwork.Regtest).
 				SetTxid([]byte(fmt.Sprintf("test_txid_%d", i))).
 				SetVout(uint32(i)).
 				SetBlockHeight(int64(100 + i)).
@@ -674,7 +669,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(false).
 			SetConfirmationTxid(invalidTxid).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -701,13 +696,13 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
 		// Create UTXO with insufficient confirmations (block height too recent)
 		_, err = tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid([]byte("test_txid_recent")).
 			SetVout(0).
 			SetBlockHeight(198). // Current height is 200, so only 2 confirmations
@@ -741,7 +736,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -775,7 +770,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetIsDefault(true).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -788,13 +783,13 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetIsDefault(false).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
 		// Create UTXOs for first address
 		_, err = tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid([]byte("address1_txid_1")).
 			SetVout(0).
 			SetBlockHeight(100).
@@ -805,7 +800,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid([]byte("address1_txid_2")).
 			SetVout(1).
 			SetBlockHeight(101).
@@ -817,7 +812,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		// Create UTXOs for second address
 		_, err = tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid([]byte("address2_txid_1")).
 			SetVout(0).
 			SetBlockHeight(102).
@@ -828,7 +823,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid([]byte("address2_txid_2")).
 			SetVout(1).
 			SetBlockHeight(103).
@@ -897,14 +892,14 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			Save(ctx)
 		require.NoError(t, err)
 
 		// Create UTXOs for this address with sufficient confirmations
 		// UTXO 1: Will have an active UTXO swap (should be excluded)
 		utxo1, err := tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid([]byte("swap_test_txid_1")).
 			SetVout(0).
 			SetBlockHeight(100).
@@ -916,7 +911,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		// UTXO 2: Will have a cancelled UTXO swap (should be included)
 		utxo2, err := tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid([]byte("swap_test_txid_2")).
 			SetVout(1).
 			SetBlockHeight(101).
@@ -928,7 +923,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		// UTXO 3: No UTXO swap (should be included)
 		_, err = tx.Utxo.Create().
-			SetNetwork(st.NetworkRegtest).
+			SetNetwork(btcnetwork.Regtest).
 			SetTxid([]byte("swap_test_txid_3")).
 			SetVout(2).
 			SetBlockHeight(102).

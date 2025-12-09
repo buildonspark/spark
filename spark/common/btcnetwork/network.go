@@ -1,10 +1,10 @@
 package btcnetwork
 
 import (
-	"errors"
+	"database/sql/driver"
 	"fmt"
+	"strings"
 
-	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -44,69 +44,39 @@ func FromProtoNetwork(protoNetwork pb.Network) (Network, error) {
 	return network, err
 }
 
-// FromSchemaNetwork converts an Ent schema Network to a Network.
-func FromSchemaNetwork(schemaNetwork st.Network) (Network, error) {
-	switch schemaNetwork {
-	case st.NetworkMainnet:
-		return Mainnet, nil
-	case st.NetworkRegtest:
-		return Regtest, nil
-	case st.NetworkTestnet:
-		return Testnet, nil
-	case st.NetworkSignet:
-		return Signet, nil
-	default:
-		return Unspecified, sparkerrors.InternalTypeConversionError(errors.New("invalid network"))
-	}
-}
-
 // FromString parses a network name string and returns the corresponding Network.
 func FromString(network string) (Network, error) {
-	switch network {
-	case "mainnet":
+	// We compare the uppercase versions because that's what's stored in the DB, even though some APIs we use
+	// prvovide the lowercase versions.
+	switch strings.ToUpper(network) {
+	case "MAINNET":
 		return Mainnet, nil
-	case "regtest":
+	case "REGTEST":
 		return Regtest, nil
-	case "testnet":
+	case "TESTNET":
 		return Testnet, nil
-	case "signet":
+	case "SIGNET":
 		return Signet, nil
 	default:
 		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network: %s", network))
 	}
 }
 
-// String returns the lowercase string representation of the Network.
+// String returns the uppercase string representation of the Network.
 func (n Network) String() string {
 	switch n {
 	case Unspecified:
-		return "unspecified"
+		return "UNSPECIFIED"
 	case Regtest:
-		return "regtest"
+		return "REGTEST"
 	case Testnet:
-		return "testnet"
+		return "TESTNET"
 	case Signet:
-		return "signet"
+		return "SIGNET"
 	case Mainnet:
-		return "mainnet"
+		return "MAINNET"
 	default:
-		return "mainnet"
-	}
-}
-
-// ToSchemaNetwork converts a Network into an Ent schema Network.
-func (n Network) ToSchemaNetwork() (st.Network, error) {
-	switch n {
-	case Mainnet:
-		return st.NetworkMainnet, nil
-	case Regtest:
-		return st.NetworkRegtest, nil
-	case Testnet:
-		return st.NetworkTestnet, nil
-	case Signet:
-		return st.NetworkSignet, nil
-	default:
-		return st.NetworkUnspecified, sparkerrors.InternalTypeConversionError(errors.New("invalid network"))
+		return "UNSPECIFIED"
 	}
 }
 
@@ -148,10 +118,35 @@ func (n *Network) UnmarshalProto(proto pb.Network) error {
 	return nil
 }
 
+// Value implements the [field.ValueScanner] interface.
+func (n Network) Value() (driver.Value, error) {
+	return n.String(), nil
+}
+
+// Scan implements the [field.ValueScanner] interface.
+func (n *Network) Scan(src any) error {
+	*n = Unspecified
+
+	switch val := src.(type) {
+	case Network:
+		*n = val
+	case int:
+		*n = Network(val)
+	case string:
+		net, err := FromString(val)
+		if err != nil {
+			return err
+		}
+		*n = net
+	case nil:
+		return nil
+	}
+	return nil
+}
+
 // ToBitcoinNetworkIdentifier returns the standardized bitcoin network identifier.
 func (n Network) ToBitcoinNetworkIdentifier() (uint32, error) {
-	params := n.Params()
-	return uint32(params.Net), nil
+	return uint32(n.Params().Net), nil
 }
 
 // Params converts a Network into its corresponding chaincfg.Params

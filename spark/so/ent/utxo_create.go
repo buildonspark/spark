@@ -13,8 +13,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 )
 
@@ -79,8 +79,8 @@ func (uc *UtxoCreate) SetAmount(u uint64) *UtxoCreate {
 }
 
 // SetNetwork sets the "network" field.
-func (uc *UtxoCreate) SetNetwork(s schematype.Network) *UtxoCreate {
-	uc.mutation.SetNetwork(s)
+func (uc *UtxoCreate) SetNetwork(b btcnetwork.Network) *UtxoCreate {
+	uc.mutation.SetNetwork(b)
 	return uc
 }
 

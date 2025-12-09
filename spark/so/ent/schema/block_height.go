@@ -3,7 +3,7 @@ package schema
 import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
-	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/entexample"
 )
 
@@ -24,8 +24,8 @@ func (BlockHeight) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int64("height").
 			Annotations(entexample.Default(100)),
-		field.Enum("network").GoType(st.Network("")).
-			Annotations(entexample.Default(st.NetworkRegtest)),
+		field.Enum("network").GoType(btcnetwork.Unspecified).
+			Annotations(entexample.Default(btcnetwork.Regtest)),
 	}
 }
 

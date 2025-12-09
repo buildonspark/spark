@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uuids"
@@ -45,12 +44,12 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 	limit := int(req.GetLimit())
 	offset := int(req.GetOffset())
 
-	var network st.Network
+	var network btcnetwork.Network
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
-		network = st.NetworkMainnet
+		network = btcnetwork.Mainnet
 	} else {
 		var err error
-		network, err = common.SchemaNetworkFromProtoNetwork(req.GetNetwork())
+		network, err = btcnetwork.FromProtoNetwork(req.GetNetwork())
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
 		}
@@ -161,12 +160,12 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	var network st.Network
+	var network btcnetwork.Network
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
-		network = st.NetworkMainnet
+		network = btcnetwork.Mainnet
 	} else {
 		var err error
-		network, err = common.SchemaNetworkFromProtoNetwork(req.GetNetwork())
+		network, err = btcnetwork.FromProtoNetwork(req.GetNetwork())
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
 		}
@@ -233,7 +232,7 @@ func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, n
 				if err != nil {
 					return err
 				}
-				if nodeTree.Network == st.NetworkMainnet {
+				if nodeTree.Network == btcnetwork.Mainnet {
 					return nil
 				}
 			}

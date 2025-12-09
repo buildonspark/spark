@@ -5,8 +5,8 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"entgo.io/ent/schema/mixin"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
-	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/entexample"
 )
 
@@ -42,9 +42,9 @@ func (TokenMetadataMixin) Fields() []ent.Field {
 			Immutable().
 			Annotations(entexample.Default(true)),
 		field.Enum("network").
-			GoType(st.Network("")).
+			GoType(btcnetwork.Unspecified).
 			Immutable().
-			Annotations(entexample.Default(st.NetworkRegtest)),
+			Annotations(entexample.Default(btcnetwork.Regtest)),
 		// Token identifier is derived from the above token metadata fields.
 		// Despite that, we store it explicitly to enable efficient indexed lookups.
 		// The .Unique() generates an index on the token_identifier

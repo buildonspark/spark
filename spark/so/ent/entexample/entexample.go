@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -24,7 +25,7 @@ type BlockHeightExample struct {
 
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	Height  *int64
-	Network *schematype.Network
+	Network *btcnetwork.Network
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 }
@@ -44,7 +45,7 @@ func (bh *BlockHeightExample) SetHeight(v int64) *BlockHeightExample {
 }
 
 // SetNetwork sets the network field.
-func (bh *BlockHeightExample) SetNetwork(v schematype.Network) *BlockHeightExample {
+func (bh *BlockHeightExample) SetNetwork(v btcnetwork.Network) *BlockHeightExample {
 	bh.Network = &v
 	return bh
 }
@@ -65,7 +66,7 @@ func (bh *BlockHeightExample) MustExec(ctx context.Context) *ent.BlockHeight {
 		create.SetNetwork(*bh.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 
 	// Handle edges
@@ -95,7 +96,7 @@ func (bh *BlockHeightExample) Exec(ctx context.Context) (*ent.BlockHeight, error
 		create.SetNetwork(*bh.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 
 	// Handle edges
@@ -218,7 +219,7 @@ type DepositAddressExample struct {
 
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	Address             *string
-	Network             *schematype.Network
+	Network             *btcnetwork.Network
 	OwnerIdentityPubkey *keys.Public
 	OwnerSigningPubkey  *keys.Public
 	ConfirmationHeight  *int64
@@ -249,7 +250,7 @@ func (da *DepositAddressExample) SetAddress(v string) *DepositAddressExample {
 }
 
 // SetNetwork sets the network field.
-func (da *DepositAddressExample) SetNetwork(v schematype.Network) *DepositAddressExample {
+func (da *DepositAddressExample) SetNetwork(v btcnetwork.Network) *DepositAddressExample {
 	da.Network = &v
 	return da
 }
@@ -348,7 +349,7 @@ func (da *DepositAddressExample) MustExec(ctx context.Context) *ent.DepositAddre
 		create.SetNetwork(*da.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if da.OwnerIdentityPubkey != nil {
 		create.SetOwnerIdentityPubkey(*da.OwnerIdentityPubkey)
@@ -449,7 +450,7 @@ func (da *DepositAddressExample) Exec(ctx context.Context) (*ent.DepositAddress,
 		create.SetNetwork(*da.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if da.OwnerIdentityPubkey != nil {
 		create.SetOwnerIdentityPubkey(*da.OwnerIdentityPubkey)
@@ -808,7 +809,7 @@ type L1TokenCreateExample struct {
 	Decimals        *uint8
 	MaxSupply       *[]byte
 	IsFreezable     *bool
-	Network         *schematype.Network
+	Network         *btcnetwork.Network
 	TokenIdentifier *[]byte
 	TransactionID   *schematype.TxID
 
@@ -860,7 +861,7 @@ func (lc *L1TokenCreateExample) SetIsFreezable(v bool) *L1TokenCreateExample {
 }
 
 // SetNetwork sets the network field.
-func (lc *L1TokenCreateExample) SetNetwork(v schematype.Network) *L1TokenCreateExample {
+func (lc *L1TokenCreateExample) SetNetwork(v btcnetwork.Network) *L1TokenCreateExample {
 	lc.Network = &v
 	return lc
 }
@@ -923,7 +924,7 @@ func (lc *L1TokenCreateExample) MustExec(ctx context.Context) *ent.L1TokenCreate
 		create.SetNetwork(*lc.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if lc.TokenIdentifier != nil {
 		create.SetTokenIdentifier(*lc.TokenIdentifier)
@@ -998,7 +999,7 @@ func (lc *L1TokenCreateExample) Exec(ctx context.Context) (*ent.L1TokenCreate, e
 		create.SetNetwork(*lc.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if lc.TokenIdentifier != nil {
 		create.SetTokenIdentifier(*lc.TokenIdentifier)
@@ -2105,7 +2106,7 @@ type TokenCreateExample struct {
 	Decimals                        *uint8
 	MaxSupply                       *[]byte
 	IsFreezable                     *bool
-	Network                         *schematype.Network
+	Network                         *btcnetwork.Network
 	TokenIdentifier                 *[]byte
 	IssuerSignature                 *[]byte
 	OperatorSpecificIssuerSignature *[]byte
@@ -2164,7 +2165,7 @@ func (tc *TokenCreateExample) SetIsFreezable(v bool) *TokenCreateExample {
 }
 
 // SetNetwork sets the network field.
-func (tc *TokenCreateExample) SetNetwork(v schematype.Network) *TokenCreateExample {
+func (tc *TokenCreateExample) SetNetwork(v btcnetwork.Network) *TokenCreateExample {
 	tc.Network = &v
 	return tc
 }
@@ -2287,7 +2288,7 @@ func (tc *TokenCreateExample) MustExec(ctx context.Context) *ent.TokenCreate {
 		create.SetNetwork(*tc.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if tc.TokenIdentifier != nil {
 		create.SetTokenIdentifier(*tc.TokenIdentifier)
@@ -2391,7 +2392,7 @@ func (tc *TokenCreateExample) Exec(ctx context.Context) (*ent.TokenCreate, error
 		create.SetNetwork(*tc.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if tc.TokenIdentifier != nil {
 		create.SetTokenIdentifier(*tc.TokenIdentifier)
@@ -2847,7 +2848,7 @@ type TokenOutputExample struct {
 	SpentTransactionInputVout               *int32
 	SpentRevocationSecret                   *keys.Private
 	ConfirmedWithdrawBlockHash              *[]byte
-	Network                                 *schematype.Network
+	Network                                 *btcnetwork.Network
 	TokenIdentifier                         *[]byte
 	TokenCreateID                           *uuid.UUID
 
@@ -2959,7 +2960,7 @@ func (to *TokenOutputExample) SetConfirmedWithdrawBlockHash(v []byte) *TokenOutp
 }
 
 // SetNetwork sets the network field.
-func (to *TokenOutputExample) SetNetwork(v schematype.Network) *TokenOutputExample {
+func (to *TokenOutputExample) SetNetwork(v btcnetwork.Network) *TokenOutputExample {
 	to.Network = &v
 	return to
 }
@@ -3115,7 +3116,7 @@ func (to *TokenOutputExample) MustExec(ctx context.Context) *ent.TokenOutput {
 		create.SetNetwork(*to.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if to.TokenIdentifier != nil {
 		create.SetTokenIdentifier(*to.TokenIdentifier)
@@ -3263,7 +3264,7 @@ func (to *TokenOutputExample) Exec(ctx context.Context) (*ent.TokenOutput, error
 		create.SetNetwork(*to.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if to.TokenIdentifier != nil {
 		create.SetTokenIdentifier(*to.TokenIdentifier)
@@ -3898,7 +3899,7 @@ type TransferExample struct {
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	SenderIdentityPubkey   *keys.Public
 	ReceiverIdentityPubkey *keys.Public
-	Network                *schematype.Network
+	Network                *btcnetwork.Network
 	TotalValue             *uint64
 	Status                 *schematype.TransferStatus
 	Type                   *schematype.TransferType
@@ -3935,7 +3936,7 @@ func (t *TransferExample) SetReceiverIdentityPubkey(v keys.Public) *TransferExam
 }
 
 // SetNetwork sets the network field.
-func (t *TransferExample) SetNetwork(v schematype.Network) *TransferExample {
+func (t *TransferExample) SetNetwork(v btcnetwork.Network) *TransferExample {
 	t.Network = &v
 	return t
 }
@@ -4040,7 +4041,7 @@ func (t *TransferExample) MustExec(ctx context.Context) *ent.Transfer {
 		create.SetNetwork(*t.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if t.TotalValue != nil {
 		create.SetTotalValue(*t.TotalValue)
@@ -4123,7 +4124,7 @@ func (t *TransferExample) Exec(ctx context.Context) (*ent.Transfer, error) {
 		create.SetNetwork(*t.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if t.TotalValue != nil {
 		create.SetTotalValue(*t.TotalValue)
@@ -4635,7 +4636,7 @@ type TreeExample struct {
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	OwnerIdentityPubkey *keys.Public
 	Status              *schematype.TreeStatus
-	Network             *schematype.Network
+	Network             *btcnetwork.Network
 	BaseTxid            *schematype.TxID
 	Vout                *int16
 
@@ -4666,7 +4667,7 @@ func (t *TreeExample) SetStatus(v schematype.TreeStatus) *TreeExample {
 }
 
 // SetNetwork sets the network field.
-func (t *TreeExample) SetNetwork(v schematype.Network) *TreeExample {
+func (t *TreeExample) SetNetwork(v btcnetwork.Network) *TreeExample {
 	t.Network = &v
 	return t
 }
@@ -4729,7 +4730,7 @@ func (t *TreeExample) MustExec(ctx context.Context) *ent.Tree {
 		create.SetNetwork(*t.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if t.BaseTxid != nil {
 		create.SetBaseTxid(*t.BaseTxid)
@@ -4786,7 +4787,7 @@ func (t *TreeExample) Exec(ctx context.Context) (*ent.Tree, error) {
 		create.SetNetwork(*t.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if t.BaseTxid != nil {
 		create.SetBaseTxid(*t.BaseTxid)
@@ -4822,7 +4823,7 @@ type TreeNodeExample struct {
 
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	Value                    *uint64
-	Network                  *schematype.Network
+	Network                  *btcnetwork.Network
 	Status                   *schematype.TreeNodeStatus
 	VerifyingPubkey          *keys.Public
 	OwnerIdentityPubkey      *keys.Public
@@ -4863,7 +4864,7 @@ func (tn *TreeNodeExample) SetValue(v uint64) *TreeNodeExample {
 }
 
 // SetNetwork sets the network field.
-func (tn *TreeNodeExample) SetNetwork(v schematype.Network) *TreeNodeExample {
+func (tn *TreeNodeExample) SetNetwork(v btcnetwork.Network) *TreeNodeExample {
 	tn.Network = &v
 	return tn
 }
@@ -5016,7 +5017,7 @@ func (tn *TreeNodeExample) MustExec(ctx context.Context) *ent.TreeNode {
 		create.SetNetwork(*tn.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if tn.Status != nil {
 		create.SetStatus(*tn.Status)
@@ -5181,7 +5182,7 @@ func (tn *TreeNodeExample) Exec(ctx context.Context) (*ent.TreeNode, error) {
 		create.SetNetwork(*tn.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if tn.Status != nil {
 		create.SetStatus(*tn.Status)
@@ -5540,7 +5541,7 @@ type UtxoExample struct {
 	Txid        *[]byte
 	Vout        *uint32
 	Amount      *uint64
-	Network     *schematype.Network
+	Network     *btcnetwork.Network
 	PkScript    *[]byte
 
 	// Edges - if set, use the provided entity; if nil, create a default one
@@ -5580,7 +5581,7 @@ func (u *UtxoExample) SetAmount(v uint64) *UtxoExample {
 }
 
 // SetNetwork sets the network field.
-func (u *UtxoExample) SetNetwork(v schematype.Network) *UtxoExample {
+func (u *UtxoExample) SetNetwork(v btcnetwork.Network) *UtxoExample {
 	u.Network = &v
 	return u
 }
@@ -5634,7 +5635,7 @@ func (u *UtxoExample) MustExec(ctx context.Context) *ent.Utxo {
 		create.SetNetwork(*u.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if u.PkScript != nil {
 		create.SetPkScript(*u.PkScript)
@@ -5702,7 +5703,7 @@ func (u *UtxoExample) Exec(ctx context.Context) (*ent.Utxo, error) {
 		create.SetNetwork(*u.Network)
 	} else {
 		// Use default from annotation
-		create.SetNetwork("REGTEST")
+		create.SetNetwork(2)
 	}
 	if u.PkScript != nil {
 		create.SetPkScript(*u.PkScript)

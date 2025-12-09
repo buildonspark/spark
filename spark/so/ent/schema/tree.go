@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/entexample"
@@ -32,8 +33,8 @@ func (Tree) Fields() []ent.Field {
 			GoType(st.TreeStatus("")).
 			Annotations(entexample.Default(st.TreeStatusAvailable)),
 		field.Enum("network").
-			GoType(st.Network("")).
-			Annotations(entexample.Default(st.NetworkRegtest)),
+			GoType(btcnetwork.Unspecified).
+			Annotations(entexample.Default(btcnetwork.Regtest)),
 		field.Bytes("base_txid").
 			GoType(st.TxID{}).
 			Annotations(entexample.Default("bb736bfae9b0a47584bbdbb27606eedef1b5bb3927d692f339909863c22e27d2")),

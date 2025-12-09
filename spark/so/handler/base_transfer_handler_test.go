@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -39,7 +40,7 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 
 	tree, err := client.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetOwnerIdentityPubkey(senderPub).
 		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
 		SetVout(0).
@@ -156,7 +157,7 @@ func TestCreateTransfer_FailsWithWrongPrevOutpoint(t *testing.T) {
 
 	tree, err := client.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
-		SetNetwork(st.NetworkRegtest).
+		SetNetwork(btcnetwork.Regtest).
 		SetOwnerIdentityPubkey(senderPub).
 		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
 		SetVout(0).

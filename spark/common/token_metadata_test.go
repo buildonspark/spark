@@ -471,8 +471,10 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 			shouldBeEqual: true,
 		},
 		{
-			name:      "different networks produce different hashes",
-			modifier1: nil, // tm1 will have default Regtest network
+			name: "different networks produce different hashes",
+			modifier1: func(tm *TokenMetadata) {
+				tm.Network = btcnetwork.Regtest
+			},
 			modifier2: func(tm *TokenMetadata) {
 				tm.Network = btcnetwork.Mainnet
 			},

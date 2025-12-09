@@ -17,7 +17,6 @@ import (
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	_ "github.com/mattn/go-sqlite3"
@@ -210,7 +209,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 		SetStatus(schematype.TreeStatusPending).
 		SetBaseTxid(dummyTxid).
 		SetOwnerIdentityPubkey(ownerIDPubKey).
-		SetNetwork(common.SchemaNetwork(btcnetwork.Testnet)).
+		SetNetwork(btcnetwork.Testnet).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)
@@ -433,7 +432,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 		SetStatus(schematype.TreeStatusAvailable).
 		SetBaseTxid(treeTxid).
 		SetOwnerIdentityPubkey(ownerIDPubKey).
-		SetNetwork(common.SchemaNetwork(btcnetwork.Testnet)).
+		SetNetwork(btcnetwork.Testnet).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)

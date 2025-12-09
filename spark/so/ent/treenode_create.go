@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
@@ -63,8 +64,8 @@ func (tnc *TreeNodeCreate) SetValue(u uint64) *TreeNodeCreate {
 }
 
 // SetNetwork sets the "network" field.
-func (tnc *TreeNodeCreate) SetNetwork(s schematype.Network) *TreeNodeCreate {
-	tnc.mutation.SetNetwork(s)
+func (tnc *TreeNodeCreate) SetNetwork(b btcnetwork.Network) *TreeNodeCreate {
+	tnc.mutation.SetNetwork(b)
 	return tnc
 }
 

@@ -61,13 +61,9 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 			)
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
 
-			for i, output := range finalIssueTokenTransaction.TokenOutputs {
-				if output.GetWithdrawBondSats() != withdrawalBondSatsInConfig {
-					t.Errorf("output %d: expected withdrawal bond sats 10000, got %d", i, output.GetWithdrawBondSats())
-				}
-				if output.GetWithdrawRelativeBlockLocktime() != uint64(withdrawalRelativeBlockLocktimeInConfig) {
-					t.Errorf("output %d: expected withdrawal relative block locktime 1000, got %d", i, output.GetWithdrawRelativeBlockLocktime())
-				}
+			for i, output := range finalIssueTokenTransaction.GetTokenOutputs() {
+				assert.EqualValuesf(t, withdrawalBondSatsInConfig, output.GetWithdrawBondSats(), "output %d: incorrect withdrawal bond sats", i)
+				assert.EqualValuesf(t, withdrawalRelativeBlockLocktimeInConfig, output.GetWithdrawRelativeBlockLocktime(), "output %d: incorrect withdrawal relative block locktime", i)
 			}
 
 			finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)

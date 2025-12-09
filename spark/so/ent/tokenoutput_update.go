@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -171,15 +172,15 @@ func (tou *TokenOutputUpdate) ClearConfirmedWithdrawBlockHash() *TokenOutputUpda
 }
 
 // SetNetwork sets the "network" field.
-func (tou *TokenOutputUpdate) SetNetwork(s schematype.Network) *TokenOutputUpdate {
-	tou.mutation.SetNetwork(s)
+func (tou *TokenOutputUpdate) SetNetwork(b btcnetwork.Network) *TokenOutputUpdate {
+	tou.mutation.SetNetwork(b)
 	return tou
 }
 
 // SetNillableNetwork sets the "network" field if the given value is not nil.
-func (tou *TokenOutputUpdate) SetNillableNetwork(s *schematype.Network) *TokenOutputUpdate {
-	if s != nil {
-		tou.SetNetwork(*s)
+func (tou *TokenOutputUpdate) SetNillableNetwork(b *btcnetwork.Network) *TokenOutputUpdate {
+	if b != nil {
+		tou.SetNetwork(*b)
 	}
 	return tou
 }
@@ -769,15 +770,15 @@ func (touo *TokenOutputUpdateOne) ClearConfirmedWithdrawBlockHash() *TokenOutput
 }
 
 // SetNetwork sets the "network" field.
-func (touo *TokenOutputUpdateOne) SetNetwork(s schematype.Network) *TokenOutputUpdateOne {
-	touo.mutation.SetNetwork(s)
+func (touo *TokenOutputUpdateOne) SetNetwork(b btcnetwork.Network) *TokenOutputUpdateOne {
+	touo.mutation.SetNetwork(b)
 	return touo
 }
 
 // SetNillableNetwork sets the "network" field if the given value is not nil.
-func (touo *TokenOutputUpdateOne) SetNillableNetwork(s *schematype.Network) *TokenOutputUpdateOne {
-	if s != nil {
-		touo.SetNetwork(*s)
+func (touo *TokenOutputUpdateOne) SetNillableNetwork(b *btcnetwork.Network) *TokenOutputUpdateOne {
+	if b != nil {
+		touo.SetNetwork(*b)
 	}
 	return touo
 }

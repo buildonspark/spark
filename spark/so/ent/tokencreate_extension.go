@@ -7,6 +7,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
@@ -60,11 +61,12 @@ func GetTokenMetadataForTokenTransaction(ctx context.Context, tokenTransaction *
 	if err != nil {
 		return nil, err
 	}
-	schemaNetwork, err := network.ToSchemaNetwork()
-	if err != nil {
-		return nil, err
-	}
-	tokenCreate, err := tx.TokenCreate.Query().Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey), tokencreate.NetworkEQ(schemaNetwork)).First(ctx)
+	tokenCreate, err := tx.TokenCreate.Query().
+		Where(
+			tokencreate.IssuerPublicKeyEQ(issuerPublicKey),
+			tokencreate.NetworkEQ(network),
+		).
+		First(ctx)
 	if err == nil {
 		return tokenCreate.ToTokenMetadata()
 	}
