@@ -83,7 +83,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: "Notify failure on Slack"
-        if: "failure() && github.event_name == 'push'"
+        if: failure() && github.event_name == 'push'
         run: |
           curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
           {
@@ -121,7 +121,7 @@ jobs:
       - run: "yarn build"
 
       - name: "Notify failure on Slack"
-        if: "failure() && github.event_name == 'push'"
+        if: failure() && github.event_name == 'push'
         run: |
           curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
           {
@@ -135,7 +135,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    if: "success() && github.event_name == 'push'"
+    if: success() && github.event_name == 'push'
     runs-on: "ubuntu-22.04"
     environment: npm
     steps:
@@ -221,7 +221,7 @@ jobs:
           EOF
 
       - name: "Notify failure on Slack"
-        if: "failure() && github.event_name == 'push'"
+        if: failure() && github.event_name == 'push'
         run: |
           curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
           {
@@ -231,7 +231,7 @@ jobs:
 
   create-private-spark-pr:
     name: Create private Spark repository PR
-    if: "github.event_name == 'push'"
+    if: github.event_name == 'push'
     runs-on: "ubuntu-22.04"
     environment: npm
     permissions:
@@ -241,13 +241,6 @@ jobs:
         uses: "actions/checkout@v4"
         with:
           fetch-depth: 0
-
-      - name: Reset develop to main
-        run: |
-          git checkout develop
-          git reset --hard origin/main
-          git push origin develop --force
-          git checkout main
 
       - name: Generate a token
         id: generate_token
@@ -289,7 +282,7 @@ jobs:
           java -jar copybara.jar ./public/copy.bara.sky public-push-to-private --nogit-destination-rebase
 
       - name: "Notify failure on Slack"
-        if: "failure() && github.event_name == 'push'"
+        if: failure() && github.event_name == 'push'
         run: |
           curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
           {
