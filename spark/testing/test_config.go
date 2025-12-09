@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	minikubeCAFilePath    = "/tmp/minikube-ca.pem"
-	signingOperatorPrefix = "000000000000000000000000000000000000000000000000000000000000000"
+	minikubeCAFilePath               = "/tmp/minikube-ca.pem"
+	minikubeDefaultNumSparkOperators = 3
+	signingOperatorPrefix            = "000000000000000000000000000000000000000000000000000000000000000"
 )
 
 func IsMinikube() bool {
@@ -72,7 +73,12 @@ func operatorCount(tb testing.TB) int {
 			tb.Fatalf("Error converting NUM_SPARK_OPERATORS to integer: %v", err)
 		}
 	}
-	// default to all test operators
+
+	if IsMinikube() {
+		return minikubeDefaultNumSparkOperators
+	}
+
+	// Otherwise, default to the maximum number of available test operator keys.
 	return len(testOperatorPubkeys)
 }
 

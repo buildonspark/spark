@@ -149,7 +149,7 @@ func TestGenerateStaticDepositAddressDedicatedEndpoint(t *testing.T) {
 	require.NoError(t, err)
 	resp1, err := wallet.GenerateStaticDepositAddressDedicatedEndpoint(ctx, config, pubKey)
 	require.NoError(t, err)
-	require.Len(t, resp1.DepositAddress.DepositAddressProof.AddressSignatures, 5)
+	require.Len(t, resp1.DepositAddress.DepositAddressProof.AddressSignatures, len(config.SigningOperators))
 
 	// Static deposit addresses should not be returned by QueryUnusedDepositAddresses
 	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
@@ -165,7 +165,7 @@ func TestGenerateStaticDepositAddressDedicatedEndpoint(t *testing.T) {
 	resp2, err := wallet.GenerateStaticDepositAddressDedicatedEndpoint(ctx, config, pubKey)
 	require.NoError(t, err)
 	require.Equal(t, resp1.DepositAddress.Address, resp2.DepositAddress.Address)
-	require.Len(t, resp2.DepositAddress.DepositAddressProof.AddressSignatures, 5)
+	require.Len(t, resp2.DepositAddress.DepositAddressProof.AddressSignatures, len(config.SigningOperators))
 
 	// No new address should be created
 	queryStaticDepositAddresses, err = wallet.QueryStaticDepositAddresses(ctx, config, pubKey)

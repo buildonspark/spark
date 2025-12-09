@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"testing"
 
@@ -77,6 +78,7 @@ func NewTestWalletConfigWithParams(tb testing.TB, p TestWalletConfigParams) *Tes
 	}
 
 	signingOperators := sparktesting.GetAllSigningOperators(tb)
+	threshold := int(math.Floor(float64(len(signingOperators)+2) / 2))
 
 	network := btcnetwork.Regtest
 	if p.Network != btcnetwork.Unspecified {
@@ -100,7 +102,7 @@ func NewTestWalletConfigWithParams(tb testing.TB, p TestWalletConfigParams) *Tes
 		CoordinatorIdentifier:                 coordinatorIdentifier,
 		FrostSignerAddress:                    sparktesting.GetLocalFrostSignerAddress(tb),
 		IdentityPrivateKey:                    privKey,
-		Threshold:                             3,
+		Threshold:                             threshold,
 		SparkServiceProviderIdentityPublicKey: keys.MustGeneratePrivateKeyFromRand(rng).Public(),
 		UseTokenTransactionSchnorrSignatures:  p.UseTokenTransactionSchnorrSignatures,
 		CoordinatorDatabaseURI:                sparktesting.GetTestDatabasePath(p.CoordinatorIndex),
