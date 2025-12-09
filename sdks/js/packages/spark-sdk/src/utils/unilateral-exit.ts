@@ -7,7 +7,11 @@ import * as btc from "@scure/btc-signer";
 import * as psbt from "@scure/btc-signer/psbt";
 import type { SparkServiceClient } from "../proto/spark.js";
 import { TreeNode } from "../proto/spark.js";
-import { getTxFromRawTxHex, getTxId } from "../utils/bitcoin.js";
+import {
+  getTxFromRawTxHex,
+  getTxId,
+  getTxEstimatedVbytesSizeByNumberOfInputsOutputs,
+} from "../utils/bitcoin.js";
 import { isTxBroadcast } from "../utils/mempool.js";
 
 // Types
@@ -87,109 +91,6 @@ export function isEphemeralAnchorOutput(
         script[2] === 0x4e &&
         script[3] === 0x73)),
   );
-}
-
-// Main function to generate unilateral exit tx chains for broadcasting non-CPFP transactions
-export async function constructUnilateralExitTxs(
-  nodeHexStrings: string[],
-  sparkClient?: SparkServiceClient,
-  network?: any, // Network enum from the proto
-): Promise<TxChain[]> {
-  const result: TxChain[] = [];
-
-  // Convert hex strings to TreeNode objects
-  const nodes = nodeHexStrings.map((hex) => TreeNode.decode(hexToBytes(hex)));
-
-  // Create a map of nodes by ID for easy lookup
-  const nodeMap = new Map<string, TreeNode>();
-  for (const node of nodes) {
-    nodeMap.set(node.id, node);
-  }
-
-  // For each provided node, build its complete chain to the root
-  for (const node of nodes) {
-    const transactions: string[] = [];
-
-    // Build the chain from this node to the root
-    const chain: TreeNode[] = [];
-    let currentNode = node;
-
-    // Walk up the chain to find the root, querying for each parent
-    while (currentNode) {
-      chain.unshift(currentNode);
-
-      if (currentNode.parentNodeId) {
-        // Check if we already have the parent in our map (from previous queries)
-        let parentNode = nodeMap.get(currentNode.parentNodeId);
-
-        if (!parentNode && sparkClient) {
-          // Query for the parent node
-          try {
-            const response = await sparkClient.query_nodes({
-              source: {
-                $case: "nodeIds",
-                nodeIds: {
-                  nodeIds: [currentNode.parentNodeId],
-                },
-              },
-              includeParents: true,
-              network: network || 0, // Default to mainnet if not provided
-            });
-
-            parentNode = response.nodes[currentNode.parentNodeId];
-
-            if (parentNode) {
-              // Add to our map for future use
-              nodeMap.set(currentNode.parentNodeId, parentNode);
-            }
-          } catch (error) {
-            console.warn(
-              `Failed to query parent node ${currentNode.parentNodeId}: ${error}`,
-            );
-            break;
-          }
-        }
-
-        if (parentNode) {
-          currentNode = parentNode;
-        } else {
-          if (!sparkClient) {
-            console.warn(
-              `Parent node ${currentNode.parentNodeId} not found. Provide a sparkClient to fetch missing parents.`,
-            );
-          } else {
-            console.warn(
-              `Parent node ${currentNode.parentNodeId} not found in database. Chain may be incomplete.`,
-            );
-          }
-          break;
-        }
-      } else {
-        // We've reached the root
-        break;
-      }
-    }
-
-    // Now walk down the chain from root to leaf to build transactions
-    for (const chainNode of chain) {
-      // Add node tx
-      const nodeTx = bytesToHex(chainNode.nodeTx);
-      transactions.push(nodeTx);
-
-      // If this is the original node we started with, also add its refund tx
-      if (chainNode.id === node.id) {
-        const refundTx = bytesToHex(chainNode.refundTx);
-        transactions.push(refundTx);
-      }
-    }
-
-    result.push({
-      leafId: node.id,
-      transactions,
-    });
-  }
-
-  return result;
 }
 
 // Main function to generate unilateral exit tx chains for broadcasting CPFP transactions
@@ -279,6 +180,10 @@ export async function constructUnilateralExitFeeBumpPackages(
 
     // Walk up the chain to find the root, querying for each parent
     while (currentNode) {
+      // Only proceed with nodes that are available for exit
+      if (currentNode.status !== "AVAILABLE") {
+        break;
+      }
       chain.unshift(currentNode);
 
       if (currentNode.parentNodeId) {
@@ -379,7 +284,7 @@ export async function constructUnilateralExitFeeBumpPackages(
       const {
         feeBumpPsbt: nodeFeeBumpPsbt,
         usedUtxos,
-        correctedParentTx,
+        parentTx,
       } = constructFeeBumpTx(nodeTxHex, availableUtxos, feeRate, undefined);
 
       const feeBumpTx = btc.Transaction.fromPSBT(hexToBytes(nodeFeeBumpPsbt));
@@ -414,7 +319,7 @@ export async function constructUnilateralExitFeeBumpPackages(
         });
 
       // Use the corrected parent transaction if it was fixed
-      const finalNodeTx = correctedParentTx || nodeTxHex;
+      const finalNodeTx = parentTx || nodeTxHex;
       txPackages.push({ tx: finalNodeTx, feeBumpPsbt: nodeFeeBumpPsbt });
 
       // If this is the original node we started with, also add its refund tx
@@ -509,13 +414,89 @@ export function hash160(data: Uint8Array): Uint8Array {
   return ripemd160(sha256Hash);
 }
 
+// Helper function to calculate transaction vSize from hex
+function calculateTransactionVSize(txHex: string): number {
+  try {
+    const tx = getTxFromRawTxHex(txHex);
+    const numInputs = tx.inputsLength;
+    const numOutputs = tx.outputsLength;
+
+    return getTxEstimatedVbytesSizeByNumberOfInputsOutputs(
+      numInputs,
+      numOutputs,
+    );
+  } catch (error) {
+    console.warn(
+      `Failed to calculate transaction vSize: ${error}, falling back to default estimate`,
+    );
+    // Fall back to default for typical transactions
+    return 191;
+  }
+}
+
+// Helper function to select optimal UTXOs for fee payment
+function selectUtxosForFee(
+  utxos: Utxo[],
+  parentTxSize: number,
+  feeRate?: FeeRate,
+): Utxo[] {
+  if (utxos.length === 0) {
+    throw new Error("No UTXOs available for selection");
+  }
+
+  // Sort UTXOs by value in descending order (largest first)
+  const sortedUtxos = [...utxos].sort((a, b) => {
+    if (a.value > b.value) return -1;
+    if (a.value < b.value) return 1;
+    return 0;
+  });
+
+  const selectedUtxos: Utxo[] = [];
+  let totalValue = 0n;
+
+  // If no fee rate provided, use all available UTXOs (fallback behavior)
+  if (!feeRate?.satPerVbyte) {
+    return sortedUtxos;
+  }
+
+  // Try to find the minimum number of UTXOs needed to cover the fee
+  for (let i = 0; i < sortedUtxos.length; i++) {
+    const utxo = sortedUtxos[i];
+    if (!utxo) {
+      continue;
+    }
+    selectedUtxos.push(utxo);
+    totalValue += utxo.value;
+
+    // Calculate child transaction size with current number of selected UTXOs
+    const childTxSize = getTxEstimatedVbytesSizeByNumberOfInputsOutputs(
+      selectedUtxos.length + 1, // selected UTXOs + ephemeral anchor
+      1, // single change output
+    );
+
+    // Calculate total fee needed for CPFP package
+    const totalVbytes = parentTxSize + childTxSize;
+    const requiredFee = BigInt(Math.ceil(totalVbytes * feeRate.satPerVbyte));
+
+    // Minimum change amount (dust threshold)
+    const minChange = 546n;
+
+    // Check if we have enough to cover fee + minimum change
+    if (totalValue >= requiredFee + minChange) {
+      return selectedUtxos;
+    }
+  }
+
+  return sortedUtxos;
+}
+
 // Helper function to construct a fee bump tx for a given tx using available UTXOs
 export function constructFeeBumpTx(
   txHex: string,
   utxos: Utxo[],
   feeRate: FeeRate,
   previousFeeBumpTx?: string, // Optional previous fee bump tx to chain from
-): { feeBumpPsbt: string; usedUtxos: Utxo[]; correctedParentTx?: string } {
+): { feeBumpPsbt: string; usedUtxos: Utxo[]; parentTx?: string } {
   // Validate inputs first
   if (!txHex || txHex.length === 0) {
     throw new Error("Transaction hex string is empty or undefined");
@@ -526,18 +507,17 @@ export function constructFeeBumpTx(
   }
 
   // Check for and fix malformed ephemeral anchor BEFORE parsing
-  let correctedTxHex = txHex;
 
   // Decode the parent tx using the utility function with error handling
   let parentTx: any;
   try {
-    parentTx = getTxFromRawTxHex(correctedTxHex);
+    parentTx = getTxFromRawTxHex(txHex);
     if (!parentTx) {
       throw new Error("getTxFromRawTxHex returned null/undefined");
     }
   } catch (parseError) {
     throw new Error(
-      `Failed to parse parent transaction hex: ${parseError}. Transaction hex: ${correctedTxHex}`,
+      `Failed to parse parent transaction hex: ${parseError}. Transaction hex: ${txHex}`,
     );
   }
 
@@ -591,11 +571,15 @@ export function constructFeeBumpTx(
     throw new Error("No ephemeral anchor output found");
   if (!ephemeralAnchorOutput.script)
     throw new Error("No script found in ephemeral anchor output");
-
-  // Use all available UTXOs for funding
   if (utxos.length === 0) {
     throw new Error("No UTXOs available for fee bump");
   }
+
+  // Calculate parent transaction size for CPFP fee calculation
+  const parentTxSize = calculateTransactionVSize(txHex);
+
+  // Select optimal UTXOs based on fee requirements
+  const selectedUtxos = selectUtxosForFee(utxos, parentTxSize, feeRate);
 
   // Create a new transaction using the builder pattern
   const builder = new btc.Transaction({
@@ -604,15 +588,15 @@ export function constructFeeBumpTx(
     allowLegacyWitnessUtxo: true,
   }); // ✅ set v3 in constructor
 
-  // Track total value and process each funding UTXO
+  // Track total value and process each selected funding UTXO
   let totalValue = 0n;
   const processedUtxos: Array<{
     utxo: Utxo;
     p2wpkhScript: Uint8Array;
   }> = [];
 
-  for (let i = 0; i < utxos.length; i++) {
-    const fundingUtxo = utxos[i];
+  for (let i = 0; i < selectedUtxos.length; i++) {
+    const fundingUtxo = selectedUtxos[i];
     if (!fundingUtxo) {
       throw new Error(`UTXO at index ${i} is undefined`);
     }
@@ -648,20 +632,33 @@ export function constructFeeBumpTx(
     });
   }
 
-  // Add ephemeral anchor output as the last input - use direct script spend (not P2WSH)
+  // Add ephemeral anchor output as the last input - use direct script spend
   builder.addInput({
     txid: parentTxIdFromLib,
     index: ephemeralAnchorIndex,
     sequence: 0xffffffff,
     witnessUtxo: {
-      script: ephemeralAnchorOutput.script, // Use the original script directly (not P2WSH wrapped)
+      script: ephemeralAnchorOutput.script,
       amount: 0n,
     },
   });
 
-  // Use fixed fee of 1500 satoshis
-  // TODO(aakelrod): fix this
-  const fee = 1500n;
+  // Calculate child transaction size based on number of inputs and outputs
+  const childTxSize = getTxEstimatedVbytesSizeByNumberOfInputsOutputs(
+    selectedUtxos.length + 1, // funding UTXOs + ephemeral anchor
+    1, // single change output
+  );
+
+  const totalVbytes = parentTxSize + childTxSize;
+
+  // If no fee rate provided, fall back to fixed 1500 satoshis
+  let fee: bigint;
+  if (feeRate?.satPerVbyte) {
+    // Calculate total fee needed for the entire package at target rate
+    fee = BigInt(Math.ceil(totalVbytes * feeRate.satPerVbyte));
+  } else {
+    fee = 1500n;
+  }
 
   // Minimum change amount (546 satoshis for a standard output)
   const remainingValue = totalValue - fee;
@@ -716,7 +713,7 @@ export function constructFeeBumpTx(
   // Return both the fee bump transaction hex and the UTXOs used
   return {
     feeBumpPsbt: psbtHex,
-    usedUtxos: utxos,
-    correctedParentTx: correctedTxHex !== txHex ? correctedTxHex : undefined,
+    usedUtxos: selectedUtxos,
+    parentTx: txHex !== txHex ? txHex : undefined,
   };
 }
