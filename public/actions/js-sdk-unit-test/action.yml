@@ -41,6 +41,7 @@ runs:
       uses: Swatinem/rust-cache@v2
       with:
         workspaces: "signer"
+        save-if: ${{ github.event_name == 'push' }}"
 
     - name: "Setup Node ${{ inputs.node-version }}"
       uses: actions/setup-node@v4
