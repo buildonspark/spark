@@ -55,8 +55,6 @@ runs:
       with:
         cwd: ${{ inputs.workspace }}
         install-mode: "install-prevent-lock-update"
-        cache-prefix: unit-test
-        cache-node-modules: ${{ github.event_name == 'pull_request' }}
 
     - name: "Run build"
       shell: bash
