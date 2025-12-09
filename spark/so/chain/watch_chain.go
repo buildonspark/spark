@@ -575,10 +575,17 @@ func handleBlock(
 			logger.Sugar().Infof("UTXO not found for deposit address %s", deposit.Address)
 			continue
 		}
-		if len(utxos) > 1 {
-			logger.Sugar().Warnf("Multiple UTXOs found for a single use deposit address %s, picking the first one", deposit.Address)
-		}
 		utxo := utxos[0]
+		if len(utxos) > 1 {
+			logger.Sugar().Warnf("Multiple UTXOs found for a single use deposit address %s, picking the one with the biggest amount", deposit.Address)
+			// Find the UTXO with the biggest amount
+			utxo = utxos[0]
+			for _, u := range utxos[1:] {
+				if u.amount > utxo.amount {
+					utxo = u
+				}
+			}
+		}
 		_, err = dbClient.DepositAddress.UpdateOne(deposit).
 			SetConfirmationHeight(blockHeight).
 			SetConfirmationTxid(utxo.tx.TxHash().String()).
