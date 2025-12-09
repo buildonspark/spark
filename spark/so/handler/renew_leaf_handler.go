@@ -1041,6 +1041,9 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided direct node tx sequence: %w", err)
 	}
+	if err := bitcointransaction.ValidateSequenceTimelock(userDirectNodeSequence, spark.InitialTimeLock+spark.DirectTimelockOffset); err != nil {
+		return nil, fmt.Errorf("failed to validate user provided direct node tx timelock: %w", err)
+	}
 	directNodeTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: splitNodeTx.TxHash(), Index: 0},
 		Sequence:         userDirectNodeSequence,
