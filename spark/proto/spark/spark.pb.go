@@ -525,21 +525,23 @@ const (
 	TreeNodeStatus_TREE_NODE_STATUS_ON_CHAIN         TreeNodeStatus = 7
 	TreeNodeStatus_TREE_NODE_STATUS_AGGREGATE_LOCK   TreeNodeStatus = 8
 	TreeNodeStatus_TREE_NODE_STATUS_EXITED           TreeNodeStatus = 9
+	TreeNodeStatus_TREE_NODE_STATUS_RENEW_LOCKED     TreeNodeStatus = 10
 )
 
 // Enum value maps for TreeNodeStatus.
 var (
 	TreeNodeStatus_name = map[int32]string{
-		0: "TREE_NODE_STATUS_CREATING",
-		1: "TREE_NODE_STATUS_AVAILABLE",
-		2: "TREE_NODE_STATUS_FROZEN_BY_ISSUER",
-		3: "TREE_NODE_STATUS_TRANSFER_LOCKED",
-		4: "TREE_NODE_STATUS_SPLIT_LOCKED",
-		5: "TREE_NODE_STATUS_SPLITTED",
-		6: "TREE_NODE_STATUS_AGGREGATED",
-		7: "TREE_NODE_STATUS_ON_CHAIN",
-		8: "TREE_NODE_STATUS_AGGREGATE_LOCK",
-		9: "TREE_NODE_STATUS_EXITED",
+		0:  "TREE_NODE_STATUS_CREATING",
+		1:  "TREE_NODE_STATUS_AVAILABLE",
+		2:  "TREE_NODE_STATUS_FROZEN_BY_ISSUER",
+		3:  "TREE_NODE_STATUS_TRANSFER_LOCKED",
+		4:  "TREE_NODE_STATUS_SPLIT_LOCKED",
+		5:  "TREE_NODE_STATUS_SPLITTED",
+		6:  "TREE_NODE_STATUS_AGGREGATED",
+		7:  "TREE_NODE_STATUS_ON_CHAIN",
+		8:  "TREE_NODE_STATUS_AGGREGATE_LOCK",
+		9:  "TREE_NODE_STATUS_EXITED",
+		10: "TREE_NODE_STATUS_RENEW_LOCKED",
 	}
 	TreeNodeStatus_value = map[string]int32{
 		"TREE_NODE_STATUS_CREATING":         0,
@@ -552,6 +554,7 @@ var (
 		"TREE_NODE_STATUS_ON_CHAIN":         7,
 		"TREE_NODE_STATUS_AGGREGATE_LOCK":   8,
 		"TREE_NODE_STATUS_EXITED":           9,
+		"TREE_NODE_STATUS_RENEW_LOCKED":     10,
 	}
 )
 
@@ -11685,7 +11688,7 @@ const file_spark_proto_rawDesc = "" +
 	"\tNOT_FOUND\x10\x00\x12\v\n" +
 	"\aPENDING\x10\x01\x12\r\n" +
 	"\tFINALIZED\x10\x02\x12\f\n" +
-	"\bRETURNED\x10\x04\"\x04\b\x03\x10\x03*\xe0\x02\n" +
+	"\bRETURNED\x10\x04\"\x04\b\x03\x10\x03*\x83\x03\n" +
 	"\x0eTreeNodeStatus\x12\x1d\n" +
 	"\x19TREE_NODE_STATUS_CREATING\x10\x00\x12\x1e\n" +
 	"\x1aTREE_NODE_STATUS_AVAILABLE\x10\x01\x12%\n" +
@@ -11696,7 +11699,9 @@ const file_spark_proto_rawDesc = "" +
 	"\x1bTREE_NODE_STATUS_AGGREGATED\x10\x06\x12\x1d\n" +
 	"\x19TREE_NODE_STATUS_ON_CHAIN\x10\a\x12#\n" +
 	"\x1fTREE_NODE_STATUS_AGGREGATE_LOCK\x10\b\x12\x1b\n" +
-	"\x17TREE_NODE_STATUS_EXITED\x10\t2\xc7\x19\n" +
+	"\x17TREE_NODE_STATUS_EXITED\x10\t\x12!\n" +
+	"\x1dTREE_NODE_STATUS_RENEW_LOCKED\x10\n" +
+	"2\xc7\x19\n" +
 	"\fSparkService\x12i\n" +
 	"\x18generate_deposit_address\x12$.spark.GenerateDepositAddressRequest\x1a%.spark.GenerateDepositAddressResponse\"\x00\x12|\n" +
 	"\x1fgenerate_static_deposit_address\x12*.spark.GenerateStaticDepositAddressRequest\x1a+.spark.GenerateStaticDepositAddressResponse\"\x00\x12p\n" +

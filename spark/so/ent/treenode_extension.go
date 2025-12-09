@@ -134,7 +134,7 @@ func MarkNodeAsLocked(ctx context.Context, nodeID uuid.UUID, nodeStatus st.TreeN
 		return err
 	}
 
-	if nodeStatus != st.TreeNodeStatusSplitLocked && nodeStatus != st.TreeNodeStatusTransferLocked {
+	if nodeStatus != st.TreeNodeStatusSplitLocked && nodeStatus != st.TreeNodeStatusTransferLocked && nodeStatus != st.TreeNodeStatusRenewLocked {
 		return fmt.Errorf("not updating node status to a locked state: %s", nodeStatus)
 	}
 
@@ -173,6 +173,8 @@ func TreeNodeStatusSchema(status pbspark.TreeNodeStatus) (st.TreeNodeStatus, err
 		return st.TreeNodeStatusAggregateLock, nil
 	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_EXITED:
 		return st.TreeNodeStatusExited, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_RENEW_LOCKED:
+		return st.TreeNodeStatusRenewLocked, nil
 	default:
 		return "", fmt.Errorf("unknown tree node status: %s", status)
 	}

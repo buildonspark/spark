@@ -1476,6 +1476,7 @@ enum TreeNodeStatus {
     TREE_NODE_STATUS_ON_CHAIN = 7;
     TREE_NODE_STATUS_AGGREGATE_LOCK = 8;
     TREE_NODE_STATUS_EXITED = 9;
+    TREE_NODE_STATUS_RENEW_LOCKED = 10;
 }
 
 message WalletSetting {

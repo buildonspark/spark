@@ -1068,7 +1068,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "value", Type: field.TypeUint64},
 		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATING", "AVAILABLE", "FROZEN_BY_ISSUER", "TRANSFER_LOCKED", "SPLIT_LOCKED", "SPLITTED", "AGGREGATED", "ON_CHAIN", "AGGREGATE_LOCK", "EXITED", "INVESTIGATION", "LOST", "REIMBURSED", "PARENT_EXITED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATING", "AVAILABLE", "FROZEN_BY_ISSUER", "TRANSFER_LOCKED", "SPLIT_LOCKED", "SPLITTED", "AGGREGATED", "ON_CHAIN", "AGGREGATE_LOCK", "EXITED", "INVESTIGATION", "LOST", "REIMBURSED", "PARENT_EXITED", "RENEW_LOCKED"}},
 		{Name: "verifying_pubkey", Type: field.TypeBytes},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "owner_signing_pubkey", Type: field.TypeBytes},

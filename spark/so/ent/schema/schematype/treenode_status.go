@@ -32,6 +32,8 @@ const (
 	TreeNodeStatusReimbursed TreeNodeStatus = "REIMBURSED"
 	// This node is not valid for transfer, timelock refresh, etc., because the parent node is in the exiting process.
 	TreeNodeStatusParentExited TreeNodeStatus = "PARENT_EXITED"
+	// TreeNodeStatusRenewLocked is the status of a tree node that is locked for renewal.
+	TreeNodeStatusRenewLocked TreeNodeStatus = "RENEW_LOCKED"
 )
 
 // Values returns the values of the tree node status.
@@ -51,5 +53,6 @@ func (TreeNodeStatus) Values() []string {
 		string(TreeNodeStatusLost),
 		string(TreeNodeStatusReimbursed),
 		string(TreeNodeStatusParentExited),
+		string(TreeNodeStatusRenewLocked),
 	}
 }

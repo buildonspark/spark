@@ -203,6 +203,11 @@ func TestQueryNodes_StatusField(t *testing.T) {
 			status:        st.TreeNodeStatusReimbursed,
 			shouldBeFound: false,
 		},
+		{
+			name:          "Renew locked status",
+			status:        st.TreeNodeStatusRenewLocked,
+			shouldBeFound: true,
+		},
 	}
 
 	// Create tree nodes with different statuses
