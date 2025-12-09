@@ -3080,7 +3080,7 @@ func (to *TokenOutputExample) MustExec(ctx context.Context) *ent.TokenOutput {
 		create.SetAmount(*to.Amount)
 	} else {
 		// Use default from annotation
-		create.SetAmount(uint128.NewFromUint64(uint64(100)))
+		create.SetAmount(uint128.FromUint64(uint64(100)))
 	}
 	if to.CreatedTransactionOutputVout != nil {
 		create.SetCreatedTransactionOutputVout(*to.CreatedTransactionOutputVout)
@@ -3228,7 +3228,7 @@ func (to *TokenOutputExample) Exec(ctx context.Context) (*ent.TokenOutput, error
 		create.SetAmount(*to.Amount)
 	} else {
 		// Use default from annotation
-		create.SetAmount(uint128.NewFromUint64(uint64(100)))
+		create.SetAmount(uint128.FromUint64(uint64(100)))
 	}
 	if to.CreatedTransactionOutputVout != nil {
 		create.SetCreatedTransactionOutputVout(*to.CreatedTransactionOutputVout)

@@ -332,13 +332,9 @@ func CreateStartedTransactionEntities(
 			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse output token owner public key: %w", err))
 		}
 
-		var u128Amount uint128.Uint128
-		if len(output.TokenAmount) != 16 {
-			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token amount must be 16 bytes"))
-		}
-		err = u128Amount.SafeSetBytes(output.TokenAmount)
+		tokenAmount, err := uint128.FromBytes(output.TokenAmount)
 		if err != nil {
-			return nil, fmt.Errorf("invalid token amount when converting proto bytes to uint128: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token amount must be 16 bytes: %w", err))
 		}
 
 		outputEnts = append(
@@ -354,7 +350,7 @@ func CreateStartedTransactionEntities(
 				SetTokenPublicKey(issuerPublicKeyToWrite).
 				SetTokenIdentifier(tokenIdentifierToWrite).
 				SetTokenAmount(output.TokenAmount).
-				SetAmount(u128Amount).
+				SetAmount(tokenAmount).
 				SetNetwork(network).
 				SetCreatedTransactionOutputVout(int32(outputIndex)).
 				SetRevocationKeyshareID(revocationUUID).

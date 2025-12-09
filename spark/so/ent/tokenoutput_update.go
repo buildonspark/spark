@@ -367,11 +367,6 @@ func (tou *TokenOutputUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.status": %w`, err)}
 		}
 	}
-	if v, ok := tou.mutation.Amount(); ok {
-		if err := v.Validate(); err != nil {
-			return &ValidationError{Name: "amount", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.amount": %w`, err)}
-		}
-	}
 	if v, ok := tou.mutation.Network(); ok {
 		if err := tokenoutput.NetworkValidator(v); err != nil {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.network": %w`, err)}
@@ -976,11 +971,6 @@ func (touo *TokenOutputUpdateOne) check() error {
 	if v, ok := touo.mutation.Status(); ok {
 		if err := tokenoutput.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.status": %w`, err)}
-		}
-	}
-	if v, ok := touo.mutation.Amount(); ok {
-		if err := v.Validate(); err != nil {
-			return &ValidationError{Name: "amount", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.amount": %w`, err)}
 		}
 	}
 	if v, ok := touo.mutation.Network(); ok {

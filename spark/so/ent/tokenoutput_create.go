@@ -403,11 +403,6 @@ func (toc *TokenOutputCreate) check() error {
 			return &ValidationError{Name: "token_amount", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.token_amount": %w`, err)}
 		}
 	}
-	if v, ok := toc.mutation.Amount(); ok {
-		if err := v.Validate(); err != nil {
-			return &ValidationError{Name: "amount", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.amount": %w`, err)}
-		}
-	}
 	if _, ok := toc.mutation.CreatedTransactionOutputVout(); !ok {
 		return &ValidationError{Name: "created_transaction_output_vout", err: errors.New(`ent: missing required field "TokenOutput.created_transaction_output_vout"`)}
 	}

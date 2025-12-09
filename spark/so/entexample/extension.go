@@ -51,9 +51,9 @@ var typeRegistry = map[string]func(any) string{
 	},
 	"uint128.Uint128": func(v any) string {
 		if f, ok := v.(float64); ok {
-			return fmt.Sprintf("uint128.NewFromUint64(uint64(%d))", uint64(f))
+			return fmt.Sprintf("uint128.FromUint64(uint64(%d))", uint64(f))
 		}
-		return fmt.Sprintf("uint128.NewFromUint64(uint64(%v))", v)
+		return fmt.Sprintf("uint128.FromUint64(uint64(%v))", v)
 	},
 	"uuid.UUID": func(v any) string {
 		if s, ok := v.(string); ok {
@@ -128,9 +128,8 @@ func (e *Extension) Templates() []*gen.Template {
 					if defaultValStruct, ok := m["Default"].(map[string]any); ok {
 						if value, ok := defaultValStruct["Value"]; ok {
 							return renderValueForField(field, value)
-						} else {
-							return renderValueForField(field, nil)
 						}
+						return renderValueForField(field, nil)
 					}
 				}
 				return ""
