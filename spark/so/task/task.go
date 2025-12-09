@@ -894,11 +894,11 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, run
 	return nil
 }
 
-const backfillCreatedFinalizedTxHashBatchSize = 10000
+const backfillCreatedFinalizedTxHashBatchSize = 1000
 
 // backfillCreatedFinalizedTxHash backfills the created_finalized_tx_hash field on token_outputs
 // by fetching the finalized_token_transaction_hash from the linked token_transaction.
-// This task runs until all outputs have been backfilled, then becomes a no-op.
+// Commits after each batch to avoid long-held locks that block token operations.
 // Controlled by knob: spark.so.tokens.backfill_created_finalized_tx_hash.enabled
 func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 	if knobsService.GetValue(knobs.KnobBackfillCreatedFinalizedTxHashEnabled, 0) == 0 {
@@ -906,16 +906,15 @@ func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knob
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get db from context: %w", err)
-	}
-
-	var lastID uuid.UUID
 	totalUpdated := 0
 
 	for {
-		query := db.TokenOutput.Query().
+		tx, err := ent.GetTxFromContext(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get tx from context: %w", err)
+		}
+
+		outputs, err := tx.TokenOutput.Query().
 			Where(
 				tokenoutput.CreatedTransactionFinalizedHashIsNil(),
 				tokenoutput.HasOutputCreatedTokenTransaction(),
@@ -924,13 +923,8 @@ func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knob
 				q.Select(tokentransaction.FieldFinalizedTokenTransactionHash)
 			}).
 			Order(tokenoutput.ByID(sql.OrderAsc())).
-			Limit(backfillCreatedFinalizedTxHashBatchSize)
-
-		if lastID != uuid.Nil {
-			query = query.Where(tokenoutput.IDGT(lastID))
-		}
-
-		outputs, err := query.All(ctx)
+			Limit(backfillCreatedFinalizedTxHashBatchSize).
+			All(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to query outputs for backfill: %w", err)
 		}
@@ -943,7 +937,7 @@ func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knob
 			if output.Edges.OutputCreatedTokenTransaction == nil {
 				continue
 			}
-			err := db.TokenOutput.UpdateOneID(output.ID).
+			err := tx.TokenOutput.UpdateOneID(output.ID).
 				SetCreatedTransactionFinalizedHash(output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash).
 				Exec(ctx)
 			if err != nil {
@@ -952,8 +946,16 @@ func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knob
 		}
 
 		totalUpdated += len(outputs)
-		lastID = outputs[len(outputs)-1].ID
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit batch: %w", err)
+		}
+
 		logger.Sugar().Infof("Backfilled %d token outputs so far (batch of %d)", totalUpdated, len(outputs))
+
+		if len(outputs) < backfillCreatedFinalizedTxHashBatchSize {
+			break
+		}
 	}
 
 	if totalUpdated > 0 {
