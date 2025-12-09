@@ -310,7 +310,7 @@ export class LightningService {
       });
     } catch (error) {
       throw new SparkRequestError("Failed to initiate preimage swap", {
-        operation: "initiate_preimage_swap",
+        operation: "initiate_preimage_swap_v3",
         error,
       });
     }

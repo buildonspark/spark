@@ -599,7 +599,7 @@ export class DepositService {
       });
     } catch (error) {
       throw new SparkRequestError("Failed to finalize node signatures", {
-        operation: "finalize_node_signatures",
+        operation: "finalize_node_signatures_v2",
         error,
       });
     }

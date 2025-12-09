@@ -19748,64 +19748,11 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    /**
-     * This is deprecated, please use start_deposit_tree_creation instead.
-     *
-     * @deprecated
-     */
-    start_tree_creation: {
-      name: "start_tree_creation",
-      requestType: StartTreeCreationRequest,
-      requestStream: false,
-      responseType: StartTreeCreationResponse,
-      responseStream: false,
-      options: {},
-    },
-    /** @deprecated */
-    finalize_node_signatures: {
-      name: "finalize_node_signatures",
-      requestType: FinalizeNodeSignaturesRequest,
-      requestStream: false,
-      responseType: FinalizeNodeSignaturesResponse,
-      responseStream: false,
-      options: {},
-    },
-    /** @deprecated */
-    start_transfer: {
-      name: "start_transfer",
-      requestType: StartTransferRequest,
-      requestStream: false,
-      responseType: StartTransferResponse,
-      responseStream: false,
-      options: {},
-    },
-    /**
-     * This is deprecated, please use finalize_transfer_with_transfer_package instead.
-     *
-     * @deprecated
-     */
-    finalize_transfer: {
-      name: "finalize_transfer",
-      requestType: FinalizeTransferRequest,
-      requestStream: false,
-      responseType: FinalizeTransferResponse,
-      responseStream: false,
-      options: {},
-    },
     finalize_transfer_with_transfer_package: {
       name: "finalize_transfer_with_transfer_package",
       requestType: FinalizeTransferWithTransferPackageRequest,
       requestStream: false,
       responseType: FinalizeTransferResponse,
-      responseStream: false,
-      options: {},
-    },
-    /** @deprecated */
-    cancel_transfer: {
-      name: "cancel_transfer",
-      requestType: CancelTransferRequest,
-      requestStream: false,
-      responseType: CancelTransferResponse,
       responseStream: false,
       options: {},
     },
@@ -19833,15 +19780,6 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    /** @deprecated */
-    claim_transfer_sign_refunds: {
-      name: "claim_transfer_sign_refunds",
-      requestType: ClaimTransferSignRefundsRequest,
-      requestStream: false,
-      responseType: ClaimTransferSignRefundsResponse,
-      responseStream: false,
-      options: {},
-    },
     store_preimage_share: {
       name: "store_preimage_share",
       requestType: StorePreimageShareRequest,
@@ -19862,24 +19800,6 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    /** @deprecated */
-    cooperative_exit: {
-      name: "cooperative_exit",
-      requestType: CooperativeExitRequest,
-      requestStream: false,
-      responseType: CooperativeExitResponse,
-      responseStream: false,
-      options: {},
-    },
-    /** @deprecated */
-    initiate_preimage_swap: {
-      name: "initiate_preimage_swap",
-      requestType: InitiatePreimageSwapRequest,
-      requestStream: false,
-      responseType: InitiatePreimageSwapResponse,
-      responseStream: false,
-      options: {},
-    },
     provide_preimage: {
       name: "provide_preimage",
       requestType: ProvidePreimageRequest,
@@ -19893,63 +19813,6 @@ export const SparkServiceDefinition = {
       requestType: QueryHtlcRequest,
       requestStream: false,
       responseType: QueryHtlcResponse,
-      responseStream: false,
-      options: {},
-    },
-    /**
-     * This is the exact same as start_transfer, but expresses to the SO
-     * this transfer is specifically for a leaf swap.
-     */
-    start_leaf_swap: {
-      name: "start_leaf_swap",
-      requestType: StartTransferRequest,
-      requestStream: false,
-      responseType: StartTransferResponse,
-      responseStream: false,
-      options: {},
-    },
-    /**
-     * This is deprecated, please use counter_leaf_swap instead.
-     *
-     * @deprecated
-     */
-    leaf_swap: {
-      name: "leaf_swap",
-      requestType: CounterLeafSwapRequest,
-      requestStream: false,
-      responseType: CounterLeafSwapResponse,
-      responseStream: false,
-      options: {},
-    },
-    /**
-     * This is the exact same as start_leaf_swap, but signs with
-     * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
-     *
-     * @deprecated
-     */
-    counter_leaf_swap: {
-      name: "counter_leaf_swap",
-      requestType: CounterLeafSwapRequest,
-      requestStream: false,
-      responseType: CounterLeafSwapResponse,
-      responseStream: false,
-      options: {},
-    },
-    /** @deprecated */
-    refresh_timelock: {
-      name: "refresh_timelock",
-      requestType: RefreshTimelockRequest,
-      requestStream: false,
-      responseType: RefreshTimelockResponse,
-      responseStream: false,
-      options: {},
-    },
-    /** @deprecated */
-    extend_leaf: {
-      name: "extend_leaf",
-      requestType: ExtendLeafRequest,
-      requestStream: false,
-      responseType: ExtendLeafResponse,
       responseStream: false,
       options: {},
     },
@@ -19981,24 +19844,6 @@ export const SparkServiceDefinition = {
       requestType: QueryNodesRequest,
       requestStream: false,
       responseType: QueryNodesResponse,
-      responseStream: false,
-      options: {},
-    },
-    /** @deprecated */
-    query_nodes_distribution: {
-      name: "query_nodes_distribution",
-      requestType: QueryNodesDistributionRequest,
-      requestStream: false,
-      responseType: QueryNodesDistributionResponse,
-      responseStream: false,
-      options: {},
-    },
-    /** @deprecated */
-    query_nodes_by_value: {
-      name: "query_nodes_by_value",
-      requestType: QueryNodesByValueRequest,
-      requestStream: false,
-      responseType: QueryNodesByValueResponse,
       responseStream: false,
       options: {},
     },
@@ -20056,22 +19901,6 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    /**
-     * DEPRECATED: This unified method is being split for better clarity and type safety
-     *
-     * For swap operations: Use spark_ssp_internal.initiate_static_deposit_utxo_swap()
-     * For refund operations: Use initiate_static_deposit_utxo_refund()
-     *
-     * @deprecated
-     */
-    initiate_utxo_swap: {
-      name: "initiate_utxo_swap",
-      requestType: InitiateUtxoSwapRequest,
-      requestStream: false,
-      responseType: InitiateUtxoSwapResponse,
-      responseStream: false,
-      options: {},
-    },
     exit_single_node_trees: {
       name: "exit_single_node_trees",
       requestType: ExitSingleNodeTreesRequest,
@@ -20089,15 +19918,6 @@ export const SparkServiceDefinition = {
       requestType: CooperativeExitRequest,
       requestStream: false,
       responseType: CooperativeExitResponse,
-      responseStream: false,
-      options: {},
-    },
-    /** @deprecated */
-    extend_leaf_v2: {
-      name: "extend_leaf_v2",
-      requestType: ExtendLeafRequest,
-      requestStream: false,
-      responseType: ExtendLeafResponse,
       responseStream: false,
       options: {},
     },
@@ -20141,29 +19961,11 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    /** @deprecated */
-    counter_leaf_swap_v2: {
-      name: "counter_leaf_swap_v2",
-      requestType: CounterLeafSwapRequest,
-      requestStream: false,
-      responseType: CounterLeafSwapResponse,
-      responseStream: false,
-      options: {},
-    },
     start_transfer_v2: {
       name: "start_transfer_v2",
       requestType: StartTransferRequest,
       requestStream: false,
       responseType: StartTransferResponse,
-      responseStream: false,
-      options: {},
-    },
-    /** @deprecated */
-    refresh_timelock_v2: {
-      name: "refresh_timelock_v2",
-      requestType: RefreshTimelockRequest,
-      requestStream: false,
-      responseType: RefreshTimelockResponse,
       responseStream: false,
       options: {},
     },
@@ -20229,43 +20031,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartDepositTreeCreationRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartDepositTreeCreationResponse>>;
-  /**
-   * This is deprecated, please use start_deposit_tree_creation instead.
-   *
-   * @deprecated
-   */
-  start_tree_creation(
-    request: StartTreeCreationRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<StartTreeCreationResponse>>;
-  /** @deprecated */
-  finalize_node_signatures(
-    request: FinalizeNodeSignaturesRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<FinalizeNodeSignaturesResponse>>;
-  /** @deprecated */
-  start_transfer(
-    request: StartTransferRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<StartTransferResponse>>;
-  /**
-   * This is deprecated, please use finalize_transfer_with_transfer_package instead.
-   *
-   * @deprecated
-   */
-  finalize_transfer(
-    request: FinalizeTransferRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<FinalizeTransferResponse>>;
   finalize_transfer_with_transfer_package(
     request: FinalizeTransferWithTransferPackageRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<FinalizeTransferResponse>>;
-  /** @deprecated */
-  cancel_transfer(
-    request: CancelTransferRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<CancelTransferResponse>>;
   query_pending_transfers(
     request: TransferFilter,
     context: CallContext & CallContextExt,
@@ -20278,11 +20047,6 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: ClaimTransferTweakKeysRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<Empty>>;
-  /** @deprecated */
-  claim_transfer_sign_refunds(
-    request: ClaimTransferSignRefundsRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<ClaimTransferSignRefundsResponse>>;
   store_preimage_share(
     request: StorePreimageShareRequest,
     context: CallContext & CallContextExt,
@@ -20295,58 +20059,11 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: GetSigningCommitmentsRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<GetSigningCommitmentsResponse>>;
-  /** @deprecated */
-  cooperative_exit(
-    request: CooperativeExitRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<CooperativeExitResponse>>;
-  /** @deprecated */
-  initiate_preimage_swap(
-    request: InitiatePreimageSwapRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<InitiatePreimageSwapResponse>>;
   provide_preimage(
     request: ProvidePreimageRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<ProvidePreimageResponse>>;
   query_htlc(request: QueryHtlcRequest, context: CallContext & CallContextExt): Promise<DeepPartial<QueryHtlcResponse>>;
-  /**
-   * This is the exact same as start_transfer, but expresses to the SO
-   * this transfer is specifically for a leaf swap.
-   */
-  start_leaf_swap(
-    request: StartTransferRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<StartTransferResponse>>;
-  /**
-   * This is deprecated, please use counter_leaf_swap instead.
-   *
-   * @deprecated
-   */
-  leaf_swap(
-    request: CounterLeafSwapRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<CounterLeafSwapResponse>>;
-  /**
-   * This is the exact same as start_leaf_swap, but signs with
-   * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
-   *
-   * @deprecated
-   */
-  counter_leaf_swap(
-    request: CounterLeafSwapRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<CounterLeafSwapResponse>>;
-  /** @deprecated */
-  refresh_timelock(
-    request: RefreshTimelockRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<RefreshTimelockResponse>>;
-  /** @deprecated */
-  extend_leaf(
-    request: ExtendLeafRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<ExtendLeafResponse>>;
   /**
    * Resets the timelocks for a leaf's transactions. Can be used to reset the
    * refund transaction timelock for a leaf (when the node transaction
@@ -20363,16 +20080,6 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: QueryNodesRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryNodesResponse>>;
-  /** @deprecated */
-  query_nodes_distribution(
-    request: QueryNodesDistributionRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<QueryNodesDistributionResponse>>;
-  /** @deprecated */
-  query_nodes_by_value(
-    request: QueryNodesByValueRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<QueryNodesByValueResponse>>;
   query_balance(
     request: QueryBalanceRequest,
     context: CallContext & CallContextExt,
@@ -20403,18 +20110,6 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: InitiateStaticDepositUtxoRefundRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<InitiateStaticDepositUtxoRefundResponse>>;
-  /**
-   * DEPRECATED: This unified method is being split for better clarity and type safety
-   *
-   * For swap operations: Use spark_ssp_internal.initiate_static_deposit_utxo_swap()
-   * For refund operations: Use initiate_static_deposit_utxo_refund()
-   *
-   * @deprecated
-   */
-  initiate_utxo_swap(
-    request: InitiateUtxoSwapRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<InitiateUtxoSwapResponse>>;
   exit_single_node_trees(
     request: ExitSingleNodeTreesRequest,
     context: CallContext & CallContextExt,
@@ -20427,11 +20122,6 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: CooperativeExitRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<CooperativeExitResponse>>;
-  /** @deprecated */
-  extend_leaf_v2(
-    request: ExtendLeafRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<ExtendLeafResponse>>;
   claim_transfer_sign_refunds_v2(
     request: ClaimTransferSignRefundsRequest,
     context: CallContext & CallContextExt,
@@ -20452,20 +20142,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartTransferRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartTransferResponse>>;
-  /** @deprecated */
-  counter_leaf_swap_v2(
-    request: CounterLeafSwapRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<CounterLeafSwapResponse>>;
   start_transfer_v2(
     request: StartTransferRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartTransferResponse>>;
-  /** @deprecated */
-  refresh_timelock_v2(
-    request: RefreshTimelockRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<RefreshTimelockResponse>>;
   get_utxos_for_address(
     request: GetUtxosForAddressRequest,
     context: CallContext & CallContextExt,
@@ -20507,43 +20187,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartDepositTreeCreationRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartDepositTreeCreationResponse>;
-  /**
-   * This is deprecated, please use start_deposit_tree_creation instead.
-   *
-   * @deprecated
-   */
-  start_tree_creation(
-    request: DeepPartial<StartTreeCreationRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<StartTreeCreationResponse>;
-  /** @deprecated */
-  finalize_node_signatures(
-    request: DeepPartial<FinalizeNodeSignaturesRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<FinalizeNodeSignaturesResponse>;
-  /** @deprecated */
-  start_transfer(
-    request: DeepPartial<StartTransferRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<StartTransferResponse>;
-  /**
-   * This is deprecated, please use finalize_transfer_with_transfer_package instead.
-   *
-   * @deprecated
-   */
-  finalize_transfer(
-    request: DeepPartial<FinalizeTransferRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<FinalizeTransferResponse>;
   finalize_transfer_with_transfer_package(
     request: DeepPartial<FinalizeTransferWithTransferPackageRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<FinalizeTransferResponse>;
-  /** @deprecated */
-  cancel_transfer(
-    request: DeepPartial<CancelTransferRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<CancelTransferResponse>;
   query_pending_transfers(
     request: DeepPartial<TransferFilter>,
     options?: CallOptions & CallOptionsExt,
@@ -20556,11 +20203,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<ClaimTransferTweakKeysRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<Empty>;
-  /** @deprecated */
-  claim_transfer_sign_refunds(
-    request: DeepPartial<ClaimTransferSignRefundsRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<ClaimTransferSignRefundsResponse>;
   store_preimage_share(
     request: DeepPartial<StorePreimageShareRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -20573,16 +20215,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<GetSigningCommitmentsRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<GetSigningCommitmentsResponse>;
-  /** @deprecated */
-  cooperative_exit(
-    request: DeepPartial<CooperativeExitRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<CooperativeExitResponse>;
-  /** @deprecated */
-  initiate_preimage_swap(
-    request: DeepPartial<InitiatePreimageSwapRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<InitiatePreimageSwapResponse>;
   provide_preimage(
     request: DeepPartial<ProvidePreimageRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -20591,43 +20223,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QueryHtlcRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryHtlcResponse>;
-  /**
-   * This is the exact same as start_transfer, but expresses to the SO
-   * this transfer is specifically for a leaf swap.
-   */
-  start_leaf_swap(
-    request: DeepPartial<StartTransferRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<StartTransferResponse>;
-  /**
-   * This is deprecated, please use counter_leaf_swap instead.
-   *
-   * @deprecated
-   */
-  leaf_swap(
-    request: DeepPartial<CounterLeafSwapRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<CounterLeafSwapResponse>;
-  /**
-   * This is the exact same as start_leaf_swap, but signs with
-   * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
-   *
-   * @deprecated
-   */
-  counter_leaf_swap(
-    request: DeepPartial<CounterLeafSwapRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<CounterLeafSwapResponse>;
-  /** @deprecated */
-  refresh_timelock(
-    request: DeepPartial<RefreshTimelockRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<RefreshTimelockResponse>;
-  /** @deprecated */
-  extend_leaf(
-    request: DeepPartial<ExtendLeafRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<ExtendLeafResponse>;
   /**
    * Resets the timelocks for a leaf's transactions. Can be used to reset the
    * refund transaction timelock for a leaf (when the node transaction
@@ -20647,16 +20242,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QueryNodesRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryNodesResponse>;
-  /** @deprecated */
-  query_nodes_distribution(
-    request: DeepPartial<QueryNodesDistributionRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<QueryNodesDistributionResponse>;
-  /** @deprecated */
-  query_nodes_by_value(
-    request: DeepPartial<QueryNodesByValueRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<QueryNodesByValueResponse>;
   query_balance(
     request: DeepPartial<QueryBalanceRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -20687,18 +20272,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<InitiateStaticDepositUtxoRefundRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<InitiateStaticDepositUtxoRefundResponse>;
-  /**
-   * DEPRECATED: This unified method is being split for better clarity and type safety
-   *
-   * For swap operations: Use spark_ssp_internal.initiate_static_deposit_utxo_swap()
-   * For refund operations: Use initiate_static_deposit_utxo_refund()
-   *
-   * @deprecated
-   */
-  initiate_utxo_swap(
-    request: DeepPartial<InitiateUtxoSwapRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<InitiateUtxoSwapResponse>;
   exit_single_node_trees(
     request: DeepPartial<ExitSingleNodeTreesRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -20711,11 +20284,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<CooperativeExitRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<CooperativeExitResponse>;
-  /** @deprecated */
-  extend_leaf_v2(
-    request: DeepPartial<ExtendLeafRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<ExtendLeafResponse>;
   claim_transfer_sign_refunds_v2(
     request: DeepPartial<ClaimTransferSignRefundsRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -20736,20 +20304,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartTransferResponse>;
-  /** @deprecated */
-  counter_leaf_swap_v2(
-    request: DeepPartial<CounterLeafSwapRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<CounterLeafSwapResponse>;
   start_transfer_v2(
     request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartTransferResponse>;
-  /** @deprecated */
-  refresh_timelock_v2(
-    request: DeepPartial<RefreshTimelockRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<RefreshTimelockResponse>;
   get_utxos_for_address(
     request: DeepPartial<GetUtxosForAddressRequest>,
     options?: CallOptions & CallOptionsExt,

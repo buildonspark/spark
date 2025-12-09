@@ -242,14 +242,14 @@ export class CoopExitService extends BaseTransferService {
       });
     } catch (error) {
       throw new SparkRequestError("Failed to initiate cooperative exit", {
-        operation: "cooperative_exit",
+        operation: "cooperative_exit_v2",
         error,
       });
     }
 
     if (!response.transfer) {
       throw new SparkRequestError("Failed to initiate cooperative exit", {
-        operation: "cooperative_exit",
+        operation: "cooperative_exit_v2",
         error: new Error("No transfer in response"),
       });
     }
