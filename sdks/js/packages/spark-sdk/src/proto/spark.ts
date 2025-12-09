@@ -461,6 +461,7 @@ export enum TreeNodeStatus {
   TREE_NODE_STATUS_ON_CHAIN = 7,
   TREE_NODE_STATUS_AGGREGATE_LOCK = 8,
   TREE_NODE_STATUS_EXITED = 9,
+  TREE_NODE_STATUS_RENEW_LOCKED = 10,
   UNRECOGNIZED = -1,
 }
 
@@ -496,6 +497,9 @@ export function treeNodeStatusFromJSON(object: any): TreeNodeStatus {
     case 9:
     case "TREE_NODE_STATUS_EXITED":
       return TreeNodeStatus.TREE_NODE_STATUS_EXITED;
+    case 10:
+    case "TREE_NODE_STATUS_RENEW_LOCKED":
+      return TreeNodeStatus.TREE_NODE_STATUS_RENEW_LOCKED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -525,6 +529,8 @@ export function treeNodeStatusToJSON(object: TreeNodeStatus): string {
       return "TREE_NODE_STATUS_AGGREGATE_LOCK";
     case TreeNodeStatus.TREE_NODE_STATUS_EXITED:
       return "TREE_NODE_STATUS_EXITED";
+    case TreeNodeStatus.TREE_NODE_STATUS_RENEW_LOCKED:
+      return "TREE_NODE_STATUS_RENEW_LOCKED";
     case TreeNodeStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
