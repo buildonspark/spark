@@ -181,18 +181,18 @@ const BASE_CONFIG: Required<ConfigOptions> = {
 
 const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
   ...BASE_CONFIG,
-  threshold: 3,
+  threshold: getLocalSigningThreshold(),
 };
 
 const LOCAL_WALLET_CONFIG_SCHNORR: Required<ConfigOptions> = {
   ...LOCAL_WALLET_CONFIG,
-  threshold: 3, // 3 for issuance tests.
+  threshold: getLocalSigningThreshold(), // 2 for issuance tests.
 };
 
 const LOCAL_WALLET_CONFIG_ECDSA: Required<ConfigOptions> = {
   ...LOCAL_WALLET_CONFIG,
   tokenSignatures: "ECDSA",
-  threshold: 3, // 3 for issuance tests.
+  threshold: getLocalSigningThreshold(), // 2 for issuance tests.
 };
 
 const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
@@ -256,6 +256,13 @@ function getSigningOperators(): Record<string, SigningOperator> {
 }
 
 export function getLocalSigningOperators(): Record<string, SigningOperator> {
+  const numOperators =
+    process.env.NUM_SPARK_OPERATORS !== undefined
+      ? parseInt(process.env.NUM_SPARK_OPERATORS, 10)
+      : isHermeticTest
+        ? 3
+        : 5;
+
   const addresses = Array.from({ length: 5 }, (_, i) =>
     isHermeticTest
       ? `https://${i}.spark.minikube.local`
@@ -270,7 +277,7 @@ export function getLocalSigningOperators(): Record<string, SigningOperator> {
     "02c05c88cc8fc181b1ba30006df6a4b0597de6490e24514fbdd0266d2b9cd3d0ba",
   ];
 
-  return {
+  const allOperators = {
     "0000000000000000000000000000000000000000000000000000000000000001": {
       id: 0,
       identifier:
@@ -307,4 +314,13 @@ export function getLocalSigningOperators(): Record<string, SigningOperator> {
       identityPublicKey: pubkeys[4]!,
     },
   };
+
+  return Object.fromEntries(
+    Object.entries(allOperators).slice(0, numOperators),
+  );
+}
+
+export function getLocalSigningThreshold(): number {
+  const numOperators = Object.keys(getLocalSigningOperators()).length;
+  return Math.floor((numOperators + 2) / 2);
 }
