@@ -1,0 +1,45 @@
+core.workflow(
+    name="public-push-to-private",
+    origin=git.github_origin(
+        url="https://github.com/buildonspark/spark.git",
+        ref="main",
+    ),
+    destination=git.github_pr_destination(
+        url="https://github.com/lightsparkdev/spark.git",
+        destination_ref="main",
+        integrates=[],
+        title="Update from public Spark repository main branch",
+        update_description=True,
+        body=(
+            """Update public files with the latest code from the [public repository](https://github.com/buildonspark/spark) main branch.
+
+This can happen in the following scenarios:
+- New versions of the SDK are released and version updates need to be synced. The PR should be merged as soon as possible to avoid updates to private overwriting the changes in public.
+- PRs opened in the public repository have been merged to main and need to be synced to the private repository."""
+        ),
+    ),
+    origin_files=glob(
+        ["**"],
+        # GH actions, yarn.lock, and changesets are managed separately in each repo.
+        exclude=[".github/**", "sdks/js/yarn.lock", "README.md"],
+    ),
+    destination_files=glob(
+        ["**"],
+        exclude=[
+            ".github/**",
+            # dependencies and lock file are different between public and private repos:
+            "sdks/js/yarn.lock",
+            # different README for private repo, see public/README.md:
+            "README.md",
+        ],
+    ),
+    authoring=authoring.pass_thru("Lightspark Eng <engineering@lightspark.com>"),
+    mode="CHANGE_REQUEST",
+    transformations=[
+        metadata.save_author("ORIGINAL_AUTHOR"),
+        metadata.expose_label(
+            "GITHUB_PR_NUMBER", new_name="Closes", separator="buildonspark/spark"
+        ),
+        core.move("README.md", "public/README.md"),
+    ],
+)
