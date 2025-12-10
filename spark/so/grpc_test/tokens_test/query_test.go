@@ -922,6 +922,97 @@ func TestQueryTokenTransactionsLimitCapping(t *testing.T) {
 	})
 }
 
+// TestQueryTokenTransactionsExcludesExpired verifies that expired transactions are
+// excluded from QueryTokenTransactions results for both query paths (optimized and Ent).
+func TestQueryTokenTransactionsExcludesExpired(t *testing.T) {
+	for _, tc := range signatureTypeTestCases {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
+			if broadcastTokenTestsUseV3 {
+				t.Skip("StartTransaction flow not applicable in V3 mode")
+			}
+
+			issuerPrivKey := keys.GeneratePrivateKey()
+
+			nativeTokenParams := sparkTokenCreationTestParams{
+				issuerPrivateKey: issuerPrivKey,
+				name:             "Expiry Test Token",
+				ticker:           "EXP",
+				maxSupply:        1000000,
+			}
+			err := createNativeToken(t, nativeTokenParams)
+			require.NoError(t, err, "failed to create native token")
+
+			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
+
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
+
+			mintTx, owner1PrivKey, owner2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
+			require.NoError(t, err, "failed to create mint transaction")
+
+			finalMintTx, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				mintTx,
+				[]keys.Private{issuerPrivKey},
+			)
+			require.NoError(t, err, "failed to broadcast mint transaction")
+
+			mintTxHash, err := utils.HashTokenTransaction(finalMintTx, false)
+			require.NoError(t, err, "failed to hash mint transaction")
+
+			// Create a transfer transaction with a very short expiry (1 second)
+			transferTx, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+				TokenIdentityPubKey:            issuerPrivKey.Public(),
+				TokenIdentifier:                tokenIdentifier,
+				FinalIssueTokenTransactionHash: mintTxHash,
+				NumOutputs:                     1,
+				OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
+			})
+			require.NoError(t, err, "failed to create transfer transaction")
+
+			_, _, err = wallet.StartTokenTransaction(t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, 1*time.Second, nil)
+			require.NoError(t, err, "failed to start transfer transaction")
+
+			// Wait for the transaction to expire
+			time.Sleep(2 * time.Second)
+
+			t.Run("optimized query path excludes expired", func(t *testing.T) {
+				resultByOwner, err := wallet.QueryTokenTransactions(
+					t.Context(),
+					config,
+					wallet.QueryTokenTransactionsParams{
+						OwnerPublicKeys: []keys.Public{owner1PrivKey.Public()},
+						Limit:           10,
+					},
+				)
+				require.NoError(t, err, "failed to query token transactions by owner")
+				require.Len(t, resultByOwner.TokenTransactionsWithStatus, 1,
+					"expected 1 transaction (expired transaction should be excluded)")
+				require.Equal(t, mintTxHash, resultByOwner.TokenTransactionsWithStatus[0].TokenTransactionHash,
+					"expected to only see the mint transaction, not the expired transfer")
+			})
+
+			t.Run("ent query path excludes expired", func(t *testing.T) {
+				resultByHash, err := wallet.QueryTokenTransactions(
+					t.Context(),
+					config,
+					wallet.QueryTokenTransactionsParams{
+						TransactionHashes: [][]byte{mintTxHash},
+						Limit:             10,
+					},
+				)
+				require.NoError(t, err, "failed to query token transactions by hash")
+				require.Len(t, resultByHash.TokenTransactionsWithStatus, 1,
+					"expected 1 transaction")
+				require.Equal(t, mintTxHash, resultByHash.TokenTransactionsWithStatus[0].TokenTransactionHash,
+					"expected to see the mint transaction")
+			})
+		})
+	}
+}
+
 func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
