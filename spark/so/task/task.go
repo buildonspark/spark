@@ -893,7 +893,7 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, run
 	return nil
 }
 
-const backfillCreatedFinalizedTxHashBatchSize = 10000
+const backfillCreatedFinalizedTxHashBatchSize = 1000
 
 // backfillCreatedFinalizedTxHash backfills the created_finalized_tx_hash field on token_outputs
 // by fetching the finalized_token_transaction_hash from the linked token_transaction.
@@ -955,6 +955,7 @@ func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knob
 
 		totalUpdated += rowsAffected
 
+		ent.MarkTxDirty(ctx)
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("failed to commit batch: %w", err)
 		}
@@ -963,6 +964,12 @@ func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knob
 
 		if rowsAffected < backfillCreatedFinalizedTxHashBatchSize {
 			break
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
 		}
 	}
 
