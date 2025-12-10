@@ -430,23 +430,25 @@ func RunDKGIfNeeded(ctx context.Context, config *so.Config) error {
 		return err
 	}
 
-	count, err := db.SigningKeyshare.Query().Where(
-		signingkeyshare.StatusEQ(st.KeyshareStatusAvailable),
-		signingkeyshare.CoordinatorIndexEQ(config.Index),
-	).Count(ctx)
-	if err != nil {
-		return err
-	}
-
 	minAvailableKeys := defaultMinAvailableKeys
 	if config.DKGConfig.MinAvailableKeys != nil && *config.DKGConfig.MinAvailableKeys > 0 {
 		minAvailableKeys = *config.DKGConfig.MinAvailableKeys
 	}
 
-	if count >= minAvailableKeys {
+	overMinimumAvailableKeys, err := db.SigningKeyshare.Query().
+		Where(
+			signingkeyshare.StatusEQ(st.KeyshareStatusAvailable),
+			signingkeyshare.CoordinatorIndexEQ(config.Index),
+		).
+		Limit(1).
+		Offset(minAvailableKeys).
+		Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if overMinimumAvailableKeys {
 		return nil
 	}
-
 	return RunDKG(ctx, config)
 }
 
