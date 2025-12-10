@@ -56,6 +56,7 @@ const (
 	ErrInvalidOutputIDFormat              = "invalid output ID format"
 	ErrFailedToQueryTokenTransactions     = "unable to query token transactions"
 	ErrInvalidOperatorResponse            = "invalid response from operator"
+	ErrTransactionAlreadyBroadcasted      = "transaction was already broadcasted. if retrying consider updating the client created timestamp"
 	ErrTransactionAlreadyFinalized        = "transaction has already been finalized by at least one operator, cannot cancel"
 	ErrTooManyOperatorsSigned             = "transaction has been signed by %d operators, which exceeds the cancellation threshold of %d"
 	ErrInvalidTransactionStatus           = "transaction is in status %s, but must be in %s status to cancel"

@@ -88,15 +88,25 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	// Check that the previous created transaction was found and that it is still in the started state.
 	// Also, check that this SO was the coordinator for the transaction. This is necessary because only the coordinator
 	// receives direct evidence from each SO individually that a threshold of SOs have validated and saved the transaction.
-	if previouslyCreatedTokenTransaction != nil &&
-		previouslyCreatedTokenTransaction.Status == st.TokenTransactionStatusStarted {
+	if previouslyCreatedTokenTransaction != nil {
 		coordinatorPubKey, err := keys.ParsePublicKey(previouslyCreatedTokenTransaction.CoordinatorPublicKey.Serialize())
 		if err != nil {
 			return nil, err
 		}
-		if coordinatorPubKey.Equals(h.config.IdentityPublicKey()) {
+		// Transaction is in progress and this may be a retry in response to a failed commit. Support idempotent response to enable continuing to commit.
+		if coordinatorPubKey.Equals(h.config.IdentityPublicKey()) && previouslyCreatedTokenTransaction.Status == st.TokenTransactionStatusStarted {
 			logger.Info("Found existing token transaction in started state with matching coordinator")
 			return h.regenerateStartResponseForDuplicateRequest(ctx, previouslyCreatedTokenTransaction)
+		} else if req.PartialTokenTransaction.Version >= 3 {
+			// In V3+, prevent identical partial token transactions from being saved to the DB to ensure data integrity.
+			// Clients may increment their client created timestamp on explicit retries for failed requests to bypass this
+			// restriction when retrying a legitimately failed or expired request.
+			logger.Warn(
+				"Found existing partial token transaction that isn't in started state or doesn't have a matching coordinator as the original. Rejecting request.",
+				zap.String("prev_tx_coordinator_pubkey", coordinatorPubKey.String()),
+				zap.String("prev_tx_status", fmt.Sprintf("%v", previouslyCreatedTokenTransaction.Status)),
+			)
+			return nil, sparkerrors.AlreadyExistsDuplicateOperation(tokens.FormatErrorWithTransactionProto(tokens.ErrTransactionAlreadyBroadcasted, req.PartialTokenTransaction, err))
 		}
 	}
 
