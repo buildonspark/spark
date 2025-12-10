@@ -1916,19 +1916,3 @@ func (h *BaseTransferHandler) CommitSwapKeyTweaks(
 
 	return nil
 }
-
-// If the node tx has a timelock > 0, we need to send a direct refund tx
-func needsDirectRefundTx(leaf *ent.TreeNode) bool {
-	nodeTxBytes := leaf.RawTx
-	nodeTx, err := common.TxFromRawTxBytes(nodeTxBytes)
-	if err != nil {
-		return false
-	}
-
-	if len(nodeTx.TxIn) == 0 {
-		return false
-	}
-	nodeTxTimelock := bitcointransaction.GetTimelockFromSequence(nodeTx.TxIn[0].Sequence)
-
-	return nodeTxTimelock > 0
-}
