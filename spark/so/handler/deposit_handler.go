@@ -680,7 +680,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	directFromCpfpRefundTxSigningJob := req.GetDirectFromCpfpRefundTxSigningJob()
 
 	if directFromCpfpRefundTxSigningJob == nil {
-		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDirectFromCPFPRefund, 0) > 0 {
+		networkString := network.String()
+		if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobRequireDirectFromCPFPRefund, &networkString, 0) > 0 {
 			return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
 	} else {
@@ -1014,7 +1015,8 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	directFromCpfpRefundTxSigningJob := req.GetDirectFromCpfpRefundTxSigningJob()
 
 	if directFromCpfpRefundTxSigningJob == nil {
-		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDirectFromCPFPRefund, 0) > 0 {
+		networkString := network.String()
+		if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobRequireDirectFromCPFPRefund, &networkString, 0) > 0 {
 			return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
 	} else {

@@ -358,7 +358,21 @@ func validateSendLeafRefundTxsDeprecated(ctx context.Context, leaf *ent.TreeNode
 		return fmt.Errorf("unable to load new cpfp refund tx: %w", err)
 	}
 
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDirectFromCPFPRefund, 0) > 0 {
+	// Get network from leaf's tree
+	var networkString *string
+	if leaf.Edges.Tree != nil {
+		ns := leaf.Edges.Tree.Network.String()
+		networkString = &ns
+	} else {
+		// Fallback: query tree if not loaded
+		tree, err := leaf.QueryTree().Only(ctx)
+		if err == nil && tree != nil {
+			ns := tree.Network.String()
+			networkString = &ns
+		}
+	}
+
+	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobRequireDirectFromCPFPRefund, networkString, 0) > 0 {
 		if requireDirectTx {
 			if len(directFromCpfpRefundTx) == 0 {
 				return fmt.Errorf("DirectFromCpfpRefundTx is required. Please upgrade to the latest SDK version")

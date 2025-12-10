@@ -482,8 +482,11 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			if err != nil {
 				return nil, nil, fmt.Errorf("unable to verify direct from cpfp refund tx signature: %w", err)
 			}
-		} else if requireDirectTx && (knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDirectFromCPFPRefund, 0) > 0 || len(node.DirectTx) > 0) {
-			return nil, nil, fmt.Errorf("DirectFromCpfpRefundTxSignature is required. Please upgrade to the latest SDK version")
+		} else if requireDirectTx {
+			networkString := treeEnt.Network.String()
+			if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobRequireDirectFromCPFPRefund, &networkString, 0) > 0 || len(node.DirectTx) > 0 {
+				return nil, nil, fmt.Errorf("DirectFromCpfpRefundTxSignature is required. Please upgrade to the latest SDK version")
+			}
 		}
 	} else {
 		cpfpRefundTxBytes = node.RawRefundTx

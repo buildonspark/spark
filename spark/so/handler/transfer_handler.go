@@ -2276,7 +2276,8 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		if job.DirectFromCpfpRefundTxSigningJob != nil {
 			directFromCpfpRefundTxSigningJob = job.DirectFromCpfpRefundTxSigningJob
 		} else if !isSwap && requireDirectTx {
-			if knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDirectFromCPFPRefund, 0) > 0 {
+			networkString := transfer.Network.String()
+			if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobRequireDirectFromCPFPRefund, &networkString, 0) > 0 {
 				return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 			} else {
 				if len(leaf.DirectTx) > 0 {
