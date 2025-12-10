@@ -26,7 +26,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
-	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -894,66 +893,75 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, run
 	return nil
 }
 
-const backfillCreatedFinalizedTxHashBatchSize = 1000
+const backfillCreatedFinalizedTxHashBatchSize = 10000
 
 // backfillCreatedFinalizedTxHash backfills the created_finalized_tx_hash field on token_outputs
 // by fetching the finalized_token_transaction_hash from the linked token_transaction.
-// Commits after each batch to avoid long-held locks that block token operations.
+// Uses bulk UPDATE with JOIN for performance. Commits after each batch.
+// Re-checks the knob every minute so the job can be disabled mid-run.
 // Controlled by knob: spark.so.tokens.backfill_created_finalized_tx_hash.enabled
 func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-	if knobsService.GetValue(knobs.KnobBackfillCreatedFinalizedTxHashEnabled, 0) == 0 {
-		return nil
-	}
-
 	logger := logging.GetLoggerFromContext(ctx)
-	totalUpdated := 0
+	totalUpdated := int64(0)
+	var lastKnobCheck time.Time
+
+	const bulkUpdateQuery = `
+		WITH batch AS (
+			SELECT id
+			FROM token_outputs
+			WHERE created_transaction_finalized_hash IS NULL
+			  AND token_output_output_created_token_transaction IS NOT NULL
+			LIMIT $1
+		)
+		UPDATE token_outputs to_update
+		SET created_transaction_finalized_hash = tt.finalized_token_transaction_hash
+		FROM token_transactions tt, batch
+		WHERE to_update.id = batch.id
+		  AND to_update.token_output_output_created_token_transaction = tt.id
+	`
 
 	for {
+		if time.Since(lastKnobCheck) > time.Minute {
+			lastKnobCheck = time.Now()
+			if knobsService.GetValue(knobs.KnobBackfillCreatedFinalizedTxHashEnabled, 0) == 0 {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(time.Minute):
+				}
+				continue
+			}
+		}
+
 		tx, err := ent.GetTxFromContext(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get tx from context: %w", err)
 		}
 
-		outputs, err := tx.TokenOutput.Query().
-			Where(
-				tokenoutput.CreatedTransactionFinalizedHashIsNil(),
-				tokenoutput.HasOutputCreatedTokenTransaction(),
-			).
-			WithOutputCreatedTokenTransaction(func(q *ent.TokenTransactionQuery) {
-				q.Select(tokentransaction.FieldFinalizedTokenTransactionHash)
-			}).
-			Order(tokenoutput.ByID(sql.OrderAsc())).
-			Limit(backfillCreatedFinalizedTxHashBatchSize).
-			All(ctx)
+		// nolint:forbidigo
+		result, err := tx.ExecContext(ctx, bulkUpdateQuery, backfillCreatedFinalizedTxHashBatchSize)
 		if err != nil {
-			return fmt.Errorf("failed to query outputs for backfill: %w", err)
+			return fmt.Errorf("failed to execute bulk update: %w", err)
 		}
 
-		if len(outputs) == 0 {
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to get rows affected: %w", err)
+		}
+
+		if rowsAffected == 0 {
 			break
 		}
 
-		for _, output := range outputs {
-			if output.Edges.OutputCreatedTokenTransaction == nil {
-				continue
-			}
-			err := tx.TokenOutput.UpdateOneID(output.ID).
-				SetCreatedTransactionFinalizedHash(output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash).
-				Exec(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to update output %s: %w", output.ID, err)
-			}
-		}
-
-		totalUpdated += len(outputs)
+		totalUpdated += rowsAffected
 
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("failed to commit batch: %w", err)
 		}
 
-		logger.Sugar().Infof("Backfilled %d token outputs so far (batch of %d)", totalUpdated, len(outputs))
+		logger.Sugar().Infof("Backfilled %d token outputs so far (batch of %d)", totalUpdated, rowsAffected)
 
-		if len(outputs) < backfillCreatedFinalizedTxHashBatchSize {
+		if rowsAffected < backfillCreatedFinalizedTxHashBatchSize {
 			break
 		}
 	}
