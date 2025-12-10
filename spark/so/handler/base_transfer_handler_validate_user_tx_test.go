@@ -394,11 +394,11 @@ func TestValidateUserTxs_Legacy_MissingDirectFromCpfp_Error(t *testing.T) {
 	require.ErrorContains(t, err, "missing required direct from CPFP refund tx")
 }
 
-func TestValidateUserTxs_Legacy_MissingDirectWhenRequired_Error(t *testing.T) {
+func TestValidateUserTxs_Legacy_WithoutDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = withKnob(ctx, true)
 
-	// Create leaf with direct tx timelock > 0, which requires direct refund tx
+	// Create leaf that could have direct, but we don't provide it (direct is optional)
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
 
@@ -409,22 +409,21 @@ func TestValidateUserTxs_Legacy_MissingDirectWhenRequired_Error(t *testing.T) {
 				LeafId:                           leaf.node.ID.String(),
 				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCpfpTx(t, leaf, refundDest)},
 				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientDirectFromCpfpTx(t, leaf, refundDest)},
-				// Missing DirectRefundTxSigningJob - should fail because node has direct tx with timelock
+				// No DirectRefundTxSigningJob - should succeed since direct is optional
 			},
 		},
 	}
 
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
-	require.ErrorContains(t, err, "missing required direct refund tx")
+	require.NoError(t, err)
 }
 
-func TestValidateUserTxs_Legacy_UnexpectedDirectWhenNotRequired_Error(t *testing.T) {
+func TestValidateUserTxs_Legacy_InvalidDirectRefund_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = withKnob(ctx, true)
 
-	// Create leaf with direct tx timelock = 0, which does NOT require direct refund tx
-	leaf := createDbLeaf(t, ctx, false)
+	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
 
 	req := &pb.StartTransferRequest{
@@ -433,19 +432,18 @@ func TestValidateUserTxs_Legacy_UnexpectedDirectWhenNotRequired_Error(t *testing
 			{
 				LeafId:                           leaf.node.ID.String(),
 				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCpfpTx(t, leaf, refundDest)},
+				DirectRefundTxSigningJob:         &pb.SigningJob{RawTx: []byte("not a valid tx")},
 				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientDirectFromCpfpTx(t, leaf, refundDest)},
-				DirectRefundTxSigningJob:         &pb.SigningJob{RawTx: makeClientDirectTx(t, leaf, refundDest)},
-				// DirectRefundTxSigningJob is present but should NOT be - should fail
 			},
 		},
 	}
 
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
-	require.ErrorContains(t, err, "unexpected direct refund tx")
+	require.ErrorContains(t, err, "direct refund tx validation failed")
 }
 
-func TestValidateUserTxs_Package_Success(t *testing.T) {
+func TestValidateUserTxs_Package_WithDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = withKnob(ctx, true)
 
@@ -472,7 +470,7 @@ func TestValidateUserTxs_Package_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestValidateUserTxs_Package_MissingDirectLeaf_Error(t *testing.T) {
+func TestValidateUserTxs_Package_WithoutDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = withKnob(ctx, true)
 
@@ -487,26 +485,26 @@ func TestValidateUserTxs_Package_MissingDirectLeaf_Error(t *testing.T) {
 		TransferPackage: &pb.TransferPackage{
 			LeavesToSend:               []*pb.UserSignedTxSigningJob{cpfp},
 			DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{directFromCpfp},
-			KeyTweakPackage:            map[string][]byte{"noop": {}},
-			UserSignature:              []byte{1},
+			// No DirectLeavesToSend - should succeed since direct is optional
+			KeyTweakPackage: map[string][]byte{"noop": {}},
+			UserSignature:   []byte{1},
 		},
 	}
 
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
-	require.ErrorContains(t, err, "missing required direct refund tx")
+	require.NoError(t, err)
 }
 
-func TestValidateUserTxs_Package_UnexpectedDirectLeaf_Error(t *testing.T) {
+func TestValidateUserTxs_Package_InvalidDirectRefund_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = withKnob(ctx, true)
 
-	// Create a leaf whose DirectTx has timelock = 0 so no direct refund is required
-	leaf := createDbLeaf(t, ctx, false)
+	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
 
 	cpfp := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientCpfpTx(t, leaf, refundDest)}
-	direct := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientDirectTx(t, leaf, refundDest)}
+	direct := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: []byte("not a valid tx")}
 	directFromCpfp := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientDirectFromCpfpTx(t, leaf, refundDest)}
 
 	req := &pb.StartTransferRequest{
@@ -522,7 +520,7 @@ func TestValidateUserTxs_Package_UnexpectedDirectLeaf_Error(t *testing.T) {
 
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
-	require.ErrorContains(t, err, "unexpected direct refund tx")
+	require.ErrorContains(t, err, "direct refund tx validation failed")
 }
 
 func TestValidateUserTxs_Package_MismatchedCounts_Error(t *testing.T) {
@@ -742,6 +740,55 @@ func TestValidateUserTxs_CoopExit_Legacy_WithDirect_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestValidateUserTxs_CoopExit_Legacy_WithoutDirect_Success(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
+	// Create leaf that could have direct, but we don't provide it (direct is optional)
+	leaf := createDbLeaf(t, ctx, true)
+	refundDest := keys.GeneratePrivateKey().Public()
+
+	req := &pb.StartTransferRequest{
+		ReceiverIdentityPublicKey: refundDest.Serialize(),
+		LeavesToSend: []*pb.LeafRefundTxSigningJob{
+			{
+				LeafId:                           leaf.node.ID.String(),
+				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest)},
+				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest)},
+				// No DirectRefundTxSigningJob - should succeed since direct is optional
+			},
+		},
+	}
+
+	h := handlerWithConfig()
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
+	require.NoError(t, err)
+}
+
+func TestValidateUserTxs_CoopExit_Legacy_InvalidDirectRefund_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
+	leaf := createDbLeaf(t, ctx, true)
+	refundDest := keys.GeneratePrivateKey().Public()
+
+	req := &pb.StartTransferRequest{
+		ReceiverIdentityPublicKey: refundDest.Serialize(),
+		LeavesToSend: []*pb.LeafRefundTxSigningJob{
+			{
+				LeafId:                           leaf.node.ID.String(),
+				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest)},
+				DirectRefundTxSigningJob:         &pb.SigningJob{RawTx: []byte("not a valid tx")},
+				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest)},
+			},
+		},
+	}
+
+	h := handlerWithConfig()
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
+	require.ErrorContains(t, err, "failed to remove second input from Direct refund tx")
+}
+
 func TestValidateUserTxs_CoopExit_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = withKnob(ctx, true)
@@ -786,57 +833,6 @@ func TestValidateUserTxs_CoopExit_Legacy_MissingDirectFromCpfp_Error(t *testing.
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
 	require.ErrorContains(t, err, "raw transaction is empty")
-}
-
-func TestValidateUserTxs_CoopExit_Legacy_MissingDirectWhenRequired_Error(t *testing.T) {
-	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
-
-	// Create leaf with direct tx timelock > 0, which requires direct refund tx
-	leaf := createDbLeaf(t, ctx, true)
-	refundDest := keys.GeneratePrivateKey().Public()
-
-	req := &pb.StartTransferRequest{
-		ReceiverIdentityPublicKey: refundDest.Serialize(),
-		LeavesToSend: []*pb.LeafRefundTxSigningJob{
-			{
-				LeafId:                           leaf.node.ID.String(),
-				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest)},
-				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest)},
-				// Missing DirectRefundTxSigningJob - should fail because node has direct tx with timelock
-			},
-		},
-	}
-
-	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
-	require.ErrorContains(t, err, "missing required direct refund tx")
-}
-
-func TestValidateUserTxs_CoopExit_Legacy_UnexpectedDirectWhenNotRequired_Error(t *testing.T) {
-	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
-
-	// Create leaf with direct tx timelock = 0, which does NOT require direct refund tx
-	leaf := createDbLeaf(t, ctx, false)
-	refundDest := keys.GeneratePrivateKey().Public()
-
-	req := &pb.StartTransferRequest{
-		ReceiverIdentityPublicKey: refundDest.Serialize(),
-		LeavesToSend: []*pb.LeafRefundTxSigningJob{
-			{
-				LeafId:                           leaf.node.ID.String(),
-				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest)},
-				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest)},
-				DirectRefundTxSigningJob:         &pb.SigningJob{RawTx: makeClientCoopExitDirectTx(t, leaf, refundDest)},
-				// DirectRefundTxSigningJob is present but should NOT be - should fail
-			},
-		},
-	}
-
-	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
-	require.ErrorContains(t, err, "unexpected direct refund tx")
 }
 
 func TestValidateUserTxs_CoopExit_Legacy_MissingConnectorInput_Error(t *testing.T) {
@@ -893,7 +889,7 @@ func TestValidateUserTxs_CoopExit_Legacy_ExceedInput_Error(t *testing.T) {
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 }
 
-func TestValidateUserTxs_CoopExit_Package_Success(t *testing.T) {
+func TestValidateUserTxs_CoopExit_Package_WithDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = withKnob(ctx, true)
 
@@ -920,7 +916,7 @@ func TestValidateUserTxs_CoopExit_Package_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestValidateUserTxs_CoopExit_Package_MissingDirectLeaf_Error(t *testing.T) {
+func TestValidateUserTxs_CoopExit_Package_WithoutDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = withKnob(ctx, true)
 
@@ -935,26 +931,26 @@ func TestValidateUserTxs_CoopExit_Package_MissingDirectLeaf_Error(t *testing.T) 
 		TransferPackage: &pb.TransferPackage{
 			LeavesToSend:               []*pb.UserSignedTxSigningJob{cpfp},
 			DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{directFromCpfp},
-			KeyTweakPackage:            map[string][]byte{"noop": {}},
-			UserSignature:              []byte{1},
+			// No DirectLeavesToSend - should succeed since direct is optional
+			KeyTweakPackage: map[string][]byte{"noop": {}},
+			UserSignature:   []byte{1},
 		},
 	}
 
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
-	require.ErrorContains(t, err, "missing required direct refund tx")
+	require.NoError(t, err)
 }
 
-func TestValidateUserTxs_CoopExit_Package_UnexpectedDirectLeaf_Error(t *testing.T) {
+func TestValidateUserTxs_CoopExit_Package_InvalidDirectRefund_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = withKnob(ctx, true)
 
-	// Create a leaf whose DirectTx has timelock = 0 so no direct refund is required
-	leaf := createDbLeaf(t, ctx, false)
+	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
 
 	cpfp := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest)}
-	direct := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientCoopExitDirectTx(t, leaf, refundDest)}
+	direct := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: []byte("not a valid tx")}
 	directFromCpfp := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest)}
 
 	req := &pb.StartTransferRequest{
@@ -970,7 +966,7 @@ func TestValidateUserTxs_CoopExit_Package_UnexpectedDirectLeaf_Error(t *testing.
 
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
-	require.ErrorContains(t, err, "unexpected direct refund tx")
+	require.ErrorContains(t, err, "failed to remove second input from Direct refund tx")
 }
 
 func TestValidateUserTxs_CoopExit_Package_MismatchedCounts_Error(t *testing.T) {

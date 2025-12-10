@@ -1428,14 +1428,8 @@ func validateSingleLeafRefundTxs(
 			return fmt.Errorf("direct from CPFP refund tx validation failed for leaf: %w", err)
 		}
 
-		// Conditionally validate Direct refund transaction
 		hasDirectRefundTx := len(directRefundTx) > 0
-
-		if needsDirectRefundTx(node) {
-			if !hasDirectRefundTx {
-				return fmt.Errorf("missing required direct refund tx for leaf")
-			}
-
+		if hasDirectRefundTx {
 			if err := bitcointransaction.VerifyTransactionWithDatabase(
 				directRefundTx,
 				node,
@@ -1443,10 +1437,6 @@ func validateSingleLeafRefundTxs(
 				refundDestPubkey,
 			); err != nil {
 				return fmt.Errorf("direct refund tx validation failed for leaf: %w", err)
-			}
-		} else {
-			if hasDirectRefundTx {
-				return fmt.Errorf("unexpected direct refund tx for leaf (node tx has timelock == 0)")
 			}
 		}
 	}
