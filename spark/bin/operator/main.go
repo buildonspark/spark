@@ -10,14 +10,16 @@ import (
 	"io"
 	"net"
 	"net/http"
-	_ "net/http/pprof" // Add pprof support
 	"os"
 	"os/signal"
+	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
+	"github.com/grafana/pyroscope-go" // Replacement for /net/pprof.
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -91,6 +93,7 @@ type args struct {
 	RateLimiterEnabled         bool
 	RateLimiterMemcachedAddrs  string
 	EntDebug                   bool
+	PyroscopeServer            string
 }
 
 const operatorPoolKnobRefreshInterval = time.Minute
@@ -142,8 +145,8 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.RunDirectory, "run-dir", "", "Run directory for resolving relative paths")
 	flag.StringVar(&args.RateLimiterMemcachedAddrs, "rate-limiter-memcached-addrs", "", "Comma-separated list of Memcached addresses")
 	flag.BoolVar(&args.EntDebug, "ent-debug", false, "Log all the SQL queries")
+	flag.StringVar(&args.PyroscopeServer, "pyroscope-server", "", "The address of the Pyroscope server to connect to. Leave blank to skip Pyroscope monitoring.")
 
-	// Parse flags
 	flag.Parse()
 
 	if args.IdentityPrivateKeyFilePath == "" {
@@ -333,29 +336,9 @@ func main() {
 	knobsService := knobs.New(valuesProvider)
 
 	// Start profiling server if enabled (localhost only)
-	var pprofServer *http.Server
-	if os.Getenv("SPARK_PROFILING_ENABLED") == "true" {
-		profilingPort := "6060" // default port
-		if port := os.Getenv("SPARK_PROFILING_PORT"); port != "" {
-			profilingPort = port
-		}
-
-		pprofServer = &http.Server{
-			Addr:    fmt.Sprintf("127.0.0.1:%s", profilingPort), // localhost only
-			Handler: http.DefaultServeMux,                       // pprof endpoints are registered here
-		}
-
-		errGrp.Go(func() error {
-			profilingLogger := logger.With(zap.String("component", "profiling"))
-			profilingLogger.Info("Starting profiling server", zap.String("port", profilingPort))
-
-			if err := pprofServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-				profilingLogger.Error("Profiling server failed", zap.Error(err))
-				return err
-			}
-			return nil
-		})
-	}
+	pprofServer := setUpPprof(errGrp, logger)
+	shutDownPyroscope := setUpPyroscope(args, logger)
+	defer shutDownPyroscope()
 
 	dbDriver := config.DatabaseDriver()
 	connector, err := so.NewDBConnector(context.Background(), config, knobsService)
@@ -853,17 +836,97 @@ func main() {
 	}
 	logger.Info("gRPC server stopped")
 
+	shutDownPprof(shutdownCtx, pprofServer, logger)
+
+	if err := errGrp.Wait(); err != nil {
+		logger.Error("Shutdown due to error", zap.Error(err))
+	}
+}
+
+func setUpPprof(errGrp *errgroup.Group, logger *zap.Logger) *http.Server {
+	if os.Getenv("SPARK_PROFILING_ENABLED") != "true" {
+		return nil
+	}
+	profilingPort := "6060" // default port
+	if port := os.Getenv("SPARK_PROFILING_PORT"); port != "" {
+		profilingPort = port
+	}
+
+	pprofServer := &http.Server{
+		Addr:    net.JoinHostPort("127.0.0.1", profilingPort), // localhost only
+		Handler: http.DefaultServeMux,                         // pprof endpoints are registered here
+	}
+
+	errGrp.Go(func() error {
+		profilingLogger := logger.With(zap.String("component", "profiling"))
+		profilingLogger.Info("Starting profiling server", zap.String("port", profilingPort))
+
+		if err := pprofServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			profilingLogger.Error("Profiling server failed", zap.Error(err))
+			return err
+		}
+		return nil
+	})
+	return pprofServer
+}
+
+func shutDownPprof(shutdownCtx context.Context, pprofServer *http.Server, logger *zap.Logger) {
 	if pprofServer != nil {
 		logger.Info("Stopping profiling server...")
 		if err := pprofServer.Shutdown(shutdownCtx); err != nil {
 			logger.Error("Profiling server failed to shutdown gracefully", zap.Error(err))
-		} else {
-			logger.Info("Profiling server stopped")
+			return
 		}
+		logger.Info("Profiling server stopped")
+	}
+}
+
+func setUpPyroscope(args *args, logger *zap.Logger) (shutDown func()) {
+	pyroLogger := logger.With(zap.String("component", "profiling"))
+	if len(args.PyroscopeServer) == 0 {
+		pyroLogger.Info("No Pyroscope server specified; skipping")
+		return
 	}
 
-	if err := errGrp.Wait(); err != nil {
-		logger.Error("Shutdown due to error", zap.Error(err))
+	pyroLogger.Info("Connecting to Pyroscope server", zap.String("server", args.PyroscopeServer))
+
+	runtime.SetMutexProfileFraction(1000)
+	runtime.SetBlockProfileRate(int(10 * time.Microsecond))
+
+	pyroLogger.With(zap.String("server", args.PyroscopeServer))
+	profiler, err := pyroscope.Start(pyroscope.Config{
+		ApplicationName: "spark",
+		ServerAddress:   args.PyroscopeServer, // e.g. "http://pyroscope.opentelemetry.svc.cluster.local:4040"
+		Logger:          pyroLogger.Sugar(),
+		Tags: map[string]string{
+			"index":             strconv.FormatUint(args.Index, 10),
+			"supportedNetworks": args.SupportedNetworks,
+		},
+		ProfileTypes: []pyroscope.ProfileType{
+			pyroscope.ProfileCPU,
+			pyroscope.ProfileAllocObjects,
+			pyroscope.ProfileAllocSpace,
+			pyroscope.ProfileInuseObjects,
+			pyroscope.ProfileInuseSpace,
+			pyroscope.ProfileGoroutines,
+			pyroscope.ProfileMutexCount,
+			pyroscope.ProfileMutexDuration,
+			pyroscope.ProfileBlockCount,
+			pyroscope.ProfileBlockDuration,
+		},
+	})
+
+	// This is only possible if our configuration is bad.
+	if err != nil {
+		pyroLogger.Error("Failed to connect to Pyroscope. Profiling data will not be stored.", zap.Error(err))
+		return func() {}
+	}
+
+	pyroLogger.Info("Connected to Pyroscope server", zap.String("server", args.PyroscopeServer))
+	return func() {
+		if err := profiler.Stop(); err != nil {
+			pyroLogger.Error("Failed to stop profiling server", zap.Error(err))
+		}
 	}
 }
 
