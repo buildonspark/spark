@@ -156,6 +156,7 @@ func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCre
 		SetRevocationKeyshare(keyshare).
 		SetNetwork(tokenCreate.Network).
 		SetOutputCreatedTokenTransaction(tx).
+		SetCreatedTransactionFinalizedHash(tx.FinalizedTokenTransactionHash).
 		Save(f.Ctx)
 	f.RequireNoError(err)
 	return output

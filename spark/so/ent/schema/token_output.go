@@ -201,11 +201,11 @@ func (TokenOutput) Hooks() []ent.Hook {
 				return result, nil
 			})
 		},
-		autoPopulateCreatedFinalizedTxHashHook(),
+		validateCreatedFinalizedTxHashHook(),
 	}
 }
 
-func autoPopulateCreatedFinalizedTxHashHook() ent.Hook {
+func validateCreatedFinalizedTxHashHook() ent.Hook {
 	return func(next ent.Mutator) ent.Mutator {
 		return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
 			om, ok := m.(*entgen.TokenOutputMutation)
@@ -213,17 +213,16 @@ func autoPopulateCreatedFinalizedTxHashHook() ent.Hook {
 				return next.Mutate(ctx, m)
 			}
 
+			// Only validate on CREATE
+			if !om.Op().Is(ent.OpCreate) {
+				return next.Mutate(ctx, m)
+			}
+
 			txIDs := om.OutputCreatedTokenTransactionIDs()
 			if len(txIDs) == 1 {
-				tx, err := om.Client().TokenTransaction.Query().
-					Where(tokentransaction.ID(txIDs[0])).
-					Select(tokentransaction.FieldFinalizedTokenTransactionHash).
-					Only(ctx)
-				if err != nil {
-					return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to fetch transaction for %s: %w", tokenoutput.FieldCreatedTransactionFinalizedHash, err))
+				if _, exists := om.CreatedTransactionFinalizedHash(); !exists {
+					return nil, errors.InvalidArgumentMissingField(fmt.Errorf("%s must be set when creating output", tokenoutput.FieldCreatedTransactionFinalizedHash))
 				}
-
-				om.SetCreatedTransactionFinalizedHash(tx.FinalizedTokenTransactionHash)
 			}
 
 			return next.Mutate(ctx, m)

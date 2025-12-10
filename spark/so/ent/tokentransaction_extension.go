@@ -355,6 +355,7 @@ func CreateStartedTransactionEntities(
 				SetCreatedTransactionOutputVout(int32(outputIndex)).
 				SetRevocationKeyshareID(revocationUUID).
 				SetOutputCreatedTokenTransactionID(tokenTransactionEnt.ID).
+				SetCreatedTransactionFinalizedHash(tokenTransactionEnt.FinalizedTokenTransactionHash).
 				SetNetwork(network).
 				SetTokenCreateID(tokenCreateEnt.ID),
 		)

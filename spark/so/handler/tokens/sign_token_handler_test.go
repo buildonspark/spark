@@ -819,6 +819,7 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRem
 			SetTokenCreateID(tokenCreate.ID).
 			SetNetwork(btcnetwork.Regtest).
 			SetOutputCreatedTokenTransaction(otherTx).
+			SetCreatedTransactionFinalizedHash(otherHash).
 			Save(setup.ctx)
 		assert.NoError(t, err)
 
