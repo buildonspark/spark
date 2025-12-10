@@ -19,7 +19,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/staticdeposit"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
@@ -111,48 +110,7 @@ func GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx context.Context, co
 	}, nil
 }
 
-// rollbackUtxoSwap attempts to roll back a UTXO swap if an error occurred during creation.
-// It logs warnings for rollback failures but doesn't return errors since the original error is more important.
-func (o *StaticDepositHandler) rollbackUtxoSwap(ctx context.Context, config *so.Config, utxo *pb.UTXO) {
-	logger := logging.GetLoggerFromContext(ctx)
-
-	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, config, utxo)
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to create rollback request for %x:%d", utxo.Txid, utxo.Vout)
-		return
-	}
-
-	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (*pbinternal.RollbackUtxoSwapResponse, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
-		if err != nil {
-			logger.Error("Failed to connect to operator for rollback utxo swap", zap.Error(err))
-			return nil, err
-		}
-		defer conn.Close()
-
-		client := pbinternal.NewSparkInternalServiceClient(conn)
-		internalResp, err := client.RollbackUtxoSwap(ctx, rollbackRequest)
-		if err != nil {
-			logger.Sugar().Errorf(
-				"Failed to execute rollback utxo swap for %s:%x task with operator %v",
-				operator.Identifier,
-				rollbackRequest.OnChainUtxo.Txid,
-				rollbackRequest.OnChainUtxo.Vout,
-			)
-			return nil, err
-		}
-		return internalResp, err
-	})
-
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to rollback utxo swap for %x:%d", utxo.Txid, utxo.Vout)
-	} else {
-		logger.Sugar().Infof("UTXO swap rollback completed for %x:%d", utxo.Txid, utxo.Vout)
-	}
-}
-
-func (o *StaticDepositHandler) rollbackUtxoSwaUsingGossip(ctx context.Context, config *so.Config, utxo *pb.UTXO) {
+func (o *StaticDepositHandler) rollbackUtxoSwapUsingGossip(ctx context.Context, config *so.Config, utxo *pb.UTXO) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
@@ -313,11 +271,7 @@ func (o *StaticDepositHandler) createStaticDepositUtxoRefundWithRollback(ctx con
 			req.OnChainUtxo.Txid,
 			req.OnChainUtxo.Vout,
 		)
-		if k := knobs.GetKnobsService(ctx); k != nil && k.GetValue(knobs.KnobSoRollbackUtxoSwapUsingGossip, 0) > 0 {
-			o.rollbackUtxoSwaUsingGossip(ctx, config, req.OnChainUtxo)
-		} else {
-			o.rollbackUtxoSwap(ctx, config, req.OnChainUtxo)
-		}
+		o.rollbackUtxoSwapUsingGossip(ctx, config, req.OnChainUtxo)
 		return err
 	}
 
