@@ -25,7 +25,8 @@ import (
 )
 
 type QueryTokenTransactionsHandler struct {
-	config *so.Config
+	config                     *so.Config
+	includeExpiredTransactions bool
 }
 
 const (
@@ -78,7 +79,8 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 // NewQueryTokenTransactionsHandler creates a new QueryTokenTransactionsHandler.
 func NewQueryTokenTransactionsHandler(config *so.Config) *QueryTokenTransactionsHandler {
 	return &QueryTokenTransactionsHandler{
-		config: config,
+		config:                     config,
+		includeExpiredTransactions: false,
 	}
 }
 
@@ -320,18 +322,10 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(params *queryParams)
 
 	// Build transaction hash filter if provided
 	var txHashFilter string
-	var whereConditionsForTx []string
-
 	if len(params.tokenTransactionHashes) > 0 {
-		whereConditionsForTx = append(whereConditionsForTx, fmt.Sprintf("tt.finalized_token_transaction_hash = ANY($%d)", qb.argIndex))
+		txHashFilter = fmt.Sprintf(" WHERE tt.finalized_token_transaction_hash = ANY($%d)", qb.argIndex)
 		qb.args = append(qb.args, pq.Array(params.tokenTransactionHashes))
 		qb.argIndex++
-	}
-
-	whereConditionsForTx = append(whereConditionsForTx, "(tt.expiry_time IS NULL OR tt.expiry_time > NOW())")
-
-	if len(whereConditionsForTx) > 0 {
-		txHashFilter = " WHERE " + strings.Join(whereConditionsForTx, " AND ")
 	}
 
 	// Build the final query with CTE
@@ -377,13 +371,6 @@ func (h *QueryTokenTransactionsHandler) queryWithEnt(ctx context.Context, params
 	if len(params.tokenTransactionHashes) > 0 {
 		baseQuery = baseQuery.Where(tokentransaction.FinalizedTokenTransactionHashIn(params.tokenTransactionHashes...))
 	}
-
-	baseQuery = baseQuery.Where(
-		tokentransaction.Or(
-			tokentransaction.ExpiryTimeIsNil(),
-			tokentransaction.ExpiryTimeGT(time.Now()),
-		),
-	)
 
 	query := baseQuery
 	if params.order == sparkpb.Order_ASCENDING {
