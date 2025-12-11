@@ -205,59 +205,6 @@ func TestGenerateDepositAddress(t *testing.T) {
 
 	handler := NewDepositHandler(config)
 
-	t.Run("prevent duplicate static deposit address for same identity", func(t *testing.T) {
-		tx, err := ent.GetDbFromContext(ctx)
-		require.NoError(t, err)
-
-		// Generate valid secp256k1 operator public key
-		operatorPrivKey2 := keys.MustGeneratePrivateKeyFromRand(rng)
-		operatorPubKey2 := operatorPrivKey2.Public()
-		testSecretKey := keys.MustGeneratePrivateKeyFromRand(rng)
-
-		// Create a signing keyshare
-		signingKeyshare, err := tx.SigningKeyshare.Create().
-			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare(testSecretKey).
-			SetPublicShares(map[string]keys.Public{"test": testSecretKey.Public()}).
-			SetPublicKey(operatorPubKey2).
-			SetMinSigners(2).
-			SetCoordinatorIndex(0).
-			Save(ctx)
-		require.NoError(t, err)
-
-		// Create an existing static deposit address
-		existingAddress, err := tx.DepositAddress.Create().
-			SetAddress("bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e").
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
-			SetSigningKeyshare(signingKeyshare).
-			SetIsStatic(true).
-			SetNetwork(btcnetwork.Regtest).
-			Save(ctx)
-		require.NoError(t, err)
-		require.NotNil(t, existingAddress)
-
-		testConfig := &so.Config{
-			SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest},
-			SigningOperatorMap:         map[string]*so.SigningOperator{},
-			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
-		}
-
-		isStatic := true
-		req := &pb.GenerateDepositAddressRequest{
-			SigningPublicKey:  testSigningPubKey.Serialize(),
-			IdentityPublicKey: testIdentityPubKey.Serialize(),
-			Network:           pb.Network_REGTEST,
-			IsStatic:          &isStatic,
-		}
-
-		_, err = handler.GenerateDepositAddress(ctx, testConfig, req)
-		require.ErrorContains(t, err, "static deposit address already exists: bcrt1p")
-		previousError := err.Error()
-		_, err = handler.GenerateDepositAddress(ctx, testConfig, req)
-		require.EqualError(t, err, previousError)
-	})
-
 	t.Run("allow static deposit address for same identity on different network", func(t *testing.T) {
 		testConfig := &so.Config{
 			SupportedNetworks: []btcnetwork.Network{

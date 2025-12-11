@@ -59,7 +59,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	ctx, span := tracer.Start(ctx, "DepositHandler.GenerateDepositAddress")
 	defer span.End()
 
-	if req.GetIsStatic() && knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoGenerateStaticDepositAddressV2, 0) > 0 {
+	if req.GetIsStatic() {
 		res, err := o.GenerateStaticDepositAddress(ctx, config, &pb.GenerateStaticDepositAddressRequest{
 			IdentityPublicKey: req.IdentityPublicKey,
 			SigningPublicKey:  req.SigningPublicKey,
@@ -92,29 +92,6 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	reqSigningPubKey, err := keys.ParsePublicKey(req.SigningPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid signing public key: %w", err)
-	}
-
-	// TODO(LIG-8000): remove when we have a way to support multiple static deposit addresses per (identity, network).
-	if req.GetIsStatic() {
-		db, err := ent.GetDbFromContext(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
-		}
-		depositAddresses, err := db.DepositAddress.Query().
-			Where(
-				depositaddress.OwnerIdentityPubkey(reqIDPubKey),
-				depositaddress.IsStatic(true),
-			).
-			All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		// Find if there is already a static deposit address for this identity and network.
-		for _, depositAddress := range depositAddresses {
-			if utils.IsBitcoinAddressForNetwork(depositAddress.Address, network) {
-				return nil, fmt.Errorf("static deposit address already exists: %s", depositAddress.Address)
-			}
-		}
 	}
 
 	logger.Sugar().Infof("Generating deposit address for public key %s (signing %s)", reqIDPubKey, reqSigningPubKey)
@@ -164,11 +141,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		SetAddress(depositAddress)
 	// Confirmation height is not set since nothing has been confirmed yet.
 
-	if req.GetIsStatic() {
-		depositAddressMutator.SetIsStatic(true).SetIsDefault(true)
-	} else if req.LeafId != nil {
-		// Static deposit addresses are not allowed to have a leaf ID
-		// because it would be meaningless.
+	if req.LeafId != nil {
 		leafID, err := uuid.Parse(req.GetLeafId())
 		if err != nil {
 			return nil, err
@@ -314,6 +287,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 					AddressSignatures:          addressSignatures,
 					ProofOfPossessionSignature: proofOfPossessionSignature,
 				},
+				IsStatic: true,
 			},
 		}, nil
 	}
@@ -448,6 +422,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 				AddressSignatures:          addressSignatures,
 				ProofOfPossessionSignature: proofOfPossessionSignatures[0],
 			},
+			IsStatic: true,
 		},
 	}, nil
 }

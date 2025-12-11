@@ -45,7 +45,6 @@ const (
 	KnobGrpcServerConcurrencyExcludeIps     = "spark.so.grpc.server.concurrency_limit.exclude_ips"
 	KnobGrpcServerConcurrencyExcludePubkeys = "spark.so.grpc.server.concurrency_limit.exclude_pubkeys"
 
-	KnobSoGenerateStaticDepositAddressV2    = "spark.so.generate_static_deposit_address_v2"
 	KnobSoMaxTransactionsPerRequest         = "spark.so.max_transactions_per_request"
 	KnobSoMaxKeysharesPerRequest            = "spark.so.max_keyshares_per_request"
 	KnobGRPCClientTimeout                   = "spark.so.grpc.client.timeout"
