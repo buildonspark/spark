@@ -184,9 +184,10 @@ describe.each(TEST_CONFIGS)(
       }
 
       for (let index = 0; index < 100; ++index) {
-        await issuerWallet.mintTokens(tokenAmount);
+        const dynamicAmount = BigInt(index + 1);
+        await issuerWallet.mintTokens(dynamicAmount);
         await issuerWallet.transferTokens({
-          tokenAmount,
+          tokenAmount: dynamicAmount,
           tokenIdentifier: tokenIdentifier!,
           receiverSparkAddress: await userWallet.getSparkAddress(),
         });

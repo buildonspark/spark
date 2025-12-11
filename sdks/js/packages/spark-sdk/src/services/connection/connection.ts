@@ -215,6 +215,10 @@ export abstract class ConnectionManager {
     return serverTime;
   }
 
+  public isTimeSynced(): boolean {
+    return this.timeSync.isSynced();
+  }
+
   protected getMonotonicTime(): number {
     return getMonotonicTime();
   }
@@ -438,54 +442,6 @@ export abstract class ConnectionManager {
     return metadata;
   }
 
-  protected recordTimeSync(
-    dateHeader: string,
-    serverProcessingTimeMs: number,
-    sendTime: number,
-    receiveTime: number,
-  ) {
-    this.timeSync.recordSync(
-      dateHeader,
-      serverProcessingTimeMs,
-      sendTime,
-      receiveTime,
-    );
-  }
-
-  private processResponseForTimeSync(
-    result: IteratorResult<any, any>,
-    firstResponse: boolean,
-    sendTime: number,
-  ): boolean {
-    if (!firstResponse) return false;
-
-    const receiveTime = this.getMonotonicTime();
-
-    if (typeof result.value === "object" && result.value !== null) {
-      const responseObj = result.value as any;
-      if (responseObj.header && responseObj.header instanceof Metadata) {
-        const dateHeader = responseObj.header.get(
-          ConnectionManager.DATE_HEADER,
-        )?.[0];
-        const processingTimeHeader = responseObj.header.get(
-          ConnectionManager.PROCESSING_TIME_HEADER,
-        )?.[0];
-
-        if (dateHeader && processingTimeHeader) {
-          const serverProcessingTimeMs = parseFloat(processingTimeHeader);
-          this.recordTimeSync(
-            dateHeader,
-            serverProcessingTimeMs,
-            sendTime,
-            receiveTime,
-          );
-        }
-      }
-    }
-
-    return true;
-  }
-
   protected createAuthnMiddleware() {
     return async function* <Req, Res>(
       this: ConnectionManager,
@@ -512,33 +468,40 @@ export abstract class ConnectionManager {
       const metadata = this.prepareMetadata(Metadata(options.metadata));
       const authToken = await this.authenticate(address);
       const sendTime = this.getMonotonicTime();
+      const receiveTime = { value: 0 };
 
       try {
         const generator = call.next(call.request as Req, {
           ...options,
           metadata: metadata.set("Authorization", `Bearer ${authToken}`),
+          onHeader: (header: Metadata) => {
+            receiveTime.value = this.getMonotonicTime();
+
+            const dateHeader = header.get(ConnectionManager.DATE_HEADER);
+            const processingTimeHeader = header.get(
+              ConnectionManager.PROCESSING_TIME_HEADER,
+            );
+
+            if (dateHeader && processingTimeHeader) {
+              const serverProcessingTimeMs = parseFloat(processingTimeHeader);
+              this.timeSync.recordSync(
+                dateHeader,
+                serverProcessingTimeMs,
+                sendTime,
+                receiveTime.value,
+              );
+            }
+          },
         });
 
-        let firstResponse = true;
         let result = await generator.next();
 
         while (!result.done) {
-          if (firstResponse) {
-            firstResponse = this.processResponseForTimeSync(
-              result,
-              firstResponse,
-              sendTime,
-            );
-          }
-
           yield result.value;
           result = await generator.next();
         }
 
         if (result.value !== undefined) {
-          if (firstResponse) {
-            this.processResponseForTimeSync(result, firstResponse, sendTime);
-          }
           return result.value;
         }
       } catch (error: unknown) {
