@@ -257,6 +257,7 @@ function getSigningOperators(): Record<string, SigningOperator> {
 
 export function getLocalSigningOperators(): Record<string, SigningOperator> {
   const numOperators =
+    typeof process !== "undefined" &&
     process.env.NUM_SPARK_OPERATORS !== undefined
       ? parseInt(process.env.NUM_SPARK_OPERATORS, 10)
       : isHermeticTest
