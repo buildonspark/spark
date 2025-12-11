@@ -68,7 +68,9 @@ runs:
       env:
         YARN_ENABLE_GLOBAL_CACHE: "false"
       run: |
-        echo "CACHE_FOLDER=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+        CACHE_FOLDER=$(yarn config get cacheFolder)
+        mkdir -p "$CACHE_FOLDER"
+        echo "CACHE_FOLDER=$CACHE_FOLDER" >> $GITHUB_OUTPUT
         echo "CURRENT_NODE_VERSION="node-$(node --version)"" >> $GITHUB_OUTPUT
         echo "CURRENT_BRANCH=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's,/,-,g')" >> $GITHUB_OUTPUT
 
@@ -81,13 +83,6 @@ runs:
         restore-keys: |
           yarn-download-cache-${{ inputs.cache-prefix }}-
 
-    - name: ♻️ Save yarn cache
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.yarn-download-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: ${{ steps.yarn-config.outputs.CACHE_FOLDER }}
-        key: ${{ steps.yarn-download-cache.outputs.cache-primary-key }}
-
     - name: ♻️ Restore node_modules
       if: inputs.cache-node-modules == 'true'
       id: yarn-nm-cache
@@ -98,13 +93,6 @@ runs:
         # Only exact restore key makes sense for node_modules cache:
         restore-keys: |
           yarn-nm-cache-${{ inputs.cache-prefix }}-${{ runner.os }}-${{ steps.yarn-config.outputs.CURRENT_NODE_VERSION }}-main-${{ hashFiles(format('{0}/yarn.lock', inputs.cwd), format('{0}/.yarnrc.yml', inputs.cwd)) }}
-
-    - name: ♻️ Save node_modules
-      if: inputs.cache-node-modules == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.yarn-nm-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: ${{ inputs.cwd }}/**/node_modules
-        key: ${{ steps.yarn-nm-cache.outputs.cache-primary-key }}
 
     - name: ♻️ Restore yarn install state
       if: inputs.cache-install-state == 'true' && inputs.cache-node-modules == 'true'
@@ -117,13 +105,6 @@ runs:
           yarn-install-state-cache-${{ inputs.cache-prefix }}-${{ runner.os }}-${{ steps.yarn-config.outputs.CURRENT_NODE_VERSION }}-main-${{ hashFiles(format('{0}/yarn.lock', inputs.cwd), format('{0}/.yarnrc.yml', inputs.cwd)) }}
           yarn-install-state-cache-${{ inputs.cache-prefix }}-${{ runner.os }}-${{ steps.yarn-config.outputs.CURRENT_NODE_VERSION }}-
           yarn-install-state-cache-${{ inputs.cache-prefix }}-
-
-    - name: ♻️ Save yarn install state
-      if: inputs.cache-install-state == 'true' && inputs.cache-node-modules == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.yarn-install-state-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: ${{ inputs.cwd }}/.yarn/ci-cache
-        key: ${{ steps.yarn-install-state-cache.outputs.cache-primary-key }}
 
     - name: 📥 Install dependencies with prevent lock update
       if: inputs.install-mode == 'install-prevent-lock-update'
@@ -164,3 +145,24 @@ runs:
         YARN_INSTALL_STATE_PATH: ".yarn/ci-cache/install-state.gz" # Might speed up resolution step when node_modules present
         # Other environment variables
         HUSKY: "0" # By default do not run HUSKY install
+
+    - name: ♻️ Save yarn cache
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.yarn-download-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.yarn-config.outputs.CACHE_FOLDER }}
+        key: ${{ steps.yarn-download-cache.outputs.cache-primary-key }}
+
+    - name: ♻️ Save node_modules
+      if: inputs.cache-node-modules == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.yarn-nm-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ inputs.cwd }}/**/node_modules
+        key: ${{ steps.yarn-nm-cache.outputs.cache-primary-key }}
+
+    - name: ♻️ Save yarn install state
+      if: inputs.cache-install-state == 'true' && inputs.cache-node-modules == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.yarn-install-state-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ inputs.cwd }}/.yarn/ci-cache
+        key: ${{ steps.yarn-install-state-cache.outputs.cache-primary-key }}
