@@ -151,7 +151,15 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 	}
 
 	switch inferredTxType {
-	case utils.TokenTransactionTypeCreate, utils.TokenTransactionTypeMint:
+	case utils.TokenTransactionTypeCreate:
+		// We validated the signatures package above, so we know that it is finalized.
+		tokenCreate, err := lockedTokenTransaction.Edges.CreateOrErr()
+		if err != nil {
+			return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("token create edge not eager loaded or not found: %w", err))
+		}
+		finalizedCommitTransactionResponse.TokenIdentifier = tokenCreate.TokenIdentifier
+		return finalizedCommitTransactionResponse, nil
+	case utils.TokenTransactionTypeMint:
 		// We validated the signatures package above, so we know that it is finalized.
 		return finalizedCommitTransactionResponse, nil
 	case utils.TokenTransactionTypeTransfer:

@@ -3357,6 +3357,21 @@ func (m *CommitTransactionResponse) validate(all bool) error {
 		}
 	}
 
+	if m.TokenIdentifier != nil {
+
+		if len(m.GetTokenIdentifier()) != 32 {
+			err := CommitTransactionResponseValidationError{
+				field:  "TokenIdentifier",
+				reason: "value length must be 32 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return CommitTransactionResponseMultiError(errors)
 	}
@@ -3694,6 +3709,21 @@ func (m *BroadcastTransactionResponse) validate(all bool) error {
 				cause:  err,
 			}
 		}
+	}
+
+	if m.TokenIdentifier != nil {
+
+		if len(m.GetTokenIdentifier()) != 32 {
+			err := BroadcastTransactionResponseValidationError{
+				field:  "TokenIdentifier",
+				reason: "value length must be 32 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
 	}
 
 	if len(errors) > 0 {

@@ -575,7 +575,7 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 		verifyEntityCounts(t, subtestCtx, subtestClient, 1, 1, "After second block")
 	})
 
-	t.Run("same issuer different tokens in different blocks", func(t *testing.T) {
+	t.Run("same issuer different tokens in different blocks, creates two Spark tokens", func(t *testing.T) {
 		subtestCtx, subtestClient := setupSubtest(t)
 
 		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = false
@@ -592,13 +592,32 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 
 		// Process second token with same issuer but different token metadata
 		processTokenAnnouncements(t, subtestCtx, config, subtestClient, []wire.MsgTx{tx2}, "Processing second token")
-		verifyEntityCounts(t, subtestCtx, subtestClient, 2, 1, "After second token (business rule: one Spark token per issuer)")
+		verifyEntityCounts(t, subtestCtx, subtestClient, 2, 2, "After second token (business rule: Spark tokens with unique identifiers are allowed)")
 
 		// Verify the tokens have different identifiers
 		verifyTokenDifferences(t, subtestCtx, subtestClient)
 	})
 
-	t.Run("same issuer different tokens in same block", func(t *testing.T) {
+	t.Run("same issuer same token in different blocks, creates only one Spark token", func(t *testing.T) {
+		subtestCtx, subtestClient := setupSubtest(t)
+
+		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = false
+
+		// Create transactions with different token announcements from same issuer
+		tokenData1 := createValidTokenData()
+		tx1 := createTokenTransaction(tokenData1, 0)
+		tx2 := createTokenTransaction(tokenData1, 1)
+
+		// Process first token
+		processTokenAnnouncements(t, subtestCtx, config, subtestClient, []wire.MsgTx{tx1}, "Processing first token")
+		verifyEntityCounts(t, subtestCtx, subtestClient, 1, 1, "After first token")
+
+		// Process second token with same issuer but different token metadata
+		processTokenAnnouncements(t, subtestCtx, config, subtestClient, []wire.MsgTx{tx2}, "Processing second token")
+		verifyEntityCounts(t, subtestCtx, subtestClient, 1, 1, "After second token (business rule: Spark tokens must be unique by identifier)")
+	})
+
+	t.Run("same issuer different tokens in same block, creates two Spark tokens", func(t *testing.T) {
 		subtestCtx, subtestClient := setupSubtest(t)
 
 		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = false
@@ -611,9 +630,24 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 
 		// Process both tokens in the same block
 		processTokenAnnouncements(t, subtestCtx, config, subtestClient, []wire.MsgTx{tx1, tx2}, "Processing both different tokens in same block")
-		verifyEntityCounts(t, subtestCtx, subtestClient, 2, 1, "After processing both tokens (business rule: one Spark token per issuer)")
+		verifyEntityCounts(t, subtestCtx, subtestClient, 2, 2, "After processing both tokens (business rule: Spark tokens with unique identifiers are allowed)")
 
 		// Verify the tokens have different identifiers
 		verifyTokenDifferences(t, subtestCtx, subtestClient)
+	})
+
+	t.Run("same issuer same tokens in same block, creates only one Spark token", func(t *testing.T) {
+		subtestCtx, subtestClient := setupSubtest(t)
+
+		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = false
+
+		// Create transactions with different token announcements from same issuer
+		tokenData1 := createValidTokenData()
+		tx1 := createTokenTransaction(tokenData1, 0)
+		tx2 := createTokenTransaction(tokenData1, 1)
+
+		// Process both tokens in the same block
+		processTokenAnnouncements(t, subtestCtx, config, subtestClient, []wire.MsgTx{tx1, tx2}, "Processing both different tokens in same block")
+		verifyEntityCounts(t, subtestCtx, subtestClient, 1, 1, "After processing both tokens (business rule: Spark tokens must be unique by identifier)")
 	})
 }

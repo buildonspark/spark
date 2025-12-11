@@ -477,6 +477,7 @@ func TestCommitTransaction_CreateTransaction_Retry_AfterInternalSignFailed(t *te
 	// Assert that the sign step went through and returned a finalized status.
 	require.NotNil(t, resp)
 	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
+	assert.Equal(t, tokenIdentifier, resp.TokenIdentifier)
 
 	// Verify the status in the DB is in "Signed".
 	queriedDbTx, err := setup.sessionCtx.Client.TokenTransaction.Query().Only(setup.ctx)
@@ -503,6 +504,7 @@ func TestCommitTransaction_TransferTransaction_Retry_AfterInternalSignFailed(t *
 	// Assert that the sign step went through and returned a processing status.
 	require.NotNil(t, resp)
 	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
+	assert.Empty(t, resp.TokenIdentifier)
 
 	// Verify the status in the DB is "Revealed".
 	queriedDbTx, err := setup.sessionCtx.Client.TokenTransaction.Query().
@@ -534,12 +536,14 @@ func TestCommitTransaction_TransferTransaction_Retry_AfterInternalFinalizeFailed
 	require.NotNil(t, resp.CommitProgress)
 	assert.Equal(t, setup.coordinatorPubKey.Serialize(), resp.CommitProgress.CommittedOperatorPublicKeys[0])
 	assert.Equal(t, setup.mockOperatorPubKey.Serialize(), resp.CommitProgress.UncommittedOperatorPublicKeys[0])
+	assert.Empty(t, resp.TokenIdentifier)
 
 	// Call CommitTransaction again to test retrying in the reveal state - should return early with COMMIT_PROCESSING
 	resp2, err := setup.handler.CommitTransaction(setup.ctx, req)
 	require.NoError(t, err)
 	require.NotNil(t, resp2)
 	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp2.CommitStatus)
+	assert.Empty(t, resp2.TokenIdentifier)
 
 	// Validate CommitProgress shows correct operator statuses
 	require.NotNil(t, resp2.CommitProgress)
@@ -585,6 +589,7 @@ func TestCommitTransaction_TransferTransactionSimulateRace_ControlSucceedsWithVa
 	require.NotNil(t, resp)
 	// For transfer, we expect processing state in this test harness
 	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
+	assert.Empty(t, resp.TokenIdentifier)
 }
 
 func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputStatusFinalized(t *testing.T) {

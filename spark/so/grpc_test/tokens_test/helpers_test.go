@@ -599,9 +599,20 @@ func verifyNativeToken(t *testing.T, params sparkTokenCreationTestParams) []byte
 	issuerPubKey := params.issuerPrivateKey.Public()
 	resp, err := wallet.QueryTokenMetadata(t.Context(), config, nil, []keys.Public{issuerPubKey})
 	require.NoError(t, err, "failed to query created token metadata")
-	require.Len(t, resp.TokenMetadata, 1, "expected exactly 1 token metadata entry")
+	require.NotEmpty(t, resp.TokenMetadata, "expected at least one token metadata entry")
 
-	return resp.TokenMetadata[0].TokenIdentifier
+	for _, metadata := range resp.TokenMetadata {
+		if params.name == metadata.TokenName &&
+			params.ticker == metadata.TokenTicker &&
+			bytes.Equal(getTokenMaxSupplyBytes(params.maxSupply), metadata.MaxSupply) &&
+			bytes.Equal(params.extraMetadata, metadata.ExtraMetadata) {
+			return metadata.TokenIdentifier
+		}
+	}
+	require.FailNow(t, "no matching token found",
+		"expected to find token with name=%s, ticker=%s, but found %d tokens for issuer",
+		params.name, params.ticker, len(resp.TokenMetadata))
+	return nil
 }
 
 // queryAndVerifyTokenOutputs verifies the token outputs from the given finalTokenTransaction assigned to the owner private key are queryable

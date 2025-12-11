@@ -69,7 +69,7 @@ func validatePushBytes(script *bytes.Buffer) error {
 	// Parse data length based on push operation
 	var dataLength int
 	switch {
-	case pushOp >= 0x01 && pushOp < 0x4b:
+	case pushOp >= 0x01 && pushOp <= 0x4b:
 		// Direct push of 1-75 bytes
 		dataLength = int(pushOp)
 	case pushOp == txscript.OP_PUSHDATA1:
@@ -299,7 +299,6 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *
 					)
 				continue
 			}
-
 			if l1TokenToCreate != nil {
 				announcements = append(announcements, parsedAnnouncement{
 					l1TokenToCreate: l1TokenToCreate,
@@ -311,7 +310,6 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *
 	}
 
 	tokenIdentifiersAnnouncedInBlock := make(map[string]struct{})
-	issuerPublicKeysAnnouncedInBlock := make(map[keys.Public]struct{})
 	for _, ann := range announcements {
 		logger.With(zap.Stringer("issuer_public_key", ann.l1TokenToCreate.IssuerPublicKey)).
 			Sugar().
@@ -369,15 +367,17 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *
 			)
 
 		if !config.Token.DisableSparkTokenCreationForL1TokenAnnouncements {
-			exists, err := issuerAlreadyHasSparkToken(ctx, dbClient, tokenMetadata.IssuerPublicKey, issuerPublicKeysAnnouncedInBlock)
+			exists, err := tokenIdentifierAlreadyExists(ctx, dbClient, tokenIdentifier, tokenIdentifiersAnnouncedInBlock)
 			if err != nil {
 				logger.Error("Failed to check for existing spark token", zap.Error(err))
 				continue
 			}
 			if exists {
-				logger.With(zap.Stringer("issuer_public_key", tokenMetadata.IssuerPublicKey)).
+				logger.With(
+					zap.String("token_identifier", hex.EncodeToString(tokenIdentifier)),
+					zap.Stringer("issuer_public_key", tokenMetadata.IssuerPublicKey)).
 					Sugar().
-					Infof("Issuer already has a Spark token. Not creating a spark native token (txid %s).", ann.txHash)
+					Infof("Issuer already has a Spark token with this identifier (txid %s).", ann.txHash)
 			} else {
 				if err := createNativeSparkTokenEntity(ctx, dbClient, tokenMetadata, l1TokenCreate.ID); err != nil {
 					logger.With(zap.Error(err)).Sugar().Errorf("Failed to create spark native token create entity (txid %s)", ann.txHash)
@@ -385,7 +385,6 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *
 			}
 		}
 		tokenIdentifiersAnnouncedInBlock[hex.EncodeToString(tokenIdentifier)] = struct{}{}
-		issuerPublicKeysAnnouncedInBlock[ann.l1TokenToCreate.IssuerPublicKey] = struct{}{}
 	}
 	return nil
 }
@@ -415,13 +414,13 @@ func isDuplicateAnnouncement(ctx context.Context, dbClient *ent.Client, tokenIde
 	if exists {
 		return true, nil
 	}
-	_, ok := tokenIdentifiersAnnouncedInBlock[string(tokenIdentifier)]
+	_, ok := tokenIdentifiersAnnouncedInBlock[hex.EncodeToString(tokenIdentifier)]
 	return ok, nil
 }
 
-func issuerAlreadyHasSparkToken(ctx context.Context, dbClient *ent.Client, issuerPublicKey keys.Public, issuerPublicKeysAnnouncedInBlock map[keys.Public]struct{}) (bool, error) {
+func tokenIdentifierAlreadyExists(ctx context.Context, dbClient *ent.Client, tokenIdentifier common.TokenIdentifier, tokenIdentifiersAnnouncedInBlock map[string]struct{}) (bool, error) {
 	exists, err := dbClient.TokenCreate.Query().
-		Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey)).
+		Where(tokencreate.TokenIdentifierEQ(tokenIdentifier)).
 		Exist(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to query for existing spark token: %w", err)
@@ -429,6 +428,6 @@ func issuerAlreadyHasSparkToken(ctx context.Context, dbClient *ent.Client, issue
 	if exists {
 		return true, nil
 	}
-	_, ok := issuerPublicKeysAnnouncedInBlock[issuerPublicKey]
-	return ok, nil
+	_, duplicateInBlock := tokenIdentifiersAnnouncedInBlock[string(tokenIdentifier)]
+	return duplicateInBlock, nil
 }

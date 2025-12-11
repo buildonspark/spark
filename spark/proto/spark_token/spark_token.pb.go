@@ -1579,8 +1579,10 @@ type CommitTransactionResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	CommitStatus   CommitStatus           `protobuf:"varint,1,opt,name=commit_status,json=commitStatus,proto3,enum=spark_token.CommitStatus" json:"commit_status,omitempty"`
 	CommitProgress *CommitProgress        `protobuf:"bytes,2,opt,name=commit_progress,json=commitProgress,proto3" json:"commit_progress,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// The raw token identifier is returned on create transactions
+	TokenIdentifier []byte `protobuf:"bytes,3,opt,name=token_identifier,json=tokenIdentifier,proto3,oneof" json:"token_identifier,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CommitTransactionResponse) Reset() {
@@ -1623,6 +1625,13 @@ func (x *CommitTransactionResponse) GetCommitStatus() CommitStatus {
 func (x *CommitTransactionResponse) GetCommitProgress() *CommitProgress {
 	if x != nil {
 		return x.CommitProgress
+	}
+	return nil
+}
+
+func (x *CommitTransactionResponse) GetTokenIdentifier() []byte {
+	if x != nil {
+		return x.TokenIdentifier
 	}
 	return nil
 }
@@ -1696,8 +1705,10 @@ type BroadcastTransactionResponse struct {
 	FinalTokenTransaction *FinalTokenTransaction `protobuf:"bytes,1,opt,name=final_token_transaction,json=finalTokenTransaction,proto3" json:"final_token_transaction,omitempty"`
 	CommitStatus          CommitStatus           `protobuf:"varint,2,opt,name=commit_status,json=commitStatus,proto3,enum=spark_token.CommitStatus" json:"commit_status,omitempty"`
 	CommitProgress        *CommitProgress        `protobuf:"bytes,3,opt,name=commit_progress,json=commitProgress,proto3" json:"commit_progress,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// The raw token identifier is returned on create transactions
+	TokenIdentifier []byte `protobuf:"bytes,4,opt,name=token_identifier,json=tokenIdentifier,proto3,oneof" json:"token_identifier,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *BroadcastTransactionResponse) Reset() {
@@ -1747,6 +1758,13 @@ func (x *BroadcastTransactionResponse) GetCommitStatus() CommitStatus {
 func (x *BroadcastTransactionResponse) GetCommitProgress() *CommitProgress {
 	if x != nil {
 		return x.CommitProgress
+	}
+	return nil
+}
+
+func (x *BroadcastTransactionResponse) GetTokenIdentifier() []byte {
+	if x != nil {
+		return x.TokenIdentifier
 	}
 	return nil
 }
@@ -2787,18 +2805,22 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x19owner_identity_public_key\x18\x04 \x01(\fB\a\xfaB\x04z\x02h!R\x16ownerIdentityPublicKey\"\xba\x01\n" +
 	"\x0eCommitProgress\x12Q\n" +
 	"\x1ecommitted_operator_public_keys\x18\x01 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x1bcommittedOperatorPublicKeys\x12U\n" +
-	" uncommitted_operator_public_keys\x18\x02 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x1duncommittedOperatorPublicKeys\"\xa1\x01\n" +
+	" uncommitted_operator_public_keys\x18\x02 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x1duncommittedOperatorPublicKeys\"\xef\x01\n" +
 	"\x19CommitTransactionResponse\x12>\n" +
 	"\rcommit_status\x18\x01 \x01(\x0e2\x19.spark_token.CommitStatusR\fcommitStatus\x12D\n" +
-	"\x0fcommit_progress\x18\x02 \x01(\v2\x1b.spark_token.CommitProgressR\x0ecommitProgress\"\xa6\x02\n" +
+	"\x0fcommit_progress\x18\x02 \x01(\v2\x1b.spark_token.CommitProgressR\x0ecommitProgress\x127\n" +
+	"\x10token_identifier\x18\x03 \x01(\fB\a\xfaB\x04z\x02h H\x00R\x0ftokenIdentifier\x88\x01\x01B\x13\n" +
+	"\x11_token_identifier\"\xa6\x02\n" +
 	"\x1bBroadcastTransactionRequest\x127\n" +
 	"\x13identity_public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\x11identityPublicKey\x12`\n" +
 	"\x19partial_token_transaction\x18\x02 \x01(\v2$.spark_token.PartialTokenTransactionR\x17partialTokenTransaction\x12l\n" +
-	"\"token_transaction_owner_signatures\x18\x03 \x03(\v2\x1f.spark_token.SignatureWithIndexR\x1ftokenTransactionOwnerSignatures\"\x80\x02\n" +
+	"\"token_transaction_owner_signatures\x18\x03 \x03(\v2\x1f.spark_token.SignatureWithIndexR\x1ftokenTransactionOwnerSignatures\"\xce\x02\n" +
 	"\x1cBroadcastTransactionResponse\x12Z\n" +
 	"\x17final_token_transaction\x18\x01 \x01(\v2\".spark_token.FinalTokenTransactionR\x15finalTokenTransaction\x12>\n" +
 	"\rcommit_status\x18\x02 \x01(\x0e2\x19.spark_token.CommitStatusR\fcommitStatus\x12D\n" +
-	"\x0fcommit_progress\x18\x03 \x01(\v2\x1b.spark_token.CommitProgressR\x0ecommitProgress\"\x92\x01\n" +
+	"\x0fcommit_progress\x18\x03 \x01(\v2\x1b.spark_token.CommitProgressR\x0ecommitProgress\x127\n" +
+	"\x10token_identifier\x18\x04 \x01(\fB\a\xfaB\x04z\x02h H\x00R\x0ftokenIdentifier\x88\x01\x01B\x13\n" +
+	"\x11_token_identifier\"\x92\x01\n" +
 	"\x19QueryTokenMetadataRequest\x129\n" +
 	"\x11token_identifiers\x18\x01 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h R\x10tokenIdentifiers\x12:\n" +
 	"\x12issuer_public_keys\x18\x02 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x10issuerPublicKeys\"\xf0\x03\n" +
@@ -3055,6 +3077,8 @@ func file_spark_token_proto_init() {
 		(*FinalTokenTransaction_TransferInput)(nil),
 		(*FinalTokenTransaction_CreateInput)(nil),
 	}
+	file_spark_token_proto_msgTypes[18].OneofWrappers = []any{}
+	file_spark_token_proto_msgTypes[20].OneofWrappers = []any{}
 	file_spark_token_proto_msgTypes[22].OneofWrappers = []any{}
 	file_spark_token_proto_msgTypes[32].OneofWrappers = []any{}
 	type x struct{}

@@ -273,18 +273,18 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	t.Logf("Valid script hex: %x", validScript)
 	validTokenTx := wire.MsgTx{TxOut: []*wire.TxOut{{Value: 0, PkScript: validScript}}}
 
-	// A second valid token announcement with the same issuer pubkey (should be rejected as duplicate)
+	// A duplicate token announcement with the same issuer pubkey and the same token metadata (should be rejected as duplicate)
 	duplicateScriptData := func() []byte {
 		s := []byte(announcementPrefix)
 		s = append(s, creationAnnouncementKind[:]...)
-		s = append(s, validIssuerPubKey.Serialize()...) // Same issuer pubkey
-		s = append(s, 4)
-		s = append(s, []byte("DUP1")...)
-		s = append(s, 4)
-		s = append(s, []byte("DUP1")...)
-		s = append(s, 6)
+		s = append(s, validIssuerPubKey.Serialize()...)
+		s = append(s, 9) // "TestToken"
+		s = append(s, []byte("TestToken")...)
+		s = append(s, 4) // "TICK"
+		s = append(s, []byte("TICK")...)
+		s = append(s, 8)
 		s = append(s, make([]byte, 16)...)
-		return append(s, 0)
+		return append(s, 1)
 	}()
 	b2 := txscript.NewScriptBuilder()
 	b2.AddOp(txscript.OP_RETURN)
@@ -293,6 +293,26 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	require.NoError(t, err)
 	duplicateTokenTx := wire.MsgTx{TxOut: []*wire.TxOut{{Value: 0, PkScript: duplicateScript}}}
 
+	// A valid token announcement with the same issuer pubkey and different token metadata (should be created as a new token)
+	validScriptData2 := func() []byte {
+		s := []byte(announcementPrefix)
+		s = append(s, creationAnnouncementKind[:]...)
+		s = append(s, validIssuerPubKey.Serialize()...) // Same issuer pubkey
+		s = append(s, 10)
+		s = append(s, []byte("TestToken2")...)
+		s = append(s, 5)
+		s = append(s, []byte("TICK2")...)
+		s = append(s, 8)
+		s = append(s, make([]byte, 16)...)
+		return append(s, 1)
+	}()
+	b3 := txscript.NewScriptBuilder()
+	b3.AddOp(txscript.OP_RETURN)
+	b3.AddData(validScriptData2)
+	validScript2, err := b3.Script()
+	require.NoError(t, err)
+	validTokenTx2 := wire.MsgTx{TxOut: []*wire.TxOut{{Value: 0, PkScript: validScript2}}}
+
 	// An invalid token announcement script that should cause a parsing error
 	invalidScriptData := func() []byte {
 		s := []byte(announcementPrefix)
@@ -300,10 +320,10 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 		s = append(s, make([]byte, 33)...)
 		return append(s, 1) // Invalid name length
 	}()
-	b3 := txscript.NewScriptBuilder()
-	b3.AddOp(txscript.OP_RETURN)
-	b3.AddData(invalidScriptData)
-	invalidScript, err := b3.Script()
+	b4 := txscript.NewScriptBuilder()
+	b4.AddOp(txscript.OP_RETURN)
+	b4.AddData(invalidScriptData)
+	invalidScript, err := b4.Script()
 	require.NoError(t, err)
 	invalidTokenTx := wire.MsgTx{TxOut: []*wire.TxOut{{Value: 0, PkScript: invalidScript}}}
 
@@ -311,7 +331,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	nonAnnouncementScript := []byte{txscript.OP_DUP, txscript.OP_HASH160}
 	nonAnnouncementTx := wire.MsgTx{TxOut: []*wire.TxOut{{Value: 1000, PkScript: nonAnnouncementScript}}}
 
-	txs := []wire.MsgTx{validTokenTx, duplicateTokenTx, invalidTokenTx, nonAnnouncementTx, refundTx}
+	txs := []wire.MsgTx{validTokenTx, duplicateTokenTx, validTokenTx2, invalidTokenTx, nonAnnouncementTx, refundTx}
 
 	// Disable LRC20 RPCs because we are only interested in testing SO logic.
 	config := so.Config{
@@ -332,7 +352,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	err = handleBlock(ctx, &config, dbTx, bitcoinClient, txs, blockHeight, btcnetwork.Testnet)
 	require.NoError(t, err)
 
-	// Both token announcements should be created as L1TokenCreate, but only one TokenCreate should be created
+	// Both valid token announcements should be created as L1TokenCreate, the duplicate token announcement should not get created as a L1TokenCreate
 	l1CreatedTokens, err := dbTx.L1TokenCreate.Query().All(ctx)
 	require.NoError(t, err)
 	require.Len(t, l1CreatedTokens, 2)
@@ -343,7 +363,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 		switch token.TokenName {
 		case "TestToken":
 			validToken = token
-		case "DUP1":
+		case "TestToken2":
 			duplicateToken = token
 		}
 	}
@@ -352,17 +372,20 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	assert.Equal(t, "TestToken", validToken.TokenName)
 	assert.Equal(t, "TICK", validToken.TokenTicker)
 	assert.Equal(t, validIssuerPubKey, validToken.IssuerPublicKey)
-	assert.Equal(t, "DUP1", duplicateToken.TokenName)
-	assert.Equal(t, "DUP1", duplicateToken.TokenTicker)
+	assert.Equal(t, "TestToken2", duplicateToken.TokenName)
+	assert.Equal(t, "TICK2", duplicateToken.TokenTicker)
 	assert.Equal(t, validIssuerPubKey, duplicateToken.IssuerPublicKey)
 
-	// Only one TokenCreate should be created (duplicate issuer filtered out)
+	// Two TokenCreates should be created (one for each valid token announcement)
 	createdTokens, err := dbTx.TokenCreate.Query().All(ctx)
 	require.NoError(t, err)
-	require.Len(t, createdTokens, 1)
+	require.Len(t, createdTokens, 2)
 	assert.Equal(t, "TestToken", createdTokens[0].TokenName)
 	assert.Equal(t, "TICK", createdTokens[0].TokenTicker)
 	assert.Equal(t, validIssuerPubKey, createdTokens[0].IssuerPublicKey)
+	assert.Equal(t, "TestToken2", createdTokens[1].TokenName)
+	assert.Equal(t, "TICK2", createdTokens[1].TokenTicker)
+	assert.Equal(t, validIssuerPubKey, createdTokens[1].IssuerPublicKey)
 
 	// And the tree node should have been refunded
 	node, err := dbTx.TreeNode.Get(ctx, treeNode.ID)

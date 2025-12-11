@@ -239,6 +239,8 @@ message CommitProgress {
 message CommitTransactionResponse {
     CommitStatus commit_status = 1;
     CommitProgress commit_progress = 2;
+    // The raw token identifier is returned on create transactions
+    optional bytes token_identifier = 3 [(validate.rules).bytes.len = 32];
 }
 
 
@@ -256,6 +258,8 @@ message BroadcastTransactionResponse {
     FinalTokenTransaction final_token_transaction = 1;
     CommitStatus commit_status = 2;
     CommitProgress commit_progress = 3;
+    // The raw token identifier is returned on create transactions
+    optional bytes token_identifier = 4 [(validate.rules).bytes.len = 32];
 }
 
 

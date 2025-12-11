@@ -154,7 +154,7 @@ func TestCreateNativeSparkTokenScenarios(t *testing.T) {
 		secondTokenParams *sparkTokenCreationTestParams
 	}{
 		{
-			name: "create second token with same issuer key should fail",
+			name: "create second token with same issuer key should succeed",
 			firstTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: fixedRandomKey,
 				name:             testTokenName,
@@ -166,6 +166,21 @@ func TestCreateNativeSparkTokenScenarios(t *testing.T) {
 				name:             "Different Name",
 				ticker:           "DIFF",
 				maxSupply:        testTokenMaxSupply + 1000,
+			},
+		},
+		{
+			name: "create second token with same issuer key should fail if params are the same",
+			firstTokenParams: &sparkTokenCreationTestParams{
+				issuerPrivateKey: fixedRandomKey,
+				name:             "same params token",
+				ticker:           "SPT",
+				maxSupply:        testTokenMaxSupply,
+			},
+			secondTokenParams: &sparkTokenCreationTestParams{
+				issuerPrivateKey: fixedRandomKey,
+				name:             "same params token",
+				ticker:           "SPT",
+				maxSupply:        testTokenMaxSupply,
 				expectedError:    true,
 			},
 		},

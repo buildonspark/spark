@@ -1086,6 +1086,46 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 		verifyTimestampHeaders(t, header, "QueryTokenMetadata")
 	})
 
+	t.Run("QueryTokenMetadata returns oldest token create first for issuer with multiple tokens to preserve compatibility with legacy clients that only support one token per issuer", func(t *testing.T) {
+		privKey := keys.GeneratePrivateKey()
+		pubKey := privKey.Public().Serialize()
+
+		token1Params := sparkTokenCreationTestParams{
+			issuerPrivateKey: privKey,
+			name:             testTokenName,
+			ticker:           testTokenTicker,
+			maxSupply:        testTokenMaxSupply,
+			extraMetadata:    []byte{1, 2, 3, 4},
+		}
+		token2Params := sparkTokenCreationTestParams{
+			issuerPrivateKey: privKey,
+			name:             "Different Name",
+			ticker:           "DIFF",
+			maxSupply:        testTokenMaxSupply + 1000,
+			extraMetadata:    []byte{5, 6, 7, 8},
+		}
+		err := createNativeToken(t, token1Params)
+		require.NoError(t, err, "CreateToken should succeed")
+		firstTokenIdentifier := verifyNativeToken(t, token1Params)
+		require.NotNil(t, firstTokenIdentifier, "first token should have been created successfully")
+
+		err = createNativeToken(t, token2Params)
+		require.NoError(t, err, "CreateToken should succeed")
+		secondTokenIdentifier := verifyNativeToken(t, token2Params)
+		require.NotNil(t, secondTokenIdentifier, "second token should have been created successfully")
+
+		var header metadata.MD
+		response, err := tokenClient.QueryTokenMetadata(tmpCtx, &tokenpb.QueryTokenMetadataRequest{
+			IssuerPublicKeys: [][]byte{pubKey},
+		}, grpc.Header(&header))
+
+		require.NoError(t, err, "QueryTokenMetadata should succeed")
+		require.Len(t, response.TokenMetadata, 2, "expected 2 token metadata")
+
+		require.Equal(t, firstTokenIdentifier, response.TokenMetadata[0].TokenIdentifier, "first token metadata should be tokenIdentifier1")
+		require.Equal(t, secondTokenIdentifier, response.TokenMetadata[1].TokenIdentifier, "second token metadata should be tokenIdentifier2")
+	})
+
 	t.Run("QueryTokenTransactions", func(t *testing.T) {
 		var header metadata.MD
 		_, err := tokenClient.QueryTokenTransactions(tmpCtx, &tokenpb.QueryTokenTransactionsRequest{

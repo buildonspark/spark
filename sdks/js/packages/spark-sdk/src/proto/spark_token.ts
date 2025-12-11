@@ -388,7 +388,11 @@ export interface CommitProgress {
 
 export interface CommitTransactionResponse {
   commitStatus: CommitStatus;
-  commitProgress: CommitProgress | undefined;
+  commitProgress:
+    | CommitProgress
+    | undefined;
+  /** The raw token identifier is returned on create transactions */
+  tokenIdentifier?: Uint8Array | undefined;
 }
 
 export interface BroadcastTransactionRequest {
@@ -408,7 +412,11 @@ export interface BroadcastTransactionRequest {
 export interface BroadcastTransactionResponse {
   finalTokenTransaction: FinalTokenTransaction | undefined;
   commitStatus: CommitStatus;
-  commitProgress: CommitProgress | undefined;
+  commitProgress:
+    | CommitProgress
+    | undefined;
+  /** The raw token identifier is returned on create transactions */
+  tokenIdentifier?: Uint8Array | undefined;
 }
 
 export interface QueryTokenMetadataRequest {
@@ -2729,7 +2737,7 @@ export const CommitProgress: MessageFns<CommitProgress> = {
 };
 
 function createBaseCommitTransactionResponse(): CommitTransactionResponse {
-  return { commitStatus: 0, commitProgress: undefined };
+  return { commitStatus: 0, commitProgress: undefined, tokenIdentifier: undefined };
 }
 
 export const CommitTransactionResponse: MessageFns<CommitTransactionResponse> = {
@@ -2739,6 +2747,9 @@ export const CommitTransactionResponse: MessageFns<CommitTransactionResponse> = 
     }
     if (message.commitProgress !== undefined) {
       CommitProgress.encode(message.commitProgress, writer.uint32(18).fork()).join();
+    }
+    if (message.tokenIdentifier !== undefined) {
+      writer.uint32(26).bytes(message.tokenIdentifier);
     }
     return writer;
   },
@@ -2766,6 +2777,14 @@ export const CommitTransactionResponse: MessageFns<CommitTransactionResponse> = 
           message.commitProgress = CommitProgress.decode(reader, reader.uint32());
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.tokenIdentifier = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2779,6 +2798,7 @@ export const CommitTransactionResponse: MessageFns<CommitTransactionResponse> = 
     return {
       commitStatus: isSet(object.commitStatus) ? commitStatusFromJSON(object.commitStatus) : 0,
       commitProgress: isSet(object.commitProgress) ? CommitProgress.fromJSON(object.commitProgress) : undefined,
+      tokenIdentifier: isSet(object.tokenIdentifier) ? bytesFromBase64(object.tokenIdentifier) : undefined,
     };
   },
 
@@ -2789,6 +2809,9 @@ export const CommitTransactionResponse: MessageFns<CommitTransactionResponse> = 
     }
     if (message.commitProgress !== undefined) {
       obj.commitProgress = CommitProgress.toJSON(message.commitProgress);
+    }
+    if (message.tokenIdentifier !== undefined) {
+      obj.tokenIdentifier = base64FromBytes(message.tokenIdentifier);
     }
     return obj;
   },
@@ -2802,6 +2825,7 @@ export const CommitTransactionResponse: MessageFns<CommitTransactionResponse> = 
     message.commitProgress = (object.commitProgress !== undefined && object.commitProgress !== null)
       ? CommitProgress.fromPartial(object.commitProgress)
       : undefined;
+    message.tokenIdentifier = object.tokenIdentifier ?? undefined;
     return message;
   },
 };
@@ -2915,7 +2939,7 @@ export const BroadcastTransactionRequest: MessageFns<BroadcastTransactionRequest
 };
 
 function createBaseBroadcastTransactionResponse(): BroadcastTransactionResponse {
-  return { finalTokenTransaction: undefined, commitStatus: 0, commitProgress: undefined };
+  return { finalTokenTransaction: undefined, commitStatus: 0, commitProgress: undefined, tokenIdentifier: undefined };
 }
 
 export const BroadcastTransactionResponse: MessageFns<BroadcastTransactionResponse> = {
@@ -2928,6 +2952,9 @@ export const BroadcastTransactionResponse: MessageFns<BroadcastTransactionRespon
     }
     if (message.commitProgress !== undefined) {
       CommitProgress.encode(message.commitProgress, writer.uint32(26).fork()).join();
+    }
+    if (message.tokenIdentifier !== undefined) {
+      writer.uint32(34).bytes(message.tokenIdentifier);
     }
     return writer;
   },
@@ -2963,6 +2990,14 @@ export const BroadcastTransactionResponse: MessageFns<BroadcastTransactionRespon
           message.commitProgress = CommitProgress.decode(reader, reader.uint32());
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.tokenIdentifier = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2979,6 +3014,7 @@ export const BroadcastTransactionResponse: MessageFns<BroadcastTransactionRespon
         : undefined,
       commitStatus: isSet(object.commitStatus) ? commitStatusFromJSON(object.commitStatus) : 0,
       commitProgress: isSet(object.commitProgress) ? CommitProgress.fromJSON(object.commitProgress) : undefined,
+      tokenIdentifier: isSet(object.tokenIdentifier) ? bytesFromBase64(object.tokenIdentifier) : undefined,
     };
   },
 
@@ -2992,6 +3028,9 @@ export const BroadcastTransactionResponse: MessageFns<BroadcastTransactionRespon
     }
     if (message.commitProgress !== undefined) {
       obj.commitProgress = CommitProgress.toJSON(message.commitProgress);
+    }
+    if (message.tokenIdentifier !== undefined) {
+      obj.tokenIdentifier = base64FromBytes(message.tokenIdentifier);
     }
     return obj;
   },
@@ -3009,6 +3048,7 @@ export const BroadcastTransactionResponse: MessageFns<BroadcastTransactionRespon
     message.commitProgress = (object.commitProgress !== undefined && object.commitProgress !== null)
       ? CommitProgress.fromPartial(object.commitProgress)
       : undefined;
+    message.tokenIdentifier = object.tokenIdentifier ?? undefined;
     return message;
   },
 };

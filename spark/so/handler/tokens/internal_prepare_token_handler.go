@@ -32,6 +32,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
+	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
@@ -107,8 +108,14 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 		if err = validateIssuerSignature(finalTokenTX, req.TokenTransactionSignatures, createPubKey); err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to validate create token transaction signature", req.FinalTokenTransaction, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("failed to validate create token transaction signature: %w", err)))
 		}
-		if err = validateIssuerTokenNotAlreadyCreated(ctx, finalTokenTX); err != nil {
-			return nil, err
+		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobAllowMultipleTokenCreatesPerIssuer, 0) != 0 {
+			if err = validateTokenIdentifierNotAlreadyCreated(ctx, finalTokenTX); err != nil {
+				return nil, err
+			}
+		} else {
+			if err = validateIssuerTokenNotAlreadyCreated(ctx, finalTokenTX); err != nil {
+				return nil, err
+			}
 		}
 	case utils.TokenTransactionTypeMint:
 		mintPubKey, err := keys.ParsePublicKey(finalTokenTX.GetMintInput().GetIssuerPublicKey())
@@ -663,6 +670,41 @@ func validateIssuerTokenNotAlreadyCreated(ctx context.Context, tokenTransaction 
 	if existingTokenCreateMetadata != nil {
 		return tokens.NewTokenAlreadyCreatedError(tokenTransaction)
 	}
+	return nil
+}
+
+func validateTokenIdentifierNotAlreadyCreated(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) error {
+	createInput := tokenTransaction.GetCreateInput()
+	if createInput == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing create input"))
+	}
+
+	tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, tokenTransaction.Network)
+	if err != nil {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to create token metadata: %w", err))
+	}
+
+	computedTokenIdentifier, err := tokenMetadata.ComputeTokenIdentifier()
+	if err != nil {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to compute token identifier: %w", err))
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get database: %w", err))
+	}
+
+	exists, err := db.TokenCreate.Query().
+		Where(tokencreate.TokenIdentifierEQ(computedTokenIdentifier)).
+		Exist(ctx)
+	if err != nil {
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to check for existing token: %w", err))
+	}
+
+	if exists {
+		return tokens.NewTokenAlreadyCreatedError(tokenTransaction)
+	}
+
 	return nil
 }
 

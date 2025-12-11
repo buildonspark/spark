@@ -92,5 +92,6 @@ func (h *BroadcastTokenHandler) BroadcastTokenTransaction(
 		FinalTokenTransaction: finalForResponse,
 		CommitStatus:          commitResponse.GetCommitStatus(),
 		CommitProgress:        commitResponse.GetCommitProgress(),
+		TokenIdentifier:       commitResponse.GetTokenIdentifier(),
 	}, nil
 }

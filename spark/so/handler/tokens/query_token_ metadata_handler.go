@@ -6,6 +6,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 
+	"entgo.io/ent/dialect/sql"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -64,6 +65,7 @@ func (h *QueryTokenMetadataHandler) QueryTokenMetadata(ctx context.Context, req 
 	tokenCreateEntities, err := db.TokenCreate.Query().
 		Where(tokencreate.Or(conditions...)).
 		Select(fields...).
+		Order(tokencreate.ByCreateTime(sql.OrderAsc())). // Return the oldest first to support legacy sdks that only supported one token per issuer
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query token metadata: %w", err)
