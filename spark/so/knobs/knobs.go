@@ -76,6 +76,7 @@ const (
 	KnobReclaimRemappedOutputsIfRevealRequested = "spark.so.tokens.reclaim_remapped_outputs_if_reveal_requested"
 	KnobFinalizeCreatedSignedOutputsJustInTime  = "spark.so.tokens.finalize_created_signed_outputs_just_in_time"
 	KnobTokenTransactionV3Enabled               = "spark.so.tokens.token_transaction_v3_enabled"
+	KnobAllowMultipleTokenCreatesPerIssuer      = "spark.so.tokens.allow_multiple_token_creates_per_issuer"
 	KnobAllowExtraMetadataOnMainnet             = "spark.so.tokens.allow_extra_metadata_on_mainnet"
 
 	// Number of confirmations required before finalizing tree creation
