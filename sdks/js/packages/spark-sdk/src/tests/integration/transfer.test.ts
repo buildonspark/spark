@@ -100,7 +100,12 @@ describe.each(walletTypes)(
 
       const claimingNodes: LeafKeyTweak[] = receiverTransfer!.leaves.map(
         (leaf) => ({
-          leaf: leaf.leaf!,
+          leaf: {
+            ...leaf.leaf!,
+            refundTx: leaf.intermediateRefundTx,
+            directRefundTx: leaf.intermediateDirectRefundTx,
+            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+          },
           keyDerivation: {
             type: KeyDerivationType.ECIES,
             path: leaf.secretCipher,
@@ -197,7 +202,12 @@ describe.each(walletTypes)(
 
       const claimingNodes: LeafKeyTweak[] = receiverTransfer!.leaves.map(
         (leaf) => ({
-          leaf: leaf.leaf!,
+          leaf: {
+            ...leaf.leaf!,
+            refundTx: leaf.intermediateRefundTx,
+            directRefundTx: leaf.intermediateDirectRefundTx,
+            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+          },
           keyDerivation: {
             type: KeyDerivationType.ECIES,
             path: leaf.secretCipher,
@@ -342,7 +352,12 @@ describe.each(walletTypes)(
 
         const claimingNodes: LeafKeyTweak[] = receiverTransfer!.leaves.map(
           (leaf) => ({
-            leaf: rootNode,
+            leaf: {
+              ...rootNode,
+              refundTx: leaf.intermediateRefundTx,
+              directRefundTx: leaf.intermediateDirectRefundTx,
+              directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+            },
             keyDerivation: {
               type: KeyDerivationType.ECIES,
               path: receiverTransfer!.leaves[0]!.secretCipher,
@@ -691,7 +706,12 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
 
     const claimingNodes: LeafKeyTweak[] = receiverTransfer!.leaves.map(
       (leaf) => ({
-        leaf: leaf.leaf!,
+        leaf: {
+          ...leaf.leaf!,
+          refundTx: leaf.intermediateRefundTx,
+          directRefundTx: leaf.intermediateDirectRefundTx,
+          directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+        },
         keyDerivation: {
           type: KeyDerivationType.ECIES,
           path: leaf.secretCipher,
@@ -753,7 +773,12 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
 
     const claimingNodes: LeafKeyTweak[] = receiverTransfer!.leaves.map(
       (leaf) => ({
-        leaf: rootNode,
+        leaf: {
+          ...rootNode,
+          refundTx: leaf.intermediateRefundTx,
+          directRefundTx: leaf.intermediateDirectRefundTx,
+          directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+        },
         keyDerivation: {
           type: KeyDerivationType.ECIES,
           path: receiverTransfer!.leaves[0]!.secretCipher,
@@ -1049,7 +1074,12 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     const transfer = pendingTransfers.transfers[0]!;
 
     const claimingNodes: LeafKeyTweak[] = transfer!.leaves.map((leaf) => ({
-      leaf: leaf.leaf!,
+      leaf: {
+        ...leaf.leaf!,
+        refundTx: leaf.intermediateRefundTx,
+        directRefundTx: leaf.intermediateDirectRefundTx,
+        directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+      },
       keyDerivation: {
         type: KeyDerivationType.ECIES,
         path: leaf.secretCipher,
@@ -1112,7 +1142,12 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     const transfer = pendingTransfers.transfers[0]!;
 
     const claimingNodes: LeafKeyTweak[] = transfer!.leaves.map((leaf) => ({
-      leaf: leaf.leaf!,
+      leaf: {
+        ...leaf.leaf!,
+        refundTx: leaf.intermediateRefundTx,
+        directRefundTx: leaf.intermediateDirectRefundTx,
+        directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+      },
       keyDerivation: {
         type: KeyDerivationType.ECIES,
         path: leaf.secretCipher,

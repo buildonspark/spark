@@ -237,7 +237,12 @@ describe.each(walletTypes)(
           throw new Error("test: Leaf not found");
         }
         return {
-          leaf: leaf.leaf,
+          leaf: {
+            ...leaf.leaf,
+            refundTx: leaf.intermediateRefundTx,
+            directRefundTx: leaf.intermediateDirectRefundTx,
+            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+          },
           keyDerivation: {
             type: KeyDerivationType.ECIES,
             path: leaf.secretCipher,
@@ -356,7 +361,12 @@ describe.each(walletTypes)(
           throw new Error("test: Leaf not found");
         }
         return {
-          leaf: leaf.leaf,
+          leaf: {
+            ...leaf.leaf,
+            refundTx: leaf.intermediateRefundTx,
+            directRefundTx: leaf.intermediateDirectRefundTx,
+            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+          },
           keyDerivation: {
             type: KeyDerivationType.ECIES,
             path: leaf.secretCipher,
@@ -474,7 +484,12 @@ describe.each(walletTypes)(
           throw new Error("test: Leaf not found");
         }
         return {
-          leaf: leaf.leaf,
+          leaf: {
+            ...leaf.leaf,
+            refundTx: leaf.intermediateRefundTx,
+            directRefundTx: leaf.intermediateDirectRefundTx,
+            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+          },
           keyDerivation: {
             type: KeyDerivationType.ECIES,
             path: leaf.secretCipher,
@@ -598,7 +613,12 @@ describe.each(walletTypes)(
           throw new Error("test: Leaf not found");
         }
         return {
-          leaf: leaf.leaf,
+          leaf: {
+            ...leaf.leaf,
+            refundTx: leaf.intermediateRefundTx,
+            directRefundTx: leaf.intermediateDirectRefundTx,
+            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+          },
           keyDerivation: {
             type: KeyDerivationType.ECIES,
             path: leaf.secretCipher,

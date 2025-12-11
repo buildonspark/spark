@@ -192,7 +192,12 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
     // Try to claim leaf before exit tx confirms -> should fail
     const leavesToClaim: LeafKeyTweak[] = receiverTransfer!.leaves.map(
       (leaf) => ({
-        leaf: leaf.leaf!,
+        leaf: {
+          ...leaf.leaf!,
+          refundTx: leaf.intermediateRefundTx,
+          directRefundTx: leaf.intermediateDirectRefundTx,
+          directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+        },
         keyDerivation: {
           type: KeyDerivationType.ECIES,
           path: leaf.secretCipher,
