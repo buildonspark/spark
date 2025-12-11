@@ -3,6 +3,7 @@ package authz
 import (
 	"context"
 	"fmt"
+
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/so/authn"
@@ -49,6 +50,10 @@ func (e *Error) ToGRPCError() error {
 		code = codes.Internal
 	}
 	return status.Error(code, e.Error())
+}
+
+func (e *Error) GRPCStatus() *status.Status {
+	return status.Convert(e.ToGRPCError())
 }
 
 // EnforceSessionIdentityPublicKeyMatches checks if the request's identity public key matches the current session.

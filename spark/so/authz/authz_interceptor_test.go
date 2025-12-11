@@ -2,9 +2,13 @@ package authz
 
 import (
 	"context"
+	"fmt"
+	"math/rand/v2"
 	"strings"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -524,4 +528,79 @@ type mockServerStream struct {
 
 func (m *mockServerStream) Context() context.Context {
 	return m.ctx
+}
+
+// simpleConfig is a simple implementation of the Config interface for testing
+type simpleConfig struct {
+	authzEnforced bool
+}
+
+func (m *simpleConfig) IsAuthzEnforced() bool {
+	return m.authzEnforced
+}
+
+func TestEnforceSession_PreservesAuthErrorStatus(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+
+	tests := []struct {
+		name           string
+		setupContext   func(context.Context) context.Context
+		identityPubKey keys.Public
+		config         Config
+		expectedCode   codes.Code
+		expectedMsg    string
+	}{
+		{
+			name: "NoSession",
+			setupContext: func(ctx context.Context) context.Context {
+				// Return without adding a session
+				return ctx
+			},
+			identityPubKey: keys.MustGeneratePrivateKeyFromRand(rng).Public(),
+			config:         &simpleConfig{authzEnforced: true},
+			expectedCode:   codes.Unauthenticated,
+			expectedMsg:    "no valid session found",
+		},
+		{
+			name: "IdentityMismatch",
+			setupContext: func(ctx context.Context) context.Context {
+				// Inject a session where the identity doesn't match
+				wrongSessionKey := keys.MustGeneratePrivateKeyFromRand(rng)
+				return authn.InjectSessionForTests(ctx, wrongSessionKey.Public().ToHex(), 0)
+			},
+			identityPubKey: keys.MustGeneratePrivateKeyFromRand(rng).Public(),
+			config:         &simpleConfig{authzEnforced: true},
+			expectedCode:   codes.PermissionDenied,
+			expectedMsg:    "session identity does not match request identity",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := tt.setupContext(t.Context())
+
+			// Generate an auth error
+			err := EnforceSessionIdentityPublicKeyMatches(ctx, tt.config, tt.identityPubKey)
+			require.Error(t, err)
+
+			var authzErr *Error
+			require.ErrorAs(t, err, &authzErr)
+
+			// Imitate how tokens.FormatErrorWith... would wrap the error in real use
+			formattedErr := fmt.Errorf("dummy message: %w", err)
+
+			// Test that the status functions that an "interceptor" would use extract the correct values
+			code := status.Code(formattedErr)
+			assert.Equal(t, tt.expectedCode, code, "status.Code() for auth error is wrong")
+
+			convertedSt := status.Convert(formattedErr)
+			assert.Equal(t, tt.expectedCode, convertedSt.Code(), "status.Convert() for auth error is wrong")
+			assert.Contains(t, convertedSt.Message(), tt.expectedMsg, "status.Convert() should preserve the error message")
+
+			fromErrSt, ok := status.FromError(formattedErr)
+			require.True(t, ok, "status.FromError() should work with auth error")
+			assert.Equal(t, tt.expectedCode, fromErrSt.Code(), "status.FromError() for auth error is wrong")
+			assert.Contains(t, fromErrSt.Message(), tt.expectedMsg, "status.FromError() should preserve the error message")
+		})
+	}
 }
