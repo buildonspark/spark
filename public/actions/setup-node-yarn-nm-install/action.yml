@@ -1,0 +1,86 @@
+name: "Setup Node.js and Yarn"
+description: "Runs actions/setup-node then yarn-nm-install with consistent defaults"
+
+inputs:
+  node-version:
+    description: "Node.js version spec passed to actions/setup-node (e.g. 20.x)"
+    required: false
+    default: ""
+  node-version-file:
+    description: "Path to file containing Node version (e.g. .nvmrc)"
+    required: false
+    default: ".nvmrc"
+  skip-yarn-corepack-check:
+    description: "Sets SKIP_YARN_COREPACK_CHECK env var for actions/setup-node"
+    required: false
+    default: "true"
+
+  # Forwarded to yarn-nm-install
+  cwd:
+    description: "Working directory for yarn install"
+    required: false
+    default: "."
+  cache-prefix:
+    description: "Add a specific cache-prefix"
+    required: false
+    default: "default"
+  cache-node-modules:
+    description: "Cache node_modules"
+    required: false
+    default: "false"
+  cache-install-state:
+    description: "Cache yarn install state"
+    required: false
+    default: "false"
+  enable-corepack:
+    description: "Enable corepack"
+    required: false
+    default: "false"
+  install-mode:
+    description: "Install mode: install-prevent-lock-update, install-prevent-lock-update-skip-build, install-allow-lock-update, update-lock-only"
+    required: false
+    default: "install-prevent-lock-update"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Validate Node inputs"
+      shell: bash
+      run: |
+        if [[ -z "${{ inputs.node-version }}" ]]; then
+          if [[ -z "${{ inputs.node-version-file }}" ]]; then
+            echo "Must provide either inputs.node-version or inputs.node-version-file" >&2
+            exit 1
+          fi
+
+          if [[ ! -f "${{ inputs.node-version-file }}" ]]; then
+            echo "Node version file not found: ${{ inputs.node-version-file }}" >&2
+            exit 1
+          fi
+        fi
+
+    - name: "Setup Node.js (from version)"
+      if: inputs.node-version != ''
+      uses: actions/setup-node@v4
+      env:
+        SKIP_YARN_COREPACK_CHECK: ${{ inputs.skip-yarn-corepack-check }}
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: "Setup Node.js (from version file)"
+      if: inputs.node-version == ''
+      uses: actions/setup-node@v4
+      env:
+        SKIP_YARN_COREPACK_CHECK: ${{ inputs.skip-yarn-corepack-check }}
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+
+    - name: "Install dependencies (yarn-nm-install)"
+      uses: ./public/actions/yarn-nm-install
+      with:
+        cwd: ${{ inputs.cwd }}
+        cache-prefix: ${{ inputs.cache-prefix }}
+        cache-node-modules: ${{ inputs.cache-node-modules }}
+        cache-install-state: ${{ inputs.cache-install-state }}
+        enable-corepack: ${{ inputs.enable-corepack }}
+        install-mode: ${{ inputs.install-mode }}

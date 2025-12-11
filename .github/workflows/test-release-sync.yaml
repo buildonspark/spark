@@ -30,15 +30,8 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch-depth: 2
 
-      - name: "Setup Node ${{ inputs.node-version }}"
-        uses: actions/setup-node@v4
-        env:
-          SKIP_YARN_COREPACK_CHECK: true
-        with:
-          node-version-file: ".nvmrc"
-
-      - name: "Install dependencies with yarn cache"
-        uses: ./public/actions/yarn-nm-install
+      - name: "Setup Node.js and Yarn"
+        uses: ./public/actions/setup-node-yarn-install
         with:
           cwd: "."
           install-mode: "update-lock-only"
@@ -106,16 +99,10 @@ jobs:
         with:
           ref: ${{ needs.update-lock-file.outputs.VERIFIED_LOCK_COMMIT }}
 
-      - name: "Setup Node ${{ matrix.node-version }}"
-        uses: actions/setup-node@v4
-        env:
-          SKIP_YARN_COREPACK_CHECK: true
+      - name: Setup Node.js and Yarn
+        uses: ./public/actions/setup-node-yarn-install
         with:
-          node-version: ${{ inputs.node-version }}
-
-      - name: Install dependencies with yarn cache
-        uses: ./public/actions/yarn-nm-install
-        with:
+          node-version: ${{ matrix.node-version }}
           cwd: "."
 
       - run: "yarn build"
@@ -142,15 +129,8 @@ jobs:
       - name: "Checkout"
         uses: "actions/checkout@v4"
 
-      - name: "Setup Node"
-        uses: actions/setup-node@v4
-        env:
-          SKIP_YARN_COREPACK_CHECK: true
-        with:
-          node-version-file: ".nvmrc"
-
-      - name: Install dependencies with yarn cache
-        uses: ./public/actions/yarn-nm-install
+      - name: Setup Node.js and Yarn
+        uses: ./public/actions/setup-node-yarn-install
         with:
           cwd: "."
 
@@ -169,7 +149,7 @@ jobs:
       - name: "Install dependencies with yarn cache"
         id: update-lock-file-for-version-packages-pr
         if: steps.changesets.outputs.published == 'false' && github.ref == 'refs/heads/main'
-        uses: ./public/actions/yarn-nm-install
+        uses: ./public/actions/setup-node-yarn-install
         with:
           cwd: "."
           install-mode: "update-lock-only"

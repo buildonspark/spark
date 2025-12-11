@@ -27,18 +27,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: "Setup Node"
-        uses: actions/setup-node@v4
+      - name: "Setup Node.js and Yarn"
+        uses: ./public/actions/setup-node-yarn-install
         with:
-          node-version: "22.x"
-          cache: "yarn"
-          cache-dependency-path: "sdks/js/yarn.lock"
+          cwd: sdks/js
+          enable-corepack: "true"
+          install-mode: "update-lock-only"
 
-      - name: "Update JS SDK lockfile"
-        working-directory: sdks/js
-        run: |
-          corepack enable
-          yarn install --mode update-lockfile
       - name: "Check for lockfile changes"
         id: lockfile
         run: |

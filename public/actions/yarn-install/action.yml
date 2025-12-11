@@ -6,7 +6,7 @@
 # Usage in workflows steps:                                                            #
 #                                                                                      #
 #      - name: 📥 Monorepo install                                                     #
-#        uses: ./public/actions/yarn-nm-install                                       #
+#        uses: ./public/actions/yarn-install                                          #
 #        with:                                                                         #
 #          enable-corepack: false                   # (default = 'false')              #
 #          cwd: ${{ github.workspace }}/apps/my-app # (default = '.')                  #
@@ -47,7 +47,7 @@ inputs:
     required: false
     default: "false"
   install-mode:
-    description: "Install mode: install-prevent-lock-update, install-allow-lock-update, update-lock-only"
+    description: "Install mode: install-prevent-lock-update, install-prevent-lock-update-skip-build, install-allow-lock-update, update-lock-only"
     required: false
     default: "install-prevent-lock-update"
 
@@ -71,8 +71,10 @@ runs:
         CACHE_FOLDER=$(yarn config get cacheFolder)
         mkdir -p "$CACHE_FOLDER"
         echo "CACHE_FOLDER=$CACHE_FOLDER" >> $GITHUB_OUTPUT
-        echo "CURRENT_NODE_VERSION="node-$(node --version)"" >> $GITHUB_OUTPUT
-        echo "CURRENT_BRANCH=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's,/,-,g')" >> $GITHUB_OUTPUT
+        echo "CURRENT_NODE_VERSION=node-$(node --version)" >> $GITHUB_OUTPUT
+        BRANCH="${GITHUB_REF#refs/heads/}"
+        BRANCH="${BRANCH//\//-}"
+        echo "CURRENT_BRANCH=$BRANCH" >> $GITHUB_OUTPUT
 
     - name: ♻️ Restore yarn cache
       id: yarn-download-cache
@@ -111,6 +113,19 @@ runs:
       shell: bash
       working-directory: ${{ inputs.cwd }}
       run: yarn install --immutable --inline-builds
+      env:
+        # Overrides/align yarnrc.yml options (v3, v4) for a CI context
+        YARN_ENABLE_GLOBAL_CACHE: "false" # Use local cache folder to keep downloaded archives
+        YARN_NM_MODE: "hardlinks-local" # Reduce node_modules size
+        YARN_INSTALL_STATE_PATH: ".yarn/ci-cache/install-state.gz" # Might speed up resolution step when node_modules present
+        # Other environment variables
+        HUSKY: "0" # By default do not run HUSKY install
+
+    - name: 📥 Install dependencies (skip builds, prevent lock update)
+      if: inputs.install-mode == 'install-prevent-lock-update-skip-build'
+      shell: bash
+      working-directory: ${{ inputs.cwd }}
+      run: yarn install --immutable --mode=skip-build
       env:
         # Overrides/align yarnrc.yml options (v3, v4) for a CI context
         YARN_ENABLE_GLOBAL_CACHE: "false" # Use local cache folder to keep downloaded archives

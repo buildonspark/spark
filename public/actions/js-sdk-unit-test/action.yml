@@ -43,18 +43,11 @@ runs:
         workspaces: "signer"
         save-if: ${{ github.event_name == 'push' }}"
 
-    - name: "Setup Node ${{ inputs.node-version }}"
-      uses: actions/setup-node@v4
-      env:
-        SKIP_YARN_COREPACK_CHECK: true
+    - name: "Setup Node.js and Yarn"
+      uses: ./public/actions/setup-node-yarn-install
       with:
         node-version: ${{ inputs.node-version }}
-
-    - name: "Install dependencies"
-      uses: ./public/actions/yarn-nm-install
-      with:
         cwd: ${{ inputs.workspace }}
-        install-mode: "install-prevent-lock-update"
 
     - name: "Run build"
       shell: bash
