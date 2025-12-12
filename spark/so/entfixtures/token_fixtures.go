@@ -139,7 +139,7 @@ func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCre
 	}
 	amountBytes := make([]byte, 16)
 	amount.FillBytes(amountBytes)
-	u128Amount, err := uint128.FromBigInt(amount)
+	u128Amount, err := uint128.FromBytes(amountBytes)
 	f.RequireNoError(err)
 
 	output, err := f.Client.TokenOutput.Create().
