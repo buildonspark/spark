@@ -652,10 +652,16 @@ func handleBlock(
 				if err != nil {
 					return err
 				}
+
+				// A deposit is a two-step protocol that creates a tree in the first step.
+				// In the second step, the operators validate and populate the witness of each tree node.
+				// The witness will be valid if and only if it is populated,
+				// and this is the only available signal that the deposit is complete.
 				if !tx.HasWitness() {
 					logger.Sugar().Debugf("Tree node %s has not been signed", treeNode.ID)
 					continue
 				}
+
 				treeNode, err = dbClient.TreeNode.UpdateOne(treeNode).
 					SetStatus(st.TreeNodeStatusAvailable).
 					Save(ctx)
