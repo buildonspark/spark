@@ -184,5 +184,10 @@ describe("HTLC create and claim tests", () => {
       matchRole: PreimageRequestRole.PREIMAGE_REQUEST_ROLE_SENDER,
     });
     expect(queryWithPaymentHash.preimageRequests.length).toBe(1);
+
+    const queryWithBothRoles = await aliceWallet.queryHTLC({
+      matchRole: PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER,
+    });
+    expect(queryWithBothRoles.preimageRequests.length).toBe(2);
   }, 120000);
 });
