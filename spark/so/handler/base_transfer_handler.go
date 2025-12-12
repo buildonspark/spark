@@ -6,6 +6,7 @@ import (
 	dbSql "database/sql"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"slices"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uuids"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"go.uber.org/zap"
 
@@ -523,7 +525,7 @@ func (h *BaseTransferHandler) createTransfer(
 		}
 	}
 
-	transfer, err := transferCreate.SetNetwork(*network).Save(ctx)
+	transfer, err := transferCreate.SetNetwork(network).Save(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
@@ -633,14 +635,10 @@ func createAndLockSparkInvoice(ctx context.Context, sparkInvoice string) (uuid.U
 	return storedInvoice.ID, nil
 }
 
-func loadLeavesWithLock(ctx context.Context, db *ent.Client, leafRefundMap map[string][]byte) ([]*ent.TreeNode, *btcnetwork.Network, error) {
-	leafUUIDs := make([]uuid.UUID, 0, len(leafRefundMap))
-	for leafID := range leafRefundMap {
-		leafUUID, err := uuid.Parse(leafID)
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to parse leaf_id %s: %w", leafID, err)
-		}
-		leafUUIDs = append(leafUUIDs, leafUUID)
+func loadLeavesWithLock(ctx context.Context, db *ent.Client, leafRefundMap map[string][]byte) ([]*ent.TreeNode, btcnetwork.Network, error) {
+	leafUUIDs, err := uuids.ParseSeq(maps.Keys(leafRefundMap))
+	if err != nil {
+		return nil, btcnetwork.Unspecified, fmt.Errorf("unable to parse leaf IDs: %w", err)
 	}
 
 	leaves, err := db.TreeNode.Query().
@@ -649,26 +647,28 @@ func loadLeavesWithLock(ctx context.Context, db *ent.Client, leafRefundMap map[s
 		ForUpdate().
 		All(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to find leaves: %w", err)
+		return nil, btcnetwork.Unspecified, fmt.Errorf("unable to find leaves: %w", err)
 	}
 	if len(leaves) != len(leafRefundMap) {
-		return nil, nil, fmt.Errorf("some leaves not found")
+		return nil, btcnetwork.Unspecified, errors.New("some leaves not found")
 	}
 
 	var network *btcnetwork.Network
 	for _, leaf := range leaves {
 		tree := leaf.Edges.Tree
 		if tree == nil {
-			return nil, nil, fmt.Errorf("unable to find tree for leaf %s", leaf.ID)
+			return nil, btcnetwork.Unspecified, fmt.Errorf("unable to find tree for leaf %s", leaf.ID)
 		}
 		if network == nil {
 			network = &tree.Network
 		} else if tree.Network != *network {
-			return nil, nil, fmt.Errorf("leaves sent for transfer must be on the same network")
+			return nil, btcnetwork.Unspecified, errors.New("leaves sent for transfer must be on the same network")
 		}
 	}
-
-	return leaves, network, nil
+	if network == nil {
+		return nil, btcnetwork.Unspecified, errors.New("no network found")
+	}
+	return leaves, *network, nil
 }
 
 func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context, transfer *ent.Transfer, leaves []*ent.TreeNode, leafCpfpRefundMap map[string][]byte, leafDirectRefundMap map[string][]byte, leafDirectFromCpfpRefundMap map[string][]byte, receiverIdentityPublicKey keys.Public, requireDirectTx bool) error {
