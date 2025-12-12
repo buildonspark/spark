@@ -1,9 +1,7 @@
 package ent
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"time"
@@ -11,137 +9,79 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
-
-	"github.com/lightsparkdev/spark/so/ent/predicate"
-
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
-
+	"github.com/lightsparkdev/spark/so/ent/predicate"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 )
 
-// FetchAndLockTokenInputs fetches the transaction whose token transaction hashes
-// match the PrevTokenTransactionHash of each output, then loads the created outputs for those transactions,
-// and finally maps each input to the created output in the DB.
-// Return the TTXOs in the same order they were specified in the input object.
+// FetchAndLockTokenInputs fetches token outputs by their (tx_hash, vout) identifiers and locks them for update.
+// Returns the outputs in the same order they were specified in the input.
+//
+// This optimized version uses the denormalized created_finalized_tx_hash field to query directly
+// without joining the token_transactions table.
 func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*tokenpb.TokenOutputToSpend) ([]*TokenOutput, error) {
-	// Gather all distinct prev transaction hashes
-	var distinctTxHashes [][]byte
-	txHashMap := make(map[string]bool)
-	for _, output := range outputsToSpend {
-		if output.PrevTokenTransactionHash != nil {
-			txHashMap[string(output.PrevTokenTransactionHash)] = true
-		}
-	}
-
-	for hashStr := range txHashMap {
-		distinctTxHashes = append(distinctTxHashes, []byte(hashStr))
-	}
-
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	transactions, err := db.TokenTransaction.Query().
-		Where(tokentransaction.FinalizedTokenTransactionHashIn(distinctTxHashes...)).
-		WithCreatedOutput().
-		All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch matching transaction and outputs: %w", err)
-	}
-
-	transaction, err := GetTokenTransactionMapFromList(transactions)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transaction map: %w", err)
-	}
-
-	// For each outputToSpend, find a matching created output based on its prev transaction and prev vout fields.
-	outputToSpendEnts := make([]*TokenOutput, len(outputsToSpend))
-	for i, output := range outputsToSpend {
-		hashKey := hex.EncodeToString(output.PrevTokenTransactionHash)
-		transaction, ok := transaction[hashKey]
-		if !ok {
-			return nil, fmt.Errorf("no transaction found for prev tx hash %x", output.PrevTokenTransactionHash)
+	// Build predicates for each (tx_hash, vout) pair using the denormalized field
+	predicates := make([]predicate.TokenOutput, 0, len(outputsToSpend))
+	for _, output := range outputsToSpend {
+		if output.PrevTokenTransactionHash == nil {
+			return nil, fmt.Errorf("prev token transaction hash is nil")
 		}
-
-		var foundOutput *TokenOutput
-		for _, createdOutput := range transaction.Edges.CreatedOutput {
-			if createdOutput.CreatedTransactionOutputVout == int32(output.PrevTokenTransactionVout) {
-				foundOutput = createdOutput
-				break
-			}
-		}
-		if foundOutput == nil {
-			return nil, fmt.Errorf("no created output found for prev tx hash %x and vout %d",
-				output.PrevTokenTransactionHash,
-				output.PrevTokenTransactionVout)
-		}
-
-		outputToSpendEnts[i] = foundOutput
+		predicates = append(predicates, tokenoutput.And(
+			tokenoutput.CreatedTransactionFinalizedHash(output.PrevTokenTransactionHash),
+			tokenoutput.CreatedTransactionOutputVout(int32(output.PrevTokenTransactionVout)),
+		))
 	}
 
-	outputIDs := make([]uuid.UUID, len(outputToSpendEnts))
-	for i, output := range outputToSpendEnts {
-		outputIDs[i] = output.ID
-	}
-
+	// Query all outputs matching any of the (tx_hash, vout) pairs and lock them
 	lockedOutputs, err := db.TokenOutput.Query().
-		Where(tokenoutput.IDIn(outputIDs...)).
-		WithOutputSpentTokenTransaction(
-			func(q *TokenTransactionQuery) {
-				q.ForUpdate()
-			},
-		).
+		Where(tokenoutput.Or(predicates...)).
+		WithOutputSpentTokenTransaction(func(q *TokenTransactionQuery) {
+			q.ForUpdate()
+		}).
 		ForUpdate().
 		All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to lock outputs for update: %w", err)
+		return nil, fmt.Errorf("failed to fetch and lock outputs: %w", err)
 	}
 
-	if len(lockedOutputs) != len(outputToSpendEnts) {
-		return nil, fmt.Errorf("failed to lock all outputs: expected %d, got %d", len(outputToSpendEnts), len(lockedOutputs))
+	// Build a map for quick lookup by (tx_hash, vout)
+	type outputKey struct {
+		txHash string
+		vout   int32
 	}
-
-	lockedOutputMap := make(map[uuid.UUID]*TokenOutput)
+	outputMap := make(map[outputKey]*TokenOutput, len(lockedOutputs))
 	for _, output := range lockedOutputs {
-		lockedOutputMap[output.ID] = output
+		key := outputKey{
+			txHash: string(output.CreatedTransactionFinalizedHash),
+			vout:   output.CreatedTransactionOutputVout,
+		}
+		outputMap[key] = output
 	}
 
-	for i, output := range outputToSpendEnts {
-		lockedOutput, ok := lockedOutputMap[output.ID]
+	// Return outputs in the same order as the input
+	result := make([]*TokenOutput, len(outputsToSpend))
+	for i, output := range outputsToSpend {
+		key := outputKey{
+			txHash: string(output.PrevTokenTransactionHash),
+			vout:   int32(output.PrevTokenTransactionVout),
+		}
+		lockedOutput, ok := outputMap[key]
 		if !ok {
-			return nil, fmt.Errorf("unable to lock output prior to spending for ID %s", output.ID)
+			return nil, fmt.Errorf("no output found for prev tx hash %x and vout %d",
+				output.PrevTokenTransactionHash,
+				output.PrevTokenTransactionVout)
 		}
-
-		if err := validateTokenOutputIntegrity(output, lockedOutput); err != nil {
-			return nil, err
-		}
-
-		// Replace unlocked outputs with locked outputs.
-		outputToSpendEnts[i] = lockedOutput
+		result[i] = lockedOutput
 	}
 
-	return outputToSpendEnts, nil
-}
-
-// validateTokenOutputIntegrity validates that no critical fields changed between the original fetch and the locked version.
-func validateTokenOutputIntegrity(original, locked *TokenOutput) error {
-	if locked.Status != original.Status {
-		return fmt.Errorf("output status changed between fetching and locking prior to spending for ID %s (original: %v, locked: %v)", original.ID, original.Status, locked.Status)
-	}
-
-	originalSpentTx := original.Edges.OutputSpentTokenTransaction
-	lockedSpentTx := locked.Edges.OutputSpentTokenTransaction
-
-	if originalSpentTx != nil && lockedSpentTx != nil {
-		if !bytes.Equal(originalSpentTx.FinalizedTokenTransactionHash, lockedSpentTx.FinalizedTokenTransactionHash) {
-			return fmt.Errorf("output assigned to different transaction hash between fetching and locking for ID %s", original.ID)
-		}
-	}
-
-	return nil
+	return result, nil
 }
 
 // GetOwnedTokenOutputsParams holds the parameters for GetOwnedTokenOutputs
