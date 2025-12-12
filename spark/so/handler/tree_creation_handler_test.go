@@ -91,8 +91,7 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 				RawTx: []byte{0x01, 0x02}, // invalid tx
 				Vout:  0,
 			},
-			expectError:           true,
-			expectedErrorContains: "EOF", // The actual error from Bitcoin transaction parsing
+			expectError: true,
 		},
 		{
 			name:                  "vout out of bounds",

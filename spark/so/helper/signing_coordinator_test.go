@@ -132,12 +132,11 @@ func TestNewSigningJob_InvalidInputs(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name:          "malformed raw tx",
-			keyshare:      pubKey,
-			protoPub:      pubKey,
-			rawTx:         []byte{0x00, 0x01, 0x02},
-			commit:        &pbcommon.SigningCommitment{Binding: pubKey.Serialize(), Hiding: pubKey.Serialize()},
-			expectedError: "unexpected EOF",
+			name:     "malformed raw tx",
+			keyshare: pubKey,
+			protoPub: pubKey,
+			rawTx:    []byte{0x00, 0x01, 0x02},
+			commit:   &pbcommon.SigningCommitment{Binding: pubKey.Serialize(), Hiding: pubKey.Serialize()},
 		},
 		{
 			name:          "malformed commitment",

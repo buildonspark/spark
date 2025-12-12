@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"encoding/hex"
+	"runtime"
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -348,4 +349,28 @@ func TestValidateBitcoinTxVersion(t *testing.T) {
 		err := ValidateBitcoinTxVersion(tx)
 		require.NoError(t, err)
 	})
+}
+
+func measureMemory(fn func()) uint64 {
+	var m1, m2 runtime.MemStats
+
+	runtime.GC() // Force GC to get accurate baseline
+	runtime.ReadMemStats(&m1)
+
+	fn()
+
+	runtime.GC()
+	runtime.ReadMemStats(&m2)
+
+	return m2.TotalAlloc - m1.TotalAlloc
+}
+
+func TestMaliciousTransaction(t *testing.T) {
+	// This transaction claims 3.7m outputs without providing any data.
+	txHex := "02000000000100fe8fe33800"
+	memory := measureMemory(func() {
+		_, err := TxFromRawTxHex(txHex)
+		require.Error(t, err)
+	})
+	require.Less(t, memory, uint64(1024*1024))
 }

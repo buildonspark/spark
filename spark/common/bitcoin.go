@@ -93,14 +93,132 @@ func TxFromRawTxHex(rawTxHex string) (*wire.MsgTx, error) {
 	return TxFromRawTxBytes(txBytes)
 }
 
+// MaxTxSize is the maximum allowed transaction size in bytes.
+// This prevents memory exhaustion attacks from malicious transactions that claim
+// huge input/output counts. Set to 400KB which is well above the standard
+// transaction size limit (100KB) but provides a reasonable safety margin.
+const MaxTxSize = 400_000
+
+// MaxTxInputs is the maximum number of inputs allowed in a transaction.
+// This is a sanity check to prevent memory exhaustion from malformed transactions.
+const MaxTxInputs = 10000
+
+// MaxTxOutputs is the maximum number of outputs allowed in a transaction.
+// This is a sanity check to prevent memory exhaustion from malformed transactions.
+const MaxTxOutputs = 10000
+
 // TxFromRawTxBytes returns a btcd MsgTx from a raw tx bytes.
 func TxFromRawTxBytes(rawTxBytes []byte) (*wire.MsgTx, error) {
+	// Validate transaction size to prevent memory exhaustion attacks.
+	// Malicious transactions can claim huge input/output counts via VarInts,
+	// causing btcd to pre-allocate massive slices before discovering the data is truncated.
+	if len(rawTxBytes) > MaxTxSize {
+		return nil, fmt.Errorf("transaction size %d exceeds maximum allowed size %d", len(rawTxBytes), MaxTxSize)
+	}
+
+	// Pre-validate the transaction structure to prevent memory exhaustion.
+	// This checks that claimed input/output counts are reasonable before btcd allocates memory.
+	if err := validateTxStructure(rawTxBytes); err != nil {
+		return nil, fmt.Errorf("invalid transaction structure: %w", err)
+	}
+
 	var tx wire.MsgTx
 	err := tx.Deserialize(bytes.NewReader(rawTxBytes))
 	if err != nil {
 		return nil, err
 	}
 	return &tx, nil
+}
+
+// validateTxStructure performs a lightweight pre-validation of the transaction
+// to ensure claimed input/output counts are reasonable before btcd allocates memory.
+func validateTxStructure(rawTxBytes []byte) error {
+	if len(rawTxBytes) < 10 {
+		return fmt.Errorf("transaction too short: %d bytes", len(rawTxBytes))
+	}
+
+	// Skip version (4 bytes)
+	offset := 4
+
+	// Check for segwit marker and flag
+	if rawTxBytes[offset] == 0x00 && rawTxBytes[offset+1] == 0x01 {
+		offset += 2
+	}
+
+	// Read input count
+	inputCount, bytesRead := readVarInt(rawTxBytes[offset:])
+	if bytesRead == 0 {
+		return fmt.Errorf("failed to read input count")
+	}
+	if inputCount > MaxTxInputs {
+		return fmt.Errorf("input count %d exceeds maximum %d", inputCount, MaxTxInputs)
+	}
+	offset += bytesRead
+
+	// Skip inputs - we just need to get past them to read output count
+	// Each input is at minimum 41 bytes (32 prevout hash + 4 index + 1 script len + 4 sequence)
+	minInputSize := 41
+	for i := uint64(0); i < inputCount; i++ {
+		if offset+minInputSize > len(rawTxBytes) {
+			return fmt.Errorf("transaction truncated while reading inputs")
+		}
+		// Skip prevout (36 bytes)
+		offset += 36
+		// Read script length and skip script
+		scriptLen, bytesReadLoop := readVarInt(rawTxBytes[offset:])
+		if bytesReadLoop == 0 {
+			return fmt.Errorf("failed to read input script length")
+		}
+		offset += bytesReadLoop + int(scriptLen)
+		// Skip sequence (4 bytes)
+		offset += 4
+		if offset > len(rawTxBytes) {
+			return fmt.Errorf("transaction truncated while reading inputs")
+		}
+	}
+
+	// Read output count
+	if offset >= len(rawTxBytes) {
+		return fmt.Errorf("transaction truncated before output count")
+	}
+	outputCount, bytesRead := readVarInt(rawTxBytes[offset:])
+	if bytesRead == 0 {
+		return fmt.Errorf("failed to read output count")
+	}
+	if outputCount > MaxTxOutputs {
+		return fmt.Errorf("output count %d exceeds maximum %d", outputCount, MaxTxOutputs)
+	}
+	return nil
+}
+
+// readVarInt reads a variable length integer from the byte slice.
+// Returns the value and number of bytes read, or 0 bytes read on error.
+func readVarInt(buf []byte) (uint64, int) {
+	if len(buf) == 0 {
+		return 0, 0
+	}
+
+	discriminant := buf[0]
+	switch {
+	case discriminant < 0xfd:
+		return uint64(discriminant), 1
+	case discriminant == 0xfd:
+		if len(buf) < 3 {
+			return 0, 0
+		}
+		return uint64(buf[1]) | uint64(buf[2])<<8, 3
+	case discriminant == 0xfe:
+		if len(buf) < 5 {
+			return 0, 0
+		}
+		return uint64(buf[1]) | uint64(buf[2])<<8 | uint64(buf[3])<<16 | uint64(buf[4])<<24, 5
+	default: // 0xff
+		if len(buf) < 9 {
+			return 0, 0
+		}
+		return uint64(buf[1]) | uint64(buf[2])<<8 | uint64(buf[3])<<16 | uint64(buf[4])<<24 |
+			uint64(buf[5])<<32 | uint64(buf[6])<<40 | uint64(buf[7])<<48 | uint64(buf[8])<<56, 9
+	}
 }
 
 // ValidateBitcoinTxVersion validates that a Bitcoin transaction has a valid version (>= 2).
