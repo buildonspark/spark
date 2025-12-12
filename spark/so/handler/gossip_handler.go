@@ -90,33 +90,45 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 }
 
 func (h *GossipHandler) handleCancelTransferGossipMessage(ctx context.Context, cancelTransfer *pbgossip.GossipMessageCancelTransfer) error {
+	transferID, err := uuid.Parse(cancelTransfer.GetTransferId())
+	if err != nil {
+		return fmt.Errorf("failed to cancel transfer: invalid transfer ID: %s: %w", cancelTransfer.GetTransferId(), err)
+	}
 	transferHandler := NewBaseTransferHandler(h.config)
-	err := transferHandler.CancelTransferInternal(ctx, cancelTransfer.TransferId)
+	err = transferHandler.CancelTransferInternal(ctx, transferID)
 	if err != nil {
 		logger := logging.GetLoggerFromContext(ctx)
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to cancel transfer %s", cancelTransfer.TransferId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to cancel transfer %s", transferID)
 	}
 	return err
 }
 
 func (h *GossipHandler) handleSettleSenderKeyTweakGossipMessage(ctx context.Context, settleSenderKeyTweak *pbgossip.GossipMessageSettleSenderKeyTweak) error {
 	transferHandler := NewBaseTransferHandler(h.config)
-	_, err := transferHandler.CommitSenderKeyTweaks(ctx, settleSenderKeyTweak.TransferId, settleSenderKeyTweak.SenderKeyTweakProofs)
+	transferID, err := uuid.Parse(settleSenderKeyTweak.GetTransferId())
+	if err != nil {
+		return fmt.Errorf("failed to settle sender key tweak: invalid transfer ID: %s: %w", settleSenderKeyTweak.GetTransferId(), err)
+	}
+	_, err = transferHandler.CommitSenderKeyTweaks(ctx, transferID, settleSenderKeyTweak.SenderKeyTweakProofs)
 	if err != nil {
 		logger := logging.GetLoggerFromContext(ctx)
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle sender key tweak for transfer %s", settleSenderKeyTweak.TransferId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle sender key tweak for transfer %s", transferID)
 	}
 	return err
 }
 
 func (h *GossipHandler) handleRollbackTransfer(ctx context.Context, req *pbgossip.GossipMessageRollbackTransfer) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Handling rollback transfer gossip message for transfer %s", req.TransferId)
+	transferID, err := uuid.Parse(req.GetTransferId())
+	if err != nil {
+		return fmt.Errorf("failed to roll back transfer: invalid transfer ID: %s: %w", req.GetTransferId(), err)
+	}
+
+	logger.Sugar().Infof("Handling rollback transfer gossip message for transfer %s", transferID)
 
 	baseHandler := NewBaseTransferHandler(h.config)
-	err := baseHandler.RollbackTransfer(ctx, req.TransferId)
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to rollback transfer %s", req.TransferId)
+	if err := baseHandler.RollbackTransfer(ctx, transferID); err != nil {
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to rollback transfer %s", transferID)
 	}
 	return err
 }
@@ -146,8 +158,7 @@ func (h *GossipHandler) handleMarkTreesExited(ctx context.Context, req *pbgossip
 	}
 
 	treeExitHandler := NewTreeExitHandler(h.config)
-	err = treeExitHandler.MarkTreesExited(ctx, trees)
-	if err != nil {
+	if err := treeExitHandler.MarkTreesExited(ctx, trees); err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to mark trees %+q exited", req.TreeIds)
 	}
 	return err
@@ -163,10 +174,9 @@ func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, r
 		return err
 	}
 
-	// Parse tree ID
-	treeID, err := uuid.Parse(req.TreeId)
+	treeID, err := uuid.Parse(req.GetTreeId())
 	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to parse tree ID %s as UUID", req.TreeId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to parse tree ID %s as UUID", req.GetTreeId())
 		return err
 	}
 
@@ -176,7 +186,7 @@ func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, r
 		ForUpdate().
 		All(ctx)
 	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to query tree nodes for tree %s", req.TreeId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to query tree nodes for tree %s", treeID)
 		return err
 	}
 
@@ -190,13 +200,7 @@ func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, r
 
 	// c) Throw an error if this count > 1
 	if nonSplitLeafCount > 1 {
-		err := fmt.Errorf(
-			"Expected at most 1 tree node for tree %s excluding extended leaves (got: %d)",
-			req.TreeId,
-			nonSplitLeafCount,
-		)
-		logger.Error(err.Error())
-		return err
+		return fmt.Errorf("expected at most 1 tree node for tree %s excluding extended leaves (got: %d)", treeID, nonSplitLeafCount)
 	}
 
 	// d) Delete all tree nodes associated with the tree
@@ -210,18 +214,15 @@ func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, r
 	}
 
 	// Delete the tree
-	err = db.Tree.DeleteOneID(treeID).Exec(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			logger.Sugar().Warnf("Tree %s not found for deposit cleanup", req.TreeId)
-		} else {
-			logger.With(zap.Error(err)).Sugar().Errorf("Failed to delete tree %s", req.TreeId)
-		}
-		return err
+	switch err := db.Tree.DeleteOneID(treeID).Exec(ctx); {
+	case ent.IsNotFound(err):
+		logger.Sugar().Warnf("Tree %s not found for deposit cleanup", treeID)
+	case err != nil:
+		logger.With(zap.Error(err)).Sugar().Warnf("Failed to delete tree %s", treeID)
+	default:
+		logger.Sugar().Infof("Successfully deleted tree %s for deposit cleanup", treeID)
+		logger.Sugar().Infof("Completed deposit cleanup processing for tree %s", treeID)
 	}
-	logger.Sugar().Infof("Successfully deleted tree %s for deposit cleanup", req.TreeId)
-
-	logger.Sugar().Infof("Completed deposit cleanup processing for tree %s", req.TreeId)
 	return nil
 }
 
@@ -348,10 +349,14 @@ func (h *GossipHandler) handlePreimageGossipMessage(ctx context.Context, gossip 
 
 func (h *GossipHandler) handleSettleSwapKeyTweakGossipMessage(ctx context.Context, settleSwapKeyTweak *pbgossip.GossipMessageSettleSwapKeyTweak) error {
 	transferHandler := NewBaseTransferHandler(h.config)
-	err := transferHandler.CommitSwapKeyTweaks(ctx, settleSwapKeyTweak.CounterTransferId)
+	id, err := uuid.Parse(settleSwapKeyTweak.GetCounterTransferId())
+	if err != nil {
+		return fmt.Errorf("invalid counter transfer id: %w", err)
+	}
+	err = transferHandler.CommitSwapKeyTweaks(ctx, id)
 	if err != nil {
 		logger := logging.GetLoggerFromContext(ctx)
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle swap key tweak for  counter transfer %s", settleSwapKeyTweak.CounterTransferId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle swap key tweak for counter transfer %s", id)
 	}
 	return err
 }

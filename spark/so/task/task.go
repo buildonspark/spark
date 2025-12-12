@@ -207,7 +207,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 
 					for _, dbTransfer := range transfers {
 						logger.Sugar().Infof("Cancelling transfer %s", dbTransfer.ID)
-						err := h.CancelTransferInternal(ctx, dbTransfer.ID.String())
+						err := h.CancelTransferInternal(ctx, dbTransfer.ID)
 						if err != nil {
 							logger.With(zap.Error(err)).Sugar().Errorf("failed to cancel transfer %s", dbTransfer.ID)
 						}
@@ -255,7 +255,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						// Checking for an active counter transfer is not required since a counter
 						// transfer creation will move both transfer to a non-cancellable status
 						// `TransferStatusApplyingSenderKeyTweak`.
-						err := h.CancelTransferInternal(ctx, dbTransfer.ID.String())
+						err := h.CancelTransferInternal(ctx, dbTransfer.ID)
 						if err != nil {
 							logger.With(zap.Error(err)).Sugar().Errorf("failed to cancel transfer %s", dbTransfer.ID)
 						}
@@ -624,7 +624,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						if shouldCancel {
 							logger.Sugar().Infof("Cancelling transfer %s", pendingSendTransfer.TransferID)
 							transferHandler := handler.NewTransferHandler(config)
-							err := transferHandler.CreateCancelTransferGossipMessage(ctx, pendingSendTransfer.TransferID.String())
+							err := transferHandler.CreateCancelTransferGossipMessage(ctx, pendingSendTransfer.TransferID)
 							if err != nil {
 								logger.Sugar().Errorw("failed to cancel transfer", zap.Error(err))
 							} else {

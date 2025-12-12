@@ -190,7 +190,11 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
-	if _, err := transferHandler.ValidateTransferPackage(ctx, req.Transfer.TransferId, req.Transfer.TransferPackage, reqTransferOwnerIDPubKey); err != nil {
+	transferID, err := uuid.Parse(req.GetTransfer().GetTransferId())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", transferID, err)
+	}
+	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.Transfer.TransferPackage, reqTransferOwnerIDPubKey); err != nil {
 		return nil, fmt.Errorf("error validating transfer package: %w", err)
 	}
 
@@ -223,7 +227,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 
 	logger.Sugar().Infof(
 		"Creating UTXO swap record (request type fixed, transfer id %s, receiver identity %s, txid %x, vout %d, network %s, credit amount %d)",
-		req.Transfer.TransferId,
+		transferID,
 		reqTransferReceiverIdentityPubKey,
 		targetUtxo.Txid,
 		targetUtxo.Vout,
@@ -234,10 +238,6 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	// Create a utxo swap record and then a transfer. We rely on DbSessionMiddleware to
 	// ensure that all db inserts are rolled back in case of an error.
 
-	transferUUID, err := uuid.Parse(req.Transfer.TransferId)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.Transfer.TransferId, err)
-	}
 	utxoSwap, err = db.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCreated).
 		// utxo
@@ -252,7 +252,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		SetUserSignature(req.UserSignature).
 		SetUserIdentityPublicKey(reqTransferReceiverIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
-		SetRequestedTransferID(transferUUID).
+		SetRequestedTransferID(transferID).
 		Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store utxo swap: %w", err)

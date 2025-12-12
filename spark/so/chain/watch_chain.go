@@ -512,8 +512,7 @@ func handleBlock(
 	// but this should be done for a short period of time to avoid any potential double spends.
 	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobWatchChainMarkExitingNodesEnabled, &networkString, 1.0) > 0 {
 		logger.Sugar().Infof("Started processing confirmed transactions for exiting tree nodes at height %d", blockHeight)
-		err = tree.MarkExitingNodes(ctx, dbClient, confirmedTxHashSet, blockHeight)
-		if err != nil {
+		if err := tree.MarkExitingNodes(ctx, dbClient, confirmedTxHashSet, blockHeight); err != nil {
 			return fmt.Errorf("failed to mark exiting nodes: %w", err)
 		}
 	}
@@ -532,7 +531,7 @@ func handleBlock(
 		_, found := confirmedTxHashSet[[32]byte(txHashBytes)]
 		_, reverseFound := confirmedTxHashSet[[32]byte(reversedHash)]
 		if found {
-			logger.Sugar().Debug("Found BE coop exit tx at tx hash %s", txHash)
+			logger.Sugar().Debugf("Found BE coop exit tx at tx hash %s", txHash)
 		} else if reverseFound {
 			logger.Sugar().Debugf("Found LE coop exit tx at tx hash %s", txHash)
 		} else {
@@ -541,7 +540,7 @@ func handleBlock(
 		// Set confirmation height for the coop exit.
 		_, err = coopExit.Update().SetConfirmationHeight(blockHeight).Save(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to update coop exit %s: %w", coopExit.ID.String(), err)
+			return fmt.Errorf("failed to update coop exit %s: %w", coopExit.ID, err)
 		}
 
 		// Attempt to tweak keys for the coop exit. Ok to log the error and continue here

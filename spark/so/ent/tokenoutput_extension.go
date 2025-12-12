@@ -173,7 +173,7 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 	return outputs, nil
 }
 
-func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys []keys.Public, tokenIdentifier []byte, network btcnetwork.Network) ([]string, *big.Int, error) {
+func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys []keys.Public, tokenIdentifier []byte, network btcnetwork.Network) (uuid.UUIDs, *big.Int, error) {
 	outputs, err := GetOwnedTokenOutputs(ctx, GetOwnedTokenOutputsParams{
 		OwnerPublicKeys:            ownerPublicKeys,
 		TokenIdentifiers:           [][]byte{tokenIdentifier},
@@ -185,10 +185,10 @@ func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys []keys.Public
 	}
 
 	// Collect output IDs and token amounts
-	outputIDs := make([]string, len(outputs))
+	outputIDs := make([]uuid.UUID, len(outputs))
 	totalAmount := new(big.Int)
 	for i, output := range outputs {
-		outputIDs[i] = output.ID.String()
+		outputIDs[i] = output.ID
 		amount := new(big.Int).SetBytes(output.TokenAmount)
 		totalAmount.Add(totalAmount, amount)
 	}

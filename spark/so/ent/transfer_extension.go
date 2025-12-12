@@ -14,13 +14,13 @@ import (
 func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 	leaves, err := t.QueryTransferLeaves().All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID.String(), err)
+		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
 	}
 	var leavesProto []*pb.TransferLeaf
 	for _, leaf := range leaves {
 		leafProto, err := leaf.MarshalProto(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to marshal transfer leaf %s: %w", leaf.ID.String(), err)
+			return nil, fmt.Errorf("unable to marshal transfer leaf %s: %w", leaf.ID, err)
 		}
 		leavesProto = append(leavesProto, leafProto)
 	}

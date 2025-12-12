@@ -103,7 +103,7 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 	}
 
 	return &tokenpb.FreezeTokensResponse{
-		ImpactedOutputIds:   outputIDs,
+		ImpactedOutputIds:   outputIDs.Strings(),
 		ImpactedTokenAmount: totalAmount.Bytes(),
 	}, nil
 }

@@ -62,7 +62,7 @@ type bitcoinClient interface {
 }
 
 // BroadcastTransaction broadcasts a transaction to the network
-func BroadcastTransaction(ctx context.Context, btcClient bitcoinClient, nodeID string, txBytes []byte) error {
+func BroadcastTransaction(ctx context.Context, btcClient bitcoinClient, nodeID uuid.UUID, txBytes []byte) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	tx, err := common.TxFromRawTxBytes(txBytes)
@@ -187,7 +187,7 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 	if len(node.DirectTx) > 0 && node.NodeConfirmationHeight == 0 {
 		directTx, err := common.TxFromRawTxBytes(node.DirectTx)
 		if err != nil {
-			return fmt.Errorf("watchtower failed to parse node tx for node %s: %w", node.ID.String(), err)
+			return fmt.Errorf("watchtower failed to parse node tx for node %s: %w", node.ID, err)
 		}
 		// Check if direct TX has a timelock and has parent
 		if directTx.TxIn[0].Sequence <= 0xFFFFFFFE {
@@ -199,14 +199,14 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 					// Exit gracefully if the node is a root node and has no parent
 					return nil
 				} else if err != nil {
-					return fmt.Errorf("watchtower failed to query parent for node %s: %w", node.ID.String(), err)
+					return fmt.Errorf("watchtower failed to query parent for node %s: %w", node.ID, err)
 				}
 				parent = p
 			}
 			if parent.NodeConfirmationHeight > 0 {
 				timelockExpiryHeight := uint64(directTx.TxIn[0].Sequence&0xFFFF) + parent.NodeConfirmationHeight
 				if timelockExpiryHeight <= uint64(blockHeight) {
-					if err := BroadcastTransaction(ctx, bitcoinClient, node.ID.String(), node.DirectTx); err != nil {
+					if err := BroadcastTransaction(ctx, bitcoinClient, node.ID, node.DirectTx); err != nil {
 						// Record node tx broadcast failure
 						if nodeTxBroadcastCounter != nil {
 							nodeTxBroadcastCounter.Add(ctx, 1, metric.WithAttributes(
@@ -215,7 +215,7 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 							))
 						}
 						logger.With(zap.Error(err)).Sugar().Infof("Failed to broadcast node tx for node %s", node.ID)
-						return fmt.Errorf("watchtower failed to broadcast node tx for node %s: %w", node.ID.String(), err)
+						return fmt.Errorf("watchtower failed to broadcast node tx for node %s: %w", node.ID, err)
 					}
 
 					// Record successful node tx broadcast
@@ -231,15 +231,15 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 	} else if len(node.DirectRefundTx) > 0 && node.RefundConfirmationHeight == 0 {
 		directRefundTx, err := common.TxFromRawTxBytes(node.DirectRefundTx)
 		if err != nil {
-			return fmt.Errorf("watchtower failed to parse direct refund tx for node %s: %w", node.ID.String(), err)
+			return fmt.Errorf("watchtower failed to parse direct refund tx for node %s: %w", node.ID, err)
 		}
 
 		timelockExpiryHeight := uint64(directRefundTx.TxIn[0].Sequence & 0xFFFF)
 		if timelockExpiryHeight <= uint64(blockHeight) {
-			if err := BroadcastTransaction(ctx, bitcoinClient, node.ID.String(), node.DirectRefundTx); err != nil {
+			if err := BroadcastTransaction(ctx, bitcoinClient, node.ID, node.DirectRefundTx); err != nil {
 				// Try broadcasting the DirectFromCpfpRefundTx as a fallback
 				if len(node.DirectFromCpfpRefundTx) > 0 {
-					if err := BroadcastTransaction(ctx, bitcoinClient, node.ID.String(), node.DirectFromCpfpRefundTx); err != nil {
+					if err := BroadcastTransaction(ctx, bitcoinClient, node.ID, node.DirectFromCpfpRefundTx); err != nil {
 						// Record refund tx broadcast failure
 						if refundTxBroadcastCounter != nil {
 							refundTxBroadcastCounter.Add(ctx, 1, metric.WithAttributes(
@@ -251,7 +251,7 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 							"Failed to broadcast both direct refund tx and direct from cpfp refund tx for node %s",
 							node.ID,
 						)
-						return fmt.Errorf("watchtower failed to broadcast refund txs for node %s: %w", node.ID.String(), err)
+						return fmt.Errorf("watchtower failed to broadcast refund txs for node %s: %w", node.ID, err)
 					}
 					// Record successful refund tx broadcast
 					if refundTxBroadcastCounter != nil {
@@ -270,7 +270,7 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 					))
 				}
 				logger.With(zap.Error(err)).Sugar().Infof("Failed to broadcast direct refund tx for node %s", node.ID)
-				return fmt.Errorf("watchtower failed to broadcast refund tx for node %s: %w", node.ID.String(), err)
+				return fmt.Errorf("watchtower failed to broadcast refund tx for node %s: %w", node.ID, err)
 			}
 
 			// Record successful refund tx broadcast
@@ -301,7 +301,7 @@ func BroadcastTransferLeafRefund(ctx context.Context, bitcoinClient *rpcclient.C
 	var broadcastErr error
 
 	if directRefundTimelockExpired && len(transferLeaf.IntermediateDirectRefundTx) > 0 {
-		broadcastErr = BroadcastTransaction(ctx, bitcoinClient, transferLeaf.ID.String(), transferLeaf.IntermediateDirectRefundTx)
+		broadcastErr = BroadcastTransaction(ctx, bitcoinClient, transferLeaf.ID, transferLeaf.IntermediateDirectRefundTx)
 		if broadcastErr == nil {
 			if refundTxBroadcastCounter != nil {
 				refundTxBroadcastCounter.Add(ctx, 1, metric.WithAttributes(
@@ -315,7 +315,7 @@ func BroadcastTransferLeafRefund(ctx context.Context, bitcoinClient *rpcclient.C
 	}
 
 	if directFromCpfpRefundTimelockExpired && len(transferLeaf.IntermediateDirectFromCpfpRefundTx) > 0 {
-		broadcastErr = BroadcastTransaction(ctx, bitcoinClient, transferLeaf.ID.String(), transferLeaf.IntermediateDirectFromCpfpRefundTx)
+		broadcastErr = BroadcastTransaction(ctx, bitcoinClient, transferLeaf.ID, transferLeaf.IntermediateDirectFromCpfpRefundTx)
 		if broadcastErr == nil {
 			if refundTxBroadcastCounter != nil {
 				refundTxBroadcastCounter.Add(ctx, 1, metric.WithAttributes(

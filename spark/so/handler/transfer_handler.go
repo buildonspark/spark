@@ -113,7 +113,7 @@ type TransferAdaptorPublicKeys struct {
 	directFromCpfpAdaptorPubKey keys.Public
 }
 
-// A helper function to call startTransferInternal from the SSP handler for Swap V3 counter swap initiation.
+// StartCounterTransferInternal is a helper function to call startTransferInternal from the SSP handler for Swap V3 counter swap initiation.
 // Will pass adaptor pubkeys and enable key tweak for both transfers of the swap.
 func (h *TransferHandler) StartCounterTransferInternal(ctx context.Context, req *pb.StartTransferRequest, adaptorPublicKeys TransferAdaptorPublicKeys, primaryTransferId uuid.UUID) (*pb.StartTransferResponse, error) {
 	return h.startTransferInternal(ctx, req, st.TransferTypeCounterSwapV3, adaptorPublicKeys.cpfpAdaptorPubKey, adaptorPublicKeys.directAdaptorPubKey, adaptorPublicKeys.directFromCpfpAdaptorPubKey, false, &SwapV3Package{primaryTransferId: primaryTransferId})
@@ -171,9 +171,13 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		return nil, err
 	}
 
-	leafTweakMap, err := h.ValidateTransferPackage(ctx, req.TransferId, req.TransferPackage, reqOwnerIdentityPubKey)
+	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate transfer package for transfer %s: %w", req.TransferId, err)
+		return nil, fmt.Errorf("invalid transfer id: %w", err)
+	}
+	leafTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.TransferPackage, reqOwnerIdentityPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate transfer package for transfer %s: %w", transferID, err)
 	}
 
 	knobService := knobs.GetKnobsService(ctx)
@@ -206,7 +210,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 
 		err = validateSatsSparkInvoice(ctx, req.SparkInvoice, receiverIdentityPubKey, reqOwnerIdentityPubKey, leafIDsToSend, true)
 		if err != nil {
-			return nil, fmt.Errorf("failed to validate sats spark invoice: %s for transfer id: %s. error: %w", req.SparkInvoice, req.TransferId, err)
+			return nil, fmt.Errorf("failed to validate sats spark invoice: %s for transfer id: %s. error: %w", req.SparkInvoice, transferID, err)
 		}
 	}
 
@@ -215,16 +219,10 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}
 	db := entTx.Client()
-	transferUUID, err := uuid.Parse(req.TransferId)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.TransferId, err)
-	}
-	_, err = ent.CreateOrResetPendingSendTransfer(ctx, transferUUID)
-	if err != nil {
+	if _, err = ent.CreateOrResetPendingSendTransfer(ctx, transferID); err != nil {
 		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
 	}
-	err = entTx.Commit()
-	if err != nil {
+	if err := entTx.Commit(); err != nil {
 		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
 	}
 
@@ -244,8 +242,8 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	}
 	transfer, leafMap, err := h.createTransfer(
 		ctx,
-		req,
-		req.TransferId,
+		nil,
+		transferID,
 		transferType,
 		req.ExpiryTime.AsTime(),
 		reqOwnerIdentityPubKey,
@@ -265,8 +263,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		if err != nil {
 			return nil, fmt.Errorf("unable to get database transaction: %w while creating transfer: %w", err, originalErr)
 		}
-		err = entTx.Rollback()
-		if err != nil {
+		if err := entTx.Rollback(); err != nil {
 			return nil, fmt.Errorf("unable to rollback database transaction: %w while creating transfer: %w", err, originalErr)
 		}
 		entTx, err = ent.GetTxFromContext(ctx)
@@ -274,15 +271,14 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			return nil, fmt.Errorf("unable to get database transaction: %w while creating transfer: %w", err, originalErr)
 		}
 		dbClient := entTx.Client()
-		_, err = dbClient.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transferUUID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+		_, err = dbClient.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transferID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to update pending send transfer: %w while creating transfer: %w", err, originalErr)
 		}
-		err = entTx.Commit()
-		if err != nil {
+		if err = entTx.Commit(); err != nil {
 			return nil, fmt.Errorf("unable to commit database transaction: %w while creating transfer: %w", err, originalErr)
 		}
-		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", req.TransferId, originalErr)
+		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", transferID, originalErr)
 	}
 
 	// If the SSP matched the user's primary transfer with a counter transfer, lock it from cancellation.
@@ -301,7 +297,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	if req.TransferPackage == nil {
 		signingResults, err = signRefunds(ctx, h.config, req, leafMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to sign refunds for transfer %s: %w", req.TransferId, err)
+			return nil, fmt.Errorf("failed to sign refunds for transfer %s: %w", transferID, err)
 		}
 	} else {
 		cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, err := SignRefundsWithPregeneratedNonce(ctx, h.config, req, leafMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey)
@@ -367,7 +363,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	err = h.syncTransferInit(ctx, req, transferType, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey, swapV3Package)
 	if err != nil {
 		syncErr := err
-		logger.With(zap.Error(syncErr)).Sugar().Errorf("Failed to sync transfer init for transfer %s", req.TransferId)
+		logger.With(zap.Error(syncErr)).Sugar().Errorf("Failed to sync transfer init for transfer %s", transferID)
 
 		entTx, err := ent.GetTxFromContext(ctx)
 		if err != nil {
@@ -387,16 +383,16 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		if err != nil {
 			return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
 		}
-		cancelErr := h.CreateCancelTransferGossipMessage(ctx, req.TransferId)
+		cancelErr := h.CreateCancelTransferGossipMessage(ctx, transferID)
 		if cancelErr != nil {
-			logger.With(zap.Error(cancelErr)).Sugar().Errorf("Failed to create cancel transfer gossip message for transfer %s", req.TransferId)
+			logger.With(zap.Error(cancelErr)).Sugar().Errorf("Failed to create cancel transfer gossip message for transfer %s", transferID)
 		}
 		err = entTx.Commit()
 		if err != nil {
 			return nil, fmt.Errorf("unable to commit database transaction: %w", err)
 		}
 
-		return nil, fmt.Errorf("failed to sync transfer init for transfer %s: %w", req.TransferId, syncErr)
+		return nil, fmt.Errorf("failed to sync transfer init for transfer %s: %w", transferID, syncErr)
 	}
 
 	// After this point, the transfer send is considered successful.
@@ -406,19 +402,18 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		if err != nil {
 			return nil, fmt.Errorf("unable to get db before sync transfer init: %w", err)
 		}
-		err = entTx.Commit()
-		if err != nil {
+		if err := entTx.Commit(); err != nil {
 			return nil, fmt.Errorf("unable to commit db before sync transfer init: %w", err)
 		}
 		// Only false for Swap V3 flow when initiating a primary transfer for a swap.
 		// Swap V3 postpones key tweaking for the primary transfer, until a counter transfer is submitted.
 		if tweakKeys {
-			var message pbgossip.GossipMessage
+			var message *pbgossip.GossipMessage
 			// Swap V3 requires both primary and counter transfer tweaks settled at the same time,
 			// so there is a special handler for this case.
 			// primaryTransferId is only passed in for swap v3.
 			if transferType == st.TransferTypeCounterSwapV3 && primaryTransferId != uuid.Nil {
-				message = pbgossip.GossipMessage{
+				message = &pbgossip.GossipMessage{
 					Message: &pbgossip.GossipMessage_SettleSwapKeyTweak{
 						SettleSwapKeyTweak: &pbgossip.GossipMessageSettleSwapKeyTweak{
 							CounterTransferId: transfer.ID.String(),
@@ -436,10 +431,10 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 					}
 				}
 
-				message = pbgossip.GossipMessage{
+				message = &pbgossip.GossipMessage{
 					Message: &pbgossip.GossipMessage_SettleSenderKeyTweak{
 						SettleSenderKeyTweak: &pbgossip.GossipMessageSettleSenderKeyTweak{
-							TransferId:           req.TransferId,
+							TransferId:           transfer.ID.String(),
 							SenderKeyTweakProofs: keyTweakProofMap,
 						},
 					},
@@ -454,16 +449,16 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			if err != nil {
 				return nil, fmt.Errorf("unable to get operator list: %w", err)
 			}
-			_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &message, participants)
+			_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, message, participants)
 			if err != nil {
 				logger.With(zap.Error(err)).Sugar().Errorf(
 					"Failed to create and send gossip message to settle sender key tweak for transfer %s",
-					req.TransferId,
+					transferID,
 				)
 				return nil, fmt.Errorf("failed to create and send gossip message to settle sender key tweak: %w", err)
 			}
 		}
-		transfer, err = h.loadTransferForUpdate(ctx, req.TransferId)
+		transfer, err = h.loadTransferForUpdate(ctx, transferID)
 		if err != nil {
 			return nil, fmt.Errorf("unable to load transfer: %w", err)
 		}
@@ -672,7 +667,7 @@ func (h *TransferHandler) UpdateTransferLeavesSignaturesForRefundTxOnly(ctx cont
 }
 
 // settleSenderKeyTweaks calls the other SOs to settle the sender key tweaks.
-func (h *TransferHandler) settleSenderKeyTweaks(ctx context.Context, transferID string, action pbinternal.SettleKeyTweakAction) error {
+func (h *TransferHandler) settleSenderKeyTweaks(ctx context.Context, transferID uuid.UUID, action pbinternal.SettleKeyTweakAction) error {
 	operatorSelection := helper.OperatorSelection{
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
@@ -685,7 +680,7 @@ func (h *TransferHandler) settleSenderKeyTweaks(ctx context.Context, transferID 
 
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		return client.SettleSenderKeyTweak(ctx, &pbinternal.SettleSenderKeyTweakRequest{
-			TransferId: transferID,
+			TransferId: transferID.String(),
 			Action:     action,
 		})
 	})
@@ -1421,7 +1416,11 @@ func AggregateSignatures(
 }
 
 func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Context, req *pb.FinalizeTransferWithTransferPackageRequest) (*pb.FinalizeTransferResponse, error) {
-	transfer, err := h.loadTransferForUpdate(ctx, req.TransferId)
+	transferID, err := uuid.Parse(req.GetTransferId())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer id %s: %w", req.GetTransferId(), err)
+	}
+	transfer, err := h.loadTransferForUpdate(ctx, transferID)
 	if err != nil {
 		return nil, err
 	}
@@ -1430,10 +1429,10 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		return nil, err
 	}
 	if transfer.Status != st.TransferStatusSenderInitiated {
-		return nil, fmt.Errorf("transfer %s is in state %s; expected sender initiated status", req.TransferId, transfer.Status)
+		return nil, fmt.Errorf("transfer %s is in state %s; expected sender initiated status", transferID, transfer.Status)
 	}
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Preparing to send key tweaks to other SOs for transfer %s", req.TransferId)
+	logger.Sugar().Infof("Preparing to send key tweaks to other SOs for transfer %s", transferID)
 	err = h.syncDeliverSenderKeyTweak(ctx, req, transfer.Type)
 	if err != nil {
 		entTx, dbErr := ent.GetTxFromContext(ctx)
@@ -1449,17 +1448,17 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		// Counterswaps are from the SSP. We need to allow SSP to
 		// perform retries, so don't cancel the transfer, just reset it
 		if transfer.Type == st.TransferTypeCounterSwap {
-			rollbackErr := h.CreateRollbackTransferGossipMessage(ctx, req.TransferId)
+			rollbackErr := h.CreateRollbackTransferGossipMessage(ctx, transferID)
 			if rollbackErr != nil {
-				logger.With(zap.Error(rollbackErr)).Sugar().Errorf("Error when rolling back sender key tweaks for transfer %s", req.TransferId)
+				logger.With(zap.Error(rollbackErr)).Sugar().Errorf("Error when rolling back sender key tweaks for transfer %s", transferID)
 			}
 		} else {
-			cancelErr := h.CreateCancelTransferGossipMessage(ctx, req.TransferId)
+			cancelErr := h.CreateCancelTransferGossipMessage(ctx, transferID)
 			if cancelErr != nil {
-				logger.With(zap.Error(cancelErr)).Sugar().Errorf("Error when canceling transfer %s", req.TransferId)
+				logger.With(zap.Error(cancelErr)).Sugar().Errorf("Error when canceling transfer %s", transferID)
 			}
 		}
-		errorMsg := fmt.Sprintf("failed to sync deliver sender key tweak for transfer %s", req.TransferId)
+		errorMsg := fmt.Sprintf("failed to sync deliver sender key tweak for transfer %s", transferID)
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.Unavailable {
 			// Preserve external error's gRPC code and reason, prefixing with external coordinator context
 			enriched := sparkerrors.WrapErrorWithMessage(err, errorMsg)
@@ -1477,7 +1476,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		}
 		return nil, fmt.Errorf("%s: %w", errorMsg, err)
 	}
-	logger.Sugar().Infof("Successfully delivered key tweaks to other SOs for transfer %s", req.TransferId)
+	logger.Sugar().Infof("Successfully delivered key tweaks to other SOs for transfer %s", transferID)
 
 	entTx, err := ent.GetTxFromContext(ctx)
 	if err != nil {
@@ -1507,7 +1506,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	}
 	transfer, err = transfer.Update().SetStatus(stat).Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update status of transfer %s: %w", req.TransferId, err)
+		return nil, fmt.Errorf("failed to update status of transfer %s: %w", transferID, err)
 	}
 	ownerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
 	if err != nil {
@@ -1521,12 +1520,12 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		if err = entTx.Commit(); err != nil {
 			return nil, fmt.Errorf("failed to commit transaction: %w", err)
 		}
-		err = h.settleSenderKeyTweaks(ctx, req.TransferId, pbinternal.SettleKeyTweakAction_COMMIT)
+		err = h.settleSenderKeyTweaks(ctx, transferID, pbinternal.SettleKeyTweakAction_COMMIT)
 		if err != nil {
 			return nil, err
 		}
 
-		transfer, err = h.loadTransferForUpdate(ctx, req.TransferId)
+		transfer, err = h.loadTransferForUpdate(ctx, transferID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load transfer for update: %w", err)
 		}
@@ -1853,24 +1852,29 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return err
 	}
 
-	transfer, err := h.loadTransferForUpdate(ctx, req.TransferId, sql.WithLockAction(sql.NoWait))
+	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
-		return fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
+		return fmt.Errorf("invalid transfer ID: %w", err)
+	}
+
+	transfer, err := h.loadTransferForUpdate(ctx, transferID, sql.WithLockAction(sql.NoWait))
+	if err != nil {
+		return fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
 	if !transfer.ReceiverIdentityPubkey.Equals(reqOwnerIDPubKey) {
-		return fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", req.TransferId)
+		return fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", transferID)
 	}
 	// Validate transfer is not in terminal states
 	if transfer.Status == st.TransferStatusCompleted {
-		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", req.TransferId))
+		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", transferID))
 	}
 	if transfer.Status == st.TransferStatusExpired ||
 		transfer.Status == st.TransferStatusReturned {
-		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in terminal state %s and cannot be processed", req.TransferId, transfer.Status))
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in terminal state %s and cannot be processed", transferID, transfer.Status))
 	}
 	if transfer.Status != st.TransferStatusSenderKeyTweaked {
-		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("please call ClaimTransferSignRefunds to claim the transfer %s, the transfer is not in SENDER_KEY_TWEAKED status. transferstatus: %s,", req.TransferId, transfer.Status))
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("please call ClaimTransferSignRefunds to claim the transfer %s, the transfer is not in SENDER_KEY_TWEAKED status. transferstatus: %s", transferID, transfer.Status))
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -1878,16 +1882,16 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 	if err := checkCoopExitTxBroadcasted(ctx, db, transfer); err != nil {
-		return fmt.Errorf("failed to unlock transfer %s: %w", req.TransferId, err)
+		return fmt.Errorf("failed to unlock transfer %s: %w", transferID, err)
 	}
 
 	// Validate leaves count
 	transferLeaves, err := transfer.QueryTransferLeaves().WithLeaf().All(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to get transfer leaves for transfer %s: %w", req.TransferId, err)
+		return fmt.Errorf("unable to get transfer leaves for transfer %s: %w", transferID, err)
 	}
 	if len(transferLeaves) != len(req.LeavesToReceive) {
-		return fmt.Errorf("inconsistent leaves to claim for transfer %s", req.TransferId)
+		return fmt.Errorf("inconsistent leaves to claim for transfer %s", transferID)
 	}
 
 	leafMap := make(map[string]*ent.TransferLeaf)
@@ -2162,13 +2166,18 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, err
 	}
 
-	transfer, err := h.loadTransferForUpdate(ctx, req.TransferId, sql.WithLockAction(sql.NoWait))
+	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
-		return nil, fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
+		return nil, fmt.Errorf("invalid transfer ID: %w", err)
+	}
+
+	transfer, err := h.loadTransferForUpdate(ctx, transferID, sql.WithLockAction(sql.NoWait))
+	if err != nil {
+		return nil, fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
 	if !transfer.ReceiverIdentityPubkey.Equals(reqOwnerIDPubKey) {
-		return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", req.TransferId)
+		return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", transferID)
 	}
 
 	switch transfer.Status {
@@ -2178,31 +2187,31 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	case st.TransferStatusReceiverKeyTweakApplied:
 		// do nothing
 	case st.TransferStatusCompleted:
-		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", req.TransferId))
+		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", transferID))
 	default:
-		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusKeyTweaked or TransferStatusReceiverRefundSigned or TransferStatusReceiverKeyTweakLocked or TransferStatusReceiverKeyTweakApplied but %s found", req.TransferId, transfer.Status)
+		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusKeyTweaked or TransferStatusReceiverRefundSigned or TransferStatusReceiverKeyTweakLocked or TransferStatusReceiverKeyTweakApplied but %s found", transferID, transfer.Status)
 	}
 
 	// Validate leaves count
 	leavesToTransfer, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to load leaves to transfer for transfer %s: %w", req.TransferId, err)
+		return nil, fmt.Errorf("unable to load leaves to transfer for transfer %s: %w", transferID, err)
 	}
 	if len(leavesToTransfer) != len(req.SigningJobs) {
-		return nil, fmt.Errorf("inconsistent leaves to claim for transfer %s", req.TransferId)
+		return nil, fmt.Errorf("inconsistent leaves to claim for transfer %s", transferID)
 	}
 
 	keyTweakProofs := map[string]*pb.SecretProof{}
 	for _, leaf := range leavesToTransfer {
 		treeNode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get tree node for leaf %s: %w", leaf.ID.String(), err)
+			return nil, fmt.Errorf("unable to get tree node for leaf %s: %w", leaf.ID, err)
 		}
 		leafKeyTweak := &pb.ClaimLeafKeyTweak{}
 		if leaf.KeyTweak != nil {
 			err = proto.Unmarshal(leaf.KeyTweak, leafKeyTweak)
 			if err != nil {
-				return nil, fmt.Errorf("unable to unmarshal key tweak for leaf %s: %w", leaf.ID.String(), err)
+				return nil, fmt.Errorf("unable to unmarshal key tweak for leaf %s: %w", leaf.ID, err)
 			}
 			keyTweakProofs[treeNode.ID.String()] = &pb.SecretProof{
 				Proofs: leafKeyTweak.SecretShareTweak.Proofs,
@@ -2220,18 +2229,18 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	}
 
 	// Lock the transfer after the key tweak is settled.
-	transfer, err = h.loadTransferForUpdate(ctx, req.TransferId)
+	transfer, err = h.loadTransferForUpdate(ctx, transferID)
 	if err != nil {
-		return nil, fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
+		return nil, fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
 	if transfer.Status == st.TransferStatusCompleted {
-		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s is already completed", req.TransferId))
+		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s is already completed", transferID))
 	}
 
 	// Update transfer status.
 	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverRefundSigned).Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update transfer status %s: %w", transfer.ID.String(), err)
+		return nil, fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
 	}
 
 	leaves, err := h.getLeavesFromTransfer(ctx, transfer)
@@ -2471,9 +2480,14 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	ctx, span := tracer.Start(ctx, "TransferHandler.InitiateSettleReceiverKeyTweak")
 	defer span.End()
 
-	transfer, err := h.loadTransferForUpdate(ctx, req.TransferId)
+	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
-		return fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
+		return fmt.Errorf("invalid transfer ID: %w", err)
+	}
+
+	transfer, err := h.loadTransferForUpdate(ctx, transferID)
+	if err != nil {
+		return fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
 
@@ -2493,7 +2507,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	if applied {
 		_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakApplied).Save(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID.String(), err)
+			return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
 		}
 		return nil
 	}
@@ -2506,12 +2520,12 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		// The key tweak is already applied, return early.
 		return nil
 	default:
-		return fmt.Errorf("transfer %s is expected to be at status TransferStatusReceiverKeyTweaked or TransferStatusReceiverKeyTweakLocked or TransferStatusReceiverKeyTweakApplied but %s found", req.TransferId, transfer.Status)
+		return fmt.Errorf("transfer %s is expected to be at status TransferStatusReceiverKeyTweaked or TransferStatusReceiverKeyTweakLocked or TransferStatusReceiverKeyTweakApplied but %s found", transferID, transfer.Status)
 	}
 
 	leaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to get leaves from transfer %s: %w", req.TransferId, err)
+		return fmt.Errorf("unable to get leaves from transfer %s: %w", transferID, err)
 	}
 
 	if req.KeyTweakProofs != nil {
@@ -2525,7 +2539,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 
 	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakLocked).Save(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID.String(), err)
+		return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
 	}
 
 	entTx, err := ent.GetTxFromContext(ctx)
@@ -2569,10 +2583,13 @@ func (h *TransferHandler) checkIfKeyTweakApplied(ctx context.Context, transfer *
 func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbinternal.SettleReceiverKeyTweakRequest) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.SettleReceiverKeyTweak")
 	defer span.End()
-
-	transfer, err := h.loadTransferForUpdate(ctx, req.TransferId)
+	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
-		return fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
+		return fmt.Errorf("invalid transfer ID: %w", err)
+	}
+	transfer, err := h.loadTransferForUpdate(ctx, transferID)
+	if err != nil {
+		return fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
 
@@ -2587,7 +2604,7 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			tnq.WithTree().WithSigningKeyshare()
 		}).All(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to get leaves from transfer %s: %w", req.TransferId, err)
+			return fmt.Errorf("unable to get leaves from transfer %s: %w", transferID, err)
 		}
 
 		db, err := ent.GetDbFromContext(ctx)
@@ -2665,15 +2682,15 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 		}
 		_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakApplied).Save(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to update transfer status %v: %w", transfer.ID, err)
+			return fmt.Errorf("unable to update transfer status %v: %w", transferID, err)
 		}
 	case pbinternal.SettleKeyTweakAction_ROLLBACK:
 		leaves, err := transfer.QueryTransferLeaves().All(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to get leaves from transfer %s: %w", req.TransferId, err)
+			return fmt.Errorf("unable to get leaves from transfer %s: %w", transferID, err)
 		}
 		if err := h.revertClaimTransfer(ctx, transfer, leaves); err != nil {
-			return fmt.Errorf("unable to revert claim transfer %v: %w", transfer.ID, err)
+			return fmt.Errorf("unable to revert claim transfer %v: %w", transferID, err)
 		}
 	default:
 		return fmt.Errorf("invalid action %s", req.Action)
@@ -2736,7 +2753,7 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 		}
 	default:
 		// All other transfers
-		err := h.settleSenderKeyTweaks(ctx, transfer.ID.String(), pbinternal.SettleKeyTweakAction_COMMIT)
+		err := h.settleSenderKeyTweaks(ctx, transfer.ID, pbinternal.SettleKeyTweakAction_COMMIT)
 		if err == nil {
 			// If there's no error, it means all SOs have tweaked the key. The coordinator can tweak the key here.
 			transfer, err = h.commitSenderKeyTweaks(ctx, transfer)
@@ -2752,7 +2769,7 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 // setSoCoordinatorKeyTweaks sets the key tweaks for each transfer leaf based on the validated transfer package.
 func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfer *ent.Transfer, req *pb.TransferPackage, ownerIdentityPubKey keys.Public) error {
 	// Get key tweak map from transfer package
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, transfer.ID.String(), req, ownerIdentityPubKey)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, transfer.ID, req, ownerIdentityPubKey)
 	if err != nil {
 		return fmt.Errorf("failed to validate transfer package: %w", err)
 	}
@@ -2783,7 +2800,7 @@ func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfe
 
 func updateSwapPrimaryTransferToStatus(ctx context.Context, counterTransfer *ent.Transfer, status st.TransferStatus) error {
 	if counterTransfer == nil {
-		return fmt.Errorf("Counter transfer is nil")
+		return fmt.Errorf("counter transfer is nil")
 	}
 
 	db, err := ent.GetDbFromContext(ctx)

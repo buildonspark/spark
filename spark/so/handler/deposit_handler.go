@@ -664,8 +664,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		if err != nil {
 			return nil, err
 		}
-		err = o.verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundTx)
-		if err != nil {
+		if err := o.verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundTx); err != nil {
 			return nil, err
 		}
 		directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpRootTx.TxOut[0])
@@ -999,8 +998,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		if err != nil {
 			return nil, err
 		}
-		err = o.verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundTx)
-		if err != nil {
+		if err := o.verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundTx); err != nil {
 			return nil, err
 		}
 		if len(cpfpRootTx.TxOut) <= 0 {

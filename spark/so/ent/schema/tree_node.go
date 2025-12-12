@@ -224,14 +224,12 @@ func (TreeNode) Hooks() []ent.Hook {
 						return nil, err
 					}
 
-					nodeIdUuid, _ := m.ID()
-					nodeId := nodeIdUuid.String()
-
+					nodeID, _ := m.ID()
 					rawTxBytes, _ := m.RawTx()
 					if rawTxBytes != nil {
 						rawTx, err := common.TxFromRawTxBytes(rawTxBytes)
 						if err != nil {
-							return nil, fmt.Errorf("failed to parse raw_tx for node %s: %w", nodeId, err)
+							return nil, fmt.Errorf("failed to parse raw_tx for node %s: %w", nodeID, err)
 						}
 						rawTxid := rawTx.TxHash()
 						m.SetRawTxid(st.NewTxID(rawTxid))
@@ -250,7 +248,7 @@ func (TreeNode) Hooks() []ent.Hook {
 							} else {
 								directTx, err := common.TxFromRawTxBytes(directTxBytes)
 								if err != nil {
-									return nil, fmt.Errorf("failed to parse direct_tx for node %s: %w", nodeId, err)
+									return nil, fmt.Errorf("failed to parse direct_tx for node %s: %w", nodeID, err)
 								}
 								directTxid := directTx.TxHash()
 								m.SetDirectTxid(st.NewTxID(directTxid))
@@ -267,7 +265,7 @@ func (TreeNode) Hooks() []ent.Hook {
 							} else {
 								directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTxBytes)
 								if err != nil {
-									return nil, fmt.Errorf("failed to parse direct_from_cpfp_refundtx for node %s: %w", nodeId, err)
+									return nil, fmt.Errorf("failed to parse direct_from_cpfp_refundtx for node %s: %w", nodeID, err)
 								}
 								directFromCpfpRefundTxid := directFromCpfpRefundTx.TxHash()
 								m.SetDirectFromCpfpRefundTxid(st.NewTxID(directFromCpfpRefundTxid))
@@ -284,7 +282,7 @@ func (TreeNode) Hooks() []ent.Hook {
 							} else {
 								rawRefundTx, err := common.TxFromRawTxBytes(rawRefundTxBytes)
 								if err != nil {
-									return nil, fmt.Errorf("failed to parse raw_refund_tx for node %s: %w", nodeId, err)
+									return nil, fmt.Errorf("failed to parse raw_refund_tx for node %s: %w", nodeID, err)
 								}
 								rawRefundTxid := rawRefundTx.TxHash()
 								m.SetRawRefundTxid(st.NewTxID(rawRefundTxid))
@@ -301,7 +299,7 @@ func (TreeNode) Hooks() []ent.Hook {
 							} else {
 								directRefundTx, err := common.TxFromRawTxBytes(directRefundTxBytes)
 								if err != nil {
-									return nil, fmt.Errorf("failed to parse direct_refund_tx for node %s: %w", nodeId, err)
+									return nil, fmt.Errorf("failed to parse direct_refund_tx for node %s: %w", nodeID, err)
 								}
 								directRefundTxid := directRefundTx.TxHash()
 								m.SetDirectRefundTxid(st.NewTxID(directRefundTxid))
@@ -322,13 +320,11 @@ func (TreeNode) Hooks() []ent.Hook {
 						return nil, err
 					}
 
-					nodeIdUuid, _ := m.ID()
-					nodeId := nodeIdUuid.String()
-
+					nodeID, _ := m.ID()
 					rawTxBytes, _ := m.RawTx()
 					rawTx, err := common.TxFromRawTxBytes(rawTxBytes)
 					if err != nil {
-						return nil, fmt.Errorf("failed to parse raw_tx for node %s: %w", nodeId, err)
+						return nil, fmt.Errorf("failed to parse raw_tx for node %s: %w", nodeID, err)
 					}
 					rawTxid := rawTx.TxHash()
 					m.SetRawTxid(st.NewTxID(rawTxid))
@@ -338,7 +334,7 @@ func (TreeNode) Hooks() []ent.Hook {
 					if directTxBytes != nil {
 						directTx, err := common.TxFromRawTxBytes(directTxBytes)
 						if err != nil {
-							return nil, fmt.Errorf("failed to parse direct_tx for node %s: %w", nodeId, err)
+							return nil, fmt.Errorf("failed to parse direct_tx for node %s: %w", nodeID, err)
 						}
 						directTxid := directTx.TxHash()
 						m.SetDirectTxid(st.NewTxID(directTxid))
@@ -348,7 +344,7 @@ func (TreeNode) Hooks() []ent.Hook {
 					if directFromCpfpRefundTxBytes != nil {
 						directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTxBytes)
 						if err != nil {
-							return nil, fmt.Errorf("failed to parse direct_from_cpfp_refundtx for node %s: %w", nodeId, err)
+							return nil, fmt.Errorf("failed to parse direct_from_cpfp_refundtx for node %s: %w", nodeID, err)
 						}
 						directFromCpfpRefundTxid := directFromCpfpRefundTx.TxHash()
 						m.SetDirectFromCpfpRefundTxid(st.NewTxID(directFromCpfpRefundTxid))
@@ -358,7 +354,7 @@ func (TreeNode) Hooks() []ent.Hook {
 					if rawRefundTxBytes != nil {
 						rawRefundTx, err := common.TxFromRawTxBytes(rawRefundTxBytes)
 						if err != nil {
-							return nil, fmt.Errorf("failed to parse raw_refund_tx for node %s: %w", nodeId, err)
+							return nil, fmt.Errorf("failed to parse raw_refund_tx for node %s: %w", nodeID, err)
 						}
 						rawRefundTxid := rawRefundTx.TxHash()
 						m.SetRawRefundTxid(st.NewTxID(rawRefundTxid))
@@ -368,7 +364,7 @@ func (TreeNode) Hooks() []ent.Hook {
 					if directRefundTxBytes != nil {
 						directRefundTx, err := common.TxFromRawTxBytes(directRefundTxBytes)
 						if err != nil {
-							return nil, fmt.Errorf("failed to parse direct_refund_tx for node %s: %w", nodeId, err)
+							return nil, fmt.Errorf("failed to parse direct_refund_tx for node %s: %w", nodeID, err)
 						}
 						directRefundTxid := directRefundTx.TxHash()
 						m.SetDirectRefundTxid(st.NewTxID(directRefundTxid))

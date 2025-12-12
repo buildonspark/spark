@@ -93,7 +93,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
 		nil,
-		req.Transfer.TransferId,
+		transferUUID,
 		st.TransferTypeCooperativeExit,
 		req.Transfer.ExpiryTime.AsTime(),
 		reqTransferOwnerIdentityPubKey,
@@ -153,7 +153,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 	err = transferHandler.syncCoopExitInit(ctx, req)
 	if err != nil {
 
-		cancelErr := transferHandler.CreateCancelTransferGossipMessage(ctx, req.Transfer.TransferId)
+		cancelErr := transferHandler.CreateCancelTransferGossipMessage(ctx, transferUUID)
 		if cancelErr != nil {
 			return nil, fmt.Errorf("failed to create cancel transfer gossip message for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
 		}
@@ -170,7 +170,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 
 func (h *TransferHandler) syncCoopExitInit(ctx context.Context, req *pb.CooperativeExitRequest) error {
 	transfer := req.Transfer
-	leaves := make([]*pbinternal.InitiateTransferLeaf, 0)
+	var leaves []*pbinternal.InitiateTransferLeaf
 	for _, leaf := range transfer.LeavesToSend {
 		var directRefundTx []byte
 		var directFromCpfpRefundTx []byte

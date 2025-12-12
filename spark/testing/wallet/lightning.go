@@ -421,7 +421,7 @@ func buildLightningHTLCTransfer(
 		}
 	}
 
-	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID.String(), receiverIdentityPubKey, leaves, nil)
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID, receiverIdentityPubKey, leaves, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to prepare send transfer key tweaks: %w", err)
 	}

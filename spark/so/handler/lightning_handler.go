@@ -772,8 +772,12 @@ func (h *LightningHandler) GetPreimageShare(
 	}
 
 	var keyTweakMap map[string]*pbspark.SendLeafKeyTweak
+	transferID, err := uuid.Parse(req.GetTransfer().GetTransferId())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer id: %w", err)
+	}
 	if req.TransferRequest != nil {
-		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, req.Transfer.TransferId, req.TransferRequest.TransferPackage, ownerIdentityPubKey)
+		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, transferID, req.TransferRequest.TransferPackage, ownerIdentityPubKey)
 		if err != nil {
 			return nil, fmt.Errorf("unable to validate transfer package: %w", err)
 		}
@@ -786,7 +790,7 @@ func (h *LightningHandler) GetPreimageShare(
 	transfer, _, err := transferHandler.createTransfer(
 		ctx,
 		nil,
-		req.Transfer.TransferId,
+		transferID,
 		st.TransferTypePreimageSwap,
 		// TODO: (LIG-8397) Remove once we can remove transfer
 		req.Transfer.ExpiryTime.AsTime(),
@@ -1036,7 +1040,7 @@ func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest 
 	return AggregateSignatures(ctx, h.config, transferRequest, keys.Public{}, keys.Public{}, keys.Public{}, cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, leafMap)
 }
 
-// InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
+// InitiatePreimageSwapV3 initiates a preimage swap for the given payment hash.
 func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	return h.initiatePreimageSwap(ctx, req, true, nil)
 }
@@ -1181,8 +1185,12 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	transferHandler := NewTransferHandler(h.config)
 	var keyTweakMap map[string]*pbspark.SendLeafKeyTweak
+	transferID, err := uuid.Parse(req.GetTransfer().GetTransferId())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer id: %w", err)
+	}
 	if req.TransferRequest != nil {
-		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, req.Transfer.TransferId, req.TransferRequest.TransferPackage, ownerIdentityPubKey)
+		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, transferID, req.TransferRequest.TransferPackage, ownerIdentityPubKey)
 		if err != nil {
 			return nil, fmt.Errorf("unable to validate transfer package: %w", err)
 		}
@@ -1198,23 +1206,18 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}
 	db := entTx.Client()
-	transferUUID, err := uuid.Parse(req.Transfer.TransferId)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.Transfer.TransferId, err)
-	}
-	_, err = ent.CreateOrResetPendingSendTransfer(ctx, transferUUID)
+	_, err = ent.CreateOrResetPendingSendTransfer(ctx, transferID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
 	}
-	err = entTx.Commit()
-	if err != nil {
+	if err = entTx.Commit(); err != nil {
 		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
 	}
 
 	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
 		nil,
-		req.Transfer.TransferId,
+		transferID,
 		st.TransferTypePreimageSwap,
 		req.Transfer.ExpiryTime.AsTime(),
 		ownerIdentityPubKey,
@@ -1294,7 +1297,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		}
 		// At least one operator failed to initiate preimage swap, cancel the transfer.
 		baseHandler := NewBaseTransferHandler(h.config)
-		cancelErr := baseHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID.String())
+		cancelErr := baseHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID)
 		if cancelErr != nil {
 			logger.Error("InitiatePreimageSwap: unable to cancel own send transfer", zap.Error(cancelErr))
 		}
@@ -1350,25 +1353,19 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		}
 
 		baseHandler := NewBaseTransferHandler(h.config)
-		err := baseHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID.String())
-		if err != nil {
+		if err := baseHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID); err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to cancel own send transfer %s (payment_hash: %x)",
 				transfer.ID,
 				req.PaymentHash,
 			)
 		}
-
-		commitErr := ent.DbCommit(ctx)
-		if commitErr != nil {
-			logger.Error("Unable to commit transaction after canceling transfer", zap.Error(commitErr))
+		if err := ent.DbCommit(ctx); err != nil {
+			logger.Error("Unable to commit transaction after canceling transfer", zap.Error(err))
 		}
 
 		return nil, fmt.Errorf("recovered preimage did not match payment hash: %x and transfer id: %s", req.PaymentHash, transfer.ID)
-	} else {
-		err = h.sendPreimageGossipMessage(ctx, secretBytes, req.PaymentHash)
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage gossip message for payment hash %x", req.PaymentHash)
-		}
+	} else if err := h.sendPreimageGossipMessage(ctx, secretBytes, req.PaymentHash); err != nil {
+		logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage gossip message for payment hash %x", req.PaymentHash)
 	}
 
 	err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)

@@ -599,7 +599,7 @@ func GenerateTransferPackage(
 	if err != nil {
 		return nil, uuid.UUID{}, fmt.Errorf("failed to generate transfer id: %w", err)
 	}
-	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID.String(), receiverIdentityPubkey, leavesToTransfer, map[string][]byte{})
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID, receiverIdentityPubkey, leavesToTransfer, map[string][]byte{})
 	if err != nil {
 		return nil, uuid.UUID{}, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}

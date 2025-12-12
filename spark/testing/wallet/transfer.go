@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"math/big"
 	"slices"
@@ -37,8 +38,6 @@ type LeafKeyTweak struct {
 	NewSigningPrivKey keys.Private
 }
 
-// SendTransfer initiates a transfer from sender.
-
 func CreateTransferPackage(
 	ctx context.Context,
 	transferID uuid.UUID,
@@ -47,7 +46,7 @@ func CreateTransferPackage(
 	leaves []LeafKeyTweak,
 	receiverIdentityPubKey keys.Public,
 ) (*pb.TransferPackage, error) {
-	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID.String(), receiverIdentityPubKey, leaves, map[string][]byte{})
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID, receiverIdentityPubKey, leaves, map[string][]byte{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
@@ -304,7 +303,7 @@ func GenerateTransferPackageForSwapV3(
 	}
 
 	// 2. Prepare user key tweaks
-	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID.String(), receiverIdentityPubkey, leavesToTransfer, map[string][]byte{})
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID, receiverIdentityPubkey, leavesToTransfer, map[string][]byte{})
 	if err != nil {
 		return nil, uuid.UUID{}, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
@@ -422,7 +421,11 @@ func DeliverTransferPackage(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse receiver identity public key: %w", err)
 	}
-	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transfer.Id, transferReceiverPubKey, leaves, refundSignatureMap)
+	transferUUID, err := uuid.Parse(transfer.Id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse transfer ID %s: %w", transferUUID, err)
+	}
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferUUID, transferReceiverPubKey, leaves, refundSignatureMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare key tweaks: %w", err)
 	}
@@ -441,18 +444,13 @@ func DeliverTransferPackage(
 
 	client := pb.NewSparkServiceClient(sparkConn)
 
-	transferUUID, err := uuid.Parse(transfer.Id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse transfer id %s: %w", transfer.Id, err)
-	}
-
 	transferPackage, err := PrepareTransferPackage(authCtx, config, client, transferUUID, keyTweakInputMap, leaves, transferReceiverPubKey, keys.Public{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
 
 	resp, err := client.FinalizeTransferWithTransferPackage(authCtx, &pb.FinalizeTransferWithTransferPackageRequest{
-		TransferId:             transfer.Id,
+		TransferId:             transferUUID.String(),
 		OwnerIdentityPublicKey: config.IdentityPublicKey().Serialize(),
 		TransferPackage:        transferPackage,
 	})
@@ -461,8 +459,6 @@ func DeliverTransferPackage(
 	}
 	return resp.Transfer, nil
 }
-
-// Deprecated: use DeliverTransferPackage instead.
 
 func StartSwapSignRefund(
 	ctx context.Context,
@@ -534,7 +530,7 @@ func StartSwapSignRefund(
 	return transfer, signatureMap, leafDataMap, nil
 }
 
-func PrepareSendTransferKeyTweaks(config *TestWalletConfig, transferID string, receiverIdentityPubkey keys.Public, leaves []LeafKeyTweak, refundSignatureMap map[string][]byte) (map[string][]*pb.SendLeafKeyTweak, error) {
+func PrepareSendTransferKeyTweaks(config *TestWalletConfig, transferID uuid.UUID, receiverIdentityPubkey keys.Public, leaves []LeafKeyTweak, refundSignatureMap map[string][]byte) (map[string][]*pb.SendLeafKeyTweak, error) {
 	receiverEciesPubKey, err := eciesgo.NewPublicKeyFromBytes(receiverIdentityPubkey.Serialize())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse receiver public key: %w", err)
@@ -553,7 +549,7 @@ func PrepareSendTransferKeyTweaks(config *TestWalletConfig, transferID string, r
 	return leavesTweaksMap, nil
 }
 
-func prepareSingleSendTransferKeyTweak(config *TestWalletConfig, transferID string, leaf LeafKeyTweak, receiverEciesPubKey *eciesgo.PublicKey, refundSignature []byte) (map[string]*pb.SendLeafKeyTweak, error) {
+func prepareSingleSendTransferKeyTweak(config *TestWalletConfig, transferID uuid.UUID, leaf LeafKeyTweak, receiverEciesPubKey *eciesgo.PublicKey, refundSignature []byte) (map[string]*pb.SendLeafKeyTweak, error) {
 	privKeyTweak := leaf.SigningPrivKey.Sub(leaf.NewSigningPrivKey)
 
 	// Calculate secret tweak shares
@@ -587,7 +583,7 @@ func prepareSingleSendTransferKeyTweak(config *TestWalletConfig, transferID stri
 	}
 
 	// Generate signature over Sha256(leaf_id||transfer_id||secret_cipher)
-	payload := append(append([]byte(leaf.Leaf.Id), []byte(transferID)...), secretCipher...)
+	payload := append(append([]byte(leaf.Leaf.Id), []byte(transferID.String())...), secretCipher...)
 	payloadHash := sha256.Sum256(payload)
 	signature := ecdsa.Sign(config.IdentityPrivateKey.ToBTCEC(), payloadHash[:])
 
@@ -715,7 +711,7 @@ func VerifyPendingTransfer(_ context.Context, config *TestWalletConfig, transfer
 		payload := slices.Concat([]byte(leaf.Leaf.Id), []byte(transfer.Id), leaf.SecretCipher)
 		payloadHash := sha256.Sum256(payload)
 		if !signature.Verify(payloadHash[:], senderPubKey.ToBTCEC()) {
-			return nil, fmt.Errorf("failed to verify signature: %w", err)
+			return nil, errors.New("failed to verify signature")
 		}
 
 		// Decrypt secret cipher
