@@ -45,7 +45,6 @@ var (
 	defaultTaskTimeout                    = 1 * time.Minute
 	dkgTaskTimeout                        = 3 * time.Minute
 	deleteStaleTreeNodesTaskTimeout       = 10 * time.Minute
-	backfillCreatedFinalizedTxHashTimeout = 24 * time.Hour
 	backfillTokenAmountTimeout            = 24 * time.Hour
 )
 
