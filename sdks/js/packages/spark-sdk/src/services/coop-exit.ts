@@ -173,9 +173,7 @@ export class CoopExitService extends BaseTransferService {
       const signingJob: LeafRefundTxSigningJob = {
         leafId: leaf.leaf.id,
         refundTxSigningJob: {
-          signingPublicKey: await this.config.signer.getPublicKeyFromDerivation(
-            leaf.keyDerivation,
-          ),
+          signingPublicKey,
           rawTx: cpfpRefundTx.toBytes(),
           signingNonceCommitment: signingNonceCommitment.commitment,
         },

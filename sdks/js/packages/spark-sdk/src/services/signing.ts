@@ -49,12 +49,13 @@ export class SigningService {
         expected: "Non-null signing commitments",
       });
     }
+    const publicKey = await this.config.signer.getPublicKeyFromDerivation(
+      leaf.keyDerivation,
+    );
     const signingResult = await this.config.signer.signFrost({
       message: sighash,
       keyDerivation: leaf.keyDerivation,
-      publicKey: await this.config.signer.getPublicKeyFromDerivation(
-        leaf.keyDerivation,
-      ),
+      publicKey,
       selfCommitment: signingCommitment,
       statechainCommitments: signingCommitments,
       adaptorPubKey: new Uint8Array(),
@@ -63,9 +64,7 @@ export class SigningService {
 
     leafSigningJobs.push({
       leafId: leaf.leaf.id,
-      signingPublicKey: await this.config.signer.getPublicKeyFromDerivation(
-        leaf.keyDerivation,
-      ),
+      signingPublicKey: publicKey,
       rawTx: refundTx.toBytes(),
       signingNonceCommitment: signingCommitment.commitment,
       userSignature: signingResult,
