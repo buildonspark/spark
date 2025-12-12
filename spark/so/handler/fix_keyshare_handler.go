@@ -17,6 +17,8 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
 )
 
@@ -475,6 +477,27 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update keyshare: %w", err)
+	}
+
+	// Update every tree node that references the fixed keyshare,
+	// setting its owner signing pubkey to maintain the required invariant:
+	// verifying pubkey = owner signing pubkey + keyshare pubkey
+	treeNodes, err := db.TreeNode.Query().
+		Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(badKeyshare.ID))).
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query tree nodes for keyshare: %w", err)
+	}
+
+	for _, node := range treeNodes {
+		newOwnerSigningPubkey := node.VerifyingPubkey.Sub(pubKey)
+
+		_, err = node.Update().
+			SetOwnerSigningPubkey(newOwnerSigningPubkey).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update tree node %s: %w", node.ID, err)
+		}
 	}
 
 	return nil
