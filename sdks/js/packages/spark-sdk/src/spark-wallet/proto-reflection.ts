@@ -38,7 +38,6 @@ function getRegistry() {
 
   try {
     // Load the embedded descriptors
-    console.log("Loading embedded protobuf descriptors...");
     const descriptorBytes = getSparkDescriptorBytes();
 
     // Decode the FileDescriptorSet
@@ -54,7 +53,6 @@ function getRegistry() {
 
     // Build lookup maps from the descriptor set
     for (const fileDescriptor of descriptorSet.file) {
-      console.log(`Processing proto file: ${fileDescriptor.name}`);
       _registry.fileMap.set(fileDescriptor.name, fileDescriptor);
 
       // Process messages in this file
