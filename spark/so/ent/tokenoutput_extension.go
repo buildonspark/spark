@@ -18,9 +18,6 @@ import (
 
 // FetchAndLockTokenInputs fetches token outputs by their (tx_hash, vout) identifiers and locks them for update.
 // Returns the outputs in the same order they were specified in the input.
-//
-// This optimized version uses the denormalized created_finalized_tx_hash field to query directly
-// without joining the token_transactions table.
 func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*tokenpb.TokenOutputToSpend) ([]*TokenOutput, error) {
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
