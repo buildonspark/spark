@@ -76,18 +76,6 @@ func (tou *TokenOutputUpdate) ClearAmount() *TokenOutputUpdate {
 	return tou
 }
 
-// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
-func (tou *TokenOutputUpdate) SetCreatedTransactionFinalizedHash(b []byte) *TokenOutputUpdate {
-	tou.mutation.SetCreatedTransactionFinalizedHash(b)
-	return tou
-}
-
-// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
-func (tou *TokenOutputUpdate) ClearCreatedTransactionFinalizedHash() *TokenOutputUpdate {
-	tou.mutation.ClearCreatedTransactionFinalizedHash()
-	return tou
-}
-
 // SetSpentOwnershipSignature sets the "spent_ownership_signature" field.
 func (tou *TokenOutputUpdate) SetSpentOwnershipSignature(b []byte) *TokenOutputUpdate {
 	tou.mutation.SetSpentOwnershipSignature(b)
@@ -191,25 +179,6 @@ func (tou *TokenOutputUpdate) ClearNetwork() *TokenOutputUpdate {
 	return tou
 }
 
-// SetOutputCreatedTokenTransactionID sets the "output_created_token_transaction" edge to the TokenTransaction entity by ID.
-func (tou *TokenOutputUpdate) SetOutputCreatedTokenTransactionID(id uuid.UUID) *TokenOutputUpdate {
-	tou.mutation.SetOutputCreatedTokenTransactionID(id)
-	return tou
-}
-
-// SetNillableOutputCreatedTokenTransactionID sets the "output_created_token_transaction" edge to the TokenTransaction entity by ID if the given value is not nil.
-func (tou *TokenOutputUpdate) SetNillableOutputCreatedTokenTransactionID(id *uuid.UUID) *TokenOutputUpdate {
-	if id != nil {
-		tou = tou.SetOutputCreatedTokenTransactionID(*id)
-	}
-	return tou
-}
-
-// SetOutputCreatedTokenTransaction sets the "output_created_token_transaction" edge to the TokenTransaction entity.
-func (tou *TokenOutputUpdate) SetOutputCreatedTokenTransaction(t *TokenTransaction) *TokenOutputUpdate {
-	return tou.SetOutputCreatedTokenTransactionID(t.ID)
-}
-
 // SetOutputSpentTokenTransactionID sets the "output_spent_token_transaction" edge to the TokenTransaction entity by ID.
 func (tou *TokenOutputUpdate) SetOutputSpentTokenTransactionID(id uuid.UUID) *TokenOutputUpdate {
 	tou.mutation.SetOutputSpentTokenTransactionID(id)
@@ -262,12 +231,6 @@ func (tou *TokenOutputUpdate) AddTokenPartialRevocationSecretShares(t ...*TokenP
 // Mutation returns the TokenOutputMutation object of the builder.
 func (tou *TokenOutputUpdate) Mutation() *TokenOutputMutation {
 	return tou.mutation
-}
-
-// ClearOutputCreatedTokenTransaction clears the "output_created_token_transaction" edge to the TokenTransaction entity.
-func (tou *TokenOutputUpdate) ClearOutputCreatedTokenTransaction() *TokenOutputUpdate {
-	tou.mutation.ClearOutputCreatedTokenTransaction()
-	return tou
 }
 
 // ClearOutputSpentTokenTransaction clears the "output_spent_token_transaction" edge to the TokenTransaction entity.
@@ -375,6 +338,9 @@ func (tou *TokenOutputUpdate) check() error {
 	if tou.mutation.RevocationKeyshareCleared() && len(tou.mutation.RevocationKeyshareIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TokenOutput.revocation_keyshare"`)
 	}
+	if tou.mutation.OutputCreatedTokenTransactionCleared() && len(tou.mutation.OutputCreatedTokenTransactionIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "TokenOutput.output_created_token_transaction"`)
+	}
 	if tou.mutation.TokenCreateCleared() && len(tou.mutation.TokenCreateIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TokenOutput.token_create"`)
 	}
@@ -414,12 +380,6 @@ func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if tou.mutation.AmountCleared() {
 		_spec.ClearField(tokenoutput.FieldAmount, field.TypeOther)
 	}
-	if value, ok := tou.mutation.CreatedTransactionFinalizedHash(); ok {
-		_spec.SetField(tokenoutput.FieldCreatedTransactionFinalizedHash, field.TypeBytes, value)
-	}
-	if tou.mutation.CreatedTransactionFinalizedHashCleared() {
-		_spec.ClearField(tokenoutput.FieldCreatedTransactionFinalizedHash, field.TypeBytes)
-	}
 	if value, ok := tou.mutation.SpentOwnershipSignature(); ok {
 		_spec.SetField(tokenoutput.FieldSpentOwnershipSignature, field.TypeBytes, value)
 	}
@@ -458,35 +418,6 @@ func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tou.mutation.NetworkCleared() {
 		_spec.ClearField(tokenoutput.FieldNetwork, field.TypeEnum)
-	}
-	if tou.mutation.OutputCreatedTokenTransactionCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   tokenoutput.OutputCreatedTokenTransactionTable,
-			Columns: []string{tokenoutput.OutputCreatedTokenTransactionColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := tou.mutation.OutputCreatedTokenTransactionIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   tokenoutput.OutputCreatedTokenTransactionTable,
-			Columns: []string{tokenoutput.OutputCreatedTokenTransactionColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if tou.mutation.OutputSpentTokenTransactionCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -669,18 +600,6 @@ func (touo *TokenOutputUpdateOne) ClearAmount() *TokenOutputUpdateOne {
 	return touo
 }
 
-// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
-func (touo *TokenOutputUpdateOne) SetCreatedTransactionFinalizedHash(b []byte) *TokenOutputUpdateOne {
-	touo.mutation.SetCreatedTransactionFinalizedHash(b)
-	return touo
-}
-
-// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
-func (touo *TokenOutputUpdateOne) ClearCreatedTransactionFinalizedHash() *TokenOutputUpdateOne {
-	touo.mutation.ClearCreatedTransactionFinalizedHash()
-	return touo
-}
-
 // SetSpentOwnershipSignature sets the "spent_ownership_signature" field.
 func (touo *TokenOutputUpdateOne) SetSpentOwnershipSignature(b []byte) *TokenOutputUpdateOne {
 	touo.mutation.SetSpentOwnershipSignature(b)
@@ -784,25 +703,6 @@ func (touo *TokenOutputUpdateOne) ClearNetwork() *TokenOutputUpdateOne {
 	return touo
 }
 
-// SetOutputCreatedTokenTransactionID sets the "output_created_token_transaction" edge to the TokenTransaction entity by ID.
-func (touo *TokenOutputUpdateOne) SetOutputCreatedTokenTransactionID(id uuid.UUID) *TokenOutputUpdateOne {
-	touo.mutation.SetOutputCreatedTokenTransactionID(id)
-	return touo
-}
-
-// SetNillableOutputCreatedTokenTransactionID sets the "output_created_token_transaction" edge to the TokenTransaction entity by ID if the given value is not nil.
-func (touo *TokenOutputUpdateOne) SetNillableOutputCreatedTokenTransactionID(id *uuid.UUID) *TokenOutputUpdateOne {
-	if id != nil {
-		touo = touo.SetOutputCreatedTokenTransactionID(*id)
-	}
-	return touo
-}
-
-// SetOutputCreatedTokenTransaction sets the "output_created_token_transaction" edge to the TokenTransaction entity.
-func (touo *TokenOutputUpdateOne) SetOutputCreatedTokenTransaction(t *TokenTransaction) *TokenOutputUpdateOne {
-	return touo.SetOutputCreatedTokenTransactionID(t.ID)
-}
-
 // SetOutputSpentTokenTransactionID sets the "output_spent_token_transaction" edge to the TokenTransaction entity by ID.
 func (touo *TokenOutputUpdateOne) SetOutputSpentTokenTransactionID(id uuid.UUID) *TokenOutputUpdateOne {
 	touo.mutation.SetOutputSpentTokenTransactionID(id)
@@ -855,12 +755,6 @@ func (touo *TokenOutputUpdateOne) AddTokenPartialRevocationSecretShares(t ...*To
 // Mutation returns the TokenOutputMutation object of the builder.
 func (touo *TokenOutputUpdateOne) Mutation() *TokenOutputMutation {
 	return touo.mutation
-}
-
-// ClearOutputCreatedTokenTransaction clears the "output_created_token_transaction" edge to the TokenTransaction entity.
-func (touo *TokenOutputUpdateOne) ClearOutputCreatedTokenTransaction() *TokenOutputUpdateOne {
-	touo.mutation.ClearOutputCreatedTokenTransaction()
-	return touo
 }
 
 // ClearOutputSpentTokenTransaction clears the "output_spent_token_transaction" edge to the TokenTransaction entity.
@@ -981,6 +875,9 @@ func (touo *TokenOutputUpdateOne) check() error {
 	if touo.mutation.RevocationKeyshareCleared() && len(touo.mutation.RevocationKeyshareIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TokenOutput.revocation_keyshare"`)
 	}
+	if touo.mutation.OutputCreatedTokenTransactionCleared() && len(touo.mutation.OutputCreatedTokenTransactionIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "TokenOutput.output_created_token_transaction"`)
+	}
 	if touo.mutation.TokenCreateCleared() && len(touo.mutation.TokenCreateIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TokenOutput.token_create"`)
 	}
@@ -1037,12 +934,6 @@ func (touo *TokenOutputUpdateOne) sqlSave(ctx context.Context) (_node *TokenOutp
 	if touo.mutation.AmountCleared() {
 		_spec.ClearField(tokenoutput.FieldAmount, field.TypeOther)
 	}
-	if value, ok := touo.mutation.CreatedTransactionFinalizedHash(); ok {
-		_spec.SetField(tokenoutput.FieldCreatedTransactionFinalizedHash, field.TypeBytes, value)
-	}
-	if touo.mutation.CreatedTransactionFinalizedHashCleared() {
-		_spec.ClearField(tokenoutput.FieldCreatedTransactionFinalizedHash, field.TypeBytes)
-	}
 	if value, ok := touo.mutation.SpentOwnershipSignature(); ok {
 		_spec.SetField(tokenoutput.FieldSpentOwnershipSignature, field.TypeBytes, value)
 	}
@@ -1081,35 +972,6 @@ func (touo *TokenOutputUpdateOne) sqlSave(ctx context.Context) (_node *TokenOutp
 	}
 	if touo.mutation.NetworkCleared() {
 		_spec.ClearField(tokenoutput.FieldNetwork, field.TypeEnum)
-	}
-	if touo.mutation.OutputCreatedTokenTransactionCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   tokenoutput.OutputCreatedTokenTransactionTable,
-			Columns: []string{tokenoutput.OutputCreatedTokenTransactionColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := touo.mutation.OutputCreatedTokenTransactionIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   tokenoutput.OutputCreatedTokenTransactionTable,
-			Columns: []string{tokenoutput.OutputCreatedTokenTransactionColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if touo.mutation.OutputSpentTokenTransactionCleared() {
 		edge := &sqlgraph.EdgeSpec{

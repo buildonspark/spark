@@ -640,16 +640,6 @@ func CreatedTransactionFinalizedHashLTE(v []byte) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldLTE(FieldCreatedTransactionFinalizedHash, v))
 }
 
-// CreatedTransactionFinalizedHashIsNil applies the IsNil predicate on the "created_transaction_finalized_hash" field.
-func CreatedTransactionFinalizedHashIsNil() predicate.TokenOutput {
-	return predicate.TokenOutput(sql.FieldIsNull(FieldCreatedTransactionFinalizedHash))
-}
-
-// CreatedTransactionFinalizedHashNotNil applies the NotNil predicate on the "created_transaction_finalized_hash" field.
-func CreatedTransactionFinalizedHashNotNil() predicate.TokenOutput {
-	return predicate.TokenOutput(sql.FieldNotNull(FieldCreatedTransactionFinalizedHash))
-}
-
 // SpentOwnershipSignatureEQ applies the EQ predicate on the "spent_ownership_signature" field.
 func SpentOwnershipSignatureEQ(v []byte) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldSpentOwnershipSignature, v))

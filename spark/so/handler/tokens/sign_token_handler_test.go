@@ -344,6 +344,26 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 	}
 	require.NoError(t, err)
 
+	mint, err := setup.sessionCtx.Client.TokenMint.Create().
+		SetIssuerPublicKey(setup.pubKey).
+		SetTokenIdentifier(tokenIdentifier).
+		SetIssuerSignature(bytes.Repeat([]byte{0}, 64)).
+		SetWalletProvidedTimestamp(uint64(time.Now().Add(-10 * time.Minute).UnixMilli())).
+		Save(setup.ctx)
+	require.NoError(t, err)
+	prevCoordinatorSignature := ecdsa.Sign(setup.coordinatorPrivKey.ToBTCEC(), prevTxHash)
+	prevTokenTx, err := setup.sessionCtx.Client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(prevTxHash).
+		SetFinalizedTokenTransactionHash(prevTxHash).
+		SetStatus(schematype.TokenTransactionStatusFinalized).
+		SetVersion(schematype.TokenTransactionVersionV1).
+		SetClientCreatedTimestamp(time.Now().Add(-10 * time.Minute)).
+		SetOperatorSignature(prevCoordinatorSignature.Serialize()).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		SetMint(mint).
+		Save(setup.ctx)
+	require.NoError(t, err)
+
 	// Create the previous token outputs that will be spent
 	prevTokenOutput1, err := setup.sessionCtx.Client.TokenOutput.Create().
 		SetID(uuid.New()).
@@ -358,6 +378,8 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 		SetTokenIdentifier(tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
 		SetNetwork(btcnetwork.Regtest).
+		SetOutputCreatedTokenTransaction(prevTokenTx).
+		SetCreatedTransactionFinalizedHash(prevTxHash).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
@@ -374,33 +396,9 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 		SetTokenIdentifier(tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
 		SetNetwork(btcnetwork.Regtest).
+		SetOutputCreatedTokenTransaction(prevTokenTx).
+		SetCreatedTransactionFinalizedHash(prevTxHash).
 		Save(setup.ctx)
-	require.NoError(t, err)
-
-	prevCoordinatorSignature := ecdsa.Sign(setup.coordinatorPrivKey.ToBTCEC(), prevTxHash)
-
-	mint, err := setup.sessionCtx.Client.TokenMint.Create().
-		SetIssuerPublicKey(setup.pubKey).
-		SetTokenIdentifier(tokenIdentifier).
-		SetIssuerSignature(bytes.Repeat([]byte{0}, 64)).
-		SetWalletProvidedTimestamp(uint64(time.Now().Add(-10 * time.Minute).UnixMilli())).
-		Save(setup.ctx)
-	require.NoError(t, err)
-
-	prevTokenTx, err := setup.sessionCtx.Client.TokenTransaction.Create().
-		SetPartialTokenTransactionHash(prevTxHash).
-		SetFinalizedTokenTransactionHash(prevTxHash).
-		SetStatus(schematype.TokenTransactionStatusFinalized).
-		SetVersion(schematype.TokenTransactionVersionV1).
-		SetClientCreatedTimestamp(time.Now().Add(-10 * time.Minute)).
-		SetOperatorSignature(prevCoordinatorSignature.Serialize()).
-		SetExpiryTime(time.Now().Add(10 * time.Minute)).
-		SetMint(mint).
-		Save(setup.ctx)
-	require.NoError(t, err)
-	_, err = prevTokenOutput1.Update().SetOutputCreatedTokenTransaction(prevTokenTx).Save(setup.ctx)
-	require.NoError(t, err)
-	_, err = prevTokenOutput2.Update().SetOutputCreatedTokenTransaction(prevTokenTx).Save(setup.ctx)
 	require.NoError(t, err)
 
 	return &transferTestData{
@@ -500,8 +498,20 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 	}
 	require.NoError(t, err)
 
+	// Create the database transaction with the computed hash
+	dbTx, err := setup.sessionCtx.Client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(partialTxHash).
+		SetFinalizedTokenTransactionHash(finalTxHash).
+		SetStatus(schematype.TokenTransactionStatusSigned).
+		SetVersion(schematype.TokenTransactionVersionV1).
+		SetClientCreatedTimestamp(tokenTxProto.ClientCreatedTimestamp.AsTime()).
+		SetOperatorSignature(coordinatorSignature.Serialize()).
+		SetExpiryTime(tokenTxProto.ExpiryTime.AsTime()).
+		Save(setup.ctx)
+	require.NoError(t, err)
+
 	// Create the new token outputs for the transfer
-	dbTokenOutput1, err := setup.sessionCtx.Client.TokenOutput.Create().
+	_, err = setup.sessionCtx.Client.TokenOutput.Create().
 		SetID(uuid.MustParse(transferData.tokenOutputId1)).
 		SetOwnerPublicKey(setup.coordinatorPubKey).
 		SetTokenAmount(padBytes(big.NewInt(50).Bytes(), 16)).
@@ -514,10 +524,12 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 		SetTokenIdentifier(transferData.tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
 		SetNetwork(btcnetwork.Regtest).
+		SetOutputCreatedTokenTransaction(dbTx).
+		SetCreatedTransactionFinalizedHash(finalTxHash).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
-	dbTokenOutput2, err := setup.sessionCtx.Client.TokenOutput.Create().
+	_, err = setup.sessionCtx.Client.TokenOutput.Create().
 		SetID(uuid.MustParse(transferData.tokenOutputId2)).
 		SetOwnerPublicKey(setup.coordinatorPubKey).
 		SetTokenAmount(padBytes(big.NewInt(50).Bytes(), 16)).
@@ -530,24 +542,11 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 		SetTokenIdentifier(transferData.tokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
 		SetNetwork(btcnetwork.Regtest).
+		SetOutputCreatedTokenTransaction(dbTx).
+		SetCreatedTransactionFinalizedHash(finalTxHash).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
-	// Create the database transaction with the computed hash
-	dbTx, err := setup.sessionCtx.Client.TokenTransaction.Create().
-		SetPartialTokenTransactionHash(partialTxHash).
-		SetFinalizedTokenTransactionHash(finalTxHash).
-		SetStatus(schematype.TokenTransactionStatusSigned).
-		SetVersion(schematype.TokenTransactionVersionV1).
-		SetClientCreatedTimestamp(tokenTxProto.ClientCreatedTimestamp.AsTime()).
-		SetOperatorSignature(coordinatorSignature.Serialize()).
-		SetExpiryTime(tokenTxProto.ExpiryTime.AsTime()).
-		Save(setup.ctx)
-	require.NoError(t, err)
-	_, err = dbTokenOutput1.Update().SetOutputCreatedTokenTransaction(dbTx).Save(setup.ctx)
-	require.NoError(t, err)
-	_, err = dbTokenOutput2.Update().SetOutputCreatedTokenTransaction(dbTx).Save(setup.ctx)
-	require.NoError(t, err)
 	_, err = transferData.prevTokenOutput1.Update().
 		SetOutputSpentTokenTransaction(dbTx).
 		SetStatus(schematype.TokenOutputStatusSpentSigned).

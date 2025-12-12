@@ -20,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/entfixtures"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
@@ -48,6 +49,8 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, dbClient
 	secretShare, err := keys.PrivateKeyFromBigInt(coordinatorShare.Share)
 	require.NoError(t, err)
 
+	fixtures := entfixtures.New(t, ctx, dbClient)
+
 	keyshare := dbClient.SigningKeyshare.Create().
 		SetSecretShare(secretShare).
 		SetPublicKey(secretPriv.Public()).
@@ -58,6 +61,14 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, dbClient
 		SaveX(ctx)
 
 	ownerPubKey := handler.config.IdentityPublicKey()
+
+	txHash := fixtures.RandomBytes(32)
+	tokenTx := dbClient.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(txHash).
+		SetFinalizedTokenTransactionHash(txHash).
+		SetStatus(st.TokenTransactionStatusFinalized).
+		SetCreateID(tokenCreateID).
+		SaveX(ctx)
 
 	output := dbClient.TokenOutput.Create().
 		SetID(uuid.New()).
@@ -74,6 +85,8 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, dbClient
 		SetTokenIdentifier([]byte("token_identifier")).
 		SetTokenCreateID(tokenCreateID).
 		SetSpentTransactionInputVout(0).
+		SetOutputCreatedTokenTransaction(tokenTx).
+		SetCreatedTransactionFinalizedHash(tokenTx.FinalizedTokenTransactionHash).
 		SaveX(ctx)
 
 	// add partial share for operator 2
@@ -92,6 +105,7 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, dbClient
 func TestGetSecretSharesNotInInput(t *testing.T) {
 	handler, ctx, dbClient := setUpInternalSignTokenTestHandlerPostgres(t)
 	rng := rand.NewChaCha8([32]byte{})
+	fixtures := entfixtures.New(t, ctx, dbClient).WithRNG(rng)
 
 	aliceOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000001"].IdentityPublicKey
 	bobOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000002"].IdentityPublicKey
@@ -140,6 +154,14 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 		SaveX(ctx)
 
+	txHash := fixtures.RandomBytes(32)
+	tokenTx := dbClient.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(txHash).
+		SetFinalizedTokenTransactionHash(txHash).
+		SetStatus(st.TokenTransactionStatusFinalized).
+		SetCreateID(tokenCreate.ID).
+		SaveX(ctx)
+
 	withdrawRevocationCommitment := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	tokenOutputInDb := dbClient.TokenOutput.Create().
 		SetID(uuid.New()).
@@ -152,6 +174,8 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SetWithdrawRelativeBlockLocktime(1).
 		SetWithdrawRevocationCommitment(withdrawRevocationCommitment.Serialize()).
 		SetCreatedTransactionOutputVout(0).
+		SetOutputCreatedTokenTransaction(tokenTx).
+		SetCreatedTransactionFinalizedHash(tokenTx.FinalizedTokenTransactionHash).
 		SetNetwork(btcnetwork.Regtest).
 		SetTokenIdentifier([]byte("token_identifier")).
 		SetTokenCreateID(tokenCreate.ID).

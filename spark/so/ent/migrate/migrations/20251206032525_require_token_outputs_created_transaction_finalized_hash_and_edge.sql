@@ -1,0 +1,2 @@
+-- Modify "token_outputs" table
+ALTER TABLE "token_outputs" DROP CONSTRAINT "token_outputs_token_transactio_d0380012988c8a57eb9f0fa7b88ce6d3", ALTER COLUMN "token_output_output_created_token_transaction" SET NOT NULL, ALTER COLUMN "created_transaction_finalized_hash" SET NOT NULL, ADD CONSTRAINT "token_outputs_token_transactio_d0380012988c8a57eb9f0fa7b88ce6d3" FOREIGN KEY ("token_output_output_created_token_transaction") REFERENCES "token_transactions" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION;

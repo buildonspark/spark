@@ -79,8 +79,11 @@ func (TokenOutput) Fields() []ent.Field {
 			Immutable().
 			Annotations(entexample.Default(0)),
 		field.Bytes("created_transaction_finalized_hash").
-			Optional().
-			Comment("Denormalized finalized transaction hash from the output_created_token_transaction edge. Auto-populated by hook."),
+			Immutable().
+			Comment("Denormalized finalized transaction hash from the output_created_token_transaction edge. Auto-populated by hook.").
+			Annotations(entexample.Default(
+				"a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+			)),
 		field.Bytes("spent_ownership_signature").
 			Optional(),
 		field.Bytes("spent_operator_specific_ownership_signature").
@@ -116,6 +119,8 @@ func (TokenOutput) Edges() []ent.Edge {
 			Comment("The signing keyshare used to derive the revocation secret for this output."),
 		edge.To("output_created_token_transaction", TokenTransaction.Type).
 			Unique().
+			Required().
+			Immutable().
 			Comment("The token transaction that created this output."),
 		// This relation maps the most recent transaction attempting to spend this output.
 		// It is not necessarily finalized.

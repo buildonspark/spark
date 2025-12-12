@@ -239,14 +239,6 @@ func (toc *TokenOutputCreate) SetOutputCreatedTokenTransactionID(id uuid.UUID) *
 	return toc
 }
 
-// SetNillableOutputCreatedTokenTransactionID sets the "output_created_token_transaction" edge to the TokenTransaction entity by ID if the given value is not nil.
-func (toc *TokenOutputCreate) SetNillableOutputCreatedTokenTransactionID(id *uuid.UUID) *TokenOutputCreate {
-	if id != nil {
-		toc = toc.SetOutputCreatedTokenTransactionID(*id)
-	}
-	return toc
-}
-
 // SetOutputCreatedTokenTransaction sets the "output_created_token_transaction" edge to the TokenTransaction entity.
 func (toc *TokenOutputCreate) SetOutputCreatedTokenTransaction(t *TokenTransaction) *TokenOutputCreate {
 	return toc.SetOutputCreatedTokenTransactionID(t.ID)
@@ -406,6 +398,9 @@ func (toc *TokenOutputCreate) check() error {
 	if _, ok := toc.mutation.CreatedTransactionOutputVout(); !ok {
 		return &ValidationError{Name: "created_transaction_output_vout", err: errors.New(`ent: missing required field "TokenOutput.created_transaction_output_vout"`)}
 	}
+	if _, ok := toc.mutation.CreatedTransactionFinalizedHash(); !ok {
+		return &ValidationError{Name: "created_transaction_finalized_hash", err: errors.New(`ent: missing required field "TokenOutput.created_transaction_finalized_hash"`)}
+	}
 	if v, ok := toc.mutation.Network(); ok {
 		if err := tokenoutput.NetworkValidator(v); err != nil {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.network": %w`, err)}
@@ -419,6 +414,9 @@ func (toc *TokenOutputCreate) check() error {
 	}
 	if len(toc.mutation.RevocationKeyshareIDs()) == 0 {
 		return &ValidationError{Name: "revocation_keyshare", err: errors.New(`ent: missing required edge "TokenOutput.revocation_keyshare"`)}
+	}
+	if len(toc.mutation.OutputCreatedTokenTransactionIDs()) == 0 {
+		return &ValidationError{Name: "output_created_token_transaction", err: errors.New(`ent: missing required edge "TokenOutput.output_created_token_transaction"`)}
 	}
 	if len(toc.mutation.TokenCreateIDs()) == 0 {
 		return &ValidationError{Name: "token_create", err: errors.New(`ent: missing required edge "TokenOutput.token_create"`)}
@@ -729,24 +727,6 @@ func (u *TokenOutputUpsert) ClearAmount() *TokenOutputUpsert {
 	return u
 }
 
-// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
-func (u *TokenOutputUpsert) SetCreatedTransactionFinalizedHash(v []byte) *TokenOutputUpsert {
-	u.Set(tokenoutput.FieldCreatedTransactionFinalizedHash, v)
-	return u
-}
-
-// UpdateCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field to the value that was provided on create.
-func (u *TokenOutputUpsert) UpdateCreatedTransactionFinalizedHash() *TokenOutputUpsert {
-	u.SetExcluded(tokenoutput.FieldCreatedTransactionFinalizedHash)
-	return u
-}
-
-// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
-func (u *TokenOutputUpsert) ClearCreatedTransactionFinalizedHash() *TokenOutputUpsert {
-	u.SetNull(tokenoutput.FieldCreatedTransactionFinalizedHash)
-	return u
-}
-
 // SetSpentOwnershipSignature sets the "spent_ownership_signature" field.
 func (u *TokenOutputUpsert) SetSpentOwnershipSignature(v []byte) *TokenOutputUpsert {
 	u.Set(tokenoutput.FieldSpentOwnershipSignature, v)
@@ -902,6 +882,9 @@ func (u *TokenOutputUpsertOne) UpdateNewValues() *TokenOutputUpsertOne {
 		if _, exists := u.create.mutation.CreatedTransactionOutputVout(); exists {
 			s.SetIgnore(tokenoutput.FieldCreatedTransactionOutputVout)
 		}
+		if _, exists := u.create.mutation.CreatedTransactionFinalizedHash(); exists {
+			s.SetIgnore(tokenoutput.FieldCreatedTransactionFinalizedHash)
+		}
 		if _, exists := u.create.mutation.TokenIdentifier(); exists {
 			s.SetIgnore(tokenoutput.FieldTokenIdentifier)
 		}
@@ -985,27 +968,6 @@ func (u *TokenOutputUpsertOne) UpdateAmount() *TokenOutputUpsertOne {
 func (u *TokenOutputUpsertOne) ClearAmount() *TokenOutputUpsertOne {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.ClearAmount()
-	})
-}
-
-// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
-func (u *TokenOutputUpsertOne) SetCreatedTransactionFinalizedHash(v []byte) *TokenOutputUpsertOne {
-	return u.Update(func(s *TokenOutputUpsert) {
-		s.SetCreatedTransactionFinalizedHash(v)
-	})
-}
-
-// UpdateCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field to the value that was provided on create.
-func (u *TokenOutputUpsertOne) UpdateCreatedTransactionFinalizedHash() *TokenOutputUpsertOne {
-	return u.Update(func(s *TokenOutputUpsert) {
-		s.UpdateCreatedTransactionFinalizedHash()
-	})
-}
-
-// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
-func (u *TokenOutputUpsertOne) ClearCreatedTransactionFinalizedHash() *TokenOutputUpsertOne {
-	return u.Update(func(s *TokenOutputUpsert) {
-		s.ClearCreatedTransactionFinalizedHash()
 	})
 }
 
@@ -1349,6 +1311,9 @@ func (u *TokenOutputUpsertBulk) UpdateNewValues() *TokenOutputUpsertBulk {
 			if _, exists := b.mutation.CreatedTransactionOutputVout(); exists {
 				s.SetIgnore(tokenoutput.FieldCreatedTransactionOutputVout)
 			}
+			if _, exists := b.mutation.CreatedTransactionFinalizedHash(); exists {
+				s.SetIgnore(tokenoutput.FieldCreatedTransactionFinalizedHash)
+			}
 			if _, exists := b.mutation.TokenIdentifier(); exists {
 				s.SetIgnore(tokenoutput.FieldTokenIdentifier)
 			}
@@ -1433,27 +1398,6 @@ func (u *TokenOutputUpsertBulk) UpdateAmount() *TokenOutputUpsertBulk {
 func (u *TokenOutputUpsertBulk) ClearAmount() *TokenOutputUpsertBulk {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.ClearAmount()
-	})
-}
-
-// SetCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field.
-func (u *TokenOutputUpsertBulk) SetCreatedTransactionFinalizedHash(v []byte) *TokenOutputUpsertBulk {
-	return u.Update(func(s *TokenOutputUpsert) {
-		s.SetCreatedTransactionFinalizedHash(v)
-	})
-}
-
-// UpdateCreatedTransactionFinalizedHash sets the "created_transaction_finalized_hash" field to the value that was provided on create.
-func (u *TokenOutputUpsertBulk) UpdateCreatedTransactionFinalizedHash() *TokenOutputUpsertBulk {
-	return u.Update(func(s *TokenOutputUpsert) {
-		s.UpdateCreatedTransactionFinalizedHash()
-	})
-}
-
-// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
-func (u *TokenOutputUpsertBulk) ClearCreatedTransactionFinalizedHash() *TokenOutputUpsertBulk {
-	return u.Update(func(s *TokenOutputUpsert) {
-		s.ClearCreatedTransactionFinalizedHash()
 	})
 }
 

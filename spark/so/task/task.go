@@ -776,13 +776,6 @@ func AllStartupTasks() []StartupTaskSpec {
 		},
 		{
 			BaseTaskSpec: BaseTaskSpec{
-				Name:    "backfill_created_finalized_tx_hash",
-				Timeout: &backfillCreatedFinalizedTxHashTimeout,
-				Task:    backfillCreatedFinalizedTxHash,
-			},
-		},
-		{
-			BaseTaskSpec: BaseTaskSpec{
 				Name:    "backfill_token_amounts",
 				Timeout: &backfillTokenAmountTimeout,
 				Task:    backfillTokenAmounts,
@@ -900,92 +893,6 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, run
 		}
 	}
 	logger.Info("All startup tasks completed")
-	return nil
-}
-
-const backfillCreatedFinalizedTxHashBatchSize = 1000
-
-// backfillCreatedFinalizedTxHash backfills the created_finalized_tx_hash field on token_outputs
-// by fetching the finalized_token_transaction_hash from the linked token_transaction.
-// Uses bulk UPDATE with JOIN for performance. Commits after each batch.
-// Re-checks the knob every minute so the job can be disabled mid-run.
-// Controlled by knob: spark.so.tokens.backfill_created_finalized_tx_hash.enabled
-func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-	logger := logging.GetLoggerFromContext(ctx)
-	totalUpdated := int64(0)
-	var lastKnobCheck time.Time
-
-	const bulkUpdateQuery = `
-		WITH batch AS (
-			SELECT id
-			FROM token_outputs
-			WHERE created_transaction_finalized_hash IS NULL
-			  AND token_output_output_created_token_transaction IS NOT NULL
-			LIMIT $1
-		)
-		UPDATE token_outputs to_update
-		SET created_transaction_finalized_hash = tt.finalized_token_transaction_hash
-		FROM token_transactions tt, batch
-		WHERE to_update.id = batch.id
-		  AND to_update.token_output_output_created_token_transaction = tt.id
-	`
-
-	for {
-		if time.Since(lastKnobCheck) > time.Minute {
-			lastKnobCheck = time.Now()
-			if knobsService.GetValue(knobs.KnobBackfillCreatedFinalizedTxHashEnabled, 0) == 0 {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(time.Minute):
-				}
-				continue
-			}
-		}
-
-		tx, err := ent.GetTxFromContext(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get tx from context: %w", err)
-		}
-
-		// nolint:forbidigo
-		result, err := tx.ExecContext(ctx, bulkUpdateQuery, backfillCreatedFinalizedTxHashBatchSize)
-		if err != nil {
-			return fmt.Errorf("failed to execute bulk update: %w", err)
-		}
-
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			return fmt.Errorf("failed to get rows affected: %w", err)
-		}
-
-		if rowsAffected == 0 {
-			break
-		}
-
-		totalUpdated += rowsAffected
-
-		ent.MarkTxDirty(ctx)
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("failed to commit batch: %w", err)
-		}
-
-		logger.Sugar().Infof("Backfilled %d token outputs so far (batch of %d)", totalUpdated, rowsAffected)
-
-		if rowsAffected < backfillCreatedFinalizedTxHashBatchSize {
-			break
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(100 * time.Millisecond):
-		}
-	}
-
-	if totalUpdated > 0 {
-		logger.Sugar().Infof("Successfully backfilled %d total token outputs", totalUpdated)
-	}
 	return nil
 }
 

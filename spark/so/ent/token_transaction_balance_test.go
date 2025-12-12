@@ -43,7 +43,7 @@ func TestUnbalancedTransferFails(t *testing.T) {
 			inputAmount := big.NewInt(1000)
 			outputAmount := big.NewInt(500)
 
-			input := f.CreateStandaloneOutput(tokenCreate, inputAmount, st.TokenOutputStatusCreatedFinalized)
+			input := f.CreateStandaloneOutput(tokenCreate, inputAmount)
 
 			tokenTx, err := entTx.TokenTransaction.Create().
 				SetPartialTokenTransactionHash([]byte("partial_hash_2")).
@@ -78,7 +78,7 @@ func TestOutputReassignmentFromRevealedFails(t *testing.T) {
 			tokenCreate := f.CreateTokenCreate(btcnetwork.Mainnet, nil, nil)
 
 			amount := big.NewInt(1000)
-			input := f.CreateStandaloneOutput(tokenCreate, amount, st.TokenOutputStatusCreatedFinalized)
+			input := f.CreateStandaloneOutput(tokenCreate, amount)
 
 			tx1, err := entTx.TokenTransaction.Create().
 				SetPartialTokenTransactionHash([]byte("partial_hash_3")).
@@ -125,8 +125,8 @@ func TestOutputReassignmentValidatesNewTransaction(t *testing.T) {
 			tokenCreate := f.CreateTokenCreate(btcnetwork.Mainnet, nil, nil)
 
 			amount := big.NewInt(1000)
-			input1 := f.CreateStandaloneOutput(tokenCreate, amount, st.TokenOutputStatusCreatedFinalized)
-			input2 := f.CreateStandaloneOutput(tokenCreate, amount, st.TokenOutputStatusCreatedFinalized)
+			input1 := f.CreateStandaloneOutput(tokenCreate, amount)
+			input2 := f.CreateStandaloneOutput(tokenCreate, amount)
 
 			tx1, err := entTx.TokenTransaction.Create().
 				SetPartialTokenTransactionHash([]byte("partial_hash_7")).

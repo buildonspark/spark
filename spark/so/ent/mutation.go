@@ -14647,22 +14647,9 @@ func (m *TokenOutputMutation) OldCreatedTransactionFinalizedHash(ctx context.Con
 	return oldValue.CreatedTransactionFinalizedHash, nil
 }
 
-// ClearCreatedTransactionFinalizedHash clears the value of the "created_transaction_finalized_hash" field.
-func (m *TokenOutputMutation) ClearCreatedTransactionFinalizedHash() {
-	m.created_transaction_finalized_hash = nil
-	m.clearedFields[tokenoutput.FieldCreatedTransactionFinalizedHash] = struct{}{}
-}
-
-// CreatedTransactionFinalizedHashCleared returns if the "created_transaction_finalized_hash" field was cleared in this mutation.
-func (m *TokenOutputMutation) CreatedTransactionFinalizedHashCleared() bool {
-	_, ok := m.clearedFields[tokenoutput.FieldCreatedTransactionFinalizedHash]
-	return ok
-}
-
 // ResetCreatedTransactionFinalizedHash resets all changes to the "created_transaction_finalized_hash" field.
 func (m *TokenOutputMutation) ResetCreatedTransactionFinalizedHash() {
 	m.created_transaction_finalized_hash = nil
-	delete(m.clearedFields, tokenoutput.FieldCreatedTransactionFinalizedHash)
 }
 
 // SetSpentOwnershipSignature sets the "spent_ownership_signature" field.
@@ -15732,9 +15719,6 @@ func (m *TokenOutputMutation) ClearedFields() []string {
 	if m.FieldCleared(tokenoutput.FieldAmount) {
 		fields = append(fields, tokenoutput.FieldAmount)
 	}
-	if m.FieldCleared(tokenoutput.FieldCreatedTransactionFinalizedHash) {
-		fields = append(fields, tokenoutput.FieldCreatedTransactionFinalizedHash)
-	}
 	if m.FieldCleared(tokenoutput.FieldSpentOwnershipSignature) {
 		fields = append(fields, tokenoutput.FieldSpentOwnershipSignature)
 	}
@@ -15772,9 +15756,6 @@ func (m *TokenOutputMutation) ClearField(name string) error {
 		return nil
 	case tokenoutput.FieldAmount:
 		m.ClearAmount()
-		return nil
-	case tokenoutput.FieldCreatedTransactionFinalizedHash:
-		m.ClearCreatedTransactionFinalizedHash()
 		return nil
 	case tokenoutput.FieldSpentOwnershipSignature:
 		m.ClearSpentOwnershipSignature()

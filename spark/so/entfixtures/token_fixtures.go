@@ -163,32 +163,9 @@ func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCre
 }
 
 // CreateStandaloneOutput creates an output not linked to any transaction
-func (f *Fixtures) CreateStandaloneOutput(tokenCreate *ent.TokenCreate, amount *big.Int, status st.TokenOutputStatus) *ent.TokenOutput {
-	ownerKey := keys.GeneratePrivateKey()
-	keyshare := f.CreateKeyshare()
-
-	amountBytes := make([]byte, 16)
-	amount.FillBytes(amountBytes)
-	u128Amount, err := uint128.FromBigInt(amount)
-	f.RequireNoError(err)
-
-	output, err := f.Client.TokenOutput.Create().
-		SetStatus(status).
-		SetOwnerPublicKey(ownerKey.Public()).
-		SetWithdrawBondSats(testWithdrawBondSats).
-		SetWithdrawRelativeBlockLocktime(testWithdrawRelativeBlockLocktime).
-		SetWithdrawRevocationCommitment(f.RandomBytes(32)).
-		SetTokenAmount(amountBytes).
-		SetAmount(u128Amount).
-		SetCreatedTransactionOutputVout(0).
-		SetTokenIdentifier(tokenCreate.TokenIdentifier).
-		SetTokenCreate(tokenCreate).
-		SetRevocationKeyshare(keyshare).
-		SetNetwork(tokenCreate.Network).
-		Save(f.Ctx)
-	f.RequireNoError(err)
-
-	return output
+func (f *Fixtures) CreateStandaloneOutput(tokenCreate *ent.TokenCreate, amount *big.Int) *ent.TokenOutput {
+	_, outputs := f.CreateMintTransaction(tokenCreate, OutputSpecs(amount), st.TokenTransactionStatusFinalized)
+	return outputs[0]
 }
 
 // CreateBalancedTransferTransaction creates a balanced transfer transaction
