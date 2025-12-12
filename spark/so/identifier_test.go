@@ -1,4 +1,4 @@
-package utils
+package so
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIndexToIdentifier(t *testing.T) {
@@ -29,11 +29,8 @@ func TestIndexToIdentifier(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("Index_%d", tt.index),
 			func(t *testing.T) {
-				t.Parallel()
 				identifier := IndexToIdentifier(tt.index)
-				if diff := cmp.Diff(tt.want, identifier); diff != "" {
-					t.Errorf("IndexToIdentifier(%d) mismatch (-want +got):\n%s", tt.index, diff)
-				}
+				require.Equal(t, tt.want, identifier)
 			},
 		)
 	}

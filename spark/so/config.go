@@ -35,7 +35,6 @@ import (
 	"github.com/lightsparkdev/spark/so/frost"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/middleware"
-	"github.com/lightsparkdev/spark/so/utils"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
 
@@ -68,9 +67,9 @@ const (
 type Config struct {
 	// Index is the index of the signing operator.
 	Index uint64
-	// Identifier is the identifier of the signing operator, which will be index + 1 in 32 bytes big endian hex string.
+	// Identifier is the identifier of the signing operator, which is its index + 1 as 32-bytes big-endian value, in hex.
 	// Used as shamir secret share identifier in DKG key shares.
-	Identifier string
+	Identifier Identifier
 	// IdentityPrivateKey is the identity private key of the signing operator.
 	IdentityPrivateKey keys.Private
 	// SigningOperatorMap is the map of signing operators.
@@ -328,7 +327,7 @@ func NewConfig(
 	if index > math.MaxUint32 {
 		return nil, fmt.Errorf("invalid index: %d exceeds %d", index, math.MaxUint32)
 	}
-	identifier := utils.IndexToIdentifier(uint32(index))
+	identifier := IndexToIdentifier(uint32(index))
 
 	if !operatorConfig.ServiceAuthz.Mode.Valid() {
 		logger.Sugar().Warnf("unset or invalid authz mode %d - treating authz as disabled", operatorConfig.ServiceAuthz.Mode)

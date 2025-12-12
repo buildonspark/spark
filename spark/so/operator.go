@@ -12,8 +12,6 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	sparkgrpc "github.com/lightsparkdev/spark/common/grpc"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/so/utils"
-
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
@@ -117,7 +115,7 @@ func (s *SigningOperator) UnmarshalJSON(data []byte) error {
 	s.IdentityPublicKey = identityPubKey
 
 	s.ID = uint64(js.ID)
-	s.Identifier = utils.IndexToIdentifier(js.ID)
+	s.Identifier = IndexToIdentifier(js.ID)
 	s.AddressRpc = js.Address
 	if js.AddressDkg != nil {
 		s.AddressDkg = *js.AddressDkg

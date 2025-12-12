@@ -157,12 +157,12 @@ func setUpCommonTest(t *testing.T) *testSetupCommon {
 
 	cfg.SigningOperatorMap = make(map[string]*so.SigningOperator)
 	cfg.Threshold = 2
-	coordinatorIdentifier := utils.IndexToIdentifier(0)
+	coordinatorIdentifier := so.IndexToIdentifier(0)
 	cfg.SigningOperatorMap[coordinatorIdentifier] = &so.SigningOperator{
 		Identifier:        coordinatorIdentifier,
 		IdentityPublicKey: coordinatorPubKey,
 	}
-	mockOperatorIdentifier := utils.IndexToIdentifier(1)
+	mockOperatorIdentifier := so.IndexToIdentifier(1)
 	cfg.SigningOperatorMap[mockOperatorIdentifier] = &so.SigningOperator{
 		Identifier:                mockOperatorIdentifier,
 		IdentityPublicKey:         mockOperatorPubKey,
