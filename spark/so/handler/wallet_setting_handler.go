@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -12,6 +13,7 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
+	"github.com/lightsparkdev/spark/so/authninternal"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/walletsetting"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -210,6 +212,11 @@ func (h *WalletSettingHandler) HasReadAccessToWallet(ctx context.Context, wallet
 
 	session, err := authn.GetSessionFromContext(ctx)
 	if err != nil {
+		// Propagate expired token errors
+		if errors.Is(err, authninternal.ErrTokenExpired) {
+			return false, err
+		}
+
 		// If there's no session, return false (no access) without error
 		// This allows callers to handle "no access" gracefully vs actual errors
 		return false, nil
