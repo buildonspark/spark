@@ -9,9 +9,11 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -19,10 +21,9 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/entfixtures"
 	"github.com/lightsparkdev/spark/so/utils"
 	sparktesting "github.com/lightsparkdev/spark/testing"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // TestPrepareTokenTransactionInternal_NetworkValidation ensures we correctly validate network matching.
@@ -68,9 +69,9 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 			ctx, _ := db.ConnectToTestPostgres(t)
 			dbtx, err := ent.GetDbFromContext(ctx)
 			require.NoError(t, err)
+			f := entfixtures.New(t, ctx, dbtx).WithRNG(rng)
 			handler := NewInternalPrepareTokenHandler(cfg)
 
-			// Arrange: create a TokenCreate on tokenNet
 			issuerPriv := keys.MustGeneratePrivateKeyFromRand(rng)
 			tokenCreate := dbtx.TokenCreate.Create().
 				SetIssuerPublicKey(issuerPriv.Public()).
@@ -80,11 +81,10 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 				SetMaxSupply([]byte{0}).
 				SetIsFreezable(true).
 				SetNetwork(tc.tokenNet).
-				SetTokenIdentifier(make([]byte, 32)).
+				SetTokenIdentifier(f.RandomBytes(32)).
 				SetCreationEntityPublicKey(issuerPriv.Public()).
 				SaveX(ctx)
 
-			// Create an AVAILABLE signing keyshare to be reserved by prepare handler
 			secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
 			ks := dbtx.SigningKeyshare.Create().
 				SetSecretShare(secretShare).
@@ -95,12 +95,10 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 				SetCoordinatorIndex(1).
 				SaveX(ctx)
 
-			// Seed the Entity DKG key referencing the signing keyshare
 			_ = dbtx.EntityDkgKey.Create().
 				SetSigningKeyshare(ks).
 				SaveX(ctx)
 
-			// Build a mint tx on txNet
 			now := time.Now()
 			txProto := &tokenpb.TokenTransaction{
 				Version: 2,
@@ -141,7 +139,6 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 			require.NoError(t, err)
 			sig := schnorrSig.Serialize()
 
-			// Use the first operator as coordinator
 			operatorList := handler.config.GetSigningOperatorList()
 			var firstOperator *sparkpb.SigningOperatorInfo
 			for _, operator := range operatorList {
