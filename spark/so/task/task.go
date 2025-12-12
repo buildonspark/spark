@@ -994,6 +994,7 @@ func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService k
 	totalUpdated := int64(0)
 	const batchSize = 1000
 	var lastKnobCheck time.Time
+	cutoffTime := time.Date(2025, 12, 8, 0, 0, 0, 0, time.UTC)
 
 	for {
 		if time.Since(lastKnobCheck) > time.Minute {
@@ -1014,7 +1015,7 @@ func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService k
 		}
 
 		rows, err := tx.TokenOutput.Query().
-			Where(tokenoutput.UpdateTimeGT(time.Now().Add(-4 * 24 * time.Hour))).
+			Where(tokenoutput.UpdateTimeGT(cutoffTime)).
 			ForUpdate().
 			Limit(batchSize).
 			All(ctx)
