@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/google/uuid"
@@ -49,12 +50,11 @@ func EncodeSparkAddressWithSignature(identityPublicKey keys.Public, network btcn
 			}
 		case *pb.SparkInvoiceFields_SatsPayment:
 			satsPayment := pt.SatsPayment
-			const MAX_SATS_AMOUNT = 2_100_000_000_000_000 // 21_000_000 BTC * 100_000_000 sats/BTC
 			if satsPayment == nil {
 				return "", fmt.Errorf("sats payment is required")
 			}
-			if satsPayment.Amount != nil && *satsPayment.Amount > MAX_SATS_AMOUNT {
-				return "", fmt.Errorf("sats amount must be between 0 and %d", MAX_SATS_AMOUNT)
+			if satsPayment.GetAmount() > btcutil.MaxSatoshi {
+				return "", fmt.Errorf("sats amount must be between 0 and %v", btcutil.MaxSatoshi)
 			}
 		default:
 			return "", fmt.Errorf("invalid payment type: %T", paymentType)

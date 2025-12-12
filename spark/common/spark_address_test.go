@@ -3,228 +3,208 @@ package common
 import (
 	"encoding/hex"
 	"math/big"
+	"math/rand/v2"
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
-	"github.com/stretchr/testify/require"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
-func TestEncodeDecodeSparkInvoice(t *testing.T) {
-	testCases := []struct {
-		name                   string
-		emptyAmount            bool
-		emptyMemo              bool
-		emptyExpiryTime        bool
-		emptySenderPublicKey   bool
-		emptyId                bool
-		emptyIdentityPublicKey bool
-		emptyTokenIdentifier   bool
-		overMaxSatsAmount      bool
-		invalidPaymentType     bool
-		invalidVersion         bool
-		invalidId              bool
+var (
+	testExpiryTime  = time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC)
+	testTokenAmount = big.NewInt(1000).Bytes()
+	testUUID        = uuid.Must(uuid.Parse("56ec4b25-c86d-4218-97d4-3dcc4300df8f"))
+	testTokenID, _  = hex.DecodeString("9cef64327b1c1f18eb4b4944fc70a1fe9dd84d9084c7daae751de535baafd49f")
+	testIDPubKey    = keys.MustGeneratePrivateKeyFromRand(rand.NewChaCha8([32]byte{})).Public()
+)
+
+const (
+	testSats = 1000
+	testMemo = "myMemo"
+)
+
+func TestEncodeDecodeSparkInvoiceSats(t *testing.T) {
+	tests := []struct {
+		name  string
+		setUp func(fields *pb.SparkInvoiceFields)
 	}{
 		{
-			name: "no empty fields",
+			name:  "base",
+			setUp: func(fields *pb.SparkInvoiceFields) {},
 		},
 		{
-			name:        "empty amount",
-			emptyAmount: true,
+			name:  "empty amount",
+			setUp: func(fields *pb.SparkInvoiceFields) { fields.PaymentType = satsPaymentOf(0) },
 		},
 		{
-			name:      "empty memo",
-			emptyMemo: true,
+			name:  "empty memo",
+			setUp: func(fields *pb.SparkInvoiceFields) { fields.Memo = nil },
 		},
 		{
-			name:            "empty expiry time",
-			emptyExpiryTime: true,
+			name:  "empty expiry time",
+			setUp: func(fields *pb.SparkInvoiceFields) { fields.ExpiryTime = nil },
 		},
 		{
-			name:                 "empty sender public key",
-			emptySenderPublicKey: true,
-		},
-		{
-			name:    "empty id",
-			emptyId: true,
-		},
-		{
-			name:                   "empty identity public key",
-			emptyIdentityPublicKey: true,
-		},
-		{
-			name:                 "empty token identifier",
-			emptyTokenIdentifier: true,
-		},
-		{
-			name:              "over max sats amount",
-			overMaxSatsAmount: true,
-		},
-		{
-			name:               "invalid payment type",
-			invalidPaymentType: true,
-		},
-		{
-			name:           "invalid version",
-			invalidVersion: true,
-		},
-		{
-			name:      "invalid id",
-			invalidId: true,
+			name:  "empty sender public key",
+			setUp: func(fields *pb.SparkInvoiceFields) { fields.SenderPublicKey = nil },
 		},
 	}
 
-	for _, tc := range testCases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			identityPublicKey := keys.MustParsePublicKeyHex("02ccb26ba79c63aaf60c9192fd874be3087ae8d8703275df0e558704a6d3a4f132")
-			senderPublicKey := identityPublicKey
+			invoiceFields := &pb.SparkInvoiceFields{
+				Version:         1,
+				Id:              testUUID[:],
+				PaymentType:     satsPaymentOf(testSats),
+				Memo:            proto.String(testMemo),
+				SenderPublicKey: testIDPubKey.Serialize(),
+				ExpiryTime:      timestamppb.New(testExpiryTime),
+			}
+			tc.setUp(invoiceFields)
 
-			testUUID, err := uuid.NewV7()
-			if err != nil {
-				t.Fatalf("failed to generate uuid: %v", err)
-			}
-			tokenIdentifier, err := hex.DecodeString("9cef64327b1c1f18eb4b4944fc70a1fe9dd84d9084c7daae751de535baafd49f")
-			if err != nil {
-				t.Fatalf("failed to decode token identifier: %v", err)
-			}
-			var amount uint64 = 1000
-			satsAmount := &amount
-			tokenAmount := big.NewInt(1000).Bytes()
-			expiryTime := time.Now().Add(24 * time.Hour).UTC()
-			expiryTimePtr := &expiryTime
-			memo := "myMemo"
-
-			if tc.emptyMemo {
-				memo = ""
-			}
-			if tc.emptyExpiryTime {
-				expiryTimePtr = nil
-			}
-			if tc.emptySenderPublicKey {
-				senderPublicKey = keys.Public{}
-			}
-			if tc.emptyIdentityPublicKey {
-				identityPublicKey = keys.Public{}
-			}
-			if tc.emptyAmount {
-				tokenAmount = nil
-				satsAmount = nil
-			}
-			if tc.overMaxSatsAmount {
-				satsAmount = new(uint64)
-				*satsAmount = 2_100_000_000_000_001
-			}
-			if tc.emptyTokenIdentifier {
-				tokenIdentifier = nil
-			}
-
-			tokenInvoiceFields := CreateTokenSparkInvoiceFields(
-				testUUID[:],
-				tokenIdentifier,
-				tokenAmount,
-				&memo,
-				senderPublicKey,
-				expiryTimePtr,
-			)
-			satsInvoiceFields := CreateSatsSparkInvoiceFields(
-				testUUID[:],
-				satsAmount,
-				&memo,
-				senderPublicKey,
-				expiryTimePtr,
-			)
-
-			if tc.invalidVersion {
-				tokenInvoiceFields.Version = 9999
-				satsInvoiceFields.Version = 9999
-			}
-			if tc.invalidId {
-				tokenInvoiceFields.Id = []byte{1, 2, 3}
-				satsInvoiceFields.Id = []byte{1, 2, 3}
-			}
-			if tc.invalidPaymentType {
-				tokenInvoiceFields.PaymentType = nil
-				satsInvoiceFields.PaymentType = nil
-			}
-
-			tokensInvoice, err := EncodeSparkAddress(identityPublicKey, btcnetwork.Regtest, tokenInvoiceFields)
-			if tc.invalidPaymentType || tc.invalidVersion || tc.invalidId || tc.emptyIdentityPublicKey {
-				require.Error(t, err, "expected error")
-			} else {
-				require.NoError(t, err, "failed to encode spark address")
-			}
-
-			satsInvoice, err := EncodeSparkAddress(identityPublicKey, btcnetwork.Regtest, satsInvoiceFields)
-			if tc.invalidPaymentType || tc.invalidVersion || tc.invalidId || tc.emptyIdentityPublicKey || tc.overMaxSatsAmount {
-				require.Error(t, err, "expected error")
-				return // Early return to avoid decoding the invalid invoices
-			} else {
-				require.NoError(t, err, "failed to encode spark address")
-			}
-
-			// ==== DecodeSparkAddress Tests ====
-			decodedTokensInvoice, err := DecodeSparkAddress(tokensInvoice)
+			invoice, err := EncodeSparkAddress(testIDPubKey, btcnetwork.Regtest, invoiceFields)
+			require.NoError(t, err, "failed to encode spark address")
+			decoded, err := DecodeSparkAddress(invoice)
 			require.NoError(t, err, "failed to decode spark address")
 
-			decodedSatsInvoice, err := DecodeSparkAddress(satsInvoice)
+			want := &DecodedSparkAddress{
+				Network: btcnetwork.Regtest,
+				SparkAddress: &pb.SparkAddress{
+					IdentityPublicKey:  testIDPubKey.Serialize(),
+					SparkInvoiceFields: invoiceFields,
+				},
+			}
+			assert.EqualExportedValues(t, want, decoded)
+		})
+	}
+}
+
+func TestEncodeSparkAddress_Errors(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	senderPublicKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	identityPublicKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	tests := []struct {
+		name              string
+		identityPublicKey keys.Public
+		setUp             func(fields *pb.SparkInvoiceFields)
+	}{
+		{
+			name:              "empty identity public key",
+			identityPublicKey: keys.Public{},
+			setUp:             func(fields *pb.SparkInvoiceFields) {},
+		},
+		{
+			name:              "payment sats over limit",
+			identityPublicKey: identityPublicKey,
+			setUp:             func(fields *pb.SparkInvoiceFields) { fields.PaymentType = satsPaymentOf(btcutil.MaxSatoshi + 1) },
+		},
+		{
+			name:              "invalid payment type",
+			identityPublicKey: identityPublicKey,
+			setUp:             func(fields *pb.SparkInvoiceFields) { fields.PaymentType = nil },
+		},
+		{
+			name:              "invalid version",
+			identityPublicKey: identityPublicKey,
+			setUp:             func(fields *pb.SparkInvoiceFields) { fields.Version = 999999 },
+		},
+		{
+			name:              "invalid ID",
+			identityPublicKey: identityPublicKey,
+			setUp:             func(fields *pb.SparkInvoiceFields) { fields.Id = []byte{1, 2, 3} },
+		},
+		{
+			name:              "empty ID",
+			identityPublicKey: identityPublicKey,
+			setUp:             func(fields *pb.SparkInvoiceFields) { fields.Id = nil },
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fields := &pb.SparkInvoiceFields{
+				Version:         1,
+				Id:              testUUID[:],
+				PaymentType:     satsPaymentOf(testSats),
+				Memo:            proto.String(testMemo),
+				SenderPublicKey: senderPublicKey.Serialize(),
+				ExpiryTime:      timestamppb.New(testExpiryTime),
+			}
+			tc.setUp(fields)
+
+			_, err := EncodeSparkAddress(tc.identityPublicKey, btcnetwork.Regtest, fields)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestEncodeDecodeSparkInvoiceTokens(t *testing.T) {
+	tests := []struct {
+		name  string
+		setUp func(fields *pb.SparkInvoiceFields)
+	}{
+		{
+			name:  "base",
+			setUp: func(fields *pb.SparkInvoiceFields) {},
+		},
+		{
+			name:  "empty amount",
+			setUp: func(fields *pb.SparkInvoiceFields) { fields.PaymentType = tokensPaymentOf(testTokenID, nil) },
+		},
+		{
+			name:  "empty token identifier",
+			setUp: func(fields *pb.SparkInvoiceFields) { fields.PaymentType = tokensPaymentOf(nil, testTokenAmount) },
+		},
+		{
+			name:  "empty memo",
+			setUp: func(fields *pb.SparkInvoiceFields) { fields.Memo = nil },
+		},
+		{
+			name:  "empty expiry time",
+			setUp: func(fields *pb.SparkInvoiceFields) { fields.ExpiryTime = nil },
+		},
+		{
+			name:  "empty sender public key",
+			setUp: func(fields *pb.SparkInvoiceFields) { fields.SenderPublicKey = nil },
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			invoiceFields := &pb.SparkInvoiceFields{
+				Version:         1,
+				Id:              testUUID[:],
+				PaymentType:     tokensPaymentOf(testTokenID, testTokenAmount),
+				Memo:            proto.String(testMemo),
+				SenderPublicKey: testIDPubKey.Serialize(),
+				ExpiryTime:      timestamppb.New(testExpiryTime),
+			}
+			tc.setUp(invoiceFields)
+
+			invoice, err := EncodeSparkAddress(testIDPubKey, btcnetwork.Regtest, invoiceFields)
+			require.NoError(t, err, "failed to encode spark address")
+			decoded, err := DecodeSparkAddress(invoice)
 			require.NoError(t, err, "failed to decode spark address")
 
-			if tc.emptyExpiryTime {
-				require.Nil(t, decodedTokensInvoice.SparkAddress.SparkInvoiceFields.ExpiryTime, "expiry time should be nil")
-				require.Nil(t, decodedSatsInvoice.SparkAddress.SparkInvoiceFields.ExpiryTime, "expiry time should be nil")
-			} else {
-				require.Equal(t, *expiryTimePtr, decodedTokensInvoice.SparkAddress.SparkInvoiceFields.ExpiryTime.AsTime(), "expiry time does not match")
-				require.Equal(t, *expiryTimePtr, decodedSatsInvoice.SparkAddress.SparkInvoiceFields.ExpiryTime.AsTime(), "expiry time does not match")
+			want := &DecodedSparkAddress{
+				Network: btcnetwork.Regtest,
+				SparkAddress: &pb.SparkAddress{
+					IdentityPublicKey:  testIDPubKey.Serialize(),
+					SparkInvoiceFields: invoiceFields,
+				},
 			}
-
-			require.Equal(t, btcnetwork.Regtest, decodedTokensInvoice.Network, "network does not match")
-			require.Equal(t, identityPublicKey.Serialize(), decodedTokensInvoice.SparkAddress.IdentityPublicKey, "identity public key does not match")
-			require.Equal(t, testUUID[:], decodedTokensInvoice.SparkAddress.SparkInvoiceFields.Id, "id does not match")
-			require.Equal(t, memo, *decodedTokensInvoice.SparkAddress.SparkInvoiceFields.Memo, "memo does not match")
-			require.Equal(t, senderPublicKey.Serialize(), decodedTokensInvoice.SparkAddress.SparkInvoiceFields.SenderPublicKey, "sender public key does not match")
-			require.Equal(t, tokenIdentifier, decodedTokensInvoice.SparkAddress.SparkInvoiceFields.PaymentType.(*pb.SparkInvoiceFields_TokensPayment).TokensPayment.TokenIdentifier, "token identifier does not match")
-			require.Equal(t, tokenAmount, decodedTokensInvoice.SparkAddress.SparkInvoiceFields.PaymentType.(*pb.SparkInvoiceFields_TokensPayment).TokensPayment.Amount, "amount does not match")
-
-			require.NoError(t, err, "failed to decode spark address")
-			require.Equal(t, btcnetwork.Regtest, decodedSatsInvoice.Network, "network does not match")
-			require.Equal(t, identityPublicKey.Serialize(), decodedSatsInvoice.SparkAddress.IdentityPublicKey, "identity public key does not match")
-			require.Equal(t, testUUID[:], decodedSatsInvoice.SparkAddress.SparkInvoiceFields.Id, "id does not match")
-			require.Equal(t, memo, *decodedSatsInvoice.SparkAddress.SparkInvoiceFields.Memo, "memo does not match")
-			require.Equal(t, senderPublicKey.Serialize(), decodedSatsInvoice.SparkAddress.SparkInvoiceFields.SenderPublicKey, "sender public key does not match")
-			require.Equal(t, satsAmount, decodedSatsInvoice.SparkAddress.SparkInvoiceFields.PaymentType.(*pb.SparkInvoiceFields_SatsPayment).SatsPayment.Amount, "amount does not match")
-
-			// ==== ParseSparkInvoice Tests ====
-			parsedTokensInvoice, err := ParseSparkInvoice(tokensInvoice)
-			require.NoError(t, err, "failed to parse spark tokens invoice")
-			parsedSatsInvoice, err := ParseSparkInvoice(satsInvoice)
-			require.NoError(t, err, "failed to parse spark sats invoice")
-
-			if tc.emptyExpiryTime {
-				require.Nil(t, parsedTokensInvoice.ExpiryTime, "expiry time should be nil")
-				require.Nil(t, parsedSatsInvoice.ExpiryTime, "expiry time should be nil")
-			} else {
-				require.Equal(t, *expiryTimePtr, parsedTokensInvoice.ExpiryTime.AsTime(), "expiry time does not match")
-				require.Equal(t, *expiryTimePtr, parsedSatsInvoice.ExpiryTime.AsTime(), "expiry time does not match")
-			}
-
-			if tc.emptyAmount {
-				require.Nil(t, parsedSatsInvoice.Payment.SatsPayment.Amount, "sats amount should be nil")
-				require.Nil(t, parsedTokensInvoice.Payment.TokensPayment.Amount, "token amount should be nil")
-			} else {
-				require.NotNil(t, parsedSatsInvoice.Payment.SatsPayment, "sats amount should not be nil")
-				require.NotNil(t, parsedTokensInvoice.Payment.TokensPayment.Amount, "token amount should not be nil")
-				require.Equal(t, *satsAmount, *parsedSatsInvoice.Payment.SatsPayment.Amount, "sats amount does not match")
-				require.Equal(t, tokenAmount, parsedTokensInvoice.Payment.TokensPayment.Amount, "token amount does not match")
-			}
-
-			require.Equal(t, testUUID, parsedTokensInvoice.Id, "id does not match")
-			require.Equal(t, memo, parsedTokensInvoice.Memo, "memo does not match")
-			require.Equal(t, senderPublicKey, parsedTokensInvoice.SenderPublicKey, "sender public key does not match")
-			require.Equal(t, tokenIdentifier, parsedTokensInvoice.Payment.TokensPayment.TokenIdentifier, "token identifier does not match")
+			assert.EqualExportedValues(t, want, decoded)
 		})
 	}
 }
@@ -234,43 +214,27 @@ func TestDecodeKnownTokensSparkInvoice(t *testing.T) {
 
 	res, err := DecodeSparkAddress(tokensAddress)
 	require.NoError(t, err, "failed to decode tokens address")
+
 	expectedIdentityPubKey, _ := hex.DecodeString("0353908bac090ba741de6147a540a665537006911590f93249b2823dbe187d3213")
-	require.Equal(t, expectedIdentityPubKey, res.SparkAddress.IdentityPublicKey, "identity public key does not match for tokens address")
-
-	tokensPayment, ok := res.SparkAddress.SparkInvoiceFields.PaymentType.(*pb.SparkInvoiceFields_TokensPayment)
-	require.True(t, ok, "expected tokens payment, got: %T", res.SparkAddress.SparkInvoiceFields.PaymentType)
-
-	require.Equal(t, uint32(1), res.SparkAddress.SparkInvoiceFields.Version, "version does not match")
-	require.NotNil(t, res.SparkAddress.SparkInvoiceFields.Id, "id should not be nil")
-
 	expectedId, _ := hex.DecodeString("01992fa6dba47dc0a39d0f4f566cf82b")
-	require.Equal(t, expectedId, res.SparkAddress.SparkInvoiceFields.Id, "id does not match")
-
 	expectedTokenId, _ := hex.DecodeString("093e4813f6463ae2b03b548500fe0f02c74b277f70955a8d9cb2a8ea39504614")
-	require.Equal(t, expectedTokenId, tokensPayment.TokensPayment.TokenIdentifier, "token identifier does not match")
-
-	amount := tokensPayment.TokensPayment.Amount
-	expectedAmount := big.NewInt(1000).Bytes()
-	require.Equal(t, expectedAmount, amount, "amount does not match")
-
-	require.NotNil(t, res.SparkAddress.SparkInvoiceFields.Memo, "memo should not be nil")
-	require.Equal(t, "testMemo", *res.SparkAddress.SparkInvoiceFields.Memo, "memo does not match")
-
-	require.NotNil(t, res.SparkAddress.SparkInvoiceFields.ExpiryTime, "expiry time should not be nil")
-
-	require.Equal(t,
-		time.Date(2025, time.September, 9, 18, 9, 48, 419000000, time.UTC),
-		res.SparkAddress.SparkInvoiceFields.ExpiryTime.AsTime(),
-		"expiry time does not match",
-	)
-
-	require.NotNil(t, res.SparkAddress.SparkInvoiceFields.SenderPublicKey, "sender public key should not be nil")
-	require.Equal(t, expectedIdentityPubKey, res.SparkAddress.SparkInvoiceFields.SenderPublicKey, "sender public key does not match")
-
-	require.NotNil(t, res.SparkAddress.Signature, "signature should not be nil")
-	require.Equal(t,
-		"9d69a7bbac4d5942d7dec0bb845d784333dc80b3bba88fd046345285939e0567339cd357a8337654bdd948a4a3cb6d3033c6bb0e6c8ac4fcb068f5433f437afb", hex.EncodeToString(res.SparkAddress.Signature),
-		"signature does not match")
+	expectedSignature, _ := hex.DecodeString("9d69a7bbac4d5942d7dec0bb845d784333dc80b3bba88fd046345285939e0567339cd357a8337654bdd948a4a3cb6d3033c6bb0e6c8ac4fcb068f5433f437afb")
+	want := &DecodedSparkAddress{
+		Network: btcnetwork.Regtest,
+		SparkAddress: &pb.SparkAddress{
+			IdentityPublicKey: expectedIdentityPubKey,
+			SparkInvoiceFields: &pb.SparkInvoiceFields{
+				Version:         1,
+				Id:              expectedId,
+				PaymentType:     tokensPaymentOf(expectedTokenId, big.NewInt(1000).Bytes()),
+				Memo:            proto.String("testMemo"),
+				SenderPublicKey: expectedIdentityPubKey,
+				ExpiryTime:      timestamppb.New(time.Date(2025, time.September, 9, 18, 9, 48, 419000000, time.UTC)),
+			},
+			Signature: expectedSignature,
+		},
+	}
+	require.EqualExportedValues(t, want, res)
 }
 
 func TestDecodeKnownSatsSparkInvoice(t *testing.T) {
@@ -280,32 +244,24 @@ func TestDecodeKnownSatsSparkInvoice(t *testing.T) {
 	require.NoError(t, err, "failed to decode sats address")
 
 	expectedIdentityPubKey, _ := hex.DecodeString("0353908bac090ba741de6147a540a665537006911590f93249b2823dbe187d3213")
-	require.Equal(t, expectedIdentityPubKey, res.SparkAddress.IdentityPublicKey, "identity public key does not match for sats address")
-
-	satsPayment, ok := res.SparkAddress.SparkInvoiceFields.PaymentType.(*pb.SparkInvoiceFields_SatsPayment)
-	require.True(t, ok, "expected sats payment, got: %T", res.SparkAddress.SparkInvoiceFields.PaymentType)
-	require.Equal(t, uint32(1), res.SparkAddress.SparkInvoiceFields.Version, "version does not match")
-
-	require.NotNil(t, res.SparkAddress.SparkInvoiceFields.Id, "id should not be nil")
 	expectedId, _ := hex.DecodeString("01992fa72c3a7872897d10f6726910ad")
-	require.Equal(t, expectedId, res.SparkAddress.SparkInvoiceFields.Id, "id does not match")
-
-	require.Equal(t, uint64(1000), *satsPayment.SatsPayment.Amount, "sats amount does not match")
-
-	require.NotNil(t, res.SparkAddress.SparkInvoiceFields.ExpiryTime, "expiry time should not be nil")
-	expectedExpiryTime := time.Date(2025, time.September, 9, 18, 10, 9, 49000000, time.UTC)
-	require.Equal(t, expectedExpiryTime, res.SparkAddress.SparkInvoiceFields.ExpiryTime.AsTime(), "expiry time does not match")
-
-	require.NotNil(t, res.SparkAddress.SparkInvoiceFields.Memo, "memo should not be nil")
-	require.Equal(t, "testMemo", *res.SparkAddress.SparkInvoiceFields.Memo, "memo does not match")
-
-	require.NotNil(t, res.SparkAddress.SparkInvoiceFields.SenderPublicKey, "sender public key should not be nil")
-	require.Equal(t, expectedIdentityPubKey, res.SparkAddress.SparkInvoiceFields.SenderPublicKey, "sender public key does not match")
-
-	require.NotNil(t, res.SparkAddress.Signature, "signature should not be nil")
-	require.Equal(t,
-		"8a95af0beb5f2c73090d72a7dab2cb870d26ac6aa91374ceccfa9717b2602d48a0c3c47c7fc4dee18b1aaab7b58503744d274b25846ab46f1f2473c88851ea62", hex.EncodeToString(res.SparkAddress.Signature),
-		"signature does not match")
+	expectedSignature, _ := hex.DecodeString("8a95af0beb5f2c73090d72a7dab2cb870d26ac6aa91374ceccfa9717b2602d48a0c3c47c7fc4dee18b1aaab7b58503744d274b25846ab46f1f2473c88851ea62")
+	want := &DecodedSparkAddress{
+		Network: btcnetwork.Regtest,
+		SparkAddress: &pb.SparkAddress{
+			IdentityPublicKey: expectedIdentityPubKey,
+			SparkInvoiceFields: &pb.SparkInvoiceFields{
+				Version:         1,
+				Id:              expectedId,
+				PaymentType:     satsPaymentOf(1000),
+				Memo:            proto.String("testMemo"),
+				SenderPublicKey: expectedIdentityPubKey,
+				ExpiryTime:      timestamppb.New(time.Date(2025, time.September, 9, 18, 10, 9, 49000000, time.UTC)),
+			},
+			Signature: expectedSignature,
+		},
+	}
+	require.EqualExportedValues(t, want, res)
 }
 
 func TestDecodeAndEncodeKnownSparkAddressProducesSameAddress(t *testing.T) {
@@ -321,6 +277,14 @@ func TestDecodeAndEncodeKnownSparkAddressProducesSameAddress(t *testing.T) {
 		dec.SparkAddress.GetSparkInvoiceFields(),
 		dec.SparkAddress.GetSignature(),
 	)
+
 	require.NoError(t, err)
 	require.Equal(t, expectedFromJs, addr)
+}
+
+func tokensPaymentOf(tokenID, tokenAmount []byte) *pb.SparkInvoiceFields_TokensPayment {
+	return &pb.SparkInvoiceFields_TokensPayment{TokensPayment: &pb.TokensPayment{TokenIdentifier: tokenID, Amount: tokenAmount}}
+}
+func satsPaymentOf(sats uint64) *pb.SparkInvoiceFields_SatsPayment {
+	return &pb.SparkInvoiceFields_SatsPayment{SatsPayment: &pb.SatsPayment{Amount: proto.Uint64(sats)}}
 }
