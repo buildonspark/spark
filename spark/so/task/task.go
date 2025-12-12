@@ -949,6 +949,12 @@ func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService k
 			rowsAffected++
 		}
 
+		logger.Sugar().Infof("Backfilled %d token output amounts", rowsAffected)
+		err = tx.Commit()
+		if err != nil {
+			return fmt.Errorf("failed to commit tx: %w", err)
+		}
+
 		if rowsAffected == 0 {
 			break
 		}
