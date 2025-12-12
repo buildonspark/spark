@@ -76,6 +76,7 @@ const (
 	KnobFinalizeCreatedSignedOutputsJustInTime  = "spark.so.tokens.finalize_created_signed_outputs_just_in_time"
 	KnobTokenTransactionV3Enabled               = "spark.so.tokens.token_transaction_v3_enabled"
 	KnobBackfillCreatedFinalizedTxHashEnabled   = "spark.so.tokens.backfill_created_finalized_tx_hash.enabled"
+	KnobBackfillCreatedReversedTokenAmount      = "spark.so.tokens.backfill_created_reversed_token_amount.enabled"
 
 	// Number of confirmations required before finalizing tree creation
 	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/uint128"
+	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"go.uber.org/zap"
 
 	"entgo.io/ent/dialect/sql"
@@ -44,6 +46,7 @@ var (
 	dkgTaskTimeout                        = 3 * time.Minute
 	deleteStaleTreeNodesTaskTimeout       = 10 * time.Minute
 	backfillCreatedFinalizedTxHashTimeout = 24 * time.Hour
+	backfillTokenAmountTimeout            = 24 * time.Hour
 )
 
 // Task contains common fields for all task types.
@@ -778,6 +781,13 @@ func AllStartupTasks() []StartupTaskSpec {
 				Task:    backfillCreatedFinalizedTxHash,
 			},
 		},
+		{
+			BaseTaskSpec: BaseTaskSpec{
+				Name:    "backfill_token_amounts",
+				Timeout: &backfillTokenAmountTimeout,
+				Task:    backfillTokenAmounts,
+			},
+		},
 	}
 }
 
@@ -975,6 +985,76 @@ func backfillCreatedFinalizedTxHash(ctx context.Context, config *so.Config, knob
 
 	if totalUpdated > 0 {
 		logger.Sugar().Infof("Successfully backfilled %d total token outputs", totalUpdated)
+	}
+	return nil
+}
+
+func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	totalUpdated := int64(0)
+	const batchSize = 1000
+	var lastKnobCheck time.Time
+
+	for {
+		if time.Since(lastKnobCheck) > time.Minute {
+			lastKnobCheck = time.Now()
+			if knobsService.GetValue(knobs.KnobBackfillCreatedReversedTokenAmount, 0) == 0 {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(time.Minute):
+				}
+				continue
+			}
+		}
+
+		tx, err := ent.GetTxFromContext(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get tx from context: %w", err)
+		}
+
+		rows, err := tx.TokenOutput.Query().
+			Where(tokenoutput.UpdateTimeGT(time.Now().Add(-4 * 24 * time.Hour))).
+			ForUpdate().
+			Limit(batchSize).
+			All(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get rows: %w", err)
+		}
+
+		rowsAffected := int64(0)
+		for _, row := range rows {
+			fixedAmount, err := uint128.FromBytes(row.TokenAmount)
+			if err != nil {
+				return fmt.Errorf("failed to get token amount: %w", err)
+			}
+			if fixedAmount == row.Amount {
+				continue
+			}
+			_, err = tx.TokenOutput.
+				UpdateOneID(row.ID).
+				SetAmount(fixedAmount).
+				Save(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to update token amount: %w", err)
+			}
+			rowsAffected++
+		}
+
+		if rowsAffected == 0 {
+			break
+		}
+		totalUpdated += rowsAffected
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+
+	if totalUpdated > 0 {
+		logger.Sugar().Infof("Successfully backfilled %d total token output amounts", totalUpdated)
 	}
 	return nil
 }
