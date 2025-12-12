@@ -41,11 +41,11 @@ import (
 )
 
 var (
-	confirmPendingDKGKeysCutoffAge        = 15 * time.Minute
-	defaultTaskTimeout                    = 1 * time.Minute
-	dkgTaskTimeout                        = 3 * time.Minute
-	deleteStaleTreeNodesTaskTimeout       = 10 * time.Minute
-	backfillTokenAmountTimeout            = 24 * time.Hour
+	confirmPendingDKGKeysCutoffAge  = 15 * time.Minute
+	defaultTaskTimeout              = 1 * time.Minute
+	dkgTaskTimeout                  = 3 * time.Minute
+	deleteStaleTreeNodesTaskTimeout = 10 * time.Minute
+	backfillTokenAmountTimeout      = 24 * time.Hour
 )
 
 // Task contains common fields for all task types.
