@@ -34,8 +34,8 @@ func FromBytes(b []byte) (Uint128, error) {
 		return Uint128{}, sparkerrors.InvalidArgumentOutOfRange(errors.New("uint128 must be 16 bytes"))
 	}
 	return Uint128{
-		lo: binary.BigEndian.Uint64(b[:8]),
-		hi: binary.BigEndian.Uint64(b[8:]),
+		lo: binary.BigEndian.Uint64(b[8:]),
+		hi: binary.BigEndian.Uint64(b[:8]),
 	}, nil
 }
 
@@ -137,8 +137,8 @@ func (u Uint128) Value() (driver.Value, error) {
 // Bytes returns the 16-byte big-endian representation of this Uint128.
 func (u Uint128) Bytes() []byte {
 	out := make([]byte, 16)
-	binary.BigEndian.PutUint64(out[:8], u.lo)
-	binary.BigEndian.PutUint64(out[8:], u.hi)
+	binary.BigEndian.PutUint64(out[8:], u.lo)
+	binary.BigEndian.PutUint64(out[:8], u.hi)
 	return out
 }
 

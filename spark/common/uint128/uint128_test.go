@@ -3,6 +3,7 @@ package uint128
 import (
 	"database/sql"
 	"encoding/binary"
+	"encoding/hex"
 	"math/big"
 	"testing"
 
@@ -15,6 +16,15 @@ func TestNew(t *testing.T) {
 
 	assert.True(t, result.IsZero())
 	assert.Equal(t, Uint128{lo: 0, hi: 0}, result)
+}
+
+func TestFromBytes_SetsCorrectEndianness(t *testing.T) {
+	fromUint := Uint128{lo: 0xe8d4a51000}
+
+	h, _ := hex.DecodeString("0000000000000000000000e8d4a51000")
+	fromBytes, _ := FromBytes(h)
+
+	require.Equal(t, fromUint, fromBytes)
 }
 
 func TestFromUint(t *testing.T) {
@@ -103,22 +113,26 @@ func TestNewFromBytes(t *testing.T) {
 			name: "low value only",
 			input: func() []byte {
 				b := make([]byte, 16)
-				binary.BigEndian.PutUint64(b[:8], 42)
+				binary.BigEndian.PutUint64(b[8:], 42)
 				return b
 			}(),
 			want: Uint128{lo: 42, hi: 0},
 		},
 		{
-			name:  "high value only",
-			input: binary.BigEndian.AppendUint64(make([]byte, 8), 100),
-			want:  Uint128{lo: 0, hi: 100},
+			name: "high value only",
+			input: func() []byte {
+				b := make([]byte, 16)
+				binary.BigEndian.PutUint64(b[:8], 100)
+				return b
+			}(),
+			want: Uint128{lo: 0, hi: 100},
 		},
 		{
 			name: "both values",
 			input: func() []byte {
 				b := make([]byte, 16)
-				binary.BigEndian.PutUint64(b[:8], 123)
-				binary.BigEndian.PutUint64(b[8:], 456)
+				binary.BigEndian.PutUint64(b[8:], 123)
+				binary.BigEndian.PutUint64(b[:8], 456)
 				return b
 			}(),
 			want: Uint128{lo: 123, hi: 456},
@@ -127,8 +141,8 @@ func TestNewFromBytes(t *testing.T) {
 			name: "max value",
 			input: func() []byte {
 				b := make([]byte, 16)
-				binary.BigEndian.PutUint64(b[:8], ^uint64(0))
 				binary.BigEndian.PutUint64(b[8:], ^uint64(0))
+				binary.BigEndian.PutUint64(b[:8], ^uint64(0))
 				return b
 			}(),
 			want: Uint128{lo: ^uint64(0), hi: ^uint64(0)},
@@ -183,8 +197,8 @@ func TestBytes(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.u, result)
 
-			assert.Equal(t, tt.u.lo, binary.BigEndian.Uint64(bytes[:8]))
-			assert.Equal(t, tt.u.hi, binary.BigEndian.Uint64(bytes[8:]))
+			assert.Equal(t, tt.u.lo, binary.BigEndian.Uint64(bytes[8:]))
+			assert.Equal(t, tt.u.hi, binary.BigEndian.Uint64(bytes[:8]))
 		})
 	}
 }
