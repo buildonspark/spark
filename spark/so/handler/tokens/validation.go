@@ -178,3 +178,37 @@ func validateNoActiveFreezesForOutputs(ctx context.Context, outputs []*ent.Token
 	}
 	return nil
 }
+
+func validateQueryTokenTransactionsRequest(req *tokenpb.QueryTokenTransactionsRequest) error {
+	if len(req.OutputIds) > maxTokenTransactionFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many output ids in filter: got %d, max %d", len(req.OutputIds), maxTokenTransactionFilterValues),
+		)
+	}
+
+	if len(req.OwnerPublicKeys) > maxTokenTransactionFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.OwnerPublicKeys), maxTokenTransactionFilterValues),
+		)
+	}
+
+	if len(req.IssuerPublicKeys) > maxTokenTransactionFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.IssuerPublicKeys), maxTokenTransactionFilterValues),
+		)
+	}
+
+	if len(req.TokenIdentifiers) > maxTokenTransactionFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.TokenIdentifiers), maxTokenTransactionFilterValues),
+		)
+	}
+
+	if len(req.TokenTransactionHashes) > maxTokenTransactionFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.TokenTransactionHashes), maxTokenTransactionFilterValues),
+		)
+	}
+
+	return nil
+}

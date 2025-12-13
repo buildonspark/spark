@@ -10,7 +10,6 @@ import (
 	"github.com/lightsparkdev/spark/common/uuids"
 	"go.uber.org/zap"
 
-	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 
 	"github.com/google/uuid"
@@ -25,8 +24,7 @@ import (
 )
 
 type QueryTokenTransactionsHandler struct {
-	config                     *so.Config
-	includeExpiredTransactions bool
+	config *so.Config
 }
 
 const (
@@ -46,49 +44,19 @@ type queryParams struct {
 	offset                 int64
 }
 
-func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryParams, error) {
-	limit := req.GetLimit()
-	if limit == 0 {
-		limit = defaultTokenTransactionPageSize
-	} else if limit > maxTokenTransactionPageSize {
-		limit = maxTokenTransactionPageSize
-	}
-
-	ownerPubKeys, err := keys.ParsePublicKeys(req.GetOwnerPublicKeys())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner public keys: %w", err)
-	}
-
-	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner public keys: %w", err)
-	}
-
-	return &queryParams{
-		outputIDs:              req.OutputIds,
-		ownerPublicKeys:        ownerPubKeys,
-		issuerPublicKeys:       issuerPubKeys,
-		tokenIdentifiers:       req.GetTokenIdentifiers(),
-		tokenTransactionHashes: req.GetTokenTransactionHashes(),
-		order:                  req.GetOrder(),
-		limit:                  limit,
-		offset:                 req.Offset,
-	}, nil
+type queryBuilder struct {
+	args     []any
+	argIndex int
 }
 
 // NewQueryTokenTransactionsHandler creates a new QueryTokenTransactionsHandler.
 func NewQueryTokenTransactionsHandler(config *so.Config) *QueryTokenTransactionsHandler {
 	return &QueryTokenTransactionsHandler{
-		config:                     config,
-		includeExpiredTransactions: false,
+		config: config,
 	}
 }
 
 // QueryTokenTransactions returns SO provided data about specific token transactions alosng with their status.
-// Allows caller to specify data to be returned related to:
-// a) transactions associated with a particular set of output ids
-// b) transactions associated with a particular set of transaction hashes
-// c) all transactions associated with a particular token public key
 func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Context, req *tokenpb.QueryTokenTransactionsRequest) (*tokenpb.QueryTokenTransactionsResponse, error) {
 	ctx, span := GetTracer().Start(ctx, "QueryTokenTransactionsHandler.queryTokenTransactionsInternal")
 	defer span.End()
@@ -106,67 +74,13 @@ func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	var transactions []*ent.TokenTransaction
 
-	// Check if we should use the optimized UNION query
-	useOptimizedQuery := h.shouldUseOptimizedQuery(params)
-	if useOptimizedQuery {
-		transactions, err = h.queryWithRawSql(ctx, params, db)
-		if err != nil {
-			return nil, fmt.Errorf("failed to query token transactions with raw sql: %w", err)
-		}
-	} else {
-		transactions, err = h.queryWithEnt(ctx, params, db)
-		if err != nil {
-			return nil, fmt.Errorf("failed to query token transactions with ent: %w", err)
-		}
+	transactions, err := h.queryWithRawSql(ctx, params, db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query token transactions with raw sql: %w", err)
 	}
 
-	return h.convertTransactionsToResponse(ctx, transactions, params)
-}
-
-func validateQueryTokenTransactionsRequest(req *tokenpb.QueryTokenTransactionsRequest) error {
-	if len(req.OutputIds) > maxTokenTransactionFilterValues {
-		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many output ids in filter: got %d, max %d", len(req.OutputIds), maxTokenTransactionFilterValues),
-		)
-	}
-
-	if len(req.OwnerPublicKeys) > maxTokenTransactionFilterValues {
-		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.OwnerPublicKeys), maxTokenTransactionFilterValues),
-		)
-	}
-
-	if len(req.IssuerPublicKeys) > maxTokenTransactionFilterValues {
-		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.IssuerPublicKeys), maxTokenTransactionFilterValues),
-		)
-	}
-
-	if len(req.TokenIdentifiers) > maxTokenTransactionFilterValues {
-		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.TokenIdentifiers), maxTokenTransactionFilterValues),
-		)
-	}
-
-	if len(req.TokenTransactionHashes) > maxTokenTransactionFilterValues {
-		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.TokenTransactionHashes), maxTokenTransactionFilterValues),
-		)
-	}
-
-	return nil
-}
-
-// shouldUseOptimizedQuery determines if we should use the optimized UNION-based query
-func (h *QueryTokenTransactionsHandler) shouldUseOptimizedQuery(params *queryParams) bool {
-	// Use optimized query when we have filters that require token_outputs joins
-	hasOutputFilters := len(params.outputIDs) > 0 ||
-		len(params.ownerPublicKeys) > 0 ||
-		len(params.issuerPublicKeys) > 0 ||
-		len(params.tokenIdentifiers) > 0
-	return hasOutputFilters
+	return convertTransactionsToResponse(ctx, h.config, transactions, params)
 }
 
 // queryTokenTransactionsRawSql uses raw SQL with UNION for better performance
@@ -320,14 +234,6 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(params *queryParams)
 		WHERE %s
 	)`, cteWhere)
 
-	// Build transaction hash filter if provided
-	var txHashFilter string
-	if len(params.tokenTransactionHashes) > 0 {
-		txHashFilter = fmt.Sprintf(" WHERE tt.finalized_token_transaction_hash = ANY($%d)", qb.argIndex)
-		qb.args = append(qb.args, pq.Array(params.tokenTransactionHashes))
-		qb.argIndex++
-	}
-
 	// Build the final query with CTE
 	var queryBuilder strings.Builder
 	queryBuilder.WriteString("WITH ")
@@ -337,11 +243,9 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(params *queryParams)
 	// UNION: transactions that created the filtered outputs OR spent the filtered outputs
 	queryBuilder.WriteString("SELECT tt.id, tt.create_time FROM token_transactions tt ")
 	queryBuilder.WriteString("JOIN filtered_outputs ON tt.id = filtered_outputs.token_output_output_created_token_transaction")
-	queryBuilder.WriteString(txHashFilter)
 	queryBuilder.WriteString(" UNION ALL ")
 	queryBuilder.WriteString("SELECT tt.id, tt.create_time FROM token_transactions tt ")
 	queryBuilder.WriteString("JOIN filtered_outputs ON tt.id = filtered_outputs.token_output_output_spent_token_transaction")
-	queryBuilder.WriteString(txHashFilter)
 
 	queryBuilder.WriteString(") combined")
 
@@ -364,51 +268,13 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(params *queryParams)
 	return queryBuilder.String(), qb.args, nil
 }
 
-// queryWithEnt runs an ent-based query for simple cases without complicated filters
-func (h *QueryTokenTransactionsHandler) queryWithEnt(ctx context.Context, params *queryParams, db *ent.Client) ([]*ent.TokenTransaction, error) {
-	baseQuery := db.TokenTransaction.Query()
-
-	if len(params.tokenTransactionHashes) > 0 {
-		baseQuery = baseQuery.Where(tokentransaction.FinalizedTokenTransactionHashIn(params.tokenTransactionHashes...))
-	}
-
-	query := baseQuery
-	if params.order == sparkpb.Order_ASCENDING {
-		query = query.Order(ent.Asc(tokentransaction.FieldCreateTime))
-	} else {
-		query = query.Order(ent.Desc(tokentransaction.FieldCreateTime))
-	}
-
-	query = query.Limit(int(params.limit))
-
-	if params.offset > 0 {
-		query = query.Offset(int(params.offset))
-	}
-
-	query = query.
-		WithCreatedOutput().
-		WithSpentOutput(func(slq *ent.TokenOutputQuery) {
-			slq.WithOutputCreatedTokenTransaction()
-		}).
-		WithCreate().
-		WithMint().
-		WithSparkInvoice()
-
-	transactions, err := query.All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to query token transactions: %w", err)
-	}
-
-	return transactions, nil
-}
-
 // convertTransactionsToResponse converts Ent transactions to protobuf response
-func (h *QueryTokenTransactionsHandler) convertTransactionsToResponse(ctx context.Context, transactions []*ent.TokenTransaction, params *queryParams) (*tokenpb.QueryTokenTransactionsResponse, error) {
+func convertTransactionsToResponse(ctx context.Context, config *so.Config, transactions []*ent.TokenTransaction, params *queryParams) (*tokenpb.QueryTokenTransactionsResponse, error) {
 	transactionsWithStatus := make([]*tokenpb.TokenTransactionWithStatus, 0, len(transactions))
 	for _, transaction := range transactions {
 		status := protoconverter.ConvertTokenTransactionStatusToTokenPb(transaction.Status)
 
-		transactionProto, err := transaction.MarshalProto(ctx, h.config)
+		transactionProto, err := transaction.MarshalProto(ctx, config)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToMarshalTokenTransaction, transaction, err)
 		}
@@ -448,7 +314,32 @@ func (h *QueryTokenTransactionsHandler) convertTransactionsToResponse(ctx contex
 	}, nil
 }
 
-type queryBuilder struct {
-	args     []any
-	argIndex int
+func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryParams, error) {
+	limit := req.GetLimit()
+	if limit == 0 {
+		limit = defaultTokenTransactionPageSize
+	} else if limit > maxTokenTransactionPageSize {
+		limit = maxTokenTransactionPageSize
+	}
+
+	ownerPubKeys, err := keys.ParsePublicKeys(req.GetOwnerPublicKeys())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner public keys: %w", err)
+	}
+
+	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner public keys: %w", err)
+	}
+
+	return &queryParams{
+		outputIDs:              req.OutputIds,
+		ownerPublicKeys:        ownerPubKeys,
+		issuerPublicKeys:       issuerPubKeys,
+		tokenIdentifiers:       req.GetTokenIdentifiers(),
+		tokenTransactionHashes: req.GetTokenTransactionHashes(),
+		order:                  req.GetOrder(),
+		limit:                  limit,
+		offset:                 req.Offset,
+	}, nil
 }
