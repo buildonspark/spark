@@ -125,32 +125,9 @@ func init() {
 // Creates a unary server interceptor that enforces a concurrency limit on incoming gRPC requests
 func ConcurrencyInterceptor(guard ResourceLimiter, clientInfoProvider *GRPCClientInfoProvider, knobsService knobs.Knobs) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		// Check if the request should be excluded from concurrency limiting by pubkey or IP.
-		bypassConcurrency := false
-		bypassState := "enforced"
-
-		if knobsService != nil {
-			if session, err := authn.GetSessionFromContext(ctx); err == nil && session != nil {
-				identityHex := session.IdentityPublicKey().ToHex()
-				if identityHex != "" {
-					if knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyExcludePubkeys, &identityHex, 0) > 0 {
-						bypassConcurrency = true
-						bypassState = "bypassed_pubkey"
-					}
-				}
-			}
-
-			if clientInfoProvider != nil {
-				if ip, err := clientInfoProvider.GetClientIP(ctx); err == nil && ip != "" {
-					if knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyExcludeIps, &ip, 0) > 0 {
-						bypassConcurrency = true
-						bypassState = "bypassed_ip"
-					}
-				}
-			}
-		}
-
+		bypassConcurrency, bypassState := checkBypassConcurrency(ctx, clientInfoProvider, knobsService)
 		attrs := append(grpcutil.ParseFullMethod(info.FullMethod), attribute.String("concurrency_limit_action", bypassState))
+
 		if !bypassConcurrency {
 			if err := guard.TryAcquireMethod(info.FullMethod); err != nil {
 				return nil, err
@@ -165,4 +142,55 @@ func ConcurrencyInterceptor(guard ResourceLimiter, clientInfoProvider *GRPCClien
 
 		return handler(ctx, req)
 	}
+}
+
+// Creates a stream server interceptor that enforces a concurrency limit on incoming gRPC stream requests
+// Each request to open a stream is counted against the limit. If allowed, calls
+// the handler to open the stream and blocks until the stream is closed.
+func ConcurrencyStreamInterceptor(guard ResourceLimiter, clientInfoProvider *GRPCClientInfoProvider, knobsService knobs.Knobs) grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		bypassConcurrency, bypassState := checkBypassConcurrency(ss.Context(), clientInfoProvider, knobsService)
+		attrs := append(grpcutil.ParseFullMethod(info.FullMethod), attribute.String("concurrency_limit_action", bypassState))
+
+		if !bypassConcurrency {
+			if err := guard.TryAcquireMethod(info.FullMethod); err != nil {
+				return err
+			}
+			defer guard.ReleaseMethod(info.FullMethod)
+
+			// Only requests not excluded from concurrency limiting should count against the limit.
+			otelAttrs := metric.WithAttributes(attrs...)
+			methodConcurrencyGauge.Add(ss.Context(), 1, otelAttrs)
+			defer methodConcurrencyGauge.Add(ss.Context(), -1, otelAttrs)
+		}
+
+		return handler(srv, ss)
+	}
+}
+
+// Check if the request should be excluded from concurrency limiting by pubkey or IP.
+func checkBypassConcurrency(ctx context.Context, clientInfoProvider *GRPCClientInfoProvider, knobsService knobs.Knobs) (bool, string) {
+	bypassConcurrency := false
+	bypassState := "enforced"
+
+	if session, err := authn.GetSessionFromContext(ctx); err == nil && session != nil {
+		identityHex := session.IdentityPublicKey().ToHex()
+		if identityHex != "" {
+			if knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyExcludePubkeys, &identityHex, 0) > 0 {
+				bypassConcurrency = true
+				bypassState = "bypassed_pubkey"
+			}
+		}
+	}
+
+	if clientInfoProvider != nil {
+		if ip, err := clientInfoProvider.GetClientIP(ctx); err == nil && ip != "" {
+			if knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyExcludeIps, &ip, 0) > 0 {
+				bypassConcurrency = true
+				bypassState = "bypassed_ip"
+			}
+		}
+	}
+
+	return bypassConcurrency, bypassState
 }

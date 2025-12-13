@@ -674,6 +674,7 @@ func main() {
 			}(),
 			sparkgrpc.PanicRecoveryStreamInterceptor(),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).StreamAuthnInterceptor,
+			sparkgrpc.ConcurrencyStreamInterceptor(concurrencyGuard, clientInfoProvider, knobsService),
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
 				authz.WithMode(config.ServiceAuthz.Mode),
 				authz.WithAllowedIPs(config.ServiceAuthz.IPAllowlist),
