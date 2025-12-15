@@ -176,7 +176,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
     intervalMs: 300000, // 5 minutes
     minOutputsThreshold: 50,
   },
-  tokenTransactionVersion: "V2",
+  tokenTransactionVersion: "V3",
 };
 
 const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
