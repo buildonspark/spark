@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
@@ -23,6 +24,7 @@ import (
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 )
 
@@ -1118,6 +1120,7 @@ func validateBaseTransferTransaction(
 // It checks the transaction structure, signatures, and token amounts for create, mint and transfer operations.
 // It also ensures that SO-filled fields are not set, as these will be filled by the SOs to form the final transaction.
 func ValidatePartialTokenTransaction(
+	ctx context.Context,
 	tokenTransaction *tokenpb.TokenTransaction,
 	inputSignatures []*tokenpb.SignatureWithIndex,
 	sparkOperatorsFromConfig map[string]*sparkpb.SigningOperatorInfo,
@@ -1168,6 +1171,17 @@ func ValidatePartialTokenTransaction(
 		createInput := tokenTransaction.GetCreateInput()
 		if createInput.GetCreationEntityPublicKey() != nil {
 			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("creation entity public key will be added by the SO - do not set this field when starting transactions"))
+		}
+		if len(createInput.GetExtraMetadata()) > 0 {
+			network, err := btcnetwork.FromProtoNetwork(tokenTransaction.Network)
+			if err != nil {
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid network: %w", err))
+			}
+			if network == btcnetwork.Mainnet &&
+				knobs.GetKnobsService(ctx).GetValue(knobs.KnobAllowExtraMetadataOnMainnet, 0) != 1 {
+				return sparkerrors.UnimplementedMethodDisabled(
+					fmt.Errorf("extra metadata is not allowed on mainnet"))
+			}
 		}
 	case TokenTransactionTypeMint, TokenTransactionTypeTransfer:
 		for i, output := range tokenTransaction.TokenOutputs {

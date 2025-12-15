@@ -66,6 +66,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	expectedBondSats := h.config.Lrc20Configs[strings.ToLower(network.String())].WithdrawBondSats
 	expectedRelativeBlockLocktime := h.config.Lrc20Configs[strings.ToLower(network.String())].WithdrawRelativeBlockLocktime
 	if err := utils.ValidatePartialTokenTransaction(
+		ctx,
 		req.PartialTokenTransaction,
 		req.PartialTokenTransactionOwnerSignatures,
 		h.config.GetSigningOperatorList(),
