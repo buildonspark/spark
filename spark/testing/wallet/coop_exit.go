@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/frost"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 )
@@ -45,25 +45,53 @@ func GetConnectorRefundSignaturesV2(
 	return transfer, signaturesMap, nil
 }
 
-func createConnectorRefundTransactionSigningJob(
+func createCoopExitRefundTransactionSigningJob(
 	leafID string,
 	signingPubKey keys.Public,
-	nonce frost.SigningNonce,
+	refundNonce frost.SigningNonce,
 	refundTx *wire.MsgTx,
+	directRefundNonce frost.SigningNonce,
+	directRefundTx *wire.MsgTx,
+	directFromCpfpNonce frost.SigningNonce,
+	directFromCpfpRefundTx *wire.MsgTx,
 ) (*pb.LeafRefundTxSigningJob, error) {
 	var refundBuf bytes.Buffer
 	if err := refundTx.Serialize(&refundBuf); err != nil {
 		return nil, fmt.Errorf("failed to serialize refund tx: %w", err)
 	}
-	rawTx := refundBuf.Bytes()
-	refundNonceCommitmentProto, _ := nonce.SigningCommitment().MarshalProto()
+	rawRefundTx := refundBuf.Bytes()
+	refundNonceCommitmentProto, _ := refundNonce.SigningCommitment().MarshalProto()
+
+	var directRefundBuf bytes.Buffer
+	if err := directRefundTx.Serialize(&directRefundBuf); err != nil {
+		return nil, fmt.Errorf("failed to serialize direct refund tx: %w", err)
+	}
+	rawDirectRefundTx := directRefundBuf.Bytes()
+	directRefundNonceCommitmentProto, _ := directRefundNonce.SigningCommitment().MarshalProto()
+
+	var directFromCpfpRefundBuf bytes.Buffer
+	if err := directFromCpfpRefundTx.Serialize(&directFromCpfpRefundBuf); err != nil {
+		return nil, fmt.Errorf("failed to serialize direct from cpfp refund tx: %w", err)
+	}
+	rawDirectFromCpfpRefundTx := directFromCpfpRefundBuf.Bytes()
+	directFromCpfpRefundNonceCommitmentProto, _ := directFromCpfpNonce.SigningCommitment().MarshalProto()
 
 	return &pb.LeafRefundTxSigningJob{
 		LeafId: leafID,
 		RefundTxSigningJob: &pb.SigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
-			RawTx:                  rawTx,
+			RawTx:                  rawRefundTx,
 			SigningNonceCommitment: refundNonceCommitmentProto,
+		},
+		DirectRefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       signingPubKey.Serialize(),
+			RawTx:                  rawDirectRefundTx,
+			SigningNonceCommitment: directRefundNonceCommitmentProto,
+		},
+		DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       signingPubKey.Serialize(),
+			RawTx:                  rawDirectFromCpfpRefundTx,
+			SigningNonceCommitment: directFromCpfpRefundNonceCommitmentProto,
 		},
 	}, nil
 }
@@ -96,33 +124,81 @@ func signCoopExitRefunds(
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to parse refund tx: %w", err)
 		}
-		sequence, err := spark.NextSequence(currentRefundTx.TxIn[0].Sequence)
+		sequence, directSequence, err := bitcointransaction.NextSequence(currentRefundTx.TxIn[0].Sequence)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get next sequence: %w", err)
 		}
-		refundTx, err := createConnectorRefundTransaction(
-			sequence, &currentRefundTx.TxIn[0].PreviousOutPoint, connectorOutput, int64(leaf.Leaf.Value), receiverPubKey,
+		nodeOutPoint := &currentRefundTx.TxIn[0].PreviousOutPoint
+
+		nodeTx, err := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse node tx: %w", err)
+		}
+		if len(nodeTx.TxOut) == 0 {
+			return nil, nil, fmt.Errorf("node tx has no outputs")
+		}
+		nodeAmountSats := nodeTx.TxOut[0].Value
+
+		if len(leaf.Leaf.DirectTx) == 0 {
+			return nil, nil, fmt.Errorf("leaf at index %d has nil DirectTx field", i)
+		}
+		directTx, err := common.TxFromRawTxBytes(leaf.Leaf.DirectTx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse direct tx: %w", err)
+		}
+		if len(directTx.TxOut) == 0 {
+			return nil, nil, fmt.Errorf("direct tx has no outputs")
+		}
+		directOutPoint := &wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
+		directAmountSats := directTx.TxOut[0].Value
+
+		cpfpRefundTx, directFromCpfpRefundTx, directRefundTx, err := CreateAllRefundTxs(
+			sequence,
+			directSequence,
+			nodeOutPoint,
+			nodeAmountSats,
+			directOutPoint,
+			directAmountSats,
+			receiverPubKey,
+			true,
 		)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create refund transaction: %w", err)
+			return nil, nil, fmt.Errorf("failed to create refund txs: %w", err)
 		}
-		nonce := frost.GenerateSigningNonce()
-		signingJob, err := createConnectorRefundTransactionSigningJob(
-			leaf.Leaf.Id, leaf.SigningPrivKey.Public(), nonce, refundTx,
+
+		cpfpRefundTx.AddTxIn(wire.NewTxIn(connectorOutput, nil, nil))
+		directRefundTx.AddTxIn(wire.NewTxIn(connectorOutput, nil, nil))
+		directFromCpfpRefundTx.AddTxIn(wire.NewTxIn(connectorOutput, nil, nil))
+
+		refundNonce := frost.GenerateSigningNonce()
+		directRefundNonce := frost.GenerateSigningNonce()
+		directFromCpfpNonce := frost.GenerateSigningNonce()
+		signingJob, err := createCoopExitRefundTransactionSigningJob(
+			leaf.Leaf.Id,
+			leaf.SigningPrivKey.Public(),
+			refundNonce,
+			cpfpRefundTx,
+			directRefundNonce,
+			directRefundTx,
+			directFromCpfpNonce,
+			directFromCpfpRefundTx,
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create signing job: %w", err)
 		}
 		signingJobs = append(signingJobs, signingJob)
 
-		tx, _ := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
-
 		leafDataMap[leaf.Leaf.Id] = &LeafRefundSigningData{
-			SigningPrivKey: leaf.SigningPrivKey,
-			RefundTx:       refundTx,
-			Nonce:          &nonce,
-			Tx:             tx,
-			Vout:           int(leaf.Leaf.Vout),
+			SigningPrivKey:            leaf.SigningPrivKey,
+			RefundTx:                  cpfpRefundTx,
+			Nonce:                     &refundNonce,
+			DirectTx:                  directTx,
+			DirectRefundTx:            directRefundTx,
+			DirectRefundNonce:         &directRefundNonce,
+			DirectFromCpfpRefundTx:    directFromCpfpRefundTx,
+			DirectFromCpfpRefundNonce: &directFromCpfpNonce,
+			Tx:                        nodeTx,
+			Vout:                      int(leaf.Leaf.Vout),
 		}
 	}
 

@@ -80,14 +80,19 @@ func VerifyTransactionWithSource(clientRawTxBytes []byte, sourceRawTxBytes []byt
 		return fmt.Errorf("transaction does not match expected construction: %w", err)
 	}
 
-	// Serialize the expected and client transactions to compare the raw bytes for more extensive validation
-	expectedTxBytes, err := common.SerializeTx(expectedTx)
+	// Serialize the expected and client transactions to compare the raw bytes for more extensive validation.
+	expectedTxBytes, err := common.SerializeTxNoWitness(expectedTx)
 	if err != nil {
 		return fmt.Errorf("failed to serialize expected transaction: %w", err)
 	}
 
-	if !bytes.Equal(expectedTxBytes, clientRawTxBytes) {
-		diff := cmp.Diff(expectedTxBytes, clientRawTxBytes)
+	clientTxBytes, err := common.SerializeTxNoWitness(clientTx)
+
+	if err != nil {
+		return fmt.Errorf("failed to serialize client transaction: %w", err)
+	}
+	if !bytes.Equal(expectedTxBytes, clientTxBytes) {
+		diff := cmp.Diff(expectedTxBytes, clientTxBytes)
 		return fmt.Errorf("transaction does not match expected construction: %s", diff)
 	}
 

@@ -48,3 +48,6 @@ _data/
 
 # Claude Code settings
 .claude/settings.local.json
+
+# Claude Code thoughts/plans
+/thoughts/

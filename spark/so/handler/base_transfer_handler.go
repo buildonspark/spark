@@ -1345,10 +1345,6 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 	leafDirectFromCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
 ) error {
-	if req == nil {
-		return nil
-	}
-
 	enhancedValidationEnabled := knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoEnhancedBitcoinTxValidation, 0) > 0
 	if !enhancedValidationEnabled {
 		return nil
@@ -1358,16 +1354,16 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 
 	switch transferType {
 	case st.TransferTypeTransfer:
-		if req.TransferPackage == nil {
+		if req == nil || req.TransferPackage == nil {
 			return validateLegacyLeavesToSend_transfer(nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 		}
 		return validateLeaves_transfer(req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 
 	case st.TransferTypeSwap, st.TransferTypeCounterSwap:
-		return validateLeaves_swap(nodesByID, leafCpfpRefundMap, refundDestPubkey)
+		return validateLeaves_swap(nodesByID, leafCpfpRefundMap, refundDestPubkey, transferType)
 
 	case st.TransferTypeCooperativeExit:
-		if req.TransferPackage == nil {
+		if req == nil || req.TransferPackage == nil {
 			return validateTransactionCooperativeExitLegacyLeavesToSend(nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 		}
 		return validateTransactionCooperativeExitLeaves(req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
@@ -1599,6 +1595,7 @@ func validateLeaves_swap(
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
+	transferType st.TransferType,
 ) error {
 	for leafID := range leafCpfpRefundMap {
 		node, exists := nodesByID[leafID]
@@ -1614,9 +1611,9 @@ func validateLeaves_swap(
 			nil,
 			nil,
 			refundDestPubkey,
-			st.TransferTypeSwap,
+			transferType,
 		); err != nil {
-			return fmt.Errorf("leaf %s validation for swap failed: %w", leafID, err)
+			return fmt.Errorf("leaf %s validation for %s failed: %w", leafID, transferType, err)
 		}
 	}
 
