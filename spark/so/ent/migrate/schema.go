@@ -284,8 +284,11 @@ var (
 		Indexes: []*schema.Index{
 			{
 				Name:    "preimagerequest_payment_hash_receiver_identity_pubkey",
-				Unique:  false,
+				Unique:  true,
 				Columns: []*schema.Column{PreimageRequestsColumns[3], PreimageRequestsColumns[5]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status != 'RETURNED'",
+				},
 			},
 			{
 				Name:    "preimagerequest_sender_identity_pubkey",

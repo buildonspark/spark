@@ -2,6 +2,7 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -25,7 +26,9 @@ func (PreimageRequest) Mixin() []ent.Mixin {
 // Indexes returns the indexes for the preimage request table.
 func (PreimageRequest) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("payment_hash", "receiver_identity_pubkey"),
+		index.Fields("payment_hash", "receiver_identity_pubkey").
+			Unique().
+			Annotations(entsql.IndexWhere("status != 'RETURNED'")),
 		index.Fields("sender_identity_pubkey"),
 		index.Edges("transfers"),
 	}

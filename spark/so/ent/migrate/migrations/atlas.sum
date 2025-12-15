@@ -1,4 +1,4 @@
-h1:4voacrJi1gcPZ7mvQg1/Hd76U5Ay/nxmgEAtipDXCms=
+h1:HxNIeaEgGJs09aNwFi129PIzThtumudEiAN7OMVzLos=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -103,3 +103,4 @@ h1:4voacrJi1gcPZ7mvQg1/Hd76U5Ay/nxmgEAtipDXCms=
 20251206031312_denormalize_token_output_created_transaction_finalized_hash.sql h1:LWlN56sTP0wX77sueuoFBmt+lQUBaPpykX5UGbL2nX4=
 20251206032525_require_token_outputs_created_transaction_finalized_hash_and_edge.sql h1:weHLI1+qlrpP/AQxJvG8Cm7M5MWlWSP60u0OfsIqqnM=
 20251212211636_add_extra_metadata_to_token_metadata.sql h1:LS+lpVPmFMOstExka+Mb1hvyyKB/JBRn/IRoR8RM/eE=
+20251215225231_add_unique_constraint_preimage_request.sql h1:pHa7YcAsSjkXyKh7ckk2N9Do8WHhzkfFMRkchC9Rn7I=
