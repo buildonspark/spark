@@ -1,5 +1,31 @@
 # @buildonspark/spark-sdk
 
+## 0.5.1
+
+### Patch Changes
+
+- **Retry gateway errors**
+  - Retry on 502, 503, 504 errors as these can temporarily occur when the service is autoscaling
+  - Includes exponential backoff with a max of 5 retries and a base delay of 1000ms
+
+  **Direct refund transactions**
+  - Do not construct the directRefundTx if the node timelock is 0
+
+  **Lightning**
+  - Added missing lightning send status
+
+  **Token transaction v3**
+  - Default to token transaction v3
+
+  **Query token transcations**
+  - Lower the default page size to 50
+
+  **Miscellaneous tweaks**
+  - Remove unused proof map in claim transfer flow
+  - Only derive the public key once when signing
+  - Update sats transfer flows to use Promise.all instead of looping through sequentially
+  - Update grpc HTTP/2 header parsing
+
 ## 0.5.0
 
 ### Minor Changes

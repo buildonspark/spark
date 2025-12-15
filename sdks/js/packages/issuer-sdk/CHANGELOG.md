@@ -1,5 +1,18 @@
 # @buildonspark/issuer-sdk
 
+## 0.1.1
+
+### Patch Changes
+
+- **Token transaction v3**
+  - Updated test configs and expanded test coverage to include both v2 and v3 token transactions
+
+  **Extra metadata field available when creating new tokens**
+  - Added a field to accept additional bytes data to attach to token creates
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.5.1
+
 ## 0.1.0
 
 ### Minor Changes
