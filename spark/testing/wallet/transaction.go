@@ -125,29 +125,6 @@ func CreateAllRefundTxs(
 	return cpfpRefundTx, directFromCpfpRefundTx, directRefundTx, nil
 }
 
-func createConnectorRefundTransaction(
-	sequence uint32,
-	nodeOutPoint *wire.OutPoint,
-	connectorOutput *wire.OutPoint,
-	amountSats int64,
-	receiverPubKey keys.Public,
-) (*wire.MsgTx, error) {
-	refundTx := wire.NewMsgTx(3)
-	refundTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: *nodeOutPoint,
-		SignatureScript:  nil,
-		Witness:          nil,
-		Sequence:         sequence,
-	})
-	refundTx.AddTxIn(wire.NewTxIn(connectorOutput, nil, nil))
-	receiverScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create receiver script: %w", err)
-	}
-	refundTx.AddTxOut(wire.NewTxOut(amountSats, receiverScript))
-	return refundTx, nil
-}
-
 func SerializeTx(tx *wire.MsgTx) ([]byte, error) {
 	var buf bytes.Buffer
 	err := tx.Serialize(&buf)
