@@ -492,6 +492,11 @@ func (h *BaseTransferHandler) createTransfer(
 		transferCreate = transferCreate.SetSparkInvoiceID(invoiceID)
 	}
 
+	leaves, network, err := loadLeavesWithLock(ctx, db, leafCpfpRefundMap)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to load leaves: %w", err)
+	}
+
 	// For counter swap v3, we need to validate the primary transfer is in the right status and has enough time left.
 	if transferType == st.TransferTypeCounterSwapV3 {
 		primaryTransfer, err := db.Transfer.Query().Where(enttransfer.IDEQ(primaryTransferId)).Only(ctx)
@@ -507,11 +512,11 @@ func (h *BaseTransferHandler) createTransfer(
 			return nil, nil, fmt.Errorf("primary swap transfer %s has expired or expires within 30 seconds, expiry time is %s", primaryTransferId.String(), primaryTransfer.ExpiryTime.String())
 		}
 		transferCreate.SetPrimarySwapTransfer(primaryTransfer)
-	}
-
-	leaves, network, err := loadLeavesWithLock(ctx, db, leafCpfpRefundMap)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to load leaves: %w", err)
+		// The counter transfer amount should be the same as the primary transfer amount until we implement fees. Then we should probably validate a statement from the user that they accepted the fees.
+		counterTransferAmount := getTotalTransferValue(leaves)
+		if primaryTransfer.TotalValue != counterTransferAmount {
+			return nil, nil, fmt.Errorf("primary swap transfer %s amount %d does not match counter transfer amount %d", primaryTransferId.String(), primaryTransfer.TotalValue, counterTransferAmount)
+		}
 	}
 
 	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeSwap || transferType == st.TransferTypeCounterSwap || transferType == st.TransferTypeCooperativeExit {

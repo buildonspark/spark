@@ -50,6 +50,7 @@ func (Transfer) Fields() []ent.Field {
 			Comment("The network on which the transfer is taking place.").
 			Annotations(entexample.Default(btcnetwork.Regtest)),
 		field.Uint64("total_value").
+			Comment("Amount of the transfer in satoshis.").
 			Annotations(entexample.Default(30)),
 		field.Enum("status").
 			GoType(st.TransferStatus("")).

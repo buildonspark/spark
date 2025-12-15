@@ -33,7 +33,7 @@ type Transfer struct {
 	ReceiverIdentityPubkey keys.Public `json:"receiver_identity_pubkey,omitempty"`
 	// The network on which the transfer is taking place.
 	Network btcnetwork.Network `json:"network,omitempty"`
-	// TotalValue holds the value of the "total_value" field.
+	// Amount of the transfer in satoshis.
 	TotalValue uint64 `json:"total_value,omitempty"`
 	// Status holds the value of the "status" field.
 	Status schematype.TransferStatus `json:"status,omitempty"`
