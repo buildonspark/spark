@@ -74,6 +74,9 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	case *pbgossip.GossipMessage_SettleSwapKeyTweak:
 		settleSwapKeyTweak := gossipMessage.GetSettleSwapKeyTweak()
 		err = h.handleSettleSwapKeyTweakGossipMessage(ctx, settleSwapKeyTweak)
+	case *pbgossip.GossipMessage_UnlockLeafFromRenewal:
+		unlockLeafFromRenewal := gossipMessage.GetUnlockLeafFromRenewal()
+		err = h.handleUnlockLeafFromRenewalGossipMessage(ctx, unlockLeafFromRenewal)
 	case *pbgossip.GossipMessage_FinalizeRefreshTimelock:
 		return fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.Message)
 	case *pbgossip.GossipMessage_FinalizeExtendLeaf:
@@ -384,4 +387,14 @@ func (h *GossipHandler) handleUpdateWalletSettingGossipMessage(ctx context.Conte
 
 	logger.Sugar().Infof("Successfully updated wallet setting from gossip message for identity public key %x", ownerIdentityPubKey)
 	return nil
+}
+
+func (h *GossipHandler) handleUnlockLeafFromRenewalGossipMessage(ctx context.Context, unlockLeafFromRenewal *pbgossip.GossipMessageUnlockLeafFromRenewal) error {
+	renewLeafHandler := NewInternalRenewLeafHandler(h.config)
+	err := renewLeafHandler.UnlockLeafFromRenewal(ctx, unlockLeafFromRenewal.NodeId)
+	if err != nil {
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to unlock leaf %s from renewal", unlockLeafFromRenewal.NodeId)
+	}
+	return err
 }
