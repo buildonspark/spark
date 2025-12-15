@@ -7,11 +7,13 @@ import (
 
 	"entgo.io/ent/entc"
 	"entgo.io/ent/entc/gen"
+	"github.com/lightsparkdev/spark/so/entcomments"
 	"github.com/lightsparkdev/spark/so/entexample"
 )
 
 func main() {
-	ext := &entexample.Extension{}
+	exampleExt := &entexample.Extension{}
+	commentsExt := &entcomments.Extension{}
 
 	err := entc.Generate("./schema", &gen.Config{
 		Features: []gen.Feature{
@@ -21,7 +23,7 @@ func main() {
 			gen.FeatureModifier,
 			gen.FeatureUpsert,
 		},
-	}, entc.Extensions(ext))
+	}, entc.Extensions(exampleExt, commentsExt))
 
 	if err != nil {
 		log.Fatalf("running ent codegen: %v", err)

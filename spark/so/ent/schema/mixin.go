@@ -29,9 +29,11 @@ func (BaseMixin) Fields() []ent.Field {
 			Default(NewID),
 		field.Time("create_time").
 			Default(time.Now).
-			Immutable(),
+			Immutable().
+			Comment("The time when the entity was created."),
 		field.Time("update_time").
 			Default(time.Now).
-			UpdateDefault(time.Now),
+			UpdateDefault(time.Now).
+			Comment("The time when the entity was last updated."),
 	}
 }

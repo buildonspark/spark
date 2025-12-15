@@ -20,9 +20,9 @@ type CooperativeExit struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID uuid.UUID `json:"id,omitempty"`
-	// CreateTime holds the value of the "create_time" field.
+	// The time when the entity was created.
 	CreateTime time.Time `json:"create_time,omitempty"`
-	// UpdateTime holds the value of the "update_time" field.
+	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// ExitTxid holds the value of the "exit_txid" field.
 	ExitTxid schematype.TxID `json:"exit_txid,omitempty"`
