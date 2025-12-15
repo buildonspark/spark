@@ -897,10 +897,12 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, run
 
 func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 	logger := logging.GetLoggerFromContext(ctx)
+	logger = logger.With(zap.String("task.name", "backfill_token_amounts"))
 	totalUpdated := int64(0)
 	const batchSize = 1000
 	var lastKnobCheck time.Time
 	cutoffTime := time.Date(2025, 12, 8, 0, 0, 0, 0, time.UTC)
+	logger.Sugar().Infof("Backfilling token output amounts for cutoff time %s", cutoffTime)
 
 	for {
 		if time.Since(lastKnobCheck) > time.Minute {
@@ -921,21 +923,30 @@ func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService k
 		}
 
 		rows, err := tx.TokenOutput.Query().
-			Where(tokenoutput.UpdateTimeGT(cutoffTime)).
+			Where(tokenoutput.CreateTimeGTE(cutoffTime)).
 			ForUpdate().
 			Limit(batchSize).
 			All(ctx)
 		if err != nil {
+			_ = tx.Rollback()
 			return fmt.Errorf("failed to get rows: %w", err)
 		}
+		logger.Sugar().Infof("Found %d token outputs to backfill", len(rows))
 
 		rowsAffected := int64(0)
+		skipped := int64(0)
 		for _, row := range rows {
 			fixedAmount, err := uint128.FromBytes(row.TokenAmount)
 			if err != nil {
+				_ = tx.Rollback()
 				return fmt.Errorf("failed to get token amount: %w", err)
 			}
 			if fixedAmount == row.Amount {
+				skipped++
+				if skipped <= 3 {
+					logger.Sugar().Infof("Skipping row %s: fixedAmount=%s, row.Amount=%s, tokenAmount=%x",
+						row.ID, fixedAmount.String(), row.Amount.String(), row.TokenAmount)
+				}
 				continue
 			}
 			_, err = tx.TokenOutput.
@@ -943,18 +954,19 @@ func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService k
 				SetAmount(fixedAmount).
 				Save(ctx)
 			if err != nil {
+				_ = tx.Rollback()
 				return fmt.Errorf("failed to update token amount: %w", err)
 			}
 			rowsAffected++
 		}
 
-		logger.Sugar().Infof("Backfilled %d token output amounts", rowsAffected)
+		logger.Sugar().Infof("Batch complete: updated=%d, skipped=%d", rowsAffected, skipped)
 		err = tx.Commit()
 		if err != nil {
 			return fmt.Errorf("failed to commit tx: %w", err)
 		}
 
-		if rowsAffected == 0 {
+		if len(rows) < batchSize {
 			break
 		}
 		totalUpdated += rowsAffected
