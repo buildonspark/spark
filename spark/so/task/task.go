@@ -901,6 +901,7 @@ func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService k
 	totalUpdated := int64(0)
 	const batchSize = 1000
 	var lastKnobCheck time.Time
+	var lastID uuid.UUID
 	cutoffTime := time.Date(2025, 12, 8, 0, 0, 0, 0, time.UTC)
 	logger.Sugar().Infof("Backfilling token output amounts for cutoff time %s", cutoffTime)
 
@@ -922,8 +923,13 @@ func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService k
 			return fmt.Errorf("failed to get tx from context: %w", err)
 		}
 
-		rows, err := tx.TokenOutput.Query().
-			Where(tokenoutput.CreateTimeGTE(cutoffTime)).
+		query := tx.TokenOutput.Query().
+			Where(tokenoutput.CreateTimeGTE(cutoffTime))
+		if lastID != uuid.Nil {
+			query = query.Where(tokenoutput.IDGT(lastID))
+		}
+		rows, err := query.
+			Order(tokenoutput.ByID()).
 			ForUpdate().
 			Limit(batchSize).
 			All(ctx)
@@ -931,7 +937,7 @@ func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService k
 			_ = tx.Rollback()
 			return fmt.Errorf("failed to get rows: %w", err)
 		}
-		logger.Sugar().Infof("Found %d token outputs to backfill", len(rows))
+		logger.Sugar().Infof("Found %d token outputs to backfill after id=%s", len(rows), lastID)
 
 		rowsAffected := int64(0)
 		skipped := int64(0)
@@ -969,6 +975,7 @@ func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService k
 		if len(rows) < batchSize {
 			break
 		}
+		lastID = rows[len(rows)-1].ID
 		totalUpdated += rowsAffected
 
 		select {
