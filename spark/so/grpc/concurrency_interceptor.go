@@ -16,7 +16,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const knobTargetGlobal = "global"
+type KnobTargetName string
+
+const KnobTargetName_UnaryGlobalLimit KnobTargetName = "global"
+const KnobTargetName_StreamGlobalLimit KnobTargetName = "global_stream"
 
 // Interface for a resource limiter that allows enforcing a budget on acquiring and releasing resources.
 type ResourceLimiter interface {
@@ -35,14 +38,17 @@ type ConcurrencyGuard struct {
 	mu sync.Mutex
 	// A knobs service for retrieving limit overrides.
 	knobsService knobs.Knobs
+	// The target name for the global limit knob.
+	globalLimitTargetName KnobTargetName
 }
 
-func NewConcurrencyGuard(knobsService knobs.Knobs) ResourceLimiter {
+func NewConcurrencyGuard(knobsService knobs.Knobs, globalLimitTargetName KnobTargetName) ResourceLimiter {
 	return &ConcurrencyGuard{
-		globalCounter: 0,
-		counterMap:    make(map[string]int64),
-		mu:            sync.Mutex{},
-		knobsService:  knobsService,
+		globalCounter:         0,
+		counterMap:            make(map[string]int64),
+		mu:                    sync.Mutex{},
+		knobsService:          knobsService,
+		globalLimitTargetName: globalLimitTargetName,
 	}
 }
 
@@ -52,8 +58,8 @@ func (c *ConcurrencyGuard) TryAcquireMethod(method string) error {
 	methodLimit := int64(c.knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyLimitLimit, &method, -1))
 	// Global limit is configured via the same knob, using the magic target "global".
 	// If unset, no global limit is enforced.
-	globalTarget := knobTargetGlobal
-	globalLimit := int64(c.knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyLimitLimit, &globalTarget, -1))
+	globalLimitTarget := string(c.globalLimitTargetName)
+	globalLimit := int64(c.knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyLimitLimit, &globalLimitTarget, -1))
 
 	c.mu.Lock()
 	defer c.mu.Unlock()

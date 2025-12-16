@@ -82,7 +82,7 @@ func TestConcurrencyGuard_Acquire_WithinLimit(t *testing.T) {
 			}
 			knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global")] = float64(tt.globalLimit)
 			mockKnobs := knobs.NewFixedKnobs(knobValues)
-			guard := NewConcurrencyGuard(mockKnobs)
+			guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 
 			// Acquire multiple times
 			for i := 0; i < tt.acquisitions; i++ {
@@ -129,7 +129,7 @@ func TestConcurrencyGuard_AcquireTarget_ExceedsLimit(t *testing.T) {
 			// Set global limit via magic target "global"
 			knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global")] = float64(tt.globalLimit)
 			mockKnobs := knobs.NewFixedKnobs(knobValues)
-			guard := NewConcurrencyGuard(mockKnobs)
+			guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 
 			var err error
 			for i := 0; i < tt.acquisitions; i++ {
@@ -149,7 +149,7 @@ func TestConcurrencyGuard_Release(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 
 		// Acquire some resources
 		for i := 0; i < 3; i++ {
@@ -178,7 +178,7 @@ func TestConcurrencyGuard_Release(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 
 		// Release without acquiring - this will make counter negative
 		guard.ReleaseMethod("TestMethod")
@@ -194,7 +194,7 @@ func TestConcurrencyGuard_ConcurrentAccess(t *testing.T) {
 	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 100, // High limit for concurrent test
 	})
-	guard := NewConcurrencyGuard(mockKnobs)
+	guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 
 	numGoroutines := 50
 	numOperationsPerGoroutine := 20
@@ -244,7 +244,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 1,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 		interceptor := ConcurrencyInterceptor(guard, nil, nil)
 
 		called := false
@@ -272,7 +272,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 1,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 		interceptor := ConcurrencyInterceptor(guard, nil, nil)
 
 		// First acquire the only slot
@@ -305,7 +305,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 		interceptor := ConcurrencyInterceptor(guard, nil, nil)
 
 		handler := func(ctx context.Context, req any) (any, error) {
@@ -331,7 +331,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 		interceptor := ConcurrencyInterceptor(guard, nil, nil)
 
 		expectedErr := fmt.Errorf("handler error")
@@ -480,7 +480,7 @@ func TestConcurrencyGuard_AcquireAfterGlobalLimit(t *testing.T) {
 	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 3,
 	})
-	guard := NewConcurrencyGuard(mockKnobs)
+	guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 
 	// Acquire some resources
 	for i := 0; i < 3; i++ {
@@ -509,6 +509,68 @@ func TestConcurrencyGuard_AcquireAfterGlobalLimit(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestConcurrencyGuard_AcquireGlobalStreamLimit(t *testing.T) {
+	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, KnobTargetName_UnaryGlobalLimit):  3,
+		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, KnobTargetName_StreamGlobalLimit): 5,
+	})
+	guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
+	guardStream := NewConcurrencyGuard(mockKnobs, KnobTargetName_StreamGlobalLimit)
+
+	// Acquire some resources
+	for i := 0; i < 3; i++ {
+		err := guard.TryAcquireMethod("TestMethod")
+		require.NoError(t, err)
+	}
+
+	// Verify current count
+	concurrencyGuard := guard.(*ConcurrencyGuard)
+	assert.Equal(t, int64(3), concurrencyGuard.counterMap["TestMethod"])
+
+	// Acquiring again fails
+	err := guard.TryAcquireMethod("TestMethod")
+	require.Error(t, err)
+
+	// Acquire some streamresources
+	for i := 0; i < 5; i++ {
+		err := guardStream.TryAcquireMethod("TestMethod")
+		require.NoError(t, err)
+	}
+
+	// Verify current count
+	concurrencyGuardStream := guardStream.(*ConcurrencyGuard)
+	assert.Equal(t, int64(5), concurrencyGuardStream.counterMap["TestMethod"])
+
+	// Acquiring again fails
+	err = guardStream.TryAcquireMethod("TestMethod")
+	require.Error(t, err)
+
+	// Method counter is still at 5
+	assert.Equal(t, int64(5), concurrencyGuardStream.counterMap["TestMethod"])
+
+	guard.ReleaseMethod("TestMethod")
+
+	// Global counter is decremented
+	assert.Equal(t, int64(2), concurrencyGuard.globalCounter)
+
+	// Acquiring after release works
+	err = guard.TryAcquireMethod("TestMethod")
+	require.NoError(t, err)
+
+	// But stream guard is still at 5
+	err = guardStream.TryAcquireMethod("TestMethod")
+	require.Error(t, err)
+
+	guardStream.ReleaseMethod("TestMethod")
+
+	// Global counter is decremented
+	assert.Equal(t, int64(4), concurrencyGuardStream.globalCounter)
+
+	// Acquiring after release works
+	err = guardStream.TryAcquireMethod("TestMethod")
+	require.NoError(t, err)
+}
+
 // mockServerStream is a minimal mock implementation of grpc.ServerStream for testing.
 type mockServerStream struct {
 	grpc.ServerStream
@@ -522,9 +584,9 @@ func (m *mockServerStream) Context() context.Context {
 func TestConcurrencyStreamInterceptor(t *testing.T) {
 	t.Run("successful request within limit", func(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
-			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 1,
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, KnobTargetName_StreamGlobalLimit): 1,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_StreamGlobalLimit)
 		interceptor := ConcurrencyStreamInterceptor(guard, nil, nil)
 
 		called := false
@@ -551,9 +613,9 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 
 	t.Run("request exceeding limit", func(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
-			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 1,
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, KnobTargetName_StreamGlobalLimit): 1,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_StreamGlobalLimit)
 		interceptor := ConcurrencyStreamInterceptor(guard, nil, nil)
 
 		// First acquire the only slot
@@ -584,9 +646,9 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 
 	t.Run("handler panic still releases resource", func(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
-			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, KnobTargetName_StreamGlobalLimit): 10,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_StreamGlobalLimit)
 		interceptor := ConcurrencyStreamInterceptor(guard, nil, nil)
 
 		handler := func(srv any, stream grpc.ServerStream) error {
@@ -611,9 +673,9 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 
 	t.Run("handler error still releases resource", func(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
-			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, KnobTargetName_StreamGlobalLimit): 10,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_StreamGlobalLimit)
 		interceptor := ConcurrencyStreamInterceptor(guard, nil, nil)
 
 		expectedErr := fmt.Errorf("handler error")
@@ -660,10 +722,10 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 
 	t.Run("method limit exceeded", func(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
-			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "/test.Service/TestStream"): 2,
-			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"):                   10,
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "/test.Service/TestStream"):       2,
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, KnobTargetName_StreamGlobalLimit): 10,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_StreamGlobalLimit)
 		interceptor := ConcurrencyStreamInterceptor(guard, nil, nil)
 
 		// Acquire two slots (the method limit)
@@ -693,9 +755,9 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 
 	t.Run("concurrent streams respect limit", func(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
-			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 5,
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, KnobTargetName_StreamGlobalLimit): 5,
 		})
-		guard := NewConcurrencyGuard(mockKnobs)
+		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_StreamGlobalLimit)
 		interceptor := ConcurrencyStreamInterceptor(guard, nil, nil)
 
 		numGoroutines := 10

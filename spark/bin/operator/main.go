@@ -614,7 +614,8 @@ func main() {
 		MaxConnectionAgeGrace: grpcMaxConnectionAgeGrace,
 	}))
 
-	concurrencyGuard := sparkgrpc.NewConcurrencyGuard(knobsService)
+	concurrencyGuard := sparkgrpc.NewConcurrencyGuard(knobsService, sparkgrpc.KnobTargetName_UnaryGlobalLimit)
+	concurrencyStreamGuard := sparkgrpc.NewConcurrencyGuard(knobsService, sparkgrpc.KnobTargetName_StreamGlobalLimit)
 
 	var eventsRouter *events.EventRouter
 	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {
@@ -678,7 +679,7 @@ func main() {
 			}(),
 			sparkgrpc.PanicRecoveryStreamInterceptor(),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).StreamAuthnInterceptor,
-			sparkgrpc.ConcurrencyStreamInterceptor(concurrencyGuard, clientInfoProvider, knobsService),
+			sparkgrpc.ConcurrencyStreamInterceptor(concurrencyStreamGuard, clientInfoProvider, knobsService),
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
 				authz.WithMode(config.ServiceAuthz.Mode),
 				authz.WithAllowedIPs(config.ServiceAuthz.IPAllowlist),
