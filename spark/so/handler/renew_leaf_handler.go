@@ -64,6 +64,35 @@ func NewRenewLeafHandler(config *so.Config) *RenewLeafHandler {
 	}
 }
 
+func (h *RenewLeafHandler) NodeAvailableForRenew(ctx context.Context, req *pbinternal.NodeAvailableForRenewRequest) error {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get database from context: %w", err)
+	}
+
+	id, err := uuid.Parse(req.NodeId)
+	if err != nil {
+		return fmt.Errorf("failed to parse leaf id: %w", err)
+	}
+
+	leaf, err := db.TreeNode.
+		Query().
+		Where(enttreenode.ID(id)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return errors.NotFoundMissingEntity(fmt.Errorf("leaf with id %s not found", req.NodeId))
+		}
+		return fmt.Errorf("failed to get leaf node: %w", err)
+	}
+
+	if leaf.Status != st.TreeNodeStatusAvailable {
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf node is not available for renewal, current status: %s", leaf.Status))
+	}
+
+	return nil
+}
+
 // RenewLeaf manages timelocks of nodes. This function validates user-sent signing jobs, signs them, aggregates them,
 // and then updates internal data model with the signed transactions.
 func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafRequest) (*pb.RenewLeafResponse, error) {
