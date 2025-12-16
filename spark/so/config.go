@@ -46,10 +46,12 @@ var (
 	defaultPoolMaxConnIdleTime       = 5 * time.Minute
 	defaultPoolHealthCheckPeriod     = 30 * time.Second
 	// Defaults for gRPC server behavior
-	defaultGRPCServerConnectionTimeout   = 5 * time.Second
-	defaultGRPCServerKeepaliveTime       = 300 * time.Second
-	defaultGRPCServerKeepaliveTimeout    = 20 * time.Second
-	defaultGRPCServerUnaryHandlerTimeout = 60 * time.Second
+	defaultGRPCServerConnectionTimeout     = 5 * time.Second
+	defaultGRPCServerKeepaliveTime         = 300 * time.Second
+	defaultGRPCServerKeepaliveTimeout      = 20 * time.Second
+	defaultGRPCServerUnaryHandlerTimeout   = 60 * time.Second
+	defaultGRPCServerMaxConnectionAge      = 10 * time.Minute
+	defaultGRPCServerMaxConnectionAgeGrace = 1 * time.Minute
 	// Defaults for gRPC client behavior
 	// 0 or unset means to fall back to the default value.
 	// < 0 means disable timeouts
@@ -245,6 +247,10 @@ type GRPCConfig struct {
 	ServerKeepaliveTime time.Duration `yaml:"server_keepalive_time"`
 	// ServerKeepaliveTimeout is the timeout waiting for keepalive ack before closing the connection.
 	ServerKeepaliveTimeout time.Duration `yaml:"server_keepalive_timeout"`
+	// ServerMaxConnectionAge is the maximum amount of time a connection may exist before it will be closed by sending a GoAway.
+	ServerMaxConnectionAge time.Duration `yaml:"server_max_connection_age"`
+	// ServerMaxConnectionAgeGrace is the additive period after ServerMaxConnectionAge after which the connection will be forcibly closed.
+	ServerMaxConnectionAgeGrace time.Duration `yaml:"server_max_connection_age_grace"`
 	// ServerUnaryHandlerTimeout enforces a per-request timeout for unary RPC handlers.
 	ServerUnaryHandlerTimeout time.Duration `yaml:"server_unary_handler_timeout"`
 	// ClientTimeout enforces a per-request timeout for unary RPC client calls.
@@ -744,6 +750,12 @@ func setGrpcDefaults(cfg *GRPCConfig) {
 	}
 	if cfg.ServerUnaryHandlerTimeout == 0 {
 		cfg.ServerUnaryHandlerTimeout = defaultGRPCServerUnaryHandlerTimeout
+	}
+	if cfg.ServerMaxConnectionAge == 0 {
+		cfg.ServerMaxConnectionAge = defaultGRPCServerMaxConnectionAge
+	}
+	if cfg.ServerMaxConnectionAgeGrace == 0 {
+		cfg.ServerMaxConnectionAgeGrace = defaultGRPCServerMaxConnectionAgeGrace
 	}
 	if cfg.ClientTimeout == 0 {
 		cfg.ClientTimeout = defaultGRPCClientTimeout

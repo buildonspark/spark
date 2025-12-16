@@ -594,6 +594,8 @@ func main() {
 	grpcConnTimeout := knobsService.GetDuration(knobs.KnobGrpcServerConnectionTimeout, config.GRPC.ServerConnectionTimeout)
 	grpcKeepaliveTime := knobsService.GetDuration(knobs.KnobGrpcServerKeepaliveTime, config.GRPC.ServerKeepaliveTime)
 	grpcKeepaliveTimeout := knobsService.GetDuration(knobs.KnobGrpcServerKeepaliveTimeout, config.GRPC.ServerKeepaliveTimeout)
+	grpcMaxConnectionAge := knobsService.GetDuration(knobs.KnobGrpcServerMaxConnectionAge, config.GRPC.ServerMaxConnectionAge)
+	grpcMaxConnectionAgeGrace := knobsService.GetDuration(knobs.KnobGrpcServerMaxConnectionAgeGrace, config.GRPC.ServerMaxConnectionAgeGrace)
 
 	// This uses SetDeadline in net.Conn to set the timeout for the connection
 	// establishment, after which the connection is closed with error
@@ -606,8 +608,10 @@ func main() {
 	// Time is the interval between keepalive pings.
 	// Timeout is the interval between keepalive pings after which the connection is closed.
 	serverOpts = append(serverOpts, grpc.KeepaliveParams(keepalive.ServerParameters{
-		Time:    grpcKeepaliveTime,
-		Timeout: grpcKeepaliveTimeout,
+		Time:                  grpcKeepaliveTime,
+		Timeout:               grpcKeepaliveTimeout,
+		MaxConnectionAge:      grpcMaxConnectionAge,
+		MaxConnectionAgeGrace: grpcMaxConnectionAgeGrace,
 	}))
 
 	concurrencyGuard := sparkgrpc.NewConcurrencyGuard(knobsService)

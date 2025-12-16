@@ -35,11 +35,13 @@ const (
 	KnobSoSigningCommitmentNodeLimit  = "spark.so.signing_commitments.nodes_limit"
 	KnobSoSigningCommitmentCountLimit = "spark.so.signing_commitments.count_limit"
 
-	KnobGrpcServerMethodEnabled       = "spark.so.grpc.server.method.enabled"
-	KnobGrpcServerConnectionTimeout   = "spark.so.grpc.server.connection_timeout"
-	KnobGrpcServerKeepaliveTime       = "spark.so.grpc.server.keepalive_time"
-	KnobGrpcServerKeepaliveTimeout    = "spark.so.grpc.server.keepalive_timeout"
-	KnobGrpcServerUnaryHandlerTimeout = "spark.so.grpc.server.unary_handler_timeout"
+	KnobGrpcServerMethodEnabled         = "spark.so.grpc.server.method.enabled"
+	KnobGrpcServerConnectionTimeout     = "spark.so.grpc.server.connection_timeout"
+	KnobGrpcServerKeepaliveTime         = "spark.so.grpc.server.keepalive_time"
+	KnobGrpcServerKeepaliveTimeout      = "spark.so.grpc.server.keepalive_timeout"
+	KnobGrpcServerMaxConnectionAge      = "spark.so.grpc.server.max_connection_age"
+	KnobGrpcServerMaxConnectionAgeGrace = "spark.so.grpc.server.max_connection_age_grace"
+	KnobGrpcServerUnaryHandlerTimeout   = "spark.so.grpc.server.unary_handler_timeout"
 
 	KnobGrpcServerConcurrencyLimitLimit     = "spark.so.grpc.server.concurrency_limit.limit"
 	KnobGrpcServerConcurrencyExcludeIps     = "spark.so.grpc.server.concurrency_limit.exclude_ips"
