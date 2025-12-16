@@ -372,7 +372,7 @@ func TestValidateReceivedRefundTransactions_Transfer_Success(t *testing.T) {
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 	job := createValidSigningJobForLeaf(t, rng, leaf, false /* isSwap */)
 
-	err := validateReceivedRefundTransactions(job, leaf, false /* isSwap */)
+	err := validateReceivedRefundTransactions(job, leaf, st.TransferTypeTransfer /* isSwap */)
 	require.NoError(t, err)
 }
 
@@ -382,7 +382,7 @@ func TestValidateReceivedRefundTransactions_Swap_Success(t *testing.T) {
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 	job := createValidSigningJobForLeaf(t, rng, leaf, true /* isSwap */)
 
-	err := validateReceivedRefundTransactions(job, leaf, true /* isSwap */)
+	err := validateReceivedRefundTransactions(job, leaf, st.TransferTypeSwap /* isSwap */)
 	require.NoError(t, err)
 }
 
@@ -404,11 +404,11 @@ func TestValidateReceivedRefundTransactions_RetrySkipsValidation(t *testing.T) {
 
 	// When bytes.Equal(job.RefundTxSigningJob.RawTx, leaf.RawRefundTx) is true,
 	// validation should be skipped and return nil
-	err := validateReceivedRefundTransactions(job, leaf, false /* isSwap */)
+	err := validateReceivedRefundTransactions(job, leaf, st.TransferTypeTransfer /* isSwap */)
 	require.NoError(t, err)
 
 	// Also works for swap
-	err = validateReceivedRefundTransactions(job, leaf, true /* isSwap */)
+	err = validateReceivedRefundTransactions(job, leaf, st.TransferTypeSwap /* isSwap */)
 	require.NoError(t, err)
 }
 
@@ -423,7 +423,7 @@ func TestValidateReceivedRefundTransactions_MissingRefundTxSigningJob(t *testing
 		RefundTxSigningJob: nil,
 	}
 
-	err := validateReceivedRefundTransactions(job, leaf, false /* isSwap */)
+	err := validateReceivedRefundTransactions(job, leaf, st.TransferTypeTransfer /* isSwap */)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing RefundTxSigningJob")
 }
@@ -453,7 +453,7 @@ func TestValidateReceivedRefundTransactions_Transfer_MissingDirectFromCpfp(t *te
 		// DirectFromCpfpRefundTxSigningJob is nil - this is required for transfers
 	}
 
-	err = validateReceivedRefundTransactions(job, leaf, false /* isSwap */)
+	err = validateReceivedRefundTransactions(job, leaf, st.TransferTypeTransfer /* isSwap */)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "direct from CPFP refund tx")
 }
@@ -483,7 +483,7 @@ func TestValidateReceivedRefundTransactions_Swap_DoesNotRequireDirectTx(t *testi
 	}
 
 	// For swaps, only CPFP refund tx is required
-	err = validateReceivedRefundTransactions(job, leaf, true /* isSwap */)
+	err = validateReceivedRefundTransactions(job, leaf, st.TransferTypeSwap /* isSwap */)
 	require.NoError(t, err)
 }
 

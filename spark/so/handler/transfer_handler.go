@@ -2144,7 +2144,7 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 	return nil
 }
 
-func validateReceivedRefundTransactions(job *pb.LeafRefundTxSigningJob, leaf *ent.TreeNode, isSwap bool) error {
+func validateReceivedRefundTransactions(job *pb.LeafRefundTxSigningJob, leaf *ent.TreeNode, transferType st.TransferType) error {
 	if job.RefundTxSigningJob == nil {
 		return fmt.Errorf("missing RefundTxSigningJob for leaf %s", job.LeafId)
 	}
@@ -2166,11 +2166,6 @@ func validateReceivedRefundTransactions(job *pb.LeafRefundTxSigningJob, leaf *en
 			return nil
 		}
 		return signingJob.RawTx
-	}
-
-	transferType := st.TransferTypeTransfer
-	if isSwap {
-		transferType = st.TransferTypeSwap
 	}
 
 	if err := validateSingleLeafRefundTxs(
@@ -2306,15 +2301,16 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	isDirectSigningJob := make(map[string]bool)
 	isDirectFromCpfpSigningJob := make(map[string]bool)
 	isSwap := transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap
-	isTransfer := transfer.Type == st.TransferTypeTransfer
+	isSupportedTransferType := transfer.Type == st.TransferTypeTransfer || transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap || transfer.Type == st.TransferTypeCooperativeExit
+
 	for _, job := range req.SigningJobs {
 		leaf, exists := leaves[job.LeafId]
 		if !exists {
 			return nil, fmt.Errorf("unexpected leaf id %s", job.LeafId)
 		}
 
-		if (isTransfer || isSwap) && enhancedTransferReceiveValidationEnabled {
-			if err := validateReceivedRefundTransactions(job, leaf, isSwap); err != nil {
+		if isSupportedTransferType && enhancedTransferReceiveValidationEnabled {
+			if err := validateReceivedRefundTransactions(job, leaf, transfer.Type); err != nil {
 				return nil, err
 			}
 		}
