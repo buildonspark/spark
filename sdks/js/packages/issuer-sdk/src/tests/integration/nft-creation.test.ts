@@ -37,6 +37,30 @@ describe.each(TEST_CONFIGS)(
       expect(Array.from(metadata.extraMetadata!)).toEqual(
         Array.from(extraMetadata),
       );
+
+      const txId = await issuerWallet.mintTokens(1n);
+      expect(typeof txId).toBe("string");
+      expect(txId.length).toBeGreaterThan(0);
+
+      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      expect(tokenIdentifier).toBeDefined();
+      expect(tokenIdentifier!.length).toBeGreaterThan(0);
+
+      const { balance: satsBalance, tokenBalances: tokenBalancesMap } =
+        await issuerWallet.getBalance();
+      expect(satsBalance).toEqual(0n);
+      expect(tokenBalancesMap.size).toEqual(1);
+      expect(tokenBalancesMap.get(tokenIdentifier)).toBeDefined();
+      expect(tokenBalancesMap.get(tokenIdentifier)?.balance).toEqual(1n);
+
+      const tokenMetadata =
+        tokenBalancesMap.get(tokenIdentifier)?.tokenMetadata;
+      expect(tokenMetadata).toBeDefined();
+      expect(tokenMetadata?.tokenName).toEqual(tokenName);
+      expect(tokenMetadata?.tokenTicker).toEqual(tokenTicker);
+      expect(tokenMetadata?.maxSupply).toEqual(1n);
+      expect(tokenMetadata?.decimals).toEqual(0);
+      expect(tokenMetadata?.extraMetadata).toEqual(extraMetadata);
     });
 
     it("should fail to create an nft with extra metadata longer than MAX_TOKEN_CONTENT_SIZE bytes", async () => {

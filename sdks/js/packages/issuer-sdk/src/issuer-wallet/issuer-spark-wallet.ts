@@ -97,7 +97,9 @@ export abstract class IssuerSparkWallet extends SparkWallet {
         decimals: metadata.decimals,
         maxSupply: bytesToNumberBE(metadata.maxSupply),
         isFreezable: metadata.isFreezable,
-        extraMetadata: metadata.extraMetadata,
+        extraMetadata: metadata.extraMetadata
+          ? new Uint8Array(metadata.extraMetadata)
+          : undefined,
       };
     }
 

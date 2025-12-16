@@ -1820,6 +1820,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           tokenTicker: metadata.tokenTicker,
           decimals: metadata.decimals,
           maxSupply: bytesToNumberBE(metadata.maxSupply),
+          extraMetadata: metadata.extraMetadata
+            ? new Uint8Array(metadata.extraMetadata)
+            : undefined,
         });
       }
 

@@ -134,6 +134,8 @@ export type UserTokenMetadata = {
   decimals: number;
   /** Maximum supply of tokens that can ever be minted */
   maxSupply: bigint;
+  /** Extra metadata of the token */
+  extraMetadata?: Uint8Array;
 };
 
 export type TokenBalanceMap = Map<
