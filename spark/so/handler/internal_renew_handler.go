@@ -47,8 +47,8 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		return fmt.Errorf("failed to query extended leaf node %s: %w", extendedLeafID, err)
 	}
 
-	if extendedLeafNode.Status != st.TreeNodeStatusRenewLocked {
-		return fmt.Errorf("extended leaf node %s must have status Renew Locked, but has status %s", extendedLeafID, extendedLeafNode.Status)
+	if extendedLeafNode.Status != st.TreeNodeStatusAvailable {
+		return fmt.Errorf("extended leaf node %s must have status Available, but has status %s", extendedLeafID, extendedLeafNode.Status)
 	}
 
 	// Process the split node (newly created node) - first node
@@ -174,63 +174,5 @@ func (h *InternalRenewLeafHandler) FinalizeRenewRefundTimelock(ctx context.Conte
 
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Info("Updated leaf for refund timelock renewal", zap.String("leaf_id", leafID.String()))
-	return nil
-}
-
-// LockLeafForRenewal locks a leaf node for renewal by setting its status to RenewLocked.
-func (h *InternalRenewLeafHandler) LockLeafForRenewal(ctx context.Context, nodeID string) error {
-	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Locking leaf for renewal: %s", nodeID)
-
-	id, err := uuid.Parse(nodeID)
-	if err != nil {
-		return fmt.Errorf("failed to parse node ID %s as UUID: %w", nodeID, err)
-	}
-
-	if err := ent.MarkNodeAsLocked(ctx, id, st.TreeNodeStatusRenewLocked); err != nil {
-		return fmt.Errorf("failed to lock tree node %s for renewal: %w", nodeID, err)
-	}
-
-	logger.Sugar().Infof("Successfully locked leaf %s for renewal", nodeID)
-	return nil
-}
-
-// UnlockLeafFromRenewal unlocks a leaf node from renewal by setting its status to Available.
-func (h *InternalRenewLeafHandler) UnlockLeafFromRenewal(ctx context.Context, nodeID string) error {
-	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Unlocking leaf from renewal: %s", nodeID)
-
-	id, err := uuid.Parse(nodeID)
-	if err != nil {
-		return fmt.Errorf("failed to parse node ID %s as UUID: %w", nodeID, err)
-	}
-
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get database from context: %w", err)
-	}
-
-	node, err := db.TreeNode.Query().Where(treenode.ID(id)).ForUpdate().Only(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to query tree node %s: %w", nodeID, err)
-	}
-
-	if node.Status == st.TreeNodeStatusAvailable {
-		logger.Sugar().Infof("Leaf %s is already available, no-op", nodeID)
-		return nil
-	}
-
-	if node.Status != st.TreeNodeStatusRenewLocked {
-		return fmt.Errorf("cannot unlock leaf %s: expected status RenewLocked or Available, but got %s", nodeID, node.Status)
-	}
-
-	_, err = node.Update().
-		SetStatus(st.TreeNodeStatusAvailable).
-		Save(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to update tree node %s status to Available: %w", nodeID, err)
-	}
-
-	logger.Sugar().Infof("Successfully unlocked leaf %s from renewal", nodeID)
 	return nil
 }
