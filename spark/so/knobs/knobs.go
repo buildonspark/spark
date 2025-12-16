@@ -88,8 +88,9 @@ const (
 	KnobEnableStrictFinalizeSignature        = "spark.so.enable_strict_finalize_signature"
 	KnobEnableStrictDirectRefundTxValidation = "spark.so.enable_strict_direct_refund_tx_validation"
 
-	KnobEnableDepositFlowValidation   = "spark.so.enable_deposit_flow_validation"
-	KnobSoEnhancedBitcoinTxValidation = "spark.so.enhanced_bitcoin_tx_validation"
+	KnobEnableDepositFlowValidation       = "spark.so.enable_deposit_flow_validation"
+	KnobSoEnhancedBitcoinTxValidation     = "spark.so.enhanced_bitcoin_tx_validation"
+	KnobEnhancedTransferReceiveValidation = "spark.so.enhanced_transfer_receive_validation"
 )
 
 type Config struct {

@@ -1373,11 +1373,6 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 	}
 }
 
-// validateSingleLeafRefundTxs validates all refund transactions for a single leaf.
-// It enforces that:
-// - CPFP refund tx is always present and valid
-// - DirectFromCpfp refund tx is always present and valid on transfers
-// - Direct refund tx is present and valid only if needsDirectRefundTx returns true
 func validateSingleLeafRefundTxs(
 	node *ent.TreeNode,
 	cpfpRefundTx []byte,

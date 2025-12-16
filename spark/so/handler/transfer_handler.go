@@ -2144,6 +2144,49 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 	return nil
 }
 
+func validateReceivedRefundTransactions(job *pb.LeafRefundTxSigningJob, leaf *ent.TreeNode, isSwap bool) error {
+	if job.RefundTxSigningJob == nil {
+		return fmt.Errorf("missing RefundTxSigningJob for leaf %s", job.LeafId)
+	}
+
+	// If the incoming CPFP refund tx matches what's already in the DB,
+	// this is a retry of a previous signing request - skip validation
+	if bytes.Equal(job.RefundTxSigningJob.RawTx, leaf.RawRefundTx) {
+		return nil
+	}
+
+	refundDestPubKey, err := keys.ParsePublicKey(job.RefundTxSigningJob.SigningPublicKey)
+	if err != nil {
+		return fmt.Errorf("invalid refund signing public key for leaf %s: %w", job.LeafId, err)
+	}
+
+	// Helper function to safely extract RawTx from signing job
+	getRawTx := func(signingJob *pb.SigningJob) []byte {
+		if signingJob == nil {
+			return nil
+		}
+		return signingJob.RawTx
+	}
+
+	transferType := st.TransferTypeTransfer
+	if isSwap {
+		transferType = st.TransferTypeSwap
+	}
+
+	if err := validateSingleLeafRefundTxs(
+		leaf,
+		getRawTx(job.RefundTxSigningJob),
+		getRawTx(job.DirectFromCpfpRefundTxSigningJob),
+		getRawTx(job.DirectRefundTxSigningJob),
+		refundDestPubKey,
+		transferType,
+	); err != nil {
+		return fmt.Errorf("refund transaction validation failed for leaf %s: %w", job.LeafId, err)
+	}
+
+	return nil
+}
+
 // ClaimTransferSignRefundsV2 signs new refund transactions as part of the transfer.
 func (h *TransferHandler) ClaimTransferSignRefundsV2(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
 	return h.claimTransferSignRefunds(ctx, req, true)
@@ -2256,15 +2299,24 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	// Collect all TreeNode updates to batch them and avoid N+1 queries
 	builders := make([]*ent.TreeNodeCreate, 0, len(req.SigningJobs))
 
+	enhancedTransferReceiveValidationEnabled := knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnhancedTransferReceiveValidation, 0) > 0
+
 	var signingJobs []*helper.SigningJob
 	jobToLeafMap := make(map[string]uuid.UUID)
 	isDirectSigningJob := make(map[string]bool)
 	isDirectFromCpfpSigningJob := make(map[string]bool)
 	isSwap := transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap
+	isTransfer := transfer.Type == st.TransferTypeTransfer
 	for _, job := range req.SigningJobs {
 		leaf, exists := leaves[job.LeafId]
 		if !exists {
 			return nil, fmt.Errorf("unexpected leaf id %s", job.LeafId)
+		}
+
+		if (isTransfer || isSwap) && enhancedTransferReceiveValidationEnabled {
+			if err := validateReceivedRefundTransactions(job, leaf, isSwap); err != nil {
+				return nil, err
+			}
 		}
 
 		directRefundTxSigningJob := (*pb.SigningJob)(nil)

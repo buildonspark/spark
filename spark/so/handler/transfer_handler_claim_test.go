@@ -1,15 +1,17 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math/rand/v2"
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,17 +78,33 @@ var (
 )
 
 func createValidBitcoinTxBytes(t *testing.T, receiverPubKey keys.Public) []byte {
+	return createValidBitcoinTxBytesWithSequence(t, receiverPubKey, 9000)
+}
+
+func createValidBitcoinTxBytesWithSequence(t *testing.T, receiverPubKey keys.Public, sequence uint32) []byte {
 	p2trScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
 	require.NoError(t, err)
 
-	// sequence = 9000 = 0x2328 (little-endian: 28 23 00 00)
-	scriptLen := fmt.Sprintf("%02x", len(p2trScript))
-	hexStr := "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff002823000001e803000000000000" +
-		scriptLen +
-		hex.EncodeToString(p2trScript) +
-		"000000000000000000000000000000000000000000"
-	bytes, _ := hex.DecodeString(hexStr)
-	return bytes
+	tx := wire.NewMsgTx(3)
+
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  chainhash.Hash{},
+			Index: 0xffffffff,
+		},
+		Sequence: sequence,
+	})
+
+	tx.AddTxOut(&wire.TxOut{
+		Value:    1000,
+		PkScript: p2trScript,
+	})
+
+	var buf bytes.Buffer
+	err = tx.Serialize(&buf)
+	require.NoError(t, err)
+
+	return buf.Bytes()
 }
 
 func createTestSigningKeyshare(t *testing.T, ctx context.Context, rng io.Reader, client *ent.Client) *ent.SigningKeyshare {
@@ -189,27 +207,284 @@ func createTestSigningCommitment(rng io.Reader) *pbcommon.SigningCommitment {
 	}
 }
 
+// createRefundTxBytes creates a refund transaction that spends from the given sourceTxBytes
+func createRefundTxBytes(t *testing.T, sourceTxBytes []byte, receiverPubKey keys.Public, sequence uint32, isWatchtowerTx bool) []byte {
+	p2trScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
+	require.NoError(t, err)
+
+	// Parse source transaction to get the txid and output value
+	sourceTx, err := common.TxFromRawTxBytes(sourceTxBytes)
+	require.NoError(t, err)
+	require.NotEmpty(t, sourceTx.TxOut, "source transaction must have outputs")
+
+	sourceValue := sourceTx.TxOut[0].Value
+
+	// Calculate refund amount based on whether this is a watchtower tx
+	var refundAmount int64
+	if isWatchtowerTx {
+		refundAmount = common.MaybeApplyFee(sourceValue)
+	} else {
+		refundAmount = sourceValue
+	}
+
+	tx := wire.NewMsgTx(3) // Version 3
+
+	// Add input spending from the previous transaction
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  sourceTx.TxHash(),
+			Index: 0,
+		},
+		Sequence: sequence,
+	})
+
+	// Add output with the receiver's P2TR script
+	tx.AddTxOut(&wire.TxOut{
+		Value:    refundAmount,
+		PkScript: p2trScript,
+	})
+
+	// CPFP transactions have an ephemeral anchor output
+	if !isWatchtowerTx {
+		tx.AddTxOut(common.EphemeralAnchorOutput())
+	}
+
+	var buf bytes.Buffer
+	err = tx.Serialize(&buf)
+	require.NoError(t, err)
+
+	return buf.Bytes()
+}
+
 func createTestLeafRefundTxSigningJob(t *testing.T, rng io.Reader, leaf *ent.TreeNode) *pb.LeafRefundTxSigningJob {
-	validTxBytes := createValidBitcoinTxBytes(t, leaf.OwnerIdentityPubkey)
+	rawRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
+	require.NoError(t, err)
+	require.NotEmpty(t, rawRefundTx.TxIn)
+
+	currentTimelock := rawRefundTx.TxIn[0].Sequence & 0xFFFF
+
+	expectedCpfpTimelock := currentTimelock - 100
+	expectedDirectTimelock := expectedCpfpTimelock + 50
+
+	pubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Create transactions that spend from the correct UTXOs
+	cpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, pubKey, expectedCpfpTimelock, false)
+	directTxBytes := createRefundTxBytes(t, leaf.DirectTx, pubKey, expectedDirectTimelock, true)
+	directFromCpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, pubKey, expectedDirectTimelock, true)
 
 	return &pb.LeafRefundTxSigningJob{
 		LeafId: leaf.ID.String(),
 		RefundTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
-			RawTx:                  validTxBytes,
+			SigningPublicKey:       pubKey.Serialize(),
+			RawTx:                  cpfpTxBytes,
 			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 		DirectRefundTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
-			RawTx:                  validTxBytes,
+			SigningPublicKey:       pubKey.Serialize(),
+			RawTx:                  directTxBytes,
 			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 		DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
-			RawTx:                  validTxBytes,
+			SigningPublicKey:       pubKey.Serialize(),
+			RawTx:                  directFromCpfpTxBytes,
 			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 	}
+}
+
+// createTestTreeNodeForValidation creates a TreeNode with valid transactions for validateReceivedRefundTransactions tests
+func createTestTreeNodeForValidation(t *testing.T, rng io.Reader, ownerPubKey keys.Public) *ent.TreeNode {
+	leafAmount := int64(1000)
+	leafVout := int16(0)
+
+	// Create parent tx (RawTx)
+	parentTxBytes, parentTxHash := createVersion3ParentTx(t, ownerPubKey, leafAmount, uint32(leafVout))
+
+	// Create direct tx (same as parent tx for simplicity)
+	directTxBytes, _ := createVersion3ParentTx(t, ownerPubKey, leafAmount, uint32(leafVout))
+
+	// Create existing CPFP refund tx with timelock
+	cpfpTimelock := uint32((1 << 30) | 1900)
+	cpfpRefundTx := createVersion3CPFPRefundTx(t, parentTxHash, uint32(leafVout), ownerPubKey, leafAmount, cpfpTimelock)
+
+	// Create a mock TreeNode (not persisted to DB, just for unit testing the validation function)
+	return &ent.TreeNode{
+		RawTx:       parentTxBytes,
+		DirectTx:    directTxBytes,
+		RawRefundTx: cpfpRefundTx,
+		Vout:        leafVout,
+	}
+}
+
+// createValidSigningJobForLeaf creates a LeafRefundTxSigningJob with valid transactions that should pass validation
+func createValidSigningJobForLeaf(t *testing.T, rng io.Reader, leaf *ent.TreeNode, isSwap bool) *pb.LeafRefundTxSigningJob {
+	// Parse existing refund tx to get the current timelock
+	rawRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
+	require.NoError(t, err)
+	require.NotEmpty(t, rawRefundTx.TxIn)
+
+	currentTimelock := rawRefundTx.TxIn[0].Sequence & 0xFFFF
+
+	// New timelock should be TimeLockInterval shorter
+	expectedCpfpTimelock := currentTimelock - 100       // spark.TimeLockInterval is 100
+	expectedDirectTimelock := expectedCpfpTimelock + 50 // spark.DirectTimelockOffset is 50
+
+	// Generate a new refund destination pubkey
+	refundDestPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Create new refund transactions
+	cpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, refundDestPubKey, expectedCpfpTimelock, false)
+
+	job := &pb.LeafRefundTxSigningJob{
+		LeafId: "test-leaf-id",
+		RefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       refundDestPubKey.Serialize(),
+			RawTx:                  cpfpTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+	}
+
+	// For transfers (not swaps), we also need direct refund txs
+	if !isSwap {
+		directFromCpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, refundDestPubKey, expectedDirectTimelock, true)
+		job.DirectFromCpfpRefundTxSigningJob = &pb.SigningJob{
+			SigningPublicKey:       refundDestPubKey.Serialize(),
+			RawTx:                  directFromCpfpTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		}
+
+		// DirectRefundTx is optional but let's include it
+		directTxBytes := createRefundTxBytes(t, leaf.DirectTx, refundDestPubKey, expectedDirectTimelock, true)
+		job.DirectRefundTxSigningJob = &pb.SigningJob{
+			SigningPublicKey:       refundDestPubKey.Serialize(),
+			RawTx:                  directTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		}
+	}
+
+	return job
+}
+
+func TestValidateReceivedRefundTransactions_Transfer_Success(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{1})
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+	job := createValidSigningJobForLeaf(t, rng, leaf, false /* isSwap */)
+
+	err := validateReceivedRefundTransactions(job, leaf, false /* isSwap */)
+	require.NoError(t, err)
+}
+
+func TestValidateReceivedRefundTransactions_Swap_Success(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{2})
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+	job := createValidSigningJobForLeaf(t, rng, leaf, true /* isSwap */)
+
+	err := validateReceivedRefundTransactions(job, leaf, true /* isSwap */)
+	require.NoError(t, err)
+}
+
+func TestValidateReceivedRefundTransactions_RetrySkipsValidation(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{3})
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+
+	// Create a job where RawTx matches the existing RawRefundTx in the leaf
+	// This simulates a retry scenario
+	job := &pb.LeafRefundTxSigningJob{
+		LeafId: "test-leaf-id",
+		RefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       ownerPubKey.Serialize(),
+			RawTx:                  leaf.RawRefundTx, // Same as leaf.RawRefundTx
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+	}
+
+	// When bytes.Equal(job.RefundTxSigningJob.RawTx, leaf.RawRefundTx) is true,
+	// validation should be skipped and return nil
+	err := validateReceivedRefundTransactions(job, leaf, false /* isSwap */)
+	require.NoError(t, err)
+
+	// Also works for swap
+	err = validateReceivedRefundTransactions(job, leaf, true /* isSwap */)
+	require.NoError(t, err)
+}
+
+func TestValidateReceivedRefundTransactions_MissingRefundTxSigningJob(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{4})
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+
+	// Job without RefundTxSigningJob
+	job := &pb.LeafRefundTxSigningJob{
+		LeafId:             "test-leaf-id",
+		RefundTxSigningJob: nil,
+	}
+
+	err := validateReceivedRefundTransactions(job, leaf, false /* isSwap */)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing RefundTxSigningJob")
+}
+
+func TestValidateReceivedRefundTransactions_Transfer_MissingDirectFromCpfp(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{5})
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+
+	// Parse existing refund tx to get the current timelock
+	rawRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
+	require.NoError(t, err)
+	currentTimelock := rawRefundTx.TxIn[0].Sequence & 0xFFFF
+	expectedCpfpTimelock := currentTimelock - 100
+
+	refundDestPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	cpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, refundDestPubKey, expectedCpfpTimelock, false)
+
+	// Job with only CPFP refund tx but no DirectFromCpfp (required for transfers)
+	job := &pb.LeafRefundTxSigningJob{
+		LeafId: "test-leaf-id",
+		RefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       refundDestPubKey.Serialize(),
+			RawTx:                  cpfpTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+		// DirectFromCpfpRefundTxSigningJob is nil - this is required for transfers
+	}
+
+	err = validateReceivedRefundTransactions(job, leaf, false /* isSwap */)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "direct from CPFP refund tx")
+}
+
+func TestValidateReceivedRefundTransactions_Swap_DoesNotRequireDirectTx(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{6})
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+
+	// Parse existing refund tx to get the current timelock
+	rawRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
+	require.NoError(t, err)
+	currentTimelock := rawRefundTx.TxIn[0].Sequence & 0xFFFF
+	expectedCpfpTimelock := currentTimelock - 100
+
+	refundDestPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	cpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, refundDestPubKey, expectedCpfpTimelock, false)
+
+	// Job with only CPFP refund tx - this is sufficient for swaps
+	job := &pb.LeafRefundTxSigningJob{
+		LeafId: "test-leaf-id",
+		RefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       refundDestPubKey.Serialize(),
+			RawTx:                  cpfpTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+	}
+
+	// For swaps, only CPFP refund tx is required
+	err = validateReceivedRefundTransactions(job, leaf, true /* isSwap */)
+	require.NoError(t, err)
 }
 
 func TestClaimTransferSignRefunds_Success(t *testing.T) {
