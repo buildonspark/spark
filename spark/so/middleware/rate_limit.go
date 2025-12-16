@@ -164,6 +164,11 @@ type bucketConfig struct {
 	window time.Duration
 }
 
+type dimensionName string
+
+const dimensionNameIp dimensionName = "ip"
+const dimensionNamePubkey dimensionName = "pubkey"
+
 // rateLimitEnforcementParams encapsulates inputs for a single enforcement observation
 type rateLimitEnforcementParams struct {
 	// Scope indicates the scope being enforced: "method", "service", or "global".
@@ -176,7 +181,7 @@ type rateLimitEnforcementParams struct {
 
 	// Dimension selects which identity dimension to enforce: "ip" or "pubkey".
 	// This is used for metrics and to compose the bucket identity.
-	Dimension string
+	Dimension dimensionName
 
 	// Bucket is the identity value for the chosen dimension (no prefix),
 	// e.g., "203.0.113.1" for ip or "<hex>" for pubkey. If empty, enforcement is skipped.
@@ -392,7 +397,7 @@ func (r *RateLimiter) observeUtilization(ctx context.Context, p rateLimitEnforce
 	}
 
 	limitKey := rateLimitKey(p.Scope, p.FullMethod, p.ServicePath)
-	attrs := metricAttributes(p.Scope, p.TierSuffix, p.Dimension, limitKey)
+	attrs := metricAttributes(p.Scope, p.TierSuffix, string(p.Dimension), limitKey)
 	attrs = append(attrs, grpcutil.ParseFullMethod(p.FullMethod)...)
 	utilizationPercentage := math.Max(0, math.Min(float64(capacity-remaining)/float64(capacity), 1))
 	r.recordUtilizationMetric(ctx, utilizationPercentage, attrs)
@@ -481,6 +486,141 @@ func (r *RateLimiter) resolveScopeLimits(baseKey string, suffix string) (ipLimit
 	return resolvedIp, resolvedPub
 }
 
+// Represents a rate limiting dimension (pubkey or ip) with its bucket value.
+type rateLimitDimensionConstraint struct {
+	name   dimensionName
+	bucket string
+}
+
+// Applies rate limiting across all tiers and dimensions for the given method.
+func (r *RateLimiter) enforceRateLimits(ctx context.Context, fullMethod string, dimensions []rateLimitDimensionConstraint) error {
+	// Nothing to enforce
+	if len(dimensions) == 0 {
+		return nil
+	}
+
+	service, methodName := grpcutil.ParseFullMethodStrings(fullMethod)
+	servicePath := "/" + service + "/" // includes trailing '/'
+
+	for _, t := range r.tiers {
+		suffix := t.suffix
+		if suffix == "" {
+			continue
+		}
+
+		// Resolve per-scope limits once per tier
+		methodIpLimit, methodPubkeyLimit := r.resolveMethodLimits(servicePath, methodName, fullMethod, suffix)
+		serviceIpLimit, servicePubkeyLimit := r.resolveScopeLimits(servicePath, suffix)
+		globalIpLimit, globalPubkeyLimit := r.resolveScopeLimits("global", suffix)
+
+		// Base parameters for this tier
+		baseTierParams := rateLimitEnforcementParams{
+			TierSuffix:  suffix,
+			FullMethod:  fullMethod,
+			ServicePath: servicePath,
+		}
+
+		for _, d := range dimensions {
+			p := baseTierParams
+			p.Dimension = d.name
+			p.Bucket = d.bucket
+
+			var methodLimit, serviceLimit, globalLimit int
+			switch d.name {
+			case dimensionNameIp:
+				methodLimit, serviceLimit, globalLimit = methodIpLimit, serviceIpLimit, globalIpLimit
+			case dimensionNamePubkey:
+				methodLimit, serviceLimit, globalLimit = methodPubkeyLimit, servicePubkeyLimit, globalPubkeyLimit
+			}
+
+			if err := r.enforceAcrossScopes(ctx, p, methodLimit, serviceLimit, globalLimit); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Enforces rate limits for method, service, and global scopes.
+func (r *RateLimiter) enforceAcrossScopes(ctx context.Context, base rateLimitEnforcementParams, methodLimit, serviceLimit, globalLimit int) error {
+	base.Scope = "method"
+	base.Limit = methodLimit
+	if err := r.enforceAndObserve(ctx, base); err != nil {
+		return err
+	}
+	base.Scope = "service"
+	base.Limit = serviceLimit
+	if err := r.enforceAndObserve(ctx, base); err != nil {
+		return err
+	}
+	base.Scope = "global"
+	base.Limit = globalLimit
+	if err := r.enforceAndObserve(ctx, base); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Build potential dimensions based on availability (dimension selection is driven by knob selectors)
+func (r *RateLimiter) buildDimensions(ctx context.Context) []rateLimitDimensionConstraint {
+	var pubkeyBucket, ipBucket string
+	havePubkey, haveIP := false, false
+	var identityHex string
+	var clientIP string
+
+	if session, err := authn.GetSessionFromContext(ctx); err == nil && session != nil {
+		identityHex = session.IdentityPublicKey().ToHex()
+	}
+
+	if v, err := GetClientIpFromHeader(ctx, r.config.XffClientIpPosition); err == nil && v != "" {
+		clientIP = v
+	}
+
+	// Check for full exclusions first - these bypass all rate limiting entirely.
+	if identityHex != "" {
+		if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludePubkeys, &identityHex, 0) > 0 {
+			return nil
+		}
+	}
+	if clientIP != "" {
+		if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludeIps, &clientIP, 0) > 0 {
+			return nil
+		}
+	}
+
+	// Check for dimension-only exclusions - these only exclude the specific dimension.
+	if identityHex != "" {
+		// Only add pubkey dimension if not excluded via dimension-only exclusion
+		if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludePubkeysOnly, &identityHex, 0) == 0 {
+			pubkeyBucket = identityHex
+			havePubkey = true
+		}
+	}
+	if clientIP != "" {
+		// Only add IP dimension if not excluded via dimension-only exclusion
+		if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludeIpsOnly, &clientIP, 0) == 0 {
+			ipBucket = clientIP
+			haveIP = true
+		}
+	}
+
+	if !havePubkey && !haveIP {
+		// No usable dimension; bypass rate limiting.
+		return nil
+	}
+
+	// Build list of available dimensions
+	dimensions := make([]rateLimitDimensionConstraint, 0, 2)
+	if havePubkey {
+		dimensions = append(dimensions, rateLimitDimensionConstraint{name: dimensionNamePubkey, bucket: pubkeyBucket})
+	}
+	if haveIP {
+		dimensions = append(dimensions, rateLimitDimensionConstraint{name: dimensionNameIp, bucket: ipBucket})
+	}
+
+	return dimensions
+}
+
 func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		// Check if the method is enabled.
@@ -489,127 +629,9 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 			return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("the method is currently unavailable, please try again later"))
 		}
 
-		// Build potential dimensions based on availability (dimension selection is driven by knob selectors)
-		var pubkeyBucket, ipBucket string
-		havePubkey, haveIP := false, false
-		var identityHex string
-		var clientIP string
-
-		if session, err := authn.GetSessionFromContext(ctx); err == nil && session != nil {
-			identityHex = session.IdentityPublicKey().ToHex()
-		}
-
-		if v, err := GetClientIpFromHeader(ctx, r.config.XffClientIpPosition); err == nil && v != "" {
-			clientIP = v
-		}
-
-		// Check for full exclusions first - these bypass all rate limiting entirely.
-		if identityHex != "" {
-			if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludePubkeys, &identityHex, 0) > 0 {
-				return handler(ctx, req)
-			}
-		}
-		if clientIP != "" {
-			if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludeIps, &clientIP, 0) > 0 {
-				return handler(ctx, req)
-			}
-		}
-
-		// Check for dimension-only exclusions - these only exclude the specific dimension.
-		if identityHex != "" {
-			// Only add pubkey dimension if not excluded via dimension-only exclusion
-			if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludePubkeysOnly, &identityHex, 0) == 0 {
-				pubkeyBucket = identityHex
-				havePubkey = true
-			}
-		}
-		if clientIP != "" {
-			// Only add IP dimension if not excluded via dimension-only exclusion
-			if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludeIpsOnly, &clientIP, 0) == 0 {
-				ipBucket = clientIP
-				haveIP = true
-			}
-		}
-
-		if !havePubkey && !haveIP {
-			// No usable dimension; bypass rate limiting.
-			return handler(ctx, req)
-		}
-
-		service, method := grpcutil.ParseFullMethodStrings(info.FullMethod)
-		servicePath := "/" + service + "/" // includes trailing '/'
-		methodName := method
-
-		// Build list of available dimensions
-		dimensions := make([]struct {
-			name   string
-			bucket string
-		}, 0, 2)
-		if havePubkey {
-			dimensions = append(dimensions, struct {
-				name   string
-				bucket string
-			}{name: "pubkey", bucket: pubkeyBucket})
-		}
-		if haveIP {
-			dimensions = append(dimensions, struct {
-				name   string
-				bucket string
-			}{name: "ip", bucket: ipBucket})
-		}
-
-		for _, t := range r.tiers {
-			suffix := t.suffix
-			if suffix == "" {
-				continue
-			}
-
-			// Resolve per-scope limits once per tier
-			methodIpLimit, methodPubkeyLimit := r.resolveMethodLimits(servicePath, methodName, info.FullMethod, suffix)
-			serviceIpLimit, servicePubkeyLimit := r.resolveScopeLimits(servicePath, suffix)
-			globalIpLimit, globalPubkeyLimit := r.resolveScopeLimits("global", suffix)
-
-			// Helper to DRY enforcement and utilization recording across method/service/global
-			enforceAcrossScopes := func(base rateLimitEnforcementParams, methodLimit int, serviceLimit int, globalLimit int) error {
-				base.Scope = "method"
-				base.Limit = methodLimit
-				if err := r.enforceAndObserve(ctx, base); err != nil {
-					return err
-				}
-				base.Scope = "service"
-				base.Limit = serviceLimit
-				if err := r.enforceAndObserve(ctx, base); err != nil {
-					return err
-				}
-				base.Scope = "global"
-				base.Limit = globalLimit
-				if err := r.enforceAndObserve(ctx, base); err != nil {
-					return err
-				}
-				return nil
-			}
-
-			// Base parameters for this tier and method/service
-			baseTierParams := rateLimitEnforcementParams{
-				TierSuffix:  suffix,
-				FullMethod:  info.FullMethod,
-				ServicePath: servicePath,
-			}
-
-			for _, d := range dimensions {
-				p := baseTierParams
-				p.Dimension = d.name
-				p.Bucket = d.bucket
-				var methodLimit, serviceLimit, globalLimit int
-				if d.name == "ip" {
-					methodLimit, serviceLimit, globalLimit = methodIpLimit, serviceIpLimit, globalIpLimit
-				} else { // pubkey
-					methodLimit, serviceLimit, globalLimit = methodPubkeyLimit, servicePubkeyLimit, globalPubkeyLimit
-				}
-				if err := enforceAcrossScopes(p, methodLimit, serviceLimit, globalLimit); err != nil {
-					return nil, err
-				}
-			}
+		dimensions := r.buildDimensions(ctx)
+		if err := r.enforceRateLimits(ctx, info.FullMethod, dimensions); err != nil {
+			return nil, err
 		}
 
 		return handler(ctx, req)
@@ -642,7 +664,7 @@ func (r *RateLimiter) enforceAndObserve(ctx context.Context, p rateLimitEnforcem
 		st, _ := status.FromError(err)
 		if st != nil && st.Code() == codes.ResourceExhausted {
 			limitKey := rateLimitKey(p.Scope, p.FullMethod, p.ServicePath)
-			attrs := metricAttributes(p.Scope, p.TierSuffix, p.Dimension, limitKey)
+			attrs := metricAttributes(p.Scope, p.TierSuffix, string(p.Dimension), limitKey)
 			attrs = append(attrs, grpcutil.ParseFullMethod(p.FullMethod)...)
 			r.incrementBreachMetric(ctx, attrs)
 			// Log breach with bucket identity
