@@ -9,7 +9,6 @@ import (
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
-	"github.com/lightsparkdev/spark/common/logging"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -21,7 +20,6 @@ import (
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
-	"go.uber.org/zap"
 )
 
 // RenewNodeTransactions encapsulates the return values from constructRenewNodeTransactions
@@ -120,11 +118,14 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 		return nil, fmt.Errorf("failed to get leaf node: %w", err)
 	}
 
+	if leaf.Status != st.TreeNodeStatusAvailable {
+		return nil, errors.FailedPreconditionInvalidState(fmt.Errorf("leaf node is not available for renewal, current status: %s", leaf.Status))
+	}
+
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, leaf.OwnerIdentityPubkey); err != nil {
 		return nil, err
 	}
 
-	// Call lock leaf for renewal internal endpoint on all operators except self
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
@@ -133,54 +134,23 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 		}
 		defer conn.Close()
 		client := pbinternal.NewSparkInternalServiceClient(conn)
-		return client.LockLeafForRenewal(ctx, &pbinternal.LockLeafForRenewalRequest{NodeId: leaf.ID.String()})
+		return client.NodeAvailableForRenew(ctx, &pbinternal.NodeAvailableForRenewRequest{NodeId: leaf.ID.String()})
 	})
 	if err != nil {
-		unlockErr := h.sendUnlockLeafFromRenewalGossipMessage(ctx, leaf)
-		if unlockErr != nil {
-			logger := logging.GetLoggerFromContext(ctx)
-			logger.Error("failed to send unlock leaf from renewal gossip message", zap.Error(unlockErr), zap.String("nodeId", leaf.ID.String()))
-		}
-		return nil, fmt.Errorf("failed to lock leaf for renewal on other operators: %w", err)
-	}
-
-	// Lock leaf for renewal
-	if err := ent.MarkNodeAsLocked(ctx, leafUUID, st.TreeNodeStatusRenewLocked); err != nil {
-		return nil, fmt.Errorf("failed to lock tree node %s for renewal: %w", leafUUID, err)
+		return nil, fmt.Errorf("failed to check if node is available for renew: %w", err)
 	}
 
 	// Determine operation type and delegate to appropriate handler
-	var resp *pb.RenewLeafResponse
 	switch req.SigningJobs.(type) {
 	case *pb.RenewLeafRequest_RenewNodeTimelockSigningJob:
-		resp, err = h.renewNodeTimelock(ctx, req.GetRenewNodeTimelockSigningJob(), leaf)
+		return h.renewNodeTimelock(ctx, req.GetRenewNodeTimelockSigningJob(), leaf)
 	case *pb.RenewLeafRequest_RenewRefundTimelockSigningJob:
-		resp, err = h.renewRefundTimelock(ctx, req.GetRenewRefundTimelockSigningJob(), leaf)
+		return h.renewRefundTimelock(ctx, req.GetRenewRefundTimelockSigningJob(), leaf)
 	case *pb.RenewLeafRequest_RenewNodeZeroTimelockSigningJob:
-		resp, err = h.renewNodeZeroTimelock(ctx, req.GetRenewNodeZeroTimelockSigningJob(), leaf)
+		return h.renewNodeZeroTimelock(ctx, req.GetRenewNodeZeroTimelockSigningJob(), leaf)
 	default:
-		err = errors.InvalidArgumentMissingField(fmt.Errorf("request must specify either RenewNodeTimelockSigningJob or RenewRefundTimelockSigningJob"))
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request must specify either RenewNodeTimelockSigningJob or RenewRefundTimelockSigningJob"))
 	}
-
-	_, updateErr := db.TreeNode.
-		Update().
-		Where(enttreenode.ID(leafUUID)).
-		SetStatus(st.TreeNodeStatusAvailable).
-		Save(ctx)
-	if updateErr != nil {
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Error("failed to unlock tree node from renewal", zap.Error(updateErr), zap.String("nodeId", req.LeafId))
-	}
-	// Unlock leaf in error case
-	if err != nil {
-		unlockErr := h.sendUnlockLeafFromRenewalGossipMessage(ctx, leaf)
-		if unlockErr != nil {
-			logger := logging.GetLoggerFromContext(ctx)
-			logger.Error("failed to send unlock leaf from renewal gossip message", zap.Error(unlockErr), zap.String("nodeId", req.LeafId))
-		}
-	}
-
-	return resp, err
 }
 
 // Resets the node and refund transaction timelocks
@@ -1604,30 +1574,6 @@ func (h *RenewLeafHandler) sendFinalizeRefundTimelockGossipMessage(ctx context.C
 		Message: &pbgossip.GossipMessage_FinalizeRefundTimelock{
 			FinalizeRefundTimelock: &pbgossip.GossipMessageFinalizeRenewRefundTimelock{
 				Node: nodeInternal,
-			},
-		},
-	}, participants)
-	if err != nil {
-		return fmt.Errorf("unable to create and send gossip message: %w", err)
-	}
-	return nil
-}
-
-func (h *RenewLeafHandler) sendUnlockLeafFromRenewalGossipMessage(ctx context.Context, leaf *ent.TreeNode) error {
-	selection := helper.OperatorSelection{
-		Option: helper.OperatorSelectionOptionExcludeSelf,
-	}
-	participants, err := selection.OperatorIdentifierList(h.config)
-	if err != nil {
-		return fmt.Errorf("unable to get operator list: %w", err)
-	}
-
-	// Create and send gossip message
-	sendGossipHandler := NewSendGossipHandler(h.config)
-	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
-		Message: &pbgossip.GossipMessage_UnlockLeafFromRenewal{
-			UnlockLeafFromRenewal: &pbgossip.GossipMessageUnlockLeafFromRenewal{
-				NodeId: leaf.ID.String(),
 			},
 		},
 	}, participants)
