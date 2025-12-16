@@ -533,6 +533,7 @@ function parseQueryTokenTransactionsArgsWithYargs(
     throw error;
   }
 }
+
 function parseCreateSparkInvoiceArgsWithYargs(
   args: string[],
 ): CreateSparkInvoiceArgs | null {
@@ -707,7 +708,7 @@ async function runCLI() {
   burntokens <amount>                                                 - Burn tokens
   freezetokens <sparkAddress>                                         - Freeze tokens for a specific address
   unfreezetokens <sparkAddress>                                       - Unfreeze tokens for a specific address
-  createtoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> <extraMetadata> - Create a new token.
+  createtoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> <extraMetadata> - Create a new token. Use "_", or leave blank, to denote empty extra metadata.
   decodetokenidentifier <tokenIdentifier>                             - Returns the raw token identifier as a hex string
 
   enablelogging <true|false>                                          - Enable or disable logging
@@ -1930,6 +1931,9 @@ async function runCLI() {
             decimals: metadata.decimals,
             maxSupply: metadata.maxSupply.toString(),
             isFreezable: metadata.isFreezable,
+            extraMetadata: metadata.extraMetadata
+              ? hex.encode(metadata.extraMetadata)
+              : undefined,
           });
           break;
         }
@@ -1999,15 +2003,21 @@ async function runCLI() {
             isFreezable,
             extraMetadata,
           ] = args;
+          let extraMetadataBytes: Uint8Array | undefined;
+
+          if (extraMetadata == "_" || extraMetadata == "undefined") {
+            extraMetadataBytes = undefined;
+          } else {
+            extraMetadataBytes = hexToBytes(extraMetadata);
+          }
+
           const result = await wallet.createToken({
             tokenName,
             tokenTicker,
             decimals: parseInt(decimals),
             maxSupply: BigInt(maxSupply),
             isFreezable: isFreezable.toLowerCase() === "true",
-            extraMetadata: extraMetadata
-              ? hexToBytes(extraMetadata)
-              : undefined,
+            extraMetadata: extraMetadataBytes,
           });
           console.log("Create Token Transaction ID:", result);
           break;
