@@ -1,0 +1,35 @@
+{
+  "codebase_locations": {
+    "so": {
+      "description": "Signing Operator (SO) implementation in Go",
+      "key_directories": {
+        "handlers": "so/handler",
+        "entities": "so/ent",
+        "schemas": "so/ent/schema",
+        "chain_watcher": "so/chain",
+        "signer": "../signer"
+      }
+    },
+    "sdks": {
+      "description": "Client SDKs for TypeScript, Go, and Rust",
+      "key_directories": {
+        "typescript": "js/packages/spark-sdk",
+        "typescript_services": "js/packages/spark-sdk/src/services",
+        "typescript_graphql": "js/packages/spark-sdk/src/graphql"
+      }
+    },
+    "ssp": {
+      "description": "Spark Service Provider (SSP) implementation in Python",
+      "path": "/Users/dhruv/Documents/webdev",
+      "key_directories": {
+        "handlers": "sparkcore/spark/handlers",
+        "clients": "sparkcore/spark/clients",
+        "entities": "sparkcore/entities",
+        "graphql": "sparkcore/graphql/mutations"
+      }
+    },
+    "protos": {
+      "description": "Protocol Buffer definitions for gRPC"
+    }
+  }
+}
