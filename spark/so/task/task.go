@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lightsparkdev/spark/common/uint128"
-	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"go.uber.org/zap"
 
 	"entgo.io/ent/dialect/sql"
@@ -45,7 +43,6 @@ var (
 	defaultTaskTimeout              = 1 * time.Minute
 	dkgTaskTimeout                  = 3 * time.Minute
 	deleteStaleTreeNodesTaskTimeout = 10 * time.Minute
-	backfillTokenAmountTimeout      = 24 * time.Hour
 )
 
 // Task contains common fields for all task types.
@@ -773,13 +770,6 @@ func AllStartupTasks() []StartupTaskSpec {
 				},
 			},
 		},
-		{
-			BaseTaskSpec: BaseTaskSpec{
-				Name:    "backfill_token_amounts",
-				Timeout: &backfillTokenAmountTimeout,
-				Task:    backfillTokenAmounts,
-			},
-		},
 	}
 }
 
@@ -892,101 +882,5 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, run
 		}
 	}
 	logger.Info("All startup tasks completed")
-	return nil
-}
-
-func backfillTokenAmounts(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-	logger := logging.GetLoggerFromContext(ctx)
-	logger = logger.With(zap.String("task.name", "backfill_token_amounts"))
-	totalUpdated := int64(0)
-	const batchSize = 1000
-	var lastKnobCheck time.Time
-	var lastID uuid.UUID
-	cutoffTime := time.Date(2025, 12, 8, 0, 0, 0, 0, time.UTC)
-	logger.Sugar().Infof("Backfilling token output amounts for cutoff time %s", cutoffTime)
-
-	for {
-		if time.Since(lastKnobCheck) > time.Minute {
-			lastKnobCheck = time.Now()
-			if knobsService.GetValue(knobs.KnobBackfillCreatedReversedTokenAmount, 0) == 0 {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(time.Minute):
-				}
-				continue
-			}
-		}
-
-		tx, err := ent.GetTxFromContext(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get tx from context: %w", err)
-		}
-
-		query := tx.TokenOutput.Query().
-			Where(tokenoutput.CreateTimeGTE(cutoffTime))
-		if lastID != uuid.Nil {
-			query = query.Where(tokenoutput.IDGT(lastID))
-		}
-		rows, err := query.
-			Order(tokenoutput.ByID()).
-			ForUpdate().
-			Limit(batchSize).
-			All(ctx)
-		if err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("failed to get rows: %w", err)
-		}
-		logger.Sugar().Infof("Found %d token outputs to backfill after id=%s", len(rows), lastID)
-
-		rowsAffected := int64(0)
-		skipped := int64(0)
-		for _, row := range rows {
-			fixedAmount, err := uint128.FromBytes(row.TokenAmount)
-			if err != nil {
-				_ = tx.Rollback()
-				return fmt.Errorf("failed to get token amount: %w", err)
-			}
-			if fixedAmount == row.Amount {
-				skipped++
-				if skipped <= 3 {
-					logger.Sugar().Infof("Skipping row %s: fixedAmount=%s, row.Amount=%s, tokenAmount=%x",
-						row.ID, fixedAmount.String(), row.Amount.String(), row.TokenAmount)
-				}
-				continue
-			}
-			_, err = tx.TokenOutput.
-				UpdateOneID(row.ID).
-				SetAmount(fixedAmount).
-				Save(ctx)
-			if err != nil {
-				_ = tx.Rollback()
-				return fmt.Errorf("failed to update token amount: %w", err)
-			}
-			rowsAffected++
-		}
-
-		logger.Sugar().Infof("Batch complete: updated=%d, skipped=%d", rowsAffected, skipped)
-		err = tx.Commit()
-		if err != nil {
-			return fmt.Errorf("failed to commit tx: %w", err)
-		}
-
-		if len(rows) < batchSize {
-			break
-		}
-		lastID = rows[len(rows)-1].ID
-		totalUpdated += rowsAffected
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(100 * time.Millisecond):
-		}
-	}
-
-	if totalUpdated > 0 {
-		logger.Sugar().Infof("Successfully backfilled %d total token output amounts", totalUpdated)
-	}
 	return nil
 }
