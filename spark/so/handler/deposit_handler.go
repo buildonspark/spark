@@ -1290,7 +1290,7 @@ func (h *DepositHandler) validateBitcoinTransactions(req *pb.StartDepositTreeCre
 	// set to InitialTimeLock
 	cpfpTimelock := spark.InitialTimeLock + spark.TimeLockInterval
 	// Validate cpfp refund tx based on cpfp root tx
-	err = bitcointransaction.VerifyTransactionWithSource(cpfpRefundTx, cpfpRootTx, vout, cpfpTimelock, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithSource(cpfpRefundTx, cpfpRootTx, 0, cpfpTimelock, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey)
 	if err != nil {
 		return fmt.Errorf("cpfp refund transaction verification failed: %w", err)
 	}
@@ -1299,7 +1299,7 @@ func (h *DepositHandler) validateBitcoinTransactions(req *pb.StartDepositTreeCre
 	if req.DirectFromCpfpRefundTxSigningJob != nil {
 		directFromCpfpRefundTx := req.DirectFromCpfpRefundTxSigningJob.RawTx
 
-		err = bitcointransaction.VerifyTransactionWithSource(directFromCpfpRefundTx, cpfpRootTx, vout, cpfpTimelock, bitcointransaction.TxTypeRefundDirectFromCPFP, refundDestPubkey)
+		err = bitcointransaction.VerifyTransactionWithSource(directFromCpfpRefundTx, cpfpRootTx, 0, cpfpTimelock, bitcointransaction.TxTypeRefundDirectFromCPFP, refundDestPubkey)
 		if err != nil {
 			return fmt.Errorf("direct-from-cpfp refund transaction verification failed: %w", err)
 		}
@@ -1315,7 +1315,7 @@ func (h *DepositHandler) validateBitcoinTransactions(req *pb.StartDepositTreeCre
 		}
 
 		directRefundTx := req.DirectRefundTxSigningJob.RawTx
-		err = bitcointransaction.VerifyTransactionWithSource(directRefundTx, directRootTx, vout, cpfpTimelock, bitcointransaction.TxTypeRefundDirect, refundDestPubkey)
+		err = bitcointransaction.VerifyTransactionWithSource(directRefundTx, directRootTx, 0, cpfpTimelock, bitcointransaction.TxTypeRefundDirect, refundDestPubkey)
 		if err != nil {
 			return fmt.Errorf("direct refund transaction verification failed: %w", err)
 		}
