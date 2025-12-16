@@ -18,10 +18,15 @@ func createRootTx(
 	depositTxOut *wire.TxOut,
 ) *wire.MsgTx {
 	rootTx := wire.NewMsgTx(3)
-	rootTx.AddTxIn(wire.NewTxIn(depositOutPoint, nil, nil))
+
+	txIn := wire.NewTxIn(depositOutPoint, nil, nil)
+	txIn.Sequence = spark.ZeroSequence
+	rootTx.AddTxIn(txIn)
 
 	// Create new output with fee-adjusted amount
 	rootTx.AddTxOut(wire.NewTxOut(depositTxOut.Value, depositTxOut.PkScript))
+	// Add ephemeral anchor output for CPFP root transactions
+	rootTx.AddTxOut(common.EphemeralAnchorOutput())
 	return rootTx
 }
 
@@ -47,6 +52,13 @@ func CreateLeafNodeTx(
 	outputAmount := amountSats
 	newLeafTx.AddTxOut(wire.NewTxOut(outputAmount, txOut.PkScript))
 	return newLeafTx
+}
+
+// InitialRefundSequences returns the sequence values for initial deposit refund transactions.
+func InitialRefundSequences() (refundSequence uint32, directSequence uint32) {
+	refundSequence = spark.InitialSequence()
+	directSequence = refundSequence + spark.DirectTimelockOffset
+	return
 }
 
 func CreateRefundTxs(

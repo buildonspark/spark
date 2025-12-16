@@ -28,7 +28,7 @@ func TestValidateUtxoIsNotSpent(t *testing.T) {
 	// Test with faucet transaction
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
-	err = handler.ValidateUtxoIsNotSpent(bitcoinClient, coin.OutPoint.Hash, 0)
+	err = handler.ValidateUtxoIsNotSpent(bitcoinClient, coin.OutPoint.Hash, coin.OutPoint.Index)
 	require.NoError(t, err)
 
 	// Spend the faucet transaction and test with a new one
@@ -54,7 +54,7 @@ func TestValidateUtxoIsNotSpent(t *testing.T) {
 	require.NoError(t, err)
 
 	// faucet coin is spent
-	err = handler.ValidateUtxoIsNotSpent(bitcoinClient, coin.OutPoint.Hash, 0)
+	err = handler.ValidateUtxoIsNotSpent(bitcoinClient, coin.OutPoint.Hash, coin.OutPoint.Index)
 	require.Error(t, err)
 
 	// deposit tx is not spent

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/frost"
@@ -1098,11 +1097,13 @@ func TestStartDepositTreeCreationWithDirectFromCpfpRefundAlongsideRegularRefund(
 
 	// Create root transaction (required) - this acts as the "node tx"
 	rootTx := wire.NewMsgTx(3)
-	rootTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}, nil, nil))
+	txIn := wire.NewTxIn(&wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}, nil, nil)
+	txIn.Sequence = spark.ZeroSequence
+	rootTx.AddTxIn(txIn)
 	rootTx.AddTxOut(wire.NewTxOut(depositTx.TxOut[0].Value, depositTx.TxOut[0].PkScript))
+	rootTx.AddTxOut(common.EphemeralAnchorOutput())
 
-	initialRefundSequence, initialDirectSequence, err := bitcointransaction.NextSequence(spark.InitialSequence())
-	require.NoError(t, err)
+	initialRefundSequence, initialDirectSequence := wallet.InitialRefundSequences()
 
 	refundTx, directFromCpfpRefundTx, err := wallet.CreateRefundTxs(
 		initialRefundSequence,
@@ -1169,11 +1170,13 @@ func TestStartDepositTreeCreationDirectTxValidation(t *testing.T) {
 
 	// Create test transactions
 	rootTx := wire.NewMsgTx(3)
-	rootTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}, nil, nil))
+	txIn := wire.NewTxIn(&wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}, nil, nil)
+	txIn.Sequence = spark.ZeroSequence
+	rootTx.AddTxIn(txIn)
 	rootTx.AddTxOut(wire.NewTxOut(depositTx.TxOut[0].Value, depositTx.TxOut[0].PkScript))
+	rootTx.AddTxOut(common.EphemeralAnchorOutput())
 
-	initialRefundSequence, initialDirectSequence, err := bitcointransaction.NextSequence(spark.InitialSequence())
-	require.NoError(t, err)
+	initialRefundSequence, initialDirectSequence := wallet.InitialRefundSequences()
 
 	refundTx, directFromCpfpRefundTx, err := wallet.CreateRefundTxs(
 		initialRefundSequence,

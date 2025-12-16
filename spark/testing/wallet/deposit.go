@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -20,7 +20,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
@@ -321,10 +320,7 @@ func CreateTreeRoot(
 		return nil, err
 	}
 
-	initialRefundSequence, initialDirectSequence, err := bitcointransaction.NextSequence(spark.InitialSequence())
-	if err != nil {
-		return nil, err
-	}
+	initialRefundSequence, initialDirectSequence := InitialRefundSequences()
 
 	// Create CPFP refund tx
 	cpfpRefundTx, _, err := CreateRefundTxs(
@@ -345,7 +341,10 @@ func CreateTreeRoot(
 
 	// Create Direct Root Tx
 	directRootTx := wire.NewMsgTx(3)
-	directRootTx.AddTxIn(wire.NewTxIn(depositOutPoint, nil, nil))
+	txIn := wire.NewTxIn(depositOutPoint, nil, nil)
+	// Set sequence to ZeroSequence + DirectTimelockOffset for direct root transactions
+	txIn.Sequence = spark.ZeroSequence | spark.DirectTimelockOffset
+	directRootTx.AddTxIn(txIn)
 	directRootAmount := common.MaybeApplyFee(depositTx.TxOut[vout].Value)
 	directRootTx.AddTxOut(wire.NewTxOut(directRootAmount, depositTx.TxOut[vout].PkScript))
 	directRootPrepared, err := prepareTxSigningArtifacts(directRootTx, depositTx.TxOut[vout], signingPubKey)

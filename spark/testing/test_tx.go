@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -49,7 +50,10 @@ func CreateTestP2TRTransactionWithSequence(t *testing.T, receiverPubKey keys.Pub
 // CreateTestDepositTransaction creates a test deposit transaction spending
 // the given outpoint to the given P2TR address with the given amount.
 func CreateTestDepositTransaction(outPoint *wire.OutPoint, p2trAddress string, amountSats int64) (*wire.MsgTx, error) {
-	inputs := []*wire.TxIn{wire.NewTxIn(outPoint, nil, [][]byte{})}
+	txIn := wire.NewTxIn(outPoint, nil, [][]byte{})
+	// Set sequence to ZeroSequence for root transactions (deposits)
+	txIn.Sequence = spark.ZeroSequence
+	inputs := []*wire.TxIn{txIn}
 	txOut, err := createP2TROutput(p2trAddress, amountSats)
 	if err != nil {
 		return nil, fmt.Errorf("error creating output: %w", err)
@@ -61,7 +65,10 @@ func CreateTestDepositTransaction(outPoint *wire.OutPoint, p2trAddress string, a
 // CreateTestDepositTransactionManyOutputs creates a test deposit transaction spending
 // the given outpoint to the given P2TR addresses with the given amount.
 func CreateTestDepositTransactionManyOutputs(outPoint *wire.OutPoint, p2trAddresses []string, amountSats int64) (*wire.MsgTx, error) {
-	inputs := []*wire.TxIn{wire.NewTxIn(outPoint, nil, [][]byte{})}
+	txIn := wire.NewTxIn(outPoint, nil, [][]byte{})
+	// Set sequence to ZeroSequence for root transactions (deposits)
+	txIn.Sequence = spark.ZeroSequence
+	inputs := []*wire.TxIn{txIn}
 	outputs := make([]*wire.TxOut, 0)
 	for _, p2trAddress := range p2trAddresses {
 		txOut, err := createP2TROutput(p2trAddress, amountSats)
@@ -80,7 +87,10 @@ func CreateTestCoopExitTransaction(
 	outPoint *wire.OutPoint,
 	userP2trAddr string, userAmountSats int64, intermediateP2trAddr string, intermediateAmountSats int64,
 ) (*wire.MsgTx, error) {
-	inputs := []*wire.TxIn{wire.NewTxIn(outPoint, nil, [][]byte{})}
+	txIn := wire.NewTxIn(outPoint, nil, [][]byte{})
+	// Set sequence to ZeroSequence to avoid bit 31 being set (timelock disabled)
+	txIn.Sequence = spark.ZeroSequence
+	inputs := []*wire.TxIn{txIn}
 	userOutput, err := createP2TROutput(userP2trAddr, userAmountSats)
 	if err != nil {
 		return nil, fmt.Errorf("error creating output: %w", err)
@@ -100,7 +110,10 @@ func CreateTestCoopExitTransaction(
 func CreateTestConnectorTransaction(
 	intermediateOutPoint *wire.OutPoint, intermediateAmountSats int64, connectorP2trAddrs []string, feeBumpP2trAddr string,
 ) (*wire.MsgTx, error) {
-	inputs := []*wire.TxIn{wire.NewTxIn(intermediateOutPoint, nil, [][]byte{})}
+	txIn := wire.NewTxIn(intermediateOutPoint, nil, [][]byte{})
+	// Set sequence to ZeroSequence to avoid bit 31 being set (timelock disabled)
+	txIn.Sequence = spark.ZeroSequence
+	inputs := []*wire.TxIn{txIn}
 	outputAddrs := append(connectorP2trAddrs, feeBumpP2trAddr)
 	outputAmountSats := intermediateAmountSats / int64(len(connectorP2trAddrs)) // Should be dust, i.e. 354 sats
 	outputs := make([]*wire.TxOut, 0)
@@ -128,6 +141,8 @@ func CreateTestTransaction(inputs []*wire.TxIn, outputs []*wire.TxOut) *wire.Msg
 func dummyInput() *wire.TxIn {
 	prevOut := wire.NewOutPoint(&chainhash.Hash{}, 0) // Empty hash and index 0
 	txIn := wire.NewTxIn(prevOut, nil, [][]byte{})
+	// Set sequence to ZeroSequence to avoid bit 31 being set (timelock disabled)
+	txIn.Sequence = spark.ZeroSequence
 
 	// For taproot, we need some form of witness data
 	// This is just dummy data for testing
