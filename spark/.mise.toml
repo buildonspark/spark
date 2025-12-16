@@ -1,8 +1,7 @@
 [tasks]
 build = "go build -tags=lightspark ./bin/operator"
 build-oss = "go build ./bin/operator"
-lint = "golangci-lint run --new-from-merge-base=main"
-lint-full = "golangci-lint run"
+lint = "golangci-lint run"
 # Sadly, `mise fmt` is a built in command
 format = "golangci-lint fmt"
 test-unit = """
