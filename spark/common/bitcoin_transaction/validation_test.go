@@ -688,3 +688,92 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_DirectFromCPFP
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 1 outputs, got 2")
 }
+
+func TestRoundDownToTimelockInterval(t *testing.T) {
+	tests := []struct {
+		name     string
+		timelock uint32
+		expected uint32
+	}{
+		{name: "aligned 100", timelock: 100, expected: 100},
+		{name: "aligned 1000", timelock: 1000, expected: 1000},
+		{name: "misaligned 740", timelock: 740, expected: 700},
+		{name: "misaligned 670", timelock: 670, expected: 600},
+		{name: "zero", timelock: 0, expected: 0},
+		{name: "htlc offset 1970", timelock: 1970, expected: 1900},
+		{name: "htlc offset 1870", timelock: 1870, expected: 1800},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := roundDownToTimelockInterval(tc.timelock)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestValidateSequence_MisalignedTimelock(t *testing.T) {
+	dbTimelock := uint32(740)
+	clientTimelock := uint32(600) // Correctly rounded by SDK
+
+	serverSeq, err := validateSequence(dbTimelock, TxTypeRefundCPFP, clientTimelock)
+	require.NoError(t, err)
+	assert.Equal(t, clientTimelock, serverSeq&0xFFFF)
+}
+
+func TestValidateSequence_MisalignedTimelock_Direct(t *testing.T) {
+	dbTimelock := uint32(740)
+	clientTimelock := uint32(650) // 600 + DirectTimelockOffset
+
+	serverSeq, err := validateSequence(dbTimelock, TxTypeRefundDirect, clientTimelock)
+	require.NoError(t, err)
+	assert.Equal(t, clientTimelock, serverSeq&0xFFFF)
+}
+
+// Tests that aligned timelocks continue to work
+func TestValidateSequence_AlignedTimelock(t *testing.T) {
+	dbTimelock := uint32(700)
+	clientTimelock := uint32(600)
+
+	serverSeq, err := validateSequence(dbTimelock, TxTypeRefundCPFP, clientTimelock)
+	require.NoError(t, err)
+	assert.Equal(t, clientTimelock, serverSeq&0xFFFF)
+}
+
+// Tests that wrong timelocks are still rejected
+func TestValidateSequence_MisalignedTimelock_WrongClient(t *testing.T) {
+	dbTimelock := uint32(740)
+	clientTimelock := uint32(640) // Wrong - should be 600
+
+	_, err := validateSequence(dbTimelock, TxTypeRefundCPFP, clientTimelock)
+	require.ErrorContains(t, err, "does not match expected timelock")
+}
+
+// Tests full verification with misaligned timelock in database
+func TestVerifyTransactionWithDatabase_MisalignedTimelock(t *testing.T) {
+	pubKey := keys.GeneratePrivateKey().Public()
+	pkScript, err := common.P2TRScriptFromPubKey(pubKey)
+	require.NoError(t, err)
+
+	nodeTx := newTestTx(testSourceValue, pkScript, 0, nil)
+	nodeTxHash := nodeTx.TxHash()
+
+	misalignedTimelock := uint32(740)
+	cpfpRefundTx := newTestTx(testSourceValue, pkScript, misalignedTimelock, &nodeTxHash)
+
+	dbLeaf := &ent.TreeNode{
+		ID:          uuid.New(),
+		RawTx:       serializeTx(t, nodeTx),
+		RawTxid:     st.NewTxID(nodeTxHash),
+		RawRefundTx: serializeTx(t, cpfpRefundTx),
+	}
+
+	expectedClientTimelock := uint32(600)
+	clientRawTx := createClientTx(t,
+		dbLeaf.RawTxid.Hash(),
+		expectedClientTimelock,
+		&wire.TxOut{Value: testSourceValue, PkScript: pkScript},
+		common.EphemeralAnchorOutput(),
+	)
+
+	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, pubKey))
+}

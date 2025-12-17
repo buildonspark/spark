@@ -259,17 +259,19 @@ func validateSequence(cpfpTimelock uint32, txType TxType, clientSequence uint32)
 
 	var expectedCPFPTimelock uint32
 
+	roundedCpfpTimelock := roundDownToTimelockInterval(cpfpTimelock)
+
 	// For node transaction, we don't need to subtract TimeLockInterval
 	if (txType == TxTypeNodeCPFP) || (txType == TxTypeNodeDirect) {
-		expectedCPFPTimelock = cpfpTimelock
+		expectedCPFPTimelock = roundedCpfpTimelock
 	} else {
 		// For refund transaction, validate that the timelock is large enough to subtract TimeLockInterval
-		if cpfpTimelock < spark.TimeLockInterval {
-			return 0, fmt.Errorf("current timelock %d in CPFP refund transaction is too small to subtract TimeLockInterval %d",
-				cpfpTimelock, spark.TimeLockInterval)
+		if roundedCpfpTimelock < spark.TimeLockInterval {
+			return 0, fmt.Errorf("current timelock %d (rounded from %d) in CPFP refund transaction is too small to subtract TimeLockInterval %d",
+				roundedCpfpTimelock, cpfpTimelock, spark.TimeLockInterval)
 		}
 		// Calculate the expected new timelock (should be TimeLockInterval shorter)
-		expectedCPFPTimelock = cpfpTimelock - spark.TimeLockInterval
+		expectedCPFPTimelock = roundedCpfpTimelock - spark.TimeLockInterval
 	}
 
 	// Get the expected timelock based on transaction type
@@ -345,6 +347,11 @@ func ValidateSequenceTimelock(sequence uint32, expectedTimelock uint32) error {
 // GetTimelockFromSequence extracts the timelock from a sequence
 func GetTimelockFromSequence(sequence uint32) uint32 {
 	return sequence & wire.SequenceLockTimeMask
+}
+
+// roundDownToTimelockInterval handles leaves that have non-aligned timelocks (e.g., 740 instead of 700)
+func roundDownToTimelockInterval(timelock uint32) uint32 {
+	return timelock - (timelock % spark.TimeLockInterval)
 }
 
 // Decrement the timelock in the provided sequence by one step, preserving any other bits that are set.
