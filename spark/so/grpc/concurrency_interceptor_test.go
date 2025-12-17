@@ -797,7 +797,7 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 				mu.Unlock()
 			}()
 		}
-		time.Sleep(100 * time.Microsecond)
+		time.Sleep(10 * time.Millisecond)
 		concurrencyGuard := guard.(*ConcurrencyGuard)
 		assert.Positive(t, concurrencyGuard.globalCounter)
 
