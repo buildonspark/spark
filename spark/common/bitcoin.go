@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 
@@ -198,26 +199,24 @@ func readVarInt(buf []byte) (uint64, int) {
 		return 0, 0
 	}
 
-	discriminant := buf[0]
-	switch {
-	case discriminant < 0xfd:
-		return uint64(discriminant), 1
-	case discriminant == 0xfd:
+	switch discriminant := buf[0]; discriminant {
+	case 0xFD:
 		if len(buf) < 3 {
 			return 0, 0
 		}
-		return uint64(buf[1]) | uint64(buf[2])<<8, 3
-	case discriminant == 0xfe:
+		return uint64(binary.LittleEndian.Uint16(buf[1:])), 3
+	case 0xFE:
 		if len(buf) < 5 {
 			return 0, 0
 		}
-		return uint64(buf[1]) | uint64(buf[2])<<8 | uint64(buf[3])<<16 | uint64(buf[4])<<24, 5
-	default: // 0xff
+		return uint64(binary.LittleEndian.Uint32(buf[1:])), 5
+	case 0xFF:
 		if len(buf) < 9 {
 			return 0, 0
 		}
-		return uint64(buf[1]) | uint64(buf[2])<<8 | uint64(buf[3])<<16 | uint64(buf[4])<<24 |
-			uint64(buf[5])<<32 | uint64(buf[6])<<40 | uint64(buf[7])<<48 | uint64(buf[8])<<56, 9
+		return binary.LittleEndian.Uint64(buf[1:]), 9
+	default:
+		return uint64(discriminant), 1
 	}
 }
 
