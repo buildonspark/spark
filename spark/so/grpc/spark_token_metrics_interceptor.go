@@ -16,6 +16,7 @@ import (
 )
 
 var tokenMethods = map[string]struct{}{
+	"/spark_token.SparkTokenService/broadcast_transaction":                            {},
 	"/spark_token.SparkTokenService/start_transaction":                                {},
 	"/spark_token.SparkTokenService/commit_transaction":                               {},
 	"/spark_token.SparkTokenInternalService/prepare_transaction":                      {},
