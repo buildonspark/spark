@@ -92,6 +92,8 @@ const (
 	KnobEnableDepositFlowValidation       = "spark.so.enable_deposit_flow_validation"
 	KnobSoEnhancedBitcoinTxValidation     = "spark.so.enhanced_bitcoin_tx_validation"
 	KnobEnhancedTransferReceiveValidation = "spark.so.enhanced_transfer_receive_validation"
+
+	KnobShutdownRenewNode = "spark.so.shutdown_renew_node"
 )
 
 type Config struct {

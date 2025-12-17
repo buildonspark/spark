@@ -20,6 +20,8 @@ import (
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
+	"google.golang.org/grpc/codes"
 )
 
 // RenewNodeTransactions encapsulates the return values from constructRenewNodeTransactions
@@ -143,6 +145,9 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 	// Determine operation type and delegate to appropriate handler
 	switch req.SigningJobs.(type) {
 	case *pb.RenewLeafRequest_RenewNodeTimelockSigningJob:
+		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobShutdownRenewNode, 0) > 0 {
+			return nil, errors.WrapErrorWithCodeAndReason(fmt.Errorf("renew node is currently disabled"), codes.Unavailable, errors.ReasonUnavailableMethodDisabled)
+		}
 		return h.renewNodeTimelock(ctx, req.GetRenewNodeTimelockSigningJob(), leaf)
 	case *pb.RenewLeafRequest_RenewRefundTimelockSigningJob:
 		return h.renewRefundTimelock(ctx, req.GetRenewRefundTimelockSigningJob(), leaf)
