@@ -61,7 +61,3 @@ export async function waitForClaim({
     wallet.once(SparkWalletEvent.TransferClaimed, onClaim);
   });
 }
-
-export const isMinikube = process.env.MINIKUBE_IP != undefined;
-export const testMinikubeOnly = !isMinikube ? it.skip : it;
-export const testMinikubeAndLocalOnly = process.env.GITHUB_ACTIONS || !isMinikube ? it.skip : it;
