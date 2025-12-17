@@ -15,8 +15,13 @@ import { OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto
 import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { TokenFreezeService } from "../services/freeze.js";
 import { IssuerTokenTransactionService } from "../services/token-transactions.js";
+import { hashFinalTokenTransaction } from "@buildonspark/spark-sdk";
 import { validateTokenParameters } from "../utils/create-validation.js";
-import { IssuerTokenMetadata, TokenDistribution } from "./types.js";
+import {
+  IssuerTokenMetadata,
+  TokenCreationDetails,
+  TokenDistribution,
+} from "./types.js";
 
 const BURN_ADDRESS = "02".repeat(33);
 
@@ -50,7 +55,10 @@ export abstract class IssuerSparkWallet extends SparkWallet {
 
   /**
    * Gets the token balance for the issuer's token.
+   * @deprecated Use getIssuerTokenBalances() instead. This method will be removed in a future version.
    * @returns An object containing the token balance as a bigint
+   *
+   * @throws {SparkValidationError} If multiple tokens are found for this issuer
    */
   public async getIssuerTokenBalance(): Promise<{
     tokenIdentifier: Bech32mTokenIdentifier | undefined;
@@ -58,50 +66,74 @@ export abstract class IssuerSparkWallet extends SparkWallet {
   }> {
     const publicKey = await super.getIdentityPublicKey();
     const balanceObj = await this.getBalance();
-    const issuerBalance = [...balanceObj.tokenBalances.entries()].find(
+    const issuerBalance = [...balanceObj.tokenBalances.entries()].filter(
       ([, info]) => info.tokenMetadata.tokenPublicKey === publicKey,
     ); // [tokenIdentifier, { balance, tokenMetadata }]
 
-    if (!balanceObj.tokenBalances || issuerBalance === undefined) {
+    if (issuerBalance.length > 1) {
+      throw new SparkValidationError(
+        "Multiple tokens found for this issuer. Use getIssuerTokenBalances() instead.",
+        {
+          field: "issuerTokenBalance",
+          expected: "single token",
+          actual: `${issuerBalance.length} tokens`,
+        },
+      );
+    }
+
+    if (issuerBalance.length === 0) {
       return {
         tokenIdentifier: undefined,
         balance: 0n,
       };
     }
+
     return {
-      tokenIdentifier: issuerBalance[0] ?? undefined,
-      balance: issuerBalance[1].balance,
+      tokenIdentifier: issuerBalance[0][0],
+      balance: issuerBalance[0][1].balance,
     };
   }
 
   /**
+   * Gets the token balances for the tokens that were issued by this user.
+   * @returns An array of objects containing the token identifier and balance
+   */
+  public async getIssuerTokenBalances(): Promise<
+    {
+      tokenIdentifier: Bech32mTokenIdentifier | undefined;
+      balance: bigint;
+    }[]
+  > {
+    const publicKey = await super.getIdentityPublicKey();
+    const balanceObj = await this.getBalance();
+    const issuerBalance = [...balanceObj.tokenBalances.entries()].filter(
+      ([, info]) => info.tokenMetadata.tokenPublicKey === publicKey,
+    ); // [tokenIdentifier, { balance, tokenMetadata }]
+
+    if (issuerBalance.length === 0) {
+      return [
+        {
+          tokenIdentifier: undefined,
+          balance: 0n,
+        },
+      ];
+    }
+
+    return issuerBalance.map(([tokenIdentifier, { balance }]) => ({
+      tokenIdentifier,
+      balance,
+    }));
+  }
+
+  /**
    * Retrieves information about the issuer's token.
-   * @returns An object containing token information including public key, name, symbol, decimals, max supply, and freeze status
+   * @deprecated Use getIssuerTokensMetadata() instead. This method will be removed in a future version.
+   * @returns An object containing token information including public key, name, symbol, decimals, max supply, freeze status, and extra metadata
    * @throws {SparkRequestError} If the token metadata cannot be retrieved
+   * @throws {SparkValidationError} If multiple tokens are found for this issuer
    */
   public async getIssuerTokenMetadata(): Promise<IssuerTokenMetadata> {
     const issuerPublicKey = await super.getIdentityPublicKey();
-    const tokenMetadata = this.tokenMetadata;
-
-    const cachedIssuerTokenMetadata = [...tokenMetadata.entries()].find(
-      ([, metadata]) =>
-        bytesToHex(metadata.issuerPublicKey) === issuerPublicKey,
-    );
-    if (cachedIssuerTokenMetadata !== undefined) {
-      const metadata = cachedIssuerTokenMetadata[1];
-      return {
-        tokenPublicKey: bytesToHex(metadata.issuerPublicKey),
-        rawTokenIdentifier: metadata.tokenIdentifier,
-        tokenName: metadata.tokenName,
-        tokenTicker: metadata.tokenTicker,
-        decimals: metadata.decimals,
-        maxSupply: bytesToNumberBE(metadata.maxSupply),
-        isFreezable: metadata.isFreezable,
-        extraMetadata: metadata.extraMetadata
-          ? new Uint8Array(metadata.extraMetadata)
-          : undefined,
-      };
-    }
 
     const sparkTokenClient =
       await this.connectionManager.createSparkTokenClient(
@@ -123,12 +155,22 @@ export abstract class IssuerSparkWallet extends SparkWallet {
           },
         );
       }
+      if (response.tokenMetadata.length > 1) {
+        throw new SparkValidationError(
+          "Multiple tokens found for this issuer. Please migrate to getIssuerTokensMetadata() instead.",
+          {
+            field: "tokenMetadata",
+            value: response.tokenMetadata,
+          },
+        );
+      }
+
       const metadata = response.tokenMetadata[0];
-      const tokenIdentifier = encodeBech32mTokenIdentifier({
+      const bech32mTokenIdentifier = encodeBech32mTokenIdentifier({
         tokenIdentifier: metadata.tokenIdentifier,
         network: this.config.getNetworkType(),
       });
-      this.tokenMetadata.set(tokenIdentifier, metadata);
+      this.tokenMetadata.set(bech32mTokenIdentifier, metadata);
 
       return {
         tokenPublicKey: bytesToHex(metadata.issuerPublicKey),
@@ -138,7 +180,10 @@ export abstract class IssuerSparkWallet extends SparkWallet {
         decimals: metadata.decimals,
         maxSupply: bytesToNumberBE(metadata.maxSupply),
         isFreezable: metadata.isFreezable,
-        extraMetadata: metadata.extraMetadata,
+        extraMetadata: metadata.extraMetadata
+          ? new Uint8Array(metadata.extraMetadata)
+          : undefined,
+        bech32mTokenIdentifier,
       };
     } catch (error) {
       throw new SparkRequestError("Failed to fetch token metadata", { error });
@@ -146,17 +191,107 @@ export abstract class IssuerSparkWallet extends SparkWallet {
   }
 
   /**
+   * Retrieves information about the tokens that were issued by this user.
+   * @returns An array of objects containing token information including public key, name, symbol, decimals, max supply, freeze status, and extra metadata
+   * @throws {SparkRequestError} If the token metadata cannot be retrieved
+   */
+  public async getIssuerTokensMetadata(): Promise<IssuerTokenMetadata[]> {
+    const issuerPublicKey = await super.getIdentityPublicKey();
+
+    const sparkTokenClient =
+      await this.connectionManager.createSparkTokenClient(
+        this.config.getCoordinatorAddress(),
+      );
+    try {
+      const response = await sparkTokenClient.query_token_metadata({
+        issuerPublicKeys: Array.of(hexToBytes(issuerPublicKey)),
+      });
+      if (response.tokenMetadata.length === 0) {
+        throw new SparkValidationError(
+          "Token metadata not found - If a token has not yet been created, please create it first. Try again in a few seconds.",
+          {
+            field: "tokenMetadata",
+            value: response.tokenMetadata,
+            expected: "non-empty array",
+            actualLength: response.tokenMetadata.length,
+            expectedLength: 1,
+          },
+        );
+      }
+
+      const tokenMetadata: IssuerTokenMetadata[] = [];
+
+      for (const metadata of response.tokenMetadata) {
+        const bech32mTokenIdentifier = encodeBech32mTokenIdentifier({
+          tokenIdentifier: metadata.tokenIdentifier,
+          network: this.config.getNetworkType(),
+        });
+
+        this.tokenMetadata.set(bech32mTokenIdentifier, metadata);
+
+        tokenMetadata.push({
+          tokenPublicKey: bytesToHex(metadata.issuerPublicKey),
+          rawTokenIdentifier: metadata.tokenIdentifier,
+          tokenName: metadata.tokenName,
+          tokenTicker: metadata.tokenTicker,
+          decimals: metadata.decimals,
+          maxSupply: bytesToNumberBE(metadata.maxSupply),
+          isFreezable: metadata.isFreezable,
+          extraMetadata: metadata.extraMetadata
+            ? new Uint8Array(metadata.extraMetadata)
+            : undefined,
+          bech32mTokenIdentifier,
+        });
+      }
+      return tokenMetadata;
+    } catch (error) {
+      throw new SparkRequestError("Failed to fetch token metadata", { error });
+    }
+  }
+
+  /**
+   * Retrieves the bech32m encoded token identifier for the issuer's token.
+   * @deprecated Use getIssuerTokenIdentifiers() instead. This method will be removed in a future version.
+   * @returns The bech32m encoded token identifier for the issuer's token
+   * @throws {SparkRequestError} If the token identifier cannot be retrieved
+   * @throws {SparkValidationError} If multiple tokens are found for this issuer
+   */
+  public async getIssuerTokenIdentifier(): Promise<Bech32mTokenIdentifier> {
+    const tokensMetadata = await this.getIssuerTokensMetadata();
+
+    if (tokensMetadata.length > 1) {
+      throw new SparkValidationError(
+        "Multiple tokens found. Use getIssuerTokenIdentifiers() instead.",
+        {
+          method: "getIssuerTokenIdentifier",
+          availableTokens: tokensMetadata.map((t) => ({
+            tokenName: t.tokenName,
+            tokenTicker: t.tokenTicker,
+            bech32mTokenIdentifier: encodeBech32mTokenIdentifier({
+              tokenIdentifier: t.rawTokenIdentifier,
+              network: this.config.getNetworkType(),
+            }),
+          })),
+        },
+      );
+    }
+
+    if (tokensMetadata.length === 0) {
+      throw new SparkValidationError("No tokens found. Create a token first.");
+    }
+
+    return tokensMetadata[0].bech32mTokenIdentifier;
+  }
+
+  /**
    * Retrieves the bech32m encoded token identifier for the issuer's token.
    * @returns The bech32m encoded token identifier for the issuer's token
    * @throws {SparkRequestError} If the token identifier cannot be retrieved
    */
-  public async getIssuerTokenIdentifier(): Promise<Bech32mTokenIdentifier> {
-    const tokenMetadata = await this.getIssuerTokenMetadata();
+  public async getIssuerTokenIdentifiers(): Promise<Bech32mTokenIdentifier[]> {
+    const tokensMetadata = await this.getIssuerTokensMetadata();
 
-    return encodeBech32mTokenIdentifier({
-      tokenIdentifier: tokenMetadata.rawTokenIdentifier,
-      network: this.config.getNetworkType(),
-    });
+    return tokensMetadata.map((metadata) => metadata.bech32mTokenIdentifier);
   }
 
   /**
@@ -169,12 +304,31 @@ export abstract class IssuerSparkWallet extends SparkWallet {
    * @param params.isFreezable - Whether the token can be frozen.
    * @param [params.maxSupply=0n] - (Optional) The maximum supply of the token. Defaults to <code>0n</code>.
    * @param params.extraMetadata - (Optional) This can be used to store additional bytes data to be associated with a token, like image data.
-   *
-   * @returns The transaction ID of the announcement.
-   *
+   * @param params.returnIdentifierForCreate - (Optional) Whether to return the token identifier in addition to the transaction hash. Defaults to <code>false</code>.
+   * @returns The transaction hash of the announcement or TokenCreationDetails if `returnIdentifierForCreate` is true.
    * @throws {SparkValidationError} If `decimals` is not a safe integer or other validation fails.
    * @throws {SparkRequestError} If the announcement transaction cannot be broadcast.
    */
+  public async createToken(params: {
+    tokenName: string;
+    tokenTicker: string;
+    decimals: number;
+    isFreezable: boolean;
+    maxSupply?: bigint;
+    extraMetadata?: Uint8Array;
+    returnIdentifierForCreate?: false;
+  }): Promise<string>;
+
+  public async createToken(params: {
+    tokenName: string;
+    tokenTicker: string;
+    decimals: number;
+    isFreezable: boolean;
+    maxSupply?: bigint;
+    extraMetadata?: Uint8Array;
+    returnIdentifierForCreate: true;
+  }): Promise<TokenCreationDetails>;
+
   public async createToken({
     tokenName,
     tokenTicker,
@@ -182,6 +336,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
     isFreezable,
     maxSupply = 0n,
     extraMetadata,
+    returnIdentifierForCreate = false,
   }: {
     tokenName: string;
     tokenTicker: string;
@@ -189,7 +344,8 @@ export abstract class IssuerSparkWallet extends SparkWallet {
     isFreezable: boolean;
     maxSupply?: bigint;
     extraMetadata?: Uint8Array;
-  }): Promise<string> {
+    returnIdentifierForCreate?: boolean;
+  }): Promise<string | TokenCreationDetails> {
     validateTokenParameters(
       tokenName,
       tokenTicker,
@@ -212,9 +368,32 @@ export abstract class IssuerSparkWallet extends SparkWallet {
           extraMetadata,
         );
 
-      return await this.issuerTokenTransactionService.broadcastTokenTransaction(
-        tokenTransaction,
-      );
+      const { finalTokenTransactionHash, tokenIdentifier } =
+        await this.issuerTokenTransactionService.broadcastTokenTransactionDetailed(
+          tokenTransaction,
+        );
+      const txHash = bytesToHex(finalTokenTransactionHash);
+
+      if (returnIdentifierForCreate) {
+        if (!tokenIdentifier) {
+          throw new SparkRequestError(
+            "Server response missing expected field: tokenIdentifier",
+            {
+              operation: "broadcast_transaction",
+              field: "tokenIdentifier",
+            },
+          );
+        }
+        const bech32mTokenIdentifier = encodeBech32mTokenIdentifier({
+          tokenIdentifier: tokenIdentifier,
+          network: this.config.getNetworkType(),
+        });
+        return {
+          tokenIdentifier: bech32mTokenIdentifier,
+          transactionHash: txHash,
+        };
+      }
+      return txHash;
     } else {
       const partialTokenTransaction =
         await this.issuerTokenTransactionService.constructPartialCreateTokenTransaction(
@@ -227,23 +406,116 @@ export abstract class IssuerSparkWallet extends SparkWallet {
           extraMetadata,
         );
 
-      return await this.issuerTokenTransactionService.broadcastTokenTransactionV3(
-        partialTokenTransaction,
+      const broadcastResponse =
+        await this.issuerTokenTransactionService.broadcastTokenTransactionV3Detailed(
+          partialTokenTransaction,
+        );
+      const finalHash = await hashFinalTokenTransaction(
+        broadcastResponse.finalTokenTransaction!,
       );
+      const finalTransactionHash = bytesToHex(finalHash);
+
+      if (returnIdentifierForCreate) {
+        if (!broadcastResponse.tokenIdentifier) {
+          throw new SparkRequestError(
+            "Server response missing expected field: tokenIdentifier",
+            {
+              operation: "broadcast_transaction",
+              field: "tokenIdentifier",
+            },
+          );
+        }
+        const tokenIdentifier = encodeBech32mTokenIdentifier({
+          tokenIdentifier: broadcastResponse.tokenIdentifier!,
+          network: this.config.getNetworkType(),
+        });
+        return {
+          tokenIdentifier,
+          transactionHash: finalTransactionHash,
+        };
+      }
+
+      return finalTransactionHash;
     }
   }
 
   /**
-   * Mints new tokens
-   * @param tokenAmount - The amount of tokens to mint
+   * @deprecated Use mintTokens({ tokenAmount, tokenIdentifier }) instead. This method will be removed in a future version.
+   * @param amount - The amount of tokens to mint
    * @returns The transaction ID of the mint operation
+   * @throws {SparkValidationError} If multiple tokens are found for this issuer
+   * @throws {SparkValidationError} If no tokens are found for this issuer
    */
-  public async mintTokens(tokenAmount: bigint): Promise<string> {
+  public async mintTokens(amount: bigint): Promise<string>;
+
+  /**
+   * Mints new tokens
+   * @param params - Object containing token minting parameters.
+   * @param params.tokenAmount - The amount of tokens to mint
+   * @param params.tokenIdentifier - The bech32m encoded token identifier
+   * @returns The transaction ID of the mint operation
+   * @throws {SparkValidationError} If no tokens are found for this issuer
+   */
+  public async mintTokens({
+    tokenAmount,
+    tokenIdentifier,
+  }: {
+    tokenAmount: bigint;
+    tokenIdentifier?: Bech32mTokenIdentifier;
+  }): Promise<string>;
+
+  public async mintTokens(
+    tokenAmountOrParams:
+      | bigint
+      | {
+          tokenAmount: bigint;
+          tokenIdentifier?: Bech32mTokenIdentifier;
+        },
+  ): Promise<string> {
+    let tokenAmount: bigint;
+    let bech32mTokenIdentifier: Bech32mTokenIdentifier | undefined;
+
+    if (typeof tokenAmountOrParams === "bigint") {
+      tokenAmount = tokenAmountOrParams;
+      bech32mTokenIdentifier = undefined;
+    } else {
+      tokenAmount = tokenAmountOrParams.tokenAmount;
+      bech32mTokenIdentifier = tokenAmountOrParams.tokenIdentifier;
+    }
+
     const issuerTokenPublicKey = await super.getIdentityPublicKey();
     const issuerTokenPublicKeyBytes = hexToBytes(issuerTokenPublicKey);
 
-    const tokenMetadata = await this.getIssuerTokenMetadata();
-    const rawTokenIdentifier: Uint8Array = tokenMetadata.rawTokenIdentifier;
+    const tokensMetadata = await this.getIssuerTokensMetadata();
+    if (bech32mTokenIdentifier === undefined) {
+      if (tokensMetadata.length > 1) {
+        throw new SparkValidationError(
+          "Multiple tokens found. Please use mintTokens({ tokenAmount, tokenIdentifier }) instead.",
+          {
+            field: "tokenIdentifier",
+            availableTokens: tokensMetadata.map((t) => ({
+              tokenName: t.tokenName,
+              tokenTicker: t.tokenTicker,
+              bech32mTokenIdentifier: encodeBech32mTokenIdentifier({
+                tokenIdentifier: t.rawTokenIdentifier,
+                network: this.config.getNetworkType(),
+              }),
+            })),
+          },
+        );
+      }
+
+      const encodedTokenIdentifier = encodeBech32mTokenIdentifier({
+        tokenIdentifier: tokensMetadata[0].rawTokenIdentifier,
+        network: this.config.getNetworkType(),
+      });
+      bech32mTokenIdentifier = encodedTokenIdentifier;
+    }
+
+    const rawTokenIdentifier = decodeBech32mTokenIdentifier(
+      bech32mTokenIdentifier,
+      this.config.getNetworkType(),
+    ).tokenIdentifier;
 
     if (this.config.getTokenTransactionVersion() === "V2") {
       const tokenTransaction =
@@ -272,47 +544,191 @@ export abstract class IssuerSparkWallet extends SparkWallet {
 
   /**
    * Burns issuer's tokens
+   * @deprecated Use burnTokens({ tokenAmount, tokenIdentifier, selectedOutputs }) instead. This method will be removed in a future version.
    * @param tokenAmount - The amount of tokens to burn
    * @param selectedOutputs - Optional array of outputs to use for the burn operation
    * @returns The transaction ID of the burn operation
+   * @throws {SparkValidationError} If multiple tokens are found for this issuer
+   * @throws {SparkValidationError} If no tokens are found for this issuer
    */
   public async burnTokens(
     tokenAmount: bigint,
     selectedOutputs?: OutputWithPreviousTransactionData[],
+  ): Promise<string>;
+
+  /**
+   * Burns issuer's tokens
+   * @param params - Object containing token burning parameters.
+   * @param params.tokenAmount - The amount of tokens to burn
+   * @param params.tokenIdentifier - The bech32m encoded token identifier
+   * @param params.selectedOutputs - Optional array of outputs to use for the burn operation
+   * @returns The transaction ID of the burn operation
+   */
+  public async burnTokens({
+    tokenAmount,
+    tokenIdentifier,
+    selectedOutputs,
+  }: {
+    tokenAmount: bigint;
+    tokenIdentifier?: Bech32mTokenIdentifier;
+    selectedOutputs?: OutputWithPreviousTransactionData[];
+  }): Promise<string>;
+
+  public async burnTokens(
+    tokenAmountOrParams:
+      | bigint
+      | {
+          tokenAmount: bigint;
+          tokenIdentifier?: Bech32mTokenIdentifier;
+          selectedOutputs?: OutputWithPreviousTransactionData[];
+        },
+    selectedOutputs?: OutputWithPreviousTransactionData[],
   ): Promise<string> {
+    let bech32mTokenIdentifier: Bech32mTokenIdentifier;
+    let tokenAmount: bigint;
+    let outputs: OutputWithPreviousTransactionData[] | undefined;
+
+    if (typeof tokenAmountOrParams === "bigint") {
+      tokenAmount = tokenAmountOrParams;
+      outputs = selectedOutputs;
+
+      const tokenIdentifiers = await this.getIssuerTokenIdentifiers();
+      if (tokenIdentifiers.length > 1) {
+        throw new SparkValidationError(
+          "Multiple tokens found. Use burnTokens({ tokenIdentifier, tokenAmount, selectedOutputs }) to specify which token to burn.",
+          {
+            field: "tokenIdentifier",
+            availableTokens: tokenIdentifiers,
+          },
+        );
+      }
+      if (tokenIdentifiers.length === 0) {
+        throw new SparkValidationError(
+          "No tokens found. Create a token first.",
+        );
+      }
+      bech32mTokenIdentifier = tokenIdentifiers[0];
+    } else {
+      tokenAmount = tokenAmountOrParams.tokenAmount;
+      outputs = tokenAmountOrParams.selectedOutputs;
+
+      if (tokenAmountOrParams.tokenIdentifier) {
+        const tokenIdentifiers = await this.getIssuerTokenIdentifiers();
+        const tokenIdentifier = tokenIdentifiers.find(
+          (identifier) => identifier === tokenAmountOrParams.tokenIdentifier,
+        );
+        if (!tokenIdentifier) {
+          throw new SparkValidationError("Token not found for this issuer", {
+            field: "tokenIdentifier",
+            value: tokenAmountOrParams.tokenIdentifier,
+          });
+        }
+        bech32mTokenIdentifier = tokenAmountOrParams.tokenIdentifier;
+      } else {
+        const tokenIdentifiers = await this.getIssuerTokenIdentifiers();
+        if (tokenIdentifiers.length === 0) {
+          throw new SparkValidationError(
+            "No tokens found. Create a token first.",
+          );
+        }
+        if (tokenIdentifiers.length > 1) {
+          throw new SparkValidationError(
+            "Multiple tokens found. Please specify tokenIdentifier in parameters.",
+            {
+              field: "tokenIdentifier",
+              availableTokens: tokenIdentifiers,
+            },
+          );
+        }
+        bech32mTokenIdentifier = tokenIdentifiers[0];
+      }
+    }
+
     const burnAddress = encodeSparkAddress({
       identityPublicKey: BURN_ADDRESS,
       network: this.config.getNetworkType(),
     });
-    const issuerTokenIdentifier: Bech32mTokenIdentifier =
-      await this.getIssuerTokenIdentifier();
 
     return await this.transferTokens({
-      tokenIdentifier: issuerTokenIdentifier,
+      tokenIdentifier: bech32mTokenIdentifier,
       tokenAmount,
       receiverSparkAddress: burnAddress,
-      selectedOutputs,
+      selectedOutputs: outputs,
     });
   }
 
   /**
    * Freezes tokens associated with a specific Spark address.
+   * @deprecated Use freezeToken({ tokenIdentifier, sparkAddress }) instead. This method will be removed in a future version.
    * @param sparkAddress - The Spark address whose tokens should be frozen
    * @returns An object containing the IDs of impacted outputs and the total amount of frozen tokens
+   * @throws {SparkValidationError} If multiple tokens are found for this issuer
+   * @throws {SparkValidationError} If no tokens are found for this issuer
    */
   public async freezeTokens(
     sparkAddress: string,
+  ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }>;
+
+  /**
+   * Freezes tokens associated with a specific Spark address.
+   * @param params - Object containing token freezing parameters.
+   * @param params.tokenIdentifier - The bech32m encoded token identifier
+   * @param params.sparkAddress - The Spark address whose tokens should be frozen
+   * @returns An object containing the IDs of impacted outputs and the total amount of frozen tokens
+   */
+  public async freezeTokens({
+    tokenIdentifier,
+    sparkAddress,
+  }: {
+    tokenIdentifier: Bech32mTokenIdentifier;
+    sparkAddress: string;
+  }): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }>;
+
+  public async freezeTokens(
+    sparkAddressOrParams:
+      | string
+      | {
+          tokenIdentifier: Bech32mTokenIdentifier;
+          sparkAddress: string;
+        },
   ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }> {
-    await this.syncTokenOutputs();
+    let bech32mTokenIdentifier: Bech32mTokenIdentifier | undefined;
+    let sparkAddress: string;
+
+    if (typeof sparkAddressOrParams === "string") {
+      sparkAddress = sparkAddressOrParams;
+      bech32mTokenIdentifier = undefined;
+    } else {
+      sparkAddress = sparkAddressOrParams.sparkAddress;
+      bech32mTokenIdentifier = sparkAddressOrParams.tokenIdentifier;
+    }
+
     const decodedOwnerPubkey = decodeSparkAddress(
       sparkAddress,
       this.config.getNetworkType(),
     );
 
-    const issuerTokenIdentifier = await this.getIssuerTokenIdentifier();
+    if (bech32mTokenIdentifier === undefined) {
+      const tokenIdentifiers = await this.getIssuerTokenIdentifiers();
+      if (tokenIdentifiers.length === 0) {
+        throw new SparkValidationError(
+          "No tokens found. Create a token first.",
+        );
+      }
+      if (tokenIdentifiers.length > 1) {
+        throw new SparkValidationError(
+          "Multiple tokens found. Use freezeTokens({ tokenIdentifier, sparkAddress }) instead.",
+          {
+            field: "tokenIdentifier",
+            availableTokens: tokenIdentifiers,
+          },
+        );
+      }
+      bech32mTokenIdentifier = tokenIdentifiers[0];
+    }
 
     const rawTokenIdentifier = decodeBech32mTokenIdentifier(
-      issuerTokenIdentifier,
+      bech32mTokenIdentifier,
       this.config.getNetworkType(),
     ).tokenIdentifier;
 
@@ -332,22 +748,73 @@ export abstract class IssuerSparkWallet extends SparkWallet {
 
   /**
    * Unfreezes previously frozen tokens associated with a specific Spark address.
+   * @deprecated Use unfreezeToken({ tokenIdentifier, sparkAddress }) instead. This method will be removed in a future version.
    * @param sparkAddress - The Spark address whose tokens should be unfrozen
    * @returns An object containing the IDs of impacted outputs and the total amount of unfrozen tokens
+   * @throws {SparkValidationError} If multiple tokens are found for this issuer
+   * @throws {SparkValidationError} If no tokens are found for this issuer
    */
   public async unfreezeTokens(
     sparkAddress: string,
+  ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }>;
+
+  /**
+   * Unfreezes previously frozen tokens associated with a specific Spark address.
+   * @param params - Object containing token unfreezing parameters.
+   * @param params.tokenIdentifier - The bech32m encoded token identifier
+   * @param params.sparkAddress - The Spark address whose tokens should be unfrozen
+   * @returns An object containing the IDs of impacted outputs and the total amount of unfrozen tokens
+   * @throws {SparkValidationError} If multiple tokens are found for this issuer
+   * @throws {SparkValidationError} If no tokens are found for this issuer
+   */
+  public async unfreezeTokens({
+    tokenIdentifier,
+    sparkAddress,
+  }: {
+    tokenIdentifier: Bech32mTokenIdentifier;
+    sparkAddress: string;
+  }): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }>;
+
+  public async unfreezeTokens(
+    sparkAddressOrParams:
+      | string
+      | {
+          tokenIdentifier: Bech32mTokenIdentifier;
+          sparkAddress: string;
+        },
   ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }> {
-    await this.syncTokenOutputs();
+    let bech32mTokenIdentifier: Bech32mTokenIdentifier | undefined;
+    let sparkAddress: string;
+
+    if (typeof sparkAddressOrParams === "string") {
+      sparkAddress = sparkAddressOrParams;
+      bech32mTokenIdentifier = undefined;
+    } else {
+      sparkAddress = sparkAddressOrParams.sparkAddress;
+      bech32mTokenIdentifier = sparkAddressOrParams.tokenIdentifier;
+    }
+
+    if (bech32mTokenIdentifier === undefined) {
+      const tokenIdentifiers = await this.getIssuerTokenIdentifiers();
+      if (tokenIdentifiers.length > 1) {
+        throw new SparkValidationError(
+          "Multiple tokens found. Use unfreezeTokens({ tokenIdentifier, sparkAddress }) instead.",
+          {
+            field: "tokenIdentifier",
+            availableTokens: tokenIdentifiers,
+          },
+        );
+      }
+      bech32mTokenIdentifier = tokenIdentifiers[0];
+    }
+
     const decodedOwnerPubkey = decodeSparkAddress(
       sparkAddress,
       this.config.getNetworkType(),
     );
 
-    const issuerTokenIdentifier = await this.getIssuerTokenIdentifier();
-
     const rawTokenIdentifier = decodeBech32mTokenIdentifier(
-      issuerTokenIdentifier,
+      bech32mTokenIdentifier,
       this.config.getNetworkType(),
     ).tokenIdentifier;
 
@@ -421,8 +888,11 @@ type IssuerSparkWalletFunctionKeys = Extract<
 
 const PUBLIC_ISSUER_SPARK_WALLET_METHODS = [
   "getIssuerTokenBalance",
+  "getIssuerTokenBalances",
   "getIssuerTokenMetadata",
+  "getIssuerTokensMetadata",
   "getIssuerTokenIdentifier",
+  "getIssuerTokenIdentifiers",
   "createToken",
   "mintTokens",
   "burnTokens",

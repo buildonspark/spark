@@ -20,6 +20,10 @@ import {
   TokenTransaction,
   PartialTokenTransaction,
   PartialTokenOutput,
+  BroadcastTransactionResponse,
+  CommitTransactionResponse,
+  CommitProgress,
+  CommitStatus,
 } from "../proto/spark_token.js";
 import { TokenOutputsMap } from "../spark-wallet/types.js";
 import { SparkCallOptions } from "../types/grpc.js";
@@ -389,6 +393,27 @@ export class TokenTransactionService {
     outputsToSpendSigningPublicKeys?: Uint8Array[],
     outputsToSpendCommitments?: Uint8Array[],
   ): Promise<string> {
+    const { finalTokenTransactionHash } =
+      await this.broadcastTokenTransactionDetailed(
+        tokenTransaction,
+        outputsToSpendSigningPublicKeys,
+        outputsToSpendCommitments,
+      );
+
+    return bytesToHex(finalTokenTransactionHash);
+  }
+
+  public async broadcastTokenTransactionDetailed(
+    tokenTransaction: TokenTransaction,
+    outputsToSpendSigningPublicKeys?: Uint8Array[],
+    outputsToSpendCommitments?: Uint8Array[],
+  ): Promise<{
+    commitStatus: CommitStatus;
+    commitProgress: CommitProgress | undefined;
+    tokenIdentifier: Uint8Array | undefined;
+    finalTokenTransaction: TokenTransaction;
+    finalTokenTransactionHash: Uint8Array;
+  }> {
     const signingOperators = this.config.getSigningOperators();
 
     const { finalTokenTransaction, finalTokenTransactionHash, threshold } =
@@ -399,19 +424,41 @@ export class TokenTransactionService {
         outputsToSpendCommitments,
       );
 
-    await this.signTokenTransaction(
+    const { commitStatus, commitProgress, tokenIdentifier } =
+      await this.signTokenTransaction(
+        finalTokenTransaction,
+        finalTokenTransactionHash,
+        signingOperators,
+      );
+    return {
+      commitStatus,
+      commitProgress,
+      tokenIdentifier,
       finalTokenTransaction,
       finalTokenTransactionHash,
-      signingOperators,
-    );
-
-    return bytesToHex(finalTokenTransactionHash);
+    };
   }
 
   public async broadcastTokenTransactionV3(
     partialTokenTransaction: PartialTokenTransaction,
     outputsToSpendSigningPublicKeys?: Uint8Array[],
   ): Promise<string> {
+    const broadcastResponse = await this.broadcastTokenTransactionV3Detailed(
+      partialTokenTransaction,
+      outputsToSpendSigningPublicKeys,
+    );
+
+    const finalHash = await hashFinalTokenTransaction(
+      broadcastResponse.finalTokenTransaction!,
+    );
+
+    return bytesToHex(finalHash);
+  }
+
+  public async broadcastTokenTransactionV3Detailed(
+    partialTokenTransaction: PartialTokenTransaction,
+    outputsToSpendSigningPublicKeys?: Uint8Array[],
+  ): Promise<BroadcastTransactionResponse> {
     const sparkClient = await this.connectionManager.createSparkTokenClient(
       this.config.getCoordinatorAddress(),
     );
@@ -493,7 +540,7 @@ export class TokenTransactionService {
       }
     }
 
-    const broadcastResponse = await sparkClient.broadcast_transaction(
+    return await sparkClient.broadcast_transaction(
       {
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
         partialTokenTransaction,
@@ -505,12 +552,6 @@ export class TokenTransactionService {
         retryMaxAttempts: 3,
       } as SparkCallOptions,
     );
-
-    const finalHash = await hashFinalTokenTransaction(
-      broadcastResponse.finalTokenTransaction!,
-    );
-
-    return bytesToHex(finalHash);
   }
 
   private async startTokenTransaction(
@@ -662,7 +703,7 @@ export class TokenTransactionService {
     finalTokenTransaction: TokenTransaction,
     finalTokenTransactionHash: Uint8Array,
     signingOperators: Record<string, SigningOperator>,
-  ) {
+  ): Promise<CommitTransactionResponse> {
     const coordinatorClient =
       await this.connectionManager.createSparkTokenClient(
         this.config.getCoordinatorAddress(),
@@ -676,7 +717,7 @@ export class TokenTransactionService {
       );
 
     try {
-      await coordinatorClient.commit_transaction(
+      return await coordinatorClient.commit_transaction(
         {
           finalTokenTransaction,
           finalTokenTransactionHash,

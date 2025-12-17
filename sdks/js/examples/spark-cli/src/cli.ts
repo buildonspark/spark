@@ -581,10 +581,10 @@ async function runCLI() {
   getissuertokenmetadata                                              - Get the issuer's token metadata
   getissuertokenidentifier                                            - Get the issuer's token identifier
   getissuertokenpublickey                                             - Get the issuer's token public key
-  minttokens <amount>                                                 - Mint new tokens. If the token was created with 2 decimals, minttokens 1 would transfer 0.01 tokens.
-  burntokens <amount>                                                 - Burn tokens
-  freezetokens <sparkAddress>                                         - Freeze tokens for a specific address
-  unfreezetokens <sparkAddress>                                       - Unfreeze tokens for a specific address
+  minttokens <amount> <tokenIdentifier>                                - Mint new tokens. If the token was created with 2 decimals, minttokens 1 would transfer 0.01 tokens.
+  burntokens <amount> <tokenIdentifier>                               - Burn tokens. If the token was created with 2 decimals, burntokens 1 would burn 0.01 tokens.
+  freezetokens <sparkAddress> <tokenIdentifier>                       - Freeze tokens for a specific address
+  unfreezetokens <sparkAddress> <tokenIdentifier>                     - Unfreeze tokens for a specific address
   createtoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> <extraMetadata> - Create a new token. Use "_", or leave blank, to denote empty extra metadata.
   decodetokenidentifier <tokenIdentifier>                             - Returns the raw token identifier as a hex string
 
@@ -1777,9 +1777,12 @@ async function runCLI() {
             console.log("Please initialize a wallet first");
             break;
           }
-          const balance = await wallet.getIssuerTokenBalance();
-          console.log("Issuer Token Identifier:", balance.tokenIdentifier);
-          console.log("Issuer Token Balance:", balance.balance.toString());
+          const balances = await wallet.getIssuerTokenBalances();
+          for (const balance of balances) {
+            console.log("--------------------------------");
+            console.log("Token Identifier:", balance.tokenIdentifier);
+            console.log("Balance:", balance.balance.toString());
+          }
           break;
         }
         case "getissuertokenidentifier": {
@@ -1787,8 +1790,18 @@ async function runCLI() {
             console.log("Please initialize a wallet first");
             break;
           }
-          const tokenIdentifier = await wallet.getIssuerTokenIdentifier();
-          console.log("Issuer Token Identifier:", tokenIdentifier);
+          const metadataArray = await wallet.getIssuerTokensMetadata();
+          for (const md of metadataArray) {
+            console.log("--------------------------------");
+
+            console.log("Token Metadata:", {
+              tokenName: md.tokenName,
+              tokenIdentifier: encodeBech32mTokenIdentifier({
+                tokenIdentifier: md.rawTokenIdentifier,
+                network: (wallet as any).config.getNetworkType(),
+              }),
+            });
+          }
           break;
         }
         case "getissuertokenmetadata": {
@@ -1796,22 +1809,25 @@ async function runCLI() {
             console.log("Please initialize a wallet first");
             break;
           }
-          const metadata = await wallet.getIssuerTokenMetadata();
-          console.log("Token Metadata:", {
-            tokenIdentifier: encodeBech32mTokenIdentifier({
-              tokenIdentifier: metadata.rawTokenIdentifier,
-              network: (wallet as any).config.getNetworkType(),
-            }),
-            tokenPublicKey: metadata.tokenPublicKey,
-            tokenName: metadata.tokenName,
-            tokenTicker: metadata.tokenTicker,
-            decimals: metadata.decimals,
-            maxSupply: metadata.maxSupply.toString(),
-            isFreezable: metadata.isFreezable,
-            extraMetadata: metadata.extraMetadata
-              ? hex.encode(metadata.extraMetadata)
-              : undefined,
-          });
+          const metadataArray = await wallet.getIssuerTokensMetadata();
+          for (const md of metadataArray) {
+            console.log("--------------------------------");
+            console.log("Token Metadata:", {
+              tokenIdentifier: encodeBech32mTokenIdentifier({
+                tokenIdentifier: md.rawTokenIdentifier,
+                network: (wallet as any).config.getNetworkType(),
+              }),
+              tokenPublicKey: md.tokenPublicKey,
+              tokenName: md.tokenName,
+              tokenTicker: md.tokenTicker,
+              decimals: md.decimals,
+              maxSupply: md.maxSupply.toString(),
+              isFreezable: md.isFreezable,
+              extraMetadata: md.extraMetadata
+                ? hex.encode(md.extraMetadata)
+                : undefined,
+            });
+          }
           break;
         }
         case "getissuertokenpublickey": {
@@ -1829,8 +1845,17 @@ async function runCLI() {
             break;
           }
           const amount = BigInt(parseInt(args[0]));
-          const result = await wallet.mintTokens(amount);
-          console.log("Mint Transaction ID:", result);
+          const tokenIdentifier = args[1] as Bech32mTokenIdentifier | undefined;
+          let result: string;
+          if (!tokenIdentifier) {
+            result = await wallet.mintTokens(amount);
+          } else {
+            result = await wallet.mintTokens({
+              tokenAmount: amount,
+              tokenIdentifier: tokenIdentifier,
+            });
+          }
+          console.log("Mint Transaction Hash:", result);
           break;
         }
         case "burntokens": {
@@ -1839,8 +1864,17 @@ async function runCLI() {
             break;
           }
           const amount = BigInt(parseInt(args[0]));
-          const result = await wallet.burnTokens(amount);
-          console.log("Burn Transaction ID:", result);
+          const tokenIdentifier = args[1] as Bech32mTokenIdentifier | undefined;
+          let result: string;
+          if (!tokenIdentifier) {
+            result = await wallet.burnTokens(amount);
+          } else {
+            result = await wallet.burnTokens({
+              tokenAmount: amount,
+              tokenIdentifier: tokenIdentifier,
+            });
+          }
+          console.log("Burn Transaction Hash:", result);
           break;
         }
         case "freezetokens": {
@@ -1848,7 +1882,20 @@ async function runCLI() {
             console.log("Please initialize a wallet first");
             break;
           }
-          const result = await wallet.freezeTokens(args[0]);
+          const sparkAddress = args[0];
+          const tokenIdentifier = args[1] as Bech32mTokenIdentifier | undefined;
+          let result: {
+            impactedOutputIds: string[];
+            impactedTokenAmount: bigint;
+          };
+          if (!tokenIdentifier) {
+            result = await wallet.freezeTokens(sparkAddress);
+          } else {
+            result = await wallet.freezeTokens({
+              tokenIdentifier: tokenIdentifier,
+              sparkAddress: sparkAddress,
+            });
+          }
           console.log("Freeze Result:", {
             impactedOutputIds: result.impactedOutputIds,
             impactedTokenAmount: result.impactedTokenAmount.toString(),
@@ -1860,7 +1907,20 @@ async function runCLI() {
             console.log("Please initialize a wallet first");
             break;
           }
-          const result = await wallet.unfreezeTokens(args[0]);
+          const sparkAddress = args[0];
+          const tokenIdentifier = args[1] as Bech32mTokenIdentifier | undefined;
+          let result: {
+            impactedOutputIds: string[];
+            impactedTokenAmount: bigint;
+          };
+          if (!tokenIdentifier) {
+            result = await wallet.unfreezeTokens(sparkAddress);
+          } else {
+            result = await wallet.unfreezeTokens({
+              tokenIdentifier: tokenIdentifier,
+              sparkAddress: sparkAddress,
+            });
+          }
           console.log("Unfreeze Result:", {
             impactedOutputIds: result.impactedOutputIds,
             impactedTokenAmount: result.impactedTokenAmount.toString(),
@@ -1882,7 +1942,11 @@ async function runCLI() {
           ] = args;
           let extraMetadataBytes: Uint8Array | undefined;
 
-          if (extraMetadata == "_" || extraMetadata == "undefined") {
+          if (
+            !extraMetadata ||
+            extraMetadata === "_" ||
+            extraMetadata === "undefined"
+          ) {
             extraMetadataBytes = undefined;
           } else {
             extraMetadataBytes = hexToBytes(extraMetadata);
@@ -1895,8 +1959,10 @@ async function runCLI() {
             maxSupply: BigInt(maxSupply),
             isFreezable: isFreezable.toLowerCase() === "true",
             extraMetadata: extraMetadataBytes,
+            returnIdentifierForCreate: true,
           });
-          console.log("Create Token Transaction ID:", result);
+          console.log("Create Token Transaction Hash:", result.transactionHash);
+          console.log("Create Token Token Identifier:", result.tokenIdentifier);
           break;
         }
         case "querytokentransactions": {

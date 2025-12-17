@@ -1,3 +1,5 @@
+import type { Bech32mTokenIdentifier } from "@buildonspark/spark-sdk";
+
 /**
  * Token metadata containing essential information about issuer's token.
  * This is the wallet's internal representation with JavaScript-friendly types.
@@ -36,6 +38,8 @@ export type IssuerTokenMetadata = {
   isFreezable: boolean;
   /** Extra metadata of the token */
   extraMetadata?: Uint8Array;
+  /** Bech32m encoded token identifier */
+  bech32mTokenIdentifier: Bech32mTokenIdentifier;
 };
 
 export interface TokenDistribution {
@@ -44,4 +48,25 @@ export interface TokenDistribution {
   totalBurned: bigint;
   numHoldingAddress: number;
   numConfirmedTransactions: bigint;
+}
+
+/**
+ * Details of a token creation.
+ *
+ * tokenIdentifier: The Bech32m encoded token identifier.
+ * transactionHash: The hash of the transaction that created the token.
+ *
+ * @example
+ * ```typescript
+ * const tokenCreationDetails: TokenCreationDetails = {
+ *   tokenIdentifier: "btkn1...",
+ *   transactionHash: "1234567890abcdef...",
+ * };
+ * ```
+ */
+export interface TokenCreationDetails {
+  /** Bech32m encoded token identifier */
+  tokenIdentifier: Bech32mTokenIdentifier;
+  /** Transaction hash of the announcement */
+  transactionHash: string;
 }
