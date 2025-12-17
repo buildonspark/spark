@@ -112,7 +112,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 	}
 	_, err = splitNodeMut.Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create split node: %w", err)
+		return fmt.Errorf("failed to create split node %s: %w", splitNodeID, err)
 	}
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Info("Created split node", zap.String("split_node_id", splitNodeID.String()))
@@ -128,7 +128,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		SetStatus(st.TreeNodeStatusAvailable).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update extended leaf: %w", err)
+		return fmt.Errorf("failed to update extended leaf %s: %w", extendedLeafID, err)
 	}
 	logger.Info("Updated extended leaf",
 		zap.String("extended_leaf_id", extendedLeafID.String()),
@@ -169,7 +169,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewRefundTimelock(ctx context.Conte
 		SetStatus(st.TreeNodeStatusAvailable).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update leaf: %w", err)
+		return fmt.Errorf("failed to update leaf %s: %w", leafID, err)
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
