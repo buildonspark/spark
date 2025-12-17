@@ -933,8 +933,14 @@ func InferTokenTransactionTypeSparkProtos(tokenTransaction *sparkpb.TokenTransac
 	return inputType, nil
 }
 
+type InferrableTokenTransaction interface {
+	GetCreateInput() *tokenpb.TokenCreateInput
+	GetMintInput() *tokenpb.TokenMintInput
+	GetTransferInput() *tokenpb.TokenTransferInput
+}
+
 // InferTokenTransactionType validates that exactly one input type is present and returns it
-func InferTokenTransactionType(tokenTransaction *tokenpb.TokenTransaction) (TokenTransactionType, error) {
+func InferTokenTransactionType(tokenTransaction InferrableTokenTransaction) (TokenTransactionType, error) {
 	hasCreateInput := tokenTransaction.GetCreateInput() != nil
 	hasMintInput := tokenTransaction.GetMintInput() != nil
 

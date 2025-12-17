@@ -5,7 +5,6 @@ import (
 	"time"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
-	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so/grpcutil"
 	"github.com/lightsparkdev/spark/so/utils"
 	"go.opentelemetry.io/otel"
@@ -89,44 +88,38 @@ func isTokenTransactionMethod(method string) bool {
 	return exists
 }
 
+type hasPartialTokenTransaction interface {
+	GetPartialTokenTransaction() *tokenpb.PartialTokenTransaction
+}
+
+type hasLegacyPartialTokenTransaction interface {
+	GetPartialTokenTransaction() *tokenpb.TokenTransaction
+}
+
+type hasFinalTokenTransaction interface {
+	GetFinalTokenTransaction() *tokenpb.TokenTransaction
+}
+
 // extractTransactionType extracts the transaction type from the request
 func extractTransactionType(req any) string {
+	var tokenTx utils.InferrableTokenTransaction
+
 	switch r := req.(type) {
-	case *tokenpb.StartTransactionRequest:
-		if r.PartialTokenTransaction != nil {
-			txType, err := utils.InferTokenTransactionType(r.PartialTokenTransaction)
-			if err == nil {
-				return txType.String()
-			}
-		}
-	case *tokenpb.CommitTransactionRequest:
-		if r.FinalTokenTransaction != nil {
-			txType, err := utils.InferTokenTransactionType(r.FinalTokenTransaction)
-			if err == nil {
-				return txType.String()
-			}
-		}
-	case *tokeninternalpb.PrepareTransactionRequest:
-		if r.FinalTokenTransaction != nil {
-			txType, err := utils.InferTokenTransactionType(r.FinalTokenTransaction)
-			if err == nil {
-				return txType.String()
-			}
-		}
-	case *tokeninternalpb.SignTokenTransactionFromCoordinationRequest:
-		if r.FinalTokenTransaction != nil {
-			txType, err := utils.InferTokenTransactionType(r.FinalTokenTransaction)
-			if err == nil {
-				return txType.String()
-			}
-		}
-	case *tokeninternalpb.ExchangeRevocationSecretsSharesRequest:
-		if r.FinalTokenTransaction != nil {
-			txType, err := utils.InferTokenTransactionType(r.FinalTokenTransaction)
-			if err == nil {
-				return txType.String()
-			}
-		}
+	case hasPartialTokenTransaction:
+		tokenTx = r.GetPartialTokenTransaction()
+	case hasFinalTokenTransaction:
+		tokenTx = r.GetFinalTokenTransaction()
+	case hasLegacyPartialTokenTransaction:
+		tokenTx = r.GetPartialTokenTransaction()
+	}
+
+	if tokenTx == nil {
+		return "UNKNOWN"
+	}
+
+	txType, err := utils.InferTokenTransactionType(tokenTx)
+	if err == nil {
+		return txType.String()
 	}
 
 	return "UNKNOWN"
