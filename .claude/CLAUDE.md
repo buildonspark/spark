@@ -526,6 +526,13 @@ mise test-unit-with-postgres  # Full unit tests with postgres
 make
 ```
 
+**CRITICAL**: After running `make` to regenerate SO proto bindings, you MUST also regenerate JS SDK proto bindings:
+```bash
+cd sdks/js/packages/spark-sdk/
+mise exec -- yarn generate:proto
+```
+**NOTE**: Must use `mise exec --` to ensure correct protoc version (29.3) is used. See section 13.4 for tool version requirements.
+
 **Ent Generation** (When schema changes):
 ```bash
 mise gen-ent
@@ -624,6 +631,12 @@ yarn test
 ```bash
 yarn test:integration
 ```
+
+**Proto Generation** (When proto files change):
+```bash
+mise exec -- yarn generate:proto
+```
+**CRITICAL**: When proto files (`.proto`) are modified in the SO codebase, you MUST regenerate the JS SDK proto bindings. Run this from `sdks/js/packages/spark-sdk/` directory after running `make` in the SO repository. Must use `mise exec --` to ensure correct protoc version (29.3) is used.
 
 **Example Scripts Verification** (Required if examples modified):
 ```bash
