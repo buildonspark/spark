@@ -47,6 +47,10 @@ export class SparkError extends Error {
     );
   }
 
+  public getContext(): Record<string, unknown> {
+    return this.context;
+  }
+
   public toString(): string {
     return this.message;
   }
