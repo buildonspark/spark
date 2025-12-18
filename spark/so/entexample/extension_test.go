@@ -164,7 +164,7 @@ func TestRenderValueForField(t *testing.T) {
 				RType: &schemafield.RType{Kind: reflect.Slice, Ident: "[]string"},
 			}},
 			value:    []any{"a", "b", "c"},
-			expected: `[]string{"a", "b", "c"}`,
+			expected: `[]string{"a", "b", "c", }`,
 		},
 
 		// JSON type - map[string][]byte
@@ -175,7 +175,7 @@ func TestRenderValueForField(t *testing.T) {
 				RType: &schemafield.RType{Kind: reflect.Map, Ident: "map[string][]uint8"},
 			}},
 			value:    map[string]any{"key1": "deadbeef"},
-			expected: `map[string][]byte{"key1": func() []byte { b, _ := hex.DecodeString("deadbeef"); return b }()}`,
+			expected: `map[string][]byte{"key1": func() []byte { b, _ := hex.DecodeString("deadbeef"); return b }(), }`,
 		},
 
 		// JSON type - map[string]keys.Public
@@ -186,7 +186,7 @@ func TestRenderValueForField(t *testing.T) {
 				RType: &schemafield.RType{Kind: reflect.Map, Ident: "map[string]keys.Public"},
 			}},
 			value:    map[string]any{"op1": "02abcd"},
-			expected: `map[string]keys.Public{"op1": keys.MustParsePublicKeyHex("02abcd")}`,
+			expected: `map[string]keys.Public{"op1": keys.MustParsePublicKeyHex("02abcd"), }`,
 		},
 
 		// Enum type
@@ -260,8 +260,123 @@ func TestRenderValueForField(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := renderValueForField(tt.field, tt.value)
+			result, err := renderValueForField(tt.field, tt.value)
+			require.NoError(t, err)
 			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestTypeRegistry(t *testing.T) {
+	tests := []struct {
+		name     string
+		typeKey  string
+		value    any
+		expected string
+	}{
+		{
+			name:     "keys.Public",
+			typeKey:  "keys.Public",
+			value:    "02abcdef1234567890",
+			expected: `keys.MustParsePublicKeyHex("02abcdef1234567890")`,
+		},
+		{
+			name:     "keys.Private",
+			typeKey:  "keys.Private",
+			value:    "abcdef0123456789",
+			expected: `keys.MustParsePrivateKeyHex("abcdef0123456789")`,
+		},
+		{
+			name:     "frost.SigningCommitment",
+			typeKey:  "frost.SigningCommitment",
+			value:    "commitment123",
+			expected: `frost.MustParseSigningCommitment("commitment123")`,
+		},
+		{
+			name:     "frost.SigningNonce",
+			typeKey:  "frost.SigningNonce",
+			value:    "nonce456",
+			expected: `frost.MustParseSigningNonce("nonce456")`,
+		},
+		{
+			name:     "schematype.TxID",
+			typeKey:  "schematype.TxID",
+			value:    "txid789",
+			expected: `schematype.MustParseTxID("txid789")`,
+		},
+		{
+			name:     "uint128.Uint128",
+			typeKey:  "uint128.Uint128",
+			value:    float64(12345),
+			expected: "uint128.FromUint64(uint64(12345))",
+		},
+		{
+			name:     "uuid.UUID",
+			typeKey:  "uuid.UUID",
+			value:    "550e8400-e29b-41d4-a716-446655440000",
+			expected: `uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			renderFunc, ok := typeRegistry[tt.typeKey]
+			require.True(t, ok, "typeRegistry should contain key %q", tt.typeKey)
+			result, err := renderFunc(tt.value)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestTypeRegistryErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		typeKey string
+		value   any
+	}{
+		{
+			name:    "keys.Public with non-string",
+			typeKey: "keys.Public",
+			value:   12345,
+		},
+		{
+			name:    "keys.Private with non-string",
+			typeKey: "keys.Private",
+			value:   67890,
+		},
+		{
+			name:    "frost.SigningCommitment with non-string",
+			typeKey: "frost.SigningCommitment",
+			value:   999,
+		},
+		{
+			name:    "frost.SigningNonce with non-string",
+			typeKey: "frost.SigningNonce",
+			value:   111,
+		},
+		{
+			name:    "schematype.TxID with non-string",
+			typeKey: "schematype.TxID",
+			value:   222,
+		},
+		{
+			name:    "uint128.Uint128 with non-float64",
+			typeKey: "uint128.Uint128",
+			value:   "67890",
+		},
+		{
+			name:    "uuid.UUID with non-string",
+			typeKey: "uuid.UUID",
+			value:   123,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Contains(t, typeRegistry, tt.typeKey)
+			_, err := typeRegistry[tt.typeKey](tt.value)
+			require.Error(t, err)
 		})
 	}
 }

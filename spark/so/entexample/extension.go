@@ -4,13 +4,16 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"reflect"
-	"sort"
+	"slices"
+	"strings"
 	"time"
 
 	"entgo.io/ent/entc"
 	"entgo.io/ent/entc/gen"
 	"entgo.io/ent/schema/field"
+	"k8s.io/apimachinery/pkg/api/validate/constraints"
 )
 
 //go:embed templates/*
@@ -18,48 +21,48 @@ var templates embed.FS
 
 // typeRegistry maps type Ident (fully qualified type name) to custom rendering functions.
 // This allows types to define custom rendering without requiring the actual type at codegen time.
-var typeRegistry = map[string]func(any) string{
-	"keys.Public": func(v any) string {
+var typeRegistry = map[string]func(any) (string, error){
+	"keys.Public": func(v any) (string, error) {
 		if s, ok := v.(string); ok {
-			return fmt.Sprintf(`keys.MustParsePublicKeyHex(%q)`, s)
+			return fmt.Sprintf(`keys.MustParsePublicKeyHex(%q)`, s), nil
 		}
-		return fmt.Sprintf(`keys.MustParsePublicKeyHex(%q)`, v)
+		return "", fmt.Errorf("invalid value %#v (type %T) for keys.Public", v, v)
 	},
-	"keys.Private": func(v any) string {
+	"keys.Private": func(v any) (string, error) {
 		if s, ok := v.(string); ok {
-			return fmt.Sprintf(`keys.MustParsePrivateKeyHex(%q)`, s)
+			return fmt.Sprintf(`keys.MustParsePrivateKeyHex(%q)`, s), nil
 		}
-		return fmt.Sprintf(`keys.MustParsePrivateKeyHex(%q)`, v)
+		return "", fmt.Errorf("invalid value %#v (type %T) for keys.Private", v, v)
 	},
-	"frost.SigningCommitment": func(v any) string {
+	"frost.SigningCommitment": func(v any) (string, error) {
 		if s, ok := v.(string); ok {
-			return fmt.Sprintf(`frost.MustParseSigningCommitment(%q)`, s)
+			return fmt.Sprintf(`frost.MustParseSigningCommitment(%q)`, s), nil
 		}
-		return fmt.Sprintf(`frost.MustParseSigningCommitment(%q)`, v)
+		return "", fmt.Errorf("invalid value %#v (type %T) for frost.SigningCommitment", v, v)
 	},
-	"frost.SigningNonce": func(v any) string {
+	"frost.SigningNonce": func(v any) (string, error) {
 		if s, ok := v.(string); ok {
-			return fmt.Sprintf(`frost.MustParseSigningNonce(%q)`, s)
+			return fmt.Sprintf(`frost.MustParseSigningNonce(%q)`, s), nil
 		}
-		return fmt.Sprintf(`frost.MustParseSigningNonce(%q)`, v)
+		return "", fmt.Errorf("invalid value %#v (type %T) for frost.SigningNonce", v, v)
 	},
-	"schematype.TxID": func(v any) string {
+	"schematype.TxID": func(v any) (string, error) {
 		if s, ok := v.(string); ok {
-			return fmt.Sprintf(`schematype.MustParseTxID(%q)`, s)
+			return fmt.Sprintf(`schematype.MustParseTxID(%q)`, s), nil
 		}
-		return fmt.Sprintf(`schematype.MustParseTxID(%q)`, v)
+		return "", fmt.Errorf("invalid value %#v (type %T) for schematype.TxID", v, v)
 	},
-	"uint128.Uint128": func(v any) string {
+	"uint128.Uint128": func(v any) (string, error) {
 		if f, ok := v.(float64); ok {
-			return fmt.Sprintf("uint128.FromUint64(uint64(%d))", uint64(f))
+			return fmt.Sprintf("uint128.FromUint64(uint64(%d))", uint64(f)), nil
 		}
-		return fmt.Sprintf("uint128.FromUint64(uint64(%v))", v)
+		return "", fmt.Errorf("invalid value %#v (type %T) for uint128.Uint128", v, v)
 	},
-	"uuid.UUID": func(v any) string {
+	"uuid.UUID": func(v any) (string, error) {
 		if s, ok := v.(string); ok {
-			return fmt.Sprintf(`uuid.MustParse(%q)`, s)
+			return fmt.Sprintf(`uuid.MustParse(%q)`, s), nil
 		}
-		return fmt.Sprintf(`uuid.MustParse(%q)`, v)
+		return "", fmt.Errorf("invalid value %#v (type %T) for uuid.UUID", v, v)
 	},
 }
 
@@ -121,7 +124,7 @@ func (e *Extension) Templates() []*gen.Template {
 	tmpl := gen.NewTemplate("entexample/entexample.go").
 		Funcs(gen.Funcs).
 		Funcs(map[string]any{
-			"formatDefault": func(field *gen.Field, ann any) string {
+			"formatDefault": func(field *gen.Field, ann any) (string, error) {
 				// Ent serializes annotations as map[string]interface{}
 				if m, ok := ann.(map[string]any); ok {
 					// Default is a defaultValue struct with a "Value" field
@@ -132,7 +135,7 @@ func (e *Extension) Templates() []*gen.Template {
 						return renderValueForField(field, nil)
 					}
 				}
-				return ""
+				return "", nil
 			},
 		})
 
@@ -141,8 +144,8 @@ func (e *Extension) Templates() []*gen.Template {
 	}
 }
 
-// renderWithFieldType renders a value based on the Ent field type.
-func renderValueForField(f *gen.Field, value any) string {
+// renderValueForField renders a value based on the Ent field type.
+func renderValueForField(f *gen.Field, value any) (string, error) {
 	// Check if the field's Go type has a custom renderer registered
 	if f.Type.RType != nil {
 		if renderFunc, ok := typeRegistry[f.Type.Ident]; ok {
@@ -152,84 +155,37 @@ func renderValueForField(f *gen.Field, value any) string {
 
 	// Handle basic types using type constants
 	switch f.Type.Type {
-	case field.TypeString:
-		if s, ok := value.(string); ok {
-			return fmt.Sprintf("%q", s)
-		}
-		return fmt.Sprintf("%q", value)
-
-	case field.TypeBool:
-		return fmt.Sprintf("%v", value)
-
+	case field.TypeString, field.TypeBool:
+		return fmt.Sprintf("%#v", value), nil
 	case field.TypeInt:
-		if f, ok := value.(float64); ok {
-			return fmt.Sprintf("int(%d)", int(f))
-		}
-		return fmt.Sprintf("int(%v)", value)
-
+		return truncateTo[int](value)
 	case field.TypeInt8:
-		if f, ok := value.(float64); ok {
-			return fmt.Sprintf("int8(%d)", int8(f))
-		}
-		return fmt.Sprintf("int8(%v)", value)
-
+		return truncateTo[int8](value)
 	case field.TypeInt16:
-		if f, ok := value.(float64); ok {
-			return fmt.Sprintf("int16(%d)", int16(f))
-		}
-		return fmt.Sprintf("int16(%v)", value)
-
+		return truncateTo[int16](value)
 	case field.TypeInt32:
-		if f, ok := value.(float64); ok {
-			return fmt.Sprintf("int32(%d)", int32(f))
-		}
-		return fmt.Sprintf("int32(%v)", value)
-
+		return truncateTo[int32](value)
 	case field.TypeInt64:
-		if f, ok := value.(float64); ok {
-			return fmt.Sprintf("int64(%d)", int64(f))
-		}
-		return fmt.Sprintf("int64(%v)", value)
-
+		return truncateTo[int64](value)
 	case field.TypeUint:
-		if f, ok := value.(float64); ok {
-			return fmt.Sprintf("uint(%d)", uint(f))
-		}
-		return fmt.Sprintf("uint(%v)", value)
-
+		return truncateTo[uint](value)
 	case field.TypeUint8:
-		if f, ok := value.(float64); ok {
-			return fmt.Sprintf("uint8(%d)", uint8(f))
-		}
-		return fmt.Sprintf("uint8(%v)", value)
-
+		return truncateTo[uint8](value)
 	case field.TypeUint16:
-		if f, ok := value.(float64); ok {
-			return fmt.Sprintf("uint16(%d)", uint16(f))
-		}
-		return fmt.Sprintf("uint16(%v)", value)
-
+		return truncateTo[uint16](value)
 	case field.TypeUint32:
-		if f, ok := value.(float64); ok {
-			return fmt.Sprintf("uint32(%d)", uint32(f))
-		}
-		return fmt.Sprintf("uint32(%v)", value)
-
+		return truncateTo[uint32](value)
 	case field.TypeUint64:
-		if f, ok := value.(float64); ok {
-			return fmt.Sprintf("uint64(%d)", uint64(f))
-		}
-		return fmt.Sprintf("uint64(%v)", value)
-
+		return truncateTo[uint64](value)
 	case field.TypeTime:
 		if s, ok := value.(string); ok {
 			// Ensure the time we are generated is always in UTC.
 			t, err := time.Parse(time.RFC3339, s)
 			if err == nil {
-				return fmt.Sprintf("func() time.Time { t, _ := time.Parse(time.RFC3339, %q); return t }()", t.UTC().Format(time.RFC3339))
+				return fmt.Sprintf("func() time.Time { t, _ := time.Parse(time.RFC3339, %q); return t }()", t.UTC().Format(time.RFC3339)), nil
 			}
 		}
-		return fmt.Sprintf("%#v", value)
+		return fmt.Sprintf("%#v", value), nil
 
 	case field.TypeBytes:
 		// Handle byte slices - accept hex strings and render them properly
@@ -237,12 +193,11 @@ func renderValueForField(f *gen.Field, value any) string {
 			// Try to decode as hex - if it's valid hex, use hex.DecodeString
 			if _, err := hex.DecodeString(s); err == nil && s != "" {
 				// Valid hex string - render as hex.DecodeString
-				return fmt.Sprintf(`func() []byte { b, _ := hex.DecodeString(%q); return b }()`, s)
+				return fmt.Sprintf(`func() []byte { b, _ := hex.DecodeString(%q); return b }()`, s), nil
 			}
 			// Not hex, render as plain string literal
-			return fmt.Sprintf("[]byte(%q)", s)
 		}
-		return fmt.Sprintf("[]byte(%q)", value)
+		return fmt.Sprintf("[]byte(%q)", value), nil
 
 	case field.TypeJSON:
 		// Check for map types
@@ -251,58 +206,37 @@ func renderValueForField(f *gen.Field, value any) string {
 				// Handle map[string][]byte where values are hex strings
 				if m, ok := value.(map[string]any); ok {
 					// Sort keys for deterministic output
-					keys := make([]string, 0, len(m))
-					for k := range m {
-						keys = append(keys, k)
-					}
-					sort.Strings(keys)
+					keys := slices.Sorted(maps.Keys(m))
 
-					result := "map[string][]byte{"
-					first := true
+					result := &strings.Builder{}
+					result.WriteString("map[string][]byte{")
 					for _, k := range keys {
 						v := m[k]
-						if !first {
-							result += ", "
-						}
-						first = false
 						// Expect v to be a hex string
 						if s, ok := v.(string); ok {
-							result += fmt.Sprintf("%q: func() []byte { b, _ := hex.DecodeString(%q); return b }()", k, s)
+							_, _ = fmt.Fprintf(result, "%q: func() []byte { b, _ := hex.DecodeString(%q); return b }(), ", k, s)
 						} else {
-							result += fmt.Sprintf("%q: []byte(%q)", k, v)
+							_, _ = fmt.Fprintf(result, "%q: []byte(%q), ", k, v)
 						}
 					}
-					result += "}"
-					return result
+					result.WriteRune('}')
+					return result.String(), nil
 				}
 			}
 			if f.Type.RType.Ident == "map[string]keys.Public" {
 				// Handle map[string]keys.Public where values are hex strings
 				if m, ok := value.(map[string]any); ok {
 					// Sort keys for deterministic output
-					keys := make([]string, 0, len(m))
-					for k := range m {
-						keys = append(keys, k)
-					}
-					sort.Strings(keys)
+					keys := slices.Sorted(maps.Keys(m))
 
-					result := "map[string]keys.Public{"
-					first := true
+					result := &strings.Builder{}
+					result.WriteString("map[string]keys.Public{")
+
 					for _, k := range keys {
-						v := m[k]
-						if !first {
-							result += ", "
-						}
-						first = false
-						// Expect v to be a hex string
-						if s, ok := v.(string); ok {
-							result += fmt.Sprintf("%q: keys.MustParsePublicKeyHex(%q)", k, s)
-						} else {
-							result += fmt.Sprintf("%q: keys.MustParsePublicKeyHex(%q)", k, v)
-						}
+						_, _ = fmt.Fprintf(result, "%q: keys.MustParsePublicKeyHex(%q), ", k, m[k])
 					}
-					result += "}"
-					return result
+					result.WriteRune('}')
+					return result.String(), nil
 				}
 			}
 		}
@@ -313,33 +247,39 @@ func renderValueForField(f *gen.Field, value any) string {
 				// Handle []string (field.Strings())
 				// After JSON deserialization, slices come through as []any
 				if slice, ok := value.([]any); ok {
-					result := "[]string{"
-					for i, v := range slice {
-						if i > 0 {
-							result += ", "
-						}
-						if s, ok := v.(string); ok {
-							result += fmt.Sprintf("%q", s)
-						} else {
-							result += fmt.Sprintf("%q", v)
-						}
+					result := &strings.Builder{}
+					result.WriteString("[]string{")
+					for _, v := range slice {
+						_, _ = fmt.Fprintf(result, "%q, ", v)
 					}
-					result += "}"
-					return result
+					result.WriteRune('}')
+					return result.String(), nil
 				}
 			}
 		}
 
 		// Other JSON types, use %#v
-		return fmt.Sprintf("%#v", value)
+		return fmt.Sprintf("%#v", value), nil
 
 	case field.TypeEnum:
 		// For enums with custom GoType, use the fully qualified constant name
 		// Value should be the enum constant (e.g., schematype.NetworkRegtest)
-		return fmt.Sprintf("%#v", value)
+		return fmt.Sprintf("%#v", value), nil
 
 	default:
 		// For custom types (enums, GoTypes, etc.), use %#v
-		return fmt.Sprintf("%#v", value)
+		return fmt.Sprintf("%#v", value), nil
+	}
+}
+
+func truncateTo[t constraints.Integer](a any) (string, error) {
+	var zero t
+	switch v := a.(type) {
+	case float64:
+		return fmt.Sprintf("%T(%d)", zero, t(v)), nil
+	case t:
+		return fmt.Sprintf("%T(%d)", zero, v), nil
+	default:
+		return "", fmt.Errorf("invalid value %#v (type %T) for %T", a, a, zero)
 	}
 }
