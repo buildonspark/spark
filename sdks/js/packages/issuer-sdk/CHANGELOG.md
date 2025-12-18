@@ -1,5 +1,15 @@
 # @buildonspark/issuer-sdk
 
+## 0.1.2
+
+### Patch Changes
+
+- **getIssuerTokenMetadata()**
+  - Convert extraMetadata from Buffer to Uint8Array for better cross-platform compatibility. Returns undefined when no metadata is present instead of an empty buffer on getIssuerTokenMetadata()
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.5.2
+
 ## 0.1.1
 
 ### Patch Changes

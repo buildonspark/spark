@@ -1,5 +1,15 @@
 # @buildonspark/spark-sdk
 
+## 0.5.2
+
+### Patch Changes
+
+- **getBalance**
+  - Return extraMetadata in token metadata fields on getBalance()
+
+  **error handling**
+  - Add a public getContext() method
+
 ## 0.5.1
 
 ### Patch Changes
