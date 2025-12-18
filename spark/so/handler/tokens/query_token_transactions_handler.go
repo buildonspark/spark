@@ -180,7 +180,7 @@ func (h *QueryTokenTransactionsHandler) queryWithRawSql(ctx context.Context, par
 		return nil, fmt.Errorf("failed to build optimized query: %w", err)
 	}
 
-	//nolint:forbidigo
+	//nolint:forbidigo // We have to use this API to run the optimized query, since it's a string.
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute optimized query: %w", err)

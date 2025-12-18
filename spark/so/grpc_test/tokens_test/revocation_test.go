@@ -1157,7 +1157,7 @@ func setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOper
 	require.NoError(t, err)
 
 	// Expire the remapped transaction. This makes its spent outputs available to be reclaimed.
-	//nolint:forbidigo
+	//nolint:forbidigo // We have to use this API because the expiry time is an immutable field, so there's no Update method for it.
 	_, err = nonCoordinatorTx.ExecContext(ctx,
 		"UPDATE token_transactions SET expiry_time = $1 WHERE finalized_token_transaction_hash = $2",
 		expirationTime,

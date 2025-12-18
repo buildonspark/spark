@@ -1,12 +1,12 @@
 package grpctest
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
 	_ "github.com/lightsparkdev/spark/so/ent/runtime"
 	sparktesting "github.com/lightsparkdev/spark/testing"
+	"go.uber.org/zap"
 )
 
 var faucet *sparktesting.Faucet
@@ -15,8 +15,7 @@ func TestMain(m *testing.M) {
 	// Setup
 	client, err := sparktesting.InitBitcoinClient()
 	if err != nil {
-		//nolint:forbidigo
-		fmt.Println("Error creating regtest client", err)
+		zap.S().Fatal("Error creating regtest client", err)
 		os.Exit(1)
 	}
 

@@ -57,7 +57,10 @@ func NewSparkOperatorController(t *testing.T) (*SparkOperatorController, error) 
 		controller.mu.Lock()
 		defer controller.mu.Unlock()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) //nolint: usetesting
+		//nolint: usetesting // Use the background context to ensure this will run even if the test is cancelled, since
+		// it deals with external resources. t.Context is canceled just before Cleanup-registered functions are called,
+		// so it's no help here.
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		for operatorNum := range controller.operators {

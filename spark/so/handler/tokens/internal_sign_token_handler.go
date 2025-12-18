@@ -609,7 +609,7 @@ func (h *InternalSignTokenHandler) getPartialRevocationSecretShares(
 		args = append(args, pq.Array(excludeOutputIDs), pq.Array(excludeOperatorKeys))
 	}
 
-	//nolint:forbidigo
+	//nolint:forbidigo // We have to use this API to run the optimized query, since it's a string.
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute optimized partial shares query: %w", err)

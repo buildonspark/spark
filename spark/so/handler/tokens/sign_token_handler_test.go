@@ -675,7 +675,6 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRem
 			t.Error("unexpected error: %w", err) // We can't use require.NoError or t.Fail from a goroutine
 			return
 		}
-
 		_, err = transferData.prevTokenOutput1.Update().
 			SetOutputSpentTokenTransaction(otherTx).
 			SetStatus(schematype.TokenOutputStatusSpentStarted).

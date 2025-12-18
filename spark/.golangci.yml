@@ -12,6 +12,7 @@ linters:
     - unused
     - govet
     - usetesting
+    - nolintlint
     - durationcheck # Checks for durations multiplied together
     - errorlint # Checks for incorrect wrapping of errors
     - exptostd # Detects functions from golang.org/x/exp/ that can be replaced by std functions
@@ -90,6 +91,11 @@ linters:
           pkg: '^github.com/lightsparkdev/spark/so/ent$'
           msg: 'Use of ent.Tx.QueryContext is forbidden. Use ent query builders unless you know what you are doing!'
       analyze-types: true
+    nolintlint:
+      # Require an explanation of nonzero length after each nolint directive.
+      require-explanation: true
+      # Require nolint directives to mention the specific linter being suppressed.
+      require-specific: true
     staticcheck:
       checks:
         - "-SA1019"
