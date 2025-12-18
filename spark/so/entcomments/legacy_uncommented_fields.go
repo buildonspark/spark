@@ -31,7 +31,6 @@ var legacyUncommentedFields = map[string][]string{
 	"TokenPartialRevocationSecretShare": {"operator_identity_public_key", "secret_share"},
 	"TokenTransaction":                  {"partial_token_transaction_hash", "finalized_token_transaction_hash", "operator_signature", "status", "expiry_time", "coordinator_public_key", "client_created_timestamp", "version", "validity_duration_seconds"},
 	"TokenTransactionPeerSignature":     {"operator_identity_public_key", "signature"},
-	"Transfer":                          {"receiver_identity_pubkey", "total_value", "status", "type", "expiry_time", "completion_time"},
 	"TransferLeaf":                      {"secret_cipher", "signature", "previous_refund_tx", "previous_direct_refund_tx", "previous_direct_from_cpfp_refund_tx", "intermediate_refund_tx", "intermediate_direct_refund_tx", "intermediate_direct_from_cpfp_refund_tx", "key_tweak", "sender_key_tweak_proof", "receiver_key_tweak"},
 	"Tree":                              {"owner_identity_pubkey", "status", "network", "base_txid", "vout"},
 	"TreeNode":                          {"value", "network", "status", "verifying_pubkey", "owner_identity_pubkey", "owner_signing_pubkey", "vout", "node_confirmation_height", "refund_confirmation_height", "direct_from_cpfp_refund_tx", "direct_refund_tx"},
