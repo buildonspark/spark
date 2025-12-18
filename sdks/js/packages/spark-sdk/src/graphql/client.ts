@@ -8,6 +8,7 @@ import {
   Requester,
 } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha2";
+import { Base64 } from "js-base64";
 import {
   SparkAuthenticationError,
   SparkRequestError,
@@ -641,16 +642,13 @@ export default class SspClient {
             throw new Error("Failed to get challenge");
           }
 
-          const challengeBytes = Buffer.from(
-            challenge.protectedChallenge,
-            "base64",
-          );
+          const challengeBytes = base64UrlToBytes(challenge.protectedChallenge);
           const signature = await this.signer.signMessageWithIdentityKey(
             sha256(challengeBytes),
           );
 
           const verifyChallenge = await this.verifyChallenge(
-            Buffer.from(signature).toString("base64"),
+            bytesToBase64Url(signature),
             challenge.protectedChallenge,
           );
           if (!verifyChallenge) {
@@ -727,6 +725,28 @@ export default class SspClient {
       },
     });
   }
+}
+
+/**
+ * Spark SSP uses **base64url** for challenge + signature values.
+ *
+ * Node's `Buffer.from(x, "base64")` is often permissive enough to decode base64url,
+ * but some runtimes/polyfills are not (e.g. certain Bare/Worklet environments),
+ * which can lead to subtly wrong bytes and "Key does not match signature".
+ */
+function base64UrlToBytes(input: string): Uint8Array {
+  // Normalize base64url -> base64, and ensure padding.
+  let s = input.replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/");
+  const mod = s.length % 4;
+  if (mod !== 0) {
+    s += "=".repeat(4 - mod);
+  }
+  return Base64.toUint8Array(s);
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  // urlSafe=true => base64url (RFC 4648 §5) encoding.
+  return Base64.fromUint8Array(bytes, true);
 }
 
 class SparkAuthProvider implements AuthProvider {
