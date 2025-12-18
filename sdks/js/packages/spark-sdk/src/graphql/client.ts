@@ -86,6 +86,8 @@ import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate.js"
 import { GetTransfers } from "./queries/Transfers.js";
 import { UserRequest } from "./queries/UserRequest.js";
 
+console.log("Using patched spark-sdk client");
+
 export interface SspClientOptions {
   baseUrl: string;
   identityPublicKey: string;
