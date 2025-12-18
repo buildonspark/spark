@@ -638,6 +638,24 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
+func (r *RateLimiter) StreamServerInterceptor() grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		// Check if the method is enabled.
+		methodEnabled := r.knobs.RolloutRandomTarget(knobs.KnobGrpcServerMethodEnabled, &info.FullMethod, 100)
+		if !methodEnabled {
+			return errors.UnimplementedMethodDisabled(fmt.Errorf("the method is currently unavailable, please try again later"))
+		}
+
+		ctx := ss.Context()
+		dimensions := r.buildDimensions(ctx)
+		if err := r.enforceRateLimits(ctx, info.FullMethod, dimensions); err != nil {
+			return err
+		}
+
+		return handler(srv, ss)
+	}
+}
+
 // enforceAndObserve enforces a rate limit for a given scope/dimension and records utilization.
 // Returns error if the rate limit store errors or if the limit is exceeded.
 func (r *RateLimiter) enforceAndObserve(ctx context.Context, p rateLimitEnforcementParams) error {

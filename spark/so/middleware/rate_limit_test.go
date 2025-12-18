@@ -1614,3 +1614,268 @@ func TestRateLimiter_FailOpen_OnTakeError(t *testing.T) {
 	_, err = interceptor(ctx, "req", info, handler)
 	require.NoError(t, err)
 }
+
+// mockServerStream implements grpc.ServerStream for testing
+type mockServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (m *mockServerStream) Context() context.Context {
+	return m.ctx
+}
+
+func TestStreamServerInterceptor(t *testing.T) {
+	t.Run("basic rate limiting", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobRateLimitLimit + "@/test.Service/TestStream#1s": 2,
+		})
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.StreamServerInterceptor()
+		handler := func(_ any, _ grpc.ServerStream) error {
+			return nil
+		}
+		info := &grpc.StreamServerInfo{FullMethod: "/test.Service/TestStream"}
+
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
+		stream := &mockServerStream{ctx: ctx}
+
+		err = interceptor(nil, stream, info, handler)
+		require.NoError(t, err)
+
+		err = interceptor(nil, stream, info, handler)
+		require.NoError(t, err)
+
+		err = interceptor(nil, stream, info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+	})
+
+	t.Run("method :ip and :pubkey limits enforced independently", func(t *testing.T) {
+		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+		store := newTestMemoryStore(clock)
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+		ip := "8.8.8.8"
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobRateLimitLimit + "@/test.Service/Stream:ip#1s":     2,
+			knobs.KnobRateLimitLimit + "@/test.Service/Stream:pubkey#1s": 1,
+		})
+		rl, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+		require.NoError(t, err)
+
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": ip,
+		}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		stream := &mockServerStream{ctx: ctx}
+
+		interceptor := rl.StreamServerInterceptor()
+		handler := func(_ any, _ grpc.ServerStream) error { return nil }
+		info := &grpc.StreamServerInfo{FullMethod: "/test.Service/Stream"}
+
+		// First request consumes 1 pubkey token (limit 1) and 1 of 2 IP tokens
+		err = interceptor(nil, stream, info, handler)
+		require.NoError(t, err)
+
+		// Second request should fail due to pubkey limit reached
+		err = interceptor(nil, stream, info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+	})
+
+	t.Run("different clients", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobRateLimitLimit + "@/test.Service/TestStream#1s": 2,
+		})
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.StreamServerInterceptor()
+		handler := func(_ any, _ grpc.ServerStream) error { return nil }
+		info := &grpc.StreamServerInfo{FullMethod: "/test.Service/TestStream"}
+
+		ctx1 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
+		ctx2 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "5.6.7.8",
+		}))
+		stream1 := &mockServerStream{ctx: ctx1}
+		stream2 := &mockServerStream{ctx: ctx2}
+
+		err = interceptor(nil, stream1, info, handler)
+		require.NoError(t, err)
+		err = interceptor(nil, stream1, info, handler)
+		require.NoError(t, err)
+
+		err = interceptor(nil, stream2, info, handler)
+		require.NoError(t, err)
+		err = interceptor(nil, stream2, info, handler)
+		require.NoError(t, err)
+
+		err = interceptor(nil, stream1, info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+
+		err = interceptor(nil, stream2, info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+	})
+
+	t.Run("IP address excluded via knobs", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		mockKnobsMap := map[string]float64{
+			knobs.KnobRateLimitExcludeIps + "@1.2.3.4":                1,
+			knobs.KnobRateLimitExcludeIps + "@5.6.7.8":                0,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestStream#1s": 2,
+		}
+		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
+
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.StreamServerInterceptor()
+		handler := func(_ any, _ grpc.ServerStream) error { return nil }
+		info := &grpc.StreamServerInfo{FullMethod: "/test.Service/TestStream"}
+
+		// IP 1.2.3.4 is excluded, so it should not be rate-limited.
+		ctxExcluded := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
+		streamExcluded := &mockServerStream{ctx: ctxExcluded}
+		for i := 0; i < 5; i++ {
+			err := interceptor(nil, streamExcluded, info, handler)
+			require.NoError(t, err)
+		}
+
+		// IP 5.6.7.8 is not excluded, so it should be rate-limited.
+		ctxNotExcluded := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "5.6.7.8",
+		}))
+		streamNotExcluded := &mockServerStream{ctx: ctxNotExcluded}
+
+		err = interceptor(nil, streamNotExcluded, info, handler)
+		require.NoError(t, err)
+		err = interceptor(nil, streamNotExcluded, info, handler)
+		require.NoError(t, err)
+		err = interceptor(nil, streamNotExcluded, info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+	})
+
+	t.Run("Pubkey excluded via knobs", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+		mockKnobsMap := map[string]float64{
+			knobs.KnobRateLimitLimit + "@/test.Service/TestStream#1s": 1,
+			knobs.KnobRateLimitExcludePubkeys + "@" + identityHex:     1,
+		}
+		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
+
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.StreamServerInterceptor()
+		handler := func(_ any, _ grpc.ServerStream) error { return nil }
+		info := &grpc.StreamServerInfo{FullMethod: "/test.Service/TestStream"}
+
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		stream := &mockServerStream{ctx: ctx}
+
+		// Should not rate limit due to exclusion
+		for i := 0; i < 3; i++ {
+			err := interceptor(nil, stream, info, handler)
+			require.NoError(t, err)
+		}
+	})
+
+	t.Run("global limit applies to all methods", func(t *testing.T) {
+		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+		store := newTestMemoryStore(clock)
+		config := &RateLimiterConfig{}
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobRateLimitLimit + "@global#1s": 2,
+		})
+		rl, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+		require.NoError(t, err)
+
+		interceptor := rl.StreamServerInterceptor()
+		handler := func(_ any, _ grpc.ServerStream) error { return nil }
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": "1.2.3.4"}))
+		stream := &mockServerStream{ctx: ctx}
+
+		info := &grpc.StreamServerInfo{FullMethod: "/test.Service/Stream1"}
+		err = interceptor(nil, stream, info, handler)
+		require.NoError(t, err)
+		err = interceptor(nil, stream, info, handler)
+		require.NoError(t, err)
+
+		// A different method should also be limited due to global limit
+		info2 := &grpc.StreamServerInfo{FullMethod: "/test.Service/Stream2"}
+		err = interceptor(nil, stream, info2, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+	})
+
+	t.Run("method not rate limited bypasses without error", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobRateLimitLimit + "@/test.Service/LimitedStream#1s": 2,
+		})
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.StreamServerInterceptor()
+		handler := func(_ any, _ grpc.ServerStream) error { return nil }
+		info := &grpc.StreamServerInfo{FullMethod: "/test.Service/NotLimited"}
+
+		for i := 0; i < 5; i++ {
+			err := interceptor(nil, &mockServerStream{ctx: t.Context()}, info, handler)
+			require.NoError(t, err)
+		}
+	})
+
+	t.Run("tiers enforce limits and windowing via suffix", func(t *testing.T) {
+		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+		mockStore := newTestMemoryStore(clock)
+		config := &RateLimiterConfig{}
+		knobValues := map[string]float64{
+			knobs.KnobRateLimitLimit + "@/test.Service/Stream#1s": 2,
+			knobs.KnobRateLimitLimit + "@/test.Service/Stream#1m": 3,
+		}
+		mockKnobs := knobs.NewFixedKnobs(knobValues)
+
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(mockStore), WithClock(clock))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.StreamServerInterceptor()
+		handler := func(_ any, _ grpc.ServerStream) error { return nil }
+		info := &grpc.StreamServerInfo{FullMethod: "/test.Service/Stream"}
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": "1.2.3.4"}))
+		stream := &mockServerStream{ctx: ctx}
+
+		// Under both tiers: allow 2 in 1s, 3 in 1m
+		for i := 0; i < 2; i++ {
+			err := interceptor(nil, stream, info, handler)
+			require.NoError(t, err)
+		}
+		// Third within same second should fail due to #1s tier
+		err = interceptor(nil, stream, info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+
+		// Advance 1s resets #1s tier, but #1m tier still counts
+		clock.Time = clock.Time.Add(1 * time.Second)
+		err = interceptor(nil, stream, info, handler)
+		require.NoError(t, err)
+
+		// At this point, total requests within the 1-minute window is 3. The next request should fail.
+		err = interceptor(nil, stream, info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+	})
+}
