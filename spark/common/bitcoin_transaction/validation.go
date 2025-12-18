@@ -30,7 +30,7 @@ func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode
 
 	cpfpRefundTxTimelock, err := GetCpfpTimelockFromLeaf(dbLeaf)
 	if err != nil {
-		return fmt.Errorf("failed to get CPFP timelock from leaf: %w", err)
+		return fmt.Errorf("failed to get CPFP timelock from leaf: %w, tx type: %d", err, txType)
 	}
 
 	switch txType {
@@ -55,45 +55,45 @@ func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode
 func VerifyTransactionWithSource(clientRawTxBytes []byte, sourceRawTxBytes []byte, vout uint32, cpfpRefundTxTimelock uint32, txType TxType, destPubkey keys.Public) error {
 	clientTx, err := common.TxFromRawTxBytes(clientRawTxBytes)
 	if err != nil {
-		return fmt.Errorf("failed to parse client tx: %w", err)
+		return fmt.Errorf("failed to parse client tx: %w, tx type: %d", err, txType)
 	}
 
 	clientSequence, err := GetAndValidateUserSequence(clientRawTxBytes)
 	if err != nil {
-		return fmt.Errorf("failed to validate user sequence: %w", err)
+		return fmt.Errorf("failed to validate user sequence: %w, tx type: %d", err, txType)
 	}
 
 	// Allow only V2 or V3 client transactions and use the client's version for construction.
 	if clientTx.Version != 2 && clientTx.Version != 3 {
-		return fmt.Errorf("unsupported transaction version: %d", clientTx.Version)
+		return fmt.Errorf("unsupported transaction version: %d, tx type: %d", clientTx.Version, txType)
 	}
 
 	// Construct the expected transaction based on the type
 	expectedTx, err := constructExpectedTransaction(sourceRawTxBytes, vout, cpfpRefundTxTimelock, txType, destPubkey, clientSequence, clientTx.Version)
 	if err != nil {
-		return fmt.Errorf("failed to construct expected transaction: %w", err)
+		return fmt.Errorf("failed to construct expected transaction: %w, tx type: %d", err, txType)
 	}
 
 	// Compare the expected and client transactions with CompareTransactions first to return a more helpful error message
 	err = common.CompareTransactions(expectedTx, clientTx)
 	if err != nil {
-		return fmt.Errorf("transaction does not match expected construction: %w", err)
+		return fmt.Errorf("transaction does not match expected construction: %w, tx type: %d", err, txType)
 	}
 
 	// Serialize the expected and client transactions to compare the raw bytes for more extensive validation.
 	expectedTxBytes, err := common.SerializeTxNoWitness(expectedTx)
 	if err != nil {
-		return fmt.Errorf("failed to serialize expected transaction: %w", err)
+		return fmt.Errorf("failed to serialize expected transaction: %w, tx type: %d", err, txType)
 	}
 
 	clientTxBytes, err := common.SerializeTxNoWitness(clientTx)
 
 	if err != nil {
-		return fmt.Errorf("failed to serialize client transaction: %w", err)
+		return fmt.Errorf("failed to serialize client transaction: %w, tx type: %d", err, txType)
 	}
 	if !bytes.Equal(expectedTxBytes, clientTxBytes) {
 		diff := cmp.Diff(expectedTxBytes, clientTxBytes)
-		return fmt.Errorf("transaction does not match expected construction: %s", diff)
+		return fmt.Errorf("transaction does not match expected construction: %s, tx type: %d", diff, txType)
 	}
 
 	return nil
