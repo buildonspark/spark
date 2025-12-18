@@ -113,10 +113,7 @@ func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration
 			opts = append(opts, db.WithTxBeginTimeout(*beginTxTimeout))
 		}
 
-		var session ent.Session = factory.NewSession(
-			sessionCtx,
-			opts...,
-		)
+		session := factory.NewSession(sessionCtx, opts...)
 
 		ctx = ent.Inject(ctx, session)
 		ctx = ent.InjectNotifier(ctx, session)
@@ -124,8 +121,7 @@ func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration
 		err := task.Task(ctx, config, knobsService)
 
 		if tx := session.GetTxIfExists(); tx != nil {
-			// nolint:errcheck
-			defer tx.Rollback() // Safe to call, will be a no-op if already committed or rolled back.
+			defer func() { _ = tx.Rollback() }() // Safe to call, will be a no-op if already committed or rolled back.
 
 			if err == nil {
 				return tx.Commit()

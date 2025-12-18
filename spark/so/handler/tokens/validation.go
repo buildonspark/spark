@@ -13,7 +13,6 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/errors"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
@@ -39,11 +38,11 @@ func validateStatuses(
 		if !matchesExpected {
 			var expectedDesc string
 			if len(expectedStatuses) == 1 {
-				expectedDesc = fmt.Sprintf("%s", expectedStatuses[0])
+				expectedDesc = string(expectedStatuses[0])
 			} else {
 				parts := make([]string, len(expectedStatuses))
 				for i, s := range expectedStatuses {
-					parts[i] = fmt.Sprintf("%s", s)
+					parts[i] = string(s)
 				}
 				expectedDesc = fmt.Sprintf("one of [%s]", strings.Join(parts, " or "))
 			}
@@ -151,7 +150,7 @@ func validateNoActiveFreezesForOutputs(ctx context.Context, outputs []*ent.Token
 	ownersByToken := make(map[uuid.UUID]ownerList)
 	for _, output := range outputs {
 		if output.TokenCreateID == uuid.Nil {
-			return errors.InternalDatabaseMissingEdge(fmt.Errorf("no created token found when attempting to validate transfer transaction"))
+			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no created token found when attempting to validate transfer transaction"))
 		}
 		ownersByToken[output.TokenCreateID] = append(ownersByToken[output.TokenCreateID], output.OwnerPublicKey)
 	}
@@ -174,7 +173,7 @@ func validateNoActiveFreezesForOutputs(ctx context.Context, outputs []*ent.Token
 				freeze.WalletProvidedFreezeTimestamp,
 			)
 		}
-		return errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("at least one input is frozen. Cannot proceed with transaction"))
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("at least one input is frozen. Cannot proceed with transaction"))
 	}
 	return nil
 }

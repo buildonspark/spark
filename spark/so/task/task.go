@@ -408,13 +408,13 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					if err != nil {
 						return err
 					}
-					logger.Info(fmt.Sprintf("[cron] Found %d token transactions to finalize", len(tokenTransactions)))
+					logger.Sugar().Infof("[cron] Found %d token transactions to finalize", len(tokenTransactions))
 
 					var errs []error
 					signTokenHandler := tokens.NewSignTokenHandler(config)
 
 					for _, tokenTransaction := range tokenTransactions {
-						ctx, logger = logging.WithAttrs(ctx, tokenslogging.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
+						ctx, _ = logging.WithAttrs(ctx, tokenslogging.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
 						err := signTokenHandler.TryFinalizeRevealedTokenTransaction(ctx, tokenTransaction)
 						if err != nil {
 							errs = append(errs, fmt.Errorf("[cron] failed to finalize revealed token transaction %s: %w", tokenTransaction.ID, err))
@@ -731,7 +731,7 @@ func AllStartupTasks() []StartupTaskSpec {
 							return fmt.Errorf("failed to query for entity DKG key: %w", err)
 						}
 						// No existing entity DKG key found, create a new one
-						entityDkgKey, err = ent.CreateEntityDkgKeyWithUnusedSigningKeyshare(ctx, config)
+						_, err = ent.CreateEntityDkgKeyWithUnusedSigningKeyshare(ctx, config)
 						if err != nil {
 							return fmt.Errorf("failed to create entity DKG key with unused signing keyshare: %w", err)
 						}
@@ -877,7 +877,7 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, run
 					}
 				}(task)
 			} else {
-				task.RunOnce(ctx, config, db, knobsService) // nolint: errcheck
+				task.RunOnce(ctx, config, db, knobsService) //nolint: errcheck
 			}
 		}
 	}

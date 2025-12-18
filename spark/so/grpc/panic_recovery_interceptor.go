@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/logging"
@@ -15,7 +16,10 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 )
 
-var globalPanicCounter metric.Int64Counter
+var (
+	errInternal        = errors.New("internal server error")
+	globalPanicCounter metric.Int64Counter
+)
 
 func init() {
 	meter := otel.GetMeterProvider().Meter("spark.grpc")
@@ -56,10 +60,10 @@ func PanicRecoveryInterceptor(returnDetailedPanicErrors bool) grpc.UnaryServerIn
 				if returnDetailedPanicErrors {
 					// Include details in testing/development
 					panicMsg := fmt.Sprintf("%v", r)
-					err = sparkerrors.InternalUnhandledError(fmt.Errorf("Internal server error: %s", panicMsg))
+					err = sparkerrors.InternalUnhandledError(fmt.Errorf("%w: %s", errInternal, panicMsg))
 				} else {
 					// Generic message for production
-					err = sparkerrors.InternalUnhandledError(fmt.Errorf("Internal server error"))
+					err = sparkerrors.InternalUnhandledError(errInternal)
 				}
 				resp = nil
 			}
@@ -89,7 +93,7 @@ func PanicRecoveryStreamInterceptor() grpc.StreamServerInterceptor {
 				)
 
 				// Convert panic to error instead of re-panicking
-				err = sparkerrors.InternalUnhandledError(fmt.Errorf("Internal server error"))
+				err = sparkerrors.InternalUnhandledError(errInternal)
 			}
 		}()
 

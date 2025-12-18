@@ -110,7 +110,7 @@ func getUnusedSigningKeysharesTx(ctx context.Context, client *Client, cfg *so.Co
 
 	// Setting these parameters to optimize the performance of the query below.
 
-	// nolint:forbidigo
+	//nolint:forbidigo
 	_, err := client.ExecContext(ctx, `
 		SET LOCAL seq_page_cost = 10.0;
 		SET LOCAL random_page_cost = 1.0;
@@ -124,7 +124,7 @@ func getUnusedSigningKeysharesTx(ctx context.Context, client *Client, cfg *so.Co
 	// We use a custom a custom query here to select and update the keyshares in a single query, while
 	// skipping locked rows to avoid contention.
 
-	// nolint:forbidigo
+	//nolint:forbidigo
 	rows, err := client.QueryContext(ctx, `
 		WITH selected_ids AS (
 			SELECT id FROM signing_keyshares
@@ -179,7 +179,7 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UU
 
 	// We use a custom a custom query here to select and update the keyshares in a single query
 
-	// nolint:forbidigo
+	//nolint:forbidigo
 	rows, err := db.QueryContext(ctx, `
 		UPDATE signing_keyshares
 		SET status = 'IN_USE', update_time = NOW()

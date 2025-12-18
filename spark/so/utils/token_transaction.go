@@ -19,7 +19,6 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/lightsparkdev/spark/common"
-	pb "github.com/lightsparkdev/spark/proto/spark"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -529,7 +528,7 @@ func HashTokenTransactionV0(tokenTransaction *sparkpb.TokenTransaction, partialH
 	return finalHash, nil
 }
 
-func hashTransferInputV0(h hash.Hash, transferSource *pb.TokenTransferInput) ([]byte, error) {
+func hashTransferInputV0(h hash.Hash, transferSource *sparkpb.TokenTransferInput) ([]byte, error) {
 	var allHashes []byte
 	if transferSource == nil {
 		return nil, fmt.Errorf("transfer input cannot be nil when hashing transfer transaction")
@@ -559,7 +558,7 @@ func hashTransferInputV0(h hash.Hash, transferSource *pb.TokenTransferInput) ([]
 	return allHashes, nil
 }
 
-func hashCreateInputV0(h hash.Hash, createInput *pb.TokenCreateInput, partialHash bool) ([]byte, error) {
+func hashCreateInputV0(h hash.Hash, createInput *sparkpb.TokenCreateInput, partialHash bool) ([]byte, error) {
 	if createInput == nil {
 		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("create input cannot be nil when hashing create transaction"))
 	}
@@ -635,7 +634,7 @@ func hashCreateInputV0(h hash.Hash, createInput *pb.TokenCreateInput, partialHas
 	return allHashes, nil
 }
 
-func hashMintInputV0(h hash.Hash, mintInput *pb.TokenMintInput) ([]byte, error) {
+func hashMintInputV0(h hash.Hash, mintInput *sparkpb.TokenMintInput) ([]byte, error) {
 	if mintInput == nil {
 		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("mint input cannot be nil when hashing mint transaction"))
 	}
@@ -659,7 +658,7 @@ func hashMintInputV0(h hash.Hash, mintInput *pb.TokenMintInput) ([]byte, error) 
 	return allHashes, nil
 }
 
-func hashTokenOutputs(h hash.Hash, tokenOutputs []*pb.TokenOutput, partialHash bool) ([]byte, error) {
+func hashTokenOutputs(h hash.Hash, tokenOutputs []*sparkpb.TokenOutput, partialHash bool) ([]byte, error) {
 	var allHashes []byte
 	for i, output := range tokenOutputs {
 		if output == nil {
@@ -751,7 +750,7 @@ func hashOperators(h hash.Hash, operatorPublicKeys [][]byte) ([]byte, error) {
 	return allHashes, nil
 }
 
-func hashNetwork(h hash.Hash, network pb.Network) []byte {
+func hashNetwork(h hash.Hash, network sparkpb.Network) []byte {
 	h.Reset()
 	networkBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(networkBytes, uint32(network))

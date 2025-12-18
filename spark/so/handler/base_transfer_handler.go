@@ -28,7 +28,6 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
-	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
@@ -430,7 +429,7 @@ func validateSendLeafRefundTxs(ctx context.Context, leaf *ent.TreeNode, rawRefun
 
 func (h *BaseTransferHandler) createTransfer(
 	ctx context.Context,
-	req *pb.StartTransferRequest,
+	req *pbspark.StartTransferRequest,
 	transferID uuid.UUID,
 	transferType st.TransferType,
 	expiryTime time.Time,
@@ -501,7 +500,7 @@ func (h *BaseTransferHandler) createTransfer(
 	if transferType == st.TransferTypeCounterSwapV3 {
 		primaryTransfer, err := db.Transfer.Query().Where(enttransfer.IDEQ(primaryTransferId)).Only(ctx)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Unable to find primary swap transfer id=%s", primaryTransferId.String())
+			return nil, nil, fmt.Errorf("unable to find primary swap transfer id=%s", primaryTransferId.String())
 		}
 		// Check that the SO holds the correct refunds for the primary transfer.
 		if primaryTransfer.Status != st.TransferStatusSenderKeyTweakPending && primaryTransfer.Status != st.TransferStatusSenderInitiatedCoordinator {
@@ -611,7 +610,7 @@ func createAndLockSparkInvoice(ctx context.Context, sparkInvoice string) (uuid.U
 		return uuid.Nil, fmt.Errorf("lock invoice: %w", err)
 	}
 	if storedInvoice.SparkInvoice != sparkInvoice {
-		return uuid.Nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("Conflicting invoices found for id: %s. Decoded request invoice: %s", storedInvoice.ID.String(), sparkInvoice))
+		return uuid.Nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("conflicting invoices found for id: %s. Decoded request invoice: %s", storedInvoice.ID, sparkInvoice))
 	}
 
 	// Check if an existing transfer is in flight or paid with this invoice.
@@ -961,7 +960,7 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 		return nil, fmt.Errorf("encountered error when fetching preimage request for transfer id %s: %w", transferID, err)
 	}
 	if preimageRequest != nil && preimageRequest.Status == st.PreimageRequestStatusPreimageShared {
-		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("Cannot cancel an invoice whose preimage has already been revealed"))
+		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("cannot cancel an invoice whose preimage has already been revealed"))
 	}
 
 	err = h.CreateCancelTransferGossipMessage(ctx, transferID)
@@ -1091,7 +1090,7 @@ func (h *BaseTransferHandler) RollbackTransfer(ctx context.Context, transferID u
 	}
 
 	// Update transfer status to sender initiated
-	transfer, err = transfer.Update().SetStatus(st.TransferStatusSenderInitiated).Save(ctx)
+	_, err = transfer.Update().SetStatus(st.TransferStatusSenderInitiated).Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to update status for transfer %s: %w", transferID, err)
 	}
@@ -1337,7 +1336,7 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 
 func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 	ctx context.Context,
-	req *pb.StartTransferRequest,
+	req *pbspark.StartTransferRequest,
 	transferType st.TransferType,
 	leaves []*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
@@ -1505,14 +1504,14 @@ func validateLegacyLeavesToSend_transfer(
 }
 
 func validateLeaves_transfer(
-	req *pb.StartTransferRequest,
+	req *pbspark.StartTransferRequest,
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
 	leafDirectRefundMap map[string][]byte,
 	leafDirectFromCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
 ) error {
-	leavesToSendByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.LeavesToSend))
+	leavesToSendByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.LeavesToSend))
 	for _, leaf := range req.TransferPackage.LeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
@@ -1525,7 +1524,7 @@ func validateLeaves_transfer(
 		leavesToSendByID[leafID] = leaf
 	}
 
-	directLeavesByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.DirectLeavesToSend))
+	directLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.DirectLeavesToSend))
 	for _, leaf := range req.TransferPackage.DirectLeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
@@ -1545,7 +1544,7 @@ func validateLeaves_transfer(
 		return fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(req.TransferPackage.LeavesToSend), len(req.TransferPackage.DirectFromCpfpLeavesToSend))
 	}
 
-	directFromCpfpLeavesByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.DirectFromCpfpLeavesToSend))
+	directFromCpfpLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.DirectFromCpfpLeavesToSend))
 	for _, leaf := range req.TransferPackage.DirectFromCpfpLeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
@@ -1667,14 +1666,14 @@ func validateTransactionCooperativeExitLegacyLeavesToSend(
 }
 
 func validateTransactionCooperativeExitLeaves(
-	req *pb.StartTransferRequest,
+	req *pbspark.StartTransferRequest,
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
 	leafDirectRefundMap map[string][]byte,
 	leafDirectFromCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
 ) error {
-	leavesToSendByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.LeavesToSend))
+	leavesToSendByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.LeavesToSend))
 	for _, leaf := range req.TransferPackage.LeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
@@ -1687,7 +1686,7 @@ func validateTransactionCooperativeExitLeaves(
 		leavesToSendByID[leafID] = leaf
 	}
 
-	directLeavesByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.DirectLeavesToSend))
+	directLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.DirectLeavesToSend))
 	for _, leaf := range req.TransferPackage.DirectLeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
@@ -1707,7 +1706,7 @@ func validateTransactionCooperativeExitLeaves(
 		return fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(req.TransferPackage.LeavesToSend), len(req.TransferPackage.DirectFromCpfpLeavesToSend))
 	}
 
-	directFromCpfpLeavesByID := make(map[string]*pb.UserSignedTxSigningJob, len(req.TransferPackage.DirectFromCpfpLeavesToSend))
+	directFromCpfpLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.DirectFromCpfpLeavesToSend))
 	for _, leaf := range req.TransferPackage.DirectFromCpfpLeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
@@ -1775,7 +1774,7 @@ func (h *BaseTransferHandler) validateKeyTweakProofs(ctx context.Context, transf
 	}
 
 	for _, leaf := range transferLeaves {
-		keyTweakProto := &pb.SendLeafKeyTweak{}
+		keyTweakProto := &pbspark.SendLeafKeyTweak{}
 		err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
 		if err != nil {
 			return fmt.Errorf("unable to unmarshal key tweak: %w", err)

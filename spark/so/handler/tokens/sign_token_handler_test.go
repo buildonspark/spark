@@ -605,7 +605,10 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputSta
 		_, err := transferData.prevTokenOutput1.Update().
 			SetStatus(schematype.TokenOutputStatusSpentFinalized).
 			Save(setup.ctx)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Error("unexpected error: %w", err) // Can't use require.NoError or t.Fatal from another goroutine.
+			return
+		}
 		close(block) // allow mock to respond
 	}()
 
@@ -617,8 +620,7 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputSta
 	}
 
 	_, commitErr := setup.handler.CommitTransaction(setup.ctx, req)
-	require.Error(t, commitErr)
-	assert.Contains(t, commitErr.Error(), othertokens.ErrInvalidInputs)
+	require.ErrorContains(t, commitErr, othertokens.ErrInvalidInputs)
 }
 
 func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRemappedToDifferentTransaction(t *testing.T) {
@@ -647,7 +649,10 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRem
 			SetOperatorSignature(setup.coordinatorPrivKey.Public().Serialize()).
 			SetExpiryTime(time.Now().Add(10 * time.Minute)).
 			Save(setup.ctx)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Error("unexpected error: %w", err) // We can't use require.NoError or t.Fail from a goroutine
+			return
+		}
 
 		otherKeyshare := setup.fixtures.CreateKeyshare()
 
@@ -666,18 +671,27 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRem
 			SetOutputCreatedTokenTransaction(otherTx).
 			SetCreatedTransactionFinalizedHash(otherHash).
 			Save(setup.ctx)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Error("unexpected error: %w", err) // We can't use require.NoError or t.Fail from a goroutine
+			return
+		}
 
 		_, err = transferData.prevTokenOutput1.Update().
 			SetOutputSpentTokenTransaction(otherTx).
 			SetStatus(schematype.TokenOutputStatusSpentStarted).
 			Save(setup.ctx)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Error("unexpected error: %w", err) // We can't use require.NoError or t.Fail from a goroutine
+			return
+		}
 
-		otherTx, err = otherTx.Update().
+		_, err = otherTx.Update().
 			SetStatus(schematype.TokenTransactionStatusRevealed).
 			Save(setup.ctx)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Error("unexpected error: %w", err) // We can't use require.NoError or t.Fail from a goroutine
+			return
+		}
 
 		close(block)
 	}()
@@ -690,7 +704,5 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRem
 	}
 
 	_, commitErr := setup.handler.CommitTransaction(setup.ctx, req)
-	require.Error(t, commitErr)
-	errStr := commitErr.Error()
-	assert.Contains(t, errStr, "number of inputs in proto")
+	require.ErrorContains(t, commitErr, "number of inputs in proto")
 }

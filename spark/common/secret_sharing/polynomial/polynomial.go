@@ -1,6 +1,7 @@
 package polynomial
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/secret_sharing/curve"
@@ -49,7 +50,7 @@ func LagrangeBasisAt(xs []curve.Scalar, i int, x curve.Scalar) (curve.Scalar, er
 
 	denProdInv, err := denProd.InvNonConst()
 	if err != nil {
-		return curve.Scalar{}, fmt.Errorf("Lagrange basis polynomial is not defined when two nodes are equal")
+		return curve.Scalar{}, errors.New("lagrange basis polynomial is not defined when two nodes are equal")
 	}
 
 	return numProd.Mul(denProdInv), nil

@@ -16,7 +16,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/lightsparkdev/spark/common"
-	pb "github.com/lightsparkdev/spark/proto/spark"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
@@ -40,7 +39,7 @@ func TestTransfer(t *testing.T) {
 		SigningPrivKey:    leafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}
-	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(senderConfig.CoordinatorAddress(), nil)
 	require.NoError(t, err, "failed to create grpc connection")
@@ -53,7 +52,7 @@ func TestTransfer(t *testing.T) {
 	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
 		senderCtx,
 		senderConfig,
-		leavesToTransfer[:],
+		leavesToTransfer,
 		receiverPrivKey.Public(),
 		time.Now().Add(10*time.Minute),
 	)
@@ -70,7 +69,7 @@ func TestTransfer(t *testing.T) {
 	require.Len(t, pendingTransfer.Transfers, 1)
 	receiverTransfer := pendingTransfer.Transfers[0]
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
@@ -108,7 +107,7 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 		SigningPrivKey:    leafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}
-	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(senderConfig.CoordinatorAddress(), nil)
 	require.NoError(t, err, "failed to create grpc connection")
@@ -121,7 +120,7 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 	_, err = wallet.SendTransferWithKeyTweaks(
 		senderCtx,
 		senderConfig,
-		leavesToTransfer[:],
+		leavesToTransfer,
 		receiverPrivKey.Public(),
 		time.Now().Add(10*time.Minute),
 	)
@@ -163,7 +162,7 @@ func TestTransferInterrupt(t *testing.T) {
 		SigningPrivKey:    leafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}
-	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(senderConfig.CoordinatorAddress(), nil)
 	require.NoError(t, err, "failed to create grpc connection")
@@ -176,7 +175,7 @@ func TestTransferInterrupt(t *testing.T) {
 	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
 		senderCtx,
 		senderConfig,
-		leavesToTransfer[:],
+		leavesToTransfer,
 		receiverPrivKey.Public(),
 		time.Now().Add(10*time.Minute),
 	)
@@ -192,7 +191,7 @@ func TestTransferInterrupt(t *testing.T) {
 	require.Len(t, pendingTransfer.Transfers, 1)
 	receiverTransfer := pendingTransfer.Transfers[0]
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
@@ -222,7 +221,7 @@ func TestTransferInterrupt(t *testing.T) {
 	require.NoError(t, err, "failed to enable operator 1")
 
 	attempts := 0
-	var claimedNodes []*pb.TreeNode
+	var claimedNodes []*sparkpb.TreeNode
 
 	// In theory we should be able to claim right away, but in practice, depending on the state of
 	// the SOs, it may take a few attempts for it to get back to the right state. Since changing the
@@ -234,9 +233,9 @@ func TestTransferInterrupt(t *testing.T) {
 
 		receiverTransfer = pendingTransfer.Transfers[0]
 		require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-		require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
+		require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.Type)
 
-		res, err := wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim[:])
+		res, err := wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
 		if err != nil {
 			t.Logf("Failed to ClaimTransfer: %v (attempt %d / 5)", err, attempts+1)
 		} else {
@@ -287,7 +286,7 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 	require.Len(t, pendingTransfer.Transfers, 1)
 	receiverTransfer := pendingTransfer.Transfers[0]
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
@@ -332,7 +331,7 @@ func TestTransferZeroLeaves(t *testing.T) {
 	_, err := wallet.SendTransferWithKeyTweaks(
 		t.Context(),
 		senderConfig,
-		leavesToTransfer[:],
+		leavesToTransfer,
 		receiverPrivKey.Public(),
 		time.Now().Add(10*time.Minute),
 	)
@@ -353,11 +352,11 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 		SigningPrivKey:    leafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}
-	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
 		t.Context(),
 		senderConfig,
-		leavesToTransfer[:],
+		leavesToTransfer,
 		receiverPrivKey.Public(),
 		time.Now().Add(10*time.Minute),
 	)
@@ -435,10 +434,7 @@ func (TestDoubleClaimTransferKnobProvider) GetValue(key string, defaultValue flo
 }
 
 func (TestDoubleClaimTransferKnobProvider) RolloutRandom(key string, defaultValue float64) bool {
-	if key == knobs.KnobEnableStrictFinalizeSignature {
-		return true
-	}
-	return false
+	return key == knobs.KnobEnableStrictFinalizeSignature
 }
 
 func TestDoubleClaimTransfer(t *testing.T) {
@@ -1109,7 +1105,7 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 	// With deterministic private key generation, when the test is retried on failure,
 	// transfers from the previous failed run will come back as a pending transfer.
 	// Find the one that matches this run so we can pass retry.
-	var receiverTransfer *pb.Transfer
+	var receiverTransfer *sparkpb.Transfer
 	for _, t := range pendingTransfer.Transfers {
 		if t.Id == senderTransfer.Id {
 			receiverTransfer = t
@@ -1117,7 +1113,7 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 		}
 	}
 	require.NotNil(t, receiverTransfer)
-	require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.Type)
 	require.Equal(t, invoice, receiverTransfer.GetSparkInvoice())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
@@ -1146,7 +1142,7 @@ func sendTransferWithInvoice(
 	invoice string,
 	senderPrivKey keys.Private,
 	receiverPrivKey keys.Private,
-) (senderTransfer *pb.Transfer, rootNode *pb.TreeNode, newLeafPrivKey keys.Private, err error) {
+) (senderTransfer *sparkpb.Transfer, rootNode *sparkpb.TreeNode, newLeafPrivKey keys.Private, err error) {
 	senderConfig := wallet.NewTestWalletConfigWithIdentityKey(t, senderPrivKey)
 
 	// Sender initiates transfer
@@ -1160,7 +1156,7 @@ func sendTransferWithInvoice(
 		SigningPrivKey:    leafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}
-	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(senderConfig.CoordinatorAddress(), nil)
 	require.NoError(t, err, "failed to create grpc connection")
@@ -1172,7 +1168,7 @@ func sendTransferWithInvoice(
 	senderTransfer, err = wallet.SendTransferWithKeyTweaksAndInvoice(
 		senderCtx,
 		senderConfig,
-		leavesToTransfer[:],
+		leavesToTransfer,
 		receiverPrivKey.Public(),
 		time.Now().Add(10*time.Minute),
 		invoice,
@@ -1238,12 +1234,12 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), token)
 
-	sparkClient := pb.NewSparkServiceClient(conn)
+	sparkClient := sparkpb.NewSparkServiceClient(conn)
 
 	// Test that QueryPendingTransfers fails when both Participant and TransferIds are missing
 	network, err := config.Network.ToProtoNetwork()
 	require.NoError(t, err)
-	_, err = sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
+	_, err = sparkClient.QueryPendingTransfers(ctx, &sparkpb.TransferFilter{
 		Network: network,
 	})
 	require.ErrorContains(t, err, "must specify either filter.Participant or filter.TransferIds")
@@ -1251,7 +1247,7 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	// Test that QueryAllTransfers fails when both Participant and TransferIds are missing
 	network, err = config.Network.ToProtoNetwork()
 	require.NoError(t, err)
-	_, err = sparkClient.QueryAllTransfers(ctx, &pb.TransferFilter{
+	_, err = sparkClient.QueryAllTransfers(ctx, &sparkpb.TransferFilter{
 		Network: network,
 		Limit:   10,
 		Offset:  0,
@@ -1261,8 +1257,8 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	// Test that providing Participant makes the query succeed (even if no transfers exist)
 	network, err = config.Network.ToProtoNetwork()
 	require.NoError(t, err)
-	_, err = sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
-		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
+	_, err = sparkClient.QueryPendingTransfers(ctx, &sparkpb.TransferFilter{
+		Participant: &sparkpb.TransferFilter_ReceiverIdentityPublicKey{
 			ReceiverIdentityPublicKey: config.IdentityPublicKey().Serialize(),
 		},
 		Network: network,
@@ -1272,7 +1268,7 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	// Test that providing TransferIds makes the query succeed (even if no transfers exist)
 	network, err = config.Network.ToProtoNetwork()
 	require.NoError(t, err)
-	_, err = sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
+	_, err = sparkClient.QueryPendingTransfers(ctx, &sparkpb.TransferFilter{
 		TransferIds: []string{uuid.NewString()},
 		Network:     network,
 	})

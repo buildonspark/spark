@@ -202,7 +202,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			return fmt.Errorf("deposit address already has a tree")
 		}
 		markNodeAsAvailable = address.ConfirmationHeight != 0
-		logger.Info(fmt.Sprintf("Marking node as available: %v", markNodeAsAvailable))
+		logger.Sugar().Infof("Marking node as available: %v", markNodeAsAvailable)
 		nodeTx, err := common.TxFromRawTxBytes(selectedNode.RawTx)
 		if err != nil {
 			return fmt.Errorf("failed to get node transaction: %w", err)

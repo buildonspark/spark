@@ -17,14 +17,13 @@ import (
 // DatabaseSessionMiddleware is a middleware to manage database sessions for each gRPC call.
 func DatabaseSessionMiddleware(dbClient *ent.Client, factory db.SessionFactory, txBeginTimeout *time.Duration) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		if info != nil &&
-			(info.FullMethod == "/grpc.health.v1.Health/Check") {
+		if info != nil && info.FullMethod == "/grpc.health.v1.Health/Check" {
 			return handler(ctx, req)
 		}
 
 		logger := logging.GetLoggerFromContext(ctx)
 
-		opts := []db.SessionOption{}
+		var opts []db.SessionOption
 		if txBeginTimeout != nil {
 			opts = append(opts, db.WithTxBeginTimeout(*txBeginTimeout))
 		}
@@ -65,8 +64,7 @@ func DatabaseSessionMiddleware(dbClient *ent.Client, factory db.SessionFactory, 
 		resp, err := handler(ctx, req)
 
 		if tx := session.GetTxIfExists(); tx != nil {
-			// nolint:errcheck
-			defer tx.Rollback() // Safe to call, will be a no-op if already committed or rolled back.
+			defer func() { _ = tx.Rollback() }() // Safe to call, will be a no-op if already committed or rolled back.
 
 			if err == nil {
 				dberr := tx.Commit()

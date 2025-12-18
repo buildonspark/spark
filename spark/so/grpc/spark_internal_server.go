@@ -2,7 +2,7 @@ package grpc
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/lightsparkdev/spark/common/uuids"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
@@ -10,7 +10,7 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/errors"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/handler/signing_handler"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -84,13 +84,15 @@ func (s *SparkInternalServer) FinalizeTransfer(ctx context.Context, req *pb.Fina
 	return &emptypb.Empty{}, transferHandler.FinalizeTransfer(ctx, req)
 }
 
+var errDeprecated = errors.New("endpoint has been deprecated")
+
 // FinalizeRefreshTimelock finalizes the refresh timelock.
-func (s *SparkInternalServer) FinalizeRefreshTimelock(ctx context.Context, req *pb.FinalizeRefreshTimelockRequest) (*emptypb.Empty, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+func (s *SparkInternalServer) FinalizeRefreshTimelock(_ context.Context, _ *pb.FinalizeRefreshTimelockRequest) (*emptypb.Empty, error) {
+	return nil, sparkerrors.UnimplementedMethodDisabled(errDeprecated)
 }
 
-func (s *SparkInternalServer) FinalizeExtendLeaf(ctx context.Context, req *pb.FinalizeExtendLeafRequest) (*emptypb.Empty, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+func (s *SparkInternalServer) FinalizeExtendLeaf(_ context.Context, _ *pb.FinalizeExtendLeafRequest) (*emptypb.Empty, error) {
+	return nil, sparkerrors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
@@ -132,7 +134,6 @@ func (s *SparkInternalServer) InitiateTransfer(ctx context.Context, req *pb.Init
 	return &emptypb.Empty{}, transferHandler.InitiateTransfer(ctx, req)
 }
 
-// InitiateTransfer initiates a transfer by creating transfer and transfer_leaf
 func (s *SparkInternalServer) DeliverSenderKeyTweak(ctx context.Context, req *pb.DeliverSenderKeyTweakRequest) (*emptypb.Empty, error) {
 	transferHandler := handler.NewInternalTransferHandler(s.config)
 	return &emptypb.Empty{}, transferHandler.DeliverSenderKeyTweak(ctx, req)
@@ -176,13 +177,13 @@ func (s *SparkInternalServer) CreateStaticDepositUtxoRefund(ctx context.Context,
 	return depositHandler.CreateStaticDepositUtxoRefund(ctx, s.config, req)
 }
 
-// Cancel a utxo swap in an SO after the creation of the swap failed
+// RollbackUtxoSwap cancels a utxo swap in an SO after the creation of the swap failed
 func (s *SparkInternalServer) RollbackUtxoSwap(ctx context.Context, req *pb.RollbackUtxoSwapRequest) (*pb.RollbackUtxoSwapResponse, error) {
 	depositHandler := handler.NewInternalDepositHandler(s.config)
 	return depositHandler.RollbackUtxoSwap(ctx, s.config, req)
 }
 
-// Mark a utxo swap as COMPLETE in all SEs
+// UtxoSwapCompleted marks a utxo swap as COMPLETE in all SEs
 func (s *SparkInternalServer) UtxoSwapCompleted(ctx context.Context, req *pb.UtxoSwapCompletedRequest) (*pb.UtxoSwapCompletedResponse, error) {
 	depositHandler := handler.NewInternalDepositHandler(s.config)
 	return depositHandler.UtxoSwapCompleted(ctx, s.config, req)

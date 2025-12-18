@@ -135,7 +135,7 @@ func WrapErrorWithReasonPrefix(err error, prefix string) error {
 	if prefix != "" {
 		if reason == "" {
 			// No reason, so just use the prefix.
-			reason = fmt.Sprintf("%s", prefix)
+			reason = prefix
 		} else {
 			reason = fmt.Sprintf("%s:%s", prefix, reason)
 		}

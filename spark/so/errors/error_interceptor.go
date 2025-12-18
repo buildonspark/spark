@@ -94,7 +94,7 @@ func ErrorInterceptor(returnDetailedErrors bool) grpc.UnaryServerInterceptor {
 
 		// Mask Internal/Unknown unless detailed errors are enabled or internal RPC.
 		if st, ok := status.FromError(err); ok && (st.Code() == codes.Internal || st.Code() == codes.Unknown) {
-			if !(returnDetailedErrors || isInternalRPC(info.FullMethod)) {
+			if !returnDetailedErrors && !isInternalRPC(info.FullMethod) {
 				err = status.Errorf(codes.Internal, "Something went wrong.")
 			}
 		}

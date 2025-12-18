@@ -14,7 +14,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
-	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/utils"
 )
@@ -85,7 +84,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 			Where(treenode.StatusNotIn(st.TreeNodeStatusInvestigation, st.TreeNodeStatusLost, st.TreeNodeStatusReimbursed)).
 			Where(treenode.NetworkEQ(network)).
 			Where(treenode.OwnerIdentityPubkey(ownerIdentityPubKey)).
-			Order(ent.Desc(enttreenode.FieldID))
+			Order(ent.Desc(treenode.FieldID))
 
 		if limit > 0 {
 			if limit > 100 {

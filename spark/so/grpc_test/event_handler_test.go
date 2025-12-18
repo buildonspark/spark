@@ -114,15 +114,12 @@ func TestEventHandlerDepositNotification(t *testing.T) {
 	events := make(chan *pb.SubscribeToEventsResponse, 1)
 	errors := make(chan error, 1)
 	go func() {
-		for {
-			event, err := stream.Recv()
-			if err != nil {
-				errors <- err
-				return
-			}
-			events <- event
+		event, err := stream.Recv()
+		if err != nil {
+			errors <- err
 			return
 		}
+		events <- event
 	}()
 
 	leafPrivKey := keys.GeneratePrivateKey()

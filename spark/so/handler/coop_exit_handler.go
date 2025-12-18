@@ -76,7 +76,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 	if err != nil {
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}
-	db := entTx.Client()
+
 	transferUUID, err := uuid.Parse(req.Transfer.TransferId)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.Transfer.TransferId, err)
@@ -120,7 +120,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		return nil, fmt.Errorf("exit_txid %x is not 32 bytes", req.ExitTxid)
 	}
 
-	db, err = ent.GetDbFromContext(ctx)
+	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for transfer id %s exit txid %x: %w", req.Transfer.TransferId, req.ExitTxid, err)
 	}

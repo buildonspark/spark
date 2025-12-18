@@ -51,12 +51,12 @@ func (s *SparkServer) StartDepositTreeCreation(ctx context.Context, req *pb.Star
 // StartTreeCreation is deprecated.
 // Deprecated: Use StartDepositTreeCreation instead
 func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
 func (s *SparkServer) FinalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) (*pb.FinalizeNodeSignaturesResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // FinalizeNodeSignaturesV2 verifies the node signatures and updates the node.
@@ -67,7 +67,7 @@ func (s *SparkServer) FinalizeNodeSignaturesV2(ctx context.Context, req *pb.Fina
 
 // StartTransfer initiates a transfer from sender.
 func (s *SparkServer) StartTransfer(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // StartTransferV2 initiates a transfer from sender.
@@ -78,7 +78,7 @@ func (s *SparkServer) StartTransferV2(ctx context.Context, req *pb.StartTransfer
 
 // FinalizeTransfer completes a transfer from sender.
 func (s *SparkServer) FinalizeTransfer(ctx context.Context, req *pb.FinalizeTransferRequest) (*pb.FinalizeTransferResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 func (s *SparkServer) FinalizeTransferWithTransferPackage(ctx context.Context, req *pb.FinalizeTransferWithTransferPackageRequest) (*pb.FinalizeTransferResponse, error) {
@@ -88,7 +88,7 @@ func (s *SparkServer) FinalizeTransferWithTransferPackage(ctx context.Context, r
 
 // CancelTransfer cancels a transfer from sender before key is tweaked.
 func (s *SparkServer) CancelTransfer(ctx context.Context, req *pb.CancelTransferRequest) (*pb.CancelTransferResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // QueryPendingTransfers queries the pending transfers to claim.
@@ -111,7 +111,7 @@ func (s *SparkServer) ClaimTransferSignRefundsV2(ctx context.Context, req *pb.Cl
 
 // ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
 func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // StorePreimageShare stores the preimage share for the given payment hash.
@@ -128,7 +128,7 @@ func (s *SparkServer) GetSigningCommitments(ctx context.Context, req *pb.GetSign
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (s *SparkServer) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
@@ -146,7 +146,7 @@ func (s *SparkServer) InitiatePreimageSwapV3(ctx context.Context, req *pb.Initia
 // CooperativeExit asks for signatures for refund transactions spending leaves
 // and connector outputs on another user's L1 transaction.
 func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // CooperativeExitV2 is the same as CooperativeExit, but enforces use of direct transactions for unilateral exits
@@ -157,7 +157,7 @@ func (s *SparkServer) CooperativeExitV2(ctx context.Context, req *pb.Cooperative
 
 // StartLeafSwap initiates a swap of leaves between two users.
 func (s *SparkServer) StartLeafSwap(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // StartLeafSwapV2 initiates a swap of leaves between two users.
@@ -170,35 +170,35 @@ func (s *SparkServer) StartLeafSwapV2(ctx context.Context, req *pb.StartTransfer
 // This is deprecated but remains for backwards compatibility,
 // CounterLeafSwap should be used instead.
 func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // CounterLeafSwap starts the reverse side of a swap of leaves between two users.
 func (s *SparkServer) CounterLeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // CounterLeafSwapV2 starts the reverse side of a swap of leaves between two users.
 func (s *SparkServer) CounterLeafSwapV2(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // RefreshTimelock refreshes the timelocks of a leaf and its ancestors.
 func (s *SparkServer) RefreshTimelock(ctx context.Context, req *pb.RefreshTimelockRequest) (*pb.RefreshTimelockResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 // RefreshTimelockV2 is the same as RefreshTimelock, but requires the direct TX to be included.
 func (s *SparkServer) RefreshTimelockV2(ctx context.Context, req *pb.RefreshTimelockRequest) (*pb.RefreshTimelockResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 func (s *SparkServer) ExtendLeaf(ctx context.Context, req *pb.ExtendLeafRequest) (*pb.ExtendLeafResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 func (s *SparkServer) ExtendLeafV2(ctx context.Context, req *pb.ExtendLeafRequest) (*pb.ExtendLeafResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 func (s *SparkServer) RenewLeaf(ctx context.Context, req *pb.RenewLeafRequest) (*pb.RenewLeafResponse, error) {
@@ -263,7 +263,7 @@ func (s *SparkServer) SubscribeToEvents(req *pb.SubscribeToEventsRequest, st pb.
 
 // InitiateUtxoSwap swaps a Spark tree node in exchange for a UTXO.
 func (s *SparkServer) InitiateUtxoSwap(ctx context.Context, req *pb.InitiateUtxoSwapRequest) (*pb.InitiateUtxoSwapResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 func (s *SparkServer) InitiateStaticDepositUtxoRefund(ctx context.Context, req *pb.InitiateStaticDepositUtxoRefundRequest) (*pb.InitiateStaticDepositUtxoRefundResponse, error) {
@@ -272,15 +272,15 @@ func (s *SparkServer) InitiateStaticDepositUtxoRefund(ctx context.Context, req *
 }
 
 func (s *SparkServer) ExitSingleNodeTrees(ctx context.Context, req *pb.ExitSingleNodeTreesRequest) (*pb.ExitSingleNodeTreesResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 func (s *SparkServer) QueryNodesDistribution(ctx context.Context, req *pb.QueryNodesDistributionRequest) (*pb.QueryNodesDistributionResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 func (s *SparkServer) QueryNodesByValue(ctx context.Context, req *pb.QueryNodesByValueRequest) (*pb.QueryNodesByValueResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
 func (s *SparkServer) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxosForAddressRequest) (*pb.GetUtxosForAddressResponse, error) {

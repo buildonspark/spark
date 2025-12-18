@@ -57,7 +57,7 @@ func NewSparkOperatorController(t *testing.T) (*SparkOperatorController, error) 
 		controller.mu.Lock()
 		defer controller.mu.Unlock()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // nolint: usetesting
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) //nolint: usetesting
 		defer cancel()
 
 		for operatorNum := range controller.operators {

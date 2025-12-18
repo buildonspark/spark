@@ -16,7 +16,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/ent/tree"
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"go.uber.org/zap"
@@ -182,7 +181,7 @@ func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, r
 
 	// a) Query all tree nodes under this tree with lock to prevent race conditions
 	treeNodes, err := db.TreeNode.Query().
-		Where(treenode.HasTreeWith(tree.IDEQ(treeID))).
+		Where(treenode.HasTreeWith(enttree.IDEQ(treeID))).
 		ForUpdate().
 		All(ctx)
 	if err != nil {
@@ -320,7 +319,7 @@ func (h *GossipHandler) handlePreimageGossipMessage(ctx context.Context, gossip 
 
 	calculatedHash := sha256.Sum256(gossip.Preimage)
 	if !bytes.Equal(calculatedHash[:], gossip.PaymentHash) {
-		err := fmt.Errorf("Preimage hash mismatch (expected %x, got %x)", calculatedHash[:], gossip.PaymentHash)
+		err := fmt.Errorf("preimage hash mismatch (expected %x, got %x)", calculatedHash[:], gossip.PaymentHash)
 		logger.Error(err.Error())
 		return err
 	}
@@ -338,7 +337,7 @@ func (h *GossipHandler) handlePreimageGossipMessage(ctx context.Context, gossip 
 	}
 
 	for _, preimageRequest := range preimageRequests {
-		preimageRequest, err = preimageRequest.Update().SetPreimage(gossip.Preimage).Save(ctx)
+		_, err = preimageRequest.Update().SetPreimage(gossip.Preimage).Save(ctx)
 		if err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("Failed to update preimage request for %x", gossip.PaymentHash)
 			return err

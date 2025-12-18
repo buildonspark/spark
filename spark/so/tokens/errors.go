@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -159,7 +160,7 @@ func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.Token
 	formatted := FormatTokenTransactionHashes(tokenTransaction)
 	txType, inferTxTypeErr := utils.InferTokenTransactionType(tokenTransaction)
 	if inferTxTypeErr != nil {
-		return fmt.Errorf("Error inferring token txType for error format: %w, original err: %s %s: %w", inferTxTypeErr, msg, formatted, err)
+		return fmt.Errorf("error inferring token txType for error format: %w, original err: %s %s: %w", inferTxTypeErr, msg, formatted, err)
 	}
 
 	var spentOutputs []readableSpentOutput
@@ -209,7 +210,7 @@ func NewTransactionPreemptedError(tokenTransaction *tokenpb.TokenTransaction, re
 	formattedError := FormatErrorWithTransactionProto(
 		fmt.Sprintf(ErrTransactionPreemptedByExisting, reason, details),
 		tokenTransaction,
-		sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("Inputs cannot be spent: token transaction with these inputs is already in progress or finalized")),
+		sparkerrors.AlreadyExistsDuplicateOperation(errors.New("inputs cannot be spent: token transaction with these inputs is already in progress or finalized")),
 	)
 	return sparkerrors.AbortedTransactionPreempted(formattedError)
 }

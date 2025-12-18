@@ -183,7 +183,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	}
 
 	transferHandler := NewBaseTransferHandler(h.config)
-	totalAmount := uint64(0)
+
 	quoteSigningBytes := req.SspSignature
 
 	reqTransferOwnerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
@@ -215,14 +215,14 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if transferNetwork != network {
 		return nil, fmt.Errorf("transfer network %s does not match utxo network %s", transferNetwork, network)
 	}
-	totalAmount = getTotalTransferValue(leaves)
+	totalAmount := getTotalTransferValue(leaves)
 	if err = validateUserSignature(reqTransferReceiverIdentityPubKey, req.UserSignature, req.SspSignature, pb.UtxoSwapRequestType_Fixed, network, hex.EncodeToString(targetUtxo.Txid), targetUtxo.Vout, totalAmount); err != nil {
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
 	// A sanity check to ensure that the total amount is not greater than the utxo amount.
 	if totalAmount > targetUtxo.Amount {
-		return nil, fmt.Errorf("Static deposit claim total amount %d is greater than utxo amount %d for utxo %x:%d", totalAmount, targetUtxo.Amount, targetUtxo.Txid, targetUtxo.Vout)
+		return nil, fmt.Errorf("static deposit claim total amount %d is greater than utxo amount %d for utxo %x:%d", totalAmount, targetUtxo.Amount, targetUtxo.Txid, targetUtxo.Vout)
 	}
 
 	logger.Sugar().Infof(

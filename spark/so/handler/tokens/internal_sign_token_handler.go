@@ -25,14 +25,12 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokenpartialrevocationsecretshare"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
-	soerrors "github.com/lightsparkdev/spark/so/errors"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/tokens"
@@ -88,7 +86,7 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 	}
 
 	// V3+ does NOT require operator-specific owner signatures. The initial user signature on 'Start' is sufficient.
-	if tokenTransaction.Version < schematype.TokenTransactionVersionV3 {
+	if tokenTransaction.Version < st.TokenTransactionVersionV3 {
 		if err := validateOperatorSpecificOwnerSignatures(h.config.IdentityPublicKey(), ownerSignatures, tokenTransaction, finalTokenTransactionHash); err != nil {
 			return nil, err
 		}
@@ -611,7 +609,7 @@ func (h *InternalSignTokenHandler) getPartialRevocationSecretShares(
 		args = append(args, pq.Array(excludeOutputIDs), pq.Array(excludeOperatorKeys))
 	}
 
-	// nolint:forbidigo
+	//nolint:forbidigo
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute optimized partial shares query: %w", err)
@@ -758,7 +756,7 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 			DoNothing().
 			Exec(ctx)
 		if err != nil {
-			return false, tokens.FormatErrorWithTransactionEnt("failed to save new secret shares", tx, soerrors.InternalDatabaseWriteError(err))
+			return false, tokens.FormatErrorWithTransactionEnt("failed to save new secret shares", tx, sparkerrors.InternalDatabaseWriteError(err))
 		}
 	}
 	finalized, err = h.recoverFullRevocationSecretsAndFinalize(ctx, transactionHash)
@@ -819,7 +817,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalize(ctx c
 			WithRevocationKeyshare().
 			All(ctx)
 		if err != nil {
-			return false, tokens.FormatErrorWithTransactionEnt(fmt.Sprintf("failed to load shares for outputs batch (%d-%d)", i, end-1), tokenTransaction, soerrors.InternalDatabaseReadError(err))
+			return false, tokens.FormatErrorWithTransactionEnt(fmt.Sprintf("failed to load shares for outputs batch (%d-%d)", i, end-1), tokenTransaction, sparkerrors.InternalDatabaseReadError(err))
 		}
 
 		for _, output := range batchOutputs {
@@ -875,11 +873,11 @@ func (h *InternalSignTokenHandler) canRecoverAndFinalizeTransaction(tokenTransac
 	for _, spentOutput := range tokenTransaction.Edges.SpentOutput {
 		if spentOutput.Edges.RevocationKeyshare == nil {
 			return false, tokens.FormatErrorWithTransactionEnt(
-				"missing revocation key-share on output", tokenTransaction, soerrors.InternalDatabaseMissingEdge(nil))
+				"missing revocation key-share on output", tokenTransaction, sparkerrors.InternalDatabaseMissingEdge(nil))
 		}
 		if spentOutput.Edges.RevocationKeyshare.SecretShare.IsZero() {
 			return false, tokens.FormatErrorWithTransactionEnt(
-				"nil revocation secret share on output", tokenTransaction, soerrors.InternalObjectMissingField(nil))
+				"nil revocation secret share on output", tokenTransaction, sparkerrors.InternalObjectMissingField(nil))
 		}
 		minCountOutputPartialRevocationSecretSharesForAllOutputs = min(
 			minCountOutputPartialRevocationSecretSharesForAllOutputs,
@@ -904,17 +902,17 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 			return nil, nil, err
 		}
 		if output.Edges.RevocationKeyshare == nil {
-			return nil, nil, soerrors.InternalDatabaseMissingEdge(fmt.Errorf("missing revocation key-share edge on output"))
+			return nil, nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("missing revocation key-share edge on output"))
 		}
 		if output.Edges.RevocationKeyshare.SecretShare.IsZero() {
-			return nil, nil, soerrors.InternalObjectMissingField(fmt.Errorf("nil revocation secret share on output"))
+			return nil, nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("nil revocation secret share on output"))
 		}
 		outputToSpendRevocationCommitments = append(outputToSpendRevocationCommitments, commitment)
 		outputShares := make([]*secretsharing.SecretShare, 0, len(output.Edges.TokenPartialRevocationSecretShares)+1)
 		for _, share := range output.Edges.TokenPartialRevocationSecretShares {
 			operatorIndex, err := strconv.ParseInt(h.config.GetOperatorIdentifierFromIdentityPublicKey(share.OperatorIdentityPublicKey), 10, 64)
 			if err != nil {
-				return nil, nil, soerrors.InternalObjectMalformedField(fmt.Errorf("failed to parse operator index: %w", err))
+				return nil, nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to parse operator index: %w", err))
 			}
 			outputShares = append(outputShares, &secretsharing.SecretShare{
 				FieldModulus: secp256k1.S256().N,
@@ -925,7 +923,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 		}
 		coordinatorIndex, err := strconv.ParseInt(h.config.GetOperatorIdentifierFromIdentityPublicKey(h.config.IdentityPublicKey()), 10, 64)
 		if err != nil {
-			return nil, nil, soerrors.InternalObjectMalformedField(fmt.Errorf("failed to parse coordinator index: %w", err))
+			return nil, nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to parse coordinator index: %w", err))
 		}
 		outputShares = append(outputShares, &secretsharing.SecretShare{
 			FieldModulus: secp256k1.S256().N,
@@ -935,11 +933,11 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 		})
 		recoveredSecret, err := secretsharing.RecoverSecret(outputShares)
 		if err != nil {
-			return nil, nil, soerrors.InternalKeyshareError(fmt.Errorf("failed to recover secret: %w", err))
+			return nil, nil, sparkerrors.InternalKeyshareError(fmt.Errorf("failed to recover secret: %w", err))
 		}
 		privKey, err := keys.PrivateKeyFromBigInt(recoveredSecret)
 		if err != nil {
-			return nil, nil, soerrors.InternalKeyshareError(fmt.Errorf("failed to convert recovered keyshare to private key: %w", err))
+			return nil, nil, sparkerrors.InternalKeyshareError(fmt.Errorf("failed to convert recovered keyshare to private key: %w", err))
 		}
 		outputRecoveredSecrets = append(outputRecoveredSecrets, &ent.RecoveredRevocationSecret{
 			OutputIndex:      uint32(output.SpentTransactionInputVout),

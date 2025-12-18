@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	msdk "go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	md "go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -304,7 +303,7 @@ func TestRateLimiter(t *testing.T) {
 				if m.Name == "rpc.server.ratelimit_utilization" {
 					foundUtil = true
 					// Expect histogram points with utilization for each scope/dimension
-					hs := m.Data.(metricdata.Histogram[float64])
+					hs := m.Data.(md.Histogram[float64])
 					// Sum of counts across all histograms should be 6
 					count := 0
 					for _, dp := range hs.DataPoints {
@@ -354,12 +353,12 @@ func TestRateLimiter(t *testing.T) {
 			for _, m := range sm.Metrics {
 				switch m.Name {
 				case "rpc.server.ratelimit_utilization":
-					hs := m.Data.(metricdata.Histogram[float64])
+					hs := m.Data.(md.Histogram[float64])
 					for _, dp := range hs.DataPoints {
 						utilCount += int(dp.Count)
 					}
 				case "rpc.server.ratelimit_exceeded_total":
-					cn := m.Data.(metricdata.Sum[int64])
+					cn := m.Data.(md.Sum[int64])
 					for _, dp := range cn.DataPoints {
 						breachCount += int(dp.Value)
 					}
@@ -383,12 +382,12 @@ func TestRateLimiter(t *testing.T) {
 			for _, m := range sm.Metrics {
 				switch m.Name {
 				case "rpc.server.ratelimit_utilization":
-					hs := m.Data.(metricdata.Histogram[float64])
+					hs := m.Data.(md.Histogram[float64])
 					for _, dp := range hs.DataPoints {
 						utilCount += int(dp.Count)
 					}
 				case "rpc.server.ratelimit_exceeded_total":
-					cn := m.Data.(metricdata.Sum[int64])
+					cn := m.Data.(md.Sum[int64])
 					for _, dp := range cn.DataPoints {
 						breachCount += int(dp.Value)
 					}

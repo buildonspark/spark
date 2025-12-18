@@ -23,7 +23,6 @@ import (
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
-	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -62,7 +61,7 @@ func NewLightningHandler(config *so.Config) *LightningHandler {
 }
 
 // StorePreimageShare stores the preimage share for the given payment hash.
-func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.StorePreimageShareRequest) error {
+func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.StorePreimageShareRequest) error {
 	if req.PreimageShare == nil {
 		return fmt.Errorf("preimage share is nil")
 	}
@@ -151,9 +150,9 @@ func (h *LightningHandler) validateNodeOwnership(ctx context.Context, nodes []*e
 
 func (h *LightningHandler) ValidateDuplicateLeaves(
 	ctx context.Context,
-	leavesToSend []*pb.UserSignedTxSigningJob,
-	directLeavesToSend []*pb.UserSignedTxSigningJob,
-	directFromCpfpLeavesToSend []*pb.UserSignedTxSigningJob,
+	leavesToSend []*pbspark.UserSignedTxSigningJob,
+	directLeavesToSend []*pbspark.UserSignedTxSigningJob,
+	directFromCpfpLeavesToSend []*pbspark.UserSignedTxSigningJob,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof(
@@ -224,13 +223,13 @@ func (f *defaultFrostServiceClientConnection) Close() {
 func (h *LightningHandler) ValidateGetPreimageRequest(
 	ctx context.Context,
 	paymentHash []byte,
-	cpfpTransactions []*pb.UserSignedTxSigningJob,
-	directTransactions []*pb.UserSignedTxSigningJob,
-	directFromCpfpTransactions []*pb.UserSignedTxSigningJob,
-	amount *pb.InvoiceAmount,
+	cpfpTransactions []*pbspark.UserSignedTxSigningJob,
+	directTransactions []*pbspark.UserSignedTxSigningJob,
+	directFromCpfpTransactions []*pbspark.UserSignedTxSigningJob,
+	amount *pbspark.InvoiceAmount,
 	destinationPubKey keys.Public,
 	feeSats uint64,
-	reason pb.InitiatePreimageSwapRequest_Reason,
+	reason pbspark.InitiatePreimageSwapRequest_Reason,
 	validateNodeOwnership bool,
 ) error {
 	return h.validateGetPreimageRequestWithFrostServiceClientFactory(ctx, &defaultFrostServiceClientConnection{}, paymentHash, cpfpTransactions, directTransactions, directFromCpfpTransactions, amount, destinationPubKey, feeSats, reason, validateNodeOwnership)
@@ -240,13 +239,13 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	ctx context.Context,
 	frostServiceClientConnection frostServiceClientConnection,
 	paymentHash []byte,
-	cpfpTransactions []*pb.UserSignedTxSigningJob,
-	directTransactions []*pb.UserSignedTxSigningJob,
-	directFromCpfpTransactions []*pb.UserSignedTxSigningJob,
-	amount *pb.InvoiceAmount,
+	cpfpTransactions []*pbspark.UserSignedTxSigningJob,
+	directTransactions []*pbspark.UserSignedTxSigningJob,
+	directFromCpfpTransactions []*pbspark.UserSignedTxSigningJob,
+	amount *pbspark.InvoiceAmount,
 	destinationPubKey keys.Public,
 	feeSats uint64,
-	reason pb.InitiatePreimageSwapRequest_Reason,
+	reason pbspark.InitiatePreimageSwapRequest_Reason,
 	validateNodeOwnership bool,
 ) error {
 	// Validate input parameters
@@ -574,7 +573,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		}
 	}
 
-	if reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
+	if reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
 		if feeSats >= totalAmountSats {
 			return fmt.Errorf("fee exceeds total amount, fee: %d, total amount: %d", feeSats, totalAmountSats)
 		}
@@ -591,7 +590,7 @@ func (h *LightningHandler) storeUserSignedTransactions(
 	ctx context.Context,
 	paymentHash []byte,
 	preimageShare *ent.PreimageShare,
-	cpfpTransactions []*pb.UserSignedTxSigningJob,
+	cpfpTransactions []*pbspark.UserSignedTxSigningJob,
 	transfer *ent.Transfer,
 	status st.PreimageRequestStatus,
 	receiverIdentityPubKey keys.Public,
@@ -676,12 +675,12 @@ func (h *LightningHandler) storeUserSignedTransactions(
 // GetPreimageShare gets the preimage share for the given payment hash.
 func (h *LightningHandler) GetPreimageShare(
 	ctx context.Context,
-	req *pb.InitiatePreimageSwapRequest,
+	req *pbspark.InitiatePreimageSwapRequest,
 	cpfpRefundSignatures map[string][]byte,
 	directRefundSignatures map[string][]byte,
 	directFromCpfpRefundSignatures map[string][]byte,
 ) ([]byte, error) {
-	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE && req.FeeSats != 0 {
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && req.FeeSats != 0 {
 		return nil, fmt.Errorf("fee is not allowed for receive preimage swap")
 	}
 
@@ -690,7 +689,7 @@ func (h *LightningHandler) GetPreimageShare(
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
 	}
-	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		tx, err := ent.GetDbFromContext(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -710,9 +709,9 @@ func (h *LightningHandler) GetPreimageShare(
 		if err != nil {
 			return nil, fmt.Errorf("unable to decode invoice: %w", err)
 		}
-		invoiceAmount = &pb.InvoiceAmount{
+		invoiceAmount = &pbspark.InvoiceAmount{
 			ValueSats: uint64(bolt11.MSatoshi / 1000),
-			InvoiceAmountProof: &pb.InvoiceAmountProof{
+			InvoiceAmountProof: &pbspark.InvoiceAmountProof{
 				Bolt11Invoice: preimageShare.InvoiceString,
 			},
 		}
@@ -817,7 +816,7 @@ func (h *LightningHandler) GetPreimageShare(
 	}
 
 	var status st.PreimageRequestStatus
-	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		status = st.PreimageRequestStatusPreimageShared
 	} else {
 		status = st.PreimageRequestStatusWaitingForPreimage
@@ -843,7 +842,7 @@ func (h *LightningHandler) GetPreimageShare(
 	return nil, nil
 }
 
-func (h *LightningHandler) validateSigningJobsHasAllLeafIDs(ctx context.Context, signingJobs []*pb.UserSignedTxSigningJob, leafIDMap map[string]bool, needDirectTx bool) error {
+func (h *LightningHandler) validateSigningJobsHasAllLeafIDs(ctx context.Context, signingJobs []*pbspark.UserSignedTxSigningJob, leafIDMap map[string]bool, needDirectTx bool) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	currentLeafIDMap := make(map[string]bool)
 	db, err := ent.GetDbFromContext(ctx)
@@ -882,7 +881,7 @@ func (h *LightningHandler) validateSigningJobsHasAllLeafIDs(ctx context.Context,
 	return nil
 }
 
-func (h *LightningHandler) validateIdenticalLeavesInTransferAndTransferRequest(ctx context.Context, req *pb.InitiatePreimageSwapRequest) error {
+func (h *LightningHandler) validateIdenticalLeavesInTransferAndTransferRequest(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) error {
 	// The purpose of the function is to validate that req.Transfer and req.TransferRequest have the same leaves.
 	// The idea is to replace req.Transfer with req.TransferRequest, but until SSP stop using the query user refund call, we can't simply remove req.Transfer.
 	if !bytes.Equal(req.Transfer.OwnerIdentityPublicKey, req.TransferRequest.OwnerIdentityPublicKey) ||
@@ -917,7 +916,7 @@ func (h *LightningHandler) validateIdenticalLeavesInTransferAndTransferRequest(c
 	return nil
 }
 
-func (h *LightningHandler) loadRefund(req []*pb.UserSignedTxSigningJob) map[string][]byte {
+func (h *LightningHandler) loadRefund(req []*pbspark.UserSignedTxSigningJob) map[string][]byte {
 	refundMap := make(map[string][]byte)
 	for _, job := range req {
 		refundMap[job.LeafId] = job.RawTx
@@ -925,12 +924,12 @@ func (h *LightningHandler) loadRefund(req []*pb.UserSignedTxSigningJob) map[stri
 	return refundMap
 }
 
-func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
+func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
 	cpfpLeafRefundMap := h.loadRefund(req.TransferRequest.TransferPackage.LeavesToSend)
 	directLeafRefundMap := h.loadRefund(req.TransferRequest.TransferPackage.DirectLeavesToSend)
 	directFromCpfpLeafRefundMap := h.loadRefund(req.TransferRequest.TransferPackage.DirectFromCpfpLeavesToSend)
 
-	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		// We are not building the refund maps for receive preimage swap for now, the transactions are created from SSP.
 		// TODO: we still need to build the refund transaction from the SSP here to validate.
 		return cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, nil
@@ -1032,7 +1031,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pb.Init
 	return cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, nil
 }
 
-func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest *pb.StartTransferRequest, leafMap map[string]*ent.TreeNode) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
+func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest *pbspark.StartTransferRequest, leafMap map[string]*ent.TreeNode) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
 	cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, err := SignRefundsWithPregeneratedNonce(ctx, h.config, transferRequest, leafMap, keys.Public{}, keys.Public{}, keys.Public{})
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to sign refunds with pregenerated nonce: %w", err)
@@ -1041,23 +1040,23 @@ func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest 
 }
 
 // InitiatePreimageSwapV3 initiates a preimage swap for the given payment hash.
-func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
+func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
 	return h.initiatePreimageSwap(ctx, req, true, nil)
 }
 
 // InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
-func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
+func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
 	expireTimeOverride := time.Now().Add(LightningPaymentExpiryDuration)
 	return h.initiatePreimageSwap(ctx, req, true, &expireTimeOverride)
 }
 
-func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
+func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
 	expireTimeOverride := time.Now().Add(LightningPaymentExpiryDuration)
 	return h.initiatePreimageSwap(ctx, req, false, &expireTimeOverride)
 }
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
-func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest, requireDirectTx bool, expireTimeOverride *time.Time) (*pb.InitiatePreimageSwapResponse, error) {
+func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, requireDirectTx bool, expireTimeOverride *time.Time) (*pbspark.InitiatePreimageSwapResponse, error) {
 	if req.Transfer == nil {
 		return nil, fmt.Errorf("transfer is required")
 	}
@@ -1079,7 +1078,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("receiver identity public key is required")
 	}
 
-	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE && req.FeeSats != 0 {
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && req.FeeSats != 0 {
 		return nil, fmt.Errorf("fee is not allowed for receive preimage swap")
 	}
 
@@ -1091,7 +1090,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 	logger := logging.GetLoggerFromContext(ctx)
 
 	var preimageShare *ent.PreimageShare
-	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		tx, err := ent.GetDbFromContext(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -1112,9 +1111,9 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 			return nil, fmt.Errorf("unable to decode invoice: %w", err)
 		}
 		if bolt11.MSatoshi > 0 {
-			invoiceAmount = &pb.InvoiceAmount{
+			invoiceAmount = &pbspark.InvoiceAmount{
 				ValueSats: uint64(bolt11.MSatoshi / 1000),
-				InvoiceAmountProof: &pb.InvoiceAmountProof{
+				InvoiceAmountProof: &pbspark.InvoiceAmountProof{
 					Bolt11Invoice: preimageShare.InvoiceString,
 				},
 			}
@@ -1171,7 +1170,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	// Only override expiry time for send preimage swap.
 	// Receive preimage swap has no expiry time, so we don't need to override it.
-	if expireTimeOverride != nil && req.Reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
+	if expireTimeOverride != nil && req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
 		req.Transfer.ExpiryTime = timestamppb.New(*expireTimeOverride)
 		if req.TransferRequest != nil {
 			req.TransferRequest.ExpiryTime = timestamppb.New(*expireTimeOverride)
@@ -1238,7 +1237,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 	var cpfpSignatureMap map[string][]byte
 	var directSignatureMap map[string][]byte
 	var directFromCpfpSignatureMap map[string][]byte
-	if req.TransferRequest != nil && req.Reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
+	if req.TransferRequest != nil && req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
 		cpfpSignatureMap, directSignatureMap, directFromCpfpSignatureMap, err = h.signHTLCRefunds(ctx, req.TransferRequest, leafMap)
 		if err != nil {
 			return nil, fmt.Errorf("unable to sign htlc refunds: %w", err)
@@ -1251,7 +1250,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	// TODO: Remove this once SSP has removed the query user refund call.
 	var status st.PreimageRequestStatus
-	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		status = st.PreimageRequestStatusPreimageShared
 	} else {
 		status = st.PreimageRequestStatusWaitingForPreimage
@@ -1314,8 +1313,8 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 	}
 
 	// Recover secret if necessary
-	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
-		return &pb.InitiatePreimageSwapResponse{Transfer: transferProto}, nil
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
+		return &pbspark.InitiatePreimageSwapResponse{Transfer: transferProto}, nil
 	}
 
 	var shares []*secretsharing.SecretShare
@@ -1380,7 +1379,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		}
 	}
 
-	return &pb.InitiatePreimageSwapResponse{Preimage: secretBytes, Transfer: transferProto}, nil
+	return &pbspark.InitiatePreimageSwapResponse{Preimage: secretBytes, Transfer: transferProto}, nil
 }
 
 func (h *LightningHandler) sendPreimageGossipMessage(ctx context.Context, preimage []byte, paymentHash []byte) error {
@@ -1440,7 +1439,7 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 }
 
 // QueryUserSignedRefunds queries the user signed refunds for the given payment hash.
-func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.QueryUserSignedRefundsRequest) (*pb.QueryUserSignedRefundsResponse, error) {
+func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pbspark.QueryUserSignedRefundsRequest) (*pbspark.QueryUserSignedRefundsResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -1483,14 +1482,14 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 		return nil, fmt.Errorf("unable to get user signed transactions: %w", err)
 	}
 
-	protos := make([]*pb.UserSignedRefund, len(userSignedRefunds))
+	protos := make([]*pbspark.UserSignedRefund, len(userSignedRefunds))
 	for i, userSignedRefund := range userSignedRefunds {
 		userSigningCommitment := &pbcommon.SigningCommitment{}
 		err := proto.Unmarshal(userSignedRefund.SigningCommitments, userSigningCommitment)
 		if err != nil {
 			return nil, fmt.Errorf("unable to unmarshal user signed refund: %w", err)
 		}
-		signingCommitments := &pb.SigningCommitments{}
+		signingCommitments := &pbspark.SigningCommitments{}
 		err = proto.Unmarshal(userSignedRefund.SigningCommitments, signingCommitments)
 		if err != nil {
 			return nil, fmt.Errorf("unable to unmarshal user signed refund: %w", err)
@@ -1504,7 +1503,7 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 			return nil, fmt.Errorf("unable to marshal network: %w", err)
 		}
 
-		protos[i] = &pb.UserSignedRefund{
+		protos[i] = &pbspark.UserSignedRefund{
 			NodeId:                  treeNode.ID.String(),
 			RefundTx:                userSignedRefund.Transaction,
 			UserSignature:           userSignedRefund.UserSignature,
@@ -1518,13 +1517,13 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 	}
-	return &pb.QueryUserSignedRefundsResponse{
+	return &pbspark.QueryUserSignedRefundsResponse{
 		UserSignedRefunds: protos,
 		Transfer:          transferProto,
 	}, nil
 }
 
-func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pb.QueryHtlcRequest) (*pb.QueryHtlcResponse, error) {
+func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlcRequest) (*pbspark.QueryHtlcResponse, error) {
 	if len(req.IdentityPublicKey) == 0 {
 		return nil, fmt.Errorf("identity public key is required")
 	}
@@ -1550,7 +1549,7 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pb.QueryHtlcReque
 		return nil, err
 	}
 
-	conditions := []predicate.PreimageRequest{}
+	var conditions []predicate.PreimageRequest
 
 	if len(req.TransferIds) > 0 {
 		transferUUIDs := make([]uuid.UUID, len(req.TransferIds))
@@ -1580,14 +1579,15 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pb.QueryHtlcReque
 	}
 
 	// Default to receiver role if not provided
-	if req.MatchRole == pb.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_SENDER {
+	switch req.MatchRole {
+	case pbspark.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_SENDER:
 		conditions = append(conditions, preimagerequest.SenderIdentityPubkeyEQ(reqIdentityPubKey))
-	} else if req.MatchRole == pb.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER {
+	case pbspark.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER:
 		conditions = append(conditions, preimagerequest.Or(
 			preimagerequest.SenderIdentityPubkeyEQ(reqIdentityPubKey),
 			preimagerequest.ReceiverIdentityPubkeyEQ(reqIdentityPubKey),
 		))
-	} else {
+	default:
 		conditions = append(conditions, preimagerequest.ReceiverIdentityPubkeyEQ(reqIdentityPubKey))
 	}
 
@@ -1605,10 +1605,10 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pb.QueryHtlcReque
 	}
 
 	// Convert to protobuf response
-	preimageRequests := make([]*pb.PreimageRequestWithTransfer, len(preimageRequestsWithTransfers))
+	preimageRequests := make([]*pbspark.PreimageRequestWithTransfer, len(preimageRequestsWithTransfers))
 	for i, current := range preimageRequestsWithTransfers {
 		transfer := current.Edges.Transfers
-		var transferProto *pb.Transfer
+		var transferProto *pbspark.Transfer
 		if transfer != nil {
 			transferProto, err = transfer.MarshalProto(ctx)
 			if err != nil {
@@ -1621,7 +1621,7 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pb.QueryHtlcReque
 			return nil, fmt.Errorf("failed to marshal status: %w", err)
 		}
 
-		preimageRequests[i] = &pb.PreimageRequestWithTransfer{
+		preimageRequests[i] = &pbspark.PreimageRequestWithTransfer{
 			PaymentHash:            current.PaymentHash,
 			ReceiverIdentityPubkey: current.ReceiverIdentityPubkey.Serialize(),
 			SenderIdentityPubkey:   current.SenderIdentityPubkey.Serialize(),
@@ -1637,13 +1637,13 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pb.QueryHtlcReque
 		nextOffset = offset + limit
 	}
 
-	return &pb.QueryHtlcResponse{
+	return &pbspark.QueryHtlcResponse{
 		PreimageRequests: preimageRequests,
 		Offset:           int64(nextOffset),
 	}, nil
 }
 
-func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pb.ProvidePreimageRequest) (*ent.Transfer, error) {
+func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (*ent.Transfer, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	// Validate input parameters
@@ -1702,7 +1702,7 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pb.Provide
 }
 
 func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pbinternal.ProvidePreimageRequest) (*ent.Transfer, error) {
-	providePreimageRequest := &pb.ProvidePreimageRequest{
+	providePreimageRequest := &pbspark.ProvidePreimageRequest{
 		PaymentHash:       req.PaymentHash,
 		Preimage:          req.Preimage,
 		IdentityPublicKey: req.IdentityPublicKey,
@@ -1720,7 +1720,7 @@ func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pb
 	return transfer, nil
 }
 
-func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvidePreimageRequest) (*pb.ProvidePreimageResponse, error) {
+func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (*pbspark.ProvidePreimageResponse, error) {
 	identityPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
@@ -1738,7 +1738,7 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 			return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 		}
 
-		return &pb.ProvidePreimageResponse{Transfer: transferProto}, nil
+		return &pbspark.ProvidePreimageResponse{Transfer: transferProto}, nil
 	}
 
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
@@ -1750,14 +1750,14 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 		Preimage:          req.Preimage,
 		IdentityPublicKey: req.IdentityPublicKey,
 	}
-	keyTweakProofMap := make(map[string]*pb.SecretProof)
+	keyTweakProofMap := make(map[string]*pbspark.SecretProof)
 	for _, leaf := range transferLeaves {
-		keyTweakProto := &pb.SendLeafKeyTweak{}
+		keyTweakProto := &pbspark.SendLeafKeyTweak{}
 		err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
 		if err != nil {
 			return nil, fmt.Errorf("unable to unmarshal key tweak: %w", err)
 		}
-		keyTweakProofMap[keyTweakProto.LeafId] = &pb.SecretProof{
+		keyTweakProofMap[keyTweakProto.LeafId] = &pbspark.SecretProof{
 			Proofs: keyTweakProto.SecretShareTweak.Proofs,
 		}
 	}
@@ -1813,5 +1813,5 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 	}
 
-	return &pb.ProvidePreimageResponse{Transfer: transferProto}, nil
+	return &pbspark.ProvidePreimageResponse{Transfer: transferProto}, nil
 }

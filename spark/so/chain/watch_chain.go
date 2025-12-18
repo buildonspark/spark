@@ -661,7 +661,7 @@ func handleBlock(
 					continue
 				}
 
-				treeNode, err = dbClient.TreeNode.UpdateOne(treeNode).
+				_, err = dbClient.TreeNode.UpdateOne(treeNode).
 					SetStatus(st.TreeNodeStatusAvailable).
 					Save(ctx)
 				if err != nil {

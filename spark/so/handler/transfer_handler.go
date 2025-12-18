@@ -218,7 +218,6 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	if err != nil {
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}
-	db := entTx.Client()
 	if _, err = ent.CreateOrResetPendingSendTransfer(ctx, transferID); err != nil {
 		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
 	}
@@ -463,7 +462,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			return nil, fmt.Errorf("unable to load transfer: %w", err)
 		}
 
-		db, err = ent.GetDbFromContext(ctx)
+		db, err := ent.GetDbFromContext(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get database transaction: %w", err)
 		}
@@ -1276,11 +1275,11 @@ func SignRefundsWithPregeneratedNonce(
 	// Validate that no signing jobs have empty round1Packages
 	for _, job := range signingJobs {
 		if len(job.Round1Packages) == 0 {
-			return nil, nil, nil, fmt.Errorf("signing job %s has empty round1Packages (message: %x)", job.SigningJob.JobID, job.SigningJob.Message)
+			return nil, nil, nil, fmt.Errorf("signing job %s has empty round1Packages (message: %x)", job.JobID, job.Message)
 		}
 		for key, commitment := range job.Round1Packages {
 			if commitment.IsZero() {
-				return nil, nil, nil, fmt.Errorf("signing job %s has invalid commitment for key %s: hiding or binding is empty (message: %x)", job.SigningJob.JobID, key, job.SigningJob.Message)
+				return nil, nil, nil, fmt.Errorf("signing job %s has invalid commitment for key %s: hiding or binding is empty (message: %x)", job.JobID, key, job.Message)
 			}
 		}
 	}
@@ -2804,7 +2803,7 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 		err := h.settleSenderKeyTweaks(ctx, transfer.ID, pbinternal.SettleKeyTweakAction_COMMIT)
 		if err == nil {
 			// If there's no error, it means all SOs have tweaked the key. The coordinator can tweak the key here.
-			transfer, err = h.commitSenderKeyTweaks(ctx, transfer)
+			_, err = h.commitSenderKeyTweaks(ctx, transfer)
 			if err != nil {
 				return err
 			}

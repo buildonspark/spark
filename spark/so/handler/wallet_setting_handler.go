@@ -206,7 +206,7 @@ func (h *WalletSettingHandler) HasReadAccessToWallet(ctx context.Context, wallet
 		return false, fmt.Errorf("failed to query wallet setting: %w", err)
 	}
 
-	if walletSetting.PrivateEnabled == false {
+	if !walletSetting.PrivateEnabled {
 		return true, nil
 	}
 

@@ -41,7 +41,7 @@ func validateFieldComments() gen.Hook {
 						return fmt.Errorf(
 							"schema %q: field %q is missing a .Comment() call. "+
 								"All new fields must have documentation. "+
-								"Add .Comment(\"description\") to the field definition in the appropriate schema file.",
+								"Add .Comment(\"description\") to the field definition in the appropriate schema file",
 							node.Name, field.Name,
 						)
 					}
