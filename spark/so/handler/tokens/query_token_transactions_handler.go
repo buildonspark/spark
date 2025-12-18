@@ -25,8 +25,7 @@ import (
 )
 
 type QueryTokenTransactionsHandler struct {
-	config                     *so.Config
-	includeExpiredTransactions bool
+	config *so.Config
 }
 
 const (
@@ -87,8 +86,7 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 // NewQueryTokenTransactionsHandler creates a new QueryTokenTransactionsHandler.
 func NewQueryTokenTransactionsHandler(config *so.Config) *QueryTokenTransactionsHandler {
 	return &QueryTokenTransactionsHandler{
-		config:                     config,
-		includeExpiredTransactions: false,
+		config: config,
 	}
 }
 
