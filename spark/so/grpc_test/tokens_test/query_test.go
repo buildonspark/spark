@@ -60,13 +60,13 @@ func getOutputIDOrFail(t *testing.T, outputs []*tokenpb.TokenOutput, outputIndex
 	return *output.Id
 }
 
-// TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval tests the full coordinated flow with mint and transfer
+// TestTokenMintAndTransferExpectedOutputAndTxRetrieval tests the full flow with a mint and a transfer
 // This test also verifies that upon success that the expected outputs and transactions are retrievable.
-func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.T) {
+func TestTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.T) {
 	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
-	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+	err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 		issuerPrivateKey: issuerPrivKey,
 		name:             testTokenName,
 		ticker:           testTokenTicker,
@@ -224,7 +224,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
-	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+	err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 		issuerPrivateKey: issuerPrivKey,
 		name:             "Filter Test Token",
 		ticker:           "FLTR",
@@ -285,7 +285,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	issuer2PrivKey := keys.GeneratePrivateKey()
 	config2 := wallet.NewTestWalletConfigWithIdentityKey(t, issuer2PrivKey)
 
-	err = testCoordinatedCreateNativeSparkTokenWithParams(t, config2, sparkTokenCreationTestParams{
+	err = testCreateNativeSparkTokenWithParams(t, config2, sparkTokenCreationTestParams{
 		issuerPrivateKey: issuer2PrivKey,
 		name:             "Second Filter Token",
 		ticker:           "FLT2",
@@ -758,7 +758,7 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
-	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+	err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 		issuerPrivateKey: issuerPrivKey,
 		name:             "Order Test Token",
 		ticker:           "ORD",
@@ -868,7 +868,7 @@ func TestQueryTokenTransactionsLimitCapping(t *testing.T) {
 	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
-	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+	err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 		issuerPrivateKey: issuerPrivKey,
 		name:             "Limit Test Token",
 		ticker:           "LMT",
@@ -926,7 +926,7 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
-	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+	err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 		issuerPrivateKey: issuerPrivKey,
 		name:             "All RPCs Test",
 		ticker:           "ARPC",

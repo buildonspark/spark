@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestCoordinatedTokenTransferPreemption(t *testing.T) {
+func TestTokenTransferPreemption(t *testing.T) {
 	if broadcastTokenTestsUseV3 {
 		t.Skip("Skipping incremental start/sign preemption tests for V3 transactions which combines both steps into a single RPC.")
 	}
@@ -178,7 +178,7 @@ func TestCoordinatedTokenTransferPreemption(t *testing.T) {
 	}
 }
 
-func TestCoordinatedTokenTransferPreemptionPreventionRevealed(t *testing.T) {
+func TestTokenTransferPreemptionPreventionRevealed(t *testing.T) {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKey := tokenPrivKey.Public()
@@ -238,7 +238,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionRevealed(t *testing.T) {
 	require.Contains(t, err.Error(), "cannot be spent", "error should indicate output cannot be spent")
 }
 
-func TestCoordinatedTokenTransferPreemptionPreventionFinalized(t *testing.T) {
+func TestTokenTransferPreemptionPreventionFinalized(t *testing.T) {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKey := tokenPrivKey.Public()

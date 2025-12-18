@@ -140,7 +140,7 @@ func TestFreezeBlocksMultiTokenTransfer(t *testing.T) {
 			issuerB := keys.GeneratePrivateKey()
 			configB := wallet.NewTestWalletConfigWithIdentityKey(t, issuerB)
 			configB.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
-			err = testCoordinatedCreateNativeSparkTokenWithParams(t, configB, sparkTokenCreationTestParams{
+			err = testCreateNativeSparkTokenWithParams(t, configB, sparkTokenCreationTestParams{
 				issuerPrivateKey: issuerB,
 				name:             "Freeze MultiToken",
 				ticker:           "FMT",

@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
+func TestTransferTransactionWithSparkInvoices(t *testing.T) {
 	// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
 	sparktesting.SkipIfGithubActions(t)
 	testCases := []struct {
@@ -139,7 +139,7 @@ func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivateKey)
 
 			tokenPrivKey := config.IdentityPrivateKey
-			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+			err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 				issuerPrivateKey: issuerPrivateKey,
 				name:             testTokenName,
 				ticker:           testTokenTicker,

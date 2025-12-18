@@ -12,8 +12,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// testCoordinatedTransactionSigningScenarios tests various signing scenarios for token transactions
-func testCoordinatedTransactionSigningScenarios(
+// testTransactionSigningScenarios tests various signing scenarios for token transactions
+func testTransactionSigningScenarios(
 	t *testing.T,
 	config *wallet.TestWalletConfig,
 	tokenTransaction *tokenpb.TokenTransaction,
@@ -160,8 +160,8 @@ func testCoordinatedTransactionSigningScenarios(
 	return startResp.FinalTokenTransaction
 }
 
-// testCoordinatedMintTransactionSigningScenarios tests mint transaction signing scenarios
-func testCoordinatedMintTransactionSigningScenarios(t *testing.T, config *wallet.TestWalletConfig,
+// testMintTransactionSigningScenarios tests mint transaction signing scenarios
+func testMintTransactionSigningScenarios(t *testing.T, config *wallet.TestWalletConfig,
 	tokenIdentifier []byte,
 	startIssuerPrivateKeys []keys.Private,
 	commitIssuerPrivateKeys []keys.Private,
@@ -191,7 +191,7 @@ func testCoordinatedMintTransactionSigningScenarios(t *testing.T, config *wallet
 	userOutput1PrivKey := userOutputPrivKeys[0]
 	userOutput2PrivKey := userOutputPrivKeys[1]
 
-	finalTx := testCoordinatedTransactionSigningScenarios(
+	finalTx := testTransactionSigningScenarios(
 		t,
 		config,
 		tokenTransaction,
@@ -212,8 +212,8 @@ func testCoordinatedMintTransactionSigningScenarios(t *testing.T, config *wallet
 	return finalTx, userOutput1PrivKey, userOutput2PrivKey
 }
 
-// testCoordinatedTransferTransactionSigningScenarios tests transfer transaction signing scenarios
-func testCoordinatedTransferTransactionSigningScenarios(t *testing.T, config *wallet.TestWalletConfig,
+// testTransferTransactionSigningScenarios tests transfer transaction signing scenarios
+func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.TestWalletConfig,
 	finalIssueTokenTransaction *tokenpb.TokenTransaction,
 	startOwnerPrivateKeys []keys.Private,
 	commitOwnerPrivateKeys []keys.Private,
@@ -237,7 +237,7 @@ func testCoordinatedTransferTransactionSigningScenarios(t *testing.T, config *wa
 	})
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
-	testCoordinatedTransactionSigningScenarios(
+	testTransactionSigningScenarios(
 		t,
 		config,
 		transferTokenTransaction,
@@ -252,8 +252,8 @@ func testCoordinatedTransferTransactionSigningScenarios(t *testing.T, config *wa
 	)
 }
 
-// TestCoordinatedMintTransactionSigning tests various start/commit scenarios for token mint transactions
-func TestCoordinatedMintTransactionSigning(t *testing.T) {
+// TestMintTransactionSigning tests various start/commit scenarios for token mint transactions
+func TestMintTransactionSigning(t *testing.T) {
 	testCases := []struct {
 		name                     string
 		issuerStartPrivateKeys   []keys.Private
@@ -339,7 +339,7 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivateKey)
 
 			if tc.createNativeSparkToken {
-				err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+				err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 					issuerPrivateKey: issuerPrivateKey,
 					name:             testTokenName,
 					ticker:           testTokenTicker,
@@ -355,7 +355,7 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 				tokenIdentifier = queryTokenIdentifierOrFail(t, config, issuerPrivateKey.Public())
 			}
 
-			testCoordinatedMintTransactionSigningScenarios(
+			testMintTransactionSigningScenarios(
 				t, config, tokenIdentifier,
 				tc.issuerStartPrivateKeys,
 				tc.issuerCommitPrivateKeys,
@@ -370,8 +370,8 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 	}
 }
 
-// TestCoordinatedTransferTransactionSigning tests various start/commit scenarios for token transfer transactions
-func TestCoordinatedTransferTransactionSigning(t *testing.T) {
+// TestTransferTransactionSigning tests various start/commit scenarios for token transfer transactions
+func TestTransferTransactionSigning(t *testing.T) {
 	testCases := []struct {
 		name                           string
 		startOwnerPrivateKeysModifier  func([]keys.Private) []keys.Private
@@ -457,7 +457,7 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivateKey)
 
 			if tc.createNativeSparkToken {
-				err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+				err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 					issuerPrivateKey: issuerPrivateKey,
 					name:             testTokenName,
 					ticker:           testTokenTicker,
@@ -468,7 +468,7 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 
 			tokenIdentifier := queryTokenIdentifierOrFail(t, config, config.IdentityPrivateKey.Public())
 
-			finalIssueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey := testCoordinatedMintTransactionSigningScenarios(
+			finalIssueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey := testMintTransactionSigningScenarios(
 				t, config, tokenIdentifier, nil, nil, false, false, false, false, false, false)
 
 			defaultStartingOwnerPrivateKeys := []keys.Private{userOutput1PrivKey, userOutput2PrivKey}
@@ -482,7 +482,7 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 				commitOwnerPrivKeys = tc.commitOwnerPrivateKeysModifier(startingOwnerPrivKeys)
 			}
 
-			testCoordinatedTransferTransactionSigningScenarios(
+			testTransferTransactionSigningScenarios(
 				t, config, finalIssueTokenTransaction,
 				startingOwnerPrivKeys,
 				commitOwnerPrivKeys,

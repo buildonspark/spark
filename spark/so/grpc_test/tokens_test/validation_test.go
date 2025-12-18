@@ -17,7 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
+func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -81,7 +81,7 @@ func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T)
 	}
 }
 
-func TestCoordinatedBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
+func TestBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -106,7 +106,7 @@ func TestCoordinatedBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 	}
 }
 
-func TestCoordinatedBroadcastTokenTransactionTooLongValidityDuration(t *testing.T) {
+func TestBroadcastTokenTransactionTooLongValidityDuration(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -132,7 +132,7 @@ func TestCoordinatedBroadcastTokenTransactionTooLongValidityDuration(t *testing.
 	}
 }
 
-func TestCoordinatedBroadcastTokenTransactionTooShortValidityDuration(t *testing.T) {
+func TestBroadcastTokenTransactionTooShortValidityDuration(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -158,7 +158,7 @@ func TestCoordinatedBroadcastTokenTransactionTooShortValidityDuration(t *testing
 	}
 }
 
-func TestCoordinatedQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t *testing.T) {
+func TestQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -218,7 +218,7 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 		{
 			name: "create transaction with creation entity public key should fail",
 			setupTx: func() (*tokenpb.TokenTransaction, []keys.Private) {
-				tx, err := createTestCoordinatedTokenCreateTransactionWithParams(config, sparkTokenCreationTestParams{
+				tx, err := createTestTokenCreateTransactionWithParams(config, sparkTokenCreationTestParams{
 					issuerPrivateKey: config.IdentityPrivateKey,
 					name:             "Test Token",
 					ticker:           "TEST",
@@ -299,7 +299,7 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 	}
 }
 
-func TestCoordinatedTokenMintAndTransferTokensTooManyOutputsFails(t *testing.T) {
+func TestTokenMintAndTransferTokensTooManyOutputsFails(t *testing.T) {
 	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 		config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
@@ -320,7 +320,7 @@ func TestCoordinatedTokenMintAndTransferTokensTooManyOutputsFails(t *testing.T) 
 	})
 }
 
-func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.T) {
+func TestTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.T) {
 	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 		config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
@@ -406,7 +406,7 @@ func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.
 	})
 }
 
-func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
+func TestTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
 	sparktesting.SkipIfGithubActions(t)
 	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())

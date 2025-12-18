@@ -145,7 +145,7 @@ func TestQueryTokenMetadataMixedParams(t *testing.T) {
 	require.True(t, foundL1Token, "L1 token should be found in mixed query results")
 }
 
-func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
+func TestCreateNativeSparkTokenScenarios(t *testing.T) {
 	fixedRandomKey := keys.GeneratePrivateKey()
 
 	testCases := []struct {
@@ -291,7 +291,7 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 			if tc.secondTokenParams != nil {
 				secondTokenConfig := wallet.NewTestWalletConfigWithIdentityKey(t, tc.secondTokenParams.issuerPrivateKey)
 
-				err = testCoordinatedCreateNativeSparkTokenWithParams(t, secondTokenConfig, *tc.secondTokenParams)
+				err = testCreateNativeSparkTokenWithParams(t, secondTokenConfig, *tc.secondTokenParams)
 				if tc.secondTokenParams.expectedError {
 					require.Error(t, err, "expected error but got none for second token creation")
 					stat, ok := status.FromError(err)
@@ -313,7 +313,7 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 	}
 }
 
-func TestCoordinatedNativeTokenMaxSupplyEnforcement(t *testing.T) {
+func TestNativeTokenMaxSupplyEnforcement(t *testing.T) {
 	testCases := []struct {
 		name                 string
 		maxSupply            uint64
@@ -364,7 +364,7 @@ func TestCoordinatedNativeTokenMaxSupplyEnforcement(t *testing.T) {
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 		tokenPrivKey := keys.GeneratePrivateKey()
-		err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 			issuerPrivateKey: tokenPrivKey,
 			name:             "MaxTest",
 			ticker:           "MAXT",

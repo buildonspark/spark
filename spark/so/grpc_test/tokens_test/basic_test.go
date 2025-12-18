@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestCoordinatedL1TokenMint(t *testing.T) {
+func TestL1TokenMint(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -41,7 +41,7 @@ func TestCoordinatedL1TokenMint(t *testing.T) {
 	}
 }
 
-func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
+func TestL1TokenMintAndTransfer(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -93,8 +93,8 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 	}
 }
 
-// TestCoordinatedTokenTransferWithMultipleTokenTypes tests transferring multiple token types in a single transaction
-func TestCoordinatedTokenTransferWithMultipleTokenTypes(t *testing.T) {
+// TestTokenTransferWithMultipleTokenTypes tests transferring multiple token types in a single transaction
+func TestTokenTransferWithMultipleTokenTypes(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())

@@ -518,13 +518,13 @@ func createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t *testing.T,
 	})
 }
 
-// testCoordinatedCreateNativeSparkTokenWithParams creates a native Spark token with custom parameters
-func testCoordinatedCreateNativeSparkTokenWithParams(
+// testCreateNativeSparkTokenWithParams creates a native Spark token with custom parameters
+func testCreateNativeSparkTokenWithParams(
 	t *testing.T,
 	config *wallet.TestWalletConfig,
 	params sparkTokenCreationTestParams,
 ) error {
-	createTx, err := createTestCoordinatedTokenCreateTransactionWithParams(config, params)
+	createTx, err := createTestTokenCreateTransactionWithParams(config, params)
 	if err != nil {
 		return err
 	}
@@ -542,8 +542,8 @@ func testCoordinatedCreateNativeSparkTokenWithParams(
 	return err
 }
 
-// createTestCoordinatedTokenCreateTransactionWithParams creates a token create transaction
-func createTestCoordinatedTokenCreateTransactionWithParams(config *wallet.TestWalletConfig, params sparkTokenCreationTestParams) (*tokenpb.TokenTransaction, error) {
+// createTestTokenCreateTransactionWithParams creates a token create transaction
+func createTestTokenCreateTransactionWithParams(config *wallet.TestWalletConfig, params sparkTokenCreationTestParams) (*tokenpb.TokenTransaction, error) {
 	version := TokenTransactionVersion2
 	if broadcastTokenTestsUseV3 {
 		version = TokenTransactionVersion3
@@ -589,7 +589,7 @@ func verifyTokenMetadata(t *testing.T, metadata *tokenpb.TokenMetadata, expected
 // createNativeToken creates a native token (no verification)
 func createNativeToken(t *testing.T, params sparkTokenCreationTestParams) error {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, params.issuerPrivateKey)
-	return testCoordinatedCreateNativeSparkTokenWithParams(t, config, params)
+	return testCreateNativeSparkTokenWithParams(t, config, params)
 }
 
 // verifyNativeToken verifies a token exists and returns its identifier
@@ -748,7 +748,7 @@ func setupNativeTokenWithMint(
 	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
-	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+	err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 		issuerPrivateKey: issuerPrivKey,
 		name:             name,
 		ticker:           ticker,
