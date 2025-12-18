@@ -1732,6 +1732,20 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		transferPredicate = append(transferPredicate, enttransfer.StatusIn(statuses...))
 	}
 
+	// Validate time filter - both cannot be set simultaneously
+	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
+		return nil, status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
+	}
+
+	// Apply time filter if provided (mutually exclusive - only one can be set)
+	if filter.GetCreatedAfter() != nil {
+		createdAfter := filter.GetCreatedAfter().AsTime().UTC()
+		transferPredicate = append(transferPredicate, enttransfer.CreateTimeGT(createdAfter))
+	} else if filter.GetCreatedBefore() != nil {
+		createdBefore := filter.GetCreatedBefore().AsTime().UTC()
+		transferPredicate = append(transferPredicate, enttransfer.CreateTimeLT(createdBefore))
+	}
+
 	baseQuery := db.Transfer.Query().WithSparkInvoice()
 	if len(transferPredicate) > 0 {
 		baseQuery = baseQuery.Where(enttransfer.And(transferPredicate...))

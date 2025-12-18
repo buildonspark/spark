@@ -894,6 +894,16 @@ var (
 				},
 			},
 			{
+				Name:    "idx_transfers_sender_status_create",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[3], TransfersColumns[7], TransfersColumns[1]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						TransfersColumns[1].Name: true,
+					},
+				},
+			},
+			{
 				Name:    "idx_transfers_spark_invoice_pending",
 				Unique:  true,
 				Columns: []*schema.Column{TransfersColumns[12]},

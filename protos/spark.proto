@@ -868,6 +868,13 @@ message TransferFilter {
     Network network = 4; // defaults to mainnet when no network is provided.
     repeated TransferStatus statuses = 80;
     Order order = 5;
+
+    oneof time_filter {
+        // Filter transfers created strictly after this timestamp (exclusive)
+        google.protobuf.Timestamp created_after = 6;
+        // Filter transfers created strictly before this timestamp (exclusive)
+        google.protobuf.Timestamp created_before = 7;
+    }
 }
 
 message QueryTransfersResponse {

@@ -10471,6 +10471,92 @@ func (m *TransferFilter) validate(all bool) error {
 	default:
 		_ = v // ensures v is used
 	}
+	switch v := m.TimeFilter.(type) {
+	case *TransferFilter_CreatedAfter:
+		if v == nil {
+			err := TransferFilterValidationError{
+				field:  "TimeFilter",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetCreatedAfter()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TransferFilterValidationError{
+						field:  "CreatedAfter",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TransferFilterValidationError{
+						field:  "CreatedAfter",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetCreatedAfter()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TransferFilterValidationError{
+					field:  "CreatedAfter",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *TransferFilter_CreatedBefore:
+		if v == nil {
+			err := TransferFilterValidationError{
+				field:  "TimeFilter",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetCreatedBefore()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TransferFilterValidationError{
+						field:  "CreatedBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TransferFilterValidationError{
+						field:  "CreatedBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetCreatedBefore()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TransferFilterValidationError{
+					field:  "CreatedBefore",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
 
 	if len(errors) > 0 {
 		return TransferFilterMultiError(errors)

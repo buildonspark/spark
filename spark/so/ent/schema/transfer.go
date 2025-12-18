@@ -103,6 +103,10 @@ func (Transfer) Indexes() []ent.Index {
 			Annotations(entsql.DescColumns("create_time")).
 			StorageKey("idx_transfers_recv_status_create"),
 
+		index.Fields("sender_identity_pubkey", "status", "create_time").
+			Annotations(entsql.DescColumns("create_time")).
+			StorageKey("idx_transfers_sender_status_create"),
+
 		index.Fields("spark_invoice_id").
 			Unique().
 			Annotations(

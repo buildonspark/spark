@@ -4809,22 +4809,35 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
-   * Gets all transfers for the wallet.
+   * Gets all transfers for the wallet, optionally filtered by creation time.
    *
    * @param {number} [limit=20] - Maximum number of transfers to return
    * @param {number} [offset=0] - Offset for pagination
-   * @returns {Promise<QueryTransfersResponse>} Response containing the list of transfers
+   * @param {Date} [createdAfter] - Optional: Return transfers created strictly after this time (exclusive). Mutually exclusive with createdBefore.
+   * @param {Date} [createdBefore] - Optional: Return transfers created strictly before this time (exclusive). Mutually exclusive with createdAfter.
+   * @returns {Promise<{transfers: WalletTransfer[], offset: number}>} Object containing array of wallet transfers and next offset
    */
   public async getTransfers(
     limit: number = 20,
     offset: number = 0,
+    createdAfter?: Date,
+    createdBefore?: Date,
   ): Promise<{
     transfers: WalletTransfer[];
     offset: number;
   }> {
+    // Validate that only one time filter is provided (mutually exclusive)
+    if (createdAfter && createdBefore) {
+      throw new Error(
+        "createdAfter and createdBefore are mutually exclusive - only one can be specified",
+      );
+    }
+
     const transfers = await this.transferService.queryAllTransfers(
       limit,
       offset,
+      createdAfter,
+      createdBefore,
     );
 
     return {

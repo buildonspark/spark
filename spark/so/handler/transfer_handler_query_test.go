@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
@@ -18,6 +19,7 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestQueryTransfers_SSP_WithReceiverFilter(t *testing.T) {
@@ -422,4 +424,106 @@ func TestQueryTransfers_WithTransferIds_MasterKeyAccess(t *testing.T) {
 	// Should return the transfer because master has access to the receiver wallet
 	assert.Len(t, resp.Transfers, 1, "Should return transfer where master has access to receiver wallet")
 	assert.Equal(t, transfer.ID.String(), resp.Transfers[0].Id)
+}
+
+// createTestTransferWithTime creates a transfer with a specific create time for testing time filters
+func createTestTransferWithTime(t *testing.T, ctx context.Context, dbTx *ent.Client, createTime time.Time, identityPubKey keys.Public, network btcnetwork.Network) *ent.Transfer {
+	transfer, err := dbTx.Transfer.Create().
+		SetSenderIdentityPubkey(identityPubKey).
+		SetReceiverIdentityPubkey(identityPubKey).
+		SetNetwork(network).
+		SetTotalValue(1000).
+		SetStatus(schematype.TransferStatusCompleted).
+		SetType(schematype.TransferTypeTransfer).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		SetCreateTime(createTime). // Override create time
+		Save(ctx)
+	require.NoError(t, err)
+	return transfer
+}
+
+func TestQueryTransfers_WithCreatedAfterFilter(t *testing.T) {
+	ctx, cfg := createTestContextForTransferQuery(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{})
+	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Create test transfers at different times
+	now := time.Now()
+	past := now.Add(-24 * time.Hour)
+	future := now.Add(24 * time.Hour)
+
+	// Create transfers with different create times
+	transfer1 := createTestTransferWithTime(t, ctx, dbTx, past, identityPubKey, btcnetwork.Regtest)
+	transfer2 := createTestTransferWithTime(t, ctx, dbTx, now, identityPubKey, btcnetwork.Regtest)
+	transfer3 := createTestTransferWithTime(t, ctx, dbTx, future, identityPubKey, btcnetwork.Regtest)
+
+	// Query transfers created strictly after 'now' (exclusive)
+	filter := &pb.TransferFilter{
+		Participant: &pb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+			SenderOrReceiverIdentityPublicKey: identityPubKey.Serialize(),
+		},
+		Network: pb.Network_REGTEST,
+		TimeFilter: &pb.TransferFilter_CreatedAfter{
+			CreatedAfter: timestamppb.New(now),
+		},
+	}
+
+	handler := NewTransferHandler(cfg)
+	resp, err := handler.queryTransfers(ctx, filter, false, true)
+	require.NoError(t, err)
+	require.Len(t, resp.Transfers, 1) // Only transfer3 (future)
+
+	// Verify correct transfers returned (transfer2 at 'now' is excluded - exclusive filter)
+	assert.Equal(t, transfer3.ID.String(), resp.Transfers[0].Id)
+	transferIds := []string{resp.Transfers[0].Id}
+	assert.NotContains(t, transferIds, transfer1.ID.String())
+	assert.NotContains(t, transferIds, transfer2.ID.String())
+}
+
+func TestQueryTransfers_WithCreatedBeforeFilter(t *testing.T) {
+	ctx, cfg := createTestContextForTransferQuery(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{})
+	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Use fixed times to avoid any edge cases with time precision
+	baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	oldTransfer := createTestTransferWithTime(t, ctx, dbTx, baseTime.Add(-48*time.Hour), identityPubKey, btcnetwork.Regtest)
+	middleTransfer := createTestTransferWithTime(t, ctx, dbTx, baseTime.Add(-24*time.Hour), identityPubKey, btcnetwork.Regtest)
+	recentTransfer := createTestTransferWithTime(t, ctx, dbTx, baseTime.Add(-1*time.Hour), identityPubKey, btcnetwork.Regtest)
+	futureTransfer := createTestTransferWithTime(t, ctx, dbTx, baseTime.Add(24*time.Hour), identityPubKey, btcnetwork.Regtest)
+
+	// Query transfers created strictly before baseTime (exclusive)
+	// Should return oldTransfer and middleTransfer (both before baseTime)
+	// Should NOT return recentTransfer or futureTransfer (both at or after baseTime)
+	filter := &pb.TransferFilter{
+		Participant: &pb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+			SenderOrReceiverIdentityPublicKey: identityPubKey.Serialize(),
+		},
+		Network: pb.Network_REGTEST,
+		TimeFilter: &pb.TransferFilter_CreatedBefore{
+			CreatedBefore: timestamppb.New(baseTime.Add(-12 * time.Hour)), // Cutoff at -12h
+		},
+	}
+
+	handler := NewTransferHandler(cfg)
+	resp, err := handler.queryTransfers(ctx, filter, false, true)
+	require.NoError(t, err)
+	require.Len(t, resp.Transfers, 2, "Should return exactly 2 transfers (oldTransfer and middleTransfer)")
+
+	// Verify correct transfers returned
+	transferIds := make(map[string]bool)
+	for _, transfer := range resp.Transfers {
+		transferIds[transfer.Id] = true
+	}
+	assert.True(t, transferIds[oldTransfer.ID.String()], "oldTransfer (-48h) should be included")
+	assert.True(t, transferIds[middleTransfer.ID.String()], "middleTransfer (-24h) should be included")
+	assert.False(t, transferIds[recentTransfer.ID.String()], "recentTransfer (-1h) should NOT be included")
+	assert.False(t, transferIds[futureTransfer.ID.String()], "futureTransfer (+24h) should NOT be included")
 }

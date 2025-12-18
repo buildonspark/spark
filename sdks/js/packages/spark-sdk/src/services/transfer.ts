@@ -27,6 +27,7 @@ import {
   TransferType,
   TreeNode,
 } from "../proto/spark.js";
+import { Timestamp } from "../proto/google/protobuf/timestamp.js";
 import {
   KeyDerivation,
   KeyDerivationType,
@@ -756,32 +757,68 @@ export class TransferService extends BaseTransferService {
     return pendingTransfersResp;
   }
 
+  /**
+   * Queries all transfers for the authenticated user with optional time filtering.
+   *
+   * @param limit - Maximum number of transfers to return
+   * @param offset - Pagination offset
+   * @param createdAfter - Optional: Return transfers created strictly after this time (exclusive). Mutually exclusive with createdBefore.
+   * @param createdBefore - Optional: Return transfers created strictly before this time (exclusive). Mutually exclusive with createdAfter.
+   * @returns Promise containing the query response with transfers
+   */
   async queryAllTransfers(
     limit: number,
     offset: number,
+    createdAfter?: Date,
+    createdBefore?: Date,
   ): Promise<QueryTransfersResponse> {
+    // Validate that only one time filter is provided (mutually exclusive)
+    if (createdAfter && createdBefore) {
+      throw new Error(
+        "createdAfter and createdBefore are mutually exclusive - only one can be specified",
+      );
+    }
+
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
 
+    // Build filter object
+    const filter: any = {
+      participant: {
+        $case: "senderOrReceiverIdentityPublicKey",
+        senderOrReceiverIdentityPublicKey:
+          await this.config.signer.getIdentityPublicKey(),
+      },
+      limit,
+      offset,
+      types: [
+        TransferType.TRANSFER,
+        TransferType.PREIMAGE_SWAP,
+        TransferType.COOPERATIVE_EXIT,
+        TransferType.UTXO_SWAP,
+      ],
+      network: NetworkToProto[this.config.getNetwork()],
+    };
+
+    // Add optional time filter (mutually exclusive - only one can be set)
+    if (createdAfter) {
+      const seconds = Math.floor(createdAfter.getTime() / 1000);
+      filter.timeFilter = {
+        $case: "createdAfter",
+        createdAfter: { seconds, nanos: 0 } as Timestamp,
+      };
+    } else if (createdBefore) {
+      const seconds = Math.floor(createdBefore.getTime() / 1000);
+      filter.timeFilter = {
+        $case: "createdBefore",
+        createdBefore: { seconds, nanos: 0 } as Timestamp,
+      };
+    }
+
     let allTransfersResp: QueryTransfersResponse;
     try {
-      allTransfersResp = await sparkClient.query_all_transfers({
-        participant: {
-          $case: "senderOrReceiverIdentityPublicKey",
-          senderOrReceiverIdentityPublicKey:
-            await this.config.signer.getIdentityPublicKey(),
-        },
-        limit,
-        offset,
-        types: [
-          TransferType.TRANSFER,
-          TransferType.PREIMAGE_SWAP,
-          TransferType.COOPERATIVE_EXIT,
-          TransferType.UTXO_SWAP,
-        ],
-        network: NetworkToProto[this.config.getNetwork()],
-      });
+      allTransfersResp = await sparkClient.query_all_transfers(filter);
     } catch (error) {
       throw new Error(`Error querying all transfers: ${error}`);
     }

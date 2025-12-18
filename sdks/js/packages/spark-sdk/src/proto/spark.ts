@@ -1378,6 +1378,14 @@ export interface TransferFilter {
   network: Network;
   statuses: TransferStatus[];
   order: Order;
+  timeFilter?:
+    | //
+    /** Filter transfers created strictly after this timestamp (exclusive) */
+    { $case: "createdAfter"; createdAfter: Date }
+    | //
+    /** Filter transfers created strictly before this timestamp (exclusive) */
+    { $case: "createdBefore"; createdBefore: Date }
+    | undefined;
 }
 
 export interface QueryTransfersResponse {
@@ -10264,6 +10272,7 @@ function createBaseTransferFilter(): TransferFilter {
     network: 0,
     statuses: [],
     order: 0,
+    timeFilter: undefined,
   };
 }
 
@@ -10304,6 +10313,14 @@ export const TransferFilter: MessageFns<TransferFilter> = {
     writer.join();
     if (message.order !== 0) {
       writer.uint32(40).int32(message.order);
+    }
+    switch (message.timeFilter?.$case) {
+      case "createdAfter":
+        Timestamp.encode(toTimestamp(message.timeFilter.createdAfter), writer.uint32(50).fork()).join();
+        break;
+      case "createdBefore":
+        Timestamp.encode(toTimestamp(message.timeFilter.createdBefore), writer.uint32(58).fork()).join();
+        break;
     }
     return writer;
   },
@@ -10418,6 +10435,28 @@ export const TransferFilter: MessageFns<TransferFilter> = {
           message.order = reader.int32() as any;
           continue;
         }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.timeFilter = {
+            $case: "createdAfter",
+            createdAfter: fromTimestamp(Timestamp.decode(reader, reader.uint32())),
+          };
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.timeFilter = {
+            $case: "createdBefore",
+            createdBefore: fromTimestamp(Timestamp.decode(reader, reader.uint32())),
+          };
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -10453,6 +10492,11 @@ export const TransferFilter: MessageFns<TransferFilter> = {
         ? object.statuses.map((e: any) => transferStatusFromJSON(e))
         : [],
       order: isSet(object.order) ? orderFromJSON(object.order) : 0,
+      timeFilter: isSet(object.createdAfter)
+        ? { $case: "createdAfter", createdAfter: fromJsonTimestamp(object.createdAfter) }
+        : isSet(object.createdBefore)
+        ? { $case: "createdBefore", createdBefore: fromJsonTimestamp(object.createdBefore) }
+        : undefined,
     };
   },
 
@@ -10485,6 +10529,11 @@ export const TransferFilter: MessageFns<TransferFilter> = {
     }
     if (message.order !== 0) {
       obj.order = orderToJSON(message.order);
+    }
+    if (message.timeFilter?.$case === "createdAfter") {
+      obj.createdAfter = message.timeFilter.createdAfter.toISOString();
+    } else if (message.timeFilter?.$case === "createdBefore") {
+      obj.createdBefore = message.timeFilter.createdBefore.toISOString();
     }
     return obj;
   },
@@ -10539,6 +10588,20 @@ export const TransferFilter: MessageFns<TransferFilter> = {
     message.network = object.network ?? 0;
     message.statuses = object.statuses?.map((e) => e) || [];
     message.order = object.order ?? 0;
+    switch (object.timeFilter?.$case) {
+      case "createdAfter": {
+        if (object.timeFilter?.createdAfter !== undefined && object.timeFilter?.createdAfter !== null) {
+          message.timeFilter = { $case: "createdAfter", createdAfter: object.timeFilter.createdAfter };
+        }
+        break;
+      }
+      case "createdBefore": {
+        if (object.timeFilter?.createdBefore !== undefined && object.timeFilter?.createdBefore !== null) {
+          message.timeFilter = { $case: "createdBefore", createdBefore: object.timeFilter.createdBefore };
+        }
+        break;
+      }
+    }
     return message;
   },
 };
