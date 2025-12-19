@@ -35,35 +35,46 @@ func (TreeNode) Fields() []ent.Field {
 	return []ent.Field{
 		field.Uint64("value").
 			Immutable().
+			Comment("Bitcoin value in satoshis for this node.").
 			Annotations(entexample.Default(2)),
 		field.Enum("network").
 			GoType(btcnetwork.Unspecified).
 			Immutable().
+			Comment("Bitcoin network this node belongs to (Mainnet, Testnet, Regtest).").
 			Annotations(entexample.Default(btcnetwork.Regtest)),
 		field.Enum("status").
 			GoType(st.TreeNodeStatus("")).
+			Comment("Current state of the node (e.g., AVAILABLE, TRANSFER_LOCKED, SPLITTED, ON_CHAIN).").
 			Annotations(entexample.Default(st.TreeNodeStatusAvailable)),
 		field.Bytes("verifying_pubkey").
 			Immutable().
 			GoType(keys.Public{}).
+			Comment("Aggregated public key (user + SE) that controls spending of this node.").
 			Annotations(entexample.Default(
 				"023f6e31741d42deac29b3895303a35a964f822982f3576664cd838e007001922b",
 			)),
 		field.Bytes("owner_identity_pubkey").
 			GoType(keys.Public{}).
+			Comment("User's identity public key that owns this node.").
 			Annotations(entexample.Default(
 				"02e6858515f7f886842537c752983fa3c3bc7f4b7d35057ae1e0477f637551d7e8",
 			)),
 		field.Bytes("owner_signing_pubkey").
 			GoType(keys.Public{}).
+			Comment("User's signing public key derived from their identity key for this specific node.").
 			Annotations(entexample.Default(
 				"02008022cc74b350a1fea49d1cfc2ded422ad1bfe8eeea0f25cb90b02dad091706",
 			)),
 		field.Int16("vout").
+			Comment("Output index of this node in the parent transaction.").
 			Annotations(entexample.Default(0)),
 
-		field.Uint64("node_confirmation_height").Optional(),
-		field.Uint64("refund_confirmation_height").Optional(),
+		field.Uint64("node_confirmation_height").
+			Optional().
+			Comment("Block height when this node's transaction was confirmed on-chain, value is set to nil if the node transaction is not confirmed on-chain."),
+		field.Uint64("refund_confirmation_height").
+			Optional().
+			Comment("Block height when the refund transaction was confirmed on-chain, value is set to nil if the refund transaction is not confirmed on-chain."),
 
 		// Node transactions
 		field.Bytes("raw_tx").
@@ -80,6 +91,7 @@ func (TreeNode) Fields() []ent.Field {
 			)),
 		field.Bytes("direct_from_cpfp_refund_tx").
 			Optional().
+			Comment("A transaction that the watctower can broadcast on behalf of the user which spends the node tx and pays to the user.").
 			Annotations(entexample.Default(
 				"0300000000010149e740760c484ca6deedf45083d700273c26d40eeee9f130dedddbacd7063b490000000000520300400102000000000000002251201b3d6c48bdc256ea039a8238f42ad8deba6ee4d80791db22e9d91fd75d74685d014012a9dd37dd95f1f0b81a663aa83a65581adcd7a5212886768783e757e8fc4cbba8b4dc9cdf650b87a1420230c9dae0cb39b6ff95a96395a96fda75424943d09f00000000",
 			)),
@@ -114,6 +126,7 @@ func (TreeNode) Fields() []ent.Field {
 			)),
 		field.Bytes("direct_refund_tx").
 			Optional().
+			Comment("A transaction that the watctower can broadcast on behalf of the user which spends the direct tx and pays to the user.").
 			Annotations(entexample.Default(
 				"03000000000101c042a47790af0231a37ee72479537dab4a16decbcea4abe77d65f6246af88b910000000000520300400102000000000000002251201b3d6c48bdc256ea039a8238f42ad8deba6ee4d80791db22e9d91fd75d74685d0140d42a73bd03a7fa3f65309e08ca79b17e38251e374caec60d2f5f1eff4456cafcf32b2da96a2a4ad99364585eeb607256655b264cf7aa97f4ce87bd1d831a754400000000",
 			)),

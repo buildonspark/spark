@@ -33,7 +33,6 @@ var legacyUncommentedFields = map[string][]string{
 	"TokenTransactionPeerSignature":     {"operator_identity_public_key", "signature"},
 	"TransferLeaf":                      {"secret_cipher", "signature", "previous_refund_tx", "previous_direct_refund_tx", "previous_direct_from_cpfp_refund_tx", "intermediate_refund_tx", "intermediate_direct_refund_tx", "intermediate_direct_from_cpfp_refund_tx", "key_tweak", "sender_key_tweak_proof", "receiver_key_tweak"},
 	"Tree":                              {"owner_identity_pubkey", "status", "network", "base_txid", "vout"},
-	"TreeNode":                          {"value", "network", "status", "verifying_pubkey", "owner_identity_pubkey", "owner_signing_pubkey", "vout", "node_confirmation_height", "refund_confirmation_height", "direct_from_cpfp_refund_tx", "direct_refund_tx"},
 	"UserSignedTransaction":             {"transaction", "user_signature", "signing_commitments", "user_signature_commitment"},
 	"Utxo":                              {"block_height", "txid", "vout", "amount", "network", "pk_script"},
 	"UtxoSwap":                          {"status", "request_type", "credit_amount_sats", "max_fee_sats", "ssp_signature", "ssp_identity_public_key", "user_signature", "user_identity_public_key", "coordinator_identity_public_key", "requested_transfer_id", "spend_tx_signing_result"},

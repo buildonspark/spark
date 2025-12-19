@@ -63,7 +63,7 @@ func (Transfer) Fields() []ent.Field {
 			Annotations(entexample.Default(st.TransferTypePreimageSwap)),
 		field.Time("expiry_time").
 			Immutable().
-			Comment("Time when the transfer expires if not completed.").
+			Comment("Time when the transfer expires if not completed. Expired transfers are cancelled, and their locked leaves are returned to the sender and made available for new transfers.").
 			Annotations(entexample.Default(time.Unix(0, 0))),
 		field.Time("completion_time").
 			Optional().

@@ -39,7 +39,7 @@ type Transfer struct {
 	Status schematype.TransferStatus `json:"status,omitempty"`
 	// Type of transfer operation (standard, preimage swap, atomic swap, etc.).
 	Type schematype.TransferType `json:"type,omitempty"`
-	// Time when the transfer expires if not completed.
+	// Time when the transfer expires if not completed. Expired transfers are cancelled, and their locked leaves are returned to the sender and made available for new transfers.
 	ExpiryTime time.Time `json:"expiry_time,omitempty"`
 	// Time when the transfer was successfully completed (null until completion).
 	CompletionTime *time.Time `json:"completion_time,omitempty"`
