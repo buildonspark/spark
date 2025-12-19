@@ -195,7 +195,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 								transfer.ExpiryTimeLT(time.Now()),
 								transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
 							),
-						))
+						)).Limit(1000)
 
 					transfers, err := query.All(ctx)
 					if err != nil {
