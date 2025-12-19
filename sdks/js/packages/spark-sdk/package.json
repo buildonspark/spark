@@ -49,20 +49,44 @@
       }
     },
     "./types": {
-      "import": "./dist/types/index.js",
-      "require": "./dist/types/index.cjs"
+      "import": {
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/types/index.js"
+      },
+      "require": {
+        "types": "./dist/types/index.d.cts",
+        "default": "./dist/types/index.cjs"
+      }
     },
     "./test-utils": {
-      "import": "./dist/tests/test-utils.js",
-      "require": "./dist/tests/test-utils.cjs"
+      "import": {
+        "types": "./dist/tests/test-utils.d.ts",
+        "default": "./dist/tests/test-utils.js"
+      },
+      "require": {
+        "types": "./dist/tests/test-utils.d.cts",
+        "default": "./dist/tests/test-utils.cjs"
+      }
     },
     "./proto/spark": {
-      "import": "./dist/proto/spark.js",
-      "require": "./dist/proto/spark.cjs"
+      "import": {
+        "types": "./dist/proto/spark.d.ts",
+        "default": "./dist/proto/spark.js"
+      },
+      "require": {
+        "types": "./dist/proto/spark.d.cts",
+        "default": "./dist/proto/spark.cjs"
+      }
     },
     "./proto/spark_token": {
-      "import": "./dist/proto/spark_token.js",
-      "require": "./dist/proto/spark_token.cjs"
+      "import": {
+        "types": "./dist/proto/spark_token.d.ts",
+        "default": "./dist/proto/spark_token.js"
+      },
+      "require": {
+        "types": "./dist/proto/spark_token.d.cts",
+        "default": "./dist/proto/spark_token.cjs"
+      }
     },
     "./native": {
       "import": "./dist/native/index.react-native.js",
