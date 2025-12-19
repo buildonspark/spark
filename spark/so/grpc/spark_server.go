@@ -42,6 +42,13 @@ func (s *SparkServer) GenerateStaticDepositAddress(ctx context.Context, req *pb.
 	return depositHandler.GenerateStaticDepositAddress(ctx, s.config, req)
 }
 
+// RotateStaticDepositAddress archives the current default static deposit address and generates a new one.
+func (s *SparkServer) RotateStaticDepositAddress(ctx context.Context, req *pb.RotateStaticDepositAddressRequest) (*pb.RotateStaticDepositAddressResponse, error) {
+	// depositHandler := handler.NewDepositHandler(s.config)
+	// return depositHandler.RotateStaticDepositAddress(ctx, s.config, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("the method is not implemented"))
+}
+
 // StartDepositTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (s *SparkServer) StartDepositTreeCreation(ctx context.Context, req *pb.StartDepositTreeCreationRequest) (*pb.StartDepositTreeCreationResponse, error) {
 	depositHandler := handler.NewDepositHandler(s.config)

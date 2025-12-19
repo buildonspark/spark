@@ -1762,6 +1762,300 @@ var _ interface {
 	ErrorName() string
 } = GenerateStaticDepositAddressResponseValidationError{}
 
+// Validate checks the field values on RotateStaticDepositAddressRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *RotateStaticDepositAddressRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RotateStaticDepositAddressRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// RotateStaticDepositAddressRequestMultiError, or nil if none found.
+func (m *RotateStaticDepositAddressRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RotateStaticDepositAddressRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetSigningPublicKey()) != 33 {
+		err := RotateStaticDepositAddressRequestValidationError{
+			field:  "SigningPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := _RotateStaticDepositAddressRequest_Network_NotInLookup[m.GetNetwork()]; ok {
+		err := RotateStaticDepositAddressRequestValidationError{
+			field:  "Network",
+			reason: "value must not be in list [UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return RotateStaticDepositAddressRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// RotateStaticDepositAddressRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// RotateStaticDepositAddressRequest.ValidateAll() if the designated
+// constraints aren't met.
+type RotateStaticDepositAddressRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RotateStaticDepositAddressRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RotateStaticDepositAddressRequestMultiError) AllErrors() []error { return m }
+
+// RotateStaticDepositAddressRequestValidationError is the validation error
+// returned by RotateStaticDepositAddressRequest.Validate if the designated
+// constraints aren't met.
+type RotateStaticDepositAddressRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RotateStaticDepositAddressRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RotateStaticDepositAddressRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RotateStaticDepositAddressRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RotateStaticDepositAddressRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RotateStaticDepositAddressRequestValidationError) ErrorName() string {
+	return "RotateStaticDepositAddressRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RotateStaticDepositAddressRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRotateStaticDepositAddressRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RotateStaticDepositAddressRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RotateStaticDepositAddressRequestValidationError{}
+
+var _RotateStaticDepositAddressRequest_Network_NotInLookup = map[Network]struct{}{
+	0: {},
+}
+
+// Validate checks the field values on RotateStaticDepositAddressResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *RotateStaticDepositAddressResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RotateStaticDepositAddressResponse
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// RotateStaticDepositAddressResponseMultiError, or nil if none found.
+func (m *RotateStaticDepositAddressResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RotateStaticDepositAddressResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetNewDepositAddress()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RotateStaticDepositAddressResponseValidationError{
+					field:  "NewDepositAddress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RotateStaticDepositAddressResponseValidationError{
+					field:  "NewDepositAddress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNewDepositAddress()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RotateStaticDepositAddressResponseValidationError{
+				field:  "NewDepositAddress",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetArchivedDepositAddress()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RotateStaticDepositAddressResponseValidationError{
+					field:  "ArchivedDepositAddress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RotateStaticDepositAddressResponseValidationError{
+					field:  "ArchivedDepositAddress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetArchivedDepositAddress()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RotateStaticDepositAddressResponseValidationError{
+				field:  "ArchivedDepositAddress",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return RotateStaticDepositAddressResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// RotateStaticDepositAddressResponseMultiError is an error wrapping multiple
+// validation errors returned by
+// RotateStaticDepositAddressResponse.ValidateAll() if the designated
+// constraints aren't met.
+type RotateStaticDepositAddressResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RotateStaticDepositAddressResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RotateStaticDepositAddressResponseMultiError) AllErrors() []error { return m }
+
+// RotateStaticDepositAddressResponseValidationError is the validation error
+// returned by RotateStaticDepositAddressResponse.Validate if the designated
+// constraints aren't met.
+type RotateStaticDepositAddressResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RotateStaticDepositAddressResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RotateStaticDepositAddressResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RotateStaticDepositAddressResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RotateStaticDepositAddressResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RotateStaticDepositAddressResponseValidationError) ErrorName() string {
+	return "RotateStaticDepositAddressResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RotateStaticDepositAddressResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRotateStaticDepositAddressResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RotateStaticDepositAddressResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RotateStaticDepositAddressResponseValidationError{}
+
 // Validate checks the field values on UTXO with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
 // encountered is returned, or nil if there are no violations.

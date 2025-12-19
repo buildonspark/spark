@@ -14,6 +14,9 @@ service SparkService {
     // Generates a new static deposit address of the user or returns the existing one for the specified network.
     rpc generate_static_deposit_address(GenerateStaticDepositAddressRequest) returns (GenerateStaticDepositAddressResponse) {}
 
+    // Archives the current default static deposit address and generates a new one for the user.
+    rpc rotate_static_deposit_address(RotateStaticDepositAddressRequest) returns (RotateStaticDepositAddressResponse) {}
+
     rpc start_deposit_tree_creation(StartDepositTreeCreationRequest) returns (StartDepositTreeCreationResponse) {}
     // Creates a deposit tree with the commitments from get_signing_commitments, after they are signed. Fails if the tree already exists.
     rpc finalize_deposit_tree_creation(FinalizeDepositTreeCreationRequest) returns (FinalizeDepositTreeCreationResponse) {}
@@ -212,6 +215,29 @@ message GenerateStaticDepositAddressRequest {
  */
 message GenerateStaticDepositAddressResponse {
     Address deposit_address = 1;
+}
+
+/**
+ * Request to rotate a static deposit address.
+ * This archives the current default address and generates a new one.
+ * Old address still can be used to receive deposits.
+ */
+message RotateStaticDepositAddressRequest {
+    // The signing public key of the user to aggregate with SO keys and produce the
+    // final pubkey used to generate P2TR address.
+    bytes signing_public_key = 1 [(validate.rules).bytes.len = 33];
+    // The network of the bitcoin network.
+    Network network = 2 [(validate.rules).enum = {not_in: [0]}];
+}
+
+/**
+ * Response to the request to rotate a static deposit address.
+ */
+message RotateStaticDepositAddressResponse {
+    // The newly generated default deposit address.
+    Address new_deposit_address = 1;
+    // The archived (previous default) deposit address.
+    Address archived_deposit_address = 2;
 }
 
 /**

@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	SparkService_GenerateDepositAddress_FullMethodName              = "/spark.SparkService/generate_deposit_address"
 	SparkService_GenerateStaticDepositAddress_FullMethodName        = "/spark.SparkService/generate_static_deposit_address"
+	SparkService_RotateStaticDepositAddress_FullMethodName          = "/spark.SparkService/rotate_static_deposit_address"
 	SparkService_StartDepositTreeCreation_FullMethodName            = "/spark.SparkService/start_deposit_tree_creation"
 	SparkService_FinalizeDepositTreeCreation_FullMethodName         = "/spark.SparkService/finalize_deposit_tree_creation"
 	SparkService_FinalizeTransferWithTransferPackage_FullMethodName = "/spark.SparkService/finalize_transfer_with_transfer_package"
@@ -63,6 +64,8 @@ type SparkServiceClient interface {
 	GenerateDepositAddress(ctx context.Context, in *GenerateDepositAddressRequest, opts ...grpc.CallOption) (*GenerateDepositAddressResponse, error)
 	// Generates a new static deposit address of the user or returns the existing one for the specified network.
 	GenerateStaticDepositAddress(ctx context.Context, in *GenerateStaticDepositAddressRequest, opts ...grpc.CallOption) (*GenerateStaticDepositAddressResponse, error)
+	// Archives the current default static deposit address and generates a new one for the user.
+	RotateStaticDepositAddress(ctx context.Context, in *RotateStaticDepositAddressRequest, opts ...grpc.CallOption) (*RotateStaticDepositAddressResponse, error)
 	StartDepositTreeCreation(ctx context.Context, in *StartDepositTreeCreationRequest, opts ...grpc.CallOption) (*StartDepositTreeCreationResponse, error)
 	// Creates a deposit tree with the commitments from get_signing_commitments, after they are signed. Fails if the tree already exists.
 	FinalizeDepositTreeCreation(ctx context.Context, in *FinalizeDepositTreeCreationRequest, opts ...grpc.CallOption) (*FinalizeDepositTreeCreationResponse, error)
@@ -136,6 +139,16 @@ func (c *sparkServiceClient) GenerateStaticDepositAddress(ctx context.Context, i
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GenerateStaticDepositAddressResponse)
 	err := c.cc.Invoke(ctx, SparkService_GenerateStaticDepositAddress_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) RotateStaticDepositAddress(ctx context.Context, in *RotateStaticDepositAddressRequest, opts ...grpc.CallOption) (*RotateStaticDepositAddressResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RotateStaticDepositAddressResponse)
+	err := c.cc.Invoke(ctx, SparkService_RotateStaticDepositAddress_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -478,6 +491,8 @@ type SparkServiceServer interface {
 	GenerateDepositAddress(context.Context, *GenerateDepositAddressRequest) (*GenerateDepositAddressResponse, error)
 	// Generates a new static deposit address of the user or returns the existing one for the specified network.
 	GenerateStaticDepositAddress(context.Context, *GenerateStaticDepositAddressRequest) (*GenerateStaticDepositAddressResponse, error)
+	// Archives the current default static deposit address and generates a new one for the user.
+	RotateStaticDepositAddress(context.Context, *RotateStaticDepositAddressRequest) (*RotateStaticDepositAddressResponse, error)
 	StartDepositTreeCreation(context.Context, *StartDepositTreeCreationRequest) (*StartDepositTreeCreationResponse, error)
 	// Creates a deposit tree with the commitments from get_signing_commitments, after they are signed. Fails if the tree already exists.
 	FinalizeDepositTreeCreation(context.Context, *FinalizeDepositTreeCreationRequest) (*FinalizeDepositTreeCreationResponse, error)
@@ -542,6 +557,9 @@ func (UnimplementedSparkServiceServer) GenerateDepositAddress(context.Context, *
 }
 func (UnimplementedSparkServiceServer) GenerateStaticDepositAddress(context.Context, *GenerateStaticDepositAddressRequest) (*GenerateStaticDepositAddressResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateStaticDepositAddress not implemented")
+}
+func (UnimplementedSparkServiceServer) RotateStaticDepositAddress(context.Context, *RotateStaticDepositAddressRequest) (*RotateStaticDepositAddressResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RotateStaticDepositAddress not implemented")
 }
 func (UnimplementedSparkServiceServer) StartDepositTreeCreation(context.Context, *StartDepositTreeCreationRequest) (*StartDepositTreeCreationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartDepositTreeCreation not implemented")
@@ -692,6 +710,24 @@ func _SparkService_GenerateStaticDepositAddress_Handler(srv interface{}, ctx con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkServiceServer).GenerateStaticDepositAddress(ctx, req.(*GenerateStaticDepositAddressRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_RotateStaticDepositAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RotateStaticDepositAddressRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).RotateStaticDepositAddress(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_RotateStaticDepositAddress_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).RotateStaticDepositAddress(ctx, req.(*RotateStaticDepositAddressRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1279,6 +1315,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "generate_static_deposit_address",
 			Handler:    _SparkService_GenerateStaticDepositAddress_Handler,
+		},
+		{
+			MethodName: "rotate_static_deposit_address",
+			Handler:    _SparkService_RotateStaticDepositAddress_Handler,
 		},
 		{
 			MethodName: "start_deposit_tree_creation",

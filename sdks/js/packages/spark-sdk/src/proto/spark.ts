@@ -657,6 +657,31 @@ export interface GenerateStaticDepositAddressResponse {
 }
 
 /**
+ * Request to rotate a static deposit address.
+ * This archives the current default address and generates a new one.
+ * Old address still can be used to receive deposits.
+ */
+export interface RotateStaticDepositAddressRequest {
+  /**
+   * The signing public key of the user to aggregate with SO keys and produce the
+   * final pubkey used to generate P2TR address.
+   */
+  signingPublicKey: Uint8Array;
+  /** The network of the bitcoin network. */
+  network: Network;
+}
+
+/** Response to the request to rotate a static deposit address. */
+export interface RotateStaticDepositAddressResponse {
+  /** The newly generated default deposit address. */
+  newDepositAddress:
+    | Address
+    | undefined;
+  /** The archived (previous default) deposit address. */
+  archivedDepositAddress: Address | undefined;
+}
+
+/**
  * UTXO represents a utxo on the bitcoin network.
  * The UTXO is used to create a tree on Spark, it can also be an off-chain utxo so that the user
  * can create the tree first and the broadcast the transaction.
@@ -3323,6 +3348,165 @@ export const GenerateStaticDepositAddressResponse: MessageFns<GenerateStaticDepo
     message.depositAddress = (object.depositAddress !== undefined && object.depositAddress !== null)
       ? Address.fromPartial(object.depositAddress)
       : undefined;
+    return message;
+  },
+};
+
+function createBaseRotateStaticDepositAddressRequest(): RotateStaticDepositAddressRequest {
+  return { signingPublicKey: new Uint8Array(0), network: 0 };
+}
+
+export const RotateStaticDepositAddressRequest: MessageFns<RotateStaticDepositAddressRequest> = {
+  encode(message: RotateStaticDepositAddressRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.signingPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.signingPublicKey);
+    }
+    if (message.network !== 0) {
+      writer.uint32(16).int32(message.network);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RotateStaticDepositAddressRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRotateStaticDepositAddressRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.signingPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RotateStaticDepositAddressRequest {
+    return {
+      signingPublicKey: isSet(object.signingPublicKey) ? bytesFromBase64(object.signingPublicKey) : new Uint8Array(0),
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+    };
+  },
+
+  toJSON(message: RotateStaticDepositAddressRequest): unknown {
+    const obj: any = {};
+    if (message.signingPublicKey.length !== 0) {
+      obj.signingPublicKey = base64FromBytes(message.signingPublicKey);
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RotateStaticDepositAddressRequest>): RotateStaticDepositAddressRequest {
+    return RotateStaticDepositAddressRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RotateStaticDepositAddressRequest>): RotateStaticDepositAddressRequest {
+    const message = createBaseRotateStaticDepositAddressRequest();
+    message.signingPublicKey = object.signingPublicKey ?? new Uint8Array(0);
+    message.network = object.network ?? 0;
+    return message;
+  },
+};
+
+function createBaseRotateStaticDepositAddressResponse(): RotateStaticDepositAddressResponse {
+  return { newDepositAddress: undefined, archivedDepositAddress: undefined };
+}
+
+export const RotateStaticDepositAddressResponse: MessageFns<RotateStaticDepositAddressResponse> = {
+  encode(message: RotateStaticDepositAddressResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.newDepositAddress !== undefined) {
+      Address.encode(message.newDepositAddress, writer.uint32(10).fork()).join();
+    }
+    if (message.archivedDepositAddress !== undefined) {
+      Address.encode(message.archivedDepositAddress, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RotateStaticDepositAddressResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRotateStaticDepositAddressResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.newDepositAddress = Address.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.archivedDepositAddress = Address.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RotateStaticDepositAddressResponse {
+    return {
+      newDepositAddress: isSet(object.newDepositAddress) ? Address.fromJSON(object.newDepositAddress) : undefined,
+      archivedDepositAddress: isSet(object.archivedDepositAddress)
+        ? Address.fromJSON(object.archivedDepositAddress)
+        : undefined,
+    };
+  },
+
+  toJSON(message: RotateStaticDepositAddressResponse): unknown {
+    const obj: any = {};
+    if (message.newDepositAddress !== undefined) {
+      obj.newDepositAddress = Address.toJSON(message.newDepositAddress);
+    }
+    if (message.archivedDepositAddress !== undefined) {
+      obj.archivedDepositAddress = Address.toJSON(message.archivedDepositAddress);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RotateStaticDepositAddressResponse>): RotateStaticDepositAddressResponse {
+    return RotateStaticDepositAddressResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RotateStaticDepositAddressResponse>): RotateStaticDepositAddressResponse {
+    const message = createBaseRotateStaticDepositAddressResponse();
+    message.newDepositAddress = (object.newDepositAddress !== undefined && object.newDepositAddress !== null)
+      ? Address.fromPartial(object.newDepositAddress)
+      : undefined;
+    message.archivedDepositAddress =
+      (object.archivedDepositAddress !== undefined && object.archivedDepositAddress !== null)
+        ? Address.fromPartial(object.archivedDepositAddress)
+        : undefined;
     return message;
   },
 };
@@ -20096,6 +20280,15 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** Archives the current default static deposit address and generates a new one for the user. */
+    rotate_static_deposit_address: {
+      name: "rotate_static_deposit_address",
+      requestType: RotateStaticDepositAddressRequest,
+      requestStream: false,
+      responseType: RotateStaticDepositAddressResponse,
+      responseStream: false,
+      options: {},
+    },
     start_deposit_tree_creation: {
       name: "start_deposit_tree_creation",
       requestType: StartDepositTreeCreationRequest,
@@ -20392,6 +20585,11 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: GenerateStaticDepositAddressRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<GenerateStaticDepositAddressResponse>>;
+  /** Archives the current default static deposit address and generates a new one for the user. */
+  rotate_static_deposit_address(
+    request: RotateStaticDepositAddressRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<RotateStaticDepositAddressResponse>>;
   start_deposit_tree_creation(
     request: StartDepositTreeCreationRequest,
     context: CallContext & CallContextExt,
@@ -20553,6 +20751,11 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<GenerateStaticDepositAddressRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<GenerateStaticDepositAddressResponse>;
+  /** Archives the current default static deposit address and generates a new one for the user. */
+  rotate_static_deposit_address(
+    request: DeepPartial<RotateStaticDepositAddressRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<RotateStaticDepositAddressResponse>;
   start_deposit_tree_creation(
     request: DeepPartial<StartDepositTreeCreationRequest>,
     options?: CallOptions & CallOptionsExt,
