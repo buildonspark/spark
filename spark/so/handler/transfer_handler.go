@@ -2307,7 +2307,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	// Collect all TreeNode updates to batch them and avoid N+1 queries
 	builders := make([]*ent.TreeNodeCreate, 0, len(req.SigningJobs))
 
-	enhancedTransferReceiveValidationEnabled := knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnhancedTransferReceiveValidation, 0) > 0
+	enhancedTransferReceiveValidationEnabled := knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobEnhancedTransferReceiveValidation, 0)
 
 	var signingJobs []*helper.SigningJob
 	jobToLeafMap := make(map[string]uuid.UUID)
