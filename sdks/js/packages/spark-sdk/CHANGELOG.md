@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.5.3
+
+### Patch Changes
+
+- - Transfers: SparkWallet.getTransfers() now supports optional time filtering via createdAfter?: Date or createdBefore?: Date (mutually exclusive; providing both throws).
+  - TypeScript packaging: subpath exports now include explicit types mappings (notably @buildonspark/spark-sdk/types, /test-utils, /proto/spark, /proto/spark_token) to improve TS type resolution across ESM/CJS.
+
 ## 0.5.2
 
 ### Patch Changes
