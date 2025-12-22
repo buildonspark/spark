@@ -331,6 +331,14 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 		shouldContainTxHashes [][]byte
 	}{
 		{
+			name: "no filters - returns all transactions up to limit",
+			params: wallet.QueryTokenTransactionsParams{
+				Limit: 10,
+			},
+			expectedTxCount:       10,
+			shouldContainTxHashes: [][]byte{mintTxHash1, mintTxHash2, transferTxHash, mintTxHash3},
+		},
+		{
 			name: "filter by issuer public key only",
 			params: wallet.QueryTokenTransactionsParams{
 				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
@@ -1144,5 +1152,265 @@ func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 		}, grpc.Header(&header))
 		require.NoError(t, err, "QueryTokenOutputs should succeed")
 		verifyTimestampHeaders(t, header, "QueryTokenOutputs")
+	})
+}
+
+func TestQueryTokenTransactionsInvalidInputs(t *testing.T) {
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+
+	t.Run("invalid output ID format", func(t *testing.T) {
+		_, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				OutputIDs: []string{"not-a-valid-uuid"},
+				Limit:     10,
+			},
+		)
+		require.Error(t, err, "expected error for invalid output ID format")
+		require.Contains(t, err.Error(), "invalid", "error should mention invalid format")
+	})
+
+	t.Run("empty output ID", func(t *testing.T) {
+		_, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				OutputIDs: []string{""},
+				Limit:     10,
+			},
+		)
+		require.Error(t, err, "expected error for empty output ID")
+	})
+
+	t.Run("negative offset", func(t *testing.T) {
+		_, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				TransactionHashes: [][]byte{make([]byte, 32)},
+				Offset:            -1,
+				Limit:             10,
+			},
+		)
+		require.Error(t, err, "expected error for negative offset")
+	})
+
+	t.Run("negative limit", func(t *testing.T) {
+		_, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				TransactionHashes: [][]byte{make([]byte, 32)},
+				Limit:             -1,
+			},
+		)
+		require.Error(t, err, "expected error for negative limit")
+	})
+}
+
+func TestQueryTokenTransactionsEdgeCases(t *testing.T) {
+	issuerPrivKey := keys.GeneratePrivateKey()
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+	err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             "Edge Case Token",
+		ticker:           "EDGE",
+		maxSupply:        1000000,
+	})
+	require.NoError(t, err, "failed to create native spark token")
+
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
+
+	for i := 0; i < 3; i++ {
+		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
+		require.NoError(t, err, "failed to create mint transaction %d", i+1)
+
+		_, err = broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			mintTx,
+			[]keys.Private{issuerPrivKey},
+		)
+		require.NoError(t, err, "failed to broadcast mint transaction %d", i+1)
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	t.Run("offset beyond available results", func(t *testing.T) {
+		result, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Offset:           1000,
+				Limit:            10,
+			},
+		)
+		require.NoError(t, err, "should succeed with offset beyond results")
+		require.Empty(t, result.TokenTransactionsWithStatus, "expected no results when offset exceeds total")
+		require.Equal(t, int64(-1), result.Offset, "expected offset -1 when no results")
+	})
+
+	t.Run("zero limit uses default", func(t *testing.T) {
+		result, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Limit:            0,
+			},
+		)
+		require.NoError(t, err, "should succeed with zero limit")
+		require.NotEmpty(t, result.TokenTransactionsWithStatus, "expected results with default limit")
+	})
+
+	t.Run("limit of 1 returns single result", func(t *testing.T) {
+		result, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Limit:            1,
+			},
+		)
+		require.NoError(t, err, "failed to query with limit 1")
+		require.Len(t, result.TokenTransactionsWithStatus, 1, "expected exactly 1 result")
+		require.Positive(t, result.Offset, "expected next offset when more results exist")
+	})
+
+	t.Run("empty filters with transaction hash only uses Ent path", func(t *testing.T) {
+		result, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				TransactionHashes: [][]byte{make([]byte, 32)},
+				Limit:             10,
+			},
+		)
+		require.NoError(t, err, "should succeed with transaction hash only filter")
+		require.Empty(t, result.TokenTransactionsWithStatus, "expected no results for non-existent hash")
+	})
+}
+
+func TestQueryTokenTransactionsPagination(t *testing.T) {
+	issuerPrivKey := keys.GeneratePrivateKey()
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+	err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             "Pagination Token",
+		ticker:           "PAGE",
+		maxSupply:        1000000,
+	})
+	require.NoError(t, err, "failed to create native spark token")
+
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
+
+	var transactionHashes [][]byte
+	for i := 0; i < 5; i++ {
+		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
+		require.NoError(t, err, "failed to create mint transaction %d", i+1)
+
+		finalMintTx, err := broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			mintTx,
+			[]keys.Private{issuerPrivKey},
+		)
+		require.NoError(t, err, "failed to broadcast mint transaction %d", i+1)
+
+		txHash, err := utils.HashTokenTransaction(finalMintTx, false)
+		require.NoError(t, err, "failed to hash mint transaction %d", i+1)
+		transactionHashes = append(transactionHashes, txHash)
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	t.Run("paginate through all results", func(t *testing.T) {
+		var allTransactions []*tokenpb.TokenTransactionWithStatus
+		offset := int64(0)
+
+		for {
+			result, err := wallet.QueryTokenTransactions(
+				t.Context(),
+				config,
+				wallet.QueryTokenTransactionsParams{
+					IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+					Offset:           offset,
+					Limit:            2,
+					Order:            sparkpb.Order_ASCENDING,
+				},
+			)
+			require.NoError(t, err, "failed to query page at offset %d", offset)
+
+			allTransactions = append(allTransactions, result.TokenTransactionsWithStatus...)
+
+			if result.Offset == -1 {
+				break
+			}
+			offset = result.Offset
+		}
+
+		require.Len(t, allTransactions, 5, "should have retrieved all 5 transactions")
+
+		for i, tx := range allTransactions {
+			require.Equal(t, transactionHashes[i], tx.TokenTransactionHash,
+				"transaction %d hash should match", i)
+		}
+	})
+
+	t.Run("pagination maintains order across pages", func(t *testing.T) {
+		page1, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Offset:           0,
+				Limit:            3,
+				Order:            sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query page 1")
+
+		page2, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Offset:           page1.Offset,
+				Limit:            3,
+				Order:            sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query page 2")
+
+		require.Len(t, page1.TokenTransactionsWithStatus, 3)
+		require.Len(t, page2.TokenTransactionsWithStatus, 2)
+
+		require.Equal(t, transactionHashes[0], page1.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		require.Equal(t, transactionHashes[1], page1.TokenTransactionsWithStatus[1].TokenTransactionHash)
+		require.Equal(t, transactionHashes[2], page1.TokenTransactionsWithStatus[2].TokenTransactionHash)
+
+		require.Equal(t, transactionHashes[3], page2.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		require.Equal(t, transactionHashes[4], page2.TokenTransactionsWithStatus[1].TokenTransactionHash)
+	})
+
+	t.Run("last page returns offset -1", func(t *testing.T) {
+		result, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Offset:           3,
+				Limit:            10,
+			},
+		)
+		require.NoError(t, err, "failed to query last page")
+		require.Len(t, result.TokenTransactionsWithStatus, 2, "expected 2 remaining transactions")
+		require.Equal(t, int64(-1), result.Offset, "last page should have offset -1")
 	})
 }
