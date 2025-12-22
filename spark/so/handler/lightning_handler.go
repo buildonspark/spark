@@ -975,6 +975,10 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to get refund tx: %w", err)
 		}
+		refundSequence := bitcointransaction.GetTimelockFromSequence(refundTx.TxIn[0].Sequence)
+		if refundSequence < HTLCSequenceOffset || refundSequence < DirectSequenceOffset {
+			return nil, nil, nil, fmt.Errorf("refund tx sequence is less than HTLCSequenceOffset: %d", refundSequence)
+		}
 		currentSequence := refundTx.TxIn[0].Sequence - HTLCSequenceOffset
 		directSequence := refundTx.TxIn[0].Sequence - DirectSequenceOffset
 
