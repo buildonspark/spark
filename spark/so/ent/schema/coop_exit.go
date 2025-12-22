@@ -27,11 +27,13 @@ func (CooperativeExit) Fields() []ent.Field {
 			Unique().
 			Immutable().
 			GoType(schematype.TxID{}).
+			Comment("The transaction ID of the cooperative exit transaction.").
 			Annotations(entexample.Default(
 				"6d4924aac6832d44ef06a0056fe6f5bc51faff37fa489518d93c012d675e2556",
 			)),
 		field.Int64("confirmation_height").
-			Optional(),
+			Optional().
+			Comment("The block height at which the cooperative exit transaction was confirmed. If null, the transaction is unconfirmed."),
 	}
 }
 

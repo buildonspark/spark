@@ -23,8 +23,11 @@ func (BlockHeight) Mixin() []ent.Mixin {
 func (BlockHeight) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int64("height").
+			Comment("The height of the most recent block processed by the chain watcher.").
 			Annotations(entexample.Default(100)),
-		field.Enum("network").GoType(btcnetwork.Unspecified).
+		field.Enum("network").
+			GoType(btcnetwork.Unspecified).
+			Comment("The bitcoin network to which this block height belongs.").
 			Annotations(entexample.Default(btcnetwork.Regtest)),
 	}
 }

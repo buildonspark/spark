@@ -23,9 +23,9 @@ type BlockHeight struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Height holds the value of the "height" field.
+	// The height of the most recent block processed by the chain watcher.
 	Height int64 `json:"height,omitempty"`
-	// Network holds the value of the "network" field.
+	// The bitcoin network to which this block height belongs.
 	Network      btcnetwork.Network `json:"network,omitempty"`
 	selectValues sql.SelectValues
 }

@@ -25,7 +25,7 @@ type WalletSetting struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// Signing public key of the owner of the deposit address.
 	OwnerIdentityPublicKey keys.Public `json:"owner_identity_public_key,omitempty"`
-	// PrivateEnabled holds the value of the "private_enabled" field.
+	// Indicates whether privacy features are enabled for this wallet.
 	PrivateEnabled bool `json:"private_enabled,omitempty"`
 	// The master identity public key that is allowed to bypass the privacy and read the wallet.
 	MasterIdentityPublicKey *keys.Public `json:"master_identity_public_key,omitempty"`

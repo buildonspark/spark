@@ -13,8 +13,6 @@ import "slices"
 // 2. Remove the field from this map
 // 3. Run `make ent` to verify it still generates successfully
 var legacyUncommentedFields = map[string][]string{
-	"BlockHeight":                       {"height", "network"},
-	"CooperativeExit":                   {"exit_txid", "confirmation_height"},
 	"EntityDkgKey":                      {"key_type"},
 	"Gossip":                            {"participants", "message", "receipts", "status"},
 	"L1TokenCreate":                     {"transaction_id", "issuer_public_key", "token_name", "token_ticker", "decimals", "max_supply", "is_freezable", "network", "token_identifier"},
@@ -36,7 +34,6 @@ var legacyUncommentedFields = map[string][]string{
 	"UserSignedTransaction":             {"transaction", "user_signature", "signing_commitments", "user_signature_commitment"},
 	"Utxo":                              {"block_height", "txid", "vout", "amount", "network", "pk_script"},
 	"UtxoSwap":                          {"status", "request_type", "credit_amount_sats", "max_fee_sats", "ssp_signature", "ssp_identity_public_key", "user_signature", "user_identity_public_key", "coordinator_identity_public_key", "requested_transfer_id", "spend_tx_signing_result"},
-	"WalletSetting":                     {"private_enabled"},
 }
 
 // isLegacyUncommentedField returns true if the given schema and field are grandfathered

@@ -28,7 +28,9 @@ func (WalletSetting) Fields() []ent.Field {
 			GoType(keys.Public{}).
 			Comment("Signing public key of the owner of the deposit address.").
 			Annotations(entexample.Default("028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4")),
-		field.Bool("private_enabled").Default(false),
+		field.Bool("private_enabled").
+			Default(false).
+			Comment("Indicates whether privacy features are enabled for this wallet."),
 		field.Bytes("master_identity_public_key").
 			Nillable().
 			Optional().
