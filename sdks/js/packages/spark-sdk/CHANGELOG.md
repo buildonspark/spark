@@ -1,5 +1,15 @@
 # @buildonspark/spark-sdk
 
+## 0.5.4
+
+### Patch Changes
+
+- **Token transactions utilities**
+  - Added `broadcastTokenTransactionDetailed()` method that returns detailed transaction information including `tokenIdentifier`, `commitStatus`, `commitProgress`, `finalTokenTransaction`, and `finalTokenTransactionHash`
+  - Added `broadcastTokenTransactionV3Detailed()` method that returns the full `BroadcastTransactionResponse` including `tokenIdentifier` and `finalTokenTransaction`
+  - Exported `hashFinalTokenTransaction` utility function from package utils for computing transaction hashes
+  - Updated existing `broadcastTokenTransaction()` and `broadcastTokenTransactionV3()` to internally use the detailed methods and extract just the transaction hash for backward compatibility
+
 ## 0.5.3
 
 ### Patch Changes

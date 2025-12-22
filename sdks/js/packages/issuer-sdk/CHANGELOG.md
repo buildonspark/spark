@@ -1,5 +1,107 @@
 # @buildonspark/issuer-sdk
 
+## 0.1.4
+
+### Patch Changes
+
+- ## Multi-Token Issuance Support
+
+  Introduces support for issuer wallets to create and manage multiple tokens. Each token is uniquely identified by a bech32m token identifier derived from the token's creation parameters.
+
+  **Deprecated Methods**
+
+  The following methods are now marked deprecated and will throw `SparkValidationError` when multiple tokens exist for an issuer. These methods will be removed in a future major version:
+  - `getIssuerTokenBalance()` - Use `getIssuerTokenBalances()` instead
+  - `getIssuerTokenMetadata()` - Use `getIssuerTokensMetadata()` instead
+  - `getIssuerTokenIdentifier()` - Use `getIssuerTokenIdentifiers()` instead
+  - `mintTokens(amount)` - Use `mintTokens({ tokenAmount, tokenIdentifier })` instead
+  - `burnTokens(amount, selectedOutputs?)` - Use `burnTokens({ tokenAmount, tokenIdentifier, selectedOutputs })` instead
+  - `freezeTokens(sparkAddress)` - Use `freezeTokens({ tokenIdentifier, sparkAddress })` instead
+  - `unfreezeTokens(sparkAddress)` - Use `unfreezeTokens({ tokenIdentifier, sparkAddress })` instead
+
+  ### New Features
+
+  **Token Creation with Identifier**
+
+  `createToken()` now accepts an optional `returnIdentifierForCreate` parameter to return both the transaction hash and token identifier:
+
+  ```ts
+  const result = await wallet.createToken({
+    tokenName: "MyToken",
+    tokenTicker: "MTK",
+    decimals: 8,
+    maxSupply: 1000000n,
+    isFreezable: false,
+    returnIdentifierForCreate: true, // Returns TokenCreationDetails
+  });
+  ```
+
+  **Return issuer info for all issuer tokens**
+  - `getIssuerTokenBalances()` - Returns an array of token balances for all tokens owned by the issuer
+  - `getIssuerTokensMetadata()` - Returns an array of metadata for all tokens created by the issuer
+  - `getIssuerTokenIdentifiers()` - Returns an array of bech32m token identifiers for all issuer tokens
+
+  **Method Overloads**
+
+  All token operation methods now support optional `tokenIdentifier` parameters:
+
+  ```ts
+  // Mint tokens for a specific token
+  await wallet.mintTokens({
+      tokenAmount: 1000n,
+      tokenIdentifier: "btkn1..."
+  });
+
+  // Burn tokens for a specific token
+  await wallet.burnTokens({
+      tokenAmount: 500n,
+      tokenIdentifier: "btkn1...",
+      selectedOutputs: [...] // optional
+  });
+
+  // Freeze tokens for a specific token and address
+  await wallet.freezeTokens({
+      tokenIdentifier: "btkn1...",
+      sparkAddress: "spark1..."
+  });
+
+  // Unfreeze tokens for a specific token and address
+  await wallet.unfreezeTokens({
+      tokenIdentifier: "btkn1...",
+      sparkAddress: "spark1..."
+  });
+  ```
+
+  ### Backward Compatibility
+
+  Legacy method signatures continue to work for issuers with a single token. When multiple tokens are detected, these methods will throw descriptive errors guiding developers to use the new multi-token methods.
+
+  ### Migration Guide
+
+  **For Single-Token Issuers**
+
+  Existing code consuming older SDK versions will continue to work.
+
+  **For Multi-Token Issuers**
+
+  Update your code to use the new multi-token methods:
+
+  ```ts
+  // Before
+  await wallet.mintTokens(100n);
+
+  // After
+  const metadata = await wallet.getIssuerTokensMetadata();
+  const tokenIdentifier = metadata[1].bech32mTokenIdentifier;
+  await wallet.mintTokens({
+    tokenAmount: 100n,
+    tokenIdentifier: tokenIdentifier,
+  });
+  ```
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.5.4
+
 ## 0.1.3
 
 ### Patch Changes
