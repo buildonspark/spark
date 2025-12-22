@@ -29,7 +29,7 @@ func init() {
 	var err error
 
 	queryTokenTransactionsResultCount, err = meter.Float64Histogram(
-		"spark_token_query_transactions_result_count",
+		"spark_token_query_transactions_result",
 		metric.WithDescription("Distribution of result counts for QueryTokenTransactions"),
 		metric.WithUnit("{count}"),
 		metric.WithExplicitBucketBoundaries(generateResultCountBuckets(maxTokenTransactionPageSize)...),
