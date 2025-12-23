@@ -119,11 +119,6 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 			if !bytes.Equal(nonceEnt.RetryFingerprint, jobRetryFingerprint) {
 				return nil, fmt.Errorf("this signing nonce is already used for a different signing job, cannot use it for this signing job")
 			}
-		} else if len(nonceEnt.Message) > 0 {
-			// TODO: Probably remove this branch later after the retry fingerprint branch is deployed.
-			if !bytes.Equal(nonceEnt.Message, job.Message) {
-				return nil, fmt.Errorf("this signing nonce is already used for a different message %s, cannot use it for this message %s", hex.EncodeToString(nonceEnt.Message), hex.EncodeToString(job.Message))
-			}
 		} else {
 			// Collect this nonce for bulk update
 			bulkUpdates[commitment] = jobRetryFingerprint
