@@ -481,87 +481,82 @@ export class BaseTransferService {
         selfSignature: cpfpUserSignature,
       });
 
-      // Sign direct refund transaction
-
+      // Sign direct refund transaction (spends direct tx output).
       let directRefundAggregate: Uint8Array | undefined;
-      let directFromCpfpRefundAggregate: Uint8Array | undefined;
-      if (leafData.directTx) {
+      if (leafData.directTx && leafData.directRefundTx) {
         const directTxOutput = leafData.directTx.getOutput(0);
 
-        if (leafData.directRefundTx) {
-          const directRefundTxSighash = getSigHashFromTx(
-            leafData.directRefundTx,
-            0,
-            directTxOutput,
-          );
+        const directRefundTxSighash = getSigHashFromTx(
+          leafData.directRefundTx,
+          0,
+          directTxOutput,
+        );
 
-          const directUserSignature = await this.config.signer.signFrost({
-            message: directRefundTxSighash,
-            publicKey,
-            keyDerivation: leafData.keyDerivation,
-            selfCommitment: leafData.directSigningNonceCommitment,
-            statechainCommitments:
-              operatorSigningResult.directRefundTxSigningResult
-                ?.signingNonceCommitments,
-            verifyingKey: operatorSigningResult.verifyingKey,
-          });
+        const directUserSignature = await this.config.signer.signFrost({
+          message: directRefundTxSighash,
+          publicKey,
+          keyDerivation: leafData.keyDerivation,
+          selfCommitment: leafData.directSigningNonceCommitment,
+          statechainCommitments:
+            operatorSigningResult.directRefundTxSigningResult
+              ?.signingNonceCommitments,
+          verifyingKey: operatorSigningResult.verifyingKey,
+        });
 
-          directRefundAggregate = await this.config.signer.aggregateFrost({
-            message: directRefundTxSighash,
+        directRefundAggregate = await this.config.signer.aggregateFrost({
+          message: directRefundTxSighash,
+          statechainSignatures:
+            operatorSigningResult.directRefundTxSigningResult?.signatureShares,
+          statechainPublicKeys:
+            operatorSigningResult.directRefundTxSigningResult?.publicKeys,
+          verifyingKey: operatorSigningResult.verifyingKey,
+          statechainCommitments:
+            operatorSigningResult.directRefundTxSigningResult
+              ?.signingNonceCommitments,
+          selfCommitment: leafData.directSigningNonceCommitment,
+          publicKey,
+          selfSignature: directUserSignature,
+        });
+      }
+
+      // Sign direct-from-CPFP refund transaction (spends CPFP tx output).
+      let directFromCpfpRefundAggregate: Uint8Array | undefined;
+      if (leafData.directFromCpfpRefundTx) {
+        const directFromCpfpRefundTxSighash = getSigHashFromTx(
+          leafData.directFromCpfpRefundTx,
+          0,
+          txOutput,
+        );
+
+        const directFromCpfpUserSignature = await this.config.signer.signFrost({
+          message: directFromCpfpRefundTxSighash,
+          publicKey,
+          keyDerivation: leafData.keyDerivation,
+          selfCommitment: leafData.directFromCpfpRefundSigningNonceCommitment,
+          statechainCommitments:
+            operatorSigningResult.directFromCpfpRefundTxSigningResult
+              ?.signingNonceCommitments,
+          verifyingKey: operatorSigningResult.verifyingKey,
+        });
+
+        directFromCpfpRefundAggregate = await this.config.signer.aggregateFrost(
+          {
+            message: directFromCpfpRefundTxSighash,
             statechainSignatures:
-              operatorSigningResult.directRefundTxSigningResult
+              operatorSigningResult.directFromCpfpRefundTxSigningResult
                 ?.signatureShares,
             statechainPublicKeys:
-              operatorSigningResult.directRefundTxSigningResult?.publicKeys,
+              operatorSigningResult.directFromCpfpRefundTxSigningResult
+                ?.publicKeys,
             verifyingKey: operatorSigningResult.verifyingKey,
             statechainCommitments:
-              operatorSigningResult.directRefundTxSigningResult
+              operatorSigningResult.directFromCpfpRefundTxSigningResult
                 ?.signingNonceCommitments,
-            selfCommitment: leafData.directSigningNonceCommitment,
+            selfCommitment: leafData.directFromCpfpRefundSigningNonceCommitment,
             publicKey,
-            selfSignature: directUserSignature,
-          });
-        }
-
-        if (leafData.directFromCpfpRefundTx) {
-          const directFromCpfpRefundTxSighash = getSigHashFromTx(
-            leafData.directFromCpfpRefundTx,
-            0,
-            txOutput,
-          );
-
-          const directFromCpfpUserSignature =
-            await this.config.signer.signFrost({
-              message: directFromCpfpRefundTxSighash,
-              publicKey,
-              keyDerivation: leafData.keyDerivation,
-              selfCommitment:
-                leafData.directFromCpfpRefundSigningNonceCommitment,
-              statechainCommitments:
-                operatorSigningResult.directFromCpfpRefundTxSigningResult
-                  ?.signingNonceCommitments,
-              verifyingKey: operatorSigningResult.verifyingKey,
-            });
-
-          directFromCpfpRefundAggregate =
-            await this.config.signer.aggregateFrost({
-              message: directFromCpfpRefundTxSighash,
-              statechainSignatures:
-                operatorSigningResult.directFromCpfpRefundTxSigningResult
-                  ?.signatureShares,
-              statechainPublicKeys:
-                operatorSigningResult.directFromCpfpRefundTxSigningResult
-                  ?.publicKeys,
-              verifyingKey: operatorSigningResult.verifyingKey,
-              statechainCommitments:
-                operatorSigningResult.directFromCpfpRefundTxSigningResult
-                  ?.signingNonceCommitments,
-              selfCommitment:
-                leafData.directFromCpfpRefundSigningNonceCommitment,
-              publicKey,
-              selfSignature: directFromCpfpUserSignature,
-            });
-        }
+            selfSignature: directFromCpfpUserSignature,
+          },
+        );
       }
 
       nodeSignatures.push({
