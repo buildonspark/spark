@@ -1354,18 +1354,18 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 	switch transferType {
 	case st.TransferTypeTransfer:
 		if req == nil || req.TransferPackage == nil {
-			return validateLegacyLeavesToSend_transfer(nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
+			return validateLegacyLeavesToSend_transfer(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 		}
-		return validateLeaves_transfer(req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
+		return validateLeaves_transfer(ctx, req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 
 	case st.TransferTypeSwap, st.TransferTypeCounterSwap:
-		return validateLeaves_swap(nodesByID, leafCpfpRefundMap, refundDestPubkey, transferType)
+		return validateLeaves_swap(ctx, nodesByID, leafCpfpRefundMap, refundDestPubkey, transferType)
 
 	case st.TransferTypeCooperativeExit:
 		if req == nil || req.TransferPackage == nil {
-			return validateTransactionCooperativeExitLegacyLeavesToSend(nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
+			return validateTransactionCooperativeExitLegacyLeavesToSend(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 		}
-		return validateTransactionCooperativeExitLeaves(req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
+		return validateTransactionCooperativeExitLeaves(ctx, req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 
 	default:
 		return fmt.Errorf("invalid transfer type: %s", transferType)
@@ -1373,6 +1373,7 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 }
 
 func validateSingleLeafRefundTxs(
+	ctx context.Context,
 	node *ent.TreeNode,
 	cpfpRefundTx []byte,
 	directFromCpfpRefundTx []byte,
@@ -1408,6 +1409,13 @@ func validateSingleLeafRefundTxs(
 		}
 
 		hasDirectRefundTx := len(directRefundTx) > 0
+		isZeroNode, err := bitcointransaction.IsZeroNode(node)
+		if err != nil {
+			return fmt.Errorf("failed to determine if node is zero node: %w", err)
+		}
+		// If the knob is enabled and the node is not a zero node, enforce direct refund tx validation
+		enforceDirectRefundTxValidation := (knobs.GetKnobsService(ctx).GetValue(knobs.KnobDirectRefundTxValidation, 0) > 0) && !isZeroNode
+
 		if hasDirectRefundTx {
 			if err := bitcointransaction.VerifyTransactionWithDatabase(
 				directRefundTx,
@@ -1417,6 +1425,8 @@ func validateSingleLeafRefundTxs(
 			); err != nil {
 				return fmt.Errorf("direct refund tx validation failed for leaf: %w", err)
 			}
+		} else if !hasDirectRefundTx && enforceDirectRefundTxValidation {
+			return fmt.Errorf("leaf %s does not have a direct refund tx and it is not a zero node, non-zero nodes must have a direct refund tx", node.ID.String())
 		}
 	}
 
@@ -1473,6 +1483,7 @@ func removeTxIn(rawTx []byte, vin int) ([]byte, error) {
 }
 
 func validateLegacyLeavesToSend_transfer(
+	ctx context.Context,
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
 	leafDirectRefundMap map[string][]byte,
@@ -1490,6 +1501,7 @@ func validateLegacyLeavesToSend_transfer(
 		directRefundTx := leafDirectRefundMap[leafID]
 
 		if err := validateSingleLeafRefundTxs(
+			ctx,
 			node,
 			cpfpRefundTx,
 			directFromCpfpRefundTx,
@@ -1504,6 +1516,7 @@ func validateLegacyLeavesToSend_transfer(
 }
 
 func validateLeaves_transfer(
+	ctx context.Context,
 	req *pbspark.StartTransferRequest,
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
@@ -1571,6 +1584,7 @@ func validateLeaves_transfer(
 		directRefundTx := leafDirectRefundMap[leafID]
 
 		if err := validateSingleLeafRefundTxs(
+			ctx,
 			node,
 			cpfpRefundTx,
 			directFromCpfpRefundTx,
@@ -1586,6 +1600,7 @@ func validateLeaves_transfer(
 }
 
 func validateLeaves_swap(
+	ctx context.Context,
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
@@ -1600,6 +1615,7 @@ func validateLeaves_swap(
 		cpfpRefundTx := leafCpfpRefundMap[leafID]
 
 		if err := validateSingleLeafRefundTxs(
+			ctx,
 			node,
 			cpfpRefundTx,
 			nil,
@@ -1615,6 +1631,7 @@ func validateLeaves_swap(
 }
 
 func validateTransactionCooperativeExitLegacyLeavesToSend(
+	ctx context.Context,
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
 	leafDirectRefundMap map[string][]byte,
@@ -1652,6 +1669,7 @@ func validateTransactionCooperativeExitLegacyLeavesToSend(
 		}
 
 		if err := validateSingleLeafRefundTxs(
+			ctx,
 			node,
 			modifiedCpfpRefundTx,
 			modifiedDirectFromCpfpRefundTx,
@@ -1666,6 +1684,7 @@ func validateTransactionCooperativeExitLegacyLeavesToSend(
 }
 
 func validateTransactionCooperativeExitLeaves(
+	ctx context.Context,
 	req *pbspark.StartTransferRequest,
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
@@ -1753,6 +1772,7 @@ func validateTransactionCooperativeExitLeaves(
 		}
 
 		if err := validateSingleLeafRefundTxs(
+			ctx,
 			node,
 			modifiedCpfpRefundTx,
 			modifiedDirectFromCpfpRefundTx,

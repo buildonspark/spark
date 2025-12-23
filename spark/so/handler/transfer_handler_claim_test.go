@@ -368,26 +368,29 @@ func createValidSigningJobForLeaf(t *testing.T, rng io.Reader, leaf *ent.TreeNod
 
 func TestValidateReceivedRefundTransactions_Transfer_Success(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
+	ctx, _ := db.ConnectToTestPostgres(t)
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 	job := createValidSigningJobForLeaf(t, rng, leaf, false /* isSwap */)
 
-	err := validateReceivedRefundTransactions(job, leaf, st.TransferTypeTransfer /* isSwap */)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */)
 	require.NoError(t, err)
 }
 
 func TestValidateReceivedRefundTransactions_Swap_Success(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{2})
+	ctx, _ := db.ConnectToTestPostgres(t)
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 	job := createValidSigningJobForLeaf(t, rng, leaf, true /* isSwap */)
 
-	err := validateReceivedRefundTransactions(job, leaf, st.TransferTypeSwap /* isSwap */)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */)
 	require.NoError(t, err)
 }
 
 func TestValidateReceivedRefundTransactions_RetrySkipsValidation(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{3})
+	ctx, _ := db.ConnectToTestPostgres(t)
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 
@@ -404,16 +407,17 @@ func TestValidateReceivedRefundTransactions_RetrySkipsValidation(t *testing.T) {
 
 	// When bytes.Equal(job.RefundTxSigningJob.RawTx, leaf.RawRefundTx) is true,
 	// validation should be skipped and return nil
-	err := validateReceivedRefundTransactions(job, leaf, st.TransferTypeTransfer /* isSwap */)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */)
 	require.NoError(t, err)
 
 	// Also works for swap
-	err = validateReceivedRefundTransactions(job, leaf, st.TransferTypeSwap /* isSwap */)
+	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */)
 	require.NoError(t, err)
 }
 
 func TestValidateReceivedRefundTransactions_MissingRefundTxSigningJob(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{4})
+	ctx, _ := db.ConnectToTestPostgres(t)
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 
@@ -423,13 +427,14 @@ func TestValidateReceivedRefundTransactions_MissingRefundTxSigningJob(t *testing
 		RefundTxSigningJob: nil,
 	}
 
-	err := validateReceivedRefundTransactions(job, leaf, st.TransferTypeTransfer /* isSwap */)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing RefundTxSigningJob")
 }
 
 func TestValidateReceivedRefundTransactions_Transfer_MissingDirectFromCpfp(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{5})
+	ctx, _ := db.ConnectToTestPostgres(t)
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 
@@ -453,13 +458,14 @@ func TestValidateReceivedRefundTransactions_Transfer_MissingDirectFromCpfp(t *te
 		// DirectFromCpfpRefundTxSigningJob is nil - this is required for transfers
 	}
 
-	err = validateReceivedRefundTransactions(job, leaf, st.TransferTypeTransfer /* isSwap */)
+	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "direct from CPFP refund tx")
 }
 
 func TestValidateReceivedRefundTransactions_Swap_DoesNotRequireDirectTx(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{6})
+	ctx, _ := db.ConnectToTestPostgres(t)
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 
@@ -483,7 +489,7 @@ func TestValidateReceivedRefundTransactions_Swap_DoesNotRequireDirectTx(t *testi
 	}
 
 	// For swaps, only CPFP refund tx is required
-	err = validateReceivedRefundTransactions(job, leaf, st.TransferTypeSwap /* isSwap */)
+	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */)
 	require.NoError(t, err)
 }
 

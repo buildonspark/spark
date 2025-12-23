@@ -382,3 +382,16 @@ func GetCpfpTimelockFromLeaf(dbLeaf *ent.TreeNode) (uint32, error) {
 	cpfpRefundTxTimelock := GetTimelockFromSequence(rawRefundTx.TxIn[0].Sequence)
 	return cpfpRefundTxTimelock, nil
 }
+
+func IsZeroNode(leaf *ent.TreeNode) (bool, error) {
+	nodeTxBytes := leaf.RawTx
+	nodeTx, err := common.TxFromRawTxBytes(nodeTxBytes)
+	if err != nil {
+		return false, fmt.Errorf("unable to load node tx for leaf %s: %w", leaf.ID.String(), err)
+	}
+	if len(nodeTx.TxIn) == 0 {
+		return false, fmt.Errorf("no tx inputs for node tx %s", leaf.ID.String())
+	}
+	nodeTxTimelock := GetTimelockFromSequence(nodeTx.TxIn[0].Sequence)
+	return nodeTxTimelock == 0, nil
+}

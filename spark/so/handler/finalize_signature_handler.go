@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
@@ -460,7 +461,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		} else if requireDirectTx && len(node.DirectTx) > 0 {
 			ignoreZeroNode := knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnableStrictDirectRefundTxValidation, 0) == 0
 
-			isZeroNode, err := isZeroNode(node)
+			isZeroNode, err := bitcointransaction.IsZeroNode(node)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to determine if node is zero node: %w", err)
 			}

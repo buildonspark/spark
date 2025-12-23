@@ -2157,7 +2157,7 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 	return nil
 }
 
-func validateReceivedRefundTransactions(job *pb.LeafRefundTxSigningJob, leaf *ent.TreeNode, transferType st.TransferType) error {
+func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundTxSigningJob, leaf *ent.TreeNode, transferType st.TransferType) error {
 	if job.RefundTxSigningJob == nil {
 		return fmt.Errorf("missing RefundTxSigningJob for leaf %s", job.LeafId)
 	}
@@ -2182,6 +2182,7 @@ func validateReceivedRefundTransactions(job *pb.LeafRefundTxSigningJob, leaf *en
 	}
 
 	if err := validateSingleLeafRefundTxs(
+		ctx,
 		leaf,
 		getRawTx(job.RefundTxSigningJob),
 		getRawTx(job.DirectFromCpfpRefundTxSigningJob),
@@ -2323,7 +2324,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		}
 
 		if isSupportedTransferType && enhancedTransferReceiveValidationEnabled {
-			if err := validateReceivedRefundTransactions(job, leaf, transfer.Type); err != nil {
+			if err := validateReceivedRefundTransactions(ctx, job, leaf, transfer.Type); err != nil {
 				return nil, err
 			}
 		}
@@ -2334,7 +2335,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 			directRefundTxSigningJob = job.DirectRefundTxSigningJob
 		} else if !isSwap && requireDirectTx && len(leaf.DirectTx) > 0 {
 			ignoreZeroNode := knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnableStrictDirectRefundTxValidation, 0) == 0
-			isZeroNode, err := isZeroNode(leaf)
+			isZeroNode, err := bitcointransaction.IsZeroNode(leaf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to determine if node is zero node: %w", err)
 			}
@@ -2475,19 +2476,6 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	}
 
 	return &pb.ClaimTransferSignRefundsResponse{SigningResults: signingResultProtos}, nil
-}
-
-func isZeroNode(leaf *ent.TreeNode) (bool, error) {
-	nodeTxBytes := leaf.RawTx
-	nodeTx, err := common.TxFromRawTxBytes(nodeTxBytes)
-	if err != nil {
-		return false, fmt.Errorf("unable to load node tx for leaf %s: %w", leaf.ID.String(), err)
-	}
-	if len(nodeTx.TxIn) == 0 {
-		return false, fmt.Errorf("no tx inputs for node tx %s", leaf.ID.String())
-	}
-	nodeTxTimelock := bitcointransaction.GetTimelockFromSequence(nodeTx.TxIn[0].Sequence)
-	return nodeTxTimelock == 0, nil
 }
 
 func (h *TransferHandler) getRefundTxSigningJobs(ctx context.Context, leaf *ent.TreeNode, cpfpJob *pb.SigningJob, directJob *pb.SigningJob, directFromCpfpJob *pb.SigningJob) (*helper.SigningJob, *helper.SigningJob, *helper.SigningJob, error) {
