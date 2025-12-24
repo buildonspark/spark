@@ -1344,7 +1344,11 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 	leafDirectFromCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
 ) error {
-	enhancedValidationEnabled := knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobSoEnhancedBitcoinTxValidation, 0)
+	if len(leaves) == 0 {
+		return fmt.Errorf("leaves cannot be empty")
+	}
+	networkString := leaves[0].Network.String()
+	enhancedValidationEnabled := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobSoEnhancedBitcoinTxValidation, &networkString, 0) > 0
 	if !enhancedValidationEnabled {
 		return nil
 	}

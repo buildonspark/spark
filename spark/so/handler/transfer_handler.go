@@ -2300,6 +2300,17 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, err
 	}
 
+	if len(leaves) == 0 {
+		return nil, fmt.Errorf("leaves cannot be empty")
+	}
+
+	// Extract network from first leaf (all leaves should be on the same network)
+	var networkString string
+	for _, leaf := range leaves {
+		networkString = leaf.Network.String()
+		break
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get db from context: %w", err)
@@ -2308,7 +2319,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	// Collect all TreeNode updates to batch them and avoid N+1 queries
 	builders := make([]*ent.TreeNodeCreate, 0, len(req.SigningJobs))
 
-	enhancedTransferReceiveValidationEnabled := knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobEnhancedTransferReceiveValidation, 0)
+	enhancedTransferReceiveValidationEnabled := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobEnhancedTransferReceiveValidation, &networkString, 0) > 0
 
 	var signingJobs []*helper.SigningJob
 	jobToLeafMap := make(map[string]uuid.UUID)
@@ -2334,7 +2345,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		if job.DirectRefundTxSigningJob != nil {
 			directRefundTxSigningJob = job.DirectRefundTxSigningJob
 		} else if !isSwap && requireDirectTx && len(leaf.DirectTx) > 0 {
-			ignoreZeroNode := knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnableStrictDirectRefundTxValidation, 0) == 0
+			ignoreZeroNode := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobEnableStrictDirectRefundTxValidation, &networkString, 100) == 0
 			isZeroNode, err := bitcointransaction.IsZeroNode(leaf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to determine if node is zero node: %w", err)

@@ -749,7 +749,8 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, fmt.Errorf("direct root tx signing job and direct refund tx signing job must both be provided or neither of them")
 	}
 
-	if knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobEnableDepositFlowValidation, 0) {
+	networkString := network.String()
+	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobEnableDepositFlowValidation, &networkString, 0) > 0 {
 		combinedPublicKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
 		err = o.validateBitcoinTransactions(req, combinedPublicKey)
 		if err != nil {
