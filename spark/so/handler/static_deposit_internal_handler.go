@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -15,6 +17,7 @@ import (
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/staticdeposit"
@@ -417,4 +420,59 @@ func CreateArchiveStaticDepositAddressStatement(ownerIdentityPubKey keys.Public,
 		Hash()
 
 	return hash, nil
+}
+
+// Archives a specific static deposit address for a user during address rotation.
+// This marks the specific address as archived (is_default=false) on all SOs.
+// Archived addresses are still queryable and able to accept deposits.
+// The address parameter ensures idempotency and prevents race conditions during rotation.
+func (h *StaticDepositInternalHandler) ArchiveStaticDepositAddress(ctx context.Context, ownerIdentityPublicKey []byte, protoNetwork pb.Network, address string) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		logger.Error("failed to get database from context", zap.Error(err))
+		return fmt.Errorf("failed to get database from context: %w", err)
+	}
+
+	// Parse owner identity public key
+	ownerIDPubKey, err := keys.ParsePublicKey(ownerIdentityPublicKey)
+	if err != nil {
+		logger.Error("failed to parse owner identity public key", zap.Error(err))
+		return fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
+
+	// Parse network
+	network, err := btcnetwork.FromProtoNetwork(protoNetwork)
+	if err != nil {
+		logger.Error("failed to parse network", zap.Error(err))
+		return fmt.Errorf("failed to parse network: %w", err)
+	}
+
+	// Find the specific address to archive
+	depositAddress, err := db.DepositAddress.Query().
+		Where(
+			depositaddress.Address(address),
+			depositaddress.OwnerIdentityPubkey(ownerIDPubKey),
+			depositaddress.IsStatic(true),
+			depositaddress.NetworkEQ(network),
+		).
+		Only(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query static deposit address: %w", err)
+	}
+
+	// Check if already archived (is_default=false)
+	if !depositAddress.IsDefault {
+		return nil
+	}
+
+	// Archive the specific address by setting is_default to false
+	_, err = db.DepositAddress.UpdateOneID(depositAddress.ID).
+		SetIsDefault(false).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to archive static deposit address: %w", err)
+	}
+
+	return nil
 }

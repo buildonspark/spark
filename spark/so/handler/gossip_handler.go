@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -21,7 +20,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
-	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"go.uber.org/zap"
 )
 
@@ -426,6 +424,13 @@ func (h *GossipHandler) handleArchiveStaticDepositAddressGossipMessage(ctx conte
 		return fmt.Errorf("failed to verify coordinator signature: %w", err)
 	}
 
-	// Archive the specific address (will be implemented in the next PR)
-	return sparkerrors.UnimplementedMethodDisabled(errors.New("method not implemented yet"))
+	staticDepositHandler := NewStaticDepositInternalHandler(h.config)
+	err = staticDepositHandler.ArchiveStaticDepositAddress(ctx, archiveStaticDepositAddress.OwnerIdentityPublicKey, archiveStaticDepositAddress.Network, archiveStaticDepositAddress.Address)
+	if err != nil {
+		logger.Sugar().Errorf("failed to archive static deposit address from gossip message: %w", err)
+		return err
+	}
+
+	logger.Sugar().Infof("Successfully archived static deposit address %s from gossip message for identity public key %x", archiveStaticDepositAddress.Address, ownerIDPubKey.Serialize())
+	return nil
 }
