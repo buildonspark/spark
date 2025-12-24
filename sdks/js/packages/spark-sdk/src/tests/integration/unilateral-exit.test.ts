@@ -13,6 +13,10 @@ import {
 import { signPsbtWithExternalKey } from "../utils/signing.js";
 import { TreeNode } from "../../proto/spark.js";
 
+const didTxSucceed = (response: any) => {
+  return response.package_msg === "success";
+};
+
 describe("unilateral exit", () => {
   it("should unilateral exit", async () => {
     const faucet = BitcoinFaucet.getInstance();
@@ -32,7 +36,7 @@ describe("unilateral exit", () => {
 
     const signedTx = await faucet.sendToAddress(depositResp, 100_000n);
 
-    await faucet.mineBlocks(6);
+    await faucet.mineBlocksAndWaitForMiningToComplete(6);
 
     await userWallet.claimDeposit(signedTx.id);
 
@@ -50,11 +54,11 @@ describe("unilateral exit", () => {
       address: fundingWalletAddress,
       key: fundingWalletKey,
       pubKey: fundingWalletPubKey,
-    } = await faucet.getNewExternalWallet();
+    } = await faucet.getNewExternalWPKHWallet();
 
     const fundingTx = await faucet.sendToAddress(fundingWalletAddress, 50_000n);
 
-    await faucet.mineBlocks(6);
+    await faucet.mineBlocksAndWaitForMiningToComplete(6);
 
     const pubKeyHash = hash160(fundingWalletPubKey);
     const p2wpkhScript = new Uint8Array([0x00, 0x14, ...pubKeyHash]);
@@ -88,24 +92,21 @@ describe("unilateral exit", () => {
     const txPackages = constructedTx[0]?.txPackages;
 
     // Broadcast unilateral exit transactions in order
-    txPackages?.forEach(async (txPackage) => {
-      const startBlock = await faucet.getBlockCount();
+    for (let i = 0; i < txPackages!.length; i++) {
+      const txPackage = txPackages![i];
       const feeBumpPsbtSigned = await signPsbtWithExternalKey(
-        txPackage.feeBumpPsbt!,
+        txPackage!.feeBumpPsbt!,
         bytesToHex(fundingWalletKey),
       );
-      await faucet.submitPackage([txPackage.tx, feeBumpPsbtSigned]);
+      const res = await faucet.submitPackage([
+        txPackage!.tx,
+        feeBumpPsbtSigned,
+      ]);
 
-      // Mine 1910 blocks to expire time lock.
-      await faucet.mineBlocks(1910);
-
-      // Since we do not depend on the chain watcher, we just need to wait for the blocks to be mined.
-      await faucet.waitForBlocksMined({
-        startBlock,
-        expectedIncrease: 1910,
-      });
-    });
-
+      expect(didTxSucceed(res)).toBe(true);
+      // Mine 2000 blocks to expire time lock.
+      await faucet.mineBlocksAndWaitForMiningToComplete(2000);
+    }
     await connectionManager.closeConnections();
   }, 90000);
 });

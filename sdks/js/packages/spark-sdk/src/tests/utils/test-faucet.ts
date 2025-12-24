@@ -9,6 +9,7 @@ import {
   getP2TRAddressFromPkScript,
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
+  getP2WPKHAddressFromPublicKey,
 } from "../../utils/bitcoin.js";
 import { getFetch } from "../../utils/fetch.js";
 import { getNetwork, Network } from "../../utils/network.js";
@@ -425,7 +426,7 @@ export class BitcoinFaucet {
     return getP2TRAddressFromPublicKey(pubKey, Network.LOCAL);
   }
 
-  async getNewExternalWallet(): Promise<{
+  async getNewExternalWPKHWallet(): Promise<{
     address: string;
     key: Uint8Array;
     pubKey: Uint8Array;
@@ -433,7 +434,7 @@ export class BitcoinFaucet {
     const key = secp256k1.utils.randomPrivateKey();
     const pubKey = secp256k1.getPublicKey(key);
     return {
-      address: getP2TRAddressFromPublicKey(pubKey, Network.LOCAL),
+      address: getP2WPKHAddressFromPublicKey(pubKey, Network.LOCAL),
       key,
       pubKey,
     };
