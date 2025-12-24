@@ -5,11 +5,11 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/lightsparkdev/spark/common/btcnetwork"
-	"github.com/lightsparkdev/spark/common/keys"
-
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/hashstructure"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -389,4 +389,32 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	}
 
 	return &pbinternal.CreateStaticDepositUtxoRefundResponse{UtxoDepositAddress: depositAddress.Address}, nil
+}
+
+// Creates a hash statement for archiving a static deposit address.
+// This statement is signed by the coordinator to prove authorization and
+// prevent rogue SOs from archiving addresses without user consent.
+//
+// Uses hashstructure to ensure unambiguous encoding with built-in length prefixes,
+// eliminating hash collision vulnerabilities.
+func CreateArchiveStaticDepositAddressStatement(ownerIdentityPubKey keys.Public, network btcnetwork.Network, address string) ([]byte, error) {
+	// Validate inputs
+	if ownerIdentityPubKey.IsZero() {
+		return nil, fmt.Errorf("owner identity public key cannot be zero")
+	}
+	if network == btcnetwork.Unspecified {
+		return nil, fmt.Errorf("network cannot be unspecified")
+	}
+	if address == "" {
+		return nil, fmt.Errorf("address cannot be empty")
+	}
+
+	// Create hash using hashstructure
+	hash := hashstructure.NewHasher([]string{"spark", "archive_static_deposit_address"}).
+		AddString(network.String()).
+		AddBytes(ownerIdentityPubKey.Serialize()).
+		AddString(address).
+		Hash()
+
+	return hash, nil
 }

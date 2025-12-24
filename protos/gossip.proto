@@ -31,6 +31,7 @@ message GossipMessage {
         GossipMessageFinalizeRenewNodeTimelock finalize_node_timelock = 15;
         GossipMessageSettleSwapKeyTweak settle_swap_key_tweak = 16;
         GossipMessageUpdateWalletSetting update_wallet_setting = 17;
+        GossipMessageArchiveStaticDepositAddress archive_static_deposit_address = 18;
     }
 }
 
@@ -120,4 +121,16 @@ message GossipMessageUpdateWalletSetting {
         bytes set_master_identity_public_key = 3;
         bool clear_master_identity_public_key = 4;
     }
+}
+
+// Archives a specific static deposit address for a user during address rotation.
+// This marks the old address as archived (is_default=false) on all SOs.
+// Archived addresses are still queryable and able to accept deposits.
+// The coordinator signs this operation to prevent unauthorized archiving by rogue SOs.
+message GossipMessageArchiveStaticDepositAddress {
+    bytes owner_identity_public_key = 1;
+    spark.Network network = 2;
+    string address = 3;  // Specific address to archive
+    bytes signature = 4;  // Coordinator's signature over the operation
+    bytes coordinator_public_key = 5;  // Identity public key of the SO that initiated the rotation
 }

@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/uuids"
@@ -18,6 +21,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"go.uber.org/zap"
 )
 
@@ -77,6 +81,9 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 		return fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.Message)
 	case *pbgossip.GossipMessage_FinalizeExtendLeaf:
 		return fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.Message)
+	case *pbgossip.GossipMessage_ArchiveStaticDepositAddress:
+		archiveStaticDepositAddress := gossipMessage.GetArchiveStaticDepositAddress()
+		err = h.handleArchiveStaticDepositAddressGossipMessage(ctx, archiveStaticDepositAddress)
 	default:
 		return fmt.Errorf("unsupported gossip message type: %T", gossipMessage.Message)
 	}
@@ -383,4 +390,42 @@ func (h *GossipHandler) handleUpdateWalletSettingGossipMessage(ctx context.Conte
 
 	logger.Sugar().Infof("Successfully updated wallet setting from gossip message for identity public key %x", ownerIdentityPubKey)
 	return nil
+}
+
+func (h *GossipHandler) handleArchiveStaticDepositAddressGossipMessage(ctx context.Context, archiveStaticDepositAddress *pbgossip.GossipMessageArchiveStaticDepositAddress) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	// Parse coordinator public key
+	coordinatorPubKey, err := keys.ParsePublicKey(archiveStaticDepositAddress.CoordinatorPublicKey)
+	if err != nil {
+		logger.Error("failed to parse coordinator public key", zap.Error(err))
+		return fmt.Errorf("failed to parse coordinator public key: %w", err)
+	}
+
+	// Parse owner identity public key
+	ownerIDPubKey, err := keys.ParsePublicKey(archiveStaticDepositAddress.OwnerIdentityPublicKey)
+	if err != nil {
+		logger.Error("failed to parse owner identity public key", zap.Error(err))
+		return fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
+
+	network, err := btcnetwork.FromProtoNetwork(archiveStaticDepositAddress.Network)
+	if err != nil {
+		logger.Error("failed to parse network", zap.Error(err))
+		return fmt.Errorf("failed to parse network: %w", err)
+	}
+
+	messageHash, err := CreateArchiveStaticDepositAddressStatement(ownerIDPubKey, network, archiveStaticDepositAddress.Address)
+	if err != nil {
+		logger.Error("failed to create archive statement", zap.Error(err))
+		return fmt.Errorf("failed to create archive statement: %w", err)
+	}
+
+	if err := common.VerifyECDSASignature(coordinatorPubKey, archiveStaticDepositAddress.Signature, messageHash); err != nil {
+		logger.Error("failed to verify coordinator signature", zap.Error(err))
+		return fmt.Errorf("failed to verify coordinator signature: %w", err)
+	}
+
+	// Archive the specific address (will be implemented in the next PR)
+	return sparkerrors.UnimplementedMethodDisabled(errors.New("method not implemented yet"))
 }
