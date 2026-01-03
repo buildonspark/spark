@@ -708,13 +708,13 @@ func (h *TransferHandler) StartLeafSwapV2(ctx context.Context, req *pb.StartTran
 // applied, awaiting a counter swap transfer.
 // Swap V3 flow requires adapted signatures, so the User must provide the adaptor public keys.
 func (h *TransferHandler) InitiateSwapPrimaryTransfer(ctx context.Context, req *pb.InitiateSwapPrimaryTransferRequest) (*pb.StartTransferResponse, error) {
-	adaptorPublicKey, err := keys.ParsePublicKey(req.AdaptorPublicKeys.AdaptorPublicKey)
+	adaptorPublicKey, err := keys.ParsePublicKey(req.GetAdaptorPublicKeys().GetAdaptorPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse adaptor public key: %w", err)
 	}
 
-	if len(req.GetTransfer().TransferPackage.DirectLeavesToSend) > 0 || len(req.GetTransfer().TransferPackage.DirectFromCpfpLeavesToSend) > 0 {
-		return nil, fmt.Errorf("direct transactions should not be provided for primary transfer %s", req.Transfer.TransferId)
+	if len(req.GetTransfer().GetTransferPackage().GetDirectLeavesToSend()) > 0 || len(req.GetTransfer().GetTransferPackage().GetDirectFromCpfpLeavesToSend()) > 0 {
+		return nil, fmt.Errorf("direct transactions should not be provided for primary transfer %s", req.GetTransfer().GetTransferId())
 	}
 
 	return h.startTransferInternal(ctx, req.GetTransfer(), st.TransferTypePrimarySwapV3, adaptorPublicKey, keys.Public{}, keys.Public{}, true, &SwapV3Package{primaryTransferId: uuid.Nil})
