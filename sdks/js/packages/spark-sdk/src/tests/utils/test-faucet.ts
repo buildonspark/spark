@@ -497,4 +497,32 @@ export class BitcoinFaucet {
   async getRawTransaction(txid: string) {
     return await this.call("getrawtransaction", [txid, 2]);
   }
+
+  async getRawMempool() {
+    return await this.call("getrawmempool", []);
+  }
+
+  async getMempoolEntry(txid: string) {
+    return await this.call("getmempoolentry", [txid]);
+  }
+
+  async waitForMempoolEntry(
+    txid: string,
+    timeoutMs: number = 30000,
+    intervalMs: number = 5000,
+  ) {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      try {
+        const mempoolEntry = await this.getMempoolEntry(txid);
+        if (mempoolEntry) {
+          return mempoolEntry;
+        }
+      } catch (error) {
+        await new Promise((r) => setTimeout(r, intervalMs));
+      }
+    }
+    throw new Error(`Timed out waiting for mempool entry for txid ${txid}`);
+  }
 }
