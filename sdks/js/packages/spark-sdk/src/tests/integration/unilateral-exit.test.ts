@@ -8,6 +8,8 @@ import { Network } from "../../utils/network.js";
 import { SparkWalletTestingIntegration } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
 import { waitForClaim } from "../utils/utils.js";
+import { testHermeticOnly } from "../isHermeticTest.js";
+
 import {
   constructUnilateralExitFeeBumpPackages,
   hash160,
@@ -22,7 +24,7 @@ const didTxSucceed = (response: any) => {
 };
 
 describe("unilateral exit", () => {
-  it("should unilateral exit", async () => {
+  testHermeticOnly("should unilateral exit", async () => {
     const faucet = BitcoinFaucet.getInstance();
 
     const { wallet: userWallet } =
