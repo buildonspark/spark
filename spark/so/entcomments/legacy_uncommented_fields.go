@@ -21,7 +21,7 @@ var legacyUncommentedFields = map[string][]string{
 	"PreimageRequest":                   {"payment_hash", "status", "receiver_identity_pubkey", "preimage", "sender_identity_pubkey"},
 	"PreimageShare":                     {"payment_hash", "preimage_share", "threshold", "owner_identity_pubkey", "invoice_string"},
 	"SigningCommitment":                 {"operator_index", "status", "nonce_commitment"},
-	"SigningNonce":                      {"nonce", "nonce_commitment", "message", "retry_fingerprint"},
+	"SigningNonce":                      {"nonce", "nonce_commitment", "retry_fingerprint"},
 	"TokenCreate":                       {"issuer_signature", "operator_specific_issuer_signature", "creation_entity_public_key", "wallet_provided_timestamp", "issuer_public_key", "token_name", "token_ticker", "decimals", "max_supply", "is_freezable", "network", "token_identifier"},
 	"TokenFreeze":                       {"status", "owner_public_key", "token_public_key", "issuer_signature", "wallet_provided_freeze_timestamp", "wallet_provided_thaw_timestamp", "token_create_id"},
 	"TokenMint":                         {"issuer_public_key", "wallet_provided_timestamp", "issuer_signature", "operator_specific_issuer_signature", "token_identifier"},

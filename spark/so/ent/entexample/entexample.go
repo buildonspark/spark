@@ -1867,7 +1867,6 @@ type SigningNonceExample struct {
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	Nonce            *frost.SigningNonce
 	NonceCommitment  *frost.SigningCommitment
-	Message          *[]byte
 	RetryFingerprint *[]byte
 
 	// Edges - if set, use the provided entity; if nil, create a default one
@@ -1890,12 +1889,6 @@ func (sn *SigningNonceExample) SetNonce(v frost.SigningNonce) *SigningNonceExamp
 // SetNonceCommitment sets the nonce_commitment field.
 func (sn *SigningNonceExample) SetNonceCommitment(v frost.SigningCommitment) *SigningNonceExample {
 	sn.NonceCommitment = &v
-	return sn
-}
-
-// SetMessage sets the message field.
-func (sn *SigningNonceExample) SetMessage(v []byte) *SigningNonceExample {
-	sn.Message = &v
 	return sn
 }
 
@@ -1922,10 +1915,6 @@ func (sn *SigningNonceExample) MustExec(ctx context.Context) *ent.SigningNonce {
 	} else {
 		// Use default from annotation
 		create.SetNonceCommitment(frost.MustParseSigningCommitment("02b1da9d3de7774d492150db96dea151050a7c9e4459e35020d4b768c4b4044e8103f694a39e78d4804c985ff637d6e3a56052b5a122d2edd1cf75e385f6b69297dd"))
-	}
-	if sn.Message != nil {
-		create.SetMessage(*sn.Message)
-	} else {
 	}
 	if sn.RetryFingerprint != nil {
 		create.SetRetryFingerprint(*sn.RetryFingerprint)
@@ -1965,10 +1954,6 @@ func (sn *SigningNonceExample) Exec(ctx context.Context) (*ent.SigningNonce, err
 	} else {
 		// Use default from annotation
 		create.SetNonceCommitment(frost.MustParseSigningCommitment("02b1da9d3de7774d492150db96dea151050a7c9e4459e35020d4b768c4b4044e8103f694a39e78d4804c985ff637d6e3a56052b5a122d2edd1cf75e385f6b69297dd"))
-	}
-	if sn.Message != nil {
-		create.SetMessage(*sn.Message)
-	} else {
 	}
 	if sn.RetryFingerprint != nil {
 		create.SetRetryFingerprint(*sn.RetryFingerprint)

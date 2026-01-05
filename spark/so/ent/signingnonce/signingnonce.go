@@ -22,8 +22,6 @@ const (
 	FieldNonce = "nonce"
 	// FieldNonceCommitment holds the string denoting the nonce_commitment field in the database.
 	FieldNonceCommitment = "nonce_commitment"
-	// FieldMessage holds the string denoting the message field in the database.
-	FieldMessage = "message"
 	// FieldRetryFingerprint holds the string denoting the retry_fingerprint field in the database.
 	FieldRetryFingerprint = "retry_fingerprint"
 	// Table holds the table name of the signingnonce in the database.
@@ -44,11 +42,6 @@ var Columns = []string{
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
-			return true
-		}
-	}
-	for _, f := range [...]string{FieldMessage} {
-		if column == f {
 			return true
 		}
 	}

@@ -65,12 +65,6 @@ func (snc *SigningNonceCreate) SetNonceCommitment(fc frost.SigningCommitment) *S
 	return snc
 }
 
-// SetMessage sets the "message" field.
-func (snc *SigningNonceCreate) SetMessage(b []byte) *SigningNonceCreate {
-	snc.mutation.SetMessage(b)
-	return snc
-}
-
 // SetRetryFingerprint sets the "retry_fingerprint" field.
 func (snc *SigningNonceCreate) SetRetryFingerprint(b []byte) *SigningNonceCreate {
 	snc.mutation.SetRetryFingerprint(b)
@@ -206,10 +200,6 @@ func (snc *SigningNonceCreate) createSpec() (*SigningNonce, *sqlgraph.CreateSpec
 		_spec.SetField(signingnonce.FieldNonceCommitment, field.TypeBytes, value)
 		_node.NonceCommitment = value
 	}
-	if value, ok := snc.mutation.Message(); ok {
-		_spec.SetField(signingnonce.FieldMessage, field.TypeBytes, value)
-		_node.Message = value
-	}
 	if value, ok := snc.mutation.RetryFingerprint(); ok {
 		_spec.SetField(signingnonce.FieldRetryFingerprint, field.TypeBytes, value)
 		_node.RetryFingerprint = value
@@ -275,24 +265,6 @@ func (u *SigningNonceUpsert) SetUpdateTime(v time.Time) *SigningNonceUpsert {
 // UpdateUpdateTime sets the "update_time" field to the value that was provided on create.
 func (u *SigningNonceUpsert) UpdateUpdateTime() *SigningNonceUpsert {
 	u.SetExcluded(signingnonce.FieldUpdateTime)
-	return u
-}
-
-// SetMessage sets the "message" field.
-func (u *SigningNonceUpsert) SetMessage(v []byte) *SigningNonceUpsert {
-	u.Set(signingnonce.FieldMessage, v)
-	return u
-}
-
-// UpdateMessage sets the "message" field to the value that was provided on create.
-func (u *SigningNonceUpsert) UpdateMessage() *SigningNonceUpsert {
-	u.SetExcluded(signingnonce.FieldMessage)
-	return u
-}
-
-// ClearMessage clears the value of the "message" field.
-func (u *SigningNonceUpsert) ClearMessage() *SigningNonceUpsert {
-	u.SetNull(signingnonce.FieldMessage)
 	return u
 }
 
@@ -382,27 +354,6 @@ func (u *SigningNonceUpsertOne) SetUpdateTime(v time.Time) *SigningNonceUpsertOn
 func (u *SigningNonceUpsertOne) UpdateUpdateTime() *SigningNonceUpsertOne {
 	return u.Update(func(s *SigningNonceUpsert) {
 		s.UpdateUpdateTime()
-	})
-}
-
-// SetMessage sets the "message" field.
-func (u *SigningNonceUpsertOne) SetMessage(v []byte) *SigningNonceUpsertOne {
-	return u.Update(func(s *SigningNonceUpsert) {
-		s.SetMessage(v)
-	})
-}
-
-// UpdateMessage sets the "message" field to the value that was provided on create.
-func (u *SigningNonceUpsertOne) UpdateMessage() *SigningNonceUpsertOne {
-	return u.Update(func(s *SigningNonceUpsert) {
-		s.UpdateMessage()
-	})
-}
-
-// ClearMessage clears the value of the "message" field.
-func (u *SigningNonceUpsertOne) ClearMessage() *SigningNonceUpsertOne {
-	return u.Update(func(s *SigningNonceUpsert) {
-		s.ClearMessage()
 	})
 }
 
@@ -662,27 +613,6 @@ func (u *SigningNonceUpsertBulk) SetUpdateTime(v time.Time) *SigningNonceUpsertB
 func (u *SigningNonceUpsertBulk) UpdateUpdateTime() *SigningNonceUpsertBulk {
 	return u.Update(func(s *SigningNonceUpsert) {
 		s.UpdateUpdateTime()
-	})
-}
-
-// SetMessage sets the "message" field.
-func (u *SigningNonceUpsertBulk) SetMessage(v []byte) *SigningNonceUpsertBulk {
-	return u.Update(func(s *SigningNonceUpsert) {
-		s.SetMessage(v)
-	})
-}
-
-// UpdateMessage sets the "message" field to the value that was provided on create.
-func (u *SigningNonceUpsertBulk) UpdateMessage() *SigningNonceUpsertBulk {
-	return u.Update(func(s *SigningNonceUpsert) {
-		s.UpdateMessage()
-	})
-}
-
-// ClearMessage clears the value of the "message" field.
-func (u *SigningNonceUpsertBulk) ClearMessage() *SigningNonceUpsertBulk {
-	return u.Update(func(s *SigningNonceUpsert) {
-		s.ClearMessage()
 	})
 }
 

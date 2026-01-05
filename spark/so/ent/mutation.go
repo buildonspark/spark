@@ -9548,7 +9548,6 @@ type SigningNonceMutation struct {
 	update_time       *time.Time
 	nonce             *frost.SigningNonce
 	nonce_commitment  *frost.SigningCommitment
-	message           *[]byte
 	retry_fingerprint *[]byte
 	clearedFields     map[string]struct{}
 	done              bool
@@ -9804,55 +9803,6 @@ func (m *SigningNonceMutation) ResetNonceCommitment() {
 	m.nonce_commitment = nil
 }
 
-// SetMessage sets the "message" field.
-func (m *SigningNonceMutation) SetMessage(b []byte) {
-	m.message = &b
-}
-
-// Message returns the value of the "message" field in the mutation.
-func (m *SigningNonceMutation) Message() (r []byte, exists bool) {
-	v := m.message
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldMessage returns the old "message" field's value of the SigningNonce entity.
-// If the SigningNonce object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SigningNonceMutation) OldMessage(ctx context.Context) (v []byte, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldMessage is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldMessage requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldMessage: %w", err)
-	}
-	return oldValue.Message, nil
-}
-
-// ClearMessage clears the value of the "message" field.
-func (m *SigningNonceMutation) ClearMessage() {
-	m.message = nil
-	m.clearedFields[signingnonce.FieldMessage] = struct{}{}
-}
-
-// MessageCleared returns if the "message" field was cleared in this mutation.
-func (m *SigningNonceMutation) MessageCleared() bool {
-	_, ok := m.clearedFields[signingnonce.FieldMessage]
-	return ok
-}
-
-// ResetMessage resets all changes to the "message" field.
-func (m *SigningNonceMutation) ResetMessage() {
-	m.message = nil
-	delete(m.clearedFields, signingnonce.FieldMessage)
-}
-
 // SetRetryFingerprint sets the "retry_fingerprint" field.
 func (m *SigningNonceMutation) SetRetryFingerprint(b []byte) {
 	m.retry_fingerprint = &b
@@ -9936,7 +9886,7 @@ func (m *SigningNonceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SigningNonceMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 5)
 	if m.create_time != nil {
 		fields = append(fields, signingnonce.FieldCreateTime)
 	}
@@ -9948,9 +9898,6 @@ func (m *SigningNonceMutation) Fields() []string {
 	}
 	if m.nonce_commitment != nil {
 		fields = append(fields, signingnonce.FieldNonceCommitment)
-	}
-	if m.message != nil {
-		fields = append(fields, signingnonce.FieldMessage)
 	}
 	if m.retry_fingerprint != nil {
 		fields = append(fields, signingnonce.FieldRetryFingerprint)
@@ -9971,8 +9918,6 @@ func (m *SigningNonceMutation) Field(name string) (ent.Value, bool) {
 		return m.Nonce()
 	case signingnonce.FieldNonceCommitment:
 		return m.NonceCommitment()
-	case signingnonce.FieldMessage:
-		return m.Message()
 	case signingnonce.FieldRetryFingerprint:
 		return m.RetryFingerprint()
 	}
@@ -9992,8 +9937,6 @@ func (m *SigningNonceMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldNonce(ctx)
 	case signingnonce.FieldNonceCommitment:
 		return m.OldNonceCommitment(ctx)
-	case signingnonce.FieldMessage:
-		return m.OldMessage(ctx)
 	case signingnonce.FieldRetryFingerprint:
 		return m.OldRetryFingerprint(ctx)
 	}
@@ -10033,13 +9976,6 @@ func (m *SigningNonceMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetNonceCommitment(v)
 		return nil
-	case signingnonce.FieldMessage:
-		v, ok := value.([]byte)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetMessage(v)
-		return nil
 	case signingnonce.FieldRetryFingerprint:
 		v, ok := value.([]byte)
 		if !ok {
@@ -10077,9 +10013,6 @@ func (m *SigningNonceMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *SigningNonceMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(signingnonce.FieldMessage) {
-		fields = append(fields, signingnonce.FieldMessage)
-	}
 	if m.FieldCleared(signingnonce.FieldRetryFingerprint) {
 		fields = append(fields, signingnonce.FieldRetryFingerprint)
 	}
@@ -10097,9 +10030,6 @@ func (m *SigningNonceMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *SigningNonceMutation) ClearField(name string) error {
 	switch name {
-	case signingnonce.FieldMessage:
-		m.ClearMessage()
-		return nil
 	case signingnonce.FieldRetryFingerprint:
 		m.ClearRetryFingerprint()
 		return nil
@@ -10122,9 +10052,6 @@ func (m *SigningNonceMutation) ResetField(name string) error {
 		return nil
 	case signingnonce.FieldNonceCommitment:
 		m.ResetNonceCommitment()
-		return nil
-	case signingnonce.FieldMessage:
-		m.ResetMessage()
 		return nil
 	case signingnonce.FieldRetryFingerprint:
 		m.ResetRetryFingerprint()
