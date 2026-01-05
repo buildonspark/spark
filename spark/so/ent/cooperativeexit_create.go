@@ -226,7 +226,7 @@ func (cec *CooperativeExitCreate) createSpec() (*CooperativeExit, *sqlgraph.Crea
 	}
 	if value, ok := cec.mutation.ConfirmationHeight(); ok {
 		_spec.SetField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64, value)
-		_node.ConfirmationHeight = value
+		_node.ConfirmationHeight = &value
 	}
 	if value, ok := cec.mutation.KeyTweakedHeight(); ok {
 		_spec.SetField(cooperativeexit.FieldKeyTweakedHeight, field.TypeInt64, value)

@@ -1844,10 +1844,10 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Client, transfer *e
 	if err != nil {
 		return fmt.Errorf("failed to find block height: %w", err)
 	}
-	if coopExit.ConfirmationHeight == 0 {
+	if coopExit.ConfirmationHeight == nil {
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("coop exit tx hasn't been broadcasted"))
 	}
-	if coopExit.ConfirmationHeight+CoopExitConfirmationThreshold-1 > blockHeight.Height {
+	if *coopExit.ConfirmationHeight+CoopExitConfirmationThreshold-1 > blockHeight.Height {
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height))
 	}
 	return nil
