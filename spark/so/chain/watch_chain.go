@@ -542,6 +542,10 @@ func handleBlock(
 		if err != nil {
 			return fmt.Errorf("failed to update coop exit %s: %w", coopExit.ID, err)
 		}
+		_, err = coopExit.Update().SetKeyTweakedHeight(blockHeight).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update coop exit %s: %w", coopExit.ID, err)
+		}
 
 		// Attempt to tweak keys for the coop exit. Ok to log the error and continue here
 		// since this is not critical for the block processing.
