@@ -51,3 +51,6 @@ _data/
 
 # Claude Code thoughts/plans
 /thoughts/
+
+# Trunk configuration
+/.trunk

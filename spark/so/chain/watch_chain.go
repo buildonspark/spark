@@ -592,89 +592,10 @@ func handleBlock(
 		if err != nil {
 			return err
 		}
-		signingKeyShare, err := deposit.QuerySigningKeyshare().Only(ctx)
-		if err != nil {
-			return err
-		}
-		treeNode, err := dbClient.TreeNode.Query().
-			Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(signingKeyShare.ID))).
-			// FIXME(mhr): Unblocking deployment. Is this what we should do if we encounter a tree node that
-			// has already been marked available (e.g. through `FinalizeNodeSignatures`)?
-			Where(treenode.StatusEQ(st.TreeNodeStatusCreating)).
-			Only(ctx)
-		if ent.IsNotFound(err) {
-			logger.Sugar().Infof("Deposit confirmed before tree creation or tree already available for address %s", deposit.Address)
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		logger.Sugar().Infof("Found tree node %s", treeNode.ID)
-		if treeNode.Status != st.TreeNodeStatusCreating {
-			logger.Sugar().Infof("Expected tree node status to be creating (was: %s)", treeNode.Status)
-		}
-		nodeTree, err := treeNode.QueryTree().Only(ctx)
-		if err != nil {
-			return err
-		}
-		if nodeTree.Status != st.TreeStatusPending {
-			logger.Sugar().Infof("Expected tree status to be pending (was: %s)", nodeTree.Status)
-			continue
-		}
-		baseTxidHash := nodeTree.BaseTxid.Hash()
-		if _, ok := confirmedTxHashSet[baseTxidHash]; !ok {
-			logger.Sugar().Debugf("Base txid %s not found in confirmed txids", baseTxidHash.String())
-			for txid := range confirmedTxHashSet {
-				logger.Sugar().Debugf("Found confirmed txid %s", chainhash.Hash(txid))
-			}
-			continue
-		}
 
-		_, err = dbClient.Tree.UpdateOne(nodeTree).
-			SetStatus(st.TreeStatusAvailable).
-			Save(ctx)
+		err = markDepositAsAvailable(ctx, dbClient, deposit, confirmedTxHashSet)
 		if err != nil {
 			return err
-		}
-
-		treeNodes, err := nodeTree.QueryNodes().All(ctx)
-		if err != nil {
-			return err
-		}
-		for _, treeNode := range treeNodes {
-			if treeNode.Status != st.TreeNodeStatusCreating {
-				logger.Sugar().Debugf("Tree node %s is not in creating status", treeNode.ID)
-				continue
-			}
-			if len(treeNode.RawRefundTx) > 0 {
-				tx, err := common.TxFromRawTxBytes(treeNode.RawRefundTx)
-				if err != nil {
-					return err
-				}
-
-				// A deposit is a two-step protocol that creates a tree in the first step.
-				// In the second step, the operators validate and populate the witness of each tree node.
-				// The witness will be valid if and only if it is populated,
-				// and this is the only available signal that the deposit is complete.
-				if !tx.HasWitness() {
-					logger.Sugar().Debugf("Tree node %s has not been signed", treeNode.ID)
-					continue
-				}
-
-				_, err = dbClient.TreeNode.UpdateOne(treeNode).
-					SetStatus(st.TreeNodeStatusAvailable).
-					Save(ctx)
-				if err != nil {
-					return err
-				}
-			} else {
-				_, err = dbClient.TreeNode.UpdateOne(treeNode).
-					SetStatus(st.TreeNodeStatusSplitted).
-					Save(ctx)
-				if err != nil {
-					return err
-				}
-			}
 		}
 	}
 
@@ -682,6 +603,103 @@ func handleBlock(
 	blockHeightProcessingTimeHistogram.Record(ctx, time.Since(start).Milliseconds(), metric.WithAttributes(
 		attribute.String("network", network.String()),
 	))
+	return nil
+}
+
+// markDepositAsAvailable marks a deposit's tree and tree nodes as available once the deposit
+// has been confirmed on-chain and all signatures have been finalized.
+func markDepositAsAvailable(
+	ctx context.Context,
+	dbClient *ent.Client,
+	deposit *ent.DepositAddress,
+	confirmedTxHashSet map[[32]byte]bool,
+) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	signingKeyShare, err := deposit.QuerySigningKeyshare().Only(ctx)
+	if err != nil {
+		return err
+	}
+	treeNode, err := dbClient.TreeNode.Query().
+		Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(signingKeyShare.ID))).
+		// FIXME(mhr): Unblocking deployment. Is this what we should do if we encounter a tree node that
+		// has already been marked available (e.g. through `FinalizeNodeSignatures`)?
+		Where(treenode.StatusEQ(st.TreeNodeStatusCreating)).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		logger.Sugar().Infof("Deposit confirmed before tree creation or tree already available for address %s", deposit.Address)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	logger.Sugar().Infof("Found tree node %s", treeNode.ID)
+	if treeNode.Status != st.TreeNodeStatusCreating {
+		logger.Sugar().Infof("Expected tree node status to be creating (was: %s)", treeNode.Status)
+	}
+	nodeTree, err := treeNode.QueryTree().Only(ctx)
+	if err != nil {
+		return err
+	}
+	if nodeTree.Status != st.TreeStatusPending {
+		logger.Sugar().Infof("Expected tree status to be pending (was: %s)", nodeTree.Status)
+		return nil
+	}
+	baseTxidHash := nodeTree.BaseTxid.Hash()
+	if _, ok := confirmedTxHashSet[baseTxidHash]; !ok {
+		logger.Sugar().Debugf("Base txid %s not found in confirmed txids", baseTxidHash.String())
+		for txid := range confirmedTxHashSet {
+			logger.Sugar().Debugf("Found confirmed txid %s", chainhash.Hash(txid))
+		}
+		return nil
+	}
+
+	_, err = dbClient.Tree.UpdateOne(nodeTree).
+		SetStatus(st.TreeStatusAvailable).
+		Save(ctx)
+	if err != nil {
+		return err
+	}
+
+	treeNodes, err := nodeTree.QueryNodes().All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, treeNode := range treeNodes {
+		if treeNode.Status != st.TreeNodeStatusCreating {
+			logger.Sugar().Debugf("Tree node %s is not in creating status", treeNode.ID)
+			continue
+		}
+		if len(treeNode.RawRefundTx) > 0 {
+			tx, err := common.TxFromRawTxBytes(treeNode.RawRefundTx)
+			if err != nil {
+				return err
+			}
+
+			// A deposit is a two-step protocol that creates a tree in the first step.
+			// In the second step, the operators validate and populate the witness of each tree node.
+			// The witness will be valid if and only if it is populated,
+			// and this is the only available signal that the deposit is complete.
+			if !tx.HasWitness() {
+				logger.Sugar().Debugf("Tree node %s has not been signed", treeNode.ID)
+				continue
+			}
+
+			_, err = dbClient.TreeNode.UpdateOne(treeNode).
+				SetStatus(st.TreeNodeStatusAvailable).
+				Save(ctx)
+			if err != nil {
+				return err
+			}
+		} else {
+			_, err = dbClient.TreeNode.UpdateOne(treeNode).
+				SetStatus(st.TreeNodeStatusSplitted).
+				Save(ctx)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
