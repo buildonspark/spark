@@ -64,6 +64,33 @@ func (ceu *CooperativeExitUpdate) ClearConfirmationHeight() *CooperativeExitUpda
 	return ceu
 }
 
+// SetKeyTweakedHeight sets the "key_tweaked_height" field.
+func (ceu *CooperativeExitUpdate) SetKeyTweakedHeight(i int64) *CooperativeExitUpdate {
+	ceu.mutation.ResetKeyTweakedHeight()
+	ceu.mutation.SetKeyTweakedHeight(i)
+	return ceu
+}
+
+// SetNillableKeyTweakedHeight sets the "key_tweaked_height" field if the given value is not nil.
+func (ceu *CooperativeExitUpdate) SetNillableKeyTweakedHeight(i *int64) *CooperativeExitUpdate {
+	if i != nil {
+		ceu.SetKeyTweakedHeight(*i)
+	}
+	return ceu
+}
+
+// AddKeyTweakedHeight adds i to the "key_tweaked_height" field.
+func (ceu *CooperativeExitUpdate) AddKeyTweakedHeight(i int64) *CooperativeExitUpdate {
+	ceu.mutation.AddKeyTweakedHeight(i)
+	return ceu
+}
+
+// ClearKeyTweakedHeight clears the value of the "key_tweaked_height" field.
+func (ceu *CooperativeExitUpdate) ClearKeyTweakedHeight() *CooperativeExitUpdate {
+	ceu.mutation.ClearKeyTweakedHeight()
+	return ceu
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by ID.
 func (ceu *CooperativeExitUpdate) SetTransferID(id uuid.UUID) *CooperativeExitUpdate {
 	ceu.mutation.SetTransferID(id)
@@ -160,6 +187,15 @@ func (ceu *CooperativeExitUpdate) sqlSave(ctx context.Context) (n int, err error
 	if ceu.mutation.ConfirmationHeightCleared() {
 		_spec.ClearField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64)
 	}
+	if value, ok := ceu.mutation.KeyTweakedHeight(); ok {
+		_spec.SetField(cooperativeexit.FieldKeyTweakedHeight, field.TypeInt64, value)
+	}
+	if value, ok := ceu.mutation.AddedKeyTweakedHeight(); ok {
+		_spec.AddField(cooperativeexit.FieldKeyTweakedHeight, field.TypeInt64, value)
+	}
+	if ceu.mutation.KeyTweakedHeightCleared() {
+		_spec.ClearField(cooperativeexit.FieldKeyTweakedHeight, field.TypeInt64)
+	}
 	if ceu.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -241,6 +277,33 @@ func (ceuo *CooperativeExitUpdateOne) AddConfirmationHeight(i int64) *Cooperativ
 // ClearConfirmationHeight clears the value of the "confirmation_height" field.
 func (ceuo *CooperativeExitUpdateOne) ClearConfirmationHeight() *CooperativeExitUpdateOne {
 	ceuo.mutation.ClearConfirmationHeight()
+	return ceuo
+}
+
+// SetKeyTweakedHeight sets the "key_tweaked_height" field.
+func (ceuo *CooperativeExitUpdateOne) SetKeyTweakedHeight(i int64) *CooperativeExitUpdateOne {
+	ceuo.mutation.ResetKeyTweakedHeight()
+	ceuo.mutation.SetKeyTweakedHeight(i)
+	return ceuo
+}
+
+// SetNillableKeyTweakedHeight sets the "key_tweaked_height" field if the given value is not nil.
+func (ceuo *CooperativeExitUpdateOne) SetNillableKeyTweakedHeight(i *int64) *CooperativeExitUpdateOne {
+	if i != nil {
+		ceuo.SetKeyTweakedHeight(*i)
+	}
+	return ceuo
+}
+
+// AddKeyTweakedHeight adds i to the "key_tweaked_height" field.
+func (ceuo *CooperativeExitUpdateOne) AddKeyTweakedHeight(i int64) *CooperativeExitUpdateOne {
+	ceuo.mutation.AddKeyTweakedHeight(i)
+	return ceuo
+}
+
+// ClearKeyTweakedHeight clears the value of the "key_tweaked_height" field.
+func (ceuo *CooperativeExitUpdateOne) ClearKeyTweakedHeight() *CooperativeExitUpdateOne {
+	ceuo.mutation.ClearKeyTweakedHeight()
 	return ceuo
 }
 
@@ -369,6 +432,15 @@ func (ceuo *CooperativeExitUpdateOne) sqlSave(ctx context.Context) (_node *Coope
 	}
 	if ceuo.mutation.ConfirmationHeightCleared() {
 		_spec.ClearField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64)
+	}
+	if value, ok := ceuo.mutation.KeyTweakedHeight(); ok {
+		_spec.SetField(cooperativeexit.FieldKeyTweakedHeight, field.TypeInt64, value)
+	}
+	if value, ok := ceuo.mutation.AddedKeyTweakedHeight(); ok {
+		_spec.AddField(cooperativeexit.FieldKeyTweakedHeight, field.TypeInt64, value)
+	}
+	if ceuo.mutation.KeyTweakedHeightCleared() {
+		_spec.ClearField(cooperativeexit.FieldKeyTweakedHeight, field.TypeInt64)
 	}
 	if ceuo.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{

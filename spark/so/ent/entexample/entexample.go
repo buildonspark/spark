@@ -112,6 +112,7 @@ type CooperativeExitExample struct {
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	ExitTxid           *schematype.TxID
 	ConfirmationHeight *int64
+	KeyTweakedHeight   *int64
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 	Transfer *ent.Transfer
@@ -137,6 +138,12 @@ func (ce *CooperativeExitExample) SetConfirmationHeight(v int64) *CooperativeExi
 	return ce
 }
 
+// SetKeyTweakedHeight sets the key_tweaked_height field.
+func (ce *CooperativeExitExample) SetKeyTweakedHeight(v int64) *CooperativeExitExample {
+	ce.KeyTweakedHeight = &v
+	return ce
+}
+
 // SetTransfer sets the transfer edge.
 func (ce *CooperativeExitExample) SetTransfer(v *ent.Transfer) *CooperativeExitExample {
 	ce.Transfer = v
@@ -157,6 +164,10 @@ func (ce *CooperativeExitExample) MustExec(ctx context.Context) *ent.Cooperative
 	}
 	if ce.ConfirmationHeight != nil {
 		create.SetConfirmationHeight(*ce.ConfirmationHeight)
+	} else {
+	}
+	if ce.KeyTweakedHeight != nil {
+		create.SetKeyTweakedHeight(*ce.KeyTweakedHeight)
 	} else {
 	}
 
@@ -193,6 +204,10 @@ func (ce *CooperativeExitExample) Exec(ctx context.Context) (*ent.CooperativeExi
 	}
 	if ce.ConfirmationHeight != nil {
 		create.SetConfirmationHeight(*ce.ConfirmationHeight)
+	} else {
+	}
+	if ce.KeyTweakedHeight != nil {
+		create.SetKeyTweakedHeight(*ce.KeyTweakedHeight)
 	} else {
 	}
 

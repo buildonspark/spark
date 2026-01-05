@@ -34,6 +34,10 @@ func (CooperativeExit) Fields() []ent.Field {
 		field.Int64("confirmation_height").
 			Optional().
 			Comment("The block height at which the cooperative exit transaction was confirmed. If null, the transaction is unconfirmed."),
+		field.Int64("key_tweaked_height").
+			Optional().
+			Nillable().
+			Comment("This is the block height when the key is tweaked for the transfer sending to SSP."),
 	}
 }
 

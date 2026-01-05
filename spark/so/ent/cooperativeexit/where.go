@@ -77,6 +77,11 @@ func ConfirmationHeight(v int64) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldEQ(FieldConfirmationHeight, v))
 }
 
+// KeyTweakedHeight applies equality check predicate on the "key_tweaked_height" field. It's identical to KeyTweakedHeightEQ.
+func KeyTweakedHeight(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldEQ(FieldKeyTweakedHeight, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldEQ(FieldCreateTime, v))
@@ -245,6 +250,56 @@ func ConfirmationHeightIsNil() predicate.CooperativeExit {
 // ConfirmationHeightNotNil applies the NotNil predicate on the "confirmation_height" field.
 func ConfirmationHeightNotNil() predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldNotNull(FieldConfirmationHeight))
+}
+
+// KeyTweakedHeightEQ applies the EQ predicate on the "key_tweaked_height" field.
+func KeyTweakedHeightEQ(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldEQ(FieldKeyTweakedHeight, v))
+}
+
+// KeyTweakedHeightNEQ applies the NEQ predicate on the "key_tweaked_height" field.
+func KeyTweakedHeightNEQ(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldNEQ(FieldKeyTweakedHeight, v))
+}
+
+// KeyTweakedHeightIn applies the In predicate on the "key_tweaked_height" field.
+func KeyTweakedHeightIn(vs ...int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldIn(FieldKeyTweakedHeight, vs...))
+}
+
+// KeyTweakedHeightNotIn applies the NotIn predicate on the "key_tweaked_height" field.
+func KeyTweakedHeightNotIn(vs ...int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldNotIn(FieldKeyTweakedHeight, vs...))
+}
+
+// KeyTweakedHeightGT applies the GT predicate on the "key_tweaked_height" field.
+func KeyTweakedHeightGT(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldGT(FieldKeyTweakedHeight, v))
+}
+
+// KeyTweakedHeightGTE applies the GTE predicate on the "key_tweaked_height" field.
+func KeyTweakedHeightGTE(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldGTE(FieldKeyTweakedHeight, v))
+}
+
+// KeyTweakedHeightLT applies the LT predicate on the "key_tweaked_height" field.
+func KeyTweakedHeightLT(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldLT(FieldKeyTweakedHeight, v))
+}
+
+// KeyTweakedHeightLTE applies the LTE predicate on the "key_tweaked_height" field.
+func KeyTweakedHeightLTE(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldLTE(FieldKeyTweakedHeight, v))
+}
+
+// KeyTweakedHeightIsNil applies the IsNil predicate on the "key_tweaked_height" field.
+func KeyTweakedHeightIsNil() predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldIsNull(FieldKeyTweakedHeight))
+}
+
+// KeyTweakedHeightNotNil applies the NotNil predicate on the "key_tweaked_height" field.
+func KeyTweakedHeightNotNil() predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldNotNull(FieldKeyTweakedHeight))
 }
 
 // HasTransfer applies the HasEdge predicate on the "transfer" edge.

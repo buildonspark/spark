@@ -632,6 +632,8 @@ type CooperativeExitMutation struct {
 	exit_txid              *schematype.TxID
 	confirmation_height    *int64
 	addconfirmation_height *int64
+	key_tweaked_height     *int64
+	addkey_tweaked_height  *int64
 	clearedFields          map[string]struct{}
 	transfer               *uuid.UUID
 	clearedtransfer        bool
@@ -922,6 +924,76 @@ func (m *CooperativeExitMutation) ResetConfirmationHeight() {
 	delete(m.clearedFields, cooperativeexit.FieldConfirmationHeight)
 }
 
+// SetKeyTweakedHeight sets the "key_tweaked_height" field.
+func (m *CooperativeExitMutation) SetKeyTweakedHeight(i int64) {
+	m.key_tweaked_height = &i
+	m.addkey_tweaked_height = nil
+}
+
+// KeyTweakedHeight returns the value of the "key_tweaked_height" field in the mutation.
+func (m *CooperativeExitMutation) KeyTweakedHeight() (r int64, exists bool) {
+	v := m.key_tweaked_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKeyTweakedHeight returns the old "key_tweaked_height" field's value of the CooperativeExit entity.
+// If the CooperativeExit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CooperativeExitMutation) OldKeyTweakedHeight(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKeyTweakedHeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKeyTweakedHeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKeyTweakedHeight: %w", err)
+	}
+	return oldValue.KeyTweakedHeight, nil
+}
+
+// AddKeyTweakedHeight adds i to the "key_tweaked_height" field.
+func (m *CooperativeExitMutation) AddKeyTweakedHeight(i int64) {
+	if m.addkey_tweaked_height != nil {
+		*m.addkey_tweaked_height += i
+	} else {
+		m.addkey_tweaked_height = &i
+	}
+}
+
+// AddedKeyTweakedHeight returns the value that was added to the "key_tweaked_height" field in this mutation.
+func (m *CooperativeExitMutation) AddedKeyTweakedHeight() (r int64, exists bool) {
+	v := m.addkey_tweaked_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearKeyTweakedHeight clears the value of the "key_tweaked_height" field.
+func (m *CooperativeExitMutation) ClearKeyTweakedHeight() {
+	m.key_tweaked_height = nil
+	m.addkey_tweaked_height = nil
+	m.clearedFields[cooperativeexit.FieldKeyTweakedHeight] = struct{}{}
+}
+
+// KeyTweakedHeightCleared returns if the "key_tweaked_height" field was cleared in this mutation.
+func (m *CooperativeExitMutation) KeyTweakedHeightCleared() bool {
+	_, ok := m.clearedFields[cooperativeexit.FieldKeyTweakedHeight]
+	return ok
+}
+
+// ResetKeyTweakedHeight resets all changes to the "key_tweaked_height" field.
+func (m *CooperativeExitMutation) ResetKeyTweakedHeight() {
+	m.key_tweaked_height = nil
+	m.addkey_tweaked_height = nil
+	delete(m.clearedFields, cooperativeexit.FieldKeyTweakedHeight)
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by id.
 func (m *CooperativeExitMutation) SetTransferID(id uuid.UUID) {
 	m.transfer = &id
@@ -995,7 +1067,7 @@ func (m *CooperativeExitMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CooperativeExitMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.create_time != nil {
 		fields = append(fields, cooperativeexit.FieldCreateTime)
 	}
@@ -1007,6 +1079,9 @@ func (m *CooperativeExitMutation) Fields() []string {
 	}
 	if m.confirmation_height != nil {
 		fields = append(fields, cooperativeexit.FieldConfirmationHeight)
+	}
+	if m.key_tweaked_height != nil {
+		fields = append(fields, cooperativeexit.FieldKeyTweakedHeight)
 	}
 	return fields
 }
@@ -1024,6 +1099,8 @@ func (m *CooperativeExitMutation) Field(name string) (ent.Value, bool) {
 		return m.ExitTxid()
 	case cooperativeexit.FieldConfirmationHeight:
 		return m.ConfirmationHeight()
+	case cooperativeexit.FieldKeyTweakedHeight:
+		return m.KeyTweakedHeight()
 	}
 	return nil, false
 }
@@ -1041,6 +1118,8 @@ func (m *CooperativeExitMutation) OldField(ctx context.Context, name string) (en
 		return m.OldExitTxid(ctx)
 	case cooperativeexit.FieldConfirmationHeight:
 		return m.OldConfirmationHeight(ctx)
+	case cooperativeexit.FieldKeyTweakedHeight:
+		return m.OldKeyTweakedHeight(ctx)
 	}
 	return nil, fmt.Errorf("unknown CooperativeExit field %s", name)
 }
@@ -1078,6 +1157,13 @@ func (m *CooperativeExitMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetConfirmationHeight(v)
 		return nil
+	case cooperativeexit.FieldKeyTweakedHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKeyTweakedHeight(v)
+		return nil
 	}
 	return fmt.Errorf("unknown CooperativeExit field %s", name)
 }
@@ -1089,6 +1175,9 @@ func (m *CooperativeExitMutation) AddedFields() []string {
 	if m.addconfirmation_height != nil {
 		fields = append(fields, cooperativeexit.FieldConfirmationHeight)
 	}
+	if m.addkey_tweaked_height != nil {
+		fields = append(fields, cooperativeexit.FieldKeyTweakedHeight)
+	}
 	return fields
 }
 
@@ -1099,6 +1188,8 @@ func (m *CooperativeExitMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case cooperativeexit.FieldConfirmationHeight:
 		return m.AddedConfirmationHeight()
+	case cooperativeexit.FieldKeyTweakedHeight:
+		return m.AddedKeyTweakedHeight()
 	}
 	return nil, false
 }
@@ -1115,6 +1206,13 @@ func (m *CooperativeExitMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddConfirmationHeight(v)
 		return nil
+	case cooperativeexit.FieldKeyTweakedHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddKeyTweakedHeight(v)
+		return nil
 	}
 	return fmt.Errorf("unknown CooperativeExit numeric field %s", name)
 }
@@ -1125,6 +1223,9 @@ func (m *CooperativeExitMutation) ClearedFields() []string {
 	var fields []string
 	if m.FieldCleared(cooperativeexit.FieldConfirmationHeight) {
 		fields = append(fields, cooperativeexit.FieldConfirmationHeight)
+	}
+	if m.FieldCleared(cooperativeexit.FieldKeyTweakedHeight) {
+		fields = append(fields, cooperativeexit.FieldKeyTweakedHeight)
 	}
 	return fields
 }
@@ -1142,6 +1243,9 @@ func (m *CooperativeExitMutation) ClearField(name string) error {
 	switch name {
 	case cooperativeexit.FieldConfirmationHeight:
 		m.ClearConfirmationHeight()
+		return nil
+	case cooperativeexit.FieldKeyTweakedHeight:
+		m.ClearKeyTweakedHeight()
 		return nil
 	}
 	return fmt.Errorf("unknown CooperativeExit nullable field %s", name)
@@ -1162,6 +1266,9 @@ func (m *CooperativeExitMutation) ResetField(name string) error {
 		return nil
 	case cooperativeexit.FieldConfirmationHeight:
 		m.ResetConfirmationHeight()
+		return nil
+	case cooperativeexit.FieldKeyTweakedHeight:
+		m.ResetKeyTweakedHeight()
 		return nil
 	}
 	return fmt.Errorf("unknown CooperativeExit field %s", name)

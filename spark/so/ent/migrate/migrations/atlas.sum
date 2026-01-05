@@ -1,4 +1,4 @@
-h1:TCCzU7mN70bDk06Es6KWORFppkYY5fNimg/YjyUNlug=
+h1:VxMjf99Rv6vL5+tcnAN9vkegXrcO5RHgN5sCJV37fnY=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -105,3 +105,4 @@ h1:TCCzU7mN70bDk06Es6KWORFppkYY5fNimg/YjyUNlug=
 20251212211636_add_extra_metadata_to_token_metadata.sql h1:LS+lpVPmFMOstExka+Mb1hvyyKB/JBRn/IRoR8RM/eE=
 20251215225231_add_unique_constraint_preimage_request.sql h1:pHa7YcAsSjkXyKh7ckk2N9Do8WHhzkfFMRkchC9Rn7I=
 20251217211236_add_transfers_sender_status_index.sql h1:GjCQvs81RUt9Pu3PxQegkzNWpL+7V8UNkXjC4o7Nhbw=
+20251219000700_add_key_tweaked_height.sql h1:dq4ZrxaT8gOCFPj4Wjj8DYceYkwPZLZUTiocBY4/aa0=

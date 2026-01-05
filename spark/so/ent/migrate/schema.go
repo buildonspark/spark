@@ -30,6 +30,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "exit_txid", Type: field.TypeBytes, Unique: true},
 		{Name: "confirmation_height", Type: field.TypeInt64, Nullable: true},
+		{Name: "key_tweaked_height", Type: field.TypeInt64, Nullable: true},
 		{Name: "cooperative_exit_transfer", Type: field.TypeUUID},
 	}
 	// CooperativeExitsTable holds the schema information for the "cooperative_exits" table.
@@ -40,7 +41,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "cooperative_exits_transfers_transfer",
-				Columns:    []*schema.Column{CooperativeExitsColumns[5]},
+				Columns:    []*schema.Column{CooperativeExitsColumns[6]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -49,7 +50,7 @@ var (
 			{
 				Name:    "cooperativeexit_cooperative_exit_transfer",
 				Unique:  false,
-				Columns: []*schema.Column{CooperativeExitsColumns[5]},
+				Columns: []*schema.Column{CooperativeExitsColumns[6]},
 			},
 		},
 	}

@@ -74,6 +74,20 @@ func (cec *CooperativeExitCreate) SetNillableConfirmationHeight(i *int64) *Coope
 	return cec
 }
 
+// SetKeyTweakedHeight sets the "key_tweaked_height" field.
+func (cec *CooperativeExitCreate) SetKeyTweakedHeight(i int64) *CooperativeExitCreate {
+	cec.mutation.SetKeyTweakedHeight(i)
+	return cec
+}
+
+// SetNillableKeyTweakedHeight sets the "key_tweaked_height" field if the given value is not nil.
+func (cec *CooperativeExitCreate) SetNillableKeyTweakedHeight(i *int64) *CooperativeExitCreate {
+	if i != nil {
+		cec.SetKeyTweakedHeight(*i)
+	}
+	return cec
+}
+
 // SetID sets the "id" field.
 func (cec *CooperativeExitCreate) SetID(u uuid.UUID) *CooperativeExitCreate {
 	cec.mutation.SetID(u)
@@ -214,6 +228,10 @@ func (cec *CooperativeExitCreate) createSpec() (*CooperativeExit, *sqlgraph.Crea
 		_spec.SetField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64, value)
 		_node.ConfirmationHeight = value
 	}
+	if value, ok := cec.mutation.KeyTweakedHeight(); ok {
+		_spec.SetField(cooperativeexit.FieldKeyTweakedHeight, field.TypeInt64, value)
+		_node.KeyTweakedHeight = &value
+	}
 	if nodes := cec.mutation.TransferIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -319,6 +337,30 @@ func (u *CooperativeExitUpsert) ClearConfirmationHeight() *CooperativeExitUpsert
 	return u
 }
 
+// SetKeyTweakedHeight sets the "key_tweaked_height" field.
+func (u *CooperativeExitUpsert) SetKeyTweakedHeight(v int64) *CooperativeExitUpsert {
+	u.Set(cooperativeexit.FieldKeyTweakedHeight, v)
+	return u
+}
+
+// UpdateKeyTweakedHeight sets the "key_tweaked_height" field to the value that was provided on create.
+func (u *CooperativeExitUpsert) UpdateKeyTweakedHeight() *CooperativeExitUpsert {
+	u.SetExcluded(cooperativeexit.FieldKeyTweakedHeight)
+	return u
+}
+
+// AddKeyTweakedHeight adds v to the "key_tweaked_height" field.
+func (u *CooperativeExitUpsert) AddKeyTweakedHeight(v int64) *CooperativeExitUpsert {
+	u.Add(cooperativeexit.FieldKeyTweakedHeight, v)
+	return u
+}
+
+// ClearKeyTweakedHeight clears the value of the "key_tweaked_height" field.
+func (u *CooperativeExitUpsert) ClearKeyTweakedHeight() *CooperativeExitUpsert {
+	u.SetNull(cooperativeexit.FieldKeyTweakedHeight)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -412,6 +454,34 @@ func (u *CooperativeExitUpsertOne) UpdateConfirmationHeight() *CooperativeExitUp
 func (u *CooperativeExitUpsertOne) ClearConfirmationHeight() *CooperativeExitUpsertOne {
 	return u.Update(func(s *CooperativeExitUpsert) {
 		s.ClearConfirmationHeight()
+	})
+}
+
+// SetKeyTweakedHeight sets the "key_tweaked_height" field.
+func (u *CooperativeExitUpsertOne) SetKeyTweakedHeight(v int64) *CooperativeExitUpsertOne {
+	return u.Update(func(s *CooperativeExitUpsert) {
+		s.SetKeyTweakedHeight(v)
+	})
+}
+
+// AddKeyTweakedHeight adds v to the "key_tweaked_height" field.
+func (u *CooperativeExitUpsertOne) AddKeyTweakedHeight(v int64) *CooperativeExitUpsertOne {
+	return u.Update(func(s *CooperativeExitUpsert) {
+		s.AddKeyTweakedHeight(v)
+	})
+}
+
+// UpdateKeyTweakedHeight sets the "key_tweaked_height" field to the value that was provided on create.
+func (u *CooperativeExitUpsertOne) UpdateKeyTweakedHeight() *CooperativeExitUpsertOne {
+	return u.Update(func(s *CooperativeExitUpsert) {
+		s.UpdateKeyTweakedHeight()
+	})
+}
+
+// ClearKeyTweakedHeight clears the value of the "key_tweaked_height" field.
+func (u *CooperativeExitUpsertOne) ClearKeyTweakedHeight() *CooperativeExitUpsertOne {
+	return u.Update(func(s *CooperativeExitUpsert) {
+		s.ClearKeyTweakedHeight()
 	})
 }
 
@@ -675,6 +745,34 @@ func (u *CooperativeExitUpsertBulk) UpdateConfirmationHeight() *CooperativeExitU
 func (u *CooperativeExitUpsertBulk) ClearConfirmationHeight() *CooperativeExitUpsertBulk {
 	return u.Update(func(s *CooperativeExitUpsert) {
 		s.ClearConfirmationHeight()
+	})
+}
+
+// SetKeyTweakedHeight sets the "key_tweaked_height" field.
+func (u *CooperativeExitUpsertBulk) SetKeyTweakedHeight(v int64) *CooperativeExitUpsertBulk {
+	return u.Update(func(s *CooperativeExitUpsert) {
+		s.SetKeyTweakedHeight(v)
+	})
+}
+
+// AddKeyTweakedHeight adds v to the "key_tweaked_height" field.
+func (u *CooperativeExitUpsertBulk) AddKeyTweakedHeight(v int64) *CooperativeExitUpsertBulk {
+	return u.Update(func(s *CooperativeExitUpsert) {
+		s.AddKeyTweakedHeight(v)
+	})
+}
+
+// UpdateKeyTweakedHeight sets the "key_tweaked_height" field to the value that was provided on create.
+func (u *CooperativeExitUpsertBulk) UpdateKeyTweakedHeight() *CooperativeExitUpsertBulk {
+	return u.Update(func(s *CooperativeExitUpsert) {
+		s.UpdateKeyTweakedHeight()
+	})
+}
+
+// ClearKeyTweakedHeight clears the value of the "key_tweaked_height" field.
+func (u *CooperativeExitUpsertBulk) ClearKeyTweakedHeight() *CooperativeExitUpsertBulk {
+	return u.Update(func(s *CooperativeExitUpsert) {
+		s.ClearKeyTweakedHeight()
 	})
 }
 

@@ -28,6 +28,8 @@ type CooperativeExit struct {
 	ExitTxid schematype.TxID `json:"exit_txid,omitempty"`
 	// The block height at which the cooperative exit transaction was confirmed. If null, the transaction is unconfirmed.
 	ConfirmationHeight int64 `json:"confirmation_height,omitempty"`
+	// This is the block height when the key is tweaked for the transfer sending to SSP.
+	KeyTweakedHeight *int64 `json:"key_tweaked_height,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the CooperativeExitQuery when eager-loading is set.
 	Edges                     CooperativeExitEdges `json:"edges"`
@@ -62,7 +64,7 @@ func (*CooperativeExit) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case cooperativeexit.FieldExitTxid:
 			values[i] = new(schematype.TxID)
-		case cooperativeexit.FieldConfirmationHeight:
+		case cooperativeexit.FieldConfirmationHeight, cooperativeexit.FieldKeyTweakedHeight:
 			values[i] = new(sql.NullInt64)
 		case cooperativeexit.FieldCreateTime, cooperativeexit.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -114,6 +116,13 @@ func (ce *CooperativeExit) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field confirmation_height", values[i])
 			} else if value.Valid {
 				ce.ConfirmationHeight = value.Int64
+			}
+		case cooperativeexit.FieldKeyTweakedHeight:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field key_tweaked_height", values[i])
+			} else if value.Valid {
+				ce.KeyTweakedHeight = new(int64)
+				*ce.KeyTweakedHeight = value.Int64
 			}
 		case cooperativeexit.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -174,6 +183,11 @@ func (ce *CooperativeExit) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("confirmation_height=")
 	builder.WriteString(fmt.Sprintf("%v", ce.ConfirmationHeight))
+	builder.WriteString(", ")
+	if v := ce.KeyTweakedHeight; v != nil {
+		builder.WriteString("key_tweaked_height=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }
