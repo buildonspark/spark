@@ -118,6 +118,20 @@ func (dac *DepositAddressCreate) SetNillableConfirmationTxid(s *string) *Deposit
 	return dac
 }
 
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (dac *DepositAddressCreate) SetAvailabilityConfirmedAt(t time.Time) *DepositAddressCreate {
+	dac.mutation.SetAvailabilityConfirmedAt(t)
+	return dac
+}
+
+// SetNillableAvailabilityConfirmedAt sets the "availability_confirmed_at" field if the given value is not nil.
+func (dac *DepositAddressCreate) SetNillableAvailabilityConfirmedAt(t *time.Time) *DepositAddressCreate {
+	if t != nil {
+		dac.SetAvailabilityConfirmedAt(*t)
+	}
+	return dac
+}
+
 // SetAddressSignatures sets the "address_signatures" field.
 func (dac *DepositAddressCreate) SetAddressSignatures(m map[string][]uint8) *DepositAddressCreate {
 	dac.mutation.SetAddressSignatures(m)
@@ -419,6 +433,10 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 		_spec.SetField(depositaddress.FieldConfirmationTxid, field.TypeString, value)
 		_node.ConfirmationTxid = value
 	}
+	if value, ok := dac.mutation.AvailabilityConfirmedAt(); ok {
+		_spec.SetField(depositaddress.FieldAvailabilityConfirmedAt, field.TypeTime, value)
+		_node.AvailabilityConfirmedAt = value
+	}
 	if value, ok := dac.mutation.AddressSignatures(); ok {
 		_spec.SetField(depositaddress.FieldAddressSignatures, field.TypeJSON, value)
 		_node.AddressSignatures = value
@@ -607,6 +625,24 @@ func (u *DepositAddressUpsert) UpdateConfirmationTxid() *DepositAddressUpsert {
 // ClearConfirmationTxid clears the value of the "confirmation_txid" field.
 func (u *DepositAddressUpsert) ClearConfirmationTxid() *DepositAddressUpsert {
 	u.SetNull(depositaddress.FieldConfirmationTxid)
+	return u
+}
+
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (u *DepositAddressUpsert) SetAvailabilityConfirmedAt(v time.Time) *DepositAddressUpsert {
+	u.Set(depositaddress.FieldAvailabilityConfirmedAt, v)
+	return u
+}
+
+// UpdateAvailabilityConfirmedAt sets the "availability_confirmed_at" field to the value that was provided on create.
+func (u *DepositAddressUpsert) UpdateAvailabilityConfirmedAt() *DepositAddressUpsert {
+	u.SetExcluded(depositaddress.FieldAvailabilityConfirmedAt)
+	return u
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (u *DepositAddressUpsert) ClearAvailabilityConfirmedAt() *DepositAddressUpsert {
+	u.SetNull(depositaddress.FieldAvailabilityConfirmedAt)
 	return u
 }
 
@@ -811,6 +847,27 @@ func (u *DepositAddressUpsertOne) UpdateConfirmationTxid() *DepositAddressUpsert
 func (u *DepositAddressUpsertOne) ClearConfirmationTxid() *DepositAddressUpsertOne {
 	return u.Update(func(s *DepositAddressUpsert) {
 		s.ClearConfirmationTxid()
+	})
+}
+
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (u *DepositAddressUpsertOne) SetAvailabilityConfirmedAt(v time.Time) *DepositAddressUpsertOne {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.SetAvailabilityConfirmedAt(v)
+	})
+}
+
+// UpdateAvailabilityConfirmedAt sets the "availability_confirmed_at" field to the value that was provided on create.
+func (u *DepositAddressUpsertOne) UpdateAvailabilityConfirmedAt() *DepositAddressUpsertOne {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.UpdateAvailabilityConfirmedAt()
+	})
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (u *DepositAddressUpsertOne) ClearAvailabilityConfirmedAt() *DepositAddressUpsertOne {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.ClearAvailabilityConfirmedAt()
 	})
 }
 
@@ -1195,6 +1252,27 @@ func (u *DepositAddressUpsertBulk) UpdateConfirmationTxid() *DepositAddressUpser
 func (u *DepositAddressUpsertBulk) ClearConfirmationTxid() *DepositAddressUpsertBulk {
 	return u.Update(func(s *DepositAddressUpsert) {
 		s.ClearConfirmationTxid()
+	})
+}
+
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (u *DepositAddressUpsertBulk) SetAvailabilityConfirmedAt(v time.Time) *DepositAddressUpsertBulk {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.SetAvailabilityConfirmedAt(v)
+	})
+}
+
+// UpdateAvailabilityConfirmedAt sets the "availability_confirmed_at" field to the value that was provided on create.
+func (u *DepositAddressUpsertBulk) UpdateAvailabilityConfirmedAt() *DepositAddressUpsertBulk {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.UpdateAvailabilityConfirmedAt()
+	})
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (u *DepositAddressUpsertBulk) ClearAvailabilityConfirmedAt() *DepositAddressUpsertBulk {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.ClearAvailabilityConfirmedAt()
 	})
 }
 

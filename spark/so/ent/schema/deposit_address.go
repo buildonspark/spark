@@ -33,6 +33,7 @@ func (DepositAddress) Indexes() []ent.Index {
 		index.Fields("owner_signing_pubkey"),
 		index.Edges("signing_keyshare"),
 		index.Fields("network", "owner_identity_pubkey").Unique().Annotations(entsql.IndexWhere("is_static = true and is_default = true")),
+		index.Fields("confirmation_height", "is_static").Annotations(entsql.IndexWhere("availability_confirmed_at IS NULL")),
 	}
 }
 
@@ -74,6 +75,10 @@ func (DepositAddress) Fields() []ent.Field {
 			Optional().
 			Comment("Transaction ID of the block that confirmed the deposit address.").
 			Annotations(entexample.Default("6afc6ebd5ce104a3d03a927e48b05ee5b9ba52ec28dea2e4b79776e2f95de2d4")),
+		field.Time("availability_confirmed_at").
+			Optional().
+			Default(nil).
+			Comment("Timestamp when the availability of funds was confirmed (null if not yet confirmed)"),
 		field.JSON("address_signatures", map[string][]byte{}).
 			Optional().
 			Comment("Address signatures of the deposit address. It is used prove that all SOs have generated the address.").

@@ -93,6 +93,11 @@ func ConfirmationTxid(v string) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldConfirmationTxid, v))
 }
 
+// AvailabilityConfirmedAt applies equality check predicate on the "availability_confirmed_at" field. It's identical to AvailabilityConfirmedAtEQ.
+func AvailabilityConfirmedAt(v time.Time) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldAvailabilityConfirmedAt, v))
+}
+
 // PossessionSignature applies equality check predicate on the "possession_signature" field. It's identical to PossessionSignatureEQ.
 func PossessionSignature(v []byte) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldPossessionSignature, v))
@@ -491,6 +496,56 @@ func ConfirmationTxidEqualFold(v string) predicate.DepositAddress {
 // ConfirmationTxidContainsFold applies the ContainsFold predicate on the "confirmation_txid" field.
 func ConfirmationTxidContainsFold(v string) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldContainsFold(FieldConfirmationTxid, v))
+}
+
+// AvailabilityConfirmedAtEQ applies the EQ predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtEQ(v time.Time) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtNEQ applies the NEQ predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtNEQ(v time.Time) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNEQ(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtIn applies the In predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtIn(vs ...time.Time) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldIn(FieldAvailabilityConfirmedAt, vs...))
+}
+
+// AvailabilityConfirmedAtNotIn applies the NotIn predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtNotIn(vs ...time.Time) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNotIn(FieldAvailabilityConfirmedAt, vs...))
+}
+
+// AvailabilityConfirmedAtGT applies the GT predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtGT(v time.Time) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldGT(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtGTE applies the GTE predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtGTE(v time.Time) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldGTE(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtLT applies the LT predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtLT(v time.Time) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldLT(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtLTE applies the LTE predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtLTE(v time.Time) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldLTE(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtIsNil applies the IsNil predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtIsNil() predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldIsNull(FieldAvailabilityConfirmedAt))
+}
+
+// AvailabilityConfirmedAtNotNil applies the NotNil predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtNotNil() predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNotNull(FieldAvailabilityConfirmedAt))
 }
 
 // AddressSignaturesIsNil applies the IsNil predicate on the "address_signatures" field.

@@ -1351,37 +1351,38 @@ func (m *CooperativeExitMutation) ResetEdge(name string) error {
 // DepositAddressMutation represents an operation that mutates the DepositAddress nodes in the graph.
 type DepositAddressMutation struct {
 	config
-	op                      Op
-	typ                     string
-	id                      *uuid.UUID
-	create_time             *time.Time
-	update_time             *time.Time
-	address                 *string
-	network                 *btcnetwork.Network
-	owner_identity_pubkey   *keys.Public
-	owner_signing_pubkey    *keys.Public
-	confirmation_height     *int64
-	addconfirmation_height  *int64
-	confirmation_txid       *string
-	address_signatures      *map[string][]uint8
-	possession_signature    *[]byte
-	node_id                 *uuid.UUID
-	is_static               *bool
-	is_default              *bool
-	clearedFields           map[string]struct{}
-	signing_keyshare        *uuid.UUID
-	clearedsigning_keyshare bool
-	utxo                    map[uuid.UUID]struct{}
-	removedutxo             map[uuid.UUID]struct{}
-	clearedutxo             bool
-	utxoswaps               map[uuid.UUID]struct{}
-	removedutxoswaps        map[uuid.UUID]struct{}
-	clearedutxoswaps        bool
-	tree                    *uuid.UUID
-	clearedtree             bool
-	done                    bool
-	oldValue                func(context.Context) (*DepositAddress, error)
-	predicates              []predicate.DepositAddress
+	op                        Op
+	typ                       string
+	id                        *uuid.UUID
+	create_time               *time.Time
+	update_time               *time.Time
+	address                   *string
+	network                   *btcnetwork.Network
+	owner_identity_pubkey     *keys.Public
+	owner_signing_pubkey      *keys.Public
+	confirmation_height       *int64
+	addconfirmation_height    *int64
+	confirmation_txid         *string
+	availability_confirmed_at *time.Time
+	address_signatures        *map[string][]uint8
+	possession_signature      *[]byte
+	node_id                   *uuid.UUID
+	is_static                 *bool
+	is_default                *bool
+	clearedFields             map[string]struct{}
+	signing_keyshare          *uuid.UUID
+	clearedsigning_keyshare   bool
+	utxo                      map[uuid.UUID]struct{}
+	removedutxo               map[uuid.UUID]struct{}
+	clearedutxo               bool
+	utxoswaps                 map[uuid.UUID]struct{}
+	removedutxoswaps          map[uuid.UUID]struct{}
+	clearedutxoswaps          bool
+	tree                      *uuid.UUID
+	clearedtree               bool
+	done                      bool
+	oldValue                  func(context.Context) (*DepositAddress, error)
+	predicates                []predicate.DepositAddress
 }
 
 var _ ent.Mutation = (*DepositAddressMutation)(nil)
@@ -1836,6 +1837,55 @@ func (m *DepositAddressMutation) ResetConfirmationTxid() {
 	delete(m.clearedFields, depositaddress.FieldConfirmationTxid)
 }
 
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (m *DepositAddressMutation) SetAvailabilityConfirmedAt(t time.Time) {
+	m.availability_confirmed_at = &t
+}
+
+// AvailabilityConfirmedAt returns the value of the "availability_confirmed_at" field in the mutation.
+func (m *DepositAddressMutation) AvailabilityConfirmedAt() (r time.Time, exists bool) {
+	v := m.availability_confirmed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAvailabilityConfirmedAt returns the old "availability_confirmed_at" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldAvailabilityConfirmedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAvailabilityConfirmedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAvailabilityConfirmedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAvailabilityConfirmedAt: %w", err)
+	}
+	return oldValue.AvailabilityConfirmedAt, nil
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (m *DepositAddressMutation) ClearAvailabilityConfirmedAt() {
+	m.availability_confirmed_at = nil
+	m.clearedFields[depositaddress.FieldAvailabilityConfirmedAt] = struct{}{}
+}
+
+// AvailabilityConfirmedAtCleared returns if the "availability_confirmed_at" field was cleared in this mutation.
+func (m *DepositAddressMutation) AvailabilityConfirmedAtCleared() bool {
+	_, ok := m.clearedFields[depositaddress.FieldAvailabilityConfirmedAt]
+	return ok
+}
+
+// ResetAvailabilityConfirmedAt resets all changes to the "availability_confirmed_at" field.
+func (m *DepositAddressMutation) ResetAvailabilityConfirmedAt() {
+	m.availability_confirmed_at = nil
+	delete(m.clearedFields, depositaddress.FieldAvailabilityConfirmedAt)
+}
+
 // SetAddressSignatures sets the "address_signatures" field.
 func (m *DepositAddressMutation) SetAddressSignatures(value map[string][]uint8) {
 	m.address_signatures = &value
@@ -2275,7 +2325,7 @@ func (m *DepositAddressMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DepositAddressMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.create_time != nil {
 		fields = append(fields, depositaddress.FieldCreateTime)
 	}
@@ -2299,6 +2349,9 @@ func (m *DepositAddressMutation) Fields() []string {
 	}
 	if m.confirmation_txid != nil {
 		fields = append(fields, depositaddress.FieldConfirmationTxid)
+	}
+	if m.availability_confirmed_at != nil {
+		fields = append(fields, depositaddress.FieldAvailabilityConfirmedAt)
 	}
 	if m.address_signatures != nil {
 		fields = append(fields, depositaddress.FieldAddressSignatures)
@@ -2339,6 +2392,8 @@ func (m *DepositAddressMutation) Field(name string) (ent.Value, bool) {
 		return m.ConfirmationHeight()
 	case depositaddress.FieldConfirmationTxid:
 		return m.ConfirmationTxid()
+	case depositaddress.FieldAvailabilityConfirmedAt:
+		return m.AvailabilityConfirmedAt()
 	case depositaddress.FieldAddressSignatures:
 		return m.AddressSignatures()
 	case depositaddress.FieldPossessionSignature:
@@ -2374,6 +2429,8 @@ func (m *DepositAddressMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldConfirmationHeight(ctx)
 	case depositaddress.FieldConfirmationTxid:
 		return m.OldConfirmationTxid(ctx)
+	case depositaddress.FieldAvailabilityConfirmedAt:
+		return m.OldAvailabilityConfirmedAt(ctx)
 	case depositaddress.FieldAddressSignatures:
 		return m.OldAddressSignatures(ctx)
 	case depositaddress.FieldPossessionSignature:
@@ -2448,6 +2505,13 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetConfirmationTxid(v)
+		return nil
+	case depositaddress.FieldAvailabilityConfirmedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAvailabilityConfirmedAt(v)
 		return nil
 	case depositaddress.FieldAddressSignatures:
 		v, ok := value.(map[string][]uint8)
@@ -2538,6 +2602,9 @@ func (m *DepositAddressMutation) ClearedFields() []string {
 	if m.FieldCleared(depositaddress.FieldConfirmationTxid) {
 		fields = append(fields, depositaddress.FieldConfirmationTxid)
 	}
+	if m.FieldCleared(depositaddress.FieldAvailabilityConfirmedAt) {
+		fields = append(fields, depositaddress.FieldAvailabilityConfirmedAt)
+	}
 	if m.FieldCleared(depositaddress.FieldAddressSignatures) {
 		fields = append(fields, depositaddress.FieldAddressSignatures)
 	}
@@ -2569,6 +2636,9 @@ func (m *DepositAddressMutation) ClearField(name string) error {
 		return nil
 	case depositaddress.FieldConfirmationTxid:
 		m.ClearConfirmationTxid()
+		return nil
+	case depositaddress.FieldAvailabilityConfirmedAt:
+		m.ClearAvailabilityConfirmedAt()
 		return nil
 	case depositaddress.FieldAddressSignatures:
 		m.ClearAddressSignatures()
@@ -2610,6 +2680,9 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 		return nil
 	case depositaddress.FieldConfirmationTxid:
 		m.ResetConfirmationTxid()
+		return nil
+	case depositaddress.FieldAvailabilityConfirmedAt:
+		m.ResetAvailabilityConfirmedAt()
 		return nil
 	case depositaddress.FieldAddressSignatures:
 		m.ResetAddressSignatures()

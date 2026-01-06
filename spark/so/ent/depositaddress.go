@@ -39,6 +39,8 @@ type DepositAddress struct {
 	ConfirmationHeight int64 `json:"confirmation_height,omitempty"`
 	// Transaction ID of the block that confirmed the deposit address.
 	ConfirmationTxid string `json:"confirmation_txid,omitempty"`
+	// Timestamp when the availability of funds was confirmed (null if not yet confirmed)
+	AvailabilityConfirmedAt time.Time `json:"availability_confirmed_at,omitempty"`
 	// Address signatures of the deposit address. It is used prove that all SOs have generated the address.
 	AddressSignatures map[string][]uint8 `json:"address_signatures,omitempty"`
 	// Proof of keyshare possession signature for the deposit address. It is used to prove that the key used by the coordinator to generate the address is known by all SOs.
@@ -128,7 +130,7 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case depositaddress.FieldAddress, depositaddress.FieldConfirmationTxid:
 			values[i] = new(sql.NullString)
-		case depositaddress.FieldCreateTime, depositaddress.FieldUpdateTime:
+		case depositaddress.FieldCreateTime, depositaddress.FieldUpdateTime, depositaddress.FieldAvailabilityConfirmedAt:
 			values[i] = new(sql.NullTime)
 		case depositaddress.FieldID, depositaddress.FieldNodeID:
 			values[i] = new(uuid.UUID)
@@ -202,6 +204,12 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field confirmation_txid", values[i])
 			} else if value.Valid {
 				da.ConfirmationTxid = value.String
+			}
+		case depositaddress.FieldAvailabilityConfirmedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field availability_confirmed_at", values[i])
+			} else if value.Valid {
+				da.AvailabilityConfirmedAt = value.Time
 			}
 		case depositaddress.FieldAddressSignatures:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -321,6 +329,9 @@ func (da *DepositAddress) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("confirmation_txid=")
 	builder.WriteString(da.ConfirmationTxid)
+	builder.WriteString(", ")
+	builder.WriteString("availability_confirmed_at=")
+	builder.WriteString(da.AvailabilityConfirmedAt.Format(time.ANSIC))
 	builder.WriteString(", ")
 	builder.WriteString("address_signatures=")
 	builder.WriteString(fmt.Sprintf("%v", da.AddressSignatures))

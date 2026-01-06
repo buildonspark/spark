@@ -86,6 +86,26 @@ func (dau *DepositAddressUpdate) ClearConfirmationTxid() *DepositAddressUpdate {
 	return dau
 }
 
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (dau *DepositAddressUpdate) SetAvailabilityConfirmedAt(t time.Time) *DepositAddressUpdate {
+	dau.mutation.SetAvailabilityConfirmedAt(t)
+	return dau
+}
+
+// SetNillableAvailabilityConfirmedAt sets the "availability_confirmed_at" field if the given value is not nil.
+func (dau *DepositAddressUpdate) SetNillableAvailabilityConfirmedAt(t *time.Time) *DepositAddressUpdate {
+	if t != nil {
+		dau.SetAvailabilityConfirmedAt(*t)
+	}
+	return dau
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (dau *DepositAddressUpdate) ClearAvailabilityConfirmedAt() *DepositAddressUpdate {
+	dau.mutation.ClearAvailabilityConfirmedAt()
+	return dau
+}
+
 // SetAddressSignatures sets the "address_signatures" field.
 func (dau *DepositAddressUpdate) SetAddressSignatures(m map[string][]uint8) *DepositAddressUpdate {
 	dau.mutation.SetAddressSignatures(m)
@@ -349,6 +369,12 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 	if dau.mutation.ConfirmationTxidCleared() {
 		_spec.ClearField(depositaddress.FieldConfirmationTxid, field.TypeString)
 	}
+	if value, ok := dau.mutation.AvailabilityConfirmedAt(); ok {
+		_spec.SetField(depositaddress.FieldAvailabilityConfirmedAt, field.TypeTime, value)
+	}
+	if dau.mutation.AvailabilityConfirmedAtCleared() {
+		_spec.ClearField(depositaddress.FieldAvailabilityConfirmedAt, field.TypeTime)
+	}
 	if value, ok := dau.mutation.AddressSignatures(); ok {
 		_spec.SetField(depositaddress.FieldAddressSignatures, field.TypeJSON, value)
 	}
@@ -564,6 +590,26 @@ func (dauo *DepositAddressUpdateOne) SetNillableConfirmationTxid(s *string) *Dep
 // ClearConfirmationTxid clears the value of the "confirmation_txid" field.
 func (dauo *DepositAddressUpdateOne) ClearConfirmationTxid() *DepositAddressUpdateOne {
 	dauo.mutation.ClearConfirmationTxid()
+	return dauo
+}
+
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (dauo *DepositAddressUpdateOne) SetAvailabilityConfirmedAt(t time.Time) *DepositAddressUpdateOne {
+	dauo.mutation.SetAvailabilityConfirmedAt(t)
+	return dauo
+}
+
+// SetNillableAvailabilityConfirmedAt sets the "availability_confirmed_at" field if the given value is not nil.
+func (dauo *DepositAddressUpdateOne) SetNillableAvailabilityConfirmedAt(t *time.Time) *DepositAddressUpdateOne {
+	if t != nil {
+		dauo.SetAvailabilityConfirmedAt(*t)
+	}
+	return dauo
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (dauo *DepositAddressUpdateOne) ClearAvailabilityConfirmedAt() *DepositAddressUpdateOne {
+	dauo.mutation.ClearAvailabilityConfirmedAt()
 	return dauo
 }
 
@@ -859,6 +905,12 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 	}
 	if dauo.mutation.ConfirmationTxidCleared() {
 		_spec.ClearField(depositaddress.FieldConfirmationTxid, field.TypeString)
+	}
+	if value, ok := dauo.mutation.AvailabilityConfirmedAt(); ok {
+		_spec.SetField(depositaddress.FieldAvailabilityConfirmedAt, field.TypeTime, value)
+	}
+	if dauo.mutation.AvailabilityConfirmedAtCleared() {
+		_spec.ClearField(depositaddress.FieldAvailabilityConfirmedAt, field.TypeTime)
 	}
 	if value, ok := dauo.mutation.AddressSignatures(); ok {
 		_spec.SetField(depositaddress.FieldAddressSignatures, field.TypeJSON, value)

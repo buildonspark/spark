@@ -104,11 +104,11 @@ func init() {
 	// depositaddress.AddressValidator is a validator for the "address" field. It is called by the builders before save.
 	depositaddress.AddressValidator = depositaddressDescAddress.Validators[0].(func(string) error)
 	// depositaddressDescIsStatic is the schema descriptor for is_static field.
-	depositaddressDescIsStatic := depositaddressFields[9].Descriptor()
+	depositaddressDescIsStatic := depositaddressFields[10].Descriptor()
 	// depositaddress.DefaultIsStatic holds the default value on creation for the is_static field.
 	depositaddress.DefaultIsStatic = depositaddressDescIsStatic.Default.(bool)
 	// depositaddressDescIsDefault is the schema descriptor for is_default field.
-	depositaddressDescIsDefault := depositaddressFields[10].Descriptor()
+	depositaddressDescIsDefault := depositaddressFields[11].Descriptor()
 	// depositaddress.DefaultIsDefault holds the default value on creation for the is_default field.
 	depositaddress.DefaultIsDefault = depositaddressDescIsDefault.Default.(bool)
 	// depositaddressDescID is the schema descriptor for id field.

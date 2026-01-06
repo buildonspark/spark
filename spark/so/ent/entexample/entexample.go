@@ -233,15 +233,16 @@ type DepositAddressExample struct {
 	t      *testing.T
 
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
-	Address             *string
-	Network             *btcnetwork.Network
-	OwnerIdentityPubkey *keys.Public
-	OwnerSigningPubkey  *keys.Public
-	ConfirmationHeight  *int64
-	ConfirmationTxid    *string
-	AddressSignatures   *map[string][]uint8
-	PossessionSignature *[]byte
-	NodeID              *uuid.UUID
+	Address                 *string
+	Network                 *btcnetwork.Network
+	OwnerIdentityPubkey     *keys.Public
+	OwnerSigningPubkey      *keys.Public
+	ConfirmationHeight      *int64
+	ConfirmationTxid        *string
+	AvailabilityConfirmedAt *time.Time
+	AddressSignatures       *map[string][]uint8
+	PossessionSignature     *[]byte
+	NodeID                  *uuid.UUID
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 	SigningKeyshare *ent.SigningKeyshare
@@ -291,6 +292,12 @@ func (da *DepositAddressExample) SetConfirmationHeight(v int64) *DepositAddressE
 // SetConfirmationTxid sets the confirmation_txid field.
 func (da *DepositAddressExample) SetConfirmationTxid(v string) *DepositAddressExample {
 	da.ConfirmationTxid = &v
+	return da
+}
+
+// SetAvailabilityConfirmedAt sets the availability_confirmed_at field.
+func (da *DepositAddressExample) SetAvailabilityConfirmedAt(v time.Time) *DepositAddressExample {
+	da.AvailabilityConfirmedAt = &v
 	return da
 }
 
@@ -389,6 +396,10 @@ func (da *DepositAddressExample) MustExec(ctx context.Context) *ent.DepositAddre
 	} else {
 		// Use default from annotation
 		create.SetConfirmationTxid("6afc6ebd5ce104a3d03a927e48b05ee5b9ba52ec28dea2e4b79776e2f95de2d4")
+	}
+	if da.AvailabilityConfirmedAt != nil {
+		create.SetAvailabilityConfirmedAt(*da.AvailabilityConfirmedAt)
+	} else {
 	}
 	if da.AddressSignatures != nil {
 		create.SetAddressSignatures(*da.AddressSignatures)
@@ -490,6 +501,10 @@ func (da *DepositAddressExample) Exec(ctx context.Context) (*ent.DepositAddress,
 	} else {
 		// Use default from annotation
 		create.SetConfirmationTxid("6afc6ebd5ce104a3d03a927e48b05ee5b9ba52ec28dea2e4b79776e2f95de2d4")
+	}
+	if da.AvailabilityConfirmedAt != nil {
+		create.SetAvailabilityConfirmedAt(*da.AvailabilityConfirmedAt)
+	} else {
 	}
 	if da.AddressSignatures != nil {
 		create.SetAddressSignatures(*da.AddressSignatures)
