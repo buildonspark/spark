@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.5.5
+
+### Patch Changes
+
+- - Fix: ensure direct-from-CPFP refund transactions are signed even when directTx is missing.
+  - Improvement: increase embedded WASM stack size to 3MB (bindings regenerated) to reduce stack overflow failures.
+
 ## 0.5.4
 
 ### Patch Changes
