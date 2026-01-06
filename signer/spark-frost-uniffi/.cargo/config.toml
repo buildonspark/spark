@@ -13,3 +13,8 @@ rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 [target.x86_64-linux-android]
 linker = "x86_64-linux-android33-clang"
 rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
+
+[target.wasm32-unknown-unknown]
+# Increase the stack size to 3MB (default is ~1MB). In WASM, stack/heap can overlap without a guard
+# page, which can manifest as flaky runtime traps/panics on some environments.
+rustflags = ["-C", "link-arg=-zstack-size=3000000"]
