@@ -469,6 +469,7 @@ func main() {
 
 				chainLogger := logger.With(zap.String("component", "chainwatcher"), zap.String("network", network))
 				chainCtx = logging.Inject(chainCtx, chainLogger)
+				chainCtx = knobs.InjectKnobsService(chainCtx, knobsService)
 
 				err := chain.WatchChain(
 					chainCtx,

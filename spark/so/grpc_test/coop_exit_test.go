@@ -144,7 +144,10 @@ func TestCoopExitBasic(t *testing.T) {
 	require.NoError(t, err)
 	// Confirm extra buffer to scan more blocks than needed
 	// So that we don't race the chain watcher in this test
-	_, err = client.GenerateToAddress(handler.CoopExitConfirmationThreshold+6, randomAddress, nil)
+	// First generate 3 blocks to trigger fund availability
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
+	require.NoError(t, err)
+	_, err = client.GenerateToAddress(handler.CoopExitConfirmationThreshold+2, randomAddress, nil)
 	require.NoError(t, err)
 
 	// Wait until tx is confirmed and picked up by SO

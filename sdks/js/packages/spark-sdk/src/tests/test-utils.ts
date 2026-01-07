@@ -95,7 +95,8 @@ async function createDeposit(
 
   await faucet.broadcastTx(signedDepositTx.hex);
 
-  // Mine just 1 block instead of waiting for many confirmations
+  // Mine blocks to reach confirmation threshold (currently 3 blocks) plus one additional
+  // block to ensure the setDepositAvailability logic has processed
   const randomKey = secp256k1.utils.randomPrivateKey();
   const randomPubKey = secp256k1.getPublicKey(randomKey);
   const randomAddress = getP2TRAddressFromPublicKey(
@@ -103,7 +104,7 @@ async function createDeposit(
     Network.LOCAL,
   );
 
-  await faucet.generateToAddress(1, randomAddress);
+  await faucet.generateToAddress(3, randomAddress);
 
   await new Promise((resolve) => setTimeout(resolve, 100));
   return treeResp.nodes[0]!;

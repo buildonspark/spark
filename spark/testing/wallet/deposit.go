@@ -844,9 +844,11 @@ func CreateNewTree(config *TestWalletConfig, faucet *sparktesting.Faucet, privKe
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate random address: %w", err)
 	}
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	// Mine blocks to reach the confirmation threshold (currently 3 blocks)
+	// This ensures the deposit is marked as available by the chain watcher
+	_, err = client.GenerateToAddress(4, randomAddress, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to mine deposit tx: %w", err)
+		return nil, fmt.Errorf("failed to mine deposit confirmation blocks: %w", err)
 	}
 
 	// Wait until the deposited leaf is available

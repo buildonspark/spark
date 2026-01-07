@@ -50,6 +50,11 @@ var (
 	blockHeightProcessingTimeHistogram metric.Int64Histogram
 )
 
+const (
+	nonStaticDefaultConfirmationThreshold = 3
+	lookbackThreshold                     = 2
+)
+
 func init() {
 	var err error
 
@@ -177,6 +182,7 @@ func scanChainUpdates(
 	dbClient *ent.Client,
 	bitcoinClient *rpcclient.Client,
 	network btcnetwork.Network,
+	bitcoindConfig so.BitcoindConfig,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	defer func() {
@@ -225,6 +231,12 @@ func scanChainUpdates(
 	if err != nil {
 		return fmt.Errorf("failed to disconnect blocks: %w", err)
 	}
+
+	// Save the old block height before connecting new blocks so we can query deposits
+	// that were confirmed in any of the blocks we're about to connect
+	oldBlockHeight := dbBlockHeight.Height
+
+	// Connect new blocks first
 	err = connectBlocks(
 		ctx,
 		config,
@@ -237,6 +249,20 @@ func scanChainUpdates(
 	if err != nil {
 		return fmt.Errorf("failed to connect blocks: %w", err)
 	}
+
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMultipleConfirmationForNonStaticDeposit, 0) > 0 {
+		// After connecting blocks, process deposit availability
+		// This runs sequentially to avoid potential issues with parallel database transactions
+		deposits, err := loadDepositAvailabilityCandidates(ctx, dbClient, latestBlockHeight, oldBlockHeight, bitcoindConfig)
+		if err != nil {
+			return fmt.Errorf("failed to load deposit availability candidates: %w", err)
+		}
+		err = setDepositAvailability(ctx, dbClient, deposits, network)
+		if err != nil {
+			return fmt.Errorf("failed to set deposit availability: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -269,7 +295,7 @@ func WatchChain(
 		return err
 	}
 
-	err = scanChainUpdates(ctx, config, dbClient, bitcoinClient, network)
+	err = scanChainUpdates(ctx, config, dbClient, bitcoinClient, network, bitcoindConfig)
 	if err != nil {
 		logger.Error("failed to scan chain updates", zap.Error(err))
 	}
@@ -307,7 +333,7 @@ func WatchChain(
 		// we need to query bitcoind for the height anyway. We just
 		// treat it as a notification that a new block appeared.
 
-		err = scanChainUpdates(ctx, config, dbClient, bitcoinClient, network)
+		err = scanChainUpdates(ctx, config, dbClient, bitcoinClient, network, bitcoindConfig)
 		if err != nil {
 			logger.Error("Failed to scan chain updates", zap.Error(err))
 		}
@@ -597,9 +623,11 @@ func handleBlock(
 			return err
 		}
 
-		err = markDepositAsAvailable(ctx, dbClient, deposit, confirmedTxHashSet)
-		if err != nil {
-			return err
+		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMultipleConfirmationForNonStaticDeposit, 0) == 0 {
+			err = markDepositAsAvailable(ctx, dbClient, deposit, confirmedTxHashSet)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -607,6 +635,118 @@ func handleBlock(
 	blockHeightProcessingTimeHistogram.Record(ctx, time.Since(start).Milliseconds(), metric.WithAttributes(
 		attribute.String("network", network.String()),
 	))
+	return nil
+}
+
+// loadDepositAvailabilityCandidates loads deposits that are ready to be marked as available.
+// A deposit is ready when:
+// - It has a confirmation height set
+// - Its confirmation height is at least getNonStaticConfirmationThreshold() blocks old
+// - We also check a few blocks back (2) to catch any deposits that may have been missed on previous runs
+func loadDepositAvailabilityCandidates(
+	ctx context.Context,
+	dbClient *ent.Client,
+	blockHeight int64,
+	dbBlockHeight int64,
+	bitcoindConfig so.BitcoindConfig,
+) ([]*ent.DepositAddress, error) {
+	threshold := getNonStaticConfirmationThreshold(bitcoindConfig)
+	// "threshold" is 1-based (i.e., setting it to 1 means the funds are available on the same block as the first confirmation)
+	maxConfirmationHeight := blockHeight - threshold + 1
+	//TODO(SPARK-289) Set to a constant height after this has been running for awhile
+	minConfirmationHeight := min(dbBlockHeight, blockHeight) - threshold - lookbackThreshold
+	network, err := btcnetwork.FromString(bitcoindConfig.Network)
+	if err != nil {
+		return nil, fmt.Errorf("cannot load deposit availability candidates: invalid network %s: %w", bitcoindConfig.Network, err)
+	}
+
+	deposits, err := dbClient.DepositAddress.Query().
+		Where(depositaddress.IsStaticEQ(false)).
+		Where(depositaddress.AvailabilityConfirmedAtIsNil()).
+		Where(depositaddress.ConfirmationHeightLTE(maxConfirmationHeight)).
+		Where(depositaddress.ConfirmationHeightGTE(minConfirmationHeight)).
+		Where(depositaddress.NetworkEQ(network)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return deposits, nil
+}
+
+// setDepositAvailability processes a list of deposit addresses and marks their associated
+// trees and nodes as available if all conditions are met.
+func setDepositAvailability(
+	ctx context.Context,
+	dbClient *ent.Client,
+	deposits []*ent.DepositAddress,
+	network btcnetwork.Network,
+) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Sugar().Infof("Processing %d deposit availability candidates for network %s", len(deposits), network)
+
+	if len(deposits) == 0 {
+		return nil
+	}
+
+	// Build a set of confirmed transaction hashes
+	// Since these deposits already have confirmation_height set (verified in handleBlock),
+	// we just need to track which txids we've seen for the tree availability check
+	confirmedTxHashSet := make(map[[32]byte]bool)
+
+	for _, deposit := range deposits {
+		if deposit.ConfirmationTxid == "" {
+			continue
+		}
+		txidHash, err := chainhash.NewHashFromStr(deposit.ConfirmationTxid)
+		if err != nil {
+			logger.Sugar().Warnf("Failed to parse confirmation txid %s: %v", deposit.ConfirmationTxid, err)
+			continue
+		}
+
+		// No need to verify with RPC - if confirmation_height is set, it was already verified
+		var txHashBytes [32]byte
+		copy(txHashBytes[:], txidHash.CloneBytes())
+		confirmedTxHashSet[txHashBytes] = true
+	}
+
+	// Start a database transaction to make all updates atomic
+	notifier := ent.NewBufferedNotifier(dbClient)
+	ctx = ent.InjectNotifier(ctx, &notifier)
+
+	dbTx, err := dbClient.Tx(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Process each deposit within the transaction
+	var failedDeposits []string
+	for _, deposit := range deposits {
+		err := markDepositAsAvailable(ctx, dbTx.Client(), deposit, confirmedTxHashSet)
+		if err != nil {
+			logger.Sugar().Warnf("Failed to mark deposit %s as available: %v", deposit.Address, err)
+			failedDeposits = append(failedDeposits, deposit.Address)
+			// Continue processing other deposits even if one fails
+		}
+	}
+
+	// Commit the transaction
+	err = dbTx.Commit()
+	if err != nil {
+		logger.Error("Failed to commit deposit availability transaction", zap.Error(err))
+		return err
+	}
+
+	// Flush notifier after successful commit
+	err = notifier.Flush(ctx)
+	if err != nil {
+		logger.Error("Failed to flush notifier", zap.Error(err))
+	}
+
+	if len(failedDeposits) > 0 {
+		logger.Sugar().Warnf("Failed to process %d deposits: %v", len(failedDeposits), failedDeposits)
+	}
+
+	logger.Sugar().Infof("Finished processing deposit availability candidates")
 	return nil
 }
 
@@ -632,7 +772,8 @@ func markDepositAsAvailable(
 		Only(ctx)
 	if ent.IsNotFound(err) {
 		logger.Sugar().Infof("Deposit confirmed before tree creation or tree already available for address %s", deposit.Address)
-		return nil
+		// Since the deposit is already available, mark it to avoid future runs
+		return markDepositAddressUTXOConfirmed(ctx, dbClient, deposit)
 	}
 	if err != nil {
 		return err
@@ -647,6 +788,9 @@ func markDepositAsAvailable(
 	}
 	if nodeTree.Status != st.TreeStatusPending {
 		logger.Sugar().Infof("Expected tree status to be pending (was: %s)", nodeTree.Status)
+		if nodeTree.Status == st.TreeStatusAvailable || nodeTree.Status == st.TreeStatusExited {
+			return markDepositAddressUTXOConfirmed(ctx, dbClient, deposit)
+		}
 		return nil
 	}
 	baseTxidHash := nodeTree.BaseTxid.Hash()
@@ -703,6 +847,21 @@ func markDepositAsAvailable(
 				return err
 			}
 		}
+	}
+
+	return markDepositAddressUTXOConfirmed(ctx, dbClient, deposit)
+}
+
+func markDepositAddressUTXOConfirmed(
+	ctx context.Context,
+	dbClient *ent.Client,
+	deposit *ent.DepositAddress,
+) error {
+	_, err := dbClient.DepositAddress.UpdateOne(deposit).
+		SetAvailabilityConfirmedAt(time.Now()).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to mark deposit %s as availability confirmed: %w", deposit.ID, err)
 	}
 	return nil
 }
@@ -812,4 +971,12 @@ func tweakKeysForCoopExit(ctx context.Context, coopExit *ent.CooperativeExit, bl
 
 	logger.Sugar().Infof("Successfully tweaked key for coop exit transaction %x at block height %d", coopExit.ExitTxid, blockHeight)
 	return nil
+}
+
+func getNonStaticConfirmationThreshold(bitcoindConfig so.BitcoindConfig) int64 {
+	if bitcoindConfig.NonStaticConfirmationThreshold > 0 {
+		return int64(bitcoindConfig.NonStaticConfirmationThreshold)
+	}
+
+	return nonStaticDefaultConfirmationThreshold
 }

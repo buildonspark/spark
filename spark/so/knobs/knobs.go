@@ -95,6 +95,9 @@ const (
 
 	KnobShutdownRenewNode        = "spark.so.shutdown_renew_node"
 	KnobDirectRefundTxValidation = "spark.so.direct_refund_tx_validation"
+
+	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)
+	KnobMultipleConfirmationForNonStaticDeposit = "spark.so.require_multiple_conf_for_non_static_deposit"
 )
 
 type Config struct {

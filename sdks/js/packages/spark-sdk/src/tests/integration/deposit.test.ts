@@ -156,7 +156,10 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
     const broadcastResult = await faucet.broadcastTx(signedTx.hex);
     expect(broadcastResult).toBeDefined();
 
-    await faucet.generateToAddress(1, depositAddress);
+    // Mine blocks to reach confirmation threshold (currently 3 blocks) plus one additional
+    // block to ensure the setDepositAvailability logic has processed
+    const randomAddress = await faucet.getNewAddress();
+    await faucet.generateToAddress(3, randomAddress);
 
     // Sleep to allow chain watcher to catch up
     await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -228,7 +231,10 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
     const broadcastResult = await faucet.broadcastTx(signedTx.hex);
     expect(broadcastResult).toBeDefined();
 
-    await faucet.generateToAddress(1, depositAddress);
+    // Mine blocks to reach confirmation threshold (currently 3 blocks) plus one additional
+    // block to ensure the setDepositAvailability logic has processed
+    const randomAddress = await faucet.getNewAddress();
+    await faucet.generateToAddress(3, randomAddress);
 
     // Sleep to allow chain watcher to catch up
     await new Promise((resolve) => setTimeout(resolve, 3000));

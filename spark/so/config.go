@@ -210,6 +210,10 @@ type BitcoindConfig struct {
 	Password                     string `yaml:"rpcpassword"`
 	ZmqPubRawBlock               string `yaml:"zmqpubrawblock"`
 	DepositConfirmationThreshold uint   `yaml:"deposit_confirmation_threshold"`
+	// NonStaticConfirmationThreshold specifies the number of blocks a non-static deposit must
+	// exist in before being marked as available. For example, a threshold of 3 means the deposit
+	// must be present in 3 confirmed blocks after the initial confirmation. Defaults to 3 if not set.
+	NonStaticConfirmationThreshold uint `yaml:"non_static_confirmation_threshold"`
 	// Enable Watchtowers in Chain Watcher, this may slow down block processing
 	ProcessNodesForWatchtowers *bool `yaml:"process_nodes_for_watchtowers"`
 }

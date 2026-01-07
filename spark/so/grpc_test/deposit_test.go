@@ -651,7 +651,7 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	if err != nil {
 		t.Fatalf("failed to generate to address: %v", err)
 	}
