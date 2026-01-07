@@ -459,15 +459,12 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 				return nil, nil, fmt.Errorf("unable to verify direct refund tx signature: %w", err)
 			}
 		} else if requireDirectTx && len(node.DirectTx) > 0 {
-			networkString := treeEnt.Network.String()
-			ignoreZeroNode := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobEnableStrictDirectRefundTxValidation, &networkString, 100) == 0
-
 			isZeroNode, err := bitcointransaction.IsZeroNode(node)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to determine if node is zero node: %w", err)
 			}
 
-			if ignoreZeroNode || !isZeroNode {
+			if !isZeroNode {
 				return nil, nil, fmt.Errorf("DirectRefundTxSignature is required. Please upgrade to the latest SDK version")
 			}
 		}

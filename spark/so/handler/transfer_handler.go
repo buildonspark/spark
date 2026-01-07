@@ -2345,13 +2345,12 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		if job.DirectRefundTxSigningJob != nil {
 			directRefundTxSigningJob = job.DirectRefundTxSigningJob
 		} else if !isSwap && requireDirectTx && len(leaf.DirectTx) > 0 {
-			ignoreZeroNode := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobEnableStrictDirectRefundTxValidation, &networkString, 100) == 0
 			isZeroNode, err := bitcointransaction.IsZeroNode(leaf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to determine if node is zero node: %w", err)
 			}
 
-			if ignoreZeroNode || !isZeroNode {
+			if !isZeroNode {
 				return nil, fmt.Errorf("DirectRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 			}
 		}

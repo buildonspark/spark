@@ -87,8 +87,7 @@ const (
 	KnobResumeSendTransferLimit  = "spark.so.resume_send_transfer.limit"
 
 	// Enable more rigorous checks for finalize signature requests. See SPARK-236
-	KnobEnableStrictFinalizeSignature        = "spark.so.enable_strict_finalize_signature"
-	KnobEnableStrictDirectRefundTxValidation = "spark.so.enable_strict_direct_refund_tx_validation"
+	KnobEnableStrictFinalizeSignature = "spark.so.enable_strict_finalize_signature"
 
 	KnobEnableDepositFlowValidation       = "spark.so.enable_deposit_flow_validation"
 	KnobSoEnhancedBitcoinTxValidation     = "spark.so.enhanced_bitcoin_tx_validation"
