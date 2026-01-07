@@ -1661,7 +1661,7 @@ func validateTransactionCooperativeExitLegacyLeavesToSend(
 
 		modifiedDirectFromCpfpRefundTx, err := removeTxIn(directFromCpfpRefundTx, 1)
 		if err != nil {
-			return fmt.Errorf("failed to remove second input from Direct-from-CPFP refund tx %x: %w", cpfpRefundTx, err)
+			return fmt.Errorf("failed to remove second input from Direct-from-CPFP refund tx %x: %w", directFromCpfpRefundTx, err)
 		}
 
 		var modifiedDirectRefundTx []byte
@@ -1764,7 +1764,7 @@ func validateTransactionCooperativeExitLeaves(
 
 		modifiedDirectFromCpfpRefundTx, err := removeTxIn(directFromCpfpRefundTx, 1)
 		if err != nil {
-			return fmt.Errorf("failed to remove second input from Direct-from-CPFP refund tx %x: %w", cpfpRefundTx, err)
+			return fmt.Errorf("failed to remove second input from Direct-from-CPFP refund tx %x: %w", directFromCpfpRefundTx, err)
 		}
 
 		var modifiedDirectRefundTx []byte

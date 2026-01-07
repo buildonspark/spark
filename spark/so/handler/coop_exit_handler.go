@@ -59,11 +59,13 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 	directFromCpfpLeafRefundMap := make(map[string][]byte)
 	for _, job := range req.Transfer.LeavesToSend {
 		cpfpLeafRefundMap[job.LeafId] = job.RefundTxSigningJob.RawTx
-		if job.DirectRefundTxSigningJob != nil && job.DirectFromCpfpRefundTxSigningJob != nil {
+		if job.DirectRefundTxSigningJob != nil {
 			directLeafRefundMap[job.LeafId] = job.DirectRefundTxSigningJob.RawTx
+		}
+		if job.DirectFromCpfpRefundTxSigningJob != nil {
 			directFromCpfpLeafRefundMap[job.LeafId] = job.DirectFromCpfpRefundTxSigningJob.RawTx
 		} else if requireDirectTx {
-			return nil, fmt.Errorf("DirectRefundTxSigningJob and DirectFromCpfpRefundTxSigningJob are required. Please upgrade to the latest SDK version")
+			return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
 	}
 
