@@ -52,6 +52,7 @@ func SwapNodesForPreimage(
 	}
 	signingCommitments, err := client.GetSigningCommitments(tmpCtx, &pb.GetSigningCommitmentsRequest{
 		NodeIds: nodeIDs,
+		Count:   1, // 1 per leaf (for single refund transaction type)
 	})
 	if err != nil {
 		return nil, err

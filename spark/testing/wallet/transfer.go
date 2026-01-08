@@ -38,6 +38,27 @@ type LeafKeyTweak struct {
 	NewSigningPrivKey keys.Private
 }
 
+// extractCommitmentsByLeaf organizes interleaved commitments into a map keyed by leaf ID.
+// Returns: leafID -> [CPFP, Direct, DirectFromCpfp] commitments
+func extractCommitmentsByLeaf(
+	leaves []LeafKeyTweak,
+	signingCommitments []*pb.RequestedSigningCommitments,
+) map[string][]*pb.RequestedSigningCommitments {
+	const maxRefundTxsPerLeaf = 3 // CPFP, Direct, DirectFromCpfp
+	commitmentsByLeafID := make(map[string][]*pb.RequestedSigningCommitments)
+
+	for i, leaf := range leaves {
+		commitments := make([]*pb.RequestedSigningCommitments, maxRefundTxsPerLeaf)
+		for refundIdx := 0; refundIdx < maxRefundTxsPerLeaf; refundIdx++ {
+			commitmentIdx := i*maxRefundTxsPerLeaf + refundIdx
+			commitments[refundIdx] = signingCommitments[commitmentIdx]
+		}
+		commitmentsByLeafID[leaf.Leaf.Id] = commitments
+	}
+
+	return commitmentsByLeafID
+}
+
 func CreateTransferPackage(
 	ctx context.Context,
 	transferID uuid.UUID,
@@ -120,16 +141,27 @@ func PrepareTransferPackage(
 	receiverIdentityPubKey keys.Public,
 	adaptorPublicKey keys.Public,
 ) (*pb.TransferPackage, error) {
-	// Fetch signing commitments.
+	// Fetch signing commitments: 3 per leaf (for CPFP, Direct, DirectFromCpfp)
+	const maxRefundTxsPerLeaf = 3
 	nodes := make([]string, len(leaves))
 	for i, leaf := range leaves {
 		nodes[i] = leaf.Leaf.Id
 	}
 	signingCommitments, err := client.GetSigningCommitments(ctx, &pb.GetSigningCommitmentsRequest{
 		NodeIds: nodes,
+		Count:   maxRefundTxsPerLeaf,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing commitments: %w", err)
+	}
+
+	// Organize commitments by leaf ID then index (0=CPFP, 1=Direct, 2=DirectFromCpfp)
+	commitmentsByLeafID := extractCommitmentsByLeaf(leaves, signingCommitments.SigningCommitments)
+
+	// Extract CPFP commitments
+	cpfpCommitments := make([]*pb.RequestedSigningCommitments, len(leaves))
+	for i, leaf := range leaves {
+		cpfpCommitments[i] = commitmentsByLeafID[leaf.Leaf.Id][0]
 	}
 
 	// Sign user refund.
@@ -141,7 +173,7 @@ func PrepareTransferPackage(
 	signerClient := pbfrost.NewFrostServiceClient(signerConn)
 
 	// Create CPFP refund transactions (with anchor, no fee deduction)
-	cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, signingCommitments.SigningCommitments, receiverIdentityPubKey, adaptorPublicKey)
+	cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, cpfpCommitments, receiverIdentityPubKey, adaptorPublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +191,7 @@ func PrepareTransferPackage(
 		cpfpRefundTxs,
 		cpfpSigningResults.Results,
 		cpfpUserCommitments,
-		signingCommitments.SigningCommitments,
+		cpfpCommitments,
 	)
 	if err != nil {
 		return nil, err
@@ -168,18 +200,17 @@ func PrepareTransferPackage(
 	// Create DirectFromCPFP refund transactions (direct refund, with fee deduction)
 	var directFromCpfpLeafSigningJobs []*pb.UserSignedTxSigningJob
 	var leavesWithDirectFromCpfp []LeafKeyTweak
-	var leavesWithDirectFromCpfpIndices []int
-	for i, leaf := range leaves {
+	for _, leaf := range leaves {
 		if len(leaf.Leaf.DirectFromCpfpRefundTx) > 0 {
 			leavesWithDirectFromCpfp = append(leavesWithDirectFromCpfp, leaf)
-			leavesWithDirectFromCpfpIndices = append(leavesWithDirectFromCpfpIndices, i)
 		}
 	}
 
 	if len(leavesWithDirectFromCpfp) > 0 {
 		directFromCpfpCommitments := make([]*pb.RequestedSigningCommitments, len(leavesWithDirectFromCpfp))
-		for i, idx := range leavesWithDirectFromCpfpIndices {
-			directFromCpfpCommitments[i] = signingCommitments.SigningCommitments[idx]
+		for i, leaf := range leavesWithDirectFromCpfp {
+			// DirectFromCpfp uses index 2 (0=CPFP, 1=Direct, 2=DirectFromCpfp)
+			directFromCpfpCommitments[i] = commitmentsByLeafID[leaf.Leaf.Id][2]
 		}
 
 		directFromCpfpSigningJobs, directFromCpfpRefundTxs, directFromCpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefundDirect(leavesWithDirectFromCpfp, directFromCpfpCommitments, receiverIdentityPubKey)
@@ -211,17 +242,16 @@ func PrepareTransferPackage(
 	// Direct refunds spend from DirectTx (not NodeTx like DirectFromCPFP)
 	var directLeafSigningJobs []*pb.UserSignedTxSigningJob
 	leavesWithDirectTx := make([]LeafKeyTweak, 0)
-	leavesWithDirectTxIndices := make([]int, 0)
-	for i, leaf := range leaves {
+	for _, leaf := range leaves {
 		if len(leaf.Leaf.DirectRefundTx) > 0 {
 			leavesWithDirectTx = append(leavesWithDirectTx, leaf)
-			leavesWithDirectTxIndices = append(leavesWithDirectTxIndices, i)
 		}
 	}
 	if len(leavesWithDirectTx) > 0 {
 		directCommitments := make([]*pb.RequestedSigningCommitments, len(leavesWithDirectTx))
-		for i, idx := range leavesWithDirectTxIndices {
-			directCommitments[i] = signingCommitments.SigningCommitments[idx]
+		for i, leaf := range leavesWithDirectTx {
+			// Direct uses index 1 (0=CPFP, 1=Direct, 2=DirectFromCpfp)
+			directCommitments[i] = commitmentsByLeafID[leaf.Leaf.Id][1]
 		}
 
 		directSigningJobs, directRefundTxs, directUserCommitments, err := prepareFrostSigningJobsForDirectRefund(leavesWithDirectTx, directCommitments, receiverIdentityPubKey)
@@ -367,16 +397,27 @@ func PrepareUserSignedLeafSigningJobs(
 	receiverIdentityPubKey keys.Public,
 	adaptorPublicKey keys.Public,
 ) ([]*pb.UserSignedTxSigningJob, error) {
-	// Fetch signing commitments.
+	// Fetch signing commitments: 3 per leaf (for CPFP, Direct, DirectFromCpfp)
+	const maxRefundTxsPerLeaf = 3
 	nodes := make([]string, len(leaves))
 	for i, leaf := range leaves {
 		nodes[i] = leaf.Leaf.Id
 	}
 	signingCommitments, err := client.GetSigningCommitments(ctx, &pb.GetSigningCommitmentsRequest{
 		NodeIds: nodes,
+		Count:   maxRefundTxsPerLeaf,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing commitments: %w", err)
+	}
+
+	// Organize commitments by leaf ID then index (0=CPFP, 1=Direct, 2=DirectFromCpfp)
+	commitmentsByLeafID := extractCommitmentsByLeaf(leaves, signingCommitments.SigningCommitments)
+
+	// Extract CPFP commitments
+	cpfpCommitments := make([]*pb.RequestedSigningCommitments, len(leaves))
+	for i, leaf := range leaves {
+		cpfpCommitments[i] = commitmentsByLeafID[leaf.Leaf.Id][0]
 	}
 
 	// Sign user refund.
@@ -388,7 +429,7 @@ func PrepareUserSignedLeafSigningJobs(
 	signerClient := pbfrost.NewFrostServiceClient(signerConn)
 
 	// Create CPFP refund transactions (with anchor, no fee deduction)
-	cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, signingCommitments.SigningCommitments, receiverIdentityPubKey, adaptorPublicKey)
+	cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, cpfpCommitments, receiverIdentityPubKey, adaptorPublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +447,7 @@ func PrepareUserSignedLeafSigningJobs(
 		cpfpRefundTxs,
 		cpfpSigningResults.Results,
 		cpfpUserCommitments,
-		signingCommitments.SigningCommitments,
+		cpfpCommitments,
 	)
 }
 
