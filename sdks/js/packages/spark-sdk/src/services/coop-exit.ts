@@ -9,7 +9,10 @@ import {
 } from "../proto/spark.js";
 import { getTxFromRawTxBytes } from "../utils/bitcoin.js";
 import { Network } from "../utils/network.js";
-import { createConnectorRefundTxs } from "../utils/transaction.js";
+import {
+  createConnectorRefundTxs,
+  getCurrentTimelock,
+} from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection/connection.js";
 import { SigningService } from "./signing.js";
@@ -123,8 +126,10 @@ export class CoopExitService extends BaseTransferService {
 
       const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
 
+      const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
+
       let directNodeTx: Transaction | undefined;
-      if (leaf.leaf.directTx.length > 0) {
+      if (leaf.leaf.directTx.length > 0 && !isZeroNode) {
         directNodeTx = getTxFromRawTxBytes(leaf.leaf.directTx);
       }
 
