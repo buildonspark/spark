@@ -190,6 +190,10 @@ func retryFingerprint(job *pb.SigningJob) []byte {
 
 	writeBytesCollisionResistant(hashState, job.Message)
 
+	writeBytesCollisionResistant(hashState, job.VerifyingKey)
+
+	writeBytesCollisionResistant(hashState, job.AdaptorPublicKey)
+
 	if job.UserCommitments != nil {
 		writeBytesCollisionResistant(hashState, job.UserCommitments.Hiding)
 		writeBytesCollisionResistant(hashState, job.UserCommitments.Binding)
