@@ -1413,6 +1413,7 @@ func validateSingleLeafRefundTxs(
 		}
 
 		hasDirectRefundTx := len(directRefundTx) > 0
+		hasDirectNodeTx := len(node.DirectTx) > 0
 		isZeroNode, err := bitcointransaction.IsZeroNode(node)
 		if err != nil {
 			return fmt.Errorf("failed to determine if node is zero node: %w", err)
@@ -1429,7 +1430,7 @@ func validateSingleLeafRefundTxs(
 			); err != nil {
 				return fmt.Errorf("direct refund tx validation failed for leaf: %w", err)
 			}
-		} else if !hasDirectRefundTx && enforceDirectRefundTxValidation {
+		} else if !hasDirectRefundTx && hasDirectNodeTx && enforceDirectRefundTxValidation {
 			return fmt.Errorf("leaf %s does not have a direct refund tx and it is not a zero node, non-zero nodes must have a direct refund tx", node.ID.String())
 		}
 	}
