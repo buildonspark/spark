@@ -65,13 +65,20 @@ type queryMetricsRecorder struct {
 	startTime    time.Time
 	filters      string
 	queryBackend string
+	queryType    string
 }
 
-func newQueryMetricsRecorder(params *queryParams, backend queryBackend) *queryMetricsRecorder {
+const (
+	queryTypeByHash    = "by_hash"
+	queryTypeByFilters = "by_filters"
+)
+
+func newQueryMetricsRecorder(params *queryParams, backend queryBackend, queryType string) *queryMetricsRecorder {
 	return &queryMetricsRecorder{
 		startTime:    time.Now(),
 		filters:      buildFiltersAttribute(params),
 		queryBackend: string(backend),
+		queryType:    queryType,
 	}
 }
 
@@ -81,6 +88,7 @@ func (r *queryMetricsRecorder) record(ctx context.Context, resultCount int, err 
 	attrs := []attribute.KeyValue{
 		attribute.String("filters", r.filters),
 		attribute.String("query_backend", r.queryBackend),
+		attribute.String("query_type", r.queryType),
 		attribute.Bool("success", err == nil),
 	}
 	opts := metric.WithAttributes(attrs...)

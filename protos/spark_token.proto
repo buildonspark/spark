@@ -296,19 +296,38 @@ message QueryTokenOutputsRequest {
 
 // Request constraints are combined using an AND relation.
 message QueryTokenTransactionsRequest {
+    oneof query_type {
+        QueryTokenTransactionsByTxHash by_tx_hash = 9;
+        QueryTokenTransactionsByFilters by_filters = 10;
+    }
     // Returns transactions that have one of these output ids in the input or output.
     repeated string output_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
-    // Returns transactions that have this owner public key as the sender or receiver in one or more of the input/output leaves.
+    // Returns transactions that have this owner public key as the sender or receiver in one or more of the outputs.
     repeated bytes owner_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
-    // Returns transactions that related to this token public key.
+    // Returns transactions that are related to this token public key.
     repeated bytes issuer_public_keys = 3 [(validate.rules).repeated.items.bytes.len = 33];
-    // Returns transactions that related to this token identifier.
+    // Returns transactions that are related to this token identifier.
     repeated bytes token_identifiers = 7 [(validate.rules).repeated.items.bytes.len = 32];
     // Returns transactions that match the provided transaction hashes.
     repeated bytes token_transaction_hashes = 4 [(validate.rules).repeated.items.bytes.len = 32];
     spark.Order order = 8;
     int64 limit = 5 [(validate.rules).int64 = { gte: 0, lte: 1000 }];
     int64 offset = 6 [(validate.rules).int64.gte = 0];
+}
+
+message QueryTokenTransactionsByTxHash {
+    repeated bytes token_transaction_hashes = 1 [(validate.rules).repeated.items.bytes.len = 32];
+}
+
+message QueryTokenTransactionsByFilters {
+    // Returns transactions that have one of these output ids in the input or output.
+    repeated string output_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
+    // Returns transactions that have this owner public key as the sender or receiver in one or more of the output leaves.
+    repeated bytes owner_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
+    // Returns transactions that are related to this token public key.
+    repeated bytes issuer_public_keys = 3 [(validate.rules).repeated.items.bytes.len = 33];
+    // Returns transactions that are related to this token identifier.
+    repeated bytes token_identifiers = 4 [(validate.rules).repeated.items.bytes.len = 32];
 }
 
 message QueryTokenTransactionsResponse {

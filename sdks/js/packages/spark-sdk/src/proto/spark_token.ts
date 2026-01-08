@@ -454,19 +454,38 @@ export interface QueryTokenOutputsRequest {
 
 /** Request constraints are combined using an AND relation. */
 export interface QueryTokenTransactionsRequest {
+  queryType?:
+    | { $case: "byTxHash"; byTxHash: QueryTokenTransactionsByTxHash }
+    | { $case: "byFilters"; byFilters: QueryTokenTransactionsByFilters }
+    | undefined;
   /** Returns transactions that have one of these output ids in the input or output. */
   outputIds: string[];
-  /** Returns transactions that have this owner public key as the sender or receiver in one or more of the input/output leaves. */
+  /** Returns transactions that have this owner public key as the sender or receiver in one or more of the outputs. */
   ownerPublicKeys: Uint8Array[];
-  /** Returns transactions that related to this token public key. */
+  /** Returns transactions that are related to this token public key. */
   issuerPublicKeys: Uint8Array[];
-  /** Returns transactions that related to this token identifier. */
+  /** Returns transactions that are related to this token identifier. */
   tokenIdentifiers: Uint8Array[];
   /** Returns transactions that match the provided transaction hashes. */
   tokenTransactionHashes: Uint8Array[];
   order: Order;
   limit: number;
   offset: number;
+}
+
+export interface QueryTokenTransactionsByTxHash {
+  tokenTransactionHashes: Uint8Array[];
+}
+
+export interface QueryTokenTransactionsByFilters {
+  /** Returns transactions that have one of these output ids in the input or output. */
+  outputIds: string[];
+  /** Returns transactions that have this owner public key as the sender or receiver in one or more of the output leaves. */
+  ownerPublicKeys: Uint8Array[];
+  /** Returns transactions that are related to this token public key. */
+  issuerPublicKeys: Uint8Array[];
+  /** Returns transactions that are related to this token identifier. */
+  tokenIdentifiers: Uint8Array[];
 }
 
 export interface QueryTokenTransactionsResponse {
@@ -3529,6 +3548,7 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
 
 function createBaseQueryTokenTransactionsRequest(): QueryTokenTransactionsRequest {
   return {
+    queryType: undefined,
     outputIds: [],
     ownerPublicKeys: [],
     issuerPublicKeys: [],
@@ -3542,6 +3562,14 @@ function createBaseQueryTokenTransactionsRequest(): QueryTokenTransactionsReques
 
 export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsRequest> = {
   encode(message: QueryTokenTransactionsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    switch (message.queryType?.$case) {
+      case "byTxHash":
+        QueryTokenTransactionsByTxHash.encode(message.queryType.byTxHash, writer.uint32(74).fork()).join();
+        break;
+      case "byFilters":
+        QueryTokenTransactionsByFilters.encode(message.queryType.byFilters, writer.uint32(82).fork()).join();
+        break;
+    }
     for (const v of message.outputIds) {
       writer.uint32(10).string(v!);
     }
@@ -3576,6 +3604,28 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.queryType = {
+            $case: "byTxHash",
+            byTxHash: QueryTokenTransactionsByTxHash.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.queryType = {
+            $case: "byFilters",
+            byFilters: QueryTokenTransactionsByFilters.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
         case 1: {
           if (tag !== 10) {
             break;
@@ -3651,6 +3701,11 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
 
   fromJSON(object: any): QueryTokenTransactionsRequest {
     return {
+      queryType: isSet(object.byTxHash)
+        ? { $case: "byTxHash", byTxHash: QueryTokenTransactionsByTxHash.fromJSON(object.byTxHash) }
+        : isSet(object.byFilters)
+        ? { $case: "byFilters", byFilters: QueryTokenTransactionsByFilters.fromJSON(object.byFilters) }
+        : undefined,
       outputIds: globalThis.Array.isArray(object?.outputIds)
         ? object.outputIds.map((e: any) => globalThis.String(e))
         : [],
@@ -3674,6 +3729,11 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
 
   toJSON(message: QueryTokenTransactionsRequest): unknown {
     const obj: any = {};
+    if (message.queryType?.$case === "byTxHash") {
+      obj.byTxHash = QueryTokenTransactionsByTxHash.toJSON(message.queryType.byTxHash);
+    } else if (message.queryType?.$case === "byFilters") {
+      obj.byFilters = QueryTokenTransactionsByFilters.toJSON(message.queryType.byFilters);
+    }
     if (message.outputIds?.length) {
       obj.outputIds = message.outputIds;
     }
@@ -3706,6 +3766,26 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
   },
   fromPartial(object: DeepPartial<QueryTokenTransactionsRequest>): QueryTokenTransactionsRequest {
     const message = createBaseQueryTokenTransactionsRequest();
+    switch (object.queryType?.$case) {
+      case "byTxHash": {
+        if (object.queryType?.byTxHash !== undefined && object.queryType?.byTxHash !== null) {
+          message.queryType = {
+            $case: "byTxHash",
+            byTxHash: QueryTokenTransactionsByTxHash.fromPartial(object.queryType.byTxHash),
+          };
+        }
+        break;
+      }
+      case "byFilters": {
+        if (object.queryType?.byFilters !== undefined && object.queryType?.byFilters !== null) {
+          message.queryType = {
+            $case: "byFilters",
+            byFilters: QueryTokenTransactionsByFilters.fromPartial(object.queryType.byFilters),
+          };
+        }
+        break;
+      }
+    }
     message.outputIds = object.outputIds?.map((e) => e) || [];
     message.ownerPublicKeys = object.ownerPublicKeys?.map((e) => e) || [];
     message.issuerPublicKeys = object.issuerPublicKeys?.map((e) => e) || [];
@@ -3714,6 +3794,184 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
     message.order = object.order ?? 0;
     message.limit = object.limit ?? 0;
     message.offset = object.offset ?? 0;
+    return message;
+  },
+};
+
+function createBaseQueryTokenTransactionsByTxHash(): QueryTokenTransactionsByTxHash {
+  return { tokenTransactionHashes: [] };
+}
+
+export const QueryTokenTransactionsByTxHash: MessageFns<QueryTokenTransactionsByTxHash> = {
+  encode(message: QueryTokenTransactionsByTxHash, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.tokenTransactionHashes) {
+      writer.uint32(10).bytes(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenTransactionsByTxHash {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryTokenTransactionsByTxHash();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tokenTransactionHashes.push(reader.bytes());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryTokenTransactionsByTxHash {
+    return {
+      tokenTransactionHashes: globalThis.Array.isArray(object?.tokenTransactionHashes)
+        ? object.tokenTransactionHashes.map((e: any) => bytesFromBase64(e))
+        : [],
+    };
+  },
+
+  toJSON(message: QueryTokenTransactionsByTxHash): unknown {
+    const obj: any = {};
+    if (message.tokenTransactionHashes?.length) {
+      obj.tokenTransactionHashes = message.tokenTransactionHashes.map((e) => base64FromBytes(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryTokenTransactionsByTxHash>): QueryTokenTransactionsByTxHash {
+    return QueryTokenTransactionsByTxHash.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryTokenTransactionsByTxHash>): QueryTokenTransactionsByTxHash {
+    const message = createBaseQueryTokenTransactionsByTxHash();
+    message.tokenTransactionHashes = object.tokenTransactionHashes?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseQueryTokenTransactionsByFilters(): QueryTokenTransactionsByFilters {
+  return { outputIds: [], ownerPublicKeys: [], issuerPublicKeys: [], tokenIdentifiers: [] };
+}
+
+export const QueryTokenTransactionsByFilters: MessageFns<QueryTokenTransactionsByFilters> = {
+  encode(message: QueryTokenTransactionsByFilters, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.outputIds) {
+      writer.uint32(10).string(v!);
+    }
+    for (const v of message.ownerPublicKeys) {
+      writer.uint32(18).bytes(v!);
+    }
+    for (const v of message.issuerPublicKeys) {
+      writer.uint32(26).bytes(v!);
+    }
+    for (const v of message.tokenIdentifiers) {
+      writer.uint32(34).bytes(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenTransactionsByFilters {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryTokenTransactionsByFilters();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.outputIds.push(reader.string());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerPublicKeys.push(reader.bytes());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.issuerPublicKeys.push(reader.bytes());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.tokenIdentifiers.push(reader.bytes());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryTokenTransactionsByFilters {
+    return {
+      outputIds: globalThis.Array.isArray(object?.outputIds)
+        ? object.outputIds.map((e: any) => globalThis.String(e))
+        : [],
+      ownerPublicKeys: globalThis.Array.isArray(object?.ownerPublicKeys)
+        ? object.ownerPublicKeys.map((e: any) => bytesFromBase64(e))
+        : [],
+      issuerPublicKeys: globalThis.Array.isArray(object?.issuerPublicKeys)
+        ? object.issuerPublicKeys.map((e: any) => bytesFromBase64(e))
+        : [],
+      tokenIdentifiers: globalThis.Array.isArray(object?.tokenIdentifiers)
+        ? object.tokenIdentifiers.map((e: any) => bytesFromBase64(e))
+        : [],
+    };
+  },
+
+  toJSON(message: QueryTokenTransactionsByFilters): unknown {
+    const obj: any = {};
+    if (message.outputIds?.length) {
+      obj.outputIds = message.outputIds;
+    }
+    if (message.ownerPublicKeys?.length) {
+      obj.ownerPublicKeys = message.ownerPublicKeys.map((e) => base64FromBytes(e));
+    }
+    if (message.issuerPublicKeys?.length) {
+      obj.issuerPublicKeys = message.issuerPublicKeys.map((e) => base64FromBytes(e));
+    }
+    if (message.tokenIdentifiers?.length) {
+      obj.tokenIdentifiers = message.tokenIdentifiers.map((e) => base64FromBytes(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryTokenTransactionsByFilters>): QueryTokenTransactionsByFilters {
+    return QueryTokenTransactionsByFilters.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryTokenTransactionsByFilters>): QueryTokenTransactionsByFilters {
+    const message = createBaseQueryTokenTransactionsByFilters();
+    message.outputIds = object.outputIds?.map((e) => e) || [];
+    message.ownerPublicKeys = object.ownerPublicKeys?.map((e) => e) || [];
+    message.issuerPublicKeys = object.issuerPublicKeys?.map((e) => e) || [];
+    message.tokenIdentifiers = object.tokenIdentifiers?.map((e) => e) || [];
     return message;
   },
 };

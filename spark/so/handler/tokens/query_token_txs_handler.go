@@ -10,7 +10,6 @@ import (
 	"github.com/lightsparkdev/spark/common/uuids"
 	"go.uber.org/zap"
 
-	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 
 	"github.com/google/uuid"
@@ -53,41 +52,65 @@ type queryParams struct {
 	offset                 int64
 }
 
-func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryParams, error) {
-	limit := req.GetLimit()
-	if limit == 0 {
-		limit = defaultTokenTransactionPageSize
-	} else if limit > maxTokenTransactionPageSize {
-		limit = maxTokenTransactionPageSize
-	}
-
-	ownerPubKeys, err := keys.ParsePublicKeys(req.GetOwnerPublicKeys())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner public keys: %w", err)
-	}
-
-	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner public keys: %w", err)
-	}
-
-	return &queryParams{
-		outputIDs:              req.OutputIds,
-		ownerPublicKeys:        ownerPubKeys,
-		issuerPublicKeys:       issuerPubKeys,
-		tokenIdentifiers:       req.GetTokenIdentifiers(),
-		tokenTransactionHashes: req.GetTokenTransactionHashes(),
-		order:                  req.GetOrder(),
-		limit:                  limit,
-		offset:                 req.Offset,
-	}, nil
-}
-
 // NewQueryTokenTransactionsHandler creates a new QueryTokenTransactionsHandler.
 func NewQueryTokenTransactionsHandler(config *so.Config) *QueryTokenTransactionsHandler {
 	return &QueryTokenTransactionsHandler{
 		config: config,
 	}
+}
+
+func (h *QueryTokenTransactionsHandler) QueryTokenTransactionsByHash(ctx context.Context, req *tokenpb.QueryTokenTransactionsRequest) (*tokenpb.QueryTokenTransactionsResponse, error) {
+	ctx, span := GetTracer().Start(ctx, "QueryTokenTransactionsByHashHandler.QueryTokenTransactionsByHash")
+	defer span.End()
+
+	if err := validateQueryTokenTransactionsRequest(req); err != nil {
+		return nil, err
+	}
+
+	params, err := normalizeQueryParams(req)
+	if err != nil {
+		return nil, err
+	}
+
+	metricsRecorder := newQueryMetricsRecorder(params, queryBackendEnt, queryTypeByHash)
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+
+	query := db.TokenTransaction.Query().Where(tokentransaction.FinalizedTokenTransactionHashIn(params.tokenTransactionHashes...))
+
+	if params.order == sparkpb.Order_ASCENDING {
+		query = query.Order(ent.Asc(tokentransaction.FieldCreateTime))
+	} else {
+		query = query.Order(ent.Desc(tokentransaction.FieldCreateTime))
+	}
+
+	query = query.Limit(int(params.limit))
+
+	if params.offset > 0 {
+		query = query.Offset(int(params.offset))
+	}
+
+	query = query.
+		WithCreatedOutput().
+		WithSpentOutput(func(slq *ent.TokenOutputQuery) {
+			slq.WithOutputCreatedTokenTransaction()
+		}).
+		WithCreate().
+		WithMint().
+		WithSparkInvoice()
+
+	transactions, err := query.All(ctx)
+	if err != nil {
+		metricsRecorder.record(ctx, 0, err)
+		return nil, fmt.Errorf("unable to query token transactions: %w", err)
+	}
+
+	resp, err := convertTransactionsToResponse(ctx, h.config, transactions, params)
+	metricsRecorder.record(ctx, len(transactions), err)
+	return resp, err
 }
 
 // QueryTokenTransactions returns SO provided data about specific token transactions alosng with their status.
@@ -103,19 +126,20 @@ func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Conte
 		return nil, err
 	}
 
+	params, err := normalizeQueryParams(req)
+	if err != nil {
+		return nil, err
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	params, err := normalizeQueryParams(req)
-	if err != nil {
-		return nil, err
-	}
 	var transactions []*ent.TokenTransaction
 
 	requestQueryBackend := h.determineQueryBackend(params)
-	metricsRecorder := newQueryMetricsRecorder(params, requestQueryBackend)
+	metricsRecorder := newQueryMetricsRecorder(params, requestQueryBackend, queryTypeByFilters)
 
 	if requestQueryBackend == queryBackendRawSQL {
 		transactions, err = h.queryWithRawSql(ctx, params, db)
@@ -131,42 +155,9 @@ func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Conte
 		}
 	}
 
-	metricsRecorder.record(ctx, len(transactions), nil)
-	return h.convertTransactionsToResponse(ctx, transactions, params)
-}
-
-func validateQueryTokenTransactionsRequest(req *tokenpb.QueryTokenTransactionsRequest) error {
-	if len(req.OutputIds) > maxTokenTransactionFilterValues {
-		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many output ids in filter: got %d, max %d", len(req.OutputIds), maxTokenTransactionFilterValues),
-		)
-	}
-
-	if len(req.OwnerPublicKeys) > maxTokenTransactionFilterValues {
-		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.OwnerPublicKeys), maxTokenTransactionFilterValues),
-		)
-	}
-
-	if len(req.IssuerPublicKeys) > maxTokenTransactionFilterValues {
-		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.IssuerPublicKeys), maxTokenTransactionFilterValues),
-		)
-	}
-
-	if len(req.TokenIdentifiers) > maxTokenTransactionFilterValues {
-		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.TokenIdentifiers), maxTokenTransactionFilterValues),
-		)
-	}
-
-	if len(req.TokenTransactionHashes) > maxTokenTransactionFilterValues {
-		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.TokenTransactionHashes), maxTokenTransactionFilterValues),
-		)
-	}
-
-	return nil
+	resp, err := convertTransactionsToResponse(ctx, h.config, transactions, params)
+	metricsRecorder.record(ctx, len(transactions), err)
+	return resp, err
 }
 
 // determineQueryBackend determines the query backend to use based on the query parameters
@@ -416,12 +407,12 @@ func (h *QueryTokenTransactionsHandler) queryWithEnt(ctx context.Context, params
 }
 
 // convertTransactionsToResponse converts Ent transactions to protobuf response
-func (h *QueryTokenTransactionsHandler) convertTransactionsToResponse(ctx context.Context, transactions []*ent.TokenTransaction, params *queryParams) (*tokenpb.QueryTokenTransactionsResponse, error) {
+func convertTransactionsToResponse(ctx context.Context, config *so.Config, transactions []*ent.TokenTransaction, params *queryParams) (*tokenpb.QueryTokenTransactionsResponse, error) {
 	transactionsWithStatus := make([]*tokenpb.TokenTransactionWithStatus, 0, len(transactions))
 	for _, transaction := range transactions {
 		status := protoconverter.ConvertTokenTransactionStatusToTokenPb(transaction.Status)
 
-		transactionProto, err := transaction.MarshalProto(ctx, h.config)
+		transactionProto, err := transaction.MarshalProto(ctx, config)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToMarshalTokenTransaction, transaction, err)
 		}
@@ -464,4 +455,65 @@ func (h *QueryTokenTransactionsHandler) convertTransactionsToResponse(ctx contex
 type queryBuilder struct {
 	args     []any
 	argIndex int
+}
+
+func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryParams, error) {
+	limit := req.GetLimit()
+	if limit == 0 {
+		limit = defaultTokenTransactionPageSize
+	} else if limit > maxTokenTransactionPageSize {
+		limit = maxTokenTransactionPageSize
+	}
+
+	if req.GetByTxHash() != nil {
+		return &queryParams{
+			tokenTransactionHashes: req.GetByTxHash().TokenTransactionHashes,
+			order:                  req.GetOrder(),
+			limit:                  limit,
+			offset:                 req.Offset,
+		}, nil
+	}
+
+	if req.GetByFilters() != nil {
+		ownerPubKeys, err := keys.ParsePublicKeys(req.GetByFilters().GetOwnerPublicKeys())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse owner public keys: %w", err)
+		}
+
+		issuerPubKeys, err := keys.ParsePublicKeys(req.GetByFilters().GetIssuerPublicKeys())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse issuer public keys: %w", err)
+		}
+
+		return &queryParams{
+			outputIDs:        req.GetByFilters().OutputIds,
+			ownerPublicKeys:  ownerPubKeys,
+			issuerPublicKeys: issuerPubKeys,
+			tokenIdentifiers: req.GetByFilters().TokenIdentifiers,
+			order:            req.GetOrder(),
+			limit:            limit,
+			offset:           req.Offset,
+		}, nil
+	}
+
+	ownerPubKeys, err := keys.ParsePublicKeys(req.GetOwnerPublicKeys())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner public keys: %w", err)
+	}
+
+	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner public keys: %w", err)
+	}
+
+	return &queryParams{
+		outputIDs:              req.OutputIds,
+		ownerPublicKeys:        ownerPubKeys,
+		issuerPublicKeys:       issuerPubKeys,
+		tokenIdentifiers:       req.GetTokenIdentifiers(),
+		tokenTransactionHashes: req.GetTokenTransactionHashes(),
+		order:                  req.GetOrder(),
+		limit:                  limit,
+		offset:                 req.Offset,
+	}, nil
 }

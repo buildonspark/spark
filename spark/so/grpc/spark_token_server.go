@@ -49,7 +49,11 @@ func (s *SparkTokenServer) QueryTokenMetadata(ctx context.Context, req *tokenpb.
 // QueryTokenTransactions returns token transactions with status using native tokenpb protos.
 func (s *SparkTokenServer) QueryTokenTransactions(ctx context.Context, req *tokenpb.QueryTokenTransactionsRequest) (*tokenpb.QueryTokenTransactionsResponse, error) {
 	queryTokenTransactionsHandler := tokens.NewQueryTokenTransactionsHandler(s.soConfig)
-	return queryTokenTransactionsHandler.QueryTokenTransactions(ctx, req)
+	if req.GetByTxHash() != nil {
+		return queryTokenTransactionsHandler.QueryTokenTransactionsByHash(ctx, req)
+	} else {
+		return queryTokenTransactionsHandler.QueryTokenTransactions(ctx, req)
+	}
 }
 
 // QueryTokenOutputs returns token outputs with previous transaction data using native tokenpb protos.
