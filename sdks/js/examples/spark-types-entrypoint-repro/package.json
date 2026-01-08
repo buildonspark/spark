@@ -1,0 +1,14 @@
+{
+  "name": "spark-types-entrypoint-repro",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@buildonspark/spark-sdk": "0.5.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
