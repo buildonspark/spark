@@ -648,6 +648,14 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	// New flow
 	directRootTxSigningJob := req.GetDirectRootTxSigningJob()
 	directRefundTxSigningJob := req.GetDirectRefundTxSigningJob()
+
+	if directRootTxSigningJob != nil || directRefundTxSigningJob != nil {
+		networkString := network.String()
+		if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobEnforceNoDirectTransactionsFromDepositTx, &networkString, 0) > 0 {
+			return nil, errors.InvalidArgumentInvalidVersion(fmt.Errorf("direct root tx signing job and direct refund tx signing job are deprecated, please upgrade to the latest SDK version"))
+		}
+	}
+
 	directFromCpfpRefundTxSigningJob := req.GetDirectFromCpfpRefundTxSigningJob()
 
 	if directFromCpfpRefundTxSigningJob == nil {

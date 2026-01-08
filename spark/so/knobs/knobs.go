@@ -99,6 +99,10 @@ const (
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)
 	KnobMultipleConfirmationForNonStaticDeposit = "spark.so.require_multiple_conf_for_non_static_deposit"
+
+	// Enforce that direct node transactions and direct refund transactions spending the deposit tx
+	// are not provided by the client. When enabled, the server will reject deprecated direct signing jobs.
+	KnobEnforceNoDirectTransactionsFromDepositTx = "spark.so.enforce_no_direct_transactions_from_deposit_tx"
 )
 
 type Config struct {

@@ -880,11 +880,19 @@ export interface NodeSignatureShares {
     | undefined;
   /** The verifying key of the node. */
   verifyingKey: Uint8Array;
-  /** The signing result of the node's transaction. This transaction is to pay to self. */
+  /**
+   * The signing result of the node's transaction. This transaction is to pay to self.
+   *
+   * @deprecated
+   */
   directNodeTxSigningResult:
     | SigningResult
     | undefined;
-  /** The signing result of the node's direct refund transaction. This transaction is to broadcast for the SO. */
+  /**
+   * The signing result of the node's direct refund transaction. This transaction is to broadcast for the SO.
+   *
+   * @deprecated
+   */
   directRefundTxSigningResult:
     | SigningResult
     | undefined;
@@ -963,11 +971,19 @@ export interface StartDepositTreeCreationRequest {
   refundTxSigningJob:
     | SigningJob
     | undefined;
-  /** The direct signing job for the root node's transaction. */
+  /**
+   * The direct signing job for the root node's transaction.
+   *
+   * @deprecated
+   */
   directRootTxSigningJob:
     | SigningJob
     | undefined;
-  /** The signing job for the root node's direct refund transaction. */
+  /**
+   * The signing job for the root node's direct refund transaction.
+   *
+   * @deprecated
+   */
   directRefundTxSigningJob:
     | SigningJob
     | undefined;

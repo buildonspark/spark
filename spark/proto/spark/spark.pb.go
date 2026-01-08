@@ -2403,8 +2403,12 @@ type NodeSignatureShares struct {
 	// The verifying key of the node.
 	VerifyingKey []byte `protobuf:"bytes,4,opt,name=verifying_key,json=verifyingKey,proto3" json:"verifying_key,omitempty"`
 	// The signing result of the node's transaction. This transaction is to pay to self.
+	//
+	// Deprecated: Marked as deprecated in spark.proto.
 	DirectNodeTxSigningResult *SigningResult `protobuf:"bytes,5,opt,name=direct_node_tx_signing_result,json=directNodeTxSigningResult,proto3" json:"direct_node_tx_signing_result,omitempty"`
 	// The signing result of the node's direct refund transaction. This transaction is to broadcast for the SO.
+	//
+	// Deprecated: Marked as deprecated in spark.proto.
 	DirectRefundTxSigningResult *SigningResult `protobuf:"bytes,6,opt,name=direct_refund_tx_signing_result,json=directRefundTxSigningResult,proto3" json:"direct_refund_tx_signing_result,omitempty"`
 	// The signing result of the node's direct from cpfp refund transaction. This transaction is to broadcast for the SO.
 	DirectFromCpfpRefundTxSigningResult *SigningResult `protobuf:"bytes,7,opt,name=direct_from_cpfp_refund_tx_signing_result,json=directFromCpfpRefundTxSigningResult,proto3" json:"direct_from_cpfp_refund_tx_signing_result,omitempty"`
@@ -2470,6 +2474,7 @@ func (x *NodeSignatureShares) GetVerifyingKey() []byte {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in spark.proto.
 func (x *NodeSignatureShares) GetDirectNodeTxSigningResult() *SigningResult {
 	if x != nil {
 		return x.DirectNodeTxSigningResult
@@ -2477,6 +2482,7 @@ func (x *NodeSignatureShares) GetDirectNodeTxSigningResult() *SigningResult {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in spark.proto.
 func (x *NodeSignatureShares) GetDirectRefundTxSigningResult() *SigningResult {
 	if x != nil {
 		return x.DirectRefundTxSigningResult
@@ -2754,8 +2760,12 @@ type StartDepositTreeCreationRequest struct {
 	// The signing job for the root node's refund transaction.
 	RefundTxSigningJob *SigningJob `protobuf:"bytes,4,opt,name=refund_tx_signing_job,json=refundTxSigningJob,proto3" json:"refund_tx_signing_job,omitempty"`
 	// The direct signing job for the root node's transaction.
+	//
+	// Deprecated: Marked as deprecated in spark.proto.
 	DirectRootTxSigningJob *SigningJob `protobuf:"bytes,5,opt,name=direct_root_tx_signing_job,json=directRootTxSigningJob,proto3" json:"direct_root_tx_signing_job,omitempty"`
 	// The signing job for the root node's direct refund transaction.
+	//
+	// Deprecated: Marked as deprecated in spark.proto.
 	DirectRefundTxSigningJob *SigningJob `protobuf:"bytes,6,opt,name=direct_refund_tx_signing_job,json=directRefundTxSigningJob,proto3" json:"direct_refund_tx_signing_job,omitempty"`
 	// The signing job for the root node's direct from cpfp refund transaction.
 	DirectFromCpfpRefundTxSigningJob *SigningJob `protobuf:"bytes,7,opt,name=direct_from_cpfp_refund_tx_signing_job,json=directFromCpfpRefundTxSigningJob,proto3" json:"direct_from_cpfp_refund_tx_signing_job,omitempty"`
@@ -2821,6 +2831,7 @@ func (x *StartDepositTreeCreationRequest) GetRefundTxSigningJob() *SigningJob {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in spark.proto.
 func (x *StartDepositTreeCreationRequest) GetDirectRootTxSigningJob() *SigningJob {
 	if x != nil {
 		return x.DirectRootTxSigningJob
@@ -2828,6 +2839,7 @@ func (x *StartDepositTreeCreationRequest) GetDirectRootTxSigningJob() *SigningJo
 	return nil
 }
 
+// Deprecated: Marked as deprecated in spark.proto.
 func (x *StartDepositTreeCreationRequest) GetDirectRefundTxSigningJob() *SigningJob {
 	if x != nil {
 		return x.DirectRefundTxSigningJob
@@ -11027,14 +11039,14 @@ const file_spark_proto_rawDesc = "" +
 	"\x1bRenewNodeZeroTimelockResult\x12.\n" +
 	"\n" +
 	"split_node\x18\x01 \x01(\v2\x0f.spark.TreeNodeR\tsplitNode\x12#\n" +
-	"\x04node\x18\x02 \x01(\v2\x0f.spark.TreeNodeR\x04node\"\x8f\x04\n" +
+	"\x04node\x18\x02 \x01(\v2\x0f.spark.TreeNodeR\x04node\"\x97\x04\n" +
 	"\x13NodeSignatureShares\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12I\n" +
 	"\x16node_tx_signing_result\x18\x02 \x01(\v2\x14.spark.SigningResultR\x13nodeTxSigningResult\x12M\n" +
 	"\x18refund_tx_signing_result\x18\x03 \x01(\v2\x14.spark.SigningResultR\x15refundTxSigningResult\x12#\n" +
-	"\rverifying_key\x18\x04 \x01(\fR\fverifyingKey\x12V\n" +
-	"\x1ddirect_node_tx_signing_result\x18\x05 \x01(\v2\x14.spark.SigningResultR\x19directNodeTxSigningResult\x12Z\n" +
-	"\x1fdirect_refund_tx_signing_result\x18\x06 \x01(\v2\x14.spark.SigningResultR\x1bdirectRefundTxSigningResult\x12l\n" +
+	"\rverifying_key\x18\x04 \x01(\fR\fverifyingKey\x12Z\n" +
+	"\x1ddirect_node_tx_signing_result\x18\x05 \x01(\v2\x14.spark.SigningResultB\x02\x18\x01R\x19directNodeTxSigningResult\x12^\n" +
+	"\x1fdirect_refund_tx_signing_result\x18\x06 \x01(\v2\x14.spark.SigningResultB\x02\x18\x01R\x1bdirectRefundTxSigningResult\x12l\n" +
 	")direct_from_cpfp_refund_tx_signing_result\x18\a \x01(\v2\x14.spark.SigningResultR#directFromCpfpRefundTxSigningResult\"\xca\x02\n" +
 	"\x0eNodeSignatures\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12*\n" +
@@ -11053,14 +11065,14 @@ const file_spark_proto_rawDesc = "" +
 	"&direct_from_cpfp_refund_tx_signing_job\x18\a \x01(\v2\x11.spark.SigningJobR directFromCpfpRefundTxSigningJob\"\x8d\x01\n" +
 	"\x19StartTreeCreationResponse\x12\x17\n" +
 	"\atree_id\x18\x01 \x01(\tR\x06treeId\x12W\n" +
-	"\x1aroot_node_signature_shares\x18\x02 \x01(\v2\x1a.spark.NodeSignatureSharesR\x17rootNodeSignatureShares\"\x91\x04\n" +
+	"\x1aroot_node_signature_shares\x18\x02 \x01(\v2\x1a.spark.NodeSignatureSharesR\x17rootNodeSignatureShares\"\x99\x04\n" +
 	"\x1fStartDepositTreeCreationRequest\x12.\n" +
 	"\x13identity_public_key\x18\x01 \x01(\fR\x11identityPublicKey\x12/\n" +
 	"\ron_chain_utxo\x18\x02 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12@\n" +
 	"\x13root_tx_signing_job\x18\x03 \x01(\v2\x11.spark.SigningJobR\x10rootTxSigningJob\x12D\n" +
-	"\x15refund_tx_signing_job\x18\x04 \x01(\v2\x11.spark.SigningJobR\x12refundTxSigningJob\x12M\n" +
-	"\x1adirect_root_tx_signing_job\x18\x05 \x01(\v2\x11.spark.SigningJobR\x16directRootTxSigningJob\x12Q\n" +
-	"\x1cdirect_refund_tx_signing_job\x18\x06 \x01(\v2\x11.spark.SigningJobR\x18directRefundTxSigningJob\x12c\n" +
+	"\x15refund_tx_signing_job\x18\x04 \x01(\v2\x11.spark.SigningJobR\x12refundTxSigningJob\x12Q\n" +
+	"\x1adirect_root_tx_signing_job\x18\x05 \x01(\v2\x11.spark.SigningJobB\x02\x18\x01R\x16directRootTxSigningJob\x12U\n" +
+	"\x1cdirect_refund_tx_signing_job\x18\x06 \x01(\v2\x11.spark.SigningJobB\x02\x18\x01R\x18directRefundTxSigningJob\x12c\n" +
 	"&direct_from_cpfp_refund_tx_signing_job\x18\a \x01(\v2\x11.spark.SigningJobR directFromCpfpRefundTxSigningJob\"\x94\x01\n" +
 	" StartDepositTreeCreationResponse\x12\x17\n" +
 	"\atree_id\x18\x01 \x01(\tR\x06treeId\x12W\n" +

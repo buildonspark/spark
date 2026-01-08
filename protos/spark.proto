@@ -397,9 +397,9 @@ message NodeSignatureShares {
     // The verifying key of the node.
     bytes verifying_key = 4;
     // The signing result of the node's transaction. This transaction is to pay to self.
-    SigningResult direct_node_tx_signing_result = 5;
+    SigningResult direct_node_tx_signing_result = 5 [deprecated = true];
     // The signing result of the node's direct refund transaction. This transaction is to broadcast for the SO.
-    SigningResult direct_refund_tx_signing_result = 6;
+    SigningResult direct_refund_tx_signing_result = 6 [deprecated = true];
     // The signing result of the node's direct from cpfp refund transaction. This transaction is to broadcast for the SO.
     SigningResult direct_from_cpfp_refund_tx_signing_result = 7;
 }
@@ -466,9 +466,9 @@ message StartDepositTreeCreationRequest {
     // The signing job for the root node's refund transaction.
     SigningJob refund_tx_signing_job = 4;
     // The direct signing job for the root node's transaction.
-    SigningJob direct_root_tx_signing_job = 5;
+    SigningJob direct_root_tx_signing_job = 5 [deprecated = true];
     // The signing job for the root node's direct refund transaction.
-    SigningJob direct_refund_tx_signing_job = 6;
+    SigningJob direct_refund_tx_signing_job = 6 [deprecated = true];
     // The signing job for the root node's direct from cpfp refund transaction.
     SigningJob direct_from_cpfp_refund_tx_signing_job = 7;
 }
