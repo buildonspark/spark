@@ -91,6 +91,11 @@ export class SparkWalletTestingIntegrationWithStream extends SparkWalletTestingI
   protected override async setupBackgroundStream() {
     return this.proxyParentSetupBackgroundStream();
   }
+
+  // Expose SparkWallet's private sync for tests
+  public async syncWalletForTesting(): Promise<void> {
+    await (this as any).syncWallet();
+  }
 }
 
 export async function initTestingWallet(
