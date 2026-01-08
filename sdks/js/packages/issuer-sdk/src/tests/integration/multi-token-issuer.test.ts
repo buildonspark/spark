@@ -73,6 +73,48 @@ describe.each(TEST_CONFIGS)(
       expect(metadata[1].tokenTicker).toEqual("TK2");
     });
 
+    it("get issuer tokens metadata should only return tokens owned by the issuer", async () => {
+      const { wallet: aliceWallet } = await IssuerSparkWalletTesting.initialize(
+        {
+          options: config,
+        },
+      );
+      const { wallet: bobWallet } = await IssuerSparkWalletTesting.initialize({
+        options: config,
+      });
+
+      const {
+        firstTokenIdentifier: bobCoinOne,
+        secondTokenIdentifier: bobCoinTwo,
+      } = await setupMultipleTokens(bobWallet);
+      const {
+        firstTokenIdentifier: aliceCoinOne,
+        secondTokenIdentifier: aliceCoinTwo,
+      } = await setupMultipleTokens(aliceWallet);
+
+      const bobWalletForBobCoins = await bobWallet.getIssuerTokensMetadata([
+        bobCoinOne,
+        bobCoinTwo,
+      ]);
+      expect(bobWalletForBobCoins.length).toEqual(2);
+      expect(
+        bobWalletForBobCoins.map((m) => ({
+          name: m.tokenName,
+          ticker: m.tokenTicker,
+        })),
+      ).toEqual(
+        expect.arrayContaining([
+          { name: "Token1", ticker: "TK1" },
+          { name: "Token2", ticker: "TK2" },
+        ]),
+      );
+      const bobWalletForAliceCoins = await bobWallet.getIssuerTokensMetadata([
+        aliceCoinOne,
+        aliceCoinTwo,
+      ]);
+      expect(bobWalletForAliceCoins.length).toEqual(0);
+    });
+
     it("should fail to create multiple tokens with the same parameters", async () => {
       const { wallet: issuerWallet } =
         await IssuerSparkWalletTesting.initialize({

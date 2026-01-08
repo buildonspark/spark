@@ -27,11 +27,30 @@ export class TokenOutputManager {
   }
 
   /**
-   * Set the token outputs map (typically after sync).
+   * Set token outputs.
+   * @param newOutputs - The new outputs to set
+   * @param tokenIdentifiers - If provided, only update these tokens (preserving others).
+   *                           If omitted or empty, replaces all outputs.
    */
-  async setOutputs(newOutputs: TokenOutputsMap): Promise<void> {
+  async setOutputs(
+    newOutputs: TokenOutputsMap,
+    tokenIdentifiers?: Bech32mTokenIdentifier[],
+  ): Promise<void> {
     await this.mutex.runExclusive(() => {
-      this.outputs = newOutputs;
+      if (tokenIdentifiers && tokenIdentifiers.length > 0) {
+        for (const tokenId of tokenIdentifiers) {
+          const outputs = newOutputs.get(tokenId);
+          if (outputs && outputs.length > 0) {
+            this.outputs.set(tokenId, [...outputs]);
+          } else {
+            this.outputs.delete(tokenId);
+          }
+        }
+      } else {
+        this.outputs = new Map(
+          [...newOutputs.entries()].map(([k, v]) => [k, [...v]]),
+        );
+      }
       this.cleanupStaleLocks();
     });
   }
