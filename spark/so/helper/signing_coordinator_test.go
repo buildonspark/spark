@@ -714,7 +714,7 @@ func TestGetSigningCommitments(t *testing.T) {
 
 		frostSignerFactory := &mockSparkServiceFrostSignerFactory{conn: frostSigner}
 
-		_, err := helper.GetSigningCommitmentsInternal(t.Context(), config, keyshareIDs, 1, frostSignerFactory)
+		_, err := helper.GetSigningCommitmentsInternal(t.Context(), config, uint32(len(keyshareIDs)), 1, frostSignerFactory)
 		require.NoError(t, err)
 	})
 
@@ -730,7 +730,7 @@ func TestGetSigningCommitments(t *testing.T) {
 
 			keyshareIDs := []uuid.UUID{uuid.New()}
 
-			_, err := helper.GetSigningCommitmentsInternal(t.Context(), config, keyshareIDs, 1, frostSignerFactory)
+			_, err := helper.GetSigningCommitmentsInternal(t.Context(), config, uint32(len(keyshareIDs)), 1, frostSignerFactory)
 			require.ErrorContains(t, err, "frost round 1 failed")
 		})
 
@@ -741,7 +741,7 @@ func TestGetSigningCommitments(t *testing.T) {
 			}
 			keyshareIDs := []uuid.UUID{uuid.New()}
 
-			_, err := helper.GetSigningCommitmentsInternal(t.Context(), config, keyshareIDs, 1, frostSignerFactory)
+			_, err := helper.GetSigningCommitmentsInternal(t.Context(), config, uint32(len(keyshareIDs)), 1, frostSignerFactory)
 			require.ErrorContains(t, err, "database connection failed")
 		})
 	})

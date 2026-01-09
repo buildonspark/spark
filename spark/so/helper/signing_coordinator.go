@@ -520,17 +520,17 @@ func prepareResults(
 }
 
 // GetSigningCommitments gets the signing commitments for the given keyshare ids.
-func GetSigningCommitments(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID, count uint32) (map[string][]frost.SigningCommitment, error) {
-	return GetSigningCommitmentsInternal(ctx, config, keyshareIDs, count, &SparkServiceFrostSignerFactoryImpl{})
+func GetSigningCommitments(ctx context.Context, config *so.Config, keyshareIDcount uint32, count uint32) (map[string][]frost.SigningCommitment, error) {
+	return GetSigningCommitmentsInternal(ctx, config, keyshareIDcount, count, &SparkServiceFrostSignerFactoryImpl{})
 }
 
-func GetSigningCommitmentsInternal(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID, count uint32, sparkServiceClientFactory SparkServiceFrostSignerFactory) (map[string][]frost.SigningCommitment, error) {
+func GetSigningCommitmentsInternal(ctx context.Context, config *so.Config, keyshareIDcount uint32, count uint32, sparkServiceClientFactory SparkServiceFrostSignerFactory) (map[string][]frost.SigningCommitment, error) {
 	if count == 0 {
 		return nil, errors.New("count cannot be 0")
 	}
 
 	selection := OperatorSelection{Option: OperatorSelectionOptionThreshold, Threshold: int(config.Threshold)}
-	total := count * uint32(len(keyshareIDs))
+	total := count * keyshareIDcount
 	round1, err := frostRound1(ctx, config, &selection, total, sparkServiceClientFactory)
 	if err != nil {
 		return nil, err

@@ -124,7 +124,7 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 		keyshareIDs[i] = node.Edges.SigningKeyshare.ID
 	}
 
-	commitments, err := helper.GetSigningCommitments(ctx, h.config, keyshareIDs, count)
+	commitments, err := helper.GetSigningCommitments(ctx, h.config, uint32(len(keyshareIDs)), count)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get signing commitments: %w", err)
 	}

@@ -347,7 +347,7 @@ func TestFrostRound1(t *testing.T) {
 	}
 
 	t.Run("GetSigningCommitments with count 1", func(t *testing.T) {
-		operatorNonceCommitments, err := helper.GetSigningCommitments(ctx, config, operatorKeyShareIDs, 1)
+		operatorNonceCommitments, err := helper.GetSigningCommitments(ctx, config, uint32(len(operatorKeyShareIDs)), 1)
 		require.NoError(t, err)
 
 		for _, commitments := range operatorNonceCommitments {
@@ -356,7 +356,7 @@ func TestFrostRound1(t *testing.T) {
 	})
 
 	t.Run("GetSigningCommitments with count 5", func(t *testing.T) {
-		operatorNonceCommitments, err := helper.GetSigningCommitments(ctx, config, operatorKeyShareIDs, 5)
+		operatorNonceCommitments, err := helper.GetSigningCommitments(ctx, config, uint32(len(operatorKeyShareIDs)), 5)
 		require.NoError(t, err)
 
 		for _, commitments := range operatorNonceCommitments {
@@ -407,7 +407,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 	userNonceCommitmentProto, _ := userNonceCommitment.MarshalProto()
 
 	// Step 6: Generate operator side of nonce.
-	operatorNonceCommitments, err := helper.GetSigningCommitments(ctx, config, []uuid.UUID{operatorKeyShare.ID}, 1)
+	operatorNonceCommitments, err := helper.GetSigningCommitments(ctx, config, 1, 1)
 	require.NoError(t, err)
 	operatorNonceCommitmentArray := collections.MapOfArrayToArrayOfMap(operatorNonceCommitments)
 	operatorCommitmentsProto := make(map[string]*pbcommon.SigningCommitment)
