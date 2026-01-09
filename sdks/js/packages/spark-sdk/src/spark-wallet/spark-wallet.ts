@@ -2229,7 +2229,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       );
     }
 
-    const tx = new Transaction();
+    const tx = new Transaction({
+      version: 3,
+    });
 
     tx.addInput({
       txid: depositTransactionId,
