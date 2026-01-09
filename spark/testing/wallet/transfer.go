@@ -1242,61 +1242,66 @@ func PrepareRefundSoSigningJobs(
 			},
 		}
 
-		// If the leaf has direct transactions, create and add signing jobs for direct refunds
+		isZeroNode := bitcointransaction.GetTimelockFromSequence(nodeTx.TxIn[0].Sequence) == 0
+
+		// If the leaf has DirectTx and is not a zero node, create DirectRefundTx signing job
 		if len(leaf.Leaf.DirectTx) > 0 {
 			directTx, err := common.TxFromRawTxBytes(leaf.Leaf.DirectTx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse direct tx: %w", err)
 			}
 			refundSigningData.DirectTx = directTx
-			directOutPoint := wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
-			directAmountSats := directTx.TxOut[0].Value
 
-			// Create DirectRefundTx (spending from DirectTx)
-			_, directRefundTx, err := CreateRefundTxs(nextSequence, nextDirectSequence, &directOutPoint, directAmountSats, refundSigningData.ReceivingPubKey, true)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create direct refund tx: %w", err)
-			}
-			refundSigningData.DirectRefundTx = directRefundTx
-			var directRefundBuf bytes.Buffer
-			err = directRefundTx.Serialize(&directRefundBuf)
-			if err != nil {
-				return nil, fmt.Errorf("failed to serialize direct refund tx: %w", err)
-			}
+			if !isZeroNode {
+				directOutPoint := wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
+				directAmountSats := directTx.TxOut[0].Value
 
-			// Generate nonce for DirectRefundTx
-			directRefundNonce := frost.GenerateSigningNonce()
-			refundSigningData.DirectRefundNonce = &directRefundNonce
-			directRefundNonceCommitmentProto, _ := directRefundNonce.SigningCommitment().MarshalProto()
+				// Create DirectRefundTx (spending from DirectTx)
+				_, directRefundTx, err := CreateRefundTxs(nextSequence, nextDirectSequence, &directOutPoint, directAmountSats, refundSigningData.ReceivingPubKey, true)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create direct refund tx: %w", err)
+				}
+				refundSigningData.DirectRefundTx = directRefundTx
+				var directRefundBuf bytes.Buffer
+				err = directRefundTx.Serialize(&directRefundBuf)
+				if err != nil {
+					return nil, fmt.Errorf("failed to serialize direct refund tx: %w", err)
+				}
 
-			job.DirectRefundTxSigningJob = &pb.SigningJob{
-				SigningPublicKey:       refundSigningData.SigningPrivKey.Public().Serialize(),
-				RawTx:                  directRefundBuf.Bytes(),
-				SigningNonceCommitment: directRefundNonceCommitmentProto,
-			}
+				// Generate nonce for DirectRefundTx
+				directRefundNonce := frost.GenerateSigningNonce()
+				refundSigningData.DirectRefundNonce = &directRefundNonce
+				directRefundNonceCommitmentProto, _ := directRefundNonce.SigningCommitment().MarshalProto()
 
-			// Create DirectFromCpfpRefundTx (spending from NodeTx/CPFP)
-			_, directFromCpfpRefundTx, err := CreateRefundTxs(nextSequence, nextDirectSequence, &nodeOutPoint, amountSats, refundSigningData.ReceivingPubKey, true)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create direct from cpfp refund tx: %w", err)
+				job.DirectRefundTxSigningJob = &pb.SigningJob{
+					SigningPublicKey:       refundSigningData.SigningPrivKey.Public().Serialize(),
+					RawTx:                  directRefundBuf.Bytes(),
+					SigningNonceCommitment: directRefundNonceCommitmentProto,
+				}
 			}
-			refundSigningData.DirectFromCpfpRefundTx = directFromCpfpRefundTx
-			var directFromCpfpRefundBuf bytes.Buffer
-			err = directFromCpfpRefundTx.Serialize(&directFromCpfpRefundBuf)
-			if err != nil {
-				return nil, fmt.Errorf("failed to serialize direct from cpfp refund tx: %w", err)
-			}
+		}
 
-			// Generate nonce for DirectFromCpfpRefundTx
-			directFromCpfpRefundNonce := frost.GenerateSigningNonce()
-			refundSigningData.DirectFromCpfpRefundNonce = &directFromCpfpRefundNonce
-			directFromCpfpRefundNonceCommitmentProto, _ := directFromCpfpRefundNonce.SigningCommitment().MarshalProto()
+		// Create DirectFromCpfpRefundTx for ALL leaves (spending from NodeTx/CPFP)
+		_, directFromCpfpRefundTx, err := CreateRefundTxs(nextSequence, nextDirectSequence, &nodeOutPoint, amountSats, refundSigningData.ReceivingPubKey, true)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create direct from cpfp refund tx: %w", err)
+		}
+		refundSigningData.DirectFromCpfpRefundTx = directFromCpfpRefundTx
+		var directFromCpfpRefundBuf bytes.Buffer
+		err = directFromCpfpRefundTx.Serialize(&directFromCpfpRefundBuf)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize direct from cpfp refund tx: %w", err)
+		}
 
-			job.DirectFromCpfpRefundTxSigningJob = &pb.SigningJob{
-				SigningPublicKey:       refundSigningData.SigningPrivKey.Public().Serialize(),
-				RawTx:                  directFromCpfpRefundBuf.Bytes(),
-				SigningNonceCommitment: directFromCpfpRefundNonceCommitmentProto,
-			}
+		// Generate nonce for DirectFromCpfpRefundTx
+		directFromCpfpRefundNonce := frost.GenerateSigningNonce()
+		refundSigningData.DirectFromCpfpRefundNonce = &directFromCpfpRefundNonce
+		directFromCpfpRefundNonceCommitmentProto, _ := directFromCpfpRefundNonce.SigningCommitment().MarshalProto()
+
+		job.DirectFromCpfpRefundTxSigningJob = &pb.SigningJob{
+			SigningPublicKey:       refundSigningData.SigningPrivKey.Public().Serialize(),
+			RawTx:                  directFromCpfpRefundBuf.Bytes(),
+			SigningNonceCommitment: directFromCpfpRefundNonceCommitmentProto,
 		}
 
 		signingJobs = append(signingJobs, job)

@@ -50,7 +50,7 @@ func createCoopExitRefundTransactionSigningJob(
 	signingPubKey keys.Public,
 	refundNonce frost.SigningNonce,
 	refundTx *wire.MsgTx,
-	directRefundNonce frost.SigningNonce,
+	directRefundNonce *frost.SigningNonce,
 	directRefundTx *wire.MsgTx,
 	directFromCpfpNonce frost.SigningNonce,
 	directFromCpfpRefundTx *wire.MsgTx,
@@ -62,13 +62,6 @@ func createCoopExitRefundTransactionSigningJob(
 	rawRefundTx := refundBuf.Bytes()
 	refundNonceCommitmentProto, _ := refundNonce.SigningCommitment().MarshalProto()
 
-	var directRefundBuf bytes.Buffer
-	if err := directRefundTx.Serialize(&directRefundBuf); err != nil {
-		return nil, fmt.Errorf("failed to serialize direct refund tx: %w", err)
-	}
-	rawDirectRefundTx := directRefundBuf.Bytes()
-	directRefundNonceCommitmentProto, _ := directRefundNonce.SigningCommitment().MarshalProto()
-
 	var directFromCpfpRefundBuf bytes.Buffer
 	if err := directFromCpfpRefundTx.Serialize(&directFromCpfpRefundBuf); err != nil {
 		return nil, fmt.Errorf("failed to serialize direct from cpfp refund tx: %w", err)
@@ -76,24 +69,37 @@ func createCoopExitRefundTransactionSigningJob(
 	rawDirectFromCpfpRefundTx := directFromCpfpRefundBuf.Bytes()
 	directFromCpfpRefundNonceCommitmentProto, _ := directFromCpfpNonce.SigningCommitment().MarshalProto()
 
-	return &pb.LeafRefundTxSigningJob{
+	job := &pb.LeafRefundTxSigningJob{
 		LeafId: leafID,
 		RefundTxSigningJob: &pb.SigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
 			RawTx:                  rawRefundTx,
 			SigningNonceCommitment: refundNonceCommitmentProto,
 		},
-		DirectRefundTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       signingPubKey.Serialize(),
-			RawTx:                  rawDirectRefundTx,
-			SigningNonceCommitment: directRefundNonceCommitmentProto,
-		},
 		DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
 			RawTx:                  rawDirectFromCpfpRefundTx,
 			SigningNonceCommitment: directFromCpfpRefundNonceCommitmentProto,
 		},
-	}, nil
+	}
+
+	// Only add DirectRefundTxSigningJob for non-zero nodes
+	if directRefundTx != nil && directRefundNonce != nil {
+		var directRefundBuf bytes.Buffer
+		if err := directRefundTx.Serialize(&directRefundBuf); err != nil {
+			return nil, fmt.Errorf("failed to serialize direct refund tx: %w", err)
+		}
+		rawDirectRefundTx := directRefundBuf.Bytes()
+		directRefundNonceCommitmentProto, _ := directRefundNonce.SigningCommitment().MarshalProto()
+
+		job.DirectRefundTxSigningJob = &pb.SigningJob{
+			SigningPublicKey:       signingPubKey.Serialize(),
+			RawTx:                  rawDirectRefundTx,
+			SigningNonceCommitment: directRefundNonceCommitmentProto,
+		}
+	}
+
+	return job, nil
 }
 
 func signCoopExitRefunds(
@@ -139,18 +145,23 @@ func signCoopExitRefunds(
 		}
 		nodeAmountSats := nodeTx.TxOut[0].Value
 
-		if len(leaf.Leaf.DirectTx) == 0 {
-			return nil, nil, fmt.Errorf("leaf at index %d has nil DirectTx field", i)
+		isZeroNode := bitcointransaction.GetTimelockFromSequence(nodeTx.TxIn[0].Sequence) == 0
+
+		var directTx *wire.MsgTx
+		var directOutPoint *wire.OutPoint
+		var directAmountSats int64
+		if len(leaf.Leaf.DirectTx) > 0 {
+			var err error
+			directTx, err = common.TxFromRawTxBytes(leaf.Leaf.DirectTx)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to parse direct tx: %w", err)
+			}
+			if len(directTx.TxOut) == 0 {
+				return nil, nil, fmt.Errorf("direct tx has no outputs")
+			}
+			directOutPoint = &wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
+			directAmountSats = directTx.TxOut[0].Value
 		}
-		directTx, err := common.TxFromRawTxBytes(leaf.Leaf.DirectTx)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse direct tx: %w", err)
-		}
-		if len(directTx.TxOut) == 0 {
-			return nil, nil, fmt.Errorf("direct tx has no outputs")
-		}
-		directOutPoint := &wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
-		directAmountSats := directTx.TxOut[0].Value
 
 		cpfpRefundTx, directFromCpfpRefundTx, directRefundTx, err := CreateAllRefundTxs(
 			sequence,
@@ -167,19 +178,27 @@ func signCoopExitRefunds(
 		}
 
 		cpfpRefundTx.AddTxIn(wire.NewTxIn(connectorOutput, nil, nil))
-		directRefundTx.AddTxIn(wire.NewTxIn(connectorOutput, nil, nil))
 		directFromCpfpRefundTx.AddTxIn(wire.NewTxIn(connectorOutput, nil, nil))
 
 		refundNonce := frost.GenerateSigningNonce()
-		directRefundNonce := frost.GenerateSigningNonce()
 		directFromCpfpNonce := frost.GenerateSigningNonce()
+
+		var directRefundNoncePtr *frost.SigningNonce
+		var directRefundTxForJob *wire.MsgTx
+		if !isZeroNode && directRefundTx != nil {
+			directRefundTx.AddTxIn(wire.NewTxIn(connectorOutput, nil, nil))
+			directRefundNonce := frost.GenerateSigningNonce()
+			directRefundNoncePtr = &directRefundNonce
+			directRefundTxForJob = directRefundTx
+		}
+
 		signingJob, err := createCoopExitRefundTransactionSigningJob(
 			leaf.Leaf.Id,
 			leaf.SigningPrivKey.Public(),
 			refundNonce,
 			cpfpRefundTx,
-			directRefundNonce,
-			directRefundTx,
+			directRefundNoncePtr,
+			directRefundTxForJob,
 			directFromCpfpNonce,
 			directFromCpfpRefundTx,
 		)
@@ -188,18 +207,21 @@ func signCoopExitRefunds(
 		}
 		signingJobs = append(signingJobs, signingJob)
 
-		leafDataMap[leaf.Leaf.Id] = &LeafRefundSigningData{
+		leafData := &LeafRefundSigningData{
 			SigningPrivKey:            leaf.SigningPrivKey,
 			RefundTx:                  cpfpRefundTx,
 			Nonce:                     &refundNonce,
 			DirectTx:                  directTx,
-			DirectRefundTx:            directRefundTx,
-			DirectRefundNonce:         &directRefundNonce,
 			DirectFromCpfpRefundTx:    directFromCpfpRefundTx,
 			DirectFromCpfpRefundNonce: &directFromCpfpNonce,
 			Tx:                        nodeTx,
 			Vout:                      int(leaf.Leaf.Vout),
 		}
+		if !isZeroNode && directRefundTx != nil {
+			leafData.DirectRefundTx = directRefundTx
+			leafData.DirectRefundNonce = directRefundNoncePtr
+		}
+		leafDataMap[leaf.Leaf.Id] = leafData
 	}
 
 	sparkConn, err := config.NewCoordinatorGRPCConnection()
