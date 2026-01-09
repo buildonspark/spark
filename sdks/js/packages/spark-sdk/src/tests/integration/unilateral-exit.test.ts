@@ -2,18 +2,18 @@ import { describe, expect, it } from "@jest/globals";
 import { bytesToHex } from "@noble/hashes/utils";
 import { Transaction } from "@scure/btc-signer";
 
-import { getTxId } from "../../utils/bitcoin.js";
 import { SparkError } from "../../errors/index.js";
+import { TreeNode } from "../../proto/spark.js";
+import { getTxId } from "../../utils/bitcoin.js";
 import { Network } from "../../utils/network.js";
-import { SparkWalletTestingIntegration } from "../utils/spark-testing-wallet.js";
-import { BitcoinFaucet } from "../utils/test-faucet.js";
-import { waitForClaim } from "../utils/utils.js";
 import {
   constructUnilateralExitFeeBumpPackages,
   hash160,
 } from "../../utils/unilateral-exit.js";
 import { signPsbtWithExternalKey } from "../utils/signing.js";
-import { TreeNode } from "../../proto/spark.js";
+import { SparkWalletTestingIntegration } from "../utils/spark-testing-wallet.js";
+import { BitcoinFaucet } from "../utils/test-faucet.js";
+import { waitForClaim } from "../utils/utils.js";
 
 const LOCAL_MEMPOOL_URL = "http://mempool.minikube.local/api";
 
@@ -185,10 +185,18 @@ describe("unilateral exit", () => {
       bytesToHex(fundingWalletKey),
     );
 
-    // Submit node tx and fee bump package. Then mine 2050 blocks to expire time lock for direct from cpfp refund txn.
+    // Submit node tx and fee bump package.
     const res = await faucet.submitPackage([txPackage!.tx, feeBumpPsbtSigned]);
     expect(didTxSucceed(res)).toBe(true);
+
+    // Confirm package (establishes confirmation height)
+    await faucet.mineBlocksAndWaitForMiningToComplete(1);
+
+    // Mine 2050 blocks to expire time lock for direct from cpfp refund txn.
+    // (Current Height will be ConfHeight + 2050)
     await faucet.mineBlocksAndWaitForMiningToComplete(2050);
+
+    await faucet.waitForMempoolEntry(directFromCpfpRefundTxId);
 
     // Mining another 5 blocks to confirm that direct from cpfp refund txn is confirmed.
     await faucet.mineBlocksAndWaitForMiningToComplete(5);
