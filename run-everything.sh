@@ -244,6 +244,37 @@ parse_bitcoin_config() {
     echo "$rpcuser $rpcpassword"
 }
 
+create_load_fund_wallet() {
+    local wallet_name=${1:-spark-wallet}
+    local bitcoin_cli="bitcoin-cli -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password""
+
+    if ! $bitcoin_cli -rpcwallet="$wallet_name" getwalletinfo &>/dev/null; then
+        if $bitcoin_cli listwallets | grep -q "\"$wallet_name\""; then
+            echo "Loading existing wallet: $wallet_name"
+            $bitcoin_cli loadwallet "$wallet_name" &>/dev/null
+        else
+            echo "Creating new wallet: $wallet_name"
+            $bitcoin_cli createwallet "$wallet_name" &>/dev/null
+        fi
+    fi
+    echo "Wallet '$wallet_name' is ready"
+
+    # Check wallet balance
+    local balance=$($bitcoin_cli -rpcwallet="$wallet_name" getbalance)
+    echo "Current wallet balance: $balance BTC"
+
+    # Fund wallet if balance is 0 or very low
+    if (( $(echo "$balance < 1" | bc -l) )); then
+        echo "Wallet balance is low, funding with 101 blocks..."
+        local address=$($bitcoin_cli -rpcwallet="$wallet_name" getnewaddress)
+        $bitcoin_cli generatetoaddress 101 "$address" > /dev/null
+        local new_balance=$($bitcoin_cli -rpcwallet="$wallet_name" getbalance)
+        echo "Wallet funded! New balance: $new_balance BTC"
+    else
+        echo "Wallet has sufficient funds"
+    fi
+}
+
 run_bitcoind_tmux() {
     local run_dir=$1
     local wipe=$2
@@ -274,6 +305,11 @@ run_bitcoind_tmux() {
 
     # Send the command to tmux
     tmux send-keys -t "$session_name" "$cmd" C-m
+
+    sleep 5  # Give bitcoind time to start
+
+    # make sure the wallet is created, loaded, and funded
+    create_load_fund_wallet "spark-wallet"
 
     echo ""
     echo "================================================"
