@@ -2659,7 +2659,9 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 	case st.TransferStatusReceiverKeyTweakLocked, st.TransferStatusReceiverKeyTweaked:
 		// Do nothing
 	default:
-		return fmt.Errorf("transfer %s is in an invalid status %s to settle receiver key tweak", transfer.ID, transfer.Status)
+		if req.Action == pbinternal.SettleKeyTweakAction_COMMIT {
+			return fmt.Errorf("transfer %s is in an invalid status %s to settle receiver key tweak", transfer.ID, transfer.Status)
+		}
 	}
 	switch req.Action {
 	case pbinternal.SettleKeyTweakAction_COMMIT:
