@@ -48,6 +48,9 @@ var (
 	eligibleNodesGauge                 metric.Int64Gauge
 	blockHeightGauge                   metric.Int64Gauge
 	blockHeightProcessingTimeHistogram metric.Int64Histogram
+
+	// tweakKeysForCoopExitFunc is a function variable that can be mocked in tests
+	tweakKeysForCoopExitFunc = tweakKeysForCoopExit
 )
 
 const (
@@ -547,20 +550,32 @@ func handleBlock(
 	// TODO: expire pending coop exits after some time so this doesn't become too large
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled, 0) > 0 {
 		confirmedTxIDs := make([]st.TxID, 0, len(confirmedTxHashSet))
+		reversedConfirmedTxIDs := make([]st.TxID, 0, len(confirmedTxHashSet))
 		for txHashBytes := range confirmedTxHashSet {
 			txid, err := st.NewTxIDFromBytes(txHashBytes[:])
 			if err != nil {
-				logger.With(zap.Error(err)).Sugar().Warnf("Failed to parse txid from confirmed tx hash, skipping")
-				continue
+				return fmt.Errorf("failed to parse txid from confirmed tx hash: %w", err)
 			}
 			confirmedTxIDs = append(confirmedTxIDs, txid)
+			reversedTxHashBytes := slices.Clone(txHashBytes[:])
+			slices.Reverse(reversedTxHashBytes)
+			reversedTxid, err := st.NewTxIDFromBytes(reversedTxHashBytes)
+			if err != nil {
+				return fmt.Errorf("failed to parse reversed txid from confirmed tx hash: %w", err)
+			}
+			reversedConfirmedTxIDs = append(reversedConfirmedTxIDs, reversedTxid)
 		}
 
 		if len(confirmedTxIDs) > 0 {
 			unconfirmedCoopExits, err := dbClient.CooperativeExit.Query().
 				Where(
-					cooperativeexit.ConfirmationHeightIsNil(),
-					cooperativeexit.ExitTxidIn(confirmedTxIDs...),
+					cooperativeexit.And(
+						cooperativeexit.ConfirmationHeightIsNil(),
+						cooperativeexit.Or(
+							cooperativeexit.ExitTxidIn(confirmedTxIDs...),
+							cooperativeexit.ExitTxidIn(reversedConfirmedTxIDs...),
+						),
+					),
 				).
 				All(ctx)
 			if err != nil {
@@ -569,8 +584,7 @@ func handleBlock(
 
 			for _, coopExit := range unconfirmedCoopExits {
 				if coopExit.KeyTweakedHeight != nil {
-					logger.With(zap.Error(err)).Sugar().Errorf("coop exit %s has KeyTweakedHeight set but ConfirmationHeight not set", coopExit.ID)
-					continue
+					return fmt.Errorf("coop exit %s has KeyTweakedHeight set but ConfirmationHeight not set", coopExit.ID)
 				}
 				logger.Sugar().Debugf("Found coop exit tx at tx hash %s", coopExit.ExitTxid)
 				_, err = coopExit.Update().SetConfirmationHeight(blockHeight).Save(ctx)
@@ -594,7 +608,7 @@ func handleBlock(
 			if blockHeight-*coopExit.ConfirmationHeight >= 2 {
 				// Attempt to tweak keys for the coop exit. Ok to log the error and continue here
 				// since this is not critical for the block processing.
-				err = tweakKeysForCoopExit(ctx, coopExit, blockHeight)
+				err = tweakKeysForCoopExitFunc(ctx, coopExit, blockHeight)
 				if err != nil {
 					logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle transfer key tweak for coop exit %s", coopExit.ID)
 					continue
@@ -636,7 +650,7 @@ func handleBlock(
 
 			// Attempt to tweak keys for the coop exit. Ok to log the error and continue here
 			// since this is not critical for the block processing.
-			err = tweakKeysForCoopExit(ctx, coopExit, blockHeight)
+			err = tweakKeysForCoopExitFunc(ctx, coopExit, blockHeight)
 			if err != nil {
 				logger.With(zap.Error(err)).Sugar().Errorf("Failed to tweak keys for coop exit %s", coopExit.ID)
 				continue

@@ -2,6 +2,7 @@ package chain
 
 import (
 	"bytes"
+	"context"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/handler"
+	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -626,4 +628,403 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "is not available to transfer")
 	}
+}
+
+func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	knobsService := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled: 1.0,
+	})
+	ctx = knobs.InjectKnobsService(ctx, knobsService)
+
+	// Mock tweakKeysForCoopExit to succeed immediately
+	originalTweakFunc := tweakKeysForCoopExitFunc
+	tweakKeysForCoopExitFunc = func(ctx context.Context, coopExit *ent.CooperativeExit, blockHeight int64) error {
+		return nil
+	}
+	defer func() { tweakKeysForCoopExitFunc = originalTweakFunc }()
+
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	// Create test transactions for coop exits
+	// Output 1: withdrawal amount to user, Output 2: intermediate amount to connector
+	coopExitTx1 := wire.MsgTx{
+		Version: 2,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut: []*wire.TxOut{
+			{Value: 900},
+			{Value: 100},
+		},
+	}
+	coopExitTx2 := wire.MsgTx{
+		Version: 2,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut: []*wire.TxOut{
+			{Value: 1800},
+			{Value: 200},
+		},
+	}
+	coopExitTx3 := wire.MsgTx{
+		Version: 2,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut: []*wire.TxOut{
+			{Value: 2700},
+			{Value: 300},
+		},
+	}
+
+	// Transaction not in block (should not be confirmed)
+	coopExitTxNotInBlock := wire.MsgTx{
+		Version: 2,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut: []*wire.TxOut{
+			{Value: 3600},
+			{Value: 400},
+		},
+	}
+
+	// Create transfers and coop exits
+	senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	transfer1, err := dbTx.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer2, err := dbTx.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(2000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer3, err := dbTx.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(3000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer4, err := dbTx.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(4000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create cooperative exits with different txids
+	txHash1 := coopExitTx1.TxHash()
+	exitTxid1, err := schematype.NewTxIDFromBytes(txHash1[:])
+	require.NoError(t, err)
+	_, err = dbTx.CooperativeExit.Create().
+		SetTransfer(transfer1).
+		SetExitTxid(exitTxid1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	txHash2 := coopExitTx2.TxHash()
+	exitTxid2, err := schematype.NewTxIDFromBytes(txHash2[:])
+	require.NoError(t, err)
+	_, err = dbTx.CooperativeExit.Create().
+		SetTransfer(transfer2).
+		SetExitTxid(exitTxid2).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// This one has reversed byte order
+	txHash3 := coopExitTx3.TxHash()
+	reversedTxHash3 := make([]byte, len(txHash3))
+	copy(reversedTxHash3, txHash3[:])
+	for i := 0; i < len(reversedTxHash3)/2; i++ {
+		reversedTxHash3[i], reversedTxHash3[len(reversedTxHash3)-1-i] = reversedTxHash3[len(reversedTxHash3)-1-i], reversedTxHash3[i]
+	}
+	exitTxid3, err := schematype.NewTxIDFromBytes(reversedTxHash3)
+	require.NoError(t, err)
+	_, err = dbTx.CooperativeExit.Create().
+		SetTransfer(transfer3).
+		SetExitTxid(exitTxid3).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// This one is not in the block
+	txHash4 := coopExitTxNotInBlock.TxHash()
+	exitTxid4, err := schematype.NewTxIDFromBytes(txHash4[:])
+	require.NoError(t, err)
+	_, err = dbTx.CooperativeExit.Create().
+		SetTransfer(transfer4).
+		SetExitTxid(exitTxid4).
+		Save(ctx)
+	require.NoError(t, err)
+
+	config := so.Config{
+		SupportedNetworks: []btcnetwork.Network{btcnetwork.Testnet},
+		Lrc20Configs: map[string]so.Lrc20Config{
+			btcnetwork.Testnet.String(): {
+				DisableRpcs: true,
+			},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+
+	connCfg := &rpcclient.ConnConfig{DisableTLS: true, HTTPPostMode: true}
+	bitcoinClient, err := rpcclient.New(connCfg, nil)
+	require.NoError(t, err)
+
+	blockHeight := int64(100)
+	blockTxs := []wire.MsgTx{coopExitTx1, coopExitTx2, coopExitTx3}
+
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, btcnetwork.Testnet)
+	require.NoError(t, err)
+
+	// Verify: exits 1, 2, and 3 should be confirmed
+	allCoopExits, err := dbTx.CooperativeExit.Query().All(ctx)
+	require.NoError(t, err)
+	require.Len(t, allCoopExits, 4)
+
+	confirmedCount := 0
+	for _, exit := range allCoopExits {
+		if exit.ConfirmationHeight != nil {
+			confirmedCount++
+			assert.Equal(t, blockHeight, *exit.ConfirmationHeight)
+			// Key tweaked height should still be nil (not enough blocks passed)
+			assert.Nil(t, exit.KeyTweakedHeight)
+		}
+	}
+	assert.Equal(t, 3, confirmedCount, "Expected 3 coop exits to be confirmed")
+
+	// Process a few more blocks to trigger key tweaking (need >= 2 blocks)
+	blockHeight = int64(102)
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, []wire.MsgTx{}, blockHeight, btcnetwork.Testnet)
+	require.NoError(t, err)
+
+	// Verify: After 2+ blocks, keys should be tweaked for all confirmed exits
+	allCoopExits, err = dbTx.CooperativeExit.Query().All(ctx)
+	require.NoError(t, err)
+
+	tweakedCount := 0
+	for _, exit := range allCoopExits {
+		if exit.ConfirmationHeight != nil {
+			// All confirmed exits should now have KeyTweakedHeight set
+			assert.NotNil(t, exit.KeyTweakedHeight, "KeyTweakedHeight should be set after 2+ blocks")
+			if exit.KeyTweakedHeight != nil {
+				assert.Equal(t, blockHeight, *exit.KeyTweakedHeight)
+				tweakedCount++
+			}
+		}
+	}
+	assert.Equal(t, 3, tweakedCount, "Expected 3 coop exits to have keys tweaked")
+}
+
+func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	// Disable the knob to use old code path
+	knobsService := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled: 0.0,
+	})
+	ctx = knobs.InjectKnobsService(ctx, knobsService)
+
+	// Mock tweakKeysForCoopExit to succeed immediately
+	originalTweakFunc := tweakKeysForCoopExitFunc
+	tweakKeysForCoopExitFunc = func(ctx context.Context, coopExit *ent.CooperativeExit, blockHeight int64) error {
+		return nil
+	}
+	defer func() { tweakKeysForCoopExitFunc = originalTweakFunc }()
+
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	// Create test transactions for coop exits (version 2 with two outputs)
+	// Output 1: withdrawal amount to user, Output 2: intermediate amount to connector
+	coopExitTx1 := wire.MsgTx{
+		Version: 2,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut: []*wire.TxOut{
+			{Value: 900},
+			{Value: 100},
+		},
+	}
+	coopExitTx2 := wire.MsgTx{
+		Version: 2,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut: []*wire.TxOut{
+			{Value: 1800},
+			{Value: 200},
+		},
+	}
+	coopExitTx3 := wire.MsgTx{
+		Version: 2,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut: []*wire.TxOut{
+			{Value: 2700},
+			{Value: 300},
+		},
+	}
+
+	// Transaction not in block
+	coopExitTxNotInBlock := wire.MsgTx{
+		Version: 2,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut: []*wire.TxOut{
+			{Value: 3600},
+			{Value: 400},
+		},
+	}
+
+	// Create transfers and coop exits
+	senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	transfer1, err := dbTx.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer2, err := dbTx.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(2000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer3, err := dbTx.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(3000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer4, err := dbTx.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(4000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create cooperative exits with different txids
+	txHash1 := coopExitTx1.TxHash()
+	exitTxid1, err := schematype.NewTxIDFromBytes(txHash1[:])
+	require.NoError(t, err)
+	_, err = dbTx.CooperativeExit.Create().
+		SetTransfer(transfer1).
+		SetExitTxid(exitTxid1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	txHash2 := coopExitTx2.TxHash()
+	exitTxid2, err := schematype.NewTxIDFromBytes(txHash2[:])
+	require.NoError(t, err)
+	_, err = dbTx.CooperativeExit.Create().
+		SetTransfer(transfer2).
+		SetExitTxid(exitTxid2).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// This one has reversed byte order
+	txHash3 := coopExitTx3.TxHash()
+	reversedTxHash3 := make([]byte, len(txHash3))
+	copy(reversedTxHash3, txHash3[:])
+	for i := 0; i < len(reversedTxHash3)/2; i++ {
+		reversedTxHash3[i], reversedTxHash3[len(reversedTxHash3)-1-i] = reversedTxHash3[len(reversedTxHash3)-1-i], reversedTxHash3[i]
+	}
+	exitTxid3, err := schematype.NewTxIDFromBytes(reversedTxHash3)
+	require.NoError(t, err)
+	_, err = dbTx.CooperativeExit.Create().
+		SetTransfer(transfer3).
+		SetExitTxid(exitTxid3).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// This one is not in the block
+	txHash4 := coopExitTxNotInBlock.TxHash()
+	exitTxid4, err := schematype.NewTxIDFromBytes(txHash4[:])
+	require.NoError(t, err)
+	_, err = dbTx.CooperativeExit.Create().
+		SetTransfer(transfer4).
+		SetExitTxid(exitTxid4).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create config
+	config := so.Config{
+		SupportedNetworks: []btcnetwork.Network{btcnetwork.Testnet},
+		Lrc20Configs: map[string]so.Lrc20Config{
+			btcnetwork.Testnet.String(): {
+				DisableRpcs: true,
+			},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+
+	connCfg := &rpcclient.ConnConfig{DisableTLS: true, HTTPPostMode: true}
+	bitcoinClient, err := rpcclient.New(connCfg, nil)
+	require.NoError(t, err)
+
+	blockHeight := int64(100)
+	blockTxs := []wire.MsgTx{coopExitTx1, coopExitTx2, coopExitTx3}
+
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, btcnetwork.Testnet)
+	require.NoError(t, err)
+
+	// Verify: exits 1, 2, and 3 should be confirmed, exit 4 should not
+	allCoopExits, err := dbTx.CooperativeExit.Query().All(ctx)
+	require.NoError(t, err)
+	require.Len(t, allCoopExits, 4)
+
+	confirmedCount := 0
+	unconfirmedCount := 0
+	for _, exit := range allCoopExits {
+		if exit.ConfirmationHeight != nil {
+			confirmedCount++
+			assert.Equal(t, blockHeight, *exit.ConfirmationHeight)
+			// In legacy path, KeyTweakedHeight should be set immediately
+			assert.NotNil(t, exit.KeyTweakedHeight, "KeyTweakedHeight should be set immediately in legacy path")
+			assert.Equal(t, blockHeight, *exit.KeyTweakedHeight)
+		} else {
+			unconfirmedCount++
+		}
+	}
+	assert.Equal(t, 3, confirmedCount, "Expected 3 coop exits to be confirmed")
+	assert.Equal(t, 1, unconfirmedCount, "Expected 1 coop exit to remain unconfirmed")
 }
