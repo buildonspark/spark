@@ -2,6 +2,7 @@ package bitcointransaction
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -11,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/knobs"
 )
 
 // TxType represents the type of refund transaction expected
@@ -25,7 +27,7 @@ const (
 )
 
 // VerifyTransactionWithDatabase validates a Bitcoin transaction by reconstructing it based on node in the database
-func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode, txType TxType, refundDestPubkey keys.Public) error {
+func VerifyTransactionWithDatabase(ctx context.Context, clientRawTxBytes []byte, dbLeaf *ent.TreeNode, txType TxType, refundDestPubkey keys.Public, networkString string) error {
 	var sourceRawTxBytes []byte
 
 	cpfpRefundTxTimelock, err := GetCpfpTimelockFromLeaf(dbLeaf)
@@ -44,7 +46,7 @@ func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode
 	default:
 		return fmt.Errorf("unknown transaction type: %d", txType)
 	}
-	err = VerifyTransactionWithSource(clientRawTxBytes, sourceRawTxBytes, 0, cpfpRefundTxTimelock, txType, refundDestPubkey)
+	err = VerifyTransactionWithSource(ctx, clientRawTxBytes, sourceRawTxBytes, 0, cpfpRefundTxTimelock, txType, refundDestPubkey, networkString)
 	if err != nil {
 		return fmt.Errorf("failed to verify transaction of leaf %s: %w", dbLeaf.ID, err)
 	}
@@ -52,7 +54,7 @@ func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode
 }
 
 // VerifyTransactionWithSource validates a Bitcoin transaction by reconstructing it from a source transaction
-func VerifyTransactionWithSource(clientRawTxBytes []byte, sourceRawTxBytes []byte, vout uint32, cpfpRefundTxTimelock uint32, txType TxType, destPubkey keys.Public) error {
+func VerifyTransactionWithSource(ctx context.Context, clientRawTxBytes []byte, sourceRawTxBytes []byte, vout uint32, cpfpRefundTxTimelock uint32, txType TxType, destPubkey keys.Public, networkString string) error {
 	clientTx, err := common.TxFromRawTxBytes(clientRawTxBytes)
 	if err != nil {
 		return fmt.Errorf("failed to parse client tx: %w, tx type: %d", err, txType)
@@ -63,13 +65,20 @@ func VerifyTransactionWithSource(clientRawTxBytes []byte, sourceRawTxBytes []byt
 		return fmt.Errorf("failed to validate user sequence: %w, tx type: %d", err, txType)
 	}
 
-	// Allow only V2 or V3 client transactions and use the client's version for construction.
-	if clientTx.Version != 2 && clientTx.Version != 3 {
-		return fmt.Errorf("unsupported transaction version: %d, tx type: %d", clientTx.Version, txType)
+	disableV2TXs := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobDisableV2TXs, &networkString, 0) > 0
+
+	if disableV2TXs {
+		if clientTx.Version != 3 {
+			return fmt.Errorf("unsupported transaction version: %d, tx type: %d", clientTx.Version, txType)
+		}
+	} else {
+		if clientTx.Version != 2 && clientTx.Version != 3 {
+			return fmt.Errorf("unsupported transaction version: %d, tx type: %d", clientTx.Version, txType)
+		}
 	}
 
 	// Construct the expected transaction based on the type
-	expectedTx, err := constructExpectedTransaction(sourceRawTxBytes, vout, cpfpRefundTxTimelock, txType, destPubkey, clientSequence, clientTx.Version)
+	expectedTx, err := ConstructExpectedTransaction(sourceRawTxBytes, vout, cpfpRefundTxTimelock, txType, destPubkey, clientSequence, clientTx.Version)
 	if err != nil {
 		return fmt.Errorf("failed to construct expected transaction: %w, tx type: %d", err, txType)
 	}
@@ -100,7 +109,7 @@ func VerifyTransactionWithSource(clientRawTxBytes []byte, sourceRawTxBytes []byt
 }
 
 // constructExpectedTransaction constructs the expected Bitcoin transaction based on source transaction, transaction type and timelock
-func constructExpectedTransaction(sourceRawTxBytes []byte, vout uint32, cpfpRefundTxTimelock uint32, txType TxType, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
+func ConstructExpectedTransaction(sourceRawTxBytes []byte, vout uint32, cpfpRefundTxTimelock uint32, txType TxType, refundDestPubkey keys.Public, clientSequence uint32, txVersion int32) (*wire.MsgTx, error) {
 
 	// Parse source tx
 	sourceTx, err := common.TxFromRawTxBytes(sourceRawTxBytes)
@@ -108,7 +117,7 @@ func constructExpectedTransaction(sourceRawTxBytes []byte, vout uint32, cpfpRefu
 		return nil, fmt.Errorf("failed to parse source tx: %w", err)
 	}
 	// Build the server-side sequence (validate timelock and construct sequence bits)
-	serverSequence, err := validateSequence(cpfpRefundTxTimelock, txType, clientSequence)
+	serverSequence, err := ValidateSequence(cpfpRefundTxTimelock, txType, clientSequence)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate client sequence: %w", err)
 	}
@@ -255,11 +264,11 @@ func constructDirectFromCPFPRefundTransaction(sourceTx *wire.MsgTx, vout uint32,
 }
 
 // validateSequence validates the client's sequence number against existing database transactions
-func validateSequence(cpfpTimelock uint32, txType TxType, clientSequence uint32) (uint32, error) {
+func ValidateSequence(cpfpTimelock uint32, txType TxType, clientSequence uint32) (uint32, error) {
 
 	var expectedCPFPTimelock uint32
 
-	roundedCpfpTimelock := roundDownToTimelockInterval(cpfpTimelock)
+	roundedCpfpTimelock := RoundDownToTimelockInterval(cpfpTimelock)
 
 	// For node transaction, we don't need to subtract TimeLockInterval
 	if (txType == TxTypeNodeCPFP) || (txType == TxTypeNodeDirect) {
@@ -350,7 +359,7 @@ func GetTimelockFromSequence(sequence uint32) uint32 {
 }
 
 // roundDownToTimelockInterval handles leaves that have non-aligned timelocks (e.g., 740 instead of 700)
-func roundDownToTimelockInterval(timelock uint32) uint32 {
+func RoundDownToTimelockInterval(timelock uint32) uint32 {
 	return timelock - (timelock % spark.TimeLockInterval)
 }
 

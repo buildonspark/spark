@@ -1389,11 +1389,15 @@ func validateSingleLeafRefundTxs(
 		return fmt.Errorf("missing required CPFP refund tx for leaf")
 	}
 
+	networkString := node.Network.String()
+
 	if err := bitcointransaction.VerifyTransactionWithDatabase(
+		ctx,
 		cpfpRefundTx,
 		node,
 		bitcointransaction.TxTypeRefundCPFP,
 		refundDestPubkey,
+		networkString,
 	); err != nil {
 		return fmt.Errorf("CPFP refund tx validation failed for leaf: %w", err)
 	}
@@ -1404,10 +1408,12 @@ func validateSingleLeafRefundTxs(
 		}
 
 		if err := bitcointransaction.VerifyTransactionWithDatabase(
+			ctx,
 			directFromCpfpRefundTx,
 			node,
 			bitcointransaction.TxTypeRefundDirectFromCPFP,
 			refundDestPubkey,
+			networkString,
 		); err != nil {
 			return fmt.Errorf("direct from CPFP refund tx validation failed for leaf: %w", err)
 		}
@@ -1419,7 +1425,6 @@ func validateSingleLeafRefundTxs(
 			return fmt.Errorf("failed to determine if node is zero node: %w", err)
 		}
 
-		networkString := node.Network.String()
 		// If the knob is enabled and the node is not a zero node, enforce direct refund tx validation
 		enforceDirectRefundTxValidation := knobs.GetKnobsService(ctx).RolloutRandomTarget(knobs.KnobDirectRefundTxValidation, &networkString, 0)
 
@@ -1428,10 +1433,12 @@ func validateSingleLeafRefundTxs(
 				return fmt.Errorf("leaf %s is a zero node, zero nodes must not have a direct refund tx", node.ID.String())
 			}
 			if err := bitcointransaction.VerifyTransactionWithDatabase(
+				ctx,
 				directRefundTx,
 				node,
 				bitcointransaction.TxTypeRefundDirect,
 				refundDestPubkey,
+				networkString,
 			); err != nil {
 				return fmt.Errorf("direct refund tx validation failed for leaf: %w", err)
 			}

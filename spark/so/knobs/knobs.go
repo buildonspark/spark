@@ -103,6 +103,8 @@ const (
 	// Enforce that direct node transactions and direct refund transactions spending the deposit tx
 	// are not provided by the client. When enabled, the server will reject deprecated direct signing jobs.
 	KnobEnforceNoDirectTransactionsFromDepositTx = "spark.so.enforce_no_direct_transactions_from_deposit_tx"
+
+	KnobDisableV2TXs = "spark.so.disable_v2_txs"
 )
 
 type Config struct {

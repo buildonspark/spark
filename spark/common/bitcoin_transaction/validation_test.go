@@ -1,7 +1,8 @@
-package bitcointransaction
+package bitcointransaction_test
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -10,12 +11,27 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func withKnob(ctx context.Context, enabled bool) context.Context {
+	v := 0.0
+	if enabled {
+		v = 1.0
+	}
+	k := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobDisableV2TXs + "@REGTEST": v,
+	})
+	return knobs.InjectKnobsService(ctx, k)
+}
 
 const (
 	defaultVersion       = 3
@@ -79,6 +95,7 @@ func newTestLeafNode(t *testing.T) (*ent.TreeNode, keys.Public) {
 		RawTxid:                st.NewTxID(nodeTxHash),
 		DirectTx:               serializeTx(t, directTx),
 		DirectTxid:             st.NewTxID(directTxHash),
+		Network:                btcnetwork.Regtest,
 		RawRefundTx:            serializeTx(t, cpfpRefundTx),
 		DirectRefundTx:         serializeTx(t, directRefundTx),
 		DirectFromCpfpRefundTx: serializeTx(t, directFromCpfpRefundTx),
@@ -100,7 +117,11 @@ func createClientTx(t *testing.T, prevTxHash chainhash.Hash, sequence uint32, ou
 
 // Verifies CPFP refund transaction matches expected construction.
 func TestVerifyTransactionWithDatabase_Success_CPFP(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -111,12 +132,16 @@ func TestVerifyTransactionWithDatabase_Success_CPFP(t *testing.T) {
 		common.EphemeralAnchorOutput(),
 	)
 
-	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey))
+	require.NoError(t, bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString))
 }
 
 // Verifies Direct refund transaction matches expected construction.
 func TestVerifyTransactionWithDatabase_Success_Direct(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -126,12 +151,16 @@ func TestVerifyTransactionWithDatabase_Success_Direct(t *testing.T) {
 		&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
 	)
 
-	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirect, refundDestPubkey))
+	require.NoError(t, bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundDirect, refundDestPubkey, networkString))
 }
 
 // Verifies Direct-from-CPFP refund transaction matches expected construction.
 func TestVerifyTransactionWithDatabase_Success_DirectFromCPFP(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -141,19 +170,27 @@ func TestVerifyTransactionWithDatabase_Success_DirectFromCPFP(t *testing.T) {
 		&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
 	)
 
-	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirectFromCPFP, refundDestPubkey))
+	require.NoError(t, bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundDirectFromCPFP, refundDestPubkey, networkString))
 }
 
 // Errors on invalid client transaction bytes.
 func TestVerifyTransactionWithDatabase_Error_InvalidClientTxBytes(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
-	err := VerifyTransactionWithDatabase([]byte("invalid tx"), dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	networkString := dbLeaf.Network.String()
+	err := bitcointransaction.VerifyTransactionWithDatabase(ctx, []byte("invalid tx"), dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "failed to parse client tx")
 }
 
 // Errors when the client transaction has no inputs.
 func TestVerifyTransactionWithDatabase_Error_ClientTxNoInputs(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -167,13 +204,17 @@ func TestVerifyTransactionWithDatabase_Error_ClientTxNoInputs(t *testing.T) {
 	tx.TxIn = nil
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "failed to parse client tx")
 }
 
 // Errors when client transaction outputs/values don't match expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedTransaction(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -184,13 +225,17 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedTransaction(t *testing.T)
 		common.EphemeralAnchorOutput(),
 	)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 }
 
 // Errors when client sequence bit 31 is set.
 func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit31Set(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -201,13 +246,17 @@ func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit31Set(t *testi
 		common.EphemeralAnchorOutput(),
 	)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "client sequence has bit 31 set")
 }
 
 // Errors when client sequence bit 22 is set.
 func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit22Set(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -218,13 +267,17 @@ func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit22Set(t *testi
 		common.EphemeralAnchorOutput(),
 	)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "client sequence has bit 22 set")
 }
 
-// Verifies that a version 2 transaction is accepted.
-func TestVerifyTransactionWithDatabase_Success_Version2(t *testing.T) {
+// Verifies that a version 2 transaction is not accepted.
+func TestVerifyTransactionWithDatabase_Fail_Version2(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -237,12 +290,17 @@ func TestVerifyTransactionWithDatabase_Success_Version2(t *testing.T) {
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey))
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
+	require.ErrorContains(t, err, "unsupported transaction version")
 }
 
 // Errors when client timelock does not match expected.
 func TestVerifyTransactionWithDatabase_Error_TimelockMismatch(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -253,13 +311,17 @@ func TestVerifyTransactionWithDatabase_Error_TimelockMismatch(t *testing.T) {
 		common.EphemeralAnchorOutput(),
 	)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "does not match expected timelock")
 }
 
 // Errors when DB-stored node transaction data is corrupt.
 func TestVerifyTransactionWithDatabase_Error_CorruptedDBData(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -273,13 +335,17 @@ func TestVerifyTransactionWithDatabase_Error_CorruptedDBData(t *testing.T) {
 	badLeaf, _ := newTestLeafNode(t)
 	badLeaf.RawTx = []byte("bad raw tx")
 
-	err = VerifyTransactionWithDatabase(clientRawTx, badLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, badLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "failed to parse source tx")
 }
 
 // Errors when DB refund timelock is too small to subtract interval.
 func TestVerifyTransactionWithDatabase_Error_InsufficientTimelockInDB(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -297,13 +363,17 @@ func TestVerifyTransactionWithDatabase_Error_InsufficientTimelockInDB(t *testing
 	badRefundTx := newTestTx(testSourceValue, pkScript, spark.TimeLockInterval-1, &nodeTxHash)
 	badLeaf.RawRefundTx = serializeTx(t, badRefundTx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, badLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, badLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "is too small to subtract TimeLockInterval")
 }
 
 // Errors on unknown refund transaction type.
 func TestVerifyTransactionWithDatabase_Error_UnknownTxType(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -314,7 +384,7 @@ func TestVerifyTransactionWithDatabase_Error_UnknownTxType(t *testing.T) {
 		common.EphemeralAnchorOutput(),
 	)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxType(99), refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxType(99), refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "unknown transaction type: 99")
 }
 
@@ -322,19 +392,19 @@ func TestVerifyTransactionWithDatabase_Error_UnknownTxType(t *testing.T) {
 func TestConstructExpectedTransaction_UnknownTransactionType(t *testing.T) {
 	// Errors when constructing expected transaction with unknown type.
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
-	currTimelock, err := GetCpfpTimelockFromLeaf(dbLeaf)
+	currTimelock, err := bitcointransaction.GetCpfpTimelockFromLeaf(dbLeaf)
 	require.NoError(t, err)
-	_, err = constructExpectedTransaction(dbLeaf.RawRefundTx, uint32(0), currTimelock, TxType(99), refundDestPubkey, 0, defaultVersion)
+	_, err = bitcointransaction.ConstructExpectedTransaction(dbLeaf.RawRefundTx, uint32(0), currTimelock, bitcointransaction.TxType(99), refundDestPubkey, 0, defaultVersion)
 	require.ErrorContains(t, err, "unknown transaction type: 99")
 }
 
 func TestConstructExpectedTransaction_P2TRScriptCreationFailure(t *testing.T) {
 	// Errors when constructing expected transaction with a zero public key.
 	dbLeaf, _ := newTestLeafNode(t)
-	currTimelock, err := GetCpfpTimelockFromLeaf(dbLeaf)
+	currTimelock, err := bitcointransaction.GetCpfpTimelockFromLeaf(dbLeaf)
 	require.NoError(t, err)
 	var invalidPubKey keys.Public
-	_, err = constructExpectedTransaction(dbLeaf.RawRefundTx, uint32(0), currTimelock, TxTypeRefundCPFP, invalidPubKey, expectedCpfpTimelock, defaultVersion)
+	_, err = bitcointransaction.ConstructExpectedTransaction(dbLeaf.RawRefundTx, uint32(0), currTimelock, bitcointransaction.TxTypeRefundCPFP, invalidPubKey, expectedCpfpTimelock, defaultVersion)
 	require.ErrorContains(t, err, "public key is zero")
 }
 
@@ -368,7 +438,7 @@ func TestNextSequence(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			nextSeq, nextDirectSeq, err := NextSequence(tc.currSeq)
+			nextSeq, nextDirectSeq, err := bitcointransaction.NextSequence(tc.currSeq)
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantSeq, nextSeq)
 			assert.Equal(t, tc.wantDirectSeq, nextDirectSeq)
@@ -405,7 +475,7 @@ func TestNextSequence_ErrorTimelockTooSmall(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			nextSeq, nextDirectSeq, err := NextSequence(tc.currSequence)
+			nextSeq, nextDirectSeq, err := bitcointransaction.NextSequence(tc.currSequence)
 			require.ErrorContains(t, err, "next timelock interval is less than 0")
 			assert.Zero(t, nextSeq)
 			assert.Zero(t, nextDirectSeq)
@@ -426,12 +496,12 @@ func TestValidateSequence_ServerSequenceConstruction(t *testing.T) {
 
 	testCases := []struct {
 		name             string
-		txType           TxType
+		txType           bitcointransaction.TxType
 		expectedTimelock uint32
 	}{
-		{name: "CPFP", txType: TxTypeRefundCPFP, expectedTimelock: expectedCpfp},
-		{name: "Direct", txType: TxTypeRefundDirect, expectedTimelock: expectedCpfp + spark.DirectTimelockOffset},
-		{name: "DirectFromCPFP", txType: TxTypeRefundDirectFromCPFP, expectedTimelock: expectedCpfp + spark.DirectTimelockOffset},
+		{name: "CPFP", txType: bitcointransaction.TxTypeRefundCPFP, expectedTimelock: expectedCpfp},
+		{name: "Direct", txType: bitcointransaction.TxTypeRefundDirect, expectedTimelock: expectedCpfp + spark.DirectTimelockOffset},
+		{name: "DirectFromCPFP", txType: bitcointransaction.TxTypeRefundDirectFromCPFP, expectedTimelock: expectedCpfp + spark.DirectTimelockOffset},
 	}
 
 	const (
@@ -446,7 +516,7 @@ func TestValidateSequence_ServerSequenceConstruction(t *testing.T) {
 			clientSeq := upperWithForbidden | (tc.expectedTimelock & 0xFFFF)
 
 			// validateSequence should clear the forbidden bits and keep the expected timelock
-			serverSeq, err := validateSequence(currTimelock, tc.txType, clientSeq)
+			serverSeq, err := bitcointransaction.ValidateSequence(currTimelock, tc.txType, clientSeq)
 			require.NoError(t, err)
 
 			sanitizedUpper := (upperWithForbidden & 0xFFFF0000) &^ (disableBit | typeBit)
@@ -455,7 +525,7 @@ func TestValidateSequence_ServerSequenceConstruction(t *testing.T) {
 
 			// The constructed transaction should use exactly the server-generated sequence
 
-			tx, err := constructExpectedTransaction(dbLeaf.RawTx, uint32(0), currTimelock, tc.txType, refundDestPubkey, clientSeq, defaultVersion)
+			tx, err := bitcointransaction.ConstructExpectedTransaction(dbLeaf.RawTx, uint32(0), currTimelock, tc.txType, refundDestPubkey, clientSeq, defaultVersion)
 			require.NoError(t, err)
 			require.Len(t, tx.TxIn, 1)
 			assert.Equal(t, expectedServerSeq, tx.TxIn[0].Sequence)
@@ -480,13 +550,17 @@ func TestValidateSequence_TimelockMismatchErrorContains(t *testing.T) {
 	upperWithForbidden := uint32(0x12340000) | disableBit | typeBit
 	mismatchedClientSeq := upperWithForbidden | ((expectedCpfp + 1) & 0xFFFF)
 
-	_, err = validateSequence(currTimelock, TxTypeRefundCPFP, mismatchedClientSeq)
+	_, err = bitcointransaction.ValidateSequence(currTimelock, bitcointransaction.TxTypeRefundCPFP, mismatchedClientSeq)
 	require.ErrorContains(t, err, "does not match expected timelock")
 }
 
 // Errors when the client tx version does not match expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedVersion(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -500,13 +574,17 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedVersion(t *testing.T) {
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "unsupported transaction version")
 }
 
 // Errors when the client tx has a different number of inputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_CPFP(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -525,14 +603,18 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_CPFP(t *testing
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 1 inputs, got 2")
 }
 
 // Errors when the client tx has a different number of outputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_CPFP(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -545,14 +627,18 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_CPFP(t *testin
 	tx.AddTxOut(&wire.TxOut{Value: testSourceValue, PkScript: userScript})
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 2 outputs, got 1")
 }
 
 // Errors when the client tx spends the wrong previous outpoint (TxID/index).
 func TestVerifyTransactionWithDatabase_Error_MismatchedPrevTxID(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -566,14 +652,18 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedPrevTxID(t *testing.T) {
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected previous outpoint")
 }
 
 // Errors when the client tx locktime does not match expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedLocktime(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -588,14 +678,18 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedLocktime(t *testing.T) {
 	tx.LockTime = 12345
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected locktime 0, got 12345")
 }
 
 // Errors when the client tx (Direct) has a different number of inputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_Direct(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -614,14 +708,18 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_Direct(t *testi
 	tx.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript})
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirect, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundDirect, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 1 inputs, got 2")
 }
 
 // Errors when the client tx (Direct) has a different number of outputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_Direct(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -636,14 +734,18 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_Direct(t *test
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirect, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundDirect, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 1 outputs, got 2")
 }
 
 // Errors when the client tx (DirectFromCPFP) has a different number of inputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_DirectFromCPFP(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -662,14 +764,18 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_DirectFromCPFP(
 	tx.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript})
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirectFromCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundDirectFromCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 1 inputs, got 2")
 }
 
 // Errors when the client tx (DirectFromCPFP) has a different number of outputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_DirectFromCPFP(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
@@ -684,7 +790,7 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_DirectFromCPFP
 	tx.AddTxOut(common.EphemeralAnchorOutput())
 	clientRawTx := serializeTx(t, tx)
 
-	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundDirectFromCPFP, refundDestPubkey)
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundDirectFromCPFP, refundDestPubkey, networkString)
 	require.ErrorContains(t, err, "transaction does not match expected construction")
 	require.ErrorContains(t, err, "expected 1 outputs, got 2")
 }
@@ -705,7 +811,7 @@ func TestRoundDownToTimelockInterval(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := roundDownToTimelockInterval(tc.timelock)
+			result := bitcointransaction.RoundDownToTimelockInterval(tc.timelock)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
@@ -715,7 +821,7 @@ func TestValidateSequence_MisalignedTimelock(t *testing.T) {
 	dbTimelock := uint32(740)
 	clientTimelock := uint32(600) // Correctly rounded by SDK
 
-	serverSeq, err := validateSequence(dbTimelock, TxTypeRefundCPFP, clientTimelock)
+	serverSeq, err := bitcointransaction.ValidateSequence(dbTimelock, bitcointransaction.TxTypeRefundCPFP, clientTimelock)
 	require.NoError(t, err)
 	assert.Equal(t, clientTimelock, serverSeq&0xFFFF)
 }
@@ -724,7 +830,7 @@ func TestValidateSequence_MisalignedTimelock_Direct(t *testing.T) {
 	dbTimelock := uint32(740)
 	clientTimelock := uint32(650) // 600 + DirectTimelockOffset
 
-	serverSeq, err := validateSequence(dbTimelock, TxTypeRefundDirect, clientTimelock)
+	serverSeq, err := bitcointransaction.ValidateSequence(dbTimelock, bitcointransaction.TxTypeRefundDirect, clientTimelock)
 	require.NoError(t, err)
 	assert.Equal(t, clientTimelock, serverSeq&0xFFFF)
 }
@@ -734,7 +840,7 @@ func TestValidateSequence_AlignedTimelock(t *testing.T) {
 	dbTimelock := uint32(700)
 	clientTimelock := uint32(600)
 
-	serverSeq, err := validateSequence(dbTimelock, TxTypeRefundCPFP, clientTimelock)
+	serverSeq, err := bitcointransaction.ValidateSequence(dbTimelock, bitcointransaction.TxTypeRefundCPFP, clientTimelock)
 	require.NoError(t, err)
 	assert.Equal(t, clientTimelock, serverSeq&0xFFFF)
 }
@@ -744,12 +850,17 @@ func TestValidateSequence_MisalignedTimelock_WrongClient(t *testing.T) {
 	dbTimelock := uint32(740)
 	clientTimelock := uint32(640) // Wrong - should be 600
 
-	_, err := validateSequence(dbTimelock, TxTypeRefundCPFP, clientTimelock)
+	_, err := bitcointransaction.ValidateSequence(dbTimelock, bitcointransaction.TxTypeRefundCPFP, clientTimelock)
 	require.ErrorContains(t, err, "does not match expected timelock")
 }
 
 // Tests full verification with misaligned timelock in database
 func TestVerifyTransactionWithDatabase_MisalignedTimelock(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
+	networkString := btcnetwork.Mainnet.String()
+
 	pubKey := keys.GeneratePrivateKey().Public()
 	pkScript, err := common.P2TRScriptFromPubKey(pubKey)
 	require.NoError(t, err)
@@ -775,5 +886,5 @@ func TestVerifyTransactionWithDatabase_MisalignedTimelock(t *testing.T) {
 		common.EphemeralAnchorOutput(),
 	)
 
-	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, TxTypeRefundCPFP, pubKey))
+	require.NoError(t, bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, pubKey, networkString))
 }

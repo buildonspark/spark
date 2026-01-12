@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/db"
 )
 
 // --- Helpers for constructing minimal valid transactions and DB state ---
@@ -101,6 +102,9 @@ func depositHandlerWithConfig() *DepositHandler {
 
 // --- Tests ---
 func TestValidateUserTxs_Cpfp_Success(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 
@@ -122,11 +126,14 @@ func TestValidateUserTxs_Cpfp_Success(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.NoError(t, err)
 }
 
 func TestValidateUserDepositTxs_Legacy_Cpfp_Success(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 	cpfpRefundTx := makeClientCpfpTxForDeposit(t, deposit, refundDest)
@@ -150,11 +157,14 @@ func TestValidateUserDepositTxs_Legacy_Cpfp_Success(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.NoError(t, err)
 }
 
 func TestValidateUserTxs_Direct_Success(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 
@@ -183,11 +193,14 @@ func TestValidateUserTxs_Direct_Success(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.NoError(t, err)
 }
 
 func TestValidateUserTxs_DirectFromCpfp_Success(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 
@@ -213,11 +226,14 @@ func TestValidateUserTxs_DirectFromCpfp_Success(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.NoError(t, err)
 }
 
 func TestValidateUserTxs_InvalidRefundCpfp_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 
@@ -239,11 +255,14 @@ func TestValidateUserTxs_InvalidRefundCpfp_Error(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "cpfp refund transaction verification failed")
 }
 
 func TestValidateUserTxs_InvalidRootTxInput_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	randomScript, err := common.P2TRScriptFromPubKey(keys.GeneratePrivateKey().Public())
 	require.NoError(t, err)
@@ -271,11 +290,14 @@ func TestValidateUserTxs_InvalidRootTxInput_Error(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err = h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err = h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "cpfp root transaction verification failed: transaction does not match expected construction")
 }
 
 func TestValidateUserTxs_CpfpRootTxInvalidSequence_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 	deposit.cpfpRootTx.TxIn[0].Sequence = 1000 // Should be 0
@@ -298,11 +320,14 @@ func TestValidateUserTxs_CpfpRootTxInvalidSequence_Error(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate client sequence")
 }
 
 func TestValidateUserTxs_CpfpRootTxTwoOutputs_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 	attackerDest := keys.GeneratePrivateKey().Public()
@@ -333,11 +358,14 @@ func TestValidateUserTxs_CpfpRootTxTwoOutputs_Error(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err = h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err = h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "cpfp root transaction verification failed: transaction does not match expected construction")
 }
 
 func TestValidateUserTxs_DirectRootTxInvalidSequence_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 	deposit.directRootTx.TxIn[0].Sequence = 25 // Should be 50
@@ -367,11 +395,14 @@ func TestValidateUserTxs_DirectRootTxInvalidSequence_Error(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate client sequence")
 }
 
 func TestValidateUserTxs_DirectRootTxTwoOutputs_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 	attackerDest := keys.GeneratePrivateKey().Public()
@@ -409,11 +440,14 @@ func TestValidateUserTxs_DirectRootTxTwoOutputs_Error(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err = h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err = h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "direct root transaction verification failed: transaction does not match expected construction")
 }
 
 func TestValidateUserTxs_CpfpRefundTxFinalSequence_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 	cpfpRefundTx := makeClientCpfpTxForDeposit(t, deposit, refundDest)
@@ -437,11 +471,14 @@ func TestValidateUserTxs_CpfpRefundTxFinalSequence_Error(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate user sequence")
 }
 
 func TestValidateUserTxs_DirectRefundTxFinalSequence_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 	directRefundTx := makeClientDirectTxForDeposit(t, deposit, refundDest)
@@ -472,11 +509,14 @@ func TestValidateUserTxs_DirectRefundTxFinalSequence_Error(t *testing.T) {
 	}
 
 	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate user sequence")
 }
 
 func TestValidateUserTxs_DirectFromCpfpRefundTxFinalSequence_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = withKnob(ctx, true)
+
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
 	directFromCpfpRefundTx := makeClientDirectFromCpfpTxForDeposit(t, deposit, refundDest)
@@ -504,6 +544,6 @@ func TestValidateUserTxs_DirectFromCpfpRefundTxFinalSequence_Error(t *testing.T)
 	}
 
 	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(req, deposit.signingKey.Public())
+	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate user sequence")
 }
