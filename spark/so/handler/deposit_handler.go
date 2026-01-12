@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark/so/frost"
 	"go.uber.org/zap"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
@@ -1013,34 +1014,54 @@ func (s UtxoSwapStatementType) String() string {
 	return [...]string{"Created", "Rollback", "Completed"}[s]
 }
 
-// validatedTxID is a 32-byte Bitcoin transaction ID (txid) that has passed basic format checks.
-// "Validated" means only the length is verified; no cryptographic or blockchain existence checks are performed.
-type validatedTxID [32]byte
+// Holds an UTXO that was verified by the validating function as confirmed on
+// the blockchain. Can be used in functions that require a valid UTXO.
+type VerifiedTargetUtxo struct {
+	// DB record of the confirmed utxo stored by Chain Watcher
+	inner *ent.Utxo
+	// Cached transaction hash of the UTXO. Different from ent UTXO txid, which is
+	// txid string stored as bytes.
+	txid chainhash.Hash
+}
 
-// NewValidatedTxID returns a validatedTxID if b is exactly 32 bytes long.
-func NewValidatedTxID(b []byte) (validatedTxID, error) {
-	if len(b) != 32 {
-		return validatedTxID{}, fmt.Errorf("invalid txid length: got %d, want 32", len(b))
-	}
-	return validatedTxID(b), nil
+func (u *VerifiedTargetUtxo) Hash() *chainhash.Hash {
+	return &u.txid
+}
+
+func (u *VerifiedTargetUtxo) Vout() uint32 {
+	return u.inner.Vout
 }
 
 // Verifies that an UTXO is confirmed on the blockchain and has sufficient confirmations.
-func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Client, network btcnetwork.Network, txid validatedTxID, vout uint32) (*ent.Utxo, error) {
+func VerifiedTargetUtxoFromRequest(ctx context.Context, config *so.Config, db *ent.Client, network btcnetwork.Network, reqUtxo *pb.UTXO) (*VerifiedTargetUtxo, error) {
+	if reqUtxo == nil {
+		return nil, fmt.Errorf("requested UTXO is nil")
+	}
+
+	if len(reqUtxo.Txid) != chainhash.HashSize {
+		return nil, fmt.Errorf("invalid txid length: expected %d bytes, got %d bytes", chainhash.HashSize, len(reqUtxo.Txid))
+	}
+
+	txidString := hex.EncodeToString(reqUtxo.Txid)
+	reqUtxoTxid, err := chainhash.NewHashFromStr(txidString)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse on-chain txid: %w", err)
+	}
 	blockHeight, err := db.BlockHeight.Query().Where(
 		blockheight.NetworkEQ(network),
 	).Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find block height: %w", err)
 	}
+
 	targetUtxo, err := db.Utxo.Query().
 		Where(entutxo.NetworkEQ(network)).
-		Where(entutxo.Txid(txid[:])).
-		Where(entutxo.Vout(vout)).
+		Where(entutxo.Txid(reqUtxo.Txid[:])).
+		Where(entutxo.Vout(reqUtxo.Vout)).
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, errors.NotFoundMissingEntity(fmt.Errorf("utxo not found: txid: %s vout: %d", hex.EncodeToString(txid[:]), vout))
+			return nil, errors.NotFoundMissingEntity(fmt.Errorf("utxo not found: txid: %s vout: %d", reqUtxoTxid.String(), reqUtxo.Vout))
 		}
 		return nil, fmt.Errorf("failed to get target utxo: %w", err)
 	}
@@ -1052,7 +1073,7 @@ func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Client, 
 	if blockHeight.Height-targetUtxo.BlockHeight+1 < int64(threshold) {
 		return nil, errors.FailedPreconditionInsufficientConfirmations(fmt.Errorf("deposit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", targetUtxo.BlockHeight, blockHeight.Height))
 	}
-	return targetUtxo, nil
+	return &VerifiedTargetUtxo{inner: targetUtxo, txid: *reqUtxoTxid}, nil
 }
 
 // A helper function to generate a FROST signature for a spend transaction. This
@@ -1072,13 +1093,13 @@ func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Client, 
 //   - *pb.SigningResult: Signing result containing a partial FROST signature that can
 //     be aggregated with other signatures.
 //   - error if the operation fails.
-func getSpendTxSigningResult(ctx context.Context, config *so.Config, depositAddress *ent.DepositAddress, targetUtxo *ent.Utxo, spendTxRaw []byte, userSpendTxNonceCommitment *frost.SigningCommitment) (keys.Public, *pb.SigningResult, error) {
+func getSpendTxSigningResult(ctx context.Context, config *so.Config, depositAddress *ent.DepositAddress, targetUtxo *VerifiedTargetUtxo, spendTxRaw []byte, userSpendTxNonceCommitment *frost.SigningCommitment) (keys.Public, *pb.SigningResult, error) {
 	signingKeyShare, err := depositAddress.QuerySigningKeyshare().Only(ctx)
 	if err != nil {
 		return keys.Public{}, nil, fmt.Errorf("failed to get signing keyshare: %w", err)
 	}
 	verifyingKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
-	spendTxSigHash, _, err := GetTxSigningInfo(ctx, targetUtxo, spendTxRaw)
+	spendTxSigHash, _, err := GetTxSigningInfo(ctx, targetUtxo.inner, spendTxRaw)
 	if err != nil {
 		return keys.Public{}, nil, fmt.Errorf("failed to get spend tx sig hash: %w", err)
 	}
@@ -1156,15 +1177,11 @@ func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UT
 		return nil, nil, fmt.Errorf("failed to get schema network: %w", err)
 	}
 
-	targetUtxoTxId, err := NewValidatedTxID(utxo.Txid)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to validate UTXO txid: %w", err)
-	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, network, targetUtxoTxId, utxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, network, utxo)
 	if err != nil {
 		return nil, nil, err
 	}
-	depositAddress, err := targetUtxo.QueryDepositAddress().Only(ctx)
+	depositAddress, err := targetUtxo.inner.QueryDepositAddress().Only(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get deposit address: %w", err)
 	}

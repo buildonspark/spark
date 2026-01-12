@@ -107,8 +107,7 @@ func TestCreateStaticDepositUtxoRefundWithRollback_Success(t *testing.T) {
 	err = gripmock.AddStub("spark_internal.SparkInternalService", "rollback_utxo_swap", nil, nil)
 	require.NoError(t, err)
 
-	refundTxBytes := createValidBitcoinTxBytes(t, ownerIdentityPubKey)
-
+	refundTxBytes := createValidBitcoinTxBytes(t, ownerIdentityPrivKey.Public())
 	spendTx, err := common.TxFromRawTxBytes(refundTxBytes)
 	require.NoError(t, err)
 
@@ -567,6 +566,7 @@ func TestInitiateStaticDepositUtxoRefund_CanSignDifferentRefundTxMultipleTimes(t
 	// Second refund request with different transaction - use different receiver PubKey key
 	differentReceiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	req2 := createMockInitiateStaticDepositUtxoRefundRequest(t, rng, testUtxo, ownerIdentityPrivKey, ownerSigningPubKey)
+
 	// Replace the transaction with one that has different receiver
 	req2.RefundTxSigningJob.RawTx = createValidBitcoinTxBytes(t, differentReceiverPubKey)
 

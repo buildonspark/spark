@@ -510,18 +510,14 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 		return nil, fmt.Errorf("unable to get schema network: %w", err)
 	}
 
-	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
-	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo)
 	if err != nil {
 		return nil, err
 	}
 
 	utxoSwap, err := db.UtxoSwap.Query().
 		Where(
-			utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID)),
+			utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.inner.ID)),
 			utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted),
 			// The identity public key of the coordinator that created the utxo swap.
 			// It's been verified above.
@@ -539,7 +535,7 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 		return nil, err
 	}
 
-	logger.Sugar().Infof("UTXO swap %s for %x:%d cancelled", utxoSwap.ID, targetUtxo.Txid, targetUtxo.Vout)
+	logger.Sugar().Infof("UTXO swap %s for %s:%d cancelled", utxoSwap.ID, targetUtxo.Hash().String(), targetUtxo.Vout)
 	return &pbinternal.RollbackUtxoSwapResponse{}, nil
 }
 
@@ -600,24 +596,20 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 	if err != nil {
 		return nil, fmt.Errorf("unable to get schema network: %w", err)
 	}
-	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
-	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo)
 	if err != nil {
 		return nil, err
 	}
 
 	utxoSwap, err := db.UtxoSwap.Query().
-		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
+		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.inner.ID))).
 		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
 		// The identity public key of the coordinator that created the utxo swap.
 		// It's been verified above.
 		Where(utxoswap.CoordinatorIdentityPublicKeyEQ(coordinatorPubKey)).
 		Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get utxo swap for utxo %s: %w", targetUtxo.ID, err)
+		return nil, fmt.Errorf("unable to get utxo swap for utxo %s: %w", targetUtxo.inner.ID, err)
 	}
 
 	if utxoSwap != nil && utxoSwap.Status == st.UtxoSwapStatusCompleted {
@@ -628,7 +620,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 		return nil, fmt.Errorf("unable to complete utxo swap: %w", err)
 	}
 
-	logger.Sugar().Infof("UTXO swap %s for %x:%d marked as COMPLETED", utxoSwap.ID, targetUtxo.Txid, targetUtxo.Vout)
+	logger.Sugar().Infof("UTXO swap %s for %s:%d marked as COMPLETED", utxoSwap.ID, targetUtxo.Hash().String(), targetUtxo.Vout())
 	return &pbinternal.UtxoSwapCompletedResponse{}, nil
 }
 

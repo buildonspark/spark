@@ -161,16 +161,13 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 		return nil, err
 	}
 	// Validate the on-chain UTXO
-	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
-	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
+
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo)
 	if err != nil {
 		return nil, err
 	}
 
-	utxoSwap, err := staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo)
+	utxoSwap, err := staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo.inner)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +175,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 		// Once a static deposit has been refunded it can no longer be used in a
 		// swap and must be claimed on L1. The owner can sign multiple refund
 		// transactions after this point.
-		depositAddress, err := targetUtxo.QueryDepositAddress().Only(ctx)
+		depositAddress, err := targetUtxo.inner.QueryDepositAddress().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get deposit address: %w", err)
 		}
@@ -212,7 +209,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 		return nil, fmt.Errorf("failed to create utxo swap: %w", err)
 	}
 
-	utxoSwap, err = staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo)
+	utxoSwap, err = staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo.inner)
 	if err != nil || utxoSwap == nil {
 		return nil, fmt.Errorf("unable to get utxo swap: %w", err)
 	}

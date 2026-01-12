@@ -127,17 +127,13 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, err
 	}
 	// Validate the on-chain UTXO
-	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
-	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check that the utxo swap is not already registered
-	utxoSwap, err := staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo)
+	utxoSwap, err := staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo.inner)
 	if err != nil {
 		return nil, fmt.Errorf("unable to check if utxo swap is already registered: %w", err)
 	}
@@ -152,7 +148,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	}
 
 	// Check that the utxo deposit address is static and belongs to the receiver of the transfer
-	depositAddress, err := targetUtxo.QueryDepositAddress().Only(ctx)
+	depositAddress, err := targetUtxo.inner.QueryDepositAddress().Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get utxo deposit address: %w", err)
 	}
@@ -216,21 +212,21 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("transfer network %s does not match utxo network %s", transferNetwork, network)
 	}
 	totalAmount := getTotalTransferValue(leaves)
-	if err = validateUserSignature(reqTransferReceiverIdentityPubKey, req.UserSignature, req.SspSignature, pb.UtxoSwapRequestType_Fixed, network, hex.EncodeToString(targetUtxo.Txid), targetUtxo.Vout, totalAmount); err != nil {
+	if err = validateUserSignature(reqTransferReceiverIdentityPubKey, req.UserSignature, req.SspSignature, pb.UtxoSwapRequestType_Fixed, network, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount); err != nil {
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
 	// A sanity check to ensure that the total amount is not greater than the utxo amount.
-	if totalAmount > targetUtxo.Amount {
-		return nil, fmt.Errorf("static deposit claim total amount %d is greater than utxo amount %d for utxo %x:%d", totalAmount, targetUtxo.Amount, targetUtxo.Txid, targetUtxo.Vout)
+	if totalAmount > targetUtxo.inner.Amount {
+		return nil, fmt.Errorf("static deposit claim total amount %d is greater than utxo amount %d for utxo %s:%d", totalAmount, targetUtxo.inner.Amount, targetUtxo.Hash().String(), targetUtxo.Vout())
 	}
 
 	logger.Sugar().Infof(
-		"Creating UTXO swap record (request type fixed, transfer id %s, receiver identity %s, txid %x, vout %d, network %s, credit amount %d)",
+		"Creating UTXO swap record (request type fixed, transfer id %s, receiver identity %s, txid %s, vout %d, network %s, credit amount %d)",
 		transferID,
 		reqTransferReceiverIdentityPubKey,
-		targetUtxo.Txid,
-		targetUtxo.Vout,
+		targetUtxo.Hash().String(),
+		targetUtxo.Vout(),
 		network,
 		totalAmount,
 	)
@@ -241,7 +237,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	utxoSwap, err = db.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCreated).
 		// utxo
-		SetUtxo(targetUtxo).
+		SetUtxo(targetUtxo.inner).
 		// quote
 		SetRequestType(st.UtxoSwapFromProtoRequestType(pb.UtxoSwapRequestType_Fixed)).
 		SetCreditAmountSats(totalAmount).
@@ -323,18 +319,13 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, err
 	}
 	// Validate the on-chain UTXO
-	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
-	}
-	// Validate UTXO
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate Deposit Address ownership
-	depositAddress, err := targetUtxo.QueryDepositAddress().Only(ctx)
+	depositAddress, err := targetUtxo.inner.QueryDepositAddress().Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get utxo deposit address: %w", err)
 	}
@@ -342,13 +333,13 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, fmt.Errorf("unable to claim a deposit to a non-static address: %w", err)
 	}
 
-	spendTxSighash, totalAmount, err := GetTxSigningInfo(ctx, targetUtxo, req.RefundTxSigningJob.RawTx)
+	spendTxSighash, totalAmount, err := GetTxSigningInfo(ctx, targetUtxo.inner, req.RefundTxSigningJob.RawTx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get spend tx sighash: %w", err)
 	}
 
 	// Check that the utxo swap is not already registered
-	utxoSwap, err := staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo)
+	utxoSwap, err := staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo.inner)
 	if err != nil {
 		return nil, fmt.Errorf("unable to check if utxo swap is already registered: %w", err)
 	}
@@ -357,15 +348,15 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap is already registered"))
 	}
 
-	if err = validateUserSignature(depositAddress.OwnerIdentityPubkey, req.UserSignature, spendTxSighash, pb.UtxoSwapRequestType_Refund, network, hex.EncodeToString(targetUtxo.Txid), targetUtxo.Vout, totalAmount); err != nil {
+	if err = validateUserSignature(depositAddress.OwnerIdentityPubkey, req.UserSignature, spendTxSighash, pb.UtxoSwapRequestType_Refund, network, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount); err != nil {
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
 	logger.Sugar().Infof(
-		"Creating UTXO swap record (request type refund, public key %s, txid %x, vout %d, network %s, credit amount %d)",
+		"Creating UTXO swap record (request type refund, public key %s, txid %s, vout %d, network %s, credit amount %d)",
 		depositAddress.OwnerIdentityPubkey,
-		targetUtxo.Txid,
-		targetUtxo.Vout,
+		targetUtxo.Hash().String(),
+		targetUtxo.Vout(),
 		network,
 		totalAmount,
 	)
@@ -373,7 +364,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	utxoSwap, err = db.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCreated).
 		// utxo
-		SetUtxo(targetUtxo).
+		SetUtxo(targetUtxo.inner).
 		// quote
 		SetRequestType(st.UtxoSwapFromProtoRequestType(pb.UtxoSwapRequestType_Refund)).
 		SetCreditAmountSats(totalAmount).

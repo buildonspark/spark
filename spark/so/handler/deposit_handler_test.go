@@ -32,7 +32,9 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 
 	// Create test data
 	blockHeight := 100
-	txid, err := NewValidatedTxID(chainhash.DoubleHashB([]byte("test_txid")))
+	txid, err := chainhash.NewHash(chainhash.DoubleHashB([]byte("test_txid")))
+	require.NoError(t, err)
+	txidStringBytes, err := hex.DecodeString(txid.String())
 	require.NoError(t, err)
 	vout := uint32(0)
 
@@ -90,7 +92,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		utxoBlockHeight := blockHeight - int(config.BitcoindConfigs["regtest"].DepositConfirmationThreshold) + 1
 		utxo, err := tx.Utxo.Create().
 			SetNetwork(btcnetwork.Regtest).
-			SetTxid(txid[:]).
+			SetTxid(txidStringBytes).
 			SetVout(vout).
 			SetBlockHeight(int64(utxoBlockHeight)).
 			SetAmount(1000).
@@ -100,13 +102,13 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test verification
-		verifiedUtxo, err := VerifiedTargetUtxo(ctx, config, tx, btcnetwork.Regtest, txid, vout)
+		verifiedUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: txidStringBytes, Vout: vout})
 		require.NoError(t, err)
-		assert.Equal(t, utxo.ID, verifiedUtxo.ID)
-		assert.Equal(t, utxo.BlockHeight, verifiedUtxo.BlockHeight)
+		assert.Equal(t, utxo.ID, verifiedUtxo.inner.ID)
+		assert.Equal(t, utxo.BlockHeight, verifiedUtxo.inner.BlockHeight)
 
 		// Test verification in mainnet (should fail)
-		_, err = VerifiedTargetUtxo(ctx, config, tx, btcnetwork.Mainnet, txid, vout)
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Mainnet, &pb.UTXO{Txid: txidStringBytes, Vout: vout})
 		require.ErrorContains(t, err, "utxo not found")
 	})
 
@@ -147,22 +149,24 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 			Save(ctx)
 		require.NoError(t, err)
 
-		testTxid2, err := NewValidatedTxID(chainhash.DoubleHashB([]byte("test_txid2")))
+		testTxid2, err := chainhash.NewHash(chainhash.DoubleHashB([]byte("test_txid2")))
+		require.NoError(t, err)
+		testTxid2StringBytes, err := hex.DecodeString(testTxid2.String())
 		require.NoError(t, err)
 
 		// Test verification with not yet mined utxo
-		_, err = VerifiedTargetUtxo(ctx, config, tx, btcnetwork.Regtest, testTxid2, 1)
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: testTxid2StringBytes, Vout: 1})
 		require.Error(t, err)
 		grpcError, ok := status.FromError(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, grpcError.Code())
-		assert.Equal(t, fmt.Sprintf("utxo not found: txid: %s vout: 1", hex.EncodeToString(testTxid2[:])), grpcError.Message())
+		assert.Equal(t, fmt.Sprintf("utxo not found: txid: %s vout: 1", testTxid2.String()), grpcError.Message())
 
 		// Create UTXO with insufficient confirmations
 		utxoBlockHeight := blockHeight - int(config.BitcoindConfigs["regtest"].DepositConfirmationThreshold) + 2
 		_, err = tx.Utxo.Create().
 			SetNetwork(btcnetwork.Regtest).
-			SetTxid(testTxid2[:]).
+			SetTxid(testTxid2StringBytes).
 			SetVout(1).
 			SetBlockHeight(int64(utxoBlockHeight)).
 			SetAmount(1000).
@@ -172,9 +176,45 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test verification
-		_, err = VerifiedTargetUtxo(ctx, config, tx, btcnetwork.Regtest, testTxid2, 1)
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: testTxid2StringBytes, Vout: 1})
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "deposit tx doesn't have enough confirmations")
+	})
+
+	t.Run("invalid txid", func(t *testing.T) {
+		config := &so.Config{
+			BitcoindConfigs: map[string]so.BitcoindConfig{
+				"regtest": {
+					DepositConfirmationThreshold: 1,
+				},
+			},
+			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+		}
+		// Test with invalid txid (too long - more than 32 bytes)
+		tooLongTxid := make([]byte, 33)
+		for i := range tooLongTxid {
+			tooLongTxid[i] = byte(i)
+		}
+		_, err := VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: tooLongTxid, Vout: 0})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "invalid txid length: expected 32 bytes, got 33 bytes")
+		// Test with invalid txid (too short - less than 32 bytes)
+		tooShortTxid := make([]byte, 16)
+		for i := range tooShortTxid {
+			tooShortTxid[i] = byte(i)
+		}
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: tooShortTxid, Vout: 0})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "invalid txid length: expected 32 bytes, got 16 bytes")
+		// Test with empty txid
+		emptyTxid := []byte{}
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: emptyTxid, Vout: 0})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "invalid txid length: expected 32 bytes, got 0 bytes")
+		// Test with nil reqUtxo
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, nil)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "requested UTXO is nil")
 	})
 }
 
