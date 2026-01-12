@@ -1,13 +1,16 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"go.uber.org/zap"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
@@ -164,6 +167,12 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 
 	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo)
 	if err != nil {
+		return nil, err
+	}
+
+	// Validate that the refund transaction actually spends the requested UTXO.
+	// Also validated in CreateStaticDepositUtxoRefund in each SO.
+	if err := validateStaticDepositRefundTx(targetUtxo, req.RefundTxSigningJob.GetRawTx()); err != nil {
 		return nil, err
 	}
 
@@ -333,4 +342,47 @@ func (o *StaticDepositHandler) CreateSwapRefundForAllOperators(ctx context.Conte
 	internalDepositHandler := NewStaticDepositInternalHandler(config)
 	_, err := internalDepositHandler.CreateStaticDepositUtxoRefund(ctx, config, request)
 	return err
+}
+
+// Verifies the refund transaction, specifically that it spends the expected UTXO.
+// This prevents attacks where a caller requests a refund for UTXO A but provides a transaction
+// that actually spends UTXO B.
+func validateStaticDepositRefundTx(targetUtxo *VerifiedTargetUtxo, rawTx []byte) error {
+	if targetUtxo == nil {
+		return fmt.Errorf("target UTXO is nil")
+	}
+
+	if len(rawTx) == 0 {
+		return fmt.Errorf("refund transaction is empty")
+	}
+
+	refundTx, err := common.TxFromRawTxBytes(rawTx)
+	if err != nil {
+		return fmt.Errorf("failed to parse refund transaction: %w", err)
+	}
+
+	// Create refund transaction internally using user provided outputs
+	tx := wire.NewMsgTx(3)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  *targetUtxo.Hash(),
+			Index: targetUtxo.Vout(),
+		},
+		Sequence: wire.MaxTxInSequenceNum,
+	})
+	for _, txOut := range refundTx.TxOut {
+		tx.AddTxOut(txOut)
+	}
+
+	var buf bytes.Buffer
+	err = tx.Serialize(&buf)
+	if err != nil {
+		return fmt.Errorf("unable to serialize expected transaction")
+	}
+	expectedTxBytes := buf.Bytes()
+	if !bytes.Equal(expectedTxBytes, rawTx) {
+		return fmt.Errorf("unexpected refund transaction structure: expected %x, got %x", expectedTxBytes, rawTx)
+	}
+
+	return nil
 }

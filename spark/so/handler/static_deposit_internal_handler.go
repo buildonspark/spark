@@ -338,6 +338,11 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, fmt.Errorf("failed to get spend tx sighash: %w", err)
 	}
 
+	// Validate the provided refund tx
+	if err := validateStaticDepositRefundTx(targetUtxo, req.RefundTxSigningJob.GetRawTx()); err != nil {
+		return nil, err
+	}
+
 	// Check that the utxo swap is not already registered
 	utxoSwap, err := staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo.inner)
 	if err != nil {

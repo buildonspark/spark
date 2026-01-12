@@ -1,10 +1,14 @@
 package handler
 
 import (
+	"bytes"
+	"context"
+	"encoding/hex"
 	"io"
 	"math/rand/v2"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -23,6 +27,56 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
 
+func createTestUtxoWithOutpointForDepositAddress(
+	t *testing.T,
+	ctx context.Context,
+	client *ent.Client,
+	depositAddress *ent.DepositAddress,
+	blockHeight int64,
+	txid []byte,
+	vout uint32,
+	amount uint64,
+	pkScript []byte,
+) *ent.Utxo {
+	t.Helper()
+
+	utxo, err := client.Utxo.Create().
+		SetNetwork(btcnetwork.Regtest).
+		SetTxid(txid).
+		SetVout(vout).
+		SetBlockHeight(blockHeight).
+		SetAmount(amount).
+		SetPkScript(pkScript).
+		SetDepositAddress(depositAddress).
+		Save(ctx)
+	require.NoError(t, err)
+	return utxo
+}
+
+func createSpendTxBytesSpendingOutpoint(t *testing.T, prevTxid chainhash.Hash, prevVout uint32, receiverPubKey keys.Public, amount int64) []byte {
+	t.Helper()
+
+	p2trScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(3)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  prevTxid,
+			Index: prevVout,
+		},
+		Sequence: wire.MaxTxInSequenceNum,
+	})
+	tx.AddTxOut(&wire.TxOut{
+		Value:    amount,
+		PkScript: p2trScript,
+	})
+
+	var buf bytes.Buffer
+	require.NoError(t, tx.Serialize(&buf))
+	return buf.Bytes()
+}
+
 func createMockInitiateStaticDepositUtxoRefundRequest(
 	t *testing.T,
 	rng io.Reader,
@@ -30,7 +84,12 @@ func createMockInitiateStaticDepositUtxoRefundRequest(
 	ownerIdentityPrivKey keys.Private,
 	ownerSigningPubKey keys.Public,
 ) *pb.InitiateStaticDepositUtxoRefundRequest {
-	refundTxBytes := createValidBitcoinTxBytes(t, ownerIdentityPrivKey.Public())
+	txidString := hex.EncodeToString(utxo.Txid)
+
+	utxoTxid, err := chainhash.NewHashFromStr(txidString)
+	require.NoError(t, err)
+	refundTxBytes := createSpendTxBytesSpendingOutpoint(t, *utxoTxid, utxo.Vout, ownerIdentityPrivKey.Public(), int64(utxo.Amount))
+
 	spendTx, err := common.TxFromRawTxBytes(refundTxBytes)
 	require.NoError(t, err, "unable to parse refund tx")
 
@@ -107,7 +166,11 @@ func TestCreateStaticDepositUtxoRefundWithRollback_Success(t *testing.T) {
 	err = gripmock.AddStub("spark_internal.SparkInternalService", "rollback_utxo_swap", nil, nil)
 	require.NoError(t, err)
 
-	refundTxBytes := createValidBitcoinTxBytes(t, ownerIdentityPrivKey.Public())
+	txidString := hex.EncodeToString(testUtxo.Txid)
+	utxoTxid, err := chainhash.NewHashFromStr(txidString)
+	require.NoError(t, err)
+	refundTxBytes := createSpendTxBytesSpendingOutpoint(t, *utxoTxid, testUtxo.Vout, ownerIdentityPubKey, int64(testUtxo.Amount))
+
 	spendTx, err := common.TxFromRawTxBytes(refundTxBytes)
 	require.NoError(t, err)
 
@@ -568,7 +631,11 @@ func TestInitiateStaticDepositUtxoRefund_CanSignDifferentRefundTxMultipleTimes(t
 	req2 := createMockInitiateStaticDepositUtxoRefundRequest(t, rng, testUtxo, ownerIdentityPrivKey, ownerSigningPubKey)
 
 	// Replace the transaction with one that has different receiver
-	req2.RefundTxSigningJob.RawTx = createValidBitcoinTxBytes(t, differentReceiverPubKey)
+	txidString := hex.EncodeToString(testUtxo.Txid)
+	utxoTxid, err := chainhash.NewHashFromStr(txidString)
+	require.NoError(t, err)
+	// Replace the transaction with one that has different receiver (but still spends the same UTXO)
+	req2.RefundTxSigningJob.RawTx = createSpendTxBytesSpendingOutpoint(t, *utxoTxid, testUtxo.Vout, differentReceiverPubKey, int64(testUtxo.Amount))
 
 	resp2, err := handler.InitiateStaticDepositUtxoRefund(ctx, cfg, req2)
 	require.NoError(t, err)
@@ -594,4 +661,325 @@ func TestInitiateStaticDepositUtxoRefund_CanSignDifferentRefundTxMultipleTimes(t
 	require.NoError(t, err)
 	assert.Equal(t, st.UtxoSwapStatusCompleted, updatedSwap.Status)
 	assert.Equal(t, st.UtxoSwapRequestTypeRefund, updatedSwap.RequestType)
+}
+
+func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxSpendingDifferentOutpoint(t *testing.T) {
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
+
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositHandler(cfg)
+
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
+
+	verifyingKey := keyshare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
+	depositPkScript, err := common.P2TRScriptFromPubKey(verifyingKey)
+	require.NoError(t, err)
+
+	const (
+		utxoAmountSats = uint64(10_000)
+		spendAmount    = int64(9_000)
+	)
+
+	sharedTxID := st.NewRandomTxIDForTesting(t).Bytes()
+	utxoA := createTestUtxoWithOutpointForDepositAddress(t, ctx, sessionCtx.Client, depositAddress, 100, sharedTxID, 0, utxoAmountSats, depositPkScript)
+	utxoB := createTestUtxoWithOutpointForDepositAddress(t, ctx, sessionCtx.Client, depositAddress, 100, sharedTxID, 1, utxoAmountSats, depositPkScript)
+
+	// Simulate a realistic malicious scenario: utxoB is already locked by an in-progress swap/claim,
+	// but the caller asks to refund utxoA while providing a tx that actually spends utxoB.
+	_ = createTestUtxoSwap(t, ctx, rng, sessionCtx.Client, utxoB, st.UtxoSwapStatusCreated)
+
+	txidString := hex.EncodeToString(utxoB.Txid)
+	utxoBTxid, err := chainhash.NewHashFromStr(txidString)
+	require.NoError(t, err)
+	refundUtxoBTxBytes := createSpendTxBytesSpendingOutpoint(t, *utxoBTxid, utxoB.Vout, ownerIdentityPubKey, spendAmount)
+
+	spendTxSigHash, totalAmount, err := GetTxSigningInfo(ctx, utxoA, refundUtxoBTxBytes)
+	require.NoError(t, err)
+
+	userSignatureToRefundUtxoA := createValidUserSignatureForTest(
+		utxoA.Txid,
+		utxoA.Vout,
+		btcnetwork.Regtest,
+		pb.UtxoSwapRequestType_Refund,
+		totalAmount,
+		spendTxSigHash,
+		ownerIdentityPrivKey,
+	)
+
+	successStub := map[string]any{"UtxoDepositAddress": depositAddress.Address}
+	require.NoError(t, gripmock.AddStub("spark_internal.SparkInternalService", "create_static_deposit_utxo_refund", nil, successStub))
+	require.NoError(t, gripmock.AddStub("spark_internal.SparkInternalService", "frost_round1", nil, frostRound1StubOutput))
+	require.NoError(t, gripmock.AddStub("spark_internal.SparkInternalService", "frost_round2", nil, frostRound2StubOutput))
+	require.NoError(t, gripmock.AddStub("spark_internal.SparkInternalService", "utxo_swap_completed", nil, nil))
+
+	_, err = handler.InitiateStaticDepositUtxoRefund(ctx, cfg, &pb.InitiateStaticDepositUtxoRefundRequest{
+		OnChainUtxo: &pb.UTXO{
+			Txid:    utxoA.Txid,
+			Vout:    utxoA.Vout,
+			Network: pb.Network_REGTEST,
+		},
+		RefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       ownerSigningPubKey.Serialize(),
+			RawTx:                  refundUtxoBTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+		UserSignature: userSignatureToRefundUtxoA,
+	})
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, "unexpected refund transaction structure")
+}
+
+func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxWithMultipleInputs(t *testing.T) {
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
+
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositHandler(cfg)
+
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
+
+	verifyingKey := keyshare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
+	depositPkScript, err := common.P2TRScriptFromPubKey(verifyingKey)
+	require.NoError(t, err)
+
+	const utxoAmountSats = uint64(10_000)
+
+	sharedTxID := st.NewRandomTxIDForTesting(t).Bytes()
+	utxoA := createTestUtxoWithOutpointForDepositAddress(t, ctx, sessionCtx.Client, depositAddress, 100, sharedTxID, 0, utxoAmountSats, depositPkScript)
+	utxoB := createTestUtxoWithOutpointForDepositAddress(t, ctx, sessionCtx.Client, depositAddress, 100, sharedTxID, 1, utxoAmountSats, depositPkScript)
+
+	txidString := hex.EncodeToString(utxoA.Txid)
+	utxoATxid, err := chainhash.NewHashFromStr(txidString)
+	require.NoError(t, err)
+
+	// Create malicious transaction with MULTIPLE inputs (trying to spend both UTXO A and UTXO B)
+	p2trScript, err := common.P2TRScriptFromPubKey(ownerIdentityPubKey)
+	require.NoError(t, err)
+
+	maliciousTx := wire.NewMsgTx(3)
+	// Add input for UTXO A (the one being requested for refund)
+	maliciousTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  *utxoATxid,
+			Index: utxoA.Vout,
+		},
+		Sequence: wire.MaxTxInSequenceNum,
+	})
+	// Add SECOND input for UTXO B (attack: trying to drain additional UTXO)
+	maliciousTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  *utxoATxid,
+			Index: utxoB.Vout,
+		},
+		Sequence: wire.MaxTxInSequenceNum,
+	})
+	maliciousTx.AddTxOut(&wire.TxOut{
+		Value:    int64(utxoAmountSats * 2), // Trying to claim both UTXOs
+		PkScript: p2trScript,
+	})
+
+	var buf bytes.Buffer
+	require.NoError(t, maliciousTx.Serialize(&buf))
+	maliciousTxBytes := buf.Bytes()
+
+	spendTxSigHash, totalAmount, err := GetTxSigningInfo(ctx, utxoA, maliciousTxBytes)
+	require.NoError(t, err)
+
+	userSignature := createValidUserSignatureForTest(
+		utxoA.Txid,
+		utxoA.Vout,
+		btcnetwork.Regtest,
+		pb.UtxoSwapRequestType_Refund,
+		totalAmount,
+		spendTxSigHash,
+		ownerIdentityPrivKey,
+	)
+
+	successStub := map[string]any{"UtxoDepositAddress": depositAddress.Address}
+	require.NoError(t, gripmock.AddStub("spark_internal.SparkInternalService", "create_static_deposit_utxo_refund", nil, successStub))
+
+	_, err = handler.InitiateStaticDepositUtxoRefund(ctx, cfg, &pb.InitiateStaticDepositUtxoRefundRequest{
+		OnChainUtxo: &pb.UTXO{
+			Txid:    utxoA.Txid,
+			Vout:    utxoA.Vout,
+			Network: pb.Network_REGTEST,
+		},
+		RefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       ownerSigningPubKey.Serialize(),
+			RawTx:                  maliciousTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+		UserSignature: userSignature,
+	})
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, "unexpected refund transaction structure")
+}
+
+func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxWithWrongSequence(t *testing.T) {
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
+
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositHandler(cfg)
+
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
+	testUtxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
+
+	txidString := hex.EncodeToString(testUtxo.Txid)
+	utxoTxid, err := chainhash.NewHashFromStr(txidString)
+	require.NoError(t, err)
+
+	// Create transaction with WRONG SEQUENCE NUMBER (not MaxTxInSequenceNum)
+	p2trScript, err := common.P2TRScriptFromPubKey(ownerIdentityPubKey)
+	require.NoError(t, err)
+
+	wrongSequenceTx := wire.NewMsgTx(3)
+	wrongSequenceTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  *utxoTxid,
+			Index: testUtxo.Vout,
+		},
+		Sequence: 100, // WRONG: Should be MaxTxInSequenceNum (0xFFFFFFFF)
+	})
+	wrongSequenceTx.AddTxOut(&wire.TxOut{
+		Value:    int64(testUtxo.Amount),
+		PkScript: p2trScript,
+	})
+
+	var buf bytes.Buffer
+	require.NoError(t, wrongSequenceTx.Serialize(&buf))
+	wrongSequenceTxBytes := buf.Bytes()
+
+	spendTxSigHash, totalAmount, err := GetTxSigningInfo(ctx, testUtxo, wrongSequenceTxBytes)
+	require.NoError(t, err)
+
+	userSignature := createValidUserSignatureForTest(
+		testUtxo.Txid,
+		testUtxo.Vout,
+		btcnetwork.Regtest,
+		pb.UtxoSwapRequestType_Refund,
+		totalAmount,
+		spendTxSigHash,
+		ownerIdentityPrivKey,
+	)
+
+	successStub := map[string]any{"UtxoDepositAddress": depositAddress.Address}
+	require.NoError(t, gripmock.AddStub("spark_internal.SparkInternalService", "create_static_deposit_utxo_refund", nil, successStub))
+
+	_, err = handler.InitiateStaticDepositUtxoRefund(ctx, cfg, &pb.InitiateStaticDepositUtxoRefundRequest{
+		OnChainUtxo: &pb.UTXO{
+			Txid:    testUtxo.Txid,
+			Vout:    testUtxo.Vout,
+			Network: pb.Network_REGTEST,
+		},
+		RefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       ownerSigningPubKey.Serialize(),
+			RawTx:                  wrongSequenceTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+		UserSignature: userSignature,
+	})
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, "unexpected refund transaction structure")
+}
+
+func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxWithZeroInputs(t *testing.T) {
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
+
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositHandler(cfg)
+
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
+	testUtxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
+
+	// Create transaction with ZERO INPUTS
+	p2trScript, err := common.P2TRScriptFromPubKey(ownerIdentityPubKey)
+	require.NoError(t, err)
+
+	zeroInputsTx := wire.NewMsgTx(3)
+	// Don't add any inputs
+	zeroInputsTx.AddTxOut(&wire.TxOut{
+		Value:    int64(testUtxo.Amount),
+		PkScript: p2trScript,
+	})
+
+	var buf bytes.Buffer
+	require.NoError(t, zeroInputsTx.Serialize(&buf))
+	zeroInputsTxBytes := buf.Bytes()
+
+	// Note: We can't call GetTxSigningInfo because a transaction with zero inputs
+	// fails to parse. This is expected - the validation will catch it at parse time.
+	// We'll provide dummy values for the signature.
+	dummySigHash := make([]byte, 32)
+	userSignature := createValidUserSignatureForTest(
+		testUtxo.Txid,
+		testUtxo.Vout,
+		btcnetwork.Regtest,
+		pb.UtxoSwapRequestType_Refund,
+		testUtxo.Amount,
+		dummySigHash,
+		ownerIdentityPrivKey,
+	)
+
+	successStub := map[string]any{"UtxoDepositAddress": depositAddress.Address}
+	require.NoError(t, gripmock.AddStub("spark_internal.SparkInternalService", "create_static_deposit_utxo_refund", nil, successStub))
+
+	_, err = handler.InitiateStaticDepositUtxoRefund(ctx, cfg, &pb.InitiateStaticDepositUtxoRefundRequest{
+		OnChainUtxo: &pb.UTXO{
+			Txid:    testUtxo.Txid,
+			Vout:    testUtxo.Vout,
+			Network: pb.Network_REGTEST,
+		},
+		RefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       ownerSigningPubKey.Serialize(),
+			RawTx:                  zeroInputsTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+		UserSignature: userSignature,
+	})
+
+	require.Error(t, err)
+	// Zero-input transactions fail at parse time with a more specific error
+	require.ErrorContains(t, err, "failed to parse")
 }
