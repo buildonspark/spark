@@ -417,14 +417,17 @@ export function hash160(data: Uint8Array): Uint8Array {
 // Helper function to calculate transaction vSize from hex
 function calculateTransactionVSize(txHex: string): number {
   try {
+    const txBytes = hexToBytes(txHex);
     const tx = getTxFromRawTxHex(txHex);
-    const numInputs = tx.inputsLength;
-    const numOutputs = tx.outputsLength;
+    if (tx.vsize !== undefined) {
+      return tx.vsize;
+    }
 
-    return getTxEstimatedVbytesSizeByNumberOfInputsOutputs(
-      numInputs,
-      numOutputs,
-    );
+    if (tx.weight !== undefined) {
+      return Math.ceil(tx.weight / 4);
+    }
+
+    return txBytes.length;
   } catch (error) {
     console.warn(
       `Failed to calculate transaction vSize: ${error}, falling back to default estimate`,
@@ -432,6 +435,28 @@ function calculateTransactionVSize(txHex: string): number {
     // Fall back to default for typical transactions
     return 191;
   }
+}
+
+// Helper function to estimate CPFP fee bump transaction size
+function estimateFeeBumpTxSize(
+  numFundingUtxos: number,
+  hasEphemeralAnchor: boolean = true,
+): number {
+  const TX_OVERHEAD = 10.5;
+
+  const P2WPKH_INPUT_VBYTES = 68;
+
+  const EPHEMERAL_ANCHOR_INPUT_VBYTES = 41;
+
+  const P2WPKH_OUTPUT_VBYTES = 31;
+
+  const inputVbytes =
+    numFundingUtxos * P2WPKH_INPUT_VBYTES +
+    (hasEphemeralAnchor ? EPHEMERAL_ANCHOR_INPUT_VBYTES : 0);
+
+  const outputVbytes = P2WPKH_OUTPUT_VBYTES;
+
+  return Math.ceil(TX_OVERHEAD + inputVbytes + outputVbytes);
 }
 
 // Helper function to select optimal UTXOs for fee payment
@@ -469,9 +494,9 @@ function selectUtxosForFee(
     totalValue += utxo.value;
 
     // Calculate child transaction size with current number of selected UTXOs
-    const childTxSize = getTxEstimatedVbytesSizeByNumberOfInputsOutputs(
-      selectedUtxos.length + 1, // selected UTXOs + ephemeral anchor
-      1, // single change output
+    const childTxSize = estimateFeeBumpTxSize(
+      selectedUtxos.length, // number of funding UTXOs
+      true, // has ephemeral anchor
     );
 
     // Calculate total fee needed for CPFP package
@@ -644,9 +669,10 @@ export function constructFeeBumpTx(
   });
 
   // Calculate child transaction size based on number of inputs and outputs
-  const childTxSize = getTxEstimatedVbytesSizeByNumberOfInputsOutputs(
-    selectedUtxos.length + 1, // funding UTXOs + ephemeral anchor
-    1, // single change output
+  // Use accurate CPFP-specific estimation instead of general estimation
+  const childTxSize = estimateFeeBumpTxSize(
+    selectedUtxos.length, // number of funding UTXOs
+    true, // has ephemeral anchor
   );
 
   const totalVbytes = parentTxSize + childTxSize;
