@@ -4,12 +4,12 @@ import {
   numberToBytesBE,
 } from "@noble/curves/utils";
 import { hexToBytes } from "@noble/hashes/utils";
-import { SparkRequestError, SparkValidationError } from "../errors/types.js";
+import { SparkRequestError, SparkValidationError } from "../../errors/types.js";
 import {
   Direction,
   OperatorSpecificTokenTransactionSignablePayload,
   Order,
-} from "../proto/spark.js";
+} from "../../proto/spark.js";
 import {
   InputTtxoSignaturesPerOperator,
   OutputWithPreviousTransactionData,
@@ -24,33 +24,30 @@ import {
   CommitTransactionResponse,
   CommitProgress,
   CommitStatus,
-} from "../proto/spark_token.js";
-import { TokenOutputsMap } from "../spark-wallet/types.js";
-import { SparkCallOptions } from "../types/grpc.js";
+} from "../../proto/spark_token.js";
+import { TokenOutputsMap } from "../../spark-wallet/types.js";
+import { SparkCallOptions } from "../../types/grpc.js";
 import {
   decodeSparkAddress,
   SparkAddressFormat,
   isValidPublicKey,
-} from "../utils/address.js";
+} from "../../utils/address.js";
 import {
   hashOperatorSpecificTokenTransactionSignablePayload,
   hashTokenTransaction,
   hashPartialTokenTransaction,
   hashFinalTokenTransaction,
   sortInvoiceAttachments,
-} from "../utils/token-hashing.js";
+} from "../../utils/token-hashing.js";
 import {
   Bech32mTokenIdentifier,
   decodeBech32mTokenIdentifier,
-} from "../utils/token-identifier.js";
-import { validateTokenTransaction } from "../utils/token-transaction-validation.js";
-import {
-  checkIfSelectedOutputsAreAvailable,
-  sumAvailableTokens,
-} from "../utils/token-transactions.js";
-import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection/connection.js";
-import { SigningOperator } from "./wallet-config.js";
+} from "../../utils/token-identifier.js";
+import { validateTokenTransaction } from "../../utils/token-transaction-validation.js";
+import { sumAvailableTokens } from "../../utils/token-transactions.js";
+import { WalletConfigService } from "../config.js";
+import { ConnectionManager } from "../connection/connection.js";
+import { SigningOperator } from "../wallet-config.js";
 
 const QUERY_TOKEN_OUTPUTS_PAGE_SIZE = 100;
 export const MAX_TOKEN_OUTPUTS_TX = 500;
@@ -119,23 +116,6 @@ export class TokenTransactionService {
 
     if (selectedOutputs) {
       outputsToUse = selectedOutputs;
-
-      if (
-        !checkIfSelectedOutputsAreAvailable(
-          outputsToUse,
-          tokenOutputs,
-          tokenIdentifier,
-        )
-      ) {
-        throw new SparkValidationError(
-          "One or more selected TTXOs are not available",
-          {
-            field: "selectedOutputs",
-            value: selectedOutputs,
-            expected: "Available TTXOs",
-          },
-        );
-      }
     } else {
       outputsToUse = this.selectTokenOutputs(
         tokenOutputs.get(tokenIdentifier)!!,

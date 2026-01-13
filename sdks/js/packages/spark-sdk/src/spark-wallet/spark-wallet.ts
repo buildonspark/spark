@@ -74,7 +74,8 @@ import { LightningService } from "../services/lightning.js";
 import {
   MAX_TOKEN_OUTPUTS_TX,
   TokenTransactionService,
-} from "../services/token-transactions.js";
+} from "../services/tokens/token-transactions.js";
+import { TokenOutputManager } from "../services/tokens/output-manager.js";
 import type { LeafKeyTweak } from "../services/transfer.js";
 import { TransferService } from "../services/transfer.js";
 import {
@@ -204,11 +205,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   private streamController: AbortController | null = null;
   private tokenOptimizationInProgress = false;
   private tokenOptimizationInterval: Interval | null = null;
-  private tokenOutputsMutex = new Mutex();
+  private tokenOutputManager: TokenOutputManager;
 
   protected leaves: TreeNode[] = [];
   protected tokenMetadata: TokenMetadataMap = new Map();
-  protected tokenOutputs: TokenOutputsMap = new Map();
   protected tracer: Tracer | null = null;
   protected tracerId = "spark-sdk";
 
@@ -243,6 +243,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     this.tokenTransactionService = new TokenTransactionService(
       this.config,
       this.connectionManager,
+    );
+    this.tokenOutputManager = new TokenOutputManager(
+      this.config.getTokenOutputLockExpiryMs(),
     );
     this.lightningService = new LightningService(
       this.config,
@@ -809,53 +812,59 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       const tokenOptConfig = this.config.getTokenOptimizationOptions();
       const minOutputsThreshold = tokenOptConfig?.minOutputsThreshold ?? 50;
 
-      await this.withTokenOutputs(async () => {
-        // Find the next token that has more than the threshold number of outputs
-        for (const [tokenIdentifier, outputs] of this.tokenOutputs.entries()) {
-          if (outputs.length <= minOutputsThreshold) {
-            continue;
-          }
-
-          try {
-            const receiverSparkAddress = await this.getSparkAddress();
-
-            // Take only up to MAX_OUTPUTS_PER_TX outputs to respect transaction limits
-            const outputsToConsolidate = outputs.slice(0, MAX_TOKEN_OUTPUTS_TX);
-            const totalAmount = sumAvailableTokens(outputsToConsolidate);
-
-            const txId = await this.tokenTransactionService.tokenTransfer({
-              tokenOutputs: new Map([[tokenIdentifier, outputsToConsolidate]]),
-              receiverOutputs: [
-                {
-                  tokenIdentifier,
-                  tokenAmount: totalAmount,
-                  receiverSparkAddress,
-                },
-              ],
-              outputSelectionStrategy: "SMALL_FIRST",
-            });
-
-            for (const output of outputsToConsolidate) {
-              if (output.output?.id) {
-                this.pendingWithdrawnOutputIds.push(output.output.id);
-              }
-            }
-
-            console.log(
-              `Consolidated ${outputsToConsolidate.length} outputs for token ${tokenIdentifier} in transaction ${txId}`,
-            );
-
-            // Process only one token per run
-            break;
-          } catch (error) {
-            console.error(
-              `Failed to optimize token outputs for ${tokenIdentifier}:`,
-              error,
-            );
-            // Continue to next token if this one fails
-          }
+      const entries = await this.tokenOutputManager.entries();
+      for (const [tokenIdentifier, allOutputs] of entries) {
+        if (allOutputs.length <= minOutputsThreshold) {
+          continue;
         }
-      });
+
+        const { outputs: outputsToConsolidate, release } =
+          await this.tokenOutputManager.acquireOutputs(
+            tokenIdentifier,
+            (available) => available.slice(0, MAX_TOKEN_OUTPUTS_TX),
+            `optimize-${tokenIdentifier}`,
+          );
+
+        if (outputsToConsolidate.length === 0) {
+          continue;
+        }
+
+        try {
+          const receiverSparkAddress = await this.getSparkAddress();
+          const totalAmount = sumAvailableTokens(outputsToConsolidate);
+
+          const txId = await this.tokenTransactionService.tokenTransfer({
+            tokenOutputs: new Map([[tokenIdentifier, outputsToConsolidate]]),
+            receiverOutputs: [
+              {
+                tokenIdentifier,
+                tokenAmount: totalAmount,
+                receiverSparkAddress,
+              },
+            ],
+            outputSelectionStrategy: "SMALL_FIRST",
+          });
+
+          for (const output of outputsToConsolidate) {
+            if (output.output?.id) {
+              this.pendingWithdrawnOutputIds.push(output.output.id);
+            }
+          }
+
+          console.log(
+            `Consolidated ${outputsToConsolidate.length} outputs for token ${tokenIdentifier} in transaction ${txId}`,
+          );
+
+          break;
+        } catch (error) {
+          console.error(
+            `Failed to optimize token outputs for ${tokenIdentifier}:`,
+            error,
+          );
+        } finally {
+          await release();
+        }
+      }
     } finally {
       this.tokenOptimizationInProgress = false;
     }
@@ -908,15 +917,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   private async withLeaves<T>(operation: () => Promise<T>): Promise<T> {
     const release = await this.leavesMutex.acquire();
-    try {
-      return await operation();
-    } finally {
-      release();
-    }
-  }
-
-  private async withTokenOutputs<T>(operation: () => Promise<T>): Promise<T> {
-    const release = await this.tokenOutputsMutex.acquire();
     try {
       return await operation();
     } finally {
@@ -1752,7 +1752,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     let tokenBalances: TokenBalanceMap;
 
-    if (this.tokenOutputs.size !== 0) {
+    const hasTokenOutputs = !(await this.tokenOutputManager.isEmpty());
+    if (hasTokenOutputs) {
       tokenBalances = await this.getTokenBalance();
     } else {
       tokenBalances = new Map();
@@ -1767,90 +1768,86 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   private async getTokenMetadata(): Promise<
     Map<Bech32mTokenIdentifier, UserTokenMetadata>
   > {
-    return await this.withTokenOutputs(async () => {
-      let metadataToFetch = new Array<Bech32mTokenIdentifier>();
-      for (const tokenIdentifier of this.tokenOutputs.keys()) {
-        if (!this.tokenMetadata.has(tokenIdentifier)) {
-          metadataToFetch.push(tokenIdentifier);
-        }
+    const tokenIdentifierKeys =
+      await this.tokenOutputManager.getTokenIdentifiers();
+    let metadataToFetch = new Array<Bech32mTokenIdentifier>();
+    for (const tokenIdentifier of tokenIdentifierKeys) {
+      if (!this.tokenMetadata.has(tokenIdentifier)) {
+        metadataToFetch.push(tokenIdentifier);
       }
+    }
 
-      if (metadataToFetch.length > 0) {
-        const sparkTokenClient =
-          await this.connectionManager.createSparkTokenClient(
-            this.config.getCoordinatorAddress(),
-          );
+    if (metadataToFetch.length > 0) {
+      const sparkTokenClient =
+        await this.connectionManager.createSparkTokenClient(
+          this.config.getCoordinatorAddress(),
+        );
 
-        try {
-          const response = await sparkTokenClient.query_token_metadata({
-            tokenIdentifiers: metadataToFetch.map(
-              (tokenIdentifier) =>
-                decodeBech32mTokenIdentifier(
-                  tokenIdentifier,
-                  this.config.getNetworkType(),
-                ).tokenIdentifier,
-            ),
+      try {
+        const response = await sparkTokenClient.query_token_metadata({
+          tokenIdentifiers: metadataToFetch.map(
+            (tokenIdentifier) =>
+              decodeBech32mTokenIdentifier(
+                tokenIdentifier,
+                this.config.getNetworkType(),
+              ).tokenIdentifier,
+          ),
+        });
+
+        for (const tokenMetadata of response.tokenMetadata) {
+          const tokenIdentifier = encodeBech32mTokenIdentifier({
+            tokenIdentifier: tokenMetadata.tokenIdentifier,
+            network: this.config.getNetworkType(),
           });
 
-          for (const tokenMetadata of response.tokenMetadata) {
-            const tokenIdentifier = encodeBech32mTokenIdentifier({
-              tokenIdentifier: tokenMetadata.tokenIdentifier,
-              network: this.config.getNetworkType(),
-            });
-
-            this.tokenMetadata.set(tokenIdentifier, tokenMetadata);
-          }
-        } catch (error) {
-          throw new SparkRequestError("Failed to fetch token metadata", {
-            error,
-          });
+          this.tokenMetadata.set(tokenIdentifier, tokenMetadata);
         }
-      }
-
-      let tokenMetadataMap = new Map<
-        Bech32mTokenIdentifier,
-        UserTokenMetadata
-      >();
-
-      for (const [tokenIdentifier, metadata] of this.tokenMetadata) {
-        tokenMetadataMap.set(tokenIdentifier, {
-          tokenPublicKey: bytesToHex(metadata.issuerPublicKey),
-          rawTokenIdentifier: metadata.tokenIdentifier,
-          tokenName: metadata.tokenName,
-          tokenTicker: metadata.tokenTicker,
-          decimals: metadata.decimals,
-          maxSupply: bytesToNumberBE(metadata.maxSupply),
-          extraMetadata: metadata.extraMetadata
-            ? new Uint8Array(metadata.extraMetadata)
-            : undefined,
+      } catch (error) {
+        throw new SparkRequestError("Failed to fetch token metadata", {
+          error,
         });
       }
+    }
 
-      return tokenMetadataMap;
-    });
+    let tokenMetadataMap = new Map<Bech32mTokenIdentifier, UserTokenMetadata>();
+
+    for (const [tokenIdentifier, metadata] of this.tokenMetadata) {
+      tokenMetadataMap.set(tokenIdentifier, {
+        tokenPublicKey: bytesToHex(metadata.issuerPublicKey),
+        rawTokenIdentifier: metadata.tokenIdentifier,
+        tokenName: metadata.tokenName,
+        tokenTicker: metadata.tokenTicker,
+        decimals: metadata.decimals,
+        maxSupply: bytesToNumberBE(metadata.maxSupply),
+        extraMetadata: metadata.extraMetadata
+          ? new Uint8Array(metadata.extraMetadata)
+          : undefined,
+      });
+    }
+
+    return tokenMetadataMap;
   }
 
   private async getTokenBalance(): Promise<TokenBalanceMap> {
     const tokenMetadataMap = await this.getTokenMetadata();
+    const result: TokenBalanceMap = new Map();
 
-    return await this.withTokenOutputs(async () => {
-      const result: TokenBalanceMap = new Map();
-      for (const [tokenIdentifier, tokenMetadata] of tokenMetadataMap) {
-        const outputs = this.tokenOutputs.get(tokenIdentifier);
+    for (const [tokenIdentifier, tokenMetadata] of tokenMetadataMap) {
+      const outputs =
+        await this.tokenOutputManager.getAllOutputs(tokenIdentifier);
 
-        const humanReadableTokenIdentifier = encodeBech32mTokenIdentifier({
-          tokenIdentifier: tokenMetadata.rawTokenIdentifier,
-          network: this.config.getNetworkType(),
-        });
+      const humanReadableTokenIdentifier = encodeBech32mTokenIdentifier({
+        tokenIdentifier: tokenMetadata.rawTokenIdentifier,
+        network: this.config.getNetworkType(),
+      });
 
-        result.set(humanReadableTokenIdentifier, {
-          balance: outputs ? sumAvailableTokens(outputs) : BigInt(0),
-          tokenMetadata: tokenMetadata,
-        });
-      }
+      result.set(humanReadableTokenIdentifier, {
+        balance: outputs ? sumAvailableTokens(outputs) : BigInt(0),
+        tokenMetadata: tokenMetadata,
+      });
+    }
 
-      return result;
-    });
+    return result;
   }
 
   private getInternalBalance(): number {
@@ -4192,21 +4189,53 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         const invoices = decodedInvoices.map(
           (d) => d.invoice as SparkAddressFormat,
         );
+        const totalTokenAmount = receiverOutputs.reduce(
+          (sum, o) => sum + o.tokenAmount,
+          0n,
+        );
+
         tokenTransferTasks.push(
-          this.tokenTransactionService
-            .tokenTransfer({ tokenOutputs: this.tokenOutputs, receiverOutputs })
-            .then((txid) => ({
-              ok: true as const,
-              tokenIdentifier: tokenIdB32,
-              invoices,
-              txid,
-            }))
-            .catch((e: any) => ({
-              ok: false as const,
-              tokenIdentifier: tokenIdB32,
-              invoices,
-              error: e instanceof Error ? e : new Error(String(e)),
-            })),
+          (async () => {
+            let release = async () => {};
+            try {
+              const { outputs: acquiredOutputs, release: lockRelease } =
+                await this.tokenOutputManager.acquireOutputs(
+                  tokenIdB32,
+                  (available) =>
+                    this.tokenTransactionService.selectTokenOutputs(
+                      available,
+                      totalTokenAmount,
+                      "SMALL_FIRST",
+                    ),
+                  `fulfill-invoice-${tokenIdB32}`,
+                );
+              release = lockRelease;
+
+              const tokenOutputsMap: TokenOutputsMap = new Map([
+                [tokenIdB32, acquiredOutputs],
+              ]);
+              const txid = await this.tokenTransactionService.tokenTransfer({
+                tokenOutputs: tokenOutputsMap,
+                receiverOutputs,
+                selectedOutputs: acquiredOutputs,
+              });
+              return {
+                ok: true as const,
+                tokenIdentifier: tokenIdB32,
+                invoices,
+                txid,
+              };
+            } catch (e: any) {
+              return {
+                ok: false as const,
+                tokenIdentifier: tokenIdB32,
+                invoices,
+                error: e instanceof Error ? e : new Error(String(e)),
+              };
+            } finally {
+              await release();
+            }
+          })(),
         );
       }
       const results = await Promise.all(tokenTransferTasks);
@@ -4859,47 +4888,42 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @private
    */
   protected async syncTokenOutputs() {
-    return await this.withTokenOutputs(async () => {
-      this.tokenOutputs.clear();
-
-      const unsortedTokenOutputs =
-        await this.tokenTransactionService.fetchOwnedTokenOutputs({
-          ownerPublicKeys: [await this.config.signer.getIdentityPublicKey()],
-        });
-      const filteredTokenOutputs = unsortedTokenOutputs.filter(
-        (output) =>
-          !this.pendingWithdrawnOutputIds.includes(output.output?.id || ""),
-      );
-
-      const fetchedOutputIds = new Set(
-        unsortedTokenOutputs.map((output) => output.output?.id).filter(Boolean),
-      );
-      this.pendingWithdrawnOutputIds = this.pendingWithdrawnOutputIds.filter(
-        (id) => fetchedOutputIds.has(id),
-      );
-
-      // Group outputs by hex representation of raw token identifier bytes
-      const groupedOutputs: TokenOutputsMap = new Map();
-
-      filteredTokenOutputs.forEach((output) => {
-        const bech32mTokenIdentifier = encodeBech32mTokenIdentifier({
-          tokenIdentifier: output.output!.tokenIdentifier!,
-          network: this.config.getNetworkType(),
-        });
-        const index = output.previousTransactionVout!;
-
-        if (!groupedOutputs.has(bech32mTokenIdentifier)) {
-          groupedOutputs.set(bech32mTokenIdentifier, []);
-        }
-
-        groupedOutputs.get(bech32mTokenIdentifier)!.push({
-          ...output,
-          previousTransactionVout: index,
-        });
+    const unsortedTokenOutputs =
+      await this.tokenTransactionService.fetchOwnedTokenOutputs({
+        ownerPublicKeys: [await this.config.signer.getIdentityPublicKey()],
       });
+    const filteredTokenOutputs = unsortedTokenOutputs.filter(
+      (output) =>
+        !this.pendingWithdrawnOutputIds.includes(output.output?.id || ""),
+    );
 
-      this.tokenOutputs = groupedOutputs;
+    const fetchedOutputIds = new Set(
+      unsortedTokenOutputs.map((output) => output.output?.id).filter(Boolean),
+    );
+    this.pendingWithdrawnOutputIds = this.pendingWithdrawnOutputIds.filter(
+      (id) => fetchedOutputIds.has(id),
+    );
+
+    const groupedOutputs: TokenOutputsMap = new Map();
+
+    filteredTokenOutputs.forEach((output) => {
+      const bech32mTokenIdentifier = encodeBech32mTokenIdentifier({
+        tokenIdentifier: output.output!.tokenIdentifier!,
+        network: this.config.getNetworkType(),
+      });
+      const index = output.previousTransactionVout!;
+
+      if (!groupedOutputs.has(bech32mTokenIdentifier)) {
+        groupedOutputs.set(bech32mTokenIdentifier, []);
+      }
+
+      groupedOutputs.get(bech32mTokenIdentifier)!.push({
+        ...output,
+        previousTransactionVout: index,
+      });
     });
+
+    await this.tokenOutputManager.setOutputs(groupedOutputs);
   }
 
   /**
@@ -4942,9 +4966,31 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     await this.syncTokenOutputs();
 
-    return await this.withTokenOutputs(async () => {
-      return this.tokenTransactionService.tokenTransfer({
-        tokenOutputs: this.tokenOutputs,
+    const strategy = outputSelectionStrategy ?? "SMALL_FIRST";
+    const { outputs: acquiredOutputs, release } =
+      await this.tokenOutputManager.acquireOutputs(
+        tokenIdentifier,
+        (available) => {
+          if (selectedOutputs) {
+            return selectedOutputs.filter((so) =>
+              available.some((a) => a.output?.id === so.output?.id),
+            );
+          }
+          return this.tokenTransactionService.selectTokenOutputs(
+            available,
+            tokenAmount,
+            strategy,
+          );
+        },
+        `transfer-${tokenIdentifier}`,
+      );
+
+    try {
+      const tokenOutputsMap: TokenOutputsMap = new Map([
+        [tokenIdentifier, acquiredOutputs],
+      ]);
+      return await this.tokenTransactionService.tokenTransfer({
+        tokenOutputs: tokenOutputsMap,
         receiverOutputs: [
           {
             tokenIdentifier,
@@ -4952,10 +4998,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             receiverSparkAddress,
           },
         ],
-        outputSelectionStrategy: outputSelectionStrategy ?? "SMALL_FIRST",
-        selectedOutputs,
+        outputSelectionStrategy: strategy,
+        selectedOutputs: acquiredOutputs,
       });
-    });
+    } finally {
+      await release();
+    }
   }
 
   /**
@@ -5010,21 +5058,49 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     await this.syncTokenOutputs();
 
-    return await this.withTokenOutputs(async () => {
-      // replace bech32m encoded token identifier with raw token identifier bytes
+    const totalTokenAmount = receiverOutputs.reduce(
+      (sum, o) => sum + o.tokenAmount,
+      0n,
+    );
+
+    const { outputs: acquiredOutputs, release } =
+      await this.tokenOutputManager.acquireOutputs(
+        firstBech32mTokenIdentifier,
+        (available) => {
+          if (selectedOutputs) {
+            return selectedOutputs.filter((so) =>
+              available.some((a) => a.output?.id === so.output?.id),
+            );
+          }
+          return this.tokenTransactionService.selectTokenOutputs(
+            available,
+            totalTokenAmount,
+            outputSelectionStrategy,
+          );
+        },
+        `batch-transfer-${firstBech32mTokenIdentifier}`,
+      );
+
+    try {
       const transferOutputs = receiverOutputs.map((output) => ({
         tokenIdentifier: firstBech32mTokenIdentifier,
         tokenAmount: output.tokenAmount,
         receiverSparkAddress: output.receiverSparkAddress,
       }));
 
-      return this.tokenTransactionService.tokenTransfer({
-        tokenOutputs: this.tokenOutputs,
+      const tokenOutputsMap: TokenOutputsMap = new Map([
+        [firstBech32mTokenIdentifier, acquiredOutputs],
+      ]);
+
+      return await this.tokenTransactionService.tokenTransfer({
+        tokenOutputs: tokenOutputsMap,
         receiverOutputs: transferOutputs,
         outputSelectionStrategy,
-        selectedOutputs,
+        selectedOutputs: acquiredOutputs,
       });
-    });
+    } finally {
+      await release();
+    }
   }
 
   /**
@@ -5085,6 +5161,18 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       await this.config.signer.getIdentityPublicKey(),
       this.config.getNetwork(),
     );
+  }
+
+  // For internal use only
+  async getTokenOutputStats(
+    tokenIdentifier: Bech32mTokenIdentifier,
+  ): Promise<{ outputCount: number; totalAmount: bigint }> {
+    const outputs =
+      await this.tokenOutputManager.getAllOutputs(tokenIdentifier);
+    return {
+      outputCount: outputs.length,
+      totalAmount: sumAvailableTokens(outputs),
+    };
   }
 
   /**
@@ -5737,7 +5825,7 @@ type SparkWalletFunctionKeys = Extract<
 
 type WrappableSparkWalletMethod = Exclude<
   SparkWalletFunctionKeys,
-  "constructor"
+  "constructor" | "getTokenOutputStats"
 >;
 
 const PUBLIC_SPARK_WALLET_METHODS = [

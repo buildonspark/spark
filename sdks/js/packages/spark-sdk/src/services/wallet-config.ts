@@ -132,6 +132,7 @@ export type ConfigOptions = MayHaveSspClientOptions & {
   readonly events?: Partial<SparkWalletEvents>;
   readonly optimizationOptions?: OptimizationOptions;
   readonly tokenOptimizationOptions?: TokenOptimizationOptions;
+  readonly tokenOutputLockExpiryMs?: number;
   readonly tokenTransactionVersion?: "V2" | "V3";
 };
 
@@ -176,6 +177,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
     intervalMs: 300000, // 5 minutes
     minOutputsThreshold: 50,
   },
+  tokenOutputLockExpiryMs: 30000,
   tokenTransactionVersion: "V3",
 };
 

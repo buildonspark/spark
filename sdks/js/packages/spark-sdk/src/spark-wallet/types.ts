@@ -155,6 +155,12 @@ export type TokenOutputsMap = Map<
   OutputWithPreviousTransactionData[]
 >;
 
+export type {
+  TokenOutputLock,
+  TokenOutputLockReason,
+  AcquiredOutputs,
+} from "../services/tokens/output-manager.js";
+
 export type TokenMetadataMap = Map<Bech32mTokenIdentifier, TokenMetadata>;
 
 export type InitWalletResponse<T extends SparkWallet = SparkWallet> = {

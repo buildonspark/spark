@@ -57,11 +57,10 @@ describe.each(TEST_CONFIGS)(
         await issuerWallet.getIssuerTokenBalance();
       expect(balanceBeforeOptimization.balance).toBe(totalAmount);
 
-      const outputsBeforeOptimization = (issuerWallet as any).tokenOutputs.get(
-        tokenIdentifier,
-      );
+      const outputsBeforeOptimization =
+        await issuerWallet.getTokenOutputStats(tokenIdentifier);
       expect(outputsBeforeOptimization).toBeDefined();
-      expect(outputsBeforeOptimization.length).toBe(61);
+      expect(outputsBeforeOptimization.outputCount).toBe(61);
 
       await issuerWallet.optimizeTokenOutputs();
 
@@ -71,11 +70,10 @@ describe.each(TEST_CONFIGS)(
         await issuerWallet.getIssuerTokenBalance();
       expect(balanceAfterOptimization.balance).toBe(totalAmount);
 
-      const outputsAfterOptimization = (issuerWallet as any).tokenOutputs.get(
-        tokenIdentifier,
-      );
+      const outputsAfterOptimization =
+        await issuerWallet.getTokenOutputStats(tokenIdentifier);
       expect(outputsAfterOptimization).toBeDefined();
-      expect(outputsAfterOptimization.length).toBe(1);
+      expect(outputsAfterOptimization.outputCount).toBe(1);
 
       await issuerWallet.transferTokens({
         tokenAmount: 100n,

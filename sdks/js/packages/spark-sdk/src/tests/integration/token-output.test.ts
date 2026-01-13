@@ -2,7 +2,7 @@ import { walletTypes, createDeterministicKeys } from "../test-utils.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { WalletConfigService } from "../../services/config.js";
 import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
-import { TokenTransactionService } from "../../services/token-transactions.js";
+import { TokenTransactionService } from "../../services/tokens/token-transactions.js";
 import { SparkValidationError } from "../../errors/types.js";
 
 describe.each(walletTypes)(

@@ -1,6 +1,6 @@
 import { bytesToNumberBE, equalBytes } from "@noble/curves/utils";
 import { OutputWithPreviousTransactionData } from "../proto/spark_token.js";
-import { TokenBalanceMap, TokenOutputsMap } from "../spark-wallet/types.js";
+import { TokenBalanceMap } from "../spark-wallet/types.js";
 import {
   Bech32mTokenIdentifier,
   decodeBech32mTokenIdentifier,
@@ -18,39 +18,6 @@ export function sumAvailableTokens(
   } catch (error) {
     return 0n;
   }
-}
-
-export function checkIfSelectedOutputsAreAvailable(
-  selectedOutputs: OutputWithPreviousTransactionData[],
-  tokenOutputs: TokenOutputsMap,
-  tokenIdentifier: Bech32mTokenIdentifier,
-) {
-  const tokenOutputsAvailable = tokenOutputs.get(tokenIdentifier);
-  if (!tokenOutputsAvailable) {
-    return false;
-  }
-  if (
-    selectedOutputs.length === 0 ||
-    tokenOutputsAvailable.length < selectedOutputs.length
-  ) {
-    return false;
-  }
-
-  // Create a Set of available token output IDs for O(n + m) lookup
-  const availableOutputIds = new Set(
-    tokenOutputsAvailable.map((output) => output.output!.id),
-  );
-
-  for (const selectedOutput of selectedOutputs) {
-    if (
-      !selectedOutput.output?.id ||
-      !availableOutputIds.has(selectedOutput.output.id)
-    ) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 export function filterTokenBalanceForTokenIdentifier(

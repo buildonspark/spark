@@ -133,6 +133,10 @@ export class WalletConfigService implements HasSspClientOptions {
     return this.config.tokenOptimizationOptions;
   }
 
+  public getTokenOutputLockExpiryMs(): number {
+    return this.config.tokenOutputLockExpiryMs;
+  }
+
   public getTokenTransactionVersion(): "V2" | "V3" {
     return this.config.tokenTransactionVersion;
   }
