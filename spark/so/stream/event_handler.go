@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -15,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/handler"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"go.uber.org/zap"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -150,33 +152,63 @@ func (s *EventRouter) processNotification(ctx context.Context, eventData db.Even
 }
 
 func (s *EventRouter) processDepositNotification(ctx context.Context, event processEventPayload) *pb.SubscribeToEventsResponse {
-	if _, exists := event.Fields["confirmation_txid"]; exists {
-		depositAddress, err := s.dbClient.DepositAddress.Query().Where(depositaddress.ID(event.ID)).Only(ctx)
-		if err != nil {
+	_, exists := event.Fields["confirmation_txid"]
+	if !exists {
+		return nil
+	}
+
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMultipleConfirmationForNonStaticDeposit, 0) > 0 {
+		val, exists := event.Fields["availability_confirmed_at"]
+		if !exists {
 			return nil
 		}
 
-		treeNode, err := s.dbClient.TreeNode.Query().Where(treenode.ID(depositAddress.NodeID)).Only(ctx)
-		if err != nil {
-			// TODO: Fine to silently ignore this
-			// If tree node doesn't exist maybe we can inform client that they can claim the deposit?
-			return nil
-		} else {
-			treeNodeProto, err := treeNode.MarshalSparkProto(ctx)
+		// availability_confirmed_at is serialized as an RFC3339 string in the JSON payload
+		// Check if it's the zero time value (0001-01-01T00:00:00Z)
+		if timeStr, ok := val.(string); ok {
+			t, err := time.Parse(time.RFC3339, timeStr)
 			if err != nil {
+				s.logger.With(zap.Error(err)).Sugar().Errorf("failed to parse availability_confirmed_at '%s' as time", timeStr)
 				return nil
 			}
-
-			return &pb.SubscribeToEventsResponse{
-				Event: &pb.SubscribeToEventsResponse_Deposit{
-					Deposit: &pb.DepositEvent{
-						Deposit: treeNodeProto,
-					},
-				},
+			if t.IsZero() {
+				return nil
 			}
+		} else {
+			// Unexpected type - log and skip
+			s.logger.Sugar().Errorf("availability_confirmed_at expected to be a string, but it was %T", val)
+			return nil
 		}
 	}
-	return nil
+
+	depositAddress, err := s.dbClient.DepositAddress.Query().Where(depositaddress.ID(event.ID)).Only(ctx)
+	if err != nil {
+		return nil
+	}
+	if depositAddress.NodeID == uuid.Nil {
+		// The comment below implies that this is safe to ignore
+		return nil
+	}
+
+	treeNode, err := s.dbClient.TreeNode.Query().Where(treenode.ID(depositAddress.NodeID)).Only(ctx)
+	if err != nil {
+		// TODO: Fine to silently ignore this
+		// If tree node doesn't exist maybe we can inform client that they can claim the deposit?
+		return nil
+	}
+
+	treeNodeProto, err := treeNode.MarshalSparkProto(ctx)
+	if err != nil {
+		return nil
+	}
+
+	return &pb.SubscribeToEventsResponse{
+		Event: &pb.SubscribeToEventsResponse_Deposit{
+			Deposit: &pb.DepositEvent{
+				Deposit: treeNodeProto,
+			},
+		},
+	}
 }
 
 func (s *EventRouter) processTransferNotification(ctx context.Context, event processEventPayload) *pb.SubscribeToEventsResponse {

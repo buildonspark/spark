@@ -21,7 +21,7 @@ type DepositAddress struct {
 func (DepositAddress) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
-		NotifyMixin{AdditionalFields: []string{"owner_identity_pubkey", "confirmation_txid"}},
+		NotifyMixin{AdditionalFields: []string{"owner_identity_pubkey", "confirmation_txid", "availability_confirmed_at"}},
 	}
 }
 

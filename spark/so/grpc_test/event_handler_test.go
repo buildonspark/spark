@@ -111,15 +111,17 @@ func TestEventHandlerDepositNotification(t *testing.T) {
 	require.NoError(t, err)
 
 	skipConnectedEvent(t, stream)
-	events := make(chan *pb.SubscribeToEventsResponse, 1)
+	events := make(chan *pb.SubscribeToEventsResponse, 2)
 	errors := make(chan error, 1)
 	go func() {
-		event, err := stream.Recv()
-		if err != nil {
-			errors <- err
-			return
+		for {
+			event, err := stream.Recv()
+			if err != nil {
+				errors <- err
+				return
+			}
+			events <- event
 		}
-		events <- event
 	}()
 
 	leafPrivKey := keys.GeneratePrivateKey()
@@ -136,6 +138,14 @@ func TestEventHandlerDepositNotification(t *testing.T) {
 		t.Fatalf("stream error: %v", err)
 	case <-time.After(5 * time.Second):
 		require.Fail(t, "no event received")
+	}
+
+	// Make sure we send *only* one event
+	select {
+	case event := <-events:
+		require.Fail(t, "received multiple events for the same deposit", event)
+	case <-time.After(500 * time.Millisecond):
+		// No duplicate event received - test passes
 	}
 }
 
