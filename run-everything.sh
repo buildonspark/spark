@@ -98,7 +98,7 @@ run_frost_signers_tmux() {
 
         # Construct the command properly with escaped paths
         local log_file="${run_dir}/logs/signer_${i}.log"
-        local cmd="unset AR && cd signer && cargo run --bin spark-frost-signer --release -- -u /tmp/frost_${i}.sock 2>&1 | tee '${log_file}'"
+        local cmd="cd signer && cargo run --bin spark-frost-signer --release -- -u /tmp/frost_${i}.sock 2>&1 | tee '${log_file}'"
         # Send the command to tmux
         tmux send-keys -t "$session_name" "$cmd" C-m
     done
@@ -278,6 +278,114 @@ run_bitcoind_tmux() {
     echo ""
     echo "================================================"
     echo "Started bitcoind in tmux session: $session_name"
+    echo "To attach to the session: tmux attach -t $session_name"
+    echo "To detach from session: Press Ctrl-b then d"
+    echo "To kill the session: tmux kill-session -t $session_name"
+    echo "================================================"
+    echo ""
+}
+
+# Function to wait for bitcoind to be ready
+wait_for_bitcoind() {
+    local timeout=30
+    echo "Waiting for bitcoind to be ready..."
+
+    read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"
+
+    local start_time=$(date +%s)
+    while true; do
+        local current_time=$(date +%s)
+        local elapsed=$((current_time - start_time))
+
+        if [ $elapsed -gt $timeout ]; then
+            echo "Timeout waiting for bitcoind"
+            return 1
+        fi
+
+        if bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" getblockchaininfo &>/dev/null; then
+            echo "Bitcoind is ready!"
+            return 0
+        fi
+
+        sleep 1
+        echo -n "."
+    done
+}
+
+# Function to create and fund the default wallet
+create_and_fund_wallet() {
+    echo ""
+    echo "=== Setting up Bitcoin wallet ==="
+
+    read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"
+
+    # Check if wallet exists
+    local wallets=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" listwallets)
+
+    if echo "$wallets" | grep -q "default"; then
+        echo "Default wallet already exists"
+    else
+        echo "Creating default wallet..."
+        bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" createwallet "default" false false "" false true >/dev/null
+        if [ $? -eq 0 ]; then
+            echo "Successfully created default wallet"
+        else
+            echo "Failed to create wallet"
+            return 1
+        fi
+    fi
+
+    # Check balance
+    local balance=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcwallet=default getbalance)
+    echo "Current wallet balance: $balance BTC"
+
+    # Fund wallet if balance is low
+    if (( $(echo "$balance < 1" | bc -l) )); then
+        echo "Wallet balance is low, mining blocks to fund..."
+        local address=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcwallet=default getnewaddress)
+        bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" generatetoaddress 101 "$address" >/dev/null
+        echo "Successfully funded wallet with 101 blocks"
+
+        local new_balance=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcwallet=default getbalance)
+        echo "New wallet balance: $new_balance BTC"
+    fi
+
+    echo "Wallet setup complete!"
+    echo ""
+}
+
+# Function to run block miner in tmux
+run_block_miner_tmux() {
+    local run_dir=$1
+    local session_name="block-miner"
+
+    # Kill existing session if it exists
+    if tmux has-session -t "$session_name" 2>/dev/null; then
+        echo "Killing existing block-miner session..."
+        tmux kill-session -t "$session_name"
+    fi
+
+    read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"
+
+    # Create new tmux session
+    tmux new-session -d -s "$session_name"
+
+    local log_file="${run_dir}/logs/block-miner.log"
+
+    # Command to mine a block every 30 seconds
+    local cmd="while true; do \
+        address=\$(bitcoin-cli -regtest -rpcuser=\"$bitcoind_username\" -rpcpassword=\"$bitcoind_password\" -rpcwallet=default getnewaddress); \
+        bitcoin-cli -regtest -rpcuser=\"$bitcoind_username\" -rpcpassword=\"$bitcoind_password\" generatetoaddress 1 \"\$address\" >/dev/null; \
+        echo \"\$(date): Mined 1 block to \$address\"; \
+        sleep 30; \
+    done 2>&1 | tee '$log_file'"
+
+    tmux send-keys -t "$session_name" "$cmd" C-m
+
+    echo ""
+    echo "================================================"
+    echo "Started block miner in tmux session: $session_name"
+    echo "Mining 1 block every 30 seconds"
     echo "To attach to the session: tmux attach -t $session_name"
     echo "To detach from session: Press Ctrl-b then d"
     echo "To kill the session: tmux kill-session -t $session_name"
@@ -570,6 +678,18 @@ run_dir=$(create_run_dir)
 echo "Working with directory: $run_dir"
 
 run_bitcoind_tmux "$run_dir" $WIPE
+
+# Wait for bitcoind to be ready
+if ! wait_for_bitcoind; then
+    echo "Failed to start bitcoind"
+    exit 1
+fi
+
+# Create and fund the default wallet
+create_and_fund_wallet
+
+# Start continuous block mining
+run_block_miner_tmux "$run_dir"
 
 run_electrs_tmux "$run_dir"
 
