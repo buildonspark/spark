@@ -933,12 +933,27 @@ func markDepositAddressUTXOConfirmed(
 	dbClient *ent.Client,
 	deposit *ent.DepositAddress,
 ) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	// There is a race condition that, in practice, should not occur, but
+	// if multiple blocks are mined in rapid succession, duplicate gRPC events
+	// can be sent. To avoid this, only update availability_confirmed_at if it's
+	// already NULL.
+	// Note: We use UpdateOne (not Update) to ensure the Ent hooks fire and trigger notifications.
 	_, err := dbClient.DepositAddress.UpdateOne(deposit).
+		Where(depositaddress.AvailabilityConfirmedAtIsNil()).
 		SetAvailabilityConfirmedAt(time.Now()).
 		Save(ctx)
+
 	if err != nil {
+		if ent.IsNotFound(err) {
+			// Deposit was already marked as available by another process - this is fine
+			logger.Sugar().Debugf("Deposit %s was already marked as available", deposit.ID)
+			return nil
+		}
 		return fmt.Errorf("failed to mark deposit %s as availability confirmed: %w", deposit.ID, err)
 	}
+
 	return nil
 }
 
