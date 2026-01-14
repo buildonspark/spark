@@ -302,7 +302,7 @@ wait_for_bitcoind() {
             return 1
         fi
 
-        if bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" getblockchaininfo &>/dev/null; then
+        if bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcport=8332 getblockchaininfo &>/dev/null; then
             echo "Bitcoind is ready!"
             return 0
         fi
@@ -320,13 +320,13 @@ create_and_fund_wallet() {
     read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"
 
     # Check if wallet exists
-    local wallets=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" listwallets)
+    local wallets=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcport=8332 listwallets)
 
     if echo "$wallets" | grep -q "default"; then
         echo "Default wallet already exists"
     else
         echo "Creating default wallet..."
-        bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" createwallet "default" false false "" false true >/dev/null
+        bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcport=8332 createwallet "default" false false "" false true >/dev/null
         if [ $? -eq 0 ]; then
             echo "Successfully created default wallet"
         else
@@ -336,17 +336,17 @@ create_and_fund_wallet() {
     fi
 
     # Check balance
-    local balance=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcwallet=default getbalance)
+    local balance=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcport=8332 -rpcwallet=default getbalance)
     echo "Current wallet balance: $balance BTC"
 
     # Fund wallet if balance is low
     if (( $(echo "$balance < 1" | bc -l) )); then
         echo "Wallet balance is low, mining blocks to fund..."
-        local address=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcwallet=default getnewaddress)
-        bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" generatetoaddress 101 "$address" >/dev/null
+        local address=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcport=8332 -rpcwallet=default getnewaddress)
+        bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcport=8332 generatetoaddress 101 "$address" >/dev/null
         echo "Successfully funded wallet with 101 blocks"
 
-        local new_balance=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcwallet=default getbalance)
+        local new_balance=$(bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" -rpcport=8332 -rpcwallet=default getbalance)
         echo "New wallet balance: $new_balance BTC"
     fi
 
@@ -374,8 +374,8 @@ run_block_miner_tmux() {
 
     # Command to mine a block every 30 seconds
     local cmd="while true; do \
-        address=\$(bitcoin-cli -regtest -rpcuser=\"$bitcoind_username\" -rpcpassword=\"$bitcoind_password\" -rpcwallet=default getnewaddress); \
-        bitcoin-cli -regtest -rpcuser=\"$bitcoind_username\" -rpcpassword=\"$bitcoind_password\" generatetoaddress 1 \"\$address\" >/dev/null; \
+        address=\$(bitcoin-cli -regtest -rpcuser=\"$bitcoind_username\" -rpcpassword=\"$bitcoind_password\" -rpcport=8332 -rpcwallet=default getnewaddress); \
+        bitcoin-cli -regtest -rpcuser=\"$bitcoind_username\" -rpcpassword=\"$bitcoind_password\" -rpcport=8332 generatetoaddress 1 \"\$address\" >/dev/null; \
         echo \"\$(date): Mined 1 block to \$address\"; \
         sleep 30; \
     done 2>&1 | tee '$log_file'"
