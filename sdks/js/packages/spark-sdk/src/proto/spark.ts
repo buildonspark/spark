@@ -566,6 +566,7 @@ export interface DepositEvent {
 }
 
 export interface PageRequest {
+  unsafePageSize: number;
   pageSize: number;
   cursor: string;
   direction: Direction;
@@ -2450,13 +2451,16 @@ export const DepositEvent: MessageFns<DepositEvent> = {
 };
 
 function createBasePageRequest(): PageRequest {
-  return { pageSize: 0, cursor: "", direction: 0 };
+  return { unsafePageSize: 0, pageSize: 0, cursor: "", direction: 0 };
 }
 
 export const PageRequest: MessageFns<PageRequest> = {
   encode(message: PageRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.unsafePageSize !== 0) {
+      writer.uint32(8).int32(message.unsafePageSize);
+    }
     if (message.pageSize !== 0) {
-      writer.uint32(8).int32(message.pageSize);
+      writer.uint32(32).uint32(message.pageSize);
     }
     if (message.cursor !== "") {
       writer.uint32(18).string(message.cursor);
@@ -2479,7 +2483,15 @@ export const PageRequest: MessageFns<PageRequest> = {
             break;
           }
 
-          message.pageSize = reader.int32();
+          message.unsafePageSize = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
           continue;
         }
         case 2: {
@@ -2509,6 +2521,7 @@ export const PageRequest: MessageFns<PageRequest> = {
 
   fromJSON(object: any): PageRequest {
     return {
+      unsafePageSize: isSet(object.unsafePageSize) ? globalThis.Number(object.unsafePageSize) : 0,
       pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
       cursor: isSet(object.cursor) ? globalThis.String(object.cursor) : "",
       direction: isSet(object.direction) ? directionFromJSON(object.direction) : 0,
@@ -2517,6 +2530,9 @@ export const PageRequest: MessageFns<PageRequest> = {
 
   toJSON(message: PageRequest): unknown {
     const obj: any = {};
+    if (message.unsafePageSize !== 0) {
+      obj.unsafePageSize = Math.round(message.unsafePageSize);
+    }
     if (message.pageSize !== 0) {
       obj.pageSize = Math.round(message.pageSize);
     }
@@ -2534,6 +2550,7 @@ export const PageRequest: MessageFns<PageRequest> = {
   },
   fromPartial(object: DeepPartial<PageRequest>): PageRequest {
     const message = createBasePageRequest();
+    message.unsafePageSize = object.unsafePageSize ?? 0;
     message.pageSize = object.pageSize ?? 0;
     message.cursor = object.cursor ?? "";
     message.direction = object.direction ?? 0;

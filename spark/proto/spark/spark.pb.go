@@ -903,12 +903,13 @@ func (x *DepositEvent) GetDeposit() *TreeNode {
 }
 
 type PageRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	Cursor        string                 `protobuf:"bytes,2,opt,name=cursor,proto3" json:"cursor,omitempty"`
-	Direction     Direction              `protobuf:"varint,3,opt,name=direction,proto3,enum=spark.Direction" json:"direction,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	UnsafePageSize int32                  `protobuf:"varint,1,opt,name=unsafe_page_size,json=unsafePageSize,proto3" json:"unsafe_page_size,omitempty"`
+	PageSize       uint32                 `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	Cursor         string                 `protobuf:"bytes,2,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	Direction      Direction              `protobuf:"varint,3,opt,name=direction,proto3,enum=spark.Direction" json:"direction,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *PageRequest) Reset() {
@@ -941,7 +942,14 @@ func (*PageRequest) Descriptor() ([]byte, []int) {
 	return file_spark_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *PageRequest) GetPageSize() int32 {
+func (x *PageRequest) GetUnsafePageSize() int32 {
+	if x != nil {
+		return x.UnsafePageSize
+	}
+	return 0
+}
+
+func (x *PageRequest) GetPageSize() uint32 {
 	if x != nil {
 		return x.PageSize
 	}
@@ -10921,9 +10929,12 @@ const file_spark_proto_rawDesc = "" +
 	" \x01(\v2\x0f.spark.TransferR\btransfer\"9\n" +
 	"\fDepositEvent\x12)\n" +
 	"\adeposit\x18\n" +
-	" \x01(\v2\x0f.spark.TreeNodeR\adeposit\"r\n" +
-	"\vPageRequest\x12\x1b\n" +
-	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x16\n" +
+	" \x01(\v2\x0f.spark.TreeNodeR\adeposit\"\xb4\x01\n" +
+	"\vPageRequest\x124\n" +
+	"\x10unsafe_page_size\x18\x01 \x01(\x05B\n" +
+	"\xfaB\a\x1a\x05\x18\xe8\a(\x00R\x0eunsafePageSize\x12'\n" +
+	"\tpage_size\x18\x04 \x01(\rB\n" +
+	"\xfaB\a*\x05\x18\xe8\a(\x00R\bpageSize\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\x12.\n" +
 	"\tdirection\x18\x03 \x01(\x0e2\x10.spark.DirectionR\tdirection\"\xa8\x01\n" +
 	"\fPageResponse\x12\"\n" +

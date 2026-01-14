@@ -755,7 +755,27 @@ func (m *PageRequest) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for PageSize
+	if val := m.GetUnsafePageSize(); val < 0 || val > 1000 {
+		err := PageRequestValidationError{
+			field:  "UnsafePageSize",
+			reason: "value must be inside range [0, 1000]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if val := m.GetPageSize(); val < 0 || val > 1000 {
+		err := PageRequestValidationError{
+			field:  "PageSize",
+			reason: "value must be inside range [0, 1000]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	// no validation rules for Cursor
 

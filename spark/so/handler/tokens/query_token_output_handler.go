@@ -125,8 +125,12 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputsToken(ctx context.Context, r
 	}
 
 	limit := DefaultTokenOutputPageSize
-	if pageRequest != nil && pageRequest.GetPageSize() > 0 {
-		limit = int(pageRequest.GetPageSize())
+	if pageRequest != nil {
+		if pageRequest.GetPageSize() > 0 {
+			limit = int(pageRequest.GetPageSize())
+		} else if pageRequest.GetUnsafePageSize() > 0 {
+			limit = int(pageRequest.GetUnsafePageSize())
+		}
 	}
 	if limit > MaxTokenOutputPageSize {
 		limit = MaxTokenOutputPageSize
