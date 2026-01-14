@@ -16,7 +16,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/handler"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"go.uber.org/zap"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -157,28 +156,28 @@ func (s *EventRouter) processDepositNotification(ctx context.Context, event proc
 		return nil
 	}
 
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMultipleConfirmationForNonStaticDeposit, 0) > 0 {
-		val, exists := event.Fields["availability_confirmed_at"]
-		if !exists {
-			return nil
-		}
+	// Always check availability_confirmed_at to avoid duplicate events.
+	// Only send the deposit event when availability is actually confirmed.
+	val, exists := event.Fields["availability_confirmed_at"]
+	if !exists {
+		return nil
+	}
 
-		// availability_confirmed_at is serialized as an RFC3339 string in the JSON payload
-		// Check if it's the zero time value (0001-01-01T00:00:00Z)
-		if timeStr, ok := val.(string); ok {
-			t, err := time.Parse(time.RFC3339, timeStr)
-			if err != nil {
-				s.logger.With(zap.Error(err)).Sugar().Errorf("failed to parse availability_confirmed_at '%s' as time", timeStr)
-				return nil
-			}
-			if t.IsZero() {
-				return nil
-			}
-		} else {
-			// Unexpected type - log and skip
-			s.logger.Sugar().Errorf("availability_confirmed_at expected to be a string, but it was %T", val)
+	// availability_confirmed_at is serialized as an RFC3339 string in the JSON payload
+	// Check if it's the zero time value (0001-01-01T00:00:00Z)
+	if timeStr, ok := val.(string); ok {
+		t, err := time.Parse(time.RFC3339, timeStr)
+		if err != nil {
+			s.logger.With(zap.Error(err)).Sugar().Errorf("failed to parse availability_confirmed_at '%s' as time", timeStr)
 			return nil
 		}
+		if t.IsZero() {
+			return nil
+		}
+	} else {
+		// Unexpected type - log and skip
+		s.logger.Sugar().Errorf("availability_confirmed_at expected to be a string, but it was %T", val)
+		return nil
 	}
 
 	depositAddress, err := s.dbClient.DepositAddress.Query().Where(depositaddress.ID(event.ID)).Only(ctx)
