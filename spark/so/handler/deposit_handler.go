@@ -1331,3 +1331,18 @@ func (h *DepositHandler) validateBitcoinTransactions(ctx context.Context, req *p
 	}
 	return nil
 }
+
+// FinalizeDepositTreeCreation finalizes the tree creation for a deposit by aggregating
+// user signature shares with SE signature shares to produce final signatures.
+// This is part of the new deposit flow where:
+// 1. Client calls get_signing_commitments to get SE commitments
+// 2. Client signs locally to produce signature shares
+// 3. Client calls this endpoint to have SE aggregate and finalize the tree
+func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config *so.Config, req *pb.FinalizeDepositTreeCreationRequest) (*pb.FinalizeDepositTreeCreationResponse, error) {
+	_, span := tracer.Start(ctx, "DepositHandler.FinalizeDepositTreeCreation")
+	defer span.End()
+
+	// TODO: Implement signature aggregation and tree creation
+	// This will be implemented in a follow-up PR
+	return nil, status.Error(codes.Unimplemented, "FinalizeDepositTreeCreation is not yet implemented")
+}

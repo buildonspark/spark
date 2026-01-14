@@ -23,6 +23,7 @@ const (
 	SparkService_GenerateDepositAddress_FullMethodName              = "/spark.SparkService/generate_deposit_address"
 	SparkService_GenerateStaticDepositAddress_FullMethodName        = "/spark.SparkService/generate_static_deposit_address"
 	SparkService_StartDepositTreeCreation_FullMethodName            = "/spark.SparkService/start_deposit_tree_creation"
+	SparkService_FinalizeDepositTreeCreation_FullMethodName         = "/spark.SparkService/finalize_deposit_tree_creation"
 	SparkService_FinalizeTransferWithTransferPackage_FullMethodName = "/spark.SparkService/finalize_transfer_with_transfer_package"
 	SparkService_QueryPendingTransfers_FullMethodName               = "/spark.SparkService/query_pending_transfers"
 	SparkService_QueryAllTransfers_FullMethodName                   = "/spark.SparkService/query_all_transfers"
@@ -63,6 +64,8 @@ type SparkServiceClient interface {
 	// Generates a new static deposit address of the user or returns the existing one for the specified network.
 	GenerateStaticDepositAddress(ctx context.Context, in *GenerateStaticDepositAddressRequest, opts ...grpc.CallOption) (*GenerateStaticDepositAddressResponse, error)
 	StartDepositTreeCreation(ctx context.Context, in *StartDepositTreeCreationRequest, opts ...grpc.CallOption) (*StartDepositTreeCreationResponse, error)
+	// Creates a deposit tree with the commitments from get_signing_commitments, after they are signed. Fails if the tree already exists.
+	FinalizeDepositTreeCreation(ctx context.Context, in *FinalizeDepositTreeCreationRequest, opts ...grpc.CallOption) (*FinalizeDepositTreeCreationResponse, error)
 	FinalizeTransferWithTransferPackage(ctx context.Context, in *FinalizeTransferWithTransferPackageRequest, opts ...grpc.CallOption) (*FinalizeTransferResponse, error)
 	QueryPendingTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
 	QueryAllTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
@@ -143,6 +146,16 @@ func (c *sparkServiceClient) StartDepositTreeCreation(ctx context.Context, in *S
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(StartDepositTreeCreationResponse)
 	err := c.cc.Invoke(ctx, SparkService_StartDepositTreeCreation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) FinalizeDepositTreeCreation(ctx context.Context, in *FinalizeDepositTreeCreationRequest, opts ...grpc.CallOption) (*FinalizeDepositTreeCreationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FinalizeDepositTreeCreationResponse)
+	err := c.cc.Invoke(ctx, SparkService_FinalizeDepositTreeCreation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -466,6 +479,8 @@ type SparkServiceServer interface {
 	// Generates a new static deposit address of the user or returns the existing one for the specified network.
 	GenerateStaticDepositAddress(context.Context, *GenerateStaticDepositAddressRequest) (*GenerateStaticDepositAddressResponse, error)
 	StartDepositTreeCreation(context.Context, *StartDepositTreeCreationRequest) (*StartDepositTreeCreationResponse, error)
+	// Creates a deposit tree with the commitments from get_signing_commitments, after they are signed. Fails if the tree already exists.
+	FinalizeDepositTreeCreation(context.Context, *FinalizeDepositTreeCreationRequest) (*FinalizeDepositTreeCreationResponse, error)
 	FinalizeTransferWithTransferPackage(context.Context, *FinalizeTransferWithTransferPackageRequest) (*FinalizeTransferResponse, error)
 	QueryPendingTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
 	QueryAllTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
@@ -530,6 +545,9 @@ func (UnimplementedSparkServiceServer) GenerateStaticDepositAddress(context.Cont
 }
 func (UnimplementedSparkServiceServer) StartDepositTreeCreation(context.Context, *StartDepositTreeCreationRequest) (*StartDepositTreeCreationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartDepositTreeCreation not implemented")
+}
+func (UnimplementedSparkServiceServer) FinalizeDepositTreeCreation(context.Context, *FinalizeDepositTreeCreationRequest) (*FinalizeDepositTreeCreationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinalizeDepositTreeCreation not implemented")
 }
 func (UnimplementedSparkServiceServer) FinalizeTransferWithTransferPackage(context.Context, *FinalizeTransferWithTransferPackageRequest) (*FinalizeTransferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTransferWithTransferPackage not implemented")
@@ -692,6 +710,24 @@ func _SparkService_StartDepositTreeCreation_Handler(srv interface{}, ctx context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkServiceServer).StartDepositTreeCreation(ctx, req.(*StartDepositTreeCreationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_FinalizeDepositTreeCreation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeDepositTreeCreationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).FinalizeDepositTreeCreation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_FinalizeDepositTreeCreation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).FinalizeDepositTreeCreation(ctx, req.(*FinalizeDepositTreeCreationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1247,6 +1283,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "start_deposit_tree_creation",
 			Handler:    _SparkService_StartDepositTreeCreation_Handler,
+		},
+		{
+			MethodName: "finalize_deposit_tree_creation",
+			Handler:    _SparkService_FinalizeDepositTreeCreation_Handler,
 		},
 		{
 			MethodName: "finalize_transfer_with_transfer_package",

@@ -1000,6 +1000,26 @@ export interface StartDepositTreeCreationResponse {
   rootNodeSignatureShares: NodeSignatureShares | undefined;
 }
 
+/** FinalizeDepositTreeCreationRequest is the request to finalize the tree creation for a tree root node. */
+export interface FinalizeDepositTreeCreationRequest {
+  /** The identity public key of the user */
+  identityPublicKey: Uint8Array;
+  /** The on-chain utxo */
+  onChainUtxo:
+    | UTXO
+    | undefined;
+  /** User-signed transactions (with user signature shares, aggregated by server) */
+  rootTxSigningJob: UserSignedTxSigningJob | undefined;
+  refundTxSigningJob: UserSignedTxSigningJob | undefined;
+  directFromCpfpRefundTxSigningJob: UserSignedTxSigningJob | undefined;
+}
+
+/** FinalizeDepositTreeCreationResponse is the response to the request to finalize the tree creation for a tree root node. */
+export interface FinalizeDepositTreeCreationResponse {
+  /** the root node of the created tree */
+  rootNode: TreeNode | undefined;
+}
+
 /**
  * This proto is constructed by the wallet to specify leaves it wants to spend as
  * part of the token transaction.
@@ -1459,6 +1479,11 @@ export interface GetSigningCommitmentsRequest {
   nodeIds: string[];
   /** The number of signing commitments to get per node ID. */
   count: number;
+  /**
+   * Alternative to passing the node IDs: the number of node IDs for which to get signing commitments.
+   * Either `node_ids` or `node_id_count` should be passed, but not both.
+   */
+  nodeIdCount: number;
 }
 
 export interface GetSigningCommitmentsResponse {
@@ -6130,6 +6155,213 @@ export const StartDepositTreeCreationResponse: MessageFns<StartDepositTreeCreati
       (object.rootNodeSignatureShares !== undefined && object.rootNodeSignatureShares !== null)
         ? NodeSignatureShares.fromPartial(object.rootNodeSignatureShares)
         : undefined;
+    return message;
+  },
+};
+
+function createBaseFinalizeDepositTreeCreationRequest(): FinalizeDepositTreeCreationRequest {
+  return {
+    identityPublicKey: new Uint8Array(0),
+    onChainUtxo: undefined,
+    rootTxSigningJob: undefined,
+    refundTxSigningJob: undefined,
+    directFromCpfpRefundTxSigningJob: undefined,
+  };
+}
+
+export const FinalizeDepositTreeCreationRequest: MessageFns<FinalizeDepositTreeCreationRequest> = {
+  encode(message: FinalizeDepositTreeCreationRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    if (message.onChainUtxo !== undefined) {
+      UTXO.encode(message.onChainUtxo, writer.uint32(18).fork()).join();
+    }
+    if (message.rootTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.rootTxSigningJob, writer.uint32(26).fork()).join();
+    }
+    if (message.refundTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.refundTxSigningJob, writer.uint32(34).fork()).join();
+    }
+    if (message.directFromCpfpRefundTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.directFromCpfpRefundTxSigningJob, writer.uint32(42).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FinalizeDepositTreeCreationRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFinalizeDepositTreeCreationRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.onChainUtxo = UTXO.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.rootTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.refundTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.directFromCpfpRefundTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): FinalizeDepositTreeCreationRequest {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+      onChainUtxo: isSet(object.onChainUtxo) ? UTXO.fromJSON(object.onChainUtxo) : undefined,
+      rootTxSigningJob: isSet(object.rootTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.rootTxSigningJob)
+        : undefined,
+      refundTxSigningJob: isSet(object.refundTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.refundTxSigningJob)
+        : undefined,
+      directFromCpfpRefundTxSigningJob: isSet(object.directFromCpfpRefundTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.directFromCpfpRefundTxSigningJob)
+        : undefined,
+    };
+  },
+
+  toJSON(message: FinalizeDepositTreeCreationRequest): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    if (message.onChainUtxo !== undefined) {
+      obj.onChainUtxo = UTXO.toJSON(message.onChainUtxo);
+    }
+    if (message.rootTxSigningJob !== undefined) {
+      obj.rootTxSigningJob = UserSignedTxSigningJob.toJSON(message.rootTxSigningJob);
+    }
+    if (message.refundTxSigningJob !== undefined) {
+      obj.refundTxSigningJob = UserSignedTxSigningJob.toJSON(message.refundTxSigningJob);
+    }
+    if (message.directFromCpfpRefundTxSigningJob !== undefined) {
+      obj.directFromCpfpRefundTxSigningJob = UserSignedTxSigningJob.toJSON(message.directFromCpfpRefundTxSigningJob);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<FinalizeDepositTreeCreationRequest>): FinalizeDepositTreeCreationRequest {
+    return FinalizeDepositTreeCreationRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<FinalizeDepositTreeCreationRequest>): FinalizeDepositTreeCreationRequest {
+    const message = createBaseFinalizeDepositTreeCreationRequest();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    message.onChainUtxo = (object.onChainUtxo !== undefined && object.onChainUtxo !== null)
+      ? UTXO.fromPartial(object.onChainUtxo)
+      : undefined;
+    message.rootTxSigningJob = (object.rootTxSigningJob !== undefined && object.rootTxSigningJob !== null)
+      ? UserSignedTxSigningJob.fromPartial(object.rootTxSigningJob)
+      : undefined;
+    message.refundTxSigningJob = (object.refundTxSigningJob !== undefined && object.refundTxSigningJob !== null)
+      ? UserSignedTxSigningJob.fromPartial(object.refundTxSigningJob)
+      : undefined;
+    message.directFromCpfpRefundTxSigningJob =
+      (object.directFromCpfpRefundTxSigningJob !== undefined && object.directFromCpfpRefundTxSigningJob !== null)
+        ? UserSignedTxSigningJob.fromPartial(object.directFromCpfpRefundTxSigningJob)
+        : undefined;
+    return message;
+  },
+};
+
+function createBaseFinalizeDepositTreeCreationResponse(): FinalizeDepositTreeCreationResponse {
+  return { rootNode: undefined };
+}
+
+export const FinalizeDepositTreeCreationResponse: MessageFns<FinalizeDepositTreeCreationResponse> = {
+  encode(message: FinalizeDepositTreeCreationResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.rootNode !== undefined) {
+      TreeNode.encode(message.rootNode, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FinalizeDepositTreeCreationResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFinalizeDepositTreeCreationResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.rootNode = TreeNode.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): FinalizeDepositTreeCreationResponse {
+    return { rootNode: isSet(object.rootNode) ? TreeNode.fromJSON(object.rootNode) : undefined };
+  },
+
+  toJSON(message: FinalizeDepositTreeCreationResponse): unknown {
+    const obj: any = {};
+    if (message.rootNode !== undefined) {
+      obj.rootNode = TreeNode.toJSON(message.rootNode);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<FinalizeDepositTreeCreationResponse>): FinalizeDepositTreeCreationResponse {
+    return FinalizeDepositTreeCreationResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<FinalizeDepositTreeCreationResponse>): FinalizeDepositTreeCreationResponse {
+    const message = createBaseFinalizeDepositTreeCreationResponse();
+    message.rootNode = (object.rootNode !== undefined && object.rootNode !== null)
+      ? TreeNode.fromPartial(object.rootNode)
+      : undefined;
     return message;
   },
 };
@@ -11472,7 +11704,7 @@ export const RequestedSigningCommitments_SigningNonceCommitmentsEntry: MessageFn
 };
 
 function createBaseGetSigningCommitmentsRequest(): GetSigningCommitmentsRequest {
-  return { nodeIds: [], count: 0 };
+  return { nodeIds: [], count: 0, nodeIdCount: 0 };
 }
 
 export const GetSigningCommitmentsRequest: MessageFns<GetSigningCommitmentsRequest> = {
@@ -11482,6 +11714,9 @@ export const GetSigningCommitmentsRequest: MessageFns<GetSigningCommitmentsReque
     }
     if (message.count !== 0) {
       writer.uint32(16).uint32(message.count);
+    }
+    if (message.nodeIdCount !== 0) {
+      writer.uint32(24).uint32(message.nodeIdCount);
     }
     return writer;
   },
@@ -11509,6 +11744,14 @@ export const GetSigningCommitmentsRequest: MessageFns<GetSigningCommitmentsReque
           message.count = reader.uint32();
           continue;
         }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.nodeIdCount = reader.uint32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -11522,6 +11765,7 @@ export const GetSigningCommitmentsRequest: MessageFns<GetSigningCommitmentsReque
     return {
       nodeIds: globalThis.Array.isArray(object?.nodeIds) ? object.nodeIds.map((e: any) => globalThis.String(e)) : [],
       count: isSet(object.count) ? globalThis.Number(object.count) : 0,
+      nodeIdCount: isSet(object.nodeIdCount) ? globalThis.Number(object.nodeIdCount) : 0,
     };
   },
 
@@ -11533,6 +11777,9 @@ export const GetSigningCommitmentsRequest: MessageFns<GetSigningCommitmentsReque
     if (message.count !== 0) {
       obj.count = Math.round(message.count);
     }
+    if (message.nodeIdCount !== 0) {
+      obj.nodeIdCount = Math.round(message.nodeIdCount);
+    }
     return obj;
   },
 
@@ -11543,6 +11790,7 @@ export const GetSigningCommitmentsRequest: MessageFns<GetSigningCommitmentsReque
     const message = createBaseGetSigningCommitmentsRequest();
     message.nodeIds = object.nodeIds?.map((e) => e) || [];
     message.count = object.count ?? 0;
+    message.nodeIdCount = object.nodeIdCount ?? 0;
     return message;
   },
 };
@@ -19856,6 +20104,15 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** Creates a deposit tree with the commitments from get_signing_commitments, after they are signed. Fails if the tree already exists. */
+    finalize_deposit_tree_creation: {
+      name: "finalize_deposit_tree_creation",
+      requestType: FinalizeDepositTreeCreationRequest,
+      requestStream: false,
+      responseType: FinalizeDepositTreeCreationResponse,
+      responseStream: false,
+      options: {},
+    },
     finalize_transfer_with_transfer_package: {
       name: "finalize_transfer_with_transfer_package",
       requestType: FinalizeTransferWithTransferPackageRequest,
@@ -20139,6 +20396,11 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartDepositTreeCreationRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartDepositTreeCreationResponse>>;
+  /** Creates a deposit tree with the commitments from get_signing_commitments, after they are signed. Fails if the tree already exists. */
+  finalize_deposit_tree_creation(
+    request: FinalizeDepositTreeCreationRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<FinalizeDepositTreeCreationResponse>>;
   finalize_transfer_with_transfer_package(
     request: FinalizeTransferWithTransferPackageRequest,
     context: CallContext & CallContextExt,
@@ -20295,6 +20557,11 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartDepositTreeCreationRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartDepositTreeCreationResponse>;
+  /** Creates a deposit tree with the commitments from get_signing_commitments, after they are signed. Fails if the tree already exists. */
+  finalize_deposit_tree_creation(
+    request: DeepPartial<FinalizeDepositTreeCreationRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<FinalizeDepositTreeCreationResponse>;
   finalize_transfer_with_transfer_package(
     request: DeepPartial<FinalizeTransferWithTransferPackageRequest>,
     options?: CallOptions & CallOptionsExt,

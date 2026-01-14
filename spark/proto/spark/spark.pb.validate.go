@@ -5304,6 +5304,372 @@ var _ interface {
 	ErrorName() string
 } = StartDepositTreeCreationResponseValidationError{}
 
+// Validate checks the field values on FinalizeDepositTreeCreationRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *FinalizeDepositTreeCreationRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on FinalizeDepositTreeCreationRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// FinalizeDepositTreeCreationRequestMultiError, or nil if none found.
+func (m *FinalizeDepositTreeCreationRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *FinalizeDepositTreeCreationRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetIdentityPublicKey()) != 33 {
+		err := FinalizeDepositTreeCreationRequestValidationError{
+			field:  "IdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetOnChainUtxo()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FinalizeDepositTreeCreationRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FinalizeDepositTreeCreationRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOnChainUtxo()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FinalizeDepositTreeCreationRequestValidationError{
+				field:  "OnChainUtxo",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetRootTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FinalizeDepositTreeCreationRequestValidationError{
+					field:  "RootTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FinalizeDepositTreeCreationRequestValidationError{
+					field:  "RootTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRootTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FinalizeDepositTreeCreationRequestValidationError{
+				field:  "RootTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetRefundTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FinalizeDepositTreeCreationRequestValidationError{
+					field:  "RefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FinalizeDepositTreeCreationRequestValidationError{
+					field:  "RefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRefundTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FinalizeDepositTreeCreationRequestValidationError{
+				field:  "RefundTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetDirectFromCpfpRefundTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FinalizeDepositTreeCreationRequestValidationError{
+					field:  "DirectFromCpfpRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FinalizeDepositTreeCreationRequestValidationError{
+					field:  "DirectFromCpfpRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetDirectFromCpfpRefundTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FinalizeDepositTreeCreationRequestValidationError{
+				field:  "DirectFromCpfpRefundTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return FinalizeDepositTreeCreationRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// FinalizeDepositTreeCreationRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// FinalizeDepositTreeCreationRequest.ValidateAll() if the designated
+// constraints aren't met.
+type FinalizeDepositTreeCreationRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m FinalizeDepositTreeCreationRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m FinalizeDepositTreeCreationRequestMultiError) AllErrors() []error { return m }
+
+// FinalizeDepositTreeCreationRequestValidationError is the validation error
+// returned by FinalizeDepositTreeCreationRequest.Validate if the designated
+// constraints aren't met.
+type FinalizeDepositTreeCreationRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e FinalizeDepositTreeCreationRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e FinalizeDepositTreeCreationRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e FinalizeDepositTreeCreationRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e FinalizeDepositTreeCreationRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e FinalizeDepositTreeCreationRequestValidationError) ErrorName() string {
+	return "FinalizeDepositTreeCreationRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e FinalizeDepositTreeCreationRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sFinalizeDepositTreeCreationRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = FinalizeDepositTreeCreationRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = FinalizeDepositTreeCreationRequestValidationError{}
+
+// Validate checks the field values on FinalizeDepositTreeCreationResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *FinalizeDepositTreeCreationResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on FinalizeDepositTreeCreationResponse
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// FinalizeDepositTreeCreationResponseMultiError, or nil if none found.
+func (m *FinalizeDepositTreeCreationResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *FinalizeDepositTreeCreationResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetRootNode()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FinalizeDepositTreeCreationResponseValidationError{
+					field:  "RootNode",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FinalizeDepositTreeCreationResponseValidationError{
+					field:  "RootNode",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRootNode()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FinalizeDepositTreeCreationResponseValidationError{
+				field:  "RootNode",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return FinalizeDepositTreeCreationResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// FinalizeDepositTreeCreationResponseMultiError is an error wrapping multiple
+// validation errors returned by
+// FinalizeDepositTreeCreationResponse.ValidateAll() if the designated
+// constraints aren't met.
+type FinalizeDepositTreeCreationResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m FinalizeDepositTreeCreationResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m FinalizeDepositTreeCreationResponseMultiError) AllErrors() []error { return m }
+
+// FinalizeDepositTreeCreationResponseValidationError is the validation error
+// returned by FinalizeDepositTreeCreationResponse.Validate if the designated
+// constraints aren't met.
+type FinalizeDepositTreeCreationResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e FinalizeDepositTreeCreationResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e FinalizeDepositTreeCreationResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e FinalizeDepositTreeCreationResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e FinalizeDepositTreeCreationResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e FinalizeDepositTreeCreationResponseValidationError) ErrorName() string {
+	return "FinalizeDepositTreeCreationResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e FinalizeDepositTreeCreationResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sFinalizeDepositTreeCreationResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = FinalizeDepositTreeCreationResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = FinalizeDepositTreeCreationResponseValidationError{}
+
 // Validate checks the field values on TokenOutputToSpend with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -11661,6 +12027,8 @@ func (m *GetSigningCommitmentsRequest) validate(all bool) error {
 	var errors []error
 
 	// no validation rules for Count
+
+	// no validation rules for NodeIdCount
 
 	if len(errors) > 0 {
 		return GetSigningCommitmentsRequestMultiError(errors)

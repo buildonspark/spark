@@ -48,6 +48,12 @@ func (s *SparkServer) StartDepositTreeCreation(ctx context.Context, req *pb.Star
 	return depositHandler.StartDepositTreeCreation(ctx, s.config, req)
 }
 
+// FinalizeDepositTreeCreation finalizes the tree creation by aggregating user signature shares with SE shares.
+func (s *SparkServer) FinalizeDepositTreeCreation(ctx context.Context, req *pb.FinalizeDepositTreeCreationRequest) (*pb.FinalizeDepositTreeCreationResponse, error) {
+	depositHandler := handler.NewDepositHandler(s.config)
+	return depositHandler.FinalizeDepositTreeCreation(ctx, s.config, req)
+}
+
 // StartTreeCreation is deprecated.
 // Deprecated: Use StartDepositTreeCreation instead
 func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {

@@ -15,6 +15,8 @@ service SparkService {
     rpc generate_static_deposit_address(GenerateStaticDepositAddressRequest) returns (GenerateStaticDepositAddressResponse) {}
 
     rpc start_deposit_tree_creation(StartDepositTreeCreationRequest) returns (StartDepositTreeCreationResponse) {}
+    // Creates a deposit tree with the commitments from get_signing_commitments, after they are signed. Fails if the tree already exists.
+    rpc finalize_deposit_tree_creation(FinalizeDepositTreeCreationRequest) returns (FinalizeDepositTreeCreationResponse) {}
     rpc finalize_transfer_with_transfer_package(FinalizeTransferWithTransferPackageRequest) returns (FinalizeTransferResponse) {}
 
 
@@ -484,6 +486,30 @@ message StartDepositTreeCreationResponse {
     NodeSignatureShares root_node_signature_shares = 2;
 }
 
+/**
+ * FinalizeDepositTreeCreationRequest is the request to finalize the tree creation for a tree root node.
+ */
+message FinalizeDepositTreeCreationRequest {
+    // The identity public key of the user
+    bytes identity_public_key = 1  [(validate.rules).bytes.len = 33];
+
+    // The on-chain utxo
+    UTXO on_chain_utxo = 2;
+
+    // User-signed transactions (with user signature shares, aggregated by server)
+    UserSignedTxSigningJob root_tx_signing_job = 3;
+    UserSignedTxSigningJob refund_tx_signing_job = 4;
+    UserSignedTxSigningJob direct_from_cpfp_refund_tx_signing_job = 5;
+}
+
+/**
+ * FinalizeDepositTreeCreationResponse is the response to the request to finalize the tree creation for a tree root node.
+ */
+message FinalizeDepositTreeCreationResponse {
+    // the root node of the created tree
+    TreeNode root_node = 1;
+}
+
 // This proto is constructed by the wallet to specify leaves it wants to spend as
 // part of the token transaction.
 // DEPRECATED: Use definitions in spark_token.proto instead
@@ -923,6 +949,9 @@ message GetSigningCommitmentsRequest {
     repeated string node_ids = 1;
     // The number of signing commitments to get per node ID.
     uint32 count = 2;
+    // Alternative to passing the node IDs: the number of node IDs for which to get signing commitments.
+    // Either `node_ids` or `node_id_count` should be passed, but not both.
+    uint32 node_id_count = 3;
 }
 
 message GetSigningCommitmentsResponse {

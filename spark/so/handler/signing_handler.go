@@ -2,10 +2,10 @@ package handler
 
 import (
 	"context"
+	errs "errors"
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/uuids"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -81,6 +81,10 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 		return nil, err
 	}
 
+	if len(req.NodeIds) > 0 && req.NodeIdCount != 0 {
+		return nil, errs.New("can provide node_ids or node_id_count, but not both")
+	}
+
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -107,24 +111,23 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("count too large: %d", count))
 	}
 
-	nodes, err := tx.TreeNode.Query().WithSigningKeyshare().Where(treenode.IDIn(nodeIDs...)).All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get nodes: %w", err)
-	}
-
-	if err := h.validateNodeOwnership(ctx, nodes); err != nil {
-		return nil, err
-	}
-
-	keyshareIDs := make([]uuid.UUID, len(nodes))
-	for i, node := range nodes {
-		if node.Edges.SigningKeyshare == nil {
-			return nil, fmt.Errorf("node %s has no keyshare", node.ID)
+	var keyshareIDcount uint32
+	if len(nodeIDs) > 0 {
+		nodes, err := tx.TreeNode.Query().WithSigningKeyshare().Where(treenode.IDIn(nodeIDs...)).All(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get nodes: %w", err)
 		}
-		keyshareIDs[i] = node.Edges.SigningKeyshare.ID
+
+		if err := h.validateNodeOwnership(ctx, nodes); err != nil {
+			return nil, err
+		}
+
+		keyshareIDcount = uint32(len(nodes))
+	} else {
+		keyshareIDcount = req.NodeIdCount
 	}
 
-	commitments, err := helper.GetSigningCommitments(ctx, h.config, uint32(len(keyshareIDs)), count)
+	commitments, err := helper.GetSigningCommitments(ctx, h.config, keyshareIDcount, count)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get signing commitments: %w", err)
 	}
