@@ -2,11 +2,13 @@ syntax = "proto3";
 
 package spark_internal;
 
-option go_package = "github.com/lightsparkdev/spark/proto/spark_internal";
+import "common.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
-import "common.proto";
 import "spark.proto";
+import "validate/validate.proto";
+
+option go_package = "github.com/lightsparkdev/spark/proto/spark_internal";
 
 service SparkInternalService {
     rpc mark_keyshares_as_used(MarkKeysharesAsUsedRequest) returns (google.protobuf.Empty) {}
@@ -114,7 +116,7 @@ message FrostRound1Response {
 
 message SigningJob {
     // The unique identifier for the signing job.
-    string job_id = 1;
+    string job_id = 1 [(validate.rules).string.uuid = true];
 
     // The message to sign.
     bytes message = 2;

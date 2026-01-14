@@ -7,6 +7,7 @@
 package spark_internal
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	common "github.com/lightsparkdev/spark/proto/common"
 	spark "github.com/lightsparkdev/spark/proto/spark"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -3160,7 +3161,7 @@ var File_spark_internal_proto protoreflect.FileDescriptor
 
 const file_spark_internal_proto_rawDesc = "" +
 	"\n" +
-	"\x14spark_internal.proto\x12\x0espark_internal\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\fcommon.proto\x1a\vspark.proto\"=\n" +
+	"\x14spark_internal.proto\x12\x0espark_internal\x1a\fcommon.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\vspark.proto\x1a\x17validate/validate.proto\"=\n" +
 	"\x1aMarkKeysharesAsUsedRequest\x12\x1f\n" +
 	"\vkeyshare_id\x18\x01 \x03(\tR\n" +
 	"keyshareId\"\x85\x02\n" +
@@ -3185,10 +3186,10 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"a\n" +
 	"\x13FrostRound1Response\x12J\n" +
-	"\x13signing_commitments\x18\x01 \x03(\v2\x19.common.SigningCommitmentR\x12signingCommitments\"\xa1\x03\n" +
+	"\x13signing_commitments\x18\x01 \x03(\v2\x19.common.SigningCommitmentR\x12signingCommitments\"\xab\x03\n" +
 	"\n" +
-	"SigningJob\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x18\n" +
+	"SigningJob\x12\x1f\n" +
+	"\x06job_id\x18\x01 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01R\x05jobId\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\fR\amessage\x12\x1f\n" +
 	"\vkeyshare_id\x18\x03 \x01(\tR\n" +
 	"keyshareId\x12#\n" +

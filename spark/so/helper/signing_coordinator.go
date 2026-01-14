@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"os"
+	"slices"
 
 	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -32,7 +34,7 @@ var (
 // SigningResult is the result of a signing job.
 type SigningResult struct {
 	// JobID is the ID of the signing job.
-	JobID string
+	JobID uuid.UUID
 	// Message is the message that was signed.
 	Message []byte
 	// SignatureShares is the signature shares from all operators.
@@ -166,16 +168,16 @@ func frostRound2(
 	ctx context.Context,
 	config *so.Config,
 	jobs []*SigningJob,
-	round1 map[string][]frost.SigningCommitment,
+	round1 map[so.Identifier][]frost.SigningCommitment,
 	operatorSelection *OperatorSelection,
 	sparkServiceClientFactory SparkServiceFrostSignerFactory,
-) (map[string]map[string][]byte, error) {
-	operatorResult, err := ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (map[string][]byte, error) {
+) (map[uuid.UUID]map[so.Identifier][]byte, error) {
+	operatorResult, err := ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (map[uuid.UUID][]byte, error) {
 		commitmentsArray := collections.MapOfArrayToArrayOfMap(round1)
 
 		signingJobs := make([]*pbinternal.SigningJob, len(jobs))
 		for i, job := range jobs {
-			commitments := make(map[string]*pbcommon.SigningCommitment)
+			commitments := make(map[so.Identifier]*pbcommon.SigningCommitment)
 			for operatorID, commitment := range commitmentsArray[i] {
 				commitments[operatorID], _ = commitment.MarshalProto()
 			}
@@ -188,7 +190,7 @@ func frostRound2(
 				adaptorPublicKeyBytes = job.AdaptorPublicKey.Serialize()
 			}
 			signingJobs[i] = &pbinternal.SigningJob{
-				JobId:            job.JobID,
+				JobId:            job.JobID.String(),
 				Message:          job.Message,
 				KeyshareId:       job.SigningKeyshareID.String(),
 				VerifyingKey:     job.VerifyingKey.Serialize(),
@@ -211,9 +213,13 @@ func frostRound2(
 			return nil, err
 		}
 
-		results := make(map[string][]byte)
-		for operatorID, result := range response.Results {
-			results[operatorID] = result.SignatureShare
+		results := make(map[uuid.UUID][]byte)
+		for rawJobID, result := range response.GetResults() {
+			jobID, err := uuid.Parse(rawJobID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse job ID from results: %w", err)
+			}
+			results[jobID] = result.SignatureShare
 		}
 
 		return results, nil
@@ -222,14 +228,13 @@ func frostRound2(
 		return nil, err
 	}
 
-	result := collections.SwapMapKeys(operatorResult)
-	return result, nil
+	return collections.SwapMapKeys(operatorResult), nil
 }
 
 // SigningJob is a job for signing.
 type SigningJob struct {
 	// JobID is the ID of the signing job.
-	JobID string
+	JobID uuid.UUID
 	// SigningKeyshareID is the ID of the keyshare to use for signing.
 	SigningKeyshareID uuid.UUID
 	// Message is the message to sign.
@@ -294,7 +299,7 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 		return nil, nil, err
 	}
 	job := &SigningJob{
-		JobID:             uuid.New().String(),
+		JobID:             uuid.New(),
 		SigningKeyshareID: keyshare.ID,
 		Message:           txSigHash,
 		VerifyingKey:      &verifyingKey,
@@ -370,10 +375,9 @@ func NewSigningJobWithPregeneratedNonce(
 		round1Packages[key] = obj
 	}
 
-	jobID := uuid.New().String()
 	signingJob := &SigningJobWithPregeneratedNonce{
 		SigningJob: SigningJob{
-			JobID:             jobID,
+			JobID:             uuid.New(),
 			SigningKeyshareID: signingKeyshare.ID,
 			Message:           sigHash,
 			VerifyingKey:      &verifyingPubKey,
@@ -426,7 +430,7 @@ func SignFrostInternal(ctx context.Context, config *so.Config, jobs []*SigningJo
 
 	for _, id := range signingKeyshareIDs {
 		if _, exists := signingKeyshares[id]; !exists {
-			return nil, fmt.Errorf("keyshare %s not found", id.String())
+			return nil, fmt.Errorf("keyshare %s not found", id)
 		}
 	}
 
@@ -465,10 +469,7 @@ func SignFrostWithPregeneratedNonceInternal(ctx context.Context, config *so.Conf
 	}
 	round1 := collections.ArrayOfMapToMapOfArray(round1Array)
 
-	operatorIDs := make([]string, 0, len(round1))
-	for operatorID := range round1 {
-		operatorIDs = append(operatorIDs, operatorID)
-	}
+	operatorIDs := slices.Collect(maps.Keys(round1))
 	selection, err := NewPreSelectedOperatorSelection(config, operatorIDs)
 	if err != nil {
 		return nil, err
@@ -486,8 +487,8 @@ func prepareResults(
 	selection *OperatorSelection,
 	jobs []*SigningJob,
 	signingKeyshares map[uuid.UUID]*pbfrost.KeyPackage,
-	round1Array []map[string]frost.SigningCommitment,
-	round2 map[string]map[string][]byte,
+	round1Array []map[so.Identifier]frost.SigningCommitment,
+	round2 map[uuid.UUID]map[so.Identifier][]byte,
 ) ([]*SigningResult, error) {
 	results := make([]*SigningResult, len(jobs))
 	signingParticipants, err := selection.OperatorList(config)

@@ -12,7 +12,7 @@ import (
 
 // GenerateProofOfPossessionSignatures generates the proof of possession signatures for the given messages and keyshares.
 func GenerateProofOfPossessionSignatures(ctx context.Context, config *so.Config, messages [][]byte, keyshares []*ent.SigningKeyshare) ([][]byte, error) {
-	jobID := uuid.New().String()
+	jobID := uuid.New()
 	signingJobs := make([]*SigningJob, len(messages))
 	for i, message := range messages {
 		signingJob := SigningJob{

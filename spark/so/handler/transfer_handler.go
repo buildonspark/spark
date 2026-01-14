@@ -893,7 +893,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 		return nil, fmt.Errorf("transfer package is not nil, should call signRefundsWithPregeneratedNonce instead")
 	}
 
-	leafJobMap := make(map[string]*ent.TreeNode)
+	leafJobMap := make(map[uuid.UUID]*ent.TreeNode)
 	var cpfpSigningResults []*helper.SigningResult
 	var directSigningResults []*helper.SigningResult
 	var directFromCpfpSigningResults []*helper.SigningResult
@@ -927,7 +927,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 		if err := cpfpUserNonceCommitment.UnmarshalProto(req.GetRefundTxSigningJob().GetSigningNonceCommitment()); err != nil {
 			return nil, fmt.Errorf("unable to create cpfp signing commitment: %w", err)
 		}
-		cpfpJobID := uuid.New().String()
+		cpfpJobID := uuid.New()
 		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
@@ -967,7 +967,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if err := directUserNonceCommitment.UnmarshalProto(req.GetDirectRefundTxSigningJob().GetSigningNonceCommitment()); err != nil {
 				return nil, fmt.Errorf("unable to create direct signing commitment: %w", err)
 			}
-			directJobID := uuid.New().String()
+			directJobID := uuid.New()
 
 			directSigningJobs = append(
 				directSigningJobs,
@@ -998,7 +998,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if err := directFromCpfpUserNonceCommitment.UnmarshalProto(req.GetDirectFromCpfpRefundTxSigningJob().GetSigningNonceCommitment()); err != nil {
 				return nil, fmt.Errorf("unable to create direct from cpfp signing commitment: %w", err)
 			}
-			directFromCpfpJobID := uuid.New().String()
+			directFromCpfpJobID := uuid.New()
 			directFromCpfpSigningJobs = append(
 				directFromCpfpSigningJobs,
 				&helper.SigningJob{
@@ -1097,9 +1097,9 @@ func SignRefundsWithPregeneratedNonce(
 	ctx, span := tracer.Start(ctx, "TransferHandler.signRefunds")
 	defer span.End()
 
-	leafJobMap := make(map[string]*ent.TreeNode)
-	jobIsDirectRefund := make(map[string]bool)
-	jobIsDirectFromCpfpRefund := make(map[string]bool)
+	leafJobMap := make(map[uuid.UUID]*ent.TreeNode)
+	jobIsDirectRefund := make(map[uuid.UUID]bool)
+	jobIsDirectFromCpfpRefund := make(map[uuid.UUID]bool)
 
 	if requests.TransferPackage == nil {
 		return nil, nil, nil, fmt.Errorf("transfer package is nil")
@@ -1129,7 +1129,7 @@ func SignRefundsWithPregeneratedNonce(
 		if err := userNonceCommitment.UnmarshalProto(req.GetSigningNonceCommitment()); err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to unmarshal signing nonce commitment: %w", err)
 		}
-		cpfpJobID := uuid.New().String()
+		cpfpJobID := uuid.New()
 		jobIsDirectRefund[cpfpJobID] = false
 		jobIsDirectFromCpfpRefund[cpfpJobID] = false
 
@@ -1191,7 +1191,7 @@ func SignRefundsWithPregeneratedNonce(
 			return nil, nil, nil, fmt.Errorf("unable to unmarshal signing nonce commitment: %w", err)
 		}
 
-		directJobID := uuid.New().String()
+		directJobID := uuid.New()
 		jobIsDirectRefund[directJobID] = true
 		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
 		if err != nil {
@@ -1243,7 +1243,7 @@ func SignRefundsWithPregeneratedNonce(
 			return nil, nil, nil, fmt.Errorf("unable to unmarshal signing nonce commitment: %w", err)
 		}
 
-		directFromCpfpJobID := uuid.New().String()
+		directFromCpfpJobID := uuid.New()
 		jobIsDirectFromCpfpRefund[directFromCpfpJobID] = true
 		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
 		if err != nil {
@@ -2326,9 +2326,9 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	enhancedTransferReceiveValidationEnabled := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobEnhancedTransferReceiveValidation, &networkString, 0) > 0
 
 	var signingJobs []*helper.SigningJob
-	jobToLeafMap := make(map[string]uuid.UUID)
-	isDirectSigningJob := make(map[string]bool)
-	isDirectFromCpfpSigningJob := make(map[string]bool)
+	jobToLeafMap := make(map[uuid.UUID]uuid.UUID)
+	isDirectSigningJob := make(map[uuid.UUID]bool)
+	isDirectFromCpfpSigningJob := make(map[uuid.UUID]bool)
 	isSwap := transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap
 	isSupportedTransferType := transfer.Type == st.TransferTypeTransfer || transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap || transfer.Type == st.TransferTypeCooperativeExit
 

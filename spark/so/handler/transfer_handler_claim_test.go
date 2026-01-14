@@ -12,6 +12,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,10 +68,10 @@ var (
 
 	frostRound2StubOutput = map[string]any{
 		"results": map[string]any{
-			"operator1": map[string]any{
+			"a99a8b7c-8bd2-40ee-893b-aeefb00f1bf8": map[string]any{
 				"signature_share": signatureShare,
 			},
-			"operator2": map[string]any{
+			"43579ecc-d5a4-4115-80b7-fe86f8ac4586": map[string]any{
 				"signature_share": signatureShare,
 			},
 		},
@@ -522,7 +523,7 @@ func TestValidateReceivedRefundTransactions_Swap_DoesNotRequireDirectTx(t *testi
 
 	// Job with only CPFP refund tx - this is sufficient for swaps
 	job := &pb.LeafRefundTxSigningJob{
-		LeafId: "test-leaf-id",
+		LeafId: uuid.NewString(),
 		RefundTxSigningJob: &pb.SigningJob{
 			SigningPublicKey:       refundDestPubKey.Serialize(),
 			RawTx:                  cpfpTxBytes,

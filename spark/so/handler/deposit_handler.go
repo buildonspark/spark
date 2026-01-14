@@ -630,14 +630,14 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 
 	signingJobs := []*helper.SigningJob{
 		{
-			JobID:             uuid.New().String(),
+			JobID:             uuid.New(),
 			SigningKeyshareID: signingKeyShare.ID,
 			Message:           cpfpRootTxSigHash,
 			VerifyingKey:      &verifyingKey,
 			UserCommitment:    &userCpfpRootTxNonceCommitment,
 		},
 		{
-			JobID:             uuid.New().String(),
+			JobID:             uuid.New(),
 			SigningKeyshareID: signingKeyShare.ID,
 			Message:           cpfpRefundTxSigHash,
 			VerifyingKey:      &verifyingKey,
@@ -686,7 +686,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		signingJobs = append(
 			signingJobs,
 			&helper.SigningJob{
-				JobID:             uuid.New().String(),
+				JobID:             uuid.New(),
 				SigningKeyshareID: signingKeyShare.ID,
 				Message:           directFromCpfpRefundTxSigHash,
 				VerifyingKey:      &verifyingKey,
@@ -739,14 +739,14 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		signingJobs = append(
 			signingJobs,
 			&helper.SigningJob{
-				JobID:             uuid.New().String(),
+				JobID:             uuid.New(),
 				SigningKeyshareID: signingKeyShare.ID,
 				Message:           directRootTxSigHash,
 				VerifyingKey:      &verifyingKey,
 				UserCommitment:    &userDirectRootTxNonceCommitment,
 			},
 			&helper.SigningJob{
-				JobID:             uuid.New().String(),
+				JobID:             uuid.New(),
 				SigningKeyshareID: signingKeyShare.ID,
 				Message:           directRefundTxSigHash,
 				VerifyingKey:      &verifyingKey,
@@ -1084,7 +1084,7 @@ func getSpendTxSigningResult(ctx context.Context, config *so.Config, depositAddr
 	}
 
 	signingJobs := []*helper.SigningJob{{
-		JobID:             uuid.New().String(),
+		JobID:             uuid.New(),
 		SigningKeyshareID: signingKeyShare.ID,
 		Message:           spendTxSigHash,
 		VerifyingKey:      &verifyingKey,

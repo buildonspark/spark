@@ -70,14 +70,14 @@ func TestFrostSign(t *testing.T) {
 	// Step 6: Operator signing
 	signingJobs := []*helper.SigningJob{
 		{
-			JobID:             uuid.New().String(),
+			JobID:             uuid.New(),
 			SigningKeyshareID: operatorKeyShare.ID,
 			Message:           msgHash[:],
 			VerifyingKey:      &verifyingKey,
 			UserCommitment:    &userNonceCommitment,
 		},
 		{
-			JobID:             uuid.New().String(),
+			JobID:             uuid.New(),
 			SigningKeyshareID: operatorKeyShare.ID,
 			Message:           msgHash[:],
 			VerifyingKey:      &verifyingKey,
@@ -183,7 +183,7 @@ func TestFrostWithoutUserSign(t *testing.T) {
 	operatorKeyShare := operatorKeyShares[0]
 	// Step 3: Operator signing
 	signingJobs := []*helper.SigningJob{{
-		JobID:             uuid.New().String(),
+		JobID:             uuid.New(),
 		SigningKeyshareID: operatorKeyShare.ID,
 		Message:           msgHash[:],
 		VerifyingKey:      &operatorKeyShare.PublicKey,
@@ -276,7 +276,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 
 	// Step 6: Operator signing
 	signingJobs := []*helper.SigningJob{{
-		JobID:             uuid.New().String(),
+		JobID:             uuid.New(),
 		SigningKeyshareID: operatorKeyShare.ID,
 		Message:           msgHash[:],
 		VerifyingKey:      &verifyingKey,
@@ -439,7 +439,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 	// Step 8: Operator signing
 	signingJobs := []*helper.SigningJobWithPregeneratedNonce{{
 		SigningJob: helper.SigningJob{
-			JobID:             uuid.New().String(),
+			JobID:             uuid.New(),
 			SigningKeyshareID: operatorKeyShare.ID,
 			Message:           msgHash[:],
 			VerifyingKey:      &verifyingKey,

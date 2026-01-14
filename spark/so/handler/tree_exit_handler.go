@@ -137,7 +137,6 @@ func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 			return nil, fmt.Errorf("unable to unmarshal user nonce commitment: %w", err)
 		}
 
-		jobID := uuid.New().String()
 		signingKeyshare, err := root.QuerySigningKeyshare().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
@@ -146,7 +145,7 @@ func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 		signingJobs = append(
 			signingJobs,
 			&helper.SigningJob{
-				JobID:             jobID,
+				JobID:             uuid.New(),
 				SigningKeyshareID: signingKeyshare.ID,
 				Message:           txSigHash,
 				VerifyingKey:      &root.VerifyingPubkey,
@@ -159,7 +158,7 @@ func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign spend tx: %w", err)
 	}
-	jobIDToSigningResult := make(map[string]*helper.SigningResult)
+	jobIDToSigningResult := make(map[uuid.UUID]*helper.SigningResult)
 	for _, signingResult := range signingResults {
 		jobIDToSigningResult[signingResult.JobID] = signingResult
 	}
