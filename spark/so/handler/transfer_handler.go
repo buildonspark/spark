@@ -2162,23 +2162,27 @@ func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundT
 		return fmt.Errorf("missing RefundTxSigningJob for leaf %s", job.LeafId)
 	}
 
-	// If the incoming CPFP refund tx matches what's already in the DB,
-	// this is a retry of a previous signing request - skip validation
-	if bytes.Equal(job.RefundTxSigningJob.RawTx, leaf.RawRefundTx) {
-		return nil
-	}
-
-	refundDestPubKey, err := keys.ParsePublicKey(job.RefundTxSigningJob.SigningPublicKey)
-	if err != nil {
-		return fmt.Errorf("invalid refund signing public key for leaf %s: %w", job.LeafId, err)
-	}
-
 	// Helper function to safely extract RawTx from signing job
 	getRawTx := func(signingJob *pb.SigningJob) []byte {
 		if signingJob == nil {
 			return nil
 		}
 		return signingJob.RawTx
+	}
+
+	// If ALL incoming txs match what's already in the DB,
+	// this is a retry of a previous signing request - skip validation
+	if bytes.Equal(job.RefundTxSigningJob.RawTx, leaf.RawRefundTx) {
+		if !bytes.Equal(getRawTx(job.DirectRefundTxSigningJob), leaf.DirectRefundTx) ||
+			!bytes.Equal(getRawTx(job.DirectFromCpfpRefundTxSigningJob), leaf.DirectFromCpfpRefundTx) {
+			return fmt.Errorf("refund signing retry for leaf %s must not change direct refund transactions", job.LeafId)
+		}
+		return nil
+	}
+
+	refundDestPubKey, err := keys.ParsePublicKey(job.RefundTxSigningJob.SigningPublicKey)
+	if err != nil {
+		return fmt.Errorf("invalid refund signing public key for leaf %s: %w", job.LeafId, err)
 	}
 
 	if err := validateSingleLeafRefundTxs(

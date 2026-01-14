@@ -415,6 +415,48 @@ func TestValidateReceivedRefundTransactions_RetrySkipsValidation(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestValidateReceivedRefundTransactions_RetryWithDifferentDirectTx_RunsValidation(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{8})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+
+	// Simulate that direct refund txs have already been stored from a previous call
+	// by setting DirectRefundTx and DirectFromCpfpRefundTx on the leaf
+	validDirectRefundTx := []byte("valid-direct-refund-tx")
+	validDirectFromCpfpRefundTx := []byte("valid-direct-from-cpfp-refund-tx")
+	leaf.DirectRefundTx = validDirectRefundTx
+	leaf.DirectFromCpfpRefundTx = validDirectFromCpfpRefundTx
+
+	// Create a job where RefundTx matches (would trigger old retry behavior)
+	// but DirectRefundTx is different (the exploit attempt)
+	maliciousDirectRefundTx := []byte("malicious-direct-refund-tx")
+	maliciousDirectFromCpfpRefundTx := []byte("malicious-direct-from-cpfp-refund-tx")
+
+	job := &pb.LeafRefundTxSigningJob{
+		LeafId: "test-leaf-id",
+		RefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       ownerPubKey.Serialize(),
+			RawTx:                  leaf.RawRefundTx, // Same as leaf - would trigger old retry
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+		DirectRefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       ownerPubKey.Serialize(),
+			RawTx:                  maliciousDirectRefundTx, // DIFFERENT - exploit attempt
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+		DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       ownerPubKey.Serialize(),
+			RawTx:                  maliciousDirectFromCpfpRefundTx, // DIFFERENT - exploit attempt
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+	}
+
+	// This should NOT be treated as a retry because DirectRefundTx differs.
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer)
+	require.Error(t, err, "Expected validation to run and fail for mismatched direct txs, but it passed (retry detection bypassed validation)")
+}
+
 func TestValidateReceivedRefundTransactions_MissingRefundTxSigningJob(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{4})
 	ctx, _ := db.ConnectToTestPostgres(t)
