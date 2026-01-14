@@ -150,7 +150,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 
 		err = tokens.ValidateMintDoesNotExceedMaxSupply(ctx, finalTokenTX)
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("max supply error", finalTokenTX, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("max supply error: %w", err)))
+			return nil, tokens.FormatErrorWithTransactionProto("max supply error", finalTokenTX, err)
 		}
 	case utils.TokenTransactionTypeTransfer:
 		inputTtxos, err = ent.FetchAndLockTokenInputs(ctx, finalTokenTX.GetTransferInput().GetOutputsToSpend())
