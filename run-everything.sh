@@ -292,9 +292,11 @@ wait_for_bitcoind() {
 
     read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"
 
-    local start_time=$(date +%s)
+    local start_time
+    start_time=$(date +%s)
     while true; do
-        local current_time=$(date +%s)
+        local current_time
+        current_time=$(date +%s)
         local elapsed=$((current_time - start_time))
 
         if [ $elapsed -gt $timeout ]; then
@@ -316,6 +318,12 @@ wait_for_bitcoind() {
 create_and_fund_wallet() {
     echo ""
     echo "=== Setting up Bitcoin wallet ==="
+
+    # Check for bc dependency
+    if ! command -v bc &> /dev/null; then
+        echo "ERROR: 'bc' command not found. Please install bc (e.g., 'brew install bc' on macOS)"
+        return 1
+    fi
 
     read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"
 
@@ -374,9 +382,17 @@ run_block_miner_tmux() {
 
     # Command to mine a block every 30 seconds
     local cmd="while true; do \
-        address=\$(bitcoin-cli -regtest -rpcuser=\"$bitcoind_username\" -rpcpassword=\"$bitcoind_password\" -rpcport=8332 -rpcwallet=default getnewaddress); \
-        bitcoin-cli -regtest -rpcuser=\"$bitcoind_username\" -rpcpassword=\"$bitcoind_password\" -rpcport=8332 generatetoaddress 1 \"\$address\" >/dev/null; \
-        echo \"\$(date): Mined 1 block to \$address\"; \
+        address=\$(bitcoin-cli -regtest -rpcuser='$bitcoind_username' -rpcpassword='$bitcoind_password' -rpcport=8332 -rpcwallet=default getnewaddress 2>&1); \
+        if [ \$? -ne 0 ]; then \
+            echo \"\$(date): ERROR: Failed to get new address: \$address\"; \
+            sleep 30; \
+            continue; \
+        fi; \
+        if bitcoin-cli -regtest -rpcuser='$bitcoind_username' -rpcpassword='$bitcoind_password' -rpcport=8332 generatetoaddress 1 \"\$address\" >/dev/null 2>&1; then \
+            echo \"\$(date): Mined 1 block to \$address\"; \
+        else \
+            echo \"\$(date): ERROR: Failed to mine block\"; \
+        fi; \
         sleep 30; \
     done 2>&1 | tee '$log_file'"
 
