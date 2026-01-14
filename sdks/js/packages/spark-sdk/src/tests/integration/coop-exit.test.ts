@@ -16,7 +16,6 @@ import {
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
   getTxId,
-  getTxIdNoReverse,
 } from "../../utils/bitcoin.js";
 import { getNetwork, Network } from "../../utils/network.js";
 import { walletTypes } from "../test-utils.js";
@@ -159,7 +158,7 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
     const transferId = uuidv7();
     const senderTransfer = await coopExitService.getConnectorRefundSignatures({
       leaves: [transferNode],
-      exitTxId: hexToBytes(getTxIdNoReverse(exitTx)),
+      exitTxId: hexToBytes(getTxId(exitTx)),
       connectorOutputs,
       receiverPubKey: hexToBytes(sspPubkey),
       transferId,
@@ -237,11 +236,20 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
     // So that we don't race the chain watcher in this test
     await faucet.generateToAddress(30, randomAddress);
 
-    // Sleep to allow the SO chain watcher to catch up
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Generate 2 more blocks for key tweaking requirement (knob requires 2+ confirmations)
+    await faucet.generateToAddress(2, randomAddress);
 
-    // Refetch and claim incoming transfer
-    const transfers = await sspWallet.queryPendingTransfers();
+    // Sleep to allow the SO chain watcher to catch up and process key tweaking
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // Refetch and claim incoming transfer - retry with backoff to handle timing
+    let transfers = await sspWallet.queryPendingTransfers();
+    let retries = 0;
+    while (transfers.transfers.length === 0 && retries < 5) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      transfers = await sspWallet.queryPendingTransfers();
+      retries++;
+    }
     expect(transfers.transfers.length).toBe(1);
     await sspTransferService.claimTransfer(
       transfers.transfers[0]!,

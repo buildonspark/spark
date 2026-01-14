@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
@@ -667,15 +668,6 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 			{Value: 200},
 		},
 	}
-	coopExitTx3 := wire.MsgTx{
-		Version: 2,
-		TxIn:    []*wire.TxIn{{}},
-		TxOut: []*wire.TxOut{
-			{Value: 2700},
-			{Value: 300},
-		},
-	}
-
 	// Transaction not in block (should not be confirmed)
 	coopExitTxNotInBlock := wire.MsgTx{
 		Version: 2,
@@ -723,20 +715,15 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	transfer4, err := dbTx.Transfer.Create().
-		SetNetwork(btcnetwork.Testnet).
-		SetStatus(schematype.TransferStatusSenderInitiated).
-		SetType(schematype.TransferTypeCooperativeExit).
-		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
-		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
-		SetTotalValue(4000).
-		SetExpiryTime(time.Now().Add(24 * time.Hour)).
-		Save(ctx)
-	require.NoError(t, err)
-
-	// Create cooperative exits with different txids
+	// Create cooperative exits with reversed byte order (matching production behavior)
+	// Exit 1: Reversed bytes - should be found
 	txHash1 := coopExitTx1.TxHash()
-	exitTxid1, err := schematype.NewTxIDFromBytes(txHash1[:])
+	reversedTxHash1 := make([]byte, len(txHash1))
+	copy(reversedTxHash1, txHash1[:])
+	for i := 0; i < len(reversedTxHash1)/2; i++ {
+		reversedTxHash1[i], reversedTxHash1[len(reversedTxHash1)-1-i] = reversedTxHash1[len(reversedTxHash1)-1-i], reversedTxHash1[i]
+	}
+	exitTxid1, err := schematype.NewTxIDFromBytes(reversedTxHash1)
 	require.NoError(t, err)
 	_, err = dbTx.CooperativeExit.Create().
 		SetTransfer(transfer1).
@@ -744,6 +731,7 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
+	// Exit 2: Direct bytes (not reversed) - in block but should NOT be found with knob enabled
 	txHash2 := coopExitTx2.TxHash()
 	exitTxid2, err := schematype.NewTxIDFromBytes(txHash2[:])
 	require.NoError(t, err)
@@ -753,8 +741,8 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	// This one has reversed byte order
-	txHash3 := coopExitTx3.TxHash()
+	// Exit 3: Reversed bytes - not in the block, should not be found
+	txHash3 := coopExitTxNotInBlock.TxHash()
 	reversedTxHash3 := make([]byte, len(txHash3))
 	copy(reversedTxHash3, txHash3[:])
 	for i := 0; i < len(reversedTxHash3)/2; i++ {
@@ -765,16 +753,6 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 	_, err = dbTx.CooperativeExit.Create().
 		SetTransfer(transfer3).
 		SetExitTxid(exitTxid3).
-		Save(ctx)
-	require.NoError(t, err)
-
-	// This one is not in the block
-	txHash4 := coopExitTxNotInBlock.TxHash()
-	exitTxid4, err := schematype.NewTxIDFromBytes(txHash4[:])
-	require.NoError(t, err)
-	_, err = dbTx.CooperativeExit.Create().
-		SetTransfer(transfer4).
-		SetExitTxid(exitTxid4).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -793,15 +771,17 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 	require.NoError(t, err)
 
 	blockHeight := int64(100)
-	blockTxs := []wire.MsgTx{coopExitTx1, coopExitTx2, coopExitTx3}
+	blockTxs := []wire.MsgTx{coopExitTx1, coopExitTx2}
 
 	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, btcnetwork.Testnet)
 	require.NoError(t, err)
 
-	// Verify: exits 1, 2, and 3 should be confirmed
-	allCoopExits, err := dbTx.CooperativeExit.Query().All(ctx)
+	// Verify: only exit 1 should be confirmed (has reversed bytes)
+	// Exit 2 is in the block but not reversed, so won't be found
+	// Exit 3 is not in the block
+	allCoopExits, err := dbTx.CooperativeExit.Query().WithTransfer().All(ctx)
 	require.NoError(t, err)
-	require.Len(t, allCoopExits, 4)
+	require.Len(t, allCoopExits, 3)
 
 	confirmedCount := 0
 	for _, exit := range allCoopExits {
@@ -810,9 +790,12 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 			assert.Equal(t, blockHeight, *exit.ConfirmationHeight)
 			// Key tweaked height should still be nil (not enough blocks passed)
 			assert.Nil(t, exit.KeyTweakedHeight)
+			// Verify this is exit 1 (transfer1 - has reversed bytes)
+			require.NotNil(t, exit.Edges.Transfer)
+			assert.Equal(t, transfer1.ID, exit.Edges.Transfer.ID, "Only exit 1 (transfer1) should be confirmed with reversed bytes")
 		}
 	}
-	assert.Equal(t, 3, confirmedCount, "Expected 3 coop exits to be confirmed")
+	assert.Equal(t, 1, confirmedCount, "Expected 1 coop exit to be confirmed (only reversed bytes)")
 
 	// Process a few more blocks to trigger key tweaking (need >= 2 blocks)
 	blockHeight = int64(102)
@@ -820,7 +803,7 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify: After 2+ blocks, keys should be tweaked for all confirmed exits
-	allCoopExits, err = dbTx.CooperativeExit.Query().All(ctx)
+	allCoopExits, err = dbTx.CooperativeExit.Query().WithTransfer().All(ctx)
 	require.NoError(t, err)
 
 	tweakedCount := 0
@@ -830,11 +813,14 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 			assert.NotNil(t, exit.KeyTweakedHeight, "KeyTweakedHeight should be set after 2+ blocks")
 			if exit.KeyTweakedHeight != nil {
 				assert.Equal(t, blockHeight, *exit.KeyTweakedHeight)
+				// Verify this is exit 1 (transfer1 - has reversed bytes)
+				require.NotNil(t, exit.Edges.Transfer)
+				assert.Equal(t, transfer1.ID, exit.Edges.Transfer.ID, "Only exit 1 (transfer1) should be tweaked with reversed bytes")
 				tweakedCount++
 			}
 		}
 	}
-	assert.Equal(t, 3, tweakedCount, "Expected 3 coop exits to have keys tweaked")
+	assert.Equal(t, 1, tweakedCount, "Expected 1 coop exit to have keys tweaked")
 }
 
 func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
@@ -875,15 +861,6 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 			{Value: 200},
 		},
 	}
-	coopExitTx3 := wire.MsgTx{
-		Version: 2,
-		TxIn:    []*wire.TxIn{{}},
-		TxOut: []*wire.TxOut{
-			{Value: 2700},
-			{Value: 300},
-		},
-	}
-
 	// Transaction not in block
 	coopExitTxNotInBlock := wire.MsgTx{
 		Version: 2,
@@ -931,20 +908,15 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	transfer4, err := dbTx.Transfer.Create().
-		SetNetwork(btcnetwork.Testnet).
-		SetStatus(schematype.TransferStatusSenderInitiated).
-		SetType(schematype.TransferTypeCooperativeExit).
-		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
-		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
-		SetTotalValue(4000).
-		SetExpiryTime(time.Now().Add(24 * time.Hour)).
-		Save(ctx)
-	require.NoError(t, err)
-
-	// Create cooperative exits with different txids
+	// Create cooperative exits with reversed byte order (matching production behavior)
+	// Exit 1: Reversed bytes - should be found
 	txHash1 := coopExitTx1.TxHash()
-	exitTxid1, err := schematype.NewTxIDFromBytes(txHash1[:])
+	reversedTxHash1 := make([]byte, len(txHash1))
+	copy(reversedTxHash1, txHash1[:])
+	for i := 0; i < len(reversedTxHash1)/2; i++ {
+		reversedTxHash1[i], reversedTxHash1[len(reversedTxHash1)-1-i] = reversedTxHash1[len(reversedTxHash1)-1-i], reversedTxHash1[i]
+	}
+	exitTxid1, err := schematype.NewTxIDFromBytes(reversedTxHash1)
 	require.NoError(t, err)
 	_, err = dbTx.CooperativeExit.Create().
 		SetTransfer(transfer1).
@@ -952,6 +924,7 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
+	// Exit 2: Direct bytes (not reversed) - should be found
 	txHash2 := coopExitTx2.TxHash()
 	exitTxid2, err := schematype.NewTxIDFromBytes(txHash2[:])
 	require.NoError(t, err)
@@ -961,8 +934,8 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	// This one has reversed byte order
-	txHash3 := coopExitTx3.TxHash()
+	// Exit 3: Reversed bytes - not in the block, should not be found
+	txHash3 := coopExitTxNotInBlock.TxHash()
 	reversedTxHash3 := make([]byte, len(txHash3))
 	copy(reversedTxHash3, txHash3[:])
 	for i := 0; i < len(reversedTxHash3)/2; i++ {
@@ -973,16 +946,6 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 	_, err = dbTx.CooperativeExit.Create().
 		SetTransfer(transfer3).
 		SetExitTxid(exitTxid3).
-		Save(ctx)
-	require.NoError(t, err)
-
-	// This one is not in the block
-	txHash4 := coopExitTxNotInBlock.TxHash()
-	exitTxid4, err := schematype.NewTxIDFromBytes(txHash4[:])
-	require.NoError(t, err)
-	_, err = dbTx.CooperativeExit.Create().
-		SetTransfer(transfer4).
-		SetExitTxid(exitTxid4).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1002,18 +965,19 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 	require.NoError(t, err)
 
 	blockHeight := int64(100)
-	blockTxs := []wire.MsgTx{coopExitTx1, coopExitTx2, coopExitTx3}
+	blockTxs := []wire.MsgTx{coopExitTx1, coopExitTx2}
 
 	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, btcnetwork.Testnet)
 	require.NoError(t, err)
 
-	// Verify: exits 1, 2, and 3 should be confirmed, exit 4 should not
-	allCoopExits, err := dbTx.CooperativeExit.Query().All(ctx)
+	// Verify: exits 1 and 2 should be confirmed, exit 3 should not
+	allCoopExits, err := dbTx.CooperativeExit.Query().WithTransfer().All(ctx)
 	require.NoError(t, err)
-	require.Len(t, allCoopExits, 4)
+	require.Len(t, allCoopExits, 3)
 
 	confirmedCount := 0
 	unconfirmedCount := 0
+	confirmedTransferIDs := make(map[uuid.UUID]bool)
 	for _, exit := range allCoopExits {
 		if exit.ConfirmationHeight != nil {
 			confirmedCount++
@@ -1021,10 +985,17 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 			// In legacy path, KeyTweakedHeight should be set immediately
 			assert.NotNil(t, exit.KeyTweakedHeight, "KeyTweakedHeight should be set immediately in legacy path")
 			assert.Equal(t, blockHeight, *exit.KeyTweakedHeight)
+			// Track which transfers were confirmed
+			require.NotNil(t, exit.Edges.Transfer)
+			confirmedTransferIDs[exit.Edges.Transfer.ID] = true
 		} else {
 			unconfirmedCount++
 		}
 	}
-	assert.Equal(t, 3, confirmedCount, "Expected 3 coop exits to be confirmed")
+	assert.Equal(t, 2, confirmedCount, "Expected 2 coop exits to be confirmed")
 	assert.Equal(t, 1, unconfirmedCount, "Expected 1 coop exit to remain unconfirmed")
+	// Verify exits 1 and 2 (transfer1 and transfer2) were confirmed
+	assert.True(t, confirmedTransferIDs[transfer1.ID], "Exit 1 (transfer1) should be confirmed")
+	assert.True(t, confirmedTransferIDs[transfer2.ID], "Exit 2 (transfer2) should be confirmed")
+	assert.False(t, confirmedTransferIDs[transfer3.ID], "Exit 3 (transfer3) should NOT be confirmed")
 }

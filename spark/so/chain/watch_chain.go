@@ -549,14 +549,8 @@ func handleBlock(
 	logger.Sugar().Infof("Started processing coop exits at block height %d", blockHeight)
 	// TODO: expire pending coop exits after some time so this doesn't become too large
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled, 0) > 0 {
-		confirmedTxIDs := make([]st.TxID, 0, len(confirmedTxHashSet))
 		reversedConfirmedTxIDs := make([]st.TxID, 0, len(confirmedTxHashSet))
 		for txHashBytes := range confirmedTxHashSet {
-			txid, err := st.NewTxIDFromBytes(txHashBytes[:])
-			if err != nil {
-				return fmt.Errorf("failed to parse txid from confirmed tx hash: %w", err)
-			}
-			confirmedTxIDs = append(confirmedTxIDs, txid)
 			reversedTxHashBytes := slices.Clone(txHashBytes[:])
 			slices.Reverse(reversedTxHashBytes)
 			reversedTxid, err := st.NewTxIDFromBytes(reversedTxHashBytes)
@@ -566,15 +560,12 @@ func handleBlock(
 			reversedConfirmedTxIDs = append(reversedConfirmedTxIDs, reversedTxid)
 		}
 
-		if len(confirmedTxIDs) > 0 {
+		if len(reversedConfirmedTxIDs) > 0 {
 			unconfirmedCoopExits, err := dbClient.CooperativeExit.Query().
 				Where(
 					cooperativeexit.And(
 						cooperativeexit.ConfirmationHeightIsNil(),
-						cooperativeexit.Or(
-							cooperativeexit.ExitTxidIn(confirmedTxIDs...),
-							cooperativeexit.ExitTxidIn(reversedConfirmedTxIDs...),
-						),
+						cooperativeexit.ExitTxidIn(reversedConfirmedTxIDs...),
 					),
 				).
 				All(ctx)
@@ -586,7 +577,7 @@ func handleBlock(
 				if coopExit.KeyTweakedHeight != nil {
 					return fmt.Errorf("coop exit %s has KeyTweakedHeight set but ConfirmationHeight not set", coopExit.ID)
 				}
-				logger.Sugar().Debugf("Found coop exit tx at tx hash %s", coopExit.ExitTxid)
+				logger.Sugar().Debugf("Found coop exit %s at block height %d", coopExit.ID, blockHeight)
 				_, err = coopExit.Update().SetConfirmationHeight(blockHeight).Save(ctx)
 				if err != nil {
 					return fmt.Errorf("failed to update ConfirmationHeight for coop exit %s: %w", coopExit.ID, err)
