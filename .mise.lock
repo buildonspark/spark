@@ -109,5 +109,5 @@ size = 13557390
 url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.2.1/protoc-gen-validate_1.2.1_darwin_arm64.tar.gz"
 
 [[tools.rust]]
-version = "1.90.0"
+version = "1.92.0"
 backend = "core:rust"

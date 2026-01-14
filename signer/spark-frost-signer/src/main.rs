@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use clap::{arg, Parser};
+use clap::Parser;
 use server::FrostServer;
 use spark_frost::proto::frost::frost_service_server;
 use tokio::{
