@@ -19,6 +19,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
+	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -109,6 +111,8 @@ func checkColumn(table, column string) error {
 			eventmessage.Table:                      eventmessage.ValidColumn,
 			gossip.Table:                            gossip.ValidColumn,
 			l1tokencreate.Table:                     l1tokencreate.ValidColumn,
+			l1tokenoutputwithdrawal.Table:           l1tokenoutputwithdrawal.ValidColumn,
+			l1withdrawaltransaction.Table:           l1withdrawaltransaction.ValidColumn,
 			paymentintent.Table:                     paymentintent.ValidColumn,
 			pendingsendtransfer.Table:               pendingsendtransfer.ValidColumn,
 			preimagerequest.Table:                   preimagerequest.ValidColumn,

@@ -228,6 +228,61 @@ var (
 			},
 		},
 	}
+	// L1tokenOutputWithdrawalsColumns holds the columns for the "l1token_output_withdrawals" table.
+	L1tokenOutputWithdrawalsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "bitcoin_vout", Type: field.TypeUint16},
+		{Name: "l1withdrawal_transaction_withdrawals", Type: field.TypeUUID},
+		{Name: "token_output_withdrawal", Type: field.TypeUUID, Unique: true},
+	}
+	// L1tokenOutputWithdrawalsTable holds the schema information for the "l1token_output_withdrawals" table.
+	L1tokenOutputWithdrawalsTable = &schema.Table{
+		Name:       "l1token_output_withdrawals",
+		Columns:    L1tokenOutputWithdrawalsColumns,
+		PrimaryKey: []*schema.Column{L1tokenOutputWithdrawalsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "l1token_output_withdrawals_l1withdrawal_transactions_withdrawals",
+				Columns:    []*schema.Column{L1tokenOutputWithdrawalsColumns[4]},
+				RefColumns: []*schema.Column{L1withdrawalTransactionsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "l1token_output_withdrawals_token_outputs_withdrawal",
+				Columns:    []*schema.Column{L1tokenOutputWithdrawalsColumns[5]},
+				RefColumns: []*schema.Column{TokenOutputsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+	}
+	// L1withdrawalTransactionsColumns holds the columns for the "l1withdrawal_transactions" table.
+	L1withdrawalTransactionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "confirmation_txid", Type: field.TypeBytes},
+		{Name: "confirmation_block_hash", Type: field.TypeBytes},
+		{Name: "confirmation_height", Type: field.TypeUint64},
+		{Name: "detected_at", Type: field.TypeTime},
+		{Name: "owner_signature", Type: field.TypeBytes},
+		{Name: "l1withdrawal_transaction_se_entity", Type: field.TypeUUID},
+	}
+	// L1withdrawalTransactionsTable holds the schema information for the "l1withdrawal_transactions" table.
+	L1withdrawalTransactionsTable = &schema.Table{
+		Name:       "l1withdrawal_transactions",
+		Columns:    L1withdrawalTransactionsColumns,
+		PrimaryKey: []*schema.Column{L1withdrawalTransactionsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "l1withdrawal_transactions_entity_dkg_keys_se_entity",
+				Columns:    []*schema.Column{L1withdrawalTransactionsColumns[8]},
+				RefColumns: []*schema.Column{EntityDkgKeysColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+	}
 	// PaymentIntentsColumns holds the columns for the "payment_intents" table.
 	PaymentIntentsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1435,6 +1490,8 @@ var (
 		EventMessagesTable,
 		GossipsTable,
 		L1tokenCreatesTable,
+		L1tokenOutputWithdrawalsTable,
+		L1withdrawalTransactionsTable,
 		PaymentIntentsTable,
 		PendingSendTransfersTable,
 		PreimageRequestsTable,
@@ -1467,6 +1524,9 @@ func init() {
 	CooperativeExitsTable.ForeignKeys[0].RefTable = TransfersTable
 	DepositAddressesTable.ForeignKeys[0].RefTable = SigningKeysharesTable
 	EntityDkgKeysTable.ForeignKeys[0].RefTable = SigningKeysharesTable
+	L1tokenOutputWithdrawalsTable.ForeignKeys[0].RefTable = L1withdrawalTransactionsTable
+	L1tokenOutputWithdrawalsTable.ForeignKeys[1].RefTable = TokenOutputsTable
+	L1withdrawalTransactionsTable.ForeignKeys[0].RefTable = EntityDkgKeysTable
 	PreimageRequestsTable.ForeignKeys[0].RefTable = TransfersTable
 	PreimageSharesTable.ForeignKeys[0].RefTable = PreimageRequestsTable
 	TokenCreatesTable.ForeignKeys[0].RefTable = L1tokenCreatesTable

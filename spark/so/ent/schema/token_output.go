@@ -141,6 +141,9 @@ func (TokenOutput) Edges() []ent.Edge {
 			Required().
 			Field("token_create_id").
 			Comment("Token create contains the token metadata associated with this output."),
+		edge.To("withdrawal", L1TokenOutputWithdrawal.Type).
+			Unique().
+			Comment("The L1 withdrawal record if this output has been withdrawn."),
 	}
 }
 

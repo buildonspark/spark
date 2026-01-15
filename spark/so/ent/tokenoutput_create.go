@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -296,6 +297,25 @@ func (toc *TokenOutputCreate) AddTokenPartialRevocationSecretShares(t ...*TokenP
 // SetTokenCreate sets the "token_create" edge to the TokenCreate entity.
 func (toc *TokenOutputCreate) SetTokenCreate(t *TokenCreate) *TokenOutputCreate {
 	return toc.SetTokenCreateID(t.ID)
+}
+
+// SetWithdrawalID sets the "withdrawal" edge to the L1TokenOutputWithdrawal entity by ID.
+func (toc *TokenOutputCreate) SetWithdrawalID(id uuid.UUID) *TokenOutputCreate {
+	toc.mutation.SetWithdrawalID(id)
+	return toc
+}
+
+// SetNillableWithdrawalID sets the "withdrawal" edge to the L1TokenOutputWithdrawal entity by ID if the given value is not nil.
+func (toc *TokenOutputCreate) SetNillableWithdrawalID(id *uuid.UUID) *TokenOutputCreate {
+	if id != nil {
+		toc = toc.SetWithdrawalID(*id)
+	}
+	return toc
+}
+
+// SetWithdrawal sets the "withdrawal" edge to the L1TokenOutputWithdrawal entity.
+func (toc *TokenOutputCreate) SetWithdrawal(l *L1TokenOutputWithdrawal) *TokenOutputCreate {
+	return toc.SetWithdrawalID(l.ID)
 }
 
 // Mutation returns the TokenOutputMutation object of the builder.
@@ -631,6 +651,22 @@ func (toc *TokenOutputCreate) createSpec() (*TokenOutput, *sqlgraph.CreateSpec) 
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.TokenCreateID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := toc.mutation.WithdrawalIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   tokenoutput.WithdrawalTable,
+			Columns: []string{tokenoutput.WithdrawalColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(l1tokenoutputwithdrawal.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

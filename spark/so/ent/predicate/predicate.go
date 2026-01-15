@@ -27,6 +27,12 @@ type Gossip func(*sql.Selector)
 // L1TokenCreate is the predicate function for l1tokencreate builders.
 type L1TokenCreate func(*sql.Selector)
 
+// L1TokenOutputWithdrawal is the predicate function for l1tokenoutputwithdrawal builders.
+type L1TokenOutputWithdrawal func(*sql.Selector)
+
+// L1WithdrawalTransaction is the predicate function for l1withdrawaltransaction builders.
+type L1WithdrawalTransaction func(*sql.Selector)
+
 // PaymentIntent is the predicate function for paymentintent builders.
 type PaymentIntent func(*sql.Selector)
 

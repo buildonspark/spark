@@ -13,6 +13,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
+	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -225,6 +227,44 @@ func init() {
 	l1tokencreateDescID := l1tokencreateMixinFields0[0].Descriptor()
 	// l1tokencreate.DefaultID holds the default value on creation for the id field.
 	l1tokencreate.DefaultID = l1tokencreateDescID.Default.(func() uuid.UUID)
+	l1tokenoutputwithdrawalMixin := schema.L1TokenOutputWithdrawal{}.Mixin()
+	l1tokenoutputwithdrawalMixinFields0 := l1tokenoutputwithdrawalMixin[0].Fields()
+	_ = l1tokenoutputwithdrawalMixinFields0
+	l1tokenoutputwithdrawalFields := schema.L1TokenOutputWithdrawal{}.Fields()
+	_ = l1tokenoutputwithdrawalFields
+	// l1tokenoutputwithdrawalDescCreateTime is the schema descriptor for create_time field.
+	l1tokenoutputwithdrawalDescCreateTime := l1tokenoutputwithdrawalMixinFields0[1].Descriptor()
+	// l1tokenoutputwithdrawal.DefaultCreateTime holds the default value on creation for the create_time field.
+	l1tokenoutputwithdrawal.DefaultCreateTime = l1tokenoutputwithdrawalDescCreateTime.Default.(func() time.Time)
+	// l1tokenoutputwithdrawalDescUpdateTime is the schema descriptor for update_time field.
+	l1tokenoutputwithdrawalDescUpdateTime := l1tokenoutputwithdrawalMixinFields0[2].Descriptor()
+	// l1tokenoutputwithdrawal.DefaultUpdateTime holds the default value on creation for the update_time field.
+	l1tokenoutputwithdrawal.DefaultUpdateTime = l1tokenoutputwithdrawalDescUpdateTime.Default.(func() time.Time)
+	// l1tokenoutputwithdrawal.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	l1tokenoutputwithdrawal.UpdateDefaultUpdateTime = l1tokenoutputwithdrawalDescUpdateTime.UpdateDefault.(func() time.Time)
+	// l1tokenoutputwithdrawalDescID is the schema descriptor for id field.
+	l1tokenoutputwithdrawalDescID := l1tokenoutputwithdrawalMixinFields0[0].Descriptor()
+	// l1tokenoutputwithdrawal.DefaultID holds the default value on creation for the id field.
+	l1tokenoutputwithdrawal.DefaultID = l1tokenoutputwithdrawalDescID.Default.(func() uuid.UUID)
+	l1withdrawaltransactionMixin := schema.L1WithdrawalTransaction{}.Mixin()
+	l1withdrawaltransactionMixinFields0 := l1withdrawaltransactionMixin[0].Fields()
+	_ = l1withdrawaltransactionMixinFields0
+	l1withdrawaltransactionFields := schema.L1WithdrawalTransaction{}.Fields()
+	_ = l1withdrawaltransactionFields
+	// l1withdrawaltransactionDescCreateTime is the schema descriptor for create_time field.
+	l1withdrawaltransactionDescCreateTime := l1withdrawaltransactionMixinFields0[1].Descriptor()
+	// l1withdrawaltransaction.DefaultCreateTime holds the default value on creation for the create_time field.
+	l1withdrawaltransaction.DefaultCreateTime = l1withdrawaltransactionDescCreateTime.Default.(func() time.Time)
+	// l1withdrawaltransactionDescUpdateTime is the schema descriptor for update_time field.
+	l1withdrawaltransactionDescUpdateTime := l1withdrawaltransactionMixinFields0[2].Descriptor()
+	// l1withdrawaltransaction.DefaultUpdateTime holds the default value on creation for the update_time field.
+	l1withdrawaltransaction.DefaultUpdateTime = l1withdrawaltransactionDescUpdateTime.Default.(func() time.Time)
+	// l1withdrawaltransaction.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	l1withdrawaltransaction.UpdateDefaultUpdateTime = l1withdrawaltransactionDescUpdateTime.UpdateDefault.(func() time.Time)
+	// l1withdrawaltransactionDescID is the schema descriptor for id field.
+	l1withdrawaltransactionDescID := l1withdrawaltransactionMixinFields0[0].Descriptor()
+	// l1withdrawaltransaction.DefaultID holds the default value on creation for the id field.
+	l1withdrawaltransaction.DefaultID = l1withdrawaltransactionDescID.Default.(func() uuid.UUID)
 	paymentintentMixin := schema.PaymentIntent{}.Mixin()
 	paymentintentHooks := schema.PaymentIntent{}.Hooks()
 	paymentintent.Hooks[0] = paymentintentHooks[0]

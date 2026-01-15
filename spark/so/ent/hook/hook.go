@@ -93,6 +93,30 @@ func (f L1TokenCreateFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.L1TokenCreateMutation", m)
 }
 
+// The L1TokenOutputWithdrawalFunc type is an adapter to allow the use of ordinary
+// function as L1TokenOutputWithdrawal mutator.
+type L1TokenOutputWithdrawalFunc func(context.Context, *ent.L1TokenOutputWithdrawalMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f L1TokenOutputWithdrawalFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.L1TokenOutputWithdrawalMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.L1TokenOutputWithdrawalMutation", m)
+}
+
+// The L1WithdrawalTransactionFunc type is an adapter to allow the use of ordinary
+// function as L1WithdrawalTransaction mutator.
+type L1WithdrawalTransactionFunc func(context.Context, *ent.L1WithdrawalTransactionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f L1WithdrawalTransactionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.L1WithdrawalTransactionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.L1WithdrawalTransactionMutation", m)
+}
+
 // The PaymentIntentFunc type is an adapter to allow the use of ordinary
 // function as PaymentIntent mutator.
 type PaymentIntentFunc func(context.Context, *ent.PaymentIntentMutation) (ent.Value, error)

@@ -1092,6 +1092,325 @@ func (lc *L1TokenCreateExample) Exec(ctx context.Context) (*ent.L1TokenCreate, e
 	return create.Save(ctx)
 }
 
+// L1TokenOutputWithdrawalExample is a test fixture builder for L1TokenOutputWithdrawal.
+type L1TokenOutputWithdrawalExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	BitcoinVout *uint16
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	TokenOutput             *ent.TokenOutput
+	L1WithdrawalTransaction *ent.L1WithdrawalTransaction
+}
+
+// NewL1TokenOutputWithdrawalExample creates a new L1TokenOutputWithdrawalExample for testing.
+func NewL1TokenOutputWithdrawalExample(t *testing.T, client *ent.Client) *L1TokenOutputWithdrawalExample {
+	return &L1TokenOutputWithdrawalExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetBitcoinVout sets the bitcoin_vout field.
+func (low *L1TokenOutputWithdrawalExample) SetBitcoinVout(v uint16) *L1TokenOutputWithdrawalExample {
+	low.BitcoinVout = &v
+	return low
+}
+
+// SetTokenOutput sets the token_output edge.
+func (low *L1TokenOutputWithdrawalExample) SetTokenOutput(v *ent.TokenOutput) *L1TokenOutputWithdrawalExample {
+	low.TokenOutput = v
+	return low
+}
+
+// SetL1WithdrawalTransaction sets the l1_withdrawal_transaction edge.
+func (low *L1TokenOutputWithdrawalExample) SetL1WithdrawalTransaction(v *ent.L1WithdrawalTransaction) *L1TokenOutputWithdrawalExample {
+	low.L1WithdrawalTransaction = v
+	return low
+}
+
+// MustExec builds and saves the L1TokenOutputWithdrawal entity to the database.
+// It panics if the save fails.
+func (low *L1TokenOutputWithdrawalExample) MustExec(ctx context.Context) *ent.L1TokenOutputWithdrawal {
+	create := low.client.L1TokenOutputWithdrawal.Create()
+
+	// Set fields
+	if low.BitcoinVout != nil {
+		create.SetBitcoinVout(*low.BitcoinVout)
+	} else {
+		// Use default from annotation
+		create.SetBitcoinVout(uint16(0))
+	}
+
+	// Handle edges
+	if low.TokenOutput != nil {
+		create.SetTokenOutput(low.TokenOutput)
+	} else {
+		// Auto-create required edge
+		low.t.Helper()
+		low.TokenOutput = NewTokenOutputExample(low.t, low.client).MustExec(ctx)
+		create.SetTokenOutput(low.TokenOutput)
+	}
+	if low.L1WithdrawalTransaction != nil {
+		create.SetL1WithdrawalTransaction(low.L1WithdrawalTransaction)
+	} else {
+		// Auto-create required edge
+		low.t.Helper()
+		low.L1WithdrawalTransaction = NewL1WithdrawalTransactionExample(low.t, low.client).MustExec(ctx)
+		create.SetL1WithdrawalTransaction(low.L1WithdrawalTransaction)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		low.t.Helper()
+		low.t.Fatalf("failed to create L1TokenOutputWithdrawal: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the L1TokenOutputWithdrawal entity to the database.
+// It returns an error if the save fails.
+func (low *L1TokenOutputWithdrawalExample) Exec(ctx context.Context) (*ent.L1TokenOutputWithdrawal, error) {
+	create := low.client.L1TokenOutputWithdrawal.Create()
+
+	// Set fields
+	if low.BitcoinVout != nil {
+		create.SetBitcoinVout(*low.BitcoinVout)
+	} else {
+		// Use default from annotation
+		create.SetBitcoinVout(uint16(0))
+	}
+
+	// Handle edges
+	if low.TokenOutput != nil {
+		create.SetTokenOutput(low.TokenOutput)
+	} else {
+		// Auto-create required edge
+		var err error
+		low.TokenOutput, err = NewTokenOutputExample(low.t, low.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create token_output: %w", err)
+		}
+		create.SetTokenOutput(low.TokenOutput)
+	}
+	if low.L1WithdrawalTransaction != nil {
+		create.SetL1WithdrawalTransaction(low.L1WithdrawalTransaction)
+	} else {
+		// Auto-create required edge
+		var err error
+		low.L1WithdrawalTransaction, err = NewL1WithdrawalTransactionExample(low.t, low.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create l1_withdrawal_transaction: %w", err)
+		}
+		create.SetL1WithdrawalTransaction(low.L1WithdrawalTransaction)
+	}
+
+	return create.Save(ctx)
+}
+
+// L1WithdrawalTransactionExample is a test fixture builder for L1WithdrawalTransaction.
+type L1WithdrawalTransactionExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	ConfirmationTxid      *schematype.TxID
+	ConfirmationBlockHash *[]byte
+	ConfirmationHeight    *uint64
+	DetectedAt            *time.Time
+	OwnerSignature        *[]byte
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	Withdrawals []*ent.L1TokenOutputWithdrawal
+	SeEntity    *ent.EntityDkgKey
+}
+
+// NewL1WithdrawalTransactionExample creates a new L1WithdrawalTransactionExample for testing.
+func NewL1WithdrawalTransactionExample(t *testing.T, client *ent.Client) *L1WithdrawalTransactionExample {
+	return &L1WithdrawalTransactionExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetConfirmationTxid sets the confirmation_txid field.
+func (lt *L1WithdrawalTransactionExample) SetConfirmationTxid(v schematype.TxID) *L1WithdrawalTransactionExample {
+	lt.ConfirmationTxid = &v
+	return lt
+}
+
+// SetConfirmationBlockHash sets the confirmation_block_hash field.
+func (lt *L1WithdrawalTransactionExample) SetConfirmationBlockHash(v []byte) *L1WithdrawalTransactionExample {
+	lt.ConfirmationBlockHash = &v
+	return lt
+}
+
+// SetConfirmationHeight sets the confirmation_height field.
+func (lt *L1WithdrawalTransactionExample) SetConfirmationHeight(v uint64) *L1WithdrawalTransactionExample {
+	lt.ConfirmationHeight = &v
+	return lt
+}
+
+// SetDetectedAt sets the detected_at field.
+func (lt *L1WithdrawalTransactionExample) SetDetectedAt(v time.Time) *L1WithdrawalTransactionExample {
+	lt.DetectedAt = &v
+	return lt
+}
+
+// SetOwnerSignature sets the owner_signature field.
+func (lt *L1WithdrawalTransactionExample) SetOwnerSignature(v []byte) *L1WithdrawalTransactionExample {
+	lt.OwnerSignature = &v
+	return lt
+}
+
+// AddWithdrawal adds a L1TokenOutputWithdrawal to the withdrawals edge.
+func (lt *L1WithdrawalTransactionExample) AddWithdrawal(v *ent.L1TokenOutputWithdrawal) *L1WithdrawalTransactionExample {
+	lt.Withdrawals = append(lt.Withdrawals, v)
+	return lt
+}
+
+// SetWithdrawals sets the withdrawals edge.
+func (lt *L1WithdrawalTransactionExample) SetWithdrawals(v []*ent.L1TokenOutputWithdrawal) *L1WithdrawalTransactionExample {
+	lt.Withdrawals = v
+	return lt
+}
+
+// SetSeEntity sets the se_entity edge.
+func (lt *L1WithdrawalTransactionExample) SetSeEntity(v *ent.EntityDkgKey) *L1WithdrawalTransactionExample {
+	lt.SeEntity = v
+	return lt
+}
+
+// MustExec builds and saves the L1WithdrawalTransaction entity to the database.
+// It panics if the save fails.
+func (lt *L1WithdrawalTransactionExample) MustExec(ctx context.Context) *ent.L1WithdrawalTransaction {
+	create := lt.client.L1WithdrawalTransaction.Create()
+
+	// Set fields
+	if lt.ConfirmationTxid != nil {
+		create.SetConfirmationTxid(*lt.ConfirmationTxid)
+	} else {
+		// Use default from annotation
+		create.SetConfirmationTxid(schematype.MustParseTxID("6afc6ebd5ce104a3d03a927e48b05ee5b9ba52ec28dea2e4b79776e2f95de2d4"))
+	}
+	if lt.ConfirmationBlockHash != nil {
+		create.SetConfirmationBlockHash(*lt.ConfirmationBlockHash)
+	} else {
+		// Use default from annotation
+		create.SetConfirmationBlockHash(func() []byte {
+			b, _ := hex.DecodeString("0000000000000000000026a904803d445d297a4f32a4b2099f9291059af54a25")
+			return b
+		}())
+	}
+	if lt.ConfirmationHeight != nil {
+		create.SetConfirmationHeight(*lt.ConfirmationHeight)
+	} else {
+		// Use default from annotation
+		create.SetConfirmationHeight(uint64(0))
+	}
+	if lt.DetectedAt != nil {
+		create.SetDetectedAt(*lt.DetectedAt)
+	} else {
+		// Use default from annotation
+		create.SetDetectedAt(func() time.Time { t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z"); return t }())
+	}
+	if lt.OwnerSignature != nil {
+		create.SetOwnerSignature(*lt.OwnerSignature)
+	} else {
+		// Use default from annotation
+		create.SetOwnerSignature(func() []byte {
+			b, _ := hex.DecodeString("14bc648e78ec4ae6376b6752c35b1bd3f7a3c60a4caf3b107f9a08891bde9565006afe542e056da2726baf0915c61cbf6ec07b84b6fbcba4b82b6e5db953b1db")
+			return b
+		}())
+	}
+
+	// Handle edges
+	if len(lt.Withdrawals) > 0 {
+		create.AddWithdrawals(lt.Withdrawals...)
+	}
+	if lt.SeEntity != nil {
+		create.SetSeEntity(lt.SeEntity)
+	} else {
+		// Auto-create required edge
+		lt.t.Helper()
+		lt.SeEntity = NewEntityDkgKeyExample(lt.t, lt.client).MustExec(ctx)
+		create.SetSeEntity(lt.SeEntity)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		lt.t.Helper()
+		lt.t.Fatalf("failed to create L1WithdrawalTransaction: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the L1WithdrawalTransaction entity to the database.
+// It returns an error if the save fails.
+func (lt *L1WithdrawalTransactionExample) Exec(ctx context.Context) (*ent.L1WithdrawalTransaction, error) {
+	create := lt.client.L1WithdrawalTransaction.Create()
+
+	// Set fields
+	if lt.ConfirmationTxid != nil {
+		create.SetConfirmationTxid(*lt.ConfirmationTxid)
+	} else {
+		// Use default from annotation
+		create.SetConfirmationTxid(schematype.MustParseTxID("6afc6ebd5ce104a3d03a927e48b05ee5b9ba52ec28dea2e4b79776e2f95de2d4"))
+	}
+	if lt.ConfirmationBlockHash != nil {
+		create.SetConfirmationBlockHash(*lt.ConfirmationBlockHash)
+	} else {
+		// Use default from annotation
+		create.SetConfirmationBlockHash(func() []byte {
+			b, _ := hex.DecodeString("0000000000000000000026a904803d445d297a4f32a4b2099f9291059af54a25")
+			return b
+		}())
+	}
+	if lt.ConfirmationHeight != nil {
+		create.SetConfirmationHeight(*lt.ConfirmationHeight)
+	} else {
+		// Use default from annotation
+		create.SetConfirmationHeight(uint64(0))
+	}
+	if lt.DetectedAt != nil {
+		create.SetDetectedAt(*lt.DetectedAt)
+	} else {
+		// Use default from annotation
+		create.SetDetectedAt(func() time.Time { t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z"); return t }())
+	}
+	if lt.OwnerSignature != nil {
+		create.SetOwnerSignature(*lt.OwnerSignature)
+	} else {
+		// Use default from annotation
+		create.SetOwnerSignature(func() []byte {
+			b, _ := hex.DecodeString("14bc648e78ec4ae6376b6752c35b1bd3f7a3c60a4caf3b107f9a08891bde9565006afe542e056da2726baf0915c61cbf6ec07b84b6fbcba4b82b6e5db953b1db")
+			return b
+		}())
+	}
+
+	// Handle edges
+	if len(lt.Withdrawals) > 0 {
+		create.AddWithdrawals(lt.Withdrawals...)
+	}
+	if lt.SeEntity != nil {
+		create.SetSeEntity(lt.SeEntity)
+	} else {
+		// Auto-create required edge
+		var err error
+		lt.SeEntity, err = NewEntityDkgKeyExample(lt.t, lt.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create se_entity: %w", err)
+		}
+		create.SetSeEntity(lt.SeEntity)
+	}
+
+	return create.Save(ctx)
+}
+
 // PaymentIntentExample is a test fixture builder for PaymentIntent.
 type PaymentIntentExample struct {
 	client *ent.Client
@@ -2929,6 +3248,7 @@ type TokenOutputExample struct {
 	OutputSpentStartedTokenTransactions []*ent.TokenTransaction
 	TokenPartialRevocationSecretShares  []*ent.TokenPartialRevocationSecretShare
 	TokenCreate                         *ent.TokenCreate
+	Withdrawal                          *ent.L1TokenOutputWithdrawal
 }
 
 // NewTokenOutputExample creates a new TokenOutputExample for testing.
@@ -3095,6 +3415,12 @@ func (to *TokenOutputExample) SetTokenCreate(v *ent.TokenCreate) *TokenOutputExa
 	return to
 }
 
+// SetWithdrawal sets the withdrawal edge.
+func (to *TokenOutputExample) SetWithdrawal(v *ent.L1TokenOutputWithdrawal) *TokenOutputExample {
+	to.Withdrawal = v
+	return to
+}
+
 // MustExec builds and saves the TokenOutput entity to the database.
 // It panics if the save fails.
 func (to *TokenOutputExample) MustExec(ctx context.Context) *ent.TokenOutput {
@@ -3242,6 +3568,9 @@ func (to *TokenOutputExample) MustExec(ctx context.Context) *ent.TokenOutput {
 		to.t.Helper()
 		to.TokenCreate = NewTokenCreateExample(to.t, to.client).MustExec(ctx)
 		create.SetTokenCreate(to.TokenCreate)
+	}
+	if to.Withdrawal != nil {
+		create.SetWithdrawal(to.Withdrawal)
 	}
 
 	entity, err := create.Save(ctx)
@@ -3409,6 +3738,9 @@ func (to *TokenOutputExample) Exec(ctx context.Context) (*ent.TokenOutput, error
 			return nil, fmt.Errorf("failed to create token_create: %w", err)
 		}
 		create.SetTokenCreate(to.TokenCreate)
+	}
+	if to.Withdrawal != nil {
+		create.SetWithdrawal(to.Withdrawal)
 	}
 
 	return create.Save(ctx)

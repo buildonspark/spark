@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -88,9 +89,11 @@ type TokenOutputEdges struct {
 	TokenPartialRevocationSecretShares []*TokenPartialRevocationSecretShare `json:"token_partial_revocation_secret_shares,omitempty"`
 	// Token create contains the token metadata associated with this output.
 	TokenCreate *TokenCreate `json:"token_create,omitempty"`
+	// The L1 withdrawal record if this output has been withdrawn.
+	Withdrawal *L1TokenOutputWithdrawal `json:"withdrawal,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [7]bool
 }
 
 // RevocationKeyshareOrErr returns the RevocationKeyshare value or an error if the edge
@@ -153,6 +156,17 @@ func (e TokenOutputEdges) TokenCreateOrErr() (*TokenCreate, error) {
 		return nil, &NotFoundError{label: tokencreate.Label}
 	}
 	return nil, &NotLoadedError{edge: "token_create"}
+}
+
+// WithdrawalOrErr returns the Withdrawal value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TokenOutputEdges) WithdrawalOrErr() (*L1TokenOutputWithdrawal, error) {
+	if e.Withdrawal != nil {
+		return e.Withdrawal, nil
+	} else if e.loadedTypes[6] {
+		return nil, &NotFoundError{label: l1tokenoutputwithdrawal.Label}
+	}
+	return nil, &NotLoadedError{edge: "withdrawal"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -387,6 +401,11 @@ func (to *TokenOutput) QueryTokenPartialRevocationSecretShares() *TokenPartialRe
 // QueryTokenCreate queries the "token_create" edge of the TokenOutput entity.
 func (to *TokenOutput) QueryTokenCreate() *TokenCreateQuery {
 	return NewTokenOutputClient(to.config).QueryTokenCreate(to)
+}
+
+// QueryWithdrawal queries the "withdrawal" edge of the TokenOutput entity.
+func (to *TokenOutput) QueryWithdrawal() *L1TokenOutputWithdrawalQuery {
+	return NewTokenOutputClient(to.config).QueryWithdrawal(to)
 }
 
 // Update returns a builder for updating this TokenOutput.

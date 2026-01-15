@@ -71,6 +71,8 @@ const (
 	EdgeTokenPartialRevocationSecretShares = "token_partial_revocation_secret_shares"
 	// EdgeTokenCreate holds the string denoting the token_create edge name in mutations.
 	EdgeTokenCreate = "token_create"
+	// EdgeWithdrawal holds the string denoting the withdrawal edge name in mutations.
+	EdgeWithdrawal = "withdrawal"
 	// Table holds the table name of the tokenoutput in the database.
 	Table = "token_outputs"
 	// RevocationKeyshareTable is the table that holds the revocation_keyshare relation/edge.
@@ -113,6 +115,13 @@ const (
 	TokenCreateInverseTable = "token_creates"
 	// TokenCreateColumn is the table column denoting the token_create relation/edge.
 	TokenCreateColumn = "token_create_id"
+	// WithdrawalTable is the table that holds the withdrawal relation/edge.
+	WithdrawalTable = "l1token_output_withdrawals"
+	// WithdrawalInverseTable is the table name for the L1TokenOutputWithdrawal entity.
+	// It exists in this package in order to avoid circular dependency with the "l1tokenoutputwithdrawal" package.
+	WithdrawalInverseTable = "l1token_output_withdrawals"
+	// WithdrawalColumn is the table column denoting the withdrawal relation/edge.
+	WithdrawalColumn = "token_output_withdrawal"
 )
 
 // Columns holds all SQL columns for tokenoutput fields.
@@ -321,6 +330,13 @@ func ByTokenCreateField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newTokenCreateStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByWithdrawalField orders the results by withdrawal field.
+func ByWithdrawalField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newWithdrawalStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newRevocationKeyshareStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -361,5 +377,12 @@ func newTokenCreateStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(TokenCreateInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, TokenCreateTable, TokenCreateColumn),
+	)
+}
+func newWithdrawalStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(WithdrawalInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2O, false, WithdrawalTable, WithdrawalColumn),
 	)
 }

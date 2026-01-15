@@ -15,6 +15,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
+	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -284,6 +286,60 @@ func (f TraverseL1TokenCreate) Traverse(ctx context.Context, q ent.Query) error 
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.L1TokenCreateQuery", q)
+}
+
+// The L1TokenOutputWithdrawalFunc type is an adapter to allow the use of ordinary function as a Querier.
+type L1TokenOutputWithdrawalFunc func(context.Context, *ent.L1TokenOutputWithdrawalQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f L1TokenOutputWithdrawalFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.L1TokenOutputWithdrawalQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.L1TokenOutputWithdrawalQuery", q)
+}
+
+// The TraverseL1TokenOutputWithdrawal type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseL1TokenOutputWithdrawal func(context.Context, *ent.L1TokenOutputWithdrawalQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseL1TokenOutputWithdrawal) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseL1TokenOutputWithdrawal) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.L1TokenOutputWithdrawalQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.L1TokenOutputWithdrawalQuery", q)
+}
+
+// The L1WithdrawalTransactionFunc type is an adapter to allow the use of ordinary function as a Querier.
+type L1WithdrawalTransactionFunc func(context.Context, *ent.L1WithdrawalTransactionQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f L1WithdrawalTransactionFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.L1WithdrawalTransactionQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.L1WithdrawalTransactionQuery", q)
+}
+
+// The TraverseL1WithdrawalTransaction type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseL1WithdrawalTransaction func(context.Context, *ent.L1WithdrawalTransactionQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseL1WithdrawalTransaction) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseL1WithdrawalTransaction) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.L1WithdrawalTransactionQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.L1WithdrawalTransactionQuery", q)
 }
 
 // The PaymentIntentFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -924,6 +980,10 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.GossipQuery, predicate.Gossip, gossip.OrderOption]{typ: ent.TypeGossip, tq: q}, nil
 	case *ent.L1TokenCreateQuery:
 		return &query[*ent.L1TokenCreateQuery, predicate.L1TokenCreate, l1tokencreate.OrderOption]{typ: ent.TypeL1TokenCreate, tq: q}, nil
+	case *ent.L1TokenOutputWithdrawalQuery:
+		return &query[*ent.L1TokenOutputWithdrawalQuery, predicate.L1TokenOutputWithdrawal, l1tokenoutputwithdrawal.OrderOption]{typ: ent.TypeL1TokenOutputWithdrawal, tq: q}, nil
+	case *ent.L1WithdrawalTransactionQuery:
+		return &query[*ent.L1WithdrawalTransactionQuery, predicate.L1WithdrawalTransaction, l1withdrawaltransaction.OrderOption]{typ: ent.TypeL1WithdrawalTransaction, tq: q}, nil
 	case *ent.PaymentIntentQuery:
 		return &query[*ent.PaymentIntentQuery, predicate.PaymentIntent, paymentintent.OrderOption]{typ: ent.TypePaymentIntent, tq: q}, nil
 	case *ent.PendingSendTransferQuery:

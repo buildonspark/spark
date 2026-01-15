@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -228,6 +229,25 @@ func (tou *TokenOutputUpdate) AddTokenPartialRevocationSecretShares(t ...*TokenP
 	return tou.AddTokenPartialRevocationSecretShareIDs(ids...)
 }
 
+// SetWithdrawalID sets the "withdrawal" edge to the L1TokenOutputWithdrawal entity by ID.
+func (tou *TokenOutputUpdate) SetWithdrawalID(id uuid.UUID) *TokenOutputUpdate {
+	tou.mutation.SetWithdrawalID(id)
+	return tou
+}
+
+// SetNillableWithdrawalID sets the "withdrawal" edge to the L1TokenOutputWithdrawal entity by ID if the given value is not nil.
+func (tou *TokenOutputUpdate) SetNillableWithdrawalID(id *uuid.UUID) *TokenOutputUpdate {
+	if id != nil {
+		tou = tou.SetWithdrawalID(*id)
+	}
+	return tou
+}
+
+// SetWithdrawal sets the "withdrawal" edge to the L1TokenOutputWithdrawal entity.
+func (tou *TokenOutputUpdate) SetWithdrawal(l *L1TokenOutputWithdrawal) *TokenOutputUpdate {
+	return tou.SetWithdrawalID(l.ID)
+}
+
 // Mutation returns the TokenOutputMutation object of the builder.
 func (tou *TokenOutputUpdate) Mutation() *TokenOutputMutation {
 	return tou.mutation
@@ -279,6 +299,12 @@ func (tou *TokenOutputUpdate) RemoveTokenPartialRevocationSecretShares(t ...*Tok
 		ids[i] = t[i].ID
 	}
 	return tou.RemoveTokenPartialRevocationSecretShareIDs(ids...)
+}
+
+// ClearWithdrawal clears the "withdrawal" edge to the L1TokenOutputWithdrawal entity.
+func (tou *TokenOutputUpdate) ClearWithdrawal() *TokenOutputUpdate {
+	tou.mutation.ClearWithdrawal()
+	return tou
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -538,6 +564,35 @@ func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if tou.mutation.WithdrawalCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   tokenoutput.WithdrawalTable,
+			Columns: []string{tokenoutput.WithdrawalColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(l1tokenoutputwithdrawal.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tou.mutation.WithdrawalIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   tokenoutput.WithdrawalTable,
+			Columns: []string{tokenoutput.WithdrawalColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(l1tokenoutputwithdrawal.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	_spec.AddModifiers(tou.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tou.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -752,6 +807,25 @@ func (touo *TokenOutputUpdateOne) AddTokenPartialRevocationSecretShares(t ...*To
 	return touo.AddTokenPartialRevocationSecretShareIDs(ids...)
 }
 
+// SetWithdrawalID sets the "withdrawal" edge to the L1TokenOutputWithdrawal entity by ID.
+func (touo *TokenOutputUpdateOne) SetWithdrawalID(id uuid.UUID) *TokenOutputUpdateOne {
+	touo.mutation.SetWithdrawalID(id)
+	return touo
+}
+
+// SetNillableWithdrawalID sets the "withdrawal" edge to the L1TokenOutputWithdrawal entity by ID if the given value is not nil.
+func (touo *TokenOutputUpdateOne) SetNillableWithdrawalID(id *uuid.UUID) *TokenOutputUpdateOne {
+	if id != nil {
+		touo = touo.SetWithdrawalID(*id)
+	}
+	return touo
+}
+
+// SetWithdrawal sets the "withdrawal" edge to the L1TokenOutputWithdrawal entity.
+func (touo *TokenOutputUpdateOne) SetWithdrawal(l *L1TokenOutputWithdrawal) *TokenOutputUpdateOne {
+	return touo.SetWithdrawalID(l.ID)
+}
+
 // Mutation returns the TokenOutputMutation object of the builder.
 func (touo *TokenOutputUpdateOne) Mutation() *TokenOutputMutation {
 	return touo.mutation
@@ -803,6 +877,12 @@ func (touo *TokenOutputUpdateOne) RemoveTokenPartialRevocationSecretShares(t ...
 		ids[i] = t[i].ID
 	}
 	return touo.RemoveTokenPartialRevocationSecretShareIDs(ids...)
+}
+
+// ClearWithdrawal clears the "withdrawal" edge to the L1TokenOutputWithdrawal entity.
+func (touo *TokenOutputUpdateOne) ClearWithdrawal() *TokenOutputUpdateOne {
+	touo.mutation.ClearWithdrawal()
+	return touo
 }
 
 // Where appends a list predicates to the TokenOutputUpdate builder.
@@ -1085,6 +1165,35 @@ func (touo *TokenOutputUpdateOne) sqlSave(ctx context.Context) (_node *TokenOutp
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokenpartialrevocationsecretshare.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if touo.mutation.WithdrawalCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   tokenoutput.WithdrawalTable,
+			Columns: []string{tokenoutput.WithdrawalColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(l1tokenoutputwithdrawal.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := touo.mutation.WithdrawalIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   tokenoutput.WithdrawalTable,
+			Columns: []string{tokenoutput.WithdrawalColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(l1tokenoutputwithdrawal.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

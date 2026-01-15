@@ -17,6 +17,7 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -352,7 +353,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	bitcoinClient, err := rpcclient.New(connCfg, nil)
 	require.NoError(t, err)
 	blockHeight := int64(101)
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, txs, blockHeight, btcnetwork.Testnet)
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, txs, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
 	require.NoError(t, err)
 
 	// Both valid token announcements should be created as L1TokenCreate, the duplicate token announcement should not get created as a L1TokenCreate
@@ -573,7 +574,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 	blockHeight := int64(500)
 
 	// Call handleBlock
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, btcnetwork.Testnet)
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
 	require.NoError(t, err)
 
 	// Verify parent node status is updated to OnChain
@@ -605,7 +606,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 	blockHeight = int64(505)
 
 	// Call handleBlock
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, btcnetwork.Testnet)
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
 	require.NoError(t, err)
 
 	// Verify parent node status is updated to Exited
@@ -773,7 +774,7 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 	blockHeight := int64(100)
 	blockTxs := []wire.MsgTx{coopExitTx1, coopExitTx2}
 
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, btcnetwork.Testnet)
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
 	require.NoError(t, err)
 
 	// Verify: exits 1 and 2 should be confirmed
@@ -802,7 +803,7 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 
 	// Process a few more blocks to trigger key tweaking (need >= 2 blocks)
 	blockHeight = int64(102)
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, []wire.MsgTx{}, blockHeight, btcnetwork.Testnet)
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, []wire.MsgTx{}, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
 	require.NoError(t, err)
 
 	// Verify: After 2+ blocks, keys should be tweaked for all confirmed exits
@@ -973,7 +974,7 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 	blockHeight := int64(100)
 	blockTxs := []wire.MsgTx{coopExitTx1, coopExitTx2}
 
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, btcnetwork.Testnet)
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
 	require.NoError(t, err)
 
 	// Verify: exits 1 and 2 should be confirmed, exit 3 should not

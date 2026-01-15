@@ -1118,6 +1118,29 @@ func HasTokenCreateWith(preds ...predicate.TokenCreate) predicate.TokenOutput {
 	})
 }
 
+// HasWithdrawal applies the HasEdge predicate on the "withdrawal" edge.
+func HasWithdrawal() predicate.TokenOutput {
+	return predicate.TokenOutput(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, WithdrawalTable, WithdrawalColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasWithdrawalWith applies the HasEdge predicate on the "withdrawal" edge with a given conditions (other predicates).
+func HasWithdrawalWith(preds ...predicate.L1TokenOutputWithdrawal) predicate.TokenOutput {
+	return predicate.TokenOutput(func(s *sql.Selector) {
+		step := newWithdrawalStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.TokenOutput) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.AndPredicates(predicates...))

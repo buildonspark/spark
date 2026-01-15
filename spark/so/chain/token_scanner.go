@@ -19,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/chain/tokens"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -395,12 +396,17 @@ func handleTokenUpdatesForBlock(
 	dbClient *ent.Client,
 	txs []wire.MsgTx,
 	blockHeight int64,
+	blockHash chainhash.Hash,
 	network btcnetwork.Network,
 ) {
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Checking for token announcements (block height %d)", blockHeight)
 	if err := handleTokenAnnouncements(ctx, config, dbClient, txs, network); err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle token announcements (block height %d)", blockHeight)
+	}
+	logger.Sugar().Infof("Checking for token withdrawals (block height %d)", blockHeight)
+	if err := tokens.HandleTokenWithdrawals(ctx, config, dbClient, txs, network, uint64(blockHeight), blockHash); err != nil {
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle token withdrawals (block height %d)", blockHeight)
 	}
 }
 

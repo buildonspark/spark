@@ -185,7 +185,7 @@ func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCre
 		SetOwnerPublicKey(owner).
 		SetWithdrawBondSats(testWithdrawBondSats).
 		SetWithdrawRelativeBlockLocktime(testWithdrawRelativeBlockLocktime).
-		SetWithdrawRevocationCommitment(f.RandomBytes(32)).
+		SetWithdrawRevocationCommitment(keyshare.PublicKey.Serialize()).
 		SetTokenAmount(amountBytes).
 		SetAmount(u128Amount).
 		SetCreatedTransactionOutputVout(vout).

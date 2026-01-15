@@ -391,6 +391,7 @@ func connectBlocks(
 			bitcoinClient,
 			txs,
 			chainTip.Height,
+			chainTip.Hash,
 			network,
 		)
 		if err != nil {
@@ -478,6 +479,7 @@ func handleBlock(
 	bitcoinClient *rpcclient.Client,
 	txs []wire.MsgTx,
 	blockHeight int64,
+	blockHash chainhash.Hash,
 	network btcnetwork.Network,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
@@ -492,7 +494,7 @@ func handleBlock(
 	if err != nil {
 		return err
 	}
-	handleTokenUpdatesForBlock(ctx, config, dbClient, txs, blockHeight, network)
+	handleTokenUpdatesForBlock(ctx, config, dbClient, txs, blockHeight, blockHash, network)
 
 	confirmedTxHashSet, creditedAddresses, addressToUtxoMap, err := processTransactions(txs, networkParams)
 	if err != nil {

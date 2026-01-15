@@ -22,6 +22,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
+	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -66,6 +68,8 @@ const (
 	TypeEventMessage                      = "EventMessage"
 	TypeGossip                            = "Gossip"
 	TypeL1TokenCreate                     = "L1TokenCreate"
+	TypeL1TokenOutputWithdrawal           = "L1TokenOutputWithdrawal"
+	TypeL1WithdrawalTransaction           = "L1WithdrawalTransaction"
 	TypePaymentIntent                     = "PaymentIntent"
 	TypePendingSendTransfer               = "PendingSendTransfer"
 	TypePreimageRequest                   = "PreimageRequest"
@@ -5523,6 +5527,1452 @@ func (m *L1TokenCreateMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *L1TokenCreateMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown L1TokenCreate edge %s", name)
+}
+
+// L1TokenOutputWithdrawalMutation represents an operation that mutates the L1TokenOutputWithdrawal nodes in the graph.
+type L1TokenOutputWithdrawalMutation struct {
+	config
+	op                               Op
+	typ                              string
+	id                               *uuid.UUID
+	create_time                      *time.Time
+	update_time                      *time.Time
+	bitcoin_vout                     *uint16
+	addbitcoin_vout                  *int16
+	clearedFields                    map[string]struct{}
+	token_output                     *uuid.UUID
+	clearedtoken_output              bool
+	l1_withdrawal_transaction        *uuid.UUID
+	clearedl1_withdrawal_transaction bool
+	done                             bool
+	oldValue                         func(context.Context) (*L1TokenOutputWithdrawal, error)
+	predicates                       []predicate.L1TokenOutputWithdrawal
+}
+
+var _ ent.Mutation = (*L1TokenOutputWithdrawalMutation)(nil)
+
+// l1tokenoutputwithdrawalOption allows management of the mutation configuration using functional options.
+type l1tokenoutputwithdrawalOption func(*L1TokenOutputWithdrawalMutation)
+
+// newL1TokenOutputWithdrawalMutation creates new mutation for the L1TokenOutputWithdrawal entity.
+func newL1TokenOutputWithdrawalMutation(c config, op Op, opts ...l1tokenoutputwithdrawalOption) *L1TokenOutputWithdrawalMutation {
+	m := &L1TokenOutputWithdrawalMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeL1TokenOutputWithdrawal,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withL1TokenOutputWithdrawalID sets the ID field of the mutation.
+func withL1TokenOutputWithdrawalID(id uuid.UUID) l1tokenoutputwithdrawalOption {
+	return func(m *L1TokenOutputWithdrawalMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *L1TokenOutputWithdrawal
+		)
+		m.oldValue = func(ctx context.Context) (*L1TokenOutputWithdrawal, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().L1TokenOutputWithdrawal.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withL1TokenOutputWithdrawal sets the old L1TokenOutputWithdrawal of the mutation.
+func withL1TokenOutputWithdrawal(node *L1TokenOutputWithdrawal) l1tokenoutputwithdrawalOption {
+	return func(m *L1TokenOutputWithdrawalMutation) {
+		m.oldValue = func(context.Context) (*L1TokenOutputWithdrawal, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m L1TokenOutputWithdrawalMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m L1TokenOutputWithdrawalMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of L1TokenOutputWithdrawal entities.
+func (m *L1TokenOutputWithdrawalMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *L1TokenOutputWithdrawalMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *L1TokenOutputWithdrawalMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().L1TokenOutputWithdrawal.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *L1TokenOutputWithdrawalMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *L1TokenOutputWithdrawalMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the L1TokenOutputWithdrawal entity.
+// If the L1TokenOutputWithdrawal object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1TokenOutputWithdrawalMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *L1TokenOutputWithdrawalMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *L1TokenOutputWithdrawalMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *L1TokenOutputWithdrawalMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the L1TokenOutputWithdrawal entity.
+// If the L1TokenOutputWithdrawal object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1TokenOutputWithdrawalMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *L1TokenOutputWithdrawalMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetBitcoinVout sets the "bitcoin_vout" field.
+func (m *L1TokenOutputWithdrawalMutation) SetBitcoinVout(u uint16) {
+	m.bitcoin_vout = &u
+	m.addbitcoin_vout = nil
+}
+
+// BitcoinVout returns the value of the "bitcoin_vout" field in the mutation.
+func (m *L1TokenOutputWithdrawalMutation) BitcoinVout() (r uint16, exists bool) {
+	v := m.bitcoin_vout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBitcoinVout returns the old "bitcoin_vout" field's value of the L1TokenOutputWithdrawal entity.
+// If the L1TokenOutputWithdrawal object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1TokenOutputWithdrawalMutation) OldBitcoinVout(ctx context.Context) (v uint16, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBitcoinVout is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBitcoinVout requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBitcoinVout: %w", err)
+	}
+	return oldValue.BitcoinVout, nil
+}
+
+// AddBitcoinVout adds u to the "bitcoin_vout" field.
+func (m *L1TokenOutputWithdrawalMutation) AddBitcoinVout(u int16) {
+	if m.addbitcoin_vout != nil {
+		*m.addbitcoin_vout += u
+	} else {
+		m.addbitcoin_vout = &u
+	}
+}
+
+// AddedBitcoinVout returns the value that was added to the "bitcoin_vout" field in this mutation.
+func (m *L1TokenOutputWithdrawalMutation) AddedBitcoinVout() (r int16, exists bool) {
+	v := m.addbitcoin_vout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBitcoinVout resets all changes to the "bitcoin_vout" field.
+func (m *L1TokenOutputWithdrawalMutation) ResetBitcoinVout() {
+	m.bitcoin_vout = nil
+	m.addbitcoin_vout = nil
+}
+
+// SetTokenOutputID sets the "token_output" edge to the TokenOutput entity by id.
+func (m *L1TokenOutputWithdrawalMutation) SetTokenOutputID(id uuid.UUID) {
+	m.token_output = &id
+}
+
+// ClearTokenOutput clears the "token_output" edge to the TokenOutput entity.
+func (m *L1TokenOutputWithdrawalMutation) ClearTokenOutput() {
+	m.clearedtoken_output = true
+}
+
+// TokenOutputCleared reports if the "token_output" edge to the TokenOutput entity was cleared.
+func (m *L1TokenOutputWithdrawalMutation) TokenOutputCleared() bool {
+	return m.clearedtoken_output
+}
+
+// TokenOutputID returns the "token_output" edge ID in the mutation.
+func (m *L1TokenOutputWithdrawalMutation) TokenOutputID() (id uuid.UUID, exists bool) {
+	if m.token_output != nil {
+		return *m.token_output, true
+	}
+	return
+}
+
+// TokenOutputIDs returns the "token_output" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TokenOutputID instead. It exists only for internal usage by the builders.
+func (m *L1TokenOutputWithdrawalMutation) TokenOutputIDs() (ids []uuid.UUID) {
+	if id := m.token_output; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTokenOutput resets all changes to the "token_output" edge.
+func (m *L1TokenOutputWithdrawalMutation) ResetTokenOutput() {
+	m.token_output = nil
+	m.clearedtoken_output = false
+}
+
+// SetL1WithdrawalTransactionID sets the "l1_withdrawal_transaction" edge to the L1WithdrawalTransaction entity by id.
+func (m *L1TokenOutputWithdrawalMutation) SetL1WithdrawalTransactionID(id uuid.UUID) {
+	m.l1_withdrawal_transaction = &id
+}
+
+// ClearL1WithdrawalTransaction clears the "l1_withdrawal_transaction" edge to the L1WithdrawalTransaction entity.
+func (m *L1TokenOutputWithdrawalMutation) ClearL1WithdrawalTransaction() {
+	m.clearedl1_withdrawal_transaction = true
+}
+
+// L1WithdrawalTransactionCleared reports if the "l1_withdrawal_transaction" edge to the L1WithdrawalTransaction entity was cleared.
+func (m *L1TokenOutputWithdrawalMutation) L1WithdrawalTransactionCleared() bool {
+	return m.clearedl1_withdrawal_transaction
+}
+
+// L1WithdrawalTransactionID returns the "l1_withdrawal_transaction" edge ID in the mutation.
+func (m *L1TokenOutputWithdrawalMutation) L1WithdrawalTransactionID() (id uuid.UUID, exists bool) {
+	if m.l1_withdrawal_transaction != nil {
+		return *m.l1_withdrawal_transaction, true
+	}
+	return
+}
+
+// L1WithdrawalTransactionIDs returns the "l1_withdrawal_transaction" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// L1WithdrawalTransactionID instead. It exists only for internal usage by the builders.
+func (m *L1TokenOutputWithdrawalMutation) L1WithdrawalTransactionIDs() (ids []uuid.UUID) {
+	if id := m.l1_withdrawal_transaction; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetL1WithdrawalTransaction resets all changes to the "l1_withdrawal_transaction" edge.
+func (m *L1TokenOutputWithdrawalMutation) ResetL1WithdrawalTransaction() {
+	m.l1_withdrawal_transaction = nil
+	m.clearedl1_withdrawal_transaction = false
+}
+
+// Where appends a list predicates to the L1TokenOutputWithdrawalMutation builder.
+func (m *L1TokenOutputWithdrawalMutation) Where(ps ...predicate.L1TokenOutputWithdrawal) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the L1TokenOutputWithdrawalMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *L1TokenOutputWithdrawalMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.L1TokenOutputWithdrawal, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *L1TokenOutputWithdrawalMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *L1TokenOutputWithdrawalMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (L1TokenOutputWithdrawal).
+func (m *L1TokenOutputWithdrawalMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *L1TokenOutputWithdrawalMutation) Fields() []string {
+	fields := make([]string, 0, 3)
+	if m.create_time != nil {
+		fields = append(fields, l1tokenoutputwithdrawal.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, l1tokenoutputwithdrawal.FieldUpdateTime)
+	}
+	if m.bitcoin_vout != nil {
+		fields = append(fields, l1tokenoutputwithdrawal.FieldBitcoinVout)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *L1TokenOutputWithdrawalMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case l1tokenoutputwithdrawal.FieldCreateTime:
+		return m.CreateTime()
+	case l1tokenoutputwithdrawal.FieldUpdateTime:
+		return m.UpdateTime()
+	case l1tokenoutputwithdrawal.FieldBitcoinVout:
+		return m.BitcoinVout()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *L1TokenOutputWithdrawalMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case l1tokenoutputwithdrawal.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case l1tokenoutputwithdrawal.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case l1tokenoutputwithdrawal.FieldBitcoinVout:
+		return m.OldBitcoinVout(ctx)
+	}
+	return nil, fmt.Errorf("unknown L1TokenOutputWithdrawal field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *L1TokenOutputWithdrawalMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case l1tokenoutputwithdrawal.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case l1tokenoutputwithdrawal.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case l1tokenoutputwithdrawal.FieldBitcoinVout:
+		v, ok := value.(uint16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBitcoinVout(v)
+		return nil
+	}
+	return fmt.Errorf("unknown L1TokenOutputWithdrawal field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *L1TokenOutputWithdrawalMutation) AddedFields() []string {
+	var fields []string
+	if m.addbitcoin_vout != nil {
+		fields = append(fields, l1tokenoutputwithdrawal.FieldBitcoinVout)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *L1TokenOutputWithdrawalMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case l1tokenoutputwithdrawal.FieldBitcoinVout:
+		return m.AddedBitcoinVout()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *L1TokenOutputWithdrawalMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case l1tokenoutputwithdrawal.FieldBitcoinVout:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBitcoinVout(v)
+		return nil
+	}
+	return fmt.Errorf("unknown L1TokenOutputWithdrawal numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *L1TokenOutputWithdrawalMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *L1TokenOutputWithdrawalMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *L1TokenOutputWithdrawalMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown L1TokenOutputWithdrawal nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *L1TokenOutputWithdrawalMutation) ResetField(name string) error {
+	switch name {
+	case l1tokenoutputwithdrawal.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case l1tokenoutputwithdrawal.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case l1tokenoutputwithdrawal.FieldBitcoinVout:
+		m.ResetBitcoinVout()
+		return nil
+	}
+	return fmt.Errorf("unknown L1TokenOutputWithdrawal field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *L1TokenOutputWithdrawalMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.token_output != nil {
+		edges = append(edges, l1tokenoutputwithdrawal.EdgeTokenOutput)
+	}
+	if m.l1_withdrawal_transaction != nil {
+		edges = append(edges, l1tokenoutputwithdrawal.EdgeL1WithdrawalTransaction)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *L1TokenOutputWithdrawalMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case l1tokenoutputwithdrawal.EdgeTokenOutput:
+		if id := m.token_output; id != nil {
+			return []ent.Value{*id}
+		}
+	case l1tokenoutputwithdrawal.EdgeL1WithdrawalTransaction:
+		if id := m.l1_withdrawal_transaction; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *L1TokenOutputWithdrawalMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *L1TokenOutputWithdrawalMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *L1TokenOutputWithdrawalMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedtoken_output {
+		edges = append(edges, l1tokenoutputwithdrawal.EdgeTokenOutput)
+	}
+	if m.clearedl1_withdrawal_transaction {
+		edges = append(edges, l1tokenoutputwithdrawal.EdgeL1WithdrawalTransaction)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *L1TokenOutputWithdrawalMutation) EdgeCleared(name string) bool {
+	switch name {
+	case l1tokenoutputwithdrawal.EdgeTokenOutput:
+		return m.clearedtoken_output
+	case l1tokenoutputwithdrawal.EdgeL1WithdrawalTransaction:
+		return m.clearedl1_withdrawal_transaction
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *L1TokenOutputWithdrawalMutation) ClearEdge(name string) error {
+	switch name {
+	case l1tokenoutputwithdrawal.EdgeTokenOutput:
+		m.ClearTokenOutput()
+		return nil
+	case l1tokenoutputwithdrawal.EdgeL1WithdrawalTransaction:
+		m.ClearL1WithdrawalTransaction()
+		return nil
+	}
+	return fmt.Errorf("unknown L1TokenOutputWithdrawal unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *L1TokenOutputWithdrawalMutation) ResetEdge(name string) error {
+	switch name {
+	case l1tokenoutputwithdrawal.EdgeTokenOutput:
+		m.ResetTokenOutput()
+		return nil
+	case l1tokenoutputwithdrawal.EdgeL1WithdrawalTransaction:
+		m.ResetL1WithdrawalTransaction()
+		return nil
+	}
+	return fmt.Errorf("unknown L1TokenOutputWithdrawal edge %s", name)
+}
+
+// L1WithdrawalTransactionMutation represents an operation that mutates the L1WithdrawalTransaction nodes in the graph.
+type L1WithdrawalTransactionMutation struct {
+	config
+	op                      Op
+	typ                     string
+	id                      *uuid.UUID
+	create_time             *time.Time
+	update_time             *time.Time
+	confirmation_txid       *schematype.TxID
+	confirmation_block_hash *[]byte
+	confirmation_height     *uint64
+	addconfirmation_height  *int64
+	detected_at             *time.Time
+	owner_signature         *[]byte
+	clearedFields           map[string]struct{}
+	withdrawals             map[uuid.UUID]struct{}
+	removedwithdrawals      map[uuid.UUID]struct{}
+	clearedwithdrawals      bool
+	se_entity               *uuid.UUID
+	clearedse_entity        bool
+	done                    bool
+	oldValue                func(context.Context) (*L1WithdrawalTransaction, error)
+	predicates              []predicate.L1WithdrawalTransaction
+}
+
+var _ ent.Mutation = (*L1WithdrawalTransactionMutation)(nil)
+
+// l1withdrawaltransactionOption allows management of the mutation configuration using functional options.
+type l1withdrawaltransactionOption func(*L1WithdrawalTransactionMutation)
+
+// newL1WithdrawalTransactionMutation creates new mutation for the L1WithdrawalTransaction entity.
+func newL1WithdrawalTransactionMutation(c config, op Op, opts ...l1withdrawaltransactionOption) *L1WithdrawalTransactionMutation {
+	m := &L1WithdrawalTransactionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeL1WithdrawalTransaction,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withL1WithdrawalTransactionID sets the ID field of the mutation.
+func withL1WithdrawalTransactionID(id uuid.UUID) l1withdrawaltransactionOption {
+	return func(m *L1WithdrawalTransactionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *L1WithdrawalTransaction
+		)
+		m.oldValue = func(ctx context.Context) (*L1WithdrawalTransaction, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().L1WithdrawalTransaction.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withL1WithdrawalTransaction sets the old L1WithdrawalTransaction of the mutation.
+func withL1WithdrawalTransaction(node *L1WithdrawalTransaction) l1withdrawaltransactionOption {
+	return func(m *L1WithdrawalTransactionMutation) {
+		m.oldValue = func(context.Context) (*L1WithdrawalTransaction, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m L1WithdrawalTransactionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m L1WithdrawalTransactionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of L1WithdrawalTransaction entities.
+func (m *L1WithdrawalTransactionMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *L1WithdrawalTransactionMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *L1WithdrawalTransactionMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().L1WithdrawalTransaction.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *L1WithdrawalTransactionMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *L1WithdrawalTransactionMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the L1WithdrawalTransaction entity.
+// If the L1WithdrawalTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1WithdrawalTransactionMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *L1WithdrawalTransactionMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *L1WithdrawalTransactionMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *L1WithdrawalTransactionMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the L1WithdrawalTransaction entity.
+// If the L1WithdrawalTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1WithdrawalTransactionMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *L1WithdrawalTransactionMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetConfirmationTxid sets the "confirmation_txid" field.
+func (m *L1WithdrawalTransactionMutation) SetConfirmationTxid(si schematype.TxID) {
+	m.confirmation_txid = &si
+}
+
+// ConfirmationTxid returns the value of the "confirmation_txid" field in the mutation.
+func (m *L1WithdrawalTransactionMutation) ConfirmationTxid() (r schematype.TxID, exists bool) {
+	v := m.confirmation_txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfirmationTxid returns the old "confirmation_txid" field's value of the L1WithdrawalTransaction entity.
+// If the L1WithdrawalTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1WithdrawalTransactionMutation) OldConfirmationTxid(ctx context.Context) (v schematype.TxID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfirmationTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfirmationTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfirmationTxid: %w", err)
+	}
+	return oldValue.ConfirmationTxid, nil
+}
+
+// ResetConfirmationTxid resets all changes to the "confirmation_txid" field.
+func (m *L1WithdrawalTransactionMutation) ResetConfirmationTxid() {
+	m.confirmation_txid = nil
+}
+
+// SetConfirmationBlockHash sets the "confirmation_block_hash" field.
+func (m *L1WithdrawalTransactionMutation) SetConfirmationBlockHash(b []byte) {
+	m.confirmation_block_hash = &b
+}
+
+// ConfirmationBlockHash returns the value of the "confirmation_block_hash" field in the mutation.
+func (m *L1WithdrawalTransactionMutation) ConfirmationBlockHash() (r []byte, exists bool) {
+	v := m.confirmation_block_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfirmationBlockHash returns the old "confirmation_block_hash" field's value of the L1WithdrawalTransaction entity.
+// If the L1WithdrawalTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1WithdrawalTransactionMutation) OldConfirmationBlockHash(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfirmationBlockHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfirmationBlockHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfirmationBlockHash: %w", err)
+	}
+	return oldValue.ConfirmationBlockHash, nil
+}
+
+// ResetConfirmationBlockHash resets all changes to the "confirmation_block_hash" field.
+func (m *L1WithdrawalTransactionMutation) ResetConfirmationBlockHash() {
+	m.confirmation_block_hash = nil
+}
+
+// SetConfirmationHeight sets the "confirmation_height" field.
+func (m *L1WithdrawalTransactionMutation) SetConfirmationHeight(u uint64) {
+	m.confirmation_height = &u
+	m.addconfirmation_height = nil
+}
+
+// ConfirmationHeight returns the value of the "confirmation_height" field in the mutation.
+func (m *L1WithdrawalTransactionMutation) ConfirmationHeight() (r uint64, exists bool) {
+	v := m.confirmation_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfirmationHeight returns the old "confirmation_height" field's value of the L1WithdrawalTransaction entity.
+// If the L1WithdrawalTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1WithdrawalTransactionMutation) OldConfirmationHeight(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfirmationHeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfirmationHeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfirmationHeight: %w", err)
+	}
+	return oldValue.ConfirmationHeight, nil
+}
+
+// AddConfirmationHeight adds u to the "confirmation_height" field.
+func (m *L1WithdrawalTransactionMutation) AddConfirmationHeight(u int64) {
+	if m.addconfirmation_height != nil {
+		*m.addconfirmation_height += u
+	} else {
+		m.addconfirmation_height = &u
+	}
+}
+
+// AddedConfirmationHeight returns the value that was added to the "confirmation_height" field in this mutation.
+func (m *L1WithdrawalTransactionMutation) AddedConfirmationHeight() (r int64, exists bool) {
+	v := m.addconfirmation_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetConfirmationHeight resets all changes to the "confirmation_height" field.
+func (m *L1WithdrawalTransactionMutation) ResetConfirmationHeight() {
+	m.confirmation_height = nil
+	m.addconfirmation_height = nil
+}
+
+// SetDetectedAt sets the "detected_at" field.
+func (m *L1WithdrawalTransactionMutation) SetDetectedAt(t time.Time) {
+	m.detected_at = &t
+}
+
+// DetectedAt returns the value of the "detected_at" field in the mutation.
+func (m *L1WithdrawalTransactionMutation) DetectedAt() (r time.Time, exists bool) {
+	v := m.detected_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDetectedAt returns the old "detected_at" field's value of the L1WithdrawalTransaction entity.
+// If the L1WithdrawalTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1WithdrawalTransactionMutation) OldDetectedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDetectedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDetectedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDetectedAt: %w", err)
+	}
+	return oldValue.DetectedAt, nil
+}
+
+// ResetDetectedAt resets all changes to the "detected_at" field.
+func (m *L1WithdrawalTransactionMutation) ResetDetectedAt() {
+	m.detected_at = nil
+}
+
+// SetOwnerSignature sets the "owner_signature" field.
+func (m *L1WithdrawalTransactionMutation) SetOwnerSignature(b []byte) {
+	m.owner_signature = &b
+}
+
+// OwnerSignature returns the value of the "owner_signature" field in the mutation.
+func (m *L1WithdrawalTransactionMutation) OwnerSignature() (r []byte, exists bool) {
+	v := m.owner_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerSignature returns the old "owner_signature" field's value of the L1WithdrawalTransaction entity.
+// If the L1WithdrawalTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1WithdrawalTransactionMutation) OldOwnerSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerSignature: %w", err)
+	}
+	return oldValue.OwnerSignature, nil
+}
+
+// ResetOwnerSignature resets all changes to the "owner_signature" field.
+func (m *L1WithdrawalTransactionMutation) ResetOwnerSignature() {
+	m.owner_signature = nil
+}
+
+// AddWithdrawalIDs adds the "withdrawals" edge to the L1TokenOutputWithdrawal entity by ids.
+func (m *L1WithdrawalTransactionMutation) AddWithdrawalIDs(ids ...uuid.UUID) {
+	if m.withdrawals == nil {
+		m.withdrawals = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.withdrawals[ids[i]] = struct{}{}
+	}
+}
+
+// ClearWithdrawals clears the "withdrawals" edge to the L1TokenOutputWithdrawal entity.
+func (m *L1WithdrawalTransactionMutation) ClearWithdrawals() {
+	m.clearedwithdrawals = true
+}
+
+// WithdrawalsCleared reports if the "withdrawals" edge to the L1TokenOutputWithdrawal entity was cleared.
+func (m *L1WithdrawalTransactionMutation) WithdrawalsCleared() bool {
+	return m.clearedwithdrawals
+}
+
+// RemoveWithdrawalIDs removes the "withdrawals" edge to the L1TokenOutputWithdrawal entity by IDs.
+func (m *L1WithdrawalTransactionMutation) RemoveWithdrawalIDs(ids ...uuid.UUID) {
+	if m.removedwithdrawals == nil {
+		m.removedwithdrawals = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.withdrawals, ids[i])
+		m.removedwithdrawals[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedWithdrawals returns the removed IDs of the "withdrawals" edge to the L1TokenOutputWithdrawal entity.
+func (m *L1WithdrawalTransactionMutation) RemovedWithdrawalsIDs() (ids []uuid.UUID) {
+	for id := range m.removedwithdrawals {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// WithdrawalsIDs returns the "withdrawals" edge IDs in the mutation.
+func (m *L1WithdrawalTransactionMutation) WithdrawalsIDs() (ids []uuid.UUID) {
+	for id := range m.withdrawals {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetWithdrawals resets all changes to the "withdrawals" edge.
+func (m *L1WithdrawalTransactionMutation) ResetWithdrawals() {
+	m.withdrawals = nil
+	m.clearedwithdrawals = false
+	m.removedwithdrawals = nil
+}
+
+// SetSeEntityID sets the "se_entity" edge to the EntityDkgKey entity by id.
+func (m *L1WithdrawalTransactionMutation) SetSeEntityID(id uuid.UUID) {
+	m.se_entity = &id
+}
+
+// ClearSeEntity clears the "se_entity" edge to the EntityDkgKey entity.
+func (m *L1WithdrawalTransactionMutation) ClearSeEntity() {
+	m.clearedse_entity = true
+}
+
+// SeEntityCleared reports if the "se_entity" edge to the EntityDkgKey entity was cleared.
+func (m *L1WithdrawalTransactionMutation) SeEntityCleared() bool {
+	return m.clearedse_entity
+}
+
+// SeEntityID returns the "se_entity" edge ID in the mutation.
+func (m *L1WithdrawalTransactionMutation) SeEntityID() (id uuid.UUID, exists bool) {
+	if m.se_entity != nil {
+		return *m.se_entity, true
+	}
+	return
+}
+
+// SeEntityIDs returns the "se_entity" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// SeEntityID instead. It exists only for internal usage by the builders.
+func (m *L1WithdrawalTransactionMutation) SeEntityIDs() (ids []uuid.UUID) {
+	if id := m.se_entity; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetSeEntity resets all changes to the "se_entity" edge.
+func (m *L1WithdrawalTransactionMutation) ResetSeEntity() {
+	m.se_entity = nil
+	m.clearedse_entity = false
+}
+
+// Where appends a list predicates to the L1WithdrawalTransactionMutation builder.
+func (m *L1WithdrawalTransactionMutation) Where(ps ...predicate.L1WithdrawalTransaction) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the L1WithdrawalTransactionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *L1WithdrawalTransactionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.L1WithdrawalTransaction, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *L1WithdrawalTransactionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *L1WithdrawalTransactionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (L1WithdrawalTransaction).
+func (m *L1WithdrawalTransactionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *L1WithdrawalTransactionMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.create_time != nil {
+		fields = append(fields, l1withdrawaltransaction.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, l1withdrawaltransaction.FieldUpdateTime)
+	}
+	if m.confirmation_txid != nil {
+		fields = append(fields, l1withdrawaltransaction.FieldConfirmationTxid)
+	}
+	if m.confirmation_block_hash != nil {
+		fields = append(fields, l1withdrawaltransaction.FieldConfirmationBlockHash)
+	}
+	if m.confirmation_height != nil {
+		fields = append(fields, l1withdrawaltransaction.FieldConfirmationHeight)
+	}
+	if m.detected_at != nil {
+		fields = append(fields, l1withdrawaltransaction.FieldDetectedAt)
+	}
+	if m.owner_signature != nil {
+		fields = append(fields, l1withdrawaltransaction.FieldOwnerSignature)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *L1WithdrawalTransactionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case l1withdrawaltransaction.FieldCreateTime:
+		return m.CreateTime()
+	case l1withdrawaltransaction.FieldUpdateTime:
+		return m.UpdateTime()
+	case l1withdrawaltransaction.FieldConfirmationTxid:
+		return m.ConfirmationTxid()
+	case l1withdrawaltransaction.FieldConfirmationBlockHash:
+		return m.ConfirmationBlockHash()
+	case l1withdrawaltransaction.FieldConfirmationHeight:
+		return m.ConfirmationHeight()
+	case l1withdrawaltransaction.FieldDetectedAt:
+		return m.DetectedAt()
+	case l1withdrawaltransaction.FieldOwnerSignature:
+		return m.OwnerSignature()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *L1WithdrawalTransactionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case l1withdrawaltransaction.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case l1withdrawaltransaction.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case l1withdrawaltransaction.FieldConfirmationTxid:
+		return m.OldConfirmationTxid(ctx)
+	case l1withdrawaltransaction.FieldConfirmationBlockHash:
+		return m.OldConfirmationBlockHash(ctx)
+	case l1withdrawaltransaction.FieldConfirmationHeight:
+		return m.OldConfirmationHeight(ctx)
+	case l1withdrawaltransaction.FieldDetectedAt:
+		return m.OldDetectedAt(ctx)
+	case l1withdrawaltransaction.FieldOwnerSignature:
+		return m.OldOwnerSignature(ctx)
+	}
+	return nil, fmt.Errorf("unknown L1WithdrawalTransaction field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *L1WithdrawalTransactionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case l1withdrawaltransaction.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case l1withdrawaltransaction.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case l1withdrawaltransaction.FieldConfirmationTxid:
+		v, ok := value.(schematype.TxID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfirmationTxid(v)
+		return nil
+	case l1withdrawaltransaction.FieldConfirmationBlockHash:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfirmationBlockHash(v)
+		return nil
+	case l1withdrawaltransaction.FieldConfirmationHeight:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfirmationHeight(v)
+		return nil
+	case l1withdrawaltransaction.FieldDetectedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDetectedAt(v)
+		return nil
+	case l1withdrawaltransaction.FieldOwnerSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerSignature(v)
+		return nil
+	}
+	return fmt.Errorf("unknown L1WithdrawalTransaction field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *L1WithdrawalTransactionMutation) AddedFields() []string {
+	var fields []string
+	if m.addconfirmation_height != nil {
+		fields = append(fields, l1withdrawaltransaction.FieldConfirmationHeight)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *L1WithdrawalTransactionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case l1withdrawaltransaction.FieldConfirmationHeight:
+		return m.AddedConfirmationHeight()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *L1WithdrawalTransactionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case l1withdrawaltransaction.FieldConfirmationHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConfirmationHeight(v)
+		return nil
+	}
+	return fmt.Errorf("unknown L1WithdrawalTransaction numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *L1WithdrawalTransactionMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *L1WithdrawalTransactionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *L1WithdrawalTransactionMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown L1WithdrawalTransaction nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *L1WithdrawalTransactionMutation) ResetField(name string) error {
+	switch name {
+	case l1withdrawaltransaction.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case l1withdrawaltransaction.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case l1withdrawaltransaction.FieldConfirmationTxid:
+		m.ResetConfirmationTxid()
+		return nil
+	case l1withdrawaltransaction.FieldConfirmationBlockHash:
+		m.ResetConfirmationBlockHash()
+		return nil
+	case l1withdrawaltransaction.FieldConfirmationHeight:
+		m.ResetConfirmationHeight()
+		return nil
+	case l1withdrawaltransaction.FieldDetectedAt:
+		m.ResetDetectedAt()
+		return nil
+	case l1withdrawaltransaction.FieldOwnerSignature:
+		m.ResetOwnerSignature()
+		return nil
+	}
+	return fmt.Errorf("unknown L1WithdrawalTransaction field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *L1WithdrawalTransactionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.withdrawals != nil {
+		edges = append(edges, l1withdrawaltransaction.EdgeWithdrawals)
+	}
+	if m.se_entity != nil {
+		edges = append(edges, l1withdrawaltransaction.EdgeSeEntity)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *L1WithdrawalTransactionMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case l1withdrawaltransaction.EdgeWithdrawals:
+		ids := make([]ent.Value, 0, len(m.withdrawals))
+		for id := range m.withdrawals {
+			ids = append(ids, id)
+		}
+		return ids
+	case l1withdrawaltransaction.EdgeSeEntity:
+		if id := m.se_entity; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *L1WithdrawalTransactionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.removedwithdrawals != nil {
+		edges = append(edges, l1withdrawaltransaction.EdgeWithdrawals)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *L1WithdrawalTransactionMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case l1withdrawaltransaction.EdgeWithdrawals:
+		ids := make([]ent.Value, 0, len(m.removedwithdrawals))
+		for id := range m.removedwithdrawals {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *L1WithdrawalTransactionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedwithdrawals {
+		edges = append(edges, l1withdrawaltransaction.EdgeWithdrawals)
+	}
+	if m.clearedse_entity {
+		edges = append(edges, l1withdrawaltransaction.EdgeSeEntity)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *L1WithdrawalTransactionMutation) EdgeCleared(name string) bool {
+	switch name {
+	case l1withdrawaltransaction.EdgeWithdrawals:
+		return m.clearedwithdrawals
+	case l1withdrawaltransaction.EdgeSeEntity:
+		return m.clearedse_entity
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *L1WithdrawalTransactionMutation) ClearEdge(name string) error {
+	switch name {
+	case l1withdrawaltransaction.EdgeSeEntity:
+		m.ClearSeEntity()
+		return nil
+	}
+	return fmt.Errorf("unknown L1WithdrawalTransaction unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *L1WithdrawalTransactionMutation) ResetEdge(name string) error {
+	switch name {
+	case l1withdrawaltransaction.EdgeWithdrawals:
+		m.ResetWithdrawals()
+		return nil
+	case l1withdrawaltransaction.EdgeSeEntity:
+		m.ResetSeEntity()
+		return nil
+	}
+	return fmt.Errorf("unknown L1WithdrawalTransaction edge %s", name)
 }
 
 // PaymentIntentMutation represents an operation that mutates the PaymentIntent nodes in the graph.
@@ -14354,6 +15804,8 @@ type TokenOutputMutation struct {
 	clearedtoken_partial_revocation_secret_shares  bool
 	token_create                                   *uuid.UUID
 	clearedtoken_create                            bool
+	withdrawal                                     *uuid.UUID
+	clearedwithdrawal                              bool
 	done                                           bool
 	oldValue                                       func(context.Context) (*TokenOutput, error)
 	predicates                                     []predicate.TokenOutput
@@ -15620,6 +17072,45 @@ func (m *TokenOutputMutation) ResetTokenCreate() {
 	m.clearedtoken_create = false
 }
 
+// SetWithdrawalID sets the "withdrawal" edge to the L1TokenOutputWithdrawal entity by id.
+func (m *TokenOutputMutation) SetWithdrawalID(id uuid.UUID) {
+	m.withdrawal = &id
+}
+
+// ClearWithdrawal clears the "withdrawal" edge to the L1TokenOutputWithdrawal entity.
+func (m *TokenOutputMutation) ClearWithdrawal() {
+	m.clearedwithdrawal = true
+}
+
+// WithdrawalCleared reports if the "withdrawal" edge to the L1TokenOutputWithdrawal entity was cleared.
+func (m *TokenOutputMutation) WithdrawalCleared() bool {
+	return m.clearedwithdrawal
+}
+
+// WithdrawalID returns the "withdrawal" edge ID in the mutation.
+func (m *TokenOutputMutation) WithdrawalID() (id uuid.UUID, exists bool) {
+	if m.withdrawal != nil {
+		return *m.withdrawal, true
+	}
+	return
+}
+
+// WithdrawalIDs returns the "withdrawal" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// WithdrawalID instead. It exists only for internal usage by the builders.
+func (m *TokenOutputMutation) WithdrawalIDs() (ids []uuid.UUID) {
+	if id := m.withdrawal; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetWithdrawal resets all changes to the "withdrawal" edge.
+func (m *TokenOutputMutation) ResetWithdrawal() {
+	m.withdrawal = nil
+	m.clearedwithdrawal = false
+}
+
 // Where appends a list predicates to the TokenOutputMutation builder.
 func (m *TokenOutputMutation) Where(ps ...predicate.TokenOutput) {
 	m.predicates = append(m.predicates, ps...)
@@ -16178,7 +17669,7 @@ func (m *TokenOutputMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TokenOutputMutation) AddedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
 	if m.revocation_keyshare != nil {
 		edges = append(edges, tokenoutput.EdgeRevocationKeyshare)
 	}
@@ -16196,6 +17687,9 @@ func (m *TokenOutputMutation) AddedEdges() []string {
 	}
 	if m.token_create != nil {
 		edges = append(edges, tokenoutput.EdgeTokenCreate)
+	}
+	if m.withdrawal != nil {
+		edges = append(edges, tokenoutput.EdgeWithdrawal)
 	}
 	return edges
 }
@@ -16232,13 +17726,17 @@ func (m *TokenOutputMutation) AddedIDs(name string) []ent.Value {
 		if id := m.token_create; id != nil {
 			return []ent.Value{*id}
 		}
+	case tokenoutput.EdgeWithdrawal:
+		if id := m.withdrawal; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TokenOutputMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
 	if m.removedoutput_spent_started_token_transactions != nil {
 		edges = append(edges, tokenoutput.EdgeOutputSpentStartedTokenTransactions)
 	}
@@ -16270,7 +17768,7 @@ func (m *TokenOutputMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TokenOutputMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
 	if m.clearedrevocation_keyshare {
 		edges = append(edges, tokenoutput.EdgeRevocationKeyshare)
 	}
@@ -16288,6 +17786,9 @@ func (m *TokenOutputMutation) ClearedEdges() []string {
 	}
 	if m.clearedtoken_create {
 		edges = append(edges, tokenoutput.EdgeTokenCreate)
+	}
+	if m.clearedwithdrawal {
+		edges = append(edges, tokenoutput.EdgeWithdrawal)
 	}
 	return edges
 }
@@ -16308,6 +17809,8 @@ func (m *TokenOutputMutation) EdgeCleared(name string) bool {
 		return m.clearedtoken_partial_revocation_secret_shares
 	case tokenoutput.EdgeTokenCreate:
 		return m.clearedtoken_create
+	case tokenoutput.EdgeWithdrawal:
+		return m.clearedwithdrawal
 	}
 	return false
 }
@@ -16327,6 +17830,9 @@ func (m *TokenOutputMutation) ClearEdge(name string) error {
 		return nil
 	case tokenoutput.EdgeTokenCreate:
 		m.ClearTokenCreate()
+		return nil
+	case tokenoutput.EdgeWithdrawal:
+		m.ClearWithdrawal()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenOutput unique edge %s", name)
@@ -16353,6 +17859,9 @@ func (m *TokenOutputMutation) ResetEdge(name string) error {
 		return nil
 	case tokenoutput.EdgeTokenCreate:
 		m.ResetTokenCreate()
+		return nil
+	case tokenoutput.EdgeWithdrawal:
+		m.ResetWithdrawal()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenOutput edge %s", name)
