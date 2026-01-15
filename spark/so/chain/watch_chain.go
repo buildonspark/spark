@@ -29,6 +29,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -589,6 +590,7 @@ func handleBlock(
 			Where(
 				cooperativeexit.ConfirmationHeightNotNil(),
 				cooperativeexit.KeyTweakedHeightIsNil(),
+				cooperativeexit.HasTransferWith(transfer.NetworkEQ(network)),
 			).
 			All(ctx)
 		if err != nil {
