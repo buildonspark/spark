@@ -1,5 +1,13 @@
 # @buildonspark/spark-frost-bare-addon
 
+## 0.0.6
+
+### Patch Changes
+
+- ### Updated Rust Version Requirement
+
+  Updated minimum Rust version to 1.92.0 to be compatible with new spark-frost-python
+
 ## 0.0.5
 
 ### Patch Changes

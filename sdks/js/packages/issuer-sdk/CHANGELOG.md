@@ -1,5 +1,20 @@
 # @buildonspark/issuer-sdk
 
+## 0.1.6
+
+### Patch Changes
+
+- ### Improved Token Ownership Validation
+
+  Token metadata fetches now return only tokens owned by the issuer, with centralized ownership validation to prevent operating on non-owned tokens.
+
+  ### Stricter Token Identifier Requirements
+
+  Mint, burn, freeze, and unfreeze flows now require explicit token identifiers or validate that only a single token is available. This provides clearer validation and more descriptive error messages when operations fail.
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.5.6
+
 ## 0.1.5
 
 ### Patch Changes

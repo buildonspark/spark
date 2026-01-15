@@ -1,5 +1,28 @@
 # @buildonspark/spark-sdk
 
+## 0.5.6
+
+### Patch Changes
+
+- ### Direct Refund Transaction Fix for Zero Nodes
+
+  Fixed an issue where the SDK was creating `directRefundTx` for nodes with `timelock=0` (zero nodes), which caused backend validation errors. The SDK now correctly skips parsing `directNodeTx` for zero nodes, matching the server-side validation logic.
+
+  ### Improved Unilateral Exit Fee Estimation
+
+  Reduced unilateral exit fees by an average of 56% by improving transaction size estimation. The previous logic was overly conservative; this change uses TX-specific fields for size calculation instead of generic estimates.
+
+  ### Token Output Manager
+
+  Added a dedicated `TokenOutputManager` class for fine-grained token output locking and management.
+
+  **Key improvements:**
+  - Per-output locking instead of global mutex, enabling concurrent token operations
+  - Per-token output syncing with targeted sync support
+  - Partial output updates: update outputs for specific tokens without replacing all data
+  - Per-token pending-withdrawal tracking
+  - Automatic lock expiry mechanism (default: 30 seconds, configurable via `tokenOutputLockExpiryMs`)
+
 ## 0.5.5
 
 ### Patch Changes
