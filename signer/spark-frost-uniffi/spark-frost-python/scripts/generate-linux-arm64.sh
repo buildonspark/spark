@@ -12,9 +12,10 @@ cd ..
 cargo run --bin uniffi-bindgen generate src/spark_frost.udl --language python --out-dir spark-frost-python/src/spark_frost/ --no-format
 
 echo "Generating native binaries..."
-cross build --target aarch64-unknown-linux-gnu --profile release-smaller
+cd ../..
+cross build --manifest-path signer/Cargo.toml --target aarch64-unknown-linux-gnu --profile release-smaller
 
 echo "Copying linux binary..."
-cp ../target/aarch64-unknown-linux-gnu/release-smaller/libspark_frost.so spark-frost-python/src/spark_frost/libuniffi_spark_frost.so
+cp signer/target/aarch64-unknown-linux-gnu/release-smaller/libspark_frost.so signer/spark-frost-uniffi/spark-frost-python/src/spark_frost/libuniffi_spark_frost.so
 
 echo "All done!"
