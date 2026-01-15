@@ -75,10 +75,6 @@ function getRegistry() {
       }
     }
 
-    console.log(
-      `Registry loaded with ${descriptorSet.file.length} proto files`,
-    );
-    console.log(`Found ${_registry.messageMap.size} message types`);
     return _registry;
   } catch (error) {
     console.error("Failed to load protobuf descriptors:", error);
