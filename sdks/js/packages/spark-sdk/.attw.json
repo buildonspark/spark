@@ -1,3 +1,4 @@
 {
-  "profile": "node16"
+  "profile": "node16",
+  "excludeEntrypoints": ["./test-utils"]
 }

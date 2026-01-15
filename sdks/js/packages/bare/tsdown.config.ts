@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { defineConfig } from "tsup";
+import { defineConfig } from "tsdown";
 
 const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
@@ -9,6 +9,7 @@ const commonConfig = {
   sourcemap: false,
   dts: true,
   clean: false,
+  fixedExtension: false,
   define: {
     __PACKAGE_VERSION__: JSON.stringify(pkg.version),
   },

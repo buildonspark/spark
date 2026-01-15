@@ -1,4 +1,5 @@
 /* Root React Native entrypoint */
+import "../buffer.js";
 
 import { setCrypto } from "./utils/crypto.js";
 import { SparkFrost } from "./spark-bindings/spark-bindings.react-native.js";

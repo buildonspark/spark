@@ -62,10 +62,6 @@
       "import": {
         "types": "./dist/tests/test-utils.d.ts",
         "default": "./dist/tests/test-utils.js"
-      },
-      "require": {
-        "types": "./dist/tests/test-utils.d.cts",
-        "default": "./dist/tests/test-utils.cjs"
       }
     },
     "./proto/spark": {
@@ -98,7 +94,7 @@
     }
   },
   "scripts": {
-    "build": "yarn tsc && rm -rf dist && tsup",
+    "build": "yarn tsc && rm -rf dist && tsdown",
     "build:watch": "yarn build --watch --clean=false",
     "clean": "rm -rf dist",
     "circular-deps": "madge --circular --extensions ts,tsx src",
@@ -137,7 +133,7 @@
     "react-native": "0.79.4",
     "react-native-get-random-values": "^1.11.0",
     "ts-jest": "^29.2.5",
-    "tsup": "^8.4.0",
+    "tsdown": "^0.20.0-beta.3",
     "typescript": "^5.7.3"
   },
   "dependencies": {

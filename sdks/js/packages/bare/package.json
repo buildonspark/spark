@@ -32,7 +32,7 @@
     "./package": "./package.json"
   },
   "scripts": {
-    "build": "yarn tsc && rm -rf dist && tsup",
+    "build": "yarn tsc && rm -rf dist && tsdown",
     "build:watch": "yarn build --watch --clean=false",
     "clean": "rm -rf dist",
     "circular-deps": "madge --circular --extensions ts,tsx src",
@@ -58,7 +58,7 @@
     "madge": "^8.0.0",
     "prettier": "^3.7.4",
     "publint": "^0.3.9",
-    "tsup": "^8.4.0",
+    "tsdown": "^0.20.0-beta.3",
     "typescript": "^5.7.3"
   },
   "dependencies": {

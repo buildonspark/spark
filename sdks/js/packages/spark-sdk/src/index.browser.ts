@@ -1,3 +1,5 @@
+import "../buffer.js";
+
 import { SparkFrost } from "./spark-bindings/spark-bindings.browser.js";
 import { setSparkFrostOnce } from "./spark-bindings/spark-bindings.js";
 

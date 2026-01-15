@@ -4,6 +4,10 @@ inputs:
   node-version:
     description: "Node.js version spec passed to actions/setup-node"
     required: true
+  build-node-version:
+    description: "Node.js version to use for build when run-build is true"
+    required: false
+    default: ""
   workspace:
     description: "Working directory for the JS SDK workspace"
     required: false
@@ -43,7 +47,15 @@ runs:
         workspaces: "signer"
         save-if: ${{ github.event_name == 'push' }}"
 
-    - name: "Setup Node.js and Yarn"
+    - name: "Setup Node.js and Yarn (build)"
+      if: inputs.build-node-version != ''
+      uses: ./public/actions/setup-node-yarn-install
+      with:
+        node-version: ${{ inputs.build-node-version }}
+        cwd: ${{ inputs.workspace }}
+
+    - name: "Setup Node.js and Yarn (tests)"
+      if: inputs.build-node-version == ''
       uses: ./public/actions/setup-node-yarn-install
       with:
         node-version: ${{ inputs.node-version }}
@@ -53,6 +65,12 @@ runs:
       shell: bash
       working-directory: ${{ inputs.workspace }}
       run: yarn run build
+
+    - name: "Switch to test Node.js"
+      if: inputs.build-node-version != '' && inputs.build-node-version != inputs.node-version
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
 
     - name: "Verify Android 16kb page size alignment"
       shell: bash
@@ -85,7 +103,7 @@ runs:
         fi
         echo "✅ Proto files are up to date"
 
-    - name: "Run tests"
+    - name: "Run tests and checks"
       shell: bash
       working-directory: ${{ inputs.workspace }}
       run: yarn run test

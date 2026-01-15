@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { defineConfig } from "tsup";
+import { defineConfig } from "tsdown";
 
 const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
@@ -9,19 +9,9 @@ const commonConfig = {
   sourcemap: false,
   dts: true,
   clean: false,
+  fixedExtension: false,
   define: {
     __PACKAGE_VERSION__: JSON.stringify(pkg.version),
-  },
-  esbuildOptions(options) {
-    /* Turn import.meta warnings into errors for CJS builds to catch browser bindings imports */
-    options.logOverride = {
-      "empty-import-meta": "error",
-    };
-    // Ensure esbuild treats .wasm imports as file assets for bundlers
-    options.loader = {
-      ...options.loader,
-      ".wasm": "binary",
-    };
   },
 };
 
@@ -35,7 +25,6 @@ export default defineConfig([
       "src/tests/test-utils.ts",
       "src/proto/spark.ts",
       "src/proto/spark_token.ts",
-      "src/graphql/objects/index.ts",
       "src/types/index.ts",
     ],
     inject: ["./buffer.js"],
@@ -49,7 +38,6 @@ export default defineConfig([
     /* Only ESM format is supported for browser builds */
     format: ["esm"],
     outDir: "dist",
-    onSuccess: "node scripts/on-build-success.js",
   },
   {
     ...commonConfig,
@@ -68,11 +56,5 @@ export default defineConfig([
     },
     inject: ["./buffer.js"],
     outDir: "dist/native",
-  },
-  {
-    ...commonConfig,
-    entry: ["src/bare/index.ts"],
-    format: ["cjs", "esm"],
-    outDir: "dist/bare",
   },
 ]);

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { defineConfig } from "tsup";
+import { defineConfig } from "tsdown";
 
 const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
@@ -9,40 +9,42 @@ const commonConfig = {
   sourcemap: false,
   dts: true,
   clean: false,
+  fixedExtension: false,
   define: {
     __PACKAGE_VERSION__: JSON.stringify(pkg.version),
   },
-  esbuildOptions(options) {
-    /* Turn import.meta warnings into errors for CJS builds to catch browser bindings imports */
-    options.logOverride = {
-      "empty-import-meta": "error",
-    };
+  inputOptions: {
+    moduleTypes: {
+      ".wasm": "binary",
+    },
   },
 };
 
+const rootEntryConfig = {
+  ...commonConfig,
+  entry: [
+    "src/index.node.ts",
+    /* Entrypoints other than index should be static only, i.e. modules that never depend
+       on the state of other modules. Everything else should be exported from index. */
+    "src/proto/spark.ts",
+    "src/proto/spark_token.ts",
+    "src/types/index.ts",
+  ],
+  outDir: "dist",
+};
+
 export default defineConfig([
+  { ...rootEntryConfig, format: ["cjs"] },
   {
     ...commonConfig,
     entry: [
-      "src/index.node.ts",
+      ...rootEntryConfig.entry,
+      "src/index.browser.ts",
       /* Entrypoints other than index should be static only, i.e. modules that never depend
          on the state of other modules. Everything else should be exported from index. */
       "src/tests/test-utils.ts",
-      "src/proto/spark.ts",
-      "src/proto/spark_token.ts",
-      "src/types/index.ts",
     ],
-    inject: ["./buffer.js"],
-    format: ["cjs", "esm"],
-    outDir: "dist",
-  },
-  {
-    ...commonConfig,
-    entry: ["src/index.browser.ts"],
-    inject: ["./buffer.js"],
-    /* Only ESM format is supported for browser builds */
     format: ["esm"],
-    outDir: "dist",
   },
   {
     ...commonConfig,
@@ -59,7 +61,12 @@ export default defineConfig([
           and import react-native-get-random-values first in those modules. */
       js: `require("react-native-get-random-values");`,
     },
-    inject: ["./buffer.js"],
     outDir: "dist/native",
+  },
+  {
+    ...commonConfig,
+    entry: ["src/bare/index.ts"],
+    format: ["cjs", "esm"],
+    outDir: "dist/bare",
   },
 ]);
