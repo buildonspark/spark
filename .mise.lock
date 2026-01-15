@@ -34,6 +34,15 @@ checksum = "sha256:509cb27aef747f48faf9bce424f59dcf79572c905204b990ee935bbfcc7fa
 size = 2472317
 url = "https://github.com/gotestyourself/gotestsum/releases/download/v1.13.0/gotestsum_1.13.0_darwin_arm64.tar.gz"
 
+[[tools.helm]]
+version = "3.14.4"
+backend = "aqua:helm/helm"
+
+[tools.helm.platforms.macos-arm64]
+checksum = "sha256:61e9c5455f06b2ad0a1280975bf65892e707adc19d766b0cf4e9006e3b7b4b6c"
+size = 16128955
+url = "https://get.helm.sh/helm-v3.14.4-darwin-arm64.tar.gz"
+
 [[tools.lefthook]]
 version = "2.0.0"
 backend = "aqua:evilmartians/lefthook"
