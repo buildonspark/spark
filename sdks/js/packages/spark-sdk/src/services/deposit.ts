@@ -242,36 +242,27 @@ export class DepositService {
       });
     }
 
-    const { nodeTx: cpfpRootTx, directNodeTx: directRootTx } = createRootNodeTx(
-      depositTx,
-      vout,
-    );
+    const { nodeTx: cpfpRootTx } = createRootNodeTx(depositTx, vout);
 
     // Create nonce commitments for root transactions
     const cpfpRootNonceCommitment =
       await this.config.signer.getRandomSigningCommitment();
-    const directRootNonceCommitment =
-      await this.config.signer.getRandomSigningCommitment();
 
     // Get sighashes for root transactions
     const cpfpRootTxSighash = getSigHashFromTx(cpfpRootTx, 0, output);
-    const directRootTxSighash = getSigHashFromTx(directRootTx, 0, output);
 
     const signingPubKey =
       await this.config.signer.getPublicKeyFromDerivation(keyDerivation);
 
-    const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
+    const { cpfpRefundTx, directFromCpfpRefundTx } =
       createInitialTimelockRefundTxs({
         nodeTx: cpfpRootTx,
-        directNodeTx: directRootTx,
         receivingPubkey: signingPubKey,
         network: this.config.getNetwork(),
       });
 
     // Create nonce commitments for refund transactions
     const cpfpRefundNonceCommitment =
-      await this.config.signer.getRandomSigningCommitment();
-    const directRefundNonceCommitment =
       await this.config.signer.getRandomSigningCommitment();
     const directFromCpfpRefundNonceCommitment =
       await this.config.signer.getRandomSigningCommitment();
@@ -283,21 +274,16 @@ export class DepositService {
       cpfpRootTx.getOutput(0),
     );
 
-    if (!directRefundTx || !directFromCpfpRefundTx) {
+    if (!directFromCpfpRefundTx) {
       throw new SparkValidationError(
-        "Expected direct refund transactions for tree creation",
+        "Expected direct from CPFP refund transaction for tree creation",
         {
-          field: "directRefundTx",
-          value: directRefundTx,
+          field: "directFromCpfpRefundTx",
+          value: directFromCpfpRefundTx,
         },
       );
     }
 
-    const directRefundTxSighash = getSigHashFromTx(
-      directRefundTx,
-      0,
-      directRootTx.getOutput(0),
-    );
     const directFromCpfpRefundTxSighash = getSigHashFromTx(
       directFromCpfpRefundTx,
       0,
@@ -327,16 +313,6 @@ export class DepositService {
           rawTx: cpfpRefundTx.toBytes(),
           signingPublicKey: signingPubKey,
           signingNonceCommitment: cpfpRefundNonceCommitment.commitment,
-        },
-        directRootTxSigningJob: {
-          rawTx: directRootTx.toBytes(),
-          signingPublicKey: signingPubKey,
-          signingNonceCommitment: directRootNonceCommitment.commitment,
-        },
-        directRefundTxSigningJob: {
-          rawTx: directRefundTx.toBytes(),
-          signingPublicKey: signingPubKey,
-          signingNonceCommitment: directRefundNonceCommitment.commitment,
         },
         directFromCpfpRefundTxSigningJob: {
           rawTx: directFromCpfpRefundTx.toBytes(),
@@ -390,30 +366,6 @@ export class DepositService {
     }
 
     if (
-      !treeResp.rootNodeSignatureShares.directNodeTxSigningResult
-        ?.signingNonceCommitments
-    ) {
-      throw new SparkValidationError(
-        "No direct node signing nonce commitments found in tree response",
-        {
-          field: "directNodeTxSigningResult.signingNonceCommitments",
-        },
-      );
-    }
-
-    if (
-      !treeResp.rootNodeSignatureShares.directRefundTxSigningResult
-        ?.signingNonceCommitments
-    ) {
-      throw new SparkValidationError(
-        "No direct refund signing nonce commitments found in tree response",
-        {
-          field: "directRefundTxSigningResult.signingNonceCommitments",
-        },
-      );
-    }
-
-    if (
       !treeResp.rootNodeSignatureShares.directFromCpfpRefundTxSigningResult
         ?.signingNonceCommitments
     ) {
@@ -435,7 +387,7 @@ export class DepositService {
       });
     }
 
-    // Sign all four transactions
+    // Sign all three transactions
     const cpfpRootSignature = await this.config.signer.signFrost({
       message: cpfpRootTxSighash,
       publicKey: signingPubKey,
@@ -444,18 +396,6 @@ export class DepositService {
       selfCommitment: cpfpRootNonceCommitment,
       statechainCommitments:
         treeResp.rootNodeSignatureShares.nodeTxSigningResult
-          .signingNonceCommitments,
-      adaptorPubKey: new Uint8Array(),
-    });
-
-    const directRootSignature = await this.config.signer.signFrost({
-      message: directRootTxSighash,
-      publicKey: signingPubKey,
-      keyDerivation,
-      verifyingKey,
-      selfCommitment: directRootNonceCommitment,
-      statechainCommitments:
-        treeResp.rootNodeSignatureShares.directNodeTxSigningResult
           .signingNonceCommitments,
       adaptorPubKey: new Uint8Array(),
     });
@@ -472,18 +412,6 @@ export class DepositService {
       adaptorPubKey: new Uint8Array(),
     });
 
-    const directRefundSignature = await this.config.signer.signFrost({
-      message: directRefundTxSighash,
-      publicKey: signingPubKey,
-      keyDerivation,
-      verifyingKey: treeResp.rootNodeSignatureShares.verifyingKey,
-      selfCommitment: directRefundNonceCommitment,
-      statechainCommitments:
-        treeResp.rootNodeSignatureShares.directRefundTxSigningResult
-          .signingNonceCommitments,
-      adaptorPubKey: new Uint8Array(),
-    });
-
     const directFromCpfpRefundSignature = await this.config.signer.signFrost({
       message: directFromCpfpRefundTxSighash,
       publicKey: signingPubKey,
@@ -496,7 +424,7 @@ export class DepositService {
       adaptorPubKey: new Uint8Array(),
     });
 
-    // Aggregate all four signatures
+    // Aggregate all three signatures
     const cpfpRootAggregate = await this.config.signer.aggregateFrost({
       message: cpfpRootTxSighash,
       statechainSignatures:
@@ -513,23 +441,6 @@ export class DepositService {
       adaptorPubKey: new Uint8Array(),
     });
 
-    const directRootAggregate = await this.config.signer.aggregateFrost({
-      message: directRootTxSighash,
-      statechainSignatures:
-        treeResp.rootNodeSignatureShares.directNodeTxSigningResult
-          .signatureShares,
-      statechainPublicKeys:
-        treeResp.rootNodeSignatureShares.directNodeTxSigningResult.publicKeys,
-      verifyingKey: treeResp.rootNodeSignatureShares.verifyingKey,
-      statechainCommitments:
-        treeResp.rootNodeSignatureShares.directNodeTxSigningResult
-          .signingNonceCommitments,
-      selfCommitment: directRootNonceCommitment,
-      publicKey: signingPubKey,
-      selfSignature: directRootSignature!,
-      adaptorPubKey: new Uint8Array(),
-    });
-
     const cpfpRefundAggregate = await this.config.signer.aggregateFrost({
       message: cpfpRefundTxSighash,
       statechainSignatures:
@@ -543,23 +454,6 @@ export class DepositService {
       selfCommitment: cpfpRefundNonceCommitment,
       publicKey: signingPubKey,
       selfSignature: cpfpRefundSignature!,
-      adaptorPubKey: new Uint8Array(),
-    });
-
-    const directRefundAggregate = await this.config.signer.aggregateFrost({
-      message: directRefundTxSighash,
-      statechainSignatures:
-        treeResp.rootNodeSignatureShares.directRefundTxSigningResult
-          .signatureShares,
-      statechainPublicKeys:
-        treeResp.rootNodeSignatureShares.directRefundTxSigningResult.publicKeys,
-      verifyingKey: treeResp.rootNodeSignatureShares.verifyingKey,
-      statechainCommitments:
-        treeResp.rootNodeSignatureShares.directRefundTxSigningResult
-          .signingNonceCommitments,
-      selfCommitment: directRefundNonceCommitment,
-      publicKey: signingPubKey,
-      selfSignature: directRefundSignature!,
       adaptorPubKey: new Uint8Array(),
     });
 
@@ -591,8 +485,6 @@ export class DepositService {
             nodeId: treeResp.rootNodeSignatureShares.nodeId,
             nodeTxSignature: cpfpRootAggregate,
             refundTxSignature: cpfpRefundAggregate,
-            directNodeTxSignature: directRootAggregate,
-            directRefundTxSignature: directRefundAggregate,
             directFromCpfpRefundTxSignature: directFromCpfpRefundAggregate,
           },
         ],

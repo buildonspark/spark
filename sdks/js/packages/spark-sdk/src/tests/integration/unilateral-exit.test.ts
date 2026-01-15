@@ -196,11 +196,11 @@ describe("unilateral exit", () => {
     // (Current Height will be ConfHeight + 2050)
     await faucet.mineBlocksAndWaitForMiningToComplete(2050);
 
-    await faucet.waitForMempoolEntry(directFromCpfpRefundTxId);
+    await faucet.waitForMempoolEntry(directFromCpfpRefundTxId, 60_000);
 
     // Mining another 5 blocks to confirm that direct from cpfp refund txn is confirmed.
     await faucet.mineBlocksAndWaitForMiningToComplete(5);
     const txInfo = await faucet.getRawTransaction(directFromCpfpRefundTxId);
     expect(txInfo.confirmations).toBeGreaterThan(0);
-  }, 90000);
+  }, 120_000);
 });
