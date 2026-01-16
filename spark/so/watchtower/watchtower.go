@@ -92,7 +92,7 @@ func alreadyBroadcasted(err error) bool {
 
 // QueryBroadcastableNodes returns nodes that are eligible for broadcast.
 func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHeight int64, network btcnetwork.Network) ([]*ent.TreeNode, error) {
-	var rootNodes, childNodes, refundNodes []*ent.TreeNode
+	var childNodes, refundNodes []*ent.TreeNode
 
 	//1. Child nodes whose parent is confirmed but the node itself is not.
 	childNodes, err := dbClient.TreeNode.Query().
@@ -126,8 +126,7 @@ func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHei
 	}
 
 	// Deduplicate nodes.
-	allNodes := make([]*ent.TreeNode, 0, len(rootNodes)+len(childNodes)+len(refundNodes))
-	allNodes = append(allNodes, rootNodes...)
+	allNodes := make([]*ent.TreeNode, 0, len(childNodes)+len(refundNodes))
 	allNodes = append(allNodes, childNodes...)
 	allNodes = append(allNodes, refundNodes...)
 
