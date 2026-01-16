@@ -155,26 +155,26 @@ jobs:
           install-mode: "update-lock-only"
 
       # check if previous step updated the lock file and commit and push if so:
-      - name: Update lock file for Version Packages PR
-        if: steps.changesets.outputs.published == 'false' && github.ref == 'refs/heads/main'
-        run: |
-          if git ls-remote --exit-code --heads origin changeset-release/main; then
-            git fetch origin changeset-release/main
-            if git show-ref --quiet changeset-release/main; then
-              git checkout changeset-release/main
-              git push --set-upstream origin changeset-release/main
-              git config --global user.name 'Lightspark Eng'
-              git config --global user.email 'engineering@lightspark.com'
-              git add -A
-              git diff-index --quiet HEAD || git commit -nm "CI update lock file for PR"
-              git push
-              echo "$(git rev-parse HEAD)"
-            else
-              echo "changeset-release/main branch does not exist locally."
-            fi
-          else
-            echo "changeset-release/main branch does not exist on remote."
-          fi
+      # - name: Update lock file for Version Packages PR
+      #   if: steps.changesets.outputs.published == 'false' && github.ref == 'refs/heads/main'
+      #   run: |
+      #     if git ls-remote --exit-code --heads origin changeset-release/main; then
+      #       git fetch origin changeset-release/main
+      #       if git show-ref --quiet changeset-release/main; then
+      #         git checkout changeset-release/main
+      #         git push --set-upstream origin changeset-release/main
+      #         git config --global user.name 'Lightspark Eng'
+      #         git config --global user.email 'engineering@lightspark.com'
+      #         git add -A
+      #         git diff-index --quiet HEAD || git commit -nm "CI update lock file for PR"
+      #         git push
+      #         echo "$(git rev-parse HEAD)"
+      #       else
+      #         echo "changeset-release/main branch does not exist locally."
+      #       fi
+      #     else
+      #       echo "changeset-release/main branch does not exist on remote."
+      #     fi
 
       - name: Notify publish on Slack
         if: steps.changesets.outputs.published == 'true'
