@@ -1,12 +1,10 @@
 #!/usr/bin/env node
-/* Note lrc20-sdk will be deprecated and has been removed from Spark JS workspaces.
-   This is temporarily left for testing purposes: */
 import {
   TokenPubkey,
   TokenPubkeyAnnouncement,
-  LRCWallet,
+  Lrc20AnnouncementWallet,
   NetworkType,
-} from "@buildonspark/lrc20-sdk";
+} from "./lib/index.js";
 import fetch from "node-fetch";
 
 Object.defineProperty(globalThis, "fetch", {
@@ -43,12 +41,11 @@ async function main() {
   const maxSupply = 0n;
   const isFreezable = true;
 
-  let wallet = new LRCWallet(
+  const wallet = new Lrc20AnnouncementWallet(
     "515c86ccb09faa2235acd0e287381bf286b37002328a8cc3c3b89738ab59dc93",
     regtest,
     NetworkType.LOCAL,
     {
-      lrc20NodeUrl: "http://127.0.0.1:18332",
       electrsUrl: isHermeticTest
         ? "http://mempool.minikube.local/api"
         : "http://127.0.0.1:30000",
@@ -74,6 +71,7 @@ async function main() {
 
 /**
  * Announces a new token on the L1 (Bitcoin) network.
+ * @param wallet - The wallet to use for the announcement
  * @param tokenName - The name of the token
  * @param tokenTicker - The ticker symbol for the token
  * @param decimals - The number of decimal places for the token
@@ -81,11 +79,9 @@ async function main() {
  * @param isFreezable - Whether the token can be frozen
  * @param feeRateSatsPerVb - The fee rate in satoshis per virtual byte (default: 4.0)
  * @returns The transaction ID of the announcement
- * @throws {SparkValidationError} If decimals is not a safe integer
- * @throws {SparkRequestError} If the announcement transaction cannot be broadcast
  */
 async function announceTokenL1(
-  lrc20Wallet: LRCWallet,
+  wallet: Lrc20AnnouncementWallet,
   tokenName: string,
   tokenTicker: string,
   decimals: number,
@@ -93,9 +89,9 @@ async function announceTokenL1(
   isFreezable: boolean,
   feeRateSatsPerVb: number = 4.0,
 ): Promise<string> {
-  await lrc20Wallet!.syncWallet();
+  await wallet.syncWallet();
 
-  const tokenPublicKey = new TokenPubkey(lrc20Wallet!.pubkey);
+  const tokenPublicKey = new TokenPubkey(wallet.pubkey);
 
   const announcement = new TokenPubkeyAnnouncement(
     tokenPublicKey,
@@ -106,16 +102,13 @@ async function announceTokenL1(
     isFreezable,
   );
 
-  const tx = await lrc20Wallet!.prepareAnnouncement(
-    announcement,
-    feeRateSatsPerVb,
-  );
+  const tx = await wallet.prepareAnnouncement(announcement, feeRateSatsPerVb);
 
   let lastError: unknown;
 
   for (let attempt = 0; attempt < MAX_BROADCAST_RETRIES; attempt++) {
     try {
-      const txId = await lrc20Wallet!.broadcastRawBtcTransaction(
+      const txId = await wallet.broadcastRawBtcTransaction(
         tx.bitcoin_tx.toHex(),
       );
 

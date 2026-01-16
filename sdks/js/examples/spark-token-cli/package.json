@@ -21,8 +21,9 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@buildonspark/issuer-sdk": "0.1.6",
-    "@buildonspark/lrc20-sdk": "^0.0.54",
+    "@bitcoinerlab/secp256k1": "^1.1.1",
+    "bitcoinjs-lib": "^6.1.5",
+    "ecpair": "^2.1.0",
     "node-fetch": "^3.3.2",
     "tsx": "^4.19.3"
   },
