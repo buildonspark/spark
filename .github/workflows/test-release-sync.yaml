@@ -27,7 +27,8 @@ jobs:
         uses: "actions/checkout@v4"
         with:
           # use branch name instead of triggering ref so we can commit to the PR branch:
-          ref: ${{ github.head_ref }}
+          # (github.head_ref is empty on push events)
+          ref: ${{ github.head_ref || github.ref }}
           fetch-depth: 2
 
       - name: "Setup Node.js and Yarn"
@@ -43,7 +44,9 @@ jobs:
       - name: "Commit and push changes if modified"
         id: sync-lock-file
         run: |
-          if [[ $(git rev-parse --abbrev-ref HEAD) == "main" ]] && ! git diff-index --quiet HEAD; then
+          # On pushes to main, the checkout can be in a detached HEAD state and changes are initially
+          # unstaged. Use GitHub's ref and a working-tree diff against HEAD to detect modifications.
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]] && ! git diff --quiet HEAD; then
             echo "Lock file must not be modified by CI on main branch."
             exit 1;
           fi
