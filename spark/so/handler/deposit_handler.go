@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	errs "errors"
 	"fmt"
 	"strings"
 
@@ -42,6 +43,8 @@ import (
 
 const DefaultDepositConfirmationThreshold = uint(3)
 
+var ErrInvalidNetwork = errs.New("invalid network")
+
 // The DepositHandler is responsible for handling deposit related requests.
 type DepositHandler struct {
 	config *so.Config
@@ -52,6 +55,18 @@ func NewDepositHandler(config *so.Config) *DepositHandler {
 	return &DepositHandler{
 		config: config,
 	}
+}
+
+// validateIdentity parses and validates the identity public key from a request.
+func validateIdentity(ctx context.Context, config *so.Config, identityPublicKey []byte) (keys.Public, error) {
+	reqIDPubKey, err := keys.ParsePublicKey(identityPublicKey)
+	if err != nil {
+		return keys.Public{}, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, reqIDPubKey); err != nil {
+		return keys.Public{}, err
+	}
+	return reqIDPubKey, nil
 }
 
 // GenerateDepositAddress generates a deposit address for the given public key.
@@ -672,7 +687,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		if err := o.verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundTx); err != nil {
 			return nil, err
 		}
-		if len(cpfpRootTx.TxOut) <= 0 {
+		if len(cpfpRootTx.TxOut) == 0 {
 			return nil, fmt.Errorf("vout out of bounds, root tx has no outputs")
 		}
 		directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpRootTx.TxOut[0])
@@ -722,8 +737,11 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		if err != nil {
 			return nil, err
 		}
-		if len(cpfpRootTx.TxOut) <= 0 {
+		if len(cpfpRootTx.TxOut) == 0 {
 			return nil, fmt.Errorf("vout out of bounds, root tx has no outputs")
+		}
+		if len(directRootTx.TxOut) == 0 {
+			return nil, fmt.Errorf("vout out of bounds, direct root tx has no outputs")
 		}
 		directRefundTxSigHash, err := common.SigHashFromTx(directRefundTx, 0, directRootTx.TxOut[0])
 		if err != nil {
@@ -761,7 +779,32 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	networkString := network.String()
 	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobEnableDepositFlowValidation, &networkString, 0) > 0 {
 		combinedPublicKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
-		err = o.validateBitcoinTransactions(ctx, req, combinedPublicKey, networkString)
+
+		var directRootTxRaw, directRefundTxRaw []byte
+		if req.DirectRootTxSigningJob != nil {
+			directRootTxRaw = req.DirectRootTxSigningJob.RawTx
+		}
+		if req.DirectRefundTxSigningJob != nil {
+			directRefundTxRaw = req.DirectRefundTxSigningJob.RawTx
+		}
+		var directFromCpfpRefundTxRaw []byte
+		if req.DirectFromCpfpRefundTxSigningJob != nil {
+			directFromCpfpRefundTxRaw = req.DirectFromCpfpRefundTxSigningJob.RawTx
+		}
+
+		err = validateBitcoinTransactions(
+			ctx,
+			req.OnChainUtxo.RawTx,
+			req.OnChainUtxo.Vout,
+			req.RootTxSigningJob.RawTx,
+			req.RefundTxSigningJob.RawTx,
+			directFromCpfpRefundTxRaw,
+			directRootTxRaw,
+			directRefundTxRaw,
+			combinedPublicKey,
+			depositAddress.OwnerSigningPubkey,
+			networkString,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate transaction in tree creation request: %w", err)
 		}
@@ -946,7 +989,7 @@ func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wi
 		return fmt.Errorf("root tx version validation failed: %w", err)
 	}
 
-	if len(rootTx.TxIn) <= 0 || len(rootTx.TxOut) <= 0 {
+	if len(rootTx.TxIn) == 0 || len(rootTx.TxOut) == 0 {
 		return fmt.Errorf("root transaction should have at least 1 input and 1 output")
 	}
 
@@ -1237,7 +1280,7 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 
 	var utxosResult []*pb.UTXO
 	if depositAddress.IsStatic {
-		if req.Limit > 100 || req.Limit <= 0 {
+		if req.Limit > 100 || req.Limit == 0 {
 			req.Limit = 100
 		}
 		query := depositAddress.QueryUtxo().
@@ -1289,27 +1332,35 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 	return &pb.GetUtxosForAddressResponse{Utxos: utxosResult}, nil
 }
 
-// validateBitcoinTransactions validates Bitcoin transactions
-// in the deposit request depending on the knob.
-func (h *DepositHandler) validateBitcoinTransactions(ctx context.Context, req *pb.StartDepositTreeCreationRequest, rootDestPubkey keys.Public, networkString string) error {
-	if req == nil {
-		return nil
-	}
-	vout := req.OnChainUtxo.Vout
-	depositTx := req.OnChainUtxo.RawTx
-	cpfpRootTx := req.RootTxSigningJob.RawTx
-	cpfpRefundTx := req.RefundTxSigningJob.RawTx
-
+// validateBitcoinTransactions validates Bitcoin transactions in a deposit flow.
+// Parameters:
+//   - depositTx: Raw bytes of the on-chain deposit transaction
+//   - vout: Output index in the deposit transaction
+//   - cpfpRootTx: Raw bytes of the CPFP root transaction
+//   - cpfpRefundTx: Raw bytes of the CPFP refund transaction
+//   - directFromCpfpRefundTx: Optional raw bytes of direct-from-CPFP refund transaction
+//   - directRootTx: Optional raw bytes of direct root transaction
+//   - directRefundTx: Optional raw bytes of direct refund transaction
+//   - rootDestPubkey: Public key for root transaction destination
+//   - refundDestPubkey: Public key for refund transaction destination
+//   - networkString: Network identifier string
+func validateBitcoinTransactions(
+	ctx context.Context,
+	depositTx []byte,
+	vout uint32,
+	cpfpRootTx []byte,
+	cpfpRefundTx []byte,
+	directFromCpfpRefundTx []byte,
+	directRootTx []byte,
+	directRefundTx []byte,
+	rootDestPubkey keys.Public,
+	refundDestPubkey keys.Public,
+	networkString string,
+) error {
 	// Validate cpfp root tx based on deposit tx
 	err := bitcointransaction.VerifyTransactionWithSource(ctx, cpfpRootTx, depositTx, vout, 0, bitcointransaction.TxTypeNodeCPFP, rootDestPubkey, networkString)
 	if err != nil {
 		return fmt.Errorf("cpfp root transaction verification failed: %w", err)
-	}
-
-	// Currently we assume that all refund transactions pay to same pubkey
-	refundDestPubkey, err := keys.ParsePublicKey(req.RefundTxSigningJob.SigningPublicKey)
-	if err != nil {
-		return fmt.Errorf("invalid refund tx signing public key: %w", err)
 	}
 
 	// We add TimeLockInterval to ensure that expectedTx has locktime
@@ -1322,9 +1373,7 @@ func (h *DepositHandler) validateBitcoinTransactions(ctx context.Context, req *p
 	}
 
 	// Validate direct-from-cpfp refund tx based on cpfp root tx (If provided)
-	if req.DirectFromCpfpRefundTxSigningJob != nil {
-		directFromCpfpRefundTx := req.DirectFromCpfpRefundTxSigningJob.RawTx
-
+	if len(directFromCpfpRefundTx) > 0 {
 		err = bitcointransaction.VerifyTransactionWithSource(ctx, directFromCpfpRefundTx, cpfpRootTx, 0, cpfpTimelock, bitcointransaction.TxTypeRefundDirectFromCPFP, refundDestPubkey, networkString)
 		if err != nil {
 			return fmt.Errorf("direct-from-cpfp refund transaction verification failed: %w", err)
@@ -1333,14 +1382,12 @@ func (h *DepositHandler) validateBitcoinTransactions(ctx context.Context, req *p
 
 	// Only validate direct tx if both are provided
 	// Validate direct refund tx based on direct root tx
-	if req.DirectRootTxSigningJob != nil && req.DirectRefundTxSigningJob != nil {
-		directRootTx := req.DirectRootTxSigningJob.RawTx
+	if len(directRootTx) > 0 && len(directRefundTx) > 0 {
 		err = bitcointransaction.VerifyTransactionWithSource(ctx, directRootTx, depositTx, vout, 0, bitcointransaction.TxTypeNodeDirect, rootDestPubkey, networkString)
 		if err != nil {
 			return fmt.Errorf("direct root transaction verification failed: %w", err)
 		}
 
-		directRefundTx := req.DirectRefundTxSigningJob.RawTx
 		err = bitcointransaction.VerifyTransactionWithSource(ctx, directRefundTx, directRootTx, 0, cpfpTimelock, bitcointransaction.TxTypeRefundDirect, refundDestPubkey, networkString)
 		if err != nil {
 			return fmt.Errorf("direct refund transaction verification failed: %w", err)
@@ -1356,10 +1403,129 @@ func (h *DepositHandler) validateBitcoinTransactions(ctx context.Context, req *p
 // 2. Client signs locally to produce signature shares
 // 3. Client calls this endpoint to have SE aggregate and finalize the tree
 func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config *so.Config, req *pb.FinalizeDepositTreeCreationRequest) (*pb.FinalizeDepositTreeCreationResponse, error) {
-	_, span := tracer.Start(ctx, "DepositHandler.FinalizeDepositTreeCreation")
+	ctx, span := tracer.Start(ctx, "DepositHandler.FinalizeDepositTreeCreation")
 	defer span.End()
 
-	// TODO: Implement signature aggregation and tree creation
-	// This will be implemented in a follow-up PR
-	return nil, status.Error(codes.Unimplemented, "FinalizeDepositTreeCreation is not yet implemented")
+	logger := logging.GetLoggerFromContext(ctx)
+
+	// Validate request
+	err := validateFinalizeDepositTreeCreationRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate identity
+	reqIDPubKey, err := validateIdentity(ctx, config, req.IdentityPublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	network, err := convertAndValidateProtoNetwork(config, req.OnChainUtxo.Network)
+	if err != nil {
+		return nil, fmt.Errorf("invalid network %s: %w", req.OnChainUtxo.Network, err)
+	}
+
+	// Step 1: Validate request and get deposit address
+	depositAddress, onChainTx, onChainOutput, err := loadAndValidateDepositAddress(ctx, network, req, reqIDPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if tree already exists for this deposit address
+	if depositAddress.Edges.Tree != nil {
+		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("tree already exists for deposit address %s", depositAddress.Address))
+	}
+
+	logger.Sugar().Infof("Finalizing deposit tree creation for address %s", depositAddress.Address)
+
+	// Step 2: Prepare signing jobs with pregenerated nonces
+	signingJobs, verifyingKey, err := o.prepareSigningJobs(req, depositAddress, onChainTx, onChainOutput)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to SigningJobWithPregeneratedNonce using SE commitments from request
+	signingJobsWithNonce, err := o.convertToSigningJobsWithPregeneratedNonce(signingJobs, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert signing jobs: %w", err)
+	}
+
+	// Step 3: SE signs all transactions using pregenerated commitments
+	logger.Sugar().Infof("SE signing %d transactions for deposit using pregenerated nonces", len(signingJobsWithNonce))
+	signingResults, err := helper.SignFrostWithPregeneratedNonce(ctx, config, signingJobsWithNonce)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign transactions: %w", err)
+	}
+	if len(signingResults) != len(signingJobs) {
+		return nil, fmt.Errorf("expected %d signing results, got %d", len(signingJobs), len(signingResults))
+	}
+	for i, signingResult := range signingResults {
+		if signingResult.JobID != signingJobs[i].JobID {
+			return nil, fmt.Errorf("signing results do not match signing jobs (i=%d resultID=%s jobID=%s)", i, signingResult.JobID, signingJobs[i].JobID)
+		}
+	}
+
+	// Step 4: Aggregate signatures (SE + user)
+	rootSigningPubKey, err := keys.ParsePublicKey(req.RootTxSigningJob.SigningPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse root signing key: %w", err)
+	}
+	signatures, err := o.aggregateSignatures(ctx, config, req, signingResults, verifyingKey, rootSigningPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Sugar().Infof("Successfully aggregated %d signatures", len(signatures))
+
+	// Step 5: Apply signatures to transactions
+	signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx, err := o.applySignaturesToTransactions(req, signatures)
+	if err != nil {
+		return nil, err
+	}
+
+	// Step 6: Create tree and node in database with signed transactions
+	// Note: The tree is automatically linked to deposit address via SetDepositAddress() in createTreeAndNode
+	createdTree, createdNode, err := o.createTreeAndNode(ctx, depositAddress, onChainTx, onChainOutput, req, network, verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Sugar().Infof("Successfully finalized deposit tree with root node %s", createdNode.ID)
+
+	// Marshal the response BEFORE sending gossip (which commits the transaction)
+	// MarshalSparkProto may need to load edges from the database
+	pbNode, err := createdNode.MarshalSparkProto(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Step 7: Send gossip to other SOs
+	// Note: CreateCommitAndSendGossipMessage will commit the transaction
+	err = o.sendFinalizeNodeGossip(ctx, createdTree, createdNode)
+	if err != nil {
+		logger.With(zap.Error(err)).Sugar().Errorf(
+			"failed to send gossip for new tree (%s) and node (%s)",
+			createdTree.ID.String(), createdNode.ID.String())
+		// Don't return error - gossip failure shouldn't fail the entire operation
+		// The local SO will process the gossip through the normal retry mechanism
+	}
+
+	// Return response
+	return &pb.FinalizeDepositTreeCreationResponse{
+		RootNode: pbNode,
+	}, nil
+}
+
+func convertAndValidateProtoNetwork(
+	config *so.Config,
+	protoNetwork pb.Network,
+) (btcnetwork.Network, error) {
+	network, err := btcnetwork.FromProtoNetwork(protoNetwork)
+	if err != nil {
+		return btcnetwork.Unspecified, err
+	}
+	if !config.IsNetworkSupported(network) {
+		return btcnetwork.Unspecified, ErrInvalidNetwork
+	}
+	return network, nil
 }

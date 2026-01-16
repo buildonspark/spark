@@ -238,6 +238,100 @@ func TestStartDepositTreeCreationBasic(t *testing.T) {
 	assert.Zero(t, unusedDepositAddresses.GetDepositAddresses())
 }
 
+func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	privKey := keys.GeneratePrivateKey()
+	leafID := uuid.NewString()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+	require.NoError(t, err)
+
+	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
+	require.NoError(t, err)
+	require.Len(t, unusedDepositAddresses.DepositAddresses, 1)
+	require.Equal(t, leafID, unusedDepositAddresses.DepositAddresses[0].GetLeafId())
+
+	client := sparktesting.GetBitcoinClient()
+
+	coin, err := faucet.Fund()
+	require.NoError(t, err)
+
+	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+	require.NoError(t, err, "failed to create deposit tx")
+	vout := 0
+
+	// Sign, broadcast, and mine deposit tx
+	signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+	require.NoError(t, err, "failed to sign faucet coin")
+	_, err = client.SendRawTransaction(signedDepositTx, true)
+	require.NoError(t, err)
+
+	randomKey := keys.GeneratePrivateKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
+	require.NoError(t, err, "failed to get p2tr raw address")
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	require.NoError(t, err, "failed to generate to address")
+
+	time.Sleep(100 * time.Millisecond)
+
+	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	require.NoError(t, err)
+	resp, err := wallet.CreateTreeRootWithFinalizeDepositTreeCreation(ctx, config, privKey, verifyingKey, depositTx, vout)
+	if err != nil {
+		t.Fatalf("failed to create tree: %v", err)
+	}
+
+	require.NotNil(t, resp.RootNode)
+
+	require.Nil(t, resp.RootNode.ParentNodeId, "must be a root node")
+	require.Equal(t, resp.RootNode.Id, leafID)
+	require.Equal(t, uint64(100_000), resp.RootNode.Value)
+	require.Equal(t, resp.RootNode.Status, string(st.TreeNodeStatusCreating))
+
+	tx, err := common.TxFromRawTxBytes(resp.RootNode.NodeTx)
+	require.NoError(t, err)
+	require.Len(t, tx.TxIn, 1)
+	require.NotNil(t, tx.TxIn[0])
+	require.Len(t, tx.TxIn[0].Witness, 1)
+	require.Len(t, tx.TxOut, 2)
+
+	refundTx, err := common.TxFromRawTxBytes(resp.RootNode.RefundTx)
+	require.NoError(t, err)
+	require.Len(t, refundTx.TxIn, 1)
+	require.NotNil(t, refundTx.TxIn[0])
+	require.Len(t, refundTx.TxIn[0].Witness, 1)
+	require.Len(t, refundTx.TxOut, 2)
+
+	directFromCpfpRefundTx, err := common.TxFromRawTxBytes(resp.RootNode.DirectFromCpfpRefundTx)
+	require.NoError(t, err)
+	require.Len(t, directFromCpfpRefundTx.TxIn, 1)
+	require.NotNil(t, directFromCpfpRefundTx.TxIn[0])
+	require.Len(t, directFromCpfpRefundTx.TxIn[0].Witness, 1)
+	require.Len(t, directFromCpfpRefundTx.TxOut, 1)
+
+	// Mine 2 more blocks because deposits won't be available until there are 3 confirmations
+	_, err = client.GenerateToAddress(2, randomAddress, nil)
+	require.NoError(t, err, "failed to generate to address")
+
+	sparkClient := pb.NewSparkServiceClient(conn)
+	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.RootNode)
+	require.NoError(t, err)
+	assert.Equal(t, rootNode.Id, leafID)
+	assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
+
+	unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
+	require.NoError(t, err, "failed to query unused deposit addresses")
+
+	assert.Zero(t, unusedDepositAddresses.GetDepositAddresses())
+}
+
 func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
 	config := wallet.NewTestWalletConfig(t)
 

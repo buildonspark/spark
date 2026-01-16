@@ -6,6 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -490,6 +493,195 @@ func CreateTreeRoot(
 			},
 		},
 	})
+}
+
+func CreateTreeRootWithFinalizeDepositTreeCreation(
+	ctx context.Context,
+	config *TestWalletConfig,
+	signingPrivKey keys.Private,
+	verifyingKey keys.Public,
+	depositTx *wire.MsgTx,
+	vout int,
+) (*pb.FinalizeDepositTreeCreationResponse, error) {
+	signingPubKey := signingPrivKey.Public()
+	// Create root tx
+	depositOutPoint := &wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}
+	rootTx := createRootTx(depositOutPoint, depositTx.TxOut[0])
+	rootPrepared, err := prepareTxSigningArtifacts(rootTx, depositTx.TxOut[0], signingPubKey)
+	if err != nil {
+		return nil, err
+	}
+	var depositBuf bytes.Buffer
+	err = depositTx.Serialize(&depositBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	initialRefundSequence, initialDirectSequence := InitialRefundSequences()
+
+	// Create CPFP refund tx
+	cpfpRefundTx, _, err := CreateRefundTxs(
+		initialRefundSequence,
+		initialDirectSequence,
+		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
+		rootTx.TxOut[0].Value,
+		signingPubKey,
+		true,
+	)
+	if err != nil {
+		return nil, err
+	}
+	refundPrepared, err := prepareTxSigningArtifacts(cpfpRefundTx, rootTx.TxOut[0], signingPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create Direct-From-CPFP Refund Tx
+	_, directFromCpfpRefundTx, err := CreateRefundTxs(
+		initialRefundSequence,
+		initialDirectSequence,
+		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
+		rootTx.TxOut[0].Value,
+		signingPubKey,
+		true,
+	)
+	if err != nil {
+		return nil, err
+	}
+	directFromCpfpRefundPrepared, err := prepareTxSigningArtifacts(directFromCpfpRefundTx, rootTx.TxOut[0], signingPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	sparkConn, err := config.NewCoordinatorGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+
+	// Step 1: Get SE commitments (non-mutating call)
+	commitmentsResp, err := sparkClient.GetSigningCommitments(ctx, &pb.GetSigningCommitmentsRequest{
+		Count:       3,
+		NodeIdCount: 1,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get SE commitments: %w", err)
+	}
+
+	if len(commitmentsResp.SigningCommitments) != 3 {
+		return nil, fmt.Errorf("got %d commitments, expected 3", len(commitmentsResp.SigningCommitments))
+	}
+
+	// Step 2: Generate user signature shares using SE commitments
+	userKeyPackage := CreateUserKeyPackage(signingPrivKey)
+
+	nodeJobID := uuid.NewString()
+	refundJobID := uuid.NewString()
+	directFromCpfpRefundJobID := uuid.NewString()
+	userSigningJobs := []*pbfrost.FrostSigningJob{
+		{
+			JobId:           nodeJobID,
+			Message:         rootPrepared.sighash,
+			KeyPackage:      userKeyPackage,
+			VerifyingKey:    verifyingKey.Serialize(),
+			Nonce:           rootPrepared.nonce,
+			UserCommitments: rootPrepared.commitment,
+			Commitments:     commitmentsResp.SigningCommitments[0].SigningNonceCommitments,
+		},
+		{
+			JobId:           refundJobID,
+			Message:         refundPrepared.sighash,
+			KeyPackage:      userKeyPackage,
+			VerifyingKey:    verifyingKey.Serialize(),
+			Nonce:           refundPrepared.nonce,
+			UserCommitments: refundPrepared.commitment,
+			Commitments:     commitmentsResp.SigningCommitments[1].SigningNonceCommitments,
+		},
+		{
+			JobId:           directFromCpfpRefundJobID,
+			Message:         directFromCpfpRefundPrepared.sighash,
+			KeyPackage:      userKeyPackage,
+			VerifyingKey:    verifyingKey.Serialize(),
+			Nonce:           directFromCpfpRefundPrepared.nonce,
+			UserCommitments: directFromCpfpRefundPrepared.commitment,
+			Commitments:     commitmentsResp.SigningCommitments[2].SigningNonceCommitments,
+		},
+	}
+
+	frostConn, err := config.NewFrostGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer frostConn.Close()
+
+	frostClient := pbfrost.NewFrostServiceClient(frostConn)
+
+	userSignatures, err := frostClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
+		SigningJobs: userSigningJobs,
+		Role:        pbfrost.SigningRole_USER,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	nodeSignature, ok := userSignatures.Results[nodeJobID]
+	if !ok || nodeSignature == nil {
+		returnedResults := slices.Collect(maps.Keys(userSignatures.Results))
+		return nil, fmt.Errorf("node signature (%s) not returned from frost (returned %s)", nodeJobID, strings.Join(returnedResults, ","))
+	}
+	refundSignature, ok := userSignatures.Results[refundJobID]
+	if !ok || refundSignature == nil {
+		returnedResults := slices.Collect(maps.Keys(userSignatures.Results))
+		return nil, fmt.Errorf("refund signature (%s) not returned from frost (returned %s)", refundJobID, strings.Join(returnedResults, ","))
+	}
+	cpfpRefundSignature, ok := userSignatures.Results[directFromCpfpRefundJobID]
+	if !ok || cpfpRefundSignature == nil {
+		returnedResults := slices.Collect(maps.Keys(userSignatures.Results))
+		return nil, fmt.Errorf("cpfp refund signature (%s) not returned from frost (returned %s)", directFromCpfpRefundJobID, strings.Join(returnedResults, ","))
+	}
+
+	// Step 3: Call the finalize endpoint with user signature shares and SE commitments
+	finalizeResp, err := sparkClient.FinalizeDepositTreeCreation(ctx, &pb.FinalizeDepositTreeCreationRequest{
+		IdentityPublicKey: config.IdentityPublicKey().Serialize(),
+		OnChainUtxo: &pb.UTXO{
+			Vout:    uint32(vout),
+			RawTx:   depositBuf.Bytes(),
+			Network: config.ProtoNetwork(),
+		},
+		RootTxSigningJob: &pb.UserSignedTxSigningJob{
+			SigningPublicKey:       signingPubKey.Serialize(),
+			RawTx:                  rootPrepared.signingJob.RawTx,
+			SigningNonceCommitment: rootPrepared.signingJob.SigningNonceCommitment,
+			UserSignature:          nodeSignature.SignatureShare,
+			SigningCommitments: &pb.SigningCommitments{
+				SigningCommitments: commitmentsResp.SigningCommitments[0].SigningNonceCommitments,
+			},
+		},
+		RefundTxSigningJob: &pb.UserSignedTxSigningJob{
+			SigningPublicKey:       signingPubKey.Serialize(),
+			RawTx:                  refundPrepared.signingJob.RawTx,
+			SigningNonceCommitment: refundPrepared.signingJob.SigningNonceCommitment,
+			UserSignature:          refundSignature.SignatureShare,
+			SigningCommitments: &pb.SigningCommitments{
+				SigningCommitments: commitmentsResp.SigningCommitments[1].SigningNonceCommitments,
+			},
+		},
+		DirectFromCpfpRefundTxSigningJob: &pb.UserSignedTxSigningJob{
+			SigningPublicKey:       signingPubKey.Serialize(),
+			RawTx:                  directFromCpfpRefundPrepared.signingJob.RawTx,
+			SigningNonceCommitment: directFromCpfpRefundPrepared.signingJob.SigningNonceCommitment,
+			UserSignature:          cpfpRefundSignature.SignatureShare,
+			SigningCommitments: &pb.SigningCommitments{
+				SigningCommitments: commitmentsResp.SigningCommitments[2].SigningNonceCommitments,
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return finalizeResp, nil
 }
 
 type RefundStaticDepositParams struct {

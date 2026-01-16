@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
@@ -100,6 +101,42 @@ func depositHandlerWithConfig() *DepositHandler {
 	return &DepositHandler{config: &so.Config{}}
 }
 
+// callValidateBitcoinTransactions is a test helper that extracts parameters from a request
+// and calls the validateBitcoinTransactions function
+func callValidateBitcoinTransactions(
+	ctx context.Context,
+	req *pb.StartDepositTreeCreationRequest,
+	rootDestPubkey keys.Public,
+	refundDestPubkey keys.Public,
+	networkString string,
+) error {
+	var directRootTxRaw, directRefundTxRaw []byte
+	if req.DirectRootTxSigningJob != nil {
+		directRootTxRaw = req.DirectRootTxSigningJob.RawTx
+	}
+	if req.DirectRefundTxSigningJob != nil {
+		directRefundTxRaw = req.DirectRefundTxSigningJob.RawTx
+	}
+	var directFromCpfpRefundTxRaw []byte
+	if req.DirectFromCpfpRefundTxSigningJob != nil {
+		directFromCpfpRefundTxRaw = req.DirectFromCpfpRefundTxSigningJob.RawTx
+	}
+
+	return validateBitcoinTransactions(
+		ctx,
+		req.OnChainUtxo.RawTx,
+		req.OnChainUtxo.Vout,
+		req.RootTxSigningJob.RawTx,
+		req.RefundTxSigningJob.RawTx,
+		directFromCpfpRefundTxRaw,
+		directRootTxRaw,
+		directRefundTxRaw,
+		rootDestPubkey,
+		refundDestPubkey,
+		networkString,
+	)
+}
+
 // --- Tests ---
 func TestValidateUserTxs_Cpfp_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
@@ -125,8 +162,8 @@ func TestValidateUserTxs_Cpfp_Success(t *testing.T) {
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.NoError(t, err)
 }
 
@@ -156,8 +193,8 @@ func TestValidateUserDepositTxs_Legacy_Cpfp_Success(t *testing.T) {
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.NoError(t, err)
 }
 
@@ -192,8 +229,8 @@ func TestValidateUserTxs_Direct_Success(t *testing.T) {
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.NoError(t, err)
 }
 
@@ -225,8 +262,8 @@ func TestValidateUserTxs_DirectFromCpfp_Success(t *testing.T) {
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.NoError(t, err)
 }
 
@@ -254,8 +291,8 @@ func TestValidateUserTxs_InvalidRefundCpfp_Error(t *testing.T) {
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "cpfp refund transaction verification failed")
 }
 
@@ -289,8 +326,9 @@ func TestValidateUserTxs_InvalidRootTxInput_Error(t *testing.T) {
 		RefundTxSigningJob: &pb.SigningJob{},
 	}
 
-	h := depositHandlerWithConfig()
-	err = h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	refundDest := keys.GeneratePrivateKey().Public()
+	err = callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "cpfp root transaction verification failed: transaction does not match expected construction")
 }
 
@@ -319,8 +357,8 @@ func TestValidateUserTxs_CpfpRootTxInvalidSequence_Error(t *testing.T) {
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate client sequence")
 }
 
@@ -357,8 +395,8 @@ func TestValidateUserTxs_CpfpRootTxTwoOutputs_Error(t *testing.T) {
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err = h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err = callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "cpfp root transaction verification failed: transaction does not match expected construction")
 }
 
@@ -394,8 +432,8 @@ func TestValidateUserTxs_DirectRootTxInvalidSequence_Error(t *testing.T) {
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate client sequence")
 }
 
@@ -439,8 +477,8 @@ func TestValidateUserTxs_DirectRootTxTwoOutputs_Error(t *testing.T) {
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err = h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err = callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "direct root transaction verification failed: transaction does not match expected construction")
 }
 
@@ -470,8 +508,8 @@ func TestValidateUserTxs_CpfpRefundTxFinalSequence_Error(t *testing.T) {
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate user sequence")
 }
 
@@ -508,8 +546,8 @@ func TestValidateUserTxs_DirectRefundTxFinalSequence_Error(t *testing.T) {
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate user sequence")
 }
 
@@ -543,7 +581,7 @@ func TestValidateUserTxs_DirectFromCpfpRefundTxFinalSequence_Error(t *testing.T)
 		},
 	}
 
-	h := depositHandlerWithConfig()
-	err := h.validateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), pb.Network_REGTEST.String())
+	_ = depositHandlerWithConfig()
+	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate user sequence")
 }
