@@ -731,7 +731,7 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	// Exit 2: Direct bytes (not reversed) - in block but should NOT be found with knob enabled
+	// Exit 2: Direct bytes - should be found
 	txHash2 := coopExitTx2.TxHash()
 	exitTxid2, err := schematype.NewTxIDFromBytes(txHash2[:])
 	require.NoError(t, err)
@@ -776,26 +776,29 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, btcnetwork.Testnet)
 	require.NoError(t, err)
 
-	// Verify: only exit 1 should be confirmed (has reversed bytes)
-	// Exit 2 is in the block but not reversed, so won't be found
+	// Verify: exits 1 and 2 should be confirmed
 	// Exit 3 is not in the block
 	allCoopExits, err := dbTx.CooperativeExit.Query().WithTransfer().All(ctx)
 	require.NoError(t, err)
 	require.Len(t, allCoopExits, 3)
 
 	confirmedCount := 0
+	confirmedTransferIDs := make(map[uuid.UUID]bool)
 	for _, exit := range allCoopExits {
 		if exit.ConfirmationHeight != nil {
 			confirmedCount++
 			assert.Equal(t, blockHeight, *exit.ConfirmationHeight)
 			// Key tweaked height should still be nil (not enough blocks passed)
 			assert.Nil(t, exit.KeyTweakedHeight)
-			// Verify this is exit 1 (transfer1 - has reversed bytes)
+			// Track which transfers were confirmed
 			require.NotNil(t, exit.Edges.Transfer)
-			assert.Equal(t, transfer1.ID, exit.Edges.Transfer.ID, "Only exit 1 (transfer1) should be confirmed with reversed bytes")
+			confirmedTransferIDs[exit.Edges.Transfer.ID] = true
 		}
 	}
-	assert.Equal(t, 1, confirmedCount, "Expected 1 coop exit to be confirmed (only reversed bytes)")
+	assert.Equal(t, 2, confirmedCount, "Expected 2 coop exits to be confirmed (both reversed and non-reversed)")
+	assert.True(t, confirmedTransferIDs[transfer1.ID], "Exit 1 (transfer1) should be confirmed")
+	assert.True(t, confirmedTransferIDs[transfer2.ID], "Exit 2 (transfer2) should be confirmed")
+	assert.False(t, confirmedTransferIDs[transfer3.ID], "Exit 3 (transfer3) should NOT be confirmed")
 
 	// Process a few more blocks to trigger key tweaking (need >= 2 blocks)
 	blockHeight = int64(102)
@@ -807,20 +810,23 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 	require.NoError(t, err)
 
 	tweakedCount := 0
+	tweakedTransferIDs := make(map[uuid.UUID]bool)
 	for _, exit := range allCoopExits {
 		if exit.ConfirmationHeight != nil {
 			// All confirmed exits should now have KeyTweakedHeight set
 			assert.NotNil(t, exit.KeyTweakedHeight, "KeyTweakedHeight should be set after 2+ blocks")
 			if exit.KeyTweakedHeight != nil {
 				assert.Equal(t, blockHeight, *exit.KeyTweakedHeight)
-				// Verify this is exit 1 (transfer1 - has reversed bytes)
 				require.NotNil(t, exit.Edges.Transfer)
-				assert.Equal(t, transfer1.ID, exit.Edges.Transfer.ID, "Only exit 1 (transfer1) should be tweaked with reversed bytes")
+				tweakedTransferIDs[exit.Edges.Transfer.ID] = true
 				tweakedCount++
 			}
 		}
 	}
-	assert.Equal(t, 1, tweakedCount, "Expected 1 coop exit to have keys tweaked")
+	assert.Equal(t, 2, tweakedCount, "Expected 2 coop exits to have keys tweaked (both reversed and non-reversed)")
+	assert.True(t, tweakedTransferIDs[transfer1.ID], "Exit 1 (transfer1) should be tweaked")
+	assert.True(t, tweakedTransferIDs[transfer2.ID], "Exit 2 (transfer2) should be tweaked")
+	assert.False(t, tweakedTransferIDs[transfer3.ID], "Exit 3 (transfer3) should NOT be tweaked")
 }
 
 func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {

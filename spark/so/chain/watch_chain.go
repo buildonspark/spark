@@ -550,23 +550,29 @@ func handleBlock(
 	logger.Sugar().Infof("Started processing coop exits at block height %d", blockHeight)
 	// TODO: expire pending coop exits after some time so this doesn't become too large
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled, 0) > 0 {
-		reversedConfirmedTxIDs := make([]st.TxID, 0, len(confirmedTxHashSet))
+		// Build lists of both normal and reversed TxIDs to handle both endianness
+		confirmedTxIDs := make([]st.TxID, 0, len(confirmedTxHashSet)*2)
 		for txHashBytes := range confirmedTxHashSet {
+			normalTxid, err := st.NewTxIDFromBytes(txHashBytes[:])
+			if err != nil {
+				return fmt.Errorf("failed to parse normal txid from confirmed tx hash: %w", err)
+			}
+			confirmedTxIDs = append(confirmedTxIDs, normalTxid)
 			reversedTxHashBytes := slices.Clone(txHashBytes[:])
 			slices.Reverse(reversedTxHashBytes)
 			reversedTxid, err := st.NewTxIDFromBytes(reversedTxHashBytes)
 			if err != nil {
 				return fmt.Errorf("failed to parse reversed txid from confirmed tx hash: %w", err)
 			}
-			reversedConfirmedTxIDs = append(reversedConfirmedTxIDs, reversedTxid)
+			confirmedTxIDs = append(confirmedTxIDs, reversedTxid)
 		}
 
-		if len(reversedConfirmedTxIDs) > 0 {
+		if len(confirmedTxIDs) > 0 {
 			unconfirmedCoopExits, err := dbClient.CooperativeExit.Query().
 				Where(
 					cooperativeexit.And(
 						cooperativeexit.ConfirmationHeightIsNil(),
-						cooperativeexit.ExitTxidIn(reversedConfirmedTxIDs...),
+						cooperativeexit.ExitTxidIn(confirmedTxIDs...),
 					),
 				).
 				All(ctx)
