@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
@@ -352,6 +353,14 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return fmt.Errorf("cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err)
 		}
 
+		if len(cpfpRefundTx.TxIn) == 0 {
+			return fmt.Errorf("cpfp refund tx has no inputs for tree_node id: %s", nodeID)
+		}
+		expectedCpfpOutpoint := wire.OutPoint{Hash: cpfpTx.TxHash(), Index: 0}
+		if cpfpRefundTx.TxIn[0].PreviousOutPoint != expectedCpfpOutpoint {
+			return fmt.Errorf("cpfp refund tx must spend from cpfp tx for tree_node id: %s", nodeID)
+		}
+
 		if len(cpfpTx.TxOut) <= 0 {
 			return fmt.Errorf("cpfpTx vout out of bounds for cpfpTransaction, tree_node id: %s", nodeID)
 		}
@@ -416,6 +425,15 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if err := common.ValidateBitcoinTxVersion(directRefundTx); err != nil {
 			return fmt.Errorf("direct refund tx version validation failed for tree_node id: %s: %w", nodeID, err)
 		}
+
+		if len(directRefundTx.TxIn) == 0 {
+			return fmt.Errorf("direct refund tx has no inputs for tree_node id: %s", nodeID)
+		}
+		expectedDirectOutpoint := wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
+		if directRefundTx.TxIn[0].PreviousOutPoint != expectedDirectOutpoint {
+			return fmt.Errorf("direct refund tx must spend from direct tx for tree_node id: %s", nodeID)
+		}
+
 		if len(directTx.TxOut) <= 0 {
 			return fmt.Errorf("direct tx vout out of bounds for directTransaction, tree_node id: %s", nodeID)
 		}
@@ -480,6 +498,15 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if err := common.ValidateBitcoinTxVersion(directFromCpfpRefundTx); err != nil {
 			return fmt.Errorf("direct from cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err)
 		}
+
+		if len(directFromCpfpRefundTx.TxIn) == 0 {
+			return fmt.Errorf("direct from cpfp refund tx has no inputs for tree_node id: %s", nodeID)
+		}
+		expectedDirectFromCpfpOutpoint := wire.OutPoint{Hash: cpfpTx.TxHash(), Index: 0}
+		if directFromCpfpRefundTx.TxIn[0].PreviousOutPoint != expectedDirectFromCpfpOutpoint {
+			return fmt.Errorf("direct from cpfp refund tx must spend from cpfp tx for tree_node id: %s", nodeID)
+		}
+
 		if len(cpfpTx.TxOut) <= 0 {
 			return fmt.Errorf("direct from cpfp vout out of bounds for directFromCpfpTransaction, tree_node id: %s", nodeID)
 		}

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -39,6 +40,36 @@ func (m *mockFrostServiceClientConnection) StartFrostServiceClient(*LightningHan
 }
 
 func (m *mockFrostServiceClientConnection) Close() {
+}
+
+// createParentAndRefundTx creates a parent transaction and a refund transaction that properly
+// references the parent tx's hash. This is required for outpoint validation.
+func createParentAndRefundTx(t *testing.T, outputScript []byte, value int64) (parentTxBytes []byte, refundTxBytes []byte) {
+	t.Helper()
+
+	// Create parent tx (this will be stored as node.RawTx)
+	parentTx := wire.NewMsgTx(2)
+	parentTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	parentTx.AddTxOut(&wire.TxOut{Value: value, PkScript: outputScript})
+
+	parentTxBytes, err := common.SerializeTx(parentTx)
+	require.NoError(t, err)
+
+	// Create refund tx that references the parent tx
+	refundTx := wire.NewMsgTx(2)
+	refundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	refundTx.AddTxOut(&wire.TxOut{Value: value, PkScript: outputScript})
+
+	refundTxBytes, err = common.SerializeTx(refundTx)
+	require.NoError(t, err)
+
+	return parentTxBytes, refundTxBytes
 }
 
 // mockFrostServiceClient implements the FrostServiceClient interface for testing
@@ -825,20 +856,9 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 		correctScript, err := common.P2TRScriptFromPubKey(wrongKey)
 		require.NoError(t, err)
 
-		// Create a minimal transaction with the correct P2TR output script
-		// Format: version(4) + input_count(1) + input(36) + output_count(1) + output_value(8) + output_script_len(1) + output_script + locktime(4)
-		testTx := []byte{0x02, 0x00, 0x00, 0x00} // version = 2
-		testTx = append(testTx, 0x01)            // input count = 1
-		// Add a dummy input (prev hash + vout + script_len + scriptSig + sequence)
-		testTx = append(testTx, make([]byte, 32)...)                            // prev hash (32 zeros)
-		testTx = append(testTx, 0x00, 0x00, 0x00, 0x00)                         // vout = 0
-		testTx = append(testTx, 0x00)                                           // scriptSig length = 0
-		testTx = append(testTx, 0xff, 0xff, 0xff, 0xff)                         // sequence
-		testTx = append(testTx, 0x01)                                           // output count = 1
-		testTx = append(testTx, 0xe8, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00) // value = 1000 satoshis
-		testTx = append(testTx, byte(len(correctScript)))                       // script length
-		testTx = append(testTx, correctScript...)                               // the correct P2TR script
-		testTx = append(testTx, 0x00, 0x00, 0x00, 0x00)                         // locktime = 0
+		// Create parent tx (stored in node.RawTx) and refund tx (sent by client)
+		// with proper outpoint reference
+		parentTx, refundTx := createParentAndRefundTx(t, correctScript, 1000)
 
 		_, err = tx.TreeNode.Create().
 			SetTree(tree).
@@ -849,14 +869,14 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 			SetVerifyingPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
-			SetRawTx(testTx).
+			SetRawTx(parentTx).
 			SetVout(0).
 			SetSigningKeyshare(keyshare).
 			Save(authenticatedCtx)
 		require.NoError(t, err)
 
-		// Update the test transaction to use our generated transaction bytes
-		validTx.RawTx = testTx
+		// Update the test transaction to use the refund tx that references the parent
+		validTx.RawTx = refundTx
 
 		mockFrostConnection := &mockFrostServiceClientConnection{}
 
@@ -917,33 +937,12 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	nodeID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
 
 	// Create a transaction with 500 sats output (different from expected 1000)
-	// Use the same pattern as the existing createMockSigningJob function
-	mockTx := []byte{
-		0x02, 0x00, 0x00, 0x00, // version
-		0x01, // input count
-		// Input (simplified)
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0xFF, 0xFF, 0xFF, 0xFF, // previous output index
-		0x00,                   // script length
-		0xFF, 0xFF, 0xFF, 0xFF, // sequence
-		0x01, // output count
-	}
-	// Add 500 sats value (little endian)
-	valueBytes := make([]byte, 8)
-	value := uint64(500)
-	for i := 0; i < 8; i++ {
-		valueBytes[i] = byte(value >> (i * 8))
-	}
-	mockTx = append(mockTx, valueBytes...)
-	// Add the correct P2TR script for the destination pubkey
 	correctScript, err := common.P2TRScriptFromPubKey(validPubKey)
 	require.NoError(t, err)
-	mockScript := []byte{byte(len(correctScript))}    // script length
-	mockScript = append(mockScript, correctScript...) // the correct P2TR script
-	mockTx = append(mockTx, mockScript...)
-	// Add locktime
-	mockTx = append(mockTx, 0x00, 0x00, 0x00, 0x00)
+
+	// Create parent tx (stored in node.RawTx) and refund tx (sent by client)
+	// with proper outpoint reference - both have 500 sats
+	parentTx, refundTx := createParentAndRefundTx(t, correctScript, 500)
 
 	_, err = tx.TreeNode.Create().
 		SetTree(tree).
@@ -954,8 +953,8 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 		SetVerifyingPubkey(verifyingPubKey).
 		SetOwnerIdentityPubkey(validPubKey).
 		SetOwnerSigningPubkey(validPubKey).
-		SetRawTx(mockTx).
-		SetDirectTx(mockTx). // Set direct_tx field which is required for direct transaction validation
+		SetRawTx(parentTx).
+		SetDirectTx(parentTx). // Set direct_tx field which is required for direct transaction validation
 		SetVout(0).
 		SetSigningKeyshare(keyshare).
 		Save(ctx)
@@ -977,7 +976,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 			Binding: []byte("test_nonce_binding"),
 		},
 		UserSignature: []byte("test_signature"),
-		RawTx:         mockTx, // Contains 500 sats output
+		RawTx:         refundTx, // Contains 500 sats output, properly references parent tx
 	}
 
 	mockFrostConnection := &mockFrostServiceClientConnection{}
