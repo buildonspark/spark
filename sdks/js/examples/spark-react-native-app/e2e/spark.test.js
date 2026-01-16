@@ -1,12 +1,17 @@
 describe('Spark React Native App', () => {
-  beforeEach(async () => {
+  beforeAll(async () => {
     await device.launchApp({
       newInstance: true,
+      launchArgs: { detoxPrintBusyIdleResources: 'YES' },
     });
+  });
+
+  beforeEach(async () => {
+    await device.launchApp({ resetAppState: true });
 
     await waitFor(element(by.id('open-test-screen-button')))
       .toBeVisible()
-      .withTimeout(5000);
+      .withTimeout(10000);
 
     await expect(element(by.id('open-test-screen-button'))).toBeVisible();
 

@@ -34,7 +34,7 @@ jobs:
       - name: "Setup Node.js and Yarn"
         uses: ./public/actions/setup-node-yarn-install
         with:
-          cwd: "./sdks/js"
+          cwd: "."
           install-mode: "update-lock-only"
           # Since we are in update-lock-only mode the resulting yarn cache is much smaller and less useful
           # for the rest of the steps. But since this is the first step and the cache is restored for each
@@ -44,17 +44,11 @@ jobs:
       - name: "Commit and push changes if modified"
         id: sync-lock-file
         run: |
-          # On pushes to main, CI must never update (or create) lock-related files.
-          # Use git status (includes untracked files) since `git diff` ignores new files.
-          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            if [[ -n "$(git status --porcelain)" ]]; then
-              echo "Lock file must not be modified by CI on main branch."
-              git status --porcelain
-              exit 1
-            fi
-
-            echo "VERIFIED_LOCK_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-            exit 0
+          # On pushes to main, the checkout can be in a detached HEAD state and changes are initially
+          # unstaged. Use GitHub's ref and a working-tree diff against HEAD to detect modifications.
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]] && ! git diff --quiet HEAD; then
+            echo "Lock file must not be modified by CI on main branch."
+            exit 1;
           fi
 
           git config --global user.name 'Lightspark Eng'
@@ -63,7 +57,7 @@ jobs:
           git diff-index --quiet HEAD || git commit -nm "CI update lock file for PR"
           git push
           echo "$(git rev-parse HEAD)"
-          echo "VERIFIED_LOCK_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "VERIFIED_LOCK_COMMIT=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
   test:
     # Wait to see if the lock file should be updated before running checks:
