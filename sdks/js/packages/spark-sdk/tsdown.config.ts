@@ -36,7 +36,7 @@ const rootEntryConfig = {
 export default defineConfig([
   { ...rootEntryConfig, format: ["cjs"] },
   {
-    ...commonConfig,
+    ...rootEntryConfig,
     entry: [
       ...rootEntryConfig.entry,
       "src/index.browser.ts",
