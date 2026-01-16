@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.5.7
+
+### Patch Changes
+
+- - Improvements to build types
+
 ## 0.5.6
 
 ### Patch Changes
