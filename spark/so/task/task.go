@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/uuids"
 	"go.uber.org/zap"
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -438,7 +438,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
 					gossipLimit := knobsService.GetValue(knobs.KnobGossipLimit, 50)
-					boundaryUUID := common.UUIDv7FromTime(time.Now().Add(-20 * time.Second))
+					boundaryUUID := uuids.UUIDv7FromTime(time.Now().Add(-20 * time.Second))
 					query := tx.Gossip.Query().Where(
 						gossip.StatusEQ(st.GossipStatusPending),
 						gossip.IDLT(boundaryUUID),
@@ -577,7 +577,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
-					cutOffUUID := common.UUIDv7FromTime(time.Now().Add(-24 * time.Hour))
+					cutOffUUID := uuids.UUIDv7FromTime(time.Now().Add(-24 * time.Hour))
 					// First query for IDs to delete (with limit), then delete those IDs.
 					// Use ForUpdate with SkipLocked to prevent race conditions when multiple
 					// operators run this task concurrently - each operator will lock and delete
