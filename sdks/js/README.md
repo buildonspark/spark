@@ -1,6 +1,22 @@
 # Spark JS SDK workspaces
 
-## Install
+## Prerequisites
+
+### System Dependencies
+
+The postinstall build process requires a C/C++ compiler. Install clang:
+
+**macOS:**
+```bash
+xcode-select --install
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt install clang lld
+```
+
+### Node.js
 
 You should use [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) to manage your node versions. That way you're using the same version as CI, it's easier to upgrade, and easier to repro any issues that are tied to a specific version.
 
