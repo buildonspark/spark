@@ -353,7 +353,7 @@ func (h *BaseTransferHandler) createTransfer(
 		}
 	}
 
-	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeSwap || transferType == st.TransferTypeCounterSwap || transferType == st.TransferTypeCooperativeExit {
+	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeSwap || transferType == st.TransferTypeCounterSwap || transferType == st.TransferTypePrimarySwapV3 || transferType == st.TransferTypeCounterSwapV3 || transferType == st.TransferTypeCooperativeExit {
 		if err := h.validateAndConstructBitcoinTransactions(ctx, req, transferType, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey); err != nil {
 			return nil, nil, err
 		}
@@ -1197,7 +1197,7 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 		}
 		return validateLeaves_transfer(ctx, req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 
-	case st.TransferTypeSwap, st.TransferTypeCounterSwap:
+	case st.TransferTypeSwap, st.TransferTypeCounterSwap, st.TransferTypePrimarySwapV3, st.TransferTypeCounterSwapV3:
 		return validateLeaves_swap(ctx, nodesByID, leafCpfpRefundMap, refundDestPubkey, transferType)
 
 	case st.TransferTypeCooperativeExit:

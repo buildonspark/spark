@@ -2329,8 +2329,8 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	jobToLeafMap := make(map[uuid.UUID]uuid.UUID)
 	isDirectSigningJob := make(map[uuid.UUID]bool)
 	isDirectFromCpfpSigningJob := make(map[uuid.UUID]bool)
-	isSwap := transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap
-	isSupportedTransferType := transfer.Type == st.TransferTypeTransfer || transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap || transfer.Type == st.TransferTypeCooperativeExit
+	isSwap := transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap || transfer.Type == st.TransferTypePrimarySwapV3 || transfer.Type == st.TransferTypeCounterSwapV3
+	isSupportedTransferType := transfer.Type == st.TransferTypeTransfer || transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap || transfer.Type == st.TransferTypePrimarySwapV3 || transfer.Type == st.TransferTypeCounterSwapV3 || transfer.Type == st.TransferTypeCooperativeExit
 
 	for _, job := range req.SigningJobs {
 		leaf, exists := leaves[job.LeafId]
