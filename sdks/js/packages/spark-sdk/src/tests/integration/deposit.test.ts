@@ -30,13 +30,13 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
       signer: new Signer(),
     });
 
-    for (let i = 0; i < 105; i++) {
+    for (let i = 0; i < 64; i++) {
       await sdk.getSingleUseDepositAddress();
     }
 
     const depositAddresses = await sdk.getUnusedDepositAddresses();
 
-    expect(depositAddresses).toHaveLength(105);
+    expect(depositAddresses).toHaveLength(64);
   }, 30000);
 
   it(`${name} - should generate a staticdeposit address`, async () => {

@@ -269,6 +269,180 @@ func TestGenerateDepositAddress(t *testing.T) {
 	})
 }
 
+func TestGenerateDepositAddressBlocksUnusedAddress(t *testing.T) {
+	config := &so.Config{
+		SupportedNetworks: []btcnetwork.Network{
+			btcnetwork.Regtest,
+			btcnetwork.Mainnet,
+		},
+		SigningOperatorMap:         map[string]*so.SigningOperator{},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+
+	handler := NewDepositHandler(config)
+
+	t.Run("blocks generation when unused non-static deposit address exists", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		rng := rand.NewChaCha8([32]byte{})
+		tx, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+
+		testIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		testSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+		// Create DefaultMaxUnusedDepositAddresses unused non-static deposit addresses
+		for i := 0; i < DefaultMaxUnusedDepositAddresses; i++ {
+			secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+
+			signingKeyshare, err := tx.SigningKeyshare.Create().
+				SetStatus(st.KeyshareStatusAvailable).
+				SetSecretShare(secretShare).
+				SetPublicShares(map[string]keys.Public{"test": secretShare.Public()}).
+				SetPublicKey(secretShare.Public()).
+				SetMinSigners(2).
+				SetCoordinatorIndex(0).
+				Save(ctx)
+			require.NoError(t, err)
+
+			_, err = tx.DepositAddress.Create().
+				SetAddress(fmt.Sprintf("bcrt1p_existing_unused_address_%d", i)).
+				SetOwnerIdentityPubkey(testIdentityPubKey).
+				SetOwnerSigningPubkey(testSigningPubKey).
+				SetSigningKeyshare(signingKeyshare).
+				SetNetwork(btcnetwork.Regtest).
+				SetIsStatic(false).
+				Save(ctx)
+			require.NoError(t, err)
+		}
+
+		// Try to generate a new non-static deposit address for the same user and network
+		isStatic := false
+		req := &pb.GenerateDepositAddressRequest{
+			SigningPublicKey:  testSigningPubKey.Serialize(),
+			IdentityPublicKey: testIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
+			IsStatic:          &isStatic,
+		}
+
+		_, err = handler.GenerateDepositAddress(ctx, config, req)
+		require.Error(t, err)
+		grpcError, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.ResourceExhausted, grpcError.Code())
+		assert.Contains(t, grpcError.Message(), "unused deposit addresses")
+		assert.Contains(t, grpcError.Message(), fmt.Sprintf("maximum %d", DefaultMaxUnusedDepositAddresses))
+	})
+
+	t.Run("allows generation when unused address exists on different network", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		rng := rand.NewChaCha8([32]byte{2})
+		tx, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+
+		diffNetIdentityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		diffNetSigningKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+
+		// Create a signing keyshare
+		signingKeyshare, err := tx.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(secretShare).
+			SetPublicShares(map[string]keys.Public{"test": secretShare.Public()}).
+			SetPublicKey(secretShare.Public()).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		// Create an unused non-static deposit address on REGTEST
+		_, err = tx.DepositAddress.Create().
+			SetAddress("bcrt1p_regtest_address").
+			SetOwnerIdentityPubkey(diffNetIdentityKey).
+			SetOwnerSigningPubkey(diffNetSigningKey).
+			SetSigningKeyshare(signingKeyshare).
+			SetNetwork(btcnetwork.Regtest).
+			SetIsStatic(false).
+			Save(ctx)
+		require.NoError(t, err)
+
+		// Try to generate a new non-static deposit address on MAINNET (should proceed)
+		// Note: This test verifies the query filters by network
+		isStatic := false
+		req := &pb.GenerateDepositAddressRequest{
+			SigningPublicKey:  diffNetSigningKey.Serialize(),
+			IdentityPublicKey: diffNetIdentityKey.Serialize(),
+			Network:           pb.Network_MAINNET,
+			IsStatic:          &isStatic,
+		}
+
+		// The test will fail at keyshare allocation, but importantly NOT at the unused address check
+		_, err = handler.GenerateDepositAddress(ctx, config, req)
+		// Should proceed past the unused check and fail later (no keyshares available)
+		require.Error(t, err)
+		// Verify it's NOT the "unused address" error
+		assert.NotContains(t, err.Error(), "already has an unused deposit address")
+	})
+
+	t.Run("allows generation when existing address has tree (is used)", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		rng := rand.NewChaCha8([32]byte{3})
+		tx, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+
+		usedAddrIdentityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		usedAddrSigningKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+
+		// Create a signing keyshare
+		signingKeyshare, err := tx.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(secretShare).
+			SetPublicShares(map[string]keys.Public{"test": secretShare.Public()}).
+			SetPublicKey(secretShare.Public()).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		// Create a deposit address that has a tree associated (is used)
+		usedAddress, err := tx.DepositAddress.Create().
+			SetAddress("bcrt1p_used_address").
+			SetOwnerIdentityPubkey(usedAddrIdentityKey).
+			SetOwnerSigningPubkey(usedAddrSigningKey).
+			SetSigningKeyshare(signingKeyshare).
+			SetNetwork(btcnetwork.Regtest).
+			SetIsStatic(false).
+			Save(ctx)
+		require.NoError(t, err)
+
+		// Create a tree for this deposit address (marks it as used)
+		_, err = tx.Tree.Create().
+			SetOwnerIdentityPubkey(usedAddrIdentityKey).
+			SetNetwork(btcnetwork.Regtest).
+			SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+			SetVout(0).
+			SetStatus(st.TreeStatusPending).
+			SetDepositAddress(usedAddress).
+			Save(ctx)
+		require.NoError(t, err)
+
+		// Try to generate a new non-static deposit address (should proceed past unused check)
+		isStatic := false
+		req := &pb.GenerateDepositAddressRequest{
+			SigningPublicKey:  usedAddrSigningKey.Serialize(),
+			IdentityPublicKey: usedAddrIdentityKey.Serialize(),
+			Network:           pb.Network_REGTEST,
+			IsStatic:          &isStatic,
+		}
+
+		_, err = handler.GenerateDepositAddress(ctx, config, req)
+		// Should proceed past the unused check and fail later (no keyshares available)
+		require.Error(t, err)
+		// Verify it's NOT the "unused address" error
+		assert.NotContains(t, err.Error(), "already has an unused deposit address")
+	})
+}
+
 func TestGenerateStaticDepositAddress(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})

@@ -43,6 +43,12 @@ import (
 
 const DefaultDepositConfirmationThreshold = uint(3)
 
+// DefaultMaxUnusedDepositAddresses is the default maximum number of unused non-static deposit
+// addresses a user can have per network. This prevents DoS attacks where users repeatedly
+// generate addresses without depositing, exhausting the available signing keyshares.
+// This value can be overridden via the KnobMaxUnusedDepositAddresses knob.
+const DefaultMaxUnusedDepositAddresses = 64
+
 var ErrInvalidNetwork = errs.New("invalid network")
 
 // The DepositHandler is responsible for handling deposit related requests.
@@ -111,6 +117,35 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	}
 
 	logger.Sugar().Infof("Generating deposit address for public key %s (signing %s)", reqIDPubKey, reqSigningPubKey)
+
+	// Check if user already has too many unused non-static deposit addresses for this network.
+	// An "unused" address is one that has no tree created yet (no deposit confirmed).
+	// This prevents DoS attacks where users repeatedly generate addresses without depositing,
+	// exhausting the available signing keyshares.
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get db: %w", err)
+	}
+	// Approximate count; will not include concurrent requests
+	// Considered low risk so not making use of locking
+	unusedCount, err := db.DepositAddress.Query().
+		Where(
+			depositaddress.OwnerIdentityPubkey(reqIDPubKey),
+			depositaddress.IsStatic(false),
+			depositaddress.NetworkEQ(network),
+			depositaddress.Not(depositaddress.HasTree()),
+		).
+		Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count existing deposit addresses: %w", err)
+	}
+	maxUnusedAddresses := int(knobs.GetKnobsService(ctx).GetValue(knobs.KnobMaxUnusedDepositAddresses, DefaultMaxUnusedDepositAddresses))
+	if unusedCount >= maxUnusedAddresses {
+		return nil, status.Errorf(codes.ResourceExhausted,
+			"user already has %d unused deposit addresses for this network (maximum %d); please use an existing address or wait for a deposit to be confirmed",
+			unusedCount, maxUnusedAddresses)
+	}
+
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
 	if err != nil {
 		return nil, err
@@ -144,9 +179,10 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		return nil, err
 	}
 
-	db, err := ent.GetDbFromContext(ctx)
+	// Get a fresh db handle since GetUnusedSigningKeyshares commits the transaction
+	db, err = ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx: %w", err)
+		return nil, fmt.Errorf("failed to get db: %w", err)
 	}
 
 	depositAddressMutator := db.DepositAddress.Create().

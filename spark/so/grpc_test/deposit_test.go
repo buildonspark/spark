@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/frost"
+	"github.com/lightsparkdev/spark/so/handler"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -1089,7 +1090,7 @@ func TestQueryUnusedDepositAddresses(t *testing.T) {
 
 	privKey := keys.GeneratePrivateKey()
 
-	for i := range 225 {
+	for i := range handler.DefaultMaxUnusedDepositAddresses {
 		leafID := uuid.NewString()
 		_, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
 		if err != nil {
@@ -1102,8 +1103,8 @@ func TestQueryUnusedDepositAddresses(t *testing.T) {
 		t.Fatalf("failed to query unused deposit addresses: %v", err)
 	}
 
-	if len(unusedDepositAddresses.DepositAddresses) != 225 {
-		t.Fatalf("expected 225 unused deposit addresses, got %d", len(unusedDepositAddresses.DepositAddresses))
+	if len(unusedDepositAddresses.DepositAddresses) != handler.DefaultMaxUnusedDepositAddresses {
+		t.Fatalf("expected %d unused deposit addresses, got %d", handler.DefaultMaxUnusedDepositAddresses, len(unusedDepositAddresses.DepositAddresses))
 	}
 }
 
@@ -1122,7 +1123,7 @@ func TestQueryUnusedDepositAddressesBackwardsCompatibility(t *testing.T) {
 	}
 	ctx := wallet.ContextWithToken(t.Context(), token)
 	privKey := keys.GeneratePrivateKey()
-	for i := range 225 {
+	for i := range handler.DefaultMaxUnusedDepositAddresses {
 		leafID := uuid.NewString()
 		_, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
 		if err != nil {
@@ -1135,8 +1136,8 @@ func TestQueryUnusedDepositAddressesBackwardsCompatibility(t *testing.T) {
 		t.Fatalf("failed to query unused deposit addresses: %v", err)
 	}
 
-	if len(unusedDepositAddresses.DepositAddresses) != 225 {
-		t.Fatalf("expected 225 unused deposit addresses, got %d", len(unusedDepositAddresses.DepositAddresses))
+	if len(unusedDepositAddresses.DepositAddresses) != handler.DefaultMaxUnusedDepositAddresses {
+		t.Fatalf("expected %d unused deposit addresses, got %d", handler.DefaultMaxUnusedDepositAddresses, len(unusedDepositAddresses.DepositAddresses))
 	}
 }
 
