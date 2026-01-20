@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "start": "react-native start",
     "build:ios:debug": "../../node_modules/.bin/detox build --configuration ios.sim.debug",
-    "test:ios:debug": "../../node_modules/.bin/detox test --configuration ios.sim.debug"
+    "test:ios:debug": "../../node_modules/.bin/detox test --configuration ios.sim.debug",
+    "build:ios:release": "../../node_modules/.bin/detox build --configuration ios.sim.release",
+    "test:ios:release": "../../node_modules/.bin/detox test --configuration ios.sim.release"
   },
   "dependencies": {
     "@azure/core-asynciterator-polyfill": "^1.0.2",
