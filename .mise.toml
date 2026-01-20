@@ -1,5 +1,5 @@
 [tools]
-atlas = "0.35.0"
+atlas = "1.0.0"
 go = "1.25.1"
 golangci-lint = "2.4.0"
 gotestsum = "1.13.0"
