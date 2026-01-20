@@ -4733,12 +4733,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       coopExitRequest.rawConnectorTransaction,
     );
 
-    const coopExitTxId = connectorTx.getInput(0).txid;
+    // SSP stores coop_exit_txid in little-endian format and returns it as hex string
+    // Converting hex to bytes gives us the correct little-endian format that SO expects
+    const coopExitTxId = hexToBytes(coopExitRequest.coopExitTxid);
     const connectorTxId = getTxId(connectorTx);
-
-    if (!coopExitTxId) {
-      throw new Error("Failed to get coop exit tx id");
-    }
 
     const connectorOutputs: TransactionInput[] = [];
     for (let i = 0; i < connectorTx.outputsLength - 1; i++) {
