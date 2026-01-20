@@ -176,4 +176,50 @@ describe("Hasher", () => {
     expect(hash1).not.toEqual(hash2);
     expect(hash2).not.toEqual(hash3);
   });
+
+  it("should match test vectors", () => {
+    interface TestCase {
+      name: string;
+      expected: string; // hex-encoded expected hash
+      actual: Uint8Array;
+    }
+
+    const testCases: TestCase[] = [
+      {
+        name: "empty tag",
+        expected:
+          "2dba5dbc339e7316aea2683faf839c1b7b1ee2313db792112588118df066aa35",
+        actual: newHasher([]).hash(),
+      },
+      {
+        name: "empty data",
+        expected:
+          "c67afb9eb635e689553aefb4366b06372478967e813c0261377067f38257d48f",
+        actual: newHasher(["test", "vector"]).hash(),
+      },
+      {
+        name: "all data types",
+        expected:
+          "7e6d5afa6426b20f2f08929260f3e37cf280497eae6d29c1af313db01a8996a8",
+        actual: newHasher(["test", "vector"])
+          .addBytes(new Uint8Array([1, 2, 3]))
+          .addString("string")
+          .addUint64(1) // AddUint(1) in Go maps to addUint64(1) in TypeScript
+          .addUint8(8)
+          .addUint16(16)
+          .addUint32(32)
+          .addUint64(64)
+          .hash(),
+      },
+    ];
+
+    for (const tc of testCases) {
+      // Convert expected hex string to Uint8Array
+      const expectedBytes = new Uint8Array(
+        tc.expected.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)),
+      );
+
+      expect(tc.actual).toEqual(expectedBytes);
+    }
+  });
 });
