@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -47,11 +48,11 @@ type TestContext struct {
 func (tc *TestContext) close() {
 	if tx := tc.Session.GetTxIfExists(); tx != nil {
 		if tc.t.Failed() {
-			if err := tx.Rollback(); err != nil {
+			if err := tx.Rollback(); err != nil && !errors.Is(err, context.Canceled) {
 				tc.t.Logf("failed to rollback transaction: %v", err)
 			}
 		} else {
-			if err := tx.Commit(); err != nil {
+			if err := tx.Commit(); err != nil && !errors.Is(err, context.Canceled) {
 				tc.t.Logf("failed to commit transaction: %v", err)
 			}
 		}
