@@ -78,6 +78,8 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
 
     const signedTx = await faucet.sendToAddress(depositResp, 100_000n);
 
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+
     await sdk.claimDeposit(signedTx.id);
   }, 30000);
 

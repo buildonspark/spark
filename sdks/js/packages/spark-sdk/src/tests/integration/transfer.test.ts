@@ -467,6 +467,8 @@ describe.each(walletTypes)(
 
       const signedTx = await faucet.sendToAddress(depositAddress, 1_000n);
 
+      await faucet.mineBlocksAndWaitForMiningToComplete(3);
+
       await senderWallet.claimDeposit(signedTx.id);
 
       let resolveStreamConnected: () => void;
@@ -812,6 +814,8 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
 
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+
     await sdk.claimDeposit(signedTx.id);
 
     const balance = await sdk.getBalance();
@@ -846,6 +850,8 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     }
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
+
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
 
     await sdk.claimDeposit(signedTx.id);
 
@@ -901,6 +907,8 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     }
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
+
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
 
     await sdk.claimDeposit(signedTx.id);
 
@@ -976,6 +984,8 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
 
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+
     await sdk.claimDeposit(signedTx.id);
 
     const balance = await sdk.getBalance();
@@ -1045,7 +1055,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
 
-    await faucet.mineBlocks(1);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
 
     await alice.claimDeposit(signedTx.id);
 
@@ -1112,7 +1122,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
 
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
 
-    await faucet.mineBlocks(1);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
 
     await alice.claimDeposit(signedTx.id);
 
@@ -1198,6 +1208,8 @@ describe.each(walletTypes)(
         depositAddrThree,
         3_000n,
       );
+
+      await faucet.mineBlocksAndWaitForMiningToComplete(3);
 
       await sdk.claimDeposit(oneThousand.id);
       await sdk.claimDeposit(twoThousand.id);
@@ -1305,6 +1317,8 @@ describe.each(walletTypes)(
 
       const oneThousand = await faucet.sendToAddress(depositAddr, 1_000n);
 
+      await faucet.mineBlocksAndWaitForMiningToComplete(3);
+
       await sdk.claimDeposit(oneThousand.id);
       const balance = await sdk.getBalance();
       expect(balance.balance).toBe(1_000n);
@@ -1350,6 +1364,8 @@ describe.each(walletTypes)(
       }
 
       const oneThousand = await faucet.sendToAddress(depositAddr, 1_000n);
+
+      await faucet.mineBlocksAndWaitForMiningToComplete(3);
 
       await sdk.claimDeposit(oneThousand.id);
       const balance = await sdk.getBalance();
@@ -1402,6 +1418,8 @@ describe.each(walletTypes)(
 
       const deposit = await faucet.sendToAddress(depositAddr, 1_000n);
       const depositTwo = await faucet.sendToAddress(depositAddrTwo, 1_000n);
+
+      await faucet.mineBlocksAndWaitForMiningToComplete(3);
 
       await sdk.claimDeposit(deposit.id);
       await sdk.claimDeposit(depositTwo.id);

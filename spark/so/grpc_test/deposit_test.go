@@ -214,7 +214,7 @@ func TestStartDepositTreeCreationBasic(t *testing.T) {
 	randomKey := keys.GeneratePrivateKey()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err, "failed to get p2tr raw address")
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	require.NoError(t, err, "failed to generate to address")
 
 	time.Sleep(100 * time.Millisecond)
@@ -407,7 +407,7 @@ func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	if err != nil {
 		t.Fatalf("failed to generate to address: %v", err)
 	}
@@ -486,7 +486,7 @@ func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	if err != nil {
 		t.Fatalf("failed to generate to address: %v", err)
 	}
@@ -565,7 +565,7 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	if err != nil {
 		t.Fatalf("failed to generate to address: %v", err)
 	}
@@ -930,7 +930,7 @@ func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	if err != nil {
 		t.Fatalf("failed to generate to address: %v", err)
 	}
@@ -1044,7 +1044,7 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get p2tr raw address: %v", err)
 	}
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	if err != nil {
 		t.Fatalf("failed to generate to address: %v", err)
 	}
@@ -1178,7 +1178,7 @@ func TestStartDepositTreeCreationWithDirectFromCpfpRefundAlongsideRegularRefund(
 	randomKey := keys.GeneratePrivateKey()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	require.NoError(t, err)
 
 	time.Sleep(100 * time.Millisecond)
@@ -1258,7 +1258,7 @@ func TestStartDepositTreeCreationDirectTxValidation(t *testing.T) {
 	randomKey := keys.GeneratePrivateKey()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	require.NoError(t, err)
 
 	time.Sleep(100 * time.Millisecond)

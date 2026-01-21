@@ -435,6 +435,8 @@ describe.each(TEST_CONFIGS)(
         3_000n,
       );
 
+      await faucet.mineBlocksAndWaitForMiningToComplete(3);
+
       await sdk.claimDeposit(oneThousand.id);
       await sdk.claimDeposit(twoThousand.id);
       await sdk.claimDeposit(threeThousand.id);

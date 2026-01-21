@@ -846,8 +846,8 @@ func markDepositAsAvailable(
 		Where(treenode.StatusIn(st.TreeNodeStatusCreating, st.TreeNodeStatusAvailable)).
 		Only(ctx)
 	if ent.IsNotFound(err) {
-		logger.Sugar().Warnf("tree not found in available or creating status for %s", deposit.Address)
-		return fmt.Errorf("no tree found for deposit address")
+		logger.Sugar().Infof("tree not found in available or creating status for %s", deposit.Address)
+		return markDepositAddressUTXOConfirmed(ctx, dbClient, deposit)
 	}
 	if ent.IsNotSingular(err) {
 		logger.Sugar().Warnf("tree has multiple nodes in CREATING and AVAILABLE for %s", deposit.Address)

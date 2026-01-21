@@ -630,7 +630,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, fmt.Errorf("unexpected signing public key")
 	}
 
-	txConfirmed := depositAddress.ConfirmationHeight != 0
+	txConfirmed := !depositAddress.AvailabilityConfirmedAt.IsZero()
 
 	if txConfirmed && depositAddress.ConfirmationTxid != "" {
 		onChainTxid := onChainTx.TxHash().String()

@@ -468,18 +468,29 @@ func (o *DepositHandler) createTreeAndNode(
 		return existingTree, rootNode, nil
 	}
 
+	var treeStatus st.TreeStatus
+	var treeNodeStatus st.TreeNodeStatus
+	if depositAddress.AvailabilityConfirmedAt.IsZero() {
+		treeStatus = st.TreeStatusPending
+		treeNodeStatus = st.TreeNodeStatusCreating
+	} else {
+		treeStatus = st.TreeStatusAvailable
+		treeNodeStatus = st.TreeNodeStatusAvailable
+	}
+
 	// Create new tree following StartDepositTreeCreation pattern
 	signingKeyShare := depositAddress.Edges.SigningKeyshare
 
-	// Always create tree with Pending status - chain watcher will mark it Available
-	// after confirming the transaction and verifying signatures
+	// Create tree with Pending status if the DepositAddress is not available yet.
+	// chain watcher will mark it Available after confirming the transaction and
+	// verifying signatures
 	newTree := db.Tree.Create().
 		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 		SetNetwork(network).
 		SetBaseTxid(st.NewTxID(txid)).
 		SetVout(int16(req.OnChainUtxo.Vout)).
 		SetDepositAddress(depositAddress).
-		SetStatus(st.TreeStatusPending)
+		SetStatus(treeStatus)
 
 	createdTree, err := newTree.Save(ctx)
 	if err != nil {
@@ -493,7 +504,7 @@ func (o *DepositHandler) createTreeAndNode(
 	rootNode := db.TreeNode.Create().
 		SetTree(createdTree).
 		SetNetwork(network).
-		SetStatus(st.TreeNodeStatusCreating).
+		SetStatus(treeNodeStatus).
 		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 		SetOwnerSigningPubkey(depositAddress.OwnerSigningPubkey).
 		SetValue(uint64(onChainOutput.Value)).

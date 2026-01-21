@@ -24,7 +24,10 @@ describe("HTLC create and claim tests", () => {
     });
     const depositResp = await aliceWallet.getSingleUseDepositAddress();
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+
     await aliceWallet.claimDeposit(signedTx.id);
+
     await new Promise((resolve) => setTimeout(resolve, 1000));
     let aliceBalance = await aliceWallet.getBalance();
     expect(aliceBalance.balance).toBe(1_000n);
@@ -62,6 +65,8 @@ describe("HTLC create and claim tests", () => {
     });
     const depositResp = await aliceWallet.getSingleUseDepositAddress();
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+
     await aliceWallet.claimDeposit(signedTx.id);
     let aliceBalance = await aliceWallet.getBalance();
     expect(aliceBalance.balance).toBe(1_000n);
@@ -93,6 +98,8 @@ describe("HTLC create and claim tests", () => {
     });
     const depositResp = await aliceWallet.getSingleUseDepositAddress();
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+
     await aliceWallet.claimDeposit(signedTx.id);
     await new Promise((resolve) => setTimeout(resolve, 1000));
     let aliceBalance = await aliceWallet.getBalance();
@@ -124,6 +131,8 @@ describe("HTLC create and claim tests", () => {
     });
     const depositResp = await aliceWallet.getSingleUseDepositAddress();
     const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+
     await aliceWallet.claimDeposit(signedTx.id);
     await new Promise((resolve) => setTimeout(resolve, 1000));
     let aliceBalance = await aliceWallet.getBalance();
