@@ -312,6 +312,8 @@ message InitiateStaticDepositUtxoSwapRequest {
     spark.StartTransferRequest transfer = 4;
     // Transaction constructed by the SSP spending the UTXO to an address it owns.
     spark.SigningJob spend_tx_signing_job = 5;
+    // Optional: which hash variant was used to create user_signature.
+    spark.HashVariant hash_variant = 6;
 }
 
 message CreateStaticDepositUtxoSwapRequest {

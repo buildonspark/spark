@@ -55,7 +55,7 @@ func CreateUserSignature(
 	sspSignature []byte,
 	identityPrivateKey keys.Private,
 ) []byte {
-	hash := handler.CreateUserStatement(transactionID, outputIndex, network, requestType, creditAmountSats, sspSignature)
+	hash := handler.CreateUserStatement(transactionID, outputIndex, network, requestType, creditAmountSats, sspSignature, pb.HashVariant_HASH_VARIANT_UNSPECIFIED)
 	// Sign the hash of the payload using ECDSA
 	return ecdsa.Sign(identityPrivateKey.ToBTCEC(), hash).Serialize()
 }

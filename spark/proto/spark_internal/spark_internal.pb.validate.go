@@ -4090,6 +4090,8 @@ func (m *InitiateStaticDepositUtxoSwapRequest) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for HashVariant
+
 	if len(errors) > 0 {
 		return InitiateStaticDepositUtxoSwapRequestMultiError(errors)
 	}

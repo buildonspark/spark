@@ -411,6 +411,42 @@ export function utxoSwapRequestTypeToJSON(object: UtxoSwapRequestType): string {
   }
 }
 
+/** Which hash variant to use in cryptographic operations. */
+export enum HashVariant {
+  /** HASH_VARIANT_UNSPECIFIED - Legacy */
+  HASH_VARIANT_UNSPECIFIED = 0,
+  /** HASH_VARIANT_V2 - Structured hashing */
+  HASH_VARIANT_V2 = 1,
+  UNRECOGNIZED = -1,
+}
+
+export function hashVariantFromJSON(object: any): HashVariant {
+  switch (object) {
+    case 0:
+    case "HASH_VARIANT_UNSPECIFIED":
+      return HashVariant.HASH_VARIANT_UNSPECIFIED;
+    case 1:
+    case "HASH_VARIANT_V2":
+      return HashVariant.HASH_VARIANT_V2;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return HashVariant.UNRECOGNIZED;
+  }
+}
+
+export function hashVariantToJSON(object: HashVariant): string {
+  switch (object) {
+    case HashVariant.HASH_VARIANT_UNSPECIFIED:
+      return "HASH_VARIANT_UNSPECIFIED";
+    case HashVariant.HASH_VARIANT_V2:
+      return "HASH_VARIANT_V2";
+    case HashVariant.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum InvoiceStatus {
   NOT_FOUND = 0,
   PENDING = 1,
@@ -1981,6 +2017,8 @@ export interface InitiateStaticDepositUtxoRefundRequest {
    * is signed using ECDSA with the user's identity private key to produce this signature.
    */
   userSignature: Uint8Array;
+  /** Optional: which hash variant was used to create user_signature. */
+  hashVariant: HashVariant;
 }
 
 export interface InitiateStaticDepositUtxoRefundResponse {
@@ -17542,7 +17580,7 @@ export const TokensPayment: MessageFns<TokensPayment> = {
 };
 
 function createBaseInitiateStaticDepositUtxoRefundRequest(): InitiateStaticDepositUtxoRefundRequest {
-  return { onChainUtxo: undefined, refundTxSigningJob: undefined, userSignature: new Uint8Array(0) };
+  return { onChainUtxo: undefined, refundTxSigningJob: undefined, userSignature: new Uint8Array(0), hashVariant: 0 };
 }
 
 export const InitiateStaticDepositUtxoRefundRequest: MessageFns<InitiateStaticDepositUtxoRefundRequest> = {
@@ -17555,6 +17593,9 @@ export const InitiateStaticDepositUtxoRefundRequest: MessageFns<InitiateStaticDe
     }
     if (message.userSignature.length !== 0) {
       writer.uint32(34).bytes(message.userSignature);
+    }
+    if (message.hashVariant !== 0) {
+      writer.uint32(40).int32(message.hashVariant);
     }
     return writer;
   },
@@ -17590,6 +17631,14 @@ export const InitiateStaticDepositUtxoRefundRequest: MessageFns<InitiateStaticDe
           message.userSignature = reader.bytes();
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.hashVariant = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -17604,6 +17653,7 @@ export const InitiateStaticDepositUtxoRefundRequest: MessageFns<InitiateStaticDe
       onChainUtxo: isSet(object.onChainUtxo) ? UTXO.fromJSON(object.onChainUtxo) : undefined,
       refundTxSigningJob: isSet(object.refundTxSigningJob) ? SigningJob.fromJSON(object.refundTxSigningJob) : undefined,
       userSignature: isSet(object.userSignature) ? bytesFromBase64(object.userSignature) : new Uint8Array(0),
+      hashVariant: isSet(object.hashVariant) ? hashVariantFromJSON(object.hashVariant) : 0,
     };
   },
 
@@ -17617,6 +17667,9 @@ export const InitiateStaticDepositUtxoRefundRequest: MessageFns<InitiateStaticDe
     }
     if (message.userSignature.length !== 0) {
       obj.userSignature = base64FromBytes(message.userSignature);
+    }
+    if (message.hashVariant !== 0) {
+      obj.hashVariant = hashVariantToJSON(message.hashVariant);
     }
     return obj;
   },
@@ -17633,6 +17686,7 @@ export const InitiateStaticDepositUtxoRefundRequest: MessageFns<InitiateStaticDe
       ? SigningJob.fromPartial(object.refundTxSigningJob)
       : undefined;
     message.userSignature = object.userSignature ?? new Uint8Array(0);
+    message.hashVariant = object.hashVariant ?? 0;
     return message;
   },
 };

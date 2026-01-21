@@ -143,7 +143,7 @@ func createValidUserSignatureForTest(
 	sspSignature []byte,
 	userPrivateKey keys.Private,
 ) []byte {
-	hash := CreateUserStatement(hex.EncodeToString(txid), vout, network, requestType, totalAmount, sspSignature)
+	hash := CreateUserStatement(hex.EncodeToString(txid), vout, network, requestType, totalAmount, sspSignature, pb.HashVariant_HASH_VARIANT_UNSPECIFIED)
 	return ecdsa.Sign(userPrivateKey.ToBTCEC(), hash).Serialize()
 }
 

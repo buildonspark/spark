@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/hashstructure"
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
 
@@ -348,13 +349,13 @@ func validateTransfer(transferRequest *pb.StartTransferRequest) error {
 }
 
 // validateUserSignature verifies that the user has authorized the UTXO swap by validating their signature.
-func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte, sspSignature []byte, requestType pb.UtxoSwapRequestType, network btcnetwork.Network, txIdString string, vout uint32, totalAmount uint64) error {
+func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte, sspSignature []byte, requestType pb.UtxoSwapRequestType, network btcnetwork.Network, txIdString string, vout uint32, totalAmount uint64, hashVariant pb.HashVariant) error {
 	if len(userSignature) == 0 {
 		return fmt.Errorf("user signature is required")
 	}
 
 	// Create user statement to authorize the UTXO swap
-	messageHash := CreateUserStatement(txIdString, vout, network, requestType, totalAmount, sspSignature)
+	messageHash := CreateUserStatement(txIdString, vout, network, requestType, totalAmount, sspSignature, hashVariant)
 	return common.VerifyECDSASignature(userIdentityPubKey, userSignature, messageHash)
 }
 
@@ -369,6 +370,21 @@ func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte,
 //   - creditAmountSats: the amount of satoshis to credit
 //   - sspSignature: the hex-encoded SSP signature (sighash of spendTx if SSP is not used)
 func CreateUserStatement(
+	transactionID string,
+	outputIndex uint32,
+	network btcnetwork.Network,
+	requestType pb.UtxoSwapRequestType,
+	creditAmountSats uint64,
+	sspSignature []byte,
+	hashVariant pb.HashVariant,
+) []byte {
+	if hashVariant == pb.HashVariant_HASH_VARIANT_V2 {
+		return createUserStatementV2(transactionID, outputIndex, network, requestType, creditAmountSats, sspSignature)
+	}
+	return createUserStatementLegacy(transactionID, outputIndex, network, requestType, creditAmountSats, sspSignature)
+}
+
+func createUserStatementLegacy(
 	transactionID string,
 	outputIndex uint32,
 	network btcnetwork.Network,
@@ -395,6 +411,35 @@ func CreateUserStatement(
 	_ = binary.Write(payload, binary.LittleEndian, creditAmountSats) // Credit amount as 8-byte unsigned integer (little-endian)
 	_, _ = payload.Write(sspSignature)                               // SSP signature as UTF-8 bytes
 	return payload.Sum(nil)
+}
+
+func createUserStatementV2(
+	transactionID string,
+	outputIndex uint32,
+	network btcnetwork.Network,
+	requestType pb.UtxoSwapRequestType,
+	creditAmountSats uint64,
+	sspSignature []byte,
+) []byte {
+	requestTypeInt := uint8(0)
+	switch requestType {
+	case pb.UtxoSwapRequestType_Fixed:
+		requestTypeInt = uint8(0)
+	case pb.UtxoSwapRequestType_MaxFee:
+		requestTypeInt = uint8(1)
+	case pb.UtxoSwapRequestType_Refund:
+		requestTypeInt = uint8(2)
+	}
+
+	hash := hashstructure.NewHasher([]string{"spark", "claim_static_deposit"}).
+		AddString(strings.ToLower(network.String())).
+		AddString(transactionID).
+		AddUint32(outputIndex).
+		AddUint8(requestTypeInt).
+		AddUint64(creditAmountSats).
+		AddBytes(sspSignature).
+		Hash()
+	return hash
 }
 
 func CancelUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {

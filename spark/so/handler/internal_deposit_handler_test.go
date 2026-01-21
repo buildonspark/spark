@@ -100,7 +100,7 @@ func TestValidateUserSignature(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateUserSignature(tt.userPubKey, tt.userSignature, tt.sspSignature, pb.UtxoSwapRequestType_Fixed, network, txidStr, vout, tt.totalAmount)
+			err := validateUserSignature(tt.userPubKey, tt.userSignature, tt.sspSignature, pb.UtxoSwapRequestType_Fixed, network, txidStr, vout, tt.totalAmount, pb.HashVariant_HASH_VARIANT_UNSPECIFIED)
 			if tt.expectedErrMsg == "" {
 				require.NoError(t, err)
 			} else {
@@ -312,7 +312,7 @@ func FuzzValidateUserSignature(f *testing.F) {
 		}()
 
 		// Call the function - it may return an error but should not panic
-		err := validateUserSignature(userIdentityPublicKey, userSignature, sspSignature, requestType, network, txidStr, vout, totalAmount)
+		err := validateUserSignature(userIdentityPublicKey, userSignature, sspSignature, requestType, network, txidStr, vout, totalAmount, pb.HashVariant_HASH_VARIANT_UNSPECIFIED)
 
 		// We don't assert specific error conditions since we're fuzzing with random data
 		// The main goal is to ensure no panics occur and the function handles all inputs gracefully

@@ -1358,6 +1358,12 @@ enum UtxoSwapRequestType {
   Refund = 2;
 }
 
+// Which hash variant to use in cryptographic operations.
+enum HashVariant {
+  HASH_VARIANT_UNSPECIFIED = 0;  // Legacy
+  HASH_VARIANT_V2 = 1;           // Structured hashing
+}
+
 message InitiateStaticDepositUtxoRefundRequest {
     UTXO on_chain_utxo = 1;
     // A package that is used for signing L1 Bitcoin transactions using FROST.
@@ -1379,6 +1385,8 @@ message InitiateStaticDepositUtxoRefundRequest {
     // The concatenated payload is then hashed with SHA-256, and the resulting hash
     // is signed using ECDSA with the user's identity private key to produce this signature.
     bytes user_signature = 4;
+    // Optional: which hash variant was used to create user_signature.
+    HashVariant hash_variant = 5;
 }
 
 message InitiateStaticDepositUtxoRefundResponse {

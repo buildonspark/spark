@@ -20242,6 +20242,8 @@ func (m *InitiateStaticDepositUtxoRefundRequest) validate(all bool) error {
 
 	// no validation rules for UserSignature
 
+	// no validation rules for HashVariant
+
 	if len(errors) > 0 {
 		return InitiateStaticDepositUtxoRefundRequestMultiError(errors)
 	}
