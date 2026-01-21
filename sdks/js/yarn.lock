@@ -18343,7 +18343,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nodemon@npm:^3.1.9":
+"nodemon@npm:^3.1.11":
   version: 3.1.11
   resolution: "nodemon@npm:3.1.11"
   dependencies:
@@ -21492,7 +21492,7 @@ __metadata:
     "@types/node": "npm:^22.13.2"
     cross-env: "npm:^7.0.3"
     express: "npm:^4.21.2"
-    nodemon: "npm:^3.1.9"
+    nodemon: "npm:^3.1.11"
     prettier: "npm:^3.7.4"
     ts-node: "npm:^10.9.2"
     tslib: "npm:^2.8.1"
