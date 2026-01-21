@@ -15462,6 +15462,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"is-number@npm:^6.0.0":
+  version: 6.0.0
+  resolution: "is-number@npm:6.0.0"
+  checksum: 10/8668b49747649ee0878e0a6d9e35e1c95bab58c5dd1a2b698df34989512ec553cfd090fa7af247d590afe4b12ec996e735b9a670c2cf0efbaefe7fb2c2457615
+  languageName: node
+  linkType: hard
+
 "is-number@npm:^7.0.0":
   version: 7.0.0
   resolution: "is-number@npm:7.0.0"
@@ -15473,6 +15480,15 @@ __metadata:
   version: 1.0.1
   resolution: "is-obj@npm:1.0.1"
   checksum: 10/3ccf0efdea12951e0b9c784e2b00e77e87b2f8bd30b42a498548a8afcc11b3287342a2030c308e473e93a7a19c9ea7854c99a8832a476591c727df2a9c79796c
+  languageName: node
+  linkType: hard
+
+"is-odd@npm:^3.0.1":
+  version: 3.0.1
+  resolution: "is-odd@npm:3.0.1"
+  dependencies:
+    is-number: "npm:^6.0.0"
+  checksum: 10/c9d35c336c0c0ada0bfaf1f4564f354a222c4ffb9c3b42fac353767c9b8f0af844d3ddf16fbf7b12d6ecf57ee4d2fbeb9e456e8c9d68a78bb44e91bb43fdfd56
   languageName: node
   linkType: hard
 
@@ -21492,6 +21508,7 @@ __metadata:
     "@types/node": "npm:^22.13.2"
     cross-env: "npm:^7.0.3"
     express: "npm:^4.21.2"
+    is-odd: "npm:^3.0.1"
     nodemon: "npm:^3.1.9"
     prettier: "npm:^3.7.4"
     ts-node: "npm:^10.9.2"
