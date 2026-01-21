@@ -1,5 +1,4 @@
 import { CurrencyUnit } from "@lightsparkdev/core";
-import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
   bytesToNumberBE,
@@ -39,7 +38,6 @@ import {
   CoopExitRequest,
   ExitSpeed,
   LeavesSwapFeeEstimateOutput,
-  LeavesSwapRequest,
   LightningReceiveRequest,
   LightningSendFeeEstimateInput,
   LightningSendRequest,
@@ -109,11 +107,6 @@ import {
   WalletTransfer,
 } from "../types/sdk-types.js";
 import {
-  applyAdaptorToSignature,
-  generateAdaptorFromSignature,
-  generateSignatureFromExistingAdaptor,
-} from "../utils/adaptor-signature.js";
-import {
   decodeSparkAddress,
   encodeSparkAddress,
   encodeSparkAddressWithSignature,
@@ -123,7 +116,6 @@ import {
   validateSparkInvoiceFields,
 } from "../utils/address.js";
 import {
-  computeTaprootKeyNoScript,
   getP2TRScriptFromPublicKey,
   getP2WPKHAddressFromPublicKey,
   getSigHashFromTx,
@@ -321,7 +313,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     try {
       if (
         isTransferStreamEvent(event) &&
-        event.transfer.transfer.type !== TransferType.COUNTER_SWAP
+        event.transfer.transfer.type !== TransferType.COUNTER_SWAP &&
+        event.transfer.transfer.type !== TransferType.COUNTER_SWAP_V3
       ) {
         const { senderIdentityPublicKey, receiverIdentityPublicKey } =
           event.transfer.transfer;
@@ -1352,6 +1345,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     leavesBatch: TreeNode[],
     targetAmounts?: number[],
   ): Promise<TreeNode[]> {
+    if (!targetAmounts) {
+      targetAmounts = leavesBatch.map((leaf) => leaf.value);
+    }
+
     const leafKeyTweaks: LeafKeyTweak[] = await Promise.all(
       leavesBatch.map(async (leaf) => ({
         leaf,
@@ -1365,156 +1362,45 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       })),
     );
 
-    const {
-      transfer,
-      signatureMap,
-      directSignatureMap,
-      directFromCpfpSignatureMap,
-    } = await this.transferService.startSwapSignRefund(
-      leafKeyTweaks,
-      hexToBytes(this.config.getSspIdentityPublicKey()),
-      new Date(Date.now() + 2 * 60 * 1000),
-    );
+    const { swapTransfer, adaptorPubkey, adaptorAddedSignatureMap } =
+      await this.transferService.sendSwapTransfer(
+        leafKeyTweaks,
+        hexToBytes(this.config.getSspIdentityPublicKey()),
+      );
+
+    if (!swapTransfer.transfer) {
+      throw new SparkValidationError("Transfer is missing in swap response", {
+        field: "transfer",
+        value: swapTransfer.transfer,
+        expected: "not null",
+      });
+    }
+    if (swapTransfer.transfer.leaves.some((leaf) => !leaf.leaf)) {
+      throw new SparkValidationError("Leaf is missing in swap response", {
+        field: "leaves",
+        value: swapTransfer.transfer.leaves,
+        expected: "not null",
+      });
+    }
+
+    const transfer = swapTransfer.transfer;
 
     try {
-      if (!transfer.leaves[0]?.leaf) {
-        console.error("[processSwapBatch] First leaf is missing");
-        throw new Error("Failed to get leaf");
-      }
-
-      const cpfpRefundSignature = signatureMap.get(transfer.leaves[0].leaf.id);
-      if (!cpfpRefundSignature) {
-        console.error(
-          "[processSwapBatch] Missing CPFP refund signature for first leaf",
-        );
-        throw new Error("Failed to get CPFP refund signature");
-      }
-
-      const directRefundSignature = directSignatureMap.get(
-        transfer.leaves[0].leaf.id,
-      );
-      if (!directRefundSignature) {
-        console.error(
-          "[processSwapBatch] Missing direct refund signature for first leaf",
-        );
-        throw new Error("Failed to get direct refund signature");
-      }
-
-      const directFromCpfpRefundSignature = directFromCpfpSignatureMap.get(
-        transfer.leaves[0].leaf.id,
-      );
-      if (!directFromCpfpRefundSignature) {
-        console.error(
-          "[processSwapBatch] Missing direct from CPFP refund signature for first leaf",
-        );
-        throw new Error("Failed to get direct from CPFP refund signature");
-      }
-
-      const {
-        adaptorPrivateKey: cpfpAdaptorPrivateKey,
-        adaptorSignature: cpfpAdaptorSignature,
-      } = generateAdaptorFromSignature(cpfpRefundSignature);
-
-      let directAdaptorPrivateKey: Uint8Array = new Uint8Array();
-      let directAdaptorSignature: Uint8Array = new Uint8Array();
-      let directFromCpfpAdaptorPrivateKey: Uint8Array = new Uint8Array();
-      let directFromCpfpAdaptorSignature: Uint8Array = new Uint8Array();
-
-      if (directRefundSignature.length > 0) {
-        const { adaptorPrivateKey, adaptorSignature } =
-          generateAdaptorFromSignature(directRefundSignature);
-
-        directAdaptorPrivateKey = adaptorPrivateKey;
-        directAdaptorSignature = adaptorSignature;
-      }
-
-      if (directFromCpfpRefundSignature.length > 0) {
-        const { adaptorPrivateKey, adaptorSignature } =
-          generateAdaptorFromSignature(directFromCpfpRefundSignature);
-        directFromCpfpAdaptorPrivateKey = adaptorPrivateKey;
-        directFromCpfpAdaptorSignature = adaptorSignature;
-      }
-
-      if (!transfer.leaves[0].leaf) {
-        console.error(
-          "[processSwapBatch] First leaf missing when preparing user leaves",
-        );
-        throw new Error("Failed to get leaf");
-      }
-
       const userLeaves: UserLeafInput[] = [];
-      userLeaves.push({
-        leaf_id: transfer.leaves[0].leaf.id,
-        raw_unsigned_refund_transaction: bytesToHex(
-          transfer.leaves[0].intermediateRefundTx,
-        ),
-        direct_raw_unsigned_refund_transaction: bytesToHex(
-          transfer.leaves[0].intermediateDirectRefundTx,
-        ),
-        direct_from_cpfp_raw_unsigned_refund_transaction: bytesToHex(
-          transfer.leaves[0].intermediateDirectFromCpfpRefundTx,
-        ),
-        adaptor_added_signature: bytesToHex(cpfpAdaptorSignature),
-        direct_adaptor_added_signature: bytesToHex(directAdaptorSignature),
-        direct_from_cpfp_adaptor_added_signature: bytesToHex(
-          directFromCpfpAdaptorSignature,
-        ),
-      });
-
-      for (let i = 1; i < transfer.leaves.length; i++) {
+      for (let i = 0; i < transfer.leaves.length; i++) {
         const leaf = transfer.leaves[i];
         if (!leaf?.leaf) {
           console.error(`[processSwapBatch] Leaf ${i + 1} is missing`);
           throw new Error("Failed to get leaf");
         }
 
-        const cpfpRefundSignature = signatureMap.get(leaf.leaf.id);
-        if (!cpfpRefundSignature) {
-          console.error(
-            `[processSwapBatch] Missing CPFP refund signature for leaf ${i + 1}`,
-          );
-          throw new Error("Failed to get CPFP refund signature");
-        }
-
-        const directRefundSignature = directSignatureMap.get(leaf.leaf.id);
-        if (!directRefundSignature) {
-          console.error(
-            `[processSwapBatch] Missing direct refund signature for leaf ${i + 1}`,
-          );
-          throw new Error("Failed to get direct refund signature");
-        }
-
-        const directFromCpfpRefundSignature = directFromCpfpSignatureMap.get(
+        const adaptorAddedSignature = adaptorAddedSignatureMap.get(
           leaf.leaf.id,
         );
-        if (!directFromCpfpRefundSignature) {
-          console.error(
-            `[processSwapBatch] Missing direct from CPFP refund signature for leaf ${i + 1}`,
-          );
-          throw new Error("Failed to get direct from CPFP refund signature");
+
+        if (!adaptorAddedSignature) {
+          throw new Error("Adaptor added signature not found");
         }
-
-        const cpfpSignature = generateSignatureFromExistingAdaptor(
-          cpfpRefundSignature,
-          cpfpAdaptorPrivateKey,
-        );
-
-        let directSignature: Uint8Array = new Uint8Array();
-        if (directRefundSignature.length > 0) {
-          directSignature = generateSignatureFromExistingAdaptor(
-            directRefundSignature,
-            directAdaptorPrivateKey,
-          );
-        }
-
-        let directFromCpfpSignature: Uint8Array = new Uint8Array();
-        if (directFromCpfpRefundSignature.length > 0) {
-          directFromCpfpSignature = generateSignatureFromExistingAdaptor(
-            directFromCpfpRefundSignature,
-            directFromCpfpAdaptorPrivateKey,
-          );
-        }
-
         userLeaves.push({
           leaf_id: leaf.leaf.id,
           raw_unsigned_refund_transaction: bytesToHex(
@@ -1526,224 +1412,44 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           direct_from_cpfp_raw_unsigned_refund_transaction: bytesToHex(
             leaf.intermediateDirectFromCpfpRefundTx,
           ),
-          adaptor_added_signature: bytesToHex(cpfpSignature),
-          direct_adaptor_added_signature: bytesToHex(directSignature),
+          adaptor_added_signature: bytesToHex(adaptorAddedSignature),
+          direct_adaptor_added_signature: bytesToHex(adaptorAddedSignature),
           direct_from_cpfp_adaptor_added_signature: bytesToHex(
-            directFromCpfpSignature,
+            adaptorAddedSignature,
           ),
         });
       }
 
       const sspClient = this.getSspClient();
-      const cpfpAdaptorPubkey = bytesToHex(
-        secp256k1.getPublicKey(cpfpAdaptorPrivateKey),
-      );
-      if (!cpfpAdaptorPubkey) {
-        throw new Error("Failed to generate CPFP adaptor pubkey");
-      }
 
-      let directAdaptorPubkey: string | undefined;
-      if (directAdaptorPrivateKey.length > 0) {
-        directAdaptorPubkey = bytesToHex(
-          secp256k1.getPublicKey(directAdaptorPrivateKey),
-        );
-      }
-
-      let directFromCpfpAdaptorPubkey: string | undefined;
-      if (directFromCpfpAdaptorPrivateKey.length > 0) {
-        directFromCpfpAdaptorPubkey = bytesToHex(
-          secp256k1.getPublicKey(directFromCpfpAdaptorPrivateKey),
-        );
-      }
-
-      let request: LeavesSwapRequest | null | undefined = null;
-      const targetAmountSats =
-        targetAmounts?.reduce((acc, amount) => acc + amount, 0) ||
-        leavesBatch.reduce((acc, leaf) => acc + leaf.value, 0);
-      const totalAmountSats = leavesBatch.reduce(
-        (acc, leaf) => acc + leaf.value,
-        0,
-      );
-
-      request = await sspClient.requestLeaveSwap({
+      const request = await sspClient.requestLeavesSwap({
         userLeaves,
-        adaptorPubkey: cpfpAdaptorPubkey,
-        directAdaptorPubkey: directAdaptorPubkey,
-        directFromCpfpAdaptorPubkey: directFromCpfpAdaptorPubkey,
-        targetAmountSats,
-        totalAmountSats,
-        targetAmountSatsList: targetAmounts,
+        adaptorPubkey: bytesToHex(adaptorPubkey),
+        targetAmountSats: targetAmounts,
+        totalAmountSats: leavesBatch.reduce((acc, leaf) => acc + leaf.value, 0),
         // TODO: Request fee from SSP
         feeSats: 0,
-        idempotencyKey: uuidv7(),
+        userOutboundTransferExternalId: transfer.id,
       });
 
-      if (!request) {
-        console.error("[processSwapBatch] Leave swap request returned null");
-        throw new Error("Failed to request leaves swap. No response returned.");
-      }
-
       if (
+        !request ||
+        !request.swapLeaves ||
         request.swapLeaves.length === 0 ||
-        request.status === SparkLeavesSwapRequestStatus.FAILED
+        request.status === SparkLeavesSwapRequestStatus.FAILED ||
+        !request.inboundTransfer?.sparkId
       ) {
-        console.error("[processSwapBatch] Leaves swap request failed", request);
+        console.error("[processSwapBatch] Leave swap request returned null");
         throw new Error("Failed to request leaves swap. Request failed.");
       }
 
-      const nodes = await this.queryNodes({
-        source: {
-          $case: "nodeIds",
-          nodeIds: {
-            nodeIds: request.swapLeaves.map((leaf) => leaf.leafId),
-          },
-        },
-        includeParents: false,
-        network: NetworkToProto[this.config.getNetwork()],
-        statuses: [],
-      });
-
-      if (Object.values(nodes.nodes).length !== request.swapLeaves.length) {
-        console.error("[processSwapBatch] Node count mismatch:", {
-          actual: Object.values(nodes.nodes).length,
-          expected: request.swapLeaves.length,
-        });
-        throw new Error("Expected same number of nodes as swapLeaves");
-      }
-
-      for (const [nodeId, node] of Object.entries(nodes.nodes)) {
-        if (!node.nodeTx) {
-          console.error(`[processSwapBatch] Node tx missing for ${nodeId}`);
-          throw new Error(`Node tx not found for leaf ${nodeId}`);
-        }
-
-        if (!node.verifyingPublicKey) {
-          console.error(
-            `[processSwapBatch] Verifying public key missing for ${nodeId}`,
-          );
-          throw new Error(`Node public key not found for leaf ${nodeId}`);
-        }
-
-        const leaf = request.swapLeaves.find((leaf) => leaf.leafId === nodeId);
-        if (!leaf) {
-          console.error(`[processSwapBatch] Leaf not found for node ${nodeId}`);
-          throw new Error(`Leaf not found for node ${nodeId}`);
-        }
-        // Apply CPFP adaptor signature
-        const cpfpNodeTx = getTxFromRawTxBytes(node.nodeTx);
-        const cpfpRefundTxBytes = hexToBytes(leaf.rawUnsignedRefundTransaction);
-        const cpfpRefundTx = getTxFromRawTxBytes(cpfpRefundTxBytes);
-        const cpfpSighash = getSigHashFromTx(
-          cpfpRefundTx,
-          0,
-          cpfpNodeTx.getOutput(0),
-        );
-
-        const nodePublicKey = node.verifyingPublicKey;
-        const taprootKey = computeTaprootKeyNoScript(nodePublicKey.slice(1));
-        const cpfpAdaptorSignatureBytes = hexToBytes(
-          leaf.adaptorSignedSignature,
-        );
-        applyAdaptorToSignature(
-          taprootKey.slice(1),
-          cpfpSighash,
-          cpfpAdaptorSignatureBytes,
-          cpfpAdaptorPrivateKey,
-        );
-
-        // Apply direct adaptor signature
-
-        if (leaf.directRawUnsignedRefundTransaction) {
-          const directNodeTx = getTxFromRawTxBytes(node.directTx);
-          const directRefundTxBytes = hexToBytes(
-            leaf.directRawUnsignedRefundTransaction,
-          );
-          const directRefundTx = getTxFromRawTxBytes(directRefundTxBytes);
-          const directSighash = getSigHashFromTx(
-            directRefundTx,
-            0,
-            directNodeTx.getOutput(0),
-          );
-          if (!leaf.directAdaptorSignedSignature) {
-            throw new Error(
-              `Direct adaptor signed signature missing for node ${nodeId}`,
-            );
-          }
-          const directAdaptorSignatureBytes = hexToBytes(
-            leaf.directAdaptorSignedSignature,
-          );
-
-          applyAdaptorToSignature(
-            taprootKey.slice(1),
-            directSighash,
-            directAdaptorSignatureBytes,
-            directAdaptorPrivateKey,
-          );
-        }
-
-        if (leaf.directFromCpfpRawUnsignedRefundTransaction) {
-          const directFromCpfpRefundTxBytes = hexToBytes(
-            leaf.directFromCpfpRawUnsignedRefundTransaction,
-          );
-          const directFromCpfpRefundTx = getTxFromRawTxBytes(
-            directFromCpfpRefundTxBytes,
-          );
-          const directFromCpfpSighash = getSigHashFromTx(
-            directFromCpfpRefundTx,
-            0,
-            cpfpNodeTx.getOutput(0),
-          );
-          if (!leaf.directFromCpfpAdaptorSignedSignature) {
-            throw new Error(
-              `Direct adaptor signed signature missing for node ${nodeId}`,
-            );
-          }
-          const directFromCpfpAdaptorSignatureBytes = hexToBytes(
-            leaf.directFromCpfpAdaptorSignedSignature,
-          );
-          applyAdaptorToSignature(
-            taprootKey.slice(1),
-            directFromCpfpSighash,
-            directFromCpfpAdaptorSignatureBytes,
-            directFromCpfpAdaptorPrivateKey,
-          );
-        }
-      }
-      await this.transferService.deliverTransferPackage(
-        transfer,
-        leafKeyTweaks,
-        signatureMap,
-        directSignatureMap,
-        directFromCpfpSignatureMap,
+      await this.updateLeaves(
+        leavesBatch.map((leaf) => leaf.id),
+        [],
       );
 
-      // At this point the leaves are considered outgoing.
-      // Remove them from internal state so we don't select them again
-      const leavesToRemove = new Set(leavesBatch.map((leaf) => leaf.id));
-      this.leaves = [
-        ...this.leaves.filter((leaf) => !leavesToRemove.has(leaf.id)),
-      ];
-
-      const completeResponse = await sspClient.completeLeaveSwap({
-        adaptorSecretKey: bytesToHex(cpfpAdaptorPrivateKey),
-        directAdaptorSecretKey: bytesToHex(directAdaptorPrivateKey),
-        directFromCpfpAdaptorSecretKey: bytesToHex(
-          directFromCpfpAdaptorPrivateKey,
-        ),
-        userOutboundTransferExternalId: transfer.id,
-        leavesSwapRequestId: request.id,
-      });
-
-      if (!completeResponse || !completeResponse.inboundTransfer?.sparkId) {
-        console.error(
-          "[processSwapBatch] Invalid complete response:",
-          completeResponse,
-        );
-        throw new Error("Failed to complete leaves swap");
-      }
-
       const incomingTransfer = await this.transferService.queryTransfer(
-        completeResponse.inboundTransfer.sparkId,
+        request.inboundTransfer.sparkId,
       );
 
       if (!incomingTransfer) {
@@ -3286,6 +2992,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     if (
       transfer.type !== TransferType.COUNTER_SWAP &&
+      transfer.type !== TransferType.COUNTER_SWAP_V3 &&
       this.config.getOptimizationOptions().auto &&
       shouldOptimize(
         this.leaves.map((leaf) => leaf.value),
@@ -4833,8 +4540,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         .filter((transfer) =>
           [
             TransferType.COOPERATIVE_EXIT,
+            TransferType.COUNTER_SWAP_V3,
             TransferType.COUNTER_SWAP,
             TransferType.PREIMAGE_SWAP,
+            TransferType.PRIMARY_SWAP_V3,
             TransferType.SWAP,
             TransferType.UTXO_SWAP,
           ].includes(transfer.type),

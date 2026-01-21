@@ -17,7 +17,6 @@ import { UserRequestType } from "../types/sdk-types.js";
 import { getFetch } from "../utils/fetch.js";
 import { ClaimStaticDeposit } from "./mutations/ClaimStaticDeposit.js";
 import { CompleteCoopExit } from "./mutations/CompleteCoopExit.js";
-import { CompleteLeavesSwap } from "./mutations/CompleteLeavesSwap.js";
 import { GetChallenge } from "./mutations/GetChallenge.js";
 import { RequestCoopExit } from "./mutations/RequestCoopExit.js";
 import { RequestLightningReceive } from "./mutations/RequestLightningReceive.js";
@@ -38,7 +37,6 @@ import { GetChallengeOutputFromJson } from "./objects/GetChallengeOutput.js";
 import {
   BitcoinNetwork,
   CompleteCoopExitInput,
-  CompleteLeavesSwapInput,
   CoopExitFeeEstimatesInput,
   CoopExitFeeEstimatesOutput,
   CoopExitFeeQuote,
@@ -47,9 +45,9 @@ import {
   LeavesSwapFeeEstimateOutput,
   LightningSendRequest,
   RequestCoopExitInput,
-  RequestLeavesSwapInput,
   RequestLightningReceiveInput,
   RequestLightningSendInput,
+  RequestSwapInput,
   SparkUserRequestStatus,
   SparkUserRequestType,
   Transfer,
@@ -359,61 +357,33 @@ export default class SspClient {
     });
   }
 
-  async requestLeaveSwap({
+  async requestLeavesSwap({
     adaptorPubkey,
-    directAdaptorPubkey,
-    directFromCpfpAdaptorPubkey,
     totalAmountSats,
     targetAmountSats,
     feeSats,
     userLeaves,
-    idempotencyKey,
-    targetAmountSatsList,
-  }: RequestLeavesSwapInput): Promise<LeavesSwapRequest | null> {
+    userOutboundTransferExternalId,
+  }: RequestSwapInput): Promise<LeavesSwapRequest | null> {
     const query = {
       queryPayload: RequestSwapLeaves,
       variables: {
         adaptor_pubkey: adaptorPubkey,
-        direct_adaptor_pubkey: directAdaptorPubkey,
-        direct_from_cpfp_adaptor_pubkey: directFromCpfpAdaptorPubkey,
         total_amount_sats: totalAmountSats,
         target_amount_sats: targetAmountSats,
         fee_sats: feeSats,
         user_leaves: userLeaves,
-        idempotency_key: idempotencyKey,
-        target_amount_sats_list: targetAmountSatsList,
+        user_outbound_transfer_external_id: userOutboundTransferExternalId,
       },
-      constructObject: (response: { request_leaves_swap: any }) => {
-        if (!response.request_leaves_swap) {
+      constructObject: (response: { request_swap: any }) => {
+        if (!response.request_swap) {
           return null;
         }
 
-        return LeavesSwapRequestFromJson(response.request_leaves_swap.request);
+        return LeavesSwapRequestFromJson(response.request_swap.request);
       },
     };
     return await this.executeRawQuery(query);
-  }
-
-  async completeLeaveSwap({
-    adaptorSecretKey,
-    directAdaptorSecretKey,
-    directFromCpfpAdaptorSecretKey,
-    userOutboundTransferExternalId,
-    leavesSwapRequestId,
-  }: CompleteLeavesSwapInput): Promise<LeavesSwapRequest | null> {
-    return await this.executeRawQuery({
-      queryPayload: CompleteLeavesSwap,
-      variables: {
-        adaptor_secret_key: adaptorSecretKey,
-        direct_adaptor_secret_key: directAdaptorSecretKey,
-        direct_from_cpfp_adaptor_secret_key: directFromCpfpAdaptorSecretKey,
-        user_outbound_transfer_external_id: userOutboundTransferExternalId,
-        leaves_swap_request_id: leavesSwapRequestId,
-      },
-      constructObject: (response: { complete_leaves_swap: any }) => {
-        return LeavesSwapRequestFromJson(response.complete_leaves_swap.request);
-      },
-    });
   }
 
   async getLightningReceiveRequest(

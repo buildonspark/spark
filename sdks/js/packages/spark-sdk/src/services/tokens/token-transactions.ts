@@ -11,32 +11,32 @@ import {
   Order,
 } from "../../proto/spark.js";
 import {
+  BroadcastTransactionResponse,
+  CommitProgress,
+  CommitStatus,
+  CommitTransactionResponse,
   InputTtxoSignaturesPerOperator,
   OutputWithPreviousTransactionData,
+  PartialTokenOutput,
+  PartialTokenTransaction,
   QueryTokenTransactionsRequest as QueryTokenTransactionsRequestV1,
   QueryTokenTransactionsResponse,
   SignatureWithIndex,
   TokenOutput,
   TokenTransaction,
-  PartialTokenTransaction,
-  PartialTokenOutput,
-  BroadcastTransactionResponse,
-  CommitTransactionResponse,
-  CommitProgress,
-  CommitStatus,
 } from "../../proto/spark_token.js";
 import { TokenOutputsMap } from "../../spark-wallet/types.js";
 import { SparkCallOptions } from "../../types/grpc.js";
 import {
   decodeSparkAddress,
-  SparkAddressFormat,
   isValidPublicKey,
+  SparkAddressFormat,
 } from "../../utils/address.js";
 import {
-  hashOperatorSpecificTokenTransactionSignablePayload,
-  hashTokenTransaction,
-  hashPartialTokenTransaction,
   hashFinalTokenTransaction,
+  hashOperatorSpecificTokenTransactionSignablePayload,
+  hashPartialTokenTransaction,
+  hashTokenTransaction,
   sortInvoiceAttachments,
 } from "../../utils/token-hashing.js";
 import {

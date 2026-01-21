@@ -6,10 +6,12 @@ import { TransactionOutput } from "@scure/btc-signer/psbt";
 import { uuidv7 } from "uuidv7";
 import { SparkRequestError, SparkValidationError } from "../errors/index.js";
 import { SignatureIntent } from "../proto/common.js";
+import { Timestamp } from "../proto/google/protobuf/timestamp.js";
 import {
   ClaimLeafKeyTweak,
   ClaimTransferSignRefundsResponse,
   CounterLeafSwapResponse,
+  InitiateSwapPrimaryTransferResponse,
   LeafRefundTxSigningJob,
   LeafRefundTxSigningResult,
   NodeSignatures,
@@ -27,7 +29,6 @@ import {
   TransferType,
   TreeNode,
 } from "../proto/spark.js";
-import { Timestamp } from "../proto/google/protobuf/timestamp.js";
 import {
   KeyDerivation,
   KeyDerivationType,
@@ -50,7 +51,22 @@ import {
 import { getTransferPackageSigningPayload } from "../utils/transfer_package.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection/connection.js";
-import { SigningService } from "./signing.js";
+import {
+  SigningService,
+  UserSignedTxSigningJobWithSelfCommitment,
+} from "./signing.js";
+
+type TransferPackageCommitmentsOverride = {
+  leavesToSend: UserSignedTxSigningJobWithSelfCommitment[];
+  directLeavesToSend: UserSignedTxSigningJobWithSelfCommitment[];
+  directFromCpfpLeavesToSend: UserSignedTxSigningJobWithSelfCommitment[];
+};
+
+export type TransferPackageWithSelfCommitments = Omit<
+  TransferPackage,
+  keyof TransferPackageCommitmentsOverride
+> &
+  TransferPackageCommitmentsOverride;
 
 export type LeafKeyTweak = {
   leaf: TreeNode;
@@ -262,12 +278,118 @@ export class BaseTransferService {
     return response.transfer;
   }
 
+  async sendSwapTransfer(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+  ): Promise<{
+    swapTransfer: InitiateSwapPrimaryTransferResponse;
+    adaptorPubkey: Uint8Array;
+    adaptorAddedSignatureMap: Map<string, Uint8Array>;
+  }> {
+    const transferID = uuidv7();
+
+    const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
+      transferID,
+      receiverIdentityPubkey,
+      leaves,
+      new Map<string, Uint8Array>(),
+      new Map<string, Uint8Array>(),
+      new Map<string, Uint8Array>(),
+    );
+
+    const adaptorPrivKey = secp256k1.utils.randomSecretKey();
+    const adaptorPubkey = secp256k1.getPublicKey(adaptorPrivKey);
+    const transferPackage = await this.prepareTransferPackage(
+      transferID,
+      keyTweakInputMap,
+      leaves,
+      receiverIdentityPubkey,
+      adaptorPubkey,
+    );
+
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    transferPackage.directFromCpfpLeavesToSend = [];
+    transferPackage.directLeavesToSend = [];
+    try {
+      const response = await sparkClient.initiate_swap_primary_transfer({
+        transfer: {
+          transferId: transferID,
+          ownerIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
+          receiverIdentityPublicKey: receiverIdentityPubkey,
+          transferPackage,
+        },
+        adaptorPublicKeys: {
+          adaptorPublicKey: adaptorPubkey,
+        },
+      });
+
+      if (!response.transfer) {
+        throw new SparkValidationError("No transfer response from operator");
+      }
+
+      const adaptorAddedSignatureMap: Map<string, Uint8Array> = new Map();
+      for (const signingResult of response.signingResults) {
+        const leaf = transferPackage.leavesToSend.find(
+          (leaf) => leaf.leafId === signingResult.leafId,
+        );
+        const leaf_1 = leaves.find(
+          (leaf) => leaf.leaf.id === signingResult.leafId,
+        );
+        if (!leaf || !leaf_1) {
+          throw new SparkValidationError("Leaf not found", {
+            field: "leafId",
+            value: signingResult.leafId,
+          });
+        }
+
+        const message = getSigHashFromTx(
+          getTxFromRawTxBytes(leaf.rawTx),
+          0,
+          getTxFromRawTxBytes(leaf_1.leaf.nodeTx).getOutput(0),
+        );
+        const adaptorAddedSignature = await this.config.signer.aggregateFrost({
+          message: message,
+          publicKey: leaf.signingPublicKey,
+          verifyingKey: signingResult.verifyingKey,
+          selfCommitment: leaf.selfCommitment,
+          statechainCommitments:
+            signingResult.refundTxSigningResult?.signingNonceCommitments,
+          statechainSignatures:
+            signingResult.refundTxSigningResult?.signatureShares,
+          statechainPublicKeys: signingResult.refundTxSigningResult?.publicKeys,
+          selfSignature: leaf.userSignature,
+          adaptorPubKey: adaptorPubkey,
+        });
+        adaptorAddedSignatureMap.set(
+          signingResult.leafId,
+          adaptorAddedSignature,
+        );
+      }
+
+      return {
+        swapTransfer: response,
+        adaptorPubkey,
+        adaptorAddedSignatureMap,
+      };
+    } catch (error) {
+      throw new SparkRequestError("Failed to initiate swap primary transfer", {
+        method: "POST",
+        error: error as Error,
+      });
+    }
+  }
+
   private async prepareTransferPackage(
     transferID: string,
     keyTweakInputMap: Map<string, SendLeafKeyTweak[]>,
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
-  ): Promise<TransferPackage> {
+    adaptorPubKey?: Uint8Array,
+  ): Promise<TransferPackageWithSelfCommitments> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
@@ -295,6 +417,7 @@ export class BaseTransferService {
         2 * leaves.length,
       ),
       signingCommitments.signingCommitments.slice(2 * leaves.length),
+      adaptorPubKey,
     );
 
     const sparkFrost = getSparkFrost();
@@ -321,7 +444,7 @@ export class BaseTransferService {
       }),
     );
     const encryptedKeyTweaks = Object.fromEntries(encryptedKeyTweaksEntries);
-    const transferPackage: TransferPackage = {
+    const transferPackage: TransferPackageWithSelfCommitments = {
       leavesToSend: cpfpLeafSigningJobs,
       keyTweakPackage: encryptedKeyTweaks,
       userSignature: new Uint8Array(),
@@ -454,6 +577,7 @@ export class BaseTransferService {
         0,
         txOutput,
       );
+
       const publicKey = await this.config.signer.getPublicKeyFromDerivation(
         leafData.keyDerivation,
       );
@@ -899,40 +1023,6 @@ export class TransferService extends BaseTransferService {
       leaves,
       receiverIdentityPubkey,
       expiryTime,
-      false,
-    );
-
-    return {
-      transfer,
-      signatureMap,
-      directSignatureMap,
-      directFromCpfpSignatureMap,
-      leafDataMap,
-    };
-  }
-
-  async startSwapSignRefund(
-    leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
-    expiryTime: Date,
-  ): Promise<{
-    transfer: Transfer;
-    signatureMap: Map<string, Uint8Array>;
-    directSignatureMap: Map<string, Uint8Array>;
-    directFromCpfpSignatureMap: Map<string, Uint8Array>;
-    leafDataMap: Map<string, LeafRefundSigningData>;
-  }> {
-    const {
-      transfer,
-      signatureMap,
-      directSignatureMap,
-      directFromCpfpSignatureMap,
-      leafDataMap,
-    } = await this.sendTransferSignRefundInternal(
-      leaves,
-      receiverIdentityPubkey,
-      expiryTime,
-      true,
     );
 
     return {
@@ -948,7 +1038,6 @@ export class TransferService extends BaseTransferService {
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
     expiryTime: Date,
-    forSwap: boolean,
   ): Promise<{
     transfer: Transfer;
     signatureMap: Map<string, Uint8Array>;
@@ -1012,25 +1101,13 @@ export class TransferService extends BaseTransferService {
 
     let response: CounterLeafSwapResponse;
     try {
-      if (forSwap) {
-        response = await sparkClient.start_leaf_swap_v2({
-          transferId,
-          leavesToSend: signingJobs,
-          ownerIdentityPublicKey:
-            await this.config.signer.getIdentityPublicKey(),
-          receiverIdentityPublicKey: receiverIdentityPubkey,
-          expiryTime: expiryTime,
-        });
-      } else {
-        response = await sparkClient.start_transfer_v2({
-          transferId,
-          leavesToSend: signingJobs,
-          ownerIdentityPublicKey:
-            await this.config.signer.getIdentityPublicKey(),
-          receiverIdentityPublicKey: receiverIdentityPubkey,
-          expiryTime: expiryTime,
-        });
-      }
+      response = await sparkClient.start_transfer_v2({
+        transferId,
+        leavesToSend: signingJobs,
+        ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        receiverIdentityPublicKey: receiverIdentityPubkey,
+        expiryTime: expiryTime,
+      });
     } catch (error) {
       throw new Error(`Error starting send transfer: ${error}`);
     }

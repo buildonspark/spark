@@ -5,6 +5,7 @@ import {
   RequestedSigningCommitments,
   UserSignedTxSigningJob,
 } from "../proto/spark.js";
+import { SigningCommitmentWithOptionalNonce } from "../signer/types.js";
 import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin.js";
 import { createRefundTxsForLightning } from "../utils/htlc-transactions.js";
 import { getNetwork } from "../utils/network.js";
@@ -20,6 +21,10 @@ import type {
   SigningJobWithOptionalNonce,
 } from "./transfer.js";
 
+export type UserSignedTxSigningJobWithSelfCommitment =
+  UserSignedTxSigningJob & {
+    selfCommitment: SigningCommitmentWithOptionalNonce;
+  };
 export class SigningService {
   private readonly config: WalletConfigService;
 
@@ -36,8 +41,9 @@ export class SigningService {
           [key: string]: SigningCommitment;
         }
       | undefined,
-  ): Promise<UserSignedTxSigningJob[]> {
-    const leafSigningJobs: UserSignedTxSigningJob[] = [];
+    adaptorPubKey: Uint8Array = new Uint8Array(),
+  ): Promise<UserSignedTxSigningJobWithSelfCommitment[]> {
+    const leafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[] = [];
 
     const signingCommitment =
       await this.config.signer.getRandomSigningCommitment();
@@ -58,7 +64,7 @@ export class SigningService {
       publicKey,
       selfCommitment: signingCommitment,
       statechainCommitments: signingCommitments,
-      adaptorPubKey: new Uint8Array(),
+      adaptorPubKey,
       verifyingKey: leaf.leaf.verifyingPublicKey,
     });
 
@@ -71,6 +77,7 @@ export class SigningService {
       signingCommitments: {
         signingCommitments: signingCommitments,
       },
+      selfCommitment: signingCommitment,
     });
 
     return leafSigningJobs;
@@ -82,14 +89,17 @@ export class SigningService {
     cpfpSigningCommitments: RequestedSigningCommitments[],
     directSigningCommitments: RequestedSigningCommitments[],
     directFromCpfpSigningCommitments: RequestedSigningCommitments[],
+    adaptorPubKey?: Uint8Array,
   ): Promise<{
-    cpfpLeafSigningJobs: UserSignedTxSigningJob[];
-    directLeafSigningJobs: UserSignedTxSigningJob[];
-    directFromCpfpLeafSigningJobs: UserSignedTxSigningJob[];
+    cpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[];
+    directLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[];
+    directFromCpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[];
   }> {
-    const cpfpLeafSigningJobs: UserSignedTxSigningJob[] = [];
-    const directLeafSigningJobs: UserSignedTxSigningJob[] = [];
-    const directFromCpfpLeafSigningJobs: UserSignedTxSigningJob[] = [];
+    const cpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[] = [];
+    const directLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[] =
+      [];
+    const directFromCpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[] =
+      [];
 
     for (let i = 0; i < leaves.length; i++) {
       const leaf = leaves[i];
@@ -147,6 +157,7 @@ export class SigningService {
         refundSighash,
         leaf,
         cpfpSigningCommitments[i]?.signingNonceCommitments,
+        adaptorPubKey,
       );
 
       cpfpLeafSigningJobs.push(...signingJobs);
@@ -173,6 +184,7 @@ export class SigningService {
           refundSighash,
           leaf,
           directSigningCommitments[i]?.signingNonceCommitments,
+          adaptorPubKey,
         );
         directLeafSigningJobs.push(...signingJobs);
       }
@@ -188,6 +200,7 @@ export class SigningService {
           refundSighash,
           leaf,
           directFromCpfpSigningCommitments[i]?.signingNonceCommitments,
+          adaptorPubKey,
         );
         directFromCpfpLeafSigningJobs.push(...signingJobs);
       }
@@ -282,6 +295,7 @@ export class SigningService {
         refundSighash,
         leaf,
         cpfpSigningCommitments[i]?.signingNonceCommitments,
+        undefined,
       );
 
       cpfpLeafSigningJobs.push(...signingJobs);
@@ -307,6 +321,7 @@ export class SigningService {
           refundSighash,
           leaf,
           directSigningCommitments[i]?.signingNonceCommitments,
+          undefined,
         );
         directLeafSigningJobs.push(...signingJobs);
       }
@@ -322,6 +337,7 @@ export class SigningService {
           refundSighash,
           leaf,
           directFromCpfpSigningCommitments[i]?.signingNonceCommitments,
+          undefined,
         );
         directFromCpfpLeafSigningJobs.push(...signingJobs);
       }
