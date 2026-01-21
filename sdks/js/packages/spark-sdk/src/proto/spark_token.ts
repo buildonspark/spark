@@ -486,11 +486,14 @@ export interface QueryTokenTransactionsByFilters {
   issuerPublicKeys: Uint8Array[];
   /** Returns transactions that are related to this token identifier. */
   tokenIdentifiers: Uint8Array[];
+  /** For cursor-based pagination */
+  pageRequest: PageRequest | undefined;
 }
 
 export interface QueryTokenTransactionsResponse {
   tokenTransactionsWithStatus: TokenTransactionWithStatus[];
   offset: number;
+  pageResponse: PageResponse | undefined;
 }
 
 export interface OutputWithPreviousTransactionData {
@@ -3861,7 +3864,7 @@ export const QueryTokenTransactionsByTxHash: MessageFns<QueryTokenTransactionsBy
 };
 
 function createBaseQueryTokenTransactionsByFilters(): QueryTokenTransactionsByFilters {
-  return { outputIds: [], ownerPublicKeys: [], issuerPublicKeys: [], tokenIdentifiers: [] };
+  return { outputIds: [], ownerPublicKeys: [], issuerPublicKeys: [], tokenIdentifiers: [], pageRequest: undefined };
 }
 
 export const QueryTokenTransactionsByFilters: MessageFns<QueryTokenTransactionsByFilters> = {
@@ -3877,6 +3880,9 @@ export const QueryTokenTransactionsByFilters: MessageFns<QueryTokenTransactionsB
     }
     for (const v of message.tokenIdentifiers) {
       writer.uint32(34).bytes(v!);
+    }
+    if (message.pageRequest !== undefined) {
+      PageRequest.encode(message.pageRequest, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -3920,6 +3926,14 @@ export const QueryTokenTransactionsByFilters: MessageFns<QueryTokenTransactionsB
           message.tokenIdentifiers.push(reader.bytes());
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.pageRequest = PageRequest.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3943,6 +3957,7 @@ export const QueryTokenTransactionsByFilters: MessageFns<QueryTokenTransactionsB
       tokenIdentifiers: globalThis.Array.isArray(object?.tokenIdentifiers)
         ? object.tokenIdentifiers.map((e: any) => bytesFromBase64(e))
         : [],
+      pageRequest: isSet(object.pageRequest) ? PageRequest.fromJSON(object.pageRequest) : undefined,
     };
   },
 
@@ -3960,6 +3975,9 @@ export const QueryTokenTransactionsByFilters: MessageFns<QueryTokenTransactionsB
     if (message.tokenIdentifiers?.length) {
       obj.tokenIdentifiers = message.tokenIdentifiers.map((e) => base64FromBytes(e));
     }
+    if (message.pageRequest !== undefined) {
+      obj.pageRequest = PageRequest.toJSON(message.pageRequest);
+    }
     return obj;
   },
 
@@ -3972,12 +3990,15 @@ export const QueryTokenTransactionsByFilters: MessageFns<QueryTokenTransactionsB
     message.ownerPublicKeys = object.ownerPublicKeys?.map((e) => e) || [];
     message.issuerPublicKeys = object.issuerPublicKeys?.map((e) => e) || [];
     message.tokenIdentifiers = object.tokenIdentifiers?.map((e) => e) || [];
+    message.pageRequest = (object.pageRequest !== undefined && object.pageRequest !== null)
+      ? PageRequest.fromPartial(object.pageRequest)
+      : undefined;
     return message;
   },
 };
 
 function createBaseQueryTokenTransactionsResponse(): QueryTokenTransactionsResponse {
-  return { tokenTransactionsWithStatus: [], offset: 0 };
+  return { tokenTransactionsWithStatus: [], offset: 0, pageResponse: undefined };
 }
 
 export const QueryTokenTransactionsResponse: MessageFns<QueryTokenTransactionsResponse> = {
@@ -3987,6 +4008,9 @@ export const QueryTokenTransactionsResponse: MessageFns<QueryTokenTransactionsRe
     }
     if (message.offset !== 0) {
       writer.uint32(16).int64(message.offset);
+    }
+    if (message.pageResponse !== undefined) {
+      PageResponse.encode(message.pageResponse, writer.uint32(26).fork()).join();
     }
     return writer;
   },
@@ -4014,6 +4038,14 @@ export const QueryTokenTransactionsResponse: MessageFns<QueryTokenTransactionsRe
           message.offset = longToNumber(reader.int64());
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.pageResponse = PageResponse.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4029,6 +4061,7 @@ export const QueryTokenTransactionsResponse: MessageFns<QueryTokenTransactionsRe
         ? object.tokenTransactionsWithStatus.map((e: any) => TokenTransactionWithStatus.fromJSON(e))
         : [],
       offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+      pageResponse: isSet(object.pageResponse) ? PageResponse.fromJSON(object.pageResponse) : undefined,
     };
   },
 
@@ -4042,6 +4075,9 @@ export const QueryTokenTransactionsResponse: MessageFns<QueryTokenTransactionsRe
     if (message.offset !== 0) {
       obj.offset = Math.round(message.offset);
     }
+    if (message.pageResponse !== undefined) {
+      obj.pageResponse = PageResponse.toJSON(message.pageResponse);
+    }
     return obj;
   },
 
@@ -4053,6 +4089,9 @@ export const QueryTokenTransactionsResponse: MessageFns<QueryTokenTransactionsRe
     message.tokenTransactionsWithStatus =
       object.tokenTransactionsWithStatus?.map((e) => TokenTransactionWithStatus.fromPartial(e)) || [];
     message.offset = object.offset ?? 0;
+    message.pageResponse = (object.pageResponse !== undefined && object.pageResponse !== null)
+      ? PageResponse.fromPartial(object.pageResponse)
+      : undefined;
     return message;
   },
 };

@@ -4965,6 +4965,35 @@ func (m *QueryTokenTransactionsByFilters) validate(all bool) error {
 
 	}
 
+	if all {
+		switch v := interface{}(m.GetPageRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, QueryTokenTransactionsByFiltersValidationError{
+					field:  "PageRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, QueryTokenTransactionsByFiltersValidationError{
+					field:  "PageRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetPageRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return QueryTokenTransactionsByFiltersValidationError{
+				field:  "PageRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return QueryTokenTransactionsByFiltersMultiError(errors)
 	}
@@ -5111,6 +5140,35 @@ func (m *QueryTokenTransactionsResponse) validate(all bool) error {
 	}
 
 	// no validation rules for Offset
+
+	if all {
+		switch v := interface{}(m.GetPageResponse()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, QueryTokenTransactionsResponseValidationError{
+					field:  "PageResponse",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, QueryTokenTransactionsResponseValidationError{
+					field:  "PageResponse",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetPageResponse()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return QueryTokenTransactionsResponseValidationError{
+				field:  "PageResponse",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
 
 	if len(errors) > 0 {
 		return QueryTokenTransactionsResponseMultiError(errors)

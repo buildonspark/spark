@@ -1414,3 +1414,370 @@ func TestQueryTokenTransactionsPagination(t *testing.T) {
 		require.Equal(t, int64(-1), result.Offset, "last page should have offset -1")
 	})
 }
+
+// TestQueryTokenTransactionsCursorPagination tests cursor-based pagination for QueryTokenTransactions
+func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
+	issuerPrivKey := keys.GeneratePrivateKey()
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+	err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             "Cursor Pagination",
+		ticker:           "CURS",
+		maxSupply:        1000000,
+	})
+	require.NoError(t, err, "failed to create native spark token")
+
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
+
+	var transactionHashes [][]byte
+	for i := 0; i < 5; i++ {
+		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
+		require.NoError(t, err, "failed to create mint transaction %d", i+1)
+
+		finalMintTx, err := broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			mintTx,
+			[]keys.Private{issuerPrivKey},
+		)
+		require.NoError(t, err, "failed to broadcast mint transaction %d", i+1)
+
+		txHash, err := utils.HashTokenTransaction(finalMintTx, false)
+		require.NoError(t, err, "failed to hash mint transaction %d", i+1)
+		transactionHashes = append(transactionHashes, txHash)
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	t.Run("cursor paginate forward through all results", func(t *testing.T) {
+		var allTransactions []*tokenpb.TokenTransactionWithStatus
+		cursor := ""
+
+		for {
+			result, err := wallet.QueryTokenTransactions(
+				t.Context(),
+				config,
+				wallet.QueryTokenTransactionsParams{
+					IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+					UseCursorPagination: true,
+					PageSize:            2,
+					Cursor:              cursor,
+					Direction:           sparkpb.Direction_NEXT,
+					Order:               sparkpb.Order_ASCENDING,
+				},
+			)
+			require.NoError(t, err, "failed to query page with cursor %q", cursor)
+			require.NotNil(t, result.PageResponse, "page response should not be nil")
+
+			allTransactions = append(allTransactions, result.TokenTransactionsWithStatus...)
+
+			if !result.PageResponse.HasNextPage {
+				break
+			}
+			cursor = result.PageResponse.NextCursor
+		}
+
+		require.Len(t, allTransactions, 5, "should have retrieved all 5 transactions")
+
+		for i, tx := range allTransactions {
+			require.Equal(t, transactionHashes[i], tx.TokenTransactionHash,
+				"transaction %d hash should match", i)
+		}
+	})
+
+	t.Run("cursor pagination maintains order across pages", func(t *testing.T) {
+		page1, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            3,
+				Direction:           sparkpb.Direction_NEXT,
+				Order:               sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query page 1")
+		require.NotNil(t, page1.PageResponse, "page response should not be nil")
+		require.True(t, page1.PageResponse.HasNextPage, "page 1 should have next page")
+
+		page2, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            3,
+				Cursor:              page1.PageResponse.NextCursor,
+				Direction:           sparkpb.Direction_NEXT,
+				Order:               sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query page 2")
+		require.NotNil(t, page2.PageResponse, "page response should not be nil")
+
+		require.Len(t, page1.TokenTransactionsWithStatus, 3)
+		require.Len(t, page2.TokenTransactionsWithStatus, 2)
+
+		require.Equal(t, transactionHashes[0], page1.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		require.Equal(t, transactionHashes[1], page1.TokenTransactionsWithStatus[1].TokenTransactionHash)
+		require.Equal(t, transactionHashes[2], page1.TokenTransactionsWithStatus[2].TokenTransactionHash)
+
+		require.Equal(t, transactionHashes[3], page2.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		require.Equal(t, transactionHashes[4], page2.TokenTransactionsWithStatus[1].TokenTransactionHash)
+	})
+
+	t.Run("cursor pagination backward direction", func(t *testing.T) {
+		// First get all transactions to get the last cursor
+		allResult, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            10,
+				Direction:           sparkpb.Direction_NEXT,
+				Order:               sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query all transactions")
+		require.Len(t, allResult.TokenTransactionsWithStatus, 5)
+
+		// Use the cursor from the 4th transaction to paginate backward
+		page1, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            2,
+				Cursor:              allResult.PageResponse.NextCursor,
+				Direction:           sparkpb.Direction_PREVIOUS,
+				Order:               sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query backward page")
+		require.NotNil(t, page1.PageResponse, "page response should not be nil")
+		require.Len(t, page1.TokenTransactionsWithStatus, 2, "expected 2 transactions before the cursor")
+		require.True(t, page1.PageResponse.HasNextPage, "backward page should have next page (the cursor position)")
+		require.True(t, page1.PageResponse.HasPreviousPage, "backward page should have previous page")
+
+		// Verify backward results don't include the cursor transaction (the last one)
+		for _, tx := range page1.TokenTransactionsWithStatus {
+			require.NotEqual(t, transactionHashes[4], tx.TokenTransactionHash,
+				"backward pagination should not include the cursor transaction")
+		}
+	})
+
+	t.Run("cursor pagination descending order", func(t *testing.T) {
+		result, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            3,
+				Direction:           sparkpb.Direction_NEXT,
+				Order:               sparkpb.Order_DESCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query with descending order")
+		require.NotNil(t, result.PageResponse, "page response should not be nil")
+		require.Len(t, result.TokenTransactionsWithStatus, 3)
+
+		// In descending order, the most recent transactions come first
+		require.Equal(t, transactionHashes[4], result.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		require.Equal(t, transactionHashes[3], result.TokenTransactionsWithStatus[1].TokenTransactionHash)
+		require.Equal(t, transactionHashes[2], result.TokenTransactionsWithStatus[2].TokenTransactionHash)
+	})
+
+	t.Run("cursor pagination last page has no next", func(t *testing.T) {
+		// Get first page with all transactions
+		firstPage, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            3,
+				Direction:           sparkpb.Direction_NEXT,
+				Order:               sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query first page")
+		require.True(t, firstPage.PageResponse.HasNextPage, "first page should have next page")
+
+		// Get second (last) page
+		lastPage, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            3,
+				Cursor:              firstPage.PageResponse.NextCursor,
+				Direction:           sparkpb.Direction_NEXT,
+				Order:               sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query last page")
+		require.Len(t, lastPage.TokenTransactionsWithStatus, 2, "expected 2 remaining transactions")
+		require.False(t, lastPage.PageResponse.HasNextPage, "last page should not have next page")
+		require.True(t, lastPage.PageResponse.HasPreviousPage, "last page should have previous page")
+	})
+
+	t.Run("cursor pagination with empty cursor returns first page", func(t *testing.T) {
+		result, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            2,
+				Cursor:              "", // Empty cursor means start from beginning
+				Direction:           sparkpb.Direction_NEXT,
+				Order:               sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query with empty cursor")
+		require.NotNil(t, result.PageResponse, "page response should not be nil")
+		require.Len(t, result.TokenTransactionsWithStatus, 2)
+		require.False(t, result.PageResponse.HasPreviousPage, "first page should not have previous page")
+		require.True(t, result.PageResponse.HasNextPage, "first page should have next page")
+
+		require.Equal(t, transactionHashes[0], result.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		require.Equal(t, transactionHashes[1], result.TokenTransactionsWithStatus[1].TokenTransactionHash)
+	})
+
+	t.Run("cursor pagination with zero page size uses default", func(t *testing.T) {
+		result, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            0, // Should use default page size
+				Direction:           sparkpb.Direction_NEXT,
+				Order:               sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query with zero page size")
+		require.NotNil(t, result.PageResponse, "page response should not be nil")
+		// Default page size is 50, we only have 5 transactions
+		require.Len(t, result.TokenTransactionsWithStatus, 5)
+		require.False(t, result.PageResponse.HasNextPage, "should not have next page with default size")
+	})
+
+	t.Run("cursor pagination returns cursors for navigation", func(t *testing.T) {
+		result, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            2,
+				Direction:           sparkpb.Direction_NEXT,
+				Order:               sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query")
+		require.NotNil(t, result.PageResponse, "page response should not be nil")
+		require.NotEmpty(t, result.PageResponse.NextCursor, "should have next cursor when more pages exist")
+		require.NotEmpty(t, result.PageResponse.PreviousCursor, "should have previous cursor for navigation back")
+	})
+
+	t.Run("cursor pagination with invalid cursor returns error", func(t *testing.T) {
+		_, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            2,
+				Cursor:              "invalid-cursor-not-base64-uuid",
+				Direction:           sparkpb.Direction_NEXT,
+				Order:               sparkpb.Order_ASCENDING,
+			},
+		)
+		require.Error(t, err, "should error with invalid cursor")
+		require.Contains(t, err.Error(), "invalid cursor", "error should mention invalid cursor")
+	})
+}
+
+// TestQueryTokenTransactionsCursorPaginationSameCreateTime tests cursor pagination
+// when multiple transactions have identical create_time values.
+func TestQueryTokenTransactionsCursorPaginationSameCreateTime(t *testing.T) {
+	issuerPrivKey := keys.GeneratePrivateKey()
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+	err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             "Same Time Token",
+		ticker:           "SAME",
+		maxSupply:        1000000,
+	})
+	require.NoError(t, err, "failed to create native spark token")
+
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
+
+	// Create transactions rapidly without sleeping to force same create_time
+	var transactionHashes [][]byte
+	for i := 0; i < 5; i++ {
+		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
+		require.NoError(t, err, "failed to create mint transaction %d", i+1)
+
+		finalMintTx, err := broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			mintTx,
+			[]keys.Private{issuerPrivKey},
+		)
+		require.NoError(t, err, "failed to broadcast mint transaction %d", i+1)
+
+		txHash, err := utils.HashTokenTransaction(finalMintTx, false)
+		require.NoError(t, err, "failed to hash mint transaction %d", i+1)
+		transactionHashes = append(transactionHashes, txHash)
+		// No sleep - transactions may have same create_time
+	}
+
+	t.Run("cursor pagination returns all transactions without skips or duplicates", func(t *testing.T) {
+		var allTransactions []*tokenpb.TokenTransactionWithStatus
+		seenHashes := make(map[string]bool)
+		cursor := ""
+
+		for {
+			result, err := wallet.QueryTokenTransactions(
+				t.Context(),
+				config,
+				wallet.QueryTokenTransactionsParams{
+					IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+					UseCursorPagination: true,
+					PageSize:            2,
+					Cursor:              cursor,
+					Direction:           sparkpb.Direction_NEXT,
+					Order:               sparkpb.Order_ASCENDING,
+				},
+			)
+			require.NoError(t, err, "failed to query page with cursor %q", cursor)
+			require.NotNil(t, result.PageResponse, "page response should not be nil")
+
+			for _, tx := range result.TokenTransactionsWithStatus {
+				hashKey := string(tx.TokenTransactionHash)
+				require.False(t, seenHashes[hashKey], "duplicate transaction found during pagination")
+				seenHashes[hashKey] = true
+			}
+
+			allTransactions = append(allTransactions, result.TokenTransactionsWithStatus...)
+
+			if !result.PageResponse.HasNextPage {
+				break
+			}
+			cursor = result.PageResponse.NextCursor
+		}
+
+		require.Len(t, allTransactions, 5, "should have retrieved all 5 transactions without skips")
+	})
+}

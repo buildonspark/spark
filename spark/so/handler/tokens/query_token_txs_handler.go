@@ -2,12 +2,14 @@ package tokens
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uuids"
+	"github.com/lightsparkdev/spark/so/errors"
 	"go.uber.org/zap"
 
 	"github.com/lightsparkdev/spark/so/protoconverter"
@@ -50,6 +52,9 @@ type queryParams struct {
 	order                  sparkpb.Order
 	limit                  int64
 	offset                 int64
+	afterID                *uuid.UUID
+	beforeID               *uuid.UUID
+	useCursorPagination    bool
 }
 
 // NewQueryTokenTransactionsHandler creates a new QueryTokenTransactionsHandler.
@@ -131,6 +136,11 @@ func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Conte
 		return nil, err
 	}
 
+	requestedLimit := params.limit
+	if params.useCursorPagination {
+		params.limit = requestedLimit + 1
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -155,6 +165,7 @@ func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Conte
 		}
 	}
 
+	params.limit = requestedLimit
 	resp, err := convertTransactionsToResponse(ctx, h.config, transactions, params)
 	metricsRecorder.record(ctx, len(transactions), err)
 	return resp, err
@@ -349,18 +360,31 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(params *queryParams)
 
 	queryBuilder.WriteString(") combined")
 
-	// Add ordering, limit, and offset
-	if params.order == sparkpb.Order_ASCENDING {
-		queryBuilder.WriteString(" ORDER BY combined.create_time ASC")
+	// Add cursor filter if using cursor pagination
+	if params.afterID != nil {
+		queryBuilder.WriteString(fmt.Sprintf(" WHERE combined.id > $%d", qb.argIndex))
+		qb.args = append(qb.args, *params.afterID)
+		qb.argIndex++
+	} else if params.beforeID != nil {
+		queryBuilder.WriteString(fmt.Sprintf(" WHERE combined.id < $%d", qb.argIndex))
+		qb.args = append(qb.args, *params.beforeID)
+		qb.argIndex++
+	}
+
+	isBackward := params.beforeID != nil
+	effectiveOrder := determineEffectiveOrder(params.order, isBackward)
+
+	if effectiveOrder == sparkpb.Order_ASCENDING {
+		queryBuilder.WriteString(" ORDER BY combined.create_time ASC, combined.id ASC")
 	} else {
-		queryBuilder.WriteString(" ORDER BY combined.create_time DESC")
+		queryBuilder.WriteString(" ORDER BY combined.create_time DESC, combined.id DESC")
 	}
 
 	queryBuilder.WriteString(fmt.Sprintf(" LIMIT $%d", qb.argIndex))
 	qb.args = append(qb.args, params.limit)
 	qb.argIndex++
 
-	if params.offset > 0 {
+	if params.offset > 0 && !params.useCursorPagination {
 		queryBuilder.WriteString(fmt.Sprintf(" OFFSET $%d", qb.argIndex))
 		qb.args = append(qb.args, params.offset)
 	}
@@ -376,16 +400,25 @@ func (h *QueryTokenTransactionsHandler) queryWithEnt(ctx context.Context, params
 		baseQuery = baseQuery.Where(tokentransaction.FinalizedTokenTransactionHashIn(params.tokenTransactionHashes...))
 	}
 
+	if params.afterID != nil {
+		baseQuery = baseQuery.Where(tokentransaction.IDGT(*params.afterID))
+	} else if params.beforeID != nil {
+		baseQuery = baseQuery.Where(tokentransaction.IDLT(*params.beforeID))
+	}
+
+	isBackward := params.beforeID != nil
+	effectiveOrder := determineEffectiveOrder(params.order, isBackward)
+
 	query := baseQuery
-	if params.order == sparkpb.Order_ASCENDING {
-		query = query.Order(ent.Asc(tokentransaction.FieldCreateTime))
+	if effectiveOrder == sparkpb.Order_ASCENDING {
+		query = query.Order(ent.Asc(tokentransaction.FieldCreateTime), ent.Asc(tokentransaction.FieldID))
 	} else {
-		query = query.Order(ent.Desc(tokentransaction.FieldCreateTime))
+		query = query.Order(ent.Desc(tokentransaction.FieldCreateTime), ent.Desc(tokentransaction.FieldID))
 	}
 
 	query = query.Limit(int(params.limit))
 
-	if params.offset > 0 {
+	if params.offset > 0 && !params.useCursorPagination {
 		query = query.Offset(int(params.offset))
 	}
 
@@ -408,8 +441,23 @@ func (h *QueryTokenTransactionsHandler) queryWithEnt(ctx context.Context, params
 
 // convertTransactionsToResponse converts Ent transactions to protobuf response
 func convertTransactionsToResponse(ctx context.Context, config *so.Config, transactions []*ent.TokenTransaction, params *queryParams) (*tokenpb.QueryTokenTransactionsResponse, error) {
-	transactionsWithStatus := make([]*tokenpb.TokenTransactionWithStatus, 0, len(transactions))
-	for _, transaction := range transactions {
+	hasMoreResults := len(transactions) > int(params.limit)
+	isBackward := params.beforeID != nil
+
+	resultTransactions := transactions
+	if hasMoreResults {
+		resultTransactions = transactions[:params.limit]
+	}
+
+	// For backward pagination, reverse the results to restore the original sort order
+	if isBackward {
+		for i, j := 0, len(resultTransactions)-1; i < j; i, j = i+1, j-1 {
+			resultTransactions[i], resultTransactions[j] = resultTransactions[j], resultTransactions[i]
+		}
+	}
+
+	transactionsWithStatus := make([]*tokenpb.TokenTransactionWithStatus, 0, len(resultTransactions))
+	for _, transaction := range resultTransactions {
 		status := protoconverter.ConvertTokenTransactionStatusToTokenPb(transaction.Status)
 
 		transactionProto, err := transaction.MarshalProto(ctx, config)
@@ -439,22 +487,57 @@ func convertTransactionsToResponse(ctx context.Context, config *so.Config, trans
 		transactionsWithStatus = append(transactionsWithStatus, transactionWithStatus)
 	}
 
-	var nextOffset int64
-	if len(transactions) == int(params.limit) {
-		nextOffset = params.offset + int64(len(transactions))
-	} else {
-		nextOffset = -1
+	resp := &tokenpb.QueryTokenTransactionsResponse{
+		TokenTransactionsWithStatus: transactionsWithStatus,
 	}
 
-	return &tokenpb.QueryTokenTransactionsResponse{
-		TokenTransactionsWithStatus: transactionsWithStatus,
-		Offset:                      nextOffset,
-	}, nil
+	if params.useCursorPagination {
+		var hasNextPage, hasPreviousPage bool
+		if isBackward {
+			hasNextPage = params.beforeID != nil
+			hasPreviousPage = hasMoreResults
+		} else {
+			hasNextPage = hasMoreResults
+			hasPreviousPage = params.afterID != nil
+		}
+		pageResponse := &sparkpb.PageResponse{
+			HasNextPage:     hasNextPage,
+			HasPreviousPage: hasPreviousPage,
+		}
+
+		if len(resultTransactions) > 0 {
+			firstID := resultTransactions[0].ID
+			pageResponse.PreviousCursor = base64.RawURLEncoding.EncodeToString(firstID[:])
+
+			lastID := resultTransactions[len(resultTransactions)-1].ID
+			pageResponse.NextCursor = base64.RawURLEncoding.EncodeToString(lastID[:])
+		}
+
+		resp.PageResponse = pageResponse
+	} else {
+		if len(resultTransactions) == int(params.limit) {
+			resp.Offset = params.offset + int64(len(resultTransactions))
+		} else {
+			resp.Offset = -1
+		}
+	}
+
+	return resp, nil
 }
 
 type queryBuilder struct {
 	args     []any
 	argIndex int
+}
+
+func determineEffectiveOrder(requestedOrder sparkpb.Order, isBackward bool) sparkpb.Order {
+	if !isBackward {
+		return requestedOrder
+	}
+	if requestedOrder == sparkpb.Order_ASCENDING {
+		return sparkpb.Order_DESCENDING
+	}
+	return sparkpb.Order_ASCENDING
 }
 
 func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryParams, error) {
@@ -485,7 +568,7 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 			return nil, fmt.Errorf("failed to parse issuer public keys: %w", err)
 		}
 
-		return &queryParams{
+		params := &queryParams{
 			outputIDs:        req.GetByFilters().OutputIds,
 			ownerPublicKeys:  ownerPubKeys,
 			issuerPublicKeys: issuerPubKeys,
@@ -493,7 +576,37 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 			order:            req.GetOrder(),
 			limit:            limit,
 			offset:           req.Offset,
-		}, nil
+		}
+
+		if pageRequest := req.GetByFilters().GetPageRequest(); pageRequest != nil {
+			params.useCursorPagination = true
+			if pageRequest.GetPageSize() > 0 {
+				params.limit = int64(pageRequest.GetPageSize())
+				if params.limit > maxTokenTransactionPageSize {
+					params.limit = maxTokenTransactionPageSize
+				}
+			}
+			if cursor := pageRequest.GetCursor(); cursor != "" {
+				cursorBytes, err := base64.RawURLEncoding.DecodeString(cursor)
+				if err != nil {
+					cursorBytes, err = base64.URLEncoding.DecodeString(cursor)
+					if err != nil {
+						return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid cursor: %w", err))
+					}
+				}
+				id, err := uuid.FromBytes(cursorBytes)
+				if err != nil {
+					return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid cursor: %w", err))
+				}
+				if pageRequest.GetDirection() == sparkpb.Direction_PREVIOUS {
+					params.beforeID = &id
+				} else {
+					params.afterID = &id
+				}
+			}
+		}
+
+		return params, nil
 	}
 
 	ownerPubKeys, err := keys.ParsePublicKeys(req.GetOwnerPublicKeys())

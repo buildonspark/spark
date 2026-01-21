@@ -721,6 +721,11 @@ type QueryTokenTransactionsParams struct {
 	Order             pb.Order
 	Offset            int64
 	Limit             int64
+	// Cursor-based pagination fields (used with by_filters query type)
+	UseCursorPagination bool
+	PageSize            uint32
+	Cursor              string
+	Direction           pb.Direction
 }
 
 // QueryTokenOutputs retrieves the token outputs for the given owner and token public keys.
@@ -799,15 +804,39 @@ func QueryTokenTransactions(
 	// Combine decoded owner public keys with direct owner public keys
 	allOwnerPublicKeys := append(decodedOwnerPublicKeys, params.OwnerPublicKeys...)
 
-	request := &tokenpb.QueryTokenTransactionsRequest{
-		OwnerPublicKeys:        serializeAll(allOwnerPublicKeys),
-		IssuerPublicKeys:       serializeAll(params.IssuerPublicKeys), // Field name change: TokenPublicKeys -> IssuerPublicKeys
-		TokenIdentifiers:       params.TokenIdentifiers,
-		OutputIds:              params.OutputIDs,
-		TokenTransactionHashes: params.TransactionHashes,
-		Order:                  params.Order,
-		Limit:                  params.Limit,
-		Offset:                 params.Offset,
+	var request *tokenpb.QueryTokenTransactionsRequest
+
+	if params.UseCursorPagination {
+		// Use the by_filters query type with cursor-based pagination
+		byFilters := &tokenpb.QueryTokenTransactionsByFilters{
+			OutputIds:        params.OutputIDs,
+			OwnerPublicKeys:  serializeAll(allOwnerPublicKeys),
+			IssuerPublicKeys: serializeAll(params.IssuerPublicKeys),
+			TokenIdentifiers: params.TokenIdentifiers,
+			PageRequest: &pb.PageRequest{
+				PageSize:  params.PageSize,
+				Cursor:    params.Cursor,
+				Direction: params.Direction,
+			},
+		}
+		request = &tokenpb.QueryTokenTransactionsRequest{
+			QueryType: &tokenpb.QueryTokenTransactionsRequest_ByFilters{
+				ByFilters: byFilters,
+			},
+			Order: params.Order,
+		}
+	} else {
+		// Use the legacy query format with offset-based pagination
+		request = &tokenpb.QueryTokenTransactionsRequest{
+			OwnerPublicKeys:        serializeAll(allOwnerPublicKeys),
+			IssuerPublicKeys:       serializeAll(params.IssuerPublicKeys),
+			TokenIdentifiers:       params.TokenIdentifiers,
+			OutputIds:              params.OutputIDs,
+			TokenTransactionHashes: params.TransactionHashes,
+			Order:                  params.Order,
+			Limit:                  params.Limit,
+			Offset:                 params.Offset,
+		}
 	}
 
 	response, err := tokenClient.QueryTokenTransactions(tmpCtx, request)

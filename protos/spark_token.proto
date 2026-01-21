@@ -328,11 +328,14 @@ message QueryTokenTransactionsByFilters {
     repeated bytes issuer_public_keys = 3 [(validate.rules).repeated.items.bytes.len = 33];
     // Returns transactions that are related to this token identifier.
     repeated bytes token_identifiers = 4 [(validate.rules).repeated.items.bytes.len = 32];
+    // For cursor-based pagination
+    spark.PageRequest page_request = 5;
 }
 
 message QueryTokenTransactionsResponse {
     repeated TokenTransactionWithStatus token_transactions_with_status = 1;
     int64 offset = 2;
+    spark.PageResponse page_response = 3;
 }
 
 message OutputWithPreviousTransactionData {
