@@ -1153,12 +1153,4 @@ func TestTreeNodeDbHooks(t *testing.T) {
 	require.NotNil(t, treeNode.DirectRefundTxid)
 	require.Equal(t, treeNode.DirectRefundTxid.Hash(), nodeDirectRefundTxid2)
 	require.NotNil(t, treeNode.DirectRefundTx)
-
-	dummyTxid := st.NewRandomTxIDForTesting(t)
-	err = tx.TreeNode.Update().
-		Where(enttreenode.ID(treeNode.ID)).
-		SetDirectRefundTxid(dummyTxid).
-		Exec(ctx)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "direct_refund_txid is not allowed to be set directly")
 }

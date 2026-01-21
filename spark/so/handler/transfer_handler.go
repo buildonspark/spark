@@ -2381,25 +2381,49 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 
 		leafID := leaf.ID.String()
 
+		// Compute txids from transaction bytes (same logic as ent hooks)
+		rawRefundTx, err := common.TxFromRawTxBytes(job.RefundTxSigningJob.RawTx)
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse raw_refund_tx for leaf %s: %w", leafID, err))
+		}
+		rawRefundTxid := st.NewTxID(rawRefundTx.TxHash())
+
 		// Build upsert for batch update. Since records always exist (queried above),
 		// OnConflict will always UPDATE, never INSERT. We set ID (for matching), all required fields, and the fields we want to update.
-		builders = append(builders,
-			db.TreeNode.Create().
-				SetID(leaf.ID).
-				SetTree(leaf.Edges.Tree).
-				SetNetwork(leaf.Edges.Tree.Network).
-				SetSigningKeyshare(leaf.Edges.SigningKeyshare).
-				SetValue(leaf.Value).
-				SetVerifyingPubkey(leaf.VerifyingPubkey).
-				SetOwnerIdentityPubkey(leaf.OwnerIdentityPubkey).
-				SetOwnerSigningPubkey(leaf.OwnerSigningPubkey).
-				SetRawTx(leaf.RawTx).
-				SetVout(leaf.Vout).
-				SetStatus(leaf.Status).
-				SetRawRefundTx(job.RefundTxSigningJob.RawTx).
-				SetDirectRefundTx(directRefundTx).
-				SetDirectFromCpfpRefundTx(directFromCpfpRefundTx),
-		)
+		builder := db.TreeNode.Create().
+			SetID(leaf.ID).
+			SetTree(leaf.Edges.Tree).
+			SetNetwork(leaf.Edges.Tree.Network).
+			SetSigningKeyshare(leaf.Edges.SigningKeyshare).
+			SetValue(leaf.Value).
+			SetVerifyingPubkey(leaf.VerifyingPubkey).
+			SetOwnerIdentityPubkey(leaf.OwnerIdentityPubkey).
+			SetOwnerSigningPubkey(leaf.OwnerSigningPubkey).
+			SetRawTx(leaf.RawTx).
+			SetVout(leaf.Vout).
+			SetStatus(leaf.Status).
+			SetRawRefundTx(job.RefundTxSigningJob.RawTx).
+			SetRawRefundTxid(rawRefundTxid)
+
+		if directRefundTx != nil {
+			builder = builder.SetDirectRefundTx(directRefundTx)
+			directRefundTxParsed, err := common.TxFromRawTxBytes(directRefundTx)
+			if err != nil {
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse direct_refund_tx for leaf %s: %w", leafID, err))
+			}
+			builder = builder.SetDirectRefundTxid(st.NewTxID(directRefundTxParsed.TxHash()))
+		}
+
+		if directFromCpfpRefundTx != nil {
+			builder = builder.SetDirectFromCpfpRefundTx(directFromCpfpRefundTx)
+			directFromCpfpRefundTxParsed, err := common.TxFromRawTxBytes(directFromCpfpRefundTx)
+			if err != nil {
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse direct_from_cpfp_refund_tx for leaf %s: %w", leafID, err))
+			}
+			builder = builder.SetDirectFromCpfpRefundTxid(st.NewTxID(directFromCpfpRefundTxParsed.TxHash()))
+		}
+
+		builders = append(builders, builder)
 
 		cpfpSigningJob, directSigningJob, directFromCpfpSigningJob, err := h.getRefundTxSigningJobs(ctx, leaf, job.RefundTxSigningJob, job.DirectRefundTxSigningJob, job.DirectFromCpfpRefundTxSigningJob)
 		if err != nil {
@@ -2437,8 +2461,11 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 			OnConflictColumns(enttreenode.FieldID).
 			Update(func(u *ent.TreeNodeUpsert) {
 				u.UpdateRawRefundTx()
+				u.UpdateRawRefundTxid()
 				u.UpdateDirectRefundTx()
+				u.UpdateDirectRefundTxid()
 				u.UpdateDirectFromCpfpRefundTx()
+				u.UpdateDirectFromCpfpRefundTxid()
 			}).
 			Exec(ctx)
 		if err != nil {
