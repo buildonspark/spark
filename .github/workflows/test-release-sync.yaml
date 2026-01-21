@@ -31,15 +31,16 @@ jobs:
           ref: ${{ github.head_ref || github.ref }}
           fetch-depth: 2
 
-      - name: "Fail if JS lockfile would change on main"
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: "Setup Node.js and Yarn"
         uses: ./public/actions/setup-node-yarn-install
         with:
           cwd: "sdks/js"
           enable-corepack: "true"
-          # Fast lockfile-only refresh (skips link step / node_modules install).
           install-mode: "update-lock-only"
-          cache-prefix: "verify-js-lockfile-on-main"
+          # Since we are in update-lock-only mode the resulting yarn cache is much smaller and less useful
+          # for the rest of the steps. But since this is the first step and the cache is restored for each
+          # step in the workflow, they all get the same useless cache unless we set a different prefix here:
+          cache-prefix: "update-lock-file-for-prs"
 
       - name: "Fail if JS lockfile was modified on main"
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -50,18 +51,6 @@ jobs:
             git diff --stat -- sdks/js/yarn.lock
             exit 1
           fi
-
-      - name: "Setup Node.js and Yarn"
-        if: github.event_name == 'pull_request'
-        uses: ./public/actions/setup-node-yarn-install
-        with:
-          cwd: "sdks/js"
-          enable-corepack: "true"
-          install-mode: "update-lock-only"
-          # Since we are in update-lock-only mode the resulting yarn cache is much smaller and less useful
-          # for the rest of the steps. But since this is the first step and the cache is restored for each
-          # step in the workflow, they all get the same useless cache unless we set a different prefix here:
-          cache-prefix: "update-lock-file-for-prs"
 
       - name: "Commit and push changes if modified"
         id: sync-lock-file
