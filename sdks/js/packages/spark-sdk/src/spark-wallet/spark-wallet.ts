@@ -2748,6 +2748,16 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
                 job.receiverIdentityPubkey,
                 job.sparkInvoice,
               );
+
+            const idsToRemove = new Set<string>();
+            for (const leaf of job.leafKeyTweaks) {
+              idsToRemove.add(leaf.leaf.id);
+            }
+            if (idsToRemove.size > 0) {
+              this.leaves = this.leaves.filter(
+                (leaf) => !idsToRemove.has(leaf.id),
+              );
+            }
             const isSelfTransfer = equalBytes(
               signerIdentityPublicKey,
               job.receiverIdentityPubkey,
@@ -2778,20 +2788,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         }),
       );
 
-      const idsToRemove = new Set<string>();
-      for (const outcome of outcomes) {
-        if (outcome.ok) {
-          for (const leaf of outcome.transfer.leaves) {
-            if (leaf.leaf) {
-              idsToRemove.add(leaf.leaf.id);
-            }
-          }
-        }
-      }
-
-      if (idsToRemove.size > 0) {
-        this.leaves = this.leaves.filter((leaf) => !idsToRemove.has(leaf.id));
-      }
       return outcomes;
     });
   }
