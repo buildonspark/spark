@@ -1139,7 +1139,13 @@ func SignRefundsWithPregeneratedNonce(
 		}
 
 		round1Packages := make(map[string]frost.SigningCommitment)
-		for key, commitment := range req.SigningCommitments.SigningCommitments {
+
+		signingCommitments := req.GetSigningCommitments()
+		if signingCommitments == nil {
+			return nil, nil, nil, fmt.Errorf("missing signing_commitments for leaf_id %s", req.LeafId)
+		}
+
+		for key, commitment := range signingCommitments.GetSigningCommitments() {
 			obj := frost.SigningCommitment{}
 			if err := obj.UnmarshalProto(commitment); err != nil {
 				return nil, nil, nil, fmt.Errorf("unable to unmarshal signing commitment: %w", err)
@@ -1199,7 +1205,13 @@ func SignRefundsWithPregeneratedNonce(
 		}
 
 		round1Packages := make(map[string]frost.SigningCommitment)
-		for key, commitment := range req.SigningCommitments.SigningCommitments {
+
+		signingCommitments := req.GetSigningCommitments()
+		if signingCommitments == nil {
+			return nil, nil, nil, fmt.Errorf("missing signing_commitments for leaf_id %s", req.LeafId)
+		}
+
+		for key, commitment := range signingCommitments.GetSigningCommitments() {
 			obj := frost.SigningCommitment{}
 			if err := obj.UnmarshalProto(commitment); err != nil {
 				return nil, nil, nil, fmt.Errorf("unable to unmarshal signing commitment: %w", err)
@@ -1251,7 +1263,13 @@ func SignRefundsWithPregeneratedNonce(
 		}
 
 		round1Packages := make(map[string]frost.SigningCommitment)
-		for key, commitment := range req.GetSigningCommitments().GetSigningCommitments() {
+
+		signingCommitments := req.GetSigningCommitments()
+		if signingCommitments == nil {
+			return nil, nil, nil, fmt.Errorf("missing signing_commitments for leaf_id %s", req.LeafId)
+		}
+
+		for key, commitment := range signingCommitments.GetSigningCommitments() {
 			obj := frost.SigningCommitment{}
 			if err := obj.UnmarshalProto(commitment); err != nil {
 				return nil, nil, nil, fmt.Errorf("unable to unmarshal signing commitment: %w", err)
