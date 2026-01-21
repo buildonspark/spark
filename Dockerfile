@@ -70,7 +70,7 @@ RUN rustup target add "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu"
 RUN cargo build --target "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu" --release
 
 
-FROM --platform=$BUILDPLATFORM arigaio/atlas:0.37.0 AS atlas
+FROM --platform=$BUILDPLATFORM arigaio/atlas:1.0.0-community AS atlas
 
 FROM debian:bookworm-slim AS final
 
