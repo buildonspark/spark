@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
@@ -280,6 +281,79 @@ func TestValidateOutputWithdrawable_AlreadyWithdrawnOnChain(t *testing.T) {
 	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "already withdrawn on-chain")
+}
+
+func TestValidateOutputWithdrawable_ActiveSpendingTransaction(t *testing.T) {
+	sparkTxHash := make([]byte, 32)
+	key := sparkTxHashVoutKey(sparkTxHash, 0)
+
+	// Create an active (non-expired) spending transaction in Started status
+	spendingTx := &ent.TokenTransaction{
+		ID:                      uuid.New(),
+		Status:                  schematype.TokenTransactionStatusStarted,
+		Version:                 3,
+		ClientCreatedTimestamp:  time.Now(), // Not expired
+		ValidityDurationSeconds: 3600,       // 1 hour validity
+	}
+
+	tokenOutput := &ent.TokenOutput{
+		ID:     uuid.New(),
+		Status: schematype.TokenOutputStatusSpentSigned, // Non-spendable status
+		Edges: ent.TokenOutputEdges{
+			OutputSpentTokenTransaction: spendingTx,
+		},
+	}
+
+	tokenOutputMap := map[string]*ent.TokenOutput{
+		key: tokenOutput,
+	}
+	withdrawnInBlock := make(map[string]struct{})
+
+	output := parsedOutputWithdrawal{
+		sparkTxHash: sparkTxHash,
+		sparkTxVout: 0,
+	}
+
+	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spending transaction in progress")
+}
+
+func TestValidateOutputWithdrawable_ExpiredSpendingTransaction(t *testing.T) {
+	sparkTxHash := make([]byte, 32)
+	key := sparkTxHashVoutKey(sparkTxHash, 0)
+
+	// Create an expired spending transaction
+	spendingTx := &ent.TokenTransaction{
+		ID:                      uuid.New(),
+		Status:                  schematype.TokenTransactionStatusStarted,
+		Version:                 3,
+		ClientCreatedTimestamp:  time.Now().Add(-2 * time.Hour), // Created 2 hours ago
+		ValidityDurationSeconds: 3600,                           // 1 hour validity - expired
+	}
+
+	tokenOutput := &ent.TokenOutput{
+		ID:     uuid.New(),
+		Status: schematype.TokenOutputStatusSpentSigned, // Non-spendable status
+		Edges: ent.TokenOutputEdges{
+			OutputSpentTokenTransaction: spendingTx,
+		},
+	}
+
+	tokenOutputMap := map[string]*ent.TokenOutput{
+		key: tokenOutput,
+	}
+	withdrawnInBlock := make(map[string]struct{})
+
+	output := parsedOutputWithdrawal{
+		sparkTxHash: sparkTxHash,
+		sparkTxVout: 0,
+	}
+
+	// Expired transaction should allow withdrawal
+	result, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
+	require.NoError(t, err)
+	assert.Equal(t, tokenOutput, result)
 }
 
 func TestValidateWithdrawalTxOutput_Success(t *testing.T) {

@@ -326,7 +326,10 @@ func validateOutputWithdrawable(
 				spentTx.Status == schematype.TokenTransactionStatusFinalized {
 				return nil, fmt.Errorf("output cannot be withdrawn: already spent by finalized transaction")
 			}
+			// Transaction is active but not finalized - block withdrawal until it expires or finalizes
+			return nil, fmt.Errorf("output cannot be withdrawn: spending transaction in progress (status: %s)", spentTx.Status)
 		}
+		// Transaction has expired - allow withdrawal to proceed
 	}
 
 	// Check if already withdrawn on-chain
