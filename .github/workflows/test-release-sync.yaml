@@ -21,7 +21,7 @@ jobs:
       contents: write
       pull-requests: write
     outputs:
-      VERIFIED_LOCK_COMMIT: ${{ steps.verified-lock-commit.outputs.VERIFIED_LOCK_COMMIT }}
+      VERIFIED_LOCK_COMMIT: ${{ steps.sync-lock-file.outputs.VERIFIED_LOCK_COMMIT }}
     steps:
       - name: "Checkout"
         uses: "actions/checkout@v4"
@@ -34,44 +34,30 @@ jobs:
       - name: "Setup Node.js and Yarn"
         uses: ./public/actions/setup-node-yarn-install
         with:
-          cwd: "sdks/js"
-          enable-corepack: "true"
+          cwd: "."
           install-mode: "update-lock-only"
           # Since we are in update-lock-only mode the resulting yarn cache is much smaller and less useful
           # for the rest of the steps. But since this is the first step and the cache is restored for each
           # step in the workflow, they all get the same useless cache unless we set a different prefix here:
           cache-prefix: "update-lock-file-for-prs"
 
-      - name: "Fail if JS lockfile was modified on main"
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          if ! git diff --quiet -- sdks/js/yarn.lock; then
-            echo "sdks/js/yarn.lock would be modified on main."
-            echo "This should be handled by the JS SDK lockfile maintenance workflow (opens a PR)."
-            git diff --stat -- sdks/js/yarn.lock
-            exit 1
-          fi
-
       - name: "Commit and push changes if modified"
         id: sync-lock-file
-        if: github.event_name == 'pull_request'
         run: |
-          git config --global user.name 'Lightspark Eng'
-          git config --global user.email 'engineering@lightspark.com'
-          git add sdks/js/yarn.lock
-
-          if git diff --cached --quiet; then
-            echo "No JS SDK lockfile changes to commit."
-            exit 0
+          # On pushes to main, the checkout can be in a detached HEAD state and changes are initially
+          # unstaged. Use GitHub's ref and a working-tree diff against HEAD to detect modifications.
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]] && ! git diff --quiet HEAD; then
+            echo "Lock file must not be modified by CI on main branch."
+            exit 1;
           fi
 
-          git commit -nm "CI update lock file for PR"
+          git config --global user.name 'Lightspark Eng'
+          git config --global user.email 'engineering@lightspark.com'
+          git add -A
+          git diff-index --quiet HEAD || git commit -nm "CI update lock file for PR"
           git push
-
-      - name: "Set verified lock commit"
-        id: verified-lock-commit
-        run: |
-          echo "VERIFIED_LOCK_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "$(git rev-parse HEAD)"
+          echo "VERIFIED_LOCK_COMMIT=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
   test:
     # Wait to see if the lock file should be updated before running checks:
@@ -91,15 +77,6 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: "Fail if CI modified files on main"
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          if [[ -n "$(git status --porcelain)" ]]; then
-            echo "CI produced git changes on main; refusing."
-            git status --porcelain
-            exit 1
-          fi
 
       - name: "Notify failure on Slack"
         if: failure() && github.event_name == 'push'
@@ -129,20 +106,9 @@ jobs:
         uses: ./public/actions/setup-node-yarn-install
         with:
           node-version: ${{ matrix.node-version }}
-          cwd: "sdks/js"
-          enable-corepack: "true"
+          cwd: "."
 
       - run: "yarn build"
-        working-directory: "sdks/js"
-
-      - name: "Fail if CI modified files on main"
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          if [[ -n "$(git status --porcelain)" ]]; then
-            echo "CI produced git changes on main; refusing."
-            git status --porcelain
-            exit 1
-          fi
 
       - name: "Notify failure on Slack"
         if: failure() && github.event_name == 'push'
@@ -169,15 +135,13 @@ jobs:
       - name: Setup Node.js and Yarn
         uses: ./public/actions/setup-node-yarn-install
         with:
-          cwd: "sdks/js"
-          enable-corepack: "true"
+          cwd: "."
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
         uses: changesets/action@v1
         with:
           # This expects you to have a script called release which does a build for your packages and calls changeset publish
-          cwd: sdks/js
           publish: yarn release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -190,8 +154,7 @@ jobs:
         if: steps.changesets.outputs.published == 'false' && github.ref == 'refs/heads/main'
         uses: ./public/actions/setup-node-yarn-install
         with:
-          cwd: "sdks/js"
-          enable-corepack: "true"
+          cwd: "."
           install-mode: "update-lock-only"
 
       # check if previous step updated the lock file and commit and push if so:

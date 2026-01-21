@@ -47,6 +47,7 @@ import (
 
 const (
 	LightningPaymentExpiryDuration = 16 * 24 * time.Hour
+	LightningReceiveExpiryDuration = 4 * time.Hour
 	HTLCSequenceOffset             = 30
 	DirectSequenceOffset           = 15
 )
@@ -1077,13 +1078,27 @@ func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pbsp
 
 // InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
 func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
-	expireTimeOverride := time.Now().Add(LightningPaymentExpiryDuration)
-	return h.initiatePreimageSwap(ctx, req, true, &expireTimeOverride)
+	var expireTimeOverride *time.Time
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
+		t := time.Now().Add(LightningPaymentExpiryDuration)
+		expireTimeOverride = &t
+	} else {
+		t := time.Now().Add(LightningReceiveExpiryDuration)
+		expireTimeOverride = &t
+	}
+	return h.initiatePreimageSwap(ctx, req, true, expireTimeOverride)
 }
 
 func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
-	expireTimeOverride := time.Now().Add(LightningPaymentExpiryDuration)
-	return h.initiatePreimageSwap(ctx, req, false, &expireTimeOverride)
+	var expireTimeOverride *time.Time
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
+		t := time.Now().Add(LightningPaymentExpiryDuration)
+		expireTimeOverride = &t
+	} else {
+		t := time.Now().Add(LightningReceiveExpiryDuration)
+		expireTimeOverride = &t
+	}
+	return h.initiatePreimageSwap(ctx, req, false, expireTimeOverride)
 }
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
@@ -1128,9 +1143,11 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		}
 		preimageShare, err = tx.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
-		}
-		if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
+			if !ent.IsNotFound(err) {
+				return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
+			}
+			// preimageShare remains nil for HODL invoices in lightning receive flow
+		} else if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
 			return nil, fmt.Errorf("preimage share owner identity public key mismatch for payment hash: %x", req.PaymentHash)
 		}
 	}
@@ -1199,9 +1216,8 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		directFromCpfpLeafRefundMap[directFromCpfpTransaction.LeafId] = directFromCpfpTransaction.RawTx
 	}
 
-	// Only override expiry time for send preimage swap.
-	// Receive preimage swap has no expiry time, so we don't need to override it.
-	if expireTimeOverride != nil && req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
+	// Receive preimage swap only has expiry time when it is HODL invoice.
+	if expireTimeOverride != nil && (req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND || preimageShare == nil) {
 		req.Transfer.ExpiryTime = timestamppb.New(*expireTimeOverride)
 		if req.TransferRequest != nil {
 			req.TransferRequest.ExpiryTime = timestamppb.New(*expireTimeOverride)
@@ -1281,7 +1297,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 
 	// TODO: Remove this once SSP has removed the query user refund call.
 	var status st.PreimageRequestStatus
-	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && preimageShare != nil {
 		status = st.PreimageRequestStatusPreimageShared
 	} else {
 		status = st.PreimageRequestStatusWaitingForPreimage
@@ -1398,9 +1414,11 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage gossip message for payment hash %x", req.PaymentHash)
 	}
 
-	err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
+	if preimageShare != nil {
+		err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
+		}
 	}
 
 	if req.TransferRequest != nil {
