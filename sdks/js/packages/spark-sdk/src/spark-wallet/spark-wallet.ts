@@ -1,5 +1,5 @@
-import { CurrencyUnit, isObject } from "@lightsparkdev/core";
-import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import { CurrencyUnit } from "@lightsparkdev/core";
+import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
   bytesToNumberBE,
@@ -7,11 +7,20 @@ import {
   hexToBytes,
   numberToVarBytesBE,
 } from "@noble/curves/utils";
+import { sha256 } from "@noble/hashes/sha2";
+import { type Tracer } from "@opentelemetry/api";
+import {
+  ConsoleSpanExporter,
+  SimpleSpanProcessor,
+  SpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
-import { Address, OutScript, SigHash, Transaction } from "@scure/btc-signer";
+import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { Mutex } from "async-mutex";
+import { EventEmitter } from "eventemitter3";
+import { ClientError, Status } from "nice-grpc-common";
 import { uuidv7, uuidv7obj } from "uuidv7";
 import { isReactNative } from "../constants.js";
 import {
@@ -43,6 +52,8 @@ import {
 import {
   ConnectedEvent,
   DepositAddressQueryResult,
+  Network as NetworkProto,
+  networkToJSON,
   PreimageRequestRole,
   PreimageRequestStatus,
   QueryHtlcResponse,
@@ -59,72 +70,35 @@ import {
   UtxoSwapRequestType,
 } from "../proto/spark.js";
 import {
-  createSenderSpendTx,
-  createReceiverSpendTx,
-} from "../utils/htlc-transactions.js";
-import {
-  QueryTokenTransactionsResponse,
   OutputWithPreviousTransactionData,
+  QueryTokenTransactionsResponse,
 } from "../proto/spark_token.js";
+import {
+  decodeInvoice,
+  getNetworkFromInvoice,
+  isValidSparkFallback,
+} from "../services/bolt11-spark.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection/connection.js";
 import { CoopExitService } from "../services/coop-exit.js";
 import { DepositService } from "../services/deposit.js";
 import { LightningService } from "../services/lightning.js";
+import { SigningService } from "../services/signing.js";
+import { TokenOutputManager } from "../services/tokens/output-manager.js";
 import {
   MAX_TOKEN_OUTPUTS_TX,
   TokenTransactionService,
 } from "../services/tokens/token-transactions.js";
-import { TokenOutputManager } from "../services/tokens/output-manager.js";
 import type { LeafKeyTweak } from "../services/transfer.js";
 import { TransferService } from "../services/transfer.js";
 import {
   ConfigOptions,
   ELECTRS_CREDENTIALS,
 } from "../services/wallet-config.js";
-import {
-  applyAdaptorToSignature,
-  generateAdaptorFromSignature,
-  generateSignatureFromExistingAdaptor,
-} from "../utils/adaptor-signature.js";
-import {
-  computeTaprootKeyNoScript,
-  getP2TRScriptFromPublicKey,
-  getP2WPKHAddressFromPublicKey,
-  getSigHashFromTx,
-  getTxEstimatedVbytesSizeByNumberOfInputsOutputs,
-  getTxFromRawTxBytes,
-  getTxFromRawTxHex,
-  getTxId,
-} from "../utils/bitcoin.js";
-import { HashSparkInvoice } from "../utils/invoice-hashing.js";
-import {
-  getNetwork,
-  Network,
-  NetworkToProto,
-  NetworkType,
-} from "../utils/network.js";
-import { sumAvailableTokens } from "../utils/token-transactions.js";
-import { doesTxnNeedRenewed, isZeroTimelock } from "../utils/transaction.js";
-import { sha256 } from "@noble/hashes/sha2";
-import { type Tracer } from "@opentelemetry/api";
-import {
-  ConsoleSpanExporter,
-  SimpleSpanProcessor,
-  SpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
-import { EventEmitter } from "eventemitter3";
-import { ClientError, Status } from "nice-grpc-common";
-import { Network as NetworkProto, networkToJSON } from "../proto/spark.js";
-import {
-  decodeInvoice,
-  getNetworkFromInvoice,
-  isValidSparkFallback,
-} from "../services/bolt11-spark.js";
-import { SigningService } from "../services/signing.js";
 import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
 import { KeyDerivation, KeyDerivationType } from "../signer/types.js";
 import { BitcoinFaucet } from "../tests/utils/test-faucet.js";
+import { Interval } from "../types/index.js";
 import {
   mapSettingsProtoToWalletSettings,
   mapTransferToWalletTransfer,
@@ -135,6 +109,11 @@ import {
   WalletTransfer,
 } from "../types/sdk-types.js";
 import {
+  applyAdaptorToSignature,
+  generateAdaptorFromSignature,
+  generateSignatureFromExistingAdaptor,
+} from "../utils/adaptor-signature.js";
+import {
   decodeSparkAddress,
   encodeSparkAddress,
   encodeSparkAddressWithSignature,
@@ -143,9 +122,30 @@ import {
   SparkAddressFormat,
   validateSparkInvoiceFields,
 } from "../utils/address.js";
+import {
+  computeTaprootKeyNoScript,
+  getP2TRScriptFromPublicKey,
+  getP2WPKHAddressFromPublicKey,
+  getSigHashFromTx,
+  getTxEstimatedVbytesSizeByNumberOfInputsOutputs,
+  getTxFromRawTxBytes,
+  getTxFromRawTxHex,
+  getTxId,
+} from "../utils/bitcoin.js";
 import { chunkArray } from "../utils/chunkArray.js";
 import { getFetch } from "../utils/fetch.js";
+import {
+  createReceiverSpendTx,
+  createSenderSpendTx,
+} from "../utils/htlc-transactions.js";
+import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import { addPublicKeys } from "../utils/keys.js";
+import {
+  getNetwork,
+  Network,
+  NetworkToProto,
+  NetworkType,
+} from "../utils/network.js";
 import { optimize, shouldOptimize } from "../utils/optimize.js";
 import { RetryContext, withRetry } from "../utils/retry.js";
 import {
@@ -153,14 +153,16 @@ import {
   decodeBech32mTokenIdentifier,
   encodeBech32mTokenIdentifier,
 } from "../utils/token-identifier.js";
+import { sumAvailableTokens } from "../utils/token-transactions.js";
+import { doesTxnNeedRenewed, isZeroTimelock } from "../utils/transaction.js";
 import type {
   CreateHTLCParams,
   CreateLightningInvoiceParams,
   DepositParams,
   FulfillSparkInvoiceResponse,
   GroupSparkInvoicesResult,
-  InitWalletResponse,
   HandlePublicMethodErrorParams,
+  InitWalletResponse,
   InvalidInvoice,
   PayLightningInvoiceParams,
   SparkWalletEvents,
@@ -177,7 +179,6 @@ import type {
   WithdrawParams,
 } from "./types.js";
 import { SparkWalletEvent } from "./types.js";
-import { Interval } from "../types/index.js";
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
@@ -2791,7 +2792,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
 
       await this.withLeaves(async () => {
-        this.leaves.push(...nodes);
+        const availableNodes = nodes.filter(
+          (node) => node.status === "AVAILABLE",
+        );
+
+        this.leaves.push(...availableNodes);
       });
 
       return nodes;
