@@ -843,15 +843,21 @@ func markDepositAsAvailable(
 		Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(signingKeyShare.ID))).
 		// FIXME(mhr): Unblocking deployment. Is this what we should do if we encounter a tree node that
 		// has already been marked available (e.g. through `FinalizeNodeSignatures`)?
-		Where(treenode.StatusEQ(st.TreeNodeStatusCreating)).
+		Where(treenode.StatusIn(st.TreeNodeStatusCreating, st.TreeNodeStatusAvailable)).
 		Only(ctx)
 	if ent.IsNotFound(err) {
-		logger.Sugar().Infof("Deposit confirmed before tree creation or tree already available for address %s", deposit.Address)
-		// Since the deposit is already available, mark it to avoid future runs
-		return markDepositAddressUTXOConfirmed(ctx, dbClient, deposit)
+		logger.Sugar().Warnf("tree not found in available or creating status for %s", deposit.Address)
+		return fmt.Errorf("no tree found for deposit address")
+	}
+	if ent.IsNotSingular(err) {
+		logger.Sugar().Warnf("tree has multiple nodes in CREATING and AVAILABLE for %s", deposit.Address)
+		return fmt.Errorf("multiple nodes found for deposit address")
 	}
 	if err != nil {
 		return err
+	}
+	if treeNode.Status == st.TreeNodeStatusAvailable {
+		return markDepositAddressUTXOConfirmed(ctx, dbClient, deposit)
 	}
 	logger.Sugar().Infof("Found tree node %s", treeNode.ID)
 	if treeNode.Status != st.TreeNodeStatusCreating {
