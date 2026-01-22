@@ -351,6 +351,13 @@ func (h *BaseTransferHandler) createTransfer(
 		if primaryTransfer.TotalValue != counterTransferAmount {
 			return nil, nil, fmt.Errorf("primary swap transfer %s amount %d does not match counter transfer amount %d", primaryTransferId.String(), primaryTransfer.TotalValue, counterTransferAmount)
 		}
+		// Validate that the parties in the Swap V3 counter transfer are the reverse of the primary transfer to ensure atomic swap correctness
+		if !primaryTransfer.SenderIdentityPubkey.Equals(receiverIdentityPubKey) {
+			return nil, nil, fmt.Errorf("counter transfer receiver must be the primary transfer sender: expected %s, got %s", primaryTransfer.SenderIdentityPubkey, receiverIdentityPubKey)
+		}
+		if !primaryTransfer.ReceiverIdentityPubkey.Equals(senderIdentityPubKey) {
+			return nil, nil, fmt.Errorf("counter transfer sender must be the primary transfer receiver: expected %s, got %s", primaryTransfer.ReceiverIdentityPubkey, senderIdentityPubKey)
+		}
 	}
 
 	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeSwap || transferType == st.TransferTypeCounterSwap || transferType == st.TransferTypePrimarySwapV3 || transferType == st.TransferTypeCounterSwapV3 || transferType == st.TransferTypeCooperativeExit {
