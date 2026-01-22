@@ -1,6 +1,6 @@
 FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS builder-go
 
-ARG TARGETOS TARGETARCH
+ARG TARGETOS TARGETARCH BUILDARCH
 ARG DEBUG=0
 ARG GOFLAGS
 
@@ -8,7 +8,20 @@ ENV GOOS=$TARGETOS
 ENV GOARCH=$TARGETARCH
 ENV GOFLAGS=$GOFLAGS
 
-RUN apt-get update && apt-get install -y libzmq3-dev wget && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install cross-compilation dependencies
+RUN dpkg --add-architecture arm64 && dpkg --add-architecture amd64 && \
+    apt-get update && \
+    apt-get install -y wget && \
+    if [ "$BUILDARCH" != "$TARGETARCH" ]; then \
+      if [ "$TARGETARCH" = "arm64" ]; then \
+        apt-get install -y gcc-aarch64-linux-gnu libzmq3-dev:arm64; \
+      elif [ "$TARGETARCH" = "amd64" ]; then \
+        apt-get install -y gcc-x86-64-linux-gnu libzmq3-dev:amd64; \
+      fi; \
+    else \
+      apt-get install -y libzmq3-dev; \
+    fi && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
@@ -22,6 +35,20 @@ COPY spark spark
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
+    export CGO_ENABLED=1; \
+    if [ "$BUILDARCH" != "$TARGETARCH" ]; then \
+      if [ "$TARGETARCH" = "amd64" ]; then \
+        export CC=x86_64-linux-gnu-gcc CXX=x86_64-linux-gnu-g++; \
+        export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig; \
+        export CGO_CFLAGS="-I/usr/include -I/usr/include/x86_64-linux-gnu"; \
+        export CGO_LDFLAGS="-L/usr/lib/x86_64-linux-gnu"; \
+      elif [ "$TARGETARCH" = "arm64" ]; then \
+        export CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++; \
+        export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig; \
+        export CGO_CFLAGS="-I/usr/include -I/usr/include/aarch64-linux-gnu"; \
+        export CGO_LDFLAGS="-L/usr/lib/aarch64-linux-gnu"; \
+      fi; \
+    fi && \
     if [ "$DEBUG" = "1" ]; then \
       cd spark && go build -gcflags="all=-N -l" -o /go/bin/spark-operator ./bin/operator ; \
     else \
