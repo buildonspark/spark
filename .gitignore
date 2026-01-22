@@ -52,5 +52,5 @@ _data/
 # Claude Code thoughts/plans
 /thoughts/
 
-# Trunk configuration
-/.trunk
+# Tilt
+tilt/tilt_config.json
