@@ -22,6 +22,7 @@ const (
 	SparkTokenInternalService_PrepareTransaction_FullMethodName                   = "/spark_token.SparkTokenInternalService/prepare_transaction"
 	SparkTokenInternalService_SignTokenTransactionFromCoordination_FullMethodName = "/spark_token.SparkTokenInternalService/sign_token_transaction_from_coordination"
 	SparkTokenInternalService_ExchangeRevocationSecretsShares_FullMethodName      = "/spark_token.SparkTokenInternalService/exchange_revocation_secrets_shares"
+	SparkTokenInternalService_BroadcastTokenTransactionInternal_FullMethodName    = "/spark_token.SparkTokenInternalService/broadcast_token_transaction_internal"
 )
 
 // SparkTokenInternalServiceClient is the client API for SparkTokenInternalService service.
@@ -36,6 +37,8 @@ type SparkTokenInternalServiceClient interface {
 	// Once an SO has all the revocation secret shares, it can finalize the
 	// transaction.
 	ExchangeRevocationSecretsShares(ctx context.Context, in *ExchangeRevocationSecretsSharesRequest, opts ...grpc.CallOption) (*ExchangeRevocationSecretsSharesResponse, error)
+	// Combined prepare and sign transaction (SO-to-SO) for broadcast flow
+	BroadcastTokenTransactionInternal(ctx context.Context, in *BroadcastTransactionInternalRequest, opts ...grpc.CallOption) (*BroadcastTransactionInternalResponse, error)
 }
 
 type sparkTokenInternalServiceClient struct {
@@ -76,6 +79,16 @@ func (c *sparkTokenInternalServiceClient) ExchangeRevocationSecretsShares(ctx co
 	return out, nil
 }
 
+func (c *sparkTokenInternalServiceClient) BroadcastTokenTransactionInternal(ctx context.Context, in *BroadcastTransactionInternalRequest, opts ...grpc.CallOption) (*BroadcastTransactionInternalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BroadcastTransactionInternalResponse)
+	err := c.cc.Invoke(ctx, SparkTokenInternalService_BroadcastTokenTransactionInternal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkTokenInternalServiceServer is the server API for SparkTokenInternalService service.
 // All implementations must embed UnimplementedSparkTokenInternalServiceServer
 // for forward compatibility.
@@ -88,6 +101,8 @@ type SparkTokenInternalServiceServer interface {
 	// Once an SO has all the revocation secret shares, it can finalize the
 	// transaction.
 	ExchangeRevocationSecretsShares(context.Context, *ExchangeRevocationSecretsSharesRequest) (*ExchangeRevocationSecretsSharesResponse, error)
+	// Combined prepare and sign transaction (SO-to-SO) for broadcast flow
+	BroadcastTokenTransactionInternal(context.Context, *BroadcastTransactionInternalRequest) (*BroadcastTransactionInternalResponse, error)
 	mustEmbedUnimplementedSparkTokenInternalServiceServer()
 }
 
@@ -106,6 +121,9 @@ func (UnimplementedSparkTokenInternalServiceServer) SignTokenTransactionFromCoor
 }
 func (UnimplementedSparkTokenInternalServiceServer) ExchangeRevocationSecretsShares(context.Context, *ExchangeRevocationSecretsSharesRequest) (*ExchangeRevocationSecretsSharesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExchangeRevocationSecretsShares not implemented")
+}
+func (UnimplementedSparkTokenInternalServiceServer) BroadcastTokenTransactionInternal(context.Context, *BroadcastTransactionInternalRequest) (*BroadcastTransactionInternalResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BroadcastTokenTransactionInternal not implemented")
 }
 func (UnimplementedSparkTokenInternalServiceServer) mustEmbedUnimplementedSparkTokenInternalServiceServer() {
 }
@@ -183,6 +201,24 @@ func _SparkTokenInternalService_ExchangeRevocationSecretsShares_Handler(srv inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkTokenInternalService_BroadcastTokenTransactionInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BroadcastTransactionInternalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkTokenInternalServiceServer).BroadcastTokenTransactionInternal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkTokenInternalService_BroadcastTokenTransactionInternal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkTokenInternalServiceServer).BroadcastTokenTransactionInternal(ctx, req.(*BroadcastTransactionInternalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkTokenInternalService_ServiceDesc is the grpc.ServiceDesc for SparkTokenInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -201,6 +237,10 @@ var SparkTokenInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "exchange_revocation_secrets_shares",
 			Handler:    _SparkTokenInternalService_ExchangeRevocationSecretsShares_Handler,
+		},
+		{
+			MethodName: "broadcast_token_transaction_internal",
+			Handler:    _SparkTokenInternalService_BroadcastTokenTransactionInternal_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -71,3 +71,9 @@ func (s *SparkTokenInternalServer) ExchangeRevocationSecretsShares(
 	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 	return internalTokenTransactionHandler.ExchangeRevocationSecretsShares(ctx, req)
 }
+
+func (s *SparkTokenInternalServer) BroadcastTokenTransactionInternal(ctx context.Context, req *tokeninternalpb.BroadcastTransactionInternalRequest) (*tokeninternalpb.BroadcastTransactionInternalResponse, error) {
+	internalTokenTransactionHandler := tokens.NewInternalBroadcastTokenHandler(s.soConfig)
+	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
+	return internalTokenTransactionHandler.BroadcastTokenTransactionInternal(ctx, req)
+}

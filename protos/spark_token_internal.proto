@@ -24,13 +24,19 @@ service SparkTokenInternalService {
     rpc exchange_revocation_secrets_shares(
         ExchangeRevocationSecretsSharesRequest)
         returns (ExchangeRevocationSecretsSharesResponse) {}
+
+    // Combined prepare and sign transaction (SO-to-SO) for broadcast flow
+    rpc broadcast_token_transaction_internal(BroadcastTransactionInternalRequest)
+        returns (BroadcastTransactionInternalResponse) {}
 }
 
 message PrepareTransactionRequest {
     spark_token.TokenTransaction final_token_transaction = 1;
     repeated spark_token.SignatureWithIndex
         token_transaction_signatures = 2;
-    repeated string keyshare_ids = 3;
+    repeated string keyshare_ids = 3 [
+        (validate.rules).repeated.items.string.uuid = true
+    ];
     bytes coordinator_public_key = 4;
 }
 
@@ -108,4 +114,22 @@ message UnencodedTokenIdentifier {
     spark.Network network = 8 [(validate.rules).enum.defined_only = true];
     bytes creation_entity_public_key = 9 [(validate.rules).bytes.len = 33];
     optional bytes extra_metadata = 10 [(validate.rules).bytes = {max_len: 1024}];
+}
+message BroadcastTransactionInternalRequest {
+    // TODO: After the switch to require V3+ transactions, stop accepting the legacy tx shape in favor of the new Partial/Final shapes.
+    spark_token.TokenTransaction final_token_transaction = 1;
+    repeated spark_token.SignatureWithIndex
+        token_transaction_signatures = 2;
+    repeated string keyshare_ids = 3 [
+        (validate.rules).repeated.items.string.uuid = true
+    ];
+    bytes coordinator_public_key = 4  [(validate.rules).bytes.len = 33];
+}
+
+message BroadcastTransactionInternalResponse {
+    // The signature from this SO
+    bytes spark_operator_signature = 1 [
+        (validate.rules).bytes.min_len = 64,
+        (validate.rules).bytes.max_len = 73
+    ];
 }

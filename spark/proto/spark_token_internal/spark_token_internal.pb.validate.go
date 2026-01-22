@@ -39,6 +39,9 @@ var (
 	_ = spark.Network(0)
 )
 
+// define the regex for a UUID once up-front
+var _spark_token_internal_uuidPattern = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
 // Validate checks the field values on PrepareTransactionRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -124,10 +127,35 @@ func (m *PrepareTransactionRequest) validate(all bool) error {
 
 	}
 
+	for idx, item := range m.GetKeyshareIds() {
+		_, _ = idx, item
+
+		if err := m._validateUuid(item); err != nil {
+			err = PrepareTransactionRequestValidationError{
+				field:  fmt.Sprintf("KeyshareIds[%v]", idx),
+				reason: "value must be a valid UUID",
+				cause:  err,
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
 	// no validation rules for CoordinatorPublicKey
 
 	if len(errors) > 0 {
 		return PrepareTransactionRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *PrepareTransactionRequest) _validateUuid(uuid string) error {
+	if matched := _spark_token_internal_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
 	}
 
 	return nil
@@ -1712,3 +1740,323 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = UnencodedTokenIdentifierValidationError{}
+
+// Validate checks the field values on BroadcastTransactionInternalRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *BroadcastTransactionInternalRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on BroadcastTransactionInternalRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// BroadcastTransactionInternalRequestMultiError, or nil if none found.
+func (m *BroadcastTransactionInternalRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *BroadcastTransactionInternalRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetFinalTokenTransaction()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, BroadcastTransactionInternalRequestValidationError{
+					field:  "FinalTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, BroadcastTransactionInternalRequestValidationError{
+					field:  "FinalTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetFinalTokenTransaction()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return BroadcastTransactionInternalRequestValidationError{
+				field:  "FinalTokenTransaction",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	for idx, item := range m.GetTokenTransactionSignatures() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, BroadcastTransactionInternalRequestValidationError{
+						field:  fmt.Sprintf("TokenTransactionSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, BroadcastTransactionInternalRequestValidationError{
+						field:  fmt.Sprintf("TokenTransactionSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return BroadcastTransactionInternalRequestValidationError{
+					field:  fmt.Sprintf("TokenTransactionSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	for idx, item := range m.GetKeyshareIds() {
+		_, _ = idx, item
+
+		if err := m._validateUuid(item); err != nil {
+			err = BroadcastTransactionInternalRequestValidationError{
+				field:  fmt.Sprintf("KeyshareIds[%v]", idx),
+				reason: "value must be a valid UUID",
+				cause:  err,
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if len(m.GetCoordinatorPublicKey()) != 33 {
+		err := BroadcastTransactionInternalRequestValidationError{
+			field:  "CoordinatorPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return BroadcastTransactionInternalRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *BroadcastTransactionInternalRequest) _validateUuid(uuid string) error {
+	if matched := _spark_token_internal_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// BroadcastTransactionInternalRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// BroadcastTransactionInternalRequest.ValidateAll() if the designated
+// constraints aren't met.
+type BroadcastTransactionInternalRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m BroadcastTransactionInternalRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m BroadcastTransactionInternalRequestMultiError) AllErrors() []error { return m }
+
+// BroadcastTransactionInternalRequestValidationError is the validation error
+// returned by BroadcastTransactionInternalRequest.Validate if the designated
+// constraints aren't met.
+type BroadcastTransactionInternalRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e BroadcastTransactionInternalRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e BroadcastTransactionInternalRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e BroadcastTransactionInternalRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e BroadcastTransactionInternalRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e BroadcastTransactionInternalRequestValidationError) ErrorName() string {
+	return "BroadcastTransactionInternalRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e BroadcastTransactionInternalRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sBroadcastTransactionInternalRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = BroadcastTransactionInternalRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = BroadcastTransactionInternalRequestValidationError{}
+
+// Validate checks the field values on BroadcastTransactionInternalResponse
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *BroadcastTransactionInternalResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on BroadcastTransactionInternalResponse
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// BroadcastTransactionInternalResponseMultiError, or nil if none found.
+func (m *BroadcastTransactionInternalResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *BroadcastTransactionInternalResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if l := len(m.GetSparkOperatorSignature()); l < 64 || l > 73 {
+		err := BroadcastTransactionInternalResponseValidationError{
+			field:  "SparkOperatorSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return BroadcastTransactionInternalResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// BroadcastTransactionInternalResponseMultiError is an error wrapping multiple
+// validation errors returned by
+// BroadcastTransactionInternalResponse.ValidateAll() if the designated
+// constraints aren't met.
+type BroadcastTransactionInternalResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m BroadcastTransactionInternalResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m BroadcastTransactionInternalResponseMultiError) AllErrors() []error { return m }
+
+// BroadcastTransactionInternalResponseValidationError is the validation error
+// returned by BroadcastTransactionInternalResponse.Validate if the designated
+// constraints aren't met.
+type BroadcastTransactionInternalResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e BroadcastTransactionInternalResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e BroadcastTransactionInternalResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e BroadcastTransactionInternalResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e BroadcastTransactionInternalResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e BroadcastTransactionInternalResponseValidationError) ErrorName() string {
+	return "BroadcastTransactionInternalResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e BroadcastTransactionInternalResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sBroadcastTransactionInternalResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = BroadcastTransactionInternalResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = BroadcastTransactionInternalResponseValidationError{}

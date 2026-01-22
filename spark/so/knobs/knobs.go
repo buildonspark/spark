@@ -79,7 +79,11 @@ const (
 	KnobFinalizeCreatedSignedOutputsJustInTime  = "spark.so.tokens.finalize_created_signed_outputs_just_in_time"
 	KnobTokenTransactionV3Enabled               = "spark.so.tokens.token_transaction_v3_enabled"
 	KnobAllowMultipleTokenCreatesPerIssuer      = "spark.so.tokens.allow_multiple_token_creates_per_issuer"
-	KnobAllowExtraMetadataOnMainnet             = "spark.so.tokens.allow_extra_metadata_on_mainnet"
+	// Enable Phase 2 of the token transaction v3 migration which combines the internal prepare and sign RPCs into a single RPC.
+	// This will be flipped to true permanently (with Phase 1 and legacy handlers being cleaned up) once we are confident in the migration
+	// (which means passing integration tests, load tests, and likely an incremental production rollout).
+	KnobTokenTransactionV3Phase2Enabled = "spark.so.tokens.token_transaction_v3_phase2_enabled"
+	KnobAllowExtraMetadataOnMainnet     = "spark.so.tokens.allow_extra_metadata_on_mainnet"
 
 	// Number of confirmations required before finalizing tree creation
 	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
