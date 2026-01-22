@@ -724,9 +724,12 @@ func (h *LightningHandler) GetPreimageShare(
 		}
 		preimageShare, err = tx.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get preimage share: %w", err)
-		}
-		if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
+			// For HODL invoices in lightning receive flow, preimageShare may not exist yet, the user will provide it later via ProvidePreimage
+			if !ent.IsNotFound(err) {
+				return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
+			}
+			// preimageShare remains nil for HODL invoices in lightning receive flow
+		} else if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
 			return nil, fmt.Errorf("preimage share owner identity public key mismatch")
 		}
 	}
@@ -844,7 +847,7 @@ func (h *LightningHandler) GetPreimageShare(
 	}
 
 	var status st.PreimageRequestStatus
-	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && preimageShare != nil {
 		status = st.PreimageRequestStatusPreimageShared
 	} else {
 		status = st.PreimageRequestStatusWaitingForPreimage
@@ -1143,6 +1146,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		}
 		preimageShare, err = tx.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
 		if err != nil {
+			// For HODL invoices in lightning receive flow, preimageShare may not exist yet, the user will provide it later via ProvidePreimage
 			if !ent.IsNotFound(err) {
 				return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
 			}
@@ -1251,7 +1255,6 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	if err != nil {
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}
-	db := entTx.Client()
 	_, err = ent.CreateOrResetPendingSendTransfer(ctx, transferID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
@@ -1359,11 +1362,24 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		return nil, fmt.Errorf("unable to marshal transfer for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
-	// Recover secret if necessary
-	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
+	if req.TransferRequest != nil {
+		tx, err := ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get database context: %w", err)
+		}
+		_, err = tx.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
+		}
+	}
+
+	// For HODL invoices in lightning receive flow without preimageShare, return transfer without preimage
+	// The user will provide the preimage later via ProvidePreimage, and SSP can query it via QueryPreimage
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND || preimageShare == nil {
 		return &pbspark.InitiatePreimageSwapResponse{Transfer: transferProto}, nil
 	}
 
+	// For non-HODL invoices in lightning receive flow: recover preimage from shares
 	var shares []*secretsharing.SecretShare
 	for identifier, share := range result {
 		if share == nil {
@@ -1414,18 +1430,9 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage gossip message for payment hash %x", req.PaymentHash)
 	}
 
-	if preimageShare != nil {
-		err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
-		}
-	}
-
-	if req.TransferRequest != nil {
-		_, err = db.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
-		}
+	err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
 	return &pbspark.InitiatePreimageSwapResponse{Preimage: secretBytes, Transfer: transferProto}, nil
