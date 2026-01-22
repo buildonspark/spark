@@ -1424,7 +1424,7 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
 
 	var transactionHashes [][]byte
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 		require.NoError(t, err, "failed to create mint transaction %d", i+1)
 
@@ -1717,7 +1717,7 @@ func TestQueryTokenTransactionsCursorPaginationSameCreateTime(t *testing.T) {
 
 	// Create transactions rapidly without sleeping to force same create_time
 	var transactionHashes [][]byte
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 		require.NoError(t, err, "failed to create mint transaction %d", i+1)
 

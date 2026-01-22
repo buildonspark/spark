@@ -581,10 +581,7 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 		if pageRequest := req.GetByFilters().GetPageRequest(); pageRequest != nil {
 			params.useCursorPagination = true
 			if pageRequest.GetPageSize() > 0 {
-				params.limit = int64(pageRequest.GetPageSize())
-				if params.limit > maxTokenTransactionPageSize {
-					params.limit = maxTokenTransactionPageSize
-				}
+				params.limit = min(int64(pageRequest.GetPageSize()), params.limit)
 			}
 			if cursor := pageRequest.GetCursor(); cursor != "" {
 				cursorBytes, err := base64.RawURLEncoding.DecodeString(cursor)

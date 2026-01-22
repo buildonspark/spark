@@ -178,7 +178,7 @@ func newOperatorConnPool(factory func() (*grpc.ClientConn, error), cfg OperatorC
 	}
 
 	now := time.Now()
-	for i := 0; i < cfg.MinConnections; i++ {
+	for range cfg.MinConnections {
 		conn, err := factory()
 		if err != nil {
 			pool.recordDialFailure("prewarm", err)

@@ -205,7 +205,6 @@ func RunWithBroadcastLabel(t *testing.T, fn func(t *testing.T)) {
 
 func runSignatureTypeTestCases(t *testing.T, fn func(t *testing.T, tc signatureTypeTestCase)) {
 	for _, tc := range signatureTypeTestCases {
-		tc := tc
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			fn(t, tc)
 		})
@@ -505,8 +504,8 @@ func createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t *testing.T,
 	tokenIdentityPubKey keys.Public, numOutputs int,
 ) (*tokenpb.TokenTransaction, []keys.Private, error) {
 	outputAmounts := make([]uint64, numOutputs)
-	for i := 0; i < numOutputs; i++ {
-		outputAmounts[i] = uint64(testIssueMultiplePerOutputAmount)
+	for i := range outputAmounts {
+		outputAmounts[i] = testIssueMultiplePerOutputAmount
 	}
 
 	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenIdentityPubKey)
@@ -577,13 +576,14 @@ func createTestTokenCreateTransactionWithParams(config *wallet.TestWalletConfig,
 // verifyTokenMetadata verifies individual token metadata entries
 func verifyTokenMetadata(t *testing.T, metadata *tokenpb.TokenMetadata, expectedParams sparkTokenCreationTestParams, queryMethod string) {
 	issuerPublicKey := expectedParams.issuerPrivateKey.Public().Serialize()
-	require.Equal(t, expectedParams.name, metadata.TokenName, "%s: token name should match, expected: %s, found: %s", queryMethod, expectedParams.name, metadata.TokenName)
-	require.Equal(t, expectedParams.ticker, metadata.TokenTicker, "%s: token ticker should match, expected: %s, found: %s", queryMethod, expectedParams.ticker, metadata.TokenTicker)
-	require.Equal(t, uint32(testTokenDecimals), metadata.Decimals, "%s: token decimals should match, expected: %d, found: %d", queryMethod, uint32(testTokenDecimals), metadata.Decimals)
-	require.Equal(t, testTokenIsFreezable, metadata.IsFreezable, "%s: token freezable flag should match, expected: %t, found: %t", queryMethod, testTokenIsFreezable, metadata.IsFreezable)
-	require.True(t, bytes.Equal(issuerPublicKey, metadata.IssuerPublicKey), "%s: issuer public key should match, expected: %x, found: %x", queryMethod, issuerPublicKey, metadata.IssuerPublicKey)
-	require.True(t, bytes.Equal(getTokenMaxSupplyBytes(expectedParams.maxSupply), metadata.MaxSupply), "%s: max supply should match, expected: %x, found: %x", queryMethod, getTokenMaxSupplyBytes(expectedParams.maxSupply), metadata.MaxSupply)
-	require.True(t, bytes.Equal(expectedParams.extraMetadata, metadata.ExtraMetadata), "%s: extra metadata should match, expected: %x, found: %x", queryMethod, expectedParams.extraMetadata, metadata.ExtraMetadata)
+	require.Equalf(t, expectedParams.name, metadata.TokenName, "%s: token name should match, expected: %s, found: %s", queryMethod, expectedParams.name, metadata.TokenName)
+	require.Equalf(t, expectedParams.ticker, metadata.TokenTicker, "%s: token ticker should match, expected: %s, found: %s", queryMethod, expectedParams.ticker, metadata.TokenTicker)
+	require.Equalf(t, uint32(testTokenDecimals), metadata.Decimals, "%s: token decimals should match, expected: %d, found: %d", queryMethod, testTokenDecimals, metadata.Decimals)
+	require.Equalf(t, testTokenIsFreezable, metadata.IsFreezable, "%s: token freezable flag should match, expected: %t, found: %t", queryMethod, testTokenIsFreezable, metadata.IsFreezable)
+	require.Equalf(t, issuerPublicKey, metadata.IssuerPublicKey, "%s: issuer public key should match, expected: %x, found: %x", queryMethod, issuerPublicKey, metadata.IssuerPublicKey)
+	maxSupplyBytes := getTokenMaxSupplyBytes(expectedParams.maxSupply)
+	require.Equalf(t, maxSupplyBytes, metadata.MaxSupply, "%s: max supply should match, expected: %x, found: %x", queryMethod, maxSupplyBytes, metadata.MaxSupply)
+	require.Equalf(t, expectedParams.extraMetadata, metadata.ExtraMetadata, "%s: extra metadata should match, expected: %x, found: %x", queryMethod, expectedParams.extraMetadata, metadata.ExtraMetadata)
 }
 
 // createNativeToken creates a native token (no verification)
@@ -780,7 +780,7 @@ func setupNativeTokenWithMint(
 		return nil, fmt.Errorf("failed to create mint transaction: %w", err)
 	}
 
-	mintTxForBroadcast := proto.Clone(mintTxBeforeBroadcast).(*tokenpb.TokenTransaction)
+	mintTxForBroadcast := proto.CloneOf(mintTxBeforeBroadcast)
 	finalMintTx, err := broadcastTokenTransaction(
 		t,
 		t.Context(),

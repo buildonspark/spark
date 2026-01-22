@@ -5,26 +5,27 @@ run:
 linters:
   enable:
     - depguard
-    - revive
-    - staticcheck
-    - exhaustive
-    - ineffassign
-    - unused
-    - govet
-    - usetesting
-    - nolintlint
     - durationcheck # Checks for durations multiplied together
     - errorlint # Checks for incorrect wrapping of errors
+    - exhaustive
     - exptostd # Detects functions from golang.org/x/exp/ that can be replaced by std functions
+    - forbidigo # Checks for forbidden identifiers
     - gocheckcompilerdirectives # Checks that go compiler directive comments (//go:) are valid
+    - govet
     - iface # Detects the incorrect use of interfaces
+    - ineffassign
+    - loggercheck # Checks for key value pairs in zap.
     - mirror # Replaces e.g. someRegex.Match([]byte(str)) with someRegex.MatchString(str)
+    - modernize
+    - nolintlint
     - nosprintfhostport # Checks for misuse of Sprintf to construct a host with port in a URL
     - predeclared # Finds code that shadows one of Go's predeclared identifiers
+    - revive
+    - staticcheck
     - testifylint # Checks that testify test assertions are correct
     - unconvert # Checks for no-op type conversions
-    - forbidigo # Checks for forbidden identifiers
-    - loggercheck # Checks for key value pairs in zap.
+    - unused
+    - usetesting
   exclusions:
     generated: lax
     presets:

@@ -74,9 +74,7 @@ func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
 	errChannel := make(chan error, 5)
 
 	for range 5 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			leafID := uuid.NewString()
 			resp, err := wallet.GenerateDepositAddress(ctx, config, pubKey, &leafID, false)
 			if err != nil {
@@ -89,7 +87,7 @@ func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
 			}
 
 			resultChannel <- resp.DepositAddress.Address
-		}()
+		})
 	}
 
 	wg.Wait()

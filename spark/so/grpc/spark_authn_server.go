@@ -36,10 +36,7 @@ type challengeNonceCache struct {
 }
 
 func newChallengeNonceCache(challengeTimeout time.Duration) *challengeNonceCache {
-	cleanupInterval := challengeTimeout / 10
-	if cleanupInterval < 10*time.Second {
-		cleanupInterval = 10 * time.Second
-	}
+	cleanupInterval := max(challengeTimeout/10, 10*time.Second)
 	return &challengeNonceCache{
 		cache: cache.New(challengeTimeout, cleanupInterval),
 	}

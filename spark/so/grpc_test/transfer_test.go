@@ -491,14 +491,12 @@ func TestDoubleClaimTransfer(t *testing.T) {
 	errCount := 0
 	wg := sync.WaitGroup{}
 	for range 5 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err = wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
 			if err != nil {
 				errCount++
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

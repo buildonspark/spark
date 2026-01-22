@@ -73,7 +73,6 @@ func HashTokenTransaction(tokenTransaction *tokenpb.TokenTransaction, partialHas
 		return nil, sparkerrors.InternalObjectNull(fmt.Errorf("token transaction cannot be nil"))
 	}
 
-	var hasher func() ([]byte, error)
 	switch tokenTransaction.Version {
 	case 0:
 		{
@@ -81,19 +80,18 @@ func HashTokenTransaction(tokenTransaction *tokenpb.TokenTransaction, partialHas
 			if err != nil {
 				return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to convert token transaction: %w", err))
 			}
-			hasher = func() ([]byte, error) { return HashTokenTransactionV0(sparkTx, partialHash) }
+			return HashTokenTransactionV0(sparkTx, partialHash)
 		}
 	case 1:
-		hasher = func() ([]byte, error) { return HashTokenTransactionV1(tokenTransaction, partialHash) }
+		return HashTokenTransactionV1(tokenTransaction, partialHash)
 	case 2:
-		hasher = func() ([]byte, error) { return HashTokenTransactionV2(tokenTransaction, partialHash) }
+		return HashTokenTransactionV2(tokenTransaction, partialHash)
 	case 3:
-		hasher = func() ([]byte, error) { return HashTokenTransactionV3(tokenTransaction, partialHash) }
+		return HashTokenTransactionV3(tokenTransaction, partialHash)
 	default:
 		return nil, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("unsupported token transaction version: %d", tokenTransaction.Version))
 	}
 
-	return hasher()
 }
 
 func HashTokenTransactionV3(tokenTransaction *tokenpb.TokenTransaction, partialHash bool) ([]byte, error) {
@@ -107,13 +105,12 @@ func HashTokenTransactionV3(tokenTransaction *tokenpb.TokenTransaction, partialH
 			return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to convert legacy token transaction to partial: %w", err))
 		}
 		return protohash.Hash(converted)
-	} else {
-		converted, err := protoconverter.ConvertV2TxShapeToFinal(tokenTransaction)
-		if err != nil {
-			return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to convert legacy token transaction to final: %w", err))
-		}
-		return protohash.Hash(converted)
 	}
+	converted, err := protoconverter.ConvertV2TxShapeToFinal(tokenTransaction)
+	if err != nil {
+		return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to convert legacy token transaction to final: %w", err))
+	}
+	return protohash.Hash(converted)
 }
 
 func HashTokenTransactionV2(tokenTransaction *tokenpb.TokenTransaction, partialHash bool) ([]byte, error) {

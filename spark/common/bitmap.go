@@ -36,7 +36,7 @@ func (b *BitMap) Bytes() []byte {
 
 func (b *BitMap) IsAllSet() bool {
 	length := len(b.value)
-	for i := 0; i < length; i++ {
+	for i := range length {
 		if i == length-1 && b.size%8 != 0 {
 			mask := byte(0xFF >> (8 - (b.size % 8)))
 			if b.value[i] != mask {

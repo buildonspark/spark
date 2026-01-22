@@ -306,7 +306,7 @@ func TestMemcacheStore_WhitespaceTrimming(t *testing.T) {
 	require.NoError(t, store.Set(ctx, "bucketWhitespace", 100, time.Second))
 
 	// Take tokens multiple times to trigger padding
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		ok, err := store.Take(ctx, "bucketWhitespace")
 		require.NoError(t, err)
 		assert.True(t, ok)
@@ -325,7 +325,7 @@ func TestMemcacheStore_WhitespaceTrimming(t *testing.T) {
 	assert.Equal(t, byte(' '), storedValue[0], "value should have leading space padding")
 
 	// Continue taking to get to single digit
-	for i := 0; i < 90; i++ {
+	for range 90 {
 		ok, err := store.Take(ctx, "bucketWhitespace")
 		require.NoError(t, err)
 		assert.True(t, ok)

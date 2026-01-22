@@ -85,7 +85,7 @@ func TestConcurrencyGuard_Acquire_WithinLimit(t *testing.T) {
 			guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 
 			// Acquire multiple times
-			for i := 0; i < tt.acquisitions; i++ {
+			for range tt.acquisitions {
 				err := guard.TryAcquireMethod("/test.Service/TestMethod")
 				require.NoError(t, err)
 			}
@@ -132,7 +132,7 @@ func TestConcurrencyGuard_AcquireTarget_ExceedsLimit(t *testing.T) {
 			guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 
 			var err error
-			for i := 0; i < tt.acquisitions; i++ {
+			for range tt.acquisitions {
 				err = guard.TryAcquireMethod("/test.Service/TestMethod")
 			}
 			require.Error(t, err)
@@ -152,7 +152,7 @@ func TestConcurrencyGuard_Release(t *testing.T) {
 		guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 
 		// Acquire some resources
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			err := guard.TryAcquireMethod("TestMethod")
 			require.NoError(t, err)
 		}
@@ -162,7 +162,7 @@ func TestConcurrencyGuard_Release(t *testing.T) {
 		assert.Equal(t, int64(3), concurrencyGuard.counterMap["TestMethod"])
 
 		// Release resources
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			guard.ReleaseMethod("TestMethod")
 		}
 
@@ -203,15 +203,11 @@ func TestConcurrencyGuard_ConcurrentAccess(t *testing.T) {
 	errors := make([]error, numGoroutines)
 
 	// Launch multiple goroutines that acquire and release concurrently
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-
-			for j := 0; j < numOperationsPerGoroutine; j++ {
+	for idx := range numGoroutines {
+		wg.Go(func() {
+			for range numOperationsPerGoroutine {
 				// Acquire
-				err := guard.TryAcquireMethod("TestMethod")
-				if err != nil {
+				if err := guard.TryAcquireMethod("TestMethod"); err != nil {
 					errors[idx] = err
 					return
 				}
@@ -222,7 +218,7 @@ func TestConcurrencyGuard_ConcurrentAccess(t *testing.T) {
 				// Release
 				guard.ReleaseMethod("TestMethod")
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -483,7 +479,7 @@ func TestConcurrencyGuard_AcquireAfterGlobalLimit(t *testing.T) {
 	guard := NewConcurrencyGuard(mockKnobs, KnobTargetName_UnaryGlobalLimit)
 
 	// Acquire some resources
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		err := guard.TryAcquireMethod("TestMethod")
 		require.NoError(t, err)
 	}
@@ -518,7 +514,7 @@ func TestConcurrencyGuard_AcquireGlobalStreamLimit(t *testing.T) {
 	guardStream := NewConcurrencyGuard(mockKnobs, KnobTargetName_StreamGlobalLimit)
 
 	// Acquire some resources
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		err := guard.TryAcquireMethod("TestMethod")
 		require.NoError(t, err)
 	}
@@ -532,7 +528,7 @@ func TestConcurrencyGuard_AcquireGlobalStreamLimit(t *testing.T) {
 	require.Error(t, err)
 
 	// Acquire some streamresources
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		err := guardStream.TryAcquireMethod("TestMethod")
 		require.NoError(t, err)
 	}
@@ -770,11 +766,8 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 		handlerStarted := make(chan struct{}, numGoroutines)
 		handlerComplete := make(chan struct{})
 
-		for i := 0; i < numGoroutines; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
+		for range numGoroutines {
+			wg.Go(func() {
 				handler := func(srv any, stream grpc.ServerStream) error {
 					handlerStarted <- struct{}{}
 					<-handlerComplete // Wait for signal to complete
@@ -795,7 +788,7 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 					successCount++
 				}
 				mu.Unlock()
-			}()
+			})
 		}
 		time.Sleep(10 * time.Millisecond)
 		concurrencyGuard := guard.(*ConcurrencyGuard)

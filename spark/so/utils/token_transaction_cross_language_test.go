@@ -42,7 +42,6 @@ func TestTokenTransactionV3CrossLanguageJSONCases(t *testing.T) {
 	}
 
 	for _, tc := range file.TestCases {
-		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
 			var msg tokenpb.TokenTransaction
 			if err := protojson.Unmarshal(tc.TokenTransaction, &msg); err != nil {

@@ -159,7 +159,7 @@ func validateTxStructure(rawTxBytes []byte) error {
 	// Skip inputs - we just need to get past them to read output count
 	// Each input is at minimum 41 bytes (32 prevout hash + 4 index + 1 script len + 4 sequence)
 	minInputSize := 41
-	for i := uint64(0); i < inputCount; i++ {
+	for range inputCount {
 		if offset+minInputSize > len(rawTxBytes) {
 			return fmt.Errorf("transaction truncated while reading inputs")
 		}

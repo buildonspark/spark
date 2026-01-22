@@ -266,7 +266,7 @@ func (f *Faucet) Refill() error {
 		return err
 	}
 
-	for i := int64(0); i < numCoinsToCreate; i++ {
+	for range numCoinsToCreate {
 		splitTx.AddTxOut(wire.NewTxOut(coinAmountSats, faucetScript))
 	}
 
@@ -289,7 +289,7 @@ func (f *Faucet) Refill() error {
 	}
 
 	splitTxid := signedSplitTx.TxHash()
-	for i := 0; i < int(numCoinsToCreate); i++ {
+	for i := range numCoinsToCreate {
 		faucetCoin := FaucetCoin{
 			Key:      staticFaucetKey,
 			OutPoint: wire.NewOutPoint(&splitTxid, uint32(i)),

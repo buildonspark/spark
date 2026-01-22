@@ -110,7 +110,7 @@ func TestValidateAdaptorSignature_InvalidSignatureBytes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.name == "invalid r component (all 0xFF)" {
 				// Set all bytes to 0xFF for r component, keep s as zeros
-				for i := 0; i < 32; i++ {
+				for i := range 32 {
 					tt.signature[i] = 0xFF
 				}
 			}
@@ -243,7 +243,7 @@ func TestValidateAdaptorSignature_EdgeCases(t *testing.T) {
 
 	t.Run("repeated validation should work", func(t *testing.T) {
 		// Test that validation can be called multiple times
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			err := ValidateAdaptorSignature(pubkey, hash[:], adaptorSig, adaptorPubKey)
 			require.NoError(t, err)
 		}
