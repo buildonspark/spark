@@ -1864,6 +1864,14 @@ export interface ProvidePreimageResponse {
   transfer: Transfer | undefined;
 }
 
+export interface QueryPreimageRequest {
+  paymentHash: Uint8Array;
+}
+
+export interface QueryPreimageResponse {
+  preimage?: Uint8Array | undefined;
+}
+
 export interface TreeNodeIds {
   nodeIds: string[];
 }
@@ -15836,6 +15844,122 @@ export const ProvidePreimageResponse: MessageFns<ProvidePreimageResponse> = {
   },
 };
 
+function createBaseQueryPreimageRequest(): QueryPreimageRequest {
+  return { paymentHash: new Uint8Array(0) };
+}
+
+export const QueryPreimageRequest: MessageFns<QueryPreimageRequest> = {
+  encode(message: QueryPreimageRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.paymentHash.length !== 0) {
+      writer.uint32(10).bytes(message.paymentHash);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryPreimageRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryPreimageRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.paymentHash = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryPreimageRequest {
+    return { paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0) };
+  },
+
+  toJSON(message: QueryPreimageRequest): unknown {
+    const obj: any = {};
+    if (message.paymentHash.length !== 0) {
+      obj.paymentHash = base64FromBytes(message.paymentHash);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryPreimageRequest>): QueryPreimageRequest {
+    return QueryPreimageRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryPreimageRequest>): QueryPreimageRequest {
+    const message = createBaseQueryPreimageRequest();
+    message.paymentHash = object.paymentHash ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseQueryPreimageResponse(): QueryPreimageResponse {
+  return { preimage: undefined };
+}
+
+export const QueryPreimageResponse: MessageFns<QueryPreimageResponse> = {
+  encode(message: QueryPreimageResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.preimage !== undefined) {
+      writer.uint32(10).bytes(message.preimage);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryPreimageResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryPreimageResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.preimage = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryPreimageResponse {
+    return { preimage: isSet(object.preimage) ? bytesFromBase64(object.preimage) : undefined };
+  },
+
+  toJSON(message: QueryPreimageResponse): unknown {
+    const obj: any = {};
+    if (message.preimage !== undefined) {
+      obj.preimage = base64FromBytes(message.preimage);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryPreimageResponse>): QueryPreimageResponse {
+    return QueryPreimageResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryPreimageResponse>): QueryPreimageResponse {
+    const message = createBaseQueryPreimageResponse();
+    message.preimage = object.preimage ?? undefined;
+    return message;
+  },
+};
+
 function createBaseTreeNodeIds(): TreeNodeIds {
   return { nodeIds: [] };
 }
@@ -20420,6 +20544,15 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** Used to check if a user has provided the preimage for a HODL invoice in lightning receive flow. */
+    query_preimage: {
+      name: "query_preimage",
+      requestType: QueryPreimageRequest,
+      requestStream: false,
+      responseType: QueryPreimageResponse,
+      responseStream: false,
+      options: {},
+    },
     query_htlc: {
       name: "query_htlc",
       requestType: QueryHtlcRequest,
@@ -20685,6 +20818,11 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: ProvidePreimageRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<ProvidePreimageResponse>>;
+  /** Used to check if a user has provided the preimage for a HODL invoice in lightning receive flow. */
+  query_preimage(
+    request: QueryPreimageRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryPreimageResponse>>;
   query_htlc(request: QueryHtlcRequest, context: CallContext & CallContextExt): Promise<DeepPartial<QueryHtlcResponse>>;
   /**
    * Resets the timelocks for a leaf's transactions. Can be used to reset the
@@ -20851,6 +20989,11 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<ProvidePreimageRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<ProvidePreimageResponse>;
+  /** Used to check if a user has provided the preimage for a HODL invoice in lightning receive flow. */
+  query_preimage(
+    request: DeepPartial<QueryPreimageRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryPreimageResponse>;
   query_htlc(
     request: DeepPartial<QueryHtlcRequest>,
     options?: CallOptions & CallOptionsExt,

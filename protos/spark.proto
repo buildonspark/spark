@@ -33,6 +33,8 @@ service SparkService {
     rpc get_signing_commitments(GetSigningCommitmentsRequest) returns (GetSigningCommitmentsResponse) {}
 
     rpc provide_preimage(ProvidePreimageRequest) returns (ProvidePreimageResponse) {}
+    // Used to check if a user has provided the preimage for a HODL invoice in lightning receive flow.
+    rpc query_preimage(QueryPreimageRequest) returns (QueryPreimageResponse) {}
     rpc query_htlc(QueryHtlcRequest) returns (QueryHtlcResponse) {}
 
 
@@ -1242,6 +1244,14 @@ message ProvidePreimageRequest {
 
 message ProvidePreimageResponse {
     Transfer transfer = 1;
+}
+
+message QueryPreimageRequest {
+    bytes payment_hash = 1 [(validate.rules).bytes.len = 32];
+}
+
+message QueryPreimageResponse {
+    optional bytes preimage = 1;
 }
 
 message TreeNodeIds {

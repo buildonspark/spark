@@ -32,6 +32,7 @@ const (
 	SparkService_StorePreimageShare_FullMethodName                  = "/spark.SparkService/store_preimage_share"
 	SparkService_GetSigningCommitments_FullMethodName               = "/spark.SparkService/get_signing_commitments"
 	SparkService_ProvidePreimage_FullMethodName                     = "/spark.SparkService/provide_preimage"
+	SparkService_QueryPreimage_FullMethodName                       = "/spark.SparkService/query_preimage"
 	SparkService_QueryHtlc_FullMethodName                           = "/spark.SparkService/query_htlc"
 	SparkService_RenewLeaf_FullMethodName                           = "/spark.SparkService/renew_leaf"
 	SparkService_GetSigningOperatorList_FullMethodName              = "/spark.SparkService/get_signing_operator_list"
@@ -78,6 +79,8 @@ type SparkServiceClient interface {
 	// part of a transfer package.
 	GetSigningCommitments(ctx context.Context, in *GetSigningCommitmentsRequest, opts ...grpc.CallOption) (*GetSigningCommitmentsResponse, error)
 	ProvidePreimage(ctx context.Context, in *ProvidePreimageRequest, opts ...grpc.CallOption) (*ProvidePreimageResponse, error)
+	// Used to check if a user has provided the preimage for a HODL invoice in lightning receive flow.
+	QueryPreimage(ctx context.Context, in *QueryPreimageRequest, opts ...grpc.CallOption) (*QueryPreimageResponse, error)
 	QueryHtlc(ctx context.Context, in *QueryHtlcRequest, opts ...grpc.CallOption) (*QueryHtlcResponse, error)
 	// Resets the timelocks for a leaf's transactions. Can be used to reset the
 	// refund transaction timelock for a leaf (when the node transaction
@@ -239,6 +242,16 @@ func (c *sparkServiceClient) ProvidePreimage(ctx context.Context, in *ProvidePre
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ProvidePreimageResponse)
 	err := c.cc.Invoke(ctx, SparkService_ProvidePreimage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) QueryPreimage(ctx context.Context, in *QueryPreimageRequest, opts ...grpc.CallOption) (*QueryPreimageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryPreimageResponse)
+	err := c.cc.Invoke(ctx, SparkService_QueryPreimage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -505,6 +518,8 @@ type SparkServiceServer interface {
 	// part of a transfer package.
 	GetSigningCommitments(context.Context, *GetSigningCommitmentsRequest) (*GetSigningCommitmentsResponse, error)
 	ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error)
+	// Used to check if a user has provided the preimage for a HODL invoice in lightning receive flow.
+	QueryPreimage(context.Context, *QueryPreimageRequest) (*QueryPreimageResponse, error)
 	QueryHtlc(context.Context, *QueryHtlcRequest) (*QueryHtlcResponse, error)
 	// Resets the timelocks for a leaf's transactions. Can be used to reset the
 	// refund transaction timelock for a leaf (when the node transaction
@@ -587,6 +602,9 @@ func (UnimplementedSparkServiceServer) GetSigningCommitments(context.Context, *G
 }
 func (UnimplementedSparkServiceServer) ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProvidePreimage not implemented")
+}
+func (UnimplementedSparkServiceServer) QueryPreimage(context.Context, *QueryPreimageRequest) (*QueryPreimageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryPreimage not implemented")
 }
 func (UnimplementedSparkServiceServer) QueryHtlc(context.Context, *QueryHtlcRequest) (*QueryHtlcResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryHtlc not implemented")
@@ -890,6 +908,24 @@ func _SparkService_ProvidePreimage_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkServiceServer).ProvidePreimage(ctx, req.(*ProvidePreimageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_QueryPreimage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryPreimageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).QueryPreimage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_QueryPreimage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).QueryPreimage(ctx, req.(*QueryPreimageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1355,6 +1391,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "provide_preimage",
 			Handler:    _SparkService_ProvidePreimage_Handler,
+		},
+		{
+			MethodName: "query_preimage",
+			Handler:    _SparkService_QueryPreimage_Handler,
 		},
 		{
 			MethodName: "query_htlc",

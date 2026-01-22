@@ -17974,6 +17974,225 @@ var _ interface {
 	ErrorName() string
 } = ProvidePreimageResponseValidationError{}
 
+// Validate checks the field values on QueryPreimageRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryPreimageRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryPreimageRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryPreimageRequestMultiError, or nil if none found.
+func (m *QueryPreimageRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryPreimageRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetPaymentHash()) != 32 {
+		err := QueryPreimageRequestValidationError{
+			field:  "PaymentHash",
+			reason: "value length must be 32 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return QueryPreimageRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryPreimageRequestMultiError is an error wrapping multiple validation
+// errors returned by QueryPreimageRequest.ValidateAll() if the designated
+// constraints aren't met.
+type QueryPreimageRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryPreimageRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryPreimageRequestMultiError) AllErrors() []error { return m }
+
+// QueryPreimageRequestValidationError is the validation error returned by
+// QueryPreimageRequest.Validate if the designated constraints aren't met.
+type QueryPreimageRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryPreimageRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryPreimageRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryPreimageRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryPreimageRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryPreimageRequestValidationError) ErrorName() string {
+	return "QueryPreimageRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryPreimageRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryPreimageRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryPreimageRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryPreimageRequestValidationError{}
+
+// Validate checks the field values on QueryPreimageResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryPreimageResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryPreimageResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryPreimageResponseMultiError, or nil if none found.
+func (m *QueryPreimageResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryPreimageResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.Preimage != nil {
+		// no validation rules for Preimage
+	}
+
+	if len(errors) > 0 {
+		return QueryPreimageResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryPreimageResponseMultiError is an error wrapping multiple validation
+// errors returned by QueryPreimageResponse.ValidateAll() if the designated
+// constraints aren't met.
+type QueryPreimageResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryPreimageResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryPreimageResponseMultiError) AllErrors() []error { return m }
+
+// QueryPreimageResponseValidationError is the validation error returned by
+// QueryPreimageResponse.Validate if the designated constraints aren't met.
+type QueryPreimageResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryPreimageResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryPreimageResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryPreimageResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryPreimageResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryPreimageResponseValidationError) ErrorName() string {
+	return "QueryPreimageResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryPreimageResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryPreimageResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryPreimageResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryPreimageResponseValidationError{}
+
 // Validate checks the field values on TreeNodeIds with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.

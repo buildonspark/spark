@@ -239,6 +239,11 @@ func (s *SparkServer) ProvidePreimage(ctx context.Context, req *pb.ProvidePreima
 	return lightningHandler.ProvidePreimage(ctx, req)
 }
 
+func (s *SparkServer) QueryPreimage(ctx context.Context, req *pb.QueryPreimageRequest) (*pb.QueryPreimageResponse, error) {
+	lightningHandler := handler.NewLightningHandler(s.config)
+	return lightningHandler.QueryPreimage(ctx, req)
+}
+
 // QueryNodes queries the details of nodes given either the owner identity public key or a list of node ids.
 func (s *SparkServer) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest) (*pb.QueryNodesResponse, error) {
 	treeQueryHandler := handler.NewTreeQueryHandler(s.config)

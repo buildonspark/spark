@@ -1769,6 +1769,43 @@ func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pb
 	return transfer, nil
 }
 
+func (h *LightningHandler) QueryPreimage(ctx context.Context, req *pbspark.QueryPreimageRequest) (*pbspark.QueryPreimageResponse, error) {
+	session, err := authn.GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	identityPubKey := session.IdentityPublicKey()
+
+	tx, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database context: %w", err)
+	}
+
+	preimageRequest, err := tx.PreimageRequest.Query().
+		Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).
+		WithTransfers().
+		First(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query preimage request: %w", err)
+	}
+
+	transfer := preimageRequest.Edges.Transfers
+	if transfer == nil {
+		return nil, fmt.Errorf("no transfer found for preimage request")
+	}
+
+	if !transfer.SenderIdentityPubkey.Equals(identityPubKey) {
+		return nil, fmt.Errorf("unauthorized: authenticated identity does not match transfer sender")
+	}
+
+	response := &pbspark.QueryPreimageResponse{}
+	if len(preimageRequest.Preimage) > 0 {
+		response.Preimage = preimageRequest.Preimage
+	}
+
+	return response, nil
+}
+
 func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (*pbspark.ProvidePreimageResponse, error) {
 	identityPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
 	if err != nil {
