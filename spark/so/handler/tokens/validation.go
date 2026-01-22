@@ -32,11 +32,11 @@ func validateStatuses(
 		if !slices.Contains(expectedStatuses, output.Status) {
 			var expectedDesc string
 			if len(expectedStatuses) == 1 {
-				expectedDesc = string(expectedStatuses[0])
+				expectedDesc = fmt.Sprintf("%s", expectedStatuses[0])
 			} else {
 				parts := make([]string, len(expectedStatuses))
 				for i, s := range expectedStatuses {
-					parts[i] = string(s)
+					parts[i] = fmt.Sprintf("%s", s)
 				}
 				expectedDesc = fmt.Sprintf("one of [%s]", strings.Join(parts, " or "))
 			}
@@ -133,7 +133,7 @@ func validateTokenTransactionForSigning(
 }
 
 // validateNoActiveFreezesForOutputs checks whether any of the provided outputs belong to an
-// owner+token pair that is currently frozen. Supports outputs spanning multiple TokenCreateIDs.
+// owner+token pair that is currently frozen.
 func validateNoActiveFreezesForOutputs(ctx context.Context, outputs []*ent.TokenOutput) error {
 	if len(outputs) == 0 {
 		return nil

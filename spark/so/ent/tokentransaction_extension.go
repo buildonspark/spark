@@ -41,6 +41,13 @@ func GetTokenTransactionMapFromList(transactions []*TokenTransaction) (map[strin
 	return tokenTransactionMap, nil
 }
 
+type createTransactionEntitiesMode int
+
+const (
+	createTransactionEntitiesModeStarted createTransactionEntitiesMode = iota
+	createTransactionEntitiesModeSigned
+)
+
 func CreateStartedTransactionEntities(
 	ctx context.Context,
 	tokenTransaction *tokenpb.TokenTransaction,
@@ -48,6 +55,52 @@ func CreateStartedTransactionEntities(
 	orderedOutputToCreateRevocationKeyshareIDs []string,
 	orderedOutputToSpendEnts []*TokenOutput,
 	coordinatorPublicKey keys.Public,
+) (*TokenTransaction, error) {
+	return createTransactionEntities(
+		ctx,
+		tokenTransaction,
+		signaturesWithIndex,
+		orderedOutputToCreateRevocationKeyshareIDs,
+		orderedOutputToSpendEnts,
+		coordinatorPublicKey,
+		createTransactionEntitiesModeStarted,
+		nil,
+	)
+}
+
+// CreateSignedTransactionEntities creates the token transaction and output entities directly in SIGNED state.
+//
+// This is used by the V3 Phase 2 internal broadcast flow to avoid persisting intermediate STARTED state.
+func CreateSignedTransactionEntities(
+	ctx context.Context,
+	tokenTransaction *tokenpb.TokenTransaction,
+	signaturesWithIndex []*tokenpb.SignatureWithIndex,
+	orderedOutputToCreateRevocationKeyshareIDs []string,
+	orderedOutputToSpendEnts []*TokenOutput,
+	coordinatorPublicKey keys.Public,
+	operatorSignature []byte,
+) (*TokenTransaction, error) {
+	return createTransactionEntities(
+		ctx,
+		tokenTransaction,
+		signaturesWithIndex,
+		orderedOutputToCreateRevocationKeyshareIDs,
+		orderedOutputToSpendEnts,
+		coordinatorPublicKey,
+		createTransactionEntitiesModeSigned,
+		operatorSignature,
+	)
+}
+
+func createTransactionEntities(
+	ctx context.Context,
+	tokenTransaction *tokenpb.TokenTransaction,
+	signaturesWithIndex []*tokenpb.SignatureWithIndex,
+	orderedOutputToCreateRevocationKeyshareIDs []string,
+	orderedOutputToSpendEnts []*TokenOutput,
+	coordinatorPublicKey keys.Public,
+	mode createTransactionEntitiesMode,
+	operatorSignature []byte,
 ) (*TokenTransaction, error) {
 	// Ordered fields are ordered according to the order of the input in the token transaction proto.
 	db, err := GetDbFromContext(ctx)
@@ -73,6 +126,23 @@ func CreateStartedTransactionEntities(
 	tokenTransactionType, err := utils.InferTokenTransactionType(tokenTransaction)
 	if err != nil {
 		return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to infer token transaction type: %w", err))
+	}
+
+	txStatus := st.TokenTransactionStatusStarted
+	inputStatus := st.TokenOutputStatusSpentStarted
+	outputStatus := st.TokenOutputStatusCreatedStarted
+	if mode == createTransactionEntitiesModeSigned {
+		if len(operatorSignature) == 0 {
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("operator signature is required"))
+		}
+		txStatus = st.TokenTransactionStatusSigned
+		inputStatus = st.TokenOutputStatusSpentSigned
+		outputStatus = st.TokenOutputStatusCreatedSigned
+		if tokenTransactionType == utils.TokenTransactionTypeMint {
+			// Mints do not require a follow-up finalize step; treat created outputs as finalized at signing time.
+			inputStatus = st.TokenOutputStatusSpentFinalized
+			outputStatus = st.TokenOutputStatusCreatedFinalized
+		}
 	}
 
 	switch tokenTransactionType {
@@ -114,10 +184,13 @@ func CreateStartedTransactionEntities(
 		txBuilder := db.TokenTransaction.Create().
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
-			SetStatus(st.TokenTransactionStatusStarted).
+			SetStatus(txStatus).
 			SetCoordinatorPublicKey(coordinatorPublicKey).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version)).
 			SetCreateID(tokenCreateEnt.ID)
+		if mode == createTransactionEntitiesModeSigned {
+			txBuilder = txBuilder.SetOperatorSignature(operatorSignature)
+		}
 		txBuilder, err = setTokenTransactionTimingFields(txBuilder, tokenTransaction)
 		if err != nil {
 			return nil, err
@@ -144,10 +217,13 @@ func CreateStartedTransactionEntities(
 		txMintBuilder := db.TokenTransaction.Create().
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
-			SetStatus(st.TokenTransactionStatusStarted).
+			SetStatus(txStatus).
 			SetCoordinatorPublicKey(coordinatorPublicKey).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version)).
 			SetMintID(tokenMintEnt.ID)
+		if mode == createTransactionEntitiesModeSigned {
+			txMintBuilder = txMintBuilder.SetOperatorSignature(operatorSignature)
+		}
 		txMintBuilder, err = setTokenTransactionTimingFields(txMintBuilder, tokenTransaction)
 		if err != nil {
 			return nil, err
@@ -167,9 +243,12 @@ func CreateStartedTransactionEntities(
 		txTransferBuilder := db.TokenTransaction.Create().
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
-			SetStatus(st.TokenTransactionStatusStarted).
+			SetStatus(txStatus).
 			SetCoordinatorPublicKey(coordinatorPublicKey).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version))
+		if mode == createTransactionEntitiesModeSigned {
+			txTransferBuilder = txTransferBuilder.SetOperatorSignature(operatorSignature)
+		}
 		txTransferBuilder, err = setTokenTransactionTimingFields(txTransferBuilder, tokenTransaction)
 		if err != nil {
 			return nil, err
@@ -179,13 +258,13 @@ func CreateStartedTransactionEntities(
 			return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create transfer token transaction: %w", err))
 		}
 		for outputIndex, outputToSpendEnt := range orderedOutputToSpendEnts {
-			_, err = db.TokenOutput.UpdateOne(outputToSpendEnt).
-				SetStatus(st.TokenOutputStatusSpentStarted).
+			update := db.TokenOutput.UpdateOne(outputToSpendEnt).
+				SetStatus(inputStatus).
 				SetOutputSpentTokenTransactionID(tokenTransactionEnt.ID).
-				AddOutputSpentStartedTokenTransactions(tokenTransactionEnt).
 				SetSpentOwnershipSignature(signaturesWithIndex[outputIndex].Signature).
 				SetSpentTransactionInputVout(int32(outputIndex)).
-				Save(ctx)
+				AddOutputSpentStartedTokenTransactions(tokenTransactionEnt)
+			_, err = update.Save(ctx)
 			if err != nil {
 				return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update output to spend: %w", err))
 			}
@@ -294,9 +373,13 @@ func CreateStartedTransactionEntities(
 		if err != nil {
 			return nil, err
 		}
-		outputUUID, err := uuid.Parse(output.GetId())
-		if err != nil {
-			return nil, err
+		var outputUUID *uuid.UUID
+		if output.Id != nil {
+			parsed, err := uuid.Parse(output.GetId())
+			if err != nil {
+				return nil, err
+			}
+			outputUUID = &parsed
 		}
 
 		// Look up the TokenCreate entity for this specific output
@@ -338,12 +421,13 @@ func CreateStartedTransactionEntities(
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token amount must be 16 bytes: %w", err))
 		}
 
+		// ID not explicitly set for V3+ transactions. Ent will auto-generate a UUID v7 via BaseMixin's Default(NewID).
 		outputEnts = append(
 			outputEnts,
 			db.TokenOutput.
 				Create().
-				SetID(outputUUID).
-				SetStatus(st.TokenOutputStatusCreatedStarted).
+				SetNillableID(outputUUID).
+				SetStatus(outputStatus).
 				SetOwnerPublicKey(ownerPubKey).
 				SetWithdrawBondSats(output.GetWithdrawBondSats()).
 				SetWithdrawRelativeBlockLocktime(output.GetWithdrawRelativeBlockLocktime()).
@@ -806,6 +890,19 @@ func FetchTokenTransactionDataByHashForRead(ctx context.Context, tokenTransactio
 	}
 
 	return tokenTransaction, nil
+}
+
+// FetchExistingTokenTransaction fetches a token transaction by hash for read.
+// Returns a NotFoundMissingEntity error if the transaction does not exist.
+func FetchExistingTokenTransaction(ctx context.Context, tokenTransactionHash []byte) (*TokenTransaction, error) {
+	tx, err := FetchTokenTransactionDataByHashForRead(ctx, tokenTransactionHash)
+	if err != nil {
+		if IsNotFound(err) {
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token transaction not found for hash %x: %w", tokenTransactionHash, err))
+		}
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token transaction for read by hash: %w", err))
+	}
+	return tx, nil
 }
 
 // MarshalProto converts a TokenTransaction to a token protobuf TokenTransaction.

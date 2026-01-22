@@ -44,6 +44,14 @@ func OutputSpecsWithOwner(owner keys.Public, amounts ...*big.Int) []OutputSpec {
 
 // CreateTokenCreate creates a test TokenCreate entity
 func (f *Fixtures) CreateTokenCreate(network btcnetwork.Network, tokenIdentifier []byte, maxSupply *big.Int) *ent.TokenCreate {
+	_, tokenCreate := f.CreateTokenCreateWithIssuer(network, tokenIdentifier, maxSupply)
+	return tokenCreate
+}
+
+// CreateTokenCreateWithIssuer creates a test TokenCreate entity and returns the issuer private key.
+// This also creates the entity DKG key to set the proper CreationEntityPublicKey.
+// This is useful when you need to sign transactions with the issuer key.
+func (f *Fixtures) CreateTokenCreateWithIssuer(network btcnetwork.Network, tokenIdentifier []byte, maxSupply *big.Int) (keys.Private, *ent.TokenCreate) {
 	if tokenIdentifier == nil {
 		tokenIdentifier = f.RandomBytes(32)
 	}
@@ -51,8 +59,10 @@ func (f *Fixtures) CreateTokenCreate(network btcnetwork.Network, tokenIdentifier
 		maxSupply = big.NewInt(1000000)
 	}
 
-	issuerKey := keys.GeneratePrivateKey()
-	creationEntityKey := keys.GeneratePrivateKey()
+	issuerKey := f.GeneratePrivateKey()
+
+	// Get or create the entity DKG key for CreationEntityPublicKey.
+	creationEntityPubKey := f.getOrCreateEntityDkgKeyPublicKey()
 
 	tokenCreate, err := f.Client.TokenCreate.Create().
 		SetIssuerPublicKey(issuerKey.Public()).
@@ -63,20 +73,35 @@ func (f *Fixtures) CreateTokenCreate(network btcnetwork.Network, tokenIdentifier
 		SetIsFreezable(false).
 		SetNetwork(network).
 		SetTokenIdentifier(tokenIdentifier).
-		SetCreationEntityPublicKey(creationEntityKey.Public()).
+		SetCreationEntityPublicKey(creationEntityPubKey).
 		Save(f.Ctx)
 	f.RequireNoError(err)
-	return tokenCreate
+	return issuerKey, tokenCreate
+}
+
+// getOrCreateEntityDkgKeyPublicKey returns the public key from the existing entity DKG key,
+// or creates one if it doesn't exist.
+func (f *Fixtures) getOrCreateEntityDkgKeyPublicKey() keys.Public {
+	entityDkgKey, err := f.Client.EntityDkgKey.Query().
+		WithSigningKeyshare().
+		Only(f.Ctx)
+	if err == nil {
+		return entityDkgKey.Edges.SigningKeyshare.PublicKey
+	}
+
+	// Entity DKG key doesn't exist, create one.
+	keyshare := f.CreateKeyshareWithEntityDkgKey()
+	return keyshare.PublicKey
 }
 
 // CreateKeyshare creates a test SigningKeyshare
 func (f *Fixtures) CreateKeyshare() *ent.SigningKeyshare {
-	keyshareKey := keys.GeneratePrivateKey()
-	operatorKey := keys.GeneratePrivateKey()
+	keyshareKey := f.GeneratePrivateKey()
+	operatorKey := f.GeneratePrivateKey()
 
 	keyshare, err := f.Client.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keys.GeneratePrivateKey()).
+		SetSecretShare(f.GeneratePrivateKey()).
 		SetPublicShares(map[string]keys.Public{"operator1": operatorKey.Public()}).
 		SetPublicKey(keyshareKey.Public()).
 		SetMinSigners(2).
@@ -86,10 +111,23 @@ func (f *Fixtures) CreateKeyshare() *ent.SigningKeyshare {
 	return keyshare
 }
 
+// CreateKeyshareWithEntityDkgKey creates a SigningKeyshare and links it to an EntityDkgKey.
+// This is useful for tests that need the entity DKG key to be present.
+func (f *Fixtures) CreateKeyshareWithEntityDkgKey() *ent.SigningKeyshare {
+	keyshare := f.CreateKeyshare()
+
+	_, err := f.Client.EntityDkgKey.Create().
+		SetSigningKeyshare(keyshare).
+		Save(f.Ctx)
+	f.RequireNoError(err)
+
+	return keyshare
+}
+
 // CreateMintTransaction creates a mint transaction with outputs
 func (f *Fixtures) CreateMintTransaction(tokenCreate *ent.TokenCreate, outputSpecs []OutputSpec, status st.TokenTransactionStatus) (*ent.TokenTransaction, []*ent.TokenOutput) {
 	mint, err := f.Client.TokenMint.Create().
-		SetIssuerPublicKey(keys.GeneratePrivateKey().Public()).
+		SetIssuerPublicKey(f.GeneratePrivateKey().Public()).
 		SetTokenIdentifier(tokenCreate.TokenIdentifier).
 		SetWalletProvidedTimestamp(uint64(time.Now().UnixMilli())).
 		SetIssuerSignature(f.RandomBytes(64)).
@@ -121,7 +159,7 @@ func (f *Fixtures) CreateOutputForTransaction(tokenCreate *ent.TokenCreate, amou
 func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCreate, amount *big.Int, owner keys.Public, tx *ent.TokenTransaction, vout int32) *ent.TokenOutput {
 	// Generate random owner if not provided
 	if owner.IsZero() {
-		owner = keys.GeneratePrivateKey().Public()
+		owner = f.GeneratePrivateKey().Public()
 	}
 
 	keyshare := f.CreateKeyshare()

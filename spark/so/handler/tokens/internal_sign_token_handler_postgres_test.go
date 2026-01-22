@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"math/rand/v2"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -113,13 +112,12 @@ func createTestSpentOutputWithShares(t *testing.T, setup *internalSignTokenPostg
 
 func TestGetSecretSharesNotInInput(t *testing.T) {
 	setup := setUpInternalSignTokenTestHandlerPostgres(t)
-	rng := rand.NewChaCha8([32]byte{})
 
 	aliceOperatorPubKey := setup.handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000001"].IdentityPublicKey
 	bobOperatorPubKey := setup.handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000002"].IdentityPublicKey
 	carolOperatorPubKey := setup.handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000003"].IdentityPublicKey
 
-	aliceSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+	aliceSecret := setup.fixtures.GeneratePrivateKey()
 	aliceSigningKeyshare := setup.client.SigningKeyshare.Create().
 		SetSecretShare(aliceSecret).
 		SetPublicKey(aliceSecret.Public()).
@@ -129,7 +127,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SetCoordinatorIndex(1).
 		SaveX(setup.ctx)
 
-	bobSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+	bobSecret := setup.fixtures.GeneratePrivateKey()
 	bobSigningKeyshare := setup.client.SigningKeyshare.Create().
 		SetSecretShare(bobSecret).
 		SetPublicKey(bobSecret.Public()).
@@ -139,7 +137,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SetCoordinatorIndex(1).
 		SaveX(setup.ctx)
 
-	carolSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+	carolSecret := setup.fixtures.GeneratePrivateKey()
 	carolSigningKeyshare := setup.client.SigningKeyshare.Create().
 		SetSecretShare(carolSecret).
 		SetPublicKey(carolSecret.Public()).
@@ -159,7 +157,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SetCreateID(tokenCreate.ID).
 		SaveX(setup.ctx)
 
-	withdrawRevocationCommitment := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	withdrawRevocationCommitment := setup.fixtures.GeneratePrivateKey().Public()
 	tokenOutputInDb := setup.client.TokenOutput.Create().
 		SetID(uuid.New()).
 		SetOwnerPublicKey(aliceOperatorPubKey).
@@ -235,7 +233,6 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 
 func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
-	rng := rand.NewChaCha8([32]byte{})
 
 	ctx, _ := db.ConnectToTestPostgres(t)
 	entTx, err := ent.GetTxFromContext(ctx)
@@ -260,7 +257,7 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 	setup.handler.config.SigningOperatorMap = limitedOps
 	setup.handler.config.Threshold = 2
 
-	priv := keys.MustGeneratePrivateKeyFromRand(rng)
+	priv := setup.fixtures.GeneratePrivateKey()
 	secretInt := new(big.Int).SetBytes(priv.Serialize())
 	shares, err := secretsharing.SplitSecret(secretInt, secp256k1.S256().N, 2, 3)
 	require.NoError(t, err)

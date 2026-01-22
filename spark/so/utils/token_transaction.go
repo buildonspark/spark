@@ -18,6 +18,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -1145,6 +1146,13 @@ func ValidatePartialTokenTransaction(
 		}
 		if *tokenTransaction.ValidityDurationSeconds == 0 {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("validity duration seconds must be greater than 0"))
+		}
+		if *tokenTransaction.ValidityDurationSeconds > uint64(spark.TokenMaxValidityDuration.Seconds()) {
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf(
+				"validity duration seconds too large: %d, maximum value: %d",
+				*tokenTransaction.ValidityDurationSeconds,
+				uint64(spark.TokenMaxValidityDuration.Seconds()),
+			))
 		}
 	} else if tokenTransaction.ValidityDurationSeconds != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("validity duration seconds should not be set by the client for v2 transactions"))

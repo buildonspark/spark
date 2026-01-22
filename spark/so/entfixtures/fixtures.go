@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/stretchr/testify/require"
 )
@@ -38,6 +39,11 @@ func (f *Fixtures) RandomBytes(n int) []byte {
 	b := make([]byte, n)
 	_, _ = f.rng.Read(b)
 	return b
+}
+
+// GeneratePrivateKey generates a private key using the fixture's RNG
+func (f *Fixtures) GeneratePrivateKey() keys.Private {
+	return keys.MustGeneratePrivateKeyFromRand(f.rng)
 }
 
 // RequireNoError is a convenience method for require.NoError
