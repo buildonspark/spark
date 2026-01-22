@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"go.uber.org/zap"
-
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -424,28 +422,24 @@ func CreateArchiveStaticDepositAddressStatement(ownerIdentityPubKey keys.Public,
 
 // Archives a specific static deposit address for a user during address rotation.
 // This marks the specific address as archived (is_default=false) on all SOs.
-// Archived addresses are still queryable and able to accept deposits.
-// The address parameter ensures idempotency and prevents race conditions during rotation.
+// The address parameter ensures idempotency and prevents race conditions.
 func (h *StaticDepositInternalHandler) ArchiveStaticDepositAddress(ctx context.Context, ownerIdentityPublicKey []byte, protoNetwork pb.Network, address string) error {
-	logger := logging.GetLoggerFromContext(ctx)
-	db, err := ent.GetDbFromContext(ctx)
+	ctx, span := tracer.Start(ctx, "StaticDepositInternalHandler.ArchiveStaticDepositAddress")
+	defer span.End()
+
+	network, err := btcnetwork.FromProtoNetwork(protoNetwork)
 	if err != nil {
-		logger.Error("failed to get database from context", zap.Error(err))
-		return fmt.Errorf("failed to get database from context: %w", err)
+		return fmt.Errorf("failed to parse network: %w", err)
 	}
 
-	// Parse owner identity public key
 	ownerIDPubKey, err := keys.ParsePublicKey(ownerIdentityPublicKey)
 	if err != nil {
-		logger.Error("failed to parse owner identity public key", zap.Error(err))
 		return fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
 
-	// Parse network
-	network, err := btcnetwork.FromProtoNetwork(protoNetwork)
+	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		logger.Error("failed to parse network", zap.Error(err))
-		return fmt.Errorf("failed to parse network: %w", err)
+		return fmt.Errorf("failed to get db: %w", err)
 	}
 
 	// Find the specific address to archive

@@ -9,21 +9,25 @@ import (
 	"strings"
 
 	"entgo.io/ent/dialect/sql"
-	"github.com/lightsparkdev/spark"
-	"github.com/lightsparkdev/spark/common/btcnetwork"
-	"github.com/lightsparkdev/spark/common/keys"
-	"github.com/lightsparkdev/spark/so/frost"
-	"go.uber.org/zap"
-
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
@@ -34,11 +38,10 @@ import (
 	entutxo "github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/frost"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/utils"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 const DefaultDepositConfirmationThreshold = uint(3)
@@ -295,7 +298,6 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		return nil, fmt.Errorf("failed to get or create current tx: %w", err)
 	}
 
-	// TODO(LIG-8000): remove when we have a way to support multiple static deposit addresses per (identity, network).
 	depositAddress, err := db.DepositAddress.Query().
 		Where(
 			depositaddress.OwnerIdentityPubkey(idPubKey),
@@ -582,6 +584,157 @@ func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, 
 			)
 	}
 	return addressSignatures, proofOfPossessionSignatures[0], nil
+}
+
+// Archives the current default Static Deposit Address and generates a new one
+// for a user. This method is useful when users want to obtain a new static deposit
+// address for privacy or security reasons.
+//
+// The method performs the following steps:
+//  1. Queries for the existing default static deposit address
+//  2. If no default address exists, returns an error
+//  3. Archives the existing default address (sets is_default = false)
+//  4. Sends a gossip message to other SOs commanding them to archive that
+//     specific address using a signed statement (idempotent handler).
+//  5. Generates a new default static deposit address using the same logic
+//     as GenerateStaticDepositAddress (involves sending another gossip via
+//     MarkKeyshareForDepositAddress)
+//  6. Returns both the new and archived addresses in the response
+//
+// Parameters:
+//   - SigningPublicKey: User's 33-byte secp256k1 public key for address generation
+//   - IdentityPublicKey: User's 33-byte identity key for authentication
+//   - Network: Target Bitcoin network (mainnet, testnet, regtest)
+//
+// Returns:
+//   - NewDepositAddress: The newly generated default static deposit address
+//   - ArchivedDepositAddress: The archived (previous default) static deposit address
+func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config *so.Config, req *pb.RotateStaticDepositAddressRequest) (*pb.RotateStaticDepositAddressResponse, error) {
+	ctx, span := tracer.Start(ctx, "DepositHandler.RotateStaticDepositAddress")
+	defer span.End()
+
+	network, err := btcnetwork.FromProtoNetwork(req.Network)
+	if err != nil {
+		return nil, err
+	}
+	if !config.IsNetworkSupported(network) {
+		return nil, fmt.Errorf("network not supported")
+	}
+	// Get the session from context
+	session, err := authn.GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Get the identity public key from the session
+	idPubKey := session.IdentityPublicKey() // Returns keys.Public
+
+	logger := logging.GetLoggerFromContext(ctx)
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get or create current tx: %w", err)
+	}
+
+	// Query for the existing default static deposit address
+	existingDefaultAddress, err := db.DepositAddress.Query().
+		Where(
+			depositaddress.OwnerIdentityPubkey(idPubKey),
+			depositaddress.IsStatic(true),
+			depositaddress.IsDefault(true),
+			depositaddress.NetworkEQ(network),
+		).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, errors.NotFoundMissingEntity(fmt.Errorf("no default static deposit address found for user; generate one first using generate_static_deposit_address"))
+		}
+		return nil, fmt.Errorf("failed to query static deposit address for user id %s: %w", idPubKey.Serialize(), err)
+	}
+
+	// Get keyshare for the existing address to construct the archived address response
+	existingKeyshare, err := existingDefaultAddress.QuerySigningKeyshare().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get keyshare for existing static deposit address id %s: %w", existingDefaultAddress.ID, err)
+	}
+
+	// Generate proofs for the existing address to include in the archived address response
+	existingAddressSignatures, existingProofOfPossession, err := generateStaticDepositAddressProofs(ctx, config, existingKeyshare, existingDefaultAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate proofs for existing static deposit address id %s: %w", existingDefaultAddress.ID, err)
+	}
+	if existingAddressSignatures == nil {
+		return nil, fmt.Errorf("existing static deposit address id %s does not have proofs on all operators", existingDefaultAddress.ID)
+	}
+
+	existingVerifyingKey := existingKeyshare.PublicKey.Add(existingDefaultAddress.OwnerSigningPubkey)
+
+	// Archive the existing default address by setting is_default to false
+	_, err = db.DepositAddress.Update().
+		Where(depositaddress.ID(existingDefaultAddress.ID)).
+		SetIsDefault(false).
+		Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to archive existing default static deposit address: %w", err)
+	}
+
+	logger.Sugar().Infof("Archived static deposit address %s with ID %s", existingDefaultAddress.Address, existingDefaultAddress.ID)
+
+	// Create statement and sign it with coordinator's identity key to prove authorization
+	messageHash, err := CreateArchiveStaticDepositAddressStatement(idPubKey, network, existingDefaultAddress.Address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create archive statement: %w", err)
+	}
+	signature := ecdsa.Sign(config.IdentityPrivateKey.ToBTCEC(), messageHash)
+
+	// Send gossip message to archive the address on all other SOs
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	participants, err := selection.OperatorIdentifierList(config)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get operator list: %w", err)
+	}
+
+	// Broadcast gossip to other SOs to archive a specific deposit address.
+	// This call is asynchronous ensuring eventual consistency.
+	// The signature prevents rogue SOs from archiving addresses without user authorization.
+	sendGossipHandler := NewSendGossipHandler(config)
+	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_ArchiveStaticDepositAddress{
+			ArchiveStaticDepositAddress: &pbgossip.GossipMessageArchiveStaticDepositAddress{
+				OwnerIdentityPublicKey: idPubKey.Serialize(),
+				Network:                req.Network,
+				Address:                existingDefaultAddress.Address,
+				Signature:              signature.Serialize(),
+				CoordinatorPublicKey:   config.IdentityPublicKey().Serialize(),
+			},
+		},
+	}, participants)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send gossip message to archive static deposit address: %w", err)
+	}
+
+	reqSigningPubKey, err := keys.ParsePublicKey(req.GetSigningPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse signing public key: %w", err)
+	}
+
+	depositAddressInfo, err := createStaticDepositAddress(ctx, config, network, idPubKey, reqSigningPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Sugar().Infof("Successfully rotated static deposit address. New address: %s, Archived address: %s", depositAddressInfo.Address, existingDefaultAddress.Address)
+
+	return &pb.RotateStaticDepositAddressResponse{
+		NewDepositAddress: depositAddressInfo,
+		ArchivedDepositAddress: &pb.Address{
+			Address:      existingDefaultAddress.Address,
+			VerifyingKey: existingVerifyingKey.Serialize(),
+			DepositAddressProof: &pb.DepositAddressProof{
+				AddressSignatures:          existingAddressSignatures,
+				ProofOfPossessionSignature: existingProofOfPossession,
+			},
+			IsStatic: true,
+		},
+	}, nil
 }
 
 // StartDepositTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.

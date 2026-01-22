@@ -177,6 +177,35 @@ func GenerateStaticDepositAddressDedicatedEndpoint(
 	return depositResp, nil
 }
 
+// RotateStaticDepositAddress rotates the static deposit address for a given identity and signing public key.
+// It archives the current default static deposit address and generates a new one.
+func RotateStaticDepositAddress(
+	ctx context.Context,
+	config *TestWalletConfig,
+	signingPubKey keys.Public,
+) (*pb.RotateStaticDepositAddressResponse, error) {
+	sparkConn, err := config.NewCoordinatorGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	rotateResp, err := sparkClient.RotateStaticDepositAddress(ctx, &pb.RotateStaticDepositAddressRequest{
+		SigningPublicKey: signingPubKey.Serialize(),
+		Network:          config.ProtoNetwork(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := validateDepositAddress(config, rotateResp.NewDepositAddress, signingPubKey, true); err != nil {
+		return nil, err
+	}
+	if err := validateDepositAddress(config, rotateResp.ArchivedDepositAddress, signingPubKey, true); err != nil {
+		return nil, err
+	}
+	return rotateResp, nil
+}
+
 func QueryUnusedDepositAddresses(
 	ctx context.Context,
 	config *TestWalletConfig,

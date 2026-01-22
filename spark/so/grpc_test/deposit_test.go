@@ -174,6 +174,93 @@ func TestGenerateStaticDepositAddressDedicatedEndpoint(t *testing.T) {
 	assert.Equal(t, resp2.DepositAddress.Address, queryStaticDepositAddresses.DepositAddresses[0].DepositAddress)
 }
 
+func TestRotateStaticDepositAddress(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+	token, err := wallet.AuthenticateWithServer(t.Context(), config)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	pubKey := keys.MustParsePublicKeyHex("0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7")
+
+	// First, generate a static deposit address
+	initialResp, err := wallet.GenerateStaticDepositAddress(ctx, config, pubKey)
+	require.NoError(t, err)
+	assert.True(t, initialResp.DepositAddress.IsStatic)
+	initialAddress := initialResp.DepositAddress.Address
+
+	// Query to verify there is one static deposit address
+	queryStaticDepositAddresses, err := wallet.QueryStaticDepositAddresses(ctx, config, pubKey)
+	require.NoError(t, err)
+	assert.Len(t, queryStaticDepositAddresses.DepositAddresses, 1)
+	assert.Equal(t, initialAddress, queryStaticDepositAddresses.DepositAddresses[0].DepositAddress)
+
+	// Rotate the static deposit address
+	rotateResp, err := wallet.RotateStaticDepositAddress(ctx, config, pubKey)
+	require.NoError(t, err)
+
+	// Verify the new address is different from the archived address
+	assert.NotEqual(t, rotateResp.NewDepositAddress.Address, rotateResp.ArchivedDepositAddress.Address)
+
+	// Verify the archived address matches the initial address
+	assert.Equal(t, initialAddress, rotateResp.ArchivedDepositAddress.Address)
+
+	// Verify both addresses are marked as static
+	assert.True(t, rotateResp.NewDepositAddress.IsStatic)
+	assert.True(t, rotateResp.ArchivedDepositAddress.IsStatic)
+
+	// Verify proofs are present for both addresses
+	require.NotNil(t, rotateResp.NewDepositAddress.DepositAddressProof)
+	require.Len(t, rotateResp.NewDepositAddress.DepositAddressProof.AddressSignatures, len(config.SigningOperators))
+	require.NotNil(t, rotateResp.ArchivedDepositAddress.DepositAddressProof)
+	require.Len(t, rotateResp.ArchivedDepositAddress.DepositAddressProof.AddressSignatures, len(config.SigningOperators))
+
+	// Query static deposit addresses again - should now have 2 addresses (new default + archived)
+	queryStaticDepositAddresses, err = wallet.QueryStaticDepositAddresses(ctx, config, pubKey)
+	require.NoError(t, err)
+	assert.Len(t, queryStaticDepositAddresses.DepositAddresses, 2)
+
+	// Verify the new default address is in the list
+	foundNewAddress := false
+	foundArchivedAddress := false
+	for _, addr := range queryStaticDepositAddresses.DepositAddresses {
+		if addr.DepositAddress == rotateResp.NewDepositAddress.Address {
+			foundNewAddress = true
+		}
+		if addr.DepositAddress == rotateResp.ArchivedDepositAddress.Address {
+			foundArchivedAddress = true
+		}
+	}
+	assert.True(t, foundNewAddress, "New default address should be in the query results")
+	assert.True(t, foundArchivedAddress, "Archived address should still be in the query results")
+
+	// Calling GenerateStaticDepositAddress again should return the new rotated address, not create another one
+	resp2, err := wallet.GenerateStaticDepositAddress(ctx, config, pubKey)
+	require.NoError(t, err)
+	assert.Equal(t, rotateResp.NewDepositAddress.Address, resp2.DepositAddress.Address)
+
+	// Verify no additional addresses were created
+	queryStaticDepositAddresses, err = wallet.QueryStaticDepositAddresses(ctx, config, pubKey)
+	require.NoError(t, err)
+	assert.Len(t, queryStaticDepositAddresses.DepositAddresses, 2)
+}
+
+func TestRotateStaticDepositAddressWithoutExistingAddress(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+	token, err := wallet.AuthenticateWithServer(t.Context(), config)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	pubKey := keys.MustParsePublicKeyHex("0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7")
+
+	// Try to rotate without having generated a static deposit address first
+	_, err = wallet.RotateStaticDepositAddress(ctx, config, pubKey)
+	require.Error(t, err)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.NotFound, grpcStatus.Code())
+	assert.Contains(t, grpcStatus.Message(), "no default static deposit address found")
+}
+
 func TestStartDepositTreeCreationBasic(t *testing.T) {
 	config := wallet.NewTestWalletConfig(t)
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
