@@ -940,19 +940,14 @@ type InferrableTokenTransaction interface {
 
 // InferTokenTransactionType validates that exactly one input type is present and returns it
 func InferTokenTransactionType(tokenTransaction InferrableTokenTransaction) (TokenTransactionType, error) {
-	hasCreateInput := tokenTransaction.GetCreateInput() != nil
-	hasMintInput := tokenTransaction.GetMintInput() != nil
-
-	var inputType TokenTransactionType
-	if hasCreateInput {
-		inputType = TokenTransactionTypeCreate
-	} else if hasMintInput {
-		inputType = TokenTransactionTypeMint
-	} else {
-		// If no create or mint, assume its a transfer.
-		inputType = TokenTransactionTypeTransfer
+	if tokenTransaction.GetCreateInput() != nil {
+		return TokenTransactionTypeCreate, nil
 	}
-	return inputType, nil
+	if tokenTransaction.GetMintInput() != nil {
+		return TokenTransactionTypeMint, nil
+	}
+	// If no create or mint, assume its a transfer.
+	return TokenTransactionTypeTransfer, nil
 }
 
 // IsFinalTokenTransaction checks if a token transaction has all SO-filled fields present,

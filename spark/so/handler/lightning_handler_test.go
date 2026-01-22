@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math/rand/v2"
@@ -354,8 +355,8 @@ func TestGetSigningCommitments(t *testing.T) {
 	signingHandler := NewSigningHandler(config)
 
 	manyNodeIDs := make([]string, 1001)
-	for i := 0; i < 1001; i++ {
-		manyNodeIDs[i] = uuid.New().String()
+	for i := range manyNodeIDs {
+		manyNodeIDs[i] = uuid.NewString()
 	}
 
 	tests := []struct {
@@ -706,7 +707,7 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				// Create 101 transactions to exceed the default limit of 100
 				leaves := make([]*pb.UserSignedTxSigningJob, 101)
-				for i := 0; i < 101; i++ {
+				for i := range leaves {
 					leaves[i] = &pb.UserSignedTxSigningJob{
 						LeafId:                 fmt.Sprintf("550e8400-e29b-41d4-a716-44665544%04d", i),
 						SigningCommitments:     &pb.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{}},
@@ -1021,10 +1022,7 @@ func TestSendLightningLeafDuplicationBug(t *testing.T) {
 			0xFF, 0xFF, 0xFF, 0xFF, // sequence
 			0x01, // output count
 		}
-		valueBytes := make([]byte, 8)
-		for i := 0; i < 8; i++ {
-			valueBytes[i] = byte(value >> (i * 8))
-		}
+		valueBytes := binary.LittleEndian.AppendUint64(nil, value)
 		mockTx = append(mockTx, valueBytes...)
 		// Add minimal script (P2TR-like)
 		mockScript := []byte{

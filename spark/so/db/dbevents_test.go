@@ -295,8 +295,8 @@ func TestDBEventsProcessesBatchesAcrossCursor(t *testing.T) {
 	defer cleanup()
 
 	createEvents := func(start, count int) []string {
-		ids := make([]string, 0, count)
-		for i := 0; i < count; i++ {
+		ids := make([]string, count)
+		for i := range count {
 			id := fmt.Sprintf("event-%d", start+i)
 			payload := map[string]any{
 				"id":              id,
@@ -310,7 +310,7 @@ func TestDBEventsProcessesBatchesAcrossCursor(t *testing.T) {
 				SetPayload(string(payloadJSON)).
 				Save(t.Context())
 			require.NoError(t, err)
-			ids = append(ids, id)
+			ids[i] = id
 		}
 		return ids
 	}

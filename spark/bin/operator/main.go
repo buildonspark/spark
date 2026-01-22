@@ -461,8 +461,6 @@ func main() {
 	if !args.DisableChainwatcher {
 		// Chain watchers
 		for network, bitcoindConfig := range config.BitcoindConfigs {
-			network := network
-			bitcoindConfig := bitcoindConfig
 			errGrp.Go(func() error {
 				chainCtx, chainCancel := context.WithCancel(errCtx)
 				defer chainCancel()
@@ -471,13 +469,7 @@ func main() {
 				chainCtx = logging.Inject(chainCtx, chainLogger)
 				chainCtx = knobs.InjectKnobsService(chainCtx, knobsService)
 
-				err := chain.WatchChain(
-					chainCtx,
-					config,
-					dbClient,
-					bitcoindConfig,
-				)
-				if err != nil {
+				if err := chain.WatchChain(chainCtx, config, dbClient, bitcoindConfig); err != nil {
 					logger.Error("Error in chain watcher", zap.Error(err))
 					return err
 				}

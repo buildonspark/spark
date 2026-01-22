@@ -165,9 +165,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 	case utils.TokenTransactionTypeTransfer:
 		// Include the coordinator's own signature when exchanging shares so peers validate against all operators
 		allOperatorSignatures := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, len(internalSignatures)+1)
-		for k, v := range internalSignatures {
-			allOperatorSignatures[k] = v
-		}
+		maps.Copy(allOperatorSignatures, internalSignatures)
 		allOperatorSignatures[h.config.Identifier] = localResp
 		if response, err := h.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, req.FinalTokenTransaction, allOperatorSignatures, req.FinalTokenTransactionHash); err != nil {
 			return nil, err
@@ -456,14 +454,7 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 		vout := int32(outputToSpend.GetPrevTokenTransactionVout())
 		// Deduplicate vouts per hash to keep predicates minimal
 		existing := voutsByPrevHash[key]
-		seen := false
-		for _, existingVout := range existing {
-			if existingVout == vout {
-				seen = true
-				break
-			}
-		}
-		if !seen {
+		if !slices.Contains(existing, vout) {
 			voutsByPrevHash[key] = append(existing, vout)
 		}
 	}
@@ -497,11 +488,8 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 
 		// Find matching outputs by vout
 		for _, createdOutput := range transaction.Edges.CreatedOutput {
-			for _, vout := range vouts {
-				if createdOutput.CreatedTransactionOutputVout == vout {
-					outputIDs = append(outputIDs, createdOutput.ID)
-					break
-				}
+			if slices.Contains(vouts, createdOutput.CreatedTransactionOutputVout) {
+				outputIDs = append(outputIDs, createdOutput.ID)
 			}
 		}
 	}

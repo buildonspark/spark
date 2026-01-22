@@ -44,7 +44,6 @@ func TestSparkInvoiceFieldsJSONCases(t *testing.T) {
 	}
 
 	for _, tc := range file.TestCases {
-		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
 			var msg pb.SparkInvoiceFields
 			if err := protojson.Unmarshal(tc.SparkInvoiceFields, &msg); err != nil {

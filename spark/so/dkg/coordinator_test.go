@@ -3,7 +3,6 @@ package dkg
 import (
 	"context"
 	"net"
-	"os"
 	"testing"
 	"time"
 
@@ -26,7 +25,7 @@ import (
 func TestMain(m *testing.M) {
 	stop := db.StartPostgresServer()
 	defer stop()
-	os.Exit(m.Run())
+	m.Run()
 }
 
 // mockDKGServiceServer implements a mock DKG service for testing confirmation flow
@@ -204,7 +203,7 @@ func createPendingKeyshares(t *testing.T, ctx context.Context, client *ent.Clien
 	t.Helper()
 
 	keyIDs := make([]uuid.UUID, count)
-	for i := 0; i < count; i++ {
+	for i := range keyIDs {
 		id := uuid.New()
 		keyIDs[i] = id
 
@@ -257,7 +256,7 @@ func setupMockDKGServers(t *testing.T, keyIDs []uuid.UUID, unavailableDelay time
 
 	// Set up 2 mock servers (simulating other operators, excluding self)
 	servers := make([]*mockServerWrapper, 2)
-	for i := 0; i < 2; i++ {
+	for i := range servers {
 		// Create available keys map
 		availableKeys := make(map[string]bool)
 		for _, id := range keyIDs {

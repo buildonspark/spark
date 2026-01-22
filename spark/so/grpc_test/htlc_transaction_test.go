@@ -213,7 +213,7 @@ func createSenderSpendTx(t *testing.T, htlcTx *wire.MsgTx, senderKey keys.Privat
 	sequenceLockLeaf := txscript.NewBaseTapLeaf(sequenceLockScript)
 
 	// Create hash lock script (needed for taproot tree)
-	hashLockScript, err := bitcointransaction.CreateHashLockScript(paymentHash[:], receiverPubKey)
+	hashLockScript, err := bitcointransaction.CreateHashLockScript(paymentHash, receiverPubKey)
 	require.NoError(t, err)
 	hashLockLeaf := txscript.NewBaseTapLeaf(hashLockScript)
 

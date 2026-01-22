@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -28,14 +29,7 @@ func validateStatuses(
 ) []error {
 	var invalidOutputs []error
 	for i, output := range outputs {
-		matchesExpected := false
-		for _, status := range expectedStatuses {
-			if output.Status == status {
-				matchesExpected = true
-				break
-			}
-		}
-		if !matchesExpected {
+		if !slices.Contains(expectedStatuses, output.Status) {
 			var expectedDesc string
 			if len(expectedStatuses) == 1 {
 				expectedDesc = string(expectedStatuses[0])

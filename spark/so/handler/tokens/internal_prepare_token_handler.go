@@ -285,7 +285,7 @@ func validateTransferOwnerSignatures(operatorIdentityPublicKey keys.Public, owne
 		signaturesByIndex[index] = sig
 	}
 
-	for i := 0; i < numInputs; i++ {
+	for i := range numInputs {
 		if signaturesByIndex[i] == nil {
 			return tokens.FormatErrorWithTransactionEnt(
 				fmt.Sprintf("missing signature for input index %d", i),
@@ -1031,14 +1031,7 @@ func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction 
 			key := hex.EncodeToString(prevHash)
 			hashBytesByKey[key] = prevHash
 			existing := voutsByPrevHash[key]
-			seen := false
-			for _, v := range existing {
-				if v == prevVout {
-					seen = true
-					break
-				}
-			}
-			if !seen {
+			if !slices.Contains(existing, prevVout) {
 				voutsByPrevHash[key] = append(existing, prevVout)
 			}
 		}

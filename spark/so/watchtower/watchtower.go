@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -94,14 +95,12 @@ func alreadyBroadcasted(err error) bool {
 func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHeight int64, network btcnetwork.Network) ([]*ent.TreeNode, error) {
 	var childNodes, refundNodes []*ent.TreeNode
 
-	//1. Child nodes whose parent is confirmed but the node itself is not.
+	// 1. Child nodes whose parent is confirmed but the node itself is not.
 	childNodes, err := dbClient.TreeNode.Query().
 		Where(
 			treenode.HasParentWith(
-				treenode.And(
-					treenode.NodeConfirmationHeightNotNil(),
-					treenode.NodeConfirmationHeightGT(0),
-				),
+				treenode.NodeConfirmationHeightNotNil(),
+				treenode.NodeConfirmationHeightGT(0),
 			),
 			treenode.NodeConfirmationHeightIsNil(),
 			treenode.NetworkEQ(network),
@@ -126,9 +125,7 @@ func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHei
 	}
 
 	// Deduplicate nodes.
-	allNodes := make([]*ent.TreeNode, 0, len(childNodes)+len(refundNodes))
-	allNodes = append(allNodes, childNodes...)
-	allNodes = append(allNodes, refundNodes...)
+	allNodes := slices.Concat(childNodes, refundNodes)
 
 	uniqueNodes := make([]*ent.TreeNode, 0, len(allNodes))
 	seen := make(map[uuid.UUID]struct{})

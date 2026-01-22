@@ -95,7 +95,7 @@ func TestBitMap_IsAllSet(t *testing.T) {
 	}
 
 	// Set all bits
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		bm.Set(i, true)
 	}
 	if !bm.IsAllSet() {
@@ -112,7 +112,7 @@ func TestBitMap_IsAllSet(t *testing.T) {
 	bm2 := NewBitMap(16)
 
 	// Set all bits
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		bm2.Set(i, true)
 	}
 	if !bm2.IsAllSet() {

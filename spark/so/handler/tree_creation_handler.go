@@ -624,7 +624,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		}
 		nodes = append(nodes, node)
 		if currentElement.node.RefundTxSigningJob != nil {
-			if len(cpfpTx.TxOut) <= 0 {
+			if len(cpfpTx.TxOut) == 0 {
 				return nil, nil, fmt.Errorf("vout out of bounds for cpfp node tx, need at least one output")
 			}
 			cpfpRefundSigningJob, _, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.RefundTxSigningJob, cpfpTx.TxOut[0])
@@ -633,7 +633,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			}
 			signingJobs = append(signingJobs, cpfpRefundSigningJob)
 			if currentElement.node.DirectRefundTxSigningJob != nil && currentElement.node.DirectFromCpfpRefundTxSigningJob != nil {
-				if len(directTx.TxOut) <= 0 {
+				if len(directTx.TxOut) == 0 {
 					return nil, nil, fmt.Errorf("vout out of bounds for cpfp node tx, need at least one output")
 				}
 				directRefundSigningJob, _, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.DirectRefundTxSigningJob, directTx.TxOut[0])

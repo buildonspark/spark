@@ -291,7 +291,7 @@ func TestGenerateDepositAddressBlocksUnusedAddress(t *testing.T) {
 		testSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 		// Create DefaultMaxUnusedDepositAddresses unused non-static deposit addresses
-		for i := 0; i < DefaultMaxUnusedDepositAddresses; i++ {
+		for i := range DefaultMaxUnusedDepositAddresses {
 			secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
 
 			signingKeyshare, err := tx.SigningKeyshare.Create().
@@ -773,14 +773,14 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create multiple UTXOs with sufficient confirmations
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			_, err := tx.Utxo.Create().
 				SetNetwork(btcnetwork.Regtest).
-				SetTxid([]byte(fmt.Sprintf("test_txid_%d", i))).
+				SetTxid(fmt.Appendf(nil, "test_txid_%d", i)).
 				SetVout(uint32(i)).
 				SetBlockHeight(int64(100 + i)).
 				SetAmount(uint64(1000 + i*100)).
-				SetPkScript([]byte(fmt.Sprintf("test_script_%d", i))).
+				SetPkScript(fmt.Appendf(nil, "test_script_%d", i)).
 				SetDepositAddress(depositAddress).
 				Save(ctx)
 			require.NoError(t, err)

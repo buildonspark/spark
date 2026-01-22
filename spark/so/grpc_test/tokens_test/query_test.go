@@ -683,15 +683,10 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
-			result, err := wallet.QueryTokenTransactions(
-				t.Context(),
-				config,
-				tc.params,
-			)
+			result, err := wallet.QueryTokenTransactions(t.Context(), config, tc.params)
 			require.NoError(t, err, "failed to query token transactions")
 
-			require.Len(t, result.TokenTransactionsWithStatus, tc.expectedTxCount,
-				"expected %d transactions but got %d", tc.expectedTxCount, len(result.TokenTransactionsWithStatus))
+			require.Len(t, result.TokenTransactionsWithStatus, tc.expectedTxCount)
 
 			foundHashes := make(map[string]bool)
 			for _, txWithStatus := range result.TokenTransactionsWithStatus {
@@ -699,8 +694,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 			}
 
 			for _, expectedHash := range tc.shouldContainTxHashes {
-				require.True(t, foundHashes[string(expectedHash)],
-					"expected to find transaction hash %x in results", expectedHash)
+				require.Containsf(t, foundHashes, string(expectedHash), "expected to find transaction hash %x in results", expectedHash)
 			}
 		})
 	}
@@ -886,7 +880,7 @@ func TestQueryTokenTransactionsLimitCapping(t *testing.T) {
 
 	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 		require.NoError(t, err, "failed to create mint transaction %d", i+1)
 
@@ -1223,7 +1217,7 @@ func TestQueryTokenTransactionsEdgeCases(t *testing.T) {
 
 	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
 		require.NoError(t, err, "failed to create mint transaction %d", i+1)
 
@@ -1310,9 +1304,9 @@ func TestQueryTokenTransactionsPagination(t *testing.T) {
 	tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
 
 	var transactionHashes [][]byte
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
-		require.NoError(t, err, "failed to create mint transaction %d", i+1)
+		require.NoErrorf(t, err, "failed to create mint transaction %d", i+1)
 
 		finalMintTx, err := broadcastTokenTransaction(
 			t,
@@ -1321,10 +1315,10 @@ func TestQueryTokenTransactionsPagination(t *testing.T) {
 			mintTx,
 			[]keys.Private{issuerPrivKey},
 		)
-		require.NoError(t, err, "failed to broadcast mint transaction %d", i+1)
+		require.NoErrorf(t, err, "failed to broadcast mint transaction %d", i+1)
 
 		txHash, err := utils.HashTokenTransaction(finalMintTx, false)
-		require.NoError(t, err, "failed to hash mint transaction %d", i+1)
+		require.NoErrorf(t, err, "failed to hash mint transaction %d", i+1)
 		transactionHashes = append(transactionHashes, txHash)
 
 		time.Sleep(100 * time.Millisecond)
@@ -1345,7 +1339,7 @@ func TestQueryTokenTransactionsPagination(t *testing.T) {
 					Order:            sparkpb.Order_ASCENDING,
 				},
 			)
-			require.NoError(t, err, "failed to query page at offset %d", offset)
+			require.NoErrorf(t, err, "failed to query page at offset %d", offset)
 
 			allTransactions = append(allTransactions, result.TokenTransactionsWithStatus...)
 
@@ -1358,8 +1352,7 @@ func TestQueryTokenTransactionsPagination(t *testing.T) {
 		require.Len(t, allTransactions, 5, "should have retrieved all 5 transactions")
 
 		for i, tx := range allTransactions {
-			require.Equal(t, transactionHashes[i], tx.TokenTransactionHash,
-				"transaction %d hash should match", i)
+			require.Equalf(t, transactionHashes[i], tx.TokenTransactionHash, "transaction %d hash should match", i)
 		}
 	})
 
@@ -1391,12 +1384,12 @@ func TestQueryTokenTransactionsPagination(t *testing.T) {
 		require.Len(t, page1.TokenTransactionsWithStatus, 3)
 		require.Len(t, page2.TokenTransactionsWithStatus, 2)
 
-		require.Equal(t, transactionHashes[0], page1.TokenTransactionsWithStatus[0].TokenTransactionHash)
-		require.Equal(t, transactionHashes[1], page1.TokenTransactionsWithStatus[1].TokenTransactionHash)
-		require.Equal(t, transactionHashes[2], page1.TokenTransactionsWithStatus[2].TokenTransactionHash)
+		assert.Equal(t, transactionHashes[0], page1.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		assert.Equal(t, transactionHashes[1], page1.TokenTransactionsWithStatus[1].TokenTransactionHash)
+		assert.Equal(t, transactionHashes[2], page1.TokenTransactionsWithStatus[2].TokenTransactionHash)
 
-		require.Equal(t, transactionHashes[3], page2.TokenTransactionsWithStatus[0].TokenTransactionHash)
-		require.Equal(t, transactionHashes[4], page2.TokenTransactionsWithStatus[1].TokenTransactionHash)
+		assert.Equal(t, transactionHashes[3], page2.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		assert.Equal(t, transactionHashes[4], page2.TokenTransactionsWithStatus[1].TokenTransactionHash)
 	})
 
 	t.Run("last page returns offset -1", func(t *testing.T) {
@@ -1410,8 +1403,8 @@ func TestQueryTokenTransactionsPagination(t *testing.T) {
 			},
 		)
 		require.NoError(t, err, "failed to query last page")
-		require.Len(t, result.TokenTransactionsWithStatus, 2, "expected 2 remaining transactions")
-		require.Equal(t, int64(-1), result.Offset, "last page should have offset -1")
+		assert.Len(t, result.TokenTransactionsWithStatus, 2, "expected 2 remaining transactions")
+		assert.Equal(t, int64(-1), result.Offset, "last page should have offset -1")
 	})
 }
 

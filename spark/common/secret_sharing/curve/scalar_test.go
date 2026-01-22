@@ -35,8 +35,8 @@ func TestScalarGenerate(t *testing.T) {
 
 func TestScalarSerializeSmall(t *testing.T) {
 	a := ScalarFromInt(0x04_03_02_01)
-	aBytes := a.Serialize()   // Big endian
-	slices.Reverse(aBytes[:]) // Change to little endian
+	aBytes := a.Serialize() // Big endian
+	slices.Reverse(aBytes)  // Change to little endian
 
 	for i, aByte := range aBytes {
 		if i < 4 {

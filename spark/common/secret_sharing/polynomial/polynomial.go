@@ -142,7 +142,7 @@ func (p *InterpolatingPointPolynomial) Encode() InterpolatingPointPolynomialByte
 	var encoding []byte
 	for _, eval := range p.standardEvals {
 		yEncoding := eval.Y.Serialize()
-		encoding = append(encoding, yEncoding[:]...)
+		encoding = append(encoding, yEncoding...)
 	}
 	return encoding
 }
@@ -254,7 +254,7 @@ func (p *PointPolynomial) Encode() PointPolynomialBytes {
 	var encoding []byte
 	for _, coef := range p.Coefs {
 		coefEncoding := coef.Serialize()
-		encoding = append(encoding, coefEncoding[:]...)
+		encoding = append(encoding, coefEncoding...)
 	}
 	return encoding
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so/utils"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -498,11 +499,11 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 	require.NoError(t, err, "failed to query spark invoices")
 	require.Len(t, invoiceResponse.InvoiceStatuses, len(invoicesToQuery))
 	for i, invoiceResponse := range invoiceResponse.InvoiceStatuses {
-		require.Equal(t, invoiceResponse.Invoice, invoicesToQuery[i])
-		require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, invoiceResponse.Status)
-		require.Equal(t, &sparkpb.InvoiceResponse_TokenTransfer{
+		assert.Equal(t, invoiceResponse.Invoice, invoicesToQuery[i])
+		assert.Equal(t, sparkpb.InvoiceStatus_FINALIZED, invoiceResponse.Status)
+		assert.EqualExportedValues(t, &sparkpb.InvoiceResponse_TokenTransfer{
 			TokenTransfer: &sparkpb.TokenTransfer{
-				FinalTokenTransactionHash: finalTxHash[:],
+				FinalTokenTransactionHash: finalTxHash,
 			},
 		}, invoiceResponse.TransferType)
 	}

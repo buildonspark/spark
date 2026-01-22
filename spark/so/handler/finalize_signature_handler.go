@@ -431,7 +431,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to deserialize cpfp leaf tx: %w", err)
 		}
-		if len(cpfpTreeNodeTx.TxOut) <= 0 {
+		if len(cpfpTreeNodeTx.TxOut) == 0 {
 			return nil, nil, fmt.Errorf("cpfp vout out of bounds")
 		}
 		err = common.VerifySignatureSingleInput(cpfpRefundTx, 0, cpfpTreeNodeTx.TxOut[0])
@@ -451,7 +451,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			if err != nil {
 				return nil, nil, fmt.Errorf("unable to deserialize direct leaf tx: %w", err)
 			}
-			if len(directTreeNodeTx.TxOut) <= 0 {
+			if len(directTreeNodeTx.TxOut) == 0 {
 				return nil, nil, fmt.Errorf("direct vout out of bounds")
 			}
 			err = common.VerifySignatureSingleInput(directRefundTx, 0, directTreeNodeTx.TxOut[0])
@@ -501,17 +501,12 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		SetDirectRefundTx(directRefundTxBytes).
 		SetDirectFromCpfpRefundTx(directFromCpfpRefundTxBytes)
 	if treeEnt.Status == st.TreeStatusAvailable && tree.TreeNodeCanBecomeAvailable(node) {
-		if len(node.RawRefundTx) > 0 && !hasChildren {
-			if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobEnableStrictFinalizeSignature, 0) {
-				nodeMutator.SetStatus(st.TreeNodeStatusAvailable)
-			} else {
-				if (intent == pbcommon.SignatureIntent_CREATION && node.Status == st.TreeNodeStatusCreating) ||
-					(intent == pbcommon.SignatureIntent_TRANSFER) {
-					nodeMutator.SetStatus(st.TreeNodeStatusAvailable)
-				}
-			}
-		} else {
+		if len(node.RawRefundTx) == 0 || hasChildren {
 			nodeMutator.SetStatus(st.TreeNodeStatusSplitted)
+		} else if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobEnableStrictFinalizeSignature, 0) {
+			nodeMutator.SetStatus(st.TreeNodeStatusAvailable)
+		} else if (intent == pbcommon.SignatureIntent_CREATION && node.Status == st.TreeNodeStatusCreating) || intent == pbcommon.SignatureIntent_TRANSFER {
+			nodeMutator.SetStatus(st.TreeNodeStatusAvailable)
 		}
 	}
 	node, err = nodeMutator.Save(ctx)

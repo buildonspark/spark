@@ -1,6 +1,7 @@
 package knobs
 
 import (
+	"maps"
 	"sync"
 	"testing"
 
@@ -97,9 +98,7 @@ func TestKnobsK8ValuesProvider_HandleConfigMap(t *testing.T) {
 			// Verify expected values
 			provider.lock.RLock()
 			actualValues := make(map[string]float64)
-			for key, value := range provider.values {
-				actualValues[key] = value
-			}
+			maps.Copy(actualValues, provider.values)
 			provider.lock.RUnlock()
 
 			assert.Equal(t, tt.expectedValues, actualValues, "ConfigMap values should match expected values")

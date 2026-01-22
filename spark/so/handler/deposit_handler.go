@@ -1152,7 +1152,7 @@ func VerifiedTargetUtxoFromRequest(ctx context.Context, config *so.Config, db *e
 
 	targetUtxo, err := db.Utxo.Query().
 		Where(entutxo.NetworkEQ(network)).
-		Where(entutxo.Txid(reqUtxo.Txid[:])).
+		Where(entutxo.Txid(reqUtxo.Txid)).
 		Where(entutxo.Vout(reqUtxo.Vout)).
 		Only(ctx)
 	if err != nil {

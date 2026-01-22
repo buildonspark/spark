@@ -362,7 +362,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return fmt.Errorf("cpfp refund tx must spend from cpfp tx for tree_node id: %s", nodeID)
 		}
 
-		if len(cpfpTx.TxOut) <= 0 {
+		if len(cpfpTx.TxOut) == 0 {
 			return fmt.Errorf("cpfpTx vout out of bounds for cpfpTransaction, tree_node id: %s", nodeID)
 		}
 		cpfpSighash, err := common.SigHashFromTx(cpfpRefundTx, 0, cpfpTx.TxOut[0])
@@ -435,7 +435,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return fmt.Errorf("direct refund tx must spend from direct tx for tree_node id: %s", nodeID)
 		}
 
-		if len(directTx.TxOut) <= 0 {
+		if len(directTx.TxOut) == 0 {
 			return fmt.Errorf("direct tx vout out of bounds for directTransaction, tree_node id: %s", nodeID)
 		}
 		directSighash, err := common.SigHashFromTx(directRefundTx, 0, directTx.TxOut[0])
@@ -508,7 +508,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return fmt.Errorf("direct from cpfp refund tx must spend from cpfp tx for tree_node id: %s", nodeID)
 		}
 
-		if len(cpfpTx.TxOut) <= 0 {
+		if len(cpfpTx.TxOut) == 0 {
 			return fmt.Errorf("direct from cpfp vout out of bounds for directFromCpfpTransaction, tree_node id: %s", nodeID)
 		}
 		directFromCpfpSighash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpTx.TxOut[0])
@@ -552,7 +552,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if err != nil {
 			return fmt.Errorf("unable to extract pubkey from tx: %w", err)
 		}
-		if len(cpfpRefundTx.TxOut) <= 0 {
+		if len(cpfpRefundTx.TxOut) == 0 {
 			return fmt.Errorf("cpfp tx vout out of bounds")
 		}
 		if !bytes.Equal(pubkeyScript, cpfpRefundTx.TxOut[0].PkScript) {
@@ -573,7 +573,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if err != nil {
 			return fmt.Errorf("unable to extract pubkey from tx for directTransaction leaf_id: %s: %w", directTransaction.LeafId, err)
 		}
-		if len(directRefundTx.TxOut) <= 0 {
+		if len(directRefundTx.TxOut) == 0 {
 			return fmt.Errorf("direct tx vout out of bounds for directTransaction leaf_id: %s", directTransaction.LeafId)
 		}
 		if !bytes.Equal(pubkeyScript, directRefundTx.TxOut[0].PkScript) {
@@ -593,7 +593,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if err != nil {
 			return fmt.Errorf("unable to extract pubkey from tx for directFromCpfpTransaction leaf_id: %s: %w", directFromCpfpTransaction.LeafId, err)
 		}
-		if len(directFromCpfpRefundTx.TxOut) <= 0 {
+		if len(directFromCpfpRefundTx.TxOut) == 0 {
 			return fmt.Errorf("direct from cpfp tx vout out of bounds for directFromCpfpTransaction leaf_id: %s", directFromCpfpTransaction.LeafId)
 		}
 		if !bytes.Equal(pubkeyScript, directFromCpfpRefundTx.TxOut[0].PkScript) {

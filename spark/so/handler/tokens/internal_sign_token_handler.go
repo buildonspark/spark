@@ -7,6 +7,7 @@ import (
 	stderrors "errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"strconv"
 	"time"
 
@@ -493,22 +494,14 @@ func (h *InternalSignTokenHandler) getSecretSharesNotInInput(ctx context.Context
 	var outputsWithKeyShares []*ent.TokenOutput
 
 	for i := 0; i < len(uniqueTokenOutputIDs); i += batchSize {
-		end := i + batchSize
-		if end > len(uniqueTokenOutputIDs) {
-			end = len(uniqueTokenOutputIDs)
-		}
+		end := min(i+batchSize, len(uniqueTokenOutputIDs))
 
 		batchOutputIDs := uniqueTokenOutputIDs[i:end]
 
 		var excludeKeyshareTokenOutputIDs []any
 		for shareKey := range inputOperatorShareMap {
-			for _, outputID := range batchOutputIDs {
-				if shareKey.TokenOutputID == outputID {
-					if shareKey.OperatorIdentityPublicKey.Equals(thisOperatorIdentityPubkey) {
-						excludeKeyshareTokenOutputIDs = append(excludeKeyshareTokenOutputIDs, shareKey.TokenOutputID)
-					}
-					break
-				}
+			if shareKey.OperatorIdentityPublicKey == thisOperatorIdentityPubkey && slices.Contains(batchOutputIDs, shareKey.TokenOutputID) {
+				excludeKeyshareTokenOutputIDs = append(excludeKeyshareTokenOutputIDs, shareKey.TokenOutputID)
 			}
 		}
 		batchOutputs, err := db.TokenOutput.Query().Where(tokenoutput.IDIn(batchOutputIDs...)).
@@ -561,12 +554,9 @@ func (h *InternalSignTokenHandler) getPartialRevocationSecretShares(
 	var excludeOutputIDs []uuid.UUID
 	var excludeOperatorKeys [][]byte
 	for shareKey, shareValue := range inputOperatorShareMap {
-		for _, outputID := range batchOutputIDs {
-			if shareKey.TokenOutputID == outputID {
-				excludeOutputIDs = append(excludeOutputIDs, shareKey.TokenOutputID)
-				excludeOperatorKeys = append(excludeOperatorKeys, shareValue.OperatorIdentityPublicKey.Serialize())
-				break
-			}
+		if slices.Contains(batchOutputIDs, shareKey.TokenOutputID) {
+			excludeOutputIDs = append(excludeOutputIDs, shareKey.TokenOutputID)
+			excludeOperatorKeys = append(excludeOperatorKeys, shareValue.OperatorIdentityPublicKey.Serialize())
 		}
 	}
 
@@ -805,10 +795,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalize(ctx c
 	outputsWithShares := make(map[uuid.UUID]*ent.TokenOutput)
 
 	for i := 0; i < len(outputIDs); i += batchSize {
-		end := i + batchSize
-		if end > len(outputIDs) {
-			end = len(outputIDs)
-		}
+		end := min(i+batchSize, len(outputIDs))
 
 		batchOutputIDs := outputIDs[i:end]
 		batchOutputs, err := db.TokenOutput.Query().

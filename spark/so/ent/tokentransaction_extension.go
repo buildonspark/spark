@@ -827,7 +827,7 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 	// V3 deterministic ordering: sort operator keys and invoices
 	if uint32(t.Version) == 3 {
 		// Sort operator keys bytewise ascending
-		slices.SortFunc(operatorPublicKeys, func(a, b []byte) int { return bytes.Compare(a, b) })
+		slices.SortFunc(operatorPublicKeys, bytes.Compare)
 
 		// Sort invoices lexicographically by the invoice attachment string
 		slices.SortFunc(invoiceAttachments, func(a, b *tokenpb.InvoiceAttachment) int {

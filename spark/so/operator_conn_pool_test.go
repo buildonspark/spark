@@ -41,7 +41,7 @@ func TestOperatorConnPoolAutoScaleAndRelease(t *testing.T) {
 	}, nil)
 
 	var handles []OperatorClientConn
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		conn, err := pool.getConnection()
 		if err != nil {
 			t.Fatalf("getConnection failed: %v", err)

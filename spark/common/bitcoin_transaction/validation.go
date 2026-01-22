@@ -374,7 +374,7 @@ func NextSequence(currSequence uint32) (nextSequence uint32, nextDirectSequence 
 	}
 
 	// reset timelock
-	currSequence = currSequence & 0xFFFF0000
+	currSequence &= 0xFFFF0000
 
 	// Construct the new sequence
 	nextSequence = uint32(nextTimelock) | currSequence

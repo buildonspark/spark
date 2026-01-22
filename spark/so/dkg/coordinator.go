@@ -83,9 +83,7 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 
 	// Round 1 Signature Delivery
 	for _, client := range clientMap {
-		wg.Add(1)
-		go func(client pbdkg.DKGServiceClient) {
-			defer wg.Done()
+		wg.Go(func() {
 			round1SignatureRequest := &pbdkg.Round1SignatureRequest{
 				RequestId:        requestIDString,
 				Round1Signatures: round1Signatures,
@@ -98,7 +96,7 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 			if len(round1SignatureResponse.ValidationFailures) > 0 {
 				return
 			}
-		}(client)
+		})
 	}
 
 	wg.Wait()
@@ -106,10 +104,9 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 	// Optionally confirm and mark keys AVAILABLE only when the feature is enabled.
 	if config.DKGConfig.EnableKeyConfirmation {
 
-		keyIDs := make([]uuid.UUID, 0, int(keyCount))
-		for i := uint64(0); i < keyCount; i++ {
-			id := deriveKeyIndex(requestID, uint16(i))
-			keyIDs = append(keyIDs, id)
+		keyIDs := make([]uuid.UUID, int(keyCount))
+		for i := range keyIDs {
+			keyIDs[i] = deriveKeyIndex(requestID, uint16(i))
 		}
 
 		// Give participants time to complete Round3 (crypto + DB writes) before polling for confirmation
@@ -171,7 +168,7 @@ func ConfirmAndMarkAvailableKeys(ctx context.Context, config *so.Config, keyIDs 
 		}
 	}
 
-	availableOnAll := make([]uuid.UUID, 0)
+	var availableOnAll []uuid.UUID
 	for _, id := range keyIDs {
 		idStr := id.String()
 		if _, missing := missingPerKey[idStr]; !missing {

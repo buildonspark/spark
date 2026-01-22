@@ -49,7 +49,7 @@ func extractCommitmentsByLeaf(
 
 	for i, leaf := range leaves {
 		commitments := make([]*pb.RequestedSigningCommitments, maxRefundTxsPerLeaf)
-		for refundIdx := 0; refundIdx < maxRefundTxsPerLeaf; refundIdx++ {
+		for refundIdx := range commitments {
 			commitmentIdx := i*maxRefundTxsPerLeaf + refundIdx
 			commitments[refundIdx] = signingCommitments[commitmentIdx]
 		}

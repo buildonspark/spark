@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/logging"
@@ -136,23 +137,12 @@ type customSampler struct {
 
 func (s *customSampler) ShouldSample(p trace.SamplingParameters) trace.SamplingResult {
 	// Check blocklist first
-	for _, blocked := range s.spanConfig.BlockList {
-		if blocked == p.Name {
-			return trace.SamplingResult{Decision: trace.Drop}
-		}
+	if slices.Contains(s.spanConfig.BlockList, p.Name) {
+		return trace.SamplingResult{Decision: trace.Drop}
 	}
 
-	if s.allowListActive {
-		allowed := false
-		for _, allowedSpan := range s.spanConfig.AllowList {
-			if allowedSpan == p.Name {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			return trace.SamplingResult{Decision: trace.Drop}
-		}
+	if s.allowListActive && !slices.Contains(s.spanConfig.AllowList, p.Name) {
+		return trace.SamplingResult{Decision: trace.Drop}
 	}
 
 	if rate, exists := s.spanConfig.PerSpanSamplingRates[p.Name]; exists {

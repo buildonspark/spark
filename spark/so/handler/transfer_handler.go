@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 	"time"
 
@@ -578,13 +579,8 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 	// Since all records exist (queried above), OnConflict will always UPDATE, never INSERT.
 	// Batch in chunks to avoid PostgreSQL parameter limit (65535).
 	const maxBatchSize = 1000
-	for i := 0; i < len(builders); i += maxBatchSize {
-		end := i + maxBatchSize
-		if end > len(builders) {
-			end = len(builders)
-		}
-		chunk := builders[i:end]
 
+	for chunk := range slices.Chunk(builders, maxBatchSize) {
 		err = db.TransferLeaf.CreateBulk(chunk...).
 			OnConflictColumns(enttransferleaf.FieldID).
 			Update(func(u *ent.TransferLeafUpsert) {
@@ -644,13 +640,7 @@ func (h *TransferHandler) UpdateTransferLeavesSignaturesForRefundTxOnly(ctx cont
 	// Since all records exist (queried above), OnConflict will always UPDATE, never INSERT.
 	// Batch in chunks to avoid PostgreSQL parameter limit (65535).
 	const maxBatchSize = 1000
-	for i := 0; i < len(builders); i += maxBatchSize {
-		end := i + maxBatchSize
-		if end > len(builders) {
-			end = len(builders)
-		}
-		chunk := builders[i:end]
-
+	for chunk := range slices.Chunk(builders, maxBatchSize) {
 		err = db.TransferLeaf.CreateBulk(chunk...).
 			OnConflictColumns(enttransferleaf.FieldID).
 			Update(func(u *ent.TransferLeafUpsert) {
@@ -914,7 +904,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			return nil, fmt.Errorf("unable to load cpfp leaf tx: %w", err)
 		}
 
-		if len(cpfpLeafTx.TxOut) <= 0 {
+		if len(cpfpLeafTx.TxOut) == 0 {
 			return nil, fmt.Errorf("cpfp vout out of bounds")
 		}
 
@@ -956,7 +946,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if err != nil {
 				return nil, fmt.Errorf("unable to load direct leaf tx: %w", err)
 			}
-			if len(directLeafTx.TxOut) <= 0 {
+			if len(directLeafTx.TxOut) == 0 {
 				return nil, fmt.Errorf("direct vout out of bounds")
 			}
 			directRefundTxSigHash, err := common.SigHashFromTx(directRefundTx, 0, directLeafTx.TxOut[0])
@@ -1117,7 +1107,7 @@ func SignRefundsWithPregeneratedNonce(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to load leaf tx: %w", err)
 		}
-		if len(leafTx.TxOut) <= 0 {
+		if len(leafTx.TxOut) == 0 {
 			return nil, nil, nil, fmt.Errorf("vout out of bounds")
 		}
 		refundTxSigHash, err := common.SigHashFromTx(refundTx, 0, leafTx.TxOut[0])
@@ -1184,7 +1174,7 @@ func SignRefundsWithPregeneratedNonce(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to load leaf tx: %w", err)
 		}
-		if len(directTx.TxOut) <= 0 {
+		if len(directTx.TxOut) == 0 {
 			return nil, nil, nil, fmt.Errorf("vout out of bounds")
 		}
 		directRefundTxSigHash, err := common.SigHashFromTx(directRefundTx, 0, directTx.TxOut[0])
@@ -1242,7 +1232,7 @@ func SignRefundsWithPregeneratedNonce(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to load leaf tx: %w", err)
 		}
-		if len(directFromCpfpLeafTx.TxOut) <= 0 {
+		if len(directFromCpfpLeafTx.TxOut) == 0 {
 			return nil, nil, nil, fmt.Errorf("vout out of bounds")
 		}
 		directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, directFromCpfpLeafTx.TxOut[0])
@@ -2382,10 +2372,9 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 			networkString := transfer.Network.String()
 			if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobRequireDirectFromCPFPRefund, &networkString, 0) > 0 {
 				return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
-			} else {
-				if len(leaf.DirectTx) > 0 {
-					return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
-				}
+			}
+			if len(leaf.DirectTx) > 0 {
+				return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 			}
 		}
 		var directRefundTx []byte
@@ -2468,13 +2457,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	// Since all records exist (queried above), OnConflict will always UPDATE, never INSERT.
 	// Batch in chunks to avoid PostgreSQL parameter limit (65535).
 	const maxBatchSize = 1000
-	for i := 0; i < len(builders); i += maxBatchSize {
-		end := i + maxBatchSize
-		if end > len(builders) {
-			end = len(builders)
-		}
-		chunk := builders[i:end]
-
+	for chunk := range slices.Chunk(builders, maxBatchSize) {
 		err = db.TreeNode.CreateBulk(chunk...).
 			OnConflictColumns(enttreenode.FieldID).
 			Update(func(u *ent.TreeNodeUpsert) {
@@ -2558,7 +2541,7 @@ func (h *TransferHandler) getRefundTxSigningJobs(ctx context.Context, leaf *ent.
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to load direct leaf tx for leaf %s: %w", leaf.ID.String(), err)
 		}
-		if len(directLeafTx.TxOut) <= 0 {
+		if len(directLeafTx.TxOut) == 0 {
 			return nil, nil, nil, fmt.Errorf("vout out of bounds for direct tx")
 		}
 		directRefundSigningJob, _, err = helper.NewSigningJob(keyshare, directJob, directLeafTx.TxOut[0])
@@ -2574,7 +2557,7 @@ func (h *TransferHandler) getRefundTxSigningJobs(ctx context.Context, leaf *ent.
 			return nil, nil, nil, fmt.Errorf("unable to create direct from cpfp signing job for leaf %s: %w", leaf.ID.String(), err)
 		}
 	}
-	if len(cpfpLeafTx.TxOut) <= 0 {
+	if len(cpfpLeafTx.TxOut) == 0 {
 		return nil, nil, nil, fmt.Errorf("vout out of bounds for cpfp tx")
 	}
 	cpfpRefundSigningJob, _, err := helper.NewSigningJob(keyshare, cpfpJob, cpfpLeafTx.TxOut[0])
@@ -2771,13 +2754,7 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 		// Since all records exist (queried above), OnConflict will always UPDATE, never INSERT.
 		// Batch in chunks to avoid PostgreSQL parameter limit (65535).
 		const maxBatchSize = 1000
-		for i := 0; i < len(builders); i += maxBatchSize {
-			end := i + maxBatchSize
-			if end > len(builders) {
-				end = len(builders)
-			}
-			chunk := builders[i:end]
-
+		for chunk := range slices.Chunk(builders, maxBatchSize) {
 			err = db.TreeNode.CreateBulk(chunk...).
 				OnConflictColumns(enttreenode.FieldID).
 				Update(func(u *ent.TreeNodeUpsert) {

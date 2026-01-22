@@ -29,10 +29,10 @@ var (
 	issuerPubKey = keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
 )
 
-// setupIsolatedTest creates a fresh database context for a test or subtest with proper cleanup.
+// setUpIsolatedTest creates a fresh database context for a test or subtest with proper cleanup.
 // This ensures complete isolation between test runs without manual cleanup.
 // It also sets up a basic EntityDkgKey required for token operations.
-func setupIsolatedTest(t *testing.T) (context.Context, *ent.Client) {
+func setUpIsolatedTest(t *testing.T) (context.Context, *ent.Client) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -510,13 +510,8 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	// Helper function to create a clean subtest context - now uses the reusable helper
-	setupSubtest := func(t *testing.T) (context.Context, *ent.Client) {
-		return setupIsolatedTest(t)
-	}
-
 	t.Run("L1 and spark token creation", func(t *testing.T) {
-		subtestCtx, subtestClient := setupSubtest(t)
+		subtestCtx, subtestClient := setUpIsolatedTest(t)
 
 		// Test 1: First call should succeed and create L1TokenCreate and TokenCreate entities
 		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = false
@@ -530,7 +525,7 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 	})
 
 	t.Run("duplicate transactions in same block with spark token creation disabled", func(t *testing.T) {
-		subtestCtx, subtestClient := setupSubtest(t)
+		subtestCtx, subtestClient := setUpIsolatedTest(t)
 
 		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = true
 
@@ -544,7 +539,7 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 	})
 
 	t.Run("duplicate transactions in same block with spark token creation enabled", func(t *testing.T) {
-		subtestCtx, subtestClient := setupSubtest(t)
+		subtestCtx, subtestClient := setUpIsolatedTest(t)
 
 		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = false
 
@@ -558,7 +553,7 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 	})
 
 	t.Run("duplicate transactions across different blocks", func(t *testing.T) {
-		subtestCtx, subtestClient := setupSubtest(t)
+		subtestCtx, subtestClient := setUpIsolatedTest(t)
 
 		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = false
 
@@ -576,7 +571,7 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 	})
 
 	t.Run("same issuer different tokens in different blocks, creates two Spark tokens", func(t *testing.T) {
-		subtestCtx, subtestClient := setupSubtest(t)
+		subtestCtx, subtestClient := setUpIsolatedTest(t)
 
 		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = false
 
@@ -599,7 +594,7 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 	})
 
 	t.Run("same issuer same token in different blocks, creates only one Spark token", func(t *testing.T) {
-		subtestCtx, subtestClient := setupSubtest(t)
+		subtestCtx, subtestClient := setUpIsolatedTest(t)
 
 		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = false
 
@@ -618,7 +613,7 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 	})
 
 	t.Run("same issuer different tokens in same block, creates two Spark tokens", func(t *testing.T) {
-		subtestCtx, subtestClient := setupSubtest(t)
+		subtestCtx, subtestClient := setUpIsolatedTest(t)
 
 		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = false
 
@@ -637,7 +632,7 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 	})
 
 	t.Run("same issuer same tokens in same block, creates only one Spark token", func(t *testing.T) {
-		subtestCtx, subtestClient := setupSubtest(t)
+		subtestCtx, subtestClient := setUpIsolatedTest(t)
 
 		config.Token.DisableSparkTokenCreationForL1TokenAnnouncements = false
 

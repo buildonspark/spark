@@ -116,7 +116,7 @@ func TestKnobs_RolloutUUIDConsistent(t *testing.T) {
 				"RolloutUUID should return consistent result for UUID %s with default 50%%", tc.uuidStr)
 
 			// Test multiple times to ensure consistency - this is the key requirement
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				repeatResult := k.RolloutUUID("test", parsedUUID, 50.0)
 				assert.Equal(t, tc.expected, repeatResult, "RolloutUUID should be deterministic (iteration %d)", i)
 			}

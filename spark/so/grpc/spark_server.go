@@ -62,6 +62,7 @@ func (s *SparkServer) FinalizeDepositTreeCreation(ctx context.Context, req *pb.F
 }
 
 // StartTreeCreation is deprecated.
+//
 // Deprecated: Use StartDepositTreeCreation instead
 func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
 	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
