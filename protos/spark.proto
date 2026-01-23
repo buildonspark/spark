@@ -1045,6 +1045,7 @@ message CooperativeExitRequest {
     StartTransferRequest transfer = 1;
     string exit_id = 2;
     bytes exit_txid = 3;
+    bytes connector_tx = 4;
 }
 
 message CooperativeExitResponse {

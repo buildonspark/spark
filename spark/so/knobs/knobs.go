@@ -61,6 +61,8 @@ const (
 
 	KnobRequireDirectFromCPFPRefund = "spark.so.require_direct_from_cpfp_refund"
 
+	KnobRequireConnectorTxValidation = "spark.so.require_connector_tx_validation"
+
 	// Task / gocron related knobs.
 	KnobSoTaskEnabled = "spark.so.task.enabled"
 	KnobSoTaskTimeout = "spark.so.task.timeout"

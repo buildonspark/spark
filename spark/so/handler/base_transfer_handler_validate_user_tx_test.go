@@ -300,7 +300,7 @@ func validateAndConstructBitcoinTransactionsForTest(t *testing.T, ctx context.Co
 		return fmt.Errorf("could not find all tree nodes: expected %d, found %d", len(cpfpLeafRefundMap), len(leaves))
 	}
 
-	return h.validateAndConstructBitcoinTransactions(ctx, req, transferType, leaves, cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, refundDestPubkey)
+	return h.validateAndConstructBitcoinTransactions(ctx, req, transferType, leaves, cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, refundDestPubkey, nil)
 }
 
 // --- Tests ---

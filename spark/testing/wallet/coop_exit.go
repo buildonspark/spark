@@ -29,9 +29,10 @@ func GetConnectorRefundSignaturesV2(
 	connectorOutputs []*wire.OutPoint,
 	receiverPubKey keys.Public,
 	expiryTime time.Time,
+	connectorTx []byte,
 ) (*pb.Transfer, map[string][]byte, error) {
 	transfer, signaturesMap, err := signCoopExitRefunds(
-		ctx, config, leaves, exitTxid, connectorOutputs, receiverPubKey, expiryTime,
+		ctx, config, leaves, exitTxid, connectorOutputs, receiverPubKey, expiryTime, connectorTx,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to sign refund transactions: %w", err)
@@ -110,6 +111,7 @@ func signCoopExitRefunds(
 	connectorOutputs []*wire.OutPoint,
 	receiverPubKey keys.Public,
 	expiryTime time.Time,
+	connectorTx []byte,
 ) (*pb.Transfer, map[string][]byte, error) {
 	if len(leaves) != len(connectorOutputs) {
 		return nil, nil, fmt.Errorf("number of leaves and connector outputs must match")
@@ -251,8 +253,9 @@ func signCoopExitRefunds(
 			ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
 			ExpiryTime:                timestamppb.New(expiryTime),
 		},
-		ExitId:   exitID.String(),
-		ExitTxid: exitTxid,
+		ExitId:      exitID.String(),
+		ExitTxid:    exitTxid,
+		ConnectorTx: connectorTx,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initiate cooperative exit: %w", err)

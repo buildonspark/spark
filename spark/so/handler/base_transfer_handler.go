@@ -278,6 +278,7 @@ func (h *BaseTransferHandler) createTransfer(
 	requireDirectTx bool,
 	sparkInvoice string,
 	primaryTransferId uuid.UUID,
+	connectorTx []byte,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
 		return nil, nil, fmt.Errorf("invalid expiry_time %v", expiryTime)
@@ -361,7 +362,7 @@ func (h *BaseTransferHandler) createTransfer(
 	}
 
 	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeSwap || transferType == st.TransferTypeCounterSwap || transferType == st.TransferTypePrimarySwapV3 || transferType == st.TransferTypeCounterSwapV3 || transferType == st.TransferTypeCooperativeExit {
-		if err := h.validateAndConstructBitcoinTransactions(ctx, req, transferType, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey); err != nil {
+		if err := h.validateAndConstructBitcoinTransactions(ctx, req, transferType, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, connectorTx); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -1185,6 +1186,7 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 	leafDirectRefundMap map[string][]byte,
 	leafDirectFromCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
+	connectorTx []byte,
 ) error {
 	if len(leaves) == 0 {
 		return fmt.Errorf("leaves cannot be empty")
@@ -1208,8 +1210,16 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 		return validateLeaves_swap(ctx, nodesByID, leafCpfpRefundMap, refundDestPubkey, transferType)
 
 	case st.TransferTypeCooperativeExit:
+		if len(connectorTx) == 0 {
+			requireConnectorTx := knobs.GetKnobsService(ctx).GetValueTarget(
+				knobs.KnobRequireConnectorTxValidation, &networkString, 0) > 0
+			if requireConnectorTx {
+				return fmt.Errorf("connector_tx is required for cooperative exit validation. Please upgrade to the latest SDK version")
+			}
+		}
+
 		if req == nil || req.TransferPackage == nil {
-			return validateTransactionCooperativeExitLegacyLeavesToSend(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
+			return validateTransactionCooperativeExitLegacyLeavesToSend(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey, connectorTx)
 		}
 		return validateTransactionCooperativeExitLeaves(ctx, req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 
@@ -1339,6 +1349,92 @@ func removeTxIn(rawTx []byte, vin int) ([]byte, error) {
 	}
 
 	return modifiedTxRaw, nil
+}
+
+func parseConnectorTxOutputs(connectorTx []byte) (map[wire.OutPoint]*wire.TxOut, error) {
+	if len(connectorTx) == 0 {
+		return nil, nil
+	}
+
+	tx, err := common.TxFromRawTxBytes(connectorTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse connector transaction: %w", err)
+	}
+
+	connectorTxHash := tx.TxHash()
+	prevOuts := make(map[wire.OutPoint]*wire.TxOut, len(tx.TxOut))
+	for i, txOut := range tx.TxOut {
+		outpoint := wire.OutPoint{
+			Hash:  connectorTxHash,
+			Index: uint32(i),
+		}
+		prevOuts[outpoint] = txOut
+	}
+
+	return prevOuts, nil
+}
+
+func validateRefundTxWithConnector(
+	ctx context.Context,
+	refundTxBytes []byte,
+	node *ent.TreeNode,
+	connectorPrevOuts map[wire.OutPoint]*wire.TxOut,
+	txType bitcointransaction.TxType,
+	refundDestPubkey keys.Public,
+	networkString string,
+) error {
+	if len(refundTxBytes) == 0 {
+		return fmt.Errorf("refund transaction is empty")
+	}
+
+	refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse refund transaction: %w", err)
+	}
+
+	// Verify transaction has exactly 2 inputs
+	if len(refundTx.TxIn) != 2 {
+		return fmt.Errorf("expected 2 inputs in refund tx, got %d", len(refundTx.TxIn))
+	}
+
+	// Verify input 1 references a connector output
+	connectorOutpoint := refundTx.TxIn[1].PreviousOutPoint
+	_, exists := connectorPrevOuts[connectorOutpoint]
+	if !exists {
+		return fmt.Errorf("refund tx input 1 does not reference a valid connector output: %v", connectorOutpoint)
+	}
+
+	// Build the node tx prevout for input 0
+	nodeTx, err := common.TxFromRawTxBytes(node.RawTx)
+	if err != nil {
+		return fmt.Errorf("failed to parse node transaction: %w", err)
+	}
+	nodeTxHash := nodeTx.TxHash()
+
+	// Verify input 0 references the node tx
+	nodeOutpoint := refundTx.TxIn[0].PreviousOutPoint
+	if nodeOutpoint.Hash != nodeTxHash || nodeOutpoint.Index != 0 {
+		return fmt.Errorf("refund tx input 0 does not reference the node tx")
+	}
+
+	// Validate the transaction structure by stripping input 1 for structural validation
+	modifiedTxBytes, err := removeTxIn(refundTxBytes, 1)
+	if err != nil {
+		return fmt.Errorf("failed to remove connector input for structural validation: %w", err)
+	}
+
+	if err := bitcointransaction.VerifyTransactionWithDatabase(
+		ctx,
+		modifiedTxBytes,
+		node,
+		txType,
+		refundDestPubkey,
+		networkString,
+	); err != nil {
+		return fmt.Errorf("transaction structure validation failed: %w", err)
+	}
+
+	return nil
 }
 
 func validateLegacyLeavesToSend_transfer(
@@ -1496,47 +1592,88 @@ func validateTransactionCooperativeExitLegacyLeavesToSend(
 	leafDirectRefundMap map[string][]byte,
 	leafDirectFromCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
+	connectorTx []byte,
 ) error {
+	// Parse connector tx outputs if provided
+	connectorPrevOuts, err := parseConnectorTxOutputs(connectorTx)
+	if err != nil {
+		return fmt.Errorf("failed to parse connector transaction: %w", err)
+	}
+	useMultiInputValidation := connectorPrevOuts != nil
+
+	networkString := ""
+
 	for leafID := range leafCpfpRefundMap {
 		node, exists := nodesByID[leafID]
 		if !exists {
 			return fmt.Errorf("leaf %s not found in loaded leaves", leafID)
 		}
 
+		if networkString == "" {
+			networkString = node.Network.String()
+		}
+
 		cpfpRefundTx := leafCpfpRefundMap[leafID]
 		directFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leafID]
 		directRefundTx := leafDirectRefundMap[leafID]
 
-		// All refund tx in Coop Exit flow has 2 inputs: one from leaf's RawTx and
-		// one from connector tx. SOs only verify 1st input and let SSP verifies 2nd input.
-		modifiedCpfpRefundTx, err := removeTxIn(cpfpRefundTx, 1)
-		if err != nil {
-			return fmt.Errorf("failed to remove second input from CPFP refund tx %x: %w", cpfpRefundTx, err)
-		}
-
-		modifiedDirectFromCpfpRefundTx, err := removeTxIn(directFromCpfpRefundTx, 1)
-		if err != nil {
-			return fmt.Errorf("failed to remove second input from Direct-from-CPFP refund tx %x: %w", directFromCpfpRefundTx, err)
-		}
-
-		var modifiedDirectRefundTx []byte
-		if len(directRefundTx) > 0 {
-			modifiedDirectRefundTx, err = removeTxIn(directRefundTx, 1)
-			if err != nil {
-				return fmt.Errorf("failed to remove second input from Direct refund tx %x: %w", directRefundTx, err)
+		if useMultiInputValidation {
+			// Use proper multi-input validation with connector prevouts
+			if err := validateRefundTxWithConnector(
+				ctx, cpfpRefundTx, node, connectorPrevOuts,
+				bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString,
+			); err != nil {
+				return fmt.Errorf("leaf %s CPFP refund validation failed: %w", leafID, err)
 			}
-		}
 
-		if err := validateSingleLeafRefundTxs(
-			ctx,
-			node,
-			modifiedCpfpRefundTx,
-			modifiedDirectFromCpfpRefundTx,
-			modifiedDirectRefundTx,
-			refundDestPubkey,
-			st.TransferTypeTransfer,
-		); err != nil {
-			return fmt.Errorf("leaf %s validation for legacy transfer failed: %w", leafID, err)
+			if err := validateRefundTxWithConnector(
+				ctx, directFromCpfpRefundTx, node, connectorPrevOuts,
+				bitcointransaction.TxTypeRefundDirectFromCPFP, refundDestPubkey, networkString,
+			); err != nil {
+				return fmt.Errorf("leaf %s direct-from-CPFP refund validation failed: %w", leafID, err)
+			}
+
+			if len(directRefundTx) > 0 {
+				if err := validateRefundTxWithConnector(
+					ctx, directRefundTx, node, connectorPrevOuts,
+					bitcointransaction.TxTypeRefundDirect, refundDestPubkey, networkString,
+				); err != nil {
+					return fmt.Errorf("leaf %s direct refund validation failed: %w", leafID, err)
+				}
+			}
+		} else {
+			// Legacy validation: remove input 1 and validate single-input
+			// All refund tx in Coop Exit flow has 2 inputs: one from leaf's RawTx and
+			// one from connector tx. SOs only verify 1st input and let SSP verifies 2nd input.
+			modifiedCpfpRefundTx, err := removeTxIn(cpfpRefundTx, 1)
+			if err != nil {
+				return fmt.Errorf("failed to remove second input from CPFP refund tx %x: %w", cpfpRefundTx, err)
+			}
+
+			modifiedDirectFromCpfpRefundTx, err := removeTxIn(directFromCpfpRefundTx, 1)
+			if err != nil {
+				return fmt.Errorf("failed to remove second input from Direct-from-CPFP refund tx %x: %w", directFromCpfpRefundTx, err)
+			}
+
+			var modifiedDirectRefundTx []byte
+			if len(directRefundTx) > 0 {
+				modifiedDirectRefundTx, err = removeTxIn(directRefundTx, 1)
+				if err != nil {
+					return fmt.Errorf("failed to remove second input from Direct refund tx %x: %w", directRefundTx, err)
+				}
+			}
+
+			if err := validateSingleLeafRefundTxs(
+				ctx,
+				node,
+				modifiedCpfpRefundTx,
+				modifiedDirectFromCpfpRefundTx,
+				modifiedDirectRefundTx,
+				refundDestPubkey,
+				st.TransferTypeTransfer,
+			); err != nil {
+				return fmt.Errorf("leaf %s validation for legacy transfer failed: %w", leafID, err)
+			}
 		}
 	}
 	return nil

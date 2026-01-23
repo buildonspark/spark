@@ -1648,6 +1648,7 @@ export interface CooperativeExitRequest {
   transfer: StartTransferRequest | undefined;
   exitId: string;
   exitTxid: Uint8Array;
+  connectorTx: Uint8Array;
 }
 
 export interface CooperativeExitResponse {
@@ -12875,7 +12876,7 @@ export const OutPoint: MessageFns<OutPoint> = {
 };
 
 function createBaseCooperativeExitRequest(): CooperativeExitRequest {
-  return { transfer: undefined, exitId: "", exitTxid: new Uint8Array(0) };
+  return { transfer: undefined, exitId: "", exitTxid: new Uint8Array(0), connectorTx: new Uint8Array(0) };
 }
 
 export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
@@ -12888,6 +12889,9 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
     }
     if (message.exitTxid.length !== 0) {
       writer.uint32(26).bytes(message.exitTxid);
+    }
+    if (message.connectorTx.length !== 0) {
+      writer.uint32(34).bytes(message.connectorTx);
     }
     return writer;
   },
@@ -12923,6 +12927,14 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
           message.exitTxid = reader.bytes();
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.connectorTx = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -12937,6 +12949,7 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
       transfer: isSet(object.transfer) ? StartTransferRequest.fromJSON(object.transfer) : undefined,
       exitId: isSet(object.exitId) ? globalThis.String(object.exitId) : "",
       exitTxid: isSet(object.exitTxid) ? bytesFromBase64(object.exitTxid) : new Uint8Array(0),
+      connectorTx: isSet(object.connectorTx) ? bytesFromBase64(object.connectorTx) : new Uint8Array(0),
     };
   },
 
@@ -12951,6 +12964,9 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
     if (message.exitTxid.length !== 0) {
       obj.exitTxid = base64FromBytes(message.exitTxid);
     }
+    if (message.connectorTx.length !== 0) {
+      obj.connectorTx = base64FromBytes(message.connectorTx);
+    }
     return obj;
   },
 
@@ -12964,6 +12980,7 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
       : undefined;
     message.exitId = object.exitId ?? "";
     message.exitTxid = object.exitTxid ?? new Uint8Array(0);
+    message.connectorTx = object.connectorTx ?? new Uint8Array(0);
     return message;
   },
 };

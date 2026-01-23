@@ -4455,12 +4455,16 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     const sspPubIdentityKey = hexToBytes(this.config.getSspIdentityPublicKey());
+    const connectorTxBytes = hexToBytes(
+      coopExitRequest.rawConnectorTransaction,
+    );
     const transfer = await this.coopExitService.getConnectorRefundSignatures({
       leaves: leafKeyTweaks,
       exitTxId: coopExitTxId,
       connectorOutputs,
       receiverPubKey: sspPubIdentityKey,
       transferId,
+      connectorTx: connectorTxBytes,
     });
 
     const completeResponse = await sspClient.completeCoopExit({

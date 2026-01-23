@@ -256,6 +256,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		requireDirectTx,
 		req.SparkInvoice,
 		primaryTransferId,
+		nil,
 	)
 	if err != nil {
 		originalErr := err

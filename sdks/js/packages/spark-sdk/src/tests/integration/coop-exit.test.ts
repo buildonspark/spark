@@ -162,6 +162,7 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
       connectorOutputs,
       receiverPubKey: hexToBytes(sspPubkey),
       transferId,
+      connectorTx: connectorTx.toBytes(),
     });
 
     const receiverTransfer = await sspTransferService.queryTransfer(

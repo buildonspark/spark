@@ -3417,6 +3417,8 @@ func (m *InitiateCooperativeExitRequest) validate(all bool) error {
 
 	// no validation rules for ExitTxid
 
+	// no validation rules for ConnectorTx
+
 	if len(errors) > 0 {
 		return InitiateCooperativeExitRequestMultiError(errors)
 	}

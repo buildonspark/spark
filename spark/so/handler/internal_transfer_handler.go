@@ -282,6 +282,7 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		false,
 		req.SparkInvoice,
 		primaryTransferId,
+		nil,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initiate transfer for transfer id: %s and error: %w", transferID, err)
@@ -477,6 +478,7 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		false,
 		"",
 		uuid.Nil,
+		req.GetConnectorTx(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initiate cooperative exit for transfer id: %s and error: %w", transferID, err)

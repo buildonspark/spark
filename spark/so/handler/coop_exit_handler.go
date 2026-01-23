@@ -108,6 +108,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		requireDirectTx,
 		"",
 		uuid.Nil,
+		req.GetConnectorTx(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer %s: %w", req.Transfer.TransferId, err)
@@ -197,9 +198,10 @@ func (h *TransferHandler) syncCoopExitInit(ctx context.Context, req *pb.Cooperat
 		Leaves:                    leaves,
 	}
 	coopExitRequest := &pbinternal.InitiateCooperativeExitRequest{
-		Transfer: initTransferRequest,
-		ExitId:   req.ExitId,
-		ExitTxid: req.ExitTxid,
+		Transfer:    initTransferRequest,
+		ExitId:      req.ExitId,
+		ExitTxid:    req.ExitTxid,
+		ConnectorTx: req.GetConnectorTx(),
 	}
 	selection := helper.OperatorSelection{
 		Option: helper.OperatorSelectionOptionExcludeSelf,

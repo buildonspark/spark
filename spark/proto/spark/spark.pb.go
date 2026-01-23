@@ -6755,6 +6755,7 @@ type CooperativeExitRequest struct {
 	Transfer      *StartTransferRequest  `protobuf:"bytes,1,opt,name=transfer,proto3" json:"transfer,omitempty"`
 	ExitId        string                 `protobuf:"bytes,2,opt,name=exit_id,json=exitId,proto3" json:"exit_id,omitempty"`
 	ExitTxid      []byte                 `protobuf:"bytes,3,opt,name=exit_txid,json=exitTxid,proto3" json:"exit_txid,omitempty"`
+	ConnectorTx   []byte                 `protobuf:"bytes,4,opt,name=connector_tx,json=connectorTx,proto3" json:"connector_tx,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6806,6 +6807,13 @@ func (x *CooperativeExitRequest) GetExitId() string {
 func (x *CooperativeExitRequest) GetExitTxid() []byte {
 	if x != nil {
 		return x.ExitTxid
+	}
+	return nil
+}
+
+func (x *CooperativeExitRequest) GetConnectorTx() []byte {
+	if x != nil {
+		return x.ConnectorTx
 	}
 	return nil
 }
@@ -11796,11 +11804,12 @@ const file_spark_proto_rawDesc = "" +
 	"\btransfer\x18\x02 \x01(\v2\x0f.spark.TransferR\btransfer\"2\n" +
 	"\bOutPoint\x12\x12\n" +
 	"\x04txid\x18\x01 \x01(\fR\x04txid\x12\x12\n" +
-	"\x04vout\x18\x02 \x01(\rR\x04vout\"\x87\x01\n" +
+	"\x04vout\x18\x02 \x01(\rR\x04vout\"\xaa\x01\n" +
 	"\x16CooperativeExitRequest\x127\n" +
 	"\btransfer\x18\x01 \x01(\v2\x1b.spark.StartTransferRequestR\btransfer\x12\x17\n" +
 	"\aexit_id\x18\x02 \x01(\tR\x06exitId\x12\x1b\n" +
-	"\texit_txid\x18\x03 \x01(\fR\bexitTxid\"\x91\x01\n" +
+	"\texit_txid\x18\x03 \x01(\fR\bexitTxid\x12!\n" +
+	"\fconnector_tx\x18\x04 \x01(\fR\vconnectorTx\"\x91\x01\n" +
 	"\x17CooperativeExitResponse\x12+\n" +
 	"\btransfer\x18\x01 \x01(\v2\x0f.spark.TransferR\btransfer\x12I\n" +
 	"\x0fsigning_results\x18\x02 \x03(\v2 .spark.LeafRefundTxSigningResultR\x0esigningResults\"\xa0\x02\n" +

@@ -137,6 +137,7 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 		false,
 		"",
 		uuid.Nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("expected success when using nodeTx as expected outpoint, got error: %v", err)
@@ -240,6 +241,7 @@ func TestCreateTransfer_FailsWithWrongPrevOutpoint(t *testing.T) {
 		false,
 		"",
 		uuid.Nil,
+		nil,
 	)
 	if err == nil {
 		t.Fatalf("expected error for wrong outpoint, got nil")
@@ -356,6 +358,7 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedAmount(t *testing.T) {
 		false,
 		"",
 		primaryTransfer.ID,
+		nil,
 	)
 	require.Error(t, err)
 	expectedErrSubstring := "does not match counter transfer amount"

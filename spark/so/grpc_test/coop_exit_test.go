@@ -1,6 +1,7 @@
 package grpctest
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"testing"
@@ -45,7 +46,7 @@ func createTestCoopExitAndConnectorOutputs(
 	leafCount int,
 	outPoint *wire.OutPoint,
 	userPubKey keys.Public, userAmountSats int64,
-) (*wire.MsgTx, []*wire.OutPoint) {
+) (*wire.MsgTx, *wire.MsgTx, []*wire.OutPoint) {
 	// Get arbitrary SSP address, using identity for convenience
 	identityPubKey := config.IdentityPublicKey()
 	sspIntermediateAddress, err := common.P2TRAddressFromPublicKey(identityPubKey, config.Network)
@@ -79,7 +80,7 @@ func createTestCoopExitAndConnectorOutputs(
 		txHash := connectorTx.TxHash()
 		connectorOutputs = append(connectorOutputs, wire.NewOutPoint(&txHash, uint32(i)))
 	}
-	return exitTx, connectorOutputs
+	return exitTx, connectorTx, connectorOutputs
 }
 
 func waitForPendingTransferToConfirm(
@@ -112,9 +113,14 @@ func TestCoopExitBasic(t *testing.T) {
 
 	// SSP creates transactions
 	withdrawPrivKey := keys.GeneratePrivateKey()
-	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
+	exitTx, connectorTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
 		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 	)
+
+	// Serialize connector tx for passing to SO
+	var connectorTxBuf bytes.Buffer
+	err = connectorTx.Serialize(&connectorTxBuf)
+	require.NoError(t, err)
 
 	// User creates transfer to SSP on the condition that the tx is confirmed
 	exitTxID, err := hex.DecodeString(exitTx.TxID())
@@ -127,6 +133,7 @@ func TestCoopExitBasic(t *testing.T) {
 		connectorOutputs,
 		sspConfig.IdentityPublicKey(),
 		time.Now().Add(24*time.Hour),
+		connectorTxBuf.Bytes(),
 	)
 	require.NoError(t, err)
 	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.Status)
@@ -212,9 +219,14 @@ func TestCoopExitCannotClaimBeforeEnoughConfirmations(t *testing.T) {
 
 	// SSP creates transactions
 	withdrawPrivKey := keys.GeneratePrivateKey()
-	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
+	exitTx, connectorTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
 		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 	)
+
+	// Serialize connector tx for passing to SO
+	var connectorTxBuf bytes.Buffer
+	err = connectorTx.Serialize(&connectorTxBuf)
+	require.NoError(t, err)
 
 	// User creates transfer to SSP on the condition that the tx is confirmed
 	exitTxID, err := hex.DecodeString(exitTx.TxID())
@@ -227,6 +239,7 @@ func TestCoopExitCannotClaimBeforeEnoughConfirmations(t *testing.T) {
 		connectorOutputs,
 		sspConfig.IdentityPublicKey(),
 		time.Now().Add(24*time.Hour),
+		connectorTxBuf.Bytes(),
 	)
 	require.NoError(t, err)
 
@@ -280,9 +293,14 @@ func TestCoopExitCannotClaimBeforeConfirm(t *testing.T) {
 
 	// SSP creates transactions
 	withdrawPrivKey := keys.GeneratePrivateKey()
-	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
+	exitTx, connectorTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
 		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 	)
+
+	// Serialize connector tx for passing to SO
+	var connectorTxBuf bytes.Buffer
+	err = connectorTx.Serialize(&connectorTxBuf)
+	require.NoError(t, err)
 
 	// User creates transfer to SSP on the condition that the tx is confirmed
 	exitTxID, err := hex.DecodeString(exitTx.TxID())
@@ -295,6 +313,7 @@ func TestCoopExitCannotClaimBeforeConfirm(t *testing.T) {
 		connectorOutputs,
 		sspConfig.IdentityPublicKey(),
 		time.Now().Add(24*time.Hour),
+		connectorTxBuf.Bytes(),
 	)
 	require.NoError(t, err)
 	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.Status)
@@ -347,9 +366,14 @@ func TestCoopExitFailureToSync(t *testing.T) {
 
 		// SSP creates transactions
 		withdrawPrivKey := keys.GeneratePrivateKey()
-		exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
+		exitTx, connectorTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
 			t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 		)
+
+		// Serialize connector tx for passing to SO
+		var connectorTxBuf bytes.Buffer
+		err = connectorTx.Serialize(&connectorTxBuf)
+		require.NoError(t, err)
 
 		soController, err := sparktesting.NewSparkOperatorController(t)
 		require.NoError(t, err, "failed to create operator controller")
@@ -372,6 +396,7 @@ func TestCoopExitFailureToSync(t *testing.T) {
 			connectorOutputs,
 			sspConfig.IdentityPublicKey(),
 			time.Now().Add(24*time.Hour),
+			connectorTxBuf.Bytes(),
 		)
 		require.Error(t, err)
 

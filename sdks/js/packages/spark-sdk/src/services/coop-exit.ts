@@ -25,6 +25,7 @@ export type GetConnectorRefundSignaturesParams = {
   connectorOutputs: TransactionInput[];
   receiverPubKey: Uint8Array;
   transferId: string;
+  connectorTx: Uint8Array;
 };
 
 export class CoopExitService extends BaseTransferService {
@@ -42,6 +43,7 @@ export class CoopExitService extends BaseTransferService {
     connectorOutputs,
     receiverPubKey,
     transferId,
+    connectorTx,
   }: GetConnectorRefundSignaturesParams): Promise<{
     transfer: Transfer;
     signaturesMap: Map<string, Uint8Array>;
@@ -59,6 +61,7 @@ export class CoopExitService extends BaseTransferService {
       connectorOutputs,
       receiverPubKey,
       transferId,
+      connectorTx,
     );
 
     const transferTweak = await this.deliverTransferPackage(
@@ -83,6 +86,7 @@ export class CoopExitService extends BaseTransferService {
     connectorOutputs: TransactionInput[],
     receiverPubKey: Uint8Array,
     transferId: string,
+    connectorTx: Uint8Array,
   ): Promise<{
     transfer: Transfer;
     signaturesMap: Map<string, Uint8Array>;
@@ -242,6 +246,7 @@ export class CoopExitService extends BaseTransferService {
         },
         exitId: uuidv7(),
         exitTxid: exitTxId,
+        connectorTx: connectorTx,
       });
     } catch (error) {
       throw new SparkRequestError("Failed to initiate cooperative exit", {
