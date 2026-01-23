@@ -738,11 +738,15 @@ func FetchPartialTokenTransactionData(ctx context.Context, partialTokenTransacti
 		Where(tokentransaction.PartialTokenTransactionHash(partialTokenTransactionHash)).
 		WithCreatedOutput().
 		WithSpentOutput(func(q *TokenOutputQuery) {
-			// Needed to enable marshalling of the token transaction proto.
-			q.WithOutputCreatedTokenTransaction()
+			// Needed to enable computation of the progress of a transaction commit.
+			q.WithRevocationKeyshare().
+				WithTokenPartialRevocationSecretShares().
+				// Needed to enable marshalling of the token transaction proto.
+				WithOutputCreatedTokenTransaction()
 		}).
 		WithMint().
 		WithCreate().
+		WithPeerSignatures().
 		Only(ctx)
 	if err != nil {
 		if IsNotFound(err) {

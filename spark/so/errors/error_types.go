@@ -38,6 +38,7 @@ const (
 	ReasonAbortedTransactionPreempted = "TRANSACTION_PREEMPTED"
 
 	ReasonAlreadyExistsDuplicateOperation = "DUPLICATE_OPERATION"
+	ReasonAlreadyExistsExpiredTransaction = "EXPIRED_TRANSACTION"
 
 	ReasonNotFoundMissingEntity = "MISSING_ENTITY"
 
@@ -173,6 +174,10 @@ func AbortedTransactionPreempted(err error) error {
 
 func AlreadyExistsDuplicateOperation(err error) error {
 	return newGRPCError(codes.AlreadyExists, err, ReasonAlreadyExistsDuplicateOperation)
+}
+
+func AlreadyExistsExpiredTransaction(err error) error {
+	return newGRPCError(codes.AlreadyExists, err, ReasonAlreadyExistsExpiredTransaction)
 }
 
 func NotFoundMissingEntity(err error) error {

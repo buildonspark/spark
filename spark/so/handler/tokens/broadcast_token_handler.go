@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -13,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -175,7 +177,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 		return nil, fmt.Errorf("failed to fetch partial token transaction: %w", err)
 	}
 	if existingPartialTx != nil {
-		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transaction already broadcasted"))
+		return h.handleExistingTransaction(ctx, existingPartialTx)
 	}
 
 	if err := preemptOrRejectTransactions(ctx, partialTxV2Shape); err != nil {
@@ -390,4 +392,65 @@ func (h *BroadcastTokenHandler) constructFinalTokenTransaction(
 	}
 
 	return final, keyshareIDStrings, nil
+}
+
+// handleExistingTransaction handles the case where a transaction with the same partial hash already exists.
+// It returns the current commit status and progress for the transaction.
+func (h *BroadcastTokenHandler) handleExistingTransaction(
+	ctx context.Context,
+	existingTx *ent.TokenTransaction,
+) (*tokenpb.BroadcastTransactionResponse, error) {
+	txProto, err := existingTx.MarshalProto(ctx, h.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal existing transaction: %w", err)
+	}
+	finalTx, err := protoconverter.ConvertV2TxShapeToFinal(txProto)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert transaction to final shape: %w", err)
+	}
+
+	if existingTx.Status == st.TokenTransactionStatusFinalized {
+		return &tokenpb.BroadcastTransactionResponse{
+			FinalTokenTransaction: finalTx,
+			CommitStatus:          tokenpb.CommitStatus_COMMIT_FINALIZED,
+			CommitProgress:        nil,
+		}, nil
+	}
+
+	// Check if the transaction has expired (and not finalized).
+	// so clients should check transaction status before creating a replacement.
+	// Note: In rare cases the expired transaction might still be in the process of finalizing if
+	// enough operators have signed, but not yet revealed. In this case if the client generates a new transaction
+	// with the same outputs that broadcast will fail.
+	if !existingTx.ExpiryTime.IsZero() && time.Now().After(existingTx.ExpiryTime) {
+		return nil, sparkerrors.AlreadyExistsExpiredTransaction(
+			fmt.Errorf("transaction already broadcasted and has expired at %s; please generate a new transaction to retry", existingTx.ExpiryTime),
+		)
+	}
+
+	// For transfers, track reveal progress (secret share exchange) since that's the final commitment step.
+	// For mint/create, track signing progress since there's no reveal step.
+	txType, err := utils.InferTokenTransactionType(txProto)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer transaction type: %w", err)
+	}
+
+	var commitProgress *tokenpb.CommitProgress
+	if txType == utils.TokenTransactionTypeTransfer {
+		commitProgress, err = BuildRevealCommitProgress(existingTx, h.config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build reveal commit progress: %w", err)
+		}
+	} else {
+		commitProgress, err = BuildSignedCommitProgress(existingTx, h.config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build signed commit progress: %w", err)
+		}
+	}
+
+	return &tokenpb.BroadcastTransactionResponse{
+		FinalTokenTransaction: finalTx,
+		CommitStatus:          tokenpb.CommitStatus_COMMIT_PROCESSING,
+		CommitProgress:        commitProgress,
+	}, nil
 }
