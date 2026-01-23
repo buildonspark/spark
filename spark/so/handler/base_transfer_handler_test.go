@@ -497,6 +497,7 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedParties(t *testing.T) {
 				false,
 				"",
 				primaryTransfer.ID,
+				nil,
 			)
 
 			require.Error(t, err)
