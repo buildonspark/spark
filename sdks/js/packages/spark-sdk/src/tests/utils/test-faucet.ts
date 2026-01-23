@@ -387,7 +387,7 @@ export class BitcoinFaucet {
     startBlock,
     expectedIncrease,
     timeoutMs = 30000,
-    intervalMs = 5000,
+    intervalMs = 100,
   }: {
     startBlock: number;
     expectedIncrease: number;
