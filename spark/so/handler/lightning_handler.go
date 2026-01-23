@@ -839,7 +839,7 @@ func (h *LightningHandler) GetPreimageShare(
 		return nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
 
-	if req.TransferRequest != nil {
+	if req.TransferRequest != nil && req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
 		err = transferHandler.UpdateTransferLeavesSignatures(ctx, transfer, cpfpRefundSignatures, directRefundSignatures, directFromCpfpRefundSignatures)
 		if err != nil {
 			return nil, fmt.Errorf("unable to update transfer leaves signatures: %w", err)
