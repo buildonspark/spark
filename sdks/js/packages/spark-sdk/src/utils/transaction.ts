@@ -348,15 +348,18 @@ function createRefundTxs({
       });
     }
 
-    directRefundTx = createRefundTx({
-      sequence: sequence + DIRECT_TIMELOCK_OFFSET,
-      input: directRefundInput,
-      amountSats: directAmountSats,
-      receivingPubkey,
-      network,
-      shouldCalculateFee: true,
-      includeAnchor: false,
-    });
+    const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
+    if (!isZeroNode) {
+      directRefundTx = createRefundTx({
+        sequence: sequence + DIRECT_TIMELOCK_OFFSET,
+        input: directRefundInput,
+        amountSats: directAmountSats,
+        receivingPubkey,
+        network,
+        shouldCalculateFee: true,
+        includeAnchor: false,
+      });
+    }
   }
 
   const cpfpRefundTx = createRefundTx({
