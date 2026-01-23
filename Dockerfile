@@ -74,11 +74,16 @@ WORKDIR /signer
 COPY signer/. ./
 RUN cargo chef prepare --recipe-path recipe.json
 
-# (3) build dependencies
+# (3) build dependencies with correct target architecture
 FROM chef AS cacher-rust
+ARG TARGETOS TARGETARCH
+RUN echo "$TARGETARCH" | sed 's,arm,aarch,;s,amd,x86_,' > /tmp/arch && \
+    apt-get update && apt-get install -y "gcc-$(tr _ - < /tmp/arch)-linux-gnu" "g++-$(tr _ - < /tmp/arch)-linux-gnu" && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    rustup target add "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu"
 COPY --from=planner-rust /signer/recipe.json recipe.json
 WORKDIR /signer
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --release --target "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu" --recipe-path recipe.json
 
 # (4) build app
 FROM chef AS builder-rust
@@ -90,8 +95,8 @@ WORKDIR /signer
 COPY signer/. ./
 COPY --from=cacher-rust /signer/target target
 COPY --from=cacher-rust /usr/local/cargo /usr/local/cargo
+COPY --from=cacher-rust /tmp/arch /tmp/arch
 ARG TARGETOS TARGETARCH
-RUN echo "$TARGETARCH" | sed 's,arm,aarch,;s,amd,x86_,' > /tmp/arch
 RUN apt-get update && apt-get install -y protobuf-compiler "gcc-$(tr _ - < /tmp/arch)-linux-gnu" "g++-$(tr _ - < /tmp/arch)-linux-gnu" && apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN rustup target add "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu"
 RUN cargo build --target "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu" --release
