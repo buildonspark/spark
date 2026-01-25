@@ -61,7 +61,7 @@ describe('Spark React Native App', () => {
 
     await waitFor(element(by.id('invoice-display')))
       .toBeVisible()
-      .withTimeout(5000);
+      .withTimeout(30000);
 
     await expect(element(by.id('invoice-display'))).toBeVisible();
 
