@@ -112,7 +112,7 @@ func TestFinalizeSignatureHandler_ErrorCases(t *testing.T) {
 				assert.Nil(t, resp)
 				return err
 			},
-			expectedError: "failed to get first node",
+			expectedError: "not all nodes found",
 		},
 		{
 			name: "VerifyAndUpdateTransfer_NoTransferFound",

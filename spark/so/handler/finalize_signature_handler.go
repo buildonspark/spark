@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
-	"github.com/lightsparkdev/spark/common/bitcoin_transaction"
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
@@ -69,24 +69,11 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	firstNodeID, err := uuid.Parse(req.NodeSignatures[0].NodeId)
-	if err != nil {
-		return nil, fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
-	}
-	firstNode, err := db.TreeNode.Get(ctx, firstNodeID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get first node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
-	}
-	nodeTree, err := firstNode.QueryTree().Only(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get tree for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
-	}
-
-	// Verify ALL nodes belong to the same tree before processing confirmations.
+	var nodeTree *ent.Tree
+	// For CREATION intent, verify ALL nodes belong to the same tree before processing.
 	// This prevents attacks where nodes from different trees (built from different
 	// outputs of the same transaction) are submitted together to bypass validation.
 	if req.Intent == pbcommon.SignatureIntent_CREATION {
-		// Batch fetch all nodes with their trees for efficiency
 		nodeIDs := make([]uuid.UUID, 0, len(req.NodeSignatures))
 		for _, nodeSignatures := range req.NodeSignatures {
 			nodeID, err := uuid.Parse(nodeSignatures.NodeId)
@@ -95,62 +82,66 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 			}
 			nodeIDs = append(nodeIDs, nodeID)
 		}
-		nodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeIDs...)).WithTree().All(ctx)
+		treeNodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeIDs...)).WithTree().All(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get nodes for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 		}
-		if len(nodes) != len(nodeIDs) {
-			return nil, fmt.Errorf("not all nodes found: expected %d, got %d", len(nodeIDs), len(nodes))
+		if len(treeNodes) != len(nodeIDs) {
+			return nil, fmt.Errorf("not all nodes found: expected %d, got %d", len(nodeIDs), len(treeNodes))
 		}
-		for _, node := range nodes {
+		nodeTree = treeNodes[0].Edges.Tree
+		if nodeTree == nil {
+			return nil, fmt.Errorf("failed to get tree for first node %s", treeNodes[0].ID)
+		}
+		for _, node := range treeNodes[1:] {
 			if node.Edges.Tree == nil || node.Edges.Tree.ID != nodeTree.ID {
 				return nil, fmt.Errorf("node %s does not belong to the same tree as first node", node.ID)
 			}
 		}
-	}
 
-	if nodeTree.Status == st.TreeStatusPending {
-		for _, nodeSignatures := range req.NodeSignatures {
-			nodeID, err := uuid.Parse(nodeSignatures.NodeId)
-			if err != nil {
-				return nil, fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
-			}
-			node, err := db.TreeNode.Get(ctx, nodeID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
-			}
-			signingKeyshare, err := node.QuerySigningKeyshare().Only(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get signing keyshare: %w", err)
-			}
-			address, err := db.DepositAddress.Query().Where(depositaddress.HasSigningKeyshareWith(signingkeyshare.IDEQ(signingKeyshare.ID))).Only(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get deposit address: %w", err)
-			}
-			if address.ConfirmationHeight != 0 {
-				blockHeight, err := db.BlockHeight.Query().
-					Where(blockheight.NetworkEQ(address.Network)).
-					Order(ent.Desc(blockheight.FieldHeight)).
-					First(ctx)
+		if nodeTree.Status == st.TreeStatusPending {
+			for _, nodeSignatures := range req.NodeSignatures {
+				nodeID, err := uuid.Parse(nodeSignatures.NodeId)
 				if err != nil {
-					if ent.IsNotFound(err) {
-						return nil, fmt.Errorf("no block height present in db; cannot determine number of confirmations")
+					return nil, fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
+				}
+				node, err := db.TreeNode.Get(ctx, nodeID)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
+				}
+				signingKeyshare, err := node.QuerySigningKeyshare().Only(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get signing keyshare: %w", err)
+				}
+				address, err := db.DepositAddress.Query().Where(depositaddress.HasSigningKeyshareWith(signingkeyshare.IDEQ(signingKeyshare.ID))).Only(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get deposit address: %w", err)
+				}
+				if address.ConfirmationHeight != 0 {
+					blockHeight, err := db.BlockHeight.Query().
+						Where(blockheight.NetworkEQ(address.Network)).
+						Order(ent.Desc(blockheight.FieldHeight)).
+						First(ctx)
+					if err != nil {
+						if ent.IsNotFound(err) {
+							return nil, fmt.Errorf("no block height present in db; cannot determine number of confirmations")
+						}
+						return nil, fmt.Errorf("failed to get max block height: %w", err)
 					}
-					return nil, fmt.Errorf("failed to get max block height: %w", err)
+					numConfirmations := blockHeight.Height - address.ConfirmationHeight
+					requiredConfirmations := int64(knobs.GetKnobsService(ctx).GetValue(knobs.KnobNumRequiredConfirmations, 3))
+					if numConfirmations < requiredConfirmations {
+						return nil, errors.FailedPreconditionInsufficientConfirmations(fmt.Errorf("expected at least %d confirmations, got %d", requiredConfirmations, numConfirmations))
+					}
+					if len(address.ConfirmationTxid) > 0 && address.ConfirmationTxid != nodeTree.BaseTxid.String() {
+						return nil, fmt.Errorf("confirmation txid does not match tree base txid")
+					}
+					_, err = nodeTree.Update().SetStatus(st.TreeStatusAvailable).Save(ctx)
+					if err != nil {
+						return nil, fmt.Errorf("failed to update tree: %w", err)
+					}
+					break
 				}
-				numConfirmations := blockHeight.Height - address.ConfirmationHeight
-				requiredConfirmations := int64(knobs.GetKnobsService(ctx).GetValue(knobs.KnobNumRequiredConfirmations, 3))
-				if numConfirmations < requiredConfirmations {
-					return nil, errors.FailedPreconditionInsufficientConfirmations(fmt.Errorf("expected at least %d confirmations, got %d", requiredConfirmations, numConfirmations))
-				}
-				if len(address.ConfirmationTxid) > 0 && address.ConfirmationTxid != nodeTree.BaseTxid.String() {
-					return nil, fmt.Errorf("confirmation txid does not match tree base txid")
-				}
-				_, err = nodeTree.Update().SetStatus(st.TreeStatusAvailable).Save(ctx)
-				if err != nil {
-					return nil, fmt.Errorf("failed to update tree: %w", err)
-				}
-				break
 			}
 		}
 	}
