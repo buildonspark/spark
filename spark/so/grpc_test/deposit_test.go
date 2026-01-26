@@ -388,6 +388,14 @@ func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
 	require.Len(t, tx.TxIn[0].Witness, 1)
 	require.Len(t, tx.TxOut, 2)
 
+	// Verify the NodeTx signature is cryptographically valid (spends from deposit)
+	depositPrevOut := &wire.TxOut{
+		Value:    signedDepositTx.TxOut[vout].Value,
+		PkScript: signedDepositTx.TxOut[vout].PkScript,
+	}
+	err = common.VerifySignatureSingleInput(tx, 0, depositPrevOut)
+	require.NoError(t, err, "NodeTx signature should be valid")
+
 	refundTx, err := common.TxFromRawTxBytes(resp.RootNode.RefundTx)
 	require.NoError(t, err)
 	require.Len(t, refundTx.TxIn, 1)
@@ -395,12 +403,24 @@ func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
 	require.Len(t, refundTx.TxIn[0].Witness, 1)
 	require.Len(t, refundTx.TxOut, 2)
 
+	// Verify the RefundTx signature is cryptographically valid (spends from NodeTx output 0)
+	nodeTxPrevOut := &wire.TxOut{
+		Value:    tx.TxOut[0].Value,
+		PkScript: tx.TxOut[0].PkScript,
+	}
+	err = common.VerifySignatureSingleInput(refundTx, 0, nodeTxPrevOut)
+	require.NoError(t, err, "RefundTx signature should be valid")
+
 	directFromCpfpRefundTx, err := common.TxFromRawTxBytes(resp.RootNode.DirectFromCpfpRefundTx)
 	require.NoError(t, err)
 	require.Len(t, directFromCpfpRefundTx.TxIn, 1)
 	require.NotNil(t, directFromCpfpRefundTx.TxIn[0])
 	require.Len(t, directFromCpfpRefundTx.TxIn[0].Witness, 1)
 	require.Len(t, directFromCpfpRefundTx.TxOut, 1)
+
+	// Verify the DirectFromCpfpRefundTx signature is cryptographically valid (spends from NodeTx)
+	err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, nodeTxPrevOut)
+	require.NoError(t, err, "DirectFromCpfpRefundTx signature should be valid")
 
 	// Mine 2 more blocks because deposits won't be available until there are 3 confirmations
 	_, err = client.GenerateToAddress(2, randomAddress, nil)
@@ -419,526 +439,559 @@ func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
-	config := wallet.NewTestWalletConfig(t)
+	for _, tc := range wallet.CreateRootFlows {
+		t.Run(tc.Name, func(t *testing.T) {
+			config := wallet.NewTestWalletConfig(t)
 
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect to operator: %v", err)
+			conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+			if err != nil {
+				t.Fatalf("failed to connect to operator: %v", err)
+			}
+			defer conn.Close()
+
+			token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+			if err != nil {
+				t.Fatalf("failed to authenticate: %v", err)
+			}
+			ctx := wallet.ContextWithToken(t.Context(), token)
+
+			privKey := keys.GeneratePrivateKey()
+
+			leafID := uuid.NewString()
+			depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+			if err != nil {
+				t.Fatalf("failed to generate deposit address: %v", err)
+			}
+
+			unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
+			if err != nil {
+				t.Fatalf("failed to query unused deposit addresses: %v", err)
+			}
+
+			if len(unusedDepositAddresses.DepositAddresses) != 1 {
+				t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.DepositAddresses))
+			}
+
+			if *unusedDepositAddresses.DepositAddresses[0].LeafId != leafID {
+				t.Fatalf("expected leaf id to be %s, got %s", leafID, *unusedDepositAddresses.DepositAddresses[0].LeafId)
+			}
+
+			client := sparktesting.GetBitcoinClient()
+
+			coin, err := faucet.Fund()
+			require.NoError(t, err)
+
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			if err != nil {
+				t.Fatalf("failed to create deposit tx: %v", err)
+			}
+			vout := 0
+			var buf bytes.Buffer
+			err = depositTx.Serialize(&buf)
+			if err != nil {
+				t.Fatalf("failed to serialize deposit tx: %v", err)
+			}
+			depositTxHex := hex.EncodeToString(buf.Bytes())
+			decodedBytes, err := hex.DecodeString(depositTxHex)
+			if err != nil {
+				t.Fatalf("failed to decode deposit tx hex: %v", err)
+			}
+			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
+			if err != nil {
+				t.Fatalf("failed to deserilize deposit tx: %v", err)
+			}
+
+			// Sign, broadcast, and mine deposit tx
+			signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+			if err != nil {
+				t.Fatalf("failed to sign faucet coin: %v", err)
+			}
+			_, err = client.SendRawTransaction(signedDepositTx, true)
+			require.NoError(t, err)
+
+			randomKey := keys.GeneratePrivateKey()
+			randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
+			if err != nil {
+				t.Fatalf("failed to get p2tr raw address: %v", err)
+			}
+			_, err = client.GenerateToAddress(3, randomAddress, nil)
+			if err != nil {
+				t.Fatalf("failed to generate to address: %v", err)
+			}
+
+			time.Sleep(100 * time.Millisecond)
+
+			// flip a bit in the pk script to simulate an unknown address
+			depositTx.TxOut[0].PkScript[30] = depositTx.TxOut[0].PkScript[30] ^ 1
+
+			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			require.NoError(t, err)
+			_, err = tc.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
+			require.Error(t, err)
+			grpcStatus, ok := status.FromError(err)
+			assert.True(t, ok)
+			assert.Equal(t, codes.NotFound, grpcStatus.Code())
+			assert.Contains(t, grpcStatus.Message(), "the requested deposit address could not be found")
+		})
 	}
-	defer conn.Close()
-
-	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
-	if err != nil {
-		t.Fatalf("failed to authenticate: %v", err)
-	}
-	ctx := wallet.ContextWithToken(t.Context(), token)
-
-	privKey := keys.GeneratePrivateKey()
-
-	leafID := uuid.NewString()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
-	if err != nil {
-		t.Fatalf("failed to generate deposit address: %v", err)
-	}
-
-	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
-	if err != nil {
-		t.Fatalf("failed to query unused deposit addresses: %v", err)
-	}
-
-	if len(unusedDepositAddresses.DepositAddresses) != 1 {
-		t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.DepositAddresses))
-	}
-
-	if *unusedDepositAddresses.DepositAddresses[0].LeafId != leafID {
-		t.Fatalf("expected leaf id to be %s, got %s", leafID, *unusedDepositAddresses.DepositAddresses[0].LeafId)
-	}
-
-	client := sparktesting.GetBitcoinClient()
-
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
-
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create deposit tx: %v", err)
-	}
-	vout := 0
-	var buf bytes.Buffer
-	err = depositTx.Serialize(&buf)
-	if err != nil {
-		t.Fatalf("failed to serialize deposit tx: %v", err)
-	}
-	depositTxHex := hex.EncodeToString(buf.Bytes())
-	decodedBytes, err := hex.DecodeString(depositTxHex)
-	if err != nil {
-		t.Fatalf("failed to decode deposit tx hex: %v", err)
-	}
-	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-	if err != nil {
-		t.Fatalf("failed to deserilize deposit tx: %v", err)
-	}
-
-	// Sign, broadcast, and mine deposit tx
-	signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
-	if err != nil {
-		t.Fatalf("failed to sign faucet coin: %v", err)
-	}
-	_, err = client.SendRawTransaction(signedDepositTx, true)
-	require.NoError(t, err)
-
-	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
-	if err != nil {
-		t.Fatalf("failed to get p2tr raw address: %v", err)
-	}
-	_, err = client.GenerateToAddress(3, randomAddress, nil)
-	if err != nil {
-		t.Fatalf("failed to generate to address: %v", err)
-	}
-
-	time.Sleep(100 * time.Millisecond)
-
-	// flip a bit in the pk script to simulate an unknown address
-	depositTx.TxOut[0].PkScript[30] = depositTx.TxOut[0].PkScript[30] ^ 1
-
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
-	require.NoError(t, err)
-	_, err = wallet.CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, false)
-	require.Error(t, err)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.NotFound, grpcStatus.Code())
-	assert.Contains(t, grpcStatus.Message(), "the requested deposit address could not be found")
 }
 
 func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
-	config := wallet.NewTestWalletConfig(t)
+	for _, tc := range wallet.CreateRootFlows {
+		t.Run(tc.Name, func(t *testing.T) {
+			config := wallet.NewTestWalletConfig(t)
 
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect to operator: %v", err)
-	}
-	defer conn.Close()
+			conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+			if err != nil {
+				t.Fatalf("failed to connect to operator: %v", err)
+			}
+			defer conn.Close()
 
-	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
-	if err != nil {
-		t.Fatalf("failed to authenticate: %v", err)
-	}
-	ctx := wallet.ContextWithToken(t.Context(), token)
+			token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+			if err != nil {
+				t.Fatalf("failed to authenticate: %v", err)
+			}
+			ctx := wallet.ContextWithToken(t.Context(), token)
 
-	privKey := keys.GeneratePrivateKey()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), nil, false)
-	if err != nil {
-		t.Fatalf("failed to generate deposit address: %v", err)
-	}
+			privKey := keys.GeneratePrivateKey()
+			depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), nil, false)
+			if err != nil {
+				t.Fatalf("failed to generate deposit address: %v", err)
+			}
 
-	client := sparktesting.GetBitcoinClient()
+			client := sparktesting.GetBitcoinClient()
 
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
+			coin, err := faucet.Fund()
+			require.NoError(t, err)
 
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create deposit tx: %v", err)
-	}
-	vout := 0
-	var buf bytes.Buffer
-	err = depositTx.Serialize(&buf)
-	if err != nil {
-		t.Fatalf("failed to serialize deposit tx: %v", err)
-	}
-	depositTxHex := hex.EncodeToString(buf.Bytes())
-	decodedBytes, err := hex.DecodeString(depositTxHex)
-	if err != nil {
-		t.Fatalf("failed to decode deposit tx hex: %v", err)
-	}
-	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-	if err != nil {
-		t.Fatalf("failed to deserilize deposit tx: %v", err)
-	}
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			if err != nil {
+				t.Fatalf("failed to create deposit tx: %v", err)
+			}
+			vout := 0
+			var buf bytes.Buffer
+			err = depositTx.Serialize(&buf)
+			if err != nil {
+				t.Fatalf("failed to serialize deposit tx: %v", err)
+			}
+			depositTxHex := hex.EncodeToString(buf.Bytes())
+			decodedBytes, err := hex.DecodeString(depositTxHex)
+			if err != nil {
+				t.Fatalf("failed to decode deposit tx hex: %v", err)
+			}
+			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
+			if err != nil {
+				t.Fatalf("failed to deserilize deposit tx: %v", err)
+			}
 
-	// Sign, broadcast, and mine deposit tx
-	signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
-	if err != nil {
-		t.Fatalf("failed to sign faucet coin: %v", err)
-	}
-	_, err = client.SendRawTransaction(signedDepositTx, true)
-	require.NoError(t, err)
+			// Sign, broadcast, and mine deposit tx
+			signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+			if err != nil {
+				t.Fatalf("failed to sign faucet coin: %v", err)
+			}
+			_, err = client.SendRawTransaction(signedDepositTx, true)
+			require.NoError(t, err)
 
-	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
-	if err != nil {
-		t.Fatalf("failed to get p2tr raw address: %v", err)
-	}
-	_, err = client.GenerateToAddress(3, randomAddress, nil)
-	if err != nil {
-		t.Fatalf("failed to generate to address: %v", err)
-	}
+			randomKey := keys.GeneratePrivateKey()
+			randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
+			if err != nil {
+				t.Fatalf("failed to get p2tr raw address: %v", err)
+			}
+			_, err = client.GenerateToAddress(3, randomAddress, nil)
+			if err != nil {
+				t.Fatalf("failed to generate to address: %v", err)
+			}
 
-	time.Sleep(100 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
-	require.NoError(t, err)
-	resp, err := wallet.CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, false)
-	if err != nil {
-		t.Fatalf("failed to create tree: %v", err)
-	}
+			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			require.NoError(t, err)
+			nodes, err := tc.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
+			if err != nil {
+				t.Fatalf("failed to create tree: %v", err)
+			}
 
-	for _, node := range resp.Nodes {
-		require.NoError(t, uuid.Validate(node.Id))
+			for _, node := range nodes {
+				require.NoError(t, uuid.Validate(node.Id))
+			}
+		})
 	}
 }
 
 func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
-	config := wallet.NewTestWalletConfig(t)
+	for _, tc := range wallet.CreateRootFlows {
+		t.Run(tc.Name, func(t *testing.T) {
+			config := wallet.NewTestWalletConfig(t)
 
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect to operator: %v", err)
-	}
-	defer conn.Close()
+			conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+			if err != nil {
+				t.Fatalf("failed to connect to operator: %v", err)
+			}
+			defer conn.Close()
 
-	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
-	if err != nil {
-		t.Fatalf("failed to authenticate: %v", err)
-	}
-	ctx := wallet.ContextWithToken(t.Context(), token)
+			token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+			if err != nil {
+				t.Fatalf("failed to authenticate: %v", err)
+			}
+			ctx := wallet.ContextWithToken(t.Context(), token)
 
-	privKey := keys.GeneratePrivateKey()
-	leafID := uuid.NewString()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
-	if err != nil {
-		t.Fatalf("failed to generate deposit address: %v", err)
-	}
+			privKey := keys.GeneratePrivateKey()
+			leafID := uuid.NewString()
+			depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+			if err != nil {
+				t.Fatalf("failed to generate deposit address: %v", err)
+			}
 
-	client := sparktesting.GetBitcoinClient()
+			client := sparktesting.GetBitcoinClient()
 
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
+			coin, err := faucet.Fund()
+			require.NoError(t, err)
 
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create deposit tx: %v", err)
-	}
-	vout := 0
-	var buf bytes.Buffer
-	err = depositTx.Serialize(&buf)
-	if err != nil {
-		t.Fatalf("failed to serialize deposit tx: %v", err)
-	}
-	depositTxHex := hex.EncodeToString(buf.Bytes())
-	decodedBytes, err := hex.DecodeString(depositTxHex)
-	if err != nil {
-		t.Fatalf("failed to decode deposit tx hex: %v", err)
-	}
-	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-	if err != nil {
-		t.Fatalf("failed to deserilize deposit tx: %v", err)
-	}
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			if err != nil {
+				t.Fatalf("failed to create deposit tx: %v", err)
+			}
+			vout := 0
+			var buf bytes.Buffer
+			err = depositTx.Serialize(&buf)
+			if err != nil {
+				t.Fatalf("failed to serialize deposit tx: %v", err)
+			}
+			depositTxHex := hex.EncodeToString(buf.Bytes())
+			decodedBytes, err := hex.DecodeString(depositTxHex)
+			if err != nil {
+				t.Fatalf("failed to decode deposit tx hex: %v", err)
+			}
+			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
+			if err != nil {
+				t.Fatalf("failed to deserilize deposit tx: %v", err)
+			}
 
-	// Sign, broadcast, and mine deposit tx
-	signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
-	if err != nil {
-		t.Fatalf("failed to sign faucet coin: %v", err)
-	}
-	_, err = client.SendRawTransaction(signedDepositTx, true)
-	require.NoError(t, err)
+			// Sign, broadcast, and mine deposit tx
+			signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+			if err != nil {
+				t.Fatalf("failed to sign faucet coin: %v", err)
+			}
+			_, err = client.SendRawTransaction(signedDepositTx, true)
+			require.NoError(t, err)
 
-	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
-	if err != nil {
-		t.Fatalf("failed to get p2tr raw address: %v", err)
-	}
-	_, err = client.GenerateToAddress(3, randomAddress, nil)
-	if err != nil {
-		t.Fatalf("failed to generate to address: %v", err)
-	}
+			randomKey := keys.GeneratePrivateKey()
+			randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
+			if err != nil {
+				t.Fatalf("failed to get p2tr raw address: %v", err)
+			}
+			_, err = client.GenerateToAddress(3, randomAddress, nil)
+			if err != nil {
+				t.Fatalf("failed to generate to address: %v", err)
+			}
 
-	time.Sleep(100 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 
-	resultChannel := make(chan *pb.FinalizeNodeSignaturesResponse, 2)
-	errChannel := make(chan error, 2)
+			resultChannel := make(chan []*pb.TreeNode, 2)
+			errChannel := make(chan error, 2)
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
-	require.NoError(t, err)
-	for range 2 {
-		go func() {
-			resp, err := wallet.CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, false)
+			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			require.NoError(t, err)
+			for range 2 {
+				go func() {
+					resp, err := tc.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
+
+					if err != nil {
+						errChannel <- err
+					} else {
+						resultChannel <- resp
+					}
+				}()
+			}
+
+			var nodes []*pb.TreeNode
+			respCount, errCount := 0, 0
+			treeNodeCounts := make(map[string]int)
+
+			for range 2 {
+				select {
+				case r := <-resultChannel:
+					nodes = r
+					respCount++
+					for _, node := range r {
+						treeNodeCounts[node.Id]++
+					}
+				case e := <-errChannel:
+					err = e
+					errCount++
+				}
+			}
+
+			// This test is nondeterministic. Either of two outcomes are possible:
+			// 1. One call makes the tree and the other finds it to already exist
+			// 2. One call attempts to make a duplicate tree and fails
+			assert.GreaterOrEqual(t, respCount, 1)
+			assert.LessOrEqual(t, errCount, 1)
 
 			if err != nil {
-				errChannel <- err
+				log.Print("one failed call encountered")
+				grpcStatus, ok := status.FromError(err)
+				assert.True(t, ok)
+				// Second call can either land in between tree creation
+				// and finalize node signatures, which yields Already Exists
+				// error, or after both calls, which yields failed precondition
+				assert.Contains(t, []codes.Code{codes.FailedPrecondition, codes.AlreadyExists}, grpcStatus.Code())
 			} else {
-				resultChannel <- resp
+				log.Print("both calls succeeded")
+				var duplicateNodes []string
+				for nodeId, count := range treeNodeCounts {
+					if count != 2 {
+						duplicateNodes = append(duplicateNodes, nodeId)
+					}
+				}
+				assert.Emptyf(t, duplicateNodes, "expected same nodes to be returned across concurrent calls; found duplicate nodes %v", duplicateNodes)
 			}
-		}()
-	}
 
-	var resp *pb.FinalizeNodeSignaturesResponse
-	respCount, errCount := 0, 0
-	treeNodeCounts := make(map[string]int)
+			log.Printf("tree created: %v", nodes)
 
-	for range 2 {
-		select {
-		case r := <-resultChannel:
-			resp = r
-			respCount++
-			for _, node := range r.Nodes {
-				treeNodeCounts[node.Id]++
+			// Mine 2 more blocks because deposits won't be available until there are 3 confirmations
+			_, err = client.GenerateToAddress(2, randomAddress, nil)
+			require.NoError(t, err, "failed to generate to address")
+			sparkClient := pb.NewSparkServiceClient(conn)
+			for _, node := range nodes {
+				rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, node)
+				require.NoError(t, err)
+				assert.Equal(t, rootNode.Id, leafID)
+				assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
 			}
-		case e := <-errChannel:
-			err = e
-			errCount++
-		}
-	}
 
-	// This test is nondeterministic. Either of two outcomes are possible:
-	// 1. One call makes the tree and the other finds it to already exist
-	// 2. One call attempts to make a duplicate tree and fails
-	assert.GreaterOrEqual(t, respCount, 1)
-	assert.LessOrEqual(t, errCount, 1)
-
-	if err != nil {
-		log.Print("one failed call encountered")
-		grpcStatus, ok := status.FromError(err)
-		assert.True(t, ok)
-		// Second call can either land in between tree creation
-		// and finalize node signatures, which yields Already Exists
-		// error, or after both calls, which yields failed precondition
-		assert.Contains(t, []codes.Code{codes.FailedPrecondition, codes.AlreadyExists}, grpcStatus.Code())
-	} else {
-		log.Print("both calls succeeded")
-		var duplicateNodes []string
-		for nodeId, count := range treeNodeCounts {
-			if count != 2 {
-				duplicateNodes = append(duplicateNodes, nodeId)
+			unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
+			if err != nil {
+				t.Fatalf("failed to query unused deposit addresses: %v", err)
 			}
-		}
-		assert.Emptyf(t, duplicateNodes, "expected same nodes to be returned across concurrent calls; found duplicate nodes %v", duplicateNodes)
-	}
 
-	log.Printf("tree created: %v", resp)
-
-	for _, node := range resp.Nodes {
-		if node.Status == string(st.TreeNodeStatusCreating) {
-			t.Fatalf("tree node is in status TreeNodeStatusCreating %s", node.Id)
-		}
-	}
-
-	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
-	if err != nil {
-		t.Fatalf("failed to query unused deposit addresses: %v", err)
-	}
-
-	if len(unusedDepositAddresses.DepositAddresses) != 0 {
-		t.Fatalf("expected 0 unused deposit addresses, got %d", len(unusedDepositAddresses.DepositAddresses))
+			if len(unusedDepositAddresses.DepositAddresses) != 0 {
+				t.Fatalf("expected 0 unused deposit addresses, got %d", len(unusedDepositAddresses.DepositAddresses))
+			}
+		})
 	}
 }
 
 // Test that we can get refund signatures for a tree before depositing funds on-chain,
 // and that after we confirm funds on-chain, our leaves are available for transfer.
 func TestStartDepositTreeCreationOffchain(t *testing.T) {
-	client := sparktesting.GetBitcoinClient()
+	for _, tc := range wallet.CreateRootFlows {
+		t.Run(tc.Name, func(t *testing.T) {
+			client := sparktesting.GetBitcoinClient()
 
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
+			coin, err := faucet.Fund()
+			require.NoError(t, err)
 
-	config := wallet.NewTestWalletConfig(t)
+			config := wallet.NewTestWalletConfig(t)
 
-	// Setup Mock tx
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect to operator: %v", err)
-	}
-	defer conn.Close()
+			// Setup Mock tx
+			conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+			if err != nil {
+				t.Fatalf("failed to connect to operator: %v", err)
+			}
+			defer conn.Close()
 
-	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
-	if err != nil {
-		t.Fatalf("failed to authenticate: %v", err)
-	}
-	ctx := wallet.ContextWithToken(t.Context(), token)
+			token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+			if err != nil {
+				t.Fatalf("failed to authenticate: %v", err)
+			}
+			ctx := wallet.ContextWithToken(t.Context(), token)
 
-	privKey := keys.GeneratePrivateKey()
-	leafID := uuid.NewString()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
-	if err != nil {
-		t.Fatalf("failed to generate deposit address: %v", err)
-	}
+			privKey := keys.GeneratePrivateKey()
+			leafID := uuid.NewString()
+			depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+			if err != nil {
+				t.Fatalf("failed to generate deposit address: %v", err)
+			}
 
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create deposit tx: %v", err)
-	}
-	vout := 0
-	var buf bytes.Buffer
-	err = depositTx.Serialize(&buf)
-	if err != nil {
-		t.Fatalf("failed to serialize deposit tx: %v", err)
-	}
-	depositTxHex := hex.EncodeToString(buf.Bytes())
-	decodedBytes, err := hex.DecodeString(depositTxHex)
-	if err != nil {
-		t.Fatalf("failed to decode deposit tx hex: %v", err)
-	}
-	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-	if err != nil {
-		t.Fatalf("failed to deserilize deposit tx: %v", err)
-	}
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			if err != nil {
+				t.Fatalf("failed to create deposit tx: %v", err)
+			}
+			vout := 0
+			var buf bytes.Buffer
+			err = depositTx.Serialize(&buf)
+			if err != nil {
+				t.Fatalf("failed to serialize deposit tx: %v", err)
+			}
+			depositTxHex := hex.EncodeToString(buf.Bytes())
+			decodedBytes, err := hex.DecodeString(depositTxHex)
+			if err != nil {
+				t.Fatalf("failed to decode deposit tx hex: %v", err)
+			}
+			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
+			if err != nil {
+				t.Fatalf("failed to deserilize deposit tx: %v", err)
+			}
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
-	require.NoError(t, err)
-	resp, err := wallet.CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, false)
-	if err != nil {
-		t.Fatalf("failed to create tree: %v", err)
-	}
+			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			require.NoError(t, err)
+			nodes, err := tc.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
+			if err != nil {
+				t.Fatalf("failed to create tree: %v", err)
+			}
 
-	log.Printf("tree created: %v", resp)
+			log.Printf("tree created: %v", nodes)
 
-	// User should not be able to transfer funds since
-	// L1 tx has not confirmed
-	rootNode := resp.Nodes[0]
-	newLeafPrivKey := keys.GeneratePrivateKey()
-	receiverPrivKey := keys.GeneratePrivateKey()
+			// User should not be able to transfer funds since
+			// L1 tx has not confirmed
+			rootNode := nodes[0]
+			newLeafPrivKey := keys.GeneratePrivateKey()
+			receiverPrivKey := keys.GeneratePrivateKey()
 
-	transferNode := wallet.LeafKeyTweak{
-		Leaf:              rootNode,
-		SigningPrivKey:    privKey,
-		NewSigningPrivKey: newLeafPrivKey,
-	}
-	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
+			transferNode := wallet.LeafKeyTweak{
+				Leaf:              rootNode,
+				SigningPrivKey:    privKey,
+				NewSigningPrivKey: newLeafPrivKey,
+			}
+			leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
-	_, err = wallet.SendTransferWithKeyTweaks(
-		t.Context(),
-		config,
-		leavesToTransfer,
-		receiverPrivKey.Public(),
-		time.Now().Add(10*time.Minute),
-	)
-	if err == nil {
-		t.Fatalf("expected error when sending transfer")
-	}
+			_, err = wallet.SendTransferWithKeyTweaks(
+				t.Context(),
+				config,
+				leavesToTransfer,
+				receiverPrivKey.Public(),
+				time.Now().Add(10*time.Minute),
+			)
+			if err == nil {
+				t.Fatalf("expected error when sending transfer")
+			}
 
-	// Sign, broadcast, and mine deposit tx
-	signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
-	if err != nil {
-		t.Fatalf("failed to sign faucet coin: %v", err)
-	}
-	_, err = client.SendRawTransaction(signedDepositTx, true)
-	require.NoError(t, err)
+			// Sign, broadcast, and mine deposit tx
+			signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+			if err != nil {
+				t.Fatalf("failed to sign faucet coin: %v", err)
+			}
+			_, err = client.SendRawTransaction(signedDepositTx, true)
+			require.NoError(t, err)
 
-	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
-	if err != nil {
-		t.Fatalf("failed to get p2tr raw address: %v", err)
-	}
-	_, err = client.GenerateToAddress(3, randomAddress, nil)
-	if err != nil {
-		t.Fatalf("failed to generate to address: %v", err)
-	}
+			randomKey := keys.GeneratePrivateKey()
+			randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
+			if err != nil {
+				t.Fatalf("failed to get p2tr raw address: %v", err)
+			}
+			_, err = client.GenerateToAddress(3, randomAddress, nil)
+			if err != nil {
+				t.Fatalf("failed to generate to address: %v", err)
+			}
 
-	_, err = wallet.WaitForPendingDepositNode(ctx, pb.NewSparkServiceClient(conn), rootNode)
-	require.NoError(t, err)
+			_, err = wallet.WaitForPendingDepositNode(ctx, pb.NewSparkServiceClient(conn), rootNode)
+			require.NoError(t, err)
 
-	// After L1 tx confirms, user should be able to transfer funds
-	_, err = wallet.SendTransferWithKeyTweaks(
-		t.Context(),
-		config,
-		leavesToTransfer[:],
-		receiverPrivKey.Public(),
-		time.Now().Add(10*time.Minute),
-	)
-	if err != nil {
-		t.Fatalf("failed to send transfer: %v", err)
+			// After L1 tx confirms, user should be able to transfer funds
+			_, err = wallet.SendTransferWithKeyTweaks(
+				t.Context(),
+				config,
+				leavesToTransfer[:],
+				receiverPrivKey.Public(),
+				time.Now().Add(10*time.Minute),
+			)
+			if err != nil {
+				t.Fatalf("failed to send transfer: %v", err)
+			}
+		})
 	}
 }
 
 // Test that we cannot transfer a leaf before a deposit has confirmed
 func TestStartDepositTreeCreationUnconfirmed(t *testing.T) {
-	client := sparktesting.GetBitcoinClient()
+	for _, tc := range wallet.CreateRootFlows {
+		t.Run(tc.Name, func(t *testing.T) {
+			client := sparktesting.GetBitcoinClient()
 
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
+			coin, err := faucet.Fund()
+			require.NoError(t, err)
 
-	config := wallet.NewTestWalletConfig(t)
+			config := wallet.NewTestWalletConfig(t)
 
-	// Setup Mock tx
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect to operator: %v", err)
+			// Setup Mock tx
+			conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+			if err != nil {
+				t.Fatalf("failed to connect to operator: %v", err)
+			}
+			defer conn.Close()
+
+			token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+			if err != nil {
+				t.Fatalf("failed to authenticate: %v", err)
+			}
+			ctx := wallet.ContextWithToken(t.Context(), token)
+
+			privKey := keys.GeneratePrivateKey()
+			leafID := uuid.NewString()
+			depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+			if err != nil {
+				t.Fatalf("failed to generate deposit address: %v", err)
+			}
+
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			if err != nil {
+				t.Fatalf("failed to create deposit tx: %v", err)
+			}
+			vout := 0
+			var buf bytes.Buffer
+			err = depositTx.Serialize(&buf)
+			if err != nil {
+				t.Fatalf("failed to serialize deposit tx: %v", err)
+			}
+			depositTxHex := hex.EncodeToString(buf.Bytes())
+			decodedBytes, err := hex.DecodeString(depositTxHex)
+			if err != nil {
+				t.Fatalf("failed to decode deposit tx hex: %v", err)
+			}
+			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
+			if err != nil {
+				t.Fatalf("failed to deserilize deposit tx: %v", err)
+			}
+
+			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			require.NoError(t, err)
+			nodes, err := tc.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
+			if err != nil {
+				t.Fatalf("failed to create tree: %v", err)
+			}
+
+			log.Printf("tree created: %v", nodes)
+
+			// User should not be able to transfer funds since
+			// L1 tx has not confirmed
+			rootNode := nodes[0]
+			newLeafPrivKey := keys.GeneratePrivateKey()
+			receiverPrivKey := keys.GeneratePrivateKey()
+
+			transferNode := wallet.LeafKeyTweak{
+				Leaf:              rootNode,
+				SigningPrivKey:    privKey,
+				NewSigningPrivKey: newLeafPrivKey,
+			}
+			leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
+
+			// Sign and broadcast TX but do not await confirmation
+			signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+			require.NoError(t, err)
+			_, err = client.SendRawTransaction(signedDepositTx, true)
+			require.NoError(t, err)
+
+			_, err = wallet.SendTransferWithKeyTweaks(
+				t.Context(),
+				config,
+				leavesToTransfer,
+				receiverPrivKey.Public(),
+				time.Now().Add(10*time.Minute),
+			)
+			require.ErrorContains(t, err, "failed to start transfer")
+
+			// Clean up mempool for next test iteration
+			randomKey := keys.GeneratePrivateKey()
+			randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
+			require.NoError(t, err, "failed to get p2tr raw address")
+			_, err = client.GenerateToAddress(1, randomAddress, nil)
+			require.NoError(t, err, "failed to clear mempool")
+		})
 	}
-	defer conn.Close()
-
-	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
-	if err != nil {
-		t.Fatalf("failed to authenticate: %v", err)
-	}
-	ctx := wallet.ContextWithToken(t.Context(), token)
-
-	privKey := keys.GeneratePrivateKey()
-	leafID := uuid.NewString()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
-	if err != nil {
-		t.Fatalf("failed to generate deposit address: %v", err)
-	}
-
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create deposit tx: %v", err)
-	}
-	vout := 0
-	var buf bytes.Buffer
-	err = depositTx.Serialize(&buf)
-	if err != nil {
-		t.Fatalf("failed to serialize deposit tx: %v", err)
-	}
-	depositTxHex := hex.EncodeToString(buf.Bytes())
-	decodedBytes, err := hex.DecodeString(depositTxHex)
-	if err != nil {
-		t.Fatalf("failed to decode deposit tx hex: %v", err)
-	}
-	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-	if err != nil {
-		t.Fatalf("failed to deserilize deposit tx: %v", err)
-	}
-
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
-	require.NoError(t, err)
-	resp, err := wallet.CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, false)
-	if err != nil {
-		t.Fatalf("failed to create tree: %v", err)
-	}
-
-	log.Printf("tree created: %v", resp)
-
-	// User should not be able to transfer funds since
-	// L1 tx has not confirmed
-	rootNode := resp.Nodes[0]
-	newLeafPrivKey := keys.GeneratePrivateKey()
-	receiverPrivKey := keys.GeneratePrivateKey()
-
-	transferNode := wallet.LeafKeyTweak{
-		Leaf:              rootNode,
-		SigningPrivKey:    privKey,
-		NewSigningPrivKey: newLeafPrivKey,
-	}
-	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
-
-	// Sign and broadcast TX but do not await confirmation
-	signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
-	require.NoError(t, err)
-	_, err = client.SendRawTransaction(signedDepositTx, true)
-	require.NoError(t, err)
-
-	_, err = wallet.SendTransferWithKeyTweaks(
-		t.Context(),
-		config,
-		leavesToTransfer,
-		receiverPrivKey.Public(),
-		time.Now().Add(10*time.Minute),
-	)
-	assert.ErrorContains(t, err, "failed to start transfer")
 }
 
+// This test can be removed when the original two mutation flow is deprecated
 func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 	config := wallet.NewTestWalletConfig(t)
 
@@ -1053,110 +1106,134 @@ func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
-	config := wallet.NewTestWalletConfig(t)
-
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect to operator: %v", err)
+	type testCase struct {
+		flow              wallet.CreateRootFlow
+		expectedErrorCode codes.Code
 	}
-	defer conn.Close()
-
-	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
-	if err != nil {
-		t.Fatalf("failed to authenticate: %v", err)
+	testCases := []testCase{
+		{
+			flow: wallet.CreateRootFlows[0],
+			// Node should still be in "creating" status but is not
+			expectedErrorCode: codes.FailedPrecondition,
+		},
+		{
+			flow: wallet.CreateRootFlows[1],
+			// Tree already exists
+			expectedErrorCode: codes.AlreadyExists,
+		},
 	}
-	ctx := wallet.ContextWithToken(t.Context(), token)
+	for _, tc := range testCases {
+		t.Run(tc.flow.Name, func(t *testing.T) {
+			config := wallet.NewTestWalletConfig(t)
 
-	privKey := keys.GeneratePrivateKey()
-	userPubKey := privKey.Public()
+			conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+			if err != nil {
+				t.Fatalf("failed to connect to operator: %v", err)
+			}
+			defer conn.Close()
 
-	leafID := uuid.NewString()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKey, &leafID, false)
-	if err != nil {
-		t.Fatalf("failed to generate deposit address: %v", err)
+			token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+			if err != nil {
+				t.Fatalf("failed to authenticate: %v", err)
+			}
+			ctx := wallet.ContextWithToken(t.Context(), token)
+
+			privKey := keys.GeneratePrivateKey()
+			userPubKey := privKey.Public()
+
+			leafID := uuid.NewString()
+			depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKey, &leafID, false)
+			if err != nil {
+				t.Fatalf("failed to generate deposit address: %v", err)
+			}
+
+			unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
+			if err != nil {
+				t.Fatalf("failed to query unused deposit addresses: %v", err)
+			}
+
+			if len(unusedDepositAddresses.DepositAddresses) != 1 {
+				t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.DepositAddresses))
+			}
+
+			if unusedDepositAddresses.DepositAddresses[0].GetLeafId() != leafID {
+				t.Fatalf("expected leaf id to be %s, got %s", leafID, *unusedDepositAddresses.DepositAddresses[0].LeafId)
+			}
+
+			client := sparktesting.GetBitcoinClient()
+
+			coin, err := faucet.Fund()
+			require.NoError(t, err)
+
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			if err != nil {
+				t.Fatalf("failed to create deposit tx: %v", err)
+			}
+			vout := 0
+			var buf bytes.Buffer
+			err = depositTx.Serialize(&buf)
+			if err != nil {
+				t.Fatalf("failed to serialize deposit tx: %v", err)
+			}
+			depositTxHex := hex.EncodeToString(buf.Bytes())
+			decodedBytes, err := hex.DecodeString(depositTxHex)
+			if err != nil {
+				t.Fatalf("failed to decode deposit tx hex: %v", err)
+			}
+			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
+			if err != nil {
+				t.Fatalf("failed to deserilize deposit tx: %v", err)
+			}
+
+			// Sign, broadcast, and mine deposit tx
+			signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+			if err != nil {
+				t.Fatalf("failed to sign faucet coin: %v", err)
+			}
+			require.NoError(t, err)
+			_, err = client.SendRawTransaction(signedDepositTx, true)
+			require.NoError(t, err)
+
+			randomKey := keys.GeneratePrivateKey()
+			randomPubKey := randomKey.Public()
+			randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey, btcnetwork.Regtest)
+			if err != nil {
+				t.Fatalf("failed to get p2tr raw address: %v", err)
+			}
+			_, err = client.GenerateToAddress(3, randomAddress, nil)
+			if err != nil {
+				t.Fatalf("failed to generate to address: %v", err)
+			}
+
+			time.Sleep(100 * time.Millisecond)
+
+			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			require.NoError(t, err)
+			nodes, err := tc.flow.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
+			require.NoError(t, err, "failed to create tree root")
+			require.Len(t, nodes, 1)
+
+			// Mine 2 more blocks because deposits won't be available until there are 3 confirmations
+			_, err = client.GenerateToAddress(2, randomAddress, nil)
+			require.NoError(t, err, "failed to generate to address")
+
+			sparkClient := pb.NewSparkServiceClient(conn)
+			rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, nodes[0])
+			require.NoError(t, err)
+			assert.Equal(t, rootNode.Id, leafID)
+			assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
+
+			unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
+			require.NoError(t, err, "failed to query unused deposit addresses")
+			require.Empty(t, unusedDepositAddresses.DepositAddresses, "expected no unused deposit addresses")
+
+			_, err = tc.flow.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
+			require.Error(t, err, "expected error upon double claim")
+			stat, ok := status.FromError(err)
+			require.True(t, ok)
+			require.Equal(t, tc.expectedErrorCode, stat.Code())
+		})
 	}
-
-	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
-	if err != nil {
-		t.Fatalf("failed to query unused deposit addresses: %v", err)
-	}
-
-	if len(unusedDepositAddresses.DepositAddresses) != 1 {
-		t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.DepositAddresses))
-	}
-
-	if unusedDepositAddresses.DepositAddresses[0].GetLeafId() != leafID {
-		t.Fatalf("expected leaf id to be %s, got %s", leafID, *unusedDepositAddresses.DepositAddresses[0].LeafId)
-	}
-
-	client := sparktesting.GetBitcoinClient()
-
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
-
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create deposit tx: %v", err)
-	}
-	vout := 0
-	var buf bytes.Buffer
-	err = depositTx.Serialize(&buf)
-	if err != nil {
-		t.Fatalf("failed to serialize deposit tx: %v", err)
-	}
-	depositTxHex := hex.EncodeToString(buf.Bytes())
-	decodedBytes, err := hex.DecodeString(depositTxHex)
-	if err != nil {
-		t.Fatalf("failed to decode deposit tx hex: %v", err)
-	}
-	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-	if err != nil {
-		t.Fatalf("failed to deserilize deposit tx: %v", err)
-	}
-
-	// Sign, broadcast, and mine deposit tx
-	signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
-	if err != nil {
-		t.Fatalf("failed to sign faucet coin: %v", err)
-	}
-	require.NoError(t, err)
-	_, err = client.SendRawTransaction(signedDepositTx, true)
-	require.NoError(t, err)
-
-	randomKey := keys.GeneratePrivateKey()
-	randomPubKey := randomKey.Public()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey, btcnetwork.Regtest)
-	if err != nil {
-		t.Fatalf("failed to get p2tr raw address: %v", err)
-	}
-	_, err = client.GenerateToAddress(3, randomAddress, nil)
-	if err != nil {
-		t.Fatalf("failed to generate to address: %v", err)
-	}
-
-	time.Sleep(100 * time.Millisecond)
-
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
-	require.NoError(t, err)
-	resp, err := wallet.CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, false)
-	require.NoError(t, err, "failed to create tree root")
-	require.Len(t, resp.Nodes, 1)
-
-	sparkClient := pb.NewSparkServiceClient(conn)
-	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
-	require.NoError(t, err)
-	assert.Equal(t, rootNode.Id, leafID)
-	assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
-
-	unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
-	require.NoError(t, err, "failed to query unused deposit addresses")
-	require.Empty(t, unusedDepositAddresses.DepositAddresses, "expected no unused deposit addresses")
-
-	_, err = wallet.CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, false)
-	require.Error(t, err, "expected error upon double claim")
-	stat, ok := status.FromError(err)
-	require.True(t, ok)
-	require.Equal(t, codes.FailedPrecondition, stat.Code())
 }
 
 func TestQueryUnusedDepositAddresses(t *testing.T) {

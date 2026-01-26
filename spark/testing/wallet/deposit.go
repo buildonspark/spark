@@ -33,6 +33,52 @@ const (
 	DepositPollInterval = 100 * time.Millisecond
 )
 
+type CreateRootFlow struct {
+	Name       string
+	CreateRoot func(ctx context.Context,
+		config *TestWalletConfig,
+		signingPrivKey keys.Private,
+		verifyingKey keys.Public,
+		depositTx *wire.MsgTx,
+		vout int,
+	) ([]*pb.TreeNode, error)
+}
+
+var CreateRootFlows = []CreateRootFlow{
+	{
+		Name: "original flow",
+		CreateRoot: func(ctx context.Context,
+			config *TestWalletConfig,
+			signingPrivKey keys.Private,
+			verifyingKey keys.Public,
+			depositTx *wire.MsgTx,
+			vout int,
+		) ([]*pb.TreeNode, error) {
+			res, err := CreateTreeRoot(ctx, config, signingPrivKey, verifyingKey, depositTx, vout, false)
+			if err != nil {
+				return nil, err
+			}
+			return res.Nodes, nil
+		},
+	},
+	{
+		Name: "single mutation flow",
+		CreateRoot: func(ctx context.Context,
+			config *TestWalletConfig,
+			signingPrivKey keys.Private,
+			verifyingKey keys.Public,
+			depositTx *wire.MsgTx,
+			vout int,
+		) ([]*pb.TreeNode, error) {
+			res, err := CreateTreeRootWithFinalizeDepositTreeCreation(ctx, config, signingPrivKey, verifyingKey, depositTx, vout)
+			if err != nil {
+				return nil, err
+			}
+			return []*pb.TreeNode{res.RootNode}, nil
+		},
+	},
+}
+
 // validateDepositAddress validates the cryptographic proofs of a deposit address.
 //  1. Proof of keyshare possession signature - ensures that the keyshare is known by all SOs
 //  2. Address signatures from all participating signing operators - ensures that all SOs have generated the address

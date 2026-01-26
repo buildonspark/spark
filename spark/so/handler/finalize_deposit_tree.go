@@ -136,7 +136,7 @@ func loadAndValidateDepositAddress(
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			err = errors.NotFoundMissingEntity(fmt.Errorf("deposit address not found: %s", *utxoAddress))
+			err = errors.NotFoundMissingEntity(fmt.Errorf("the requested deposit address could not be found: %s", *utxoAddress))
 			return
 		}
 		if ent.IsNotSingular(err) {
