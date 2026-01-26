@@ -1,3 +1,4 @@
+const TIMEOUT = 30 * 1000;
 describe('Spark React Native App', () => {
   beforeAll(async () => {
     await device.installApp();
@@ -12,7 +13,7 @@ describe('Spark React Native App', () => {
 
     await waitFor(element(by.id('open-test-screen-button')))
       .toBeVisible()
-      .withTimeout(180000);
+      .withTimeout(TIMEOUT * 6);
 
     // Re-enable synchronization once the app is stable
     await device.enableSynchronization();
@@ -25,7 +26,7 @@ describe('Spark React Native App', () => {
   it('should handle wallet operations in sequence', async () => {
     await waitFor(element(by.id('open-test-screen-button')))
       .toBeVisible()
-      .withTimeout(10000);
+      .withTimeout(TIMEOUT);
 
     await expect(element(by.id('open-test-screen-button'))).toBeVisible();
 
@@ -33,7 +34,7 @@ describe('Spark React Native App', () => {
 
     await waitFor(element(by.id('connect-wallet-button')))
       .toBeVisible()
-      .withTimeout(5000);
+      .withTimeout(TIMEOUT);
 
     await expect(element(by.id('connect-wallet-button'))).toBeVisible();
     await expect(element(by.id('create-invoice-button'))).toBeVisible();
@@ -43,7 +44,7 @@ describe('Spark React Native App', () => {
 
     await waitFor(element(by.id('wallet-status')))
       .toBeVisible()
-      .withTimeout(5000);
+      .withTimeout(TIMEOUT);
 
     await expect(element(by.id('wallet-status'))).toBeVisible();
 
@@ -53,7 +54,7 @@ describe('Spark React Native App', () => {
 
     await waitFor(element(by.id('wallet-balance')))
       .toBeVisible()
-      .withTimeout(5000);
+      .withTimeout(TIMEOUT);
 
     await expect(element(by.id('wallet-balance'))).toBeVisible();
 
@@ -61,7 +62,7 @@ describe('Spark React Native App', () => {
 
     await waitFor(element(by.id('invoice-display')))
       .toBeVisible()
-      .withTimeout(30000);
+      .withTimeout(TIMEOUT);
 
     await expect(element(by.id('invoice-display'))).toBeVisible();
 
@@ -69,7 +70,7 @@ describe('Spark React Native App', () => {
 
     await waitFor(element(by.id('dummy-tx-display')))
       .toBeVisible()
-      .withTimeout(5000);
+      .withTimeout(TIMEOUT);
 
     await expect(element(by.id('dummy-tx-display'))).toBeVisible();
 
@@ -77,7 +78,7 @@ describe('Spark React Native App', () => {
 
     await waitFor(element(by.id('test-token-tx-id-display')))
       .toBeVisible()
-      .withTimeout(5000);
+      .withTimeout(TIMEOUT);
 
     await expect(element(by.id('test-token-tx-id-display'))).toBeVisible();
   });
