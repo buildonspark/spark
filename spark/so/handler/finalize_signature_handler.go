@@ -81,6 +81,34 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tree for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 	}
+
+	// Verify ALL nodes belong to the same tree before processing confirmations.
+	// This prevents attacks where nodes from different trees (built from different
+	// outputs of the same transaction) are submitted together to bypass validation.
+	if req.Intent == pbcommon.SignatureIntent_CREATION {
+		// Batch fetch all nodes with their trees for efficiency
+		nodeIDs := make([]uuid.UUID, 0, len(req.NodeSignatures))
+		for _, nodeSignatures := range req.NodeSignatures {
+			nodeID, err := uuid.Parse(nodeSignatures.NodeId)
+			if err != nil {
+				return nil, fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
+			}
+			nodeIDs = append(nodeIDs, nodeID)
+		}
+		nodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeIDs...)).WithTree().All(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get nodes for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
+		}
+		if len(nodes) != len(nodeIDs) {
+			return nil, fmt.Errorf("not all nodes found: expected %d, got %d", len(nodeIDs), len(nodes))
+		}
+		for _, node := range nodes {
+			if node.Edges.Tree == nil || node.Edges.Tree.ID != nodeTree.ID {
+				return nil, fmt.Errorf("node %s does not belong to the same tree as first node", node.ID)
+			}
+		}
+	}
+
 	if nodeTree.Status == st.TreeStatusPending {
 		for _, nodeSignatures := range req.NodeSignatures {
 			nodeID, err := uuid.Parse(nodeSignatures.NodeId)

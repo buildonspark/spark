@@ -914,3 +914,140 @@ func TestFinalizeSignatureHandler_UpdateNode_TreeNodeExitingStatus(t *testing.T)
 		})
 	}
 }
+
+// Test that nodes from different trees (same base txid, different vouts) are rejected.
+// This is a regression test for the Calif Audit Finding 11 - double spend vulnerability
+// where an attacker could confirm a tree by using nodes from different trees that share
+// the same base transaction but different vouts.
+func TestFinalizeNodeSignatures_RejectsNodesFromDifferentTrees(t *testing.T) {
+	t.Parallel()
+	// Use a different seed than createTestTree to avoid duplicate key constraint violations
+	rng := rand.NewChaCha8([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:         0,
+				Identifier: "test-operator",
+				AddressRpc: "localhost:8080",
+				AddressDkg: "localhost:8081",
+			},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	handler := NewFinalizeSignatureHandler(config)
+
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	// Create a shared base txid - this simulates a Bitcoin transaction with multiple outputs
+	sharedBaseTxid := st.NewRandomTxIDForTesting(t)
+
+	// Create first tree using vout 0
+	tree1, node1 := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusPending)
+	_, err = tree1.Update().
+		SetBaseTxid(sharedBaseTxid).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create second tree using vout 1 (same txid, different vout)
+	ownerIdentity2 := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingPrivKey2 := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerSigningKey2 := keys.MustGeneratePrivateKeyFromRand(rng)
+	secretShare2 := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicShare1_2 := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicShare2_2 := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicShare3_2 := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	tree2, err := dbTX.Tree.Create().
+		SetID(uuid.New()).
+		SetNetwork(btcnetwork.Regtest).
+		SetStatus(st.TreeStatusPending).
+		SetBaseTxid(sharedBaseTxid). // Same txid as tree1
+		SetVout(1).                  // Different vout
+		SetOwnerIdentityPubkey(ownerIdentity2.Public()).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare2, err := dbTX.SigningKeyshare.Create().
+		SetID(uuid.New()).
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secretShare2).
+		SetPublicShares(map[string]keys.Public{"1": publicShare1_2.Public(), "2": publicShare2_2.Public(), "3": publicShare3_2.Public()}).
+		SetPublicKey(secretShare2.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	exampleTxString := "03000000000101d8966edeae1a3a05d0e5a3c971bb0a1b99bb901e76863812a40ea61fc60b87a000000000006c0700400214470000000000002251206b631936db9ab75c98e13235462f902944d9d81a45e3041bacaeec957bf7eeb700000000000000000451024e730140e06339a1f987b228843cf20f462f991264f89ca54c531c1c14d0df937d80acfd2ed9c626c6ad95106f3c9d90bc1de92b3d24aa89f03dd21974bb406e47ac84b000000000"
+	nodeRawTx2, err := hex.DecodeString(exampleTxString)
+	require.NoError(t, err)
+
+	node2, err := dbTX.TreeNode.Create().
+		SetID(uuid.New()).
+		SetTree(tree2). // Different tree
+		SetNetwork(tree2.Network).
+		SetSigningKeyshare(keyshare2).
+		SetValue(1000).
+		SetVerifyingPubkey(verifyingPrivKey2.Public()).
+		SetOwnerIdentityPubkey(ownerIdentity2.Public()).
+		SetOwnerSigningPubkey(ownerSigningKey2.Public()).
+		SetRawTx(nodeRawTx2).
+		SetRawRefundTx(nodeRawTx2).
+		SetVout(0).
+		SetStatus(st.TreeNodeStatusCreating).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create block height for confirmation check
+	_, err = dbTX.BlockHeight.Create().
+		SetID(uuid.New()).
+		SetNetwork(btcnetwork.Regtest).
+		SetHeight(110).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create deposit addresses for both nodes with matching confirmation txid
+	keyshare1, err := node1.QuerySigningKeyshare().Only(ctx)
+	require.NoError(t, err)
+
+	_, err = dbTX.DepositAddress.Create().
+		SetID(uuid.New()).
+		SetAddress("deposit_address_1").
+		SetOwnerIdentityPubkey(node1.OwnerIdentityPubkey).
+		SetOwnerSigningPubkey(node1.OwnerSigningPubkey).
+		SetConfirmationHeight(100).
+		SetConfirmationTxid(sharedBaseTxid.String()).
+		SetSigningKeyshare(keyshare1).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = dbTX.DepositAddress.Create().
+		SetID(uuid.New()).
+		SetAddress("deposit_address_2").
+		SetOwnerIdentityPubkey(node2.OwnerIdentityPubkey).
+		SetOwnerSigningPubkey(node2.OwnerSigningPubkey).
+		SetConfirmationHeight(100).
+		SetConfirmationTxid(sharedBaseTxid.String()).
+		SetSigningKeyshare(keyshare2).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Attempt to finalize with nodes from different trees - this should fail
+	req := &pb.FinalizeNodeSignaturesRequest{
+		NodeSignatures: []*pb.NodeSignatures{
+			{NodeId: node1.ID.String()},
+			{NodeId: node2.ID.String()}, // Node from a different tree
+		},
+		Intent: pbcommon.SignatureIntent_CREATION,
+	}
+
+	_, err = handler.FinalizeNodeSignatures(ctx, req)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "does not belong to the same tree as first node")
+}
