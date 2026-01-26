@@ -3043,9 +3043,10 @@ const file_spark_token_proto_rawDesc = "" +
 	"\xfaB\a\"\x05\x18\xe8\a(\x00R\x05limit\x12\x1f\n" +
 	"\x06offset\x18\x06 \x01(\x03B\a\xfaB\x04\"\x02(\x00R\x06offsetB\f\n" +
 	"\n" +
-	"query_type\"h\n" +
-	"\x1eQueryTokenTransactionsByTxHash\x12F\n" +
-	"\x18token_transaction_hashes\x18\x01 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h R\x16tokenTransactionHashes\"\xb7\x02\n" +
+	"query_type\"l\n" +
+	"\x1eQueryTokenTransactionsByTxHash\x12J\n" +
+	"\x18token_transaction_hashes\x18\x01 \x03(\fB\x10\xfaB\r\x92\x01\n" +
+	"\b\x01\x10d\"\x04z\x02h R\x16tokenTransactionHashes\"\xb7\x02\n" +
 	"\x1fQueryTokenTransactionsByFilters\x12,\n" +
 	"\n" +
 	"output_ids\x18\x01 \x03(\tB\r\xfaB\n" +
