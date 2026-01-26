@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/entexample"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -526,4 +528,74 @@ func TestQueryTransfers_WithCreatedBeforeFilter(t *testing.T) {
 	assert.True(t, transferIds[middleTransfer.ID.String()], "middleTransfer (-24h) should be included")
 	assert.False(t, transferIds[recentTransfer.ID.String()], "recentTransfer (-1h) should NOT be included")
 	assert.False(t, transferIds[futureTransfer.ID.String()], "futureTransfer (+24h) should NOT be included")
+}
+
+func TestQueryTransfers_FilterSSPCounterSwapAsTransfer(t *testing.T) {
+	ctx, cfg := createTestContextForTransferQuery(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
+		fmt.Sprintf("%s@%s", knobs.KnobFilterSSPCounterSwapAsTransfer, btcnetwork.Regtest.String()): 100,
+	})
+	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
+
+	rng := rand.NewChaCha8([32]byte{})
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	network := btcnetwork.Regtest
+
+	randomTransfer := createTestTransferWithTime(t, ctx, dbTx, time.Now(), userIdentityPubKey, network)
+	require.NoError(t, err)
+
+	filter := &pb.TransferFilter{
+		Participant: &pb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+			SenderOrReceiverIdentityPublicKey: userIdentityPubKey.Serialize(),
+		},
+		Network: pb.Network_REGTEST,
+		Types: []pb.TransferType{
+			pb.TransferType_TRANSFER,
+		},
+	}
+
+	handler := NewTransferHandler(cfg)
+	resp, err := handler.queryTransfers(ctx, filter, false, true)
+
+	// Should handle NotFound error when no swap is found
+	require.NoError(t, err)
+	require.Len(t, resp.Transfers, 1)
+	assert.Equal(t, randomTransfer.ID.String(), resp.Transfers[0].Id)
+
+	entexample.NewTransferExample(t, dbTx).
+		SetSenderIdentityPubkey(userIdentityPubKey).
+		SetReceiverIdentityPubkey(sspIdentityPubKey).
+		SetType(schematype.TransferTypeSwap).
+		MustExec(ctx)
+
+	counterSwapTransfer := entexample.NewTransferExample(t, dbTx).
+		SetSenderIdentityPubkey(sspIdentityPubKey).
+		SetReceiverIdentityPubkey(userIdentityPubKey).
+		SetType(schematype.TransferTypeTransfer).
+		MustExec(ctx)
+
+	// Should not return the SSP transfer
+	resp, err = handler.queryTransfers(ctx, filter, false, true)
+
+	require.NoError(t, err)
+	require.Len(t, resp.Transfers, 1)
+	assert.Equal(t, randomTransfer.ID.String(), resp.Transfers[0].Id)
+
+	filter.Types = []pb.TransferType{
+		pb.TransferType_TRANSFER,
+		pb.TransferType_COUNTER_SWAP_V3,
+		pb.TransferType_COUNTER_SWAP,
+	}
+
+	// Since we're requesting counter swaps, should return the SSP transfer
+	resp, err = handler.queryTransfers(ctx, filter, false, true)
+	require.NoError(t, err)
+	require.Len(t, resp.Transfers, 2)
+	assert.Equal(t, counterSwapTransfer.ID.String(), resp.Transfers[0].Id)
+	assert.Equal(t, randomTransfer.ID.String(), resp.Transfers[1].Id)
 }

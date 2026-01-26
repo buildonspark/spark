@@ -1705,18 +1705,6 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		transferPredicate = append(transferPredicate, enttransfer.IDIn(transferUUIDs...))
 	}
 
-	if len(filter.Types) > 0 {
-		transferTypes := make([]st.TransferType, len(filter.Types))
-		for i, protoType := range filter.Types {
-			schemaType, err := st.TransferTypeFromProto(protoType.String())
-			if err != nil {
-				return nil, status.Errorf(codes.InvalidArgument, "invalid transfer type: %s", protoType.String())
-			}
-			transferTypes[i] = schemaType
-		}
-		transferPredicate = append(transferPredicate, enttransfer.TypeIn(transferTypes...))
-	}
-
 	var network btcnetwork.Network
 	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
 		network = btcnetwork.Mainnet
@@ -1727,6 +1715,34 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
 		}
 	}
+
+	if len(filter.Types) > 0 {
+		transferTypes := make([]st.TransferType, len(filter.Types))
+
+		networkString := network.String()
+		filterSSPCounterSwap := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobFilterSSPCounterSwapAsTransfer, &networkString, 0) > 0
+
+		for i, protoType := range filter.Types {
+			schemaType, err := st.TransferTypeFromProto(protoType.String())
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid transfer type: %s", protoType.String())
+			}
+			transferTypes[i] = schemaType
+
+			if filterSSPCounterSwap && (schemaType == st.TransferTypeCounterSwap || schemaType == st.TransferTypeCounterSwapV3) {
+				filterSSPCounterSwap = false
+			}
+		}
+		transferPredicate = append(transferPredicate, enttransfer.TypeIn(transferTypes...))
+
+		// Find the most recent swap sent by the participant to find the SSP identity public key to filter out
+		if filterSSPCounterSwap && walletIdentityPubkey != nil {
+			if pred := h.getSSPCounterSwapFilter(ctx, db, network, *walletIdentityPubkey); pred != nil {
+				transferPredicate = append(transferPredicate, pred)
+			}
+		}
+	}
+
 	transferPredicate = append(transferPredicate, enttransfer.NetworkEQ(network))
 
 	if len(filter.Statuses) > 0 {
@@ -1813,6 +1829,34 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		Transfers: transferProtos,
 		Offset:    nextOffset,
 	}, nil
+}
+
+func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.Client, network btcnetwork.Network, walletIdentityPubkey keys.Public) predicate.Transfer {
+	swap, err := db.Transfer.Query().
+		Where(
+			enttransfer.And(
+				enttransfer.TypeIn(st.TransferTypeSwap, st.TransferTypePrimarySwapV3),
+				enttransfer.NetworkEQ(network),
+				enttransfer.SenderIdentityPubkeyEQ(walletIdentityPubkey),
+			),
+		).
+		Order(ent.Desc(enttransfer.FieldCreateTime)).
+		First(ctx)
+
+	if err != nil || swap == nil {
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.Sugar().Warnf("failed to find swap for wallet %s: %v", walletIdentityPubkey.String(), err)
+		// Don't want to fail the entire query if we can't find a swap or error here, just return nil
+		return nil
+	}
+
+	// include if !(sender is SSP and type is transfer)
+	return enttransfer.Not(
+		enttransfer.And(
+			enttransfer.SenderIdentityPubkeyEQ(swap.ReceiverIdentityPubkey),
+			enttransfer.TypeEQ(st.TransferTypeTransfer),
+		),
+	)
 }
 
 func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, filter *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {

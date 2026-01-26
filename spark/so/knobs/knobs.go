@@ -106,6 +106,10 @@ const (
 	// are not provided by the client. When enabled, the server will reject deprecated direct signing jobs.
 	KnobEnforceNoDirectTransactionsFromDepositTx = "spark.so.enforce_no_direct_transactions_from_deposit_tx"
 	KnobDisableV2TXs                             = "spark.so.disable_v2_txs"
+
+	// The SSP sometimes sends a counter swap as a normal transfer when it happens from a celery job
+	// This knob filters out these transfers from the query transfers endpoint if counter swaps are not explicitly requested.
+	KnobFilterSSPCounterSwapAsTransfer = "spark.so.filter_ssp_counter_swap_as_transfer"
 )
 
 type Config struct {
