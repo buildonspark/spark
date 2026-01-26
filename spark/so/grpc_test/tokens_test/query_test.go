@@ -1458,7 +1458,6 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 					PageSize:            2,
 					Cursor:              cursor,
 					Direction:           sparkpb.Direction_NEXT,
-					Order:               sparkpb.Order_ASCENDING,
 				},
 			)
 			require.NoError(t, err, "failed to query page with cursor %q", cursor)
@@ -1489,7 +1488,6 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 				UseCursorPagination: true,
 				PageSize:            3,
 				Direction:           sparkpb.Direction_NEXT,
-				Order:               sparkpb.Order_ASCENDING,
 			},
 		)
 		require.NoError(t, err, "failed to query page 1")
@@ -1505,7 +1503,6 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 				PageSize:            3,
 				Cursor:              page1.PageResponse.NextCursor,
 				Direction:           sparkpb.Direction_NEXT,
-				Order:               sparkpb.Order_ASCENDING,
 			},
 		)
 		require.NoError(t, err, "failed to query page 2")
@@ -1532,7 +1529,6 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 				UseCursorPagination: true,
 				PageSize:            10,
 				Direction:           sparkpb.Direction_NEXT,
-				Order:               sparkpb.Order_ASCENDING,
 			},
 		)
 		require.NoError(t, err, "failed to query all transactions")
@@ -1548,7 +1544,6 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 				PageSize:            2,
 				Cursor:              allResult.PageResponse.NextCursor,
 				Direction:           sparkpb.Direction_PREVIOUS,
-				Order:               sparkpb.Order_ASCENDING,
 			},
 		)
 		require.NoError(t, err, "failed to query backward page")
@@ -1562,28 +1557,6 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 			require.NotEqual(t, transactionHashes[4], tx.TokenTransactionHash,
 				"backward pagination should not include the cursor transaction")
 		}
-	})
-
-	t.Run("cursor pagination descending order", func(t *testing.T) {
-		result, err := wallet.QueryTokenTransactions(
-			t.Context(),
-			config,
-			wallet.QueryTokenTransactionsParams{
-				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
-				UseCursorPagination: true,
-				PageSize:            3,
-				Direction:           sparkpb.Direction_NEXT,
-				Order:               sparkpb.Order_DESCENDING,
-			},
-		)
-		require.NoError(t, err, "failed to query with descending order")
-		require.NotNil(t, result.PageResponse, "page response should not be nil")
-		require.Len(t, result.TokenTransactionsWithStatus, 3)
-
-		// In descending order, the most recent transactions come first
-		require.Equal(t, transactionHashes[4], result.TokenTransactionsWithStatus[0].TokenTransactionHash)
-		require.Equal(t, transactionHashes[3], result.TokenTransactionsWithStatus[1].TokenTransactionHash)
-		require.Equal(t, transactionHashes[2], result.TokenTransactionsWithStatus[2].TokenTransactionHash)
 	})
 
 	t.Run("cursor pagination last page has no next", func(t *testing.T) {
@@ -1612,7 +1585,6 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 				PageSize:            3,
 				Cursor:              firstPage.PageResponse.NextCursor,
 				Direction:           sparkpb.Direction_NEXT,
-				Order:               sparkpb.Order_ASCENDING,
 			},
 		)
 		require.NoError(t, err, "failed to query last page")
@@ -1631,7 +1603,6 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 				PageSize:            2,
 				Cursor:              "", // Empty cursor means start from beginning
 				Direction:           sparkpb.Direction_NEXT,
-				Order:               sparkpb.Order_ASCENDING,
 			},
 		)
 		require.NoError(t, err, "failed to query with empty cursor")
@@ -1653,7 +1624,6 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 				UseCursorPagination: true,
 				PageSize:            0, // Should use default page size
 				Direction:           sparkpb.Direction_NEXT,
-				Order:               sparkpb.Order_ASCENDING,
 			},
 		)
 		require.NoError(t, err, "failed to query with zero page size")
@@ -1672,13 +1642,64 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 				UseCursorPagination: true,
 				PageSize:            2,
 				Direction:           sparkpb.Direction_NEXT,
-				Order:               sparkpb.Order_ASCENDING,
 			},
 		)
 		require.NoError(t, err, "failed to query")
 		require.NotNil(t, result.PageResponse, "page response should not be nil")
 		require.NotEmpty(t, result.PageResponse.NextCursor, "should have next cursor when more pages exist")
 		require.NotEmpty(t, result.PageResponse.PreviousCursor, "should have previous cursor for navigation back")
+	})
+
+	t.Run("cursor pagination direction ignores order params", func(t *testing.T) {
+		seedPage, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            3,
+				Direction:           sparkpb.Direction_NEXT,
+			},
+		)
+		require.NoError(t, err, "failed to query seed page")
+		require.NotNil(t, seedPage.PageResponse, "page response should not be nil")
+		require.NotEmpty(t, seedPage.PageResponse.NextCursor, "seed page should have next cursor")
+
+		nextPage, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            2,
+				Cursor:              seedPage.PageResponse.NextCursor,
+				Direction:           sparkpb.Direction_NEXT,
+				Order:               sparkpb.Order_DESCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query next page with order override")
+		require.NotNil(t, nextPage.PageResponse, "page response should not be nil")
+		require.Len(t, nextPage.TokenTransactionsWithStatus, 2)
+		require.Equal(t, transactionHashes[3], nextPage.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		require.Equal(t, transactionHashes[4], nextPage.TokenTransactionsWithStatus[1].TokenTransactionHash)
+
+		prevPage, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys:    []keys.Public{issuerPrivKey.Public()},
+				UseCursorPagination: true,
+				PageSize:            2,
+				Cursor:              seedPage.PageResponse.NextCursor,
+				Direction:           sparkpb.Direction_PREVIOUS,
+				Order:               sparkpb.Order_ASCENDING,
+			},
+		)
+		require.NoError(t, err, "failed to query previous page with order override")
+		require.NotNil(t, prevPage.PageResponse, "page response should not be nil")
+		require.Len(t, prevPage.TokenTransactionsWithStatus, 2)
+		require.Equal(t, transactionHashes[0], prevPage.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		require.Equal(t, transactionHashes[1], prevPage.TokenTransactionsWithStatus[1].TokenTransactionHash)
 	})
 
 	t.Run("cursor pagination with invalid cursor returns error", func(t *testing.T) {
@@ -1691,7 +1712,6 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 				PageSize:            2,
 				Cursor:              "invalid-cursor-not-base64-uuid",
 				Direction:           sparkpb.Direction_NEXT,
-				Order:               sparkpb.Order_ASCENDING,
 			},
 		)
 		require.Error(t, err, "should error with invalid cursor")

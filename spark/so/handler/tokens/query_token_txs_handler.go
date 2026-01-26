@@ -55,6 +55,8 @@ type queryParams struct {
 	afterID                *uuid.UUID
 	beforeID               *uuid.UUID
 	useCursorPagination    bool
+	direction              sparkpb.Direction
+	cursorProvided         bool
 }
 
 // NewQueryTokenTransactionsHandler creates a new QueryTokenTransactionsHandler.
@@ -371,10 +373,16 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(params *queryParams)
 		qb.argIndex++
 	}
 
-	isBackward := params.beforeID != nil
-	effectiveOrder := determineEffectiveOrder(params.order, isBackward)
-
-	if effectiveOrder == sparkpb.Order_ASCENDING {
+	// When using cursor pagination, order by ID in the direction that matches the cursor filter.
+	// NEXT direction uses afterID (id > cursor), so we need ASC order to get items after cursor.
+	// PREVIOUS direction uses beforeID (id < cursor), so we need DESC order to get items before cursor.
+	if params.useCursorPagination {
+		if params.direction == sparkpb.Direction_PREVIOUS {
+			queryBuilder.WriteString(" ORDER BY combined.id DESC")
+		} else {
+			queryBuilder.WriteString(" ORDER BY combined.id ASC")
+		}
+	} else if params.order == sparkpb.Order_ASCENDING {
 		queryBuilder.WriteString(" ORDER BY combined.create_time ASC, combined.id ASC")
 	} else {
 		queryBuilder.WriteString(" ORDER BY combined.create_time DESC, combined.id DESC")
@@ -406,11 +414,17 @@ func (h *QueryTokenTransactionsHandler) queryWithEnt(ctx context.Context, params
 		baseQuery = baseQuery.Where(tokentransaction.IDLT(*params.beforeID))
 	}
 
-	isBackward := params.beforeID != nil
-	effectiveOrder := determineEffectiveOrder(params.order, isBackward)
-
 	query := baseQuery
-	if effectiveOrder == sparkpb.Order_ASCENDING {
+	// When using cursor pagination, order by ID in the direction that matches the cursor filter.
+	// NEXT direction uses afterID (id > cursor), so we need ASC order to get items after cursor.
+	// PREVIOUS direction uses beforeID (id < cursor), so we need DESC order to get items before cursor.
+	if params.useCursorPagination {
+		if params.direction == sparkpb.Direction_PREVIOUS {
+			query = query.Order(ent.Desc(tokentransaction.FieldID))
+		} else {
+			query = query.Order(ent.Asc(tokentransaction.FieldID))
+		}
+	} else if params.order == sparkpb.Order_ASCENDING {
 		query = query.Order(ent.Asc(tokentransaction.FieldCreateTime), ent.Asc(tokentransaction.FieldID))
 	} else {
 		query = query.Order(ent.Desc(tokentransaction.FieldCreateTime), ent.Desc(tokentransaction.FieldID))
@@ -442,7 +456,7 @@ func (h *QueryTokenTransactionsHandler) queryWithEnt(ctx context.Context, params
 // convertTransactionsToResponse converts Ent transactions to protobuf response
 func convertTransactionsToResponse(ctx context.Context, config *so.Config, transactions []*ent.TokenTransaction, params *queryParams) (*tokenpb.QueryTokenTransactionsResponse, error) {
 	hasMoreResults := len(transactions) > int(params.limit)
-	isBackward := params.beforeID != nil
+	isBackward := params.useCursorPagination && params.direction == sparkpb.Direction_PREVIOUS
 
 	resultTransactions := transactions
 	if hasMoreResults {
@@ -493,12 +507,13 @@ func convertTransactionsToResponse(ctx context.Context, config *so.Config, trans
 
 	if params.useCursorPagination {
 		var hasNextPage, hasPreviousPage bool
+		cursorProvided := params.cursorProvided
 		if isBackward {
-			hasNextPage = params.beforeID != nil
+			hasNextPage = cursorProvided
 			hasPreviousPage = hasMoreResults
 		} else {
 			hasNextPage = hasMoreResults
-			hasPreviousPage = params.afterID != nil
+			hasPreviousPage = cursorProvided
 		}
 		pageResponse := &sparkpb.PageResponse{
 			HasNextPage:     hasNextPage,
@@ -528,16 +543,6 @@ func convertTransactionsToResponse(ctx context.Context, config *so.Config, trans
 type queryBuilder struct {
 	args     []any
 	argIndex int
-}
-
-func determineEffectiveOrder(requestedOrder sparkpb.Order, isBackward bool) sparkpb.Order {
-	if !isBackward {
-		return requestedOrder
-	}
-	if requestedOrder == sparkpb.Order_ASCENDING {
-		return sparkpb.Order_DESCENDING
-	}
-	return sparkpb.Order_ASCENDING
 }
 
 func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryParams, error) {
@@ -580,10 +585,12 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 
 		if pageRequest := req.GetByFilters().GetPageRequest(); pageRequest != nil {
 			params.useCursorPagination = true
+			params.direction = pageRequest.GetDirection()
 			if pageRequest.GetPageSize() > 0 {
-				params.limit = min(int64(pageRequest.GetPageSize()), params.limit)
+				params.limit = min(int64(pageRequest.GetPageSize()), maxTokenTransactionPageSize)
 			}
 			if cursor := pageRequest.GetCursor(); cursor != "" {
+				params.cursorProvided = true
 				cursorBytes, err := base64.RawURLEncoding.DecodeString(cursor)
 				if err != nil {
 					cursorBytes, err = base64.URLEncoding.DecodeString(cursor)
@@ -595,10 +602,10 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 				if err != nil {
 					return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid cursor: %w", err))
 				}
-				if pageRequest.GetDirection() == sparkpb.Direction_PREVIOUS {
-					params.beforeID = &id
-				} else {
+				if params.direction != sparkpb.Direction_PREVIOUS {
 					params.afterID = &id
+				} else {
+					params.beforeID = &id
 				}
 			}
 		}
