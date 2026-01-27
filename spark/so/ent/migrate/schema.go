@@ -68,6 +68,7 @@ var (
 		{Name: "availability_confirmed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "address_signatures", Type: field.TypeJSON, Nullable: true},
 		{Name: "possession_signature", Type: field.TypeBytes, Nullable: true},
+		{Name: "possession_signature_v2", Type: field.TypeBytes, Nullable: true},
 		{Name: "node_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "is_static", Type: field.TypeBool, Default: false},
 		{Name: "is_default", Type: field.TypeBool, Default: true},
@@ -81,7 +82,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "deposit_addresses_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{DepositAddressesColumns[15]},
+				Columns:    []*schema.Column{DepositAddressesColumns[16]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -105,7 +106,7 @@ var (
 			{
 				Name:    "depositaddress_deposit_address_signing_keyshare",
 				Unique:  false,
-				Columns: []*schema.Column{DepositAddressesColumns[15]},
+				Columns: []*schema.Column{DepositAddressesColumns[16]},
 			},
 			{
 				Name:    "depositaddress_network_owner_identity_pubkey",
@@ -118,7 +119,7 @@ var (
 			{
 				Name:    "depositaddress_confirmation_height_is_static",
 				Unique:  false,
-				Columns: []*schema.Column{DepositAddressesColumns[7], DepositAddressesColumns[13]},
+				Columns: []*schema.Column{DepositAddressesColumns[7], DepositAddressesColumns[14]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "availability_confirmed_at IS NULL",
 				},

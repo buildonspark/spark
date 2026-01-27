@@ -40,6 +40,8 @@ const (
 	FieldAddressSignatures = "address_signatures"
 	// FieldPossessionSignature holds the string denoting the possession_signature field in the database.
 	FieldPossessionSignature = "possession_signature"
+	// FieldPossessionSignatureV2 holds the string denoting the possession_signature_v2 field in the database.
+	FieldPossessionSignatureV2 = "possession_signature_v2"
 	// FieldNodeID holds the string denoting the node_id field in the database.
 	FieldNodeID = "node_id"
 	// FieldIsStatic holds the string denoting the is_static field in the database.
@@ -100,6 +102,7 @@ var Columns = []string{
 	FieldAvailabilityConfirmedAt,
 	FieldAddressSignatures,
 	FieldPossessionSignature,
+	FieldPossessionSignatureV2,
 	FieldNodeID,
 	FieldIsStatic,
 	FieldIsDefault,

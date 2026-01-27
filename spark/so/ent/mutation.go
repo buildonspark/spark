@@ -1366,6 +1366,7 @@ type DepositAddressMutation struct {
 	availability_confirmed_at *time.Time
 	address_signatures        *map[string][]uint8
 	possession_signature      *[]byte
+	possession_signature_v2   *[]byte
 	node_id                   *uuid.UUID
 	is_static                 *bool
 	is_default                *bool
@@ -1984,6 +1985,55 @@ func (m *DepositAddressMutation) ResetPossessionSignature() {
 	delete(m.clearedFields, depositaddress.FieldPossessionSignature)
 }
 
+// SetPossessionSignatureV2 sets the "possession_signature_v2" field.
+func (m *DepositAddressMutation) SetPossessionSignatureV2(b []byte) {
+	m.possession_signature_v2 = &b
+}
+
+// PossessionSignatureV2 returns the value of the "possession_signature_v2" field in the mutation.
+func (m *DepositAddressMutation) PossessionSignatureV2() (r []byte, exists bool) {
+	v := m.possession_signature_v2
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPossessionSignatureV2 returns the old "possession_signature_v2" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldPossessionSignatureV2(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPossessionSignatureV2 is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPossessionSignatureV2 requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPossessionSignatureV2: %w", err)
+	}
+	return oldValue.PossessionSignatureV2, nil
+}
+
+// ClearPossessionSignatureV2 clears the value of the "possession_signature_v2" field.
+func (m *DepositAddressMutation) ClearPossessionSignatureV2() {
+	m.possession_signature_v2 = nil
+	m.clearedFields[depositaddress.FieldPossessionSignatureV2] = struct{}{}
+}
+
+// PossessionSignatureV2Cleared returns if the "possession_signature_v2" field was cleared in this mutation.
+func (m *DepositAddressMutation) PossessionSignatureV2Cleared() bool {
+	_, ok := m.clearedFields[depositaddress.FieldPossessionSignatureV2]
+	return ok
+}
+
+// ResetPossessionSignatureV2 resets all changes to the "possession_signature_v2" field.
+func (m *DepositAddressMutation) ResetPossessionSignatureV2() {
+	m.possession_signature_v2 = nil
+	delete(m.clearedFields, depositaddress.FieldPossessionSignatureV2)
+}
+
 // SetNodeID sets the "node_id" field.
 func (m *DepositAddressMutation) SetNodeID(u uuid.UUID) {
 	m.node_id = &u
@@ -2325,7 +2375,7 @@ func (m *DepositAddressMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DepositAddressMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 15)
 	if m.create_time != nil {
 		fields = append(fields, depositaddress.FieldCreateTime)
 	}
@@ -2358,6 +2408,9 @@ func (m *DepositAddressMutation) Fields() []string {
 	}
 	if m.possession_signature != nil {
 		fields = append(fields, depositaddress.FieldPossessionSignature)
+	}
+	if m.possession_signature_v2 != nil {
+		fields = append(fields, depositaddress.FieldPossessionSignatureV2)
 	}
 	if m.node_id != nil {
 		fields = append(fields, depositaddress.FieldNodeID)
@@ -2398,6 +2451,8 @@ func (m *DepositAddressMutation) Field(name string) (ent.Value, bool) {
 		return m.AddressSignatures()
 	case depositaddress.FieldPossessionSignature:
 		return m.PossessionSignature()
+	case depositaddress.FieldPossessionSignatureV2:
+		return m.PossessionSignatureV2()
 	case depositaddress.FieldNodeID:
 		return m.NodeID()
 	case depositaddress.FieldIsStatic:
@@ -2435,6 +2490,8 @@ func (m *DepositAddressMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldAddressSignatures(ctx)
 	case depositaddress.FieldPossessionSignature:
 		return m.OldPossessionSignature(ctx)
+	case depositaddress.FieldPossessionSignatureV2:
+		return m.OldPossessionSignatureV2(ctx)
 	case depositaddress.FieldNodeID:
 		return m.OldNodeID(ctx)
 	case depositaddress.FieldIsStatic:
@@ -2527,6 +2584,13 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPossessionSignature(v)
 		return nil
+	case depositaddress.FieldPossessionSignatureV2:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPossessionSignatureV2(v)
+		return nil
 	case depositaddress.FieldNodeID:
 		v, ok := value.(uuid.UUID)
 		if !ok {
@@ -2611,6 +2675,9 @@ func (m *DepositAddressMutation) ClearedFields() []string {
 	if m.FieldCleared(depositaddress.FieldPossessionSignature) {
 		fields = append(fields, depositaddress.FieldPossessionSignature)
 	}
+	if m.FieldCleared(depositaddress.FieldPossessionSignatureV2) {
+		fields = append(fields, depositaddress.FieldPossessionSignatureV2)
+	}
 	if m.FieldCleared(depositaddress.FieldNodeID) {
 		fields = append(fields, depositaddress.FieldNodeID)
 	}
@@ -2645,6 +2712,9 @@ func (m *DepositAddressMutation) ClearField(name string) error {
 		return nil
 	case depositaddress.FieldPossessionSignature:
 		m.ClearPossessionSignature()
+		return nil
+	case depositaddress.FieldPossessionSignatureV2:
+		m.ClearPossessionSignatureV2()
 		return nil
 	case depositaddress.FieldNodeID:
 		m.ClearNodeID()
@@ -2689,6 +2759,9 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 		return nil
 	case depositaddress.FieldPossessionSignature:
 		m.ResetPossessionSignature()
+		return nil
+	case depositaddress.FieldPossessionSignatureV2:
+		m.ResetPossessionSignatureV2()
 		return nil
 	case depositaddress.FieldNodeID:
 		m.ResetNodeID()

@@ -242,6 +242,7 @@ type DepositAddressExample struct {
 	AvailabilityConfirmedAt *time.Time
 	AddressSignatures       *map[string][]uint8
 	PossessionSignature     *[]byte
+	PossessionSignatureV2   *[]byte
 	NodeID                  *uuid.UUID
 
 	// Edges - if set, use the provided entity; if nil, create a default one
@@ -310,6 +311,12 @@ func (da *DepositAddressExample) SetAddressSignatures(v map[string][]uint8) *Dep
 // SetPossessionSignature sets the possession_signature field.
 func (da *DepositAddressExample) SetPossessionSignature(v []byte) *DepositAddressExample {
 	da.PossessionSignature = &v
+	return da
+}
+
+// SetPossessionSignatureV2 sets the possession_signature_v2 field.
+func (da *DepositAddressExample) SetPossessionSignatureV2(v []byte) *DepositAddressExample {
+	da.PossessionSignatureV2 = &v
 	return da
 }
 
@@ -425,6 +432,15 @@ func (da *DepositAddressExample) MustExec(ctx context.Context) *ent.DepositAddre
 			return b
 		}())
 	}
+	if da.PossessionSignatureV2 != nil {
+		create.SetPossessionSignatureV2(*da.PossessionSignatureV2)
+	} else {
+		// Use default from annotation
+		create.SetPossessionSignatureV2(func() []byte {
+			b, _ := hex.DecodeString("14bc648e78ec4ae6376b6752c35b1bd3f7a3c60a4caf3b107f9a08891bde9565006afe542e056da2726baf0915c61cbf6ec07b84b6fbcba4b82b6e5db953b1db")
+			return b
+		}())
+	}
 	if da.NodeID != nil {
 		create.SetNodeID(*da.NodeID)
 	} else {
@@ -526,6 +542,15 @@ func (da *DepositAddressExample) Exec(ctx context.Context) (*ent.DepositAddress,
 	} else {
 		// Use default from annotation
 		create.SetPossessionSignature(func() []byte {
+			b, _ := hex.DecodeString("14bc648e78ec4ae6376b6752c35b1bd3f7a3c60a4caf3b107f9a08891bde9565006afe542e056da2726baf0915c61cbf6ec07b84b6fbcba4b82b6e5db953b1db")
+			return b
+		}())
+	}
+	if da.PossessionSignatureV2 != nil {
+		create.SetPossessionSignatureV2(*da.PossessionSignatureV2)
+	} else {
+		// Use default from annotation
+		create.SetPossessionSignatureV2(func() []byte {
 			b, _ := hex.DecodeString("14bc648e78ec4ae6376b6752c35b1bd3f7a3c60a4caf3b107f9a08891bde9565006afe542e056da2726baf0915c61cbf6ec07b84b6fbcba4b82b6e5db953b1db")
 			return b
 		}())
