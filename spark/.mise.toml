@@ -41,6 +41,15 @@ test-grpc-minikube = """
     -p 1 \
     -tags=lightspark
 """
+test-grpc-minikube-dbg = """
+  MINIKUBE_IP=$(minikube ip) \
+  gotestsum \
+    --format standard-verbose \
+    --packages="./so/grpc_test/... ./so/grpc_test_internal/..." \
+    -- \
+    -p 1 \
+    -tags=lightspark
+"""
 test-grpc-minikube-oss = """
   MINIKUBE_IP=$(minikube ip) \
   gotestsum \

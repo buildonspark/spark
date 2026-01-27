@@ -48,6 +48,16 @@ run = """kubectl --context dev -n bitcoin exec -it regtest-miner-bitcoind-0 -- \
     sendtoaddress {{arg(name="addr")}} {{arg(name="amount", default="0.0001")}}
     """
 
+[tasks.bcli-mk]
+description = "Run arbitrary bitcoin-cli commands against regtest in minikube"
+run = """
+kubectl --context minikube -n bitcoin exec -it regtest-bitcoind-0 -c bitcoind -- \
+  bitcoin-cli \
+    -conf=/etc/bitcoin/bitcoin.conf \
+    -datadir=/data \
+    "$@"
+"""
+
 [tasks.money-mk]
 description = "Send regtest BTC in minikube to <address> [amount (default=0.0001)]"
 usage = '''

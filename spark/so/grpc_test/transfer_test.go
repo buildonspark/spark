@@ -41,10 +41,6 @@ func TestTransfer(t *testing.T) {
 	}
 	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(senderConfig.CoordinatorAddress(), nil)
-	require.NoError(t, err, "failed to create grpc connection")
-	defer conn.Close()
-
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
 	require.NoError(t, err, "failed to authenticate sender")
 	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
@@ -109,10 +105,6 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 	}
 	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(senderConfig.CoordinatorAddress(), nil)
-	require.NoError(t, err, "failed to create grpc connection")
-	defer conn.Close()
-
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
 	require.NoError(t, err, "failed to authenticate sender")
 	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
@@ -163,10 +155,6 @@ func TestTransferInterrupt(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}
 	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
-
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(senderConfig.CoordinatorAddress(), nil)
-	require.NoError(t, err, "failed to create grpc connection")
-	defer conn.Close()
 
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
 	require.NoError(t, err, "failed to authenticate sender")
@@ -1156,9 +1144,6 @@ func sendTransferWithInvoice(
 	}
 	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(senderConfig.CoordinatorAddress(), nil)
-	require.NoError(t, err, "failed to create grpc connection")
-	defer conn.Close()
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
 	require.NoError(t, err, "failed to authenticate sender")
 	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
