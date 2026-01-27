@@ -246,7 +246,6 @@ export class CoopExitService extends BaseTransferService {
         },
         exitId: uuidv7(),
         exitTxid: exitTxId,
-        connectorTx: connectorTx,
       });
     } catch (error) {
       throw new SparkRequestError("Failed to initiate cooperative exit", {

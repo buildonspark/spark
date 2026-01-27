@@ -253,9 +253,8 @@ func signCoopExitRefunds(
 			ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
 			ExpiryTime:                timestamppb.New(expiryTime),
 		},
-		ExitId:      exitID.String(),
-		ExitTxid:    exitTxid,
-		ConnectorTx: connectorTx,
+		ExitId:   exitID.String(),
+		ExitTxid: exitTxid,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initiate cooperative exit: %w", err)
