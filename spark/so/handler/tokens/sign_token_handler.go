@@ -24,6 +24,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 )
@@ -198,7 +199,7 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto("failed to build input operator share map", tokenTransactionProto, err)
 	}
-	logger.Sugar().Infof("Length of inputOperatorShareMap built from first exchange response: %d", len(inputOperatorShareMap))
+	logger.Sugar().Infof("Length of inputOperatorShareMap built from first exchange response: ByUUID=%d, ByHashVout=%d", len(inputOperatorShareMap.ByUUID), len(inputOperatorShareMap.ByHashVout))
 	// Persist the secret shares from all operators.
 	internalHandler := NewInternalSignTokenHandler(h.config)
 	finalized, err := internalHandler.persistPartialRevocationSecretShares(ctx, inputOperatorShareMap, tokenTransactionHash)
@@ -517,22 +518,41 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 		}
 	}
 
+	knobsService := knobs.GetKnobsService(ctx)
+	phase2Enabled := knobsService != nil && knobsService.RolloutRandom(knobs.KnobTokenTransactionV3Phase2Enabled, 0)
+
 	for _, outputWithKeyShare := range outputsWithKeyShares {
 		if keyshare := outputWithKeyShare.Edges.RevocationKeyshare; keyshare != nil {
 			if operatorShares, exists := sharesToReturnMap[h.config.IdentityPublicKey()]; exists {
-				operatorShares.Shares = append(operatorShares.Shares, &tokeninternalpb.RevocationSecretShare{
-					InputTtxoId: outputWithKeyShare.ID.String(),
+				share := &tokeninternalpb.RevocationSecretShare{
 					SecretShare: keyshare.SecretShare.Serialize(),
-				})
+				}
+				if phase2Enabled {
+					share.InputTtxoRef = &tokenpb.TokenOutputToSpend{
+						PrevTokenTransactionHash: outputWithKeyShare.CreatedTransactionFinalizedHash,
+						PrevTokenTransactionVout: uint32(outputWithKeyShare.CreatedTransactionOutputVout),
+					}
+				} else {
+					share.InputTtxoId = outputWithKeyShare.ID.String()
+				}
+				operatorShares.Shares = append(operatorShares.Shares, share)
 			}
 		}
 		if outputWithKeyShare.Edges.TokenPartialRevocationSecretShares != nil {
 			for _, partialShare := range outputWithKeyShare.Edges.TokenPartialRevocationSecretShares {
 				if operatorShares, exists := sharesToReturnMap[partialShare.OperatorIdentityPublicKey]; exists {
-					operatorShares.Shares = append(operatorShares.Shares, &tokeninternalpb.RevocationSecretShare{
-						InputTtxoId: outputWithKeyShare.ID.String(),
+					share := &tokeninternalpb.RevocationSecretShare{
 						SecretShare: partialShare.SecretShare.Serialize(),
-					})
+					}
+					if phase2Enabled {
+						share.InputTtxoRef = &tokenpb.TokenOutputToSpend{
+							PrevTokenTransactionHash: outputWithKeyShare.CreatedTransactionFinalizedHash,
+							PrevTokenTransactionVout: uint32(outputWithKeyShare.CreatedTransactionOutputVout),
+						}
+					} else {
+						share.InputTtxoId = outputWithKeyShare.ID.String()
+					}
+					operatorShares.Shares = append(operatorShares.Shares, share)
 				}
 			}
 		}

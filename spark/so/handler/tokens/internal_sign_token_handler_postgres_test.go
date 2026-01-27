@@ -189,7 +189,10 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SaveX(setup.ctx)
 
 	t.Run("returns empty map when input share map is empty", func(t *testing.T) {
-		inputOperatorShareMap := make(map[ShareKey]ShareValue)
+		inputOperatorShareMap := &InputOperatorShareMaps{
+			ByUUID:     make(map[ShareKey]ShareValue),
+			ByHashVout: make(map[HashVoutShareKey]ShareValue),
+		}
 
 		_, err := setup.handler.getSecretSharesNotInInput(setup.ctx, inputOperatorShareMap)
 
@@ -197,13 +200,17 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 	})
 
 	t.Run("excludes the revocation secret share if it is in the input", func(t *testing.T) {
-		inputOperatorShareMap := make(map[ShareKey]ShareValue)
-		inputOperatorShareMap[ShareKey{
-			TokenOutputID:             tokenOutputInDb.ID,
-			OperatorIdentityPublicKey: aliceOperatorPubKey,
-		}] = ShareValue{
-			SecretShare:               aliceSigningKeyshare.SecretShare,
-			OperatorIdentityPublicKey: aliceOperatorPubKey,
+		inputOperatorShareMap := &InputOperatorShareMaps{
+			ByUUID: map[ShareKey]ShareValue{
+				{
+					TokenOutputID:             tokenOutputInDb.ID,
+					OperatorIdentityPublicKey: aliceOperatorPubKey,
+				}: {
+					SecretShare:               aliceSigningKeyshare.SecretShare,
+					OperatorIdentityPublicKey: aliceOperatorPubKey,
+				},
+			},
+			ByHashVout: make(map[HashVoutShareKey]ShareValue),
 		}
 
 		result, err := setup.handler.getSecretSharesNotInInput(setup.ctx, inputOperatorShareMap)
@@ -214,19 +221,48 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 	})
 
 	t.Run("excludes the partial revocation secret share if it is in the input", func(t *testing.T) {
-		inputOperatorShareMap := make(map[ShareKey]ShareValue)
-		inputOperatorShareMap[ShareKey{
-			TokenOutputID:             tokenOutputInDb.ID,
-			OperatorIdentityPublicKey: bobOperatorPubKey,
-		}] = ShareValue{
-			SecretShare:               bobSigningKeyshare.SecretShare,
-			OperatorIdentityPublicKey: bobOperatorPubKey,
+		inputOperatorShareMap := &InputOperatorShareMaps{
+			ByUUID: map[ShareKey]ShareValue{
+				{
+					TokenOutputID:             tokenOutputInDb.ID,
+					OperatorIdentityPublicKey: bobOperatorPubKey,
+				}: {
+					SecretShare:               bobSigningKeyshare.SecretShare,
+					OperatorIdentityPublicKey: bobOperatorPubKey,
+				},
+			},
+			ByHashVout: make(map[HashVoutShareKey]ShareValue),
 		}
 
 		result, err := setup.handler.getSecretSharesNotInInput(setup.ctx, inputOperatorShareMap)
 		require.NoError(t, err)
 		assert.Len(t, result, 2)
 		assert.Equal(t, aliceSigningKeyshare.SecretShare.Serialize(), result[aliceOperatorPubKey][0].SecretShare)
+		assert.Equal(t, carolSigningKeyshare.SecretShare.Serialize(), result[carolOperatorPubKey][0].SecretShare)
+	})
+
+	t.Run("works with ByHashVout format", func(t *testing.T) {
+		var hashKey [32]byte
+		copy(hashKey[:], tokenOutputInDb.CreatedTransactionFinalizedHash)
+
+		inputOperatorShareMap := &InputOperatorShareMaps{
+			ByUUID: make(map[ShareKey]ShareValue),
+			ByHashVout: map[HashVoutShareKey]ShareValue{
+				{
+					PrevTxHash:                hashKey,
+					PrevVout:                  uint32(tokenOutputInDb.CreatedTransactionOutputVout),
+					OperatorIdentityPublicKey: aliceOperatorPubKey,
+				}: {
+					SecretShare:               aliceSigningKeyshare.SecretShare,
+					OperatorIdentityPublicKey: aliceOperatorPubKey,
+				},
+			},
+		}
+
+		result, err := setup.handler.getSecretSharesNotInInput(setup.ctx, inputOperatorShareMap)
+		require.NoError(t, err)
+		assert.Len(t, result, 2)
+		assert.Equal(t, bobSigningKeyshare.SecretShare.Serialize(), result[bobOperatorPubKey][0].SecretShare)
 		assert.Equal(t, carolSigningKeyshare.SecretShare.Serialize(), result[carolOperatorPubKey][0].SecretShare)
 	})
 }

@@ -674,8 +674,11 @@ func PrepareRevocationSharesFromCoordinator(
 		if keyshare := outputWithKeyShare.Edges.RevocationKeyshare; keyshare != nil {
 			if operatorShares, exists := sharesToReturnMap[coordinator.IdentityPublicKey]; exists {
 				operatorShares.Shares = append(operatorShares.Shares, &tokeninternalpb.RevocationSecretShare{
-					InputTtxoId: outputWithKeyShare.ID.String(),
 					SecretShare: keyshare.SecretShare.Serialize(),
+					InputTtxoRef: &tokenpb.TokenOutputToSpend{
+						PrevTokenTransactionHash: outputWithKeyShare.CreatedTransactionFinalizedHash,
+						PrevTokenTransactionVout: uint32(outputWithKeyShare.CreatedTransactionOutputVout),
+					},
 				})
 			}
 		}
@@ -685,8 +688,11 @@ func PrepareRevocationSharesFromCoordinator(
 				operatorKey := partialShare.OperatorIdentityPublicKey
 				if operatorShares, exists := sharesToReturnMap[operatorKey]; exists {
 					operatorShares.Shares = append(operatorShares.Shares, &tokeninternalpb.RevocationSecretShare{
-						InputTtxoId: outputWithKeyShare.ID.String(),
 						SecretShare: partialShare.SecretShare.Serialize(),
+						InputTtxoRef: &tokenpb.TokenOutputToSpend{
+							PrevTokenTransactionHash: outputWithKeyShare.CreatedTransactionFinalizedHash,
+							PrevTokenTransactionVout: uint32(outputWithKeyShare.CreatedTransactionOutputVout),
+						},
 					})
 				}
 			}

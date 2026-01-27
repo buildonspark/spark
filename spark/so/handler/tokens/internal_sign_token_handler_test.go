@@ -99,6 +99,107 @@ func makeFinalMintTxForTests() *tokenpb.TokenTransaction {
 	}
 }
 
+func TestBuildInputOperatorShareMap(t *testing.T) {
+	testHash := []byte{
+		0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+		0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
+		0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80,
+		0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0, 0x00,
+	}
+	testSecret := bytes.Repeat([]byte{0x42}, 32)
+	testOperatorPubKey := bytes.Repeat([]byte{0x02}, 33)
+	testUUID := uuid.New()
+
+	t.Run("parses new InputTtxoRef format", func(t *testing.T) {
+		shares := []*sparktokeninternal.OperatorRevocationShares{
+			{
+				OperatorIdentityPublicKey: testOperatorPubKey,
+				Shares: []*sparktokeninternal.RevocationSecretShare{
+					{
+						SecretShare: testSecret,
+						InputTtxoRef: &tokenpb.TokenOutputToSpend{
+							PrevTokenTransactionHash: testHash,
+							PrevTokenTransactionVout: 1,
+						},
+					},
+				},
+			},
+		}
+
+		result, err := buildInputOperatorShareMap(shares)
+		require.NoError(t, err)
+		require.Len(t, result.ByHashVout, 1)
+		require.Empty(t, result.ByUUID)
+
+		// Verify the hash/vout key
+		var hashKey [32]byte
+		copy(hashKey[:], testHash)
+		opPubKey, err := keys.ParsePublicKey(testOperatorPubKey)
+		require.NoError(t, err)
+		shareKey := HashVoutShareKey{
+			PrevTxHash:                hashKey,
+			PrevVout:                  1,
+			OperatorIdentityPublicKey: opPubKey,
+		}
+		value, ok := result.ByHashVout[shareKey]
+		require.True(t, ok)
+		require.Equal(t, testSecret, value.SecretShare.Serialize())
+	})
+
+	t.Run("parses legacy UUID format", func(t *testing.T) {
+		shares := []*sparktokeninternal.OperatorRevocationShares{
+			{
+				OperatorIdentityPublicKey: testOperatorPubKey,
+				Shares: []*sparktokeninternal.RevocationSecretShare{
+					{
+						InputTtxoId: testUUID.String(),
+						SecretShare: testSecret,
+					},
+				},
+			},
+		}
+
+		result, err := buildInputOperatorShareMap(shares)
+		require.NoError(t, err)
+		require.Len(t, result.ByUUID, 1)
+		require.Empty(t, result.ByHashVout)
+
+		opPubKey, err := keys.ParsePublicKey(testOperatorPubKey)
+		require.NoError(t, err)
+		shareKey := ShareKey{
+			TokenOutputID:             testUUID,
+			OperatorIdentityPublicKey: opPubKey,
+		}
+		value, ok := result.ByUUID[shareKey]
+		require.True(t, ok)
+		require.Equal(t, testSecret, value.SecretShare.Serialize())
+	})
+
+	t.Run("prefers InputTtxoRef when both formats provided", func(t *testing.T) {
+		shares := []*sparktokeninternal.OperatorRevocationShares{
+			{
+				OperatorIdentityPublicKey: testOperatorPubKey,
+				Shares: []*sparktokeninternal.RevocationSecretShare{
+					{
+						InputTtxoId: testUUID.String(),
+						SecretShare: testSecret,
+						InputTtxoRef: &tokenpb.TokenOutputToSpend{
+							PrevTokenTransactionHash: testHash,
+							PrevTokenTransactionVout: 2,
+						},
+					},
+				},
+			},
+		}
+
+		result, err := buildInputOperatorShareMap(shares)
+		require.NoError(t, err)
+		// When InputTtxoRef is provided, it takes precedence
+		require.Empty(t, result.ByUUID)
+		require.Len(t, result.ByHashVout, 1)
+	})
+}
+
 func TestExchangeRevocationSecretsShares(t *testing.T) {
 	setup := setUpInternalSignTokenTestHandler(t)
 	defer setup.cleanup()

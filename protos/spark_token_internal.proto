@@ -68,8 +68,9 @@ message OperatorTransactionSignature {
 }
 
 message RevocationSecretShare {
-    string input_ttxo_id = 1;
+    string input_ttxo_id = 1 [deprecated = true];  // Deprecated: TTXO IDs differ per SO; use input_ttxo_ref instead
     bytes secret_share   = 2;
+    spark_token.TokenOutputToSpend input_ttxo_ref = 3;
 }
 
 message OperatorRevocationShares {
