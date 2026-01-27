@@ -29,5 +29,6 @@ const (
 	withdrawalSparkTxHashSizeBytes = 32
 	withdrawalSparkTxVoutSizeBytes = 4
 
-	withdrawalExpectedFormat = "[se_entity_pubkey(33)] + [owner_signature(64)] + [withdrawn_ttxo_count(1)] + [[vout(2)] + [spark_tx_hash(32)] + [spark_tx_vout(4)]](variable)"
+	// WithdrawalExpectedFormat describes the expected format of a BTKN withdrawal announcement.
+	WithdrawalExpectedFormat = "[se_entity_pubkey(33)] + [owner_signature(64)] + [withdrawn_ttxo_count(1)] + [[vout(2)] + [spark_tx_hash(32)] + [spark_tx_vout(4)]](variable)"
 )

@@ -195,3 +195,11 @@ func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys []keys.Public
 
 	return outputIDs, totalAmount, nil
 }
+
+// MarkOutputsWithdrawn sets the ConfirmedWithdrawBlockHash for the given token outputs.
+func MarkOutputsWithdrawn(ctx context.Context, dbClient *Client, tokenOutputIDs []uuid.UUID, blockHash []byte) error {
+	return dbClient.TokenOutput.Update().
+		SetConfirmedWithdrawBlockHash(blockHash).
+		Where(tokenoutput.IDIn(tokenOutputIDs...)).
+		Exec(ctx)
+}

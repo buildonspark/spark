@@ -3,20 +3,17 @@ package chain
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"unicode/utf8"
-
-	"github.com/lightsparkdev/spark/common/btcnetwork"
-	"github.com/lightsparkdev/spark/common/keys"
-	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/chain/tokens"
@@ -24,6 +21,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
+	"go.uber.org/zap"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -53,61 +51,6 @@ const (
 // creationAnnouncementKind indicates this Announcement is for token creation
 var creationAnnouncementKind = [2]byte{0, 0}
 
-// validatePushBytes parses a Bitcoin script push operation and returns any error. It advances the provided buffer to
-// the end of the push metadata. If an error occurs, there are no guarantees about the buffer's subsequent state.
-// It handles OP_PUSHDATA1 (0x4c), OP_PUSHDATA2 (0x4d), and OP_PUSHDATA4 (0x4e) as well as direct pushes (0x01-0x4b).
-func validatePushBytes(script *bytes.Buffer) error {
-	totalLen := script.Len() + 1 // For OP_RETURN
-	if totalLen <= 2 {
-		return fmt.Errorf("script too short: no push operation")
-	}
-
-	pushOp, err := readByte(script)
-	if err != nil {
-		return err
-	}
-
-	// Parse data length based on push operation
-	var dataLength int
-	switch {
-	case pushOp >= 0x01 && pushOp <= 0x4b:
-		// Direct push of 1-75 bytes
-		dataLength = int(pushOp)
-	case pushOp == txscript.OP_PUSHDATA1:
-		// OP_PUSHDATA1: next byte is length
-		length, err := readByte(script)
-		if err != nil {
-			return fmt.Errorf("script too short for OP_PUSHDATA1")
-		}
-		dataLength = int(length)
-	case pushOp == txscript.OP_PUSHDATA2:
-		// OP_PUSHDATA2: next 2 bytes are length (little-endian)
-		lengthBytes := script.Next(2)
-		if len(lengthBytes) != 2 {
-			return fmt.Errorf("script too short for OP_PUSHDATA2")
-		}
-		dataLength = int(binary.LittleEndian.Uint16(lengthBytes))
-	case pushOp == txscript.OP_PUSHDATA4:
-		// OP_PUSHDATA4: next 4 bytes are length (little-endian)
-		lengthBytes := script.Next(4)
-		if len(lengthBytes) != 4 {
-			return fmt.Errorf("script too short for OP_PUSHDATA4")
-		}
-		dataLength = int(binary.LittleEndian.Uint32(lengthBytes))
-	default:
-		// Not a standard push operation, so we can't parse it.
-		return fmt.Errorf("unparseable pushBytes")
-	}
-
-	// Verify we have exactly the right amount of data. dataLength holds the number of bytes that the script has told
-	// us remain to be parsed, while script.Len() is the number of bytes that actually remain unread in the buffer.
-	if script.Len() != dataLength {
-		return fmt.Errorf("script length mismatch: expected %d bytes total, got %d (pushOp=0x%02x, dataLength=%d, offset=%d)", dataLength, totalLen, pushOp, dataLength, totalLen-script.Len()-1)
-	}
-
-	return nil
-}
-
 // Construct an L1TokenCreate entity from a token announcement script.
 // Returns nil if the transaction is not detected to be a token announcement (even if malformed).
 // Returns an error if the script is an invalid or malformed LRC20 token announcement.
@@ -116,7 +59,7 @@ func parseTokenAnnouncement(script []byte, network btcnetwork.Network) (*ent.L1T
 	if op, err := buf.ReadByte(); err != nil || op != txscript.OP_RETURN {
 		return nil, nil // Not an OP_RETURN script
 	}
-	if err := validatePushBytes(buf); err != nil {
+	if err := common.ValidatePushBytes(buf); err != nil {
 		return nil, nil // Invalid OP_RETURN script.
 	}
 
@@ -129,7 +72,7 @@ func parseTokenAnnouncement(script []byte, network btcnetwork.Network) (*ent.L1T
 	}
 
 	// Format: [token_pubkey(33)] + [name_len(1)] + [name(variable)] + [ticker_len(1)] + [ticker(variable)] + [decimal(1)] + [max_supply(16)] + [is_freezable(1)]
-	issuerPubKeyBytes, err := readBytes(buf, tokenPubKeySizeBytes)
+	issuerPubKeyBytes, err := common.ReadBytes(buf, tokenPubKeySizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("invalid issuer public key: %w", err)
 	}
@@ -148,17 +91,17 @@ func parseTokenAnnouncement(script []byte, network btcnetwork.Network) (*ent.L1T
 		return nil, fmt.Errorf("invalid ticker: %w", err)
 	}
 
-	decimal, err := readByte(buf)
+	decimal, err := common.ReadByte(buf)
 	if err != nil {
 		return nil, fmt.Errorf("invalid decimal: %w", err)
 	}
 
-	maxSupply, err := readBytes(buf, maxSupplySizeBytes)
+	maxSupply, err := common.ReadBytes(buf, maxSupplySizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("invalid max supply: %w", err)
 	}
 
-	isFreezable, err := readByte(buf)
+	isFreezable, err := common.ReadByte(buf)
 	if err != nil {
 		return nil, fmt.Errorf("invalid is_freezable: %w", err)
 	}
@@ -181,7 +124,7 @@ func parseTokenAnnouncement(script []byte, network btcnetwork.Network) (*ent.L1T
 }
 
 func readVarLenStr(buf *bytes.Buffer, minBytes int, maxBytes int) (string, error) {
-	lengthByte, err := readByte(buf)
+	lengthByte, err := common.ReadByte(buf)
 	if err != nil {
 		return "", fmt.Errorf("invalid length: %w", err)
 	}
@@ -190,7 +133,7 @@ func readVarLenStr(buf *bytes.Buffer, minBytes int, maxBytes int) (string, error
 		return "", fmt.Errorf("invalid length: expected between %d and %d, got %d. %s",
 			minBytes, maxBytes, length, expectedFormatOutputStr)
 	}
-	asBytes, err := readBytes(buf, length)
+	asBytes, err := common.ReadBytes(buf, length)
 	if err != nil {
 		return "", err
 	}
@@ -201,22 +144,6 @@ func readVarLenStr(buf *bytes.Buffer, minBytes int, maxBytes int) (string, error
 		return "", fmt.Errorf("not NFC-normalized. %s", expectedFormatOutputStr)
 	}
 	return string(asBytes), nil
-}
-
-func readBytes(buf *bytes.Buffer, want int) ([]byte, error) {
-	asBytes := buf.Next(want)
-	if len(asBytes) != want {
-		return nil, fmt.Errorf("insufficient data: expected %d byte(s), got %d bytes. %s", want, len(asBytes), expectedFormatOutputStr)
-	}
-	return asBytes, nil
-}
-
-func readByte(buf *bytes.Buffer) (byte, error) {
-	asByte, err := buf.ReadByte()
-	if err != nil {
-		return 0, fmt.Errorf("insufficient data: expected 1 byte, got 0 bytes. %s", expectedFormatOutputStr)
-	}
-	return asByte, nil
 }
 
 func createL1TokenEntity(ctx context.Context, dbClient *ent.Client, tokenMetadata *common.TokenMetadata, txid chainhash.Hash, tokenIdentifier []byte) (*ent.L1TokenCreate, error) {

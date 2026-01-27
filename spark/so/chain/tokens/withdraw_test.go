@@ -238,7 +238,7 @@ func TestValidateOutputWithdrawable_AlreadyWithdrawnInBlock(t *testing.T) {
 
 	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "already withdrawn in this block")
+	assert.ErrorIs(t, err, ErrOutputAlreadyWithdrawnInBlock)
 }
 
 func TestValidateOutputWithdrawable_OutputNotFound(t *testing.T) {
@@ -254,7 +254,7 @@ func TestValidateOutputWithdrawable_OutputNotFound(t *testing.T) {
 
 	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "token output not found")
+	assert.ErrorIs(t, err, ErrOutputNotFound)
 }
 
 func TestValidateOutputWithdrawable_AlreadyWithdrawnOnChain(t *testing.T) {
@@ -280,7 +280,7 @@ func TestValidateOutputWithdrawable_AlreadyWithdrawnOnChain(t *testing.T) {
 
 	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "already withdrawn on-chain")
+	assert.ErrorIs(t, err, ErrOutputAlreadyWithdrawnOnChain)
 }
 
 func TestValidateOutputWithdrawable_ActiveSpendingTransaction(t *testing.T) {
@@ -316,7 +316,44 @@ func TestValidateOutputWithdrawable_ActiveSpendingTransaction(t *testing.T) {
 
 	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spending transaction in progress")
+	assert.ErrorIs(t, err, ErrOutputNotWithdrawable)
+}
+
+func TestValidateOutputWithdrawable_FinalizedSpendingTransaction(t *testing.T) {
+	sparkTxHash := make([]byte, 32)
+	key := sparkTxHashVoutKey(sparkTxHash, 0)
+
+	// Create a finalized spending transaction (not expired, but already finalized)
+	spendingTx := &ent.TokenTransaction{
+		ID:                      uuid.New(),
+		Status:                  schematype.TokenTransactionStatusFinalized,
+		Version:                 3,
+		ClientCreatedTimestamp:  time.Now(), // Not expired
+		ValidityDurationSeconds: 3600,       // 1 hour validity
+	}
+
+	tokenOutput := &ent.TokenOutput{
+		ID:     uuid.New(),
+		Status: schematype.TokenOutputStatusSpentSigned,
+		Edges: ent.TokenOutputEdges{
+			OutputSpentTokenTransaction: spendingTx,
+		},
+	}
+
+	tokenOutputMap := map[string]*ent.TokenOutput{
+		key: tokenOutput,
+	}
+	withdrawnInBlock := make(map[string]struct{})
+
+	output := parsedOutputWithdrawal{
+		sparkTxHash: sparkTxHash,
+		sparkTxVout: 0,
+	}
+
+	// Finalized transaction should block withdrawal
+	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
+	require.ErrorIs(t, err, ErrOutputNotWithdrawable)
+	assert.Contains(t, err.Error(), "finalized")
 }
 
 func TestValidateOutputWithdrawable_ExpiredSpendingTransaction(t *testing.T) {
@@ -427,7 +464,7 @@ func TestValidateWithdrawalTxOutput_InsufficientBond(t *testing.T) {
 
 	err = validateWithdrawalTxOutput(tx, withdrawal, tokenOutput)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "insufficient bond")
+	assert.ErrorIs(t, err, ErrInsufficientBond)
 }
 
 func TestValidateWithdrawalTxOutput_ScriptMismatch(t *testing.T) {
@@ -463,7 +500,7 @@ func TestValidateWithdrawalTxOutput_ScriptMismatch(t *testing.T) {
 
 	err := validateWithdrawalTxOutput(tx, withdrawal, tokenOutput)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "script mismatch")
+	assert.ErrorIs(t, err, ErrScriptMismatch)
 }
 
 func TestValidateWithdrawalTxOutput_VoutOutOfRange(t *testing.T) {
@@ -481,7 +518,7 @@ func TestValidateWithdrawalTxOutput_VoutOutOfRange(t *testing.T) {
 
 	err := validateWithdrawalTxOutput(tx, withdrawal, tokenOutput)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "out of range")
+	assert.ErrorIs(t, err, ErrVoutOutOfRange)
 }
 
 // Helper types and functions
