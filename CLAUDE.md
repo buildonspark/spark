@@ -38,6 +38,13 @@ verifyOperatorSignatures(sigs)
 - Security-critical sections
 - References to external specs or papers
 
+**Comment quality guidelines:**
+- Explain "why", not "what" - the code shows what happens; comments explain reasoning
+- Comments must be self-contained - never reference "the old implementation" since future readers won't have that context
+- Only add non-obvious information - `// Save to database` before `db.Save()` wastes space
+- Don't comment out code - delete it; git remembers
+- Link to issues/specs for complex business logic
+
 ### Function Length
 Keep functions focused and reasonably short. If a function is doing too many things, consider splitting it - but avoid excessive indirection that makes code harder to follow.
 
