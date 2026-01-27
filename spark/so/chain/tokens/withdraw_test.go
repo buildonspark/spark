@@ -25,6 +25,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func testWithdrawalOutput(sparkTxHash []byte) parsedOutputWithdrawal {
+	return parsedOutputWithdrawal{sparkTxHash: sparkTxHash, sparkTxVout: 0}
+}
+
 func TestParseTokenWithdrawal_ValidWithdrawal(t *testing.T) {
 	// Generate test keys
 	sePrivKey := keys.GeneratePrivateKey()
@@ -191,164 +195,147 @@ func TestParseTokenWithdrawal_TrailingData(t *testing.T) {
 	assert.Contains(t, err.Error(), "unexpected trailing data")
 }
 
-func TestValidateOutputWithdrawable_Success(t *testing.T) {
+func TestValidateOutputWithdrawable_AllowsFinalizedOutput(t *testing.T) {
 	sparkTxHash := make([]byte, 32)
-	key := sparkTxHashVoutKey(sparkTxHash, 0)
+	key := newTokenOutputKey(sparkTxHash, 0)
 
 	tokenOutput := &ent.TokenOutput{
 		ID:     uuid.New(),
 		Status: schematype.TokenOutputStatusCreatedFinalized,
 	}
 
-	tokenOutputMap := map[string]*ent.TokenOutput{
+	tokenOutputMap := map[tokenOutputKey]*ent.TokenOutput{
 		key: tokenOutput,
 	}
-	withdrawnInBlock := make(map[string]struct{})
+	withdrawnInBlock := make(map[tokenOutputKey]struct{})
 
-	output := parsedOutputWithdrawal{
-		sparkTxHash: sparkTxHash,
-		sparkTxVout: 0,
-	}
+	output := testWithdrawalOutput(sparkTxHash)
 
 	result, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
 	require.NoError(t, err)
 	assert.Equal(t, tokenOutput, result)
 }
 
-func TestValidateOutputWithdrawable_AlreadyWithdrawnInBlock(t *testing.T) {
+func TestValidateOutputWithdrawable_BlocksDuplicateInSameBlock(t *testing.T) {
 	sparkTxHash := make([]byte, 32)
-	key := sparkTxHashVoutKey(sparkTxHash, 0)
+	key := newTokenOutputKey(sparkTxHash, 0)
 
 	tokenOutput := &ent.TokenOutput{
 		ID:     uuid.New(),
 		Status: schematype.TokenOutputStatusCreatedFinalized,
 	}
 
-	tokenOutputMap := map[string]*ent.TokenOutput{
+	tokenOutputMap := map[tokenOutputKey]*ent.TokenOutput{
 		key: tokenOutput,
 	}
-	withdrawnInBlock := map[string]struct{}{
+	withdrawnInBlock := map[tokenOutputKey]struct{}{
 		key: {},
 	}
 
-	output := parsedOutputWithdrawal{
-		sparkTxHash: sparkTxHash,
-		sparkTxVout: 0,
-	}
+	output := testWithdrawalOutput(sparkTxHash)
 
 	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrOutputAlreadyWithdrawnInBlock)
 }
 
-func TestValidateOutputWithdrawable_OutputNotFound(t *testing.T) {
+func TestValidateOutputWithdrawable_BlocksUnknownOutput(t *testing.T) {
 	sparkTxHash := make([]byte, 32)
 
-	tokenOutputMap := make(map[string]*ent.TokenOutput)
-	withdrawnInBlock := make(map[string]struct{})
+	tokenOutputMap := make(map[tokenOutputKey]*ent.TokenOutput)
+	withdrawnInBlock := make(map[tokenOutputKey]struct{})
 
-	output := parsedOutputWithdrawal{
-		sparkTxHash: sparkTxHash,
-		sparkTxVout: 0,
-	}
+	output := testWithdrawalOutput(sparkTxHash)
 
 	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrOutputNotFound)
 }
 
-func TestValidateOutputWithdrawable_AlreadyWithdrawnOnChain(t *testing.T) {
+func TestValidateOutputWithdrawable_BlocksAlreadyWithdrawn(t *testing.T) {
 	sparkTxHash := make([]byte, 32)
-	key := sparkTxHashVoutKey(sparkTxHash, 0)
+	key := newTokenOutputKey(sparkTxHash, 0)
 
-	blockHash := make([]byte, 32)
 	tokenOutput := &ent.TokenOutput{
-		ID:                         uuid.New(),
-		Status:                     schematype.TokenOutputStatusCreatedFinalized,
-		ConfirmedWithdrawBlockHash: blockHash,
+		ID:     uuid.New(),
+		Status: schematype.TokenOutputStatusCreatedFinalized,
+		Edges: ent.TokenOutputEdges{
+			Withdrawal: &ent.L1TokenOutputWithdrawal{ID: uuid.New()},
+		},
 	}
 
-	tokenOutputMap := map[string]*ent.TokenOutput{
+	tokenOutputMap := map[tokenOutputKey]*ent.TokenOutput{
 		key: tokenOutput,
 	}
-	withdrawnInBlock := make(map[string]struct{})
+	withdrawnInBlock := make(map[tokenOutputKey]struct{})
 
-	output := parsedOutputWithdrawal{
-		sparkTxHash: sparkTxHash,
-		sparkTxVout: 0,
-	}
+	output := testWithdrawalOutput(sparkTxHash)
 
 	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrOutputAlreadyWithdrawnOnChain)
 }
 
-func TestValidateOutputWithdrawable_ActiveSpendingTransaction(t *testing.T) {
+func TestValidateOutputWithdrawable_BlocksActiveSpendingTransaction(t *testing.T) {
 	sparkTxHash := make([]byte, 32)
-	key := sparkTxHashVoutKey(sparkTxHash, 0)
+	key := newTokenOutputKey(sparkTxHash, 0)
 
-	// Create an active (non-expired) spending transaction in Started status
-	spendingTx := &ent.TokenTransaction{
+	// Active (not expired) spending transaction blocks withdrawal
+	activeSpendingTx := &ent.TokenTransaction{
 		ID:                      uuid.New(),
 		Status:                  schematype.TokenTransactionStatusStarted,
 		Version:                 3,
-		ClientCreatedTimestamp:  time.Now(), // Not expired
-		ValidityDurationSeconds: 3600,       // 1 hour validity
+		ClientCreatedTimestamp:  time.Now(),
+		ValidityDurationSeconds: 3600,
 	}
 
 	tokenOutput := &ent.TokenOutput{
 		ID:     uuid.New(),
-		Status: schematype.TokenOutputStatusSpentSigned, // Non-spendable status
+		Status: schematype.TokenOutputStatusSpentSigned, // non-spendable status
 		Edges: ent.TokenOutputEdges{
-			OutputSpentTokenTransaction: spendingTx,
+			OutputSpentTokenTransaction: activeSpendingTx,
 		},
 	}
 
-	tokenOutputMap := map[string]*ent.TokenOutput{
+	tokenOutputMap := map[tokenOutputKey]*ent.TokenOutput{
 		key: tokenOutput,
 	}
-	withdrawnInBlock := make(map[string]struct{})
+	withdrawnInBlock := make(map[tokenOutputKey]struct{})
 
-	output := parsedOutputWithdrawal{
-		sparkTxHash: sparkTxHash,
-		sparkTxVout: 0,
-	}
+	output := testWithdrawalOutput(sparkTxHash)
 
 	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrOutputNotWithdrawable)
 }
 
-func TestValidateOutputWithdrawable_FinalizedSpendingTransaction(t *testing.T) {
+func TestValidateOutputWithdrawable_BlocksFinalizedTransaction(t *testing.T) {
 	sparkTxHash := make([]byte, 32)
-	key := sparkTxHashVoutKey(sparkTxHash, 0)
+	key := newTokenOutputKey(sparkTxHash, 0)
 
-	// Create a finalized spending transaction (not expired, but already finalized)
-	spendingTx := &ent.TokenTransaction{
+	// Finalized transaction permanently blocks withdrawal (output is spent)
+	finalizedSpendingTx := &ent.TokenTransaction{
 		ID:                      uuid.New(),
 		Status:                  schematype.TokenTransactionStatusFinalized,
 		Version:                 3,
-		ClientCreatedTimestamp:  time.Now(), // Not expired
-		ValidityDurationSeconds: 3600,       // 1 hour validity
+		ClientCreatedTimestamp:  time.Now(),
+		ValidityDurationSeconds: 3600,
 	}
 
 	tokenOutput := &ent.TokenOutput{
 		ID:     uuid.New(),
 		Status: schematype.TokenOutputStatusSpentSigned,
 		Edges: ent.TokenOutputEdges{
-			OutputSpentTokenTransaction: spendingTx,
+			OutputSpentTokenTransaction: finalizedSpendingTx,
 		},
 	}
 
-	tokenOutputMap := map[string]*ent.TokenOutput{
+	tokenOutputMap := map[tokenOutputKey]*ent.TokenOutput{
 		key: tokenOutput,
 	}
-	withdrawnInBlock := make(map[string]struct{})
+	withdrawnInBlock := make(map[tokenOutputKey]struct{})
 
-	output := parsedOutputWithdrawal{
-		sparkTxHash: sparkTxHash,
-		sparkTxVout: 0,
-	}
+	output := testWithdrawalOutput(sparkTxHash)
 
 	// Finalized transaction should block withdrawal
 	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
@@ -356,38 +343,102 @@ func TestValidateOutputWithdrawable_FinalizedSpendingTransaction(t *testing.T) {
 	assert.Contains(t, err.Error(), "finalized")
 }
 
-func TestValidateOutputWithdrawable_ExpiredSpendingTransaction(t *testing.T) {
+func TestValidateOutputWithdrawable_AllowsExpiredTransaction(t *testing.T) {
 	sparkTxHash := make([]byte, 32)
-	key := sparkTxHashVoutKey(sparkTxHash, 0)
+	key := newTokenOutputKey(sparkTxHash, 0)
 
-	// Create an expired spending transaction
-	spendingTx := &ent.TokenTransaction{
+	// Expired transaction allows withdrawal (transaction timed out without finalizing)
+	expiredSpendingTx := &ent.TokenTransaction{
 		ID:                      uuid.New(),
 		Status:                  schematype.TokenTransactionStatusStarted,
 		Version:                 3,
-		ClientCreatedTimestamp:  time.Now().Add(-2 * time.Hour), // Created 2 hours ago
-		ValidityDurationSeconds: 3600,                           // 1 hour validity - expired
+		ClientCreatedTimestamp:  time.Now().Add(-2 * time.Hour), // created 2h ago
+		ValidityDurationSeconds: 3600,                           // 1h validity = expired
 	}
 
 	tokenOutput := &ent.TokenOutput{
 		ID:     uuid.New(),
-		Status: schematype.TokenOutputStatusSpentSigned, // Non-spendable status
+		Status: schematype.TokenOutputStatusSpentSigned,
 		Edges: ent.TokenOutputEdges{
-			OutputSpentTokenTransaction: spendingTx,
+			OutputSpentTokenTransaction: expiredSpendingTx,
 		},
 	}
 
-	tokenOutputMap := map[string]*ent.TokenOutput{
+	tokenOutputMap := map[tokenOutputKey]*ent.TokenOutput{
 		key: tokenOutput,
 	}
-	withdrawnInBlock := make(map[string]struct{})
+	withdrawnInBlock := make(map[tokenOutputKey]struct{})
 
-	output := parsedOutputWithdrawal{
-		sparkTxHash: sparkTxHash,
-		sparkTxVout: 0,
-	}
+	output := testWithdrawalOutput(sparkTxHash)
 
 	// Expired transaction should allow withdrawal
+	result, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
+	require.NoError(t, err)
+	assert.Equal(t, tokenOutput, result)
+}
+
+// Tests for SpentStarted status - verifies fix for checking expiration on started transactions
+func TestValidateOutputWithdrawable_BlocksSpentStartedActiveTransaction(t *testing.T) {
+	sparkTxHash := make([]byte, 32)
+	key := newTokenOutputKey(sparkTxHash, 0)
+
+	// SpentStarted with active transaction should block withdrawal
+	activeSpendingTx := &ent.TokenTransaction{
+		ID:                      uuid.New(),
+		Status:                  schematype.TokenTransactionStatusStarted,
+		Version:                 3,
+		ClientCreatedTimestamp:  time.Now(),
+		ValidityDurationSeconds: 3600,
+	}
+
+	tokenOutput := &ent.TokenOutput{
+		ID:     uuid.New(),
+		Status: schematype.TokenOutputStatusSpentStarted,
+		Edges: ent.TokenOutputEdges{
+			OutputSpentTokenTransaction: activeSpendingTx,
+		},
+	}
+
+	tokenOutputMap := map[tokenOutputKey]*ent.TokenOutput{
+		key: tokenOutput,
+	}
+	withdrawnInBlock := make(map[tokenOutputKey]struct{})
+
+	output := testWithdrawalOutput(sparkTxHash)
+
+	_, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrOutputNotWithdrawable)
+}
+
+func TestValidateOutputWithdrawable_AllowsSpentStartedExpiredTransaction(t *testing.T) {
+	sparkTxHash := make([]byte, 32)
+	key := newTokenOutputKey(sparkTxHash, 0)
+
+	// SpentStarted with expired transaction should allow withdrawal
+	expiredSpendingTx := &ent.TokenTransaction{
+		ID:                      uuid.New(),
+		Status:                  schematype.TokenTransactionStatusStarted,
+		Version:                 3,
+		ClientCreatedTimestamp:  time.Now().Add(-2 * time.Hour),
+		ValidityDurationSeconds: 3600,
+	}
+
+	tokenOutput := &ent.TokenOutput{
+		ID:     uuid.New(),
+		Status: schematype.TokenOutputStatusSpentStarted,
+		Edges: ent.TokenOutputEdges{
+			OutputSpentTokenTransaction: expiredSpendingTx,
+		},
+	}
+
+	tokenOutputMap := map[tokenOutputKey]*ent.TokenOutput{
+		key: tokenOutput,
+	}
+	withdrawnInBlock := make(map[tokenOutputKey]struct{})
+
+	output := testWithdrawalOutput(sparkTxHash)
+
 	result, err := validateOutputWithdrawable(output, withdrawnInBlock, tokenOutputMap)
 	require.NoError(t, err)
 	assert.Equal(t, tokenOutput, result)
@@ -700,16 +751,20 @@ func TestHandleTokenWithdrawals_SavesWithdrawalTransaction(t *testing.T) {
 	assert.Equal(t, blockHash[:], withdrawalTxs[0].ConfirmationBlockHash)
 	assert.Equal(t, ownerSignature, withdrawalTxs[0].OwnerSignature)
 
-	// Verify L1TokenOutputWithdrawal was created
+	// Verify L1TokenOutputWithdrawal was created and linked to TokenOutput
 	outputWithdrawals, err := dbClient.L1TokenOutputWithdrawal.Query().All(ctx)
 	require.NoError(t, err)
 	require.Len(t, outputWithdrawals, 1)
 	assert.Equal(t, uint16(0), outputWithdrawals[0].BitcoinVout)
 
-	// Verify TokenOutput.ConfirmedWithdrawBlockHash was set
-	updatedOutput, err := dbClient.TokenOutput.Get(ctx, tokenOutput.ID)
+	// Verify TokenOutput has withdrawal edge set
+	updatedOutput, err := dbClient.TokenOutput.Query().
+		Where(tokenoutput.ID(tokenOutput.ID)).
+		WithWithdrawal().
+		Only(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, blockHash[:], updatedOutput.ConfirmedWithdrawBlockHash)
+	require.NotNil(t, updatedOutput.Edges.Withdrawal)
+	assert.Equal(t, outputWithdrawals[0].ID, updatedOutput.Edges.Withdrawal.ID)
 }
 
 func TestHandleTokenWithdrawals_MultipleOutputsInOneTransaction(t *testing.T) {
@@ -766,14 +821,20 @@ func TestHandleTokenWithdrawals_MultipleOutputsInOneTransaction(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, outputWithdrawals, 2)
 
-	// Verify both TokenOutputs have ConfirmedWithdrawBlockHash set
-	updatedOutput1, err := dbClient.TokenOutput.Get(ctx, tokenOutput1.ID)
+	// Verify both TokenOutputs have withdrawal edges set
+	updatedOutput1, err := dbClient.TokenOutput.Query().
+		Where(tokenoutput.ID(tokenOutput1.ID)).
+		WithWithdrawal().
+		Only(ctx)
 	require.NoError(t, err)
-	assert.NotNil(t, updatedOutput1.ConfirmedWithdrawBlockHash)
+	require.NotNil(t, updatedOutput1.Edges.Withdrawal)
 
-	updatedOutput2, err := dbClient.TokenOutput.Get(ctx, tokenOutput2.ID)
+	updatedOutput2, err := dbClient.TokenOutput.Query().
+		Where(tokenoutput.ID(tokenOutput2.ID)).
+		WithWithdrawal().
+		Only(ctx)
 	require.NoError(t, err)
-	assert.NotNil(t, updatedOutput2.ConfirmedWithdrawBlockHash)
+	require.NotNil(t, updatedOutput2.Edges.Withdrawal)
 }
 
 func TestHandleTokenWithdrawals_RejectsWrongSEPubKey(t *testing.T) {
@@ -818,9 +879,12 @@ func TestHandleTokenWithdrawals_RejectsWrongSEPubKey(t *testing.T) {
 	assert.Equal(t, 0, count)
 
 	// Verify TokenOutput was NOT marked as withdrawn
-	updatedOutput, err := dbClient.TokenOutput.Get(ctx, tokenOutput.ID)
+	updatedOutput, err := dbClient.TokenOutput.Query().
+		Where(tokenoutput.ID(tokenOutput.ID)).
+		WithWithdrawal().
+		Only(ctx)
 	require.NoError(t, err)
-	assert.Nil(t, updatedOutput.ConfirmedWithdrawBlockHash)
+	assert.Nil(t, updatedOutput.Edges.Withdrawal)
 }
 
 func TestHandleTokenWithdrawals_RejectsOutputNotFound(t *testing.T) {
@@ -868,13 +932,30 @@ func TestHandleTokenWithdrawals_RejectsAlreadyWithdrawn(t *testing.T) {
 	tokenOutput := createTestTokenOutput(t, ctx, dbClient, fixtures, sparkTxHash, 0, ownerPubKey, revocationCommitment, bondSats, csvBlocks)
 	require.NotNil(t, tokenOutput)
 
-	// Mark the output as already withdrawn
+	// Mark the output as already withdrawn by creating withdrawal records
+	seEntity, err := ent.GetEntityDkgKey(ctx, dbClient)
+	require.NoError(t, err)
 	previousBlockHash := make([]byte, 32)
+	previousTxid := make([]byte, 32)
 	for i := range previousBlockHash {
 		previousBlockHash[i] = byte(i + 100)
+		previousTxid[i] = byte(i + 50)
 	}
-	_, err := dbClient.TokenOutput.UpdateOneID(tokenOutput.ID).
-		SetConfirmedWithdrawBlockHash(previousBlockHash).
+	txid, err := schematype.NewTxIDFromBytes(previousTxid)
+	require.NoError(t, err)
+	withdrawalTx, err := dbClient.L1WithdrawalTransaction.Create().
+		SetConfirmationTxid(txid).
+		SetConfirmationBlockHash(previousBlockHash).
+		SetConfirmationHeight(50).
+		SetDetectedAt(time.Now()).
+		SetOwnerSignature(make([]byte, 64)).
+		SetSeEntity(seEntity).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = dbClient.L1TokenOutputWithdrawal.Create().
+		SetBitcoinVout(0).
+		SetTokenOutput(tokenOutput).
+		SetL1WithdrawalTransaction(withdrawalTx).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -894,10 +975,10 @@ func TestHandleTokenWithdrawals_RejectsAlreadyWithdrawn(t *testing.T) {
 	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
-	// Verify no new withdrawal was created
+	// Verify no new withdrawal was created (still just the one we created for setup)
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 0, count)
+	assert.Equal(t, 1, count)
 }
 
 func TestHandleTokenWithdrawals_LinksWithdrawalToTokenOutput(t *testing.T) {

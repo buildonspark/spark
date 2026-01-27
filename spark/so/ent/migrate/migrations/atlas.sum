@@ -1,4 +1,4 @@
-h1:R+K5bx5h7N/W7762HMAOWPBbpBU4JLsMGgfaVZDRfXo=
+h1:vzoww+0ELEkhZVKFlwbCD8Ns5gM2NqSchg3v66mhi8g=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -109,5 +109,5 @@ h1:R+K5bx5h7N/W7762HMAOWPBbpBU4JLsMGgfaVZDRfXo=
 20251223194229_drop_unused_signing_nonce_field_message.sql h1:cKVHvknL5d+1xBQ2B6nqhx2eFqZLFtKPH6Ts7s4ojbg=
 20260105231014_backfill_key_tweaked_height.sql h1:3qMs+zExwz/Cqxyq1Rwy22FBE3+0705yJbzqt03MOFM=
 20260106195419_availability_confirmed_at.sql h1:rNIjdlBAkZkZit+eWzdaMAXG14PXFYqOOJrwwi6KG60=
-20260115211314_token_withdrawal_watchtower.sql h1:CWEiTFqFwRXUlT0eK9J2WetwNfEHxPBu2KbLipeJGXs=
-20260127163507_add_possession_signature_field.sql h1:C9p2ZObBKDhXzWNRMbKT9FKRfTBc3QubapG81+s/6po=
+20260127084201_token_withdrawal_watchtower.sql h1:VIyxf4o/J6m/2JyhI4V+TdyvDq8G8ZdynGppK70EmWo=
+20260127163507_add_possession_signature_field.sql h1:/M271HH2Xg8KHIXvfBxmojiSVNAMUzGGjjAlpBZkmTE=

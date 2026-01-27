@@ -138,13 +138,9 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 	query := db.TokenOutput.
 		Query().
 		Where(
-			// Order matters here to leverage the index.
 			tokenoutput.OwnerPublicKeyIn(params.OwnerPublicKeys...),
-			// A output is 'owned' as long as it has been fully created and a spending transaction
-			// has not yet been signed by this SO (if a transaction with it has been started
-			// and not yet signed it is still considered owned).
 			statusPredicate,
-			tokenoutput.ConfirmedWithdrawBlockHashIsNil(),
+			tokenoutput.Not(tokenoutput.HasWithdrawal()),
 		).
 		Where(tokenoutput.NetworkEQ(params.Network))
 	if len(params.IssuerPublicKeys) > 0 {
@@ -194,12 +190,4 @@ func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys []keys.Public
 	}
 
 	return outputIDs, totalAmount, nil
-}
-
-// MarkOutputsWithdrawn sets the ConfirmedWithdrawBlockHash for the given token outputs.
-func MarkOutputsWithdrawn(ctx context.Context, dbClient *Client, tokenOutputIDs []uuid.UUID, blockHash []byte) error {
-	return dbClient.TokenOutput.Update().
-		SetConfirmedWithdrawBlockHash(blockHash).
-		Where(tokenoutput.IDIn(tokenOutputIDs...)).
-		Exec(ctx)
 }

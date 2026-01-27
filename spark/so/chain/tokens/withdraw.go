@@ -4,14 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/lightsparkdev/spark/common"
@@ -25,7 +23,22 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 )
 
-// parsedWithdrawal represents a parsed withdrawal transaction from L1.
+// tokenOutputKey identifies a token output by its creating transaction hash and vout.
+type tokenOutputKey struct {
+	txHash [32]byte
+	vout   uint32
+}
+
+func newTokenOutputKey(txHash []byte, vout uint32) tokenOutputKey {
+	var hash [32]byte
+	copy(hash[:], txHash)
+	return tokenOutputKey{txHash: hash, vout: vout}
+}
+
+func (k tokenOutputKey) String() string {
+	return fmt.Sprintf("%x:%d", k.txHash, k.vout)
+}
+
 type parsedWithdrawal struct {
 	withdrawalTx      *parsedWithdrawalTransaction
 	outputsToWithdraw []parsedOutputWithdrawal
@@ -69,11 +82,10 @@ func HandleTokenWithdrawals(
 	}
 	latestSeEntityPubKey := latestSeEntity.Edges.SigningKeyshare.PublicKey
 
-	// Track outputs withdrawn in this block to prevent duplicates
-	withdrawnInBlock := make(map[string]struct{})
+	withdrawnInBlock := make(map[tokenOutputKey]struct{})
 
 	for _, withdrawal := range withdrawals {
-		if err := processWithdrawal(ctx, dbClient, logger, withdrawal, latestSeEntityPubKey, latestSeEntity, withdrawnInBlock, blockHash); err != nil {
+		if err := processWithdrawal(ctx, dbClient, logger, withdrawal, latestSeEntityPubKey, latestSeEntity, withdrawnInBlock); err != nil {
 			logger.With(zap.Stringer("withdrawal_txid", withdrawal.txHash)).
 				With(zap.Uint64("block_height", blockHeight)).
 				With(zap.Error(err)).
@@ -134,10 +146,8 @@ func processWithdrawal(
 	withdrawal parsedWithdrawal,
 	expectedSePubKey keys.Public,
 	seEntity *ent.EntityDkgKey,
-	withdrawnInBlock map[string]struct{},
-	blockHash chainhash.Hash,
+	withdrawnInBlock map[tokenOutputKey]struct{},
 ) error {
-	// Verify SE entity public key
 	if withdrawal.withdrawalTx.seEntityPubKey != expectedSePubKey {
 		logger.With(zap.Stringer("withdrawal_txid", withdrawal.txHash)).
 			Sugar().Infof("Rejecting withdrawal: invalid SE entity public key. Expected: %s Got: %s",
@@ -145,23 +155,21 @@ func processWithdrawal(
 		return nil
 	}
 
-	// Query all token outputs for this withdrawal
 	tokenOutputMap, err := queryTokenOutputs(ctx, dbClient, withdrawal.outputsToWithdraw)
 	if err != nil {
 		return fmt.Errorf("failed to query token outputs: %w", err)
 	}
 
-	// Validate each output
 	var approvedWithdrawals []parsedOutputWithdrawal
 	var tokenOutputs []*ent.TokenOutput
 
 	for _, outputToWithdraw := range withdrawal.outputsToWithdraw {
-		key := sparkTxHashVoutKey(outputToWithdraw.sparkTxHash, outputToWithdraw.sparkTxVout)
+		key := newTokenOutputKey(outputToWithdraw.sparkTxHash, outputToWithdraw.sparkTxVout)
 
 		tokenOutput, err := validateOutputWithdrawable(outputToWithdraw, withdrawnInBlock, tokenOutputMap)
 		if err != nil {
 			logger.With(zap.Stringer("withdrawal_txid", withdrawal.txHash)).
-				With(zap.String("spark_output", key)).
+				With(zap.Stringer("spark_output", key)).
 				With(zap.Error(err)).
 				Info("Rejecting withdrawal output")
 			// TODO: broadcast justice transaction for invalid withdrawals
@@ -170,7 +178,7 @@ func processWithdrawal(
 
 		if err := validateWithdrawalTxOutput(withdrawal.tx, &outputToWithdraw.withdrawal, tokenOutput); err != nil {
 			logger.With(zap.Stringer("withdrawal_txid", withdrawal.txHash)).
-				With(zap.String("spark_output", key)).
+				With(zap.Stringer("spark_output", key)).
 				With(zap.Error(err)).
 				Error("Rejecting withdrawal: invalid transaction output")
 			// TODO: broadcast justice transaction for invalid withdrawals
@@ -204,26 +212,15 @@ func processWithdrawal(
 		return fmt.Errorf("failed to save output withdrawals: %w", err)
 	}
 
-	tokenOutputIDs := make([]uuid.UUID, len(tokenOutputs))
-	for i, to := range tokenOutputs {
-		tokenOutputIDs[i] = to.ID
-	}
-
-	if err := ent.MarkOutputsWithdrawn(ctx, dbClient, tokenOutputIDs, blockHash[:]); err != nil {
-		return fmt.Errorf("failed to mark outputs as withdrawn: %w", err)
-	}
-
 	return nil
 }
 
 // parseTokenWithdrawal parses a BTKN withdrawal from an OP_RETURN script.
-// Returns (transaction, outputs, nil) on success with the parsed withdrawal data.
-// Returns (nil, nil, nil) if not a BTKN withdrawal (different prefix, not OP_RETURN, etc.).
+// Returns (nil, nil, nil) if not a BTKN withdrawal.
 // Returns (nil, nil, error) if the script is a BTKN withdrawal but malformed.
 func parseTokenWithdrawal(script []byte) (*parsedWithdrawalTransaction, []parsedOutputWithdrawal, error) {
 	buf := bytes.NewBuffer(script)
 
-	// Check for OP_RETURN
 	if op, err := buf.ReadByte(); err != nil || op != txscript.OP_RETURN {
 		return nil, nil, nil
 	}
@@ -231,7 +228,6 @@ func parseTokenWithdrawal(script []byte) (*parsedWithdrawalTransaction, []parsed
 		return nil, nil, nil
 	}
 
-	// Check for BTKN prefix
 	if prefix := buf.Next(len(btknWithdrawal.Prefix)); !bytes.Equal(prefix, []byte(btknWithdrawal.Prefix)) {
 		return nil, nil, nil
 	}
@@ -239,7 +235,6 @@ func parseTokenWithdrawal(script []byte) (*parsedWithdrawalTransaction, []parsed
 		return nil, nil, nil
 	}
 
-	// Parse SE entity public key
 	seEntityPubKeyBytes, err := common.ReadBytes(buf, seEntityPubKeySizeBytes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid SE public key: %w", err)
@@ -249,13 +244,11 @@ func parseTokenWithdrawal(script []byte) (*parsedWithdrawalTransaction, []parsed
 		return nil, nil, fmt.Errorf("invalid SE public key: %w", err)
 	}
 
-	// Parse owner signature
 	ownerSignatureBytes, err := common.ReadBytes(buf, ownerSignatureSizeBytes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid owner signature: %w", err)
 	}
 
-	// Parse withdrawal count
 	withdrawnCount, err := common.ReadByte(buf)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid withdrawn count: %w", err)
@@ -264,7 +257,6 @@ func parseTokenWithdrawal(script []byte) (*parsedWithdrawalTransaction, []parsed
 		return nil, nil, fmt.Errorf("invalid withdrawn count: must be greater than zero")
 	}
 
-	// Parse each withdrawal
 	withdrawals := make([]parsedOutputWithdrawal, 0, withdrawnCount)
 	for i := 0; i < int(withdrawnCount); i++ {
 		voutBytes, err := common.ReadBytes(buf, withdrawalOutputVoutSizeBytes)
@@ -305,29 +297,23 @@ func parseTokenWithdrawal(script []byte) (*parsedWithdrawalTransaction, []parsed
 	}, withdrawals, nil
 }
 
-// validateOutputWithdrawable checks if a token output can be withdrawn.
-// Returns the token output if valid, or an error explaining why it cannot be withdrawn.
-// Errors can be checked with errors.Is() against sentinel errors like ErrOutputNotFound.
 func validateOutputWithdrawable(
 	output parsedOutputWithdrawal,
-	withdrawnInBlock map[string]struct{},
-	tokenOutputs map[string]*ent.TokenOutput,
+	withdrawnInBlock map[tokenOutputKey]struct{},
+	tokenOutputs map[tokenOutputKey]*ent.TokenOutput,
 ) (*ent.TokenOutput, error) {
-	key := sparkTxHashVoutKey(output.sparkTxHash, output.sparkTxVout)
+	key := newTokenOutputKey(output.sparkTxHash, output.sparkTxVout)
 
-	// Check if already withdrawn in this block
 	if _, ok := withdrawnInBlock[key]; ok {
 		return nil, ErrOutputAlreadyWithdrawnInBlock
 	}
 
-	// Find the token output
 	tokenOutput, ok := tokenOutputs[key]
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrOutputNotFound, key)
 	}
 
-	// Check if output is in a spendable status
-	if !isSpendableOutputStatus(tokenOutput.Status) {
+	if tokenOutput.Status != schematype.TokenOutputStatusCreatedFinalized {
 		spentTx := tokenOutput.Edges.OutputSpentTokenTransaction
 		if spentTx == nil {
 			return nil, fmt.Errorf("%w: status is %s with no spending transaction", ErrOutputNotWithdrawable, tokenOutput.Status)
@@ -337,37 +323,24 @@ func validateOutputWithdrawable(
 		}
 	}
 
-	// Check if already withdrawn on-chain
-	if tokenOutput.ConfirmedWithdrawBlockHash != nil {
+	if tokenOutput.Edges.Withdrawal != nil {
 		return nil, ErrOutputAlreadyWithdrawnOnChain
 	}
 
 	return tokenOutput, nil
 }
 
-func isSpendableOutputStatus(status schematype.TokenOutputStatus) bool {
-	return status == schematype.TokenOutputStatusCreatedFinalized ||
-		status == schematype.TokenOutputStatusSpentStarted
-}
-
-// checkSpendingTransactionAllowsWithdrawal checks if a spending transaction allows withdrawal.
-// Returns nil if the transaction has expired (allowing withdrawal).
-// Returns an error explaining why withdrawal is blocked if the transaction is still active.
 func checkSpendingTransactionAllowsWithdrawal(spentTx *ent.TokenTransaction) error {
 	if err := spentTx.ValidateNotExpired(); err == nil {
-		// Transaction hasn't expired - check if it's finalized
 		if spentTx.Status == schematype.TokenTransactionStatusRevealed ||
 			spentTx.Status == schematype.TokenTransactionStatusFinalized {
 			return fmt.Errorf("%w: already spent by finalized transaction", ErrOutputNotWithdrawable)
 		}
-		// Transaction is active but not finalized - block withdrawal until it expires or finalizes
 		return fmt.Errorf("%w: spending transaction in progress (status: %s)", ErrOutputNotWithdrawable, spentTx.Status)
 	}
 	return nil
 }
 
-// validateWithdrawalTxOutput validates that the L1 transaction output matches expected values.
-// Errors can be checked with errors.Is() against sentinel errors like ErrInsufficientBond.
 func validateWithdrawalTxOutput(tx *wire.MsgTx, withdrawal *ent.L1TokenOutputWithdrawal, tokenOutput *ent.TokenOutput) error {
 	if int(withdrawal.BitcoinVout) >= len(tx.TxOut) {
 		return fmt.Errorf("%w: vout %d out of range (tx has %d outputs)", ErrVoutOutOfRange, withdrawal.BitcoinVout, len(tx.TxOut))
@@ -375,13 +348,11 @@ func validateWithdrawalTxOutput(tx *wire.MsgTx, withdrawal *ent.L1TokenOutputWit
 
 	txOut := tx.TxOut[withdrawal.BitcoinVout]
 
-	// Verify bond amount
 	if uint64(txOut.Value) < tokenOutput.WithdrawBondSats {
 		return fmt.Errorf("%w: got %d sats, expected at least %d", ErrInsufficientBond, txOut.Value, tokenOutput.WithdrawBondSats)
 	}
 
-	// Verify script matches expected revocation CSV output
-	revocationXOnly := tokenOutput.WithdrawRevocationCommitment[1:] // Strip prefix byte
+	revocationXOnly := tokenOutput.WithdrawRevocationCommitment[1:]
 	expectedOutput, err := ConstructRevocationCsvTaprootOutput(
 		revocationXOnly,
 		tokenOutput.OwnerPublicKey.SerializeXOnly(),
@@ -399,14 +370,11 @@ func validateWithdrawalTxOutput(tx *wire.MsgTx, withdrawal *ent.L1TokenOutputWit
 }
 
 // queryTokenOutputs fetches token outputs by their (txHash, vout) pairs.
-// Uses the denormalized created_transaction_finalized_hash field for efficient lookup.
-// Returns a map keyed by "hexEncodedTxHash:vout" (see sparkTxHashVoutKey).
-func queryTokenOutputs(ctx context.Context, dbClient *ent.Client, outputs []parsedOutputWithdrawal) (map[string]*ent.TokenOutput, error) {
+func queryTokenOutputs(ctx context.Context, dbClient *ent.Client, outputs []parsedOutputWithdrawal) (map[tokenOutputKey]*ent.TokenOutput, error) {
 	if len(outputs) == 0 {
 		return nil, nil
 	}
 
-	// Build OR predicates for batch query
 	predicates := make([]predicate.TokenOutput, 0, len(outputs))
 	for _, output := range outputs {
 		predicates = append(predicates,
@@ -421,22 +389,18 @@ func queryTokenOutputs(ctx context.Context, dbClient *ent.Client, outputs []pars
 		Where(tokenoutput.Or(predicates...)).
 		WithOutputCreatedTokenTransaction().
 		WithOutputSpentTokenTransaction().
+		WithWithdrawal().
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query token outputs: %w", err)
 	}
 
-	result := make(map[string]*ent.TokenOutput, len(tokenOutputs))
+	result := make(map[tokenOutputKey]*ent.TokenOutput, len(tokenOutputs))
 	for _, to := range tokenOutputs {
 		txHash := to.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash
-		key := sparkTxHashVoutKey(txHash, uint32(to.CreatedTransactionOutputVout))
+		key := newTokenOutputKey(txHash, uint32(to.CreatedTransactionOutputVout))
 		result[key] = to
 	}
 
 	return result, nil
-}
-
-// sparkTxHashVoutKey generates a cache key for (txHash, vout) pairs.
-func sparkTxHashVoutKey(txHash []byte, vout uint32) string {
-	return fmt.Sprintf("%s:%d", hex.EncodeToString(txHash), vout)
 }
