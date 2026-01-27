@@ -1,15 +1,50 @@
 package tokens_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
+
+	"github.com/lightsparkdev/spark/so/knobs"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
 func TestMain(m *testing.M) {
-	for _, useV3 := range []bool{false, true} {
-		broadcastTokenTestsUseV3 = useV3
-		if code := m.Run(); code != 0 {
-			os.Exit(code)
-		}
+	// Test TTV2 (no phase2 knob needed)
+	broadcastTokenTestsUseV3 = false
+	broadcastTokenTestsUsePhase2 = false
+	if code := m.Run(); code != 0 {
+		os.Exit(code)
 	}
+
+	// Test TTV3 with phase2 disabled
+	broadcastTokenTestsUseV3 = true
+	broadcastTokenTestsUsePhase2 = false
+	if err := setPhase2Knob(0); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to set phase2 knob to 0: %v\n", err)
+		os.Exit(1)
+	}
+	if code := m.Run(); code != 0 {
+		os.Exit(code)
+	}
+
+	// Test TTV3 with phase2 enabled
+	broadcastTokenTestsUsePhase2 = true
+	if err := setPhase2Knob(100); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to set phase2 knob to 100: %v\n", err)
+		os.Exit(1)
+	}
+	if code := m.Run(); code != 0 {
+		os.Exit(code)
+	}
+
+	// Restore original knob value (delete it since it likely didn't exist before)
+	if err := sparktesting.DeleteKnobForTestMain(knobs.KnobTokenTransactionV3Phase2Enabled); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to restore phase2 knob: %v\n", err)
+	}
+}
+
+func setPhase2Knob(value float64) error {
+	_, _, err := sparktesting.SetKnobForTestMain(knobs.KnobTokenTransactionV3Phase2Enabled, value)
+	return err
 }

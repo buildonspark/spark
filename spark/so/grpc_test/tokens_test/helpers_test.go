@@ -189,10 +189,14 @@ var signatureTypeTestCases = []signatureTypeTestCase{
 }
 
 var broadcastTokenTestsUseV3 bool
+var broadcastTokenTestsUsePhase2 bool
 
 func currentBroadcastRunLabel() string {
 	if broadcastTokenTestsUseV3 {
-		return "TTV3"
+		if broadcastTokenTestsUsePhase2 {
+			return "TTV3_Phase2"
+		}
+		return "TTV3_Phase1"
 	}
 	return "TTV2"
 }
