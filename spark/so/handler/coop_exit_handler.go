@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 )
 
 // CooperativeExitHandler tracks transfers
@@ -148,7 +149,13 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		return nil, fmt.Errorf("failed to marshal transfer for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
 	}
 
-	signingResults, err := signRefunds(ctx, h.config, req.Transfer, leafMap, keys.Public{}, keys.Public{}, keys.Public{})
+	networkString := leafMap[req.Transfer.LeavesToSend[0].LeafId].Network.String()
+
+	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobRequireConnectorTxValidation, &networkString, 0) > 0 && len(req.GetConnectorTx()) == 0 {
+		return nil, fmt.Errorf("connector tx required for cooperative exit validation. Please upgrade to the latest SDK version")
+	}
+
+	signingResults, err := signRefunds(ctx, h.config, req.Transfer, leafMap, keys.Public{}, keys.Public{}, keys.Public{}, req.GetConnectorTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign refund transactions for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
 	}

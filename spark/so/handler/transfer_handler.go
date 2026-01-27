@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uuids"
@@ -296,7 +297,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	var finalDirectSignatureMap map[string][]byte
 	var finalDirectFromCpfpSignatureMap map[string][]byte
 	if req.TransferPackage == nil {
-		signingResults, err = signRefunds(ctx, h.config, req, leafMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey)
+		signingResults, err = signRefunds(ctx, h.config, req, leafMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign refunds for transfer %s: %w", transferID, err)
 		}
@@ -876,12 +877,30 @@ func (h *TransferHandler) syncDeliverSenderKeyTweak(ctx context.Context, req *pb
 	return err
 }
 
-func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTransferRequest, leafMap map[string]*ent.TreeNode, cpfpAdaptorPubKey keys.Public, directAdaptorPubKey keys.Public, directFromCpfpAdaptorPubKey keys.Public) ([]*pb.LeafRefundTxSigningResult, error) {
+func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTransferRequest, leafMap map[string]*ent.TreeNode, cpfpAdaptorPubKey keys.Public, directAdaptorPubKey keys.Public, directFromCpfpAdaptorPubKey keys.Public, connectorTx []byte) ([]*pb.LeafRefundTxSigningResult, error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.signRefunds")
 	defer span.End()
 
 	if requests.TransferPackage != nil {
 		return nil, fmt.Errorf("transfer package is not nil, should call signRefundsWithPregeneratedNonce instead")
+	}
+
+	// Parse connector tx if provided for multi-input sighash calculation (cooperative exit)
+	var connectorPrevOuts map[wire.OutPoint]*wire.TxOut
+	if len(connectorTx) > 0 {
+		parsedConnectorTx, err := common.TxFromRawTxBytes(connectorTx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse connector tx: %w", err)
+		}
+		connectorTxHash := parsedConnectorTx.TxHash()
+		connectorPrevOuts = make(map[wire.OutPoint]*wire.TxOut, len(parsedConnectorTx.TxOut))
+		for i, txOut := range parsedConnectorTx.TxOut {
+			outpoint := wire.OutPoint{
+				Hash:  connectorTxHash,
+				Index: uint32(i),
+			}
+			connectorPrevOuts[outpoint] = txOut
+		}
 	}
 
 	leafJobMap := make(map[uuid.UUID]*ent.TreeNode)
@@ -892,6 +911,10 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 	var cpfpSigningJobs []*helper.SigningJob
 	var directSigningJobs []*helper.SigningJob
 	var directFromCpfpSigningJobs []*helper.SigningJob
+
+	if len(requests.LeavesToSend) == 0 {
+		return nil, fmt.Errorf("leaves to send is empty when signing refunds")
+	}
 
 	// Process each leaf's signing jobs
 	for _, req := range requests.LeavesToSend {
@@ -909,9 +932,30 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			return nil, fmt.Errorf("cpfp vout out of bounds")
 		}
 
-		cpfpRefundTxSigHash, err := common.SigHashFromTx(cpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
+		var cpfpRefundTxSigHash []byte
+		if len(cpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
+			// Multi-input refund tx with connector tx provided (new coop exit flow)
+			// Use multi-input sighash for 2-input coop exit refund transactions
+			cpfpLeafTxHash := cpfpLeafTx.TxHash()
+			prevOuts := make(map[wire.OutPoint]*wire.TxOut, 2)
+			prevOuts[wire.OutPoint{Hash: cpfpLeafTxHash, Index: 0}] = cpfpLeafTx.TxOut[0]
+
+			connectorOutpoint := cpfpRefundTx.TxIn[1].PreviousOutPoint
+			connectorTxOut, exists := connectorPrevOuts[connectorOutpoint]
+			if !exists {
+				return nil, fmt.Errorf("cpfp refund tx input 1 does not reference a valid connector output: %v", connectorOutpoint)
+			}
+			prevOuts[connectorOutpoint] = connectorTxOut
+
+			cpfpRefundTxSigHash, err = common.SigHashFromMultiPrevOutTx(cpfpRefundTx, 0, prevOuts)
+		} else {
+			// Single-input sighash (legacy flow):
+			// - Single-input refund tx
+			// - OR multi-input refund tx without connector tx (backwards compatibility)
+			cpfpRefundTxSigHash, err = common.SigHashFromTx(cpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
+		}
 		if err != nil {
-			return nil, fmt.Errorf("unable to calculate sighash from cpfp refund tx: %w", err)
+			return nil, fmt.Errorf("unable to calculate sighash from cpfp refund tx for leaf %s: %w", leaf.ID, err)
 		}
 
 		cpfpUserNonceCommitment := frost.SigningCommitment{}
@@ -950,7 +994,28 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if len(directLeafTx.TxOut) == 0 {
 				return nil, fmt.Errorf("direct vout out of bounds")
 			}
-			directRefundTxSigHash, err := common.SigHashFromTx(directRefundTx, 0, directLeafTx.TxOut[0])
+			var directRefundTxSigHash []byte
+			if len(directRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
+				// Multi-input refund tx with connector tx provided (new coop exit flow)
+				// Use multi-input sighash for 2-input coop exit refund transactions
+				directLeafTxHash := directLeafTx.TxHash()
+				prevOuts := make(map[wire.OutPoint]*wire.TxOut, 2)
+				prevOuts[wire.OutPoint{Hash: directLeafTxHash, Index: 0}] = directLeafTx.TxOut[0]
+
+				connectorOutpoint := directRefundTx.TxIn[1].PreviousOutPoint
+				connectorTxOut, exists := connectorPrevOuts[connectorOutpoint]
+				if !exists {
+					return nil, fmt.Errorf("direct refund tx input 1 does not reference a valid connector output: %v", connectorOutpoint)
+				}
+				prevOuts[connectorOutpoint] = connectorTxOut
+
+				directRefundTxSigHash, err = common.SigHashFromMultiPrevOutTx(directRefundTx, 0, prevOuts)
+			} else {
+				// Single-input sighash (legacy flow):
+				// - Single-input refund tx
+				// - OR multi-input refund tx without connector tx (backwards compatibility)
+				directRefundTxSigHash, err = common.SigHashFromTx(directRefundTx, 0, directLeafTx.TxOut[0])
+			}
 			if err != nil {
 				return nil, fmt.Errorf("unable to calculate sighash from direct refund tx: %w", err)
 			}
@@ -980,9 +1045,30 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if err != nil {
 				return nil, fmt.Errorf("unable to load new refund tx: %w", err)
 			}
-			directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
+			var directFromCpfpRefundTxSigHash []byte
+			if len(directFromCpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
+				// Multi-input refund tx with connector tx provided (new coop exit flow)
+				// Use multi-input sighash for 2-input coop exit refund transactions
+				cpfpLeafTxHash := cpfpLeafTx.TxHash()
+				prevOuts := make(map[wire.OutPoint]*wire.TxOut, 2)
+				prevOuts[wire.OutPoint{Hash: cpfpLeafTxHash, Index: 0}] = cpfpLeafTx.TxOut[0]
+
+				connectorOutpoint := directFromCpfpRefundTx.TxIn[1].PreviousOutPoint
+				connectorTxOut, exists := connectorPrevOuts[connectorOutpoint]
+				if !exists {
+					return nil, fmt.Errorf("direct-from-cpfp refund tx input 1 does not reference a valid connector output: %v", connectorOutpoint)
+				}
+				prevOuts[connectorOutpoint] = connectorTxOut
+
+				directFromCpfpRefundTxSigHash, err = common.SigHashFromMultiPrevOutTx(directFromCpfpRefundTx, 0, prevOuts)
+			} else {
+				// Single-input sighash (legacy flow):
+				// - Single-input refund tx
+				// - OR multi-input refund tx without connector tx (backwards compatibility)
+				directFromCpfpRefundTxSigHash, err = common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
+			}
 			if err != nil {
-				return nil, fmt.Errorf("unable to calculate sighash from direct from cpfp refund tx: %w", err)
+				return nil, fmt.Errorf("unable to calculate sighash from direct from cpfp refund tx for leaf %s: %w", leaf.ID, err)
 			}
 
 			directFromCpfpUserNonceCommitment := frost.SigningCommitment{}

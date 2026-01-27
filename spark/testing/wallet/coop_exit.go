@@ -116,6 +116,12 @@ func signCoopExitRefunds(
 	if len(leaves) != len(connectorOutputs) {
 		return nil, nil, fmt.Errorf("number of leaves and connector outputs must match")
 	}
+
+	connectorTxParsed, err := common.TxFromRawTxBytes(connectorTx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse connector tx: %w", err)
+	}
+
 	var signingJobs []*pb.LeafRefundTxSigningJob
 	leafDataMap := make(map[string]*LeafRefundSigningData)
 	for i, leaf := range leaves {
@@ -209,6 +215,7 @@ func signCoopExitRefunds(
 		}
 		signingJobs = append(signingJobs, signingJob)
 
+		connectorPrevOutput := connectorTxParsed.TxOut[connectorOutput.Index]
 		leafData := &LeafRefundSigningData{
 			SigningPrivKey:            leaf.SigningPrivKey,
 			RefundTx:                  cpfpRefundTx,
@@ -218,6 +225,7 @@ func signCoopExitRefunds(
 			DirectFromCpfpRefundNonce: &directFromCpfpNonce,
 			Tx:                        nodeTx,
 			Vout:                      int(leaf.Leaf.Vout),
+			ConnectorPrevOutput:       connectorPrevOutput,
 		}
 		if !isZeroNode && directRefundTx != nil {
 			leafData.DirectRefundTx = directRefundTx
@@ -253,8 +261,9 @@ func signCoopExitRefunds(
 			ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
 			ExpiryTime:                timestamppb.New(expiryTime),
 		},
-		ExitId:   exitID.String(),
-		ExitTxid: exitTxid,
+		ExitId:      exitID.String(),
+		ExitTxid:    exitTxid,
+		ConnectorTx: connectorTx,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initiate cooperative exit: %w", err)

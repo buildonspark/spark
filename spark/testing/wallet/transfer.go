@@ -946,6 +946,7 @@ type LeafRefundSigningData struct {
 	DirectRefundNonce         *frost.SigningNonce
 	DirectFromCpfpRefundTx    *wire.MsgTx
 	DirectFromCpfpRefundNonce *frost.SigningNonce
+	ConnectorPrevOutput       *wire.TxOut
 }
 
 func ClaimTransferSignRefunds(
@@ -1051,7 +1052,17 @@ func SignRefunds(
 		userKeyPackage := CreateUserKeyPackage(leafData.SigningPrivKey)
 
 		// Process regular CPFP refund transaction
-		refundTxSighash, _ := common.SigHashFromTx(leafData.RefundTx, 0, leafData.Tx.TxOut[0])
+		var refundTxSighash []byte
+		if leafData.ConnectorPrevOutput != nil && len(leafData.RefundTx.TxIn) > 1 {
+			// Multi-input coop exit transaction
+			prevOutputs := map[wire.OutPoint]*wire.TxOut{
+				leafData.RefundTx.TxIn[0].PreviousOutPoint: leafData.Tx.TxOut[0],
+				leafData.RefundTx.TxIn[1].PreviousOutPoint: leafData.ConnectorPrevOutput,
+			}
+			refundTxSighash, _ = common.SigHashFromMultiPrevOutTx(leafData.RefundTx, 0, prevOutputs)
+		} else {
+			refundTxSighash, _ = common.SigHashFromTx(leafData.RefundTx, 0, leafData.Tx.TxOut[0])
+		}
 		nonceProto, _ := leafData.Nonce.MarshalProto()
 		nonceCommitmentProto, _ := leafData.Nonce.SigningCommitment().MarshalProto()
 
@@ -1084,7 +1095,19 @@ func SignRefunds(
 
 		// Process direct refund transaction if present
 		if operatorSigningResult.DirectRefundTxSigningResult != nil && leafData.DirectRefundTx != nil {
-			directRefundTxSighash, _ := common.SigHashFromTx(leafData.DirectRefundTx, 0, leafData.DirectTx.TxOut[0])
+			var directRefundTxSighash []byte
+
+			if leafData.ConnectorPrevOutput != nil && len(leafData.DirectRefundTx.TxIn) > 1 {
+				// Multi-input coop exit transaction
+				prevOutputs := map[wire.OutPoint]*wire.TxOut{
+					leafData.DirectRefundTx.TxIn[0].PreviousOutPoint: leafData.DirectTx.TxOut[0],
+
+					leafData.DirectRefundTx.TxIn[1].PreviousOutPoint: leafData.ConnectorPrevOutput,
+				}
+				directRefundTxSighash, _ = common.SigHashFromMultiPrevOutTx(leafData.DirectRefundTx, 0, prevOutputs)
+			} else {
+				directRefundTxSighash, _ = common.SigHashFromTx(leafData.DirectRefundTx, 0, leafData.DirectTx.TxOut[0])
+			}
 			directRefundNonceProto, _ := leafData.DirectRefundNonce.MarshalProto()
 			directRefundNonceCommitmentProto, _ := leafData.DirectRefundNonce.SigningCommitment().MarshalProto()
 
@@ -1118,7 +1141,18 @@ func SignRefunds(
 
 		// Process direct from CPFP refund transaction if present
 		if operatorSigningResult.DirectFromCpfpRefundTxSigningResult != nil && leafData.DirectFromCpfpRefundTx != nil {
-			directFromCpfpRefundTxSighash, _ := common.SigHashFromTx(leafData.DirectFromCpfpRefundTx, 0, leafData.Tx.TxOut[0])
+			var directFromCpfpRefundTxSighash []byte
+
+			if leafData.ConnectorPrevOutput != nil && len(leafData.DirectFromCpfpRefundTx.TxIn) > 1 {
+				// Multi-input coop exit transaction
+				prevOutputs := map[wire.OutPoint]*wire.TxOut{
+					leafData.DirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint: leafData.Tx.TxOut[0],
+					leafData.DirectFromCpfpRefundTx.TxIn[1].PreviousOutPoint: leafData.ConnectorPrevOutput,
+				}
+				directFromCpfpRefundTxSighash, _ = common.SigHashFromMultiPrevOutTx(leafData.DirectFromCpfpRefundTx, 0, prevOutputs)
+			} else {
+				directFromCpfpRefundTxSighash, _ = common.SigHashFromTx(leafData.DirectFromCpfpRefundTx, 0, leafData.Tx.TxOut[0])
+			}
 			directFromCpfpRefundNonceProto, _ := leafData.DirectFromCpfpRefundNonce.MarshalProto()
 			directFromCpfpRefundNonceCommitmentProto, _ := leafData.DirectFromCpfpRefundNonce.SigningCommitment().MarshalProto()
 
