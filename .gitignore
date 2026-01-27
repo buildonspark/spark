@@ -54,3 +54,6 @@ _data/
 
 # Tilt
 tilt/tilt_config.json
+
+# Trunk
+.trunk/
