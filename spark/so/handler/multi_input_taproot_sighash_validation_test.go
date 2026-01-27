@@ -209,6 +209,194 @@ func TestValidateRefundTxWithConnector_ValidatesMultiInputStructure(t *testing.T
 	})
 }
 
+func TestValidateRefundTxWithConnector_TxTypeRefundDirect(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	leafInternalPriv := keys.GeneratePrivateKey()
+	leafPkScript, err := common.P2TRScriptFromPubKey(leafInternalPriv.Public())
+	require.NoError(t, err)
+
+	connectorPkScript, err := common.P2TRScriptFromPubKey(keys.GeneratePrivateKey().Public())
+	require.NoError(t, err)
+
+	receiverPkScript, err := common.P2TRScriptFromPubKey(keys.GeneratePrivateKey().Public())
+	require.NoError(t, err)
+
+	rawTx := wire.NewMsgTx(3)
+	rawTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{1}, Index: 0}, nil, nil))
+	rawTx.AddTxOut(wire.NewTxOut(100_000, leafPkScript))
+	rawTxBytes, err := common.SerializeTx(rawTx)
+	require.NoError(t, err)
+
+	directTx := wire.NewMsgTx(3)
+	directTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{2}, Index: 0}, nil, nil))
+	directTx.AddTxOut(wire.NewTxOut(100_000, leafPkScript))
+	directTxBytes, err := common.SerializeTx(directTx)
+	require.NoError(t, err)
+
+	connectorTx := wire.NewMsgTx(3)
+	connectorTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{3}, Index: 0}, nil, nil))
+	connectorTx.AddTxOut(wire.NewTxOut(200_000, connectorPkScript))
+	connectorTxHash := connectorTx.TxHash()
+
+	connectorPrevOuts := map[wire.OutPoint]*wire.TxOut{
+		{Hash: connectorTxHash, Index: 0}: connectorTx.TxOut[0],
+	}
+
+	tree, err := dbClient.Tree.Create().
+		SetID(uuid.New()).
+		SetNetwork(btcnetwork.Regtest).
+		SetStatus(st.TreeStatusAvailable).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		SetOwnerIdentityPubkey(keys.GeneratePrivateKey().Public()).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshareSecret := keys.GeneratePrivateKey()
+	keyshare, err := dbClient.SigningKeyshare.Create().
+		SetID(uuid.New()).
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keyshareSecret).
+		SetPublicShares(map[string]keys.Public{"1": keyshareSecret.Public()}).
+		SetPublicKey(keyshareSecret.Public()).
+		SetMinSigners(1).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	node, err := dbClient.TreeNode.Create().
+		SetID(uuid.New()).
+		SetTree(tree).
+		SetSigningKeyshare(keyshare).
+		SetNetwork(btcnetwork.Regtest).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetValue(100_000).
+		SetVerifyingPubkey(leafInternalPriv.Public()).
+		SetOwnerIdentityPubkey(keys.GeneratePrivateKey().Public()).
+		SetOwnerSigningPubkey(keys.GeneratePrivateKey().Public()).
+		SetVout(0).
+		SetRawTx(rawTxBytes).
+		SetDirectTx(directTxBytes).
+		Save(ctx)
+	require.NoError(t, err)
+
+	refundDestPubkey := keys.GeneratePrivateKey().Public()
+
+	t.Run("TxTypeRefundDirect validates against DirectTx", func(t *testing.T) {
+		refundTx := wire.NewMsgTx(3)
+		refundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: directTx.TxHash(), Index: 0},
+			Sequence:         1000,
+		})
+		refundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: connectorTxHash, Index: 0},
+			Sequence:         0,
+		})
+		refundTx.AddTxOut(wire.NewTxOut(299_000, receiverPkScript))
+		refundTxBytes, err := common.SerializeTx(refundTx)
+		require.NoError(t, err)
+
+		err = validateRefundTxWithConnector(
+			ctx,
+			refundTxBytes,
+			node,
+			connectorPrevOuts,
+			bitcointransaction.TxTypeRefundDirect,
+			refundDestPubkey,
+			btcnetwork.Regtest.String(),
+		)
+		if err != nil {
+			require.NotContains(t, err.Error(), "does not reference the node tx")
+		}
+	})
+
+	t.Run("TxTypeRefundDirect rejects refund referencing RawTx", func(t *testing.T) {
+		refundTx := wire.NewMsgTx(3)
+		refundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: rawTx.TxHash(), Index: 0},
+			Sequence:         1000,
+		})
+		refundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: connectorTxHash, Index: 0},
+			Sequence:         0,
+		})
+		refundTx.AddTxOut(wire.NewTxOut(299_000, receiverPkScript))
+		refundTxBytes, err := common.SerializeTx(refundTx)
+		require.NoError(t, err)
+
+		err = validateRefundTxWithConnector(
+			ctx,
+			refundTxBytes,
+			node,
+			connectorPrevOuts,
+			bitcointransaction.TxTypeRefundDirect,
+			refundDestPubkey,
+			btcnetwork.Regtest.String(),
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "does not reference the node tx")
+	})
+
+	t.Run("TxTypeRefundCPFP still validates against RawTx", func(t *testing.T) {
+		refundTx := wire.NewMsgTx(3)
+		refundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: rawTx.TxHash(), Index: 0},
+			Sequence:         1000,
+		})
+		refundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: connectorTxHash, Index: 0},
+			Sequence:         0,
+		})
+		refundTx.AddTxOut(wire.NewTxOut(299_000, receiverPkScript))
+		refundTxBytes, err := common.SerializeTx(refundTx)
+		require.NoError(t, err)
+
+		err = validateRefundTxWithConnector(
+			ctx,
+			refundTxBytes,
+			node,
+			connectorPrevOuts,
+			bitcointransaction.TxTypeRefundCPFP,
+			refundDestPubkey,
+			btcnetwork.Regtest.String(),
+		)
+		if err != nil {
+			require.NotContains(t, err.Error(), "does not reference the node tx")
+		}
+	})
+
+	t.Run("TxTypeRefundCPFP rejects refund referencing DirectTx", func(t *testing.T) {
+		refundTx := wire.NewMsgTx(3)
+		refundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: directTx.TxHash(), Index: 0},
+			Sequence:         1000,
+		})
+		refundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: connectorTxHash, Index: 0},
+			Sequence:         0,
+		})
+		refundTx.AddTxOut(wire.NewTxOut(299_000, receiverPkScript))
+		refundTxBytes, err := common.SerializeTx(refundTx)
+		require.NoError(t, err)
+
+		err = validateRefundTxWithConnector(
+			ctx,
+			refundTxBytes,
+			node,
+			connectorPrevOuts,
+			bitcointransaction.TxTypeRefundCPFP,
+			refundDestPubkey,
+			btcnetwork.Regtest.String(),
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "does not reference the node tx")
+	})
+}
+
 // TestParseConnectorTxOutputs verifies that parseConnectorTxOutputs correctly
 // parses a connector transaction into a map of outpoints to outputs.
 func TestParseConnectorTxOutputs(t *testing.T) {

@@ -1405,7 +1405,13 @@ func validateRefundTxWithConnector(
 	}
 
 	// Build the node tx prevout for input 0
-	nodeTx, err := common.TxFromRawTxBytes(node.RawTx)
+	var nodeRawTx []byte
+	if txType == bitcointransaction.TxTypeRefundDirect {
+		nodeRawTx = node.DirectTx
+	} else {
+		nodeRawTx = node.RawTx
+	}
+	nodeTx, err := common.TxFromRawTxBytes(nodeRawTx)
 	if err != nil {
 		return fmt.Errorf("failed to parse node transaction: %w", err)
 	}

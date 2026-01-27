@@ -1053,7 +1053,7 @@ func SignRefunds(
 
 		// Process regular CPFP refund transaction
 		var refundTxSighash []byte
-		if leafData.ConnectorPrevOutput != nil && len(leafData.RefundTx.TxIn) > 1 {
+		if leafData.ConnectorPrevOutput != nil && len(leafData.RefundTx.TxIn) == 2 {
 			// Multi-input coop exit transaction
 			prevOutputs := map[wire.OutPoint]*wire.TxOut{
 				leafData.RefundTx.TxIn[0].PreviousOutPoint: leafData.Tx.TxOut[0],
@@ -1097,7 +1097,7 @@ func SignRefunds(
 		if operatorSigningResult.DirectRefundTxSigningResult != nil && leafData.DirectRefundTx != nil {
 			var directRefundTxSighash []byte
 
-			if leafData.ConnectorPrevOutput != nil && len(leafData.DirectRefundTx.TxIn) > 1 {
+			if leafData.ConnectorPrevOutput != nil && len(leafData.DirectRefundTx.TxIn) == 2 {
 				// Multi-input coop exit transaction
 				prevOutputs := map[wire.OutPoint]*wire.TxOut{
 					leafData.DirectRefundTx.TxIn[0].PreviousOutPoint: leafData.DirectTx.TxOut[0],
@@ -1143,7 +1143,7 @@ func SignRefunds(
 		if operatorSigningResult.DirectFromCpfpRefundTxSigningResult != nil && leafData.DirectFromCpfpRefundTx != nil {
 			var directFromCpfpRefundTxSighash []byte
 
-			if leafData.ConnectorPrevOutput != nil && len(leafData.DirectFromCpfpRefundTx.TxIn) > 1 {
+			if leafData.ConnectorPrevOutput != nil && len(leafData.DirectFromCpfpRefundTx.TxIn) == 2 {
 				// Multi-input coop exit transaction
 				prevOutputs := map[wire.OutPoint]*wire.TxOut{
 					leafData.DirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint: leafData.Tx.TxOut[0],
