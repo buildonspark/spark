@@ -182,6 +182,56 @@ export function getSigHashFromTx(
   );
 }
 
+/**
+ * Computes sighash for a multi-input Taproot transaction.
+ * Per BIP 341, the sighash commits to ALL inputs' prevout amounts and scriptPubKeys.
+ *
+ * @param tx - The transaction to compute sighash for
+ * @param inputIndex - The index of the input being signed
+ * @param prevOutputs - Array of prevOutputs, one per input (must match tx.inputsLength)
+ * @returns The sighash bytes
+ */
+export function getSigHashFromMultiInputTx(
+  tx: btc.Transaction,
+  inputIndex: number,
+  prevOutputs: TransactionOutput[],
+): Uint8Array {
+  if (prevOutputs.length !== tx.inputsLength) {
+    throw new SparkValidationError(
+      "prevOutputs length must match transaction inputs length",
+      {
+        field: "prevOutputs",
+        value: prevOutputs.length,
+        expected: tx.inputsLength,
+      },
+    );
+  }
+  const prevScripts: Uint8Array[] = [];
+  const prevAmounts: bigint[] = [];
+  for (const prevOutput of prevOutputs) {
+    if (!prevOutput.script) {
+      throw new SparkValidationError("No script found in prevOutput", {
+        field: "prevScript",
+        value: "null",
+      });
+    }
+    if (prevOutput.amount === undefined) {
+      throw new SparkValidationError("No amount found in prevOutput", {
+        field: "amount",
+        value: "null",
+      });
+    }
+    prevScripts.push(prevOutput.script);
+    prevAmounts.push(prevOutput.amount);
+  }
+  return tx.preimageWitnessV1(
+    inputIndex,
+    prevScripts,
+    btc.SigHash.DEFAULT,
+    prevAmounts,
+  );
+}
+
 export function getTxId(tx: btc.Transaction): string {
   return bytesToHex(sha256(sha256(tx.toBytes(true))).reverse());
 }

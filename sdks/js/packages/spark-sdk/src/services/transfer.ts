@@ -36,7 +36,11 @@ import {
 } from "../signer/types.js";
 import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
 import { SparkAddressFormat } from "../utils/address.js";
-import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin.js";
+import {
+  getSigHashFromMultiInputTx,
+  getSigHashFromTx,
+  getTxFromRawTxBytes,
+} from "../utils/bitcoin.js";
 import { NetworkToProto } from "../utils/network.js";
 import { VerifiableSecretShare } from "../utils/secret-sharing.js";
 import {
@@ -94,6 +98,7 @@ export type LeafRefundSigningData = {
   directFromCpfpRefundTx?: Transaction;
   directFromCpfpRefundSigningNonceCommitment: SigningCommitmentWithOptionalNonce;
   vout: number;
+  connectorPrevOutput?: TransactionOutput;
 };
 
 export type SigningJobType =
@@ -572,12 +577,16 @@ export class BaseTransferService {
       }
 
       // Sign CPFP refund transaction
-      const cpfpRefundTxSighash = getSigHashFromTx(
-        leafData.refundTx,
-        0,
-        txOutput,
-      );
-
+      // Use multi-input sighash for coop exit (2-input transactions with connector)
+      let cpfpRefundTxSighash: Uint8Array;
+      if (leafData.refundTx.inputsLength > 1 && leafData.connectorPrevOutput) {
+        cpfpRefundTxSighash = getSigHashFromMultiInputTx(leafData.refundTx, 0, [
+          txOutput,
+          leafData.connectorPrevOutput,
+        ]);
+      } else {
+        cpfpRefundTxSighash = getSigHashFromTx(leafData.refundTx, 0, txOutput);
+      }
       const publicKey = await this.config.signer.getPublicKeyFromDerivation(
         leafData.keyDerivation,
       );
@@ -610,11 +619,24 @@ export class BaseTransferService {
       if (leafData.directTx && leafData.directRefundTx) {
         const directTxOutput = leafData.directTx.getOutput(0);
 
-        const directRefundTxSighash = getSigHashFromTx(
-          leafData.directRefundTx,
-          0,
-          directTxOutput,
-        );
+        // Use multi-input sighash for coop exit (2-input transactions with connector)
+        let directRefundTxSighash: Uint8Array;
+        if (
+          leafData.directRefundTx.inputsLength > 1 &&
+          leafData.connectorPrevOutput
+        ) {
+          directRefundTxSighash = getSigHashFromMultiInputTx(
+            leafData.directRefundTx,
+            0,
+            [directTxOutput, leafData.connectorPrevOutput],
+          );
+        } else {
+          directRefundTxSighash = getSigHashFromTx(
+            leafData.directRefundTx,
+            0,
+            directTxOutput,
+          );
+        }
 
         const directUserSignature = await this.config.signer.signFrost({
           message: directRefundTxSighash,
@@ -646,11 +668,24 @@ export class BaseTransferService {
       // Sign direct-from-CPFP refund transaction (spends CPFP tx output).
       let directFromCpfpRefundAggregate: Uint8Array | undefined;
       if (leafData.directFromCpfpRefundTx) {
-        const directFromCpfpRefundTxSighash = getSigHashFromTx(
-          leafData.directFromCpfpRefundTx,
-          0,
-          txOutput,
-        );
+        // Use multi-input sighash for coop exit (2-input transactions with connector)
+        let directFromCpfpRefundTxSighash: Uint8Array;
+        if (
+          leafData.directFromCpfpRefundTx.inputsLength > 1 &&
+          leafData.connectorPrevOutput
+        ) {
+          directFromCpfpRefundTxSighash = getSigHashFromMultiInputTx(
+            leafData.directFromCpfpRefundTx,
+            0,
+            [txOutput, leafData.connectorPrevOutput],
+          );
+        } else {
+          directFromCpfpRefundTxSighash = getSigHashFromTx(
+            leafData.directFromCpfpRefundTx,
+            0,
+            txOutput,
+          );
+        }
 
         const directFromCpfpUserSignature = await this.config.signer.signFrost({
           message: directFromCpfpRefundTxSighash,

@@ -130,6 +130,30 @@ export class CoopExitService extends BaseTransferService {
 
       const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
 
+      // Parse connector transaction to get connector prevOutput for multi-input sighash
+      const connectorTxParsed = getTxFromRawTxBytes(connectorTx);
+      if (connectorOutput.index === undefined) {
+        throw new SparkValidationError("Missing connector output index", {
+          field: "connectorOutput.index",
+          value: connectorOutput.index,
+          expected: "Valid output index",
+        });
+      }
+      const connectorPrevOutput = connectorTxParsed.getOutput(
+        connectorOutput.index,
+      );
+      if (
+        !connectorPrevOutput ||
+        !connectorPrevOutput.script ||
+        connectorPrevOutput.amount === undefined
+      ) {
+        throw new SparkValidationError("Invalid connector transaction output", {
+          field: "connectorPrevOutput",
+          value: connectorPrevOutput,
+          expected: "Valid output with script and amount",
+        });
+      }
+
       const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
 
       let directNodeTx: Transaction | undefined;
@@ -223,6 +247,10 @@ export class CoopExitService extends BaseTransferService {
         directFromCpfpRefundSigningNonceCommitment:
           directFromCpfpSigningNonceCommitment,
         vout: leaf.leaf.vout,
+        connectorPrevOutput: {
+          script: connectorPrevOutput.script,
+          amount: connectorPrevOutput.amount,
+        },
       });
     }
 
@@ -246,6 +274,7 @@ export class CoopExitService extends BaseTransferService {
         },
         exitId: uuidv7(),
         exitTxid: exitTxId,
+        connectorTx: connectorTx,
       });
     } catch (error) {
       throw new SparkRequestError("Failed to initiate cooperative exit", {
