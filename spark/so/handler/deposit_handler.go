@@ -81,6 +81,15 @@ func validateIdentity(ctx context.Context, config *so.Config, identityPublicKey 
 // GenerateDepositAddress generates a deposit address for the given public key.
 // The address string is generated using provided network field in the request.
 func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.Config, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
+	return o.generateDepositAddress(ctx, config, req, false)
+}
+
+// GenerateDepositAddressInternal generates a deposit address without rate limiting for the SSP.
+func (o *DepositHandler) GenerateDepositAddressInternal(ctx context.Context, config *so.Config, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
+	return o.generateDepositAddress(ctx, config, req, true)
+}
+
+func (o *DepositHandler) generateDepositAddress(ctx context.Context, config *so.Config, req *pb.GenerateDepositAddressRequest, skipRateLimit bool) (*pb.GenerateDepositAddressResponse, error) {
 	ctx, span := tracer.Start(ctx, "DepositHandler.GenerateDepositAddress")
 	defer span.End()
 
@@ -121,32 +130,35 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 
 	logger.Sugar().Infof("Generating deposit address for public key %s (signing %s)", reqIDPubKey, reqSigningPubKey)
 
-	// Check if user already has too many unused non-static deposit addresses for this network.
-	// An "unused" address is one that has no tree created yet (no deposit confirmed).
-	// This prevents DoS attacks where users repeatedly generate addresses without depositing,
-	// exhausting the available signing keyshares.
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get db: %w", err)
 	}
-	// Approximate count; will not include concurrent requests
-	// Considered low risk so not making use of locking
-	unusedCount, err := db.DepositAddress.Query().
-		Where(
-			depositaddress.OwnerIdentityPubkey(reqIDPubKey),
-			depositaddress.IsStatic(false),
-			depositaddress.NetworkEQ(network),
-			depositaddress.Not(depositaddress.HasTree()),
-		).
-		Count(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to count existing deposit addresses: %w", err)
-	}
-	maxUnusedAddresses := int(knobs.GetKnobsService(ctx).GetValue(knobs.KnobMaxUnusedDepositAddresses, DefaultMaxUnusedDepositAddresses))
-	if unusedCount >= maxUnusedAddresses {
-		return nil, status.Errorf(codes.ResourceExhausted,
-			"user already has %d unused deposit addresses for this network (maximum %d); please use an existing address or wait for a deposit to be confirmed",
-			unusedCount, maxUnusedAddresses)
+
+	// Check if user already has too many unused non-static deposit addresses for this network.
+	// An "unused" address is one that has no tree created yet (no deposit confirmed).
+	// This prevents DoS attacks where users repeatedly generate addresses without depositing,
+	// exhausting the available signing keyshares.
+	if !skipRateLimit {
+		// Approximate count; will not include concurrent requests
+		// Considered low risk so not making use of locking
+		unusedCount, err := db.DepositAddress.Query().
+			Where(
+				depositaddress.OwnerIdentityPubkey(reqIDPubKey),
+				depositaddress.IsStatic(false),
+				depositaddress.NetworkEQ(network),
+				depositaddress.Not(depositaddress.HasTree()),
+			).
+			Count(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to count existing deposit addresses: %w", err)
+		}
+		maxUnusedAddresses := int(knobs.GetKnobsService(ctx).GetValue(knobs.KnobMaxUnusedDepositAddresses, DefaultMaxUnusedDepositAddresses))
+		if unusedCount >= maxUnusedAddresses {
+			return nil, status.Errorf(codes.ResourceExhausted,
+				"user already has %d unused deposit addresses for this network (maximum %d); please use an existing address or wait for a deposit to be confirmed",
+				unusedCount, maxUnusedAddresses)
+		}
 	}
 
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
