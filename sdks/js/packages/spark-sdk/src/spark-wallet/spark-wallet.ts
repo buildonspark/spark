@@ -3000,7 +3000,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       }
     }
 
-    if (emit) {
+    if (
+      emit &&
+      transfer.type !== TransferType.COUNTER_SWAP &&
+      transfer.type !== TransferType.COUNTER_SWAP_V3
+    ) {
       this.emit(
         SparkWalletEvent.TransferClaimed,
         transfer.id,
@@ -3098,13 +3102,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @private
    */
   private async claimTransfers(
-    type?: TransferType,
+    types?: TransferType[],
     emit?: boolean,
   ): Promise<string[]> {
     const transfers = await this.transferService.queryPendingTransfers();
     const promises: Promise<string | null>[] = [];
     for (const transfer of transfers.transfers) {
-      if (type && transfer.type !== type) {
+      if (types && !types.includes(transfer.type)) {
         continue;
       }
 
@@ -5394,17 +5398,27 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   // Add this new method to start periodic claiming
-  private startPeriodicClaimTransfers() {
+  private async startPeriodicClaimTransfers() {
     // Clear any existing interval first
     if (this.claimTransfersInterval) {
       clearInterval(this.claimTransfersInterval);
     }
 
+    await this.claimTransfers();
+
     // Set up new interval to claim transfers every 5 seconds
     // @ts-ignore
     this.claimTransfersInterval = setInterval(async () => {
       try {
-        await this.claimTransfers(undefined, true);
+        await this.claimTransfers(
+          [
+            TransferType.TRANSFER,
+            TransferType.COOPERATIVE_EXIT,
+            TransferType.PREIMAGE_SWAP,
+            TransferType.UTXO_SWAP,
+          ],
+          true,
+        );
       } catch (error) {
         console.error("Error in periodic transfer claiming:", error);
       }
