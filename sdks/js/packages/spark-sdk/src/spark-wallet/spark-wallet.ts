@@ -85,6 +85,7 @@ import { SigningService } from "../services/signing.js";
 import { TokenOutputManager } from "../services/tokens/output-manager.js";
 import {
   MAX_TOKEN_OUTPUTS_TX,
+  QueryTokenTransactionsWithFiltersParams,
   TokenTransactionService,
 } from "../services/tokens/token-transactions.js";
 import type { LeafKeyTweak } from "../services/transfer.js";
@@ -4950,6 +4951,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
+   * @deprecated Use queryTokenTransactionsWithFilters or queryTokenTransactionsByTxHashes instead
    * Retrieves token transaction history for specified tokens
    * Can optionally filter by specific transaction hashes.
    *
@@ -5007,6 +5009,61 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       await this.config.signer.getIdentityPublicKey(),
       this.config.getNetwork(),
     );
+  }
+
+  /**
+   * Retrieves specific token transactions by their transaction hashes
+   * Primarily meant for retrieving and/or confirming the status of specific token transactions.
+   *
+   * @param tokenTransactionHashes - Array of transaction hashes
+   * @returns Promise resolving to array of token transactions with their current status
+   */
+  public async queryTokenTransactionsByTxHashes(
+    tokenTransactionHashes: string[],
+  ): Promise<QueryTokenTransactionsResponse> {
+    return this.tokenTransactionService.queryTokenTransactionsByTxHashes(
+      tokenTransactionHashes,
+    );
+  }
+
+  /**
+   * Retrieves token transaction history with optional filters
+   *
+   * @param sparkAddresses - Optional array of Spark addresses to query transactions for
+   * @param issuerPublicKeys - Optional array of issuer public keys to query transactions for
+   * @param tokenIdentifiers - Optional array of token identifiers to filter by
+   * @param outputIds - Optional array of output IDs to filter by
+   * @param pageSize - Optional page size (defaults to 50)
+   * @param cursor - Optional cursor for pagination
+   * @param direction - Optional direction for pagination ("NEXT" or "PREVIOUS", defaults to "NEXT")
+   * @returns Promise resolving to array of token transactions with their current status
+   */
+  public async queryTokenTransactionsWithFilters({
+    sparkAddresses,
+    issuerPublicKeys,
+    tokenIdentifiers,
+    outputIds,
+    pageSize,
+    cursor,
+    direction,
+  }: {
+    sparkAddresses?: string[];
+    issuerPublicKeys?: string[];
+    tokenIdentifiers?: string[];
+    outputIds?: string[];
+    pageSize?: number;
+    cursor?: string;
+    direction?: "NEXT" | "PREVIOUS";
+  }): Promise<QueryTokenTransactionsResponse> {
+    return this.tokenTransactionService.queryTokenTransactionsWithFilters({
+      sparkAddresses,
+      issuerPublicKeys,
+      tokenIdentifiers,
+      outputIds,
+      pageSize,
+      cursor,
+      direction,
+    });
   }
 
   // For internal use only
@@ -5730,6 +5787,8 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "querySparkInvoices",
   "queryStaticDepositAddresses",
   "queryTokenTransactions",
+  "queryTokenTransactionsByTxHashes",
+  "queryTokenTransactionsWithFilters",
   "refundAndBroadcastStaticDeposit",
   "refundStaticDeposit",
   "setPrivacyEnabled",

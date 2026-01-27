@@ -29,7 +29,10 @@ import {
   PreimageRequestStatus,
   TreeNode,
 } from "@buildonspark/spark-sdk/proto/spark";
-import { TokenTransactionStatus } from "@buildonspark/spark-sdk/proto/spark_token";
+import {
+  QueryTokenTransactionsResponse,
+  TokenTransactionStatus,
+} from "@buildonspark/spark-sdk/proto/spark_token";
 import {
   BitcoinNetwork,
   CoopExitFeeQuote,
@@ -233,6 +236,7 @@ const commands = [
   "getissuertokenactivity",
   "createtoken",
   "nontrustydeposit",
+  "querytokentransactionsbytxhash",
   "querytokentransactions",
   "gettransferfromssp",
   "gettransfer",
@@ -268,29 +272,46 @@ interface CreateSparkInvoiceArgs {
   expiryTime?: string;
 }
 
-interface QueryTokenTransactionsArgs {
+interface QueryTokenTransactionsByTxHashArgs {
+  tokenTransactionHashes: string[];
+}
+
+interface QueryTokenTransactionsWithFiltersArgs {
   sparkAddresses?: string[];
   issuerPublicKeys?: string[];
-  tokenTransactionHashes?: string[];
   tokenIdentifiers?: string[];
   outputIds?: string[];
   pageSize?: number;
-  offset?: number;
-  sortOrder?: "asc" | "desc";
+  cursor?: string;
+  direction?: "NEXT" | "PREVIOUS";
 }
 
-function showQueryTokenTransactionsHelp() {
+function showQueryTokenTransactionsByTxHashHelp() {
+  console.log("Usage: querytokentransactionsbytxhash <hash1> <hash2> ...");
+  console.log("");
+  console.log("Query token transactions by their transaction hashes.");
+  console.log(
+    "Primarily meant for retrieving and/or confirming the status of specific token transactions.",
+  );
+  console.log("");
+  console.log("Examples:");
+  console.log("  querytokentransactionsbytxhash abc123...");
+  console.log("  querytokentransactionsbytxhash abc123... def456... ghi789...");
+}
+
+function showQueryTokenTransactionsWithFiltersHelp() {
   console.log("Usage: querytokentransactions [options]");
+  console.log("");
+  console.log(
+    "Query token transaction history with optional filters and cursor-based pagination.",
+  );
   console.log("");
   console.log("Options:");
   console.log(
-    "  --sparkAddresses <addresses>  Comma-separated list of Spark addresses (default: wallet's Spark address, use ',' for empty list, '~' for wallet)",
+    "  --sparkAddresses <addresses>  Comma-separated list of Spark addresses (default: wallet's Spark address, use ',' for empty list)",
   );
   console.log(
-    "  --issuerPublicKeys <keys>     Comma-separated list of issuer public keys (default: empty, use ',' for empty list, '~' for wallet)",
-  );
-  console.log(
-    "  --tokenTransactionHashes <hashes>  Comma-separated list of token transaction hashes",
+    "  --issuerPublicKeys <keys>     Comma-separated list of issuer public keys (default: empty, use ',' for empty list)",
   );
   console.log(
     "  --tokenIdentifiers <identifiers>   Comma-separated list of token identifiers",
@@ -299,13 +320,13 @@ function showQueryTokenTransactionsHelp() {
     "  --outputIds <ids>            Comma-separated list of output IDs",
   );
   console.log(
-    "  --sortOrder <order>          Sort order: 'asc' or 'desc' (default: desc)",
+    "  --direction <direction>      Pagination direction: 'NEXT' or 'PREVIOUS' (default: NEXT)",
   );
   console.log(
-    "  --pageSize <size>            Number of results per page (default: 10, max: 100)",
+    "  --pageSize <size>            Number of results per page (default: 50, max: 100)",
   );
   console.log(
-    "  --offset <offset>            Number of results to skip (default: 0)",
+    "  --cursor <cursor>            Pagination cursor from previous response",
   );
   console.log("  --help                        Show this help message");
   console.log("");
@@ -313,23 +334,40 @@ function showQueryTokenTransactionsHelp() {
   console.log("  querytokentransactions");
   console.log("  querytokentransactions --sparkAddresses spark1q...");
   console.log("  querytokentransactions --issuerPublicKeys 02abc123...");
-  console.log("  querytokentransactions --tokenTransactionHashes abc123...");
   console.log(
     "  querytokentransactions --sparkAddresses addr1,addr2 --tokenIdentifiers id1,id2",
   );
-  console.log("  querytokentransactions --pageSize 10 --offset 0");
+  console.log("  querytokentransactions --pageSize 10 --cursor abc123...");
   console.log(
-    "  querytokentransactions --pageSize 25 --offset 50 --sortOrder asc",
+    "  querytokentransactions --pageSize 25 --cursor xyz789... --direction PREVIOUS",
   );
   console.log(
     "  querytokentransactions --issuerPublicKeys 02abc123... --pageSize 5",
   );
-  console.log("  querytokentransactions --sortOrder desc");
 }
 
-function parseQueryTokenTransactionsArgsWithYargs(
+function parseQueryTokenTransactionsByTxHashArgs(
   args: string[],
-): QueryTokenTransactionsArgs | null {
+): QueryTokenTransactionsByTxHashArgs | null {
+  if (args.includes("--help")) {
+    showQueryTokenTransactionsByTxHashHelp();
+    return null;
+  }
+
+  if (args.length === 0) {
+    console.log("Error: At least one transaction hash is required");
+    showQueryTokenTransactionsByTxHashHelp();
+    return null;
+  }
+
+  return {
+    tokenTransactionHashes: args,
+  };
+}
+
+function parseQueryTokenTransactionsWithFiltersArgs(
+  args: string[],
+): QueryTokenTransactionsWithFiltersArgs | null {
   try {
     const parsed = yargs(args)
       .option("sparkAddresses", {
@@ -337,28 +375,18 @@ function parseQueryTokenTransactionsArgsWithYargs(
         description: "Comma-separated list of Spark addresses",
         coerce: (value: string) => {
           if (!value) return [];
-          // If it's just a comma, return empty array (explicit empty list)
           if (value === ",") return [];
-          // Otherwise split by comma and filter out empty strings
           return value.split(",").filter((key) => key.trim() !== "");
         },
       })
       .option("issuerPublicKeys", {
         type: "string",
-        description:
-          "Comma-separated list of issuer public keys (default: empty). Use ',' for empty list, '~' for wallet's identity key.",
+        description: "Comma-separated list of issuer public keys",
         coerce: (value: string) => {
           if (!value) return [];
-          // If it's just a comma, return empty array (explicit empty list)
           if (value === ",") return [];
-          // Otherwise split by comma and filter out empty strings
           return value.split(",").filter((key) => key.trim() !== "");
         },
-      })
-      .option("tokenTransactionHashes", {
-        type: "string",
-        description: "Comma-separated list of token transaction hashes",
-        coerce: (value: string) => (value ? value.split(",") : []),
       })
       .option("tokenIdentifiers", {
         type: "string",
@@ -373,41 +401,145 @@ function parseQueryTokenTransactionsArgsWithYargs(
       .option("pageSize", {
         type: "number",
         description: "Limit the number of results",
-        default: 10,
+        default: 50,
       })
-      .option("offset", {
-        type: "number",
-        description: "Offset the results",
-        default: 0,
-      })
-      .option("sortOrder", {
+      .option("cursor", {
         type: "string",
-        description: "Sort order: 'asc' or 'desc'",
-        default: "desc",
-        choices: ["asc", "desc"],
+        description: "Pagination cursor from previous response",
       })
-      .help(false) // Disable yargs built-in help
+      .option("direction", {
+        type: "string",
+        description: "Pagination direction: 'NEXT' or 'PREVIOUS'",
+        default: "NEXT",
+        choices: ["NEXT", "PREVIOUS"],
+      })
+      .help(false)
       .parseSync();
 
-    // Check if --help was requested
     if (args.includes("--help")) {
-      showQueryTokenTransactionsHelp();
+      showQueryTokenTransactionsWithFiltersHelp();
       return null;
     }
 
     return {
       sparkAddresses: parsed.sparkAddresses,
       issuerPublicKeys: parsed.issuerPublicKeys,
-      tokenTransactionHashes: parsed.tokenTransactionHashes,
       tokenIdentifiers: parsed.tokenIdentifiers,
       outputIds: parsed.outputIds,
       pageSize: parsed.pageSize,
-      offset: parsed.offset,
-      sortOrder: parsed.sortOrder as "asc" | "desc",
+      cursor: parsed.cursor,
+      direction: parsed.direction as "NEXT" | "PREVIOUS",
     };
   } catch (error) {
-    showQueryTokenTransactionsHelp();
+    showQueryTokenTransactionsWithFiltersHelp();
     throw error;
+  }
+}
+
+function displayTokenTransactions(
+  transactions: QueryTokenTransactionsResponse["tokenTransactionsWithStatus"],
+) {
+  console.log("\nToken Transactions:");
+  for (const tx of transactions) {
+    console.log("\nTransaction Details:");
+    console.log(`  Status: ${TokenTransactionStatus[tx.status]}`);
+    let tokenIdentifier = "";
+    let issuerPublicKey = "";
+    const protoNetwork = tx.tokenTransaction?.network;
+    const network = protoNetwork ? protoToNetwork(protoNetwork) : undefined;
+    if (tx.tokenTransaction?.tokenInputs?.$case === "createInput") {
+      issuerPublicKey = hex.encode(
+        tx.tokenTransaction?.tokenInputs.createInput.issuerPublicKey,
+      );
+    } else {
+      issuerPublicKey = hex.encode(
+        tx.tokenTransaction?.tokenOutputs[0].tokenPublicKey ||
+          new Uint8Array(0),
+      );
+      tokenIdentifier = bytesToHex(
+        tx.tokenTransaction?.tokenOutputs[0]?.tokenIdentifier ||
+          new Uint8Array(0),
+      );
+    }
+    if (tokenIdentifier) {
+      console.log(`  Raw Token Identifier: ${tokenIdentifier}`);
+      if (network !== undefined) {
+        const bech32mIdentifier = encodeBech32mTokenIdentifier({
+          tokenIdentifier: hexToBytes(tokenIdentifier),
+          network: Network[network] as NetworkType,
+        });
+        console.log(`  Token Identifier: ${bech32mIdentifier}`);
+      }
+    } else {
+      console.log(`  Issuer Public Key: ${issuerPublicKey}`);
+    }
+
+    if (tx.tokenTransaction?.tokenInputs) {
+      const input = tx.tokenTransaction.tokenInputs;
+      if (input.$case === "mintInput") {
+        console.log("  Type: Mint");
+        console.log(
+          `  Issuer Public Key: ${hex.encode(input.mintInput.issuerPublicKey)}`,
+        );
+        console.log(
+          `  Timestamp: ${tx.tokenTransaction.clientCreatedTimestamp?.toISOString() || "N/A"}`,
+        );
+      } else if (input.$case === "transferInput") {
+        console.log("  Type: Transfer");
+        console.log(
+          `  Outputs to Spend: ${input.transferInput.outputsToSpend.length}`,
+        );
+      } else if (input.$case === "createInput") {
+        console.log("  Type: Create");
+        console.log(
+          `  Token Name: ${input.createInput.tokenName}`,
+          `  Token Ticker: ${input.createInput.tokenTicker}`,
+          `  Max Supply: ${hex.encode(input.createInput.maxSupply)} (decimal: ${bytesToNumberBE(input.createInput.maxSupply)})`,
+          `  Decimals: ${input.createInput.decimals}`,
+          `  Is Freezable: ${input.createInput.isFreezable}`,
+          `  Creation Entity Public Key: ${hex.encode(input.createInput.creationEntityPublicKey!)}`,
+        );
+      }
+    }
+
+    if (tx.tokenTransaction?.tokenOutputs) {
+      console.log("\n  Outputs:");
+      for (const output of tx.tokenTransaction.tokenOutputs) {
+        console.log(`    Output ID: ${output.id}`);
+        console.log(
+          `    Owner Public Key: ${hex.encode(output.ownerPublicKey)}`,
+        );
+        console.log(
+          output.ownerPublicKey && network !== undefined
+            ? `    Owner Spark Address: ${encodeSparkAddress({
+                identityPublicKey: bytesToHex(output.ownerPublicKey),
+                network: Network[network] as NetworkType,
+              })}`
+            : "",
+        );
+        console.log(
+          `    Token Amount: 0x${hex.encode(output.tokenAmount)} (decimal: ${bytesToNumberBE(output.tokenAmount)})`,
+        );
+        if (output.withdrawBondSats !== undefined) {
+          console.log(`    Withdraw Bond Sats: ${output.withdrawBondSats}`);
+        }
+        if (output.withdrawRelativeBlockLocktime !== undefined) {
+          console.log(
+            `    Withdraw Relative Block Locktime: ${output.withdrawRelativeBlockLocktime}`,
+          );
+        }
+        console.log("    ---");
+      }
+    }
+
+    if (tx.tokenTransaction?.invoiceAttachments) {
+      console.log("  Invoice Attachments:");
+      for (const attachment of tx.tokenTransaction.invoiceAttachments) {
+        console.log(`    Invoice: ${attachment.sparkInvoice}`);
+      }
+    }
+
+    console.log("----------------------------------------");
   }
 }
 
@@ -573,7 +705,8 @@ async function runCLI() {
   Token Holder Commands:
     transfertokens <tokenIdentifier> <receiverAddress> <amount>        - Transfer tokens. If the token was created with 2 decimals, transfertokens _ _ 1 would transfer 0.01 tokens.
     batchtransfertokens <tokenIdentifier> <receiverAddress1:amount1> <receiverAddress2:amount2> ... - Transfer tokens with multiple outputs
-    querytokentransactions [--sparkAddresses] [--issuerPublicKeys] [--tokenTransactionHashes] [--tokenIdentifiers] [--outputIds] [--sortOrder] - Query token transaction history
+    querytokentransactionsbytxhash <hash1> <hash2> ...                 - Query token transactions by transaction hashes
+    querytokentransactions [--sparkAddresses] [--issuerPublicKeys] [--tokenIdentifiers] [--outputIds] [--pageSize] [--cursor] [--direction] - Query token transaction history with filters
 
   Token Issuer Commands:
   gettokenl1address                                                   - Get the L1 address for on-chain token operations
@@ -1965,137 +2098,54 @@ async function runCLI() {
           console.log("Create Token Token Identifier:", result.tokenIdentifier);
           break;
         }
+        case "querytokentransactionsbytxhash": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+
+          const parsedHashArgs = parseQueryTokenTransactionsByTxHashArgs(args);
+          if (!parsedHashArgs) {
+            break;
+          }
+
+          const hashRes = await wallet.queryTokenTransactionsByTxHashes(
+            parsedHashArgs.tokenTransactionHashes,
+          );
+          displayTokenTransactions(hashRes.tokenTransactionsWithStatus);
+          break;
+        }
         case "querytokentransactions": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
           }
 
-          const parsedArgs = parseQueryTokenTransactionsArgsWithYargs(args);
-          if (!parsedArgs) {
+          const parsedFilterArgs =
+            parseQueryTokenTransactionsWithFiltersArgs(args);
+          if (!parsedFilterArgs) {
             break;
           }
 
-          const res = await wallet.queryTokenTransactions({
-            sparkAddresses: parsedArgs.sparkAddresses,
-            issuerPublicKeys: parsedArgs.issuerPublicKeys,
-            tokenTransactionHashes: parsedArgs.tokenTransactionHashes,
-            tokenIdentifiers: parsedArgs.tokenIdentifiers,
-            outputIds: parsedArgs.outputIds,
-            pageSize: parsedArgs.pageSize,
-            offset: parsedArgs.offset,
-            order: parsedArgs.sortOrder,
+          const filterRes = await wallet.queryTokenTransactionsWithFilters({
+            sparkAddresses: parsedFilterArgs.sparkAddresses,
+            issuerPublicKeys: parsedFilterArgs.issuerPublicKeys,
+            tokenIdentifiers: parsedFilterArgs.tokenIdentifiers,
+            outputIds: parsedFilterArgs.outputIds,
+            pageSize: parsedFilterArgs.pageSize,
+            cursor: parsedFilterArgs.cursor,
+            direction: parsedFilterArgs.direction,
           });
-          const transactions = res.tokenTransactionsWithStatus;
-
-          console.log("\nToken Transactions:");
-          for (const tx of transactions) {
-            console.log("\nTransaction Details:");
-            console.log(`  Status: ${TokenTransactionStatus[tx.status]}`);
-            let tokenIdentifier = "";
-            let issuerPublicKey = "";
-            const protoNetwork = tx.tokenTransaction?.network;
-            const network = protoNetwork
-              ? protoToNetwork(protoNetwork)
-              : undefined;
-            if (tx.tokenTransaction?.tokenInputs?.$case === "createInput") {
-              issuerPublicKey = hex.encode(
-                tx.tokenTransaction?.tokenInputs.createInput.issuerPublicKey,
-              );
-            } else {
-              issuerPublicKey = hex.encode(
-                tx.tokenTransaction?.tokenOutputs[0].tokenPublicKey ||
-                  new Uint8Array(0),
-              );
-              tokenIdentifier = bytesToHex(
-                tx.tokenTransaction?.tokenOutputs[0]?.tokenIdentifier ||
-                  new Uint8Array(0),
-              );
-            }
-            if (tokenIdentifier) {
-              console.log(`  Raw Token Identifier: ${tokenIdentifier}`);
-              if (network !== undefined) {
-                const bech32mIdentifier = encodeBech32mTokenIdentifier({
-                  tokenIdentifier: hexToBytes(tokenIdentifier),
-                  network: Network[network] as NetworkType,
-                });
-                console.log(`  Token Identifier: ${bech32mIdentifier}`);
-              }
-            } else {
-              console.log(`  Issuer Public Key: ${issuerPublicKey}`);
-            }
-
-            if (tx.tokenTransaction?.tokenInputs) {
-              const input = tx.tokenTransaction.tokenInputs;
-              if (input.$case === "mintInput") {
-                console.log("  Type: Mint");
-                console.log(
-                  `  Issuer Public Key: ${hex.encode(input.mintInput.issuerPublicKey)}`,
-                );
-                console.log(
-                  `  Timestamp: ${tx.tokenTransaction.clientCreatedTimestamp?.toISOString() || "N/A"}`,
-                );
-              } else if (input.$case === "transferInput") {
-                console.log("  Type: Transfer");
-                console.log(
-                  `  Outputs to Spend: ${input.transferInput.outputsToSpend.length}`,
-                );
-              } else if (input.$case === "createInput") {
-                console.log("  Type: Create");
-                console.log(
-                  `  Token Name: ${input.createInput.tokenName}`,
-                  `  Token Ticker: ${input.createInput.tokenTicker}`,
-                  `  Max Supply: ${hex.encode(input.createInput.maxSupply)} (decimal: ${bytesToNumberBE(input.createInput.maxSupply)})`,
-                  `  Decimals: ${input.createInput.decimals}`,
-                  `  Is Freezable: ${input.createInput.isFreezable}`,
-                  `  Creation Entity Public Key: ${hex.encode(input.createInput.creationEntityPublicKey!)}`,
-                );
-              }
-            }
-
-            if (tx.tokenTransaction?.tokenOutputs) {
-              console.log("\n  Outputs:");
-              for (const output of tx.tokenTransaction.tokenOutputs) {
-                console.log(`    Output ID: ${output.id}`);
-                console.log(
-                  `    Owner Public Key: ${hex.encode(output.ownerPublicKey)}`,
-                );
-                console.log(
-                  output.ownerPublicKey && network !== undefined
-                    ? `    Owner Spark Address: ${encodeSparkAddress({
-                        identityPublicKey: bytesToHex(output.ownerPublicKey),
-                        network: Network[network] as NetworkType,
-                      })}`
-                    : "",
-                );
-                console.log(
-                  `    Token Amount: 0x${hex.encode(output.tokenAmount)} (decimal: ${bytesToNumberBE(output.tokenAmount)})`,
-                );
-                if (output.withdrawBondSats !== undefined) {
-                  console.log(
-                    `    Withdraw Bond Sats: ${output.withdrawBondSats}`,
-                  );
-                }
-                if (output.withdrawRelativeBlockLocktime !== undefined) {
-                  console.log(
-                    `    Withdraw Relative Block Locktime: ${output.withdrawRelativeBlockLocktime}`,
-                  );
-                }
-                console.log("    ---");
-              }
-            }
-
-            if (tx.tokenTransaction?.invoiceAttachments) {
-              console.log("  Invoice Attachments:");
-              for (const attachment of tx.tokenTransaction.invoiceAttachments) {
-                console.log(`    Invoice: ${attachment.sparkInvoice}`);
-              }
-            }
-
-            console.log("----------------------------------------");
+          displayTokenTransactions(filterRes.tokenTransactionsWithStatus);
+          if (filterRes.pageResponse?.nextCursor) {
+            console.log(
+              `\n  Next cursor: ${filterRes.pageResponse.nextCursor}`,
+            );
           }
-          if (res.offset !== undefined) {
-            console.log(`  Next offset: ${res.offset}`);
+          if (filterRes.pageResponse?.previousCursor) {
+            console.log(
+              `  Previous cursor: ${filterRes.pageResponse.previousCursor}`,
+            );
           }
           break;
         }

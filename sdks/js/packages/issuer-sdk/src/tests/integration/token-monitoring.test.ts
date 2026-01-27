@@ -1,6 +1,9 @@
-import { filterTokenBalanceForTokenIdentifier } from "@buildonspark/spark-sdk";
+import {
+  filterTokenBalanceForTokenIdentifier,
+  NetworkType,
+} from "@buildonspark/spark-sdk";
 import { jest } from "@jest/globals";
-import { bytesToHex } from "@noble/curves/utils";
+import { bytesToHex, bytesToNumberBE } from "@noble/curves/utils";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { SparkWalletTesting } from "@buildonspark/spark-sdk/test-utils";
 import { TEST_CONFIGS } from "./test-configs.js";
@@ -109,7 +112,7 @@ describe.each(TEST_CONFIGS)(
 
       await issuerWallet.burnTokens(250n);
 
-      const res = await issuerWallet.queryTokenTransactions({
+      const res = await issuerWallet.queryTokenTransactionsWithFilters({
         tokenIdentifiers: [tokenIdentifier!],
         sparkAddresses: [await issuerWallet.getSparkAddress()],
       });
@@ -156,8 +159,11 @@ describe.each(TEST_CONFIGS)(
       });
 
       const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      const issuerPublicKey = await issuerWallet.getIdentityPublicKey();
+      const issuerSparkAddress = await issuerWallet.getSparkAddress();
+      const userSparkAddress = await userWallet.getSparkAddress();
 
-      await issuerWallet.mintTokens(tokenAmount);
+      const mintTxHash = await issuerWallet.mintTokens(tokenAmount);
 
       {
         const res = await issuerWallet.queryTokenTransactions({
@@ -168,14 +174,32 @@ describe.each(TEST_CONFIGS)(
         expect(amount_of_transactions).toEqual(1);
       }
 
+      {
+        const res = await issuerWallet.queryTokenTransactionsWithFilters({
+          tokenIdentifiers: [tokenIdentifier!],
+        });
+        const transactions = res.tokenTransactionsWithStatus;
+        const amount_of_transactions = transactions.length;
+        expect(amount_of_transactions).toEqual(1);
+      }
+
       await issuerWallet.transferTokens({
         tokenAmount,
         tokenIdentifier: tokenIdentifier!,
-        receiverSparkAddress: await userWallet.getSparkAddress(),
+        receiverSparkAddress: userSparkAddress,
       });
 
       {
         const res = await issuerWallet.queryTokenTransactions({
+          tokenIdentifiers: [tokenIdentifier!],
+        });
+        const transactions = res.tokenTransactionsWithStatus;
+        const amount_of_transactions = transactions.length;
+        expect(amount_of_transactions).toEqual(2);
+      }
+
+      {
+        const res = await issuerWallet.queryTokenTransactionsWithFilters({
           tokenIdentifiers: [tokenIdentifier!],
         });
         const transactions = res.tokenTransactionsWithStatus;
@@ -189,8 +213,35 @@ describe.each(TEST_CONFIGS)(
         await issuerWallet.transferTokens({
           tokenAmount: dynamicAmount,
           tokenIdentifier: tokenIdentifier!,
-          receiverSparkAddress: await userWallet.getSparkAddress(),
+          receiverSparkAddress: userSparkAddress,
         });
+      }
+
+      {
+        const res = await issuerWallet.queryTokenTransactionsByTxHashes([
+          mintTxHash!,
+        ]);
+        const transactions = res.tokenTransactionsWithStatus;
+        expect(transactions.length).toEqual(1);
+        expect(bytesToHex(transactions[0].tokenTransactionHash)).toEqual(
+          mintTxHash,
+        );
+        expect(transactions[0].tokenTransaction?.tokenInputs?.$case).toEqual(
+          "mintInput",
+        );
+        expect(
+          bytesToHex(
+            transactions[0].tokenTransaction?.tokenOutputs?.[0]
+              ?.ownerPublicKey!,
+          ),
+        ).toEqual(issuerPublicKey);
+        expect(
+          BigInt(
+            bytesToNumberBE(
+              transactions[0].tokenTransaction?.tokenOutputs?.[0]?.tokenAmount!,
+            ),
+          ),
+        ).toEqual(tokenAmount);
       }
 
       {
@@ -201,6 +252,79 @@ describe.each(TEST_CONFIGS)(
         const transactions = res.tokenTransactionsWithStatus;
         const amount_of_transactions = transactions.length;
         expect(amount_of_transactions).toEqual(10);
+      }
+
+      {
+        const res = await issuerWallet.queryTokenTransactionsWithFilters({
+          tokenIdentifiers: [tokenIdentifier!],
+          pageSize: 10,
+        });
+        const transactions = res.tokenTransactionsWithStatus;
+        const amount_of_transactions = transactions.length;
+        expect(amount_of_transactions).toEqual(10);
+      }
+
+      {
+        const res = await issuerWallet.queryTokenTransactionsWithFilters({
+          tokenIdentifiers: [tokenIdentifier!],
+          issuerPublicKeys: [issuerPublicKey],
+          pageSize: 10,
+        });
+        const transactions = res.tokenTransactionsWithStatus;
+        const amount_of_transactions = transactions.length;
+        expect(amount_of_transactions).toEqual(10);
+      }
+
+      {
+        const res = await issuerWallet.queryTokenTransactionsWithFilters({
+          tokenIdentifiers: [tokenIdentifier!],
+          sparkAddresses: [issuerSparkAddress],
+          pageSize: 5,
+        });
+        const transactions = res.tokenTransactionsWithStatus;
+        const pageInfo = res.pageResponse;
+        expect(transactions.length).toEqual(5);
+        expect(pageInfo?.hasNextPage).toEqual(true);
+        expect(pageInfo?.nextCursor).not.toEqual("");
+        const nextCursor = pageInfo?.nextCursor ?? "";
+
+        const nextRes = await issuerWallet.queryTokenTransactionsWithFilters({
+          tokenIdentifiers: [tokenIdentifier!],
+          sparkAddresses: [issuerSparkAddress],
+          pageSize: 5,
+          cursor: nextCursor,
+        });
+        const nextTransactions = nextRes.tokenTransactionsWithStatus;
+        const nextPageInfo = nextRes.pageResponse;
+        expect(nextTransactions.length).toEqual(5);
+        expect(nextPageInfo?.hasPreviousPage).toEqual(true);
+        expect(nextPageInfo?.previousCursor).not.toEqual("");
+
+        const seenHashes = new Set(
+          transactions.map((tx) => bytesToHex(tx.tokenTransactionHash)),
+        );
+        nextTransactions.forEach((tx) => {
+          const hash = bytesToHex(tx.tokenTransactionHash);
+          expect(seenHashes.has(hash)).toEqual(false);
+        });
+
+        const prevRes = await issuerWallet.queryTokenTransactionsWithFilters({
+          tokenIdentifiers: [tokenIdentifier!],
+          sparkAddresses: [issuerSparkAddress],
+          pageSize: 5,
+          cursor: nextPageInfo?.previousCursor ?? "",
+          direction: "PREVIOUS",
+        });
+        const prevTransactions = prevRes.tokenTransactionsWithStatus;
+        expect(prevTransactions.length).toEqual(5);
+
+        const prevHashes = new Set(
+          prevTransactions.map((tx) => bytesToHex(tx.tokenTransactionHash)),
+        );
+        transactions.forEach((tx) => {
+          const hash = bytesToHex(tx.tokenTransactionHash);
+          expect(prevHashes.has(hash)).toEqual(true);
+        });
       }
 
       {

@@ -19,7 +19,7 @@ import {
   OutputWithPreviousTransactionData,
   PartialTokenOutput,
   PartialTokenTransaction,
-  QueryTokenTransactionsRequest as QueryTokenTransactionsRequestV1,
+  QueryTokenTransactionsRequest,
   QueryTokenTransactionsResponse,
   SignatureWithIndex,
   TokenOutput,
@@ -68,6 +68,16 @@ export interface QueryTokenTransactionsParams {
   order?: "asc" | "desc";
   pageSize?: number;
   offset?: number;
+}
+
+export interface QueryTokenTransactionsWithFiltersParams {
+  sparkAddresses?: string[];
+  issuerPublicKeys?: string[];
+  tokenIdentifiers?: string[];
+  outputIds?: string[];
+  pageSize?: number;
+  cursor?: string;
+  direction?: "NEXT" | "PREVIOUS";
 }
 
 export class TokenTransactionService {
@@ -829,7 +839,8 @@ export class TokenTransactionService {
       this.config.getCoordinatorAddress(),
     );
 
-    let queryParams: QueryTokenTransactionsRequestV1 = {
+    let queryParams: QueryTokenTransactionsRequest = {
+      queryType: undefined,
       issuerPublicKeys: issuerPublicKeys?.map(hexToBytes)!,
       ownerPublicKeys:
         allOwnerPublicKeys.length > 0
@@ -847,6 +858,110 @@ export class TokenTransactionService {
       order: order === "asc" ? Order.ASCENDING : Order.DESCENDING,
       limit: pageSize!,
       offset: offset!,
+    };
+
+    try {
+      return await tokenClient.query_token_transactions(queryParams);
+    } catch (error) {
+      throw new SparkRequestError("Failed to query token transactions", {
+        operation: "query_token_transactions",
+        error,
+      });
+    }
+  }
+
+  public async queryTokenTransactionsByTxHashes(
+    tokenTransactionHashes: string[],
+  ): Promise<QueryTokenTransactionsResponse> {
+    const tokenClient = await this.connectionManager.createSparkTokenClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    let queryParams: QueryTokenTransactionsRequest = {
+      queryType: {
+        $case: "byTxHash",
+        byTxHash: {
+          tokenTransactionHashes: tokenTransactionHashes.map(hexToBytes)!,
+        },
+      },
+      outputIds: [],
+      ownerPublicKeys: [],
+      issuerPublicKeys: [],
+      tokenIdentifiers: [],
+      tokenTransactionHashes: [],
+      order: Order.UNRECOGNIZED,
+      limit: 0,
+      offset: 0,
+    };
+
+    try {
+      return await tokenClient.query_token_transactions(queryParams);
+    } catch (error) {
+      throw new SparkRequestError("Failed to query token transactions", {
+        operation: "query_token_transactions",
+        error,
+      });
+    }
+  }
+
+  public async queryTokenTransactionsWithFilters(
+    params: QueryTokenTransactionsWithFiltersParams,
+  ): Promise<QueryTokenTransactionsResponse> {
+    const {
+      sparkAddresses,
+      issuerPublicKeys,
+      tokenIdentifiers,
+      outputIds,
+      pageSize,
+      cursor,
+      direction,
+    } = params;
+
+    const decodedOwnerPublicKeys: string[] | undefined = sparkAddresses?.map(
+      (address) => {
+        const decoded = decodeSparkAddress(
+          address,
+          this.config.getNetworkType(),
+        );
+        return decoded.identityPublicKey;
+      },
+    );
+
+    const tokenClient = await this.connectionManager.createSparkTokenClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    let queryParams: QueryTokenTransactionsRequest = {
+      queryType: {
+        $case: "byFilters",
+        byFilters: {
+          outputIds: outputIds || [],
+          ownerPublicKeys: decodedOwnerPublicKeys?.map(hexToBytes)!,
+          issuerPublicKeys: issuerPublicKeys?.map(hexToBytes)!,
+          tokenIdentifiers: tokenIdentifiers?.map((identifier) => {
+            const { tokenIdentifier } = decodeBech32mTokenIdentifier(
+              identifier as Bech32mTokenIdentifier,
+              this.config.getNetworkType(),
+            );
+            return tokenIdentifier;
+          })!,
+          pageRequest: {
+            unsafePageSize: 0,
+            pageSize: pageSize ?? 50,
+            cursor: cursor ?? "",
+            direction:
+              direction === "PREVIOUS" ? Direction.PREVIOUS : Direction.NEXT,
+          },
+        },
+      },
+      outputIds: [],
+      ownerPublicKeys: [],
+      issuerPublicKeys: [],
+      tokenIdentifiers: [],
+      tokenTransactionHashes: [],
+      order: Order.UNRECOGNIZED,
+      limit: 0,
+      offset: 0,
     };
 
     try {
