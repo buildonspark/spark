@@ -227,6 +227,7 @@ func (k *KnobController) RunWithKnob(t *testing.T, knobName string, value float6
 }
 
 // SetKnobWithTarget sets a knob value with environment-specific targeting.
+// The value is stored in YAML map format (e.g., "REGTEST: 100").
 // After setting, it waits briefly for the change to propagate to the SOs.
 //
 // Example: To set a knob to 100 for REGTEST environment:
