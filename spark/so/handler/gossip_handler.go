@@ -309,7 +309,7 @@ func (h *GossipHandler) handleRollbackUtxoSwapGossipMessage(ctx context.Context,
 		CoordinatorPublicKey: rollbackUtxoSwap.CoordinatorPublicKey,
 	})
 	if err != nil {
-		logger.Error("Failed to rollback utxo swap with gossip message, will not retry, on-call to intervene", zap.Error(err))
+		logger.Error("failed to rollback utxo swap with gossip message", zap.Error(err))
 	}
 	return err
 }
