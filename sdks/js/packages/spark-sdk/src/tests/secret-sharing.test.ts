@@ -60,4 +60,37 @@ describe("Secret Sharing", () => {
     const recoveredSecret = recoverSecret(shares.slice(0, threshold));
     expect(recoveredSecret).toBe(secret);
   });
+
+  it("should reject shares with invalid proof length", () => {
+    const fieldModulus = secp256k1.CURVE.n;
+    const secret =
+      56223216183876340914672117764605975762373003965917245943571257601961255596156n;
+    const threshold = 3;
+    const numberOfShares = 5;
+
+    const shares = splitSecretWithProofs(
+      secret,
+      fieldModulus,
+      threshold,
+      numberOfShares,
+    );
+
+    expect(shares.length).toBeGreaterThan(0);
+    const validShare = shares[0]!;
+    const firstProof = validShare.proofs[0];
+    expect(firstProof).toBeDefined();
+
+    // Add an extra proof to make the length incorrect
+    const invalidShare = {
+      fieldModulus: validShare.fieldModulus,
+      threshold: validShare.threshold,
+      index: validShare.index,
+      share: validShare.share,
+      proofs: [...validShare.proofs, firstProof!],
+    };
+
+    expect(() => validateShare(invalidShare)).toThrow(
+      "Invalid VSS proof length",
+    );
+  });
 });
