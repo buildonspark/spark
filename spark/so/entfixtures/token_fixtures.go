@@ -20,8 +20,12 @@ const (
 
 // OutputSpec specifies how to create a token output
 type OutputSpec struct {
-	Amount *big.Int
-	Owner  keys.Public // zero value means generate random owner
+	Amount                *big.Int
+	Owner                 keys.Public // zero value means generate random owner
+	RevocationCommitment  []byte      // nil means use random keyshare public key
+	BondSats              uint64      // 0 means use default testWithdrawBondSats
+	RelativeBlockLocktime uint64      // 0 means use default testWithdrawRelativeBlockLocktime
+	FinalizedTxHash       []byte      // nil means use transaction's hash
 }
 
 // OutputSpecs creates OutputSpec slice from amounts with random owners
@@ -144,7 +148,7 @@ func (f *Fixtures) CreateMintTransaction(tokenCreate *ent.TokenCreate, outputSpe
 
 	outputs := make([]*ent.TokenOutput, len(outputSpecs))
 	for i, spec := range outputSpecs {
-		outputs[i] = f.createOutputForTransactionWithOwner(tokenCreate, spec.Amount, spec.Owner, tx, int32(i))
+		outputs[i] = f.createOutputFromSpec(tokenCreate, spec, tx, int32(i))
 	}
 
 	return tx, outputs
@@ -152,17 +156,39 @@ func (f *Fixtures) CreateMintTransaction(tokenCreate *ent.TokenCreate, outputSpe
 
 // CreateOutputForTransaction creates an output linked to a transaction with a random owner
 func (f *Fixtures) CreateOutputForTransaction(tokenCreate *ent.TokenCreate, amount *big.Int, tx *ent.TokenTransaction, vout int32) *ent.TokenOutput {
-	return f.createOutputForTransactionWithOwner(tokenCreate, amount, keys.Public{}, tx, vout)
+	return f.createOutputFromSpec(tokenCreate, OutputSpec{Amount: amount}, tx, vout)
 }
 
-// createOutputForTransactionWithOwner creates an output linked to a transaction with an optional owner (zero value = random)
-func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCreate, amount *big.Int, owner keys.Public, tx *ent.TokenTransaction, vout int32) *ent.TokenOutput {
+// createOutputFromSpec creates an output linked to a transaction using an OutputSpec
+func (f *Fixtures) createOutputFromSpec(tokenCreate *ent.TokenCreate, spec OutputSpec, tx *ent.TokenTransaction, vout int32) *ent.TokenOutput {
 	// Generate random owner if not provided
+	owner := spec.Owner
 	if owner.IsZero() {
 		owner = f.GeneratePrivateKey().Public()
 	}
 
 	keyshare := f.CreateKeyshare()
+
+	// Use spec values or defaults
+	revocationCommitment := spec.RevocationCommitment
+	if revocationCommitment == nil {
+		revocationCommitment = keyshare.PublicKey.Serialize()
+	}
+
+	bondSats := spec.BondSats
+	if bondSats == 0 {
+		bondSats = testWithdrawBondSats
+	}
+
+	relativeBlockLocktime := spec.RelativeBlockLocktime
+	if relativeBlockLocktime == 0 {
+		relativeBlockLocktime = testWithdrawRelativeBlockLocktime
+	}
+
+	finalizedTxHash := spec.FinalizedTxHash
+	if finalizedTxHash == nil {
+		finalizedTxHash = tx.FinalizedTokenTransactionHash
+	}
 
 	var outputStatus st.TokenOutputStatus
 	switch tx.Status {
@@ -176,16 +202,16 @@ func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCre
 		outputStatus = st.TokenOutputStatusCreatedStarted
 	}
 	amountBytes := make([]byte, 16)
-	amount.FillBytes(amountBytes)
+	spec.Amount.FillBytes(amountBytes)
 	u128Amount, err := uint128.FromBytes(amountBytes)
 	f.RequireNoError(err)
 
 	output, err := f.Client.TokenOutput.Create().
 		SetStatus(outputStatus).
 		SetOwnerPublicKey(owner).
-		SetWithdrawBondSats(testWithdrawBondSats).
-		SetWithdrawRelativeBlockLocktime(testWithdrawRelativeBlockLocktime).
-		SetWithdrawRevocationCommitment(keyshare.PublicKey.Serialize()).
+		SetWithdrawBondSats(bondSats).
+		SetWithdrawRelativeBlockLocktime(relativeBlockLocktime).
+		SetWithdrawRevocationCommitment(revocationCommitment).
 		SetTokenAmount(amountBytes).
 		SetAmount(u128Amount).
 		SetCreatedTransactionOutputVout(vout).
@@ -194,7 +220,7 @@ func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCre
 		SetRevocationKeyshare(keyshare).
 		SetNetwork(tokenCreate.Network).
 		SetOutputCreatedTokenTransaction(tx).
-		SetCreatedTransactionFinalizedHash(tx.FinalizedTokenTransactionHash).
+		SetCreatedTransactionFinalizedHash(finalizedTxHash).
 		Save(f.Ctx)
 	f.RequireNoError(err)
 	return output
@@ -244,7 +270,7 @@ func (f *Fixtures) CreateBalancedTransferTransaction(
 
 	outputs := make([]*ent.TokenOutput, len(outputSpecs))
 	for i, spec := range outputSpecs {
-		outputs[i] = f.createOutputForTransactionWithOwner(tokenCreate, spec.Amount, spec.Owner, tx, int32(i))
+		outputs[i] = f.createOutputFromSpec(tokenCreate, spec, tx, int32(i))
 	}
 
 	tx, err = tx.Update().

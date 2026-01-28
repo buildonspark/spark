@@ -62,23 +62,8 @@ func setupWithdrawalTestContext(t *testing.T) (ctx context.Context, dbClient *en
 
 	fixtures = entfixtures.New(t, ctx, dbClient)
 
-	sePrivKey := keys.GeneratePrivateKey()
-	sePubKey = sePrivKey.Public()
-
-	signingKeyshare, err := dbClient.SigningKeyshare.Create().
-		SetStatus(schematype.KeyshareStatusAvailable).
-		SetSecretShare(sePrivKey).
-		SetPublicShares(map[string]keys.Public{}).
-		SetPublicKey(sePubKey).
-		SetMinSigners(1).
-		SetCoordinatorIndex(0).
-		Save(ctx)
-	require.NoError(t, err)
-
-	_, err = dbClient.EntityDkgKey.Create().
-		SetSigningKeyshare(signingKeyshare).
-		Save(ctx)
-	require.NoError(t, err)
+	seKeyshare := fixtures.CreateKeyshareWithEntityDkgKey()
+	sePubKey = seKeyshare.PublicKey
 
 	config = &so.Config{}
 	return ctx, dbClient, fixtures, config, sePubKey
