@@ -58,8 +58,8 @@ func (s *SparkTokenServer) QueryTokenTransactions(ctx context.Context, req *toke
 
 // QueryTokenOutputs returns token outputs with previous transaction data using native tokenpb protos.
 func (s *SparkTokenServer) QueryTokenOutputs(ctx context.Context, req *tokenpb.QueryTokenOutputsRequest) (*tokenpb.QueryTokenOutputsResponse, error) {
-	queryTokenOutputsHandler := tokens.NewQueryTokenOutputsHandlerWithExpiredTransactions(s.soConfig)
-	return queryTokenOutputsHandler.QueryTokenOutputsToken(ctx, req)
+	queryTokenOutputsHandler := tokens.NewQueryTokenOutputsHandler(s.soConfig)
+	return queryTokenOutputsHandler.QueryTokenOutputs(ctx, req)
 }
 
 // FreezeTokens prevents transfer of all outputs owned now and in the future by the provided owner public key.

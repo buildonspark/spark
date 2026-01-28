@@ -36,8 +36,7 @@ func setUpQueryTokenOutputsTestHandler(t *testing.T) *queryTokenOutputsTestFixtu
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	handler := &QueryTokenOutputsHandler{
-		config:                     config,
-		includeExpiredTransactions: true,
+		config: config,
 	}
 
 	return &queryTokenOutputsTestFixture{
@@ -109,7 +108,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		// Create a new output produced by the transferTx
 		_ = f.CreateOutputForTransaction(tokenCreate, amount, transferTx, 0)
 
-		outputsResp, err := handler.QueryTokenOutputsToken(ctx, &tokenpb.QueryTokenOutputsRequest{
+		outputsResp, err := handler.QueryTokenOutputs(ctx, &tokenpb.QueryTokenOutputsRequest{
 			OwnerPublicKeys: [][]byte{mintOutput.OwnerPublicKey.Serialize()},
 			Network:         sparkpb.Network_REGTEST,
 		})
@@ -154,7 +153,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 				req.PageRequest.Cursor = afterCursor
 			}
 
-			resp, err := handler.QueryTokenOutputsToken(ctx, req)
+			resp, err := handler.QueryTokenOutputs(ctx, req)
 			require.NoError(t, err)
 			require.NotNil(t, resp.PageResponse)
 
@@ -182,7 +181,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 	})
 
 	t.Run("backward pagination", func(t *testing.T) {
-		resp, err := handler.QueryTokenOutputsToken(ctx, &tokenpb.QueryTokenOutputsRequest{
+		resp, err := handler.QueryTokenOutputs(ctx, &tokenpb.QueryTokenOutputsRequest{
 			OwnerPublicKeys: [][]byte{ownerKey.Public().Serialize()},
 			Network:         sparkpb.Network_REGTEST,
 			PageRequest: &sparkpb.PageRequest{
@@ -198,7 +197,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 		require.NotEmpty(t, beforeCursor)
 
 		// Backward pagination should return an error
-		_, err = handler.QueryTokenOutputsToken(ctx, &tokenpb.QueryTokenOutputsRequest{
+		_, err = handler.QueryTokenOutputs(ctx, &tokenpb.QueryTokenOutputsRequest{
 			OwnerPublicKeys: [][]byte{ownerKey.Public().Serialize()},
 			Network:         sparkpb.Network_REGTEST,
 			PageRequest: &sparkpb.PageRequest{
@@ -211,7 +210,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 	})
 
 	t.Run("default page size", func(t *testing.T) {
-		resp, err := handler.QueryTokenOutputsToken(ctx, &tokenpb.QueryTokenOutputsRequest{
+		resp, err := handler.QueryTokenOutputs(ctx, &tokenpb.QueryTokenOutputsRequest{
 			OwnerPublicKeys: [][]byte{ownerKey.Public().Serialize()},
 			Network:         sparkpb.Network_REGTEST,
 			// PageRequest not set, should use DefaultTokenOutputPageSize
@@ -226,7 +225,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 	})
 
 	t.Run("page size limit", func(t *testing.T) {
-		resp, err := handler.QueryTokenOutputsToken(ctx, &tokenpb.QueryTokenOutputsRequest{
+		resp, err := handler.QueryTokenOutputs(ctx, &tokenpb.QueryTokenOutputsRequest{
 			OwnerPublicKeys: [][]byte{ownerKey.Public().Serialize()},
 			Network:         sparkpb.Network_REGTEST,
 			PageRequest: &sparkpb.PageRequest{

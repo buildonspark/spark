@@ -45,28 +45,17 @@ func validateQueryTokenOutputsRequest(req *tokenpb.QueryTokenOutputsRequest) err
 }
 
 type QueryTokenOutputsHandler struct {
-	config                     *so.Config
-	includeExpiredTransactions bool
+	config *so.Config
 }
 
-// NewQueryTokenOutputsHandler creates a new QueryTokenOutputsHandler.
 func NewQueryTokenOutputsHandler(config *so.Config) *QueryTokenOutputsHandler {
 	return &QueryTokenOutputsHandler{
-		config:                     config,
-		includeExpiredTransactions: false,
+		config: config,
 	}
 }
 
-func NewQueryTokenOutputsHandlerWithExpiredTransactions(config *so.Config) *QueryTokenOutputsHandler {
-	return &QueryTokenOutputsHandler{
-		config:                     config,
-		includeExpiredTransactions: true,
-	}
-}
-
-// QueryTokenOutputsToken is the native tokenpb endpoint for SparkTokenService.
-func (h *QueryTokenOutputsHandler) QueryTokenOutputsToken(ctx context.Context, req *tokenpb.QueryTokenOutputsRequest) (*tokenpb.QueryTokenOutputsResponse, error) {
-	ctx, span := GetTracer().Start(ctx, "QueryTokenOutputsHandler.queryTokenOutputsInternal")
+func (h *QueryTokenOutputsHandler) QueryTokenOutputs(ctx context.Context, req *tokenpb.QueryTokenOutputsRequest) (*tokenpb.QueryTokenOutputsResponse, error) {
+	ctx, span := GetTracer().Start(ctx, "QueryTokenOutputsHandler.QueryTokenOutputs")
 	defer span.End()
 
 	if err := validateQueryTokenOutputsRequest(req); err != nil {
