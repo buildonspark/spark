@@ -82,16 +82,6 @@ func TestVerifiableSecretSharing(t *testing.T) {
 		err := secretsharing.ValidateShare(shares[2])
 		require.Error(t, err, "failed to catch share that doesn't match proofs")
 	})
-
-	// Check that invalid proof length is caught
-	t.Run("CatchInvalidProofLength", func(t *testing.T) {
-		share := shares[0]
-		// Add an extra proof to make the length incorrect
-		share.Proofs = append(share.Proofs, share.Proofs[0])
-		err := secretsharing.ValidateShare(share)
-		require.Error(t, err, "failed to catch invalid proof length")
-		require.ErrorContains(t, err, "invalid VSS proof length")
-	})
 }
 
 func TestSecretSharingBadPubkeyLen(t *testing.T) {

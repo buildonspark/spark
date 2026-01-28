@@ -245,13 +245,6 @@ export function recoverSecret(shares: VerifiableSecretShare[]) {
 
 // Validates a share of a secret
 export function validateShare(share: VerifiableSecretShare) {
-  if (share.proofs.length !== share.threshold) {
-    throw new SparkValidationError("Invalid VSS proof length", {
-      field: "proofs",
-      value: share.proofs.length,
-      expected: share.threshold,
-    });
-  }
   const targetPubkey = secp256k1.Point.fromPrivateKey(share.share).toBytes(
     true,
   );

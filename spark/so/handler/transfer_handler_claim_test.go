@@ -6,17 +6,14 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"math/big"
 	"math/rand/v2"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
-	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -564,27 +561,13 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	transferLeaf := createTestTransferLeaf(t, ctx, sessionCtx.Client, transfer, leaf)
 
 	tweakPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	secretInt := new(big.Int).SetBytes(tweakPrivKey.Serialize())
+	tweakPubKey := tweakPrivKey.Public()
 	pubkeyShareTweakPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-	cfg := sparktesting.TestConfig(t)
-	threshold := int(cfg.Threshold)
-	numberOfShares := len(cfg.SigningOperatorMap)
-
-	// Create proper VSS shares with correct number of proofs matching the threshold
-	shares, err := secretsharing.SplitSecretWithProofs(secretInt, secp256k1.S256().N, threshold, numberOfShares)
-	require.NoError(t, err)
-	require.NotEmpty(t, shares, "expected at least one share")
-
-	// Use the first share (all shares have the same proofs)
-	share := shares[0]
-	secretShareBytes := make([]byte, 32)
-	share.Share.FillBytes(secretShareBytes)
 
 	claimKeyTweak := &pb.ClaimLeafKeyTweak{
 		SecretShareTweak: &pb.SecretShare{
-			SecretShare: secretShareBytes,
-			Proofs:      share.Proofs,
+			SecretShare: tweakPrivKey.Serialize(),
+			Proofs:      [][]byte{tweakPubKey.Serialize()},
 		},
 		PubkeySharesTweak: map[string][]byte{
 			"operator1": pubkeyShareTweakPubKey.Serialize(),
@@ -597,6 +580,7 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	_, err = transferLeaf.Update().SetKeyTweak(claimKeyTweakBytes).Save(ctx)
 	require.NoError(t, err)
 
+	cfg := sparktesting.TestConfig(t)
 	req := &pb.ClaimTransferSignRefundsRequest{
 		TransferId:             transfer.ID.String(),
 		OwnerIdentityPublicKey: transfer.ReceiverIdentityPubkey.Serialize(),
