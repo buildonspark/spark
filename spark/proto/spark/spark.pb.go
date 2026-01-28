@@ -8517,10 +8517,11 @@ func (x *ProvidePreimageResponse) GetTransfer() *Transfer {
 }
 
 type QueryPreimageRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PaymentHash   []byte                 `protobuf:"bytes,1,opt,name=payment_hash,json=paymentHash,proto3" json:"payment_hash,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	PaymentHash            []byte                 `protobuf:"bytes,1,opt,name=payment_hash,json=paymentHash,proto3" json:"payment_hash,omitempty"`
+	ReceiverIdentityPubkey []byte                 `protobuf:"bytes,2,opt,name=receiver_identity_pubkey,json=receiverIdentityPubkey,proto3" json:"receiver_identity_pubkey,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *QueryPreimageRequest) Reset() {
@@ -8556,6 +8557,13 @@ func (*QueryPreimageRequest) Descriptor() ([]byte, []int) {
 func (x *QueryPreimageRequest) GetPaymentHash() []byte {
 	if x != nil {
 		return x.PaymentHash
+	}
+	return nil
+}
+
+func (x *QueryPreimageRequest) GetReceiverIdentityPubkey() []byte {
+	if x != nil {
+		return x.ReceiverIdentityPubkey
 	}
 	return nil
 }
@@ -11933,9 +11941,10 @@ const file_spark_proto_rawDesc = "" +
 	"\bpreimage\x18\x02 \x01(\fR\bpreimage\x12.\n" +
 	"\x13identity_public_key\x18\x03 \x01(\fR\x11identityPublicKey\"F\n" +
 	"\x17ProvidePreimageResponse\x12+\n" +
-	"\btransfer\x18\x01 \x01(\v2\x0f.spark.TransferR\btransfer\"B\n" +
+	"\btransfer\x18\x01 \x01(\v2\x0f.spark.TransferR\btransfer\"\x85\x01\n" +
 	"\x14QueryPreimageRequest\x12*\n" +
-	"\fpayment_hash\x18\x01 \x01(\fB\a\xfaB\x04z\x02h R\vpaymentHash\"E\n" +
+	"\fpayment_hash\x18\x01 \x01(\fB\a\xfaB\x04z\x02h R\vpaymentHash\x12A\n" +
+	"\x18receiver_identity_pubkey\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x16receiverIdentityPubkey\"E\n" +
 	"\x15QueryPreimageResponse\x12\x1f\n" +
 	"\bpreimage\x18\x01 \x01(\fH\x00R\bpreimage\x88\x01\x01B\v\n" +
 	"\t_preimage\"(\n" +

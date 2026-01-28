@@ -1867,6 +1867,7 @@ export interface ProvidePreimageResponse {
 
 export interface QueryPreimageRequest {
   paymentHash: Uint8Array;
+  receiverIdentityPubkey: Uint8Array;
 }
 
 export interface QueryPreimageResponse {
@@ -15862,13 +15863,16 @@ export const ProvidePreimageResponse: MessageFns<ProvidePreimageResponse> = {
 };
 
 function createBaseQueryPreimageRequest(): QueryPreimageRequest {
-  return { paymentHash: new Uint8Array(0) };
+  return { paymentHash: new Uint8Array(0), receiverIdentityPubkey: new Uint8Array(0) };
 }
 
 export const QueryPreimageRequest: MessageFns<QueryPreimageRequest> = {
   encode(message: QueryPreimageRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.paymentHash.length !== 0) {
       writer.uint32(10).bytes(message.paymentHash);
+    }
+    if (message.receiverIdentityPubkey.length !== 0) {
+      writer.uint32(18).bytes(message.receiverIdentityPubkey);
     }
     return writer;
   },
@@ -15888,6 +15892,14 @@ export const QueryPreimageRequest: MessageFns<QueryPreimageRequest> = {
           message.paymentHash = reader.bytes();
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.receiverIdentityPubkey = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -15898,13 +15910,21 @@ export const QueryPreimageRequest: MessageFns<QueryPreimageRequest> = {
   },
 
   fromJSON(object: any): QueryPreimageRequest {
-    return { paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0) };
+    return {
+      paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
+      receiverIdentityPubkey: isSet(object.receiverIdentityPubkey)
+        ? bytesFromBase64(object.receiverIdentityPubkey)
+        : new Uint8Array(0),
+    };
   },
 
   toJSON(message: QueryPreimageRequest): unknown {
     const obj: any = {};
     if (message.paymentHash.length !== 0) {
       obj.paymentHash = base64FromBytes(message.paymentHash);
+    }
+    if (message.receiverIdentityPubkey.length !== 0) {
+      obj.receiverIdentityPubkey = base64FromBytes(message.receiverIdentityPubkey);
     }
     return obj;
   },
@@ -15915,6 +15935,7 @@ export const QueryPreimageRequest: MessageFns<QueryPreimageRequest> = {
   fromPartial(object: DeepPartial<QueryPreimageRequest>): QueryPreimageRequest {
     const message = createBaseQueryPreimageRequest();
     message.paymentHash = object.paymentHash ?? new Uint8Array(0);
+    message.receiverIdentityPubkey = object.receiverIdentityPubkey ?? new Uint8Array(0);
     return message;
   },
 };

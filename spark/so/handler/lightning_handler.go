@@ -1786,13 +1786,21 @@ func (h *LightningHandler) QueryPreimage(ctx context.Context, req *pbspark.Query
 	}
 	identityPubKey := session.IdentityPublicKey()
 
+	receiverIdentityPubKey, err := keys.ParsePublicKey(req.ReceiverIdentityPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
+	}
+
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database context: %w", err)
 	}
 
 	preimageRequest, err := tx.PreimageRequest.Query().
-		Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).
+		Where(
+			preimagerequest.PaymentHashEQ(req.PaymentHash),
+			preimagerequest.ReceiverIdentityPubkeyEQ(receiverIdentityPubKey),
+		).
 		WithTransfers().
 		First(ctx)
 	if err != nil {

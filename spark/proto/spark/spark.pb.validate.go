@@ -18009,6 +18009,17 @@ func (m *QueryPreimageRequest) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	if len(m.GetReceiverIdentityPubkey()) != 33 {
+		err := QueryPreimageRequestValidationError{
+			field:  "ReceiverIdentityPubkey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	if len(errors) > 0 {
 		return QueryPreimageRequestMultiError(errors)
 	}

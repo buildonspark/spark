@@ -1249,6 +1249,7 @@ message ProvidePreimageResponse {
 
 message QueryPreimageRequest {
     bytes payment_hash = 1 [(validate.rules).bytes.len = 32];
+    bytes receiver_identity_pubkey = 2 [(validate.rules).bytes.len = 33];
 }
 
 message QueryPreimageResponse {
