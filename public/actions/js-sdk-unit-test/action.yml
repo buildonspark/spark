@@ -28,7 +28,7 @@ runs:
     - name: "Install Protoc"
       uses: arduino/setup-protoc@v3
       with:
-        version: "29.3"
+        version: "33.2"
         repo-token: ${{ inputs.repo-token }}
 
     - name: "Setup Rust"
