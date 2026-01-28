@@ -62,13 +62,11 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			require.Equal(t, uint32(0), outputData.PreviousTransactionVout, "queried output vout mismatch")
 			require.NotNil(t, outputData.Output.Id, "expected non-nil output ID from query")
 
-			expectedOutputID := *outputData.Output.Id
-
 			require.Equal(t, expectedAmount, frozenAmount,
 				"frozen amount %s does not match expected amount %s", frozenAmount.String(), expectedAmount.String())
+			// TODO(SPARK-335): Update freeze RPC to return outpoints instead of output UUIDs,
+			// then re-enable output ID validation. UUIDs differ across SOs.
 			require.Len(t, freezeResponse.ImpactedOutputIds, 1, "expected 1 impacted output ID")
-			require.Equal(t, expectedOutputID, freezeResponse.ImpactedOutputIds[0],
-				"frozen output ID %s does not match expected output ID %s", freezeResponse.ImpactedOutputIds[0], expectedOutputID)
 
 			transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPb(
 				t, config, finalIssueTokenTransactionHash, tokenPrivKey.Public(), tokenIdentifier,
@@ -93,8 +91,6 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			require.Equal(t, expectedAmount, thawedAmount,
 				"thawed amount %s does not match expected amount %s", thawedAmount.String(), expectedAmount.String())
 			require.Len(t, unfreezeResponse.ImpactedOutputIds, 1, "expected 1 impacted output ID")
-			require.Equal(t, expectedOutputID, unfreezeResponse.ImpactedOutputIds[0],
-				"thawed output ID %s does not match expected output ID %s", unfreezeResponse.ImpactedOutputIds[0], expectedOutputID)
 
 			transferTokenTransactionPostThaw, _, err := createTestTokenTransferTransactionTokenPb(
 				t, config, finalIssueTokenTransactionHash, tokenPrivKey.Public(), tokenIdentifier,

@@ -2,6 +2,7 @@ package sparktesting
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ func TestKnobController_SetKnob(t *testing.T) {
 		},
 	)
 
+	// original mirrors ConfigMap data to simulate NewKnobController's snapshot behavior
 	controller := &KnobController{
 		client:   client,
 		original: map[string]string{"existing.knob": "50"},
@@ -277,7 +279,7 @@ func TestKnobController_ConcurrentAccess(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			knobName := "concurrent.knob." + string(rune('a'+i))
+			knobName := fmt.Sprintf("concurrent.knob.%d", i)
 			err := controller.SetKnob(t, knobName, float64(i*10))
 			assert.NoError(t, err)
 		}(i)
