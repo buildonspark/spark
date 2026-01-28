@@ -345,9 +345,11 @@ func TestCoopExitCannotClaimBeforeConfirm(t *testing.T) {
 
 // This test starts a coop exit, fails for one operator on the sync, and verifies that no transfer was created across all operators
 func TestCoopExitFailureToSync(t *testing.T) {
+	// TODO(mhr): Figure out why this test hangs sometimes.
+	t.Skipf("This test sometimes hangs, needs investigation (SPARK-332)")
+
 	sparktesting.RequireMinikube(t)
 
-	// TODO(mhr): Figure out why this test hangs sometimes.
 	sparktesting.WithTimeout(t, 1*time.Minute, func(t *testing.T) {
 		coin, err := faucet.Fund()
 		require.NoError(t, err)

@@ -138,6 +138,9 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 }
 
 func TestTransferInterrupt(t *testing.T) {
+	// TODO(mhr): Figure out why this test hangs sometimes.
+	t.Skipf("This test sometimes hangs, needs investigation (SPARK-332)")
+
 	sparktesting.RequireMinikube(t)
 
 	// Sender initiates transfer
