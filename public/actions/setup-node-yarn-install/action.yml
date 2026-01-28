@@ -5,11 +5,7 @@ inputs:
   node-version:
     description: "Node.js version spec passed to actions/setup-node (e.g. 20.x)"
     required: false
-    default: ""
-  node-version-file:
-    description: "Path to file containing Node version (e.g. .nvmrc)"
-    required: false
-    default: ".nvmrc"
+    default: "20.x"
   skip-yarn-corepack-check:
     description: "Sets SKIP_YARN_COREPACK_CHECK env var for actions/setup-node"
     required: false
@@ -48,15 +44,8 @@ runs:
       shell: bash
       run: |
         if [[ -z "${{ inputs.node-version }}" ]]; then
-          if [[ -z "${{ inputs.node-version-file }}" ]]; then
-            echo "Must provide either inputs.node-version or inputs.node-version-file" >&2
-            exit 1
-          fi
-
-          if [[ ! -f "${{ inputs.node-version-file }}" ]]; then
-            echo "Node version file not found: ${{ inputs.node-version-file }}" >&2
-            exit 1
-          fi
+          echo "Must provide inputs.node-version" >&2
+          exit 1
         fi
 
     - name: "Setup Node.js (from version)"
@@ -66,14 +55,6 @@ runs:
         SKIP_YARN_COREPACK_CHECK: ${{ inputs.skip-yarn-corepack-check }}
       with:
         node-version: ${{ inputs.node-version }}
-
-    - name: "Setup Node.js (from version file)"
-      if: inputs.node-version == ''
-      uses: actions/setup-node@v4
-      env:
-        SKIP_YARN_COREPACK_CHECK: ${{ inputs.skip-yarn-corepack-check }}
-      with:
-        node-version-file: ${{ inputs.node-version-file }}
 
     - name: "Install dependencies (yarn-install)"
       uses: ./public/actions/yarn-install
