@@ -170,6 +170,9 @@ func validateTxStructure(rawTxBytes []byte) error {
 		if bytesReadLoop == 0 {
 			return fmt.Errorf("failed to read input script length")
 		}
+		if scriptLen > uint64(len(rawTxBytes)-offset-bytesReadLoop) {
+			return fmt.Errorf("input script length %d exceeds remaining transaction bytes, overflow detected", scriptLen)
+		}
 		offset += bytesReadLoop + int(scriptLen)
 		// Skip sequence (4 bytes)
 		offset += 4

@@ -173,6 +173,9 @@ func constructRefundTransactionGeneric(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse %s: %w", parseTxName, err)
 	}
+	if int(vout) >= len(parsedTx.TxOut) {
+		return nil, fmt.Errorf("vout %d out of bounds for %s with %d outputs", vout, parseTxName, len(parsedTx.TxOut))
+	}
 
 	sourceValue := parsedTx.TxOut[vout].Value
 	var refundAmount int64
@@ -387,6 +390,9 @@ func GetCpfpTimelockFromLeaf(dbLeaf *ent.TreeNode) (uint32, error) {
 	rawRefundTx, err := common.TxFromRawTxBytes(dbLeaf.RawRefundTx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse CPFP refund transaction: %w", err)
+	}
+	if len(rawRefundTx.TxIn) == 0 {
+		return 0, fmt.Errorf("CPFP refund transaction has no inputs")
 	}
 	cpfpRefundTxTimelock := GetTimelockFromSequence(rawRefundTx.TxIn[0].Sequence)
 	return cpfpRefundTxTimelock, nil

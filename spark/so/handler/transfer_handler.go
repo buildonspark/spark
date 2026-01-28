@@ -918,7 +918,10 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 
 	// Process each leaf's signing jobs
 	for _, req := range requests.LeavesToSend {
-		leaf := leafMap[req.LeafId]
+		leaf, exists := leafMap[req.LeafId]
+		if !exists {
+			return nil, fmt.Errorf("leaf %s not found in leafMap", req.LeafId)
+		}
 		cpfpRefundTx, err := common.TxFromRawTxBytes(req.RefundTxSigningJob.RawTx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to load new refund tx: %w", err)
@@ -1184,7 +1187,10 @@ func SignRefundsWithPregeneratedNonce(
 
 	var signingJobs []*helper.SigningJobWithPregeneratedNonce
 	for _, req := range requests.TransferPackage.LeavesToSend {
-		leaf := leafMap[req.LeafId]
+		leaf, exists := leafMap[req.LeafId]
+		if !exists {
+			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", req.LeafId)
+		}
 		refundTx, err := common.TxFromRawTxBytes(req.RawTx)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to load new refund tx: %w", err)
@@ -1251,7 +1257,10 @@ func SignRefundsWithPregeneratedNonce(
 
 	// Create signing jobs for DIRECT refund txs.
 	for _, req := range requests.TransferPackage.DirectLeavesToSend {
-		leaf := leafMap[req.LeafId]
+		leaf, exists := leafMap[req.LeafId]
+		if !exists {
+			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", req.LeafId)
+		}
 		directRefundTx, err := common.TxFromRawTxBytes(req.RawTx)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to load new direct refund tx: %w", err)
@@ -1310,7 +1319,10 @@ func SignRefundsWithPregeneratedNonce(
 	}
 	// Create signing jobs for DIRECT FROM CPFP refund txs.
 	for _, req := range requests.TransferPackage.DirectFromCpfpLeavesToSend {
-		leaf := leafMap[req.LeafId]
+		leaf, exists := leafMap[req.LeafId]
+		if !exists {
+			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", req.LeafId)
+		}
 		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.RawTx)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to load new direct from cpfp refund tx: %w", err)
@@ -1442,7 +1454,10 @@ func AggregateSignatures(
 	for leafID, signingResult := range cpfpSigningResultMap {
 		logger.Sugar().Infof("Aggregating cpfp frost signature for leaf %s (message: %x)", leafID, signingResult.Message)
 		cpfpUserSignedRefund := cpfpUserRefundMap[leafID]
-		leaf := leafMap[leafID]
+		leaf, exists := leafMap[leafID]
+		if !exists {
+			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", leafID)
+		}
 		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
 			Message:            signingResult.Message,
 			SignatureShares:    signingResult.SignatureShares,
@@ -1463,7 +1478,10 @@ func AggregateSignatures(
 	for leafID, signingResult := range directSigningResultMap {
 		logger.Sugar().Infof("Aggregating direct frost signature for direct results for leaf %s (message: %x)", leafID, signingResult.Message)
 		directUserSignedRefund := directUserRefundMap[leafID]
-		leaf := leafMap[leafID]
+		leaf, exists := leafMap[leafID]
+		if !exists {
+			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", leafID)
+		}
 		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
 			Message:            signingResult.Message,
 			SignatureShares:    signingResult.SignatureShares,
@@ -1488,7 +1506,10 @@ func AggregateSignatures(
 			signingResult.Message,
 		)
 		directFromCpfpUserSignedRefund := directFromCpfpUserRefundMap[leafID]
-		leaf := leafMap[leafID]
+		leaf, exists := leafMap[leafID]
+		if !exists {
+			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", leafID)
+		}
 		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
 			Message:            signingResult.Message,
 			SignatureShares:    signingResult.SignatureShares,
