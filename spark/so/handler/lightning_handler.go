@@ -37,6 +37,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
@@ -749,7 +750,7 @@ func (h *LightningHandler) GetPreimageShare(
 	}
 	err = h.ValidateDuplicateLeaves(ctx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
 	if err != nil {
-		return nil, fmt.Errorf("unable to validate duplicate leaves: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer leaves validation failed: %w", err))
 	}
 
 	// TODO: Once SSP has removed the query user refund call, we can replace everything with transfer request and remove this validation.
@@ -759,7 +760,7 @@ func (h *LightningHandler) GetPreimageShare(
 	if transferRequest != nil {
 		err := h.validateIdenticalLeavesInTransferAndTransferRequest(ctx, req)
 		if err != nil {
-			return nil, fmt.Errorf("unable to validate identical transfer and transfer request: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer validation failed: %w", err))
 		}
 	}
 
@@ -1175,7 +1176,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 
 	err = h.ValidateDuplicateLeaves(ctx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
 	if err != nil {
-		return nil, fmt.Errorf("unable to validate duplicate leaves: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer leaves validation failed: %w", err))
 	}
 
 	// TODO: Once SSP has removed the query user refund call, we can replace everything with transfer request and remove this validation.
@@ -1185,7 +1186,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	if transferRequest != nil {
 		err := h.validateIdenticalLeavesInTransferAndTransferRequest(ctx, req)
 		if err != nil {
-			return nil, fmt.Errorf("unable to validate identical transfer and transfer request: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer validation failed: %w", err))
 		}
 	}
 
