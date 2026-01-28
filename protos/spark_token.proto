@@ -289,7 +289,7 @@ message QueryTokenOutputsRequest {
     // Optionally provide issuer public keys or token identifiers. If both are not set return outputs for all tokens.
     repeated bytes issuer_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
     repeated bytes token_identifiers = 4 [(validate.rules).repeated.items.bytes.len = 32];
-    spark.Network network = 3; // defaults to mainnet when no network is provided.
+    spark.Network network = 3;
     // For pagination
     spark.PageRequest page_request = 5;
 }

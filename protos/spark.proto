@@ -920,7 +920,7 @@ message TransferFilter {
     int64 limit = 40;
     int64 offset = 50;
     repeated TransferType types = 70;
-    Network network = 4; // defaults to mainnet when no network is provided.
+    Network network = 4;
     repeated TransferStatus statuses = 80;
     Order order = 5;
 
@@ -1268,7 +1268,7 @@ message QueryNodesRequest {
     bool include_parents = 3;
     int64 limit = 4;
     int64 offset = 5;
-    Network network = 6; // defaults to mainnet when no network is provided. Does not check network when querying by node_ids
+    Network network = 6; // Does not check network when querying by node_ids
     repeated TreeNodeStatus statuses = 7;
 }
 
@@ -1292,14 +1292,14 @@ message CancelTransferResponse {
 **/
 message QueryUnusedDepositAddressesRequest {
     bytes identity_public_key = 1;
-    Network network = 2; // defaults to mainnet when no network is provided.
+    Network network = 2;
     int64 limit = 3; // defaults to 100 if not set.
     int64 offset = 4; // defaults to 0 if not set.
 }
 
 message QueryStaticDepositAddressesRequest {
     bytes identity_public_key = 1;
-    Network network = 2; // defaults to mainnet when no network is provided.
+    Network network = 2;
     int64 limit = 4;
     int64 offset = 5;
     // Optional filter. When specified, only the DepositAddress with this address is returned.
@@ -1325,7 +1325,7 @@ message QueryStaticDepositAddressesResponse {
 
 message QueryBalanceRequest {
     bytes identity_public_key = 1;
-    Network network = 2; // defaults to mainnet when no network is provided.
+    Network network = 2;
 }
 
 message QueryBalanceResponse {

@@ -1472,7 +1472,6 @@ export interface TransferFilter {
   limit: number;
   offset: number;
   types: TransferType[];
-  /** defaults to mainnet when no network is provided. */
   network: Network;
   statuses: TransferStatus[];
   order: Order;
@@ -1886,7 +1885,7 @@ export interface QueryNodesRequest {
   includeParents: boolean;
   limit: number;
   offset: number;
-  /** defaults to mainnet when no network is provided. Does not check network when querying by node_ids */
+  /** Does not check network when querying by node_ids */
   network: Network;
   statuses: TreeNodeStatus[];
 }
@@ -1916,7 +1915,6 @@ export interface CancelTransferResponse {
  */
 export interface QueryUnusedDepositAddressesRequest {
   identityPublicKey: Uint8Array;
-  /** defaults to mainnet when no network is provided. */
   network: Network;
   /** defaults to 100 if not set. */
   limit: number;
@@ -1926,7 +1924,6 @@ export interface QueryUnusedDepositAddressesRequest {
 
 export interface QueryStaticDepositAddressesRequest {
   identityPublicKey: Uint8Array;
-  /** defaults to mainnet when no network is provided. */
   network: Network;
   limit: number;
   offset: number;
@@ -1954,7 +1951,6 @@ export interface QueryStaticDepositAddressesResponse {
 
 export interface QueryBalanceRequest {
   identityPublicKey: Uint8Array;
-  /** defaults to mainnet when no network is provided. */
   network: Network;
 }
 

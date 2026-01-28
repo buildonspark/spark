@@ -1979,7 +1979,7 @@ type QueryTokenOutputsRequest struct {
 	// Optionally provide issuer public keys or token identifiers. If both are not set return outputs for all tokens.
 	IssuerPublicKeys [][]byte      `protobuf:"bytes,2,rep,name=issuer_public_keys,json=issuerPublicKeys,proto3" json:"issuer_public_keys,omitempty"`
 	TokenIdentifiers [][]byte      `protobuf:"bytes,4,rep,name=token_identifiers,json=tokenIdentifiers,proto3" json:"token_identifiers,omitempty"`
-	Network          spark.Network `protobuf:"varint,3,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"` // defaults to mainnet when no network is provided.
+	Network          spark.Network `protobuf:"varint,3,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
 	// For pagination
 	PageRequest   *spark.PageRequest `protobuf:"bytes,5,opt,name=page_request,json=pageRequest,proto3" json:"page_request,omitempty"`
 	unknownFields protoimpl.UnknownFields

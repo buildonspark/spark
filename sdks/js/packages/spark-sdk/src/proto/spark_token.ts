@@ -446,7 +446,6 @@ export interface QueryTokenOutputsRequest {
   /** Optionally provide issuer public keys or token identifiers. If both are not set return outputs for all tokens. */
   issuerPublicKeys: Uint8Array[];
   tokenIdentifiers: Uint8Array[];
-  /** defaults to mainnet when no network is provided. */
   network: Network;
   /** For pagination */
   pageRequest: PageRequest | undefined;

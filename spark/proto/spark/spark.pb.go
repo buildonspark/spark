@@ -5628,7 +5628,7 @@ type TransferFilter struct {
 	Limit       int64                        `protobuf:"varint,40,opt,name=limit,proto3" json:"limit,omitempty"`
 	Offset      int64                        `protobuf:"varint,50,opt,name=offset,proto3" json:"offset,omitempty"`
 	Types       []TransferType               `protobuf:"varint,70,rep,packed,name=types,proto3,enum=spark.TransferType" json:"types,omitempty"`
-	Network     Network                      `protobuf:"varint,4,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"` // defaults to mainnet when no network is provided.
+	Network     Network                      `protobuf:"varint,4,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
 	Statuses    []TransferStatus             `protobuf:"varint,80,rep,packed,name=statuses,proto3,enum=spark.TransferStatus" json:"statuses,omitempty"`
 	Order       Order                        `protobuf:"varint,5,opt,name=order,proto3,enum=spark.Order" json:"order,omitempty"`
 	// Types that are valid to be assigned to TimeFilter:
@@ -8666,7 +8666,7 @@ type QueryNodesRequest struct {
 	IncludeParents bool                       `protobuf:"varint,3,opt,name=include_parents,json=includeParents,proto3" json:"include_parents,omitempty"`
 	Limit          int64                      `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
 	Offset         int64                      `protobuf:"varint,5,opt,name=offset,proto3" json:"offset,omitempty"`
-	Network        Network                    `protobuf:"varint,6,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"` // defaults to mainnet when no network is provided. Does not check network when querying by node_ids
+	Network        Network                    `protobuf:"varint,6,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"` // Does not check network when querying by node_ids
 	Statuses       []TreeNodeStatus           `protobuf:"varint,7,rep,packed,name=statuses,proto3,enum=spark.TreeNodeStatus" json:"statuses,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -8932,9 +8932,9 @@ func (x *CancelTransferResponse) GetTransfer() *Transfer {
 type QueryUnusedDepositAddressesRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	IdentityPublicKey []byte                 `protobuf:"bytes,1,opt,name=identity_public_key,json=identityPublicKey,proto3" json:"identity_public_key,omitempty"`
-	Network           Network                `protobuf:"varint,2,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"` // defaults to mainnet when no network is provided.
-	Limit             int64                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`                        // defaults to 100 if not set.
-	Offset            int64                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`                      // defaults to 0 if not set.
+	Network           Network                `protobuf:"varint,2,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
+	Limit             int64                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`   // defaults to 100 if not set.
+	Offset            int64                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"` // defaults to 0 if not set.
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -9000,7 +9000,7 @@ func (x *QueryUnusedDepositAddressesRequest) GetOffset() int64 {
 type QueryStaticDepositAddressesRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	IdentityPublicKey []byte                 `protobuf:"bytes,1,opt,name=identity_public_key,json=identityPublicKey,proto3" json:"identity_public_key,omitempty"`
-	Network           Network                `protobuf:"varint,2,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"` // defaults to mainnet when no network is provided.
+	Network           Network                `protobuf:"varint,2,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
 	Limit             int64                  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
 	Offset            int64                  `protobuf:"varint,5,opt,name=offset,proto3" json:"offset,omitempty"`
 	// Optional filter. When specified, only the DepositAddress with this address is returned.
@@ -9249,7 +9249,7 @@ func (x *QueryStaticDepositAddressesResponse) GetDepositAddresses() []*DepositAd
 type QueryBalanceRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	IdentityPublicKey []byte                 `protobuf:"bytes,1,opt,name=identity_public_key,json=identityPublicKey,proto3" json:"identity_public_key,omitempty"`
-	Network           Network                `protobuf:"varint,2,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"` // defaults to mainnet when no network is provided.
+	Network           Network                `protobuf:"varint,2,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
