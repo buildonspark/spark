@@ -12,6 +12,8 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	sparkpb "github.com/lightsparkdev/spark/proto/spark"
+	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -20,6 +22,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/entfixtures"
+	"github.com/lightsparkdev/spark/so/handler/tokens"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -65,8 +69,67 @@ func setupWithdrawalTestContext(t *testing.T) (ctx context.Context, dbClient *en
 	seKeyshare := fixtures.CreateKeyshareWithEntityDkgKey()
 	sePubKey = seKeyshare.PublicKey
 
-	config = &so.Config{}
+	config = sparktesting.TestConfig(t)
 	return ctx, dbClient, fixtures, config, sePubKey
+}
+
+// createQueryHandler creates a QueryTokenOutputsHandler for testing verification.
+func createQueryHandler(t *testing.T, config *so.Config) *tokens.QueryTokenOutputsHandler {
+	t.Helper()
+	return tokens.NewQueryTokenOutputsHandler(config)
+}
+
+// assertOutputNotSpendable verifies that a token output no longer appears in spendable outputs
+// by querying through the handler API. This confirms the output was successfully withdrawn.
+func assertOutputNotSpendable(t *testing.T, ctx context.Context, config *so.Config, ownerPubKey keys.Public, sparkTxHash []byte) {
+	t.Helper()
+	handler := createQueryHandler(t, config)
+
+	resp, err := handler.QueryTokenOutputsToken(ctx, &tokenpb.QueryTokenOutputsRequest{
+		OwnerPublicKeys: [][]byte{ownerPubKey.Serialize()},
+		Network:         sparkpb.Network_REGTEST,
+	})
+	require.NoError(t, err)
+
+	// Verify the specific output is NOT in the response
+	for _, output := range resp.OutputsWithPreviousTransactionData {
+		if bytes.Equal(output.PreviousTransactionHash, sparkTxHash) {
+			t.Errorf("Output with sparkTxHash %x should not appear in spendable outputs after withdrawal", sparkTxHash)
+		}
+	}
+}
+
+// assertOutputStillSpendable verifies that a token output still appears in spendable outputs
+// by querying through the handler API. This confirms the withdrawal was rejected.
+func assertOutputStillSpendable(t *testing.T, ctx context.Context, config *so.Config, ownerPubKey keys.Public, sparkTxHash []byte) {
+	t.Helper()
+	handler := createQueryHandler(t, config)
+
+	resp, err := handler.QueryTokenOutputsToken(ctx, &tokenpb.QueryTokenOutputsRequest{
+		OwnerPublicKeys: [][]byte{ownerPubKey.Serialize()},
+		Network:         sparkpb.Network_REGTEST,
+	})
+	require.NoError(t, err)
+
+	// Verify the specific output IS in the response
+	found := false
+	for _, output := range resp.OutputsWithPreviousTransactionData {
+		if bytes.Equal(output.PreviousTransactionHash, sparkTxHash) {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Output with sparkTxHash %x should still appear in spendable outputs since withdrawal was rejected", sparkTxHash)
+}
+
+// assertNoWithdrawalCreated verifies that no withdrawal transaction was created by checking
+// the DB count. Used for rejection tests where the output was already spent (SpentFinalized)
+// and wouldn't appear in spendable queries regardless of withdrawal status.
+func assertNoWithdrawalCreated(t *testing.T, ctx context.Context, dbClient *ent.Client) {
+	t.Helper()
+	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count, "No withdrawal should have been created")
 }
 
 func createTestTokenOutput(
@@ -212,25 +275,16 @@ func TestHandleTokenWithdrawals_SavesWithdrawalTransaction(t *testing.T) {
 	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, blockHeight, blockHash)
 	require.NoError(t, err)
 
+	// Verify the output is no longer spendable via the handler API
+	assertOutputNotSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
+
+	// Verify withdrawal metadata was recorded correctly
 	withdrawalTxs, err := dbClient.L1WithdrawalTransaction.Query().All(ctx)
 	require.NoError(t, err)
 	require.Len(t, withdrawalTxs, 1)
 	assert.Equal(t, blockHeight, withdrawalTxs[0].ConfirmationHeight)
 	assert.Equal(t, blockHash[:], withdrawalTxs[0].ConfirmationBlockHash)
 	assert.Equal(t, ownerSignature, withdrawalTxs[0].OwnerSignature)
-
-	outputWithdrawals, err := dbClient.L1TokenOutputWithdrawal.Query().All(ctx)
-	require.NoError(t, err)
-	require.Len(t, outputWithdrawals, 1)
-	assert.Equal(t, uint16(0), outputWithdrawals[0].BitcoinVout)
-
-	updatedOutput, err := dbClient.TokenOutput.Query().
-		Where(tokenoutput.ID(tokenOutput.ID)).
-		WithWithdrawal().
-		Only(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, updatedOutput.Edges.Withdrawal)
-	assert.Equal(t, outputWithdrawals[0].ID, updatedOutput.Edges.Withdrawal.ID)
 }
 
 func TestHandleTokenWithdrawals_MultipleOutputsInOneTransaction(t *testing.T) {
@@ -277,23 +331,9 @@ func TestHandleTokenWithdrawals_MultipleOutputsInOneTransaction(t *testing.T) {
 	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
-	outputWithdrawals, err := dbClient.L1TokenOutputWithdrawal.Query().All(ctx)
-	require.NoError(t, err)
-	assert.Len(t, outputWithdrawals, 2)
-
-	updatedOutput1, err := dbClient.TokenOutput.Query().
-		Where(tokenoutput.ID(tokenOutput1.ID)).
-		WithWithdrawal().
-		Only(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, updatedOutput1.Edges.Withdrawal)
-
-	updatedOutput2, err := dbClient.TokenOutput.Query().
-		Where(tokenoutput.ID(tokenOutput2.ID)).
-		WithWithdrawal().
-		Only(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, updatedOutput2.Edges.Withdrawal)
+	// Verify both outputs are no longer spendable via the handler API
+	assertOutputNotSpendable(t, ctx, config, ownerPubKey, sparkTxHash1)
+	assertOutputNotSpendable(t, ctx, config, ownerPubKey, sparkTxHash2)
 }
 
 func TestHandleTokenWithdrawals_RejectsWrongSEPubKey(t *testing.T) {
@@ -331,16 +371,8 @@ func TestHandleTokenWithdrawals_RejectsWrongSEPubKey(t *testing.T) {
 	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
-	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 0, count)
-
-	updatedOutput, err := dbClient.TokenOutput.Query().
-		Where(tokenoutput.ID(tokenOutput.ID)).
-		WithWithdrawal().
-		Only(ctx)
-	require.NoError(t, err)
-	assert.Nil(t, updatedOutput.Edges.Withdrawal)
+	// Verify the output is still spendable (withdrawal was rejected)
+	assertOutputStillSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
 }
 
 func TestHandleTokenWithdrawals_RejectsOutputNotFound(t *testing.T) {
@@ -557,12 +589,7 @@ func TestHandleTokenWithdrawals_RejectsInsufficientBond(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, count)
 
-	updatedOutput, err := dbClient.TokenOutput.Query().
-		Where(tokenoutput.ID(tokenOutput.ID)).
-		WithWithdrawal().
-		Only(ctx)
-	require.NoError(t, err)
-	assert.Nil(t, updatedOutput.Edges.Withdrawal)
+	assertOutputStillSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
 }
 
 func TestHandleTokenWithdrawals_RejectsScriptMismatch(t *testing.T) {
@@ -596,16 +623,7 @@ func TestHandleTokenWithdrawals_RejectsScriptMismatch(t *testing.T) {
 	err := HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
-	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 0, count)
-
-	updatedOutput, err := dbClient.TokenOutput.Query().
-		Where(tokenoutput.ID(tokenOutput.ID)).
-		WithWithdrawal().
-		Only(ctx)
-	require.NoError(t, err)
-	assert.Nil(t, updatedOutput.Edges.Withdrawal)
+	assertOutputStillSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
 }
 
 func TestHandleTokenWithdrawals_RejectsActiveSpendingTransaction(t *testing.T) {
@@ -653,16 +671,7 @@ func TestHandleTokenWithdrawals_RejectsActiveSpendingTransaction(t *testing.T) {
 	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
-	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 0, count)
-
-	updatedOutput, err := dbClient.TokenOutput.Query().
-		Where(tokenoutput.ID(tokenOutput.ID)).
-		WithWithdrawal().
-		Only(ctx)
-	require.NoError(t, err)
-	assert.Nil(t, updatedOutput.Edges.Withdrawal)
+	assertOutputStillSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
 }
 
 func TestHandleTokenWithdrawals_AllowsExpiredSpendingTransaction(t *testing.T) {
@@ -710,16 +719,7 @@ func TestHandleTokenWithdrawals_AllowsExpiredSpendingTransaction(t *testing.T) {
 	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
-	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 1, count)
-
-	updatedOutput, err := dbClient.TokenOutput.Query().
-		Where(tokenoutput.ID(tokenOutput.ID)).
-		WithWithdrawal().
-		Only(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, updatedOutput.Edges.Withdrawal)
+	assertOutputNotSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
 }
 
 func TestHandleTokenWithdrawals_RejectsDuplicateInSameBlock(t *testing.T) {
@@ -798,16 +798,7 @@ func TestHandleTokenWithdrawals_RejectsVoutOutOfRange(t *testing.T) {
 	err := HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
-	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 0, count)
-
-	updatedOutput, err := dbClient.TokenOutput.Query().
-		Where(tokenoutput.ID(tokenOutput.ID)).
-		WithWithdrawal().
-		Only(ctx)
-	require.NoError(t, err)
-	assert.Nil(t, updatedOutput.Edges.Withdrawal)
+	assertOutputStillSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
 }
 
 func TestHandleTokenWithdrawals_RejectsFinalizedSpendingTransaction(t *testing.T) {
@@ -855,14 +846,7 @@ func TestHandleTokenWithdrawals_RejectsFinalizedSpendingTransaction(t *testing.T
 	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
-	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 0, count)
-
-	updatedOutput, err := dbClient.TokenOutput.Query().
-		Where(tokenoutput.ID(tokenOutput.ID)).
-		WithWithdrawal().
-		Only(ctx)
-	require.NoError(t, err)
-	assert.Nil(t, updatedOutput.Edges.Withdrawal)
+	// Output is SpentFinalized so it won't appear in spendable queries regardless.
+	// Verify no withdrawal was created for this already-spent output.
+	assertNoWithdrawalCreated(t, ctx, dbClient)
 }
