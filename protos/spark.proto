@@ -177,6 +177,8 @@ message GenerateDepositAddressRequest {
     optional string leaf_id = 4 [(validate.rules).string.uuid = true];
     // Generate static deposit address
     optional bool is_static = 5;
+    // The hash variant to use for computing the proof of possession message hash.
+    HashVariant hash_variant = 6;
 }
 
 /**
@@ -210,6 +212,8 @@ message GenerateStaticDepositAddressRequest {
     bytes identity_public_key = 2 [(validate.rules).bytes.len = 33];
     // The network of the bitcoin network.
     Network network = 3 [(validate.rules).enum = {not_in: [0]}];
+    // The hash variant to use for computing the proof of possession message hash.
+    HashVariant hash_variant = 4;
 }
 
 /**
@@ -230,6 +234,8 @@ message RotateStaticDepositAddressRequest {
     bytes signing_public_key = 1 [(validate.rules).bytes.len = 33];
     // The network of the bitcoin network.
     Network network = 2 [(validate.rules).enum = {not_in: [0]}];
+    // The hash variant to use for computing the proof of possession message hash.
+    HashVariant hash_variant = 3;
 }
 
 /**
@@ -1304,6 +1310,8 @@ message QueryStaticDepositAddressesRequest {
     int64 offset = 5;
     // Optional filter. When specified, only the DepositAddress with this address is returned.
     optional string deposit_address = 6;
+    // The hash variant to use for computing the proof of possession message hash.
+    HashVariant hash_variant = 7;
 }
 
 message DepositAddressQueryResult {
@@ -1375,6 +1383,7 @@ enum HashVariant {
   HASH_VARIANT_UNSPECIFIED = 0;  // Legacy
   HASH_VARIANT_V2 = 1;           // Structured hashing
 }
+
 
 message InitiateStaticDepositUtxoRefundRequest {
     UTXO on_chain_utxo = 1;

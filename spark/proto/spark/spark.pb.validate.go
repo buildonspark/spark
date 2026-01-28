@@ -1108,6 +1108,8 @@ func (m *GenerateDepositAddressRequest) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for HashVariant
+
 	if m.LeafId != nil {
 
 		if err := m._validateUuid(m.GetLeafId()); err != nil {
@@ -1542,6 +1544,8 @@ func (m *GenerateStaticDepositAddressRequest) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for HashVariant
+
 	if len(errors) > 0 {
 		return GenerateStaticDepositAddressRequestMultiError(errors)
 	}
@@ -1806,6 +1810,8 @@ func (m *RotateStaticDepositAddressRequest) validate(all bool) error {
 		}
 		errors = append(errors, err)
 	}
+
+	// no validation rules for HashVariant
 
 	if len(errors) > 0 {
 		return RotateStaticDepositAddressRequestMultiError(errors)
@@ -19003,6 +19009,8 @@ func (m *QueryStaticDepositAddressesRequest) validate(all bool) error {
 	// no validation rules for Limit
 
 	// no validation rules for Offset
+
+	// no validation rules for HashVariant
 
 	if m.DepositAddress != nil {
 		// no validation rules for DepositAddress

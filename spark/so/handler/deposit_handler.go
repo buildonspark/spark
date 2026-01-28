@@ -244,7 +244,7 @@ func (o *DepositHandler) generateDepositAddress(ctx context.Context, config *so.
 		return nil, err
 	}
 
-	msg := common.ProofOfPossessionMessageHashForDepositAddress(reqIDPubKey, keyshare.PublicKey, []byte(depositAddress))
+	msg := common.ProofOfPossessionMessageHashForDepositAddress(reqIDPubKey, keyshare.PublicKey, []byte(depositAddress), req.GetHashVariant())
 	proofOfPossessionSignature, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
 	if err != nil {
 		return nil, err
@@ -330,7 +330,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 			return nil, fmt.Errorf("failed to get keyshare for static deposit address id %s: %w", depositAddress.ID, err)
 		}
 
-		addressSignatures, proofOfPossessionSignature, err := generateStaticDepositAddressProofs(ctx, config, keyshare, depositAddress)
+		addressSignatures, proofOfPossessionSignature, err := generateStaticDepositAddressProofs(ctx, config, keyshare, depositAddress, req.GetHashVariant())
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate static deposit address proofs for static deposit address id %s: %w", depositAddress.ID, err)
 		}
@@ -361,7 +361,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		return nil, fmt.Errorf("failed to parse signing public key: %w", err)
 	}
 
-	depositAddressInfo, err := createStaticDepositAddress(ctx, config, network, idPubKey, reqSigningPubKey)
+	depositAddressInfo, err := createStaticDepositAddress(ctx, config, network, idPubKey, reqSigningPubKey, req.GetHashVariant())
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +371,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 }
 
 // Create a static deposit address in the database generating all the necessary proofs and return them as a protobuf message ready to return to the user
-func createStaticDepositAddress(ctx context.Context, config *so.Config, network btcnetwork.Network, identityPublicKey keys.Public, signingPublicKey keys.Public) (*pb.Address, error) {
+func createStaticDepositAddress(ctx context.Context, config *so.Config, network btcnetwork.Network, identityPublicKey keys.Public, signingPublicKey keys.Public, hashVariant pb.HashVariant) (*pb.Address, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	if identityPublicKey.IsZero() || signingPublicKey.IsZero() {
@@ -435,7 +435,7 @@ func createStaticDepositAddress(ctx context.Context, config *so.Config, network 
 
 	// Generate proof of possession signature for the coordinator's keyshare first.
 	// If this fails, the address is not persisted and the transaction is rolled back.
-	msg := common.ProofOfPossessionMessageHashForDepositAddress(identityPublicKey, keyshare.PublicKey, []byte(depositAddressString))
+	msg := common.ProofOfPossessionMessageHashForDepositAddress(identityPublicKey, keyshare.PublicKey, []byte(depositAddressString), hashVariant)
 	proofOfPossessionSignatures, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
 	if err != nil {
 		return nil, err
@@ -488,11 +488,17 @@ func createStaticDepositAddress(ctx context.Context, config *so.Config, network 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	_, err = db.DepositAddress.Update().
+	update := db.DepositAddress.Update().
 		Where(depositaddress.ID(depositAddressRecord.ID)).
-		SetAddressSignatures(addressSignatures).
-		SetPossessionSignature(proofOfPossessionSignatures[0]).
-		Save(ctx)
+		SetAddressSignatures(addressSignatures)
+
+	if hashVariant == pb.HashVariant_HASH_VARIANT_V2 {
+		update = update.SetPossessionSignatureV2(proofOfPossessionSignatures[0])
+	} else {
+		update = update.SetPossessionSignature(proofOfPossessionSignatures[0])
+	}
+
+	_, err = update.Save(ctx)
 	if err != nil {
 		logger.With(zap.Error(err)).
 			Sugar().
@@ -513,10 +519,16 @@ func createStaticDepositAddress(ctx context.Context, config *so.Config, network 
 	}, nil
 }
 
-func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, keyshare *ent.SigningKeyshare, depositAddress *ent.DepositAddress) (map[string][]byte, []byte, error) {
+func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, keyshare *ent.SigningKeyshare, depositAddress *ent.DepositAddress, hashVariant pb.HashVariant) (map[string][]byte, []byte, error) {
 	// If the proofs are already cached, return them.
-	if depositAddress.AddressSignatures != nil && depositAddress.PossessionSignature != nil {
-		return depositAddress.AddressSignatures, depositAddress.PossessionSignature, nil
+	var cachedPossessionSignature []byte
+	if hashVariant == pb.HashVariant_HASH_VARIANT_V2 {
+		cachedPossessionSignature = depositAddress.PossessionSignatureV2
+	} else {
+		cachedPossessionSignature = depositAddress.PossessionSignature
+	}
+	if depositAddress.AddressSignatures != nil && cachedPossessionSignature != nil {
+		return depositAddress.AddressSignatures, cachedPossessionSignature, nil
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
@@ -573,7 +585,7 @@ func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, 
 	}
 	addressSignatures[config.Identifier] = selfProofs.AddressSignature
 
-	msg := common.ProofOfPossessionMessageHashForDepositAddress(depositAddress.OwnerIdentityPubkey, keyshare.PublicKey, []byte(depositAddress.Address))
+	msg := common.ProofOfPossessionMessageHashForDepositAddress(depositAddress.OwnerIdentityPubkey, keyshare.PublicKey, []byte(depositAddress.Address), hashVariant)
 	proofOfPossessionSignatures, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
 	if err != nil {
 		return nil, nil, err
@@ -584,11 +596,15 @@ func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	_, err = db.DepositAddress.Update().
+	update := db.DepositAddress.Update().
 		Where(depositaddress.ID(depositAddress.ID)).
-		SetAddressSignatures(addressSignatures).
-		SetPossessionSignature(proofOfPossessionSignatures[0]).
-		Save(ctx)
+		SetAddressSignatures(addressSignatures)
+	if hashVariant == pb.HashVariant_HASH_VARIANT_V2 {
+		update = update.SetPossessionSignatureV2(proofOfPossessionSignatures[0])
+	} else {
+		update = update.SetPossessionSignature(proofOfPossessionSignatures[0])
+	}
+	_, err = update.Save(ctx)
 	if err != nil {
 		logger.With(zap.Error(err)).
 			Sugar().
@@ -672,7 +688,7 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 	}
 
 	// Generate proofs for the existing address to include in the archived address response
-	existingAddressSignatures, existingProofOfPossession, err := generateStaticDepositAddressProofs(ctx, config, existingKeyshare, existingDefaultAddress)
+	existingAddressSignatures, existingProofOfPossession, err := generateStaticDepositAddressProofs(ctx, config, existingKeyshare, existingDefaultAddress, req.GetHashVariant())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate proofs for existing static deposit address id %s: %w", existingDefaultAddress.ID, err)
 	}
@@ -731,7 +747,7 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 		return nil, fmt.Errorf("failed to parse signing public key: %w", err)
 	}
 
-	depositAddressInfo, err := createStaticDepositAddress(ctx, config, network, idPubKey, reqSigningPubKey)
+	depositAddressInfo, err := createStaticDepositAddress(ctx, config, network, idPubKey, reqSigningPubKey, req.GetHashVariant())
 	if err != nil {
 		return nil, err
 	}

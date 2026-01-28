@@ -655,7 +655,11 @@ export interface GenerateDepositAddressRequest {
     | string
     | undefined;
   /** Generate static deposit address */
-  isStatic?: boolean | undefined;
+  isStatic?:
+    | boolean
+    | undefined;
+  /** The hash variant to use for computing the proof of possession message hash. */
+  hashVariant: HashVariant;
 }
 
 /** Address is the address of the user's public key + SE's public key. */
@@ -685,6 +689,8 @@ export interface GenerateStaticDepositAddressRequest {
   identityPublicKey: Uint8Array;
   /** The network of the bitcoin network. */
   network: Network;
+  /** The hash variant to use for computing the proof of possession message hash. */
+  hashVariant: HashVariant;
 }
 
 /** GenerateStaticDepositAddressResponse is the response to the request to generate a static deposit address. */
@@ -705,6 +711,8 @@ export interface RotateStaticDepositAddressRequest {
   signingPublicKey: Uint8Array;
   /** The network of the bitcoin network. */
   network: Network;
+  /** The hash variant to use for computing the proof of possession message hash. */
+  hashVariant: HashVariant;
 }
 
 /** Response to the request to rotate a static deposit address. */
@@ -1928,7 +1936,11 @@ export interface QueryStaticDepositAddressesRequest {
   limit: number;
   offset: number;
   /** Optional filter. When specified, only the DepositAddress with this address is returned. */
-  depositAddress?: string | undefined;
+  depositAddress?:
+    | string
+    | undefined;
+  /** The hash variant to use for computing the proof of possession message hash. */
+  hashVariant: HashVariant;
 }
 
 export interface DepositAddressQueryResult {
@@ -2945,6 +2957,7 @@ function createBaseGenerateDepositAddressRequest(): GenerateDepositAddressReques
     network: 0,
     leafId: undefined,
     isStatic: undefined,
+    hashVariant: 0,
   };
 }
 
@@ -2964,6 +2977,9 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     }
     if (message.isStatic !== undefined) {
       writer.uint32(40).bool(message.isStatic);
+    }
+    if (message.hashVariant !== 0) {
+      writer.uint32(48).int32(message.hashVariant);
     }
     return writer;
   },
@@ -3015,6 +3031,14 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
           message.isStatic = reader.bool();
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.hashVariant = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3033,6 +3057,7 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
       leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : undefined,
       isStatic: isSet(object.isStatic) ? globalThis.Boolean(object.isStatic) : undefined,
+      hashVariant: isSet(object.hashVariant) ? hashVariantFromJSON(object.hashVariant) : 0,
     };
   },
 
@@ -3053,6 +3078,9 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     if (message.isStatic !== undefined) {
       obj.isStatic = message.isStatic;
     }
+    if (message.hashVariant !== 0) {
+      obj.hashVariant = hashVariantToJSON(message.hashVariant);
+    }
     return obj;
   },
 
@@ -3066,6 +3094,7 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     message.network = object.network ?? 0;
     message.leafId = object.leafId ?? undefined;
     message.isStatic = object.isStatic ?? undefined;
+    message.hashVariant = object.hashVariant ?? 0;
     return message;
   },
 };
@@ -3243,7 +3272,7 @@ export const GenerateDepositAddressResponse: MessageFns<GenerateDepositAddressRe
 };
 
 function createBaseGenerateStaticDepositAddressRequest(): GenerateStaticDepositAddressRequest {
-  return { signingPublicKey: new Uint8Array(0), identityPublicKey: new Uint8Array(0), network: 0 };
+  return { signingPublicKey: new Uint8Array(0), identityPublicKey: new Uint8Array(0), network: 0, hashVariant: 0 };
 }
 
 export const GenerateStaticDepositAddressRequest: MessageFns<GenerateStaticDepositAddressRequest> = {
@@ -3256,6 +3285,9 @@ export const GenerateStaticDepositAddressRequest: MessageFns<GenerateStaticDepos
     }
     if (message.network !== 0) {
       writer.uint32(24).int32(message.network);
+    }
+    if (message.hashVariant !== 0) {
+      writer.uint32(32).int32(message.hashVariant);
     }
     return writer;
   },
@@ -3291,6 +3323,14 @@ export const GenerateStaticDepositAddressRequest: MessageFns<GenerateStaticDepos
           message.network = reader.int32() as any;
           continue;
         }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.hashVariant = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3307,6 +3347,7 @@ export const GenerateStaticDepositAddressRequest: MessageFns<GenerateStaticDepos
         ? bytesFromBase64(object.identityPublicKey)
         : new Uint8Array(0),
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+      hashVariant: isSet(object.hashVariant) ? hashVariantFromJSON(object.hashVariant) : 0,
     };
   },
 
@@ -3321,6 +3362,9 @@ export const GenerateStaticDepositAddressRequest: MessageFns<GenerateStaticDepos
     if (message.network !== 0) {
       obj.network = networkToJSON(message.network);
     }
+    if (message.hashVariant !== 0) {
+      obj.hashVariant = hashVariantToJSON(message.hashVariant);
+    }
     return obj;
   },
 
@@ -3332,6 +3376,7 @@ export const GenerateStaticDepositAddressRequest: MessageFns<GenerateStaticDepos
     message.signingPublicKey = object.signingPublicKey ?? new Uint8Array(0);
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     message.network = object.network ?? 0;
+    message.hashVariant = object.hashVariant ?? 0;
     return message;
   },
 };
@@ -3397,7 +3442,7 @@ export const GenerateStaticDepositAddressResponse: MessageFns<GenerateStaticDepo
 };
 
 function createBaseRotateStaticDepositAddressRequest(): RotateStaticDepositAddressRequest {
-  return { signingPublicKey: new Uint8Array(0), network: 0 };
+  return { signingPublicKey: new Uint8Array(0), network: 0, hashVariant: 0 };
 }
 
 export const RotateStaticDepositAddressRequest: MessageFns<RotateStaticDepositAddressRequest> = {
@@ -3407,6 +3452,9 @@ export const RotateStaticDepositAddressRequest: MessageFns<RotateStaticDepositAd
     }
     if (message.network !== 0) {
       writer.uint32(16).int32(message.network);
+    }
+    if (message.hashVariant !== 0) {
+      writer.uint32(24).int32(message.hashVariant);
     }
     return writer;
   },
@@ -3434,6 +3482,14 @@ export const RotateStaticDepositAddressRequest: MessageFns<RotateStaticDepositAd
           message.network = reader.int32() as any;
           continue;
         }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.hashVariant = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3447,6 +3503,7 @@ export const RotateStaticDepositAddressRequest: MessageFns<RotateStaticDepositAd
     return {
       signingPublicKey: isSet(object.signingPublicKey) ? bytesFromBase64(object.signingPublicKey) : new Uint8Array(0),
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+      hashVariant: isSet(object.hashVariant) ? hashVariantFromJSON(object.hashVariant) : 0,
     };
   },
 
@@ -3458,6 +3515,9 @@ export const RotateStaticDepositAddressRequest: MessageFns<RotateStaticDepositAd
     if (message.network !== 0) {
       obj.network = networkToJSON(message.network);
     }
+    if (message.hashVariant !== 0) {
+      obj.hashVariant = hashVariantToJSON(message.hashVariant);
+    }
     return obj;
   },
 
@@ -3468,6 +3528,7 @@ export const RotateStaticDepositAddressRequest: MessageFns<RotateStaticDepositAd
     const message = createBaseRotateStaticDepositAddressRequest();
     message.signingPublicKey = object.signingPublicKey ?? new Uint8Array(0);
     message.network = object.network ?? 0;
+    message.hashVariant = object.hashVariant ?? 0;
     return message;
   },
 };
@@ -16662,7 +16723,14 @@ export const QueryUnusedDepositAddressesRequest: MessageFns<QueryUnusedDepositAd
 };
 
 function createBaseQueryStaticDepositAddressesRequest(): QueryStaticDepositAddressesRequest {
-  return { identityPublicKey: new Uint8Array(0), network: 0, limit: 0, offset: 0, depositAddress: undefined };
+  return {
+    identityPublicKey: new Uint8Array(0),
+    network: 0,
+    limit: 0,
+    offset: 0,
+    depositAddress: undefined,
+    hashVariant: 0,
+  };
 }
 
 export const QueryStaticDepositAddressesRequest: MessageFns<QueryStaticDepositAddressesRequest> = {
@@ -16681,6 +16749,9 @@ export const QueryStaticDepositAddressesRequest: MessageFns<QueryStaticDepositAd
     }
     if (message.depositAddress !== undefined) {
       writer.uint32(50).string(message.depositAddress);
+    }
+    if (message.hashVariant !== 0) {
+      writer.uint32(56).int32(message.hashVariant);
     }
     return writer;
   },
@@ -16732,6 +16803,14 @@ export const QueryStaticDepositAddressesRequest: MessageFns<QueryStaticDepositAd
           message.depositAddress = reader.string();
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.hashVariant = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -16750,6 +16829,7 @@ export const QueryStaticDepositAddressesRequest: MessageFns<QueryStaticDepositAd
       limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
       offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
       depositAddress: isSet(object.depositAddress) ? globalThis.String(object.depositAddress) : undefined,
+      hashVariant: isSet(object.hashVariant) ? hashVariantFromJSON(object.hashVariant) : 0,
     };
   },
 
@@ -16770,6 +16850,9 @@ export const QueryStaticDepositAddressesRequest: MessageFns<QueryStaticDepositAd
     if (message.depositAddress !== undefined) {
       obj.depositAddress = message.depositAddress;
     }
+    if (message.hashVariant !== 0) {
+      obj.hashVariant = hashVariantToJSON(message.hashVariant);
+    }
     return obj;
   },
 
@@ -16783,6 +16866,7 @@ export const QueryStaticDepositAddressesRequest: MessageFns<QueryStaticDepositAd
     message.limit = object.limit ?? 0;
     message.offset = object.offset ?? 0;
     message.depositAddress = object.depositAddress ?? undefined;
+    message.hashVariant = object.hashVariant ?? 0;
     return message;
   },
 };

@@ -375,7 +375,7 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 	var staticDepositAddresses []*pb.DepositAddressQueryResult
 	for _, depositAddress := range depositAddresses {
 		if utils.IsBitcoinAddressForNetwork(depositAddress.Address, network) {
-			queryResult, err := h.depositAddressToQueryResult(ctx, depositAddress)
+			queryResult, err := h.depositAddressToQueryResult(ctx, depositAddress, req.GetHashVariant())
 			if err != nil {
 				return nil, err
 			}
@@ -389,7 +389,7 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 	return &pb.QueryStaticDepositAddressesResponse{DepositAddresses: staticDepositAddresses}, nil
 }
 
-func (h *TreeQueryHandler) depositAddressToQueryResult(ctx context.Context, depositAddress *ent.DepositAddress) (*pb.DepositAddressQueryResult, error) {
+func (h *TreeQueryHandler) depositAddressToQueryResult(ctx context.Context, depositAddress *ent.DepositAddress, hashVariant pb.HashVariant) (*pb.DepositAddressQueryResult, error) {
 	nodeIDStr := depositAddress.NodeID.String()
 	// Get local keyshare for the deposit address.
 	keyshare, err := depositAddress.Edges.SigningKeyshareOrErr()
@@ -401,7 +401,7 @@ func (h *TreeQueryHandler) depositAddressToQueryResult(ctx context.Context, depo
 	// Return the proofs of possession if they are cached.
 	// Caching is done in the GenerateStaticDepositAddressResponse handler on the coordinator.
 	// If there are no proofs of possession, the user is advised to generate them by calling the GenerateStaticDepositAddressProofs RPC.
-	addressSignatures, proofOfPossessionSignature, err := generateStaticDepositAddressProofs(ctx, h.config, keyshare, depositAddress)
+	addressSignatures, proofOfPossessionSignature, err := generateStaticDepositAddressProofs(ctx, h.config, keyshare, depositAddress, hashVariant)
 	if err != nil {
 		return nil, err
 	}
