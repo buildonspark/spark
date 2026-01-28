@@ -428,17 +428,39 @@ func RunDKGIfNeeded(ctx context.Context, config *so.Config) error {
 		minAvailableKeys = *config.DKGConfig.MinAvailableKeys
 	}
 
-	overMinimumAvailableKeys, err := db.SigningKeyshare.Query().
-		Where(
-			signingkeyshare.StatusEQ(st.KeyshareStatusAvailable),
-			signingkeyshare.CoordinatorIndexEQ(config.Index),
-		).
-		Limit(1).
-		Offset(minAvailableKeys).
-		Exist(ctx)
+	// Use optimized query that stops scanning after finding minAvailableKeys+1 rows
+	const query = `
+		SELECT COUNT(*) > $1 AS over_minimum
+		FROM (
+			SELECT 1
+			FROM signing_keyshares
+			WHERE status = $2 AND coordinator_index = $3
+			LIMIT $4
+		) AS limited
+	`
+
+	//nolint:forbidigo // This query runs every 10 seconds, scans a lot of rows, and can't be expressed using the ent query builder.
+	rows, err := db.QueryContext(ctx, query, minAvailableKeys, string(st.KeyshareStatusAvailable), config.Index, minAvailableKeys+1)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if cerr := rows.Close(); cerr != nil {
+			logging.GetLoggerFromContext(ctx).Error("failed to close rows", zap.Error(cerr))
+			span.RecordError(cerr)
+		}
+	}()
+
+	var overMinimumAvailableKeys bool
+	if rows.Next() {
+		if err := rows.Scan(&overMinimumAvailableKeys); err != nil {
+			return err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
 	if overMinimumAvailableKeys {
 		return nil
 	}
