@@ -79,8 +79,7 @@ func createQueryHandler(t *testing.T, config *so.Config) *tokens.QueryTokenOutpu
 	return tokens.NewQueryTokenOutputsHandler(config)
 }
 
-// assertOutputNotSpendable verifies that a token output no longer appears in spendable outputs
-// by querying through the handler API. This confirms the output was successfully withdrawn.
+// assertOutputNotSpendable verifies that a token output no longer appears in spendable outputs.
 func assertOutputNotSpendable(t *testing.T, ctx context.Context, config *so.Config, ownerPubKey keys.Public, sparkTxHash []byte) {
 	t.Helper()
 	handler := createQueryHandler(t, config)
@@ -99,8 +98,7 @@ func assertOutputNotSpendable(t *testing.T, ctx context.Context, config *so.Conf
 	}
 }
 
-// assertOutputStillSpendable verifies that a token output still appears in spendable outputs
-// by querying through the handler API. This confirms the withdrawal was rejected.
+// assertOutputStillSpendable verifies that a token output still appears in spendable outputs.
 func assertOutputStillSpendable(t *testing.T, ctx context.Context, config *so.Config, ownerPubKey keys.Public, sparkTxHash []byte) {
 	t.Helper()
 	handler := createQueryHandler(t, config)
@@ -275,7 +273,6 @@ func TestHandleTokenWithdrawals_SavesWithdrawalTransaction(t *testing.T) {
 	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, blockHeight, blockHash)
 	require.NoError(t, err)
 
-	// Verify the output is no longer spendable via the handler API
 	assertOutputNotSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
 
 	// Verify withdrawal metadata was recorded correctly
@@ -331,7 +328,6 @@ func TestHandleTokenWithdrawals_MultipleOutputsInOneTransaction(t *testing.T) {
 	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
-	// Verify both outputs are no longer spendable via the handler API
 	assertOutputNotSpendable(t, ctx, config, ownerPubKey, sparkTxHash1)
 	assertOutputNotSpendable(t, ctx, config, ownerPubKey, sparkTxHash2)
 }
