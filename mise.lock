@@ -34,13 +34,13 @@ backend = "aqua:gotestyourself/gotestsum"
 "platforms.windows-x64" = { checksum = "sha256:fd5a6dc69e46a0970593e70d85a7e75f16714e9c61d6d72ccc324eb82df5bb8a", url = "https://github.com/gotestyourself/gotestsum/releases/download/v1.13.0/gotestsum_1.13.0_windows_amd64.tar.gz"}
 
 [[tools.helm]]
-version = "3.14.4"
+version = "3.19.4"
 backend = "aqua:helm/helm"
-"platforms.linux-arm64" = { url = "https://get.helm.sh/helm-3.14.4-linux-arm64.tar.gz"}
-"platforms.linux-x64" = { url = "https://get.helm.sh/helm-3.14.4-linux-amd64.tar.gz"}
-"platforms.macos-arm64" = { url = "https://get.helm.sh/helm-3.14.4-darwin-arm64.tar.gz"}
-"platforms.macos-x64" = { url = "https://get.helm.sh/helm-3.14.4-darwin-amd64.tar.gz"}
-"platforms.windows-x64" = { url = "https://get.helm.sh/helm-3.14.4-windows-amd64.tar.gz"}
+"platforms.linux-arm64" = { checksum = "sha256:9e1064f5de43745bdedbff2722a1674d0397bc4b4d8d8196d52a2b730909fe62", url = "https://get.helm.sh/helm-v3.19.4-linux-arm64.tar.gz"}
+"platforms.linux-x64" = { checksum = "sha256:759c656fbd9c11e6a47784ecbeac6ad1eb16a9e76d202e51163ab78504848862", url = "https://get.helm.sh/helm-v3.19.4-linux-amd64.tar.gz"}
+"platforms.macos-arm64" = { checksum = "sha256:7e82ca63fe80a298cecefad61d0c10bc47963ff3551e94ab6470be6393a6a74b", url = "https://get.helm.sh/helm-v3.19.4-darwin-arm64.tar.gz"}
+"platforms.macos-x64" = { checksum = "sha256:d9c9b1fc499c54282c4127c60cdd506da2c6202506b708a2b45fb6dfdb318f43", url = "https://get.helm.sh/helm-v3.19.4-darwin-amd64.tar.gz"}
+"platforms.windows-x64" = { checksum = "sha256:1f5599ec85fb15a82f7240c083d00067be5fa91c9fcf48f11c43b6fa59283cd8", url = "https://get.helm.sh/helm-v3.19.4-windows-amd64.tar.gz"}
 
 [[tools.lefthook]]
 version = "2.0.12"
