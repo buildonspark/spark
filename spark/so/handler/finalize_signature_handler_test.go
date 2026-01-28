@@ -88,7 +88,7 @@ func TestFinalizeSignatureHandler_ErrorCases(t *testing.T) {
 			},
 			verifyFunc: func(t *testing.T, ctx context.Context, handler *FinalizeSignatureHandler, input any) error {
 				require.IsType(t, &pb.FinalizeNodeSignaturesRequest{}, input)
-				req := input.(*pb.FinalizeNodeSignaturesRequest)
+				req, _ := input.(*pb.FinalizeNodeSignaturesRequest)
 				resp, err := handler.FinalizeNodeSignatures(ctx, req)
 				assert.Nil(t, resp)
 				return err
@@ -107,7 +107,8 @@ func TestFinalizeSignatureHandler_ErrorCases(t *testing.T) {
 				}
 			},
 			verifyFunc: func(t *testing.T, ctx context.Context, handler *FinalizeSignatureHandler, input any) error {
-				req := input.(*pb.FinalizeNodeSignaturesRequest)
+				require.IsType(t, &pb.FinalizeNodeSignaturesRequest{}, input)
+				req, _ := input.(*pb.FinalizeNodeSignaturesRequest)
 				resp, err := handler.FinalizeNodeSignatures(ctx, req)
 				assert.Nil(t, resp)
 				return err
@@ -126,7 +127,8 @@ func TestFinalizeSignatureHandler_ErrorCases(t *testing.T) {
 				}
 			},
 			verifyFunc: func(t *testing.T, ctx context.Context, handler *FinalizeSignatureHandler, input any) error {
-				req := input.(*pb.FinalizeNodeSignaturesRequest)
+				require.IsType(t, &pb.FinalizeNodeSignaturesRequest{}, input)
+				req, _ := input.(*pb.FinalizeNodeSignaturesRequest)
 				transfer, err := handler.verifyAndUpdateTransfer(ctx, req)
 				assert.Nil(t, transfer)
 				return err
@@ -139,7 +141,8 @@ func TestFinalizeSignatureHandler_ErrorCases(t *testing.T) {
 				return &pb.NodeSignatures{NodeId: "invalid-uuid"}
 			},
 			verifyFunc: func(t *testing.T, ctx context.Context, handler *FinalizeSignatureHandler, input any) error {
-				nodeSignatures := input.(*pb.NodeSignatures)
+				require.IsType(t, &pb.NodeSignatures{}, input)
+				nodeSignatures, _ := input.(*pb.NodeSignatures)
 				sparkNode, internalNode, err := handler.updateNode(ctx, nodeSignatures, pbcommon.SignatureIntent_CREATION, false)
 				assert.Nil(t, sparkNode)
 				assert.Nil(t, internalNode)
@@ -154,7 +157,8 @@ func TestFinalizeSignatureHandler_ErrorCases(t *testing.T) {
 				return &pb.NodeSignatures{NodeId: nodeID.String()}
 			},
 			verifyFunc: func(t *testing.T, ctx context.Context, handler *FinalizeSignatureHandler, input any) error {
-				nodeSignatures := input.(*pb.NodeSignatures)
+				require.IsType(t, &pb.NodeSignatures{}, input)
+				nodeSignatures, _ := input.(*pb.NodeSignatures)
 				sparkNode, internalNode, err := handler.updateNode(ctx, nodeSignatures, pbcommon.SignatureIntent_CREATION, false)
 				assert.Nil(t, sparkNode)
 				assert.Nil(t, internalNode)

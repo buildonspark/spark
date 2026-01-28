@@ -302,7 +302,8 @@ func TestRateLimiter(t *testing.T) {
 				if m.Name == "rpc.server.ratelimit_utilization" {
 					foundUtil = true
 					// Expect histogram points with utilization for each scope/dimension
-					hs := m.Data.(md.Histogram[float64])
+					require.IsType(t, md.Histogram[float64]{}, m.Data)
+					hs, _ := m.Data.(md.Histogram[float64])
 					// Sum of counts across all histograms should be 6
 					count := 0
 					for _, dp := range hs.DataPoints {
@@ -352,12 +353,14 @@ func TestRateLimiter(t *testing.T) {
 			for _, m := range sm.Metrics {
 				switch m.Name {
 				case "rpc.server.ratelimit_utilization":
-					hs := m.Data.(md.Histogram[float64])
+					require.IsType(t, md.Histogram[float64]{}, m.Data)
+					hs, _ := m.Data.(md.Histogram[float64])
 					for _, dp := range hs.DataPoints {
 						utilCount += int(dp.Count)
 					}
 				case "rpc.server.ratelimit_exceeded_total":
-					cn := m.Data.(md.Sum[int64])
+					require.IsType(t, md.Sum[int64]{}, m.Data)
+					cn, _ := m.Data.(md.Sum[int64])
 					for _, dp := range cn.DataPoints {
 						breachCount += int(dp.Value)
 					}
@@ -381,12 +384,14 @@ func TestRateLimiter(t *testing.T) {
 			for _, m := range sm.Metrics {
 				switch m.Name {
 				case "rpc.server.ratelimit_utilization":
-					hs := m.Data.(md.Histogram[float64])
+					require.IsType(t, md.Histogram[float64]{}, m.Data)
+					hs, _ := m.Data.(md.Histogram[float64])
 					for _, dp := range hs.DataPoints {
 						utilCount += int(dp.Count)
 					}
 				case "rpc.server.ratelimit_exceeded_total":
-					cn := m.Data.(md.Sum[int64])
+					require.IsType(t, md.Sum[int64]{}, m.Data)
+					cn, _ := m.Data.(md.Sum[int64])
 					for _, dp := range cn.DataPoints {
 						breachCount += int(dp.Value)
 					}

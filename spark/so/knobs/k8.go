@@ -122,13 +122,17 @@ func (k *knobsK8ValuesProvider) fetchAndUpdate() error {
 		cache.Indexers{},
 	)
 
+	handleConfigMap := func(obj any) {
+		configMap, ok := obj.(*corev1.ConfigMap)
+		if ok {
+			k.handleConfigMap(configMap)
+			return
+		}
+		k.logger.Sugar().Warnf("Failed to cast object to configmap; actual type is %T", obj)
+	}
 	_, err = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
-			k.handleConfigMap(obj.(*corev1.ConfigMap))
-		},
-		UpdateFunc: func(_, newObj any) {
-			k.handleConfigMap(newObj.(*corev1.ConfigMap))
-		},
+		AddFunc:    handleConfigMap,
+		UpdateFunc: func(_, newObj any) { handleConfigMap(newObj) },
 	})
 	if err != nil {
 		return fmt.Errorf("failed to add event handler: %w", err)

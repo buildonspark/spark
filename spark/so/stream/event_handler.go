@@ -123,7 +123,10 @@ func (s *EventRouter) processNotification(ctx context.Context, eventData db.Even
 		return nil, err
 	}
 
-	idStr := eventJson["id"].(string)
+	idStr, ok := eventJson["id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse ID as string")
+	}
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		s.logger.With(zap.Error(err)).Error("Failed to parse ID as UUID")
@@ -211,8 +214,12 @@ func (s *EventRouter) processDepositNotification(ctx context.Context, event proc
 }
 
 func (s *EventRouter) processTransferNotification(ctx context.Context, event processEventPayload) *pb.SubscribeToEventsResponse {
-	if statusStr, exists := event.Fields["status"]; exists {
-		status := schematype.TransferStatus(statusStr.(string))
+	if rawStatus, exists := event.Fields["status"]; exists {
+		statusStr, ok := rawStatus.(string)
+		if !ok {
+			return nil
+		}
+		status := schematype.TransferStatus(statusStr)
 
 		if status == schematype.TransferStatusSenderKeyTweaked {
 			transferEnt, err := s.dbClient.Transfer.Query().Where(transfer.ID(event.ID)).Only(ctx)

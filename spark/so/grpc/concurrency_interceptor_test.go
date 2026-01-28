@@ -91,7 +91,8 @@ func TestConcurrencyGuard_Acquire_WithinLimit(t *testing.T) {
 			}
 
 			// Verify internal state
-			concurrencyGuard := guard.(*ConcurrencyGuard)
+			require.IsType(t, &ConcurrencyGuard{}, guard)
+			concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 			require.Equal(t, int64(tt.acquisitions), concurrencyGuard.counterMap["/test.Service/TestMethod"])
 		})
 	}
@@ -158,7 +159,8 @@ func TestConcurrencyGuard_Release(t *testing.T) {
 		}
 
 		// Verify current count
-		concurrencyGuard := guard.(*ConcurrencyGuard)
+		require.IsType(t, &ConcurrencyGuard{}, guard)
+		concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 		assert.Equal(t, int64(3), concurrencyGuard.counterMap["TestMethod"])
 
 		// Release resources
@@ -184,7 +186,8 @@ func TestConcurrencyGuard_Release(t *testing.T) {
 		guard.ReleaseMethod("TestMethod")
 
 		// Verify counter is still 0
-		concurrencyGuard := guard.(*ConcurrencyGuard)
+		require.IsType(t, &ConcurrencyGuard{}, guard)
+		concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 		assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"])
 
 	})
@@ -231,7 +234,8 @@ func TestConcurrencyGuard_ConcurrentAccess(t *testing.T) {
 	}
 
 	// Verify final state
-	concurrencyGuard := guard.(*ConcurrencyGuard)
+	require.IsType(t, &ConcurrencyGuard{}, guard)
+	concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 	assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"], "Final count should be zero after all releases")
 }
 
@@ -260,7 +264,8 @@ func TestConcurrencyInterceptor(t *testing.T) {
 		assert.True(t, called)
 
 		// Verify resource was released
-		concurrencyGuard := guard.(*ConcurrencyGuard)
+		require.IsType(t, &ConcurrencyGuard{}, guard)
+		concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 		assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"])
 	})
 
@@ -319,7 +324,8 @@ func TestConcurrencyInterceptor(t *testing.T) {
 		})
 
 		// Verify resource was released despite panic
-		concurrencyGuard := guard.(*ConcurrencyGuard)
+		require.IsType(t, &ConcurrencyGuard{}, guard)
+		concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 		assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"])
 	})
 
@@ -346,7 +352,8 @@ func TestConcurrencyInterceptor(t *testing.T) {
 		assert.Nil(t, resp)
 
 		// Verify resource was released
-		concurrencyGuard := guard.(*ConcurrencyGuard)
+		require.IsType(t, &ConcurrencyGuard{}, guard)
+		concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 		assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"])
 	})
 
@@ -485,7 +492,8 @@ func TestConcurrencyGuard_AcquireAfterGlobalLimit(t *testing.T) {
 	}
 
 	// Verify current count
-	concurrencyGuard := guard.(*ConcurrencyGuard)
+	require.IsType(t, &ConcurrencyGuard{}, guard)
+	concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 	assert.Equal(t, int64(3), concurrencyGuard.counterMap["TestMethod"])
 
 	// Acquiring again fails
@@ -520,7 +528,8 @@ func TestConcurrencyGuard_AcquireGlobalStreamLimit(t *testing.T) {
 	}
 
 	// Verify current count
-	concurrencyGuard := guard.(*ConcurrencyGuard)
+	require.IsType(t, &ConcurrencyGuard{}, guard)
+	concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 	assert.Equal(t, int64(3), concurrencyGuard.counterMap["TestMethod"])
 
 	// Acquiring again fails
@@ -534,7 +543,8 @@ func TestConcurrencyGuard_AcquireGlobalStreamLimit(t *testing.T) {
 	}
 
 	// Verify current count
-	concurrencyGuardStream := guardStream.(*ConcurrencyGuard)
+	require.IsType(t, &ConcurrencyGuard{}, guardStream)
+	concurrencyGuardStream, _ := guardStream.(*ConcurrencyGuard)
 	assert.Equal(t, int64(5), concurrencyGuardStream.counterMap["TestMethod"])
 
 	// Acquiring again fails
@@ -602,7 +612,8 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 		assert.True(t, called)
 
 		// Verify resource was released
-		concurrencyGuard := guard.(*ConcurrencyGuard)
+		require.IsType(t, &ConcurrencyGuard{}, guard)
+		concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 		assert.Equal(t, int64(0), concurrencyGuard.counterMap["/test.Service/TestStream"])
 		assert.Equal(t, int64(0), concurrencyGuard.globalCounter)
 	})
@@ -662,7 +673,8 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 		})
 
 		// Verify resource was released despite panic
-		concurrencyGuard := guard.(*ConcurrencyGuard)
+		require.IsType(t, &ConcurrencyGuard{}, guard)
+		concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 		assert.Equal(t, int64(0), concurrencyGuard.counterMap["/test.Service/TestStream"])
 		assert.Equal(t, int64(0), concurrencyGuard.globalCounter)
 	})
@@ -690,7 +702,8 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 		assert.Equal(t, expectedErr, err)
 
 		// Verify resource was released
-		concurrencyGuard := guard.(*ConcurrencyGuard)
+		require.IsType(t, &ConcurrencyGuard{}, guard)
+		concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 		assert.Equal(t, int64(0), concurrencyGuard.counterMap["/test.Service/TestStream"])
 		assert.Equal(t, int64(0), concurrencyGuard.globalCounter)
 	})
@@ -791,7 +804,8 @@ func TestConcurrencyStreamInterceptor(t *testing.T) {
 			})
 		}
 		time.Sleep(10 * time.Millisecond)
-		concurrencyGuard := guard.(*ConcurrencyGuard)
+		require.IsType(t, &ConcurrencyGuard{}, guard)
+		concurrencyGuard, _ := guard.(*ConcurrencyGuard)
 		assert.Positive(t, concurrencyGuard.globalCounter)
 
 		// Wait for all handlers that can start to start

@@ -101,11 +101,16 @@ func (n NotifyMixin) buildPayload(v ent.Value) map[string]any {
 
 	for _, f := range n.AdditionalFields {
 		if val, ok := fields[f]; ok {
-			if decoded, err := base64.StdEncoding.DecodeString(val.(string)); err == nil {
-				payload[f] = hex.EncodeToString(decoded)
-			} else if bytes, ok := val.([]byte); ok {
-				payload[f] = hex.EncodeToString(bytes)
-			} else {
+			switch val := val.(type) {
+			case string:
+				if decoded, err := base64.StdEncoding.DecodeString(val); err == nil {
+					payload[f] = hex.EncodeToString(decoded)
+				} else {
+					payload[f] = val
+				}
+			case []byte:
+				payload[f] = hex.EncodeToString(val)
+			default:
 				payload[f] = val
 			}
 		}

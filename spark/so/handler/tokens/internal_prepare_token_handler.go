@@ -829,25 +829,27 @@ func validateInvoiceFields(invoiceAttachments []*tokenpb.InvoiceAttachment, toke
 		if err != nil {
 			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark invoice %s: %w", invoice, err))
 		}
-		if decoded.SparkAddress == nil || decoded.SparkAddress.GetSparkInvoiceFields() == nil {
+		sparkInvoiceFields := decoded.SparkAddress.GetSparkInvoiceFields()
+		if sparkInvoiceFields == nil {
 			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no invoice fields in invoice %s", invoice))
 		}
 		_, err = keys.ParsePublicKey(decoded.SparkAddress.GetIdentityPublicKey())
 		if err != nil {
 			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid recipient public key in invoice %s: %w", invoice, err))
 		}
-		if decoded.SparkAddress.SparkInvoiceFields.Version != uint32(1) {
+		if sparkInvoiceFields.Version != 1 {
 			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("version mismatch in invoice %s", invoice))
 		}
-		if _, ok := decoded.SparkAddress.SparkInvoiceFields.PaymentType.(*sparkpb.SparkInvoiceFields_TokensPayment); !ok {
+		paymentType, ok := sparkInvoiceFields.PaymentType.(*sparkpb.SparkInvoiceFields_TokensPayment)
+		if !ok {
 			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("not a tokens payment in invoice %s", invoice))
 		}
-		payment := decoded.SparkAddress.SparkInvoiceFields.PaymentType.(*sparkpb.SparkInvoiceFields_TokensPayment).TokensPayment
+		payment := paymentType.TokensPayment
 		// all invoices pay the outputs identifier
 		if !bytes.Equal(tokenIdentifier, payment.TokenIdentifier) {
 			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token identifier mismatch in invoice %s", invoice))
 		}
-		if expiry := decoded.SparkAddress.SparkInvoiceFields.GetExpiryTime(); expiry != nil {
+		if expiry := sparkInvoiceFields.GetExpiryTime(); expiry != nil {
 			if err := expiry.CheckValid(); err != nil {
 				return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid expiry time in invoice %s: %w", invoice, err))
 			}
@@ -859,15 +861,15 @@ func validateInvoiceFields(invoiceAttachments []*tokenpb.InvoiceAttachment, toke
 			}
 		}
 		// if a sender public key is present, it must be the same across all invoices with a sender public key encoded
-		if decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey != nil {
-			decodedSenderPublicKey, err := keys.ParsePublicKey(decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey)
+		if sparkInvoiceFields.SenderPublicKey != nil {
+			decodedSenderPublicKey, err := keys.ParsePublicKey(sparkInvoiceFields.SenderPublicKey)
 			if err != nil {
 				return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender public key in invoice %s: %w", invoice, err))
 			}
 			if senderPublicKey == (keys.Public{}) {
 				senderPublicKey = decodedSenderPublicKey
 			} else if !decodedSenderPublicKey.Equals(senderPublicKey) {
-				return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender public key mismatch in invoice %s: expected %x, got %x", invoice, senderPublicKey.Serialize(), decodedSenderPublicKey.Serialize()))
+				return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender public key mismatch in invoice %s: expected %s, got %s", invoice, senderPublicKey, decodedSenderPublicKey))
 			}
 		}
 		if network == btcnetwork.Unspecified {
@@ -902,7 +904,13 @@ func countInvoiceAmounts(invoiceAttachments []*tokenpb.InvoiceAttachment) (Invoi
 		if err != nil {
 			return nil, nil, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid recipient public key in invoice %s: %w", invoice, err))
 		}
-		payment := decoded.SparkAddress.SparkInvoiceFields.PaymentType.(*sparkpb.SparkInvoiceFields_TokensPayment).TokensPayment
+		rawPaymentType := decoded.SparkAddress.GetSparkInvoiceFields().GetPaymentType()
+		paymentType, ok := rawPaymentType.(*sparkpb.SparkInvoiceFields_TokensPayment)
+		if !ok {
+			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid payment type in invoice %s: %T", invoice, rawPaymentType))
+		}
+
+		payment := paymentType.TokensPayment
 
 		var recipient [33]byte
 		copy(recipient[:], recipientPubkey.Serialize())

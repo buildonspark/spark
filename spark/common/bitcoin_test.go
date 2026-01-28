@@ -288,8 +288,7 @@ func TestCompareTransactions(t *testing.T) {
 
 		// Add two inputs to both transactions
 		for i := range 2 {
-			prevHash := [32]byte{}
-			prevHash[0] = byte(i + 1)
+			prevHash := [32]byte{byte(i + 1)}
 
 			txIn1 := &wire.TxIn{
 				PreviousOutPoint: wire.OutPoint{Hash: prevHash, Index: uint32(i)},
