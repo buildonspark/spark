@@ -61,35 +61,40 @@ backend = "core:node"
 "platforms.windows-x64" = { checksum = "sha256:be72284c7bc62de07d5a9fd0ae196879842c085f11f7f2b60bf8864c0c9d6a4f", url = "https://nodejs.org/dist/v20.19.0/node-v20.19.0-win-x64.zip"}
 
 [[tools.protoc]]
-version = "29.3"
+version = "33.2"
 backend = "aqua:protocolbuffers/protobuf/protoc"
-"platforms.linux-arm64" = { url = "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-aarch_64.zip"}
-"platforms.linux-x64" = { url = "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-x86_64.zip"}
-"platforms.macos-arm64" = { url = "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-osx-aarch_64.zip"}
-"platforms.macos-x64" = { url = "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-osx-x86_64.zip"}
-"platforms.windows-x64" = { url = "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-win64.zip"}
+"platforms.linux-arm64" = { checksum = "sha256:706662a332683aa2fffe1c4ea61588279d31679cd42d91c7d60a69651768edb8", url = "https://github.com/protocolbuffers/protobuf/releases/download/v33.2/protoc-33.2-linux-aarch_64.zip"}
+"platforms.linux-x64" = { checksum = "sha256:b24b53f87c151bfd48b112fe4c3a6e6574e5198874f38036aff41df3456b8caf", url = "https://github.com/protocolbuffers/protobuf/releases/download/v33.2/protoc-33.2-linux-x86_64.zip"}
+"platforms.macos-arm64" = { checksum = "sha256:5be1427127788c9f7dd7d606c3e69843dd3587327dea993917ffcb77e7234b44", url = "https://github.com/protocolbuffers/protobuf/releases/download/v33.2/protoc-33.2-osx-aarch_64.zip"}
+"platforms.macos-x64" = { checksum = "sha256:dba51cfcc85076d56e7de01a647865c5a7f995c3dce427d5215b53e50b7be43f", url = "https://github.com/protocolbuffers/protobuf/releases/download/v33.2/protoc-33.2-osx-x86_64.zip"}
+"platforms.windows-x64" = { checksum = "sha256:376770cd4073beb63db56fdd339260edb9957b3c4472e05a75f5f9ec8f98d8f5", url = "https://github.com/protocolbuffers/protobuf/releases/download/v33.2/protoc-33.2-win64.zip"}
 
 [[tools.protoc-gen-go]]
-version = "1.36.6"
+version = "1.36.11"
 backend = "aqua:protocolbuffers/protobuf-go/protoc-gen-go"
-"platforms.linux-arm64" = { url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.6/protoc-gen-go.v1.36.6.linux.arm64.tar.gz"}
-"platforms.linux-x64" = { url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.6/protoc-gen-go.v1.36.6.linux.amd64.tar.gz"}
-"platforms.macos-arm64" = { url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.6/protoc-gen-go.v1.36.6.darwin.arm64.tar.gz"}
-"platforms.macos-x64" = { url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.6/protoc-gen-go.v1.36.6.darwin.amd64.tar.gz"}
-"platforms.windows-x64" = { url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.6/protoc-gen-go.v1.36.6.windows.amd64.zip"}
+"platforms.linux-arm64" = { checksum = "sha256:8760755b06cbfe6e64478bbe16b60e518d89d059ccaf667df05398d19636cbad", url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.11/protoc-gen-go.v1.36.11.linux.arm64.tar.gz"}
+"platforms.linux-x64" = { checksum = "sha256:6ad8f8fc11b96dc4deb176f7ee84af40e15d32e4608594bcc3534b7824a3dc71", url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.11/protoc-gen-go.v1.36.11.linux.amd64.tar.gz"}
+"platforms.macos-arm64" = { checksum = "sha256:31a1c65833213a925f6771dd84b749ac5b3f4de30be3694d8ec19e23fc44acbf", url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.11/protoc-gen-go.v1.36.11.darwin.arm64.tar.gz"}
+"platforms.macos-x64" = { checksum = "sha256:e41b9fc3e6b80a943caee6736f8f764e1059fb6ff9ef4f423b62645a9abc8f9f", url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.11/protoc-gen-go.v1.36.11.darwin.amd64.tar.gz"}
+"platforms.windows-x64" = { checksum = "sha256:045cac56df5fae04912d39b1e9f8e568f8a1eaf0adc800a6e8bfbe97fd1bef9c", url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.11/protoc-gen-go.v1.36.11.windows.amd64.zip"}
 
 [[tools.protoc-gen-go-grpc]]
-version = "1.5.1"
+version = "1.6.0"
 backend = "aqua:grpc/grpc-go/protoc-gen-go-grpc"
+"platforms.linux-arm64" = { checksum = "sha256:a5168a1a83489e1b138a1116c09f429a3dd18f9ad1a74565d811a2d29d8528c3", url = "https://github.com/grpc/grpc-go/releases/download/cmd/protoc-gen-go-grpc/v1.6.0/protoc-gen-go-grpc.v1.6.0.linux.arm64.tar.gz"}
+"platforms.linux-x64" = { checksum = "sha256:acb6144a1a00f688d108bc06a8cbe3b88b4d9f7aad59f7e3e7c91f93b92a1df3", url = "https://github.com/grpc/grpc-go/releases/download/cmd/protoc-gen-go-grpc/v1.6.0/protoc-gen-go-grpc.v1.6.0.linux.amd64.tar.gz"}
+"platforms.macos-arm64" = { checksum = "sha256:40c67308b5519b6493f5d1dff42064812ec79ffb65009df62f007dc77f984b42", url = "https://github.com/grpc/grpc-go/releases/download/cmd/protoc-gen-go-grpc/v1.6.0/protoc-gen-go-grpc.v1.6.0.darwin.arm64.tar.gz"}
+"platforms.macos-x64" = { checksum = "sha256:d2107eb7f5e3181c8d6398215504b637ff67f85b2542b38c3264c51ebeaa651a", url = "https://github.com/grpc/grpc-go/releases/download/cmd/protoc-gen-go-grpc/v1.6.0/protoc-gen-go-grpc.v1.6.0.darwin.amd64.tar.gz"}
+"platforms.windows-x64" = { checksum = "sha256:18e15251014102ff8b455d7004794d2d4398396704b28c78fe105442f1eaa3ff", url = "https://github.com/grpc/grpc-go/releases/download/cmd/protoc-gen-go-grpc/v1.6.0/protoc-gen-go-grpc.v1.6.0.windows.amd64.tar.gz"}
 
 [[tools.protoc-gen-validate]]
-version = "1.2.1"
+version = "1.3.0"
 backend = "aqua:bufbuild/protoc-gen-validate"
-"platforms.linux-arm64" = { checksum = "sha256:c740fa572e627e41054e4518768d4c0eb14247a4d810f3fa2d7e031b82256681", url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.2.1/protoc-gen-validate_1.2.1_linux_arm64.tar.gz"}
-"platforms.linux-x64" = { checksum = "sha256:e7a1d7256184dc6824e8f8e4b672b1281013e321579daffd19b2e3e90b6f7d9f", url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.2.1/protoc-gen-validate_1.2.1_linux_amd64.tar.gz"}
-"platforms.macos-arm64" = { checksum = "sha256:44dfd7778a49febdfb088dacee835b5d649218b5277bdd7c98e2a1f8eb328b34", url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.2.1/protoc-gen-validate_1.2.1_darwin_arm64.tar.gz"}
-"platforms.macos-x64" = { checksum = "sha256:20d24cb23b14fdf97c11c01b76309b20cf562dec9a8f89d8cfab89a6136cd93c", url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.2.1/protoc-gen-validate_1.2.1_darwin_amd64.tar.gz"}
-"platforms.windows-x64" = { checksum = "sha256:fff14caba345973bfba98ba0da67594988ce10c9446322352ed6ae069e068de1", url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.2.1/protoc-gen-validate_1.2.1_windows_amd64.tar.gz"}
+"platforms.linux-arm64" = { checksum = "sha256:9ead4932aefa8b9decb17486a8d2cfe04418f92a60d388dfc310615f4d7e6034", url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.3.0/protoc-gen-validate_1.3.0_linux_arm64.tar.gz"}
+"platforms.linux-x64" = { checksum = "sha256:a534bf56625065095dbd4448f16fd87e15852d61d4e8b162542fae591003989b", url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.3.0/protoc-gen-validate_1.3.0_linux_amd64.tar.gz"}
+"platforms.macos-arm64" = { checksum = "sha256:46d19f25c2d7a65440f17ad9a4c166c7ff11ae83221b0b4217c98408b96c0671", url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.3.0/protoc-gen-validate_1.3.0_darwin_arm64.tar.gz"}
+"platforms.macos-x64" = { checksum = "sha256:65a0fea7c2e3ce246235163bcf434ebb0c1395018f2fc711da7ba26acc47334e", url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.3.0/protoc-gen-validate_1.3.0_darwin_amd64.tar.gz"}
+"platforms.windows-x64" = { checksum = "sha256:059a1ccd3fb4399dfbad78c73c7051e413f5ac957d0972a8c11ceff46aeab855", url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.3.0/protoc-gen-validate_1.3.0_windows_amd64.tar.gz"}
 
 [[tools.rust]]
 version = "1.92.0"
