@@ -433,8 +433,31 @@ func createStaticDepositAddress(ctx context.Context, config *so.Config, network 
 		return nil, fmt.Errorf("failed to save deposit address: %w", err)
 	}
 
-	isStatic := true
+	// Generate proof of possession signature for the coordinator's keyshare first.
+	// If this fails, the address is not persisted and the transaction is rolled back.
+	msg := common.ProofOfPossessionMessageHashForDepositAddress(identityPublicKey, keyshare.PublicKey, []byte(depositAddressString))
+	proofOfPossessionSignatures, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
+	if err != nil {
+		return nil, err
+	}
+	if len(proofOfPossessionSignatures) == 0 {
+		return nil, fmt.Errorf("unable to generate proof of possession signature for a deposit address: 0 signatures")
+	}
+	proofOfPossessionSignature := proofOfPossessionSignatures[0]
 
+	internalHandler := NewInternalDepositHandler(config)
+	selfProofs, err := internalHandler.GenerateStaticDepositAddressProofs(ctx, &pbinternal.GenerateStaticDepositAddressProofsRequest{
+		KeyshareId:             keyshare.ID.String(),
+		Address:                depositAddressString,
+		OwnerIdentityPublicKey: identityPublicKey.Serialize(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Mark the keyshare as used on all operators, create the deposit address
+	// record on other operators and return a proof of possession signature.
+	isStatic := true
 	addressSignatures, err := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
@@ -454,26 +477,6 @@ func createStaticDepositAddress(ctx context.Context, config *so.Config, network 
 			return nil, fmt.Errorf("failed to mark keyshare for deposit address: %w", err)
 		}
 		return response.AddressSignature, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	msg := common.ProofOfPossessionMessageHashForDepositAddress(identityPublicKey, keyshare.PublicKey, []byte(depositAddressString))
-	proofOfPossessionSignatures, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
-	if err != nil {
-		return nil, err
-	}
-	if len(proofOfPossessionSignatures) == 0 {
-		return nil, fmt.Errorf("unable to generate proof of possession signature for a deposit address: 0 signatures")
-	}
-	proofOfPossessionSignature := proofOfPossessionSignatures[0]
-
-	internalHandler := NewInternalDepositHandler(config)
-	selfProofs, err := internalHandler.GenerateStaticDepositAddressProofs(ctx, &pbinternal.GenerateStaticDepositAddressProofsRequest{
-		KeyshareId:             keyshare.ID.String(),
-		Address:                depositAddressString,
-		OwnerIdentityPublicKey: identityPublicKey.Serialize(),
 	})
 	if err != nil {
 		return nil, err
