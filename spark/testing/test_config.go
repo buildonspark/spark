@@ -2,6 +2,7 @@ package sparktesting
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"testing"
@@ -23,6 +24,10 @@ const (
 
 func IsMinikube() bool {
 	return os.Getenv("MINIKUBE_IP") != ""
+}
+
+func GetMinikubeIP() string {
+	return os.Getenv("MINIKUBE_IP")
 }
 
 // IsGripmock returns true if the GRIPMOCK environment variable is set to true.
@@ -123,7 +128,10 @@ func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 
 func GetTestDatabasePath(operatorIndex int) string {
 	if IsMinikube() {
-		return fmt.Sprintf("postgresql://postgres@localhost:15432/sparkoperator_%d?sslmode=disable", operatorIndex)
+		return fmt.Sprintf("postgresql://postgres@%s/sparkoperator_%d?sslmode=disable",
+			net.JoinHostPort(GetMinikubeIP(), "5432"),
+			operatorIndex,
+		)
 	}
 	return fmt.Sprintf("postgresql://:@127.0.0.1:5432/sparkoperator_%d?sslmode=disable", operatorIndex)
 }
