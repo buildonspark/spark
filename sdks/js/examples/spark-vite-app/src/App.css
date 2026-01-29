@@ -1,42 +1,179 @@
 #root {
-  max-width: 1280px;
+  width: 100%;
+  max-width: 600px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem;
   text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+  box-sizing: border-box;
 }
 
 .card {
-  padding: 2em;
+  padding: 1em;
+  background: #1e1e1e;
+  border-radius: 16px;
+  margin-top: 1.5em;
+  box-sizing: border-box;
+  width: 100%;
 }
 
-.read-the-docs {
+.status {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.status.info {
+  background: rgba(100, 108, 255, 0.15);
+  color: #a0a0ff;
+}
+
+.status.success {
+  background: rgba(100, 200, 100, 0.15);
+  color: #90ee90;
+}
+
+.status.error {
+  background: rgba(200, 100, 100, 0.15);
+  color: #ff9090;
+}
+
+.section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #444;
+  text-align: left;
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.section h3 {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  font-weight: 600;
   color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.section button {
+  margin-bottom: 12px;
+}
+
+.toggle-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  width: 100%;
+}
+
+.toggle-row button {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.toggle-row button.active {
+  background: #646cff;
+  border-color: #646cff;
+}
+
+.network-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  justify-content: center;
+  width: 100%;
+}
+
+.network-selector button {
+  flex: 1;
+  min-width: 0;
+}
+
+.network-selector button.active {
+  background: #646cff;
+  border-color: #646cff;
+}
+
+textarea,
+input[type="text"],
+input[type="number"] {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+textarea {
+  resize: vertical;
+}
+
+textarea:focus,
+input:focus {
+  outline: none;
+  border-color: #646cff;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.code {
+  background: #1a1a1a;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #90ee90;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  margin-bottom: 12px;
+  text-align: left;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.code.clickable {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.code.clickable:hover {
+  background: #2a2a2a;
+}
+
+.code.clickable:active {
+  background: #333;
+}
+
+.balance-display {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.balance-amount {
+  font-size: 36px;
+  font-weight: 700;
+  color: #90ee90;
+}
+
+.balance-unit {
+  font-size: 18px;
+  font-weight: 500;
+  color: #90ee90;
+  margin-left: 8px;
 }
