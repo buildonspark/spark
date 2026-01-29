@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/uuids"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 	"go.uber.org/zap"
 
 	"entgo.io/ent/dialect/sql"
@@ -44,7 +47,33 @@ var (
 	defaultTaskTimeout              = 1 * time.Minute
 	dkgTaskTimeout                  = 3 * time.Minute
 	deleteStaleTreeNodesTaskTimeout = 10 * time.Minute
+
+	meter                       = otel.Meter("gossip")
+	oldestPendingGossipAgeGauge metric.Int64Gauge
+	pendingGossipCountGauge     metric.Int64Gauge
 )
+
+func init() {
+	var err error
+	oldestPendingGossipAgeGauge, err = meter.Int64Gauge(
+		"gossip.oldest_pending_age_ms",
+		metric.WithDescription("Age of the oldest pending gossip message in milliseconds"),
+		metric.WithUnit("ms"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		oldestPendingGossipAgeGauge = noop.Int64Gauge{}
+	}
+
+	pendingGossipCountGauge, err = meter.Int64Gauge(
+		"gossip.pending_count",
+		metric.WithDescription("Total number of pending gossip messages"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		pendingGossipCountGauge = noop.Int64Gauge{}
+	}
+}
 
 // Task contains common fields for all task types.
 type Task func(context.Context, *so.Config) error
@@ -437,6 +466,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
+
 					gossipLimit := knobsService.GetValue(knobs.KnobGossipLimit, 50)
 					boundaryUUID := uuids.UUIDv7FromTime(time.Now().Add(-20 * time.Second))
 					query := tx.Gossip.Query().Where(
@@ -454,6 +484,30 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							logger.Error("Failed to send gossip", zap.Error(err))
 						}
 					}
+
+					// Record oldest pending gossip age + pending count after processing
+					oldestPending, err := tx.Gossip.Query().
+						Where(gossip.StatusEQ(st.GossipStatusPending)).
+						Order(gossip.ByCreateTime(sql.OrderAsc())).
+						First(ctx)
+					if err == nil {
+						ageMs := time.Since(oldestPending.CreateTime).Milliseconds()
+						oldestPendingGossipAgeGauge.Record(ctx, ageMs)
+					} else if ent.IsNotFound(err) {
+						oldestPendingGossipAgeGauge.Record(ctx, 0)
+					} else {
+						logger.Warn("Failed to query oldest pending gossip message", zap.Error(err))
+					}
+
+					pendingCount, err := tx.Gossip.Query().
+						Where(gossip.StatusEQ(st.GossipStatusPending)).
+						Count(ctx)
+					if err != nil {
+						logger.Warn("Failed to count pending gossip messages", zap.Error(err))
+					} else {
+						pendingGossipCountGauge.Record(ctx, int64(pendingCount))
+					}
+
 					return nil
 				},
 			},
