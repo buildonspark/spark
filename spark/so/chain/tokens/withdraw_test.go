@@ -84,7 +84,7 @@ func assertOutputNotSpendable(t *testing.T, ctx context.Context, config *so.Conf
 	t.Helper()
 	handler := createQueryHandler(t, config)
 
-	resp, err := handler.QueryTokenOutputsToken(ctx, &tokenpb.QueryTokenOutputsRequest{
+	resp, err := handler.QueryTokenOutputs(ctx, &tokenpb.QueryTokenOutputsRequest{
 		OwnerPublicKeys: [][]byte{ownerPubKey.Serialize()},
 		Network:         sparkpb.Network_REGTEST,
 	})
@@ -103,7 +103,7 @@ func assertOutputStillSpendable(t *testing.T, ctx context.Context, config *so.Co
 	t.Helper()
 	handler := createQueryHandler(t, config)
 
-	resp, err := handler.QueryTokenOutputsToken(ctx, &tokenpb.QueryTokenOutputsRequest{
+	resp, err := handler.QueryTokenOutputs(ctx, &tokenpb.QueryTokenOutputsRequest{
 		OwnerPublicKeys: [][]byte{ownerPubKey.Serialize()},
 		Network:         sparkpb.Network_REGTEST,
 	})
