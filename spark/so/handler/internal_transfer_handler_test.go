@@ -287,6 +287,15 @@ func TestApplySignatures(t *testing.T) {
 				DepositConfirmationThreshold: 1,
 			},
 		},
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:                        0,
+				Identifier:                "test-operator",
+				AddressRpc:                "localhost:8080",
+				AddressDkg:                "localhost:8081",
+				OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
+			},
+		},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 	}
 

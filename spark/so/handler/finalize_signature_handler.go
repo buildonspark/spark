@@ -23,7 +23,6 @@ import (
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
-	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/tree"
@@ -130,15 +129,14 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 					}
 					numConfirmations := blockHeight.Height - address.ConfirmationHeight
 					requiredConfirmations := int64(knobs.GetKnobsService(ctx).GetValue(knobs.KnobNumRequiredConfirmations, 3))
-					if numConfirmations < requiredConfirmations {
-						return nil, errors.FailedPreconditionInsufficientConfirmations(fmt.Errorf("expected at least %d confirmations, got %d", requiredConfirmations, numConfirmations))
-					}
-					if len(address.ConfirmationTxid) > 0 && address.ConfirmationTxid != nodeTree.BaseTxid.String() {
-						return nil, fmt.Errorf("confirmation txid does not match tree base txid")
-					}
-					_, err = nodeTree.Update().SetStatus(st.TreeStatusAvailable).Save(ctx)
-					if err != nil {
-						return nil, fmt.Errorf("failed to update tree: %w", err)
+					if numConfirmations >= requiredConfirmations {
+						if len(address.ConfirmationTxid) > 0 && address.ConfirmationTxid != nodeTree.BaseTxid.String() {
+							return nil, fmt.Errorf("confirmation txid does not match tree base txid")
+						}
+						_, err = nodeTree.Update().SetStatus(st.TreeStatusAvailable).Save(ctx)
+						if err != nil {
+							return nil, fmt.Errorf("failed to update tree: %w", err)
+						}
 					}
 					break
 				}

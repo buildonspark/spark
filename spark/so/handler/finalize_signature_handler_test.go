@@ -20,8 +20,6 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func TestNewFinalizeSignatureHandler(t *testing.T) {
@@ -37,7 +35,18 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignatures_EmptyRequest(t *testing
 	t.Parallel()
 	ctx, _ := db.NewTestSQLiteContext(t)
 
-	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:                        0,
+				Identifier:                "test-operator",
+				AddressRpc:                "localhost:8080",
+				AddressDkg:                "localhost:8081",
+				OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
+			},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
 	handler := NewFinalizeSignatureHandler(config)
 
 	req := &pb.FinalizeNodeSignaturesRequest{
@@ -55,7 +64,18 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_EmptyRequest(t *testi
 	t.Parallel()
 	ctx, _ := db.NewTestSQLiteContext(t)
 
-	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:                        0,
+				Identifier:                "test-operator",
+				AddressRpc:                "localhost:8080",
+				AddressDkg:                "localhost:8081",
+				OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
+			},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
 	handler := NewFinalizeSignatureHandler(config)
 
 	req := &pb.FinalizeNodeSignaturesRequest{
@@ -251,10 +271,11 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignatures_InvalidIntent(t *testin
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{
 			"test-operator": {
-				ID:         0,
-				Identifier: "test-operator",
-				AddressRpc: "localhost:8080",
-				AddressDkg: "localhost:8081",
+				ID:                        0,
+				Identifier:                "test-operator",
+				AddressRpc:                "localhost:8080",
+				AddressDkg:                "localhost:8081",
+				OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
 			},
 		},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
@@ -307,7 +328,18 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_RequireDirectTx(t *te
 	t.Parallel()
 	ctx, _ := db.NewTestSQLiteContext(t)
 
-	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:                        0,
+				Identifier:                "test-operator",
+				AddressRpc:                "localhost:8080",
+				AddressDkg:                "localhost:8081",
+				OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
+			},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
 	handler := NewFinalizeSignatureHandler(config)
 
 	req := &pb.FinalizeNodeSignaturesRequest{
@@ -562,10 +594,11 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{
 			"test-operator": {
-				ID:         0,
-				Identifier: "test-operator",
-				AddressRpc: "localhost:8080",
-				AddressDkg: "localhost:8081",
+				ID:                        0,
+				Identifier:                "test-operator",
+				AddressRpc:                "localhost:8080",
+				AddressDkg:                "localhost:8081",
+				OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
 			},
 		},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
@@ -674,10 +707,11 @@ func TestFinalizeTreeWithInsufficientConfirmations(t *testing.T) {
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{
 			"test-operator": {
-				ID:         0,
-				Identifier: "test-operator",
-				AddressRpc: "localhost:8080",
-				AddressDkg: "localhost:8081",
+				ID:                        0,
+				Identifier:                "test-operator",
+				AddressRpc:                "localhost:8080",
+				AddressDkg:                "localhost:8081",
+				OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
 			},
 		},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
@@ -768,14 +802,11 @@ func TestFinalizeTreeWithInsufficientConfirmations(t *testing.T) {
 		Intent: pbcommon.SignatureIntent_CREATION,
 	}
 
-	_, err = handler.FinalizeNodeSignatures(ctx, req)
-	require.Error(t, err, "should fail with insufficient confirmations")
-	require.ErrorContains(t, err, "expected at least")
+	// Should not receive an error for this. Node should be CREATING until the correct number of confirmations is reached.
+	resp, err := handler.FinalizeNodeSignatures(ctx, req)
 
-	// Check that the error has the correct gRPC status code
-	grpcError, ok := status.FromError(err)
-	require.True(t, ok, "error should be a gRPC status error")
-	assert.Equal(t, codes.FailedPrecondition, grpcError.Code(), "error should have FailedPrecondition status code (9)")
+	require.NoError(t, err)
+	require.Equal(t, string(st.TreeNodeStatusCreating), resp.Nodes[0].Status)
 }
 
 // Test that trees cannot be finalized when no block height is present in db
@@ -787,10 +818,11 @@ func TestFinalizeTreeWithNoBlockHeight(t *testing.T) {
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{
 			"test-operator": {
-				ID:         0,
-				Identifier: "test-operator",
-				AddressRpc: "localhost:8080",
-				AddressDkg: "localhost:8081",
+				ID:                        0,
+				Identifier:                "test-operator",
+				AddressRpc:                "localhost:8080",
+				AddressDkg:                "localhost:8081",
+				OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
 			},
 		},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
@@ -932,10 +964,11 @@ func TestFinalizeNodeSignatures_RejectsNodesFromDifferentTrees(t *testing.T) {
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{
 			"test-operator": {
-				ID:         0,
-				Identifier: "test-operator",
-				AddressRpc: "localhost:8080",
-				AddressDkg: "localhost:8081",
+				ID:                        0,
+				Identifier:                "test-operator",
+				AddressRpc:                "localhost:8080",
+				AddressDkg:                "localhost:8081",
+				OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
 			},
 		},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},

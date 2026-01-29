@@ -117,14 +117,15 @@ func TestFinalizeTreeCreationErrorCases(t *testing.T) {
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{
 			"test-operator": {
-				ID:         0,
-				Identifier: "test-operator",
-				AddressRpc: "localhost:8080",
-				AddressDkg: "localhost:8081",
+				ID:                        0,
+				Identifier:                "test-operator",
+				AddressRpc:                "localhost:8080",
+				AddressDkg:                "localhost:8081",
+				OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
 			},
 		},
-		SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+		SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest},
 	}
 	handler := NewInternalDepositHandler(config)
 
