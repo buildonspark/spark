@@ -126,7 +126,7 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	statusCode := status.Code(err)
 	gossipMessageHandledTotal.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("message_type", messageType),
-		semconv.RPCGRPCStatusCodeKey.String(statusCode.String()),
+		semconv.RPCGRPCStatusCodeKey.Int(int(statusCode)),
 	))
 
 	return err
