@@ -105,11 +105,9 @@ func parseWithdrawalsFromBlock(ctx context.Context, txs []wire.MsgTx, blockHeigh
 			parsedTx, parsedOutputs, err := parseTokenWithdrawal(txOut.PkScript)
 			if err != nil {
 				logger.With(zap.Stringer("withdrawal_txid", tx.TxHash())).
-					With(zap.Int("bitcoin_vout", txOutIdx)).
 					With(zap.Uint64("block_height", blockHeight)).
-					With(zap.String("expected_format", WithdrawalExpectedFormat)).
 					With(zap.Error(err)).
-					Warn("Failed to parse token withdrawal")
+					Sugar().Warnf("Failed to parse token withdrawal at vout %d (expected format: %s)", txOutIdx, WithdrawalExpectedFormat)
 				continue
 			}
 
