@@ -172,10 +172,12 @@ func (TreeNode) Indexes() []ent.Index {
 		index.Fields("owner_identity_pubkey"),
 		index.Fields("owner_identity_pubkey", "status"),
 		index.Fields("node_confirmation_height"),
-		index.Fields("refund_confirmation_height"),
 		index.Fields("update_time"),
 		// TODO(mhr): This is mostly for the backfill and can probably be removed later.
 		index.Fields("network"),
+		// Composite index for watchtower queries that check for nodes with confirmed
+		// node tx but unconfirmed refund tx on a specific network.
+		index.Fields("refund_confirmation_height", "node_confirmation_height", "network"),
 
 		index.Fields("raw_txid").Annotations(
 			entsql.IndexWhere("raw_txid is not null"),

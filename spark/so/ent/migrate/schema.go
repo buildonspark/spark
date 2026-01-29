@@ -1226,11 +1226,6 @@ var (
 				Columns: []*schema.Column{TreeNodesColumns[10]},
 			},
 			{
-				Name:    "treenode_refund_confirmation_height",
-				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[11]},
-			},
-			{
 				Name:    "treenode_update_time",
 				Unique:  false,
 				Columns: []*schema.Column{TreeNodesColumns[2]},
@@ -1239,6 +1234,11 @@ var (
 				Name:    "treenode_network",
 				Unique:  false,
 				Columns: []*schema.Column{TreeNodesColumns[4]},
+			},
+			{
+				Name:    "treenode_refund_confirmation_height_node_confirmation_height_network",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[11], TreeNodesColumns[10], TreeNodesColumns[4]},
 			},
 			{
 				Name:    "treenode_raw_txid",
