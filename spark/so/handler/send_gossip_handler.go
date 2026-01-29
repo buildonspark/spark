@@ -75,6 +75,7 @@ func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, 
 	client := pbgossip.NewGossipServiceClient(conn)
 	_, err = client.Gossip(ctx, gossip)
 	if err != nil {
+		// Only retry for the following errors
 		if status.Code(err) == codes.Unavailable ||
 			status.Code(err) == codes.Canceled ||
 			strings.Contains(err.Error(), "context canceled") ||

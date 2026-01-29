@@ -20,8 +20,33 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/status"
 )
+
+var gossipMessageHandledTotal metric.Int64Counter
+
+func init() {
+	meter := otel.GetMeterProvider().Meter("spark.grpc")
+
+	counter, err := meter.Int64Counter(
+		"gossip.message_handled_total",
+		metric.WithDescription("Total number of gossip messages handled by type and status"),
+		metric.WithUnit("{count}"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		if counter == nil {
+			counter = noop.Int64Counter{}
+		}
+	}
+	gossipMessageHandledTotal = counter
+}
 
 type GossipHandler struct {
 	config *so.Config
@@ -31,9 +56,16 @@ func NewGossipHandler(config *so.Config) *GossipHandler {
 	return &GossipHandler{config: config}
 }
 
+// Routes incoming gossip messages to their appropriate handlers based on message type.
+// The forCoordinator flag indicates whether this operator is the coordinator for the operation,
+// which affects how certain message types (e.g., FinalizeTransfer) are processed.
+// Returns nil for non-retryable errors to prevent the gossip system from retrying failed operations.
 func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *pbgossip.GossipMessage, forCoordinator bool) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Handling gossip message with ID %s", gossipMessage.MessageId)
+
+	messageType := getGossipMessageType(gossipMessage)
+
 	var err error
 	switch gossipMessage.Message.(type) {
 	case *pbgossip.GossipMessage_CancelTransfer:
@@ -76,21 +108,36 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 		settleSwapKeyTweak := gossipMessage.GetSettleSwapKeyTweak()
 		err = h.handleSettleSwapKeyTweakGossipMessage(ctx, settleSwapKeyTweak)
 	case *pbgossip.GossipMessage_FinalizeRefreshTimelock:
-		return fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.Message)
+		err = fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.Message)
 	case *pbgossip.GossipMessage_FinalizeExtendLeaf:
-		return fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.Message)
+		err = fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.Message)
 	case *pbgossip.GossipMessage_ArchiveStaticDepositAddress:
 		archiveStaticDepositAddress := gossipMessage.GetArchiveStaticDepositAddress()
 		err = h.handleArchiveStaticDepositAddressGossipMessage(ctx, archiveStaticDepositAddress)
 	default:
-		return fmt.Errorf("unsupported gossip message type: %T", gossipMessage.Message)
+		err = fmt.Errorf("unsupported gossip message type: %T", gossipMessage.Message)
 	}
 
 	if err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf("Handling for gossip message ID %s failed with error: %v", gossipMessage.MessageId, err)
-		return err
 	}
-	return nil
+
+	// Record metric
+	statusCode := status.Code(err)
+	gossipMessageHandledTotal.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("message_type", messageType),
+		semconv.RPCGRPCStatusCodeKey.String(statusCode.String()),
+	))
+
+	return err
+}
+
+func getGossipMessageType(msg *pbgossip.GossipMessage) string {
+	if msg.Message == nil {
+		return "unknown"
+	}
+	// Return the raw protobuf type name, e.g., "*gossip.GossipMessage_CancelTransfer"
+	return fmt.Sprintf("%T", msg.Message)
 }
 
 func (h *GossipHandler) handleCancelTransferGossipMessage(ctx context.Context, cancelTransfer *pbgossip.GossipMessageCancelTransfer) error {
