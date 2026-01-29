@@ -86,10 +86,7 @@ func HandleTokenWithdrawals(
 
 	for _, withdrawal := range withdrawals {
 		if err := processWithdrawal(ctx, dbClient, logger, withdrawal, latestSeEntityPubKey, latestSeEntity, withdrawnInBlock); err != nil {
-			logger.With(zap.Stringer("withdrawal_txid", withdrawal.txHash)).
-				With(zap.Uint64("block_height", blockHeight)).
-				With(zap.Error(err)).
-				Error("Failed to process withdrawal")
+			logger.Sugar().Errorf("Failed to process withdrawal %s at block height %d: %v", withdrawal.txHash, blockHeight, err)
 		}
 	}
 
@@ -104,10 +101,8 @@ func parseWithdrawalsFromBlock(ctx context.Context, txs []wire.MsgTx, blockHeigh
 		for txOutIdx, txOut := range tx.TxOut {
 			parsedTx, parsedOutputs, err := parseTokenWithdrawal(txOut.PkScript)
 			if err != nil {
-				logger.With(zap.Stringer("withdrawal_txid", tx.TxHash())).
-					With(zap.Uint64("block_height", blockHeight)).
-					With(zap.Error(err)).
-					Sugar().Warnf("Failed to parse token withdrawal at vout %d (expected format: %s)", txOutIdx, WithdrawalExpectedFormat)
+				logger.Sugar().Warnf("Failed to parse token withdrawal %s at block height %d vout %d: %v (expected format: %s)",
+					tx.TxHash(), blockHeight, txOutIdx, err, WithdrawalExpectedFormat)
 				continue
 			}
 
@@ -130,7 +125,7 @@ func parseWithdrawalsFromBlock(ctx context.Context, txs []wire.MsgTx, blockHeigh
 				outputIdx:         txOutIdx,
 			})
 
-			logger.With(zap.Stringer("withdrawal_txid", txHash)).Info("Parsed token withdrawal")
+			logger.Sugar().Infof("Parsed token withdrawal %s", txHash)
 		}
 	}
 
@@ -147,9 +142,8 @@ func processWithdrawal(
 	withdrawnInBlock map[tokenOutputKey]struct{},
 ) error {
 	if withdrawal.withdrawalTx.seEntityPubKey != expectedSePubKey {
-		logger.With(zap.Stringer("withdrawal_txid", withdrawal.txHash)).
-			Sugar().Infof("Rejecting withdrawal: invalid SE entity public key. Expected: %s Got: %s",
-			expectedSePubKey, withdrawal.withdrawalTx.seEntityPubKey)
+		logger.Sugar().Infof("Rejecting withdrawal %s: invalid SE entity public key (expected: %s, got: %s)",
+			withdrawal.txHash, expectedSePubKey, withdrawal.withdrawalTx.seEntityPubKey)
 		return nil
 	}
 
@@ -166,19 +160,13 @@ func processWithdrawal(
 
 		tokenOutput, err := validateOutputWithdrawable(outputToWithdraw, withdrawnInBlock, tokenOutputMap)
 		if err != nil {
-			logger.With(zap.Stringer("withdrawal_txid", withdrawal.txHash)).
-				With(zap.Stringer("spark_output", key)).
-				With(zap.Error(err)).
-				Info("Rejecting withdrawal output")
+			logger.Sugar().Infof("Rejecting withdrawal %s output %s: %v", withdrawal.txHash, key, err)
 			// TODO: broadcast justice transaction for invalid withdrawals
 			continue
 		}
 
 		if err := validateWithdrawalTxOutput(withdrawal.tx, &outputToWithdraw.withdrawal, tokenOutput); err != nil {
-			logger.With(zap.Stringer("withdrawal_txid", withdrawal.txHash)).
-				With(zap.Stringer("spark_output", key)).
-				With(zap.Error(err)).
-				Error("Rejecting withdrawal: invalid transaction output")
+			logger.Sugar().Errorf("Rejecting withdrawal %s output %s: invalid transaction output: %v", withdrawal.txHash, key, err)
 			// TODO: broadcast justice transaction for invalid withdrawals
 			continue
 		}
@@ -191,8 +179,7 @@ func processWithdrawal(
 	// TODO: Validate owner signature
 
 	if len(approvedWithdrawals) == 0 {
-		logger.With(zap.Stringer("withdrawal_txid", withdrawal.txHash)).
-			Info("Skipping withdrawal tx: no valid outputs")
+		logger.Sugar().Infof("Skipping withdrawal tx %s: no valid outputs", withdrawal.txHash)
 		return nil
 	}
 
