@@ -86,7 +86,7 @@ func HandleTokenWithdrawals(
 
 	for _, withdrawal := range withdrawals {
 		if err := processWithdrawal(ctx, dbClient, logger, withdrawal, latestSeEntityPubKey, latestSeEntity, withdrawnInBlock); err != nil {
-			logger.Sugar().Errorf("Failed to process withdrawal %s at block height %d: %v", withdrawal.txHash, blockHeight, err)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to process withdrawal %s at block height %d", withdrawal.txHash, blockHeight)
 		}
 	}
 
@@ -101,8 +101,8 @@ func parseWithdrawalsFromBlock(ctx context.Context, txs []wire.MsgTx, blockHeigh
 		for txOutIdx, txOut := range tx.TxOut {
 			parsedTx, parsedOutputs, err := parseTokenWithdrawal(txOut.PkScript)
 			if err != nil {
-				logger.Sugar().Warnf("Failed to parse token withdrawal %s at block height %d vout %d: %v (expected format: %s)",
-					tx.TxHash(), blockHeight, txOutIdx, err, WithdrawalExpectedFormat)
+				logger.With(zap.Error(err)).Sugar().Warnf("Failed to parse token withdrawal %s at block height %d vout %d (expected format: %s)",
+					tx.TxHash(), blockHeight, txOutIdx, WithdrawalExpectedFormat)
 				continue
 			}
 
@@ -160,13 +160,13 @@ func processWithdrawal(
 
 		tokenOutput, err := validateOutputWithdrawable(outputToWithdraw, withdrawnInBlock, tokenOutputMap)
 		if err != nil {
-			logger.Sugar().Infof("Rejecting withdrawal %s output %s: %v", withdrawal.txHash, key, err)
+			logger.With(zap.Error(err)).Sugar().Infof("Rejecting withdrawal %s output %s", withdrawal.txHash, key)
 			// TODO: broadcast justice transaction for invalid withdrawals
 			continue
 		}
 
 		if err := validateWithdrawalTxOutput(withdrawal.tx, &outputToWithdraw.withdrawal, tokenOutput); err != nil {
-			logger.Sugar().Errorf("Rejecting withdrawal %s output %s: invalid transaction output: %v", withdrawal.txHash, key, err)
+			logger.With(zap.Error(err)).Sugar().Errorf("Rejecting withdrawal %s output %s: invalid transaction output", withdrawal.txHash, key)
 			// TODO: broadcast justice transaction for invalid withdrawals
 			continue
 		}
