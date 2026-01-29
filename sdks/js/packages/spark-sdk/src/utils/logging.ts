@@ -32,9 +32,7 @@ export class SparkSdkLogger {
   static setAllEnabled(enabled: boolean) {
     this.loggers.forEach((logger) => logger.setEnabled(enabled));
   }
-
-  static {
-    // Eager-init defaults on module evaluation. This is needed to ensure that the logger is initialized before any other code is executed.
-    Object.values(LOGGER_NAMES).forEach((name) => this.get(name));
-  }
 }
+
+// Eager-init defaults on module evaluation.
+Object.values(LOGGER_NAMES).forEach((name) => SparkSdkLogger.get(name));
