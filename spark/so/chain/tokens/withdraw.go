@@ -104,8 +104,8 @@ func parseWithdrawalsFromBlock(ctx context.Context, txs []wire.MsgTx, blockHeigh
 		for txOutIdx, txOut := range tx.TxOut {
 			parsedTx, parsedOutputs, err := parseTokenWithdrawal(txOut.PkScript)
 			if err != nil {
-				logger.With(zap.Stringer("txid", tx.TxHash())).
-					With(zap.Int("output_idx", txOutIdx)).
+				logger.With(zap.Stringer("withdrawal_txid", tx.TxHash())).
+					With(zap.Int("bitcoin_vout", txOutIdx)).
 					With(zap.Uint64("block_height", blockHeight)).
 					With(zap.String("expected_format", WithdrawalExpectedFormat)).
 					With(zap.Error(err)).
