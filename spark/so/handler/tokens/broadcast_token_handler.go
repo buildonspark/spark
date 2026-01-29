@@ -216,15 +216,14 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 	if err != nil {
 		return nil, err
 	}
-	if err := ent.DbCommit(ctx); err != nil {
-		return nil, fmt.Errorf("failed to commit token transaction broadcast: %w", err)
-	}
 
+	// Fanout to other SOs, then commit. By committing after fanout, the presence of peer signatures
+	// indicates whether fanout succeeded. Transactions with no/insufficient peer signatures need retry.
 	signatures := make(operatorSignaturesMap)
 	signatures[h.config.Identifier] = localResp.SparkOperatorSignature
 
 	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	internalSignatures, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &excludeSelf,
+	internalSignatures, fanoutErr := helper.ExecuteTaskWithAllOperators(ctx, h.config, &excludeSelf,
 		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.BroadcastTransactionInternalResponse, error) {
 			conn, err := operator.NewOperatorGRPCConnection()
 			if err != nil {
@@ -241,8 +240,16 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 			})
 		},
 	)
-	if err != nil {
-		return nil, sparkerrors.WrapErrorWithReasonPrefix(err, sparkerrors.ErrorReasonPrefixFailedWithExternalCoordinator)
+
+	// Commit after fanout attempt (success or failure) to record that coordinator finished.
+	// If fanout failed, peer signatures will be absent, signaling that retry is needed.
+	if err := ent.DbCommit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit token transaction broadcast: %w", err)
+	}
+
+	// Now check the fanout error after committing
+	if fanoutErr != nil {
+		return nil, sparkerrors.WrapErrorWithReasonPrefix(fanoutErr, sparkerrors.ErrorReasonPrefixFailedWithExternalCoordinator)
 	}
 
 	for opID, resp := range internalSignatures {
@@ -306,6 +313,102 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 			CommitStatus:          commitResp.GetCommitStatus(),
 			CommitProgress:        commitResp.GetCommitProgress(),
 			TokenIdentifier:       commitResp.GetTokenIdentifier(),
+		}, nil
+	default:
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction type not supported: %s", txType))
+	}
+}
+
+// FanoutBroadcastAndFinalize broadcasts a token transaction to non-coordinator SOs,
+// collects signatures, persists peer signatures, and handles finalization for transfers.
+// This method is idempotent - SOs that already signed return their cached signature.
+// It is used by both the initial broadcast and the retry task.
+func (h *BroadcastTokenHandler) FanoutBroadcastAndFinalize(
+	ctx context.Context,
+	tokenTxEnt *ent.TokenTransaction,
+	legacyTokenTx *tokenpb.TokenTransaction,
+	keyshareIDs []string,
+	ownerSignatures []*tokenpb.SignatureWithIndex,
+) (*tokenpb.BroadcastTransactionResponse, error) {
+	// Build operatorSignaturesMap with local signature from tokenTxEnt.OperatorSignature
+	signatures := make(operatorSignaturesMap)
+	if tokenTxEnt.OperatorSignature == nil {
+		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("fanout broadcast: token transaction %s has no operator signature", tokenTxEnt.ID))
+	}
+	signatures[h.config.Identifier] = tokenTxEnt.OperatorSignature
+
+	// Fanout to all other SOs (excluding self). This is idempotent since
+	// BroadcastTokenTransactionInternal returns cached signatures for already-signed transactions.
+	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	internalSignatures, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &excludeSelf,
+		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.BroadcastTransactionInternalResponse, error) {
+			conn, err := operator.NewOperatorGRPCConnection()
+			if err != nil {
+				return nil, err
+			}
+			defer conn.Close()
+
+			client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
+			return client.BroadcastTokenTransactionInternal(ctx, &tokeninternalpb.BroadcastTransactionInternalRequest{
+				KeyshareIds:                keyshareIDs,
+				FinalTokenTransaction:      legacyTokenTx,
+				TokenTransactionSignatures: ownerSignatures,
+				CoordinatorPublicKey:       h.config.IdentityPublicKey().Serialize(),
+			})
+		},
+	)
+	if err != nil {
+		return nil, sparkerrors.WrapErrorWithReasonPrefix(err, sparkerrors.ErrorReasonPrefixFailedWithExternalCoordinator)
+	}
+
+	for opID, resp := range internalSignatures {
+		signatures[opID] = resp.SparkOperatorSignature
+	}
+
+	// Validate signatures and persist peer signatures
+	internalSignHandler := NewInternalSignTokenHandler(h.config)
+	if err := internalSignHandler.validateSignaturesPackageAndPersistPeerSignatures(ctx, signatures, tokenTxEnt); err != nil {
+		return nil, err
+	}
+
+	// Handle finalization based on transaction type
+	txType, err := utils.InferTokenTransactionType(legacyTokenTx)
+	if err != nil {
+		return nil, err
+	}
+
+	switch txType {
+	case utils.TokenTransactionTypeCreate:
+		tokenMetadata, err := common.NewTokenMetadataFromCreateInput(legacyTokenTx.GetCreateInput(), legacyTokenTx.GetNetwork())
+		if err != nil {
+			return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to create token metadata: %w", err))
+		}
+		tokenIdentifier, err := tokenMetadata.ComputeTokenIdentifier()
+		if err != nil {
+			return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to compute token identifier: %w", err))
+		}
+		return &tokenpb.BroadcastTransactionResponse{
+			CommitStatus:    tokenpb.CommitStatus_COMMIT_FINALIZED,
+			TokenIdentifier: tokenIdentifier,
+		}, nil
+	case utils.TokenTransactionTypeMint:
+		return &tokenpb.BroadcastTransactionResponse{
+			CommitStatus:    tokenpb.CommitStatus_COMMIT_FINALIZED,
+			TokenIdentifier: legacyTokenTx.GetMintInput().GetTokenIdentifier(),
+		}, nil
+	case utils.TokenTransactionTypeTransfer:
+		mappedSigs := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, len(signatures))
+		for k, v := range signatures {
+			mappedSigs[k] = &tokeninternalpb.SignTokenTransactionFromCoordinationResponse{SparkOperatorSignature: v}
+		}
+		commitResp, err := h.signTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, legacyTokenTx, mappedSigs, tokenTxEnt.FinalizedTokenTransactionHash)
+		if err != nil {
+			return nil, err
+		}
+		return &tokenpb.BroadcastTransactionResponse{
+			CommitStatus:    commitResp.GetCommitStatus(),
+			CommitProgress:  commitResp.GetCommitProgress(),
+			TokenIdentifier: commitResp.GetTokenIdentifier(),
 		}, nil
 	default:
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction type not supported: %s", txType))

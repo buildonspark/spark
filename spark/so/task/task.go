@@ -454,6 +454,19 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
+			ExecutionInterval: 30 * time.Second,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "retry_signed_token_transaction_broadcasts",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					if knobsService == nil || !knobsService.RolloutRandom(knobs.KnobTokenTransactionV3Phase2RetryEnabled, 0) {
+						return nil
+					}
+					return tokens.RetryIncompleteSignatureBroadcasts(ctx, config)
+				},
+			},
+		},
+		{
 			ExecutionInterval: 20 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "send_gossip",

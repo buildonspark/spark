@@ -83,7 +83,11 @@ const (
 	// This will be flipped to true permanently (with Phase 1 and legacy handlers being cleaned up) once we are confident in the migration
 	// (which means passing integration tests, load tests, and likely an incremental production rollout).
 	KnobTokenTransactionV3Phase2Enabled = "spark.so.tokens.token_transaction_v3_phase2_enabled"
-	KnobAllowExtraMetadataOnMainnet     = "spark.so.tokens.allow_extra_metadata_on_mainnet"
+	// Enable the retry task for Phase 2 token transaction broadcasts.
+	// When enabled, a scheduled task will retry broadcasting SIGNED token transactions to non-coordinator SOs
+	// that failed during the initial fanout. This is separate from phase 2 enablement to allow independent rollout control.
+	KnobTokenTransactionV3Phase2RetryEnabled = "spark.so.tokens.token_transaction_v3_phase2_retry_enabled"
+	KnobAllowExtraMetadataOnMainnet          = "spark.so.tokens.allow_extra_metadata_on_mainnet"
 
 	// Number of confirmations required before finalizing tree creation
 	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
