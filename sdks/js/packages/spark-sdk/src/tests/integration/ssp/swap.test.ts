@@ -21,7 +21,7 @@ describe("SSP swap", () => {
     const signedTx = await faucet.sendToAddress(depositAddress, DEPOSIT_AMOUNT);
 
     // Wait for the transaction to be mined
-    await faucet.mineBlocks(6);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
 
     expect(signedTx).toBeDefined();
 
