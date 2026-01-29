@@ -103,8 +103,11 @@ Transactions are automatically managed by the gRPC middleware (`so/grpc/database
 ## Common Patterns
 
 ### Error Handling
+Use `so/errors` (as `sparkerrors`) to wrap errors with gRPC codes and reasons as close to the source as possible. Only wrap if the error doesn't already have a reason. If no appropriate reason exists in `error_types.go`, propose adding one.
 ```go
-return errors.InvalidArgument("invalid address format")
+sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to query: %w", err))
+sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid format: %s", val))
+sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("already completed"))
 ```
 
 ### Logging
