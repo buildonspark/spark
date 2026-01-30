@@ -64,3 +64,31 @@ func ActivateFreeze(ctx context.Context, ownerPublicKey keys.Public, tokenCreate
 	}
 	return nil
 }
+
+// GetMostRecentThawTimestamp returns the most recent thaw timestamp for a given owner and token.
+// Returns 0 if no thaw has ever occurred.
+func GetMostRecentThawTimestamp(ctx context.Context, ownerPublicKey keys.Public, tokenCreateID uuid.UUID) (uint64, error) {
+	db, err := GetDbFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	// Query for the most recent thawed freeze record
+	freeze, err := db.TokenFreeze.Query().
+		Where(
+			tokenfreeze.OwnerPublicKey(ownerPublicKey),
+			tokenfreeze.TokenCreateID(tokenCreateID),
+			tokenfreeze.StatusEQ(st.TokenFreezeStatusThawed),
+			tokenfreeze.WalletProvidedThawTimestampNotNil(),
+		).
+		Order(Desc(tokenfreeze.FieldWalletProvidedThawTimestamp)).
+		First(ctx)
+	if err != nil {
+		if IsNotFound(err) {
+			return 0, nil
+		}
+		return 0, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get most recent thaw timestamp: %w", err))
+	}
+
+	return freeze.WalletProvidedThawTimestamp, nil
+}

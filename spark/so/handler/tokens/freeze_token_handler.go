@@ -2,17 +2,10 @@ package tokens
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/lightsparkdev/spark/so/errors"
-
-	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
-	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/ent/tokencreate"
-	"github.com/lightsparkdev/spark/so/tokens"
-	"github.com/lightsparkdev/spark/so/utils"
+	"github.com/lightsparkdev/spark/so/authz"
 )
 
 type FreezeTokenHandler struct {
@@ -28,82 +21,23 @@ func NewFreezeTokenHandler(config *so.Config) *FreezeTokenHandler {
 
 // FreezeTokens freezes or unfreezes tokens on the LRC20 node.
 func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.FreezeTokensRequest) (*tokenpb.FreezeTokensResponse, error) {
-	// Validate freeze tokens payload
-	if err := utils.ValidateFreezeTokensPayload(req.FreezeTokensPayload, h.config.IdentityPublicKey()); err != nil {
-		return nil, fmt.Errorf("freeze tokens payload validation failed: %w", err)
+	// Verify session auth - only the issuer can freeze tokens
+	issuerPubKey, err := GetIssuerPublicKeyForFreeze(ctx, req.FreezeTokensPayload.GetTokenIdentifier())
+	if err != nil {
+		return nil, err
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, *issuerPubKey); err != nil {
+		return nil, err
 	}
 
-	freezePayloadHash, err := utils.HashFreezeTokensPayload(req.FreezeTokensPayload)
+	// Use shared validation and freeze logic with timestamp-based replay protection
+	result, err := ValidateAndApplyFreeze(ctx, h.config, req.FreezeTokensPayload, req.IssuerSignature)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash freeze tokens payload: %w", err)
-	}
-
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get database: %w", err)
-	}
-	var tokenCreateEnt *ent.TokenCreate
-	if freezeTokenID := req.GetFreezeTokensPayload().GetTokenIdentifier(); freezeTokenID != nil {
-		tokenCreateEnt, err = db.TokenCreate.Query().Where(tokencreate.TokenIdentifier(freezeTokenID)).Only(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get single token for freeze request: %w", err)
-		}
-	}
-	if !tokenCreateEnt.IsFreezable {
-		return nil, errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("%s: token identifier %x", tokens.ErrTokenNotFreezable, tokenCreateEnt.TokenIdentifier))
-	}
-	expectedIssuerPublicKey := tokenCreateEnt.IssuerPublicKey
-	if err := utils.ValidateOwnershipSignature(req.IssuerSignature, freezePayloadHash, expectedIssuerPublicKey); err != nil {
-		return nil, fmt.Errorf("invalid issuer signature %s to freeze token with identifier %x with issuer public key %v: %w", req.IssuerSignature, req.GetFreezeTokensPayload().GetTokenIdentifier(), expectedIssuerPublicKey, err)
-	}
-
-	// Check for existing freeze.
-	ownerPubKey, err := keys.ParsePublicKey(req.FreezeTokensPayload.OwnerPublicKey)
-	if err != nil {
-		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner public key: %w", err))
-	}
-
-	activeFreezes, err := ent.GetActiveFreezes(ctx, []keys.Public{ownerPubKey}, tokenCreateEnt.ID)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToQueryTokenFreezeStatus, err)
-	}
-	if req.FreezeTokensPayload.ShouldUnfreeze {
-		if len(activeFreezes) == 0 {
-			return nil, fmt.Errorf("no active freezes found to thaw")
-		}
-		if len(activeFreezes) > 1 {
-			return nil, fmt.Errorf(tokens.ErrMultipleActiveFreezes)
-		}
-		err = ent.ThawActiveFreeze(ctx, activeFreezes[0].ID, req.FreezeTokensPayload.IssuerProvidedTimestamp)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToUpdateTokenFreeze, err)
-		}
-	} else { // Freeze
-		if len(activeFreezes) > 0 {
-			return nil, fmt.Errorf(tokens.ErrAlreadyFrozen)
-		}
-		err = ent.ActivateFreeze(ctx,
-			ownerPubKey,
-			tokenCreateEnt.ID,
-			req.IssuerSignature,
-			req.FreezeTokensPayload.IssuerProvidedTimestamp,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToCreateTokenFreeze, err)
-		}
-	}
-	// Collect information about the frozen outputs.
-	result, err := ent.GetOwnedTokenOutputRefs(ctx,
-		[]keys.Public{ownerPubKey},
-		tokenCreateEnt.TokenIdentifier,
-		tokenCreateEnt.Network,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToGetOwnedOutputStats, err)
+		return nil, err
 	}
 
 	return &tokenpb.FreezeTokensResponse{
 		ImpactedTokenOutputs: result.OutputRefs,
-		ImpactedTokenAmount:  result.TotalAmount.Bytes(),
+		ImpactedTokenAmount:  result.TotalAmount,
 	}, nil
 }
