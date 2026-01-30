@@ -2,6 +2,7 @@ package tokens_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,9 +10,12 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokenpartialrevocationsecretshare"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
@@ -20,13 +24,10 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealed(t *testing.T) {
-	if broadcastTokenTestsUseV3 {
-		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
-	}
-
 	ctx := t.Context()
 	config, finalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
@@ -69,10 +70,6 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealed(t *testing.T) {
 }
 
 func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableToSpend(t *testing.T) {
-	if broadcastTokenTestsUseV3 {
-		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
-	}
-
 	testCases := []struct {
 		name                          string
 		nonCoordinatorInitialTxStatus st.TokenTransactionStatus
@@ -100,14 +97,14 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableT
 		},
 	}
 
+	preemptLoserTimestamp := utils.ToMicrosecondPrecision(time.Now().UTC())
+	preemptWinnerTimestamp := preemptLoserTimestamp.Add(-2 * time.Minute)
+
 	for _, tc := range testCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			ctx := t.Context()
 
-			config, initalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
-			require.NoError(t, err, "failed to create transfer token transaction")
-
-			_, remappedFinalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
+			config, initalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWalletWithTimestamp(t, ctx, preemptWinnerTimestamp)
 			require.NoError(t, err, "failed to create transfer token transaction")
 
 			coordinatorEntClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
@@ -121,14 +118,15 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableT
 
 			setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOperator(
 				t, ctx,
+				config,
+				nonCoordOperatorConfig,
 				coordinatorEntClient,
 				nonCoordEntClient,
 				initalTransferTokenTransactionHash,
-				remappedFinalTransferTokenTransactionHash,
 				tc.nonCoordinatorInitialTxStatus,
 				tc.nonCoordinatorRemapTxStatus,
 				true,
-				false,
+				preemptLoserTimestamp,
 			)
 
 			conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
@@ -178,11 +176,7 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableT
 // REVEALED txA has its outputs remapped to a new tx, txB on a different operator.
 // txB is not yet expired - fallback to preemption check.
 // If txA wins the preemption check vs txB, finalize successfully.
-func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsIfRemapTxHasNotExpiredButIsNotInitialTxNotPreemptedByRemapTx(t *testing.T) {
-	if broadcastTokenTestsUseV3 {
-		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
-	}
-
+func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsIfRemapTxHasNotExpiredAndInitialTxNotPreemptedByRemapTx(t *testing.T) {
 	testCases := []struct {
 		name                          string
 		nonCoordinatorInitialTxStatus st.TokenTransactionStatus
@@ -210,14 +204,14 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsIfRemapTxH
 		},
 	}
 
+	preemptLoserTimestamp := utils.ToMicrosecondPrecision(time.Now().UTC())
+	preemptWinnerTimestamp := preemptLoserTimestamp.Add(-2 * time.Minute)
+
 	for _, tc := range testCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			ctx := t.Context()
 
-			config, initalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
-			require.NoError(t, err, "failed to create transfer token transaction")
-
-			_, remappedFinalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
+			config, initalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWalletWithTimestamp(t, ctx, preemptWinnerTimestamp)
 			require.NoError(t, err, "failed to create transfer token transaction")
 
 			coordinatorEntClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
@@ -231,14 +225,15 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsIfRemapTxH
 
 			setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOperator(
 				t, ctx,
+				config,
+				nonCoordOperatorConfig,
 				coordinatorEntClient,
 				nonCoordEntClient,
 				initalTransferTokenTransactionHash,
-				remappedFinalTransferTokenTransactionHash,
 				tc.nonCoordinatorInitialTxStatus,
 				tc.nonCoordinatorRemapTxStatus,
 				false,
-				false,
+				preemptLoserTimestamp,
 			)
 
 			conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
@@ -289,10 +284,6 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsIfRemapTxH
 // txB is not yet expired - fallback to preemption check.
 // If txA loses the preemption check vs txB, fail to finalize.
 func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasNotExpiredAndIsPreemptedByRemapTx(t *testing.T) {
-	if broadcastTokenTestsUseV3 {
-		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
-	}
-
 	testCases := []struct {
 		name                          string
 		nonCoordinatorInitialTxStatus st.TokenTransactionStatus
@@ -319,14 +310,14 @@ func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasN
 			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusStarted,
 		},
 	}
+	preemptLoserTimestamp := utils.ToMicrosecondPrecision(time.Now().UTC())
+	preemptWinnerTimestamp := preemptLoserTimestamp.Add(-2 * time.Minute)
 
 	for _, tc := range testCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			ctx := t.Context()
-			_, remappedFinalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
-			require.NoError(t, err, "failed to create transfer token transaction")
 
-			config, initalFinalTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
+			config, initalFinalTokenTransactionHash, _, err := createTransferTokenTransactionForWalletWithTimestamp(t, ctx, preemptLoserTimestamp)
 			require.NoError(t, err, "failed to create transfer token transaction")
 
 			coordinatorEntClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
@@ -339,14 +330,15 @@ func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasN
 			setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, coordinatorEntClient, initalFinalTokenTransactionHash)
 
 			setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOperator(t, ctx,
+				config,
+				nonCoordOperatorConfig,
 				coordinatorEntClient,
 				nonCoordEntClient,
 				initalFinalTokenTransactionHash,
-				remappedFinalTransferTokenTransactionHash,
 				tc.nonCoordinatorInitialTxStatus,
 				tc.nonCoordinatorRemapTxStatus,
 				false,
-				true,
+				preemptWinnerTimestamp,
 			)
 
 			conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
@@ -378,10 +370,6 @@ func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasN
 }
 
 func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealedWithAllFieldsButStatusRevealed(t *testing.T) {
-	if broadcastTokenTestsUseV3 {
-		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
-	}
-
 	ctx := t.Context()
 	config, finalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
@@ -420,10 +408,6 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealedWithAllFieldsButS
 }
 
 func TestRevocationExchangeCronJobSuccessfullyFinalizesStarted(t *testing.T) {
-	if broadcastTokenTestsUseV3 {
-		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
-	}
-
 	ctx := t.Context()
 	config, finalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
@@ -468,10 +452,6 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesStarted(t *testing.T) {
 }
 
 func TestRevocationExchangeCronJobDoesNotFinalizeStartedIfSignatureIsInvalid(t *testing.T) {
-	if broadcastTokenTestsUseV3 {
-		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
-	}
-
 	ctx := t.Context()
 	config, finalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
@@ -533,10 +513,6 @@ func TestRevocationExchangeCronJobDoesNotFinalizeStartedIfSignatureIsInvalid(t *
 }
 
 func TestRevocationExchangeCronJobSkipsRevealedWithNoSpentOutputs(t *testing.T) {
-	if broadcastTokenTestsUseV3 {
-		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
-	}
-
 	ctx := t.Context()
 	config, finalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
@@ -591,10 +567,6 @@ func TestRevocationExchangeCronJobSkipsRevealedWithNoSpentOutputs(t *testing.T) 
 }
 
 func TestJustInTimeFinalizationOfCreatedSignedOutputOnNonCoordinator(t *testing.T) {
-	if broadcastTokenTestsUseV3 {
-		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
-	}
-
 	ctx := t.Context()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	tokenIdentityPubKey := config.IdentityPrivateKey.Public()
@@ -731,7 +703,6 @@ func setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t *testing.T,
 
 	spentIDs := make([]uuid.UUID, len(tokenTransaction.Edges.SpentOutput))
 	for i, o := range tokenTransaction.Edges.SpentOutput {
-		t.Logf("spent output %s", o.ID)
 		spentIDs[i] = o.ID
 	}
 
@@ -811,7 +782,6 @@ func setAndValidateSuccessfulTokenTransactionToRevealedWithoutDeletingRevocation
 
 	spentIDs := make([]uuid.UUID, 0, len(tokenTransaction.Edges.SpentOutput))
 	for _, o := range tokenTransaction.Edges.SpentOutput {
-		t.Logf("spent output %s", o.ID)
 		spentIDs = append(spentIDs, o.ID)
 	}
 
@@ -879,7 +849,6 @@ func setAndValidateSuccessfulTokenTransactionToStartedForOperator(t *testing.T, 
 
 	spentIDs := make([]uuid.UUID, 0, len(tokenTransaction.Edges.SpentOutput))
 	for _, o := range tokenTransaction.Edges.SpentOutput {
-		t.Logf("spent output %s", o.ID)
 		spentIDs = append(spentIDs, o.ID)
 	}
 
@@ -941,7 +910,7 @@ func setAndValidateSuccessfulTokenTransactionToStartedForOperator(t *testing.T, 
 
 func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 	if broadcastTokenTestsUseV3 {
-		t.Skip("Skipping test for V3 transactions which do not impact the finalization flow.")
+		t.Skip("Skipping test for V3 transactions as V3 flow would finalize the transaction during broadcast.")
 	}
 
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -1052,7 +1021,7 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 	queryAndVerifyTokenOutputs(t, unexchangedOperatorIdentifiers, finalTokenTransaction, owner1PrivKey)
 }
 
-// This function takes two successful tokentransactions and remaps the spent outputs on the non-coordinator
+// This function takes a successful tokentransaction and remaps the spent outputs on the non-coordinator
 // from the "initial" transaction to the "remap" transaction.
 // It also sets the statuses on both to the provided status.
 // The goal is to test transactions in different states across the coordinator and non-coordinator
@@ -1060,21 +1029,24 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 func setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOperator(
 	t *testing.T,
 	ctx context.Context,
+	senderWalletConfig *wallet.TestWalletConfig,
+	nonCoordinatorOperatorConfig *so.Config,
 	coordinatorEntClient *ent.Client,
-	nonCoordinatorEntClient *ent.Client,
+	nonCoordEntClient *ent.Client,
 	initialFinalTokenTransactionHash []byte,
-	remappedFinalTransferTokenTransactionHash []byte,
 	nonCoordinatorInitialTxStatus st.TokenTransactionStatus,
 	nonCoordinatorRemapTxStatus st.TokenTransactionStatus,
 	expiredRemapTx bool,
-	preemptedByRemap bool,
+	remapClientCreatedTimestamp time.Time,
 ) {
 	coordinatorTx, err := coordinatorEntClient.Tx(ctx)
 	require.NoError(t, err)
 
 	tokenTransaction, err := coordinatorTx.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
-		WithSpentOutput().
+		WithSpentOutput(func(q *ent.TokenOutputQuery) {
+			q.WithOutputCreatedTokenTransaction()
+		}).
 		WithCreatedOutput().
 		Only(ctx)
 	require.NoError(t, err)
@@ -1127,6 +1099,7 @@ func setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOper
 		WithSpentOutput(
 			func(to *ent.TokenOutputQuery) {
 				to.WithTokenPartialRevocationSecretShares()
+				to.WithOutputCreatedTokenTransaction()
 			},
 		).
 		WithCreatedOutput().
@@ -1143,146 +1116,257 @@ func setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOper
 	// =================================
 	// The initial transaction will have its spent outputs remapped to the remap transaction.
 	// Set up both transactions to the provided status.
-	nonCoordinatorTx, err := nonCoordinatorEntClient.Tx(ctx)
-	require.NoError(t, err)
-	now := time.Now().UTC()
-	expirationTime := now.Add(20 * time.Minute)
-	if expiredRemapTx {
-		expirationTime = now.Add(-25 * time.Minute)
-	}
-	var clientCreatedTimestamp time.Time
-	if preemptedByRemap {
-		clientCreatedTimestamp = now.Add(-100 * time.Hour)
-	} else {
-		clientCreatedTimestamp = now.Add(100 * time.Hour)
-	}
-
-	err = nonCoordinatorTx.TokenTransaction.Update().
-		Where(tokentransaction.FinalizedTokenTransactionHashEQ(remappedFinalTransferTokenTransactionHash)).
-		SetClientCreatedTimestamp(clientCreatedTimestamp).
-		SetStatus(nonCoordinatorRemapTxStatus).
-		SetUpdateTime(time.Now().Add(-25 * time.Minute).UTC()).
-		ClearSpentOutput().
-		Exec(ctx)
-	require.NoError(t, err)
-
-	// Expire the remapped transaction. This makes its spent outputs available to be reclaimed.
-	//nolint:forbidigo // We have to use this API because the expiry time is an immutable field, so there's no Update method for it.
-	_, err = nonCoordinatorTx.ExecContext(ctx,
-		"UPDATE token_transactions SET expiry_time = $1 WHERE finalized_token_transaction_hash = $2",
-		expirationTime,
-		remappedFinalTransferTokenTransactionHash,
-	)
-	require.NoError(t, err)
-
-	remapTx, err := nonCoordinatorTx.TokenTransaction.Query().
-		Where(tokentransaction.FinalizedTokenTransactionHashEQ(remappedFinalTransferTokenTransactionHash)).
-		WithCreatedOutput().
-		Only(ctx)
-	require.NoError(t, err)
-	require.WithinDuration(t, expirationTime, remapTx.ExpiryTime.In(time.UTC), time.Microsecond, "expiry time should be set")
-
-	nonCoordinatorRemapTxCreatedOutputIDs := make([]uuid.UUID, 0, len(remapTx.Edges.CreatedOutput))
-	for _, o := range remapTx.Edges.CreatedOutput {
-		nonCoordinatorRemapTxCreatedOutputIDs = append(nonCoordinatorRemapTxCreatedOutputIDs, o.ID)
-	}
-
-	var createdOutputStatus st.TokenOutputStatus
-	switch nonCoordinatorRemapTxStatus {
-	case st.TokenTransactionStatusStarted:
-		createdOutputStatus = st.TokenOutputStatusCreatedStarted
-	case st.TokenTransactionStatusSigned:
-		createdOutputStatus = st.TokenOutputStatusCreatedSigned
-	default:
-		t.Fatalf("Unsupported token transaction status: %s", nonCoordinatorRemapTxStatus)
-	}
-
-	// Set the remapped transaction's created outputs to the provided status.
-	err = nonCoordinatorTx.TokenOutput.
-		Update().
-		Where(tokenoutput.IDIn(nonCoordinatorRemapTxCreatedOutputIDs...)).
-		SetStatus(createdOutputStatus).
-		Exec(ctx)
-	require.NoError(t, err)
-
-	initialTxNonCoordinator, err := nonCoordinatorTx.TokenTransaction.Query().
+	err = nonCoordEntClient.TokenTransaction.Update().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
-		WithSpentOutput().
-		WithCreatedOutput().
-		Only(ctx)
+		SetStatus(nonCoordinatorInitialTxStatus).
+		Exec(ctx)
 	require.NoError(t, err)
 
-	initialTxNonCoordinatorSpentOutputs := make([]uuid.UUID, 0, len(initialTxNonCoordinator.Edges.SpentOutput))
-	for _, o := range initialTxNonCoordinator.Edges.SpentOutput {
-		initialTxNonCoordinatorSpentOutputs = append(initialTxNonCoordinatorSpentOutputs, o.ID)
-	}
-	initialTxNonCoordinatorCreatedOutputs := make([]uuid.UUID, 0, len(initialTxNonCoordinator.Edges.CreatedOutput))
-	for _, o := range initialTxNonCoordinator.Edges.CreatedOutput {
-		initialTxNonCoordinatorCreatedOutputs = append(initialTxNonCoordinatorCreatedOutputs, o.ID)
-	}
-
-	var nonCoordinatorInitialTxCreatedOutputStatus st.TokenOutputStatus
+	var initialTxCreatedOutputStatus st.TokenOutputStatus
 	switch nonCoordinatorInitialTxStatus {
 	case st.TokenTransactionStatusStarted:
-		nonCoordinatorInitialTxCreatedOutputStatus = st.TokenOutputStatusCreatedStarted
+		initialTxCreatedOutputStatus = st.TokenOutputStatusCreatedStarted
 	case st.TokenTransactionStatusSigned:
-		nonCoordinatorInitialTxCreatedOutputStatus = st.TokenOutputStatusCreatedSigned
+		initialTxCreatedOutputStatus = st.TokenOutputStatusCreatedSigned
 	default:
 		t.Fatalf("Unsupported token transaction status: %s", nonCoordinatorInitialTxStatus)
 	}
 
-	// Set the initial transaction's created outputs to the provided status.
-	err = nonCoordinatorTx.TokenOutput.
-		Update().
-		Where(tokenoutput.IDIn(initialTxNonCoordinatorCreatedOutputs...)).
-		SetStatus(nonCoordinatorInitialTxCreatedOutputStatus).
-		Exec(ctx)
-	require.NoError(t, err)
-
-	var nonCoordinatorRemapTxSpentOutputStatus st.TokenOutputStatus
-	switch nonCoordinatorRemapTxStatus {
-	case st.TokenTransactionStatusStarted:
-		nonCoordinatorRemapTxSpentOutputStatus = st.TokenOutputStatusSpentStarted
-	case st.TokenTransactionStatusSigned:
-		nonCoordinatorRemapTxSpentOutputStatus = st.TokenOutputStatusSpentSigned
-	default:
-		t.Fatalf("Unsupported token transaction status: %s", nonCoordinatorRemapTxStatus)
-	}
-
-	// Remap the initial transaction's spent outputs to the remapped transaction.
-	err = nonCoordinatorTx.TokenOutput.
-		Update().
-		Where(tokenoutput.IDIn(initialTxNonCoordinatorSpentOutputs...)).
-		SetStatus(nonCoordinatorRemapTxSpentOutputStatus).
-		SetOutputSpentTokenTransaction(remapTx).
-		Exec(ctx)
-	require.NoError(t, err)
-
-	_, err = nonCoordinatorTx.TokenPartialRevocationSecretShare.
-		Delete().
-		Where(tokenpartialrevocationsecretshare.HasTokenOutputWith(
-			tokenoutput.IDIn(initialTxNonCoordinatorSpentOutputs...),
-		)).
-		Exec(ctx)
-	require.NoError(t, err)
-
-	// Set the initial transaction to the provided status.
-	err = nonCoordinatorTx.TokenTransaction.Update().
+	nonCoordInitialTx, err := nonCoordEntClient.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
-		SetStatus(nonCoordinatorInitialTxStatus).
-		SetUpdateTime(time.Now().Add(-25 * time.Minute).UTC()).
-		Exec(ctx)
-	require.NoError(t, err)
-
-	initialTxNonCoordinator, err = nonCoordinatorTx.TokenTransaction.Query().
-		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
-		WithSpentOutput().
 		WithCreatedOutput().
+		WithSpentOutput(func(q *ent.TokenOutputQuery) {
+			q.WithOutputCreatedTokenTransaction()
+		}).
 		Only(ctx)
 	require.NoError(t, err)
-	require.Equal(t, nonCoordinatorInitialTxStatus, initialTxNonCoordinator.Status, "token transaction status should be signed")
-	require.Empty(t, initialTxNonCoordinator.Edges.SpentOutput, "should have no spent outputs")
 
-	err = nonCoordinatorTx.Commit()
+	nonCoordCreatedOutputIDs := make([]uuid.UUID, 0, len(nonCoordInitialTx.Edges.CreatedOutput))
+	for _, o := range nonCoordInitialTx.Edges.CreatedOutput {
+		nonCoordCreatedOutputIDs = append(nonCoordCreatedOutputIDs, o.ID)
+	}
+
+	err = nonCoordEntClient.TokenOutput.Update().
+		Where(tokenoutput.IDIn(nonCoordCreatedOutputIDs...)).
+		SetStatus(initialTxCreatedOutputStatus).
+		Exec(ctx)
 	require.NoError(t, err)
+
+	_, err = createRemapTransactionSpendingSameOutputsOnNonCoordinator(
+		t, ctx,
+		senderWalletConfig,
+		nonCoordinatorOperatorConfig,
+		nonCoordEntClient,
+		tokenTransaction,
+		nonCoordinatorRemapTxStatus,
+		remapClientCreatedTimestamp,
+		expiredRemapTx,
+	)
+	require.NoError(t, err, "failed to create remap transaction")
+
+	initialNonCoordTxAfterRemap, err := nonCoordEntClient.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
+		WithSpentOutput().
+		Only(ctx)
+	require.NoError(t, err, "failed to query initial transaction")
+	require.Equal(t, nonCoordinatorInitialTxStatus, initialNonCoordTxAfterRemap.Status)
+	require.Empty(t, initialNonCoordTxAfterRemap.Edges.SpentOutput, "should have no more spent outputs after remap")
+}
+
+// createRemapTransactionSpendingSameOutputsOnNonCoordinator creates a competing "remap" transaction that
+// spends the same outputs as the initial transaction, and writes it directly to the non-coordinator's database.
+// This simulates a race condition where the non-coordinator receives a competing transaction.
+func createRemapTransactionSpendingSameOutputsOnNonCoordinator(
+	t *testing.T,
+	ctx context.Context,
+	senderWalletConfig *wallet.TestWalletConfig,
+	nonCoordinatorConfig *so.Config,
+	nonCoordEntClient *ent.Client,
+	initialTx *ent.TokenTransaction,
+	nonCoordinatorRemapTxStatus st.TokenTransactionStatus,
+	remapTimestamp time.Time,
+	expiredRemapTx bool,
+) ([]byte, error) {
+	t.Helper()
+
+	// Extract spent outputs from the initial transaction
+	spentOutputs := initialTx.Edges.SpentOutput
+	require.NotEmpty(t, spentOutputs, "initial tx must have spent outputs")
+
+	// Build the outputsToSpend for the remap transaction (same as initial TX)
+	// Collect (hash, vout) pairs to identify outputs across databases
+	outputsToSpend := make([]*tokenpb.TokenOutputToSpend, len(spentOutputs))
+	var tokenIdentifier []byte
+	var spentOutputPredicates []predicate.TokenOutput
+
+	for i, output := range spentOutputs {
+		createdByTx := output.Edges.OutputCreatedTokenTransaction
+		require.NotNil(t, createdByTx, "spent output must have a creating transaction")
+
+		outputsToSpend[i] = &tokenpb.TokenOutputToSpend{
+			PrevTokenTransactionHash: createdByTx.FinalizedTokenTransactionHash,
+			PrevTokenTransactionVout: uint32(output.CreatedTransactionOutputVout),
+		}
+
+		// Build predicate to match this output by (hash, vout) in non-coordinator DB
+		spentOutputPredicates = append(spentOutputPredicates, tokenoutput.And(
+			tokenoutput.CreatedTransactionFinalizedHashEQ(output.CreatedTransactionFinalizedHash),
+			tokenoutput.CreatedTransactionOutputVoutEQ(output.CreatedTransactionOutputVout),
+		))
+
+		if i == 0 {
+			tokenIdentifier = output.TokenIdentifier
+		}
+	}
+
+	now := time.Now().UTC()
+	expiryTime := now.Add(5 * time.Minute)
+	if expiredRemapTx {
+		expiryTime = now.Add(-25 * time.Minute)
+	}
+
+	remapTransferPb, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, senderWalletConfig, tokenTransactionParams{
+		TokenIdentityPubKey:            senderWalletConfig.IdentityPrivateKey.Public(),
+		TokenIdentifier:                tokenIdentifier,
+		FinalIssueTokenTransactionHash: outputsToSpend[0].PrevTokenTransactionHash,
+		NumOutputs:                     1,
+		OutputAmounts:                  []uint64{testTransferOutput1Amount},
+		ClientCreatedTimestamp:         remapTimestamp,
+	})
+	require.NoError(t, err, "failed to create remap transaction proto")
+
+	remapTransferPb.ExpiryTime = timestamppb.New(expiryTime)
+
+	remapTransferPb.TokenInputs = &tokenpb.TokenTransaction_TransferInput{
+		TransferInput: &tokenpb.TokenTransferInput{
+			OutputsToSpend: outputsToSpend,
+		},
+	}
+
+	for _, output := range remapTransferPb.TokenOutputs {
+		outputId := uuid.New().String()
+		output.Id = &outputId
+
+		revocationPrivKey := keys.GeneratePrivateKey()
+		output.RevocationCommitment = revocationPrivKey.Public().Serialize()
+	}
+
+	partialHash, err := utils.HashTokenTransaction(remapTransferPb, true)
+	require.NoError(t, err, "failed to compute partial hash")
+
+	finalHash, err := utils.HashTokenTransaction(remapTransferPb, false)
+	require.NoError(t, err, "failed to compute final hash")
+
+	var createdOutputStatus st.TokenOutputStatus
+	var spentOutputStatus st.TokenOutputStatus
+	switch nonCoordinatorRemapTxStatus {
+	case st.TokenTransactionStatusStarted:
+		createdOutputStatus = st.TokenOutputStatusCreatedStarted
+		spentOutputStatus = st.TokenOutputStatusSpentStarted
+	case st.TokenTransactionStatusSigned:
+		createdOutputStatus = st.TokenOutputStatusCreatedSigned
+		spentOutputStatus = st.TokenOutputStatusSpentSigned
+	default:
+		return nil, fmt.Errorf("unsupported remap transaction status: %s", nonCoordinatorRemapTxStatus)
+	}
+
+	remapTxEnt, err := nonCoordEntClient.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(partialHash).
+		SetFinalizedTokenTransactionHash(finalHash).
+		SetStatus(nonCoordinatorRemapTxStatus).
+		SetCreateTime(now).
+		SetUpdateTime(now.Add(-25 * time.Minute)).
+		SetExpiryTime(expiryTime).
+		SetClientCreatedTimestamp(remapTimestamp).
+		SetVersion(st.TokenTransactionVersion(remapTransferPb.Version)).
+		SetCoordinatorPublicKey(nonCoordinatorConfig.IdentityPublicKey()).
+		Save(ctx)
+	require.NoError(t, err, "failed to create remap transaction entity")
+
+	if remapTransferPb.ValidityDurationSeconds != nil {
+		_, err = nonCoordEntClient.TokenTransaction.UpdateOne(remapTxEnt).
+			SetValidityDurationSeconds(*remapTransferPb.ValidityDurationSeconds).
+			Save(ctx)
+		require.NoError(t, err, "failed to set validity duration")
+	}
+
+	tokenCreate, err := nonCoordEntClient.TokenCreate.Query().
+		Where(tokencreate.TokenIdentifierEQ(tokenIdentifier)).
+		Only(ctx)
+	require.NoError(t, err, "failed to get token create from non-coordinator")
+
+	for i, protoOutput := range remapTransferPb.TokenOutputs {
+		ownerPubKey, err := keys.ParsePublicKey(protoOutput.OwnerPublicKey)
+		require.NoError(t, err, "failed to parse owner public key")
+
+		secretShare := keys.GeneratePrivateKey()
+		keyshare, err := nonCoordEntClient.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusInUse).
+			SetSecretShare(secretShare).
+			SetPublicKey(secretShare.Public()).
+			SetPublicShares(map[string]keys.Public{
+				"operator0": keys.GeneratePrivateKey().Public(),
+				"operator1": keys.GeneratePrivateKey().Public(),
+				"operator2": keys.GeneratePrivateKey().Public(),
+			}).
+			SetMinSigners(2).
+			SetCoordinatorIndex(1).
+			Save(ctx)
+		require.NoError(t, err, "failed to create keyshare")
+
+		_, err = nonCoordEntClient.TokenOutput.Create().
+			SetTokenIdentifier(protoOutput.TokenIdentifier).
+			SetOwnerPublicKey(ownerPubKey).
+			SetTokenAmount(protoOutput.TokenAmount).
+			SetCreatedTransactionFinalizedHash(finalHash).
+			SetCreatedTransactionOutputVout(int32(i)).
+			SetStatus(createdOutputStatus).
+			SetOutputCreatedTokenTransaction(remapTxEnt).
+			SetWithdrawBondSats(1000000).
+			SetTokenCreate(tokenCreate).
+			SetWithdrawRelativeBlockLocktime(1000).
+			SetWithdrawRevocationCommitment(protoOutput.RevocationCommitment).
+			SetRevocationKeyshare(keyshare).
+			Save(ctx)
+		require.NoError(t, err, "failed to create created token outputs for remap transaction")
+	}
+
+	_, err = nonCoordEntClient.TokenPartialRevocationSecretShare.
+		Delete().
+		Where(tokenpartialrevocationsecretshare.HasTokenOutputWith(
+			tokenoutput.Or(spentOutputPredicates...),
+		)).
+		Exec(ctx)
+	require.NoError(t, err, "failed to delete old partial revocation shares for remapped outputs")
+
+	err = nonCoordEntClient.TokenOutput.Update().
+		Where(tokenoutput.Or(spentOutputPredicates...)).
+		SetStatus(spentOutputStatus).
+		SetOutputSpentTokenTransaction(remapTxEnt).
+		ClearSpentRevocationSecret().
+		Exec(ctx)
+	require.NoError(t, err, "failed to remap the spent outputs and update status on remap transaction")
+
+	createdRemapTx, err := nonCoordEntClient.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalHash)).
+		WithSpentOutput(func(q *ent.TokenOutputQuery) {
+			q.WithOutputSpentTokenTransaction()
+		}).
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err, "failed to query created remap transaction")
+	require.Equal(t, nonCoordinatorRemapTxStatus, createdRemapTx.Status)
+	require.Len(t, createdRemapTx.Edges.CreatedOutput, 1, "should have 1 created output")
+	require.Len(t, createdRemapTx.Edges.SpentOutput, len(spentOutputs), "should have same number of spent outputs as initial tx")
+
+	for _, output := range createdRemapTx.Edges.CreatedOutput {
+		require.Equal(t, createdOutputStatus, output.Status)
+		require.Equal(t, finalHash, output.CreatedTransactionFinalizedHash)
+	}
+	for _, output := range createdRemapTx.Edges.SpentOutput {
+		require.Equal(t, spentOutputStatus, output.Status)
+		require.Equal(t, remapTxEnt.ID, output.Edges.OutputSpentTokenTransaction.ID)
+	}
+
+	return finalHash, nil
 }

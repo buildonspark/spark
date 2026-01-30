@@ -862,7 +862,7 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 	if len(inputOperatorShareMap.ByHashVout) > 0 {
 		err = validateInputTokenOutputsMatchSpentTokenOutputsHashVout(inputOperatorShareMap.ByHashVout, tx.Edges.SpentOutput, hashVoutToOutputID)
 		if err != nil {
-			return false, tokens.FormatErrorWithTransactionEnt("input token outputs do not match spent token outputs", tx, err)
+			return false, tokens.FormatErrorWithTransactionEnt("input token outputs do not match spent token outputs by hash vout", tx, err)
 		}
 		// Process shares from ByHashVout map (preferred format)
 		for sk, sv := range inputOperatorShareMap.ByHashVout {
@@ -902,7 +902,7 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 		}
 		err = validateInputTokenOutputsMatchSpentTokenOutputs(uniqueOutputIDs, tx.Edges.SpentOutput)
 		if err != nil {
-			return false, tokens.FormatErrorWithTransactionEnt("input token outputs do not match spent token outputs", tx, err)
+			return false, tokens.FormatErrorWithTransactionEnt("input token outputs do not match spent token outputs by uuid", tx, err)
 		}
 		for sk, sv := range inputOperatorShareMap.ByUUID {
 			if sv.OperatorIdentityPublicKey == (keys.Public{}) {

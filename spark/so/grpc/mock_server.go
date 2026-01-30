@@ -105,7 +105,8 @@ func (o *MockServer) TriggerTask(ctx context.Context, req *pbmock.TriggerTaskReq
 	}
 	// Use the operator's root *ent.Client instead of the transactional one because RunOnce expects *ent.Client.
 	dbClient := o.rootClient
-	if err := selected.RunOnce(ctx, o.config, dbClient, knobs.NewFixedKnobs(map[string]float64{})); err != nil {
+	// Use the knobs service from context (injected by gRPC interceptor) to respect test-configured knob values
+	if err := selected.RunOnce(ctx, o.config, dbClient, knobs.GetKnobsService(ctx)); err != nil {
 		return nil, status.Errorf(codes.Internal, "task %s failed: %v", taskName, err)
 	}
 

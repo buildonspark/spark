@@ -18,6 +18,12 @@ type readableSpentOutput struct {
 }
 
 type readableCreatedOutput struct {
+	PrevHash        string `json:"prev_hash"`
+	Vout            uint32 `json:"vout"`
+	TokenIdentifier string `json:"token_identifier"`
+}
+
+type readableProtoOutput struct {
 	OutputId        string `json:"output_id"`
 	TokenIdentifier string `json:"token_identifier"`
 }
@@ -97,7 +103,7 @@ func FormatErrorWithTransactionEnt(msg string, tokenTransaction *ent.TokenTransa
 		readable := make([]readableSpentOutput, min(len(spentOutputs), 5))
 		for i := range readable {
 			readable[i] = readableSpentOutput{
-				PrevHash: spentOutputs[i].ID.String(),
+				PrevHash: hex.EncodeToString(spentOutputs[i].CreatedTransactionFinalizedHash),
 				Vout:     uint32(spentOutputs[i].CreatedTransactionOutputVout),
 			}
 		}
@@ -110,7 +116,8 @@ func FormatErrorWithTransactionEnt(msg string, tokenTransaction *ent.TokenTransa
 		readable := make([]readableCreatedOutput, min(len(createdOutputs), 5))
 		for i := range readable {
 			readable[i] = readableCreatedOutput{
-				OutputId:        createdOutputs[i].ID.String(),
+				PrevHash:        hex.EncodeToString(createdOutputs[i].CreatedTransactionFinalizedHash),
+				Vout:            uint32(createdOutputs[i].CreatedTransactionOutputVout),
 				TokenIdentifier: createdOutputs[i].TokenPublicKey.ToHex(),
 			}
 		}
@@ -178,10 +185,10 @@ func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.Token
 	outputMsg := fmt.Sprintf("spent_outputs: %+v", spentOutputs)
 
 	if n := len(tokenTransaction.TokenOutputs); n > 0 {
-		createdOutputs := make([]readableCreatedOutput, min(n, 5))
+		createdOutputs := make([]readableProtoOutput, min(n, 5))
 		for i := range createdOutputs {
 			output := tokenTransaction.TokenOutputs[i]
-			createdOutputs[i] = readableCreatedOutput{
+			createdOutputs[i] = readableProtoOutput{
 				OutputId:        output.GetId(),
 				TokenIdentifier: hex.EncodeToString(output.TokenIdentifier),
 			}
