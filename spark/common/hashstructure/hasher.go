@@ -1,9 +1,11 @@
 package hashstructure
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/binary"
 	"hash"
+	"slices"
 )
 
 // Hasher provides a type-safe API for securely hashing a sequence of values with SHA256.
@@ -74,6 +76,33 @@ func (h *Hasher) AddUint64(v uint64) *Hasher {
 	valueBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(valueBytes, v)
 	h.addValue(valueBytes)
+	return h
+}
+
+// AddMapStringToBytes adds a map[string][]byte to the hash computation.
+// The map is hashed in a deterministic order: first the count of entries,
+// then each key-value pair sorted by key.
+//
+// Format: [count (uint64)] [key1 (string)] [value1 (bytes)] [key2 (string)] [value2 (bytes)] ...
+func (h *Hasher) AddMapStringToBytes(m map[string][]byte) *Hasher {
+	h.AddUint64(uint64(len(m)))
+
+	// For determinism, convert map to slice of key-value pairs and sort by key
+	type keyValuePair struct {
+		key   string
+		value []byte
+	}
+	pairs := make([]keyValuePair, 0, len(m))
+	for k, v := range m {
+		pairs = append(pairs, keyValuePair{key: k, value: v})
+	}
+	slices.SortFunc(pairs, func(a, b keyValuePair) int { return cmp.Compare(a.key, b.key) })
+
+	for _, pair := range pairs {
+		h.AddString(pair.key)
+		h.AddBytes(pair.value)
+	}
+
 	return h
 }
 

@@ -1,6 +1,21 @@
 import { sha256 } from "@noble/hashes/sha2";
 
 /**
+ * Compares two Uint8Arrays using byte-wise lexicographic comparison
+ * for consistent cross-platform string ordering.
+ */
+function compareBytes(a: Uint8Array, b: Uint8Array): number {
+  const minLength = Math.min(a.length, b.length);
+  for (let i = 0; i < minLength; i++) {
+    if (a[i] !== b[i]) {
+      return a[i]! - b[i]!;
+    }
+  }
+
+  return a.length - b.length;
+}
+
+/**
  * Hasher provides a type-safe API for securely hashing a sequence of values with SHA-256.
  * It preserves collision resistance when tags differ.
  * To preserve collision resistance across schema changes (such as data type, order, or meaning)
@@ -124,6 +139,34 @@ export class Hasher {
       throw new Error(`addUint8: value must be a valid uint8, got ${v}`);
     }
     return this.addUint64(BigInt(v));
+  }
+
+  /**
+   * Adds a map<string, Uint8Array> to the hash computation.
+   * The map is hashed in a deterministic order: first the count of entries,
+   * then each key-value pair sorted by key.
+   *
+   * Format: [count (uint64)] [key1 (string)] [value1 (bytes)] [key2 (string)] [value2 (bytes)] ...
+   */
+  addMapStringToBytes(m: Record<string, Uint8Array>): Hasher {
+    this.addUint64(Object.keys(m).length);
+
+    // For determinism, convert map to array of key-value pairs and sort by key
+    const encoder = new TextEncoder();
+    const pairs: { key: string; value: Uint8Array; keyBytes: Uint8Array }[] =
+      Object.entries(m).map(([key, value]) => ({
+        key,
+        value,
+        keyBytes: encoder.encode(key),
+      }));
+    pairs.sort((a, b) => compareBytes(a.keyBytes, b.keyBytes));
+
+    for (const pair of pairs) {
+      this.addString(pair.key);
+      this.addBytes(pair.value);
+    }
+
+    return this;
   }
 
   /**

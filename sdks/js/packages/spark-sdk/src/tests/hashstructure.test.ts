@@ -200,7 +200,7 @@ describe("Hasher", () => {
       {
         name: "all data types",
         expected:
-          "7e6d5afa6426b20f2f08929260f3e37cf280497eae6d29c1af313db01a8996a8",
+          "60dec0af76249b4e9a6526fb69891ad1f5e81bf1797ad477768e7874ef16186d",
         actual: newHasher(["test", "vector"])
           .addBytes(new Uint8Array([1, 2, 3]))
           .addString("string")
@@ -209,6 +209,10 @@ describe("Hasher", () => {
           .addUint16(16)
           .addUint32(32)
           .addUint64(64)
+          .addMapStringToBytes({
+            one: new Uint8Array([1]),
+            two: new Uint8Array([2]),
+          })
           .hash(),
       },
     ];

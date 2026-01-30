@@ -103,7 +103,7 @@ func TestHasher_TestVectors(t *testing.T) {
 		},
 		{
 			name:     "all data types",
-			expected: "7e6d5afa6426b20f2f08929260f3e37cf280497eae6d29c1af313db01a8996a8",
+			expected: "60dec0af76249b4e9a6526fb69891ad1f5e81bf1797ad477768e7874ef16186d",
 			actual: NewHasher([]string{"test", "vector"}).
 				AddBytes([]byte{1, 2, 3}).
 				AddString("string").
@@ -112,6 +112,7 @@ func TestHasher_TestVectors(t *testing.T) {
 				AddUint16(16).
 				AddUint32(32).
 				AddUint64(64).
+				AddMapStringToBytes(map[string][]byte{"one": {1}, "two": {2}}).
 				Hash(),
 		},
 	}
