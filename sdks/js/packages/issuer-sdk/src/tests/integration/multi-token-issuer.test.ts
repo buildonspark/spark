@@ -248,7 +248,7 @@ describe.each(TEST_CONFIGS)(
         tokenIdentifier: firstTokenIdentifier,
         sparkAddress: receiverAddress,
       });
-      expect(freezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
+      expect(freezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
       expect(freezeResponse.impactedTokenAmount).toEqual(TOKEN_AMOUNT);
 
       // Should fail to transfer tokens because the outputs are frozen
@@ -281,7 +281,7 @@ describe.each(TEST_CONFIGS)(
         tokenIdentifier: firstTokenIdentifier,
         sparkAddress: receiverAddress,
       });
-      expect(unfreezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
+      expect(unfreezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
       expect(unfreezeResponse.impactedTokenAmount).toEqual(TOKEN_AMOUNT);
 
       // Outputs unfrozen, transfer should succeed
@@ -418,7 +418,7 @@ describe.each(TEST_CONFIGS)(
       // Legacy single token issuer method should succeed when only one token is created
       const freezeResponse =
         await issuerWallet.freezeTokens(receiverSparkAddress);
-      expect(freezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
+      expect(freezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
       expect(freezeResponse.impactedTokenAmount).toEqual(TOKEN_AMOUNT);
 
       // Should fail to transfer tokens because the outputs are frozen
@@ -434,7 +434,7 @@ describe.each(TEST_CONFIGS)(
       // Legacy single token issuer method should succeed when only one token is created
       const unfreezeResponse =
         await issuerWallet.unfreezeTokens(receiverSparkAddress);
-      expect(unfreezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
+      expect(unfreezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
       expect(unfreezeResponse.impactedTokenAmount).toEqual(TOKEN_AMOUNT);
 
       const transferBackToIssuerOfUnfrozenToken =

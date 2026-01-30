@@ -31,6 +31,7 @@ import {
 } from "@buildonspark/spark-sdk/proto/spark";
 import {
   QueryTokenTransactionsResponse,
+  TokenOutputRef,
   TokenTransactionStatus,
 } from "@buildonspark/spark-sdk/proto/spark_token";
 import {
@@ -2018,7 +2019,7 @@ async function runCLI() {
           const sparkAddress = args[0];
           const tokenIdentifier = args[1] as Bech32mTokenIdentifier | undefined;
           let result: {
-            impactedOutputIds: string[];
+            impactedTokenOutputs: TokenOutputRef[];
             impactedTokenAmount: bigint;
           };
           if (!tokenIdentifier) {
@@ -2030,7 +2031,10 @@ async function runCLI() {
             });
           }
           console.log("Freeze Result:", {
-            impactedOutputIds: result.impactedOutputIds,
+            impactedTokenOutputs: result.impactedTokenOutputs.map((o) => ({
+              transactionHash: bytesToHex(o.transactionHash),
+              vout: o.vout,
+            })),
             impactedTokenAmount: result.impactedTokenAmount.toString(),
           });
           break;
@@ -2043,7 +2047,7 @@ async function runCLI() {
           const sparkAddress = args[0];
           const tokenIdentifier = args[1] as Bech32mTokenIdentifier | undefined;
           let result: {
-            impactedOutputIds: string[];
+            impactedTokenOutputs: TokenOutputRef[];
             impactedTokenAmount: bigint;
           };
           if (!tokenIdentifier) {
@@ -2055,7 +2059,10 @@ async function runCLI() {
             });
           }
           console.log("Unfreeze Result:", {
-            impactedOutputIds: result.impactedOutputIds,
+            impactedTokenOutputs: result.impactedTokenOutputs.map((o) => ({
+              transactionHash: bytesToHex(o.transactionHash),
+              vout: o.vout,
+            })),
             impactedTokenAmount: result.impactedTokenAmount.toString(),
           });
           break;

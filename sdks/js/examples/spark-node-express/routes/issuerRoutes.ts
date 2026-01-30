@@ -1,5 +1,6 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 
+import { bytesToHex } from "@noble/curves/utils";
 import { isError } from "@lightsparkdev/core";
 import { createSparkRouter } from "./sparkRoutes.js";
 
@@ -148,7 +149,10 @@ router.post(
       const frozenTokens = await wallet!.freezeTokens(sparkAddress);
       res.json({
         data: {
-          impactedOutputIds: frozenTokens.impactedOutputIds,
+          impactedTokenOutputs: frozenTokens.impactedTokenOutputs.map((o) => ({
+            transactionHash: bytesToHex(o.transactionHash),
+            vout: o.vout,
+          })),
           impactedTokenAmount: frozenTokens.impactedTokenAmount,
         },
       });
@@ -181,7 +185,10 @@ router.post(
       const thawedTokens = await wallet!.unfreezeTokens(sparkAddress);
       res.json({
         data: {
-          impactedOutputIds: thawedTokens.impactedOutputIds,
+          impactedTokenOutputs: thawedTokens.impactedTokenOutputs.map((o) => ({
+            transactionHash: bytesToHex(o.transactionHash),
+            vout: o.vout,
+          })),
           impactedTokenAmount: thawedTokens.impactedTokenAmount,
         },
       });

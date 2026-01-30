@@ -11,7 +11,10 @@ import {
   SparkValidationError,
   type ConfigOptions,
 } from "@buildonspark/spark-sdk";
-import { OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark_token";
+import {
+  OutputWithPreviousTransactionData,
+  TokenOutputRef,
+} from "@buildonspark/spark-sdk/proto/spark_token";
 import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { TokenFreezeService } from "../services/freeze.js";
 import { IssuerTokenTransactionService } from "../services/token-transactions.js";
@@ -633,9 +636,10 @@ export abstract class IssuerSparkWallet extends SparkWallet {
    * @throws {SparkValidationError} If multiple tokens are found for this issuer
    * @throws {SparkValidationError} If no tokens are found for this issuer
    */
-  public async freezeTokens(
-    sparkAddress: string,
-  ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }>;
+  public async freezeTokens(sparkAddress: string): Promise<{
+    impactedTokenOutputs: TokenOutputRef[];
+    impactedTokenAmount: bigint;
+  }>;
 
   /**
    * Freezes tokens associated with a specific Spark address.
@@ -650,7 +654,10 @@ export abstract class IssuerSparkWallet extends SparkWallet {
   }: {
     tokenIdentifier: Bech32mTokenIdentifier;
     sparkAddress: string;
-  }): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }>;
+  }): Promise<{
+    impactedTokenOutputs: TokenOutputRef[];
+    impactedTokenAmount: bigint;
+  }>;
 
   public async freezeTokens(
     sparkAddressOrParams:
@@ -659,7 +666,10 @@ export abstract class IssuerSparkWallet extends SparkWallet {
           tokenIdentifier: Bech32mTokenIdentifier;
           sparkAddress: string;
         },
-  ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }> {
+  ): Promise<{
+    impactedTokenOutputs: TokenOutputRef[];
+    impactedTokenAmount: bigint;
+  }> {
     let bech32mTokenIdentifier: Bech32mTokenIdentifier | undefined;
     let sparkAddress: string;
 
@@ -711,7 +721,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
     const tokenAmount = bytesToNumberBE(response.impactedTokenAmount);
 
     return {
-      impactedOutputIds: response.impactedOutputIds,
+      impactedTokenOutputs: response.impactedTokenOutputs,
       impactedTokenAmount: tokenAmount,
     };
   }
@@ -724,9 +734,10 @@ export abstract class IssuerSparkWallet extends SparkWallet {
    * @throws {SparkValidationError} If multiple tokens are found for this issuer
    * @throws {SparkValidationError} If no tokens are found for this issuer
    */
-  public async unfreezeTokens(
-    sparkAddress: string,
-  ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }>;
+  public async unfreezeTokens(sparkAddress: string): Promise<{
+    impactedTokenOutputs: TokenOutputRef[];
+    impactedTokenAmount: bigint;
+  }>;
 
   /**
    * Unfreezes previously frozen tokens associated with a specific Spark address.
@@ -743,7 +754,10 @@ export abstract class IssuerSparkWallet extends SparkWallet {
   }: {
     tokenIdentifier: Bech32mTokenIdentifier;
     sparkAddress: string;
-  }): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }>;
+  }): Promise<{
+    impactedTokenOutputs: TokenOutputRef[];
+    impactedTokenAmount: bigint;
+  }>;
 
   public async unfreezeTokens(
     sparkAddressOrParams:
@@ -752,7 +766,10 @@ export abstract class IssuerSparkWallet extends SparkWallet {
           tokenIdentifier: Bech32mTokenIdentifier;
           sparkAddress: string;
         },
-  ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }> {
+  ): Promise<{
+    impactedTokenOutputs: TokenOutputRef[];
+    impactedTokenAmount: bigint;
+  }> {
     let bech32mTokenIdentifier: Bech32mTokenIdentifier | undefined;
     let sparkAddress: string;
 
@@ -802,7 +819,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
     const tokenAmount = bytesToNumberBE(response.impactedTokenAmount);
 
     return {
-      impactedOutputIds: response.impactedOutputIds,
+      impactedTokenOutputs: response.impactedTokenOutputs,
       impactedTokenAmount: tokenAmount,
     };
   }

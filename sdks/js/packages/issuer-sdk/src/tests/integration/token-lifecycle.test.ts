@@ -58,12 +58,12 @@ describe.each(TEST_CONFIGS)(
       expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
 
       const freezeResponse = await issuerWallet.freezeTokens(userSparkAddress);
-      expect(freezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
+      expect(freezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
       expect(freezeResponse.impactedTokenAmount).toEqual(tokenAmount);
 
       const unfreezeResponse =
         await issuerWallet.unfreezeTokens(userSparkAddress);
-      expect(unfreezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
+      expect(unfreezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
       expect(unfreezeResponse.impactedTokenAmount).toEqual(tokenAmount);
     });
 
