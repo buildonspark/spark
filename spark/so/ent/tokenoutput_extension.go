@@ -169,9 +169,17 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 	return outputs, nil
 }
 
-// GetOwnedTokenOutputRefs returns token output references (outpoints) and total amount for owned outputs.
+// OwnedTokenOutputResult contains the results from GetOwnedTokenOutputRefs.
+type OwnedTokenOutputResult struct {
+	OutputRefs  []*tokenpb.TokenOutputRef
+	OutputIDs   []string // UUIDs - deprecated but kept for backwards compatibility
+	TotalAmount *big.Int
+}
+
+// GetOwnedTokenOutputRefs returns token output references (outpoints), UUIDs, and total amount for owned outputs.
 // Outpoints (transaction hash + vout) are deterministic and consistent across all SOs.
-func GetOwnedTokenOutputRefs(ctx context.Context, ownerPublicKeys []keys.Public, tokenIdentifier []byte, network btcnetwork.Network) ([]*tokenpb.TokenOutputRef, *big.Int, error) {
+// UUIDs are SO-local and differ across SOs - they are deprecated but included for backwards compatibility.
+func GetOwnedTokenOutputRefs(ctx context.Context, ownerPublicKeys []keys.Public, tokenIdentifier []byte, network btcnetwork.Network) (*OwnedTokenOutputResult, error) {
 	outputs, err := GetOwnedTokenOutputs(ctx, GetOwnedTokenOutputsParams{
 		OwnerPublicKeys:            ownerPublicKeys,
 		TokenIdentifiers:           [][]byte{tokenIdentifier},
@@ -179,19 +187,25 @@ func GetOwnedTokenOutputRefs(ctx context.Context, ownerPublicKeys []keys.Public,
 		Network:                    network,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to query owned output refs: %w", err)
+		return nil, fmt.Errorf("failed to query owned output refs: %w", err)
 	}
 
 	outputRefs := make([]*tokenpb.TokenOutputRef, len(outputs))
+	outputIDs := make([]string, len(outputs))
 	totalAmount := new(big.Int)
 	for i, output := range outputs {
 		outputRefs[i] = &tokenpb.TokenOutputRef{
 			TransactionHash: output.CreatedTransactionFinalizedHash,
 			Vout:            uint32(output.CreatedTransactionOutputVout),
 		}
+		outputIDs[i] = output.ID.String()
 		amount := new(big.Int).SetBytes(output.TokenAmount)
 		totalAmount.Add(totalAmount, amount)
 	}
 
-	return outputRefs, totalAmount, nil
+	return &OwnedTokenOutputResult{
+		OutputRefs:  outputRefs,
+		OutputIDs:   outputIDs,
+		TotalAmount: totalAmount,
+	}, nil
 }

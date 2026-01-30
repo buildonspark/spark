@@ -554,10 +554,22 @@ export interface FreezeTokensRequest {
   issuerSignature: Uint8Array;
 }
 
+/** Reference to a token output by its outpoint (transaction hash + vout). */
+export interface TokenOutputRef {
+  transactionHash: Uint8Array;
+  vout: number;
+}
+
 export interface FreezeTokensResponse {
+  /**
+   * Deprecated: Use impacted_token_outputs instead. UUIDs are SO-local and differ across SOs.
+   *
+   * @deprecated
+   */
   impactedOutputIds: string[];
   /** Decoded uint128 */
   impactedTokenAmount: Uint8Array;
+  impactedTokenOutputs: TokenOutputRef[];
 }
 
 function createBaseTokenOutputToSpend(): TokenOutputToSpend {
@@ -4810,8 +4822,84 @@ export const FreezeTokensRequest: MessageFns<FreezeTokensRequest> = {
   },
 };
 
+function createBaseTokenOutputRef(): TokenOutputRef {
+  return { transactionHash: new Uint8Array(0), vout: 0 };
+}
+
+export const TokenOutputRef: MessageFns<TokenOutputRef> = {
+  encode(message: TokenOutputRef, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transactionHash.length !== 0) {
+      writer.uint32(10).bytes(message.transactionHash);
+    }
+    if (message.vout !== 0) {
+      writer.uint32(16).uint32(message.vout);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenOutputRef {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenOutputRef();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transactionHash = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.vout = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenOutputRef {
+    return {
+      transactionHash: isSet(object.transactionHash) ? bytesFromBase64(object.transactionHash) : new Uint8Array(0),
+      vout: isSet(object.vout) ? globalThis.Number(object.vout) : 0,
+    };
+  },
+
+  toJSON(message: TokenOutputRef): unknown {
+    const obj: any = {};
+    if (message.transactionHash.length !== 0) {
+      obj.transactionHash = base64FromBytes(message.transactionHash);
+    }
+    if (message.vout !== 0) {
+      obj.vout = Math.round(message.vout);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenOutputRef>): TokenOutputRef {
+    return TokenOutputRef.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenOutputRef>): TokenOutputRef {
+    const message = createBaseTokenOutputRef();
+    message.transactionHash = object.transactionHash ?? new Uint8Array(0);
+    message.vout = object.vout ?? 0;
+    return message;
+  },
+};
+
 function createBaseFreezeTokensResponse(): FreezeTokensResponse {
-  return { impactedOutputIds: [], impactedTokenAmount: new Uint8Array(0) };
+  return { impactedOutputIds: [], impactedTokenAmount: new Uint8Array(0), impactedTokenOutputs: [] };
 }
 
 export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
@@ -4821,6 +4909,9 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
     }
     if (message.impactedTokenAmount.length !== 0) {
       writer.uint32(18).bytes(message.impactedTokenAmount);
+    }
+    for (const v of message.impactedTokenOutputs) {
+      TokenOutputRef.encode(v!, writer.uint32(26).fork()).join();
     }
     return writer;
   },
@@ -4848,6 +4939,14 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
           message.impactedTokenAmount = reader.bytes();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.impactedTokenOutputs.push(TokenOutputRef.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4865,6 +4964,9 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
       impactedTokenAmount: isSet(object.impactedTokenAmount)
         ? bytesFromBase64(object.impactedTokenAmount)
         : new Uint8Array(0),
+      impactedTokenOutputs: globalThis.Array.isArray(object?.impactedTokenOutputs)
+        ? object.impactedTokenOutputs.map((e: any) => TokenOutputRef.fromJSON(e))
+        : [],
     };
   },
 
@@ -4876,6 +4978,9 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
     if (message.impactedTokenAmount.length !== 0) {
       obj.impactedTokenAmount = base64FromBytes(message.impactedTokenAmount);
     }
+    if (message.impactedTokenOutputs?.length) {
+      obj.impactedTokenOutputs = message.impactedTokenOutputs.map((e) => TokenOutputRef.toJSON(e));
+    }
     return obj;
   },
 
@@ -4886,6 +4991,7 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
     const message = createBaseFreezeTokensResponse();
     message.impactedOutputIds = object.impactedOutputIds?.map((e) => e) || [];
     message.impactedTokenAmount = object.impactedTokenAmount ?? new Uint8Array(0);
+    message.impactedTokenOutputs = object.impactedTokenOutputs?.map((e) => TokenOutputRef.fromPartial(e)) || [];
     return message;
   },
 };
