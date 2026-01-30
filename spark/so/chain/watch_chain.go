@@ -669,6 +669,7 @@ func handleBlock(
 	confirmedDeposits, err := dbClient.DepositAddress.Query().
 		Where(depositaddress.ConfirmationHeightIsNil()).
 		Where(depositaddress.IsStaticEQ(false)).
+		Where(depositaddress.NetworkEQ(network)).
 		Where(depositaddress.AddressIn(creditedAddresses...)).
 		All(ctx)
 	if err != nil {
@@ -969,6 +970,7 @@ func storeStaticDeposits(ctx context.Context, dbClient *ent.Client, creditedAddr
 
 	staticDepositAddresses, err := dbClient.DepositAddress.Query().
 		Where(depositaddress.IsStaticEQ(true)).
+		Where(depositaddress.NetworkEQ(network)).
 		Where(depositaddress.AddressIn(creditedAddresses...)).
 		All(ctx)
 	if err != nil {
