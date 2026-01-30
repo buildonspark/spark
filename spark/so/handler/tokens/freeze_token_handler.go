@@ -103,7 +103,6 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 	}
 
 	return &tokenpb.FreezeTokensResponse{
-		ImpactedOutputIds:    result.OutputIDs, // Deprecated but kept for backwards compatibility
 		ImpactedTokenOutputs: result.OutputRefs,
 		ImpactedTokenAmount:  result.TotalAmount.Bytes(),
 	}, nil
