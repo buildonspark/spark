@@ -83,6 +83,8 @@ const (
 	// When enabled, a scheduled task will retry broadcasting SIGNED token transactions to non-coordinator SOs
 	// that failed during the initial fanout. This is separate from phase 2 enablement to allow independent rollout control.
 	KnobTokenTransactionV3Phase2RetryEnabled = "spark.so.tokens.token_transaction_v3_phase2_retry_enabled"
+	KnobAllowExtraMetadataOnMainnet          = "spark.so.tokens.allow_extra_metadata_on_mainnet"
+	KnobCoordinatedFreezeEnabled             = "spark.so.tokens.coordinated_freeze_enabled"
 
 	// Tokens - Killswitches
 	// When enabled (> 0), enforces owner signature validation for token withdrawals.

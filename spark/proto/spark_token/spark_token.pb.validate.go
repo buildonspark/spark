@@ -6415,6 +6415,138 @@ var _ interface {
 	ErrorName() string
 } = TokenOutputRefValidationError{}
 
+// Validate checks the field values on FreezeProgress with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *FreezeProgress) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on FreezeProgress with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in FreezeProgressMultiError,
+// or nil if none found.
+func (m *FreezeProgress) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *FreezeProgress) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetFrozenOperatorPublicKeys() {
+		_, _ = idx, item
+
+		if len(item) != 33 {
+			err := FreezeProgressValidationError{
+				field:  fmt.Sprintf("FrozenOperatorPublicKeys[%v]", idx),
+				reason: "value length must be 33 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	for idx, item := range m.GetUnfrozenOperatorPublicKeys() {
+		_, _ = idx, item
+
+		if len(item) != 33 {
+			err := FreezeProgressValidationError{
+				field:  fmt.Sprintf("UnfrozenOperatorPublicKeys[%v]", idx),
+				reason: "value length must be 33 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return FreezeProgressMultiError(errors)
+	}
+
+	return nil
+}
+
+// FreezeProgressMultiError is an error wrapping multiple validation errors
+// returned by FreezeProgress.ValidateAll() if the designated constraints
+// aren't met.
+type FreezeProgressMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m FreezeProgressMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m FreezeProgressMultiError) AllErrors() []error { return m }
+
+// FreezeProgressValidationError is the validation error returned by
+// FreezeProgress.Validate if the designated constraints aren't met.
+type FreezeProgressValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e FreezeProgressValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e FreezeProgressValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e FreezeProgressValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e FreezeProgressValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e FreezeProgressValidationError) ErrorName() string { return "FreezeProgressValidationError" }
+
+// Error satisfies the builtin error interface
+func (e FreezeProgressValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sFreezeProgress.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = FreezeProgressValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = FreezeProgressValidationError{}
+
 // Validate checks the field values on FreezeTokensResponse with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -6488,6 +6620,35 @@ func (m *FreezeTokensResponse) validate(all bool) error {
 			}
 		}
 
+	}
+
+	if all {
+		switch v := interface{}(m.GetFreezeProgress()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FreezeTokensResponseValidationError{
+					field:  "FreezeProgress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FreezeTokensResponseValidationError{
+					field:  "FreezeProgress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetFreezeProgress()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FreezeTokensResponseValidationError{
+				field:  "FreezeProgress",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
 	}
 
 	if len(errors) > 0 {

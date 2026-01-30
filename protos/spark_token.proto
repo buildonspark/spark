@@ -412,9 +412,16 @@ message TokenOutputRef {
     uint32 vout = 2;
 }
 
+// FreezeProgress tracks the coordinated freeze status across operators.
+message FreezeProgress {
+    repeated bytes frozen_operator_public_keys = 1 [(validate.rules).repeated.items.bytes.len = 33];
+    repeated bytes unfrozen_operator_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
+}
+
 message FreezeTokensResponse {
     // Deprecated: Use impacted_token_outputs instead. UUIDs are SO-local and differ across SOs.
     repeated string impacted_output_ids = 1 [deprecated = true, (validate.rules).repeated.items.string.uuid = true];
     bytes impacted_token_amount = 2;  // Decoded uint128
     repeated TokenOutputRef impacted_token_outputs = 3;
+    FreezeProgress freeze_progress = 4;
 }
