@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -706,10 +707,13 @@ func TestConvertBroadcastToStart(t *testing.T) {
 
 func TestRoundTrip_Final_Legacy_Equivalent(t *testing.T) {
 	ts := timestamppb.New(time.UnixMilli(333))
+	// For V3+ transactions, operator keys must be sorted for deterministic hashing
+	sortedOpKeys := [][]byte{op1Key, op2Key}
+	slices.SortFunc(sortedOpKeys, bytes.Compare)
 	final := &tokenpb.FinalTokenTransaction{
 		Version: 3,
 		TokenTransactionMetadata: &tokenpb.TokenTransactionMetadata{
-			SparkOperatorIdentityPublicKeys: [][]byte{op1Key, op2Key},
+			SparkOperatorIdentityPublicKeys: sortedOpKeys,
 			Network:                         pb.Network_REGTEST,
 			ClientCreatedTimestamp:          ts,
 			InvoiceAttachments:              []*tokenpb.InvoiceAttachment{{SparkInvoice: "inv-1"}, {SparkInvoice: "inv-2"}},

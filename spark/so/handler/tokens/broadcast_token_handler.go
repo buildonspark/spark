@@ -62,6 +62,14 @@ func (h *BroadcastTokenHandler) BroadcastTokenTransaction(
 		)
 	}
 
+	metadata := partial.GetTokenTransactionMetadata()
+	if metadata == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token transaction metadata cannot be nil"))
+	}
+	if err := utils.ValidateV3TransactionMetadata(metadata); err != nil {
+		return nil, err
+	}
+
 	if knobService != nil && knobService.RolloutRandom(knobs.KnobTokenTransactionV3Phase2Enabled, 0) {
 		return h.broadcastTokenTransactionPhase2(ctx, req)
 	}

@@ -290,7 +290,13 @@ func BroadcastTokenTransactionV3(
 	if err != nil {
 		return nil, err
 	}
+	return BroadcastTokenTransactionV3Request(ctx, config, req)
+}
 
+func BroadcastTokenTransactionV3Request(ctx context.Context,
+	config *TestWalletConfig,
+	req *tokenpb.BroadcastTransactionRequest,
+) (*tokenpb.TokenTransaction, error) {
 	conn, err := config.NewCoordinatorGRPCConnection()
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to coordinator: %w", err)
@@ -339,7 +345,7 @@ func convertTokenTransactionToV3Request(
 	tokenTransaction.Version = 3
 
 	if tokenTransaction.ClientCreatedTimestamp == nil || tokenTransaction.ClientCreatedTimestamp.AsTime().IsZero() {
-		tokenTransaction.ClientCreatedTimestamp = timestamppb.Now()
+		tokenTransaction.ClientCreatedTimestamp = timestamppb.New(utils.ToMicrosecondPrecision(time.Now().UTC()))
 	}
 	tokenTransaction.ValidityDurationSeconds = proto.Uint64(uint64(validityDuration.Seconds()))
 

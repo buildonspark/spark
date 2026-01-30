@@ -424,6 +424,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							tokentransaction.HasSpentOutput(),
 						).
 						WithPeerSignatures().
+						WithSparkInvoice().
 						WithSpentOutput(func(q *ent.TokenOutputQuery) {
 							q.WithOutputCreatedTokenTransaction()
 							q.WithTokenPartialRevocationSecretShares()

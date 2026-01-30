@@ -113,7 +113,7 @@ func createBroadcastTestData(t *testing.T, f *entfixtures.Fixtures, config *so.C
 			},
 		},
 		ExpiryTime:              timestamppb.New(now.Add(24 * time.Hour)),
-		ClientCreatedTimestamp:  timestamppb.New(now),
+		ClientCreatedTimestamp:  timestamppb.New(utils.ToMicrosecondPrecision(now)),
 		ValidityDurationSeconds: &validityDuration,
 		Network:                 sparkpb.Network_REGTEST,
 	}

@@ -61,7 +61,7 @@ func (s *broadcastTokenPostgresTestSetup) defaultMetadata() *tokenpb.TokenTransa
 	return &tokenpb.TokenTransactionMetadata{
 		SparkOperatorIdentityPublicKeys: s.sortedOperatorKeys(),
 		Network:                         sparkpb.Network_REGTEST,
-		ClientCreatedTimestamp:          timestamppb.New(time.Now()),
+		ClientCreatedTimestamp:          timestamppb.New(utils.ToMicrosecondPrecision(time.Now().UTC())),
 		ValidityDurationSeconds:         300,
 	}
 }
@@ -306,7 +306,7 @@ func preInsertMintTransactionWithHashes(
 		SetMint(mint).
 		SetExpiryTime(expiryTime).
 		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
-		SetClientCreatedTimestamp(time.Now()).
+		SetClientCreatedTimestamp(setup.defaultMetadata().ClientCreatedTimestamp.AsTime()).
 		SetVersion(st.TokenTransactionVersionV3).
 		SetValidityDurationSeconds(300)
 
@@ -341,7 +341,7 @@ func preInsertTransferTransactionWithHashes(
 		SetStatus(st.TokenTransactionStatusSigned).
 		SetExpiryTime(expiryTime).
 		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
-		SetClientCreatedTimestamp(time.Now()).
+		SetClientCreatedTimestamp(setup.defaultMetadata().ClientCreatedTimestamp.AsTime()).
 		SetVersion(st.TokenTransactionVersionV3).
 		SetValidityDurationSeconds(300).
 		SetOperatorSignature(operatorSig).

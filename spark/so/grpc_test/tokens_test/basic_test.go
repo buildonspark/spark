@@ -167,7 +167,7 @@ func TestTokenTransferWithMultipleTokenTypes(t *testing.T) {
 				},
 				Network:                         config.ProtoNetwork(),
 				SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
-				ClientCreatedTimestamp:          timestamppb.New(time.Now()),
+				ClientCreatedTimestamp:          timestamppb.New(utils.ToMicrosecondPrecision(time.Now().UTC())),
 			}
 
 			finalTransferTx, err := broadcastTokenTransaction(

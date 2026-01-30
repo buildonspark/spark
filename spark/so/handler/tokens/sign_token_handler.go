@@ -272,6 +272,7 @@ func (h *SignTokenHandler) TryFinalizeRevealedTokenTransaction(ctx context.Conte
 	if err != nil {
 		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to marshal parent transaction: %w", err))
 	}
+
 	logger.Sugar().Infof("Exchanging revocation secrets and finalizing if possible for token transaction %s with txHash: %x", tokenTransaction.ID, tokenTransaction.FinalizedTokenTransactionHash)
 
 	_, err = h.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, tokenPb, signaturesPackage, tokenTransaction.FinalizedTokenTransactionHash)

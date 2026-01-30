@@ -83,12 +83,16 @@ func getSigningOperatorPublicKeyBytes(config *wallet.TestWalletConfig) [][]byte 
 	return operatorKeys
 }
 
-// ensureV3DeterministicOrdering sorts fields that must be strictly ordered for V3+ hashing:
+// normalizeV3TokenTransaction normalizes a V3+ token transaction for testing:
+// - truncates the client created timestamp to microsecond precision for PostgreSQL consistency
 // - spark_operator_identity_public_keys: bytewise ascending
 // - invoice_attachments: lexicographic by spark_invoice
-func ensureV3DeterministicOrdering(tx *tokenpb.TokenTransaction) {
+func normalizeV3TokenTransaction(tx *tokenpb.TokenTransaction) {
 	if tx == nil || tx.GetVersion() < 3 {
 		return
+	}
+	if ts := tx.ClientCreatedTimestamp; ts != nil {
+		tx.ClientCreatedTimestamp = timestamppb.New(utils.ToMicrosecondPrecision(ts.AsTime()))
 	}
 	sort.Slice(tx.SparkOperatorIdentityPublicKeys, func(i, j int) bool {
 		return bytes.Compare(tx.SparkOperatorIdentityPublicKeys[i], tx.SparkOperatorIdentityPublicKeys[j]) < 0
@@ -96,6 +100,29 @@ func ensureV3DeterministicOrdering(tx *tokenpb.TokenTransaction) {
 	if len(tx.InvoiceAttachments) > 1 {
 		sort.Slice(tx.InvoiceAttachments, func(i, j int) bool {
 			return tx.InvoiceAttachments[i].GetSparkInvoice() < tx.InvoiceAttachments[j].GetSparkInvoice()
+		})
+	}
+}
+
+func normalizeV3PartialTokenTransaction(partialTx *tokenpb.PartialTokenTransaction) {
+	if partialTx == nil || partialTx.GetVersion() < 3 {
+		return
+	}
+	metadata := partialTx.TokenTransactionMetadata
+	if metadata == nil {
+		return
+	}
+	if ts := metadata.ClientCreatedTimestamp; ts != nil {
+		metadata.ClientCreatedTimestamp = timestamppb.New(utils.ToMicrosecondPrecision(ts.AsTime()))
+	}
+
+	sort.Slice(metadata.SparkOperatorIdentityPublicKeys, func(i, j int) bool {
+		return bytes.Compare(metadata.SparkOperatorIdentityPublicKeys[i], metadata.SparkOperatorIdentityPublicKeys[j]) < 0
+	})
+
+	if len(metadata.InvoiceAttachments) > 1 {
+		sort.Slice(metadata.InvoiceAttachments, func(i, j int) bool {
+			return metadata.InvoiceAttachments[i].GetSparkInvoice() < metadata.InvoiceAttachments[j].GetSparkInvoice()
 		})
 	}
 }
@@ -123,6 +150,7 @@ type tokenTransactionParams struct {
 	NumOutputsToSpend              int      // Number of outputs to spend (defaults to 2 for backward compatibility)
 	MintToSelf                     bool
 	InvoiceAttachments             []*tokenpb.InvoiceAttachment
+	ClientCreatedTimestamp         time.Time
 }
 
 type sparkTokenCreationTestParams struct {
@@ -257,6 +285,7 @@ func broadcastTokenTransactionWithValidityDuration(
 		return nil, fmt.Errorf("failed to clone token transaction")
 	}
 	if broadcastTokenTestsUseV3 {
+		normalizeV3TokenTransaction(clonedTx)
 		return wallet.BroadcastTokenTransactionV3(ctx, config, clonedTx, ownerPrivateKeys, validityDuration)
 	}
 	return wallet.BroadcastTokenTransferWithValidityDuration(ctx, config, clonedTx, validityDuration, ownerPrivateKeys)
@@ -272,6 +301,7 @@ func startTokenTransactionOrBroadcast(
 ) (*tokenpb.StartTransactionResponse, []byte, error) {
 	t.Helper()
 	if broadcastTokenTestsUseV3 {
+		normalizeV3TokenTransaction(tokenTransaction)
 		finalTx, err := wallet.BroadcastTokenTransactionV3(ctx, config, tokenTransaction, ownerPrivateKeys, validityDuration)
 		if err != nil {
 			return nil, nil, err
@@ -350,7 +380,7 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 		TokenOutputs:                    tokenOutputs,
 		Network:                         config.ProtoNetwork(),
 		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
-		ClientCreatedTimestamp:          timestamppb.New(now),
+		ClientCreatedTimestamp:          timestamppb.New(utils.ToMicrosecondPrecision(now)),
 	}
 
 	if version >= 3 {
@@ -363,8 +393,7 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 			o.WithdrawBondSats = &bond
 			o.WithdrawRelativeBlockLocktime = &lock
 		}
-		// V3 requires deterministic ordering for hashing
-		ensureV3DeterministicOrdering(mintTokenTransaction)
+		normalizeV3TokenTransaction(mintTokenTransaction)
 
 		withdrawalBondSats := uint64(withdrawalBondSatsInConfig)
 		withdrawRelativeBlockLocktime := uint64(withdrawalRelativeBlockLocktimeInConfig)
@@ -419,6 +448,12 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 		}
 	}
 
+	ts := time.Now().UTC()
+	if !params.ClientCreatedTimestamp.IsZero() {
+		ts = params.ClientCreatedTimestamp
+	}
+	clientCreatedTimestamp := timestamppb.New(utils.ToMicrosecondPrecision(ts))
+
 	transferTokenTransaction := &tokenpb.TokenTransaction{
 		Version: uint32(version),
 		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
@@ -435,7 +470,7 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 		},
 		Network:                         config.ProtoNetwork(),
 		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
-		ClientCreatedTimestamp:          timestamppb.New(time.Now()),
+		ClientCreatedTimestamp:          clientCreatedTimestamp,
 		InvoiceAttachments:              params.InvoiceAttachments,
 	}
 
@@ -447,7 +482,7 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 			o.WithdrawBondSats = &bond
 			o.WithdrawRelativeBlockLocktime = &lock
 		}
-		ensureV3DeterministicOrdering(transferTokenTransaction)
+		normalizeV3TokenTransaction(transferTokenTransaction)
 	}
 
 	transferTokenTransaction.TokenOutputs[0].TokenIdentifier = params.TokenIdentifier
@@ -588,7 +623,7 @@ func createTestTokenCreateTransactionWithParams(config *wallet.TestWalletConfig,
 	if version >= TokenTransactionVersion3 {
 		// V3 requires client-provided validity duration and sorted operator keys for deterministic hashing
 		createTokenTransaction.ValidityDurationSeconds = proto.Uint64(uint64(wallet.DefaultValidityDuration.Seconds()))
-		ensureV3DeterministicOrdering(createTokenTransaction)
+		normalizeV3TokenTransaction(createTokenTransaction)
 	}
 	return createTokenTransaction, nil
 }

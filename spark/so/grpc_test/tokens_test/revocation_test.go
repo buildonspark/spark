@@ -28,7 +28,7 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealed(t *testing.T) {
 	}
 
 	ctx := t.Context()
-	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+	config, finalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
 
 	entClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
@@ -104,10 +104,10 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableT
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			ctx := t.Context()
 
-			config, initalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			config, initalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 			require.NoError(t, err, "failed to create transfer token transaction")
 
-			_, remappedFinalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			_, remappedFinalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 			require.NoError(t, err, "failed to create transfer token transaction")
 
 			coordinatorEntClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
@@ -214,10 +214,10 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsIfRemapTxH
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			ctx := t.Context()
 
-			config, initalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			config, initalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 			require.NoError(t, err, "failed to create transfer token transaction")
 
-			_, remappedFinalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			_, remappedFinalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 			require.NoError(t, err, "failed to create transfer token transaction")
 
 			coordinatorEntClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
@@ -323,10 +323,10 @@ func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasN
 	for _, tc := range testCases {
 		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
 			ctx := t.Context()
-			_, remappedFinalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			_, remappedFinalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 			require.NoError(t, err, "failed to create transfer token transaction")
 
-			config, initalFinalTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			config, initalFinalTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 			require.NoError(t, err, "failed to create transfer token transaction")
 
 			coordinatorEntClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
@@ -383,7 +383,7 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealedWithAllFieldsButS
 	}
 
 	ctx := t.Context()
-	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+	config, finalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
 
 	entClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
@@ -425,7 +425,7 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesStarted(t *testing.T) {
 	}
 
 	ctx := t.Context()
-	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+	config, finalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
 
 	var coordinatorEntClient, nonCoordEntClient *ent.Client
@@ -473,7 +473,7 @@ func TestRevocationExchangeCronJobDoesNotFinalizeStartedIfSignatureIsInvalid(t *
 	}
 
 	ctx := t.Context()
-	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+	config, finalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
 
 	var coordinatorEntClient, nonCoordEntClient *ent.Client
@@ -538,7 +538,7 @@ func TestRevocationExchangeCronJobSkipsRevealedWithNoSpentOutputs(t *testing.T) 
 	}
 
 	ctx := t.Context()
-	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+	config, finalTransferTokenTransactionHash, _, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
 
 	entClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
@@ -662,7 +662,15 @@ func TestJustInTimeFinalizationOfCreatedSignedOutputOnNonCoordinator(t *testing.
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
 }
 
-func createTransferTokenTransactionForWallet(t *testing.T, ctx context.Context) (*wallet.TestWalletConfig, []byte, error) {
+func createTransferTokenTransactionForWallet(
+	t *testing.T,
+	ctx context.Context,
+) (*wallet.TestWalletConfig, []byte, *tokenpb.TokenTransaction, error) {
+	now := utils.ToMicrosecondPrecision(time.Now().UTC())
+	return createTransferTokenTransactionForWalletWithTimestamp(t, ctx, now)
+}
+
+func createTransferTokenTransactionForWalletWithTimestamp(t *testing.T, ctx context.Context, timestamp time.Time) (*wallet.TestWalletConfig, []byte, *tokenpb.TokenTransaction, error) {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	tokenIdentifier := queryTokenIdentifierOrFail(t, config, config.IdentityPrivateKey.Public())
 
@@ -682,12 +690,14 @@ func createTransferTokenTransactionForWallet(t *testing.T, ctx context.Context) 
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 	require.NoError(t, err, "failed to hash final issuance token transaction")
 
-	transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPb(t,
-		config,
-		finalIssueTokenTransactionHash,
-		tokenPrivKey.Public(),
-		tokenIdentifier,
-	)
+	transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+		TokenIdentityPubKey:            tokenPrivKey.Public(),
+		TokenIdentifier:                tokenIdentifier,
+		FinalIssueTokenTransactionHash: finalIssueTokenTransactionHash,
+		NumOutputs:                     1,
+		OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
+		ClientCreatedTimestamp:         timestamp,
+	})
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
 	transferTokenTransactionResponse, err := broadcastTokenTransaction(
@@ -701,7 +711,7 @@ func createTransferTokenTransactionForWallet(t *testing.T, ctx context.Context) 
 
 	finalTransferTokenTransactionHash, err := utils.HashTokenTransaction(transferTokenTransactionResponse, false)
 	require.NoError(t, err, "failed to hash transfer token transaction")
-	return config, finalTransferTokenTransactionHash, nil
+	return config, finalTransferTokenTransactionHash, transferTokenTransactionResponse, nil
 }
 
 func setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t *testing.T, ctx context.Context, entClient *ent.Client, finalTransferTokenTransactionHash []byte) {

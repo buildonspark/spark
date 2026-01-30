@@ -37,7 +37,8 @@ func TestStartTokenTransaction_DuplicateV3StartedDifferentCoordinatorRejects(t *
 	tokenCreate := f.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
 
 	issuerPubKey := tokenCreate.IssuerPublicKey
-	clientCreated := time.Now()
+	// Truncate to microseconds to match PostgreSQL precision
+	clientCreated := utils.ToMicrosecondPrecision(time.Now().UTC())
 	validity := uint64(60)
 
 	partial := buildV3CreateTransactionProto(
@@ -73,6 +74,7 @@ func TestStartTokenTransaction_DuplicateV3StartedDifferentCoordinatorRejects(t *
 		PartialTokenTransaction:                partial,
 		PartialTokenTransactionOwnerSignatures: ownerSigs,
 		IdentityPublicKey:                      cfg.IdentityPublicKey().Serialize(),
+		ValidityDurationSeconds:                validity,
 	})
 
 	require.Error(t, err)
@@ -92,7 +94,8 @@ func TestStartTokenTransaction_DuplicateV3SignedSameCoordinatorRejects(t *testin
 	tokenCreate := f.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
 
 	issuerPubKey := tokenCreate.IssuerPublicKey
-	clientCreated := time.Now()
+	// Truncate to microseconds to match PostgreSQL precision
+	clientCreated := utils.ToMicrosecondPrecision(time.Now().UTC())
 	validity := uint64(60)
 
 	partial := buildV3CreateTransactionProto(
@@ -128,6 +131,7 @@ func TestStartTokenTransaction_DuplicateV3SignedSameCoordinatorRejects(t *testin
 		PartialTokenTransaction:                partial,
 		PartialTokenTransactionOwnerSignatures: ownerSigs,
 		IdentityPublicKey:                      cfg.IdentityPublicKey().Serialize(),
+		ValidityDurationSeconds:                validity,
 	})
 
 	require.Error(t, err)
