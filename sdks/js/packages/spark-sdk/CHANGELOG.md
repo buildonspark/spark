@@ -1,5 +1,24 @@
 # @buildonspark/spark-sdk
 
+## 0.5.8
+
+### Patch Changes
+
+- **Swap flow updates**
+  - Swaps now use the `request_swap` API with outbound transfer IDs and multi-target amounts, and the SDK initiates swap transfers with adaptor signatures.
+  - Added support for `COUNTER_SWAP_V3` transfers and updated swap processing to use adaptor-added signatures from the swap transfer response.
+- **Deposit tree creation API update**
+  - Uses `get_signing_commitments` + `finalize_deposit_tree_creation` and sends user signatures/commitments directly (no local signature aggregation).
+- **Coop exit signing fix**
+  - Added multi-input Taproot sighash support for connector-based refund transactions and include connector transaction data in coop exit requests.
+- **Token transaction querying**
+  - Split `queryTokenTransactions`
+    - `queryTokenTransactionsByTxHashes` for confirming and querying the specific state of transactions
+    - `queryTokenTransactionsWithFilters` for querying the network with filters. Includes cursor pagination
+  - `queryTokenTransactions` is now deprecated.
+- **Utilities and validation**
+  - Added `hashstructure` tagged hash helper, validated VSS proof lengths, and skip direct refund tx creation for zero-timelock nodes.
+
 ## 0.5.7
 
 ### Patch Changes
