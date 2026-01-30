@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/hashstructure"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	pb "github.com/lightsparkdev/spark/proto/spark_authn_internal"
@@ -15,7 +16,6 @@ import (
 )
 
 const (
-	sessionSecretConstant           = "AUTH_SESSION_SECRET_v1"
 	currentSessionProtectionVersion = 1
 	currentSessionVersion           = 1
 )
@@ -64,18 +64,23 @@ func NewSessionTokenCreatorVerifier(identityPrivateKey keys.Private, clock Clock
 	}
 
 	// Derive session HMAC key from identity key
-	h := sha256.New()
-	h.Write(identityPrivateKey.Serialize())
-	h.Write([]byte(sessionSecretConstant))
-	sessionHmacKey := h.Sum(nil)
+	sessionHmacKey := sha256.Sum256(identityPrivateKey.Serialize())
 
 	return &SessionTokenCreatorVerifier{
-		sessionHmacKey: sessionHmacKey,
+		sessionHmacKey: sessionHmacKey[:],
 		clock:          clock,
 	}, nil
 }
 
-func (stcv *SessionTokenCreatorVerifier) computeSessionHmac(sessionBytes []byte) []byte {
+// computeSessionHmac computes the HMAC of the session using structured hashing.
+func (stcv *SessionTokenCreatorVerifier) computeSessionHmac(session *pb.Session) []byte {
+	sessionBytes := hashstructure.NewHasher([]string{"spark", "authn", "internal", "session"}).
+		AddUint32(uint32(session.Version)).
+		AddUint64(uint64(session.ExpirationTimestamp)).
+		AddBytes(session.Nonce).
+		AddBytes(session.PublicKey).
+		Hash()
+
 	h := hmac.New(sha256.New, stcv.sessionHmacKey)
 	h.Write(sessionBytes)
 	return h.Sum(nil)
@@ -97,12 +102,7 @@ func (stcv *SessionTokenCreatorVerifier) CreateToken(publicKey keys.Public, dura
 		PublicKey:           publicKey.Serialize(),
 	}
 
-	sessionBytes, err := proto.Marshal(session)
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize session: %w", err)
-	}
-
-	mac := stcv.computeSessionHmac(sessionBytes)
+	mac := stcv.computeSessionHmac(session)
 
 	protected := &pb.ProtectedSession{
 		Version: currentSessionProtectionVersion,
@@ -145,12 +145,8 @@ func (stcv *SessionTokenCreatorVerifier) VerifyToken(token string) (*pb.Session,
 		return nil, fmt.Errorf("%w: %d", ErrUnsupportedSessionVersion, protected.Session.Version)
 	}
 
-	sessionBytes, err := proto.Marshal(protected.Session)
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize session: %w", err)
-	}
+	expectedMAC := stcv.computeSessionHmac(protected.Session)
 
-	expectedMAC := stcv.computeSessionHmac(sessionBytes)
 	if !hmac.Equal(expectedMAC, protected.Hmac) {
 		return nil, ErrInvalidTokenHmac
 	}

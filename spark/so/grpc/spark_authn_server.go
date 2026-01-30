@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/hashstructure"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark_authn"
 	"github.com/lightsparkdev/spark/so/authninternal"
@@ -26,7 +27,6 @@ import (
 const (
 	currentChallengeVersion  = 1
 	currentProtectionVersion = 1
-	challengeSecretConstant  = "AUTH_CHALLENGE_SECRET_v1"
 	clockSkewSeconds         = 1
 )
 
@@ -126,14 +126,11 @@ func NewAuthnServer(
 	}
 
 	// Derive challenge HMAC key from identity key and constant
-	h := sha256.New()
-	h.Write(config.IdentityPrivateKey.Serialize())
-	h.Write([]byte(challengeSecretConstant))
-	challengeHmacKey := h.Sum(nil)
+	challengeHmacKey := sha256.Sum256(config.IdentityPrivateKey.Serialize())
 
 	return &AuthnServer{
 		config:                      config,
-		challengeHmacKey:            challengeHmacKey,
+		challengeHmacKey:            challengeHmacKey[:],
 		sessionTokenCreatorVerifier: sessionTokenCreatorVerifier,
 		clock:                       config.Clock,
 		nonceCache:                  newChallengeNonceCache(config.ChallengeTimeout),
@@ -163,12 +160,7 @@ func (s *AuthnServer) GetChallenge(_ context.Context, req *pb.GetChallengeReques
 		PublicKey: req.PublicKey,
 	}
 
-	challengeBytes, err := proto.Marshal(challenge)
-	if err != nil {
-		return nil, fmt.Errorf("internal error: failed to serialize challenge: %w", err)
-	}
-
-	mac := s.computeChallengeHmac(challengeBytes)
+	mac := s.computeChallengeHmac(challenge)
 
 	protectedChallenge := &pb.ProtectedChallenge{
 		Version:    currentProtectionVersion,
@@ -218,7 +210,7 @@ func (s *AuthnServer) VerifyChallenge(ctx context.Context, req *pb.VerifyChallen
 		return nil, fmt.Errorf("internal error: failed to serialize challenge: %w", err)
 	}
 
-	if err := s.verifyChallengeHmac(challengeBytes, req.ProtectedChallenge.ServerHmac); err != nil {
+	if err := s.verifyChallengeHmac(challenge, req.ProtectedChallenge.ServerHmac); err != nil {
 		return nil, fmt.Errorf("challenge verification failed: %w", err)
 	}
 
@@ -237,7 +229,15 @@ func (s *AuthnServer) VerifyChallenge(ctx context.Context, req *pb.VerifyChallen
 	}, nil
 }
 
-func (s *AuthnServer) computeChallengeHmac(challengeBytes []byte) []byte {
+// computeChallengeHmac computes the HMAC of the challenge using structured hashing.
+func (s *AuthnServer) computeChallengeHmac(challenge *pb.Challenge) []byte {
+	challengeBytes := hashstructure.NewHasher([]string{"spark", "authn", "challenge"}).
+		AddUint32(uint32(challenge.Version)).
+		AddUint64(uint64(challenge.Timestamp)).
+		AddBytes(challenge.Nonce).
+		AddBytes(challenge.PublicKey).
+		Hash()
+
 	h := hmac.New(sha256.New, s.challengeHmacKey)
 	h.Write(challengeBytes)
 	return h.Sum(nil)
@@ -321,8 +321,8 @@ func (s *AuthnServer) verifyClientSignatureECDSA(challengeBytes []byte, pubKey k
 	return nil
 }
 
-func (s *AuthnServer) verifyChallengeHmac(challengeBytes []byte, serverHMAC []byte) error {
-	expectedMAC := s.computeChallengeHmac(challengeBytes)
+func (s *AuthnServer) verifyChallengeHmac(challenge *pb.Challenge, serverHMAC []byte) error {
+	expectedMAC := s.computeChallengeHmac(challenge)
 	if !hmac.Equal(expectedMAC, serverHMAC) {
 		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("verify challenge hmac: %w", ErrInvalidChallengeHmac))
 	}
