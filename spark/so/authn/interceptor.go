@@ -47,15 +47,25 @@ func (s *Session) ExpirationTimestamp() int64 {
 	return s.expirationTimestamp
 }
 
-// Interceptor is an interceptor that validates session tokens and adds session info to the context.
+// Interceptor validates session tokens and adds session info to the context.
 type Interceptor struct {
 	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier
+	unauthenticatedConfig       UnauthenticatedConfig
 }
 
 // NewInterceptor creates a new Interceptor
 func NewInterceptor(sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier) *Interceptor {
 	return &Interceptor{
 		sessionTokenCreatorVerifier: sessionTokenCreatorVerifier,
+		unauthenticatedConfig:       DefaultUnauthenticatedConfig(),
+	}
+}
+
+// NewInterceptorWithConfig creates an interceptor with custom unauthenticated method configuration.
+func NewInterceptorWithConfig(sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier, config UnauthenticatedConfig) *Interceptor {
+	return &Interceptor{
+		sessionTokenCreatorVerifier: sessionTokenCreatorVerifier,
+		unauthenticatedConfig:       config,
 	}
 }
 
@@ -68,66 +78,77 @@ func (w *wrappedServerStream) Context() context.Context {
 	return w.ctx
 }
 
-// AuthnInterceptor is an interceptor that validates session tokens and adds session info to the context.
-// If there is no session, or it does not validate, it will log rather than error.
-func (i *Interceptor) AuthnInterceptor(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	ctx = i.authenticateContext(ctx)
+// AuthnInterceptor validates session tokens and adds session info to the context.
+// Unauthenticated requests are rejected unless the method is explicitly marked as unauthenticated.
+// For unauthenticated methods, we still attempt to extract the session if a token is present.
+func (i *Interceptor) AuthnInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+	requireAuth := !i.unauthenticatedConfig.IsUnauthenticated(info.FullMethod)
+	ctx, err := i.authenticateContext(ctx, requireAuth)
+	if err != nil {
+		return nil, err
+	}
 	return handler(ctx, req)
 }
 
-func (i *Interceptor) StreamAuthnInterceptor(srv any, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	newCtx := i.authenticateContext(ss.Context())
-	return handler(srv, &wrappedServerStream{ServerStream: ss, ctx: newCtx})
+// StreamAuthnInterceptor validates session tokens for streaming RPCs.
+// Unauthenticated requests are rejected unless the method is explicitly marked as unauthenticated.
+// For unauthenticated methods, we still attempt to extract the session if a token is present.
+func (i *Interceptor) StreamAuthnInterceptor(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	requireAuth := !i.unauthenticatedConfig.IsUnauthenticated(info.FullMethod)
+	ctx, err := i.authenticateContext(ss.Context(), requireAuth)
+	if err != nil {
+		return err
+	}
+	ss = &wrappedServerStream{ServerStream: ss, ctx: ctx}
+	return handler(srv, ss)
 }
 
-func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
+func (i *Interceptor) authenticateContext(ctx context.Context, requireAuth bool) (context.Context, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	logger := logging.GetLoggerFromContext(ctx)
 	if !ok {
-		err := errors.WrapErrorWithCode(fmt.Errorf("no metadata provided"), codes.Unauthenticated)
-		logger.Info("Authentication error", zap.Error(err))
-		return context.WithValue(ctx, authnContextKey, &Context{
-			Error: err,
-		})
-
+		if requireAuth {
+			err := errors.WrapErrorWithCode(fmt.Errorf("no metadata provided"), codes.Unauthenticated)
+			logger.Info("Authentication error", zap.Error(err))
+			return nil, err
+		}
+		return ctx, nil
 	}
 
-	// Tokens are typically sent in "authorization" header
 	tokens := md.Get(authorizationHeader)
 	if len(tokens) == 0 {
-		err := errors.WrapErrorWithCode(fmt.Errorf("no authorization token provided"), codes.Unauthenticated)
-		return context.WithValue(ctx, authnContextKey, &Context{
-			Error: err,
-		})
+		if requireAuth {
+			return nil, errors.WrapErrorWithCode(fmt.Errorf("no authorization token provided"), codes.Unauthenticated)
+		}
+		return ctx, nil
 	}
 
-	// Usually follows "Bearer <token>" format
 	token := strings.TrimPrefix(tokens[0], "Bearer ")
 
 	sessionInfo, err := i.sessionTokenCreatorVerifier.VerifyToken(token)
 	if err != nil {
-		wrappedErr := errors.WrapErrorWithCode(fmt.Errorf("failed to verify token: %w", err), codes.Unauthenticated)
-		return context.WithValue(ctx, authnContextKey, &Context{
-			Error: wrappedErr,
-		})
+		if requireAuth {
+			return nil, errors.WrapErrorWithCode(fmt.Errorf("failed to verify token: %w", err), codes.Unauthenticated)
+		}
+		return ctx, nil
 	}
 
 	key, err := keys.ParsePublicKey(sessionInfo.PublicKey)
 	if err != nil {
-		wrappedErr := errors.WrapErrorWithCode(fmt.Errorf("failed to parse public key: %w", err), codes.Unauthenticated)
-		return context.WithValue(ctx, authnContextKey, &Context{
-			Error: wrappedErr,
-		})
+		if requireAuth {
+			return nil, errors.WrapErrorWithCode(fmt.Errorf("failed to parse public key: %w", err), codes.Unauthenticated)
+		}
+		return ctx, nil
 	}
 
-	ctx, logger = logging.WithIdentityPubkey(ctx, key)
+	ctx, _ = logging.WithIdentityPubkey(ctx, key)
 
 	return context.WithValue(ctx, authnContextKey, &Context{
 		Session: &Session{
 			identityPublicKey:   key,
 			expirationTimestamp: sessionInfo.ExpirationTimestamp,
 		},
-	})
+	}), nil
 }
 
 // GetSessionFromContext retrieves the session and any error from the context

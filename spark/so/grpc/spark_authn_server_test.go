@@ -194,7 +194,7 @@ func testVerifyChallenge_InvalidSignature(t *testing.T, sigAlg signingAlgorithm)
 	assert.Nil(t, resp)
 }
 
-func TestVerifyChallenge_ExpiredSessionToken(t *testing.T) {
+func TestVerifyChallenge_ExpiredSessionToken_ReturnsError(t *testing.T) {
 	clock := authninternal.NewTestClock(time.Now())
 	server, tokenVerifier := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
@@ -210,16 +210,15 @@ func TestVerifyChallenge_ExpiredSessionToken(t *testing.T) {
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(
 		"authorization", "Bearer "+resp.SessionToken,
 	))
-	var forwardedCtx context.Context
-	_, _ = authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(hctx context.Context, _ any) (any, error) {
-		forwardedCtx = hctx
+	handlerCalled := false
+	_, err := authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(hctx context.Context, _ any) (any, error) {
+		handlerCalled = true
 		return nil, nil
 	})
 
-	noSession, err := authn.GetSessionFromContext(forwardedCtx)
+	assert.False(t, handlerCalled)
 	st, _ := status.FromError(err)
 	require.Equal(t, codes.Unauthenticated, st.Code())
-	assert.Nil(t, noSession)
 }
 
 func TestVerifyChallenge_ExpiredChallenge(t *testing.T) {
@@ -425,20 +424,20 @@ func verifyChallenge(t *testing.T, server *AuthnServer, challengeResp *pb.GetCha
 	return resp
 }
 
-func assertNoSessionInContext(ctx context.Context, t *testing.T) {
+func assertContextDoesNotAuthenticate(ctx context.Context, t *testing.T) {
 	t.Helper()
-	var capturedCtx context.Context
 	authnInterceptor := authn.NewInterceptor(newTestTokenVerifier(t))
 
+	handlerCalled := false
 	_, err := authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(ctx context.Context, _ any) (any, error) {
-		capturedCtx = ctx
+		handlerCalled = true
 		return nil, nil
 	})
 
-	require.NoError(t, err)
-	noSession, err := authn.GetSessionFromContext(capturedCtx)
+	require.False(t, handlerCalled)
 	require.Error(t, err)
-	assert.Nil(t, noSession)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.Unauthenticated, st.Code())
 }
 
 func newTestTokenVerifier(t *testing.T) *authninternal.SessionTokenCreatorVerifier {
@@ -500,7 +499,7 @@ func TestVerifyChallenge_InvalidAuth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assertNoSessionInContext(tt.ctx, t)
+			assertContextDoesNotAuthenticate(tt.ctx, t)
 		})
 	}
 }
