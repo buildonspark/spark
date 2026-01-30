@@ -30,7 +30,6 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 		return nil, err
 	}
 
-	// Use shared validation and freeze logic with timestamp-based replay protection
 	result, err := ValidateAndApplyFreeze(ctx, h.config, req.FreezeTokensPayload, req.IssuerSignature)
 	if err != nil {
 		return nil, err

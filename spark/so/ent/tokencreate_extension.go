@@ -13,6 +13,15 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 )
 
+// GetTokenCreateByIdentifier returns the TokenCreate entity for the given token identifier.
+func GetTokenCreateByIdentifier(ctx context.Context, tokenIdentifier []byte) (*TokenCreate, error) {
+	db, err := GetDbFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return db.TokenCreate.Query().Where(tokencreate.TokenIdentifier(tokenIdentifier)).Only(ctx)
+}
+
 func getTokenIdentifierFromTransaction(tokenTransaction *tokenpb.TokenTransaction) common.TokenIdentifier {
 	// For transactions with token identifier set in outputs
 	if len(tokenTransaction.TokenOutputs) > 0 && tokenTransaction.TokenOutputs[0].GetTokenIdentifier() != nil {

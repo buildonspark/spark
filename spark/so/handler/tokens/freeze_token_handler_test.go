@@ -138,17 +138,38 @@ func TestFreezeTokens_IdempotentWhenAlreadyFrozen(t *testing.T) {
 
 	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
 
-	req1 := createFreezeTestRequest(t, cfg, tokenCreate, false)
+	// Use same timestamp for both requests to test idempotency
+	timestamp := uint64(1000)
+	req1 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, timestamp)
 	resp1, err := handler.FreezeTokens(ctx, req1)
 	require.NoError(t, err)
 	require.NotNil(t, resp1)
 
-	// Freezing again should succeed (idempotent)
-	req2 := createFreezeTestRequest(t, cfg, tokenCreate, false)
+	req2 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, timestamp)
 	resp2, err := handler.FreezeTokens(ctx, req2)
 
 	require.NoError(t, err)
 	require.NotNil(t, resp2)
+}
+
+func TestFreezeTokens_RejectsDifferentTimestampWhenAlreadyFrozen(t *testing.T) {
+	ctx, tc := db.NewTestSQLiteContext(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewFreezeTokenHandler(cfg)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+
+	req1 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, 1000)
+	_, err := handler.FreezeTokens(ctx, req1)
+	require.NoError(t, err)
+
+	// Freezing with a different timestamp should fail
+	req2 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, 2000)
+	resp, err := handler.FreezeTokens(ctx, req2)
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Contains(t, err.Error(), "already frozen")
 }
 
 func TestUnfreezeTokens_SuccessWhenFrozen(t *testing.T) {
@@ -178,11 +199,60 @@ func TestUnfreezeTokens_IdempotentWhenNotFrozen(t *testing.T) {
 	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
 	req := createFreezeTestRequest(t, cfg, tokenCreate, true)
 
-	// Unfreezing when not frozen should succeed (idempotent)
+	// Unfreezing when never frozen should succeed as no-op
 	resp, err := handler.FreezeTokens(ctx, req)
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
+}
+
+func TestUnfreezeTokens_IdempotentWhenAlreadyUnfrozen(t *testing.T) {
+	ctx, tc := db.NewTestSQLiteContext(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewFreezeTokenHandler(cfg)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+
+	// Freeze then unfreeze
+	freezeReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, 1000)
+	_, err := handler.FreezeTokens(ctx, freezeReq)
+	require.NoError(t, err)
+
+	unfreezeReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, 2000)
+	_, err = handler.FreezeTokens(ctx, unfreezeReq)
+	require.NoError(t, err)
+
+	// Unfreezing again with same timestamp should succeed (idempotent)
+	unfreezeReq2 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, 2000)
+	resp, err := handler.FreezeTokens(ctx, unfreezeReq2)
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+}
+
+func TestUnfreezeTokens_RejectsDifferentTimestampWhenAlreadyUnfrozen(t *testing.T) {
+	ctx, tc := db.NewTestSQLiteContext(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewFreezeTokenHandler(cfg)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+
+	// Freeze then unfreeze
+	freezeReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, 1000)
+	_, err := handler.FreezeTokens(ctx, freezeReq)
+	require.NoError(t, err)
+
+	unfreezeReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, 2000)
+	_, err = handler.FreezeTokens(ctx, unfreezeReq)
+	require.NoError(t, err)
+
+	// Unfreezing with a different timestamp should fail
+	unfreezeReq2 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, 3000)
+	resp, err := handler.FreezeTokens(ctx, unfreezeReq2)
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Contains(t, err.Error(), "already unfrozen")
 }
 
 func TestUnfreezeTokens_FailsWhenNotFreezable(t *testing.T) {
