@@ -228,6 +228,38 @@ var (
 			},
 		},
 	}
+	// L1tokenJusticeTransactionsColumns holds the columns for the "l1token_justice_transactions" table.
+	L1tokenJusticeTransactionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "justice_tx_hash", Type: field.TypeBytes},
+		{Name: "broadcast_at", Type: field.TypeTime},
+		{Name: "amount_sats", Type: field.TypeUint64},
+		{Name: "tx_cost_sats", Type: field.TypeUint64},
+		{Name: "l1token_output_withdrawal_justice_tx", Type: field.TypeUUID, Unique: true},
+		{Name: "token_output_justice_tx", Type: field.TypeUUID, Unique: true},
+	}
+	// L1tokenJusticeTransactionsTable holds the schema information for the "l1token_justice_transactions" table.
+	L1tokenJusticeTransactionsTable = &schema.Table{
+		Name:       "l1token_justice_transactions",
+		Columns:    L1tokenJusticeTransactionsColumns,
+		PrimaryKey: []*schema.Column{L1tokenJusticeTransactionsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "l1token_justice_transactions_l1token_output_withdrawals_justice_tx",
+				Columns:    []*schema.Column{L1tokenJusticeTransactionsColumns[7]},
+				RefColumns: []*schema.Column{L1tokenOutputWithdrawalsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "l1token_justice_transactions_token_outputs_justice_tx",
+				Columns:    []*schema.Column{L1tokenJusticeTransactionsColumns[8]},
+				RefColumns: []*schema.Column{TokenOutputsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+	}
 	// L1tokenOutputWithdrawalsColumns holds the columns for the "l1token_output_withdrawals" table.
 	L1tokenOutputWithdrawalsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1492,6 +1524,7 @@ var (
 		EventMessagesTable,
 		GossipsTable,
 		L1tokenCreatesTable,
+		L1tokenJusticeTransactionsTable,
 		L1tokenOutputWithdrawalsTable,
 		L1withdrawalTransactionsTable,
 		PaymentIntentsTable,
@@ -1526,6 +1559,8 @@ func init() {
 	CooperativeExitsTable.ForeignKeys[0].RefTable = TransfersTable
 	DepositAddressesTable.ForeignKeys[0].RefTable = SigningKeysharesTable
 	EntityDkgKeysTable.ForeignKeys[0].RefTable = SigningKeysharesTable
+	L1tokenJusticeTransactionsTable.ForeignKeys[0].RefTable = L1tokenOutputWithdrawalsTable
+	L1tokenJusticeTransactionsTable.ForeignKeys[1].RefTable = TokenOutputsTable
 	L1tokenOutputWithdrawalsTable.ForeignKeys[0].RefTable = L1withdrawalTransactionsTable
 	L1tokenOutputWithdrawalsTable.ForeignKeys[1].RefTable = TokenOutputsTable
 	L1withdrawalTransactionsTable.ForeignKeys[0].RefTable = EntityDkgKeysTable

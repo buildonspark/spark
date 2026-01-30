@@ -22,6 +22,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
@@ -68,6 +69,7 @@ const (
 	TypeEventMessage                      = "EventMessage"
 	TypeGossip                            = "Gossip"
 	TypeL1TokenCreate                     = "L1TokenCreate"
+	TypeL1TokenJusticeTransaction         = "L1TokenJusticeTransaction"
 	TypeL1TokenOutputWithdrawal           = "L1TokenOutputWithdrawal"
 	TypeL1WithdrawalTransaction           = "L1WithdrawalTransaction"
 	TypePaymentIntent                     = "PaymentIntent"
@@ -5529,6 +5531,803 @@ func (m *L1TokenCreateMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown L1TokenCreate edge %s", name)
 }
 
+// L1TokenJusticeTransactionMutation represents an operation that mutates the L1TokenJusticeTransaction nodes in the graph.
+type L1TokenJusticeTransactionMutation struct {
+	config
+	op                                Op
+	typ                               string
+	id                                *uuid.UUID
+	create_time                       *time.Time
+	update_time                       *time.Time
+	justice_tx_hash                   *schematype.TxID
+	broadcast_at                      *time.Time
+	amount_sats                       *uint64
+	addamount_sats                    *int64
+	tx_cost_sats                      *uint64
+	addtx_cost_sats                   *int64
+	clearedFields                     map[string]struct{}
+	token_output                      *uuid.UUID
+	clearedtoken_output               bool
+	l1_token_output_withdrawal        *uuid.UUID
+	clearedl1_token_output_withdrawal bool
+	done                              bool
+	oldValue                          func(context.Context) (*L1TokenJusticeTransaction, error)
+	predicates                        []predicate.L1TokenJusticeTransaction
+}
+
+var _ ent.Mutation = (*L1TokenJusticeTransactionMutation)(nil)
+
+// l1tokenjusticetransactionOption allows management of the mutation configuration using functional options.
+type l1tokenjusticetransactionOption func(*L1TokenJusticeTransactionMutation)
+
+// newL1TokenJusticeTransactionMutation creates new mutation for the L1TokenJusticeTransaction entity.
+func newL1TokenJusticeTransactionMutation(c config, op Op, opts ...l1tokenjusticetransactionOption) *L1TokenJusticeTransactionMutation {
+	m := &L1TokenJusticeTransactionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeL1TokenJusticeTransaction,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withL1TokenJusticeTransactionID sets the ID field of the mutation.
+func withL1TokenJusticeTransactionID(id uuid.UUID) l1tokenjusticetransactionOption {
+	return func(m *L1TokenJusticeTransactionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *L1TokenJusticeTransaction
+		)
+		m.oldValue = func(ctx context.Context) (*L1TokenJusticeTransaction, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().L1TokenJusticeTransaction.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withL1TokenJusticeTransaction sets the old L1TokenJusticeTransaction of the mutation.
+func withL1TokenJusticeTransaction(node *L1TokenJusticeTransaction) l1tokenjusticetransactionOption {
+	return func(m *L1TokenJusticeTransactionMutation) {
+		m.oldValue = func(context.Context) (*L1TokenJusticeTransaction, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m L1TokenJusticeTransactionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m L1TokenJusticeTransactionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of L1TokenJusticeTransaction entities.
+func (m *L1TokenJusticeTransactionMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *L1TokenJusticeTransactionMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *L1TokenJusticeTransactionMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().L1TokenJusticeTransaction.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *L1TokenJusticeTransactionMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *L1TokenJusticeTransactionMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the L1TokenJusticeTransaction entity.
+// If the L1TokenJusticeTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1TokenJusticeTransactionMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *L1TokenJusticeTransactionMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *L1TokenJusticeTransactionMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *L1TokenJusticeTransactionMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the L1TokenJusticeTransaction entity.
+// If the L1TokenJusticeTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1TokenJusticeTransactionMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *L1TokenJusticeTransactionMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetJusticeTxHash sets the "justice_tx_hash" field.
+func (m *L1TokenJusticeTransactionMutation) SetJusticeTxHash(si schematype.TxID) {
+	m.justice_tx_hash = &si
+}
+
+// JusticeTxHash returns the value of the "justice_tx_hash" field in the mutation.
+func (m *L1TokenJusticeTransactionMutation) JusticeTxHash() (r schematype.TxID, exists bool) {
+	v := m.justice_tx_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldJusticeTxHash returns the old "justice_tx_hash" field's value of the L1TokenJusticeTransaction entity.
+// If the L1TokenJusticeTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1TokenJusticeTransactionMutation) OldJusticeTxHash(ctx context.Context) (v schematype.TxID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldJusticeTxHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldJusticeTxHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldJusticeTxHash: %w", err)
+	}
+	return oldValue.JusticeTxHash, nil
+}
+
+// ResetJusticeTxHash resets all changes to the "justice_tx_hash" field.
+func (m *L1TokenJusticeTransactionMutation) ResetJusticeTxHash() {
+	m.justice_tx_hash = nil
+}
+
+// SetBroadcastAt sets the "broadcast_at" field.
+func (m *L1TokenJusticeTransactionMutation) SetBroadcastAt(t time.Time) {
+	m.broadcast_at = &t
+}
+
+// BroadcastAt returns the value of the "broadcast_at" field in the mutation.
+func (m *L1TokenJusticeTransactionMutation) BroadcastAt() (r time.Time, exists bool) {
+	v := m.broadcast_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBroadcastAt returns the old "broadcast_at" field's value of the L1TokenJusticeTransaction entity.
+// If the L1TokenJusticeTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1TokenJusticeTransactionMutation) OldBroadcastAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBroadcastAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBroadcastAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBroadcastAt: %w", err)
+	}
+	return oldValue.BroadcastAt, nil
+}
+
+// ResetBroadcastAt resets all changes to the "broadcast_at" field.
+func (m *L1TokenJusticeTransactionMutation) ResetBroadcastAt() {
+	m.broadcast_at = nil
+}
+
+// SetAmountSats sets the "amount_sats" field.
+func (m *L1TokenJusticeTransactionMutation) SetAmountSats(u uint64) {
+	m.amount_sats = &u
+	m.addamount_sats = nil
+}
+
+// AmountSats returns the value of the "amount_sats" field in the mutation.
+func (m *L1TokenJusticeTransactionMutation) AmountSats() (r uint64, exists bool) {
+	v := m.amount_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAmountSats returns the old "amount_sats" field's value of the L1TokenJusticeTransaction entity.
+// If the L1TokenJusticeTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1TokenJusticeTransactionMutation) OldAmountSats(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAmountSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAmountSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAmountSats: %w", err)
+	}
+	return oldValue.AmountSats, nil
+}
+
+// AddAmountSats adds u to the "amount_sats" field.
+func (m *L1TokenJusticeTransactionMutation) AddAmountSats(u int64) {
+	if m.addamount_sats != nil {
+		*m.addamount_sats += u
+	} else {
+		m.addamount_sats = &u
+	}
+}
+
+// AddedAmountSats returns the value that was added to the "amount_sats" field in this mutation.
+func (m *L1TokenJusticeTransactionMutation) AddedAmountSats() (r int64, exists bool) {
+	v := m.addamount_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAmountSats resets all changes to the "amount_sats" field.
+func (m *L1TokenJusticeTransactionMutation) ResetAmountSats() {
+	m.amount_sats = nil
+	m.addamount_sats = nil
+}
+
+// SetTxCostSats sets the "tx_cost_sats" field.
+func (m *L1TokenJusticeTransactionMutation) SetTxCostSats(u uint64) {
+	m.tx_cost_sats = &u
+	m.addtx_cost_sats = nil
+}
+
+// TxCostSats returns the value of the "tx_cost_sats" field in the mutation.
+func (m *L1TokenJusticeTransactionMutation) TxCostSats() (r uint64, exists bool) {
+	v := m.tx_cost_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTxCostSats returns the old "tx_cost_sats" field's value of the L1TokenJusticeTransaction entity.
+// If the L1TokenJusticeTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *L1TokenJusticeTransactionMutation) OldTxCostSats(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTxCostSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTxCostSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTxCostSats: %w", err)
+	}
+	return oldValue.TxCostSats, nil
+}
+
+// AddTxCostSats adds u to the "tx_cost_sats" field.
+func (m *L1TokenJusticeTransactionMutation) AddTxCostSats(u int64) {
+	if m.addtx_cost_sats != nil {
+		*m.addtx_cost_sats += u
+	} else {
+		m.addtx_cost_sats = &u
+	}
+}
+
+// AddedTxCostSats returns the value that was added to the "tx_cost_sats" field in this mutation.
+func (m *L1TokenJusticeTransactionMutation) AddedTxCostSats() (r int64, exists bool) {
+	v := m.addtx_cost_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetTxCostSats resets all changes to the "tx_cost_sats" field.
+func (m *L1TokenJusticeTransactionMutation) ResetTxCostSats() {
+	m.tx_cost_sats = nil
+	m.addtx_cost_sats = nil
+}
+
+// SetTokenOutputID sets the "token_output" edge to the TokenOutput entity by id.
+func (m *L1TokenJusticeTransactionMutation) SetTokenOutputID(id uuid.UUID) {
+	m.token_output = &id
+}
+
+// ClearTokenOutput clears the "token_output" edge to the TokenOutput entity.
+func (m *L1TokenJusticeTransactionMutation) ClearTokenOutput() {
+	m.clearedtoken_output = true
+}
+
+// TokenOutputCleared reports if the "token_output" edge to the TokenOutput entity was cleared.
+func (m *L1TokenJusticeTransactionMutation) TokenOutputCleared() bool {
+	return m.clearedtoken_output
+}
+
+// TokenOutputID returns the "token_output" edge ID in the mutation.
+func (m *L1TokenJusticeTransactionMutation) TokenOutputID() (id uuid.UUID, exists bool) {
+	if m.token_output != nil {
+		return *m.token_output, true
+	}
+	return
+}
+
+// TokenOutputIDs returns the "token_output" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TokenOutputID instead. It exists only for internal usage by the builders.
+func (m *L1TokenJusticeTransactionMutation) TokenOutputIDs() (ids []uuid.UUID) {
+	if id := m.token_output; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTokenOutput resets all changes to the "token_output" edge.
+func (m *L1TokenJusticeTransactionMutation) ResetTokenOutput() {
+	m.token_output = nil
+	m.clearedtoken_output = false
+}
+
+// SetL1TokenOutputWithdrawalID sets the "l1_token_output_withdrawal" edge to the L1TokenOutputWithdrawal entity by id.
+func (m *L1TokenJusticeTransactionMutation) SetL1TokenOutputWithdrawalID(id uuid.UUID) {
+	m.l1_token_output_withdrawal = &id
+}
+
+// ClearL1TokenOutputWithdrawal clears the "l1_token_output_withdrawal" edge to the L1TokenOutputWithdrawal entity.
+func (m *L1TokenJusticeTransactionMutation) ClearL1TokenOutputWithdrawal() {
+	m.clearedl1_token_output_withdrawal = true
+}
+
+// L1TokenOutputWithdrawalCleared reports if the "l1_token_output_withdrawal" edge to the L1TokenOutputWithdrawal entity was cleared.
+func (m *L1TokenJusticeTransactionMutation) L1TokenOutputWithdrawalCleared() bool {
+	return m.clearedl1_token_output_withdrawal
+}
+
+// L1TokenOutputWithdrawalID returns the "l1_token_output_withdrawal" edge ID in the mutation.
+func (m *L1TokenJusticeTransactionMutation) L1TokenOutputWithdrawalID() (id uuid.UUID, exists bool) {
+	if m.l1_token_output_withdrawal != nil {
+		return *m.l1_token_output_withdrawal, true
+	}
+	return
+}
+
+// L1TokenOutputWithdrawalIDs returns the "l1_token_output_withdrawal" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// L1TokenOutputWithdrawalID instead. It exists only for internal usage by the builders.
+func (m *L1TokenJusticeTransactionMutation) L1TokenOutputWithdrawalIDs() (ids []uuid.UUID) {
+	if id := m.l1_token_output_withdrawal; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetL1TokenOutputWithdrawal resets all changes to the "l1_token_output_withdrawal" edge.
+func (m *L1TokenJusticeTransactionMutation) ResetL1TokenOutputWithdrawal() {
+	m.l1_token_output_withdrawal = nil
+	m.clearedl1_token_output_withdrawal = false
+}
+
+// Where appends a list predicates to the L1TokenJusticeTransactionMutation builder.
+func (m *L1TokenJusticeTransactionMutation) Where(ps ...predicate.L1TokenJusticeTransaction) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the L1TokenJusticeTransactionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *L1TokenJusticeTransactionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.L1TokenJusticeTransaction, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *L1TokenJusticeTransactionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *L1TokenJusticeTransactionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (L1TokenJusticeTransaction).
+func (m *L1TokenJusticeTransactionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *L1TokenJusticeTransactionMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.create_time != nil {
+		fields = append(fields, l1tokenjusticetransaction.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, l1tokenjusticetransaction.FieldUpdateTime)
+	}
+	if m.justice_tx_hash != nil {
+		fields = append(fields, l1tokenjusticetransaction.FieldJusticeTxHash)
+	}
+	if m.broadcast_at != nil {
+		fields = append(fields, l1tokenjusticetransaction.FieldBroadcastAt)
+	}
+	if m.amount_sats != nil {
+		fields = append(fields, l1tokenjusticetransaction.FieldAmountSats)
+	}
+	if m.tx_cost_sats != nil {
+		fields = append(fields, l1tokenjusticetransaction.FieldTxCostSats)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *L1TokenJusticeTransactionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case l1tokenjusticetransaction.FieldCreateTime:
+		return m.CreateTime()
+	case l1tokenjusticetransaction.FieldUpdateTime:
+		return m.UpdateTime()
+	case l1tokenjusticetransaction.FieldJusticeTxHash:
+		return m.JusticeTxHash()
+	case l1tokenjusticetransaction.FieldBroadcastAt:
+		return m.BroadcastAt()
+	case l1tokenjusticetransaction.FieldAmountSats:
+		return m.AmountSats()
+	case l1tokenjusticetransaction.FieldTxCostSats:
+		return m.TxCostSats()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *L1TokenJusticeTransactionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case l1tokenjusticetransaction.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case l1tokenjusticetransaction.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case l1tokenjusticetransaction.FieldJusticeTxHash:
+		return m.OldJusticeTxHash(ctx)
+	case l1tokenjusticetransaction.FieldBroadcastAt:
+		return m.OldBroadcastAt(ctx)
+	case l1tokenjusticetransaction.FieldAmountSats:
+		return m.OldAmountSats(ctx)
+	case l1tokenjusticetransaction.FieldTxCostSats:
+		return m.OldTxCostSats(ctx)
+	}
+	return nil, fmt.Errorf("unknown L1TokenJusticeTransaction field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *L1TokenJusticeTransactionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case l1tokenjusticetransaction.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case l1tokenjusticetransaction.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case l1tokenjusticetransaction.FieldJusticeTxHash:
+		v, ok := value.(schematype.TxID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetJusticeTxHash(v)
+		return nil
+	case l1tokenjusticetransaction.FieldBroadcastAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBroadcastAt(v)
+		return nil
+	case l1tokenjusticetransaction.FieldAmountSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAmountSats(v)
+		return nil
+	case l1tokenjusticetransaction.FieldTxCostSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTxCostSats(v)
+		return nil
+	}
+	return fmt.Errorf("unknown L1TokenJusticeTransaction field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *L1TokenJusticeTransactionMutation) AddedFields() []string {
+	var fields []string
+	if m.addamount_sats != nil {
+		fields = append(fields, l1tokenjusticetransaction.FieldAmountSats)
+	}
+	if m.addtx_cost_sats != nil {
+		fields = append(fields, l1tokenjusticetransaction.FieldTxCostSats)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *L1TokenJusticeTransactionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case l1tokenjusticetransaction.FieldAmountSats:
+		return m.AddedAmountSats()
+	case l1tokenjusticetransaction.FieldTxCostSats:
+		return m.AddedTxCostSats()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *L1TokenJusticeTransactionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case l1tokenjusticetransaction.FieldAmountSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAmountSats(v)
+		return nil
+	case l1tokenjusticetransaction.FieldTxCostSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddTxCostSats(v)
+		return nil
+	}
+	return fmt.Errorf("unknown L1TokenJusticeTransaction numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *L1TokenJusticeTransactionMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *L1TokenJusticeTransactionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *L1TokenJusticeTransactionMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown L1TokenJusticeTransaction nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *L1TokenJusticeTransactionMutation) ResetField(name string) error {
+	switch name {
+	case l1tokenjusticetransaction.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case l1tokenjusticetransaction.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case l1tokenjusticetransaction.FieldJusticeTxHash:
+		m.ResetJusticeTxHash()
+		return nil
+	case l1tokenjusticetransaction.FieldBroadcastAt:
+		m.ResetBroadcastAt()
+		return nil
+	case l1tokenjusticetransaction.FieldAmountSats:
+		m.ResetAmountSats()
+		return nil
+	case l1tokenjusticetransaction.FieldTxCostSats:
+		m.ResetTxCostSats()
+		return nil
+	}
+	return fmt.Errorf("unknown L1TokenJusticeTransaction field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *L1TokenJusticeTransactionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.token_output != nil {
+		edges = append(edges, l1tokenjusticetransaction.EdgeTokenOutput)
+	}
+	if m.l1_token_output_withdrawal != nil {
+		edges = append(edges, l1tokenjusticetransaction.EdgeL1TokenOutputWithdrawal)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *L1TokenJusticeTransactionMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case l1tokenjusticetransaction.EdgeTokenOutput:
+		if id := m.token_output; id != nil {
+			return []ent.Value{*id}
+		}
+	case l1tokenjusticetransaction.EdgeL1TokenOutputWithdrawal:
+		if id := m.l1_token_output_withdrawal; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *L1TokenJusticeTransactionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *L1TokenJusticeTransactionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *L1TokenJusticeTransactionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedtoken_output {
+		edges = append(edges, l1tokenjusticetransaction.EdgeTokenOutput)
+	}
+	if m.clearedl1_token_output_withdrawal {
+		edges = append(edges, l1tokenjusticetransaction.EdgeL1TokenOutputWithdrawal)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *L1TokenJusticeTransactionMutation) EdgeCleared(name string) bool {
+	switch name {
+	case l1tokenjusticetransaction.EdgeTokenOutput:
+		return m.clearedtoken_output
+	case l1tokenjusticetransaction.EdgeL1TokenOutputWithdrawal:
+		return m.clearedl1_token_output_withdrawal
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *L1TokenJusticeTransactionMutation) ClearEdge(name string) error {
+	switch name {
+	case l1tokenjusticetransaction.EdgeTokenOutput:
+		m.ClearTokenOutput()
+		return nil
+	case l1tokenjusticetransaction.EdgeL1TokenOutputWithdrawal:
+		m.ClearL1TokenOutputWithdrawal()
+		return nil
+	}
+	return fmt.Errorf("unknown L1TokenJusticeTransaction unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *L1TokenJusticeTransactionMutation) ResetEdge(name string) error {
+	switch name {
+	case l1tokenjusticetransaction.EdgeTokenOutput:
+		m.ResetTokenOutput()
+		return nil
+	case l1tokenjusticetransaction.EdgeL1TokenOutputWithdrawal:
+		m.ResetL1TokenOutputWithdrawal()
+		return nil
+	}
+	return fmt.Errorf("unknown L1TokenJusticeTransaction edge %s", name)
+}
+
 // L1TokenOutputWithdrawalMutation represents an operation that mutates the L1TokenOutputWithdrawal nodes in the graph.
 type L1TokenOutputWithdrawalMutation struct {
 	config
@@ -5544,6 +6343,8 @@ type L1TokenOutputWithdrawalMutation struct {
 	clearedtoken_output              bool
 	l1_withdrawal_transaction        *uuid.UUID
 	clearedl1_withdrawal_transaction bool
+	justice_tx                       *uuid.UUID
+	clearedjustice_tx                bool
 	done                             bool
 	oldValue                         func(context.Context) (*L1TokenOutputWithdrawal, error)
 	predicates                       []predicate.L1TokenOutputWithdrawal
@@ -5859,6 +6660,45 @@ func (m *L1TokenOutputWithdrawalMutation) ResetL1WithdrawalTransaction() {
 	m.clearedl1_withdrawal_transaction = false
 }
 
+// SetJusticeTxID sets the "justice_tx" edge to the L1TokenJusticeTransaction entity by id.
+func (m *L1TokenOutputWithdrawalMutation) SetJusticeTxID(id uuid.UUID) {
+	m.justice_tx = &id
+}
+
+// ClearJusticeTx clears the "justice_tx" edge to the L1TokenJusticeTransaction entity.
+func (m *L1TokenOutputWithdrawalMutation) ClearJusticeTx() {
+	m.clearedjustice_tx = true
+}
+
+// JusticeTxCleared reports if the "justice_tx" edge to the L1TokenJusticeTransaction entity was cleared.
+func (m *L1TokenOutputWithdrawalMutation) JusticeTxCleared() bool {
+	return m.clearedjustice_tx
+}
+
+// JusticeTxID returns the "justice_tx" edge ID in the mutation.
+func (m *L1TokenOutputWithdrawalMutation) JusticeTxID() (id uuid.UUID, exists bool) {
+	if m.justice_tx != nil {
+		return *m.justice_tx, true
+	}
+	return
+}
+
+// JusticeTxIDs returns the "justice_tx" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// JusticeTxID instead. It exists only for internal usage by the builders.
+func (m *L1TokenOutputWithdrawalMutation) JusticeTxIDs() (ids []uuid.UUID) {
+	if id := m.justice_tx; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetJusticeTx resets all changes to the "justice_tx" edge.
+func (m *L1TokenOutputWithdrawalMutation) ResetJusticeTx() {
+	m.justice_tx = nil
+	m.clearedjustice_tx = false
+}
+
 // Where appends a list predicates to the L1TokenOutputWithdrawalMutation builder.
 func (m *L1TokenOutputWithdrawalMutation) Where(ps ...predicate.L1TokenOutputWithdrawal) {
 	m.predicates = append(m.predicates, ps...)
@@ -6041,12 +6881,15 @@ func (m *L1TokenOutputWithdrawalMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *L1TokenOutputWithdrawalMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.token_output != nil {
 		edges = append(edges, l1tokenoutputwithdrawal.EdgeTokenOutput)
 	}
 	if m.l1_withdrawal_transaction != nil {
 		edges = append(edges, l1tokenoutputwithdrawal.EdgeL1WithdrawalTransaction)
+	}
+	if m.justice_tx != nil {
+		edges = append(edges, l1tokenoutputwithdrawal.EdgeJusticeTx)
 	}
 	return edges
 }
@@ -6063,13 +6906,17 @@ func (m *L1TokenOutputWithdrawalMutation) AddedIDs(name string) []ent.Value {
 		if id := m.l1_withdrawal_transaction; id != nil {
 			return []ent.Value{*id}
 		}
+	case l1tokenoutputwithdrawal.EdgeJusticeTx:
+		if id := m.justice_tx; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *L1TokenOutputWithdrawalMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	return edges
 }
 
@@ -6081,12 +6928,15 @@ func (m *L1TokenOutputWithdrawalMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *L1TokenOutputWithdrawalMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.clearedtoken_output {
 		edges = append(edges, l1tokenoutputwithdrawal.EdgeTokenOutput)
 	}
 	if m.clearedl1_withdrawal_transaction {
 		edges = append(edges, l1tokenoutputwithdrawal.EdgeL1WithdrawalTransaction)
+	}
+	if m.clearedjustice_tx {
+		edges = append(edges, l1tokenoutputwithdrawal.EdgeJusticeTx)
 	}
 	return edges
 }
@@ -6099,6 +6949,8 @@ func (m *L1TokenOutputWithdrawalMutation) EdgeCleared(name string) bool {
 		return m.clearedtoken_output
 	case l1tokenoutputwithdrawal.EdgeL1WithdrawalTransaction:
 		return m.clearedl1_withdrawal_transaction
+	case l1tokenoutputwithdrawal.EdgeJusticeTx:
+		return m.clearedjustice_tx
 	}
 	return false
 }
@@ -6113,6 +6965,9 @@ func (m *L1TokenOutputWithdrawalMutation) ClearEdge(name string) error {
 	case l1tokenoutputwithdrawal.EdgeL1WithdrawalTransaction:
 		m.ClearL1WithdrawalTransaction()
 		return nil
+	case l1tokenoutputwithdrawal.EdgeJusticeTx:
+		m.ClearJusticeTx()
+		return nil
 	}
 	return fmt.Errorf("unknown L1TokenOutputWithdrawal unique edge %s", name)
 }
@@ -6126,6 +6981,9 @@ func (m *L1TokenOutputWithdrawalMutation) ResetEdge(name string) error {
 		return nil
 	case l1tokenoutputwithdrawal.EdgeL1WithdrawalTransaction:
 		m.ResetL1WithdrawalTransaction()
+		return nil
+	case l1tokenoutputwithdrawal.EdgeJusticeTx:
+		m.ResetJusticeTx()
 		return nil
 	}
 	return fmt.Errorf("unknown L1TokenOutputWithdrawal edge %s", name)
@@ -15808,6 +16666,8 @@ type TokenOutputMutation struct {
 	clearedtoken_create                            bool
 	withdrawal                                     *uuid.UUID
 	clearedwithdrawal                              bool
+	justice_tx                                     *uuid.UUID
+	clearedjustice_tx                              bool
 	done                                           bool
 	oldValue                                       func(context.Context) (*TokenOutput, error)
 	predicates                                     []predicate.TokenOutput
@@ -17211,6 +18071,45 @@ func (m *TokenOutputMutation) ResetWithdrawal() {
 	m.clearedwithdrawal = false
 }
 
+// SetJusticeTxID sets the "justice_tx" edge to the L1TokenJusticeTransaction entity by id.
+func (m *TokenOutputMutation) SetJusticeTxID(id uuid.UUID) {
+	m.justice_tx = &id
+}
+
+// ClearJusticeTx clears the "justice_tx" edge to the L1TokenJusticeTransaction entity.
+func (m *TokenOutputMutation) ClearJusticeTx() {
+	m.clearedjustice_tx = true
+}
+
+// JusticeTxCleared reports if the "justice_tx" edge to the L1TokenJusticeTransaction entity was cleared.
+func (m *TokenOutputMutation) JusticeTxCleared() bool {
+	return m.clearedjustice_tx
+}
+
+// JusticeTxID returns the "justice_tx" edge ID in the mutation.
+func (m *TokenOutputMutation) JusticeTxID() (id uuid.UUID, exists bool) {
+	if m.justice_tx != nil {
+		return *m.justice_tx, true
+	}
+	return
+}
+
+// JusticeTxIDs returns the "justice_tx" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// JusticeTxID instead. It exists only for internal usage by the builders.
+func (m *TokenOutputMutation) JusticeTxIDs() (ids []uuid.UUID) {
+	if id := m.justice_tx; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetJusticeTx resets all changes to the "justice_tx" edge.
+func (m *TokenOutputMutation) ResetJusticeTx() {
+	m.justice_tx = nil
+	m.clearedjustice_tx = false
+}
+
 // Where appends a list predicates to the TokenOutputMutation builder.
 func (m *TokenOutputMutation) Where(ps ...predicate.TokenOutput) {
 	m.predicates = append(m.predicates, ps...)
@@ -17815,7 +18714,7 @@ func (m *TokenOutputMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TokenOutputMutation) AddedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.revocation_keyshare != nil {
 		edges = append(edges, tokenoutput.EdgeRevocationKeyshare)
 	}
@@ -17836,6 +18735,9 @@ func (m *TokenOutputMutation) AddedEdges() []string {
 	}
 	if m.withdrawal != nil {
 		edges = append(edges, tokenoutput.EdgeWithdrawal)
+	}
+	if m.justice_tx != nil {
+		edges = append(edges, tokenoutput.EdgeJusticeTx)
 	}
 	return edges
 }
@@ -17876,13 +18778,17 @@ func (m *TokenOutputMutation) AddedIDs(name string) []ent.Value {
 		if id := m.withdrawal; id != nil {
 			return []ent.Value{*id}
 		}
+	case tokenoutput.EdgeJusticeTx:
+		if id := m.justice_tx; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TokenOutputMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.removedoutput_spent_started_token_transactions != nil {
 		edges = append(edges, tokenoutput.EdgeOutputSpentStartedTokenTransactions)
 	}
@@ -17914,7 +18820,7 @@ func (m *TokenOutputMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TokenOutputMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.clearedrevocation_keyshare {
 		edges = append(edges, tokenoutput.EdgeRevocationKeyshare)
 	}
@@ -17935,6 +18841,9 @@ func (m *TokenOutputMutation) ClearedEdges() []string {
 	}
 	if m.clearedwithdrawal {
 		edges = append(edges, tokenoutput.EdgeWithdrawal)
+	}
+	if m.clearedjustice_tx {
+		edges = append(edges, tokenoutput.EdgeJusticeTx)
 	}
 	return edges
 }
@@ -17957,6 +18866,8 @@ func (m *TokenOutputMutation) EdgeCleared(name string) bool {
 		return m.clearedtoken_create
 	case tokenoutput.EdgeWithdrawal:
 		return m.clearedwithdrawal
+	case tokenoutput.EdgeJusticeTx:
+		return m.clearedjustice_tx
 	}
 	return false
 }
@@ -17979,6 +18890,9 @@ func (m *TokenOutputMutation) ClearEdge(name string) error {
 		return nil
 	case tokenoutput.EdgeWithdrawal:
 		m.ClearWithdrawal()
+		return nil
+	case tokenoutput.EdgeJusticeTx:
+		m.ClearJusticeTx()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenOutput unique edge %s", name)
@@ -18008,6 +18922,9 @@ func (m *TokenOutputMutation) ResetEdge(name string) error {
 		return nil
 	case tokenoutput.EdgeWithdrawal:
 		m.ResetWithdrawal()
+		return nil
+	case tokenoutput.EdgeJusticeTx:
+		m.ResetJusticeTx()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenOutput edge %s", name)

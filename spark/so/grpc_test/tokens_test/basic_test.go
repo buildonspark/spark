@@ -101,12 +101,12 @@ func TestTokenTransferWithMultipleTokenTypes(t *testing.T) {
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
 			// Setup two different native spark tokens with mints
-			token1, err := setupNativeTokenWithMint(t, "Token A", "TKA", 1000000, []uint64{1000})
+			token1, err := setupNativeTokenWithMint(t, "Token A", "TKA", 1000000, []uint64{1000}, false)
 			require.NoError(t, err, "failed to setup token 1")
 			require.Len(t, token1.OutputOwners, 1, "expected 1 output owner for token 1")
 			userPrivKey := token1.OutputOwners[0]
 
-			token2, err := setupNativeTokenWithMint(t, "Token B", "TKB", 2000000, []uint64{2000})
+			token2, err := setupNativeTokenWithMint(t, "Token B", "TKB", 2000000, []uint64{2000}, false)
 			require.NoError(t, err, "failed to setup token 2")
 			require.Len(t, token2.OutputOwners, 1, "expected 1 output owner for token 2")
 

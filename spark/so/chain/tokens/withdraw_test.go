@@ -282,8 +282,6 @@ func computeOwnerSignature(t *testing.T, ownerPrivKey keys.Private, seWithdrawal
 	return sig.Serialize()
 }
 
-// API-level tests for HandleTokenWithdrawals
-
 func TestHandleTokenWithdrawals_SavesWithdrawalTransaction(t *testing.T) {
 	ctx, dbClient, fixtures, config, sePubKey := setupWithdrawalTestContext(t)
 
@@ -325,7 +323,7 @@ func TestHandleTokenWithdrawals_SavesWithdrawalTransaction(t *testing.T) {
 	}
 	blockHeight := uint64(100)
 
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, blockHeight, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, blockHeight, blockHash)
 	require.NoError(t, err)
 
 	assertOutputNotSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
@@ -393,7 +391,7 @@ func TestHandleTokenWithdrawals_MultipleOutputsInOneTransaction(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	assertOutputNotSpendable(t, ctx, config, ownerPubKey, sparkTxHash1)
@@ -432,7 +430,7 @@ func TestHandleTokenWithdrawals_RejectsWrongSEPubKey(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -466,7 +464,7 @@ func TestHandleTokenWithdrawals_RejectsOutputNotFound(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err := HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err := HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -529,7 +527,7 @@ func TestHandleTokenWithdrawals_RejectsAlreadyWithdrawn(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -566,7 +564,7 @@ func TestHandleTokenWithdrawals_LinksWithdrawalToTokenOutput(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	outputWithdrawal, err := dbClient.L1TokenOutputWithdrawal.Query().
@@ -597,7 +595,7 @@ func TestHandleTokenWithdrawals_IgnoresNonBTKNTransactions(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: script})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -617,7 +615,7 @@ func TestHandleTokenWithdrawals_IgnoresNonOpReturnScripts(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 10000, PkScript: script})
 
 	blockHash := chainhash.Hash{}
-	err := HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err := HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -654,7 +652,7 @@ func TestHandleTokenWithdrawals_RejectsInsufficientBond(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -697,7 +695,7 @@ func TestHandleTokenWithdrawals_RejectsScriptMismatch(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err := HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err := HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -754,7 +752,7 @@ func TestHandleTokenWithdrawals_RejectsActiveSpendingTransaction(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -811,7 +809,7 @@ func TestHandleTokenWithdrawals_AllowsExpiredSpendingTransaction(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -862,7 +860,7 @@ func TestHandleTokenWithdrawals_RejectsDuplicateInSameBlock(t *testing.T) {
 	tx2.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript2})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx1, *tx2}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx1, *tx2}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -899,7 +897,7 @@ func TestHandleTokenWithdrawals_RejectsVoutOutOfRange(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err := HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err := HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -956,7 +954,7 @@ func TestHandleTokenWithdrawals_RejectsFinalizedSpendingTransaction(t *testing.T
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
@@ -1008,7 +1006,7 @@ func TestHandleTokenWithdrawals_AcceptsValidOwnerSignature(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	// Verify withdrawal was accepted - output should no longer be spendable
@@ -1051,7 +1049,7 @@ func TestHandleTokenWithdrawals_RejectsInvalidOwnerSignature(t *testing.T) {
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	// Verify withdrawal was rejected - output should still be spendable
@@ -1090,7 +1088,7 @@ func TestHandleTokenWithdrawals_RejectsMissingSEWithdrawalSignature(t *testing.T
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	// Verify withdrawal was rejected - output should still be spendable
@@ -1144,7 +1142,7 @@ func TestHandleTokenWithdrawals_AcceptsMultipleOutputsWithValidOwnerSignature(t 
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	// Verify both withdrawals were accepted - neither output should be spendable
@@ -1201,7 +1199,7 @@ func TestHandleTokenWithdrawals_RejectsDifferentOwnersEvenWhenValidationSkipped(
 	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
 
 	blockHash := chainhash.Hash{}
-	err = HandleTokenWithdrawals(ctx, config, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
 	require.NoError(t, err)
 
 	// Verify withdrawal was rejected for BOTH outputs - they should still be spendable

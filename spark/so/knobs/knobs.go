@@ -123,6 +123,11 @@ const (
 	// When enabled (> 0), enforces owner signature validation for token withdrawals.
 	// By default (0), signature validation is skipped. Enable in production when SE signatures are available.
 	KnobEnforceWithdrawalSignatureValidation = "spark.so.tokens.enforce_withdrawal_signature_validation"
+
+	// Enable justice transaction broadcasting for invalid token withdrawals.
+	// When enabled (> 0), the SO will broadcast justice transactions to reclaim funds
+	// from invalid withdrawals where the revocation secret is available.
+	KnobEnableJusticeTransactions = "spark.so.tokens.enable_justice_transactions"
 )
 
 type Config struct {

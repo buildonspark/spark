@@ -7,9 +7,20 @@ import (
 
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
+	"go.uber.org/zap"
 )
 
+var faucet *sparktesting.Faucet
+
 func TestMain(m *testing.M) {
+	client, err := sparktesting.InitBitcoinClient()
+	if err != nil {
+		zap.S().Fatal("Error creating regtest client", err)
+		os.Exit(1)
+	}
+
+	faucet = sparktesting.GetFaucetInstance(client)
+
 	var exitCode int
 
 	// Test TTV2 (no phase2 knob needed)
@@ -44,6 +55,8 @@ func TestMain(m *testing.M) {
 	if err := sparktesting.DeleteKnobForTestMain(knobs.KnobTokenTransactionV3Phase2Enabled); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to restore phase2 knob: %v\n", err)
 	}
+
+	client.Shutdown()
 
 	os.Exit(exitCode)
 }

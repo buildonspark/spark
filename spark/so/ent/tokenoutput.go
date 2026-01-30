@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
@@ -95,9 +96,11 @@ type TokenOutputEdges struct {
 	TokenCreate *TokenCreate `json:"token_create,omitempty"`
 	// The L1 withdrawal record if this output has been withdrawn.
 	Withdrawal *L1TokenOutputWithdrawal `json:"withdrawal,omitempty"`
+	// The justice transaction if an invalid withdrawal was punished for this output.
+	JusticeTx *L1TokenJusticeTransaction `json:"justice_tx,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
+	loadedTypes [8]bool
 }
 
 // RevocationKeyshareOrErr returns the RevocationKeyshare value or an error if the edge
@@ -171,6 +174,17 @@ func (e TokenOutputEdges) WithdrawalOrErr() (*L1TokenOutputWithdrawal, error) {
 		return nil, &NotFoundError{label: l1tokenoutputwithdrawal.Label}
 	}
 	return nil, &NotLoadedError{edge: "withdrawal"}
+}
+
+// JusticeTxOrErr returns the JusticeTx value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TokenOutputEdges) JusticeTxOrErr() (*L1TokenJusticeTransaction, error) {
+	if e.JusticeTx != nil {
+		return e.JusticeTx, nil
+	} else if e.loadedTypes[7] {
+		return nil, &NotFoundError{label: l1tokenjusticetransaction.Label}
+	}
+	return nil, &NotLoadedError{edge: "justice_tx"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -422,6 +436,11 @@ func (to *TokenOutput) QueryTokenCreate() *TokenCreateQuery {
 // QueryWithdrawal queries the "withdrawal" edge of the TokenOutput entity.
 func (to *TokenOutput) QueryWithdrawal() *L1TokenOutputWithdrawalQuery {
 	return NewTokenOutputClient(to.config).QueryWithdrawal(to)
+}
+
+// QueryJusticeTx queries the "justice_tx" edge of the TokenOutput entity.
+func (to *TokenOutput) QueryJusticeTx() *L1TokenJusticeTransactionQuery {
+	return NewTokenOutputClient(to.config).QueryJusticeTx(to)
 }
 
 // Update returns a builder for updating this TokenOutput.

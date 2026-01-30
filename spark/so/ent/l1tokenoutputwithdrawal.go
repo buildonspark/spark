@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -40,9 +41,11 @@ type L1TokenOutputWithdrawalEdges struct {
 	TokenOutput *TokenOutput `json:"token_output,omitempty"`
 	// The L1 transaction containing this withdrawal.
 	L1WithdrawalTransaction *L1WithdrawalTransaction `json:"l1_withdrawal_transaction,omitempty"`
+	// The justice transaction if this withdrawal was invalid and punished.
+	JusticeTx *L1TokenJusticeTransaction `json:"justice_tx,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // TokenOutputOrErr returns the TokenOutput value or an error if the edge
@@ -65,6 +68,17 @@ func (e L1TokenOutputWithdrawalEdges) L1WithdrawalTransactionOrErr() (*L1Withdra
 		return nil, &NotFoundError{label: l1withdrawaltransaction.Label}
 	}
 	return nil, &NotLoadedError{edge: "l1_withdrawal_transaction"}
+}
+
+// JusticeTxOrErr returns the JusticeTx value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e L1TokenOutputWithdrawalEdges) JusticeTxOrErr() (*L1TokenJusticeTransaction, error) {
+	if e.JusticeTx != nil {
+		return e.JusticeTx, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: l1tokenjusticetransaction.Label}
+	}
+	return nil, &NotLoadedError{edge: "justice_tx"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -156,6 +170,11 @@ func (low *L1TokenOutputWithdrawal) QueryTokenOutput() *TokenOutputQuery {
 // QueryL1WithdrawalTransaction queries the "l1_withdrawal_transaction" edge of the L1TokenOutputWithdrawal entity.
 func (low *L1TokenOutputWithdrawal) QueryL1WithdrawalTransaction() *L1WithdrawalTransactionQuery {
 	return NewL1TokenOutputWithdrawalClient(low.config).QueryL1WithdrawalTransaction(low)
+}
+
+// QueryJusticeTx queries the "justice_tx" edge of the L1TokenOutputWithdrawal entity.
+func (low *L1TokenOutputWithdrawal) QueryJusticeTx() *L1TokenJusticeTransactionQuery {
+	return NewL1TokenOutputWithdrawalClient(low.config).QueryJusticeTx(low)
 }
 
 // Update returns a builder for updating this L1TokenOutputWithdrawal.

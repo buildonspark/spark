@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 
@@ -13,6 +14,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -28,6 +30,7 @@ type L1TokenOutputWithdrawalQuery struct {
 	predicates                  []predicate.L1TokenOutputWithdrawal
 	withTokenOutput             *TokenOutputQuery
 	withL1WithdrawalTransaction *L1WithdrawalTransactionQuery
+	withJusticeTx               *L1TokenJusticeTransactionQuery
 	withFKs                     bool
 	modifiers                   []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -103,6 +106,28 @@ func (lowq *L1TokenOutputWithdrawalQuery) QueryL1WithdrawalTransaction() *L1With
 			sqlgraph.From(l1tokenoutputwithdrawal.Table, l1tokenoutputwithdrawal.FieldID, selector),
 			sqlgraph.To(l1withdrawaltransaction.Table, l1withdrawaltransaction.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, l1tokenoutputwithdrawal.L1WithdrawalTransactionTable, l1tokenoutputwithdrawal.L1WithdrawalTransactionColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(lowq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryJusticeTx chains the current query on the "justice_tx" edge.
+func (lowq *L1TokenOutputWithdrawalQuery) QueryJusticeTx() *L1TokenJusticeTransactionQuery {
+	query := (&L1TokenJusticeTransactionClient{config: lowq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := lowq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := lowq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(l1tokenoutputwithdrawal.Table, l1tokenoutputwithdrawal.FieldID, selector),
+			sqlgraph.To(l1tokenjusticetransaction.Table, l1tokenjusticetransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, l1tokenoutputwithdrawal.JusticeTxTable, l1tokenoutputwithdrawal.JusticeTxColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(lowq.driver.Dialect(), step)
 		return fromU, nil
@@ -304,6 +329,7 @@ func (lowq *L1TokenOutputWithdrawalQuery) Clone() *L1TokenOutputWithdrawalQuery 
 		predicates:                  append([]predicate.L1TokenOutputWithdrawal{}, lowq.predicates...),
 		withTokenOutput:             lowq.withTokenOutput.Clone(),
 		withL1WithdrawalTransaction: lowq.withL1WithdrawalTransaction.Clone(),
+		withJusticeTx:               lowq.withJusticeTx.Clone(),
 		// clone intermediate query.
 		sql:       lowq.sql.Clone(),
 		path:      lowq.path,
@@ -330,6 +356,17 @@ func (lowq *L1TokenOutputWithdrawalQuery) WithL1WithdrawalTransaction(opts ...fu
 		opt(query)
 	}
 	lowq.withL1WithdrawalTransaction = query
+	return lowq
+}
+
+// WithJusticeTx tells the query-builder to eager-load the nodes that are connected to
+// the "justice_tx" edge. The optional arguments are used to configure the query builder of the edge.
+func (lowq *L1TokenOutputWithdrawalQuery) WithJusticeTx(opts ...func(*L1TokenJusticeTransactionQuery)) *L1TokenOutputWithdrawalQuery {
+	query := (&L1TokenJusticeTransactionClient{config: lowq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	lowq.withJusticeTx = query
 	return lowq
 }
 
@@ -412,9 +449,10 @@ func (lowq *L1TokenOutputWithdrawalQuery) sqlAll(ctx context.Context, hooks ...q
 		nodes       = []*L1TokenOutputWithdrawal{}
 		withFKs     = lowq.withFKs
 		_spec       = lowq.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [3]bool{
 			lowq.withTokenOutput != nil,
 			lowq.withL1WithdrawalTransaction != nil,
+			lowq.withJusticeTx != nil,
 		}
 	)
 	if lowq.withTokenOutput != nil || lowq.withL1WithdrawalTransaction != nil {
@@ -453,6 +491,12 @@ func (lowq *L1TokenOutputWithdrawalQuery) sqlAll(ctx context.Context, hooks ...q
 	if query := lowq.withL1WithdrawalTransaction; query != nil {
 		if err := lowq.loadL1WithdrawalTransaction(ctx, query, nodes, nil,
 			func(n *L1TokenOutputWithdrawal, e *L1WithdrawalTransaction) { n.Edges.L1WithdrawalTransaction = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := lowq.withJusticeTx; query != nil {
+		if err := lowq.loadJusticeTx(ctx, query, nodes, nil,
+			func(n *L1TokenOutputWithdrawal, e *L1TokenJusticeTransaction) { n.Edges.JusticeTx = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -520,6 +564,34 @@ func (lowq *L1TokenOutputWithdrawalQuery) loadL1WithdrawalTransaction(ctx contex
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (lowq *L1TokenOutputWithdrawalQuery) loadJusticeTx(ctx context.Context, query *L1TokenJusticeTransactionQuery, nodes []*L1TokenOutputWithdrawal, init func(*L1TokenOutputWithdrawal), assign func(*L1TokenOutputWithdrawal, *L1TokenJusticeTransaction)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*L1TokenOutputWithdrawal)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+	}
+	query.withFKs = true
+	query.Where(predicate.L1TokenJusticeTransaction(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(l1tokenoutputwithdrawal.JusticeTxColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.l1token_output_withdrawal_justice_tx
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "l1token_output_withdrawal_justice_tx" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "l1token_output_withdrawal_justice_tx" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

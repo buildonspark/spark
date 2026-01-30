@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
@@ -286,6 +287,33 @@ func (f TraverseL1TokenCreate) Traverse(ctx context.Context, q ent.Query) error 
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.L1TokenCreateQuery", q)
+}
+
+// The L1TokenJusticeTransactionFunc type is an adapter to allow the use of ordinary function as a Querier.
+type L1TokenJusticeTransactionFunc func(context.Context, *ent.L1TokenJusticeTransactionQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f L1TokenJusticeTransactionFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.L1TokenJusticeTransactionQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.L1TokenJusticeTransactionQuery", q)
+}
+
+// The TraverseL1TokenJusticeTransaction type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseL1TokenJusticeTransaction func(context.Context, *ent.L1TokenJusticeTransactionQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseL1TokenJusticeTransaction) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseL1TokenJusticeTransaction) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.L1TokenJusticeTransactionQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.L1TokenJusticeTransactionQuery", q)
 }
 
 // The L1TokenOutputWithdrawalFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -980,6 +1008,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.GossipQuery, predicate.Gossip, gossip.OrderOption]{typ: ent.TypeGossip, tq: q}, nil
 	case *ent.L1TokenCreateQuery:
 		return &query[*ent.L1TokenCreateQuery, predicate.L1TokenCreate, l1tokencreate.OrderOption]{typ: ent.TypeL1TokenCreate, tq: q}, nil
+	case *ent.L1TokenJusticeTransactionQuery:
+		return &query[*ent.L1TokenJusticeTransactionQuery, predicate.L1TokenJusticeTransaction, l1tokenjusticetransaction.OrderOption]{typ: ent.TypeL1TokenJusticeTransaction, tq: q}, nil
 	case *ent.L1TokenOutputWithdrawalQuery:
 		return &query[*ent.L1TokenOutputWithdrawalQuery, predicate.L1TokenOutputWithdrawal, l1tokenoutputwithdrawal.OrderOption]{typ: ent.TypeL1TokenOutputWithdrawal, tq: q}, nil
 	case *ent.L1WithdrawalTransactionQuery:

@@ -494,7 +494,7 @@ func handleBlock(
 	if err != nil {
 		return err
 	}
-	handleTokenUpdatesForBlock(ctx, config, dbClient, txs, blockHeight, blockHash, network)
+	handleTokenUpdatesForBlock(ctx, config, bitcoinClient, dbClient, txs, blockHeight, blockHash, network)
 
 	confirmedTxHashSet, creditedAddresses, addressToUtxoMap, err := processTransactions(txs, networkParams)
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -94,6 +95,25 @@ func (lowc *L1TokenOutputWithdrawalCreate) SetL1WithdrawalTransactionID(id uuid.
 // SetL1WithdrawalTransaction sets the "l1_withdrawal_transaction" edge to the L1WithdrawalTransaction entity.
 func (lowc *L1TokenOutputWithdrawalCreate) SetL1WithdrawalTransaction(l *L1WithdrawalTransaction) *L1TokenOutputWithdrawalCreate {
 	return lowc.SetL1WithdrawalTransactionID(l.ID)
+}
+
+// SetJusticeTxID sets the "justice_tx" edge to the L1TokenJusticeTransaction entity by ID.
+func (lowc *L1TokenOutputWithdrawalCreate) SetJusticeTxID(id uuid.UUID) *L1TokenOutputWithdrawalCreate {
+	lowc.mutation.SetJusticeTxID(id)
+	return lowc
+}
+
+// SetNillableJusticeTxID sets the "justice_tx" edge to the L1TokenJusticeTransaction entity by ID if the given value is not nil.
+func (lowc *L1TokenOutputWithdrawalCreate) SetNillableJusticeTxID(id *uuid.UUID) *L1TokenOutputWithdrawalCreate {
+	if id != nil {
+		lowc = lowc.SetJusticeTxID(*id)
+	}
+	return lowc
+}
+
+// SetJusticeTx sets the "justice_tx" edge to the L1TokenJusticeTransaction entity.
+func (lowc *L1TokenOutputWithdrawalCreate) SetJusticeTx(l *L1TokenJusticeTransaction) *L1TokenOutputWithdrawalCreate {
+	return lowc.SetJusticeTxID(l.ID)
 }
 
 // Mutation returns the L1TokenOutputWithdrawalMutation object of the builder.
@@ -242,6 +262,22 @@ func (lowc *L1TokenOutputWithdrawalCreate) createSpec() (*L1TokenOutputWithdrawa
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.l1withdrawal_transaction_withdrawals = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := lowc.mutation.JusticeTxIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   l1tokenoutputwithdrawal.JusticeTxTable,
+			Columns: []string{l1tokenoutputwithdrawal.JusticeTxColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(l1tokenjusticetransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

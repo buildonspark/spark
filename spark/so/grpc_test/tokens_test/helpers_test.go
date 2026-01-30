@@ -3,14 +3,20 @@ package tokens_test
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"sort"
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	tokenwatchtower "github.com/lightsparkdev/spark/so/chain/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
@@ -113,6 +119,7 @@ type tokenTransactionParams struct {
 	FinalIssueTokenTransactionHash []byte   // Only used for transfers, nil for mints
 	NumOutputs                     int      // Number of outputs to create (defaults to 2 for backward compatibility)
 	OutputAmounts                  []uint64 // Exact amounts for each output (must match NumOutputs length)
+	SameOwner                      bool     // Each output has the same owner
 	NumOutputsToSpend              int      // Number of outputs to spend (defaults to 2 for backward compatibility)
 	MintToSelf                     bool
 	InvoiceAttachments             []*tokenpb.InvoiceAttachment
@@ -299,12 +306,21 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 	userOutputPrivKeys := make([]keys.Private, numOutputs)
 	tokenOutputs := make([]*tokenpb.TokenOutput, numOutputs)
 
+	var ownerPrivKey *keys.Private
+	if params.SameOwner {
+		privKey := keys.GeneratePrivateKey()
+		ownerPrivKey = &privKey
+	}
+
 	for i := range numOutputs {
 		var pubKey keys.Public
 
 		if params.MintToSelf {
 			pubKey = params.TokenIdentityPubKey
 			userOutputPrivKeys[i] = config.IdentityPrivateKey
+		} else if ownerPrivKey != nil {
+			userOutputPrivKeys[i] = *ownerPrivKey
+			pubKey = ownerPrivKey.Public()
 		} else {
 			privKey := keys.GeneratePrivateKey()
 			userOutputPrivKeys[i] = privKey
@@ -759,6 +775,7 @@ func setupNativeTokenWithMint(
 	ticker string,
 	maxSupply uint64,
 	mintOutputAmounts []uint64,
+	sameOwner bool,
 ) (*tokenSetupResult, error) {
 	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
@@ -779,6 +796,7 @@ func setupNativeTokenWithMint(
 		TokenIdentifier:     tokenIdentifier,
 		NumOutputs:          len(mintOutputAmounts),
 		OutputAmounts:       mintOutputAmounts,
+		SameOwner:           sameOwner,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mint transaction: %w", err)
@@ -849,4 +867,162 @@ func queryTokenIdentifierOrFail(t *testing.T, config *wallet.TestWalletConfig, i
 	tokenIdentifier, err := queryTokenIdentifierFromCoordinator(t, config, issuerPubKey)
 	require.NoError(t, err, "failed to query token identifier")
 	return tokenIdentifier
+}
+
+// ComputeUnilateralExitOwnerSignature computes the owner's signature over SE withdrawal signatures.
+func ComputeUnilateralExitOwnerSignature(ttxos []*tokenpb.OutputWithPreviousTransactionData, signingKey keys.Private) (*schnorr.Signature, error) {
+	seSignatures := make([][]byte, 0, len(ttxos)*schnorr.SignatureSize)
+	for _, t := range ttxos {
+		seSignatures = append(seSignatures, t.Output.SeWithdrawalSignature)
+	}
+
+	hash := chainhash.TaggedHash([]byte("BTKN_BATCH_EXIT"), seSignatures...)
+
+	return schnorr.Sign(signingKey.ToBTCEC(), hash.CloneBytes())
+}
+
+// ConstructUnilateralWithdrawal constructs a withdrawal transaction from token outputs.
+func ConstructUnilateralWithdrawal(
+	ttxos []*tokenpb.OutputWithPreviousTransactionData,
+	sePublicKeyBytes []byte,
+	ownerSignature []byte,
+) (*wire.MsgTx, error) {
+	opReturnScript, err := constructUnilateralExitOpReturnScript(ttxos, ownerSignature, sePublicKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := wire.NewMsgTx(3)
+
+	// Build all P2TR outputs
+	for _, t := range ttxos {
+		ttxo := t.Output
+
+		revocationPublicKey, err := keys.ParsePublicKey(ttxo.RevocationCommitment)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse revocation public key: %w", err)
+		}
+		ownerPublicKey, err := keys.ParsePublicKey(ttxo.OwnerPublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse owner's public key: %w", err)
+		}
+
+		scriptPubKey, _, _, _, err := constructRevocationCsvTaprootOutput(
+			revocationPublicKey,
+			ownerPublicKey,
+			*ttxo.WithdrawRelativeBlockLocktime,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// token + bond output
+		tx.AddTxOut(&wire.TxOut{
+			Value:    int64(*ttxo.WithdrawBondSats),
+			PkScript: scriptPubKey,
+		})
+	}
+
+	tx.AddTxOut(&wire.TxOut{
+		Value:    0,
+		PkScript: opReturnScript,
+	})
+
+	return tx, nil
+}
+
+func constructRevocationCsvTaprootOutput(
+	revocationPublicKey keys.Public,
+	ownerPublicKey keys.Public,
+	csvBlocks uint64,
+) (scriptPubKey []byte, timelockScript []byte, leafHash []byte, tweakedXOnly []byte, err error) {
+	ownerXOnly := ownerPublicKey.SerializeXOnly()
+
+	sb := txscript.NewScriptBuilder()
+	sb.AddInt64(int64(csvBlocks))
+	sb.AddOp(txscript.OP_CHECKSEQUENCEVERIFY)
+	sb.AddOp(txscript.OP_DROP)
+	sb.AddData(ownerXOnly)
+	sb.AddOp(txscript.OP_CHECKSIG)
+
+	timelockScript, err = sb.Script()
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("build timelock tapscript: %w", err)
+	}
+
+	tapLeaf := txscript.NewBaseTapLeaf(timelockScript)
+	leafHashArr := tapLeaf.TapHash()
+	leafHash = leafHashArr[:]
+
+	internalKey := revocationPublicKey
+
+	tweakedKey := txscript.ComputeTaprootOutputKey(internalKey.ToBTCEC(), leafHash)
+	tweakedXOnly = tweakedKey.SerializeCompressed()[1:]
+
+	p2tr, err := txscript.NewScriptBuilder().
+		AddOp(txscript.OP_1).
+		AddData(tweakedXOnly).
+		Script()
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("build p2tr scriptPubKey: %w", err)
+	}
+
+	return p2tr, timelockScript, leafHash, tweakedXOnly, nil
+}
+
+func constructUnilateralExitOpReturnScript(
+	ttxos []*tokenpb.OutputWithPreviousTransactionData,
+	ownerSignature []byte,
+	sePublicKey []byte,
+) ([]byte, error) {
+	if len(ownerSignature) != 64 {
+		return nil, fmt.Errorf("ownerSignature must be 64 bytes, got %d", len(ownerSignature))
+	}
+
+	descriptor := tokenwatchtower.BtknWithdrawalDescriptor()
+
+	prefix := []byte(descriptor.Prefix) // "BTKN"
+	kind := descriptor.Kind             // L2 exit
+
+	var exitRecords bytes.Buffer
+
+	for i, t := range ttxos {
+		if len(t.PreviousTransactionHash) != 32 {
+			return nil, fmt.Errorf("PreviousTransactionHash must be 32 bytes, got %d", len(t.PreviousTransactionHash))
+		}
+
+		outputIndex := uint16(i)
+
+		var bitcoinVoutBytes [2]byte
+		binary.BigEndian.PutUint16(bitcoinVoutBytes[:], outputIndex)
+		_, _ = exitRecords.Write(bitcoinVoutBytes[:])
+
+		_, _ = exitRecords.Write(t.PreviousTransactionHash)
+
+		var sparkVoutBytes [4]byte
+		binary.BigEndian.PutUint32(sparkVoutBytes[:], t.PreviousTransactionVout)
+		_, _ = exitRecords.Write(sparkVoutBytes[:])
+	}
+
+	if len(ttxos) > 255 {
+		return nil, fmt.Errorf("ttxos length must fit in 1 byte, got %d", len(ttxos))
+	}
+
+	pushData := make([]byte, 0, 104+exitRecords.Len())
+	pushData = append(pushData, prefix...)
+	pushData = append(pushData, kind[:]...)
+	pushData = append(pushData, sePublicKey...)
+	pushData = append(pushData, ownerSignature...)
+	pushData = append(pushData, byte(len(ttxos)))
+	pushData = append(pushData, exitRecords.Bytes()...)
+
+	script, err := txscript.NewScriptBuilder().
+		AddOp(txscript.OP_RETURN).
+		AddData(pushData).
+		Script()
+	if err != nil {
+		return nil, fmt.Errorf("build op_return script: %w", err)
+	}
+
+	return script, nil
 }

@@ -237,6 +237,29 @@ func HasL1WithdrawalTransactionWith(preds ...predicate.L1WithdrawalTransaction) 
 	})
 }
 
+// HasJusticeTx applies the HasEdge predicate on the "justice_tx" edge.
+func HasJusticeTx() predicate.L1TokenOutputWithdrawal {
+	return predicate.L1TokenOutputWithdrawal(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, JusticeTxTable, JusticeTxColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasJusticeTxWith applies the HasEdge predicate on the "justice_tx" edge with a given conditions (other predicates).
+func HasJusticeTxWith(preds ...predicate.L1TokenJusticeTransaction) predicate.L1TokenOutputWithdrawal {
+	return predicate.L1TokenOutputWithdrawal(func(s *sql.Selector) {
+		step := newJusticeTxStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.L1TokenOutputWithdrawal) predicate.L1TokenOutputWithdrawal {
 	return predicate.L1TokenOutputWithdrawal(sql.AndPredicates(predicates...))

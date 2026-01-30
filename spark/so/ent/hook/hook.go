@@ -93,6 +93,18 @@ func (f L1TokenCreateFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.L1TokenCreateMutation", m)
 }
 
+// The L1TokenJusticeTransactionFunc type is an adapter to allow the use of ordinary
+// function as L1TokenJusticeTransaction mutator.
+type L1TokenJusticeTransactionFunc func(context.Context, *ent.L1TokenJusticeTransactionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f L1TokenJusticeTransactionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.L1TokenJusticeTransactionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.L1TokenJusticeTransactionMutation", m)
+}
+
 // The L1TokenOutputWithdrawalFunc type is an adapter to allow the use of ordinary
 // function as L1TokenOutputWithdrawal mutator.
 type L1TokenOutputWithdrawalFunc func(context.Context, *ent.L1TokenOutputWithdrawalMutation) (ent.Value, error)

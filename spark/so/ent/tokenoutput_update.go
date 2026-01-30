@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -272,6 +273,25 @@ func (tou *TokenOutputUpdate) SetWithdrawal(l *L1TokenOutputWithdrawal) *TokenOu
 	return tou.SetWithdrawalID(l.ID)
 }
 
+// SetJusticeTxID sets the "justice_tx" edge to the L1TokenJusticeTransaction entity by ID.
+func (tou *TokenOutputUpdate) SetJusticeTxID(id uuid.UUID) *TokenOutputUpdate {
+	tou.mutation.SetJusticeTxID(id)
+	return tou
+}
+
+// SetNillableJusticeTxID sets the "justice_tx" edge to the L1TokenJusticeTransaction entity by ID if the given value is not nil.
+func (tou *TokenOutputUpdate) SetNillableJusticeTxID(id *uuid.UUID) *TokenOutputUpdate {
+	if id != nil {
+		tou = tou.SetJusticeTxID(*id)
+	}
+	return tou
+}
+
+// SetJusticeTx sets the "justice_tx" edge to the L1TokenJusticeTransaction entity.
+func (tou *TokenOutputUpdate) SetJusticeTx(l *L1TokenJusticeTransaction) *TokenOutputUpdate {
+	return tou.SetJusticeTxID(l.ID)
+}
+
 // Mutation returns the TokenOutputMutation object of the builder.
 func (tou *TokenOutputUpdate) Mutation() *TokenOutputMutation {
 	return tou.mutation
@@ -328,6 +348,12 @@ func (tou *TokenOutputUpdate) RemoveTokenPartialRevocationSecretShares(t ...*Tok
 // ClearWithdrawal clears the "withdrawal" edge to the L1TokenOutputWithdrawal entity.
 func (tou *TokenOutputUpdate) ClearWithdrawal() *TokenOutputUpdate {
 	tou.mutation.ClearWithdrawal()
+	return tou
+}
+
+// ClearJusticeTx clears the "justice_tx" edge to the L1TokenJusticeTransaction entity.
+func (tou *TokenOutputUpdate) ClearJusticeTx() *TokenOutputUpdate {
+	tou.mutation.ClearJusticeTx()
 	return tou
 }
 
@@ -629,6 +655,35 @@ func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if tou.mutation.JusticeTxCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   tokenoutput.JusticeTxTable,
+			Columns: []string{tokenoutput.JusticeTxColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(l1tokenjusticetransaction.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tou.mutation.JusticeTxIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   tokenoutput.JusticeTxTable,
+			Columns: []string{tokenoutput.JusticeTxColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(l1tokenjusticetransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	_spec.AddModifiers(tou.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tou.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -886,6 +941,25 @@ func (touo *TokenOutputUpdateOne) SetWithdrawal(l *L1TokenOutputWithdrawal) *Tok
 	return touo.SetWithdrawalID(l.ID)
 }
 
+// SetJusticeTxID sets the "justice_tx" edge to the L1TokenJusticeTransaction entity by ID.
+func (touo *TokenOutputUpdateOne) SetJusticeTxID(id uuid.UUID) *TokenOutputUpdateOne {
+	touo.mutation.SetJusticeTxID(id)
+	return touo
+}
+
+// SetNillableJusticeTxID sets the "justice_tx" edge to the L1TokenJusticeTransaction entity by ID if the given value is not nil.
+func (touo *TokenOutputUpdateOne) SetNillableJusticeTxID(id *uuid.UUID) *TokenOutputUpdateOne {
+	if id != nil {
+		touo = touo.SetJusticeTxID(*id)
+	}
+	return touo
+}
+
+// SetJusticeTx sets the "justice_tx" edge to the L1TokenJusticeTransaction entity.
+func (touo *TokenOutputUpdateOne) SetJusticeTx(l *L1TokenJusticeTransaction) *TokenOutputUpdateOne {
+	return touo.SetJusticeTxID(l.ID)
+}
+
 // Mutation returns the TokenOutputMutation object of the builder.
 func (touo *TokenOutputUpdateOne) Mutation() *TokenOutputMutation {
 	return touo.mutation
@@ -942,6 +1016,12 @@ func (touo *TokenOutputUpdateOne) RemoveTokenPartialRevocationSecretShares(t ...
 // ClearWithdrawal clears the "withdrawal" edge to the L1TokenOutputWithdrawal entity.
 func (touo *TokenOutputUpdateOne) ClearWithdrawal() *TokenOutputUpdateOne {
 	touo.mutation.ClearWithdrawal()
+	return touo
+}
+
+// ClearJusticeTx clears the "justice_tx" edge to the L1TokenJusticeTransaction entity.
+func (touo *TokenOutputUpdateOne) ClearJusticeTx() *TokenOutputUpdateOne {
+	touo.mutation.ClearJusticeTx()
 	return touo
 }
 
@@ -1266,6 +1346,35 @@ func (touo *TokenOutputUpdateOne) sqlSave(ctx context.Context) (_node *TokenOutp
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(l1tokenoutputwithdrawal.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if touo.mutation.JusticeTxCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   tokenoutput.JusticeTxTable,
+			Columns: []string{tokenoutput.JusticeTxColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(l1tokenjusticetransaction.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := touo.mutation.JusticeTxIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   tokenoutput.JusticeTxTable,
+			Columns: []string{tokenoutput.JusticeTxColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(l1tokenjusticetransaction.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

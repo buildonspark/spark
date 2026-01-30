@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
@@ -227,6 +228,25 @@ func init() {
 	l1tokencreateDescID := l1tokencreateMixinFields0[0].Descriptor()
 	// l1tokencreate.DefaultID holds the default value on creation for the id field.
 	l1tokencreate.DefaultID = l1tokencreateDescID.Default.(func() uuid.UUID)
+	l1tokenjusticetransactionMixin := schema.L1TokenJusticeTransaction{}.Mixin()
+	l1tokenjusticetransactionMixinFields0 := l1tokenjusticetransactionMixin[0].Fields()
+	_ = l1tokenjusticetransactionMixinFields0
+	l1tokenjusticetransactionFields := schema.L1TokenJusticeTransaction{}.Fields()
+	_ = l1tokenjusticetransactionFields
+	// l1tokenjusticetransactionDescCreateTime is the schema descriptor for create_time field.
+	l1tokenjusticetransactionDescCreateTime := l1tokenjusticetransactionMixinFields0[1].Descriptor()
+	// l1tokenjusticetransaction.DefaultCreateTime holds the default value on creation for the create_time field.
+	l1tokenjusticetransaction.DefaultCreateTime = l1tokenjusticetransactionDescCreateTime.Default.(func() time.Time)
+	// l1tokenjusticetransactionDescUpdateTime is the schema descriptor for update_time field.
+	l1tokenjusticetransactionDescUpdateTime := l1tokenjusticetransactionMixinFields0[2].Descriptor()
+	// l1tokenjusticetransaction.DefaultUpdateTime holds the default value on creation for the update_time field.
+	l1tokenjusticetransaction.DefaultUpdateTime = l1tokenjusticetransactionDescUpdateTime.Default.(func() time.Time)
+	// l1tokenjusticetransaction.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	l1tokenjusticetransaction.UpdateDefaultUpdateTime = l1tokenjusticetransactionDescUpdateTime.UpdateDefault.(func() time.Time)
+	// l1tokenjusticetransactionDescID is the schema descriptor for id field.
+	l1tokenjusticetransactionDescID := l1tokenjusticetransactionMixinFields0[0].Descriptor()
+	// l1tokenjusticetransaction.DefaultID holds the default value on creation for the id field.
+	l1tokenjusticetransaction.DefaultID = l1tokenjusticetransactionDescID.Default.(func() uuid.UUID)
 	l1tokenoutputwithdrawalMixin := schema.L1TokenOutputWithdrawal{}.Mixin()
 	l1tokenoutputwithdrawalMixinFields0 := l1tokenoutputwithdrawalMixin[0].Fields()
 	_ = l1tokenoutputwithdrawalMixinFields0

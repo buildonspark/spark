@@ -30,10 +30,10 @@ func MaybeApplyFee(amount int64) int64 {
 const (
 	// Estimated transaction size in bytes for fee calculation
 	estimatedTxSize = 191
-	// Default fee rate in satoshis per vbyte
-	defaultSatsPerVbyte = 5
-	// DefaultFeeSats is the default fee in satoshis (estimatedTxSize * defaultSatsPerVbyte)
-	DefaultFeeSats = estimatedTxSize * defaultSatsPerVbyte
+	// DefaultSatsPerVbyte is the default fee rate in satoshis per vbyte.
+	DefaultSatsPerVbyte = 5
+	// DefaultFeeSats is the default fee in satoshis (estimatedTxSize * DefaultSatsPerVbyte)
+	DefaultFeeSats = estimatedTxSize * DefaultSatsPerVbyte
 )
 
 // P2TRScriptFromPubKey returns a P2TR script from a public key.

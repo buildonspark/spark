@@ -152,6 +152,9 @@ func (TokenOutput) Edges() []ent.Edge {
 		edge.To("withdrawal", L1TokenOutputWithdrawal.Type).
 			Unique().
 			Comment("The L1 withdrawal record if this output has been withdrawn."),
+		edge.To("justice_tx", L1TokenJusticeTransaction.Type).
+			Unique().
+			Comment("The justice transaction if an invalid withdrawal was punished for this output."),
 	}
 }
 

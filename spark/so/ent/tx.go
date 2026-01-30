@@ -28,6 +28,8 @@ type Tx struct {
 	Gossip *GossipClient
 	// L1TokenCreate is the client for interacting with the L1TokenCreate builders.
 	L1TokenCreate *L1TokenCreateClient
+	// L1TokenJusticeTransaction is the client for interacting with the L1TokenJusticeTransaction builders.
+	L1TokenJusticeTransaction *L1TokenJusticeTransactionClient
 	// L1TokenOutputWithdrawal is the client for interacting with the L1TokenOutputWithdrawal builders.
 	L1TokenOutputWithdrawal *L1TokenOutputWithdrawalClient
 	// L1WithdrawalTransaction is the client for interacting with the L1WithdrawalTransaction builders.
@@ -216,6 +218,7 @@ func (tx *Tx) init() {
 	tx.EventMessage = NewEventMessageClient(tx.config)
 	tx.Gossip = NewGossipClient(tx.config)
 	tx.L1TokenCreate = NewL1TokenCreateClient(tx.config)
+	tx.L1TokenJusticeTransaction = NewL1TokenJusticeTransactionClient(tx.config)
 	tx.L1TokenOutputWithdrawal = NewL1TokenOutputWithdrawalClient(tx.config)
 	tx.L1WithdrawalTransaction = NewL1WithdrawalTransactionClient(tx.config)
 	tx.PaymentIntent = NewPaymentIntentClient(tx.config)

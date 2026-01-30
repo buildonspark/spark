@@ -1092,6 +1092,182 @@ func (lc *L1TokenCreateExample) Exec(ctx context.Context) (*ent.L1TokenCreate, e
 	return create.Save(ctx)
 }
 
+// L1TokenJusticeTransactionExample is a test fixture builder for L1TokenJusticeTransaction.
+type L1TokenJusticeTransactionExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	JusticeTxHash *schematype.TxID
+	BroadcastAt   *time.Time
+	AmountSats    *uint64
+	TxCostSats    *uint64
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	TokenOutput             *ent.TokenOutput
+	L1TokenOutputWithdrawal *ent.L1TokenOutputWithdrawal
+}
+
+// NewL1TokenJusticeTransactionExample creates a new L1TokenJusticeTransactionExample for testing.
+func NewL1TokenJusticeTransactionExample(t *testing.T, client *ent.Client) *L1TokenJusticeTransactionExample {
+	return &L1TokenJusticeTransactionExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetJusticeTxHash sets the justice_tx_hash field.
+func (ljt *L1TokenJusticeTransactionExample) SetJusticeTxHash(v schematype.TxID) *L1TokenJusticeTransactionExample {
+	ljt.JusticeTxHash = &v
+	return ljt
+}
+
+// SetBroadcastAt sets the broadcast_at field.
+func (ljt *L1TokenJusticeTransactionExample) SetBroadcastAt(v time.Time) *L1TokenJusticeTransactionExample {
+	ljt.BroadcastAt = &v
+	return ljt
+}
+
+// SetAmountSats sets the amount_sats field.
+func (ljt *L1TokenJusticeTransactionExample) SetAmountSats(v uint64) *L1TokenJusticeTransactionExample {
+	ljt.AmountSats = &v
+	return ljt
+}
+
+// SetTxCostSats sets the tx_cost_sats field.
+func (ljt *L1TokenJusticeTransactionExample) SetTxCostSats(v uint64) *L1TokenJusticeTransactionExample {
+	ljt.TxCostSats = &v
+	return ljt
+}
+
+// SetTokenOutput sets the token_output edge.
+func (ljt *L1TokenJusticeTransactionExample) SetTokenOutput(v *ent.TokenOutput) *L1TokenJusticeTransactionExample {
+	ljt.TokenOutput = v
+	return ljt
+}
+
+// SetL1TokenOutputWithdrawal sets the l1_token_output_withdrawal edge.
+func (ljt *L1TokenJusticeTransactionExample) SetL1TokenOutputWithdrawal(v *ent.L1TokenOutputWithdrawal) *L1TokenJusticeTransactionExample {
+	ljt.L1TokenOutputWithdrawal = v
+	return ljt
+}
+
+// MustExec builds and saves the L1TokenJusticeTransaction entity to the database.
+// It panics if the save fails.
+func (ljt *L1TokenJusticeTransactionExample) MustExec(ctx context.Context) *ent.L1TokenJusticeTransaction {
+	create := ljt.client.L1TokenJusticeTransaction.Create()
+
+	// Set fields
+	if ljt.JusticeTxHash != nil {
+		create.SetJusticeTxHash(*ljt.JusticeTxHash)
+	} else {
+		// Use default from annotation
+		create.SetJusticeTxHash(schematype.MustParseTxID("6afc6ebd5ce104a3d03a927e48b05ee5b9ba52ec28dea2e4b79776e2f95de2d4"))
+	}
+	if ljt.BroadcastAt != nil {
+		create.SetBroadcastAt(*ljt.BroadcastAt)
+	} else {
+		// Use default from annotation
+		create.SetBroadcastAt(func() time.Time { t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z"); return t }())
+	}
+	if ljt.AmountSats != nil {
+		create.SetAmountSats(*ljt.AmountSats)
+	} else {
+		// Use default from annotation
+		create.SetAmountSats(uint64(10000))
+	}
+	if ljt.TxCostSats != nil {
+		create.SetTxCostSats(*ljt.TxCostSats)
+	} else {
+		// Use default from annotation
+		create.SetTxCostSats(uint64(1000))
+	}
+
+	// Handle edges
+	if ljt.TokenOutput != nil {
+		create.SetTokenOutput(ljt.TokenOutput)
+	} else {
+		// Auto-create required edge
+		ljt.t.Helper()
+		ljt.TokenOutput = NewTokenOutputExample(ljt.t, ljt.client).MustExec(ctx)
+		create.SetTokenOutput(ljt.TokenOutput)
+	}
+	if ljt.L1TokenOutputWithdrawal != nil {
+		create.SetL1TokenOutputWithdrawal(ljt.L1TokenOutputWithdrawal)
+	} else {
+		// Auto-create required edge
+		ljt.t.Helper()
+		ljt.L1TokenOutputWithdrawal = NewL1TokenOutputWithdrawalExample(ljt.t, ljt.client).MustExec(ctx)
+		create.SetL1TokenOutputWithdrawal(ljt.L1TokenOutputWithdrawal)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		ljt.t.Helper()
+		ljt.t.Fatalf("failed to create L1TokenJusticeTransaction: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the L1TokenJusticeTransaction entity to the database.
+// It returns an error if the save fails.
+func (ljt *L1TokenJusticeTransactionExample) Exec(ctx context.Context) (*ent.L1TokenJusticeTransaction, error) {
+	create := ljt.client.L1TokenJusticeTransaction.Create()
+
+	// Set fields
+	if ljt.JusticeTxHash != nil {
+		create.SetJusticeTxHash(*ljt.JusticeTxHash)
+	} else {
+		// Use default from annotation
+		create.SetJusticeTxHash(schematype.MustParseTxID("6afc6ebd5ce104a3d03a927e48b05ee5b9ba52ec28dea2e4b79776e2f95de2d4"))
+	}
+	if ljt.BroadcastAt != nil {
+		create.SetBroadcastAt(*ljt.BroadcastAt)
+	} else {
+		// Use default from annotation
+		create.SetBroadcastAt(func() time.Time { t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z"); return t }())
+	}
+	if ljt.AmountSats != nil {
+		create.SetAmountSats(*ljt.AmountSats)
+	} else {
+		// Use default from annotation
+		create.SetAmountSats(uint64(10000))
+	}
+	if ljt.TxCostSats != nil {
+		create.SetTxCostSats(*ljt.TxCostSats)
+	} else {
+		// Use default from annotation
+		create.SetTxCostSats(uint64(1000))
+	}
+
+	// Handle edges
+	if ljt.TokenOutput != nil {
+		create.SetTokenOutput(ljt.TokenOutput)
+	} else {
+		// Auto-create required edge
+		var err error
+		ljt.TokenOutput, err = NewTokenOutputExample(ljt.t, ljt.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create token_output: %w", err)
+		}
+		create.SetTokenOutput(ljt.TokenOutput)
+	}
+	if ljt.L1TokenOutputWithdrawal != nil {
+		create.SetL1TokenOutputWithdrawal(ljt.L1TokenOutputWithdrawal)
+	} else {
+		// Auto-create required edge
+		var err error
+		ljt.L1TokenOutputWithdrawal, err = NewL1TokenOutputWithdrawalExample(ljt.t, ljt.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create l1_token_output_withdrawal: %w", err)
+		}
+		create.SetL1TokenOutputWithdrawal(ljt.L1TokenOutputWithdrawal)
+	}
+
+	return create.Save(ctx)
+}
+
 // L1TokenOutputWithdrawalExample is a test fixture builder for L1TokenOutputWithdrawal.
 type L1TokenOutputWithdrawalExample struct {
 	client *ent.Client
@@ -1103,6 +1279,7 @@ type L1TokenOutputWithdrawalExample struct {
 	// Edges - if set, use the provided entity; if nil, create a default one
 	TokenOutput             *ent.TokenOutput
 	L1WithdrawalTransaction *ent.L1WithdrawalTransaction
+	JusticeTx               *ent.L1TokenJusticeTransaction
 }
 
 // NewL1TokenOutputWithdrawalExample creates a new L1TokenOutputWithdrawalExample for testing.
@@ -1128,6 +1305,12 @@ func (low *L1TokenOutputWithdrawalExample) SetTokenOutput(v *ent.TokenOutput) *L
 // SetL1WithdrawalTransaction sets the l1_withdrawal_transaction edge.
 func (low *L1TokenOutputWithdrawalExample) SetL1WithdrawalTransaction(v *ent.L1WithdrawalTransaction) *L1TokenOutputWithdrawalExample {
 	low.L1WithdrawalTransaction = v
+	return low
+}
+
+// SetJusticeTx sets the justice_tx edge.
+func (low *L1TokenOutputWithdrawalExample) SetJusticeTx(v *ent.L1TokenJusticeTransaction) *L1TokenOutputWithdrawalExample {
+	low.JusticeTx = v
 	return low
 }
 
@@ -1160,6 +1343,9 @@ func (low *L1TokenOutputWithdrawalExample) MustExec(ctx context.Context) *ent.L1
 		low.t.Helper()
 		low.L1WithdrawalTransaction = NewL1WithdrawalTransactionExample(low.t, low.client).MustExec(ctx)
 		create.SetL1WithdrawalTransaction(low.L1WithdrawalTransaction)
+	}
+	if low.JusticeTx != nil {
+		create.SetJusticeTx(low.JusticeTx)
 	}
 
 	entity, err := create.Save(ctx)
@@ -1206,6 +1392,9 @@ func (low *L1TokenOutputWithdrawalExample) Exec(ctx context.Context) (*ent.L1Tok
 			return nil, fmt.Errorf("failed to create l1_withdrawal_transaction: %w", err)
 		}
 		create.SetL1WithdrawalTransaction(low.L1WithdrawalTransaction)
+	}
+	if low.JusticeTx != nil {
+		create.SetJusticeTx(low.JusticeTx)
 	}
 
 	return create.Save(ctx)
@@ -3251,6 +3440,7 @@ type TokenOutputExample struct {
 	TokenPartialRevocationSecretShares  []*ent.TokenPartialRevocationSecretShare
 	TokenCreate                         *ent.TokenCreate
 	Withdrawal                          *ent.L1TokenOutputWithdrawal
+	JusticeTx                           *ent.L1TokenJusticeTransaction
 }
 
 // NewTokenOutputExample creates a new TokenOutputExample for testing.
@@ -3435,6 +3625,12 @@ func (to *TokenOutputExample) SetWithdrawal(v *ent.L1TokenOutputWithdrawal) *Tok
 	return to
 }
 
+// SetJusticeTx sets the justice_tx edge.
+func (to *TokenOutputExample) SetJusticeTx(v *ent.L1TokenJusticeTransaction) *TokenOutputExample {
+	to.JusticeTx = v
+	return to
+}
+
 // MustExec builds and saves the TokenOutput entity to the database.
 // It panics if the save fails.
 func (to *TokenOutputExample) MustExec(ctx context.Context) *ent.TokenOutput {
@@ -3603,6 +3799,9 @@ func (to *TokenOutputExample) MustExec(ctx context.Context) *ent.TokenOutput {
 	}
 	if to.Withdrawal != nil {
 		create.SetWithdrawal(to.Withdrawal)
+	}
+	if to.JusticeTx != nil {
+		create.SetJusticeTx(to.JusticeTx)
 	}
 
 	entity, err := create.Save(ctx)
@@ -3791,6 +3990,9 @@ func (to *TokenOutputExample) Exec(ctx context.Context) (*ent.TokenOutput, error
 	}
 	if to.Withdrawal != nil {
 		create.SetWithdrawal(to.Withdrawal)
+	}
+	if to.JusticeTx != nil {
+		create.SetJusticeTx(to.JusticeTx)
 	}
 
 	return create.Save(ctx)

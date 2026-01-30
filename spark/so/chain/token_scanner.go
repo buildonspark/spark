@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -320,6 +321,7 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *
 func handleTokenUpdatesForBlock(
 	ctx context.Context,
 	config *so.Config,
+	bitcoinClient *rpcclient.Client,
 	dbClient *ent.Client,
 	txs []wire.MsgTx,
 	blockHeight int64,
@@ -332,7 +334,7 @@ func handleTokenUpdatesForBlock(
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle token announcements (block height %d)", blockHeight)
 	}
 	logger.Sugar().Infof("Checking for token withdrawals (block height %d)", blockHeight)
-	if err := tokens.HandleTokenWithdrawals(ctx, config, dbClient, txs, network, uint64(blockHeight), blockHash); err != nil {
+	if err := tokens.HandleTokenWithdrawals(ctx, config, bitcoinClient, dbClient, txs, network, uint64(blockHeight), blockHash); err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle token withdrawals (block height %d)", blockHeight)
 	}
 }

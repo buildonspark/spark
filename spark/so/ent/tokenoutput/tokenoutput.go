@@ -77,6 +77,8 @@ const (
 	EdgeTokenCreate = "token_create"
 	// EdgeWithdrawal holds the string denoting the withdrawal edge name in mutations.
 	EdgeWithdrawal = "withdrawal"
+	// EdgeJusticeTx holds the string denoting the justice_tx edge name in mutations.
+	EdgeJusticeTx = "justice_tx"
 	// Table holds the table name of the tokenoutput in the database.
 	Table = "token_outputs"
 	// RevocationKeyshareTable is the table that holds the revocation_keyshare relation/edge.
@@ -126,6 +128,13 @@ const (
 	WithdrawalInverseTable = "l1token_output_withdrawals"
 	// WithdrawalColumn is the table column denoting the withdrawal relation/edge.
 	WithdrawalColumn = "token_output_withdrawal"
+	// JusticeTxTable is the table that holds the justice_tx relation/edge.
+	JusticeTxTable = "l1token_justice_transactions"
+	// JusticeTxInverseTable is the table name for the L1TokenJusticeTransaction entity.
+	// It exists in this package in order to avoid circular dependency with the "l1tokenjusticetransaction" package.
+	JusticeTxInverseTable = "l1token_justice_transactions"
+	// JusticeTxColumn is the table column denoting the justice_tx relation/edge.
+	JusticeTxColumn = "token_output_justice_tx"
 )
 
 // Columns holds all SQL columns for tokenoutput fields.
@@ -343,6 +352,13 @@ func ByWithdrawalField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newWithdrawalStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByJusticeTxField orders the results by justice_tx field.
+func ByJusticeTxField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newJusticeTxStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newRevocationKeyshareStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -390,5 +406,12 @@ func newWithdrawalStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(WithdrawalInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2O, false, WithdrawalTable, WithdrawalColumn),
+	)
+}
+func newJusticeTxStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(JusticeTxInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2O, false, JusticeTxTable, JusticeTxColumn),
 	)
 }

@@ -36,3 +36,9 @@ const (
 	// in withdrawal validation. The owner signs over this tagged hash to authorize the withdrawal.
 	TagBTKNWithdrawal = "BTKN_WITHDRAWAL"
 )
+
+// BtknWithdrawalDescriptor returns the BTKN withdrawal protocol descriptor.
+// Exported for use in integration tests.
+func BtknWithdrawalDescriptor() Descriptor {
+	return btknWithdrawal
+}

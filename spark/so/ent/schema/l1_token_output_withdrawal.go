@@ -39,5 +39,8 @@ func (L1TokenOutputWithdrawal) Edges() []ent.Edge {
 			Unique().
 			Required().
 			Comment("The L1 transaction containing this withdrawal."),
+		edge.To("justice_tx", L1TokenJusticeTransaction.Type).
+			Unique().
+			Comment("The justice transaction if this withdrawal was invalid and punished."),
 	}
 }

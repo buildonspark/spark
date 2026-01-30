@@ -1,0 +1,6 @@
+-- Create "l1token_justice_transactions" table
+CREATE TABLE "l1token_justice_transactions" ("id" uuid NOT NULL, "create_time" timestamptz NOT NULL, "update_time" timestamptz NOT NULL, "justice_tx_hash" bytea NOT NULL, "broadcast_at" timestamptz NOT NULL, "amount_sats" bigint NOT NULL, "tx_cost_sats" bigint NOT NULL, "l1token_output_withdrawal_justice_tx" uuid NOT NULL, "token_output_justice_tx" uuid NOT NULL, PRIMARY KEY ("id"), CONSTRAINT "l1token_justice_transactions_l_c0c82563a911c042099a1985e210c489" FOREIGN KEY ("l1token_output_withdrawal_justice_tx") REFERENCES "l1token_output_withdrawals" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION, CONSTRAINT "l1token_justice_transactions_token_outputs_justice_tx" FOREIGN KEY ("token_output_justice_tx") REFERENCES "token_outputs" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION);
+-- Create index "l1token_justice_transactions_l1token_output_withdrawal_justice_" to table: "l1token_justice_transactions"
+CREATE UNIQUE INDEX "l1token_justice_transactions_l1token_output_withdrawal_justice_" ON "l1token_justice_transactions" ("l1token_output_withdrawal_justice_tx");
+-- Create index "l1token_justice_transactions_token_output_justice_tx_key" to table: "l1token_justice_transactions"
+CREATE UNIQUE INDEX "l1token_justice_transactions_token_output_justice_tx_key" ON "l1token_justice_transactions" ("token_output_justice_tx");

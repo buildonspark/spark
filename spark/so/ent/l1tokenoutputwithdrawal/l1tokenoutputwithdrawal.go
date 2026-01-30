@@ -25,6 +25,8 @@ const (
 	EdgeTokenOutput = "token_output"
 	// EdgeL1WithdrawalTransaction holds the string denoting the l1_withdrawal_transaction edge name in mutations.
 	EdgeL1WithdrawalTransaction = "l1_withdrawal_transaction"
+	// EdgeJusticeTx holds the string denoting the justice_tx edge name in mutations.
+	EdgeJusticeTx = "justice_tx"
 	// Table holds the table name of the l1tokenoutputwithdrawal in the database.
 	Table = "l1token_output_withdrawals"
 	// TokenOutputTable is the table that holds the token_output relation/edge.
@@ -41,6 +43,13 @@ const (
 	L1WithdrawalTransactionInverseTable = "l1withdrawal_transactions"
 	// L1WithdrawalTransactionColumn is the table column denoting the l1_withdrawal_transaction relation/edge.
 	L1WithdrawalTransactionColumn = "l1withdrawal_transaction_withdrawals"
+	// JusticeTxTable is the table that holds the justice_tx relation/edge.
+	JusticeTxTable = "l1token_justice_transactions"
+	// JusticeTxInverseTable is the table name for the L1TokenJusticeTransaction entity.
+	// It exists in this package in order to avoid circular dependency with the "l1tokenjusticetransaction" package.
+	JusticeTxInverseTable = "l1token_justice_transactions"
+	// JusticeTxColumn is the table column denoting the justice_tx relation/edge.
+	JusticeTxColumn = "l1token_output_withdrawal_justice_tx"
 )
 
 // Columns holds all SQL columns for l1tokenoutputwithdrawal fields.
@@ -120,6 +129,13 @@ func ByL1WithdrawalTransactionField(field string, opts ...sql.OrderTermOption) O
 		sqlgraph.OrderByNeighborTerms(s, newL1WithdrawalTransactionStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByJusticeTxField orders the results by justice_tx field.
+func ByJusticeTxField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newJusticeTxStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newTokenOutputStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -132,5 +148,12 @@ func newL1WithdrawalTransactionStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(L1WithdrawalTransactionInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, L1WithdrawalTransactionTable, L1WithdrawalTransactionColumn),
+	)
+}
+func newJusticeTxStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(JusticeTxInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2O, false, JusticeTxTable, JusticeTxColumn),
 	)
 }

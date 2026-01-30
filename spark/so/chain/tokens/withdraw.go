@@ -9,8 +9,10 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/lightsparkdev/spark/common"
@@ -60,11 +62,18 @@ type parsedOutputWithdrawal struct {
 	sparkTxVout uint32
 }
 
+type punishedOutputWithdrawal struct {
+	outputWithdrawal parsedOutputWithdrawal
+	justiceTx        ent.L1TokenJusticeTransaction
+}
+
 // HandleTokenWithdrawals scans transactions for BTKN withdrawal announcements
-// and records valid withdrawals in the database.
+// and records valid withdrawals in the database. For invalid withdrawals where
+// the revocation secret is known, it broadcasts justice transactions.
 func HandleTokenWithdrawals(
 	ctx context.Context,
 	config *so.Config,
+	bitcoinClient *rpcclient.Client,
 	dbClient *ent.Client,
 	txs []wire.MsgTx,
 	network btcnetwork.Network,
@@ -87,7 +96,7 @@ func HandleTokenWithdrawals(
 	withdrawnInBlock := make(map[tokenOutputKey]struct{})
 
 	for _, withdrawal := range withdrawals {
-		if err := processWithdrawal(ctx, dbClient, logger, withdrawal, latestSeEntityPubKey, latestSeEntity, withdrawnInBlock); err != nil {
+		if err := processWithdrawal(ctx, config, bitcoinClient, dbClient, logger, withdrawal, latestSeEntityPubKey, latestSeEntity, withdrawnInBlock, network); err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("Failed to process withdrawal %s at block height %d", withdrawal.txHash, blockHeight)
 		}
 	}
@@ -136,12 +145,15 @@ func parseWithdrawalsFromBlock(ctx context.Context, txs []wire.MsgTx, blockHeigh
 
 func processWithdrawal(
 	ctx context.Context,
+	config *so.Config,
+	bitcoinClient *rpcclient.Client,
 	dbClient *ent.Client,
 	logger *zap.Logger,
 	withdrawal parsedWithdrawal,
 	expectedSePubKey keys.Public,
 	seEntity *ent.EntityDkgKey,
 	withdrawnInBlock map[tokenOutputKey]struct{},
+	network btcnetwork.Network,
 ) error {
 	if withdrawal.withdrawalTx.seEntityPubKey != expectedSePubKey {
 		logger.Sugar().Infof("Rejecting withdrawal %s: invalid SE entity public key (expected: %s, got: %s)",
@@ -174,6 +186,8 @@ func processWithdrawal(
 
 	var approvedWithdrawals []parsedOutputWithdrawal
 	var tokenOutputs []*ent.TokenOutput
+	var punishedWithdrawals []punishedOutputWithdrawal
+	var punishedTokenOutputIDs []uuid.UUID
 
 	for _, outputToWithdraw := range withdrawal.outputsToWithdraw {
 		key := newTokenOutputKey(outputToWithdraw.sparkTxHash, outputToWithdraw.sparkTxVout)
@@ -181,13 +195,35 @@ func processWithdrawal(
 		tokenOutput, err := validateOutputWithdrawable(outputToWithdraw, withdrawnInBlock, tokenOutputMap)
 		if err != nil {
 			logger.With(zap.Error(err)).Sugar().Infof("Rejecting withdrawal %s output %s", withdrawal.txHash, key)
-			// TODO: broadcast justice transaction for invalid withdrawals
+
+			// Try to broadcast justice transaction for invalid withdrawal
+			k := knobs.GetKnobsService(ctx)
+			if tokenOutput != nil && k.GetValue(knobs.KnobEnableJusticeTransactions, 0) > 0 {
+				if bitcoinClient == nil {
+					logger.Error("Cannot broadcast justice transaction: bitcoin client unavailable")
+					continue
+				}
+				justiceTx, justiceTxEnt, err := BroadcastJusticeTransaction(
+					ctx, bitcoinClient, config.IdentityPrivateKey, network,
+					tokenOutput, &withdrawal, &outputToWithdraw,
+				)
+				if err != nil {
+					logger.With(zap.Error(err)).Sugar().Errorf("Failed to broadcast justice transaction for withdrawal %s output %s", withdrawal.txHash, key)
+				} else {
+					logger.Sugar().Infof("Successfully broadcast justice transaction %s for withdrawal %s output %s", justiceTx.TxHash(), withdrawal.txHash, key)
+					punishedWithdrawals = append(punishedWithdrawals, punishedOutputWithdrawal{
+						outputWithdrawal: outputToWithdraw,
+						justiceTx:        *justiceTxEnt,
+					})
+					punishedTokenOutputIDs = append(punishedTokenOutputIDs, tokenOutput.ID)
+				}
+			}
 			continue
 		}
 
 		if err := validateWithdrawalTxOutput(withdrawal.tx, &outputToWithdraw.withdrawal, tokenOutput); err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("Rejecting withdrawal %s output %s: invalid transaction output", withdrawal.txHash, key)
-			// TODO: broadcast justice transaction for invalid withdrawals
+			logger.With(zap.Error(err)).Sugar().Infof("Rejecting withdrawal %s output %s: invalid transaction output", withdrawal.txHash, key)
+			// Don't broadcast justice tx here - SO doesn't have revocation secret for unspent outputs
 			continue
 		}
 
@@ -196,7 +232,7 @@ func processWithdrawal(
 		withdrawnInBlock[key] = struct{}{}
 	}
 
-	if len(approvedWithdrawals) == 0 {
+	if len(approvedWithdrawals) == 0 && len(punishedWithdrawals) == 0 {
 		logger.Sugar().Infof("Skipping withdrawal tx %s: no valid outputs", withdrawal.txHash)
 		return nil
 	}
@@ -204,6 +240,17 @@ func processWithdrawal(
 	savedTx, err := ent.SaveWithdrawalTransaction(ctx, dbClient, &withdrawal.withdrawalTx.entity, seEntity)
 	if err != nil {
 		return fmt.Errorf("failed to save withdrawal transaction: %w", err)
+	}
+
+	if len(punishedWithdrawals) > 0 {
+		if err := savePunishedWithdrawals(ctx, dbClient, punishedWithdrawals, punishedTokenOutputIDs, savedTx.ID); err != nil {
+			return fmt.Errorf("failed to save punished withdrawals: %w", err)
+		}
+	}
+
+	if len(approvedWithdrawals) == 0 {
+		logger.Sugar().Infof("Withdrawal %s has only punished outputs", withdrawal.txHash)
+		return nil
 	}
 
 	bitcoinVouts := make([]uint16, len(approvedWithdrawals))
@@ -319,10 +366,10 @@ func validateOutputWithdrawable(
 	if tokenOutput.Status != schematype.TokenOutputStatusCreatedFinalized {
 		spentTx := tokenOutput.Edges.OutputSpentTokenTransaction
 		if spentTx == nil {
-			return nil, fmt.Errorf("%w: status is %s with no spending transaction", ErrOutputNotWithdrawable, tokenOutput.Status)
+			return tokenOutput, fmt.Errorf("%w: status is %s with no spending transaction", ErrOutputNotWithdrawable, tokenOutput.Status)
 		}
 		if err := checkSpendingTransactionAllowsWithdrawal(spentTx); err != nil {
-			return nil, err
+			return tokenOutput, err
 		}
 	}
 
@@ -432,6 +479,9 @@ func queryTokenOutputs(ctx context.Context, dbClient *ent.Client, outputs []pars
 		)
 	}
 
+	// Note: ForUpdate would provide TOCTOU protection in Postgres, but causes issues
+	// with SQLite tests. In production, the chain watcher already wraps block processing
+	// in a transaction (watch_chain.go:383), providing the necessary isolation.
 	tokenOutputs, err := dbClient.TokenOutput.Query().
 		Where(tokenoutput.Or(predicates...)).
 		WithOutputCreatedTokenTransaction().
@@ -450,4 +500,31 @@ func queryTokenOutputs(ctx context.Context, dbClient *ent.Client, outputs []pars
 	}
 
 	return result, nil
+}
+
+func savePunishedWithdrawals(ctx context.Context, dbClient *ent.Client, withdrawals []punishedOutputWithdrawal, tokenOutputIDs []uuid.UUID, withdrawalTxID uuid.UUID) error {
+	for i, withdrawal := range withdrawals {
+		savedWithdrawal, err := dbClient.L1TokenOutputWithdrawal.Create().
+			SetBitcoinVout(withdrawal.outputWithdrawal.withdrawal.BitcoinVout).
+			SetTokenOutputID(tokenOutputIDs[i]).
+			SetL1WithdrawalTransactionID(withdrawalTxID).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to save punished output withdrawal: %w", err)
+		}
+
+		_, err = dbClient.L1TokenJusticeTransaction.Create().
+			SetJusticeTxHash(withdrawal.justiceTx.JusticeTxHash).
+			SetBroadcastAt(withdrawal.justiceTx.BroadcastAt).
+			SetAmountSats(withdrawal.justiceTx.AmountSats).
+			SetTxCostSats(withdrawal.justiceTx.TxCostSats).
+			SetL1TokenOutputWithdrawalID(savedWithdrawal.ID).
+			SetTokenOutputID(tokenOutputIDs[i]).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to save justice transaction: %w", err)
+		}
+	}
+
+	return nil
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
+	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
@@ -71,6 +72,8 @@ type Client struct {
 	Gossip *GossipClient
 	// L1TokenCreate is the client for interacting with the L1TokenCreate builders.
 	L1TokenCreate *L1TokenCreateClient
+	// L1TokenJusticeTransaction is the client for interacting with the L1TokenJusticeTransaction builders.
+	L1TokenJusticeTransaction *L1TokenJusticeTransactionClient
 	// L1TokenOutputWithdrawal is the client for interacting with the L1TokenOutputWithdrawal builders.
 	L1TokenOutputWithdrawal *L1TokenOutputWithdrawalClient
 	// L1WithdrawalTransaction is the client for interacting with the L1WithdrawalTransaction builders.
@@ -139,6 +142,7 @@ func (c *Client) init() {
 	c.EventMessage = NewEventMessageClient(c.config)
 	c.Gossip = NewGossipClient(c.config)
 	c.L1TokenCreate = NewL1TokenCreateClient(c.config)
+	c.L1TokenJusticeTransaction = NewL1TokenJusticeTransactionClient(c.config)
 	c.L1TokenOutputWithdrawal = NewL1TokenOutputWithdrawalClient(c.config)
 	c.L1WithdrawalTransaction = NewL1WithdrawalTransactionClient(c.config)
 	c.PaymentIntent = NewPaymentIntentClient(c.config)
@@ -263,6 +267,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		EventMessage:                      NewEventMessageClient(cfg),
 		Gossip:                            NewGossipClient(cfg),
 		L1TokenCreate:                     NewL1TokenCreateClient(cfg),
+		L1TokenJusticeTransaction:         NewL1TokenJusticeTransactionClient(cfg),
 		L1TokenOutputWithdrawal:           NewL1TokenOutputWithdrawalClient(cfg),
 		L1WithdrawalTransaction:           NewL1WithdrawalTransactionClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
@@ -314,6 +319,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		EventMessage:                      NewEventMessageClient(cfg),
 		Gossip:                            NewGossipClient(cfg),
 		L1TokenCreate:                     NewL1TokenCreateClient(cfg),
+		L1TokenJusticeTransaction:         NewL1TokenJusticeTransactionClient(cfg),
 		L1TokenOutputWithdrawal:           NewL1TokenOutputWithdrawalClient(cfg),
 		L1WithdrawalTransaction:           NewL1WithdrawalTransactionClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
@@ -369,13 +375,14 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
-		c.EventMessage, c.Gossip, c.L1TokenCreate, c.L1TokenOutputWithdrawal,
-		c.L1WithdrawalTransaction, c.PaymentIntent, c.PendingSendTransfer,
-		c.PreimageRequest, c.PreimageShare, c.SigningCommitment, c.SigningKeyshare,
-		c.SigningNonce, c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint,
-		c.TokenOutput, c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
+		c.EventMessage, c.Gossip, c.L1TokenCreate, c.L1TokenJusticeTransaction,
+		c.L1TokenOutputWithdrawal, c.L1WithdrawalTransaction, c.PaymentIntent,
+		c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare, c.SigningCommitment,
+		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenCreate,
+		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
+		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
+		c.TransferLeaf, c.Tree, c.TreeNode, c.UserSignedTransaction, c.Utxo,
+		c.UtxoSwap, c.WalletSetting,
 	} {
 		n.Use(hooks...)
 	}
@@ -386,13 +393,14 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
-		c.EventMessage, c.Gossip, c.L1TokenCreate, c.L1TokenOutputWithdrawal,
-		c.L1WithdrawalTransaction, c.PaymentIntent, c.PendingSendTransfer,
-		c.PreimageRequest, c.PreimageShare, c.SigningCommitment, c.SigningKeyshare,
-		c.SigningNonce, c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint,
-		c.TokenOutput, c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
+		c.EventMessage, c.Gossip, c.L1TokenCreate, c.L1TokenJusticeTransaction,
+		c.L1TokenOutputWithdrawal, c.L1WithdrawalTransaction, c.PaymentIntent,
+		c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare, c.SigningCommitment,
+		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenCreate,
+		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
+		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
+		c.TransferLeaf, c.Tree, c.TreeNode, c.UserSignedTransaction, c.Utxo,
+		c.UtxoSwap, c.WalletSetting,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -415,6 +423,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Gossip.mutate(ctx, m)
 	case *L1TokenCreateMutation:
 		return c.L1TokenCreate.mutate(ctx, m)
+	case *L1TokenJusticeTransactionMutation:
+		return c.L1TokenJusticeTransaction.mutate(ctx, m)
 	case *L1TokenOutputWithdrawalMutation:
 		return c.L1TokenOutputWithdrawal.mutate(ctx, m)
 	case *L1WithdrawalTransactionMutation:
@@ -1498,6 +1508,171 @@ func (c *L1TokenCreateClient) mutate(ctx context.Context, m *L1TokenCreateMutati
 	}
 }
 
+// L1TokenJusticeTransactionClient is a client for the L1TokenJusticeTransaction schema.
+type L1TokenJusticeTransactionClient struct {
+	config
+}
+
+// NewL1TokenJusticeTransactionClient returns a client for the L1TokenJusticeTransaction from the given config.
+func NewL1TokenJusticeTransactionClient(c config) *L1TokenJusticeTransactionClient {
+	return &L1TokenJusticeTransactionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `l1tokenjusticetransaction.Hooks(f(g(h())))`.
+func (c *L1TokenJusticeTransactionClient) Use(hooks ...Hook) {
+	c.hooks.L1TokenJusticeTransaction = append(c.hooks.L1TokenJusticeTransaction, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `l1tokenjusticetransaction.Intercept(f(g(h())))`.
+func (c *L1TokenJusticeTransactionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.L1TokenJusticeTransaction = append(c.inters.L1TokenJusticeTransaction, interceptors...)
+}
+
+// Create returns a builder for creating a L1TokenJusticeTransaction entity.
+func (c *L1TokenJusticeTransactionClient) Create() *L1TokenJusticeTransactionCreate {
+	mutation := newL1TokenJusticeTransactionMutation(c.config, OpCreate)
+	return &L1TokenJusticeTransactionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of L1TokenJusticeTransaction entities.
+func (c *L1TokenJusticeTransactionClient) CreateBulk(builders ...*L1TokenJusticeTransactionCreate) *L1TokenJusticeTransactionCreateBulk {
+	return &L1TokenJusticeTransactionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *L1TokenJusticeTransactionClient) MapCreateBulk(slice any, setFunc func(*L1TokenJusticeTransactionCreate, int)) *L1TokenJusticeTransactionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &L1TokenJusticeTransactionCreateBulk{err: fmt.Errorf("calling to L1TokenJusticeTransactionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*L1TokenJusticeTransactionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &L1TokenJusticeTransactionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for L1TokenJusticeTransaction.
+func (c *L1TokenJusticeTransactionClient) Update() *L1TokenJusticeTransactionUpdate {
+	mutation := newL1TokenJusticeTransactionMutation(c.config, OpUpdate)
+	return &L1TokenJusticeTransactionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *L1TokenJusticeTransactionClient) UpdateOne(ljt *L1TokenJusticeTransaction) *L1TokenJusticeTransactionUpdateOne {
+	mutation := newL1TokenJusticeTransactionMutation(c.config, OpUpdateOne, withL1TokenJusticeTransaction(ljt))
+	return &L1TokenJusticeTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *L1TokenJusticeTransactionClient) UpdateOneID(id uuid.UUID) *L1TokenJusticeTransactionUpdateOne {
+	mutation := newL1TokenJusticeTransactionMutation(c.config, OpUpdateOne, withL1TokenJusticeTransactionID(id))
+	return &L1TokenJusticeTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for L1TokenJusticeTransaction.
+func (c *L1TokenJusticeTransactionClient) Delete() *L1TokenJusticeTransactionDelete {
+	mutation := newL1TokenJusticeTransactionMutation(c.config, OpDelete)
+	return &L1TokenJusticeTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *L1TokenJusticeTransactionClient) DeleteOne(ljt *L1TokenJusticeTransaction) *L1TokenJusticeTransactionDeleteOne {
+	return c.DeleteOneID(ljt.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *L1TokenJusticeTransactionClient) DeleteOneID(id uuid.UUID) *L1TokenJusticeTransactionDeleteOne {
+	builder := c.Delete().Where(l1tokenjusticetransaction.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &L1TokenJusticeTransactionDeleteOne{builder}
+}
+
+// Query returns a query builder for L1TokenJusticeTransaction.
+func (c *L1TokenJusticeTransactionClient) Query() *L1TokenJusticeTransactionQuery {
+	return &L1TokenJusticeTransactionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeL1TokenJusticeTransaction},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a L1TokenJusticeTransaction entity by its id.
+func (c *L1TokenJusticeTransactionClient) Get(ctx context.Context, id uuid.UUID) (*L1TokenJusticeTransaction, error) {
+	return c.Query().Where(l1tokenjusticetransaction.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *L1TokenJusticeTransactionClient) GetX(ctx context.Context, id uuid.UUID) *L1TokenJusticeTransaction {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTokenOutput queries the token_output edge of a L1TokenJusticeTransaction.
+func (c *L1TokenJusticeTransactionClient) QueryTokenOutput(ljt *L1TokenJusticeTransaction) *TokenOutputQuery {
+	query := (&TokenOutputClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ljt.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(l1tokenjusticetransaction.Table, l1tokenjusticetransaction.FieldID, id),
+			sqlgraph.To(tokenoutput.Table, tokenoutput.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, l1tokenjusticetransaction.TokenOutputTable, l1tokenjusticetransaction.TokenOutputColumn),
+		)
+		fromV = sqlgraph.Neighbors(ljt.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryL1TokenOutputWithdrawal queries the l1_token_output_withdrawal edge of a L1TokenJusticeTransaction.
+func (c *L1TokenJusticeTransactionClient) QueryL1TokenOutputWithdrawal(ljt *L1TokenJusticeTransaction) *L1TokenOutputWithdrawalQuery {
+	query := (&L1TokenOutputWithdrawalClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ljt.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(l1tokenjusticetransaction.Table, l1tokenjusticetransaction.FieldID, id),
+			sqlgraph.To(l1tokenoutputwithdrawal.Table, l1tokenoutputwithdrawal.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, l1tokenjusticetransaction.L1TokenOutputWithdrawalTable, l1tokenjusticetransaction.L1TokenOutputWithdrawalColumn),
+		)
+		fromV = sqlgraph.Neighbors(ljt.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *L1TokenJusticeTransactionClient) Hooks() []Hook {
+	return c.hooks.L1TokenJusticeTransaction
+}
+
+// Interceptors returns the client interceptors.
+func (c *L1TokenJusticeTransactionClient) Interceptors() []Interceptor {
+	return c.inters.L1TokenJusticeTransaction
+}
+
+func (c *L1TokenJusticeTransactionClient) mutate(ctx context.Context, m *L1TokenJusticeTransactionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&L1TokenJusticeTransactionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&L1TokenJusticeTransactionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&L1TokenJusticeTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&L1TokenJusticeTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown L1TokenJusticeTransaction mutation op: %q", m.Op())
+	}
+}
+
 // L1TokenOutputWithdrawalClient is a client for the L1TokenOutputWithdrawal schema.
 type L1TokenOutputWithdrawalClient struct {
 	config
@@ -1631,6 +1806,22 @@ func (c *L1TokenOutputWithdrawalClient) QueryL1WithdrawalTransaction(low *L1Toke
 			sqlgraph.From(l1tokenoutputwithdrawal.Table, l1tokenoutputwithdrawal.FieldID, id),
 			sqlgraph.To(l1withdrawaltransaction.Table, l1withdrawaltransaction.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, l1tokenoutputwithdrawal.L1WithdrawalTransactionTable, l1tokenoutputwithdrawal.L1WithdrawalTransactionColumn),
+		)
+		fromV = sqlgraph.Neighbors(low.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryJusticeTx queries the justice_tx edge of a L1TokenOutputWithdrawal.
+func (c *L1TokenOutputWithdrawalClient) QueryJusticeTx(low *L1TokenOutputWithdrawal) *L1TokenJusticeTransactionQuery {
+	query := (&L1TokenJusticeTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := low.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(l1tokenoutputwithdrawal.Table, l1tokenoutputwithdrawal.FieldID, id),
+			sqlgraph.To(l1tokenjusticetransaction.Table, l1tokenjusticetransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, l1tokenoutputwithdrawal.JusticeTxTable, l1tokenoutputwithdrawal.JusticeTxColumn),
 		)
 		fromV = sqlgraph.Neighbors(low.driver.Dialect(), step)
 		return fromV, nil
@@ -3736,6 +3927,22 @@ func (c *TokenOutputClient) QueryWithdrawal(to *TokenOutput) *L1TokenOutputWithd
 	return query
 }
 
+// QueryJusticeTx queries the justice_tx edge of a TokenOutput.
+func (c *TokenOutputClient) QueryJusticeTx(to *TokenOutput) *L1TokenJusticeTransactionQuery {
+	query := (&L1TokenJusticeTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := to.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenoutput.Table, tokenoutput.FieldID, id),
+			sqlgraph.To(l1tokenjusticetransaction.Table, l1tokenjusticetransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, tokenoutput.JusticeTxTable, tokenoutput.JusticeTxColumn),
+		)
+		fromV = sqlgraph.Neighbors(to.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *TokenOutputClient) Hooks() []Hook {
 	hooks := c.hooks.TokenOutput
@@ -5697,22 +5904,23 @@ func (c *WalletSettingClient) mutate(ctx context.Context, m *WalletSettingMutati
 type (
 	hooks struct {
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
-		Gossip, L1TokenCreate, L1TokenOutputWithdrawal, L1WithdrawalTransaction,
-		PaymentIntent, PendingSendTransfer, PreimageRequest, PreimageShare,
-		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate,
-		TokenFreeze, TokenMint, TokenOutput, TokenPartialRevocationSecretShare,
-		TokenTransaction, TokenTransactionPeerSignature, Transfer, TransferLeaf, Tree,
-		TreeNode, UserSignedTransaction, Utxo, UtxoSwap, WalletSetting []ent.Hook
+		Gossip, L1TokenCreate, L1TokenJusticeTransaction, L1TokenOutputWithdrawal,
+		L1WithdrawalTransaction, PaymentIntent, PendingSendTransfer, PreimageRequest,
+		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
+		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		TokenPartialRevocationSecretShare, TokenTransaction,
+		TokenTransactionPeerSignature, Transfer, TransferLeaf, Tree, TreeNode,
+		UserSignedTransaction, Utxo, UtxoSwap, WalletSetting []ent.Hook
 	}
 	inters struct {
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
-		Gossip, L1TokenCreate, L1TokenOutputWithdrawal, L1WithdrawalTransaction,
-		PaymentIntent, PendingSendTransfer, PreimageRequest, PreimageShare,
-		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate,
-		TokenFreeze, TokenMint, TokenOutput, TokenPartialRevocationSecretShare,
-		TokenTransaction, TokenTransactionPeerSignature, Transfer, TransferLeaf, Tree,
-		TreeNode, UserSignedTransaction, Utxo, UtxoSwap,
-		WalletSetting []ent.Interceptor
+		Gossip, L1TokenCreate, L1TokenJusticeTransaction, L1TokenOutputWithdrawal,
+		L1WithdrawalTransaction, PaymentIntent, PendingSendTransfer, PreimageRequest,
+		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
+		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		TokenPartialRevocationSecretShare, TokenTransaction,
+		TokenTransactionPeerSignature, Transfer, TransferLeaf, Tree, TreeNode,
+		UserSignedTransaction, Utxo, UtxoSwap, WalletSetting []ent.Interceptor
 	}
 )
 
