@@ -32,7 +32,7 @@ const (
 	// WithdrawalExpectedFormat describes the expected format of a BTKN withdrawal announcement.
 	WithdrawalExpectedFormat = "[se_entity_pubkey(33)] + [owner_signature(64)] + [withdrawn_ttxo_count(1)] + [[vout(2)] + [spark_tx_hash(32)] + [spark_tx_vout(4)]](variable)"
 
-	// TagBTKNBatchExit is the tag used for the tagged hash of SE withdrawal signatures
-	// in batch exit validation. The owner signs over this tagged hash to authorize the withdrawal.
-	TagBTKNBatchExit = "BTKN_BATCH_EXIT"
+	// TagBTKNWithdrawal is the tag used for the tagged hash of SE withdrawal signatures
+	// in withdrawal validation. The owner signs over this tagged hash to authorize the withdrawal.
+	TagBTKNWithdrawal = "BTKN_WITHDRAWAL"
 )

@@ -374,7 +374,7 @@ func validateWithdrawalTxOutput(tx *wire.MsgTx, withdrawal *ent.L1TokenOutputWit
 
 // validateOwnerSignature validates that the owner signature is valid for the batch of token outputs.
 // The owner must sign over the tagged hash of all SE withdrawal signatures.
-// By default, SE withdrawal signature validation is skipped. The KnobEnforceWithdrawalSignatureValidation
+// By default, owner signature validation is skipped. The KnobEnforceWithdrawalSignatureValidation
 // knob can be enabled to require SE signatures and validate the owner signature.
 func validateOwnerSignature(ctx context.Context, tokenOutputs []*ent.TokenOutput, signatureBytes []byte) error {
 	if len(tokenOutputs) == 0 {
@@ -402,7 +402,7 @@ func validateOwnerSignature(ctx context.Context, tokenOutputs []*ent.TokenOutput
 		seSignatures = append(seSignatures, tokenOutput.SeWithdrawalSignature)
 	}
 
-	hash := chainhash.TaggedHash([]byte(TagBTKNBatchExit), seSignatures...)
+	hash := chainhash.TaggedHash([]byte(TagBTKNWithdrawal), seSignatures...)
 
 	schnorrSig, err := schnorr.ParseSignature(signatureBytes)
 	if err != nil {

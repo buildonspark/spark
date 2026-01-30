@@ -276,7 +276,7 @@ func createTestTokenOutputWithStatusAndSig(
 }
 
 func computeOwnerSignature(t *testing.T, ownerPrivKey keys.Private, seWithdrawalSigs ...[]byte) []byte {
-	hash := chainhash.TaggedHash([]byte(TagBTKNBatchExit), seWithdrawalSigs...)
+	hash := chainhash.TaggedHash([]byte(TagBTKNWithdrawal), seWithdrawalSigs...)
 	sig, err := schnorr.Sign(ownerPrivKey.ToBTCEC(), hash[:])
 	require.NoError(t, err)
 	return sig.Serialize()
