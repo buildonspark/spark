@@ -93,7 +93,7 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 		}
 	}
 	// Collect information about the frozen outputs.
-	result, err := ent.GetOwnedTokenOutputRefs(ctx,
+	outputRefs, totalAmount, err := ent.GetOwnedTokenOutputRefs(ctx,
 		[]keys.Public{ownerPubKey},
 		tokenCreateEnt.TokenIdentifier,
 		tokenCreateEnt.Network,
@@ -103,8 +103,7 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 	}
 
 	return &tokenpb.FreezeTokensResponse{
-		ImpactedOutputIds:    result.OutputIDs, // Deprecated but kept for backwards compatibility
-		ImpactedTokenOutputs: result.OutputRefs,
-		ImpactedTokenAmount:  result.TotalAmount.Bytes(),
+		ImpactedTokenOutputs: outputRefs,
+		ImpactedTokenAmount:  totalAmount.Bytes(),
 	}, nil
 }
