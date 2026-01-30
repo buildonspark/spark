@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -21,6 +22,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
+	"github.com/lightsparkdev/spark/so/knobs"
 )
 
 // tokenOutputKey identifies a token output by its creating transaction hash and vout.
@@ -152,6 +154,24 @@ func processWithdrawal(
 		return fmt.Errorf("failed to query token outputs: %w", err)
 	}
 
+	// Build ordered slice matching OP_RETURN order for signature validation.
+	// The client signs over SE signatures in this order, so we must validate in the same order.
+	orderedOutputs := make([]*ent.TokenOutput, 0, len(withdrawal.outputsToWithdraw))
+	for _, output := range withdrawal.outputsToWithdraw {
+		key := newTokenOutputKey(output.sparkTxHash, output.sparkTxVout)
+		tokenOutput, ok := tokenOutputMap[key]
+		if !ok {
+			logger.Sugar().Infof("Rejecting withdrawal %s: output %s not found in database", withdrawal.txHash, key)
+			return nil
+		}
+		orderedOutputs = append(orderedOutputs, tokenOutput)
+	}
+
+	if err := validateOwnerSignature(ctx, orderedOutputs, withdrawal.withdrawalTx.entity.OwnerSignature); err != nil {
+		logger.With(zap.Error(err)).Sugar().Errorf("Rejecting withdrawal %s: invalid owner signature", withdrawal.txHash)
+		return nil
+	}
+
 	var approvedWithdrawals []parsedOutputWithdrawal
 	var tokenOutputs []*ent.TokenOutput
 
@@ -175,8 +195,6 @@ func processWithdrawal(
 		tokenOutputs = append(tokenOutputs, tokenOutput)
 		withdrawnInBlock[key] = struct{}{}
 	}
-
-	// TODO: Validate owner signature
 
 	if len(approvedWithdrawals) == 0 {
 		logger.Sugar().Infof("Skipping withdrawal tx %s: no valid outputs", withdrawal.txHash)
@@ -349,6 +367,50 @@ func validateWithdrawalTxOutput(tx *wire.MsgTx, withdrawal *ent.L1TokenOutputWit
 
 	if !bytes.Equal(txOut.PkScript, expectedOutput.ScriptPubKey) {
 		return fmt.Errorf("%w: expected %x, got %x", ErrScriptMismatch, expectedOutput.ScriptPubKey, txOut.PkScript)
+	}
+
+	return nil
+}
+
+// validateOwnerSignature validates that the owner signature is valid for the batch of token outputs.
+// The owner must sign over the tagged hash of all SE withdrawal signatures.
+// By default, SE withdrawal signature validation is skipped. The KnobEnforceWithdrawalSignatureValidation
+// knob can be enabled to require SE signatures and validate the owner signature.
+func validateOwnerSignature(ctx context.Context, tokenOutputs []*ent.TokenOutput, signatureBytes []byte) error {
+	if len(tokenOutputs) == 0 {
+		return fmt.Errorf("no token outputs to validate")
+	}
+
+	ownerPublicKey := tokenOutputs[0].OwnerPublicKey
+	for _, tokenOutput := range tokenOutputs {
+		if tokenOutput.OwnerPublicKey != ownerPublicKey {
+			return fmt.Errorf("outputs have different owners: expected %s, got %s",
+				ownerPublicKey, tokenOutput.OwnerPublicKey)
+		}
+	}
+
+	k := knobs.GetKnobsService(ctx)
+	if k.GetValue(knobs.KnobEnforceWithdrawalSignatureValidation, 0) == 0 {
+		return nil
+	}
+
+	seSignatures := make([][]byte, 0, len(tokenOutputs))
+	for _, tokenOutput := range tokenOutputs {
+		if len(tokenOutput.SeWithdrawalSignature) == 0 {
+			return fmt.Errorf("missing SE withdrawal signature for token output")
+		}
+		seSignatures = append(seSignatures, tokenOutput.SeWithdrawalSignature)
+	}
+
+	hash := chainhash.TaggedHash([]byte(TagBTKNBatchExit), seSignatures...)
+
+	schnorrSig, err := schnorr.ParseSignature(signatureBytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse schnorr signature: %w", err)
+	}
+
+	if !ownerPublicKey.Verify(schnorrSig, hash[:]) {
+		return fmt.Errorf("invalid owner signature")
 	}
 
 	return nil
