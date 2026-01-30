@@ -114,6 +114,11 @@ const (
 	// The SSP sometimes sends a counter swap as a normal transfer when it happens from a celery job
 	// This knob filters out these transfers from the query transfers endpoint if counter swaps are not explicitly requested.
 	KnobFilterSSPCounterSwapAsTransfer = "spark.so.filter_ssp_counter_swap_as_transfer"
+
+	// Enable instant static deposit flow.
+	KnobEnableInstantStaticDeposit = "spark.so.enable_instant_static_deposit"
+	// Total number of sats that can be pending in the instant static deposit flow
+	KnobMaxPendingInstantStaticDepositAmount = "spark.so.max_pending_instant_static_deposit_amount"
 )
 
 type Config struct {
