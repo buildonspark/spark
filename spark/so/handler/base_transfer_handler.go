@@ -755,6 +755,7 @@ func lockLeaves(ctx context.Context, db *ent.Client, leaves []*ent.TreeNode) ([]
 	return updatedLeaves, nil
 }
 
+// If open this function in spark.proto, need to take TransferStatusSenderKeyTweakPending out from the allowed status list for TransferTypePreimageSwap.
 func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.CancelTransferRequest) (*pbspark.CancelTransferResponse, error) {
 	reqSenderIDPubKey, err := keys.ParsePublicKey(req.SenderIdentityPublicKey)
 	if err != nil {
@@ -778,9 +779,17 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 		return nil, fmt.Errorf("only sender is eligible to cancel the transfer %s", transferID)
 	}
 
-	if transfer.Status != st.TransferStatusSenderInitiated &&
-		transfer.Status != st.TransferStatusReturned {
-		return nil, fmt.Errorf("transfer %v is expected to be at status TransferStatusSenderInitiated or TransferStatusReturned but %s found", transfer.ID, transfer.Status)
+	if transfer.Type == st.TransferTypePreimageSwap {
+		if transfer.Status != st.TransferStatusSenderInitiated &&
+			transfer.Status != st.TransferStatusSenderKeyTweakPending &&
+			transfer.Status != st.TransferStatusReturned {
+			return nil, fmt.Errorf("preimage swap transfer %v is expected to be at status TransferStatusSenderInitiated, TransferStatusSenderKeyTweakPending, or TransferStatusReturned but %s found", transfer.ID, transfer.Status)
+		}
+	} else {
+		if transfer.Status != st.TransferStatusSenderInitiated &&
+			transfer.Status != st.TransferStatusReturned {
+			return nil, fmt.Errorf("transfer %v is expected to be at status TransferStatusSenderInitiated or TransferStatusReturned but %s found", transfer.ID, transfer.Status)
+		}
 	}
 
 	// The expiry time is only checked for coordinator SO because the creation time of each SO could be different.
