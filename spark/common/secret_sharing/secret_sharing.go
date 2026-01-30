@@ -225,7 +225,7 @@ func RecoverSecret[T LagrangeInterpolatable](shares []T) (*big.Int, error) {
 
 // ValidateShare validates a share of a secret.
 func ValidateShare(share *VerifiableSecretShare) error {
-	if len(share.Proofs) != share.Threshold {
+	if len(share.Proofs) > share.Threshold {
 		return fmt.Errorf("invalid VSS proof length: expected %d, got %d", share.Threshold, len(share.Proofs))
 	}
 	targetPrivKey, err := keys.PrivateKeyFromBigInt(share.Share)
