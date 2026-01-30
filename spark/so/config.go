@@ -711,6 +711,16 @@ func (c *Config) IdentityPublicKey() keys.Public {
 	return c.SigningOperatorMap[c.Identifier].IdentityPublicKey
 }
 
+// TokenRequiredParticipatingOperatorsCount returns the number of operators required to
+// sign/reveal to consider a token transaction valid. By default, signatures from all operators
+// are required. If Token.RequireThresholdOperators is enabled, returns the threshold instead.
+func (c *Config) TokenRequiredParticipatingOperatorsCount() int {
+	if c.Token.RequireThresholdOperators {
+		return int(c.Threshold)
+	}
+	return len(c.SigningOperatorMap)
+}
+
 func (c *Config) GetRateLimiterConfig() *middleware.RateLimiterConfig {
 	return &middleware.RateLimiterConfig{
 		XffClientIpPosition: c.XffClientIpPosition,

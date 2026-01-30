@@ -19,40 +19,6 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
-func TestGetRequiredParticipatingOperatorsCount_ThresholdEnabled(t *testing.T) {
-	config := &so.Config{
-		Threshold: 2,
-		Token: so.TokenConfig{
-			RequireThresholdOperators: true,
-		},
-		SigningOperatorMap: map[string]*so.SigningOperator{
-			"op1": {},
-			"op2": {},
-			"op3": {},
-		},
-	}
-
-	count := getRequiredParticipatingOperatorsCount(config)
-	assert.Equal(t, 2, count)
-}
-
-func TestGetRequiredParticipatingOperatorsCount_ThresholdDisabled(t *testing.T) {
-	config := &so.Config{
-		Threshold: 2,
-		Token: so.TokenConfig{
-			RequireThresholdOperators: false,
-		},
-		SigningOperatorMap: map[string]*so.SigningOperator{
-			"op1": {},
-			"op2": {},
-			"op3": {},
-		},
-	}
-
-	count := getRequiredParticipatingOperatorsCount(config)
-	assert.Equal(t, 3, count)
-}
-
 type retryBroadcastTestSetup struct {
 	config   *so.Config
 	ctx      context.Context
@@ -172,24 +138,16 @@ func TestRetryIncompleteSignatureBroadcasts_FiltersCorrectly(t *testing.T) {
 		SetExpiryTime(time.Now().Add(1 * time.Hour)).
 		SaveX(ctx)
 
-	// Query using the same logic as RetryIncompleteSignatureBroadcasts
-	now := time.Now()
-	tokenTransactions, err := setup.client.TokenTransaction.Query().
-		Where(
-			tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
-			tokentransaction.CoordinatorPublicKeyEQ(setup.config.IdentityPublicKey()),
-			tokentransaction.OperatorSignatureNotNil(),
-			tokentransaction.Or(
-				tokentransaction.ExpiryTimeGT(now),
-				tokentransaction.ExpiryTimeIsNil(),
-			),
-			tokentransaction.VersionGTE(st.TokenTransactionVersionV3),
-		).
-		All(ctx)
-
+	ids, err := findTransactionIDsNeedingRetry(ctx, setup.config)
 	require.NoError(t, err)
-	require.Len(t, tokenTransactions, 1, "should only find 1 transaction matching all criteria")
-	assert.Equal(t, hash1, tokenTransactions[0].FinalizedTokenTransactionHash)
+	require.Len(t, ids, 1, "should only find 1 transaction matching all criteria")
+
+	// Verify it's the right transaction
+	foundTx, err := setup.client.TokenTransaction.Query().
+		Where(tokentransaction.IDEQ(ids[0])).
+		Only(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, hash1, foundTx.FinalizedTokenTransactionHash)
 }
 
 func TestRetryIncompleteSignatureBroadcasts_PeerSignatureCountLogic(t *testing.T) {
@@ -231,22 +189,12 @@ func TestRetryIncompleteSignatureBroadcasts_PeerSignatureCountLogic(t *testing.T
 		Only(ctx)
 	require.NoError(t, err)
 
-	peerSignatureCount := len(txWithSigs.Edges.PeerSignatures)
-	assert.Equal(t, 1, peerSignatureCount, "should have 1 peer signature")
+	assert.Len(t, txWithSigs.Edges.PeerSignatures, 1, "should have 1 peer signature")
 
-	// Verify the filtering logic: with 1 local + 1 peer = 2 total signatures
-	// If threshold is 2, this should be sufficient
-	// If all operators required (3), this should be insufficient
-	requiredOperators := getRequiredParticipatingOperatorsCount(setup.config)
-	totalSignatures := 1 + peerSignatureCount // 1 local + peer signatures
-	needsRetry := totalSignatures < requiredOperators
-
-	t.Logf("Required operators: %d, Total signatures: %d, Needs retry: %v",
-		requiredOperators, totalSignatures, needsRetry)
-
-	// This transaction should need retry if we require all operators (typically 3)
-	// and we only have 2 signatures (1 local + 1 peer)
-	if requiredOperators > 2 {
-		assert.True(t, needsRetry, "transaction should need retry when insufficient signatures")
-	}
+	// With 1 local + 1 peer = 2 total signatures, and test config requires 5 operators,
+	// this transaction should need retry
+	ids, err := findTransactionIDsNeedingRetry(ctx, setup.config)
+	require.NoError(t, err)
+	require.Len(t, ids, 1, "transaction with insufficient signatures should need retry")
+	assert.Equal(t, tx.ID, ids[0])
 }

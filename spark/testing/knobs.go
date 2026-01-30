@@ -18,7 +18,7 @@ import (
 const (
 	knobsNamespace  = "knobs"
 	knobsConfigMap  = "knobs"
-	propagationWait = 200 * time.Millisecond
+	propagationWait = 500 * time.Millisecond
 )
 
 // KnobController provides functionality to manipulate knob values in the K8s ConfigMap

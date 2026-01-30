@@ -19,6 +19,7 @@ const (
 	ReasonInternalObjectOutOfRange             = "INTERNAL_OBJECT_OUT_OF_RANGE"
 	ReasonInternalKeyshareError                = "INTERNAL_KEYSHARE_ERROR"
 	ReasonInternalInvalidOperatorResponse      = "INVALID_OPERATOR_RESPONSE"
+	ReasonInternalOperationTooSlow             = "OPERATION_TOO_SLOW"
 
 	ReasonInvalidArgumentMissingField      = "MISSING_FIELD"
 	ReasonInvalidArgumentMalformedField    = "MALFORMED_FIELD"
@@ -109,6 +110,10 @@ func InternalKeyshareError(err error) error {
 
 func InternalObjectOutOfRange(err error) error {
 	return newGRPCError(codes.Internal, err, ReasonInternalObjectOutOfRange)
+}
+
+func InternalOperationTooSlow(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalOperationTooSlow)
 }
 
 // Use for external objects provided by the caller

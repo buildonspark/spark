@@ -49,17 +49,6 @@ func NewInternalSignTokenHandler(config *so.Config) *InternalSignTokenHandler {
 	}
 }
 
-// getRequiredParticipatingOperatorsCount returns the number of operators required to
-// sign/reveal to consider a transaction valid. By default, signatures from all operators are
-// required. If the Token.RequireThresholdOperators flag is enabled, we fall back
-// to the configured threshold value instead.
-func (h *InternalSignTokenHandler) getRequiredParticipatingOperatorsCount() int {
-	if h.config.Token.RequireThresholdOperators {
-		return int(h.config.Threshold)
-	}
-	return len(h.config.SigningOperatorMap)
-}
-
 // SignAndPersistTokenTransaction performs the core logic for signing a token transaction from coordination.
 // It validates the transaction, input signatures, signs the hash, updates the DB, and returns the signature bytes.
 func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
@@ -218,6 +207,7 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		operatorSignatures[identifier] = sig.GetSignature()
 	}
 
+	knobsService := knobs.GetKnobsService(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -231,7 +221,6 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		return nil, fmt.Errorf("failed to load token transaction with txHash (%x) in ExchangeRevocationSecretsShares: %w", req.FinalTokenTransactionHash, err)
 	}
 
-	knobsService := knobs.GetKnobsService(ctx)
 	if knobsService.GetValue(knobs.KnobReclaimRemappedOutputsIfRevealRequested, 0) == 1 &&
 		len(tokenTransaction.Edges.SpentOutput) != len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()) {
 		// Spent output was potentially re-assigned, if it is in SPENT_STARTED, re-assign it to this transaction.
@@ -1059,7 +1048,7 @@ func (h *InternalSignTokenHandler) canRecoverAndFinalizeTransaction(tokenTransac
 			len(spentOutput.Edges.TokenPartialRevocationSecretShares),
 		)
 	}
-	requiredOperators := h.getRequiredParticipatingOperatorsCount()
+	requiredOperators := h.config.TokenRequiredParticipatingOperatorsCount()
 	// min count of partial revocation secret shares + this server's share must be >= threshold, for all outputs
 	if minCountOutputPartialRevocationSecretSharesForAllOutputs+1 >= requiredOperators {
 		return true, nil
@@ -1127,6 +1116,7 @@ func buildInputOperatorShareMap(operatorShares []*pbtkinternal.OperatorRevocatio
 		ByUUID:     make(map[ShareKey]ShareValue),
 		ByHashVout: make(map[HashVoutShareKey]ShareValue),
 	}
+
 	for _, operatorShare := range operatorShares {
 		if operatorShare == nil {
 			return nil, sparkerrors.InternalInvalidOperatorResponse(fmt.Errorf("nil operator share found in buildInputOperatorShareMap"))
@@ -1177,7 +1167,7 @@ func (h *InternalSignTokenHandler) verifyOperatorSignaturesAndThreshold(
 	signatures operatorSignaturesMap,
 	finalizedTokenTransactionHash []byte,
 ) error {
-	expectedSignatures := h.getRequiredParticipatingOperatorsCount()
+	expectedSignatures := h.config.TokenRequiredParticipatingOperatorsCount()
 	if len(signatures) < expectedSignatures {
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("expected %d signatures, got %d", expectedSignatures, len(signatures)))
 	}

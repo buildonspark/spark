@@ -217,8 +217,6 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 		return nil, err
 	}
 
-	// Fanout to other SOs, then commit. By committing after fanout, the presence of peer signatures
-	// indicates whether fanout succeeded. Transactions with no/insufficient peer signatures need retry.
 	signatures := make(operatorSignaturesMap)
 	signatures[h.config.Identifier] = localResp.SparkOperatorSignature
 
@@ -241,13 +239,13 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 		},
 	)
 
-	// Commit after fanout attempt (success or failure) to record that coordinator finished.
-	// If fanout failed, peer signatures will be absent, signaling that retry is needed.
+	// Commit on coordinator only after fanout attempt fully resolves.
+	// This prevents the scheduled cron from re-attempting a SIGN fanout while the prior attempt
+	// is still executing.
 	if err := ent.DbCommit(ctx); err != nil {
 		return nil, fmt.Errorf("failed to commit token transaction broadcast: %w", err)
 	}
 
-	// Now check the fanout error after committing
 	if fanoutErr != nil {
 		return nil, sparkerrors.WrapErrorWithReasonPrefix(fanoutErr, sparkerrors.ErrorReasonPrefixFailedWithExternalCoordinator)
 	}
