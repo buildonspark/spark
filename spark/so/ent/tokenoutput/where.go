@@ -115,6 +115,16 @@ func CreatedTransactionFinalizedHash(v []byte) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldCreatedTransactionFinalizedHash, v))
 }
 
+// SeFinalizationAdaptorSig applies equality check predicate on the "se_finalization_adaptor_sig" field. It's identical to SeFinalizationAdaptorSigEQ.
+func SeFinalizationAdaptorSig(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldEQ(FieldSeFinalizationAdaptorSig, v))
+}
+
+// SeWithdrawalSignature applies equality check predicate on the "se_withdrawal_signature" field. It's identical to SeWithdrawalSignatureEQ.
+func SeWithdrawalSignature(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldEQ(FieldSeWithdrawalSignature, v))
+}
+
 // SpentOwnershipSignature applies equality check predicate on the "spent_ownership_signature" field. It's identical to SpentOwnershipSignatureEQ.
 func SpentOwnershipSignature(v []byte) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldSpentOwnershipSignature, v))
@@ -638,6 +648,106 @@ func CreatedTransactionFinalizedHashLT(v []byte) predicate.TokenOutput {
 // CreatedTransactionFinalizedHashLTE applies the LTE predicate on the "created_transaction_finalized_hash" field.
 func CreatedTransactionFinalizedHashLTE(v []byte) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldLTE(FieldCreatedTransactionFinalizedHash, v))
+}
+
+// SeFinalizationAdaptorSigEQ applies the EQ predicate on the "se_finalization_adaptor_sig" field.
+func SeFinalizationAdaptorSigEQ(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldEQ(FieldSeFinalizationAdaptorSig, v))
+}
+
+// SeFinalizationAdaptorSigNEQ applies the NEQ predicate on the "se_finalization_adaptor_sig" field.
+func SeFinalizationAdaptorSigNEQ(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNEQ(FieldSeFinalizationAdaptorSig, v))
+}
+
+// SeFinalizationAdaptorSigIn applies the In predicate on the "se_finalization_adaptor_sig" field.
+func SeFinalizationAdaptorSigIn(vs ...[]byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldIn(FieldSeFinalizationAdaptorSig, vs...))
+}
+
+// SeFinalizationAdaptorSigNotIn applies the NotIn predicate on the "se_finalization_adaptor_sig" field.
+func SeFinalizationAdaptorSigNotIn(vs ...[]byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNotIn(FieldSeFinalizationAdaptorSig, vs...))
+}
+
+// SeFinalizationAdaptorSigGT applies the GT predicate on the "se_finalization_adaptor_sig" field.
+func SeFinalizationAdaptorSigGT(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldGT(FieldSeFinalizationAdaptorSig, v))
+}
+
+// SeFinalizationAdaptorSigGTE applies the GTE predicate on the "se_finalization_adaptor_sig" field.
+func SeFinalizationAdaptorSigGTE(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldGTE(FieldSeFinalizationAdaptorSig, v))
+}
+
+// SeFinalizationAdaptorSigLT applies the LT predicate on the "se_finalization_adaptor_sig" field.
+func SeFinalizationAdaptorSigLT(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldLT(FieldSeFinalizationAdaptorSig, v))
+}
+
+// SeFinalizationAdaptorSigLTE applies the LTE predicate on the "se_finalization_adaptor_sig" field.
+func SeFinalizationAdaptorSigLTE(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldLTE(FieldSeFinalizationAdaptorSig, v))
+}
+
+// SeFinalizationAdaptorSigIsNil applies the IsNil predicate on the "se_finalization_adaptor_sig" field.
+func SeFinalizationAdaptorSigIsNil() predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldIsNull(FieldSeFinalizationAdaptorSig))
+}
+
+// SeFinalizationAdaptorSigNotNil applies the NotNil predicate on the "se_finalization_adaptor_sig" field.
+func SeFinalizationAdaptorSigNotNil() predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNotNull(FieldSeFinalizationAdaptorSig))
+}
+
+// SeWithdrawalSignatureEQ applies the EQ predicate on the "se_withdrawal_signature" field.
+func SeWithdrawalSignatureEQ(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldEQ(FieldSeWithdrawalSignature, v))
+}
+
+// SeWithdrawalSignatureNEQ applies the NEQ predicate on the "se_withdrawal_signature" field.
+func SeWithdrawalSignatureNEQ(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNEQ(FieldSeWithdrawalSignature, v))
+}
+
+// SeWithdrawalSignatureIn applies the In predicate on the "se_withdrawal_signature" field.
+func SeWithdrawalSignatureIn(vs ...[]byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldIn(FieldSeWithdrawalSignature, vs...))
+}
+
+// SeWithdrawalSignatureNotIn applies the NotIn predicate on the "se_withdrawal_signature" field.
+func SeWithdrawalSignatureNotIn(vs ...[]byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNotIn(FieldSeWithdrawalSignature, vs...))
+}
+
+// SeWithdrawalSignatureGT applies the GT predicate on the "se_withdrawal_signature" field.
+func SeWithdrawalSignatureGT(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldGT(FieldSeWithdrawalSignature, v))
+}
+
+// SeWithdrawalSignatureGTE applies the GTE predicate on the "se_withdrawal_signature" field.
+func SeWithdrawalSignatureGTE(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldGTE(FieldSeWithdrawalSignature, v))
+}
+
+// SeWithdrawalSignatureLT applies the LT predicate on the "se_withdrawal_signature" field.
+func SeWithdrawalSignatureLT(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldLT(FieldSeWithdrawalSignature, v))
+}
+
+// SeWithdrawalSignatureLTE applies the LTE predicate on the "se_withdrawal_signature" field.
+func SeWithdrawalSignatureLTE(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldLTE(FieldSeWithdrawalSignature, v))
+}
+
+// SeWithdrawalSignatureIsNil applies the IsNil predicate on the "se_withdrawal_signature" field.
+func SeWithdrawalSignatureIsNil() predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldIsNull(FieldSeWithdrawalSignature))
+}
+
+// SeWithdrawalSignatureNotNil applies the NotNil predicate on the "se_withdrawal_signature" field.
+func SeWithdrawalSignatureNotNil() predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNotNull(FieldSeWithdrawalSignature))
 }
 
 // SpentOwnershipSignatureEQ applies the EQ predicate on the "spent_ownership_signature" field.

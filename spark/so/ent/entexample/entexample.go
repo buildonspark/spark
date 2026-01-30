@@ -3232,6 +3232,8 @@ type TokenOutputExample struct {
 	Amount                                  *uint128.Uint128
 	CreatedTransactionOutputVout            *int32
 	CreatedTransactionFinalizedHash         *[]byte
+	SeFinalizationAdaptorSig                *[]byte
+	SeWithdrawalSignature                   *[]byte
 	SpentOwnershipSignature                 *[]byte
 	SpentOperatorSpecificOwnershipSignature *[]byte
 	SpentTransactionInputVout               *int32
@@ -3316,6 +3318,18 @@ func (to *TokenOutputExample) SetCreatedTransactionOutputVout(v int32) *TokenOut
 // SetCreatedTransactionFinalizedHash sets the created_transaction_finalized_hash field.
 func (to *TokenOutputExample) SetCreatedTransactionFinalizedHash(v []byte) *TokenOutputExample {
 	to.CreatedTransactionFinalizedHash = &v
+	return to
+}
+
+// SetSeFinalizationAdaptorSig sets the se_finalization_adaptor_sig field.
+func (to *TokenOutputExample) SetSeFinalizationAdaptorSig(v []byte) *TokenOutputExample {
+	to.SeFinalizationAdaptorSig = &v
+	return to
+}
+
+// SetSeWithdrawalSignature sets the se_withdrawal_signature field.
+func (to *TokenOutputExample) SetSeWithdrawalSignature(v []byte) *TokenOutputExample {
+	to.SeWithdrawalSignature = &v
 	return to
 }
 
@@ -3493,6 +3507,24 @@ func (to *TokenOutputExample) MustExec(ctx context.Context) *ent.TokenOutput {
 			return b
 		}())
 	}
+	if to.SeFinalizationAdaptorSig != nil {
+		create.SetSeFinalizationAdaptorSig(*to.SeFinalizationAdaptorSig)
+	} else {
+		// Use default from annotation
+		create.SetSeFinalizationAdaptorSig(func() []byte {
+			b, _ := hex.DecodeString("c4d0f7f4ed725175ea7f93e3c3864a4fe8f386c5652964b736c7ab7752c939c84d40affa0876733deb843a466c74662e82c94857324e07bcb597097034b3c949")
+			return b
+		}())
+	}
+	if to.SeWithdrawalSignature != nil {
+		create.SetSeWithdrawalSignature(*to.SeWithdrawalSignature)
+	} else {
+		// Use default from annotation
+		create.SetSeWithdrawalSignature(func() []byte {
+			b, _ := hex.DecodeString("c4d0f7f4ed725175ea7f93e3c3864a4fe8f386c5652964b736c7ab7752c939c84d40affa0876733deb843a466c74662e82c94857324e07bcb597097034b3c949")
+			return b
+		}())
+	}
 	if to.SpentOwnershipSignature != nil {
 		create.SetSpentOwnershipSignature(*to.SpentOwnershipSignature)
 	} else {
@@ -3651,6 +3683,24 @@ func (to *TokenOutputExample) Exec(ctx context.Context) (*ent.TokenOutput, error
 		// Use default from annotation
 		create.SetCreatedTransactionFinalizedHash(func() []byte {
 			b, _ := hex.DecodeString("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2")
+			return b
+		}())
+	}
+	if to.SeFinalizationAdaptorSig != nil {
+		create.SetSeFinalizationAdaptorSig(*to.SeFinalizationAdaptorSig)
+	} else {
+		// Use default from annotation
+		create.SetSeFinalizationAdaptorSig(func() []byte {
+			b, _ := hex.DecodeString("c4d0f7f4ed725175ea7f93e3c3864a4fe8f386c5652964b736c7ab7752c939c84d40affa0876733deb843a466c74662e82c94857324e07bcb597097034b3c949")
+			return b
+		}())
+	}
+	if to.SeWithdrawalSignature != nil {
+		create.SetSeWithdrawalSignature(*to.SeWithdrawalSignature)
+	} else {
+		// Use default from annotation
+		create.SetSeWithdrawalSignature(func() []byte {
+			b, _ := hex.DecodeString("c4d0f7f4ed725175ea7f93e3c3864a4fe8f386c5652964b736c7ab7752c939c84d40affa0876733deb843a466c74662e82c94857324e07bcb597097034b3c949")
 			return b
 		}())
 	}

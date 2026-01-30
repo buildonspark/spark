@@ -160,6 +160,7 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputs(ctx context.Context, req *t
 				TokenPublicKey:                output.TokenPublicKey.Serialize(),
 				TokenIdentifier:               output.TokenIdentifier,
 				TokenAmount:                   output.TokenAmount,
+				SeWithdrawalSignature:         output.SeWithdrawalSignature,
 			},
 			PreviousTransactionHash: output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
 			PreviousTransactionVout: uint32(output.CreatedTransactionOutputVout),

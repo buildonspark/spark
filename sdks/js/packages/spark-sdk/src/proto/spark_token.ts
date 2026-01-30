@@ -222,6 +222,11 @@ export interface TokenOutput {
     | undefined;
   /** Decoded uint128 */
   tokenAmount: Uint8Array;
+  /**
+   * SE Schnorr signature enabling offline L1 withdrawal.
+   * Only present in query responses; empty until SE signing is implemented.
+   */
+  seWithdrawalSignature?: Uint8Array | undefined;
 }
 
 export interface PartialTokenOutput {
@@ -966,6 +971,7 @@ function createBaseTokenOutput(): TokenOutput {
     tokenPublicKey: undefined,
     tokenIdentifier: undefined,
     tokenAmount: new Uint8Array(0),
+    seWithdrawalSignature: undefined,
   };
 }
 
@@ -994,6 +1000,9 @@ export const TokenOutput: MessageFns<TokenOutput> = {
     }
     if (message.tokenAmount.length !== 0) {
       writer.uint32(58).bytes(message.tokenAmount);
+    }
+    if (message.seWithdrawalSignature !== undefined) {
+      writer.uint32(74).bytes(message.seWithdrawalSignature);
     }
     return writer;
   },
@@ -1069,6 +1078,14 @@ export const TokenOutput: MessageFns<TokenOutput> = {
           message.tokenAmount = reader.bytes();
           continue;
         }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.seWithdrawalSignature = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1092,6 +1109,9 @@ export const TokenOutput: MessageFns<TokenOutput> = {
       tokenPublicKey: isSet(object.tokenPublicKey) ? bytesFromBase64(object.tokenPublicKey) : undefined,
       tokenIdentifier: isSet(object.tokenIdentifier) ? bytesFromBase64(object.tokenIdentifier) : undefined,
       tokenAmount: isSet(object.tokenAmount) ? bytesFromBase64(object.tokenAmount) : new Uint8Array(0),
+      seWithdrawalSignature: isSet(object.seWithdrawalSignature)
+        ? bytesFromBase64(object.seWithdrawalSignature)
+        : undefined,
     };
   },
 
@@ -1121,6 +1141,9 @@ export const TokenOutput: MessageFns<TokenOutput> = {
     if (message.tokenAmount.length !== 0) {
       obj.tokenAmount = base64FromBytes(message.tokenAmount);
     }
+    if (message.seWithdrawalSignature !== undefined) {
+      obj.seWithdrawalSignature = base64FromBytes(message.seWithdrawalSignature);
+    }
     return obj;
   },
 
@@ -1137,6 +1160,7 @@ export const TokenOutput: MessageFns<TokenOutput> = {
     message.tokenPublicKey = object.tokenPublicKey ?? undefined;
     message.tokenIdentifier = object.tokenIdentifier ?? undefined;
     message.tokenAmount = object.tokenAmount ?? new Uint8Array(0);
+    message.seWithdrawalSignature = object.seWithdrawalSignature ?? undefined;
     return message;
   },
 };

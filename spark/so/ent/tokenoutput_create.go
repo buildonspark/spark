@@ -137,6 +137,18 @@ func (toc *TokenOutputCreate) SetCreatedTransactionFinalizedHash(b []byte) *Toke
 	return toc
 }
 
+// SetSeFinalizationAdaptorSig sets the "se_finalization_adaptor_sig" field.
+func (toc *TokenOutputCreate) SetSeFinalizationAdaptorSig(b []byte) *TokenOutputCreate {
+	toc.mutation.SetSeFinalizationAdaptorSig(b)
+	return toc
+}
+
+// SetSeWithdrawalSignature sets the "se_withdrawal_signature" field.
+func (toc *TokenOutputCreate) SetSeWithdrawalSignature(b []byte) *TokenOutputCreate {
+	toc.mutation.SetSeWithdrawalSignature(b)
+	return toc
+}
+
 // SetSpentOwnershipSignature sets the "spent_ownership_signature" field.
 func (toc *TokenOutputCreate) SetSpentOwnershipSignature(b []byte) *TokenOutputCreate {
 	toc.mutation.SetSpentOwnershipSignature(b)
@@ -525,6 +537,14 @@ func (toc *TokenOutputCreate) createSpec() (*TokenOutput, *sqlgraph.CreateSpec) 
 		_spec.SetField(tokenoutput.FieldCreatedTransactionFinalizedHash, field.TypeBytes, value)
 		_node.CreatedTransactionFinalizedHash = value
 	}
+	if value, ok := toc.mutation.SeFinalizationAdaptorSig(); ok {
+		_spec.SetField(tokenoutput.FieldSeFinalizationAdaptorSig, field.TypeBytes, value)
+		_node.SeFinalizationAdaptorSig = value
+	}
+	if value, ok := toc.mutation.SeWithdrawalSignature(); ok {
+		_spec.SetField(tokenoutput.FieldSeWithdrawalSignature, field.TypeBytes, value)
+		_node.SeWithdrawalSignature = value
+	}
 	if value, ok := toc.mutation.SpentOwnershipSignature(); ok {
 		_spec.SetField(tokenoutput.FieldSpentOwnershipSignature, field.TypeBytes, value)
 		_node.SpentOwnershipSignature = value
@@ -760,6 +780,42 @@ func (u *TokenOutputUpsert) UpdateAmount() *TokenOutputUpsert {
 // ClearAmount clears the value of the "amount" field.
 func (u *TokenOutputUpsert) ClearAmount() *TokenOutputUpsert {
 	u.SetNull(tokenoutput.FieldAmount)
+	return u
+}
+
+// SetSeFinalizationAdaptorSig sets the "se_finalization_adaptor_sig" field.
+func (u *TokenOutputUpsert) SetSeFinalizationAdaptorSig(v []byte) *TokenOutputUpsert {
+	u.Set(tokenoutput.FieldSeFinalizationAdaptorSig, v)
+	return u
+}
+
+// UpdateSeFinalizationAdaptorSig sets the "se_finalization_adaptor_sig" field to the value that was provided on create.
+func (u *TokenOutputUpsert) UpdateSeFinalizationAdaptorSig() *TokenOutputUpsert {
+	u.SetExcluded(tokenoutput.FieldSeFinalizationAdaptorSig)
+	return u
+}
+
+// ClearSeFinalizationAdaptorSig clears the value of the "se_finalization_adaptor_sig" field.
+func (u *TokenOutputUpsert) ClearSeFinalizationAdaptorSig() *TokenOutputUpsert {
+	u.SetNull(tokenoutput.FieldSeFinalizationAdaptorSig)
+	return u
+}
+
+// SetSeWithdrawalSignature sets the "se_withdrawal_signature" field.
+func (u *TokenOutputUpsert) SetSeWithdrawalSignature(v []byte) *TokenOutputUpsert {
+	u.Set(tokenoutput.FieldSeWithdrawalSignature, v)
+	return u
+}
+
+// UpdateSeWithdrawalSignature sets the "se_withdrawal_signature" field to the value that was provided on create.
+func (u *TokenOutputUpsert) UpdateSeWithdrawalSignature() *TokenOutputUpsert {
+	u.SetExcluded(tokenoutput.FieldSeWithdrawalSignature)
+	return u
+}
+
+// ClearSeWithdrawalSignature clears the value of the "se_withdrawal_signature" field.
+func (u *TokenOutputUpsert) ClearSeWithdrawalSignature() *TokenOutputUpsert {
+	u.SetNull(tokenoutput.FieldSeWithdrawalSignature)
 	return u
 }
 
@@ -1004,6 +1060,48 @@ func (u *TokenOutputUpsertOne) UpdateAmount() *TokenOutputUpsertOne {
 func (u *TokenOutputUpsertOne) ClearAmount() *TokenOutputUpsertOne {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.ClearAmount()
+	})
+}
+
+// SetSeFinalizationAdaptorSig sets the "se_finalization_adaptor_sig" field.
+func (u *TokenOutputUpsertOne) SetSeFinalizationAdaptorSig(v []byte) *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.SetSeFinalizationAdaptorSig(v)
+	})
+}
+
+// UpdateSeFinalizationAdaptorSig sets the "se_finalization_adaptor_sig" field to the value that was provided on create.
+func (u *TokenOutputUpsertOne) UpdateSeFinalizationAdaptorSig() *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.UpdateSeFinalizationAdaptorSig()
+	})
+}
+
+// ClearSeFinalizationAdaptorSig clears the value of the "se_finalization_adaptor_sig" field.
+func (u *TokenOutputUpsertOne) ClearSeFinalizationAdaptorSig() *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.ClearSeFinalizationAdaptorSig()
+	})
+}
+
+// SetSeWithdrawalSignature sets the "se_withdrawal_signature" field.
+func (u *TokenOutputUpsertOne) SetSeWithdrawalSignature(v []byte) *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.SetSeWithdrawalSignature(v)
+	})
+}
+
+// UpdateSeWithdrawalSignature sets the "se_withdrawal_signature" field to the value that was provided on create.
+func (u *TokenOutputUpsertOne) UpdateSeWithdrawalSignature() *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.UpdateSeWithdrawalSignature()
+	})
+}
+
+// ClearSeWithdrawalSignature clears the value of the "se_withdrawal_signature" field.
+func (u *TokenOutputUpsertOne) ClearSeWithdrawalSignature() *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.ClearSeWithdrawalSignature()
 	})
 }
 
@@ -1434,6 +1532,48 @@ func (u *TokenOutputUpsertBulk) UpdateAmount() *TokenOutputUpsertBulk {
 func (u *TokenOutputUpsertBulk) ClearAmount() *TokenOutputUpsertBulk {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.ClearAmount()
+	})
+}
+
+// SetSeFinalizationAdaptorSig sets the "se_finalization_adaptor_sig" field.
+func (u *TokenOutputUpsertBulk) SetSeFinalizationAdaptorSig(v []byte) *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.SetSeFinalizationAdaptorSig(v)
+	})
+}
+
+// UpdateSeFinalizationAdaptorSig sets the "se_finalization_adaptor_sig" field to the value that was provided on create.
+func (u *TokenOutputUpsertBulk) UpdateSeFinalizationAdaptorSig() *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.UpdateSeFinalizationAdaptorSig()
+	})
+}
+
+// ClearSeFinalizationAdaptorSig clears the value of the "se_finalization_adaptor_sig" field.
+func (u *TokenOutputUpsertBulk) ClearSeFinalizationAdaptorSig() *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.ClearSeFinalizationAdaptorSig()
+	})
+}
+
+// SetSeWithdrawalSignature sets the "se_withdrawal_signature" field.
+func (u *TokenOutputUpsertBulk) SetSeWithdrawalSignature(v []byte) *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.SetSeWithdrawalSignature(v)
+	})
+}
+
+// UpdateSeWithdrawalSignature sets the "se_withdrawal_signature" field to the value that was provided on create.
+func (u *TokenOutputUpsertBulk) UpdateSeWithdrawalSignature() *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.UpdateSeWithdrawalSignature()
+	})
+}
+
+// ClearSeWithdrawalSignature clears the value of the "se_withdrawal_signature" field.
+func (u *TokenOutputUpsertBulk) ClearSeWithdrawalSignature() *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.ClearSeWithdrawalSignature()
 	})
 }
 

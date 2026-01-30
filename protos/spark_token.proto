@@ -78,6 +78,9 @@ message TokenOutput {
     bytes token_amount     = 7
         [(validate.rules).bytes.len = 16];  // Decoded uint128
 
+    // SE Schnorr signature enabling offline L1 withdrawal.
+    // Only present in query responses; empty until SE signing is implemented.
+    optional bytes se_withdrawal_signature = 9;
 }
 
 message PartialTokenOutput {

@@ -50,6 +50,10 @@ type TokenOutput struct {
 	CreatedTransactionOutputVout int32 `json:"created_transaction_output_vout,omitempty"`
 	// Denormalized finalized transaction hash from the output_created_token_transaction edge. Auto-populated by hook.
 	CreatedTransactionFinalizedHash []byte `json:"created_transaction_finalized_hash,omitempty"`
+	// SE adaptor signature locked to the finalization secret. Created during transaction signing (Phase 1).
+	SeFinalizationAdaptorSig []byte `json:"se_finalization_adaptor_sig,omitempty"`
+	// Final SE Schnorr signature over SparkExitReceipt. Computed by adapting se_finalization_adaptor_sig with the finalization secret (Phase 2). Enables offline L1 withdrawal capability.
+	SeWithdrawalSignature []byte `json:"se_withdrawal_signature,omitempty"`
 	// SpentOwnershipSignature holds the value of the "spent_ownership_signature" field.
 	SpentOwnershipSignature []byte `json:"spent_ownership_signature,omitempty"`
 	// SpentOperatorSpecificOwnershipSignature holds the value of the "spent_operator_specific_ownership_signature" field.
@@ -174,7 +178,7 @@ func (*TokenOutput) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokenoutput.FieldWithdrawRevocationCommitment, tokenoutput.FieldTokenAmount, tokenoutput.FieldCreatedTransactionFinalizedHash, tokenoutput.FieldSpentOwnershipSignature, tokenoutput.FieldSpentOperatorSpecificOwnershipSignature, tokenoutput.FieldConfirmedWithdrawBlockHash, tokenoutput.FieldTokenIdentifier:
+		case tokenoutput.FieldWithdrawRevocationCommitment, tokenoutput.FieldTokenAmount, tokenoutput.FieldCreatedTransactionFinalizedHash, tokenoutput.FieldSeFinalizationAdaptorSig, tokenoutput.FieldSeWithdrawalSignature, tokenoutput.FieldSpentOwnershipSignature, tokenoutput.FieldSpentOperatorSpecificOwnershipSignature, tokenoutput.FieldConfirmedWithdrawBlockHash, tokenoutput.FieldTokenIdentifier:
 			values[i] = new([]byte)
 		case tokenoutput.FieldNetwork:
 			values[i] = new(btcnetwork.Network)
@@ -290,6 +294,18 @@ func (to *TokenOutput) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field created_transaction_finalized_hash", values[i])
 			} else if value != nil {
 				to.CreatedTransactionFinalizedHash = *value
+			}
+		case tokenoutput.FieldSeFinalizationAdaptorSig:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field se_finalization_adaptor_sig", values[i])
+			} else if value != nil {
+				to.SeFinalizationAdaptorSig = *value
+			}
+		case tokenoutput.FieldSeWithdrawalSignature:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field se_withdrawal_signature", values[i])
+			} else if value != nil {
+				to.SeWithdrawalSignature = *value
 			}
 		case tokenoutput.FieldSpentOwnershipSignature:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -466,6 +482,12 @@ func (to *TokenOutput) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("created_transaction_finalized_hash=")
 	builder.WriteString(fmt.Sprintf("%v", to.CreatedTransactionFinalizedHash))
+	builder.WriteString(", ")
+	builder.WriteString("se_finalization_adaptor_sig=")
+	builder.WriteString(fmt.Sprintf("%v", to.SeFinalizationAdaptorSig))
+	builder.WriteString(", ")
+	builder.WriteString("se_withdrawal_signature=")
+	builder.WriteString(fmt.Sprintf("%v", to.SeWithdrawalSignature))
 	builder.WriteString(", ")
 	builder.WriteString("spent_ownership_signature=")
 	builder.WriteString(fmt.Sprintf("%v", to.SpentOwnershipSignature))

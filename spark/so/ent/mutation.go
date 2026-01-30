@@ -15781,6 +15781,8 @@ type TokenOutputMutation struct {
 	created_transaction_output_vout                *int32
 	addcreated_transaction_output_vout             *int32
 	created_transaction_finalized_hash             *[]byte
+	se_finalization_adaptor_sig                    *[]byte
+	se_withdrawal_signature                        *[]byte
 	spent_ownership_signature                      *[]byte
 	spent_operator_specific_ownership_signature    *[]byte
 	spent_transaction_input_vout                   *int32
@@ -16431,6 +16433,104 @@ func (m *TokenOutputMutation) OldCreatedTransactionFinalizedHash(ctx context.Con
 // ResetCreatedTransactionFinalizedHash resets all changes to the "created_transaction_finalized_hash" field.
 func (m *TokenOutputMutation) ResetCreatedTransactionFinalizedHash() {
 	m.created_transaction_finalized_hash = nil
+}
+
+// SetSeFinalizationAdaptorSig sets the "se_finalization_adaptor_sig" field.
+func (m *TokenOutputMutation) SetSeFinalizationAdaptorSig(b []byte) {
+	m.se_finalization_adaptor_sig = &b
+}
+
+// SeFinalizationAdaptorSig returns the value of the "se_finalization_adaptor_sig" field in the mutation.
+func (m *TokenOutputMutation) SeFinalizationAdaptorSig() (r []byte, exists bool) {
+	v := m.se_finalization_adaptor_sig
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSeFinalizationAdaptorSig returns the old "se_finalization_adaptor_sig" field's value of the TokenOutput entity.
+// If the TokenOutput object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenOutputMutation) OldSeFinalizationAdaptorSig(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSeFinalizationAdaptorSig is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSeFinalizationAdaptorSig requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSeFinalizationAdaptorSig: %w", err)
+	}
+	return oldValue.SeFinalizationAdaptorSig, nil
+}
+
+// ClearSeFinalizationAdaptorSig clears the value of the "se_finalization_adaptor_sig" field.
+func (m *TokenOutputMutation) ClearSeFinalizationAdaptorSig() {
+	m.se_finalization_adaptor_sig = nil
+	m.clearedFields[tokenoutput.FieldSeFinalizationAdaptorSig] = struct{}{}
+}
+
+// SeFinalizationAdaptorSigCleared returns if the "se_finalization_adaptor_sig" field was cleared in this mutation.
+func (m *TokenOutputMutation) SeFinalizationAdaptorSigCleared() bool {
+	_, ok := m.clearedFields[tokenoutput.FieldSeFinalizationAdaptorSig]
+	return ok
+}
+
+// ResetSeFinalizationAdaptorSig resets all changes to the "se_finalization_adaptor_sig" field.
+func (m *TokenOutputMutation) ResetSeFinalizationAdaptorSig() {
+	m.se_finalization_adaptor_sig = nil
+	delete(m.clearedFields, tokenoutput.FieldSeFinalizationAdaptorSig)
+}
+
+// SetSeWithdrawalSignature sets the "se_withdrawal_signature" field.
+func (m *TokenOutputMutation) SetSeWithdrawalSignature(b []byte) {
+	m.se_withdrawal_signature = &b
+}
+
+// SeWithdrawalSignature returns the value of the "se_withdrawal_signature" field in the mutation.
+func (m *TokenOutputMutation) SeWithdrawalSignature() (r []byte, exists bool) {
+	v := m.se_withdrawal_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSeWithdrawalSignature returns the old "se_withdrawal_signature" field's value of the TokenOutput entity.
+// If the TokenOutput object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenOutputMutation) OldSeWithdrawalSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSeWithdrawalSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSeWithdrawalSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSeWithdrawalSignature: %w", err)
+	}
+	return oldValue.SeWithdrawalSignature, nil
+}
+
+// ClearSeWithdrawalSignature clears the value of the "se_withdrawal_signature" field.
+func (m *TokenOutputMutation) ClearSeWithdrawalSignature() {
+	m.se_withdrawal_signature = nil
+	m.clearedFields[tokenoutput.FieldSeWithdrawalSignature] = struct{}{}
+}
+
+// SeWithdrawalSignatureCleared returns if the "se_withdrawal_signature" field was cleared in this mutation.
+func (m *TokenOutputMutation) SeWithdrawalSignatureCleared() bool {
+	_, ok := m.clearedFields[tokenoutput.FieldSeWithdrawalSignature]
+	return ok
+}
+
+// ResetSeWithdrawalSignature resets all changes to the "se_withdrawal_signature" field.
+func (m *TokenOutputMutation) ResetSeWithdrawalSignature() {
+	m.se_withdrawal_signature = nil
+	delete(m.clearedFields, tokenoutput.FieldSeWithdrawalSignature)
 }
 
 // SetSpentOwnershipSignature sets the "spent_ownership_signature" field.
@@ -17145,7 +17245,7 @@ func (m *TokenOutputMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenOutputMutation) Fields() []string {
-	fields := make([]string, 0, 20)
+	fields := make([]string, 0, 22)
 	if m.create_time != nil {
 		fields = append(fields, tokenoutput.FieldCreateTime)
 	}
@@ -17181,6 +17281,12 @@ func (m *TokenOutputMutation) Fields() []string {
 	}
 	if m.created_transaction_finalized_hash != nil {
 		fields = append(fields, tokenoutput.FieldCreatedTransactionFinalizedHash)
+	}
+	if m.se_finalization_adaptor_sig != nil {
+		fields = append(fields, tokenoutput.FieldSeFinalizationAdaptorSig)
+	}
+	if m.se_withdrawal_signature != nil {
+		fields = append(fields, tokenoutput.FieldSeWithdrawalSignature)
 	}
 	if m.spent_ownership_signature != nil {
 		fields = append(fields, tokenoutput.FieldSpentOwnershipSignature)
@@ -17238,6 +17344,10 @@ func (m *TokenOutputMutation) Field(name string) (ent.Value, bool) {
 		return m.CreatedTransactionOutputVout()
 	case tokenoutput.FieldCreatedTransactionFinalizedHash:
 		return m.CreatedTransactionFinalizedHash()
+	case tokenoutput.FieldSeFinalizationAdaptorSig:
+		return m.SeFinalizationAdaptorSig()
+	case tokenoutput.FieldSeWithdrawalSignature:
+		return m.SeWithdrawalSignature()
 	case tokenoutput.FieldSpentOwnershipSignature:
 		return m.SpentOwnershipSignature()
 	case tokenoutput.FieldSpentOperatorSpecificOwnershipSignature:
@@ -17287,6 +17397,10 @@ func (m *TokenOutputMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldCreatedTransactionOutputVout(ctx)
 	case tokenoutput.FieldCreatedTransactionFinalizedHash:
 		return m.OldCreatedTransactionFinalizedHash(ctx)
+	case tokenoutput.FieldSeFinalizationAdaptorSig:
+		return m.OldSeFinalizationAdaptorSig(ctx)
+	case tokenoutput.FieldSeWithdrawalSignature:
+		return m.OldSeWithdrawalSignature(ctx)
 	case tokenoutput.FieldSpentOwnershipSignature:
 		return m.OldSpentOwnershipSignature(ctx)
 	case tokenoutput.FieldSpentOperatorSpecificOwnershipSignature:
@@ -17395,6 +17509,20 @@ func (m *TokenOutputMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCreatedTransactionFinalizedHash(v)
+		return nil
+	case tokenoutput.FieldSeFinalizationAdaptorSig:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSeFinalizationAdaptorSig(v)
+		return nil
+	case tokenoutput.FieldSeWithdrawalSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSeWithdrawalSignature(v)
 		return nil
 	case tokenoutput.FieldSpentOwnershipSignature:
 		v, ok := value.([]byte)
@@ -17539,6 +17667,12 @@ func (m *TokenOutputMutation) ClearedFields() []string {
 	if m.FieldCleared(tokenoutput.FieldAmount) {
 		fields = append(fields, tokenoutput.FieldAmount)
 	}
+	if m.FieldCleared(tokenoutput.FieldSeFinalizationAdaptorSig) {
+		fields = append(fields, tokenoutput.FieldSeFinalizationAdaptorSig)
+	}
+	if m.FieldCleared(tokenoutput.FieldSeWithdrawalSignature) {
+		fields = append(fields, tokenoutput.FieldSeWithdrawalSignature)
+	}
 	if m.FieldCleared(tokenoutput.FieldSpentOwnershipSignature) {
 		fields = append(fields, tokenoutput.FieldSpentOwnershipSignature)
 	}
@@ -17576,6 +17710,12 @@ func (m *TokenOutputMutation) ClearField(name string) error {
 		return nil
 	case tokenoutput.FieldAmount:
 		m.ClearAmount()
+		return nil
+	case tokenoutput.FieldSeFinalizationAdaptorSig:
+		m.ClearSeFinalizationAdaptorSig()
+		return nil
+	case tokenoutput.FieldSeWithdrawalSignature:
+		m.ClearSeWithdrawalSignature()
 		return nil
 	case tokenoutput.FieldSpentOwnershipSignature:
 		m.ClearSpentOwnershipSignature()
@@ -17638,6 +17778,12 @@ func (m *TokenOutputMutation) ResetField(name string) error {
 		return nil
 	case tokenoutput.FieldCreatedTransactionFinalizedHash:
 		m.ResetCreatedTransactionFinalizedHash()
+		return nil
+	case tokenoutput.FieldSeFinalizationAdaptorSig:
+		m.ResetSeFinalizationAdaptorSig()
+		return nil
+	case tokenoutput.FieldSeWithdrawalSignature:
+		m.ResetSeWithdrawalSignature()
 		return nil
 	case tokenoutput.FieldSpentOwnershipSignature:
 		m.ResetSpentOwnershipSignature()

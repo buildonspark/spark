@@ -77,6 +77,30 @@ func (tou *TokenOutputUpdate) ClearAmount() *TokenOutputUpdate {
 	return tou
 }
 
+// SetSeFinalizationAdaptorSig sets the "se_finalization_adaptor_sig" field.
+func (tou *TokenOutputUpdate) SetSeFinalizationAdaptorSig(b []byte) *TokenOutputUpdate {
+	tou.mutation.SetSeFinalizationAdaptorSig(b)
+	return tou
+}
+
+// ClearSeFinalizationAdaptorSig clears the value of the "se_finalization_adaptor_sig" field.
+func (tou *TokenOutputUpdate) ClearSeFinalizationAdaptorSig() *TokenOutputUpdate {
+	tou.mutation.ClearSeFinalizationAdaptorSig()
+	return tou
+}
+
+// SetSeWithdrawalSignature sets the "se_withdrawal_signature" field.
+func (tou *TokenOutputUpdate) SetSeWithdrawalSignature(b []byte) *TokenOutputUpdate {
+	tou.mutation.SetSeWithdrawalSignature(b)
+	return tou
+}
+
+// ClearSeWithdrawalSignature clears the value of the "se_withdrawal_signature" field.
+func (tou *TokenOutputUpdate) ClearSeWithdrawalSignature() *TokenOutputUpdate {
+	tou.mutation.ClearSeWithdrawalSignature()
+	return tou
+}
+
 // SetSpentOwnershipSignature sets the "spent_ownership_signature" field.
 func (tou *TokenOutputUpdate) SetSpentOwnershipSignature(b []byte) *TokenOutputUpdate {
 	tou.mutation.SetSpentOwnershipSignature(b)
@@ -406,6 +430,18 @@ func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if tou.mutation.AmountCleared() {
 		_spec.ClearField(tokenoutput.FieldAmount, field.TypeOther)
 	}
+	if value, ok := tou.mutation.SeFinalizationAdaptorSig(); ok {
+		_spec.SetField(tokenoutput.FieldSeFinalizationAdaptorSig, field.TypeBytes, value)
+	}
+	if tou.mutation.SeFinalizationAdaptorSigCleared() {
+		_spec.ClearField(tokenoutput.FieldSeFinalizationAdaptorSig, field.TypeBytes)
+	}
+	if value, ok := tou.mutation.SeWithdrawalSignature(); ok {
+		_spec.SetField(tokenoutput.FieldSeWithdrawalSignature, field.TypeBytes, value)
+	}
+	if tou.mutation.SeWithdrawalSignatureCleared() {
+		_spec.ClearField(tokenoutput.FieldSeWithdrawalSignature, field.TypeBytes)
+	}
 	if value, ok := tou.mutation.SpentOwnershipSignature(); ok {
 		_spec.SetField(tokenoutput.FieldSpentOwnershipSignature, field.TypeBytes, value)
 	}
@@ -652,6 +688,30 @@ func (touo *TokenOutputUpdateOne) SetNillableAmount(u *uint128.Uint128) *TokenOu
 // ClearAmount clears the value of the "amount" field.
 func (touo *TokenOutputUpdateOne) ClearAmount() *TokenOutputUpdateOne {
 	touo.mutation.ClearAmount()
+	return touo
+}
+
+// SetSeFinalizationAdaptorSig sets the "se_finalization_adaptor_sig" field.
+func (touo *TokenOutputUpdateOne) SetSeFinalizationAdaptorSig(b []byte) *TokenOutputUpdateOne {
+	touo.mutation.SetSeFinalizationAdaptorSig(b)
+	return touo
+}
+
+// ClearSeFinalizationAdaptorSig clears the value of the "se_finalization_adaptor_sig" field.
+func (touo *TokenOutputUpdateOne) ClearSeFinalizationAdaptorSig() *TokenOutputUpdateOne {
+	touo.mutation.ClearSeFinalizationAdaptorSig()
+	return touo
+}
+
+// SetSeWithdrawalSignature sets the "se_withdrawal_signature" field.
+func (touo *TokenOutputUpdateOne) SetSeWithdrawalSignature(b []byte) *TokenOutputUpdateOne {
+	touo.mutation.SetSeWithdrawalSignature(b)
+	return touo
+}
+
+// ClearSeWithdrawalSignature clears the value of the "se_withdrawal_signature" field.
+func (touo *TokenOutputUpdateOne) ClearSeWithdrawalSignature() *TokenOutputUpdateOne {
+	touo.mutation.ClearSeWithdrawalSignature()
 	return touo
 }
 
@@ -1013,6 +1073,18 @@ func (touo *TokenOutputUpdateOne) sqlSave(ctx context.Context) (_node *TokenOutp
 	}
 	if touo.mutation.AmountCleared() {
 		_spec.ClearField(tokenoutput.FieldAmount, field.TypeOther)
+	}
+	if value, ok := touo.mutation.SeFinalizationAdaptorSig(); ok {
+		_spec.SetField(tokenoutput.FieldSeFinalizationAdaptorSig, field.TypeBytes, value)
+	}
+	if touo.mutation.SeFinalizationAdaptorSigCleared() {
+		_spec.ClearField(tokenoutput.FieldSeFinalizationAdaptorSig, field.TypeBytes)
+	}
+	if value, ok := touo.mutation.SeWithdrawalSignature(); ok {
+		_spec.SetField(tokenoutput.FieldSeWithdrawalSignature, field.TypeBytes, value)
+	}
+	if touo.mutation.SeWithdrawalSignatureCleared() {
+		_spec.ClearField(tokenoutput.FieldSeWithdrawalSignature, field.TypeBytes)
 	}
 	if value, ok := touo.mutation.SpentOwnershipSignature(); ok {
 		_spec.SetField(tokenoutput.FieldSpentOwnershipSignature, field.TypeBytes, value)

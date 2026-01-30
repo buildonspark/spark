@@ -43,6 +43,10 @@ const (
 	FieldCreatedTransactionOutputVout = "created_transaction_output_vout"
 	// FieldCreatedTransactionFinalizedHash holds the string denoting the created_transaction_finalized_hash field in the database.
 	FieldCreatedTransactionFinalizedHash = "created_transaction_finalized_hash"
+	// FieldSeFinalizationAdaptorSig holds the string denoting the se_finalization_adaptor_sig field in the database.
+	FieldSeFinalizationAdaptorSig = "se_finalization_adaptor_sig"
+	// FieldSeWithdrawalSignature holds the string denoting the se_withdrawal_signature field in the database.
+	FieldSeWithdrawalSignature = "se_withdrawal_signature"
 	// FieldSpentOwnershipSignature holds the string denoting the spent_ownership_signature field in the database.
 	FieldSpentOwnershipSignature = "spent_ownership_signature"
 	// FieldSpentOperatorSpecificOwnershipSignature holds the string denoting the spent_operator_specific_ownership_signature field in the database.
@@ -139,6 +143,8 @@ var Columns = []string{
 	FieldAmount,
 	FieldCreatedTransactionOutputVout,
 	FieldCreatedTransactionFinalizedHash,
+	FieldSeFinalizationAdaptorSig,
+	FieldSeWithdrawalSignature,
 	FieldSpentOwnershipSignature,
 	FieldSpentOperatorSpecificOwnershipSignature,
 	FieldSpentTransactionInputVout,

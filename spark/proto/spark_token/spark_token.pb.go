@@ -451,8 +451,11 @@ type TokenOutput struct {
 	TokenPublicKey                []byte                 `protobuf:"bytes,6,opt,name=token_public_key,json=tokenPublicKey,proto3,oneof" json:"token_public_key,omitempty"`
 	TokenIdentifier               []byte                 `protobuf:"bytes,8,opt,name=token_identifier,json=tokenIdentifier,proto3,oneof" json:"token_identifier,omitempty"`
 	TokenAmount                   []byte                 `protobuf:"bytes,7,opt,name=token_amount,json=tokenAmount,proto3" json:"token_amount,omitempty"` // Decoded uint128
-	unknownFields                 protoimpl.UnknownFields
-	sizeCache                     protoimpl.SizeCache
+	// SE Schnorr signature enabling offline L1 withdrawal.
+	// Only present in query responses; empty until SE signing is implemented.
+	SeWithdrawalSignature []byte `protobuf:"bytes,9,opt,name=se_withdrawal_signature,json=seWithdrawalSignature,proto3,oneof" json:"se_withdrawal_signature,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *TokenOutput) Reset() {
@@ -537,6 +540,13 @@ func (x *TokenOutput) GetTokenIdentifier() []byte {
 func (x *TokenOutput) GetTokenAmount() []byte {
 	if x != nil {
 		return x.TokenAmount
+	}
+	return nil
+}
+
+func (x *TokenOutput) GetSeWithdrawalSignature() []byte {
+	if x != nil {
+		return x.SeWithdrawalSignature
 	}
 	return nil
 }
@@ -2892,7 +2902,7 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x1acreation_entity_public_key\x18\a \x01(\fB\a\xfaB\x04z\x02h!H\x00R\x17creationEntityPublicKey\x88\x01\x01\x124\n" +
 	"\x0eextra_metadata\x18\b \x01(\fB\b\xfaB\x05z\x03\x18\x80\bH\x01R\rextraMetadata\x88\x01\x01B\x1d\n" +
 	"\x1b_creation_entity_public_keyB\x11\n" +
-	"\x0f_extra_metadata\"\xc7\x04\n" +
+	"\x0f_extra_metadata\"\xa0\x05\n" +
 	"\vTokenOutput\x12\x1d\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01H\x00R\x02id\x88\x01\x01\x121\n" +
 	"\x10owner_public_key\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x0eownerPublicKey\x12A\n" +
@@ -2901,13 +2911,15 @@ const file_spark_token_proto_rawDesc = "" +
 	" withdraw_relative_block_locktime\x18\x05 \x01(\x04H\x03R\x1dwithdrawRelativeBlockLocktime\x88\x01\x01\x126\n" +
 	"\x10token_public_key\x18\x06 \x01(\fB\a\xfaB\x04z\x02h!H\x04R\x0etokenPublicKey\x88\x01\x01\x127\n" +
 	"\x10token_identifier\x18\b \x01(\fB\a\xfaB\x04z\x02h H\x05R\x0ftokenIdentifier\x88\x01\x01\x12*\n" +
-	"\ftoken_amount\x18\a \x01(\fB\a\xfaB\x04z\x02h\x10R\vtokenAmountB\x05\n" +
+	"\ftoken_amount\x18\a \x01(\fB\a\xfaB\x04z\x02h\x10R\vtokenAmount\x12;\n" +
+	"\x17se_withdrawal_signature\x18\t \x01(\fH\x06R\x15seWithdrawalSignature\x88\x01\x01B\x05\n" +
 	"\x03_idB\x18\n" +
 	"\x16_revocation_commitmentB\x15\n" +
 	"\x13_withdraw_bond_satsB#\n" +
 	"!_withdraw_relative_block_locktimeB\x13\n" +
 	"\x11_token_public_keyB\x13\n" +
-	"\x11_token_identifier\"\x9e\x02\n" +
+	"\x11_token_identifierB\x1a\n" +
+	"\x18_se_withdrawal_signature\"\x9e\x02\n" +
 	"\x12PartialTokenOutput\x121\n" +
 	"\x10owner_public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\x0eownerPublicKey\x12,\n" +
 	"\x12withdraw_bond_sats\x18\x02 \x01(\x04R\x10withdrawBondSats\x12G\n" +

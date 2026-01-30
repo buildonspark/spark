@@ -84,6 +84,14 @@ func (TokenOutput) Fields() []ent.Field {
 			Annotations(entexample.Default(
 				"a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
 			)),
+		field.Bytes("se_finalization_adaptor_sig").
+			Optional().
+			Comment("SE adaptor signature locked to the finalization secret. Created during transaction signing (Phase 1).").
+			Annotations(entexample.Default("c4d0f7f4ed725175ea7f93e3c3864a4fe8f386c5652964b736c7ab7752c939c84d40affa0876733deb843a466c74662e82c94857324e07bcb597097034b3c949")),
+		field.Bytes("se_withdrawal_signature").
+			Optional().
+			Comment("Final SE Schnorr signature over SparkExitReceipt. Computed by adapting se_finalization_adaptor_sig with the finalization secret (Phase 2). Enables offline L1 withdrawal capability.").
+			Annotations(entexample.Default("c4d0f7f4ed725175ea7f93e3c3864a4fe8f386c5652964b736c7ab7752c939c84d40affa0876733deb843a466c74662e82c94857324e07bcb597097034b3c949")),
 		field.Bytes("spent_ownership_signature").
 			Optional(),
 		field.Bytes("spent_operator_specific_ownership_signature").
