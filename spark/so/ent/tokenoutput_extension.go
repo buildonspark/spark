@@ -169,7 +169,9 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 	return outputs, nil
 }
 
-func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys []keys.Public, tokenIdentifier []byte, network btcnetwork.Network) (uuid.UUIDs, *big.Int, error) {
+// GetOwnedTokenOutputRefs returns token output references (outpoints) and total amount for owned outputs.
+// Outpoints (transaction hash + vout) are deterministic and consistent across all SOs.
+func GetOwnedTokenOutputRefs(ctx context.Context, ownerPublicKeys []keys.Public, tokenIdentifier []byte, network btcnetwork.Network) ([]*tokenpb.TokenOutputRef, *big.Int, error) {
 	outputs, err := GetOwnedTokenOutputs(ctx, GetOwnedTokenOutputsParams{
 		OwnerPublicKeys:            ownerPublicKeys,
 		TokenIdentifiers:           [][]byte{tokenIdentifier},
@@ -177,17 +179,19 @@ func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys []keys.Public
 		Network:                    network,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to query owned output stats: %w", err)
+		return nil, nil, fmt.Errorf("failed to query owned output refs: %w", err)
 	}
 
-	// Collect output IDs and token amounts
-	outputIDs := make([]uuid.UUID, len(outputs))
+	outputRefs := make([]*tokenpb.TokenOutputRef, len(outputs))
 	totalAmount := new(big.Int)
 	for i, output := range outputs {
-		outputIDs[i] = output.ID
+		outputRefs[i] = &tokenpb.TokenOutputRef{
+			TransactionHash: output.CreatedTransactionFinalizedHash,
+			Vout:            uint32(output.CreatedTransactionOutputVout),
+		}
 		amount := new(big.Int).SetBytes(output.TokenAmount)
 		totalAmount.Add(totalAmount, amount)
 	}
 
-	return outputIDs, totalAmount, nil
+	return outputRefs, totalAmount, nil
 }

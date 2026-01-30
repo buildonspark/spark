@@ -107,7 +107,7 @@ func TestFreezeTokens_SuccessWhenFreezable(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Equal(t, []string{}, resp.ImpactedOutputIds)
+	assert.Empty(t, resp.ImpactedTokenOutputs)
 	assert.Equal(t, big.NewInt(0).Bytes(), resp.ImpactedTokenAmount)
 }
 

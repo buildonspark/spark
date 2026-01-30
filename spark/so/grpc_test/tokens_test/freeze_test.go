@@ -51,22 +51,13 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 			require.NoError(t, err, "failed to hash final transfer token transaction")
 
-			// V3 transactions don't return the output ID, so we query it to verify the freeze response.
-			// We verify the output matches our transaction hash and vout 0.
-			outputs, err := wallet.QueryTokenOutputs(t.Context(), config, []keys.Public{userOutput1PrivKey.Public()}, nil)
-			require.NoError(t, err, "failed to query token outputs for expected ID")
-			require.Len(t, outputs.OutputsWithPreviousTransactionData, 1, "expected 1 output for userOutput1PrivKey")
-
-			outputData := outputs.OutputsWithPreviousTransactionData[0]
-			require.Equal(t, finalIssueTokenTransactionHash, outputData.PreviousTransactionHash, "queried output hash mismatch")
-			require.Equal(t, uint32(0), outputData.PreviousTransactionVout, "queried output vout mismatch")
-			require.NotNil(t, outputData.Output.Id, "expected non-nil output ID from query")
-
 			require.Equal(t, expectedAmount, frozenAmount,
 				"frozen amount %s does not match expected amount %s", frozenAmount.String(), expectedAmount.String())
-			// TODO(SPARK-335): Update freeze RPC to return outpoints instead of output UUIDs,
-			// then re-enable output ID validation. UUIDs differ across SOs.
-			require.Len(t, freezeResponse.ImpactedOutputIds, 1, "expected 1 impacted output ID")
+			require.Len(t, freezeResponse.ImpactedTokenOutputs, 1, "expected 1 impacted token output")
+			require.Equal(t, finalIssueTokenTransactionHash, freezeResponse.ImpactedTokenOutputs[0].TransactionHash,
+				"freeze response transaction hash mismatch")
+			require.Equal(t, uint32(0), freezeResponse.ImpactedTokenOutputs[0].Vout,
+				"freeze response vout mismatch")
 
 			transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPb(
 				t, config, finalIssueTokenTransactionHash, tokenPrivKey.Public(), tokenIdentifier,
@@ -90,7 +81,11 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 
 			require.Equal(t, expectedAmount, thawedAmount,
 				"thawed amount %s does not match expected amount %s", thawedAmount.String(), expectedAmount.String())
-			require.Len(t, unfreezeResponse.ImpactedOutputIds, 1, "expected 1 impacted output ID")
+			require.Len(t, unfreezeResponse.ImpactedTokenOutputs, 1, "expected 1 impacted token output")
+			require.Equal(t, finalIssueTokenTransactionHash, unfreezeResponse.ImpactedTokenOutputs[0].TransactionHash,
+				"unfreeze response transaction hash mismatch")
+			require.Equal(t, uint32(0), unfreezeResponse.ImpactedTokenOutputs[0].Vout,
+				"unfreeze response vout mismatch")
 
 			transferTokenTransactionPostThaw, _, err := createTestTokenTransferTransactionTokenPb(
 				t, config, finalIssueTokenTransactionHash, tokenPrivKey.Public(), tokenIdentifier,

@@ -400,7 +400,15 @@ message FreezeTokensRequest {
     bytes issuer_signature = 2 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
 }
 
+// Reference to a token output by its outpoint (transaction hash + vout).
+message TokenOutputRef {
+    bytes transaction_hash = 1 [(validate.rules).bytes.len = 32];
+    uint32 vout = 2;
+}
+
 message FreezeTokensResponse {
-    repeated string impacted_output_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
+    // Deprecated: Use impacted_token_outputs instead. UUIDs are SO-local and differ across SOs.
+    repeated string impacted_output_ids = 1 [deprecated = true, (validate.rules).repeated.items.string.uuid = true];
     bytes impacted_token_amount = 2;  // Decoded uint128
+    repeated TokenOutputRef impacted_token_outputs = 3;
 }
