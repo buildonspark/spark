@@ -3427,7 +3427,6 @@ type TokenOutputExample struct {
 	SpentOperatorSpecificOwnershipSignature *[]byte
 	SpentTransactionInputVout               *int32
 	SpentRevocationSecret                   *keys.Private
-	ConfirmedWithdrawBlockHash              *[]byte
 	Network                                 *btcnetwork.Network
 	TokenIdentifier                         *[]byte
 	TokenCreateID                           *uuid.UUID
@@ -3544,12 +3543,6 @@ func (to *TokenOutputExample) SetSpentTransactionInputVout(v int32) *TokenOutput
 // SetSpentRevocationSecret sets the spent_revocation_secret field.
 func (to *TokenOutputExample) SetSpentRevocationSecret(v keys.Private) *TokenOutputExample {
 	to.SpentRevocationSecret = &v
-	return to
-}
-
-// SetConfirmedWithdrawBlockHash sets the confirmed_withdraw_block_hash field.
-func (to *TokenOutputExample) SetConfirmedWithdrawBlockHash(v []byte) *TokenOutputExample {
-	to.ConfirmedWithdrawBlockHash = &v
 	return to
 }
 
@@ -3737,10 +3730,6 @@ func (to *TokenOutputExample) MustExec(ctx context.Context) *ent.TokenOutput {
 		create.SetSpentRevocationSecret(*to.SpentRevocationSecret)
 	} else {
 	}
-	if to.ConfirmedWithdrawBlockHash != nil {
-		create.SetConfirmedWithdrawBlockHash(*to.ConfirmedWithdrawBlockHash)
-	} else {
-	}
 	if to.Network != nil {
 		create.SetNetwork(*to.Network)
 	} else {
@@ -3917,10 +3906,6 @@ func (to *TokenOutputExample) Exec(ctx context.Context) (*ent.TokenOutput, error
 	}
 	if to.SpentRevocationSecret != nil {
 		create.SetSpentRevocationSecret(*to.SpentRevocationSecret)
-	} else {
-	}
-	if to.ConfirmedWithdrawBlockHash != nil {
-		create.SetConfirmedWithdrawBlockHash(*to.ConfirmedWithdrawBlockHash)
 	} else {
 	}
 	if to.Network != nil {

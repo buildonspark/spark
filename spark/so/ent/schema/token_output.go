@@ -101,9 +101,6 @@ func (TokenOutput) Fields() []ent.Field {
 		field.Bytes("spent_revocation_secret").
 			Optional().
 			GoType(keys.Private{}),
-		field.Bytes("confirmed_withdraw_block_hash").
-			Optional().
-			Deprecated("Being deleted"),
 		field.Enum("network").
 			GoType(btcnetwork.Unspecified).
 			Optional().
@@ -167,8 +164,6 @@ func (TokenOutput) Indexes() []ent.Index {
 		index.Fields("owner_public_key", "token_identifier", "status").Annotations(tokenTxIncludeAnnotations()),
 		index.Fields("token_identifier", "status").Annotations(tokenTxIncludeAnnotations()),
 		index.Fields("token_public_key", "status").Annotations(tokenTxIncludeAnnotations()),
-		// Enables quick unmarking of withdrawn outputs in response to block reorgs.
-		index.Fields("confirmed_withdraw_block_hash"),
 		// Optimize pre-emption queries by indexing the spent transaction relationship
 		index.Edges("output_spent_token_transaction"),
 		// For finalizing token transactions

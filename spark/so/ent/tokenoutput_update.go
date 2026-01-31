@@ -173,18 +173,6 @@ func (tou *TokenOutputUpdate) ClearSpentRevocationSecret() *TokenOutputUpdate {
 	return tou
 }
 
-// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
-func (tou *TokenOutputUpdate) SetConfirmedWithdrawBlockHash(b []byte) *TokenOutputUpdate {
-	tou.mutation.SetConfirmedWithdrawBlockHash(b)
-	return tou
-}
-
-// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
-func (tou *TokenOutputUpdate) ClearConfirmedWithdrawBlockHash() *TokenOutputUpdate {
-	tou.mutation.ClearConfirmedWithdrawBlockHash()
-	return tou
-}
-
 // SetNetwork sets the "network" field.
 func (tou *TokenOutputUpdate) SetNetwork(b btcnetwork.Network) *TokenOutputUpdate {
 	tou.mutation.SetNetwork(b)
@@ -494,12 +482,6 @@ func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tou.mutation.SpentRevocationSecretCleared() {
 		_spec.ClearField(tokenoutput.FieldSpentRevocationSecret, field.TypeBytes)
-	}
-	if value, ok := tou.mutation.ConfirmedWithdrawBlockHash(); ok {
-		_spec.SetField(tokenoutput.FieldConfirmedWithdrawBlockHash, field.TypeBytes, value)
-	}
-	if tou.mutation.ConfirmedWithdrawBlockHashCleared() {
-		_spec.ClearField(tokenoutput.FieldConfirmedWithdrawBlockHash, field.TypeBytes)
 	}
 	if value, ok := tou.mutation.Network(); ok {
 		_spec.SetField(tokenoutput.FieldNetwork, field.TypeEnum, value)
@@ -838,18 +820,6 @@ func (touo *TokenOutputUpdateOne) SetNillableSpentRevocationSecret(k *keys.Priva
 // ClearSpentRevocationSecret clears the value of the "spent_revocation_secret" field.
 func (touo *TokenOutputUpdateOne) ClearSpentRevocationSecret() *TokenOutputUpdateOne {
 	touo.mutation.ClearSpentRevocationSecret()
-	return touo
-}
-
-// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
-func (touo *TokenOutputUpdateOne) SetConfirmedWithdrawBlockHash(b []byte) *TokenOutputUpdateOne {
-	touo.mutation.SetConfirmedWithdrawBlockHash(b)
-	return touo
-}
-
-// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
-func (touo *TokenOutputUpdateOne) ClearConfirmedWithdrawBlockHash() *TokenOutputUpdateOne {
-	touo.mutation.ClearConfirmedWithdrawBlockHash()
 	return touo
 }
 
@@ -1192,12 +1162,6 @@ func (touo *TokenOutputUpdateOne) sqlSave(ctx context.Context) (_node *TokenOutp
 	}
 	if touo.mutation.SpentRevocationSecretCleared() {
 		_spec.ClearField(tokenoutput.FieldSpentRevocationSecret, field.TypeBytes)
-	}
-	if value, ok := touo.mutation.ConfirmedWithdrawBlockHash(); ok {
-		_spec.SetField(tokenoutput.FieldConfirmedWithdrawBlockHash, field.TypeBytes, value)
-	}
-	if touo.mutation.ConfirmedWithdrawBlockHashCleared() {
-		_spec.ClearField(tokenoutput.FieldConfirmedWithdrawBlockHash, field.TypeBytes)
 	}
 	if value, ok := touo.mutation.Network(); ok {
 		_spec.SetField(tokenoutput.FieldNetwork, field.TypeEnum, value)
