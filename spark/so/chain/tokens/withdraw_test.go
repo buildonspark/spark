@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"os"
 	"testing"
 	"time"
 
@@ -29,6 +30,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	stop := db.StartPostgresServer()
+	code := m.Run()
+	stop()
+	os.Exit(code)
+}
 
 // Helper types and functions
 
@@ -72,7 +80,7 @@ func setupWithdrawalTestContextWithEnforcement(t *testing.T) (ctx context.Contex
 }
 
 func setupWithdrawalTestContextWithKnobs(t *testing.T, knobValues map[string]float64) (ctx context.Context, dbClient *ent.Client, fixtures *entfixtures.Fixtures, config *so.Config, sePubKey keys.Public) {
-	ctx, _ = db.NewTestSQLiteContext(t)
+	ctx, _ = db.ConnectToTestPostgres(t)
 	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 

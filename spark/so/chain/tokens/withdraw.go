@@ -479,14 +479,14 @@ func queryTokenOutputs(ctx context.Context, dbClient *ent.Client, outputs []pars
 		)
 	}
 
-	// Note: ForUpdate would provide TOCTOU protection in Postgres, but causes issues
-	// with SQLite tests. In production, the chain watcher already wraps block processing
-	// in a transaction (watch_chain.go:383), providing the necessary isolation.
+	// ForUpdate prevents races between withdrawal processing and spending output on Spark (double spend protection).
+	// If a spend on Spark is being processed, it will block until we commit and vice-versa.
 	tokenOutputs, err := dbClient.TokenOutput.Query().
 		Where(tokenoutput.Or(predicates...)).
 		WithOutputCreatedTokenTransaction().
 		WithOutputSpentTokenTransaction().
 		WithWithdrawal().
+		ForUpdate().
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query token outputs: %w", err)
