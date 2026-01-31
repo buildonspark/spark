@@ -665,6 +665,7 @@ var (
 		{Name: "spent_operator_specific_ownership_signature", Type: field.TypeBytes, Nullable: true},
 		{Name: "spent_transaction_input_vout", Type: field.TypeInt32, Nullable: true},
 		{Name: "spent_revocation_secret", Type: field.TypeBytes, Nullable: true},
+		{Name: "confirmed_withdraw_block_hash", Type: field.TypeBytes, Nullable: true},
 		{Name: "network", Type: field.TypeEnum, Nullable: true, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "token_identifier", Type: field.TypeBytes},
 		{Name: "token_create_id", Type: field.TypeUUID},
@@ -680,25 +681,25 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "token_outputs_token_creates_token_output",
-				Columns:    []*schema.Column{TokenOutputsColumns[21]},
+				Columns:    []*schema.Column{TokenOutputsColumns[22]},
 				RefColumns: []*schema.Column{TokenCreatesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "token_outputs_signing_keyshares_revocation_keyshare",
-				Columns:    []*schema.Column{TokenOutputsColumns[22]},
+				Columns:    []*schema.Column{TokenOutputsColumns[23]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "token_outputs_token_transactions_output_created_token_transaction",
-				Columns:    []*schema.Column{TokenOutputsColumns[23]},
+				Columns:    []*schema.Column{TokenOutputsColumns[24]},
 				RefColumns: []*schema.Column{TokenTransactionsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "token_outputs_token_transactions_output_spent_token_transaction",
-				Columns:    []*schema.Column{TokenOutputsColumns[24]},
+				Columns:    []*schema.Column{TokenOutputsColumns[25]},
 				RefColumns: []*schema.Column{TokenTransactionsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -707,29 +708,29 @@ var (
 			{
 				Name:    "tokenoutput_owner_public_key_status_network",
 				Unique:  false,
-				Columns: []*schema.Column{TokenOutputsColumns[4], TokenOutputsColumns[3], TokenOutputsColumns[19]},
+				Columns: []*schema.Column{TokenOutputsColumns[4], TokenOutputsColumns[3], TokenOutputsColumns[20]},
 			},
 			{
 				Name:    "tokenoutput_owner_public_key_token_identifier_status",
 				Unique:  false,
-				Columns: []*schema.Column{TokenOutputsColumns[4], TokenOutputsColumns[20], TokenOutputsColumns[3]},
+				Columns: []*schema.Column{TokenOutputsColumns[4], TokenOutputsColumns[21], TokenOutputsColumns[3]},
 				Annotation: &entsql.IndexAnnotation{
 					IncludeColumns: []string{
-						TokenOutputsColumns[23].Name,
-
 						TokenOutputsColumns[24].Name,
+
+						TokenOutputsColumns[25].Name,
 					},
 				},
 			},
 			{
 				Name:    "tokenoutput_token_identifier_status",
 				Unique:  false,
-				Columns: []*schema.Column{TokenOutputsColumns[20], TokenOutputsColumns[3]},
+				Columns: []*schema.Column{TokenOutputsColumns[21], TokenOutputsColumns[3]},
 				Annotation: &entsql.IndexAnnotation{
 					IncludeColumns: []string{
-						TokenOutputsColumns[23].Name,
-
 						TokenOutputsColumns[24].Name,
+
+						TokenOutputsColumns[25].Name,
 					},
 				},
 			},
@@ -739,31 +740,36 @@ var (
 				Columns: []*schema.Column{TokenOutputsColumns[8], TokenOutputsColumns[3]},
 				Annotation: &entsql.IndexAnnotation{
 					IncludeColumns: []string{
-						TokenOutputsColumns[23].Name,
-
 						TokenOutputsColumns[24].Name,
+
+						TokenOutputsColumns[25].Name,
 					},
 				},
 			},
 			{
+				Name:    "tokenoutput_confirmed_withdraw_block_hash",
+				Unique:  false,
+				Columns: []*schema.Column{TokenOutputsColumns[19]},
+			},
+			{
 				Name:    "tokenoutput_token_output_output_spent_token_transaction",
 				Unique:  false,
-				Columns: []*schema.Column{TokenOutputsColumns[24]},
+				Columns: []*schema.Column{TokenOutputsColumns[25]},
 			},
 			{
 				Name:    "tokenoutput_token_output_output_created_token_transaction",
 				Unique:  false,
-				Columns: []*schema.Column{TokenOutputsColumns[23]},
+				Columns: []*schema.Column{TokenOutputsColumns[24]},
 			},
 			{
 				Name:    "tokenoutput_created_transaction_output_vout_token_output_output_created_token_transaction",
 				Unique:  true,
-				Columns: []*schema.Column{TokenOutputsColumns[11], TokenOutputsColumns[23]},
+				Columns: []*schema.Column{TokenOutputsColumns[11], TokenOutputsColumns[24]},
 			},
 			{
 				Name:    "tokenoutput_token_create_id",
 				Unique:  false,
-				Columns: []*schema.Column{TokenOutputsColumns[21]},
+				Columns: []*schema.Column{TokenOutputsColumns[22]},
 			},
 			{
 				Name:    "tokenoutput_created_transaction_finalized_hash_created_transaction_output_vout",

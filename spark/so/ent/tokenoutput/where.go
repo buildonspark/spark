@@ -145,6 +145,11 @@ func SpentRevocationSecret(v keys.Private) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldSpentRevocationSecret, v))
 }
 
+// ConfirmedWithdrawBlockHash applies equality check predicate on the "confirmed_withdraw_block_hash" field. It's identical to ConfirmedWithdrawBlockHashEQ.
+func ConfirmedWithdrawBlockHash(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldEQ(FieldConfirmedWithdrawBlockHash, v))
+}
+
 // TokenIdentifier applies equality check predicate on the "token_identifier" field. It's identical to TokenIdentifierEQ.
 func TokenIdentifier(v []byte) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldTokenIdentifier, v))
@@ -943,6 +948,56 @@ func SpentRevocationSecretIsNil() predicate.TokenOutput {
 // SpentRevocationSecretNotNil applies the NotNil predicate on the "spent_revocation_secret" field.
 func SpentRevocationSecretNotNil() predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldNotNull(FieldSpentRevocationSecret))
+}
+
+// ConfirmedWithdrawBlockHashEQ applies the EQ predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashEQ(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldEQ(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashNEQ applies the NEQ predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashNEQ(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNEQ(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashIn applies the In predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashIn(vs ...[]byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldIn(FieldConfirmedWithdrawBlockHash, vs...))
+}
+
+// ConfirmedWithdrawBlockHashNotIn applies the NotIn predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashNotIn(vs ...[]byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNotIn(FieldConfirmedWithdrawBlockHash, vs...))
+}
+
+// ConfirmedWithdrawBlockHashGT applies the GT predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashGT(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldGT(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashGTE applies the GTE predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashGTE(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldGTE(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashLT applies the LT predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashLT(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldLT(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashLTE applies the LTE predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashLTE(v []byte) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldLTE(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashIsNil applies the IsNil predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashIsNil() predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldIsNull(FieldConfirmedWithdrawBlockHash))
+}
+
+// ConfirmedWithdrawBlockHashNotNil applies the NotNil predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashNotNil() predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNotNull(FieldConfirmedWithdrawBlockHash))
 }
 
 // NetworkEQ applies the EQ predicate on the "network" field.

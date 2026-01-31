@@ -55,6 +55,8 @@ const (
 	FieldSpentTransactionInputVout = "spent_transaction_input_vout"
 	// FieldSpentRevocationSecret holds the string denoting the spent_revocation_secret field in the database.
 	FieldSpentRevocationSecret = "spent_revocation_secret"
+	// FieldConfirmedWithdrawBlockHash holds the string denoting the confirmed_withdraw_block_hash field in the database.
+	FieldConfirmedWithdrawBlockHash = "confirmed_withdraw_block_hash"
 	// FieldNetwork holds the string denoting the network field in the database.
 	FieldNetwork = "network"
 	// FieldTokenIdentifier holds the string denoting the token_identifier field in the database.
@@ -156,6 +158,7 @@ var Columns = []string{
 	FieldSpentOperatorSpecificOwnershipSignature,
 	FieldSpentTransactionInputVout,
 	FieldSpentRevocationSecret,
+	FieldConfirmedWithdrawBlockHash,
 	FieldNetwork,
 	FieldTokenIdentifier,
 	FieldTokenCreateID,

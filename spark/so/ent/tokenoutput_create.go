@@ -190,6 +190,12 @@ func (toc *TokenOutputCreate) SetNillableSpentRevocationSecret(k *keys.Private) 
 	return toc
 }
 
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (toc *TokenOutputCreate) SetConfirmedWithdrawBlockHash(b []byte) *TokenOutputCreate {
+	toc.mutation.SetConfirmedWithdrawBlockHash(b)
+	return toc
+}
+
 // SetNetwork sets the "network" field.
 func (toc *TokenOutputCreate) SetNetwork(b btcnetwork.Network) *TokenOutputCreate {
 	toc.mutation.SetNetwork(b)
@@ -575,6 +581,10 @@ func (toc *TokenOutputCreate) createSpec() (*TokenOutput, *sqlgraph.CreateSpec) 
 		_spec.SetField(tokenoutput.FieldSpentRevocationSecret, field.TypeBytes, value)
 		_node.SpentRevocationSecret = value
 	}
+	if value, ok := toc.mutation.ConfirmedWithdrawBlockHash(); ok {
+		_spec.SetField(tokenoutput.FieldConfirmedWithdrawBlockHash, field.TypeBytes, value)
+		_node.ConfirmedWithdrawBlockHash = value
+	}
 	if value, ok := toc.mutation.Network(); ok {
 		_spec.SetField(tokenoutput.FieldNetwork, field.TypeEnum, value)
 		_node.Network = value
@@ -923,6 +933,24 @@ func (u *TokenOutputUpsert) ClearSpentRevocationSecret() *TokenOutputUpsert {
 	return u
 }
 
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (u *TokenOutputUpsert) SetConfirmedWithdrawBlockHash(v []byte) *TokenOutputUpsert {
+	u.Set(tokenoutput.FieldConfirmedWithdrawBlockHash, v)
+	return u
+}
+
+// UpdateConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field to the value that was provided on create.
+func (u *TokenOutputUpsert) UpdateConfirmedWithdrawBlockHash() *TokenOutputUpsert {
+	u.SetExcluded(tokenoutput.FieldConfirmedWithdrawBlockHash)
+	return u
+}
+
+// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
+func (u *TokenOutputUpsert) ClearConfirmedWithdrawBlockHash() *TokenOutputUpsert {
+	u.SetNull(tokenoutput.FieldConfirmedWithdrawBlockHash)
+	return u
+}
+
 // SetNetwork sets the "network" field.
 func (u *TokenOutputUpsert) SetNetwork(v btcnetwork.Network) *TokenOutputUpsert {
 	u.Set(tokenoutput.FieldNetwork, v)
@@ -1201,6 +1229,27 @@ func (u *TokenOutputUpsertOne) UpdateSpentRevocationSecret() *TokenOutputUpsertO
 func (u *TokenOutputUpsertOne) ClearSpentRevocationSecret() *TokenOutputUpsertOne {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.ClearSpentRevocationSecret()
+	})
+}
+
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (u *TokenOutputUpsertOne) SetConfirmedWithdrawBlockHash(v []byte) *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.SetConfirmedWithdrawBlockHash(v)
+	})
+}
+
+// UpdateConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field to the value that was provided on create.
+func (u *TokenOutputUpsertOne) UpdateConfirmedWithdrawBlockHash() *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.UpdateConfirmedWithdrawBlockHash()
+	})
+}
+
+// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
+func (u *TokenOutputUpsertOne) ClearConfirmedWithdrawBlockHash() *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.ClearConfirmedWithdrawBlockHash()
 	})
 }
 
@@ -1652,6 +1701,27 @@ func (u *TokenOutputUpsertBulk) UpdateSpentRevocationSecret() *TokenOutputUpsert
 func (u *TokenOutputUpsertBulk) ClearSpentRevocationSecret() *TokenOutputUpsertBulk {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.ClearSpentRevocationSecret()
+	})
+}
+
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (u *TokenOutputUpsertBulk) SetConfirmedWithdrawBlockHash(v []byte) *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.SetConfirmedWithdrawBlockHash(v)
+	})
+}
+
+// UpdateConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field to the value that was provided on create.
+func (u *TokenOutputUpsertBulk) UpdateConfirmedWithdrawBlockHash() *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.UpdateConfirmedWithdrawBlockHash()
+	})
+}
+
+// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
+func (u *TokenOutputUpsertBulk) ClearConfirmedWithdrawBlockHash() *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.ClearConfirmedWithdrawBlockHash()
 	})
 }
 

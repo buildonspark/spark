@@ -16646,6 +16646,7 @@ type TokenOutputMutation struct {
 	spent_transaction_input_vout                   *int32
 	addspent_transaction_input_vout                *int32
 	spent_revocation_secret                        *keys.Private
+	confirmed_withdraw_block_hash                  *[]byte
 	network                                        *btcnetwork.Network
 	token_identifier                               *[]byte
 	clearedFields                                  map[string]struct{}
@@ -17609,6 +17610,55 @@ func (m *TokenOutputMutation) ResetSpentRevocationSecret() {
 	delete(m.clearedFields, tokenoutput.FieldSpentRevocationSecret)
 }
 
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (m *TokenOutputMutation) SetConfirmedWithdrawBlockHash(b []byte) {
+	m.confirmed_withdraw_block_hash = &b
+}
+
+// ConfirmedWithdrawBlockHash returns the value of the "confirmed_withdraw_block_hash" field in the mutation.
+func (m *TokenOutputMutation) ConfirmedWithdrawBlockHash() (r []byte, exists bool) {
+	v := m.confirmed_withdraw_block_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfirmedWithdrawBlockHash returns the old "confirmed_withdraw_block_hash" field's value of the TokenOutput entity.
+// If the TokenOutput object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenOutputMutation) OldConfirmedWithdrawBlockHash(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfirmedWithdrawBlockHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfirmedWithdrawBlockHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfirmedWithdrawBlockHash: %w", err)
+	}
+	return oldValue.ConfirmedWithdrawBlockHash, nil
+}
+
+// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
+func (m *TokenOutputMutation) ClearConfirmedWithdrawBlockHash() {
+	m.confirmed_withdraw_block_hash = nil
+	m.clearedFields[tokenoutput.FieldConfirmedWithdrawBlockHash] = struct{}{}
+}
+
+// ConfirmedWithdrawBlockHashCleared returns if the "confirmed_withdraw_block_hash" field was cleared in this mutation.
+func (m *TokenOutputMutation) ConfirmedWithdrawBlockHashCleared() bool {
+	_, ok := m.clearedFields[tokenoutput.FieldConfirmedWithdrawBlockHash]
+	return ok
+}
+
+// ResetConfirmedWithdrawBlockHash resets all changes to the "confirmed_withdraw_block_hash" field.
+func (m *TokenOutputMutation) ResetConfirmedWithdrawBlockHash() {
+	m.confirmed_withdraw_block_hash = nil
+	delete(m.clearedFields, tokenoutput.FieldConfirmedWithdrawBlockHash)
+}
+
 // SetNetwork sets the "network" field.
 func (m *TokenOutputMutation) SetNetwork(b btcnetwork.Network) {
 	m.network = &b
@@ -18094,7 +18144,7 @@ func (m *TokenOutputMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenOutputMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 22)
 	if m.create_time != nil {
 		fields = append(fields, tokenoutput.FieldCreateTime)
 	}
@@ -18149,6 +18199,9 @@ func (m *TokenOutputMutation) Fields() []string {
 	if m.spent_revocation_secret != nil {
 		fields = append(fields, tokenoutput.FieldSpentRevocationSecret)
 	}
+	if m.confirmed_withdraw_block_hash != nil {
+		fields = append(fields, tokenoutput.FieldConfirmedWithdrawBlockHash)
+	}
 	if m.network != nil {
 		fields = append(fields, tokenoutput.FieldNetwork)
 	}
@@ -18202,6 +18255,8 @@ func (m *TokenOutputMutation) Field(name string) (ent.Value, bool) {
 		return m.SpentTransactionInputVout()
 	case tokenoutput.FieldSpentRevocationSecret:
 		return m.SpentRevocationSecret()
+	case tokenoutput.FieldConfirmedWithdrawBlockHash:
+		return m.ConfirmedWithdrawBlockHash()
 	case tokenoutput.FieldNetwork:
 		return m.Network()
 	case tokenoutput.FieldTokenIdentifier:
@@ -18253,6 +18308,8 @@ func (m *TokenOutputMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldSpentTransactionInputVout(ctx)
 	case tokenoutput.FieldSpentRevocationSecret:
 		return m.OldSpentRevocationSecret(ctx)
+	case tokenoutput.FieldConfirmedWithdrawBlockHash:
+		return m.OldConfirmedWithdrawBlockHash(ctx)
 	case tokenoutput.FieldNetwork:
 		return m.OldNetwork(ctx)
 	case tokenoutput.FieldTokenIdentifier:
@@ -18394,6 +18451,13 @@ func (m *TokenOutputMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSpentRevocationSecret(v)
 		return nil
+	case tokenoutput.FieldConfirmedWithdrawBlockHash:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfirmedWithdrawBlockHash(v)
+		return nil
 	case tokenoutput.FieldNetwork:
 		v, ok := value.(btcnetwork.Network)
 		if !ok {
@@ -18520,6 +18584,9 @@ func (m *TokenOutputMutation) ClearedFields() []string {
 	if m.FieldCleared(tokenoutput.FieldSpentRevocationSecret) {
 		fields = append(fields, tokenoutput.FieldSpentRevocationSecret)
 	}
+	if m.FieldCleared(tokenoutput.FieldConfirmedWithdrawBlockHash) {
+		fields = append(fields, tokenoutput.FieldConfirmedWithdrawBlockHash)
+	}
 	if m.FieldCleared(tokenoutput.FieldNetwork) {
 		fields = append(fields, tokenoutput.FieldNetwork)
 	}
@@ -18560,6 +18627,9 @@ func (m *TokenOutputMutation) ClearField(name string) error {
 		return nil
 	case tokenoutput.FieldSpentRevocationSecret:
 		m.ClearSpentRevocationSecret()
+		return nil
+	case tokenoutput.FieldConfirmedWithdrawBlockHash:
+		m.ClearConfirmedWithdrawBlockHash()
 		return nil
 	case tokenoutput.FieldNetwork:
 		m.ClearNetwork()
@@ -18625,6 +18695,9 @@ func (m *TokenOutputMutation) ResetField(name string) error {
 		return nil
 	case tokenoutput.FieldSpentRevocationSecret:
 		m.ResetSpentRevocationSecret()
+		return nil
+	case tokenoutput.FieldConfirmedWithdrawBlockHash:
+		m.ResetConfirmedWithdrawBlockHash()
 		return nil
 	case tokenoutput.FieldNetwork:
 		m.ResetNetwork()

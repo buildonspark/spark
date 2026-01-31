@@ -42,7 +42,6 @@ func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*tokenpb.Toke
 		WithOutputSpentTokenTransaction(func(q *TokenTransactionQuery) {
 			q.ForUpdate()
 		}).
-		WithWithdrawal().
 		ForUpdate().
 		All(ctx)
 	if err != nil {

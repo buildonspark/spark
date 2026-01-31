@@ -641,7 +641,7 @@ func validateOutputIsSpendable(ctx context.Context, index int, output *ent.Token
 		}
 	}
 
-	if output.Edges.Withdrawal != nil {
+	if output.ConfirmedWithdrawBlockHash != nil {
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: already withdrawn", index))
 	}
 

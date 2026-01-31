@@ -63,6 +63,8 @@ type TokenOutput struct {
 	SpentTransactionInputVout int32 `json:"spent_transaction_input_vout,omitempty"`
 	// SpentRevocationSecret holds the value of the "spent_revocation_secret" field.
 	SpentRevocationSecret keys.Private `json:"spent_revocation_secret,omitempty"`
+	// ConfirmedWithdrawBlockHash holds the value of the "confirmed_withdraw_block_hash" field.
+	ConfirmedWithdrawBlockHash []byte `json:"confirmed_withdraw_block_hash,omitempty"`
 	// Network holds the value of the "network" field.
 	Network btcnetwork.Network `json:"network,omitempty"`
 	// TokenIdentifier holds the value of the "token_identifier" field.
@@ -190,7 +192,7 @@ func (*TokenOutput) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokenoutput.FieldWithdrawRevocationCommitment, tokenoutput.FieldTokenAmount, tokenoutput.FieldCreatedTransactionFinalizedHash, tokenoutput.FieldSeFinalizationAdaptorSig, tokenoutput.FieldSeWithdrawalSignature, tokenoutput.FieldSpentOwnershipSignature, tokenoutput.FieldSpentOperatorSpecificOwnershipSignature, tokenoutput.FieldTokenIdentifier:
+		case tokenoutput.FieldWithdrawRevocationCommitment, tokenoutput.FieldTokenAmount, tokenoutput.FieldCreatedTransactionFinalizedHash, tokenoutput.FieldSeFinalizationAdaptorSig, tokenoutput.FieldSeWithdrawalSignature, tokenoutput.FieldSpentOwnershipSignature, tokenoutput.FieldSpentOperatorSpecificOwnershipSignature, tokenoutput.FieldConfirmedWithdrawBlockHash, tokenoutput.FieldTokenIdentifier:
 			values[i] = new([]byte)
 		case tokenoutput.FieldNetwork:
 			values[i] = new(btcnetwork.Network)
@@ -342,6 +344,12 @@ func (to *TokenOutput) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field spent_revocation_secret", values[i])
 			} else if value != nil {
 				to.SpentRevocationSecret = *value
+			}
+		case tokenoutput.FieldConfirmedWithdrawBlockHash:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field confirmed_withdraw_block_hash", values[i])
+			} else if value != nil {
+				to.ConfirmedWithdrawBlockHash = *value
 			}
 		case tokenoutput.FieldNetwork:
 			if value, ok := values[i].(*btcnetwork.Network); !ok {
@@ -511,6 +519,9 @@ func (to *TokenOutput) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("spent_revocation_secret=")
 	builder.WriteString(fmt.Sprintf("%v", to.SpentRevocationSecret))
+	builder.WriteString(", ")
+	builder.WriteString("confirmed_withdraw_block_hash=")
+	builder.WriteString(fmt.Sprintf("%v", to.ConfirmedWithdrawBlockHash))
 	builder.WriteString(", ")
 	builder.WriteString("network=")
 	builder.WriteString(fmt.Sprintf("%v", to.Network))
