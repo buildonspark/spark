@@ -823,6 +823,8 @@ message TransferPackage {
     repeated UserSignedTxSigningJob direct_leaves_to_send = 4;
     // The leaves to send, with user signed direct from cpfp refunds and signing package.
     repeated UserSignedTxSigningJob direct_from_cpfp_leaves_to_send = 5;
+    // The hash variant to use for computing the transfer package signing payload.
+    HashVariant hash_variant = 6;
 }
 
 message SendLeafKeyTweaks {

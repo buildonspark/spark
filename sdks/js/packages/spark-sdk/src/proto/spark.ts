@@ -1399,6 +1399,8 @@ export interface TransferPackage {
   directLeavesToSend: UserSignedTxSigningJob[];
   /** The leaves to send, with user signed direct from cpfp refunds and signing package. */
   directFromCpfpLeavesToSend: UserSignedTxSigningJob[];
+  /** The hash variant to use for computing the transfer package signing payload. */
+  hashVariant: HashVariant;
 }
 
 export interface TransferPackage_KeyTweakPackageEntry {
@@ -9546,6 +9548,7 @@ function createBaseTransferPackage(): TransferPackage {
     userSignature: new Uint8Array(0),
     directLeavesToSend: [],
     directFromCpfpLeavesToSend: [],
+    hashVariant: 0,
   };
 }
 
@@ -9565,6 +9568,9 @@ export const TransferPackage: MessageFns<TransferPackage> = {
     }
     for (const v of message.directFromCpfpLeavesToSend) {
       UserSignedTxSigningJob.encode(v!, writer.uint32(42).fork()).join();
+    }
+    if (message.hashVariant !== 0) {
+      writer.uint32(48).int32(message.hashVariant);
     }
     return writer;
   },
@@ -9619,6 +9625,14 @@ export const TransferPackage: MessageFns<TransferPackage> = {
           message.directFromCpfpLeavesToSend.push(UserSignedTxSigningJob.decode(reader, reader.uint32()));
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.hashVariant = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -9646,6 +9660,7 @@ export const TransferPackage: MessageFns<TransferPackage> = {
       directFromCpfpLeavesToSend: globalThis.Array.isArray(object?.directFromCpfpLeavesToSend)
         ? object.directFromCpfpLeavesToSend.map((e: any) => UserSignedTxSigningJob.fromJSON(e))
         : [],
+      hashVariant: isSet(object.hashVariant) ? hashVariantFromJSON(object.hashVariant) : 0,
     };
   },
 
@@ -9672,6 +9687,9 @@ export const TransferPackage: MessageFns<TransferPackage> = {
     if (message.directFromCpfpLeavesToSend?.length) {
       obj.directFromCpfpLeavesToSend = message.directFromCpfpLeavesToSend.map((e) => UserSignedTxSigningJob.toJSON(e));
     }
+    if (message.hashVariant !== 0) {
+      obj.hashVariant = hashVariantToJSON(message.hashVariant);
+    }
     return obj;
   },
 
@@ -9694,6 +9712,7 @@ export const TransferPackage: MessageFns<TransferPackage> = {
     message.directLeavesToSend = object.directLeavesToSend?.map((e) => UserSignedTxSigningJob.fromPartial(e)) || [];
     message.directFromCpfpLeavesToSend =
       object.directFromCpfpLeavesToSend?.map((e) => UserSignedTxSigningJob.fromPartial(e)) || [];
+    message.hashVariant = object.hashVariant ?? 0;
     return message;
   },
 };

@@ -455,6 +455,7 @@ export class BaseTransferService {
       userSignature: new Uint8Array(),
       directLeavesToSend: directLeafSigningJobs,
       directFromCpfpLeavesToSend: directFromCpfpLeafSigningJobs,
+      hashVariant: 0,
     };
 
     const transferPackageSigningPayload = getTransferPackageSigningPayload(
@@ -531,13 +532,13 @@ export class BaseTransferService {
     );
     const encryptedKeyTweaks = Object.fromEntries(encryptedKeyTweaksEntries);
 
-    const transferPackage: TransferPackage = {
+    const transferPackage = TransferPackage.create({
       leavesToSend: cpfpLeafSigningJobs,
       keyTweakPackage: encryptedKeyTweaks,
       userSignature: new Uint8Array(),
       directLeavesToSend: directLeafSigningJobs,
       directFromCpfpLeavesToSend: directFromCpfpLeafSigningJobs,
-    };
+    });
 
     const transferPackageSigningPayload = getTransferPackageSigningPayload(
       transferID,
