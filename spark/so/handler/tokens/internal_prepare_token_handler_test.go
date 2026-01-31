@@ -27,13 +27,15 @@ func TestValidateClientCreatedTimestamp(t *testing.T) {
 		shouldFail bool
 	}
 	// Avoid exact boundaries to reduce flakiness since validateClientCreatedTimestamp uses time.Now() internally.
+	// The oldest allowed timestamp is validitySecs + MaxTimestampSkew (1 minute) in the past.
+	// The latest allowed timestamp is MaxTimestampSkew (1 minute) in the future.
 	cases := []testCase{
 		{name: "nil_timestamp_fails", useNilTS: true, shouldFail: true},
 		{name: "now_ok", offset: 0, shouldFail: false},
-		{name: "slightly_within_past_ok", offset: -(time.Duration(validitySecs)*time.Second - 5*time.Second), shouldFail: false},
-		{name: "too_old_fail", offset: -(time.Duration(validitySecs)*time.Second + 5*time.Second), shouldFail: true},
-		{name: "slightly_future_ok", offset: 55 * time.Second, shouldFail: false},
-		{name: "too_future_fail", offset: 65 * time.Second, shouldFail: true},
+		{name: "slightly_within_past_ok", offset: -(time.Duration(validitySecs)*time.Second + MaxTimestampSkew - 5*time.Second), shouldFail: false},
+		{name: "too_old_fail", offset: -(time.Duration(validitySecs)*time.Second + MaxTimestampSkew + 5*time.Second), shouldFail: true},
+		{name: "slightly_future_ok", offset: MaxTimestampSkew - 5*time.Second, shouldFail: false},
+		{name: "too_future_fail", offset: MaxTimestampSkew + 5*time.Second, shouldFail: true},
 	}
 
 	for _, c := range cases {

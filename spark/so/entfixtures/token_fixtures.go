@@ -46,6 +46,14 @@ func OutputSpecsWithOwner(owner keys.Public, amounts ...*big.Int) []OutputSpec {
 	return specs
 }
 
+// TokenCreateOpts specifies options for creating a TokenCreate entity.
+type TokenCreateOpts struct {
+	IssuerKey       keys.Private // If zero, generates a random key
+	TokenIdentifier []byte       // If nil, generates random bytes
+	MaxSupply       *big.Int     // If nil, uses default of 1000000
+	IsFreezable     bool
+}
+
 // CreateTokenCreate creates a test TokenCreate entity
 func (f *Fixtures) CreateTokenCreate(network btcnetwork.Network, tokenIdentifier []byte, maxSupply *big.Int) *ent.TokenCreate {
 	_, tokenCreate := f.CreateTokenCreateWithIssuer(network, tokenIdentifier, maxSupply)
@@ -56,14 +64,26 @@ func (f *Fixtures) CreateTokenCreate(network btcnetwork.Network, tokenIdentifier
 // This also creates the entity DKG key to set the proper CreationEntityPublicKey.
 // This is useful when you need to sign transactions with the issuer key.
 func (f *Fixtures) CreateTokenCreateWithIssuer(network btcnetwork.Network, tokenIdentifier []byte, maxSupply *big.Int) (keys.Private, *ent.TokenCreate) {
+	return f.CreateTokenCreateWithOpts(network, TokenCreateOpts{
+		TokenIdentifier: tokenIdentifier,
+		MaxSupply:       maxSupply,
+	})
+}
+
+// CreateTokenCreateWithOpts creates a test TokenCreate entity with custom options.
+func (f *Fixtures) CreateTokenCreateWithOpts(network btcnetwork.Network, opts TokenCreateOpts) (keys.Private, *ent.TokenCreate) {
+	tokenIdentifier := opts.TokenIdentifier
 	if tokenIdentifier == nil {
 		tokenIdentifier = f.RandomBytes(32)
 	}
+	maxSupply := opts.MaxSupply
 	if maxSupply == nil {
 		maxSupply = big.NewInt(1000000)
 	}
-
-	issuerKey := f.GeneratePrivateKey()
+	issuerKey := opts.IssuerKey
+	if issuerKey.IsZero() {
+		issuerKey = f.GeneratePrivateKey()
+	}
 
 	// Get or create the entity DKG key for CreationEntityPublicKey.
 	creationEntityPubKey := f.getOrCreateEntityDkgKeyPublicKey()
@@ -74,7 +94,7 @@ func (f *Fixtures) CreateTokenCreateWithIssuer(network btcnetwork.Network, token
 		SetTokenTicker("TST").
 		SetDecimals(8).
 		SetMaxSupply(maxSupply.Bytes()).
-		SetIsFreezable(false).
+		SetIsFreezable(opts.IsFreezable).
 		SetNetwork(network).
 		SetTokenIdentifier(tokenIdentifier).
 		SetCreationEntityPublicKey(creationEntityPubKey).

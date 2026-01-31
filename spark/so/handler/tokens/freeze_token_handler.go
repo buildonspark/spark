@@ -2,10 +2,13 @@ package tokens
 
 import (
 	"context"
+	"fmt"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/errors"
 )
 
 type FreezeTokenHandler struct {
@@ -22,11 +25,15 @@ func NewFreezeTokenHandler(config *so.Config) *FreezeTokenHandler {
 // FreezeTokens freezes or unfreezes tokens on the LRC20 node.
 func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.FreezeTokensRequest) (*tokenpb.FreezeTokensResponse, error) {
 	// Verify session auth - only the issuer can freeze tokens
-	issuerPubKey, err := GetIssuerPublicKeyForFreeze(ctx, req.FreezeTokensPayload.GetTokenIdentifier())
-	if err != nil {
-		return nil, err
+	tokenIdentifier := req.FreezeTokensPayload.GetTokenIdentifier()
+	if tokenIdentifier == nil {
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("token identifier is required"))
 	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, *issuerPubKey); err != nil {
+	tokenCreateEnt, err := ent.GetTokenCreateByIdentifier(ctx, tokenIdentifier)
+	if err != nil {
+		return nil, errors.NotFoundMissingEntity(fmt.Errorf("failed to get token for freeze request: %w", err))
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, tokenCreateEnt.IssuerPublicKey); err != nil {
 		return nil, err
 	}
 

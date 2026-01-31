@@ -9,14 +9,13 @@ import (
 	mathrand "math/rand/v2"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
-	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/entfixtures"
 	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -37,37 +36,13 @@ func recentTimestamp(ago time.Duration) uint64 {
 	return uint64(time.Now().Add(-ago).UnixMilli())
 }
 
-func createFreezeTestTokenCreate(t *testing.T, ctx context.Context, client *ent.Client, cfg *so.Config, isFreezable bool) *ent.TokenCreate {
+func createFreezeTestTokenCreate(t *testing.T, ctx context.Context, client *ent.Client, isFreezable bool) *ent.TokenCreate {
 	t.Helper()
-	creationEntityPubKey := cfg.IdentityPublicKey()
-	createInput := &tokenpb.TokenCreateInput{
-		TokenName:               testTokenName,
-		TokenTicker:             testTokenTicker,
-		Decimals:                testTokenDecimals,
-		MaxSupply:               testTokenMaxSupplyBytes,
-		IsFreezable:             isFreezable,
-		IssuerPublicKey:         freezeTestIssuerKey.Public().Serialize(),
-		CreationEntityPublicKey: creationEntityPubKey.Serialize(),
-	}
-
-	metadata, err := common.NewTokenMetadataFromCreateInput(createInput, sparkpb.Network_REGTEST)
-	require.NoError(t, err)
-	tokenIdentifier, err := metadata.ComputeTokenIdentifier()
-	require.NoError(t, err)
-
-	tokenCreate, err := client.TokenCreate.Create().
-		SetIssuerPublicKey(freezeTestIssuerKey.Public()).
-		SetTokenName(testTokenName).
-		SetTokenTicker(testTokenTicker).
-		SetDecimals(testTokenDecimals).
-		SetMaxSupply(testTokenMaxSupplyBytes).
-		SetIsFreezable(isFreezable).
-		SetCreationEntityPublicKey(creationEntityPubKey).
-		SetNetwork(btcnetwork.Regtest).
-		SetTokenIdentifier(tokenIdentifier).
-		Save(ctx)
-	require.NoError(t, err)
-
+	fixtures := entfixtures.New(t, ctx, client)
+	_, tokenCreate := fixtures.CreateTokenCreateWithOpts(btcnetwork.Regtest, entfixtures.TokenCreateOpts{
+		IssuerKey:   freezeTestIssuerKey,
+		IsFreezable: isFreezable,
+	})
 	return tokenCreate
 }
 
@@ -110,7 +85,7 @@ func TestFreezeTokens_SuccessWhenFreezable(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
 	req := createFreezeTestRequest(t, cfg, tokenCreate, false)
 
 	resp, err := handler.FreezeTokens(ctx, req)
@@ -126,7 +101,7 @@ func TestFreezeTokens_FailsWhenNotFreezable(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, false)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, false)
 	req := createFreezeTestRequest(t, cfg, tokenCreate, false)
 
 	resp, err := handler.FreezeTokens(ctx, req)
@@ -141,10 +116,10 @@ func TestFreezeTokens_IdempotentWhenAlreadyFrozen(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
 
 	// Use same timestamp for both requests to test idempotency
-	timestamp := recentTimestamp(1 * time.Hour)
+	timestamp := recentTimestamp(10 * time.Second)
 	req1 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, timestamp)
 	resp1, err := handler.FreezeTokens(ctx, req1)
 	require.NoError(t, err)
@@ -162,14 +137,14 @@ func TestFreezeTokens_RejectsDifferentTimestampWhenAlreadyFrozen(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
 
-	req1 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(2*time.Hour))
+	req1 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(20*time.Second))
 	_, err := handler.FreezeTokens(ctx, req1)
 	require.NoError(t, err)
 
 	// Freezing with a different timestamp should fail
-	req2 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(1*time.Hour))
+	req2 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(10*time.Second))
 	resp, err := handler.FreezeTokens(ctx, req2)
 
 	require.Error(t, err)
@@ -182,7 +157,7 @@ func TestUnfreezeTokens_SuccessWhenFrozen(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
 
 	freezeReq := createFreezeTestRequest(t, cfg, tokenCreate, false)
 	freezeResp, err := handler.FreezeTokens(ctx, freezeReq)
@@ -201,7 +176,7 @@ func TestUnfreezeTokens_IdempotentWhenNotFrozen(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
 	req := createFreezeTestRequest(t, cfg, tokenCreate, true)
 
 	// Unfreezing when never frozen should succeed as no-op
@@ -216,11 +191,11 @@ func TestUnfreezeTokens_IdempotentWhenAlreadyUnfrozen(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
 
 	// Freeze then unfreeze (older timestamp first, then newer)
-	freezeTs := recentTimestamp(3 * time.Hour)
-	unfreezeTs := recentTimestamp(2 * time.Hour)
+	freezeTs := recentTimestamp(30 * time.Second)
+	unfreezeTs := recentTimestamp(20 * time.Second)
 	freezeReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, freezeTs)
 	_, err := handler.FreezeTokens(ctx, freezeReq)
 	require.NoError(t, err)
@@ -242,11 +217,11 @@ func TestUnfreezeTokens_RejectsDifferentTimestampWhenAlreadyUnfrozen(t *testing.
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
 
 	// Freeze then unfreeze (older timestamp first, then newer)
-	freezeTs := recentTimestamp(3 * time.Hour)
-	unfreezeTs := recentTimestamp(2 * time.Hour)
+	freezeTs := recentTimestamp(30 * time.Second)
+	unfreezeTs := recentTimestamp(20 * time.Second)
 	freezeReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, freezeTs)
 	_, err := handler.FreezeTokens(ctx, freezeReq)
 	require.NoError(t, err)
@@ -256,7 +231,7 @@ func TestUnfreezeTokens_RejectsDifferentTimestampWhenAlreadyUnfrozen(t *testing.
 	require.NoError(t, err)
 
 	// Unfreezing with a different timestamp should fail
-	unfreezeReq2 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, recentTimestamp(1*time.Hour))
+	unfreezeReq2 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, recentTimestamp(10*time.Second))
 	resp, err := handler.FreezeTokens(ctx, unfreezeReq2)
 
 	require.Error(t, err)
@@ -269,7 +244,7 @@ func TestUnfreezeTokens_FailsWhenNotFreezable(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, false)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, false)
 	req := createFreezeTestRequest(t, cfg, tokenCreate, true)
 
 	resp, err := handler.FreezeTokens(ctx, req)
@@ -284,7 +259,7 @@ func TestFreezeTokens_FailsWithInvalidSignature(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
 	req := createFreezeTestRequestWithKey(t, cfg, tokenCreate, false, freezeTestWrongKey)
 
 	resp, err := handler.FreezeTokens(ctx, req)
@@ -294,35 +269,26 @@ func TestFreezeTokens_FailsWithInvalidSignature(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid issuer signature")
 }
 
-// Timestamp-based replay protection tests
+// Timestamp validation tests
 
-func TestFreezeTokens_RejectsStaleFreeze(t *testing.T) {
+func TestFreezeTokens_TimestampValidation(t *testing.T) {
 	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
 
-	// First freeze with older timestamp
-	freezeTs := recentTimestamp(3 * time.Hour)
-	freezeReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, freezeTs)
-	_, err := handler.FreezeTokens(ctx, freezeReq)
-	require.NoError(t, err)
-
-	// Unfreeze with newer timestamp
-	unfreezeTs := recentTimestamp(1 * time.Hour)
-	unfreezeReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, unfreezeTs)
-	_, err = handler.FreezeTokens(ctx, unfreezeReq)
-	require.NoError(t, err)
-
-	// Try to freeze again with timestamp between freeze and unfreeze (older than thaw) - should be rejected
-	staleTs := recentTimestamp(2 * time.Hour)
-	staleReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, staleTs)
-	resp, err := handler.FreezeTokens(ctx, staleReq)
-
+	// Future timestamp (2 minutes from now) should be rejected
+	futureReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, uint64(time.Now().Add(2*time.Minute).UnixMilli()))
+	_, err := handler.FreezeTokens(ctx, futureReq)
 	require.Error(t, err)
-	require.Nil(t, resp)
-	assert.Contains(t, err.Error(), "stale freeze request")
+	assert.Contains(t, err.Error(), "too far in the future")
+
+	// Old timestamp (2 minutes ago) should be rejected
+	oldReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, uint64(time.Now().Add(-2*time.Minute).UnixMilli()))
+	_, err = handler.FreezeTokens(ctx, oldReq)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too old")
 }
 
 func TestFreezeTokens_RejectsStaleUnfreeze(t *testing.T) {
@@ -330,79 +296,48 @@ func TestFreezeTokens_RejectsStaleUnfreeze(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
 
-	// Freeze with newer timestamp
-	freezeTs := recentTimestamp(1 * time.Hour)
-	freezeReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, freezeTs)
-	_, err := handler.FreezeTokens(ctx, freezeReq)
+	// Freeze -> unfreeze -> freeze with increasing timestamps
+	freezeTs := recentTimestamp(30 * time.Second)
+	unfreezeTs := recentTimestamp(20 * time.Second)
+	refreezeTs := recentTimestamp(10 * time.Second)
+
+	_, err := handler.FreezeTokens(ctx, createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, freezeTs))
 	require.NoError(t, err)
 
-	// Try to unfreeze with older timestamp (older than freeze) - should be rejected
-	staleTs := recentTimestamp(2 * time.Hour)
-	staleReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, staleTs)
-	resp, err := handler.FreezeTokens(ctx, staleReq)
+	_, err = handler.FreezeTokens(ctx, createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, unfreezeTs))
+	require.NoError(t, err)
 
+	_, err = handler.FreezeTokens(ctx, createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, refreezeTs))
+	require.NoError(t, err)
+
+	// Stale unfreeze (older than current freeze) should be rejected
+	_, err = handler.FreezeTokens(ctx, createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, unfreezeTs))
 	require.Error(t, err)
-	require.Nil(t, resp)
 	assert.Contains(t, err.Error(), "stale unfreeze request")
 }
 
-func TestFreezeTokens_AcceptsNewerTimestamp(t *testing.T) {
+func TestFreezeTokens_RejectsStaleFreeze(t *testing.T) {
 	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
 
-	// Freeze with oldest timestamp
-	freezeReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(3*time.Hour))
-	_, err := handler.FreezeTokens(ctx, freezeReq)
+	// Freeze -> unfreeze with increasing timestamps
+	freezeTs := recentTimestamp(30 * time.Second)
+	unfreezeTs := recentTimestamp(20 * time.Second)
+
+	_, err := handler.FreezeTokens(ctx, createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, freezeTs))
 	require.NoError(t, err)
 
-	// Unfreeze with middle timestamp - should succeed
-	unfreezeReq := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, recentTimestamp(2*time.Hour))
-	_, err = handler.FreezeTokens(ctx, unfreezeReq)
+	_, err = handler.FreezeTokens(ctx, createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, true, freezeTestIssuerKey, unfreezeTs))
 	require.NoError(t, err)
 
-	// Freeze again with newest timestamp - should succeed
-	freezeReq2 := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(1*time.Hour))
-	resp, err := handler.FreezeTokens(ctx, freezeReq2)
-
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-}
-
-func TestFreezeTokens_RejectsFutureTimestamp(t *testing.T) {
-	ctx, tc := db.ConnectToTestPostgres(t)
-	cfg := sparktesting.TestConfig(t)
-	handler := NewFreezeTokenHandler(cfg)
-
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
-
-	// Use a timestamp far in the future (2 minutes from now)
-	futureTimestamp := uint64(time.Now().UnixMilli()) + 120000
-	req := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, futureTimestamp)
-	resp, err := handler.FreezeTokens(ctx, req)
-
+	// Stale freeze (older than most recent thaw) should be rejected
+	staleFreezeTs := recentTimestamp(25 * time.Second) // Between freezeTs and unfreezeTs, but older than unfreezeTs
+	_, err = handler.FreezeTokens(ctx, createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, staleFreezeTs))
 	require.Error(t, err)
-	require.Nil(t, resp)
-	assert.Contains(t, err.Error(), "too far in the future")
-}
-
-func TestFreezeTokens_RejectsTooOldTimestamp(t *testing.T) {
-	ctx, tc := db.ConnectToTestPostgres(t)
-	cfg := sparktesting.TestConfig(t)
-	handler := NewFreezeTokenHandler(cfg)
-
-	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
-
-	// Use a timestamp older than DefaultMaxTimestampAge (48 hours ago)
-	oldTimestamp := uint64(time.Now().Add(-48 * time.Hour).UnixMilli())
-	req := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, oldTimestamp)
-	resp, err := handler.FreezeTokens(ctx, req)
-
-	require.Error(t, err)
-	require.Nil(t, resp)
-	assert.Contains(t, err.Error(), "too old")
+	assert.Contains(t, err.Error(), "stale freeze request")
 }

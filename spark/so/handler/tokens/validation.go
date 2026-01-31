@@ -20,22 +20,18 @@ import (
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
-// MaxTimestampFutureTolerance is the maximum amount of time a client-provided timestamp
-// can be in the future. This accounts for clock drift between client and server.
-const MaxTimestampFutureTolerance = 1 * time.Minute
-
-// DefaultMaxTimestampAge is the default maximum age for client-provided timestamps.
-// Timestamps older than this are rejected as stale.
-const DefaultMaxTimestampAge = 24 * time.Hour
+// MaxTimestampSkew is the maximum allowed difference between client-provided timestamps
+// and server time. Timestamps must be within ±MaxTimestampSkew of the current time.
+const MaxTimestampSkew = 1 * time.Minute
 
 // ValidateTimestampMillis validates that a timestamp (in milliseconds) is within acceptable bounds.
-// It checks that the timestamp is not too far in the future and not too old.
-func ValidateTimestampMillis(timestampMillis uint64, maxAge time.Duration) error {
+// Timestamps must be within ±MaxTimestampSkew of the current server time.
+func ValidateTimestampMillis(timestampMillis uint64) error {
 	now := time.Now()
 	timestamp := time.UnixMilli(int64(timestampMillis))
 
-	oldestAllowed := now.Add(-maxAge)
-	latestAllowed := now.Add(MaxTimestampFutureTolerance)
+	oldestAllowed := now.Add(-MaxTimestampSkew)
+	latestAllowed := now.Add(MaxTimestampSkew)
 
 	if timestamp.Before(oldestAllowed) {
 		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf(

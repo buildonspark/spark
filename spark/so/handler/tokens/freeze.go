@@ -19,21 +19,6 @@ type FreezeResult struct {
 	TotalAmount []byte
 }
 
-// GetIssuerPublicKeyForFreeze looks up the token by identifier and returns the issuer public key.
-// This is used for session auth validation before processing a freeze request.
-func GetIssuerPublicKeyForFreeze(ctx context.Context, tokenIdentifier []byte) (*keys.Public, error) {
-	if tokenIdentifier == nil {
-		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("token identifier is required"))
-	}
-
-	tokenCreateEnt, err := ent.GetTokenCreateByIdentifier(ctx, tokenIdentifier)
-	if err != nil {
-		return nil, errors.NotFoundMissingEntity(fmt.Errorf("failed to get token for freeze request: %w", err))
-	}
-
-	return &tokenCreateEnt.IssuerPublicKey, nil
-}
-
 // ValidateAndApplyFreeze validates a freeze request and applies the freeze/unfreeze operation.
 // This is shared between the external FreezeTokenHandler and InternalFreezeTokenHandler.
 func ValidateAndApplyFreeze(
@@ -46,7 +31,7 @@ func ValidateAndApplyFreeze(
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("freeze tokens payload validation failed: %w", err))
 	}
 
-	if err := ValidateTimestampMillis(freezePayload.IssuerProvidedTimestamp, DefaultMaxTimestampAge); err != nil {
+	if err := ValidateTimestampMillis(freezePayload.IssuerProvidedTimestamp); err != nil {
 		return nil, err
 	}
 
@@ -55,7 +40,8 @@ func ValidateAndApplyFreeze(
 		return nil, errors.InternalUnhandledError(fmt.Errorf("failed to hash freeze tokens payload: %w", err))
 	}
 
-	tokenCreateEnt, err := ent.GetTokenCreateByIdentifier(ctx, freezePayload.GetTokenIdentifier())
+	// Lock the TokenCreate row to prevent concurrent freeze/unfreeze race conditions.
+	tokenCreateEnt, err := ent.GetTokenCreateByIdentifierForUpdate(ctx, freezePayload.GetTokenIdentifier())
 	if err != nil {
 		return nil, errors.NotFoundMissingEntity(fmt.Errorf("failed to get token for freeze request: %w", err))
 	}
