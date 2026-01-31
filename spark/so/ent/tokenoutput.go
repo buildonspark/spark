@@ -64,6 +64,8 @@ type TokenOutput struct {
 	// SpentRevocationSecret holds the value of the "spent_revocation_secret" field.
 	SpentRevocationSecret keys.Private `json:"spent_revocation_secret,omitempty"`
 	// ConfirmedWithdrawBlockHash holds the value of the "confirmed_withdraw_block_hash" field.
+	//
+	// Deprecated: Being deleted
 	ConfirmedWithdrawBlockHash []byte `json:"confirmed_withdraw_block_hash,omitempty"`
 	// Network holds the value of the "network" field.
 	Network btcnetwork.Network `json:"network,omitempty"`

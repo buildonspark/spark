@@ -102,7 +102,8 @@ func (TokenOutput) Fields() []ent.Field {
 			Optional().
 			GoType(keys.Private{}),
 		field.Bytes("confirmed_withdraw_block_hash").
-			Optional(),
+			Optional().
+			Deprecated("Being deleted"),
 		field.Enum("network").
 			GoType(btcnetwork.Unspecified).
 			Optional().

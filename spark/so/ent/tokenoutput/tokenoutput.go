@@ -158,7 +158,6 @@ var Columns = []string{
 	FieldSpentOperatorSpecificOwnershipSignature,
 	FieldSpentTransactionInputVout,
 	FieldSpentRevocationSecret,
-	FieldConfirmedWithdrawBlockHash,
 	FieldNetwork,
 	FieldTokenIdentifier,
 	FieldTokenCreateID,
@@ -187,6 +186,11 @@ func ValidColumn(column string) bool {
 	}
 	for i := range ForeignKeys {
 		if column == ForeignKeys[i] {
+			return true
+		}
+	}
+	for _, f := range [...]string{FieldConfirmedWithdrawBlockHash} {
+		if column == f {
 			return true
 		}
 	}
