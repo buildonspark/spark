@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -18,6 +19,38 @@ import (
 	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 )
+
+// MaxTimestampFutureTolerance is the maximum amount of time a client-provided timestamp
+// can be in the future. This accounts for clock drift between client and server.
+const MaxTimestampFutureTolerance = 1 * time.Minute
+
+// DefaultMaxTimestampAge is the default maximum age for client-provided timestamps.
+// Timestamps older than this are rejected as stale.
+const DefaultMaxTimestampAge = 24 * time.Hour
+
+// ValidateTimestampMillis validates that a timestamp (in milliseconds) is within acceptable bounds.
+// It checks that the timestamp is not too far in the future and not too old.
+func ValidateTimestampMillis(timestampMillis uint64, maxAge time.Duration) error {
+	now := time.Now()
+	timestamp := time.UnixMilli(int64(timestampMillis))
+
+	oldestAllowed := now.Add(-maxAge)
+	latestAllowed := now.Add(MaxTimestampFutureTolerance)
+
+	if timestamp.Before(oldestAllowed) {
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf(
+			"timestamp %d is too old (oldest allowed: %d)",
+			timestampMillis, oldestAllowed.UnixMilli(),
+		))
+	}
+	if timestamp.After(latestAllowed) {
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf(
+			"timestamp %d is too far in the future (max allowed: %d)",
+			timestampMillis, latestAllowed.UnixMilli(),
+		))
+	}
+	return nil
+}
 
 // validateStatuses is a shared helper that checks if all provided outputs have one of the
 // expected statuses. The idFormatter formats the identifier used in error messages

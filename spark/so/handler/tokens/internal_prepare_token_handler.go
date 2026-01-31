@@ -39,10 +39,6 @@ import (
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
-// MaxTimestampFutureTolerance is the maximum amount of time a client-provided timestamp
-// can be in the future. This accounts for clock drift between client and server.
-const MaxTimestampFutureTolerance = 1 * time.Minute
-
 type InternalPrepareTokenHandler struct {
 	config *so.Config
 }

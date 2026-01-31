@@ -3,7 +3,6 @@ package tokens
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -47,13 +46,8 @@ func ValidateAndApplyFreeze(
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("freeze tokens payload validation failed: %w", err))
 	}
 
-	// Validate timestamp is not too far in the future (allow for clock drift)
-	maxAllowedTimestamp := uint64(time.Now().Add(MaxTimestampFutureTolerance).UnixMilli())
-	if freezePayload.IssuerProvidedTimestamp > maxAllowedTimestamp {
-		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf(
-			"issuer provided timestamp %d is too far in the future (max allowed: %d)",
-			freezePayload.IssuerProvidedTimestamp, maxAllowedTimestamp,
-		))
+	if err := ValidateTimestampMillis(freezePayload.IssuerProvidedTimestamp, DefaultMaxTimestampAge); err != nil {
+		return nil, err
 	}
 
 	freezePayloadHash, err := utils.HashFreezeTokensPayload(freezePayload)
