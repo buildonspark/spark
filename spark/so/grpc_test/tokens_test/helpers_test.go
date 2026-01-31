@@ -686,10 +686,17 @@ func queryAndVerifyTokenOutputs(t *testing.T, coordinatorIdentifiers []string, f
 
 		outputs, err := wallet.QueryTokenOutputs(t.Context(), config, []keys.Public{ownerPrivateKey.Public()}, nil)
 		require.NoError(t, err, "failed to query token outputs from coordinator: %s", coordinatorIdentifier)
-		require.Len(t, outputs.OutputsWithPreviousTransactionData, len(expectedOutputs), "expected %d outputs from coordinator: %s", len(expectedOutputs), coordinatorIdentifier)
+		var availableOutputs []*tokenpb.OutputWithPreviousTransactionData
+		for _, o := range outputs.OutputsWithPreviousTransactionData {
+			if o.Output.GetStatus() == tokenpb.TokenOutputStatus_TOKEN_OUTPUT_STATUS_AVAILABLE {
+				availableOutputs = append(availableOutputs, o)
+			}
+		}
+
+		require.Len(t, availableOutputs, len(expectedOutputs), "expected %d available outputs from coordinator: %s", len(expectedOutputs), coordinatorIdentifier)
 
 		for j, expectedOutput := range expectedOutputs {
-			assert.Equal(t, expectedOutput.Id, outputs.OutputsWithPreviousTransactionData[j].Output.Id, "expected the same output ID for output %d from coordinator: %s", j, coordinatorIdentifier)
+			assert.Equal(t, expectedOutput.Id, availableOutputs[j].Output.Id, "expected the same output ID for output %d from coordinator: %s", j, coordinatorIdentifier)
 		}
 	}
 }

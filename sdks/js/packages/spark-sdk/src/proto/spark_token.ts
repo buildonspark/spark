@@ -22,6 +22,45 @@ import {
 
 export const protobufPackage = "spark_token";
 
+export enum TokenOutputStatus {
+  TOKEN_OUTPUT_STATUS_UNSPECIFIED = 0,
+  TOKEN_OUTPUT_STATUS_AVAILABLE = 1,
+  TOKEN_OUTPUT_STATUS_PENDING_OUTBOUND = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function tokenOutputStatusFromJSON(object: any): TokenOutputStatus {
+  switch (object) {
+    case 0:
+    case "TOKEN_OUTPUT_STATUS_UNSPECIFIED":
+      return TokenOutputStatus.TOKEN_OUTPUT_STATUS_UNSPECIFIED;
+    case 1:
+    case "TOKEN_OUTPUT_STATUS_AVAILABLE":
+      return TokenOutputStatus.TOKEN_OUTPUT_STATUS_AVAILABLE;
+    case 2:
+    case "TOKEN_OUTPUT_STATUS_PENDING_OUTBOUND":
+      return TokenOutputStatus.TOKEN_OUTPUT_STATUS_PENDING_OUTBOUND;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TokenOutputStatus.UNRECOGNIZED;
+  }
+}
+
+export function tokenOutputStatusToJSON(object: TokenOutputStatus): string {
+  switch (object) {
+    case TokenOutputStatus.TOKEN_OUTPUT_STATUS_UNSPECIFIED:
+      return "TOKEN_OUTPUT_STATUS_UNSPECIFIED";
+    case TokenOutputStatus.TOKEN_OUTPUT_STATUS_AVAILABLE:
+      return "TOKEN_OUTPUT_STATUS_AVAILABLE";
+    case TokenOutputStatus.TOKEN_OUTPUT_STATUS_PENDING_OUTBOUND:
+      return "TOKEN_OUTPUT_STATUS_PENDING_OUTBOUND";
+    case TokenOutputStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum TokenTransactionType {
   TOKEN_TRANSACTION_TYPE_UNSPECIFIED = 0,
   TOKEN_TRANSACTION_TYPE_CREATE = 1,
@@ -227,6 +266,7 @@ export interface TokenOutput {
    * Only present in query responses; empty until SE signing is implemented.
    */
   seWithdrawalSignature?: Uint8Array | undefined;
+  status?: TokenOutputStatus | undefined;
 }
 
 export interface PartialTokenOutput {
@@ -984,6 +1024,7 @@ function createBaseTokenOutput(): TokenOutput {
     tokenIdentifier: undefined,
     tokenAmount: new Uint8Array(0),
     seWithdrawalSignature: undefined,
+    status: undefined,
   };
 }
 
@@ -1015,6 +1056,9 @@ export const TokenOutput: MessageFns<TokenOutput> = {
     }
     if (message.seWithdrawalSignature !== undefined) {
       writer.uint32(74).bytes(message.seWithdrawalSignature);
+    }
+    if (message.status !== undefined) {
+      writer.uint32(80).int32(message.status);
     }
     return writer;
   },
@@ -1098,6 +1142,14 @@ export const TokenOutput: MessageFns<TokenOutput> = {
           message.seWithdrawalSignature = reader.bytes();
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1124,6 +1176,7 @@ export const TokenOutput: MessageFns<TokenOutput> = {
       seWithdrawalSignature: isSet(object.seWithdrawalSignature)
         ? bytesFromBase64(object.seWithdrawalSignature)
         : undefined,
+      status: isSet(object.status) ? tokenOutputStatusFromJSON(object.status) : undefined,
     };
   },
 
@@ -1156,6 +1209,9 @@ export const TokenOutput: MessageFns<TokenOutput> = {
     if (message.seWithdrawalSignature !== undefined) {
       obj.seWithdrawalSignature = base64FromBytes(message.seWithdrawalSignature);
     }
+    if (message.status !== undefined) {
+      obj.status = tokenOutputStatusToJSON(message.status);
+    }
     return obj;
   },
 
@@ -1173,6 +1229,7 @@ export const TokenOutput: MessageFns<TokenOutput> = {
     message.tokenIdentifier = object.tokenIdentifier ?? undefined;
     message.tokenAmount = object.tokenAmount ?? new Uint8Array(0);
     message.seWithdrawalSignature = object.seWithdrawalSignature ?? undefined;
+    message.status = object.status ?? undefined;
     return message;
   },
 };

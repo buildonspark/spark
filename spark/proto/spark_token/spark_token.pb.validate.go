@@ -723,6 +723,10 @@ func (m *TokenOutput) validate(all bool) error {
 		// no validation rules for SeWithdrawalSignature
 	}
 
+	if m.Status != nil {
+		// no validation rules for Status
+	}
+
 	if len(errors) > 0 {
 		return TokenOutputMultiError(errors)
 	}

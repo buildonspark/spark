@@ -12,6 +12,7 @@ import (
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/tokens"
 )
@@ -132,14 +133,13 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputs(ctx context.Context, req *t
 
 	queryLimit := limit + 1
 	outputs, err := ent.GetOwnedTokenOutputs(ctx, ent.GetOwnedTokenOutputsParams{
-		OwnerPublicKeys:            ownerPubKeys,
-		IssuerPublicKeys:           issuerPubKeys,
-		TokenIdentifiers:           tokenIdentifiers,
-		IncludeExpiredTransactions: true,
-		Network:                    network,
-		AfterID:                    afterID,
-		BeforeID:                   beforeID,
-		Limit:                      queryLimit,
+		OwnerPublicKeys:  ownerPubKeys,
+		IssuerPublicKeys: issuerPubKeys,
+		TokenIdentifiers: tokenIdentifiers,
+		Network:          network,
+		AfterID:          afterID,
+		BeforeID:         beforeID,
+		Limit:            queryLimit,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToGetOwnedOutputStats, err)
@@ -148,6 +148,10 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputs(ctx context.Context, req *t
 	for i, output := range outputs {
 		if i >= limit {
 			break
+		}
+		status, err := mapTokenOutputStatusToProto(output)
+		if err != nil {
+			return nil, err
 		}
 		idStr := output.ID.String()
 		ownedTokenOutputs = append(ownedTokenOutputs, &tokenpb.OutputWithPreviousTransactionData{
@@ -161,6 +165,7 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputs(ctx context.Context, req *t
 				TokenIdentifier:               output.TokenIdentifier,
 				TokenAmount:                   output.TokenAmount,
 				SeWithdrawalSignature:         output.SeWithdrawalSignature,
+				Status:                        status,
 			},
 			PreviousTransactionHash: output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
 			PreviousTransactionVout: uint32(output.CreatedTransactionOutputVout),
@@ -200,4 +205,29 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputs(ctx context.Context, req *t
 		OutputsWithPreviousTransactionData: ownedTokenOutputs,
 		PageResponse:                       pageResponse,
 	}, nil
+}
+
+func mapTokenOutputStatusToProto(output *ent.TokenOutput) (*tokenpb.TokenOutputStatus, error) {
+	switch output.Status {
+	case st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted:
+		return tokenpb.TokenOutputStatus_TOKEN_OUTPUT_STATUS_AVAILABLE.Enum(), nil
+	case st.TokenOutputStatusSpentSigned:
+		if isOutputSpentTransactionExpired(output) {
+			return tokenpb.TokenOutputStatus_TOKEN_OUTPUT_STATUS_AVAILABLE.Enum(), nil
+		}
+		return tokenpb.TokenOutputStatus_TOKEN_OUTPUT_STATUS_PENDING_OUTBOUND.Enum(), nil
+	default:
+		return nil, fmt.Errorf("unexpected token output status %q for output %s", output.Status, output.ID)
+	}
+}
+
+func isOutputSpentTransactionExpired(output *ent.TokenOutput) bool {
+	tx := output.Edges.OutputSpentTokenTransaction
+	if tx == nil {
+		return false
+	}
+	if err := tx.ValidateNotExpired(); err == nil {
+		return false
+	}
+	return tx.Status == st.TokenTransactionStatusSigned || tx.Status == st.TokenTransactionStatusStarted
 }

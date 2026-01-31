@@ -1,6 +1,9 @@
 import { numberToBytesBE, bytesToNumberBE } from "@noble/curves/utils";
 import { SparkValidationError } from "../errors/types.js";
-import { OutputWithPreviousTransactionData } from "../proto/spark_token.js";
+import {
+  OutputWithPreviousTransactionData,
+  TokenOutputStatus,
+} from "../proto/spark_token.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection/connection.js";
 import { TokenTransactionService } from "../services/tokens/token-transactions.js";
@@ -44,6 +47,7 @@ describe("select token outputs", () => {
       tokenPublicKey,
       tokenAmount: numberToBytesBE(tokenAmount, 16),
       revocationCommitment: new Uint8Array(32).fill(3),
+      status: TokenOutputStatus.TOKEN_OUTPUT_STATUS_UNSPECIFIED,
     },
     previousTransactionHash: new Uint8Array(32).fill(4),
     previousTransactionVout: 0,
@@ -400,6 +404,7 @@ describe("TokenOutputManager", () => {
       tokenPublicKey: new Uint8Array(32).fill(2),
       tokenAmount: numberToBytesBE(tokenAmount, 16),
       revocationCommitment: new Uint8Array(32).fill(3),
+      status: TokenOutputStatus.TOKEN_OUTPUT_STATUS_UNSPECIFIED,
     },
     previousTransactionHash: new Uint8Array(32).fill(4),
     previousTransactionVout: 0,
