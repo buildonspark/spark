@@ -22,7 +22,7 @@ func GetActiveFreezes(ctx context.Context, ownerPublicKeys []keys.Public, tokenC
 		tokenfreeze.OwnerPublicKeyIn(ownerPublicKeys...),
 		tokenfreeze.StatusEQ(st.TokenFreezeStatusFrozen),
 		tokenfreeze.TokenCreateID(tokenCreateId),
-	).All(ctx)
+	).ForUpdate().All(ctx)
 	if err != nil {
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch active freezes for token_create_id %s and owner_public_keys %+q: %w", tokenCreateId, ownerPublicKeys, err))
 	}

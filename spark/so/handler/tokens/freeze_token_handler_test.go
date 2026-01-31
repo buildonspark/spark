@@ -20,7 +20,6 @@ import (
 	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 	sparktesting "github.com/lightsparkdev/spark/testing"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,7 +100,7 @@ func createFreezeTestRequestWithTimestamp(t *testing.T, cfg *so.Config, tokenCre
 }
 
 func TestFreezeTokens_SuccessWhenFreezable(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -117,7 +116,7 @@ func TestFreezeTokens_SuccessWhenFreezable(t *testing.T) {
 }
 
 func TestFreezeTokens_FailsWhenNotFreezable(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -132,7 +131,7 @@ func TestFreezeTokens_FailsWhenNotFreezable(t *testing.T) {
 }
 
 func TestFreezeTokens_IdempotentWhenAlreadyFrozen(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -153,7 +152,7 @@ func TestFreezeTokens_IdempotentWhenAlreadyFrozen(t *testing.T) {
 }
 
 func TestFreezeTokens_RejectsDifferentTimestampWhenAlreadyFrozen(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -173,7 +172,7 @@ func TestFreezeTokens_RejectsDifferentTimestampWhenAlreadyFrozen(t *testing.T) {
 }
 
 func TestUnfreezeTokens_SuccessWhenFrozen(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -192,7 +191,7 @@ func TestUnfreezeTokens_SuccessWhenFrozen(t *testing.T) {
 }
 
 func TestUnfreezeTokens_IdempotentWhenNotFrozen(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -207,7 +206,7 @@ func TestUnfreezeTokens_IdempotentWhenNotFrozen(t *testing.T) {
 }
 
 func TestUnfreezeTokens_IdempotentWhenAlreadyUnfrozen(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -231,7 +230,7 @@ func TestUnfreezeTokens_IdempotentWhenAlreadyUnfrozen(t *testing.T) {
 }
 
 func TestUnfreezeTokens_RejectsDifferentTimestampWhenAlreadyUnfrozen(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -256,7 +255,7 @@ func TestUnfreezeTokens_RejectsDifferentTimestampWhenAlreadyUnfrozen(t *testing.
 }
 
 func TestUnfreezeTokens_FailsWhenNotFreezable(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -271,7 +270,7 @@ func TestUnfreezeTokens_FailsWhenNotFreezable(t *testing.T) {
 }
 
 func TestFreezeTokens_FailsWithInvalidSignature(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -288,7 +287,7 @@ func TestFreezeTokens_FailsWithInvalidSignature(t *testing.T) {
 // Timestamp-based replay protection tests
 
 func TestFreezeTokens_RejectsStaleFreeze(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -314,7 +313,7 @@ func TestFreezeTokens_RejectsStaleFreeze(t *testing.T) {
 }
 
 func TestFreezeTokens_RejectsStaleUnfreeze(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -335,7 +334,7 @@ func TestFreezeTokens_RejectsStaleUnfreeze(t *testing.T) {
 }
 
 func TestFreezeTokens_AcceptsNewerTimestamp(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	handler := NewFreezeTokenHandler(cfg)
 
@@ -357,4 +356,21 @@ func TestFreezeTokens_AcceptsNewerTimestamp(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
+}
+
+func TestFreezeTokens_RejectsFutureTimestamp(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewFreezeTokenHandler(cfg)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, cfg, true)
+
+	// Use a timestamp far in the future (2 minutes from now)
+	futureTimestamp := uint64(time.Now().UnixMilli()) + 120000
+	req := createFreezeTestRequestWithTimestamp(t, cfg, tokenCreate, false, freezeTestIssuerKey, futureTimestamp)
+	resp, err := handler.FreezeTokens(ctx, req)
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Contains(t, err.Error(), "too far in the future")
 }

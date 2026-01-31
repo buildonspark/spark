@@ -39,6 +39,10 @@ import (
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
+// MaxTimestampFutureTolerance is the maximum amount of time a client-provided timestamp
+// can be in the future. This accounts for clock drift between client and server.
+const MaxTimestampFutureTolerance = 1 * time.Minute
+
 type InternalPrepareTokenHandler struct {
 	config *so.Config
 }
@@ -966,10 +970,10 @@ func validateClientCreatedTimestamp(tokenTransaction *tokenpb.TokenTransaction) 
 	// The client created timestamp must be within the validity duration seconds otherwise this transaction
 	// is expired.
 	oldestAllowed := now.Add(-time.Duration(tokenTransaction.GetValidityDurationSeconds()) * time.Second)
-	// The client created timestamp must be within 1 minute of the current time otherwise this transaction
-	// is too far in the future. The clients clock is either not synced or the client is intending to
-	// construct a transaction with a longer than allowed validity duration.
-	latestAllowed := now.Add(1 * time.Minute)
+	// The client created timestamp must be within MaxTimestampFutureTolerance of the current time
+	// otherwise this transaction is too far in the future. The clients clock is either not synced
+	// or the client is intending to construct a transaction with a longer than allowed validity duration.
+	latestAllowed := now.Add(MaxTimestampFutureTolerance)
 	if clientTimestamp.Before(oldestAllowed) {
 		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("client created timestamp too old: %s, oldest allowed: %s", clientTimestamp.Format(time.RFC3339), oldestAllowed.Format(time.RFC3339)))
 	}

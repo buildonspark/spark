@@ -12,6 +12,7 @@ const (
 	ReasonInternalDatabaseRead                 = "DATABASE_READ"
 	ReasonInternalTypeConversion               = "TYPE_CONVERSION"
 	ReasonInternalUnhandled                    = "UNHANDLED"
+	ReasonInternalDataInconsistency            = "DATA_INCONSISTENCY"
 	ReasonInternalObjectNull                   = "INTERNAL_OBJECT_NULL"
 	ReasonInternalObjectMissingField           = "INTERNAL_OBJECT_MISSING_FIELD"
 	ReasonInternalObjectMalformedField         = "INTERNAL_OBJECT_MALFORMED_FIELD"
@@ -61,6 +62,10 @@ func InternalTypeConversionError(err error) error {
 
 func InternalUnhandledError(err error) error {
 	return newGRPCError(codes.Internal, err, ReasonInternalUnhandled)
+}
+
+func InternalDataInconsistency(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalDataInconsistency)
 }
 
 func InternalDatabaseTransactionLifecycleError(err error) error {

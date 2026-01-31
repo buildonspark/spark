@@ -3,6 +3,7 @@ package tokens
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -44,6 +45,15 @@ func ValidateAndApplyFreeze(
 ) (*FreezeResult, error) {
 	if err := utils.ValidateFreezeTokensPayload(freezePayload, config.IdentityPublicKey()); err != nil {
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("freeze tokens payload validation failed: %w", err))
+	}
+
+	// Validate timestamp is not too far in the future (allow for clock drift)
+	maxAllowedTimestamp := uint64(time.Now().Add(MaxTimestampFutureTolerance).UnixMilli())
+	if freezePayload.IssuerProvidedTimestamp > maxAllowedTimestamp {
+		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf(
+			"issuer provided timestamp %d is too far in the future (max allowed: %d)",
+			freezePayload.IssuerProvidedTimestamp, maxAllowedTimestamp,
+		))
 	}
 
 	freezePayloadHash, err := utils.HashFreezeTokensPayload(freezePayload)
@@ -97,7 +107,7 @@ func ValidateAndApplyFreeze(
 			return buildFreezeResult(ctx, ownerPubKey, tokenCreateEnt)
 		}
 		if len(activeFreezes) > 1 {
-			return nil, errors.FailedPreconditionInvalidState(fmt.Errorf(tokens.ErrMultipleActiveFreezes))
+			return nil, errors.InternalDataInconsistency(fmt.Errorf(tokens.ErrMultipleActiveFreezes))
 		}
 		// Reject stale unfreeze: if the active freeze is newer than this unfreeze request
 		activeFreeze := activeFreezes[0]
