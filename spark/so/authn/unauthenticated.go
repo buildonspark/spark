@@ -56,6 +56,10 @@ func DefaultUnauthenticatedConfig() UnauthenticatedConfig {
 			"/spark.SparkService/get_signing_operator_list":      {},
 			"/spark.SparkService/query_spark_invoices":           {},
 			"/spark.SparkService/get_utxos_for_address":          {},
+			// Token query methods
+			"/spark_token.SparkTokenService/query_token_metadata":     {},
+			"/spark_token.SparkTokenService/query_token_outputs":      {},
+			"/spark_token.SparkTokenService/query_token_transactions": {},
 		},
 		ServicePrefixes: []string{
 			"/dkg.DKGService/",
