@@ -148,6 +148,10 @@ func (h *GossipHandler) handleCancelTransferGossipMessage(ctx context.Context, c
 	transferHandler := NewBaseTransferHandler(h.config)
 	err = transferHandler.CancelTransferInternal(ctx, transferID)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			// The transfer is not created, treat it as successful cancellation.
+			return nil
+		}
 		logger := logging.GetLoggerFromContext(ctx)
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to cancel transfer %s", transferID)
 	}
