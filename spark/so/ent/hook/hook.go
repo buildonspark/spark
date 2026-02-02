@@ -81,6 +81,18 @@ func (f GossipFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, erro
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.GossipMutation", m)
 }
 
+// The IdempotencyKeyFunc type is an adapter to allow the use of ordinary
+// function as IdempotencyKey mutator.
+type IdempotencyKeyFunc func(context.Context, *ent.IdempotencyKeyMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f IdempotencyKeyFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.IdempotencyKeyMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.IdempotencyKeyMutation", m)
+}
+
 // The L1TokenCreateFunc type is an adapter to allow the use of ordinary
 // function as L1TokenCreate mutator.
 type L1TokenCreateFunc func(context.Context, *ent.L1TokenCreateMutation) (ent.Value, error)

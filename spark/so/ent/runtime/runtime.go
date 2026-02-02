@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
+	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
@@ -191,6 +192,33 @@ func init() {
 	gossipDescID := gossipMixinFields0[0].Descriptor()
 	// gossip.DefaultID holds the default value on creation for the id field.
 	gossip.DefaultID = gossipDescID.Default.(func() uuid.UUID)
+	idempotencykeyMixin := schema.IdempotencyKey{}.Mixin()
+	idempotencykeyMixinFields0 := idempotencykeyMixin[0].Fields()
+	_ = idempotencykeyMixinFields0
+	idempotencykeyFields := schema.IdempotencyKey{}.Fields()
+	_ = idempotencykeyFields
+	// idempotencykeyDescCreateTime is the schema descriptor for create_time field.
+	idempotencykeyDescCreateTime := idempotencykeyMixinFields0[1].Descriptor()
+	// idempotencykey.DefaultCreateTime holds the default value on creation for the create_time field.
+	idempotencykey.DefaultCreateTime = idempotencykeyDescCreateTime.Default.(func() time.Time)
+	// idempotencykeyDescUpdateTime is the schema descriptor for update_time field.
+	idempotencykeyDescUpdateTime := idempotencykeyMixinFields0[2].Descriptor()
+	// idempotencykey.DefaultUpdateTime holds the default value on creation for the update_time field.
+	idempotencykey.DefaultUpdateTime = idempotencykeyDescUpdateTime.Default.(func() time.Time)
+	// idempotencykey.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	idempotencykey.UpdateDefaultUpdateTime = idempotencykeyDescUpdateTime.UpdateDefault.(func() time.Time)
+	// idempotencykeyDescIdempotencyKey is the schema descriptor for idempotency_key field.
+	idempotencykeyDescIdempotencyKey := idempotencykeyFields[0].Descriptor()
+	// idempotencykey.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
+	idempotencykey.IdempotencyKeyValidator = idempotencykeyDescIdempotencyKey.Validators[0].(func(string) error)
+	// idempotencykeyDescMethodName is the schema descriptor for method_name field.
+	idempotencykeyDescMethodName := idempotencykeyFields[1].Descriptor()
+	// idempotencykey.MethodNameValidator is a validator for the "method_name" field. It is called by the builders before save.
+	idempotencykey.MethodNameValidator = idempotencykeyDescMethodName.Validators[0].(func(string) error)
+	// idempotencykeyDescID is the schema descriptor for id field.
+	idempotencykeyDescID := idempotencykeyMixinFields0[0].Descriptor()
+	// idempotencykey.DefaultID holds the default value on creation for the id field.
+	idempotencykey.DefaultID = idempotencykeyDescID.Default.(func() uuid.UUID)
 	l1tokencreateMixin := schema.L1TokenCreate{}.Mixin()
 	l1tokencreateMixinFields0 := l1tokencreateMixin[0].Fields()
 	_ = l1tokencreateMixinFields0

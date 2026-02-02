@@ -26,6 +26,8 @@ type Tx struct {
 	EventMessage *EventMessageClient
 	// Gossip is the client for interacting with the Gossip builders.
 	Gossip *GossipClient
+	// IdempotencyKey is the client for interacting with the IdempotencyKey builders.
+	IdempotencyKey *IdempotencyKeyClient
 	// L1TokenCreate is the client for interacting with the L1TokenCreate builders.
 	L1TokenCreate *L1TokenCreateClient
 	// L1TokenJusticeTransaction is the client for interacting with the L1TokenJusticeTransaction builders.
@@ -217,6 +219,7 @@ func (tx *Tx) init() {
 	tx.EntityDkgKey = NewEntityDkgKeyClient(tx.config)
 	tx.EventMessage = NewEventMessageClient(tx.config)
 	tx.Gossip = NewGossipClient(tx.config)
+	tx.IdempotencyKey = NewIdempotencyKeyClient(tx.config)
 	tx.L1TokenCreate = NewL1TokenCreateClient(tx.config)
 	tx.L1TokenJusticeTransaction = NewL1TokenJusticeTransactionClient(tx.config)
 	tx.L1TokenOutputWithdrawal = NewL1TokenOutputWithdrawalClient(tx.config)

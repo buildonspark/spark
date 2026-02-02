@@ -199,6 +199,33 @@ var (
 			},
 		},
 	}
+	// IdempotencyKeysColumns holds the columns for the "idempotency_keys" table.
+	IdempotencyKeysColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "idempotency_key", Type: field.TypeString},
+		{Name: "method_name", Type: field.TypeString},
+		{Name: "response", Type: field.TypeJSON, Nullable: true},
+	}
+	// IdempotencyKeysTable holds the schema information for the "idempotency_keys" table.
+	IdempotencyKeysTable = &schema.Table{
+		Name:       "idempotency_keys",
+		Columns:    IdempotencyKeysColumns,
+		PrimaryKey: []*schema.Column{IdempotencyKeysColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "idempotency_keys_idempotency_key_method_name",
+				Unique:  true,
+				Columns: []*schema.Column{IdempotencyKeysColumns[3], IdempotencyKeysColumns[4]},
+			},
+			{
+				Name:    "idempotency_keys_create_time",
+				Unique:  false,
+				Columns: []*schema.Column{IdempotencyKeysColumns[1]},
+			},
+		},
+	}
 	// L1tokenCreatesColumns holds the columns for the "l1token_creates" table.
 	L1tokenCreatesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1517,6 +1544,7 @@ var (
 		EntityDkgKeysTable,
 		EventMessagesTable,
 		GossipsTable,
+		IdempotencyKeysTable,
 		L1tokenCreatesTable,
 		L1tokenJusticeTransactionsTable,
 		L1tokenOutputWithdrawalsTable,

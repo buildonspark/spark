@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
+	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
@@ -260,6 +261,33 @@ func (f TraverseGossip) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.GossipQuery", q)
+}
+
+// The IdempotencyKeyFunc type is an adapter to allow the use of ordinary function as a Querier.
+type IdempotencyKeyFunc func(context.Context, *ent.IdempotencyKeyQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f IdempotencyKeyFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.IdempotencyKeyQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.IdempotencyKeyQuery", q)
+}
+
+// The TraverseIdempotencyKey type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseIdempotencyKey func(context.Context, *ent.IdempotencyKeyQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseIdempotencyKey) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseIdempotencyKey) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.IdempotencyKeyQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.IdempotencyKeyQuery", q)
 }
 
 // The L1TokenCreateFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1006,6 +1034,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.EventMessageQuery, predicate.EventMessage, eventmessage.OrderOption]{typ: ent.TypeEventMessage, tq: q}, nil
 	case *ent.GossipQuery:
 		return &query[*ent.GossipQuery, predicate.Gossip, gossip.OrderOption]{typ: ent.TypeGossip, tq: q}, nil
+	case *ent.IdempotencyKeyQuery:
+		return &query[*ent.IdempotencyKeyQuery, predicate.IdempotencyKey, idempotencykey.OrderOption]{typ: ent.TypeIdempotencyKey, tq: q}, nil
 	case *ent.L1TokenCreateQuery:
 		return &query[*ent.L1TokenCreateQuery, predicate.L1TokenCreate, l1tokencreate.OrderOption]{typ: ent.TypeL1TokenCreate, tq: q}, nil
 	case *ent.L1TokenJusticeTransactionQuery:

@@ -18,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
+	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
@@ -111,6 +112,7 @@ func checkColumn(table, column string) error {
 			entitydkgkey.Table:                      entitydkgkey.ValidColumn,
 			eventmessage.Table:                      eventmessage.ValidColumn,
 			gossip.Table:                            gossip.ValidColumn,
+			idempotencykey.Table:                    idempotencykey.ValidColumn,
 			l1tokencreate.Table:                     l1tokencreate.ValidColumn,
 			l1tokenjusticetransaction.Table:         l1tokenjusticetransaction.ValidColumn,
 			l1tokenoutputwithdrawal.Table:           l1tokenoutputwithdrawal.ValidColumn,

@@ -5,6 +5,7 @@ package entexample
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -845,6 +846,107 @@ func (_go *GossipExample) Exec(ctx context.Context) (*ent.Gossip, error) {
 	} else {
 		// Use default from annotation
 		create.SetReceipts(func() []byte { b, _ := hex.DecodeString("03"); return b }())
+	}
+
+	// Handle edges
+
+	return create.Save(ctx)
+}
+
+// IdempotencyKeyExample is a test fixture builder for IdempotencyKey.
+type IdempotencyKeyExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	IdempotencyKey *string
+	MethodName     *string
+	Response       *json.RawMessage
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+}
+
+// NewIdempotencyKeyExample creates a new IdempotencyKeyExample for testing.
+func NewIdempotencyKeyExample(t *testing.T, client *ent.Client) *IdempotencyKeyExample {
+	return &IdempotencyKeyExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetIdempotencyKey sets the idempotency_key field.
+func (ik *IdempotencyKeyExample) SetIdempotencyKey(v string) *IdempotencyKeyExample {
+	ik.IdempotencyKey = &v
+	return ik
+}
+
+// SetMethodName sets the method_name field.
+func (ik *IdempotencyKeyExample) SetMethodName(v string) *IdempotencyKeyExample {
+	ik.MethodName = &v
+	return ik
+}
+
+// SetResponse sets the response field.
+func (ik *IdempotencyKeyExample) SetResponse(v json.RawMessage) *IdempotencyKeyExample {
+	ik.Response = &v
+	return ik
+}
+
+// MustExec builds and saves the IdempotencyKey entity to the database.
+// It panics if the save fails.
+func (ik *IdempotencyKeyExample) MustExec(ctx context.Context) *ent.IdempotencyKey {
+	create := ik.client.IdempotencyKey.Create()
+
+	// Set fields
+	if ik.IdempotencyKey != nil {
+		create.SetIdempotencyKey(*ik.IdempotencyKey)
+	} else {
+		// Use default from annotation
+		create.SetIdempotencyKey("my_super_cool_idempotency_key_1337")
+	}
+	if ik.MethodName != nil {
+		create.SetMethodName(*ik.MethodName)
+	} else {
+		// Use default from annotation
+		create.SetMethodName("/spark.SparkService/start_transfer_v2")
+	}
+	if ik.Response != nil {
+		create.SetResponse(*ik.Response)
+	} else {
+	}
+
+	// Handle edges
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		ik.t.Helper()
+		ik.t.Fatalf("failed to create IdempotencyKey: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the IdempotencyKey entity to the database.
+// It returns an error if the save fails.
+func (ik *IdempotencyKeyExample) Exec(ctx context.Context) (*ent.IdempotencyKey, error) {
+	create := ik.client.IdempotencyKey.Create()
+
+	// Set fields
+	if ik.IdempotencyKey != nil {
+		create.SetIdempotencyKey(*ik.IdempotencyKey)
+	} else {
+		// Use default from annotation
+		create.SetIdempotencyKey("my_super_cool_idempotency_key_1337")
+	}
+	if ik.MethodName != nil {
+		create.SetMethodName(*ik.MethodName)
+	} else {
+		// Use default from annotation
+		create.SetMethodName("/spark.SparkService/start_transfer_v2")
+	}
+	if ik.Response != nil {
+		create.SetResponse(*ik.Response)
+	} else {
 	}
 
 	// Handle edges

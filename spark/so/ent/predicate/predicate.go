@@ -24,6 +24,9 @@ type EventMessage func(*sql.Selector)
 // Gossip is the predicate function for gossip builders.
 type Gossip func(*sql.Selector)
 
+// IdempotencyKey is the predicate function for idempotencykey builders.
+type IdempotencyKey func(*sql.Selector)
+
 // L1TokenCreate is the predicate function for l1tokencreate builders.
 type L1TokenCreate func(*sql.Selector)
 
