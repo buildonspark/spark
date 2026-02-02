@@ -491,10 +491,8 @@ func TestFreezeTokens_CoordinatedFreezePartialSuccess(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NotNil(t, resp.FreezeProgress)
 	// Self + 1 mock operator succeeded, 1 failed
-	// Total frozen should be 2, unfrozen should be 1
-	totalOperators := len(resp.FreezeProgress.FrozenOperatorPublicKeys) + len(resp.FreezeProgress.UnfrozenOperatorPublicKeys)
-	assert.Equal(t, 3, totalOperators)
-	assert.GreaterOrEqual(t, len(resp.FreezeProgress.FrozenOperatorPublicKeys), 1) // At least self succeeded
+	assert.Len(t, resp.FreezeProgress.FrozenOperatorPublicKeys, 2)
+	assert.Len(t, resp.FreezeProgress.UnfrozenOperatorPublicKeys, 1)
 }
 
 func TestFreezeTokens_CoordinatedFreezeDisabled(t *testing.T) {

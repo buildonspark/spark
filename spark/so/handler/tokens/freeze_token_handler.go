@@ -44,7 +44,6 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 		return nil, err
 	}
 
-	// Apply freeze locally first
 	result, err := ValidateAndApplyFreeze(ctx, h.config, req.FreezeTokensPayload, req.IssuerSignature)
 	if err != nil {
 		return nil, err
@@ -80,7 +79,7 @@ func (h *FreezeTokenHandler) fanOutFreezeToOtherOperators(ctx context.Context, r
 	logger := logging.GetLoggerFromContext(ctx)
 
 	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	results, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &excludeSelf,
+	results, err := helper.ExecuteTaskWithAllOperatorsWithAllResponses(ctx, h.config, &excludeSelf,
 		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.InternalFreezeTokensResponse, error) {
 			conn, err := operator.NewOperatorGRPCConnection()
 			if err != nil {
@@ -96,20 +95,29 @@ func (h *FreezeTokenHandler) fanOutFreezeToOtherOperators(ctx context.Context, r
 		},
 	)
 	if err != nil {
-		logger.Warn("coordinated freeze fan-out had failures",
+		logger.Warn("coordinated freeze fan-out setup failed",
 			zap.Error(err),
 			zap.Binary("token_identifier", req.FreezeTokensPayload.GetTokenIdentifier()),
 		)
+		results = &helper.PartialResults[*tokeninternalpb.InternalFreezeTokensResponse]{
+			Successes: make(map[string]*tokeninternalpb.InternalFreezeTokensResponse),
+			Errors:    make(map[string]error),
+		}
+	} else if results.HasErrors() {
+		for opID, opErr := range results.Errors {
+			logger.Warn("coordinated freeze failed for operator",
+				zap.String("operator_id", opID),
+				zap.Error(opErr),
+				zap.Binary("token_identifier", req.FreezeTokensPayload.GetTokenIdentifier()),
+			)
+		}
 	}
 
-	progress := h.buildFreezeProgress(results)
-
-	return progress
+	return h.buildFreezeProgress(results)
 }
 
 // buildFreezeProgress builds a FreezeProgress from the fan-out results.
-// Operators with non-nil results are considered frozen, others are unfrozen.
-func (h *FreezeTokenHandler) buildFreezeProgress(results map[string]*tokeninternalpb.InternalFreezeTokensResponse) *tokenpb.FreezeProgress {
+func (h *FreezeTokenHandler) buildFreezeProgress(results *helper.PartialResults[*tokeninternalpb.InternalFreezeTokensResponse]) *tokenpb.FreezeProgress {
 	var frozen, unfrozen [][]byte
 
 	for identifier, operator := range h.config.SigningOperatorMap {
@@ -117,8 +125,7 @@ func (h *FreezeTokenHandler) buildFreezeProgress(results map[string]*tokenintern
 			continue // Self is handled separately in FreezeTokens
 		}
 
-		result, exists := results[identifier]
-		if exists && result != nil {
+		if _, ok := results.Successes[identifier]; ok {
 			frozen = append(frozen, operator.IdentityPublicKey.Serialize())
 		} else {
 			unfrozen = append(unfrozen, operator.IdentityPublicKey.Serialize())

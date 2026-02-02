@@ -108,18 +108,17 @@ type taskResult[V any] struct {
 	Error error
 }
 
-// ExecuteTaskWithAllOperators executes the given task with a list of operators.
-// This will run goroutines for each operator and wait for all of them to complete before returning.
-// It returns an error if any of the tasks fail.
-func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, selection *OperatorSelection, task func(ctx context.Context, operator *so.SigningOperator) (V, error)) (map[string]V, error) {
-	wg := sync.WaitGroup{}
-
+// executeTasksCore runs tasks for all selected operators in parallel and returns
+// the raw results. Returns whether "self" was in the selection (self is handled
+// separately by callers to avoid deadlock from self-calling over gRPC).
+func executeTasksCore[V any](ctx context.Context, config *so.Config, selection *OperatorSelection, task func(ctx context.Context, operator *so.SigningOperator) (V, error)) ([]taskResult[V], bool, error) {
 	operators, err := selection.OperatorList(config)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	results := make(chan taskResult[V], len(operators))
+	wg := sync.WaitGroup{}
 
 	hasSelf := false
 	for _, operator := range operators {
@@ -143,12 +142,28 @@ func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, 
 	wg.Wait()
 	close(results)
 
-	resultsMap := make(map[string]V)
+	resultSlice := make([]taskResult[V], 0, len(operators))
 	for result := range results {
+		resultSlice = append(resultSlice, result)
+	}
+
+	return resultSlice, hasSelf, nil
+}
+
+// ExecuteTaskWithAllOperators executes the given task with a list of operators.
+// This will run goroutines for each operator and wait for all of them to complete before returning.
+// It returns an error if any of the tasks fail.
+func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, selection *OperatorSelection, task func(ctx context.Context, operator *so.SigningOperator) (V, error)) (map[string]V, error) {
+	results, hasSelf, err := executeTasksCore(ctx, config, selection, task)
+	if err != nil {
+		return nil, err
+	}
+
+	resultsMap := make(map[string]V)
+	for _, result := range results {
 		if result.Error != nil {
 			return nil, result.Error
 		}
-
 		resultsMap[result.OperatorIdentifier] = result.Result
 	}
 
@@ -161,4 +176,53 @@ func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, 
 	}
 
 	return resultsMap, nil
+}
+
+// PartialResults contains the results of executing a task across multiple operators,
+// separating successes from failures.
+type PartialResults[V any] struct {
+	// Successes maps operator identifiers to their successful results.
+	Successes map[string]V
+	// Errors maps operator identifiers to the errors they returned.
+	Errors map[string]error
+}
+
+// HasErrors returns true if any operators failed.
+func (p *PartialResults[V]) HasErrors() bool {
+	return len(p.Errors) > 0
+}
+
+// ExecuteTaskWithAllOperatorsWithAllResponses executes the given task with a list of operators.
+// Unlike ExecuteTaskWithAllOperators, this function collects all results even if some fail,
+// returning both successes and failures separately. Use this for "best effort" operations
+// where partial success is acceptable (e.g., coordinated freeze).
+func ExecuteTaskWithAllOperatorsWithAllResponses[V any](ctx context.Context, config *so.Config, selection *OperatorSelection, task func(ctx context.Context, operator *so.SigningOperator) (V, error)) (*PartialResults[V], error) {
+	results, hasSelf, err := executeTasksCore(ctx, config, selection, task)
+	if err != nil {
+		return nil, err
+	}
+
+	partial := &PartialResults[V]{
+		Successes: make(map[string]V),
+		Errors:    make(map[string]error),
+	}
+
+	for _, result := range results {
+		if result.Error != nil {
+			partial.Errors[result.OperatorIdentifier] = result.Error
+		} else {
+			partial.Successes[result.OperatorIdentifier] = result.Result
+		}
+	}
+
+	if hasSelf {
+		result, err := task(ctx, config.SigningOperatorMap[config.Identifier])
+		if err != nil {
+			partial.Errors[config.Identifier] = err
+		} else {
+			partial.Successes[config.Identifier] = result
+		}
+	}
+
+	return partial, nil
 }
