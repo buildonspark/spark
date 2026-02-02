@@ -533,7 +533,12 @@ func handleBlock(
 			return fmt.Errorf("failed to query transfer leaves: %w", err)
 		}
 		for _, transferLeaf := range transferLeaves {
-			if err := watchtower.BroadcastTransferLeafRefund(ctx, bitcoinClient, transferLeaf, network, blockHeight); err != nil {
+			leaf := transferLeaf.Edges.Leaf
+			if leaf == nil {
+				logger.Sugar().Errorf("Transfer leaf %s has no leaf edge (expected with WithLeaf())", transferLeaf.ID)
+				continue
+			}
+			if err := watchtower.BroadcastTransferLeafRefund(ctx, bitcoinClient, transferLeaf, leaf.NodeConfirmationHeight, network, blockHeight); err != nil {
 				logger.Sugar().Errorf("Failed to broadcast intermediate refund for transfer leaf %s: %v", transferLeaf.ID, err)
 			}
 		}

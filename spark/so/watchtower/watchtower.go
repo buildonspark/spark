@@ -168,6 +168,7 @@ func QueryBroadcastableTransferLeaves(ctx context.Context, dbClient *ent.Client,
 			transferleaf.HasLeafWith(treenode.IDIn(eligibleNodeIDs...)),
 			transferleaf.HasTransferWith(transfer.StatusNotIn(excludedStatuses...)),
 		).
+		WithLeaf().
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query transfer leaves for eligible nodes: %w", err)
@@ -348,11 +349,22 @@ func broadcastWithMetric(
 }
 
 // BroadcastTransferLeafRefund attempts to broadcast the refund transactions for a transfer leaf.
-func BroadcastTransferLeafRefund(ctx context.Context, bitcoinClient *rpcclient.Client, transferLeaf *ent.TransferLeaf, network btcnetwork.Network, blockHeight int64) error {
+// The intermediate refund timelocks are relative to nodeConfirmationHeight,
+// the block height at which the leaf's Spark node was confirmed.
+// The timelock is expired when blockHeight >= nodeConfirmationHeight + timelock.
+func BroadcastTransferLeafRefund(ctx context.Context, bitcoinClient *rpcclient.Client, transferLeaf *ent.TransferLeaf, nodeConfirmationHeight uint64, network btcnetwork.Network, blockHeight int64) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	directRefundTimelockExpired := transferLeaf.IntermediateDirectRefundTimelock > 0 && transferLeaf.IntermediateDirectRefundTimelock <= uint64(blockHeight)
-	directFromCpfpRefundTimelockExpired := transferLeaf.IntermediateDirectFromCpfpRefundTimelock > 0 && transferLeaf.IntermediateDirectFromCpfpRefundTimelock <= uint64(blockHeight)
+	// A confirmed node has confirmation height much greater than zero.
+	if nodeConfirmationHeight == 0 {
+		return nil
+	}
+
+	directRefundExpiryHeight := nodeConfirmationHeight + transferLeaf.IntermediateDirectRefundTimelock
+	directRefundTimelockExpired := transferLeaf.IntermediateDirectRefundTimelock > 0 && directRefundExpiryHeight <= uint64(blockHeight)
+
+	directFromCpfpRefundExpiryHeight := nodeConfirmationHeight + transferLeaf.IntermediateDirectFromCpfpRefundTimelock
+	directFromCpfpRefundTimelockExpired := transferLeaf.IntermediateDirectFromCpfpRefundTimelock > 0 && directFromCpfpRefundExpiryHeight <= uint64(blockHeight)
 
 	// If neither timelock is expired, return early
 	if !directRefundTimelockExpired && !directFromCpfpRefundTimelockExpired {
