@@ -46,6 +46,12 @@ receiverIdentityPubkey?: string | undefined;
 **/
 descriptionHash?: string | undefined;
 
+    /**
+ * The spark invoice to embed in the routing hints of the Bolt 11 lightning invoice.
+ * This is mutually exclusive with includeSparkAddress.
+**/
+sparkInvoice?: string | undefined;
+
 
 
 
@@ -61,6 +67,7 @@ export const RequestLightningReceiveInputFromJson = (obj: any): RequestLightning
         memo: obj["request_lightning_receive_input_memo"],
         receiverIdentityPubkey: obj["request_lightning_receive_input_receiver_identity_pubkey"],
         descriptionHash: obj["request_lightning_receive_input_description_hash"],
+        sparkInvoice: obj["request_lightning_receive_input_spark_invoice"],
 
         } as RequestLightningReceiveInput;
 
@@ -75,6 +82,7 @@ request_lightning_receive_input_memo: obj.memo,
 request_lightning_receive_input_receiver_identity_pubkey: obj.receiverIdentityPubkey,
 request_lightning_receive_input_include_spark_address: obj.includeSparkAddress,
 request_lightning_receive_input_description_hash: obj.descriptionHash,
+request_lightning_receive_input_spark_invoice: obj.sparkInvoice,
 
         }
 

@@ -74,7 +74,7 @@ import {
 import {
   decodeInvoice,
   getNetworkFromInvoice,
-  isValidSparkFallback,
+  isValidSparkAddressFallback,
 } from "../services/bolt11-spark.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection/connection.js";
@@ -111,6 +111,7 @@ import {
   decodeSparkAddress,
   encodeSparkAddress,
   encodeSparkAddressWithSignature,
+  getNetworkFromSparkAddress,
   isLegacySparkAddress,
   isSafeForNumber,
   SparkAddressFormat,
@@ -172,6 +173,7 @@ import type {
   WithdrawParams,
 } from "./types.js";
 import { SparkWalletEvent } from "./types.js";
+import type { DecodedInvoice } from "../services/bolt11-spark.js";
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
@@ -3152,7 +3154,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @param {number} params.amountSats - Amount in satoshis
    * @param {string} [params.memo] - Description for the invoice. Should not be provided if the descriptionHash is provided.
    * @param {number} [params.expirySeconds] - Optional expiry time in seconds
-   * @param {boolean} [params.includeSparkAddress] - Optional boolean signalling whether or not to include the spark address in the invoice
+   * @param {boolean} [params.includeSparkAddress] - Optional boolean signalling whether or not to include the spark address in the invoice. Mutually exclusive with includeSparkInvoice.
+   * @param {boolean} [params.includeSparkInvoice] - Optional boolean signalling whether to include a spark invoice in the invoice routing hints. Mutually exclusive with includeSparkAddress.
    * @param {string} [params.receiverIdentityPubkey] - Optional public key of the wallet receiving the lightning invoice. If not present, the receiver will be the creator of this request.
    * @param {string} [params.descriptionHash] - Optional h tag of the invoice. This is the hash of a longer description to include in the lightning invoice. It is used in LNURL and UMA as the hash of the metadata. This field is mutually exclusive with the memo field. Only one or the other should be provided.
    * @returns {Promise<LightningReceiveRequest>} BOLT11 encoded invoice
@@ -3162,6 +3165,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     memo,
     expirySeconds = 60 * 60 * 24 * 30,
     includeSparkAddress = false,
+    includeSparkInvoice = false,
     receiverIdentityPubkey,
     descriptionHash,
   }: CreateLightningInvoiceParams): Promise<LightningReceiveRequest> {
@@ -3218,6 +3222,27 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       );
     }
 
+    if (includeSparkAddress && includeSparkInvoice) {
+      throw new SparkValidationError(
+        "includeSparkAddress and includeSparkInvoice are mutually exclusive",
+        {
+          field: "includeSparkInvoice",
+          value: includeSparkInvoice,
+          expected: "Only one of includeSparkAddress or includeSparkInvoice",
+        },
+      );
+    }
+
+    let sparkInvoice: string | undefined;
+    if (includeSparkInvoice) {
+      const sparkAmount = amountSats > 0 ? amountSats : undefined;
+      sparkInvoice = await this.createSatsInvoice({
+        amount: sparkAmount,
+        expiryTime: new Date(Date.now() + expirySeconds * 1000),
+        // Note: memo does not need to be duplicated in the spark invoice.
+      });
+    }
+
     const requestLightningInvoice = async (
       amountSats: number,
       paymentHash: Uint8Array,
@@ -3242,6 +3267,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         includeSparkAddress: includeSparkAddress,
         receiverIdentityPubkey,
         descriptionHash,
+        sparkInvoice,
       });
 
       if (!invoice) {
@@ -3285,6 +3311,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         const sparkFallbackAddress = decodedInvoice.fallbackAddress;
 
         if (!sparkFallbackAddress) {
+          console.warn(
+            "No spark fallback address found in lightning invoice",
+            invoice.invoice.encodedInvoice,
+          );
           throw new SparkValidationError(
             "No spark fallback address found in lightning invoice",
             {
@@ -3305,6 +3335,31 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
               field: "sparkFallbackAddress",
               value: sparkFallbackAddress,
               expected: expectedIdentityPubkey,
+            },
+          );
+        }
+      } else if (includeSparkInvoice) {
+        // Validate the spark invoice embedded in the lightning invoice
+        const embeddedSparkInvoice = decodedInvoice.fallbackAddress;
+
+        if (!embeddedSparkInvoice) {
+          throw new SparkValidationError(
+            "No spark invoice found in lightning invoice",
+            {
+              field: "sparkInvoice",
+              value: embeddedSparkInvoice,
+              expected: "Valid spark invoice",
+            },
+          );
+        }
+
+        if (embeddedSparkInvoice !== sparkInvoice) {
+          throw new SparkValidationError(
+            "Mismatch between spark invoice embedded in lightning invoice and expected spark invoice",
+            {
+              field: "sparkInvoice",
+              value: embeddedSparkInvoice,
+              expected: sparkInvoice,
             },
           );
         }
@@ -3333,20 +3388,173 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
+   * Attempts to pay over Spark using the fallback data embedded in a Lightning invoice.
+   * Returns the transfer if successful, or undefined if the fallback data is not valid Spark data.
+   */
+  private async tryPayOverSpark(
+    decodedInvoice: DecodedInvoice,
+    amountSats: number,
+    network: Network,
+  ): Promise<WalletTransfer | undefined> {
+    const fallbackAddress = decodedInvoice.fallbackAddress;
+    if (!fallbackAddress) {
+      console.warn("No fallback address found in invoice");
+      return undefined;
+    }
+
+    // Try bech32m spark address/invoice first
+    // Auto-detect network from spark address prefix since REGTEST and LOCAL
+    // share the same lightning invoice prefix (lnbcrt) but have different
+    // spark address prefixes (sparkrt vs sparkl)
+    const sparkNetwork = this.tryGetNetworkFromSparkAddress(fallbackAddress);
+    if (sparkNetwork && !this.isCompatibleNetwork(network, sparkNetwork)) {
+      console.warn(
+        `Spark address network ${sparkNetwork} incompatible with invoice network ${Network[network]}`,
+      );
+      return undefined;
+    }
+    const networkType = sparkNetwork ?? (Network[network] as NetworkType);
+    const decoded = this.tryDecodeSparkAddress(fallbackAddress, networkType);
+    if (decoded?.sparkInvoiceFields) {
+      const isZeroAmountInvoice = !decodedInvoice.amountMSats;
+      this.validateSparkInvoiceAmount(
+        decoded.sparkInvoiceFields,
+        amountSats,
+        isZeroAmountInvoice,
+      );
+      return this.fulfillSparkInvoiceInternal(
+        fallbackAddress as SparkAddressFormat,
+        amountSats,
+      );
+    }
+    if (decoded) {
+      return this.transfer({
+        amountSats,
+        receiverSparkAddress: fallbackAddress as SparkAddressFormat,
+      });
+    }
+
+    if (!isValidSparkAddressFallback(fallbackAddress)) {
+      console.warn("Invalid spark fallback address", fallbackAddress);
+      return undefined;
+    }
+
+    const sparkAddress = encodeSparkAddress({
+      identityPublicKey: fallbackAddress,
+      network: Network[network] as NetworkType,
+    });
+    return this.transfer({ amountSats, receiverSparkAddress: sparkAddress });
+  }
+
+  private tryDecodeSparkAddress(
+    address: string,
+    networkType: NetworkType,
+  ): ReturnType<typeof decodeSparkAddress> | undefined {
+    try {
+      return decodeSparkAddress(address, networkType);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private tryGetNetworkFromSparkAddress(
+    address: string,
+  ): NetworkType | undefined {
+    try {
+      return getNetworkFromSparkAddress(address);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private isCompatibleNetwork(
+    invoiceNetwork: Network,
+    sparkNetwork: NetworkType,
+  ): boolean {
+    const invoiceNetworkType = Network[invoiceNetwork] as NetworkType;
+    if (invoiceNetworkType === sparkNetwork) return true;
+    // REGTEST and LOCAL share the same lightning invoice prefix (lnbcrt)
+    if (
+      (invoiceNetworkType === "REGTEST" || invoiceNetworkType === "LOCAL") &&
+      (sparkNetwork === "REGTEST" || sparkNetwork === "LOCAL")
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  private validateSparkInvoiceAmount(
+    sparkInvoiceFields: NonNullable<
+      ReturnType<typeof decodeSparkAddress>["sparkInvoiceFields"]
+    >,
+    expectedAmountSats: number,
+    isZeroAmountLightningInvoice: boolean,
+  ): void {
+    const paymentType = sparkInvoiceFields.paymentType;
+    if (paymentType?.type !== "sats") {
+      throw new SparkValidationError(
+        "Lightning invoice should only contain sats payment type",
+      );
+    }
+    const invoiceAmount = Number(paymentType.amount || 0);
+    const isZeroAmountSparkInvoice = invoiceAmount === 0;
+    if (isZeroAmountSparkInvoice !== isZeroAmountLightningInvoice) {
+      throw new SparkValidationError(
+        "Zero amount mismatch. Either both or neither the lightning invoice and the spark invoice should have a zero amount",
+        {
+          field: "isZeroAmountLightningInvoice",
+          value: isZeroAmountLightningInvoice,
+          expected: isZeroAmountSparkInvoice,
+        },
+      );
+    }
+    if (invoiceAmount !== expectedAmountSats && !isZeroAmountSparkInvoice) {
+      throw new SparkValidationError(
+        "Lightning invoice amount does not match embedded spark invoice amount",
+        {
+          field: "amountSats",
+          value: expectedAmountSats,
+          expected: invoiceAmount,
+        },
+      );
+    }
+  }
+
+  private async fulfillSparkInvoiceInternal(
+    invoice: SparkAddressFormat,
+    amountSats: number,
+  ): Promise<WalletTransfer> {
+    const result = await this.fulfillSparkInvoice([
+      { invoice, amount: BigInt(amountSats) },
+    ]);
+    const firstError = result.satsTransactionErrors[0];
+    if (firstError) {
+      throw firstError.error;
+    }
+    const firstSuccess = result.satsTransactionSuccess[0];
+    if (!firstSuccess) {
+      throw new Error("Failed to fulfill spark invoice");
+    }
+    return firstSuccess.transferResponse;
+  }
+
+  /**
    * Pays a Lightning invoice.
    *
    * @param {Object} params - Parameters for paying the invoice
    * @param {string} params.invoice - The BOLT11-encoded Lightning invoice to pay
    * @param {boolean} [params.preferSpark] - Whether to prefer a spark transfer over lightning for the payment
    * @param {number} [params.amountSatsToSend] - The amount in sats to send. This is only valid for 0 amount lightning invoices.
-   * @returns {Promise<LightningSendRequest>} The Lightning payment request details
+   * @returns {Promise<LightningSendRequest | WalletTransfer>} The Lightning payment request details or the transfer details if the payment is over Spark
    */
   public async payLightningInvoice({
     invoice,
     maxFeeSats,
     preferSpark = false,
     amountSatsToSend,
-  }: PayLightningInvoiceParams) {
+  }: PayLightningInvoiceParams): Promise<
+    LightningSendRequest | WalletTransfer
+  > {
     invoice = invoice.toLowerCase();
 
     const invoiceNetwork = getNetworkFromInvoice(invoice);
@@ -3411,25 +3619,19 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const sparkFallbackAddress = decodedInvoice.fallbackAddress;
     const paymentHash = decodedInvoice.paymentHash;
 
-    // Pay over Spark
-    if (preferSpark) {
-      if (
-        sparkFallbackAddress === undefined ||
-        isValidSparkFallback(hexToBytes(sparkFallbackAddress)) === false
-      ) {
-        console.warn(
-          "No valid spark address found in invoice. Defaulting to lightning.",
-        );
-      } else {
-        const receiverSparkAddress = encodeSparkAddress({
-          identityPublicKey: sparkFallbackAddress,
-          network: Network[invoiceNetwork] as NetworkType,
-        });
-        return await this.transfer({
-          amountSats,
-          receiverSparkAddress,
-        });
+    // Try to pay over Spark if preferred
+    if (preferSpark && sparkFallbackAddress) {
+      const sparkPayment = await this.tryPayOverSpark(
+        decodedInvoice,
+        amountSats,
+        invoiceNetwork,
+      );
+      if (sparkPayment) {
+        return sparkPayment;
       }
+      console.warn(
+        "No valid spark data found in invoice. Defaulting to lightning.",
+      );
     }
 
     // Pay over Lightning

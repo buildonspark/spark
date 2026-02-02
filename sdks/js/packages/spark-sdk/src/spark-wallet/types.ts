@@ -29,6 +29,7 @@ export type CreateLightningInvoiceParams = {
   memo?: string;
   expirySeconds?: number;
   includeSparkAddress?: boolean;
+  includeSparkInvoice?: boolean;
   receiverIdentityPubkey?: string;
   descriptionHash?: string;
 };

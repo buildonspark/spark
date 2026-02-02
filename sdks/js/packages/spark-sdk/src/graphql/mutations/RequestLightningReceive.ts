@@ -10,6 +10,7 @@ export const RequestLightningReceive = `
     $include_spark_address: Boolean
     $receiver_identity_pubkey: PublicKey
     $description_hash: Hash32
+    $spark_invoice: String
   ) {
     request_lightning_receive(
       input: {
@@ -21,6 +22,7 @@ export const RequestLightningReceive = `
         include_spark_address: $include_spark_address
         receiver_identity_pubkey: $receiver_identity_pubkey
         description_hash: $description_hash
+        spark_invoice: $spark_invoice
       }
     ) {
       request {

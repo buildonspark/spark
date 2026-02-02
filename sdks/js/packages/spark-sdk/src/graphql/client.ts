@@ -316,6 +316,7 @@ export default class SspClient {
     includeSparkAddress,
     receiverIdentityPubkey,
     descriptionHash,
+    sparkInvoice,
   }: RequestLightningReceiveInput): Promise<LightningReceiveRequest | null> {
     return await this.executeRawQuery({
       queryPayload: RequestLightningReceive,
@@ -328,6 +329,7 @@ export default class SspClient {
         include_spark_address: includeSparkAddress,
         receiver_identity_pubkey: receiverIdentityPubkey,
         description_hash: descriptionHash,
+        spark_invoice: sparkInvoice,
       },
       constructObject: (response: { request_lightning_receive: any }) => {
         return LightningReceiveRequestFromJson(
