@@ -363,7 +363,7 @@ func (h *BaseTransferHandler) createTransfer(
 
 	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeSwap || transferType == st.TransferTypeCounterSwap || transferType == st.TransferTypePrimarySwapV3 || transferType == st.TransferTypeCounterSwapV3 || transferType == st.TransferTypeCooperativeExit {
 		if err := h.validateAndConstructBitcoinTransactions(ctx, req, transferType, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, connectorTx); err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("unable to validate and construct bitcoin transactions: %w, transfer id: %s", err, transferID)
 		}
 	}
 
@@ -1228,9 +1228,10 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 		}
 
 		if req == nil || req.TransferPackage == nil {
-			return validateTransactionCooperativeExitLegacyLeavesToSend(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey, connectorTx)
+			return validateTransactionCooperativeExitLeavesToSend(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey, connectorTx)
+		} else {
+			return fmt.Errorf("Invalid cooperative exit validation request, coop exits with transfer package are not supported")
 		}
-		return validateTransactionCooperativeExitLeaves(ctx, req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 
 	default:
 		return fmt.Errorf("invalid transfer type: %s", transferType)
@@ -1600,7 +1601,7 @@ func validateLeaves_swap(
 	return nil
 }
 
-func validateTransactionCooperativeExitLegacyLeavesToSend(
+func validateTransactionCooperativeExitLeavesToSend(
 	ctx context.Context,
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
@@ -1691,110 +1692,6 @@ func validateTransactionCooperativeExitLegacyLeavesToSend(
 			}
 		}
 	}
-	return nil
-}
-
-func validateTransactionCooperativeExitLeaves(
-	ctx context.Context,
-	req *pbspark.StartTransferRequest,
-	nodesByID map[string]*ent.TreeNode,
-	leafCpfpRefundMap map[string][]byte,
-	leafDirectRefundMap map[string][]byte,
-	leafDirectFromCpfpRefundMap map[string][]byte,
-	refundDestPubkey keys.Public,
-) error {
-	leavesToSendByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.LeavesToSend))
-	for _, leaf := range req.TransferPackage.LeavesToSend {
-		parsed, err := uuid.Parse(leaf.LeafId)
-		if err != nil {
-			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
-		}
-		leafID := parsed.String()
-		if _, exists := leavesToSendByID[leafID]; exists {
-			return fmt.Errorf("duplicate leaf id: %s", leafID)
-		}
-		leavesToSendByID[leafID] = leaf
-	}
-
-	directLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.DirectLeavesToSend))
-	for _, leaf := range req.TransferPackage.DirectLeavesToSend {
-		parsed, err := uuid.Parse(leaf.LeafId)
-		if err != nil {
-			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
-		}
-		directLeafID := parsed.String()
-		if _, ok := leavesToSendByID[directLeafID]; !ok {
-			return fmt.Errorf("found orphan leaf in DirectLeavesToSend with ID %s that does not correspond to any leaf in LeavesToSend", leaf.LeafId)
-		}
-		if _, exists := directLeavesByID[directLeafID]; exists {
-			return fmt.Errorf("duplicate leaf id: %s", directLeafID)
-		}
-		directLeavesByID[directLeafID] = leaf
-	}
-
-	if len(req.TransferPackage.LeavesToSend) != len(req.TransferPackage.DirectFromCpfpLeavesToSend) {
-		return fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(req.TransferPackage.LeavesToSend), len(req.TransferPackage.DirectFromCpfpLeavesToSend))
-	}
-
-	directFromCpfpLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.DirectFromCpfpLeavesToSend))
-	for _, leaf := range req.TransferPackage.DirectFromCpfpLeavesToSend {
-		parsed, err := uuid.Parse(leaf.LeafId)
-		if err != nil {
-			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
-		}
-		directFromCpfpLeafID := parsed.String()
-		if _, ok := leavesToSendByID[directFromCpfpLeafID]; !ok {
-			return fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s which is not in LeavesToSend", leaf.LeafId)
-		}
-		if _, exists := directFromCpfpLeavesByID[directFromCpfpLeafID]; exists {
-			return fmt.Errorf("duplicate leaf id: %s", directFromCpfpLeafID)
-		}
-		directFromCpfpLeavesByID[directFromCpfpLeafID] = leaf
-	}
-
-	for leafID := range leafCpfpRefundMap {
-		node, exists := nodesByID[leafID]
-		if !exists {
-			return fmt.Errorf("leaf %s not found in loaded leaves", leafID)
-		}
-
-		cpfpRefundTx := leafCpfpRefundMap[leafID]
-		directFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leafID]
-		directRefundTx := leafDirectRefundMap[leafID]
-
-		// All refund tx in Coop Exit flow has 2 inputs: one from leaf's RawTx and
-		// one from connector tx. SOs only verify 1st input and let SSP verifies 2nd input.
-		modifiedCpfpRefundTx, err := removeTxIn(cpfpRefundTx, 1)
-		if err != nil {
-			return fmt.Errorf("failed to remove second input from CPFP refund tx %x: %w", cpfpRefundTx, err)
-		}
-
-		modifiedDirectFromCpfpRefundTx, err := removeTxIn(directFromCpfpRefundTx, 1)
-		if err != nil {
-			return fmt.Errorf("failed to remove second input from Direct-from-CPFP refund tx %x: %w", directFromCpfpRefundTx, err)
-		}
-
-		var modifiedDirectRefundTx []byte
-		if len(directRefundTx) > 0 {
-			modifiedDirectRefundTx, err = removeTxIn(directRefundTx, 1)
-			if err != nil {
-				return fmt.Errorf("failed to remove second input from Direct refund tx %x: %w", directRefundTx, err)
-			}
-		}
-
-		if err := validateSingleLeafRefundTxs(
-			ctx,
-			node,
-			modifiedCpfpRefundTx,
-			modifiedDirectFromCpfpRefundTx,
-			modifiedDirectRefundTx,
-			refundDestPubkey,
-			st.TransferTypeTransfer,
-		); err != nil {
-			return fmt.Errorf("leaf %s validation for transfer failed: %w", leafID, err)
-		}
-	}
-
 	return nil
 }
 

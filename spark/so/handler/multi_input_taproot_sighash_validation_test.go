@@ -442,10 +442,10 @@ func TestParseConnectorTxOutputs(t *testing.T) {
 	})
 }
 
-// TestValidateTransactionCooperativeExitLegacyLeavesToSend_UsesConnectorValidation verifies
-// that validateTransactionCooperativeExitLegacyLeavesToSend uses multi-input validation
+// TestValidateTransactionCooperativeExitLeavesToSend_UsesConnectorValidation verifies
+// that validateTransactionCooperativeExitLeavesToSend uses multi-input validation
 // when a connector tx is provided.
-func TestValidateTransactionCooperativeExitLegacyLeavesToSend_UsesConnectorValidation(t *testing.T) {
+func TestValidateTransactionCooperativeExitLeavesToSend_UsesConnectorValidation(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = context.WithValue(ctx, "skip_knobs", true)
 
@@ -557,7 +557,7 @@ func TestValidateTransactionCooperativeExitLegacyLeavesToSend_UsesConnectorValid
 			node.ID.String(): badRefundTxBytes,
 		}
 
-		err = validateTransactionCooperativeExitLegacyLeavesToSend(
+		err = validateTransactionCooperativeExitLeavesToSend(
 			ctx,
 			nodesByID,
 			badLeafCpfpRefundMap,
@@ -571,7 +571,7 @@ func TestValidateTransactionCooperativeExitLegacyLeavesToSend_UsesConnectorValid
 	})
 
 	t.Run("accepts valid connector reference when connector tx provided", func(t *testing.T) {
-		err = validateTransactionCooperativeExitLegacyLeavesToSend(
+		err = validateTransactionCooperativeExitLeavesToSend(
 			ctx,
 			nodesByID,
 			leafCpfpRefundMap,
