@@ -1004,6 +1004,11 @@ var (
 				Columns: []*schema.Column{TransfersColumns[5]},
 			},
 			{
+				Name:    "transfer_status_expiry_time_type",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[7], TransfersColumns[9], TransfersColumns[8]},
+			},
+			{
 				Name:    "idx_transfers_recv_status_create",
 				Unique:  false,
 				Columns: []*schema.Column{TransfersColumns[4], TransfersColumns[7], TransfersColumns[1]},

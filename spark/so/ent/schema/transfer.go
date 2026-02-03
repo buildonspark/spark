@@ -98,6 +98,8 @@ func (Transfer) Indexes() []ent.Index {
 		index.Fields("update_time"),
 		// TODO(mhr): This is mostly for the backfill and can probably be removed later.
 		index.Fields("network"),
+		// Composite index for expired transfer cleanup queries that filter on status, expiry_time, and type
+		index.Fields("status", "expiry_time", "type"),
 
 		index.Fields("receiver_identity_pubkey", "status", "create_time").
 			Annotations(entsql.DescColumns("create_time")).
