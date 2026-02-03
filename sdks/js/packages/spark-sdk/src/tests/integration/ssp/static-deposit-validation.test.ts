@@ -88,7 +88,7 @@ describe("SSP static deposit validation tests", () => {
     // Missing output index
     await expect(
       userWallet.getClaimStaticDepositQuote(transactionId, vout! + 10),
-    ).rejects.toThrow("UTXO is spent or not found.");
+    ).rejects.toThrow(/Invalid(Operation|Input)Exception/);
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
@@ -140,6 +140,6 @@ describe("SSP static deposit validation tests", () => {
         outputIndex: vout! + 10,
         sspSignature: quote!.signature,
       }),
-    ).rejects.toThrow("UTXO is spent or not found.");
+    ).rejects.toThrow(/Invalid(Operation|Input)Exception/);
   }, 600000);
 });

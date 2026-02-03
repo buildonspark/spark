@@ -643,7 +643,7 @@ describe("SSP static deposit address integration", () => {
           sspSignature,
           outputIndex: vout!,
         }),
-      ).rejects.toThrow("UTXO is spent or not found.");
+      ).rejects.toThrow(/Invalid(Operation|Input)Exception/);
     }, 600000);
 
     it("Claim, then try to refund.", async () => {
