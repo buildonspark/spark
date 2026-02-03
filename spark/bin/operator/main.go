@@ -653,6 +653,8 @@ func main() {
 				db.NewDefaultSessionFactory(dbClient, knobsService),
 				config.Database.NewTxTimeout,
 			),
+			// Idempotency must be after the DB session so we can store idempotency keys
+			sparkgrpc.IdempotencyInterceptor(),
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
 				authz.WithMode(config.ServiceAuthz.Mode),
 				authz.WithAllowedIPs(config.ServiceAuthz.IPAllowlist),
