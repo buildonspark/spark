@@ -124,6 +124,9 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 
 		keyshareIDcount = uint32(len(nodes))
 	} else {
+		if req.NodeIdCount > uint32(maxNodeIDs) {
+			return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("node_id_count too large: %d", req.NodeIdCount))
+		}
 		keyshareIDcount = req.NodeIdCount
 	}
 
