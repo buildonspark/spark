@@ -668,7 +668,7 @@ async function runCLI() {
   refundstaticdeposit <depositTransactionId> <destinationAddress> <satsPerVbyteFee> [outputIndex] - Refund a static deposit
   refundandbroadcaststaticdeposit <depositTransactionId> <destinationAddress> <satsPerVbyteFee> [outputIndex] - Refund and broadcast a static deposit
   gettransfers [limit] [offset]                                       - Get a list of transfers
-  createinvoice <amount> <memo> <includeSparkAddress> [receiverIdentityPubkey] [descriptionHash] - Create a new lightning invoice
+  createinvoice <amount> <memo> <includeSparkAddress> <includeSparkInvoice> [receiverIdentityPubkey] [descriptionHash] - Create a new lightning invoice (includeSparkAddress and includeSparkInvoice are mutually exclusive)
   payinvoice <invoice> <maxFeeSats> <preferSpark> [amountSatsToSend]  - Pay a lightning invoice
   createsparkinvoice <asset("btc" | tokenIdentifier)> [amount] [memo] [senderPublicKey] [expiryTime] - Create a spark payment request. Amount is optional. Use _ for empty optional fields eg createsparkinvoice btc _ memo _ _
   createhtlc <receiverSparkAddress> <amountSats> <expiryTimeMinutes> <preimage> - Create a HTLC
@@ -1307,12 +1307,19 @@ async function runCLI() {
             console.log("Please initialize a wallet first");
             break;
           }
+          if (args[2] === "true" && args[3] === "true") {
+            console.log(
+              "Error: includeSparkAddress and includeSparkInvoice are mutually exclusive",
+            );
+            break;
+          }
           const invoice = await wallet.createLightningInvoice({
             amountSats: parseInt(args[0]),
             memo: args[1],
             includeSparkAddress: args[2] === "true",
-            receiverIdentityPubkey: args[3],
-            descriptionHash: args[4],
+            includeSparkInvoice: args[3] === "true",
+            receiverIdentityPubkey: args[4],
+            descriptionHash: args[5],
           });
           console.log(invoice);
           break;
