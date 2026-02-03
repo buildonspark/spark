@@ -563,6 +563,61 @@ func TestBroadcastTokenTransaction_DuplicateMintRequest(t *testing.T) {
 	}
 }
 
+func TestBroadcastTokenTransaction_TransferWithDuplicateOutputsToSpend(t *testing.T) {
+	setup := setUpPhase2BroadcastTestHandlerPostgres(t)
+	ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())
+
+	ownerPriv, tokenCreate := setup.fixtures.CreateTokenCreateWithIssuer(btcnetwork.Regtest, nil, nil)
+	_, outputs := setup.fixtures.CreateMintTransaction(
+		tokenCreate,
+		entfixtures.OutputSpecsWithOwner(ownerPriv.Public(), big.NewInt(100)),
+		st.TokenTransactionStatusFinalized,
+	)
+	inputTTXO := outputs[0]
+	setup.fixtures.CreateKeyshare()
+
+	cfgVals := setup.config.Lrc20Configs[strings.ToLower(btcnetwork.Regtest.String())]
+	partial := &tokenpb.PartialTokenTransaction{
+		Version:                  3,
+		TokenTransactionMetadata: setup.defaultMetadata(),
+		TokenInputs: &tokenpb.PartialTokenTransaction_TransferInput{
+			TransferInput: &tokenpb.TokenTransferInput{
+				OutputsToSpend: []*tokenpb.TokenOutputToSpend{
+					{
+						PrevTokenTransactionHash: inputTTXO.CreatedTransactionFinalizedHash,
+						PrevTokenTransactionVout: uint32(inputTTXO.CreatedTransactionOutputVout),
+					},
+					{
+						PrevTokenTransactionHash: inputTTXO.CreatedTransactionFinalizedHash,
+						PrevTokenTransactionVout: uint32(inputTTXO.CreatedTransactionOutputVout),
+					},
+				},
+			},
+		},
+		PartialTokenOutputs: []*tokenpb.PartialTokenOutput{
+			{
+				OwnerPublicKey:                ownerPriv.Public().Serialize(),
+				TokenIdentifier:               tokenCreate.TokenIdentifier,
+				TokenAmount:                   inputTTXO.TokenAmount,
+				WithdrawBondSats:              cfgVals.WithdrawBondSats,
+				WithdrawRelativeBlockLocktime: cfgVals.WithdrawRelativeBlockLocktime,
+			},
+		},
+	}
+
+	req := setup.signAndBuildRequest(partial, ownerPriv)
+	req.TokenTransactionOwnerSignatures = append(req.TokenTransactionOwnerSignatures, &tokenpb.SignatureWithIndex{
+		InputIndex: 1,
+		Signature:  req.TokenTransactionOwnerSignatures[0].Signature,
+	})
+
+	resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Contains(t, err.Error(), "duplicate output")
+}
+
 func TestBroadcastTokenTransaction_DuplicateTransferRequest(t *testing.T) {
 	tests := []struct {
 		name          string

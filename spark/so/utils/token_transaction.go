@@ -93,7 +93,6 @@ func HashTokenTransaction(tokenTransaction *tokenpb.TokenTransaction, partialHas
 	default:
 		return nil, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("unsupported token transaction version: %d", tokenTransaction.Version))
 	}
-
 }
 
 func HashTokenTransactionV3(tokenTransaction *tokenpb.TokenTransaction, partialHash bool) ([]byte, error) {
@@ -1099,6 +1098,22 @@ func validateBaseTransferTransaction(
 	}
 	if len(tokenTransaction.GetTransferInput().OutputsToSpend) > MaxInputOrOutputTokenTransactionOutputs {
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("too many outputs to spend, maximum is %d", MaxInputOrOutputTokenTransactionOutputs))
+	}
+
+	type outputKey struct {
+		txHash string
+		vout   uint32
+	}
+	seenOutputs := make(map[outputKey]struct{})
+	for _, output := range transferInput.GetOutputsToSpend() {
+		key := outputKey{
+			txHash: string(output.GetPrevTokenTransactionHash()),
+			vout:   output.GetPrevTokenTransactionVout(),
+		}
+		if _, ok := seenOutputs[key]; ok {
+			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("duplicate output to spend: prev_hash=%x, vout=%d", output.GetPrevTokenTransactionHash(), output.GetPrevTokenTransactionVout()))
+		}
+		seenOutputs[key] = struct{}{}
 	}
 
 	// Validate there is the correct number of signatures for outputs to spend.
