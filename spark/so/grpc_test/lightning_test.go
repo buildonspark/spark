@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
@@ -16,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // FakeLightningInvoiceCreator is a fake implementation of the LightningInvoiceCreator that always returns
@@ -1223,4 +1225,172 @@ func TestQueryHTLCWithRoleFilter(t *testing.T) {
 	htlcsReceiverAndSenderRole, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, nil, nil, &receiverAndSenderRole)
 	require.NoError(t, err, "failed to query htlcs")
 	require.Len(t, htlcsReceiverAndSenderRole.PreimageRequests, 2)
+}
+
+// TestReceiveLightningPaymentWithTransferRequest tests the lightning receive flow
+// where TransferRequest is provided (non-HODL invoice with preimage available).
+// This test verifies that:
+// 1. settleSenderKeyTweaks is called to coordinate with other operators
+// 2. commitSenderKeyTweaks is called to apply key tweaks locally
+// 3. Transfer status becomes SENDER_KEY_TWEAKED
+func TestReceiveLightningPaymentWithTransferRequest(t *testing.T) {
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
+
+	amountSats := uint64(100)
+	preimageHex := "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c"
+	preimage, err := hex.DecodeString(preimageHex)
+	require.NoError(t, err)
+	paymentHash := sha256.Sum256(preimage)
+
+	fakeInvoiceCreator := NewFakeLightningInvoiceCreator()
+	defer cleanUp(t, userConfig, paymentHash)
+
+	invoice, err := wallet.CreateLightningInvoiceWithPreimage(
+		t.Context(),
+		userConfig,
+		fakeInvoiceCreator,
+		amountSats,
+		"test",
+		[32]byte(preimage),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, invoice)
+
+	sspLeafPrivKey := keys.GeneratePrivateKey()
+	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
+	require.NoError(t, err)
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	leaves := []wallet.LeafKeyTweak{{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    sspLeafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}}
+
+	conn, err := sspConfig.NewCoordinatorGRPCConnection()
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), sspConfig, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	client := spark.NewSparkServiceClient(conn)
+
+	transferID, err := uuid.NewV7()
+	require.NoError(t, err)
+
+	keyTweakInputMap, err := wallet.PrepareSendTransferKeyTweaks(
+		sspConfig,
+		transferID,
+		userConfig.IdentityPublicKey(),
+		leaves,
+		map[string][]byte{},
+	)
+	require.NoError(t, err)
+
+	transferPackage, err := wallet.PrepareTransferPackage(
+		ctx,
+		sspConfig,
+		client,
+		transferID,
+		keyTweakInputMap,
+		leaves,
+		userConfig.IdentityPublicKey(),
+		keys.Public{}, // No adaptor key for non-swap
+	)
+	require.NoError(t, err)
+
+	userSignedLeavesToSend, err := wallet.PrepareUserSignedLeafSigningJobs(
+		ctx,
+		sspConfig,
+		client,
+		leaves,
+		userConfig.IdentityPublicKey(),
+		keys.Public{}, // No adaptor key for non-swap
+	)
+	require.NoError(t, err)
+
+	response, err := client.InitiatePreimageSwapV2(ctx, &spark.InitiatePreimageSwapRequest{
+		PaymentHash: paymentHash[:],
+		Reason:      spark.InitiatePreimageSwapRequest_REASON_RECEIVE,
+		InvoiceAmount: &spark.InvoiceAmount{
+			InvoiceAmountProof: &spark.InvoiceAmountProof{
+				Bolt11Invoice: invoice,
+			},
+			ValueSats: amountSats,
+		},
+		Transfer: &spark.StartUserSignedTransferRequest{
+			TransferId:                transferID.String(),
+			OwnerIdentityPublicKey:    sspConfig.IdentityPublicKey().Serialize(),
+			ReceiverIdentityPublicKey: userConfig.IdentityPublicKey().Serialize(),
+			LeavesToSend:              userSignedLeavesToSend,
+			ExpiryTime:                timestamppb.New(time.Now().Add(2 * time.Minute)),
+		},
+		TransferRequest: &spark.StartTransferRequest{
+			TransferId:                transferID.String(),
+			OwnerIdentityPublicKey:    sspConfig.IdentityPublicKey().Serialize(),
+			ReceiverIdentityPublicKey: userConfig.IdentityPublicKey().Serialize(),
+			TransferPackage:           transferPackage,
+			ExpiryTime:                timestamppb.New(time.Now().Add(2 * time.Minute)),
+		},
+		ReceiverIdentityPublicKey: userConfig.IdentityPublicKey().Serialize(),
+		FeeSats:                   0,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	require.NotNil(t, response.Transfer)
+
+	require.Equal(t, preimage, response.Preimage, "preimage should be returned for non-HODL invoice")
+	assert.Equal(t,
+		spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+		response.Transfer.Status,
+		"transfer status should be SENDER_KEY_TWEAKED after key tweak settlement",
+	)
+	assert.Equal(t, transferID.String(), response.Transfer.Id)
+	assert.Equal(t, spark.TransferType_PREIMAGE_SWAP, response.Transfer.Type)
+	require.Len(t, response.Transfer.Leaves, 1)
+	assert.Equal(t, nodeToSend.Id, response.Transfer.Leaves[0].Leaf.Id)
+
+	// Verify all operators have the same status (distributed consensus verification)
+	for identifier, operator := range sspConfig.SigningOperators {
+		operatorConn, err := operator.NewOperatorGRPCConnection()
+		require.NoError(t, err, "failed to connect to operator %s", identifier)
+		defer operatorConn.Close()
+
+		operatorToken, err := wallet.AuthenticateWithConnection(t.Context(), sspConfig, operatorConn)
+		require.NoError(t, err, "failed to authenticate with operator %s", identifier)
+		operatorCtx := wallet.ContextWithToken(t.Context(), operatorToken)
+
+		operatorClient := spark.NewSparkServiceClient(operatorConn)
+		network, err := sspConfig.Network.ToProtoNetwork()
+		require.NoError(t, err)
+
+		response, err := operatorClient.QueryAllTransfers(operatorCtx, &spark.TransferFilter{
+			Participant: &spark.TransferFilter_SenderOrReceiverIdentityPublicKey{
+				SenderOrReceiverIdentityPublicKey: sspConfig.IdentityPublicKey().Serialize(),
+			},
+			Limit:   10,
+			Offset:  0,
+			Network: network,
+		})
+		require.NoError(t, err, "failed to query transfers from operator %s", identifier)
+
+		var found bool
+		for _, transfer := range response.Transfers {
+			if transfer.Id == transferID.String() {
+				assert.Equal(t,
+					spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+					transfer.Status,
+					"operator %s should have transfer status SENDER_KEY_TWEAKED",
+					identifier,
+				)
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "operator %s should have the transfer in its database", identifier)
+	}
 }

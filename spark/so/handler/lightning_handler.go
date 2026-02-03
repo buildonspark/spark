@@ -723,13 +723,12 @@ func (h *LightningHandler) GetPreimageShare(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 		}
+		// For HODL invoices in lightning receive flow, preimageShare may not exist yet, the user will provide it later via ProvidePreimage
 		preimageShare, err = tx.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
 		if err != nil {
-			// For HODL invoices in lightning receive flow, preimageShare may not exist yet, the user will provide it later via ProvidePreimage
 			if !ent.IsNotFound(err) {
 				return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
 			}
-			// preimageShare remains nil for HODL invoices in lightning receive flow
 		} else if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
 			return nil, fmt.Errorf("preimage share owner identity public key mismatch")
 		}
@@ -1146,13 +1145,12 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		if err != nil {
 			return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 		}
+		// For HODL invoices in lightning receive flow, preimageShare may not exist yet, the user will provide it later via ProvidePreimage
 		preimageShare, err = tx.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
 		if err != nil {
-			// For HODL invoices in lightning receive flow, preimageShare may not exist yet, the user will provide it later via ProvidePreimage
 			if !ent.IsNotFound(err) {
 				return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
 			}
-			// preimageShare remains nil for HODL invoices in lightning receive flow
 		} else if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
 			return nil, fmt.Errorf("preimage share owner identity public key mismatch for payment hash: %x", req.PaymentHash)
 		}
@@ -1431,6 +1429,24 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		return nil, fmt.Errorf("recovered preimage did not match payment hash: %x and transfer id: %s", req.PaymentHash, transfer.ID)
 	} else if err := h.sendPreimageGossipMessage(ctx, secretBytes, req.PaymentHash); err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage gossip message for payment hash %x", req.PaymentHash)
+	}
+
+	if req.TransferRequest != nil {
+		transferHandler := NewTransferHandler(h.config)
+		if err := transferHandler.settleSenderKeyTweaks(ctx, transfer.ID, pbinternal.SettleKeyTweakAction_COMMIT); err != nil {
+			return nil, fmt.Errorf("unable to settle sender key tweaks for transfer %s: %w", transfer.ID, err)
+		}
+
+		baseHandler := NewBaseTransferHandler(h.config)
+		transfer, err = baseHandler.commitSenderKeyTweaks(ctx, transfer)
+		if err != nil {
+			return nil, fmt.Errorf("unable to commit sender key tweaks for transfer %s: %w", transfer.ID, err)
+		}
+
+		transferProto, err = transfer.MarshalProto(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to marshal transfer %s: %w", transfer.ID, err)
+		}
 	}
 
 	err = preimageRequest.Update().SetPreimage(secretBytes).SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
