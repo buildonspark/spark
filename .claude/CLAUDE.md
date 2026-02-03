@@ -49,6 +49,26 @@ The `spark_config.json` file contains codebase locations. Since this config is n
 - When adding new key_directories, always use relative paths
 - Never update key_directories to absolute paths
 
+### Claude Code Permissions (settings.local.json)
+
+The `.claude/settings.local.json` file stores user-granted permissions for Claude Code. To support git worktrees sharing the same permissions file via symlink:
+
+**Always use relative paths in permissions:**
+- ✅ `Bash(./scripts/gen-migration.sh:*)`
+- ❌ `Bash(/Users/name/ws/spark/scripts/gen-migration.sh:*)`
+
+**Why this matters:**
+- Git worktrees can symlink to the parent repo's `settings.local.json`
+- Absolute paths break when the working directory changes
+- Relative paths work correctly in both the main repo and worktrees
+
+**Setting up worktree permission sharing:**
+```bash
+# In the worktree, replace settings.local.json with a symlink to parent
+rm /path/to/worktree/.claude/settings.local.json
+ln -s /path/to/main-repo/.claude/settings.local.json /path/to/worktree/.claude/settings.local.json
+```
+
 ## 1. What is Spark?
 
 Spark is a **Bitcoin Layer 2 scaling solution** based on **statechains** that enables off-chain transfer of UTXO ownership via cryptographic key updates rather than on-chain transactions.
