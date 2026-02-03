@@ -372,12 +372,10 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
 					resumeSendTransferLimit := knobsService.GetValue(knobs.KnobResumeSendTransferLimit, 100)
-					query := tx.Transfer.Query().Where(
+					transfers, err := tx.Transfer.Query().Where(
 						transfer.StatusEQ(st.TransferStatusSenderInitiatedCoordinator),
 						transfer.TypeNEQ(st.TransferTypeCooperativeExit),
-					).Limit(int(resumeSendTransferLimit))
-
-					transfers, err := query.All(ctx)
+					).Limit(int(resumeSendTransferLimit)).ForUpdate(sql.WithLockAction(sql.SkipLocked)).All(ctx)
 					if err != nil {
 						return err
 					}
