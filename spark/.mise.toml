@@ -1,7 +1,7 @@
 [tasks]
 build = "go build -tags=lightspark ./bin/operator"
 build-oss = "go build ./bin/operator"
-lint = "golangci-lint run"
+lint = "golangci-lint run && go run ./tools/entfieldlint/cmd/entfieldlint check"
 # Sadly, `mise fmt` is a built in command
 format = "golangci-lint fmt"
 test-unit = """
@@ -59,3 +59,6 @@ test-grpc-minikube-oss = """
     -p 1
 """
 atlas-hash="atlas migrate hash --dir 'file://so/ent/migrate/migrations'"
+# Ent field deprecation lint - checks that fields are deprecated before removal
+ent-field-lint = "go run ./tools/entfieldlint/cmd/entfieldlint check"
+ent-field-diff = "go run ./tools/entfieldlint/cmd/entfieldlint diff"
