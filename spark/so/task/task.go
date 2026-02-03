@@ -24,6 +24,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
+	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -664,6 +665,55 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							return fmt.Errorf("failed to purge signing nonces: %w", err)
 						}
 					}
+					return nil
+				},
+			},
+		},
+		{
+			ExecutionInterval: 5 * time.Minute,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "purge_idempotency_keys",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					cutoffTime := time.Now().Add(-24 * time.Hour)
+					const batchSize = 10000
+
+					for {
+						db, err := ent.GetTxFromContext(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to get or create current tx for request: %w", err)
+						}
+
+						idsToDelete, err := db.IdempotencyKey.Query().
+							Where(idempotencykey.CreateTimeLT(cutoffTime)).
+							Limit(batchSize).
+							ForUpdate(sql.WithLockAction(sql.SkipLocked)).
+							IDs(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to query idempotency keys to purge: %w", err)
+						}
+
+						if len(idsToDelete) == 0 {
+							break
+						}
+
+						_, err = db.IdempotencyKey.Delete().
+							Where(idempotencykey.IDIn(idsToDelete...)).
+							Exec(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to purge idempotency keys: %w", err)
+						}
+
+						if err := db.Commit(); err != nil {
+							return fmt.Errorf("failed to commit batch: %w", err)
+						}
+
+						// the last query got less than batchSize rows, so we are done
+						if len(idsToDelete) < batchSize {
+							break
+						}
+					}
+
 					return nil
 				},
 			},
