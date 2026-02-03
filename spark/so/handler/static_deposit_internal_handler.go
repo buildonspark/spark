@@ -239,6 +239,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		SetStatus(st.UtxoSwapStatusCreated).
 		// utxo
 		SetUtxo(targetUtxo.inner).
+		SetUtxoValueSats(targetUtxo.inner.Amount).
 		// quote
 		SetRequestType(st.UtxoSwapFromProtoRequestType(pb.UtxoSwapRequestType_Fixed)).
 		SetCreditAmountSats(totalAmount).
@@ -371,6 +372,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		SetStatus(st.UtxoSwapStatusCreated).
 		// utxo
 		SetUtxo(targetUtxo.inner).
+		SetUtxoValueSats(targetUtxo.inner.Amount).
 		// quote
 		SetRequestType(st.UtxoSwapFromProtoRequestType(pb.UtxoSwapRequestType_Refund)).
 		SetCreditAmountSats(totalAmount).
