@@ -2,12 +2,9 @@ import {
   MayHaveSspClientOptions,
   SspClientOptions,
 } from "../graphql/client.js";
-import { NetworkType } from "../utils/network.js";
+import type { SparkWalletEvents } from "../spark-wallet/types.js";
 import { isHermeticTest } from "../tests/isHermeticTest.js";
-import type {
-  SparkWalletEvents,
-  SparkWalletEventType,
-} from "../spark-wallet/types.js";
+import { NetworkType } from "../utils/network.js";
 
 const SSP_IDENTITY_PUBLIC_KEYS = {
   LOCAL: "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4",
@@ -244,7 +241,7 @@ function getSigningOperators(): Record<string, SigningOperator> {
       id: 1,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000002",
-      address: "https://1.spark.lightspark.com",
+      address: "https://spark-operator.breez.technology",
       identityPublicKey: PROD_PUBKEYS[1]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000003": {
