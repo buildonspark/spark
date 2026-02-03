@@ -1433,7 +1433,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage gossip message for payment hash %x", req.PaymentHash)
 	}
 
-	err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
+	err = preimageRequest.Update().SetPreimage(secretBytes).SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
