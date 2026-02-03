@@ -355,7 +355,10 @@ func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte,
 	}
 
 	// Create user statement to authorize the UTXO swap
-	messageHash := CreateUserStatement(txIdString, vout, network, requestType, totalAmount, sspSignature, hashVariant)
+	messageHash, err := CreateUserStatement(txIdString, vout, network, requestType, totalAmount, sspSignature, hashVariant)
+	if err != nil {
+		return fmt.Errorf("failed to create user statement: %w", err)
+	}
 	return common.VerifyECDSASignature(userIdentityPubKey, userSignature, messageHash)
 }
 
@@ -377,7 +380,7 @@ func CreateUserStatement(
 	creditAmountSats uint64,
 	sspSignature []byte,
 	hashVariant pb.HashVariant,
-) []byte {
+) ([]byte, error) {
 	if hashVariant == pb.HashVariant_HASH_VARIANT_V2 {
 		return createUserStatementV2(transactionID, outputIndex, network, requestType, creditAmountSats, sspSignature)
 	}
@@ -391,7 +394,7 @@ func createUserStatementLegacy(
 	requestType pb.UtxoSwapRequestType,
 	creditAmountSats uint64,
 	sspSignature []byte,
-) []byte {
+) ([]byte, error) {
 	payload := sha256.New()
 	_, _ = payload.Write([]byte("claim_static_deposit"))            // Action name
 	_, _ = payload.Write([]byte(strings.ToLower(network.String()))) // Network value as UTF-8 bytes
@@ -406,11 +409,13 @@ func createUserStatementLegacy(
 		requestTypeInt = uint8(1)
 	case pb.UtxoSwapRequestType_Refund:
 		requestTypeInt = uint8(2)
+	case pb.UtxoSwapRequestType_Instant:
+		return nil, fmt.Errorf("Instant deposit not supported for normal static deposit flow")
 	}
 	_ = binary.Write(payload, binary.LittleEndian, requestTypeInt)   // Request type
 	_ = binary.Write(payload, binary.LittleEndian, creditAmountSats) // Credit amount as 8-byte unsigned integer (little-endian)
 	_, _ = payload.Write(sspSignature)                               // SSP signature as UTF-8 bytes
-	return payload.Sum(nil)
+	return payload.Sum(nil), nil
 }
 
 func createUserStatementV2(
@@ -420,7 +425,7 @@ func createUserStatementV2(
 	requestType pb.UtxoSwapRequestType,
 	creditAmountSats uint64,
 	sspSignature []byte,
-) []byte {
+) ([]byte, error) {
 	requestTypeInt := uint8(0)
 	switch requestType {
 	case pb.UtxoSwapRequestType_Fixed:
@@ -429,6 +434,8 @@ func createUserStatementV2(
 		requestTypeInt = uint8(1)
 	case pb.UtxoSwapRequestType_Refund:
 		requestTypeInt = uint8(2)
+	case pb.UtxoSwapRequestType_Instant:
+		return nil, fmt.Errorf("Instant deposit not supported for normal static deposit flow")
 	}
 
 	hash := hashstructure.NewHasher([]string{"spark", "claim_static_deposit"}).
@@ -439,7 +446,7 @@ func createUserStatementV2(
 		AddUint64(creditAmountSats).
 		AddBytes(sspSignature).
 		Hash()
-	return hash
+	return hash, nil
 }
 
 func CancelUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {

@@ -6504,6 +6504,7 @@ type UtxoSwapExample struct {
 	Status                       *schematype.UtxoSwapStatus
 	RequestType                  *schematype.UtxoSwapRequestType
 	CreditAmountSats             *uint64
+	SecondaryCreditAmountSats    *uint64
 	MaxFeeSats                   *uint64
 	SspSignature                 *[]byte
 	SspIdentityPublicKey         *keys.Public
@@ -6512,10 +6513,13 @@ type UtxoSwapExample struct {
 	CoordinatorIdentityPublicKey *keys.Public
 	RequestedTransferID          *uuid.UUID
 	SpendTxSigningResult         *[]byte
+	ExpiryTime                   *time.Time
+	UtxoValueSats                *uint64
 
 	// Edges - if set, use the provided entity; if nil, create a default one
-	Utxo     *ent.Utxo
-	Transfer *ent.Transfer
+	Utxo              *ent.Utxo
+	Transfer          *ent.Transfer
+	SecondaryTransfer *ent.Transfer
 }
 
 // NewUtxoSwapExample creates a new UtxoSwapExample for testing.
@@ -6541,6 +6545,12 @@ func (us *UtxoSwapExample) SetRequestType(v schematype.UtxoSwapRequestType) *Utx
 // SetCreditAmountSats sets the credit_amount_sats field.
 func (us *UtxoSwapExample) SetCreditAmountSats(v uint64) *UtxoSwapExample {
 	us.CreditAmountSats = &v
+	return us
+}
+
+// SetSecondaryCreditAmountSats sets the secondary_credit_amount_sats field.
+func (us *UtxoSwapExample) SetSecondaryCreditAmountSats(v uint64) *UtxoSwapExample {
+	us.SecondaryCreditAmountSats = &v
 	return us
 }
 
@@ -6592,6 +6602,18 @@ func (us *UtxoSwapExample) SetSpendTxSigningResult(v []byte) *UtxoSwapExample {
 	return us
 }
 
+// SetExpiryTime sets the expiry_time field.
+func (us *UtxoSwapExample) SetExpiryTime(v time.Time) *UtxoSwapExample {
+	us.ExpiryTime = &v
+	return us
+}
+
+// SetUtxoValueSats sets the utxo_value_sats field.
+func (us *UtxoSwapExample) SetUtxoValueSats(v uint64) *UtxoSwapExample {
+	us.UtxoValueSats = &v
+	return us
+}
+
 // SetUtxo sets the utxo edge.
 func (us *UtxoSwapExample) SetUtxo(v *ent.Utxo) *UtxoSwapExample {
 	us.Utxo = v
@@ -6601,6 +6623,12 @@ func (us *UtxoSwapExample) SetUtxo(v *ent.Utxo) *UtxoSwapExample {
 // SetTransfer sets the transfer edge.
 func (us *UtxoSwapExample) SetTransfer(v *ent.Transfer) *UtxoSwapExample {
 	us.Transfer = v
+	return us
+}
+
+// SetSecondaryTransfer sets the secondary_transfer edge.
+func (us *UtxoSwapExample) SetSecondaryTransfer(v *ent.Transfer) *UtxoSwapExample {
+	us.SecondaryTransfer = v
 	return us
 }
 
@@ -6627,6 +6655,12 @@ func (us *UtxoSwapExample) MustExec(ctx context.Context) *ent.UtxoSwap {
 	} else {
 		// Use default from annotation
 		create.SetCreditAmountSats(uint64(19901))
+	}
+	if us.SecondaryCreditAmountSats != nil {
+		create.SetSecondaryCreditAmountSats(*us.SecondaryCreditAmountSats)
+	} else {
+		// Use default from annotation
+		create.SetSecondaryCreditAmountSats(uint64(5000))
 	}
 	if us.MaxFeeSats != nil {
 		create.SetMaxFeeSats(*us.MaxFeeSats)
@@ -6678,6 +6712,14 @@ func (us *UtxoSwapExample) MustExec(ctx context.Context) *ent.UtxoSwap {
 		create.SetSpendTxSigningResult(*us.SpendTxSigningResult)
 	} else {
 	}
+	if us.ExpiryTime != nil {
+		create.SetExpiryTime(*us.ExpiryTime)
+	} else {
+	}
+	if us.UtxoValueSats != nil {
+		create.SetUtxoValueSats(*us.UtxoValueSats)
+	} else {
+	}
 
 	// Handle edges
 	if us.Utxo != nil {
@@ -6690,6 +6732,9 @@ func (us *UtxoSwapExample) MustExec(ctx context.Context) *ent.UtxoSwap {
 	}
 	if us.Transfer != nil {
 		create.SetTransfer(us.Transfer)
+	}
+	if us.SecondaryTransfer != nil {
+		create.SetSecondaryTransfer(us.SecondaryTransfer)
 	}
 
 	entity, err := create.Save(ctx)
@@ -6725,6 +6770,12 @@ func (us *UtxoSwapExample) Exec(ctx context.Context) (*ent.UtxoSwap, error) {
 		// Use default from annotation
 		create.SetCreditAmountSats(uint64(19901))
 	}
+	if us.SecondaryCreditAmountSats != nil {
+		create.SetSecondaryCreditAmountSats(*us.SecondaryCreditAmountSats)
+	} else {
+		// Use default from annotation
+		create.SetSecondaryCreditAmountSats(uint64(5000))
+	}
 	if us.MaxFeeSats != nil {
 		create.SetMaxFeeSats(*us.MaxFeeSats)
 	} else {
@@ -6775,6 +6826,14 @@ func (us *UtxoSwapExample) Exec(ctx context.Context) (*ent.UtxoSwap, error) {
 		create.SetSpendTxSigningResult(*us.SpendTxSigningResult)
 	} else {
 	}
+	if us.ExpiryTime != nil {
+		create.SetExpiryTime(*us.ExpiryTime)
+	} else {
+	}
+	if us.UtxoValueSats != nil {
+		create.SetUtxoValueSats(*us.UtxoValueSats)
+	} else {
+	}
 
 	// Handle edges
 	if us.Utxo != nil {
@@ -6790,6 +6849,9 @@ func (us *UtxoSwapExample) Exec(ctx context.Context) (*ent.UtxoSwap, error) {
 	}
 	if us.Transfer != nil {
 		create.SetTransfer(us.Transfer)
+	}
+	if us.SecondaryTransfer != nil {
+		create.SetSecondaryTransfer(us.SecondaryTransfer)
 	}
 
 	return create.Save(ctx)

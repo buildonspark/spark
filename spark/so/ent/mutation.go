@@ -29895,6 +29895,8 @@ type UtxoSwapMutation struct {
 	request_type                    *schematype.UtxoSwapRequestType
 	credit_amount_sats              *uint64
 	addcredit_amount_sats           *int64
+	secondary_credit_amount_sats    *uint64
+	addsecondary_credit_amount_sats *int64
 	max_fee_sats                    *uint64
 	addmax_fee_sats                 *int64
 	ssp_signature                   *[]byte
@@ -29904,11 +29906,16 @@ type UtxoSwapMutation struct {
 	coordinator_identity_public_key *keys.Public
 	requested_transfer_id           *uuid.UUID
 	spend_tx_signing_result         *[]byte
+	expiry_time                     *time.Time
+	utxo_value_sats                 *uint64
+	addutxo_value_sats              *int64
 	clearedFields                   map[string]struct{}
 	utxo                            *uuid.UUID
 	clearedutxo                     bool
 	transfer                        *uuid.UUID
 	clearedtransfer                 bool
+	secondary_transfer              *uuid.UUID
+	clearedsecondary_transfer       bool
 	done                            bool
 	oldValue                        func(context.Context) (*UtxoSwap, error)
 	predicates                      []predicate.UtxoSwap
@@ -30230,6 +30237,76 @@ func (m *UtxoSwapMutation) ResetCreditAmountSats() {
 	m.credit_amount_sats = nil
 	m.addcredit_amount_sats = nil
 	delete(m.clearedFields, utxoswap.FieldCreditAmountSats)
+}
+
+// SetSecondaryCreditAmountSats sets the "secondary_credit_amount_sats" field.
+func (m *UtxoSwapMutation) SetSecondaryCreditAmountSats(u uint64) {
+	m.secondary_credit_amount_sats = &u
+	m.addsecondary_credit_amount_sats = nil
+}
+
+// SecondaryCreditAmountSats returns the value of the "secondary_credit_amount_sats" field in the mutation.
+func (m *UtxoSwapMutation) SecondaryCreditAmountSats() (r uint64, exists bool) {
+	v := m.secondary_credit_amount_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSecondaryCreditAmountSats returns the old "secondary_credit_amount_sats" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldSecondaryCreditAmountSats(ctx context.Context) (v *uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSecondaryCreditAmountSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSecondaryCreditAmountSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSecondaryCreditAmountSats: %w", err)
+	}
+	return oldValue.SecondaryCreditAmountSats, nil
+}
+
+// AddSecondaryCreditAmountSats adds u to the "secondary_credit_amount_sats" field.
+func (m *UtxoSwapMutation) AddSecondaryCreditAmountSats(u int64) {
+	if m.addsecondary_credit_amount_sats != nil {
+		*m.addsecondary_credit_amount_sats += u
+	} else {
+		m.addsecondary_credit_amount_sats = &u
+	}
+}
+
+// AddedSecondaryCreditAmountSats returns the value that was added to the "secondary_credit_amount_sats" field in this mutation.
+func (m *UtxoSwapMutation) AddedSecondaryCreditAmountSats() (r int64, exists bool) {
+	v := m.addsecondary_credit_amount_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSecondaryCreditAmountSats clears the value of the "secondary_credit_amount_sats" field.
+func (m *UtxoSwapMutation) ClearSecondaryCreditAmountSats() {
+	m.secondary_credit_amount_sats = nil
+	m.addsecondary_credit_amount_sats = nil
+	m.clearedFields[utxoswap.FieldSecondaryCreditAmountSats] = struct{}{}
+}
+
+// SecondaryCreditAmountSatsCleared returns if the "secondary_credit_amount_sats" field was cleared in this mutation.
+func (m *UtxoSwapMutation) SecondaryCreditAmountSatsCleared() bool {
+	_, ok := m.clearedFields[utxoswap.FieldSecondaryCreditAmountSats]
+	return ok
+}
+
+// ResetSecondaryCreditAmountSats resets all changes to the "secondary_credit_amount_sats" field.
+func (m *UtxoSwapMutation) ResetSecondaryCreditAmountSats() {
+	m.secondary_credit_amount_sats = nil
+	m.addsecondary_credit_amount_sats = nil
+	delete(m.clearedFields, utxoswap.FieldSecondaryCreditAmountSats)
 }
 
 // SetMaxFeeSats sets the "max_fee_sats" field.
@@ -30632,6 +30709,125 @@ func (m *UtxoSwapMutation) ResetSpendTxSigningResult() {
 	delete(m.clearedFields, utxoswap.FieldSpendTxSigningResult)
 }
 
+// SetExpiryTime sets the "expiry_time" field.
+func (m *UtxoSwapMutation) SetExpiryTime(t time.Time) {
+	m.expiry_time = &t
+}
+
+// ExpiryTime returns the value of the "expiry_time" field in the mutation.
+func (m *UtxoSwapMutation) ExpiryTime() (r time.Time, exists bool) {
+	v := m.expiry_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiryTime returns the old "expiry_time" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldExpiryTime(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiryTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiryTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiryTime: %w", err)
+	}
+	return oldValue.ExpiryTime, nil
+}
+
+// ClearExpiryTime clears the value of the "expiry_time" field.
+func (m *UtxoSwapMutation) ClearExpiryTime() {
+	m.expiry_time = nil
+	m.clearedFields[utxoswap.FieldExpiryTime] = struct{}{}
+}
+
+// ExpiryTimeCleared returns if the "expiry_time" field was cleared in this mutation.
+func (m *UtxoSwapMutation) ExpiryTimeCleared() bool {
+	_, ok := m.clearedFields[utxoswap.FieldExpiryTime]
+	return ok
+}
+
+// ResetExpiryTime resets all changes to the "expiry_time" field.
+func (m *UtxoSwapMutation) ResetExpiryTime() {
+	m.expiry_time = nil
+	delete(m.clearedFields, utxoswap.FieldExpiryTime)
+}
+
+// SetUtxoValueSats sets the "utxo_value_sats" field.
+func (m *UtxoSwapMutation) SetUtxoValueSats(u uint64) {
+	m.utxo_value_sats = &u
+	m.addutxo_value_sats = nil
+}
+
+// UtxoValueSats returns the value of the "utxo_value_sats" field in the mutation.
+func (m *UtxoSwapMutation) UtxoValueSats() (r uint64, exists bool) {
+	v := m.utxo_value_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUtxoValueSats returns the old "utxo_value_sats" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldUtxoValueSats(ctx context.Context) (v *uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUtxoValueSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUtxoValueSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUtxoValueSats: %w", err)
+	}
+	return oldValue.UtxoValueSats, nil
+}
+
+// AddUtxoValueSats adds u to the "utxo_value_sats" field.
+func (m *UtxoSwapMutation) AddUtxoValueSats(u int64) {
+	if m.addutxo_value_sats != nil {
+		*m.addutxo_value_sats += u
+	} else {
+		m.addutxo_value_sats = &u
+	}
+}
+
+// AddedUtxoValueSats returns the value that was added to the "utxo_value_sats" field in this mutation.
+func (m *UtxoSwapMutation) AddedUtxoValueSats() (r int64, exists bool) {
+	v := m.addutxo_value_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearUtxoValueSats clears the value of the "utxo_value_sats" field.
+func (m *UtxoSwapMutation) ClearUtxoValueSats() {
+	m.utxo_value_sats = nil
+	m.addutxo_value_sats = nil
+	m.clearedFields[utxoswap.FieldUtxoValueSats] = struct{}{}
+}
+
+// UtxoValueSatsCleared returns if the "utxo_value_sats" field was cleared in this mutation.
+func (m *UtxoSwapMutation) UtxoValueSatsCleared() bool {
+	_, ok := m.clearedFields[utxoswap.FieldUtxoValueSats]
+	return ok
+}
+
+// ResetUtxoValueSats resets all changes to the "utxo_value_sats" field.
+func (m *UtxoSwapMutation) ResetUtxoValueSats() {
+	m.utxo_value_sats = nil
+	m.addutxo_value_sats = nil
+	delete(m.clearedFields, utxoswap.FieldUtxoValueSats)
+}
+
 // SetUtxoID sets the "utxo" edge to the Utxo entity by id.
 func (m *UtxoSwapMutation) SetUtxoID(id uuid.UUID) {
 	m.utxo = &id
@@ -30710,6 +30906,45 @@ func (m *UtxoSwapMutation) ResetTransfer() {
 	m.clearedtransfer = false
 }
 
+// SetSecondaryTransferID sets the "secondary_transfer" edge to the Transfer entity by id.
+func (m *UtxoSwapMutation) SetSecondaryTransferID(id uuid.UUID) {
+	m.secondary_transfer = &id
+}
+
+// ClearSecondaryTransfer clears the "secondary_transfer" edge to the Transfer entity.
+func (m *UtxoSwapMutation) ClearSecondaryTransfer() {
+	m.clearedsecondary_transfer = true
+}
+
+// SecondaryTransferCleared reports if the "secondary_transfer" edge to the Transfer entity was cleared.
+func (m *UtxoSwapMutation) SecondaryTransferCleared() bool {
+	return m.clearedsecondary_transfer
+}
+
+// SecondaryTransferID returns the "secondary_transfer" edge ID in the mutation.
+func (m *UtxoSwapMutation) SecondaryTransferID() (id uuid.UUID, exists bool) {
+	if m.secondary_transfer != nil {
+		return *m.secondary_transfer, true
+	}
+	return
+}
+
+// SecondaryTransferIDs returns the "secondary_transfer" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// SecondaryTransferID instead. It exists only for internal usage by the builders.
+func (m *UtxoSwapMutation) SecondaryTransferIDs() (ids []uuid.UUID) {
+	if id := m.secondary_transfer; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetSecondaryTransfer resets all changes to the "secondary_transfer" edge.
+func (m *UtxoSwapMutation) ResetSecondaryTransfer() {
+	m.secondary_transfer = nil
+	m.clearedsecondary_transfer = false
+}
+
 // Where appends a list predicates to the UtxoSwapMutation builder.
 func (m *UtxoSwapMutation) Where(ps ...predicate.UtxoSwap) {
 	m.predicates = append(m.predicates, ps...)
@@ -30744,7 +30979,7 @@ func (m *UtxoSwapMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UtxoSwapMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 16)
 	if m.create_time != nil {
 		fields = append(fields, utxoswap.FieldCreateTime)
 	}
@@ -30759,6 +30994,9 @@ func (m *UtxoSwapMutation) Fields() []string {
 	}
 	if m.credit_amount_sats != nil {
 		fields = append(fields, utxoswap.FieldCreditAmountSats)
+	}
+	if m.secondary_credit_amount_sats != nil {
+		fields = append(fields, utxoswap.FieldSecondaryCreditAmountSats)
 	}
 	if m.max_fee_sats != nil {
 		fields = append(fields, utxoswap.FieldMaxFeeSats)
@@ -30784,6 +31022,12 @@ func (m *UtxoSwapMutation) Fields() []string {
 	if m.spend_tx_signing_result != nil {
 		fields = append(fields, utxoswap.FieldSpendTxSigningResult)
 	}
+	if m.expiry_time != nil {
+		fields = append(fields, utxoswap.FieldExpiryTime)
+	}
+	if m.utxo_value_sats != nil {
+		fields = append(fields, utxoswap.FieldUtxoValueSats)
+	}
 	return fields
 }
 
@@ -30802,6 +31046,8 @@ func (m *UtxoSwapMutation) Field(name string) (ent.Value, bool) {
 		return m.RequestType()
 	case utxoswap.FieldCreditAmountSats:
 		return m.CreditAmountSats()
+	case utxoswap.FieldSecondaryCreditAmountSats:
+		return m.SecondaryCreditAmountSats()
 	case utxoswap.FieldMaxFeeSats:
 		return m.MaxFeeSats()
 	case utxoswap.FieldSspSignature:
@@ -30818,6 +31064,10 @@ func (m *UtxoSwapMutation) Field(name string) (ent.Value, bool) {
 		return m.RequestedTransferID()
 	case utxoswap.FieldSpendTxSigningResult:
 		return m.SpendTxSigningResult()
+	case utxoswap.FieldExpiryTime:
+		return m.ExpiryTime()
+	case utxoswap.FieldUtxoValueSats:
+		return m.UtxoValueSats()
 	}
 	return nil, false
 }
@@ -30837,6 +31087,8 @@ func (m *UtxoSwapMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldRequestType(ctx)
 	case utxoswap.FieldCreditAmountSats:
 		return m.OldCreditAmountSats(ctx)
+	case utxoswap.FieldSecondaryCreditAmountSats:
+		return m.OldSecondaryCreditAmountSats(ctx)
 	case utxoswap.FieldMaxFeeSats:
 		return m.OldMaxFeeSats(ctx)
 	case utxoswap.FieldSspSignature:
@@ -30853,6 +31105,10 @@ func (m *UtxoSwapMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldRequestedTransferID(ctx)
 	case utxoswap.FieldSpendTxSigningResult:
 		return m.OldSpendTxSigningResult(ctx)
+	case utxoswap.FieldExpiryTime:
+		return m.OldExpiryTime(ctx)
+	case utxoswap.FieldUtxoValueSats:
+		return m.OldUtxoValueSats(ctx)
 	}
 	return nil, fmt.Errorf("unknown UtxoSwap field %s", name)
 }
@@ -30896,6 +31152,13 @@ func (m *UtxoSwapMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCreditAmountSats(v)
+		return nil
+	case utxoswap.FieldSecondaryCreditAmountSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSecondaryCreditAmountSats(v)
 		return nil
 	case utxoswap.FieldMaxFeeSats:
 		v, ok := value.(uint64)
@@ -30953,6 +31216,20 @@ func (m *UtxoSwapMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSpendTxSigningResult(v)
 		return nil
+	case utxoswap.FieldExpiryTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiryTime(v)
+		return nil
+	case utxoswap.FieldUtxoValueSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUtxoValueSats(v)
+		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap field %s", name)
 }
@@ -30964,8 +31241,14 @@ func (m *UtxoSwapMutation) AddedFields() []string {
 	if m.addcredit_amount_sats != nil {
 		fields = append(fields, utxoswap.FieldCreditAmountSats)
 	}
+	if m.addsecondary_credit_amount_sats != nil {
+		fields = append(fields, utxoswap.FieldSecondaryCreditAmountSats)
+	}
 	if m.addmax_fee_sats != nil {
 		fields = append(fields, utxoswap.FieldMaxFeeSats)
+	}
+	if m.addutxo_value_sats != nil {
+		fields = append(fields, utxoswap.FieldUtxoValueSats)
 	}
 	return fields
 }
@@ -30977,8 +31260,12 @@ func (m *UtxoSwapMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case utxoswap.FieldCreditAmountSats:
 		return m.AddedCreditAmountSats()
+	case utxoswap.FieldSecondaryCreditAmountSats:
+		return m.AddedSecondaryCreditAmountSats()
 	case utxoswap.FieldMaxFeeSats:
 		return m.AddedMaxFeeSats()
+	case utxoswap.FieldUtxoValueSats:
+		return m.AddedUtxoValueSats()
 	}
 	return nil, false
 }
@@ -30995,12 +31282,26 @@ func (m *UtxoSwapMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddCreditAmountSats(v)
 		return nil
+	case utxoswap.FieldSecondaryCreditAmountSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSecondaryCreditAmountSats(v)
+		return nil
 	case utxoswap.FieldMaxFeeSats:
 		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddMaxFeeSats(v)
+		return nil
+	case utxoswap.FieldUtxoValueSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUtxoValueSats(v)
 		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap numeric field %s", name)
@@ -31012,6 +31313,9 @@ func (m *UtxoSwapMutation) ClearedFields() []string {
 	var fields []string
 	if m.FieldCleared(utxoswap.FieldCreditAmountSats) {
 		fields = append(fields, utxoswap.FieldCreditAmountSats)
+	}
+	if m.FieldCleared(utxoswap.FieldSecondaryCreditAmountSats) {
+		fields = append(fields, utxoswap.FieldSecondaryCreditAmountSats)
 	}
 	if m.FieldCleared(utxoswap.FieldMaxFeeSats) {
 		fields = append(fields, utxoswap.FieldMaxFeeSats)
@@ -31034,6 +31338,12 @@ func (m *UtxoSwapMutation) ClearedFields() []string {
 	if m.FieldCleared(utxoswap.FieldSpendTxSigningResult) {
 		fields = append(fields, utxoswap.FieldSpendTxSigningResult)
 	}
+	if m.FieldCleared(utxoswap.FieldExpiryTime) {
+		fields = append(fields, utxoswap.FieldExpiryTime)
+	}
+	if m.FieldCleared(utxoswap.FieldUtxoValueSats) {
+		fields = append(fields, utxoswap.FieldUtxoValueSats)
+	}
 	return fields
 }
 
@@ -31050,6 +31360,9 @@ func (m *UtxoSwapMutation) ClearField(name string) error {
 	switch name {
 	case utxoswap.FieldCreditAmountSats:
 		m.ClearCreditAmountSats()
+		return nil
+	case utxoswap.FieldSecondaryCreditAmountSats:
+		m.ClearSecondaryCreditAmountSats()
 		return nil
 	case utxoswap.FieldMaxFeeSats:
 		m.ClearMaxFeeSats()
@@ -31071,6 +31384,12 @@ func (m *UtxoSwapMutation) ClearField(name string) error {
 		return nil
 	case utxoswap.FieldSpendTxSigningResult:
 		m.ClearSpendTxSigningResult()
+		return nil
+	case utxoswap.FieldExpiryTime:
+		m.ClearExpiryTime()
+		return nil
+	case utxoswap.FieldUtxoValueSats:
+		m.ClearUtxoValueSats()
 		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap nullable field %s", name)
@@ -31094,6 +31413,9 @@ func (m *UtxoSwapMutation) ResetField(name string) error {
 		return nil
 	case utxoswap.FieldCreditAmountSats:
 		m.ResetCreditAmountSats()
+		return nil
+	case utxoswap.FieldSecondaryCreditAmountSats:
+		m.ResetSecondaryCreditAmountSats()
 		return nil
 	case utxoswap.FieldMaxFeeSats:
 		m.ResetMaxFeeSats()
@@ -31119,18 +31441,27 @@ func (m *UtxoSwapMutation) ResetField(name string) error {
 	case utxoswap.FieldSpendTxSigningResult:
 		m.ResetSpendTxSigningResult()
 		return nil
+	case utxoswap.FieldExpiryTime:
+		m.ResetExpiryTime()
+		return nil
+	case utxoswap.FieldUtxoValueSats:
+		m.ResetUtxoValueSats()
+		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap field %s", name)
 }
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UtxoSwapMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.utxo != nil {
 		edges = append(edges, utxoswap.EdgeUtxo)
 	}
 	if m.transfer != nil {
 		edges = append(edges, utxoswap.EdgeTransfer)
+	}
+	if m.secondary_transfer != nil {
+		edges = append(edges, utxoswap.EdgeSecondaryTransfer)
 	}
 	return edges
 }
@@ -31147,13 +31478,17 @@ func (m *UtxoSwapMutation) AddedIDs(name string) []ent.Value {
 		if id := m.transfer; id != nil {
 			return []ent.Value{*id}
 		}
+	case utxoswap.EdgeSecondaryTransfer:
+		if id := m.secondary_transfer; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UtxoSwapMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	return edges
 }
 
@@ -31165,12 +31500,15 @@ func (m *UtxoSwapMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UtxoSwapMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.clearedutxo {
 		edges = append(edges, utxoswap.EdgeUtxo)
 	}
 	if m.clearedtransfer {
 		edges = append(edges, utxoswap.EdgeTransfer)
+	}
+	if m.clearedsecondary_transfer {
+		edges = append(edges, utxoswap.EdgeSecondaryTransfer)
 	}
 	return edges
 }
@@ -31183,6 +31521,8 @@ func (m *UtxoSwapMutation) EdgeCleared(name string) bool {
 		return m.clearedutxo
 	case utxoswap.EdgeTransfer:
 		return m.clearedtransfer
+	case utxoswap.EdgeSecondaryTransfer:
+		return m.clearedsecondary_transfer
 	}
 	return false
 }
@@ -31197,6 +31537,9 @@ func (m *UtxoSwapMutation) ClearEdge(name string) error {
 	case utxoswap.EdgeTransfer:
 		m.ClearTransfer()
 		return nil
+	case utxoswap.EdgeSecondaryTransfer:
+		m.ClearSecondaryTransfer()
+		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap unique edge %s", name)
 }
@@ -31210,6 +31553,9 @@ func (m *UtxoSwapMutation) ResetEdge(name string) error {
 		return nil
 	case utxoswap.EdgeTransfer:
 		m.ResetTransfer()
+		return nil
+	case utxoswap.EdgeSecondaryTransfer:
+		m.ResetSecondaryTransfer()
 		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap edge %s", name)

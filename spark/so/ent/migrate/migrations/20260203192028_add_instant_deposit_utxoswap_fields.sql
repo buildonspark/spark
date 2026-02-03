@@ -1,0 +1,2 @@
+-- Modify "utxo_swaps" table
+ALTER TABLE "utxo_swaps" ADD COLUMN "secondary_credit_amount_sats" bigint NULL, ADD COLUMN "expiry_time" timestamptz NULL, ADD COLUMN "utxo_value_sats" bigint NULL, ADD COLUMN "utxo_swap_secondary_transfer" uuid NULL, ADD CONSTRAINT "utxo_swaps_transfers_secondary_transfer" FOREIGN KEY ("utxo_swap_secondary_transfer") REFERENCES "transfers" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;

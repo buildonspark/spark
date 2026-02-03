@@ -154,7 +154,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		signedDepositTx.TxOut[vout],
 	)
 	require.NoError(t, err)
-	userSignature := wallet.CreateUserSignature(
+	userSignature, err := wallet.CreateUserSignature(
 		signedDepositTx.TxHash().String(),
 		uint32(vout),
 		btcnetwork.Regtest,
@@ -163,6 +163,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		spendTxSighash,
 		aliceConfig.IdentityPrivateKey,
 	)
+	require.NoError(t, err)
 
 	// *********************************************************************************
 	// Refund Static Deposit
@@ -199,7 +200,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		require.NoError(t, err)
 		bobCtx := wallet.ContextWithToken(t.Context(), bobConnectionToken)
 
-		wrongUserSignature := wallet.CreateUserSignature(
+		wrongUserSignature, err := wallet.CreateUserSignature(
 			signedDepositTx.TxHash().String(),
 			uint32(vout),
 			btcnetwork.Regtest,
@@ -208,6 +209,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 			spendTxSighash,
 			bobConfig.IdentityPrivateKey,
 		)
+		require.NoError(t, err)
 
 		_, err = wallet.RefundStaticDeposit(
 			bobCtx,
@@ -264,7 +266,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 
 		spendTxSighash2, err := common.SigHashFromTx(spendTx2, 0, signedDepositTx.TxOut[vout])
 		require.NoError(t, err)
-		userSignature2 := wallet.CreateUserSignature(
+		userSignature2, err := wallet.CreateUserSignature(
 			signedDepositTx.TxHash().String(),
 			uint32(vout),
 			btcnetwork.Regtest,
@@ -273,6 +275,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 			spendTxSighash2,
 			aliceConfig.IdentityPrivateKey,
 		)
+		require.NoError(t, err)
 
 		signedSpendTx2, err := wallet.RefundStaticDeposit(
 			aliceCtx,

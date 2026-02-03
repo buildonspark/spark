@@ -22,14 +22,15 @@ import (
 // UtxoSwapQuery is the builder for querying UtxoSwap entities.
 type UtxoSwapQuery struct {
 	config
-	ctx          *QueryContext
-	order        []utxoswap.OrderOption
-	inters       []Interceptor
-	predicates   []predicate.UtxoSwap
-	withUtxo     *UtxoQuery
-	withTransfer *TransferQuery
-	withFKs      bool
-	modifiers    []func(*sql.Selector)
+	ctx                   *QueryContext
+	order                 []utxoswap.OrderOption
+	inters                []Interceptor
+	predicates            []predicate.UtxoSwap
+	withUtxo              *UtxoQuery
+	withTransfer          *TransferQuery
+	withSecondaryTransfer *TransferQuery
+	withFKs               bool
+	modifiers             []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -103,6 +104,28 @@ func (usq *UtxoSwapQuery) QueryTransfer() *TransferQuery {
 			sqlgraph.From(utxoswap.Table, utxoswap.FieldID, selector),
 			sqlgraph.To(transfer.Table, transfer.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, utxoswap.TransferTable, utxoswap.TransferColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(usq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QuerySecondaryTransfer chains the current query on the "secondary_transfer" edge.
+func (usq *UtxoSwapQuery) QuerySecondaryTransfer() *TransferQuery {
+	query := (&TransferClient{config: usq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := usq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := usq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(utxoswap.Table, utxoswap.FieldID, selector),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, utxoswap.SecondaryTransferTable, utxoswap.SecondaryTransferColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(usq.driver.Dialect(), step)
 		return fromU, nil
@@ -297,13 +320,14 @@ func (usq *UtxoSwapQuery) Clone() *UtxoSwapQuery {
 		return nil
 	}
 	return &UtxoSwapQuery{
-		config:       usq.config,
-		ctx:          usq.ctx.Clone(),
-		order:        append([]utxoswap.OrderOption{}, usq.order...),
-		inters:       append([]Interceptor{}, usq.inters...),
-		predicates:   append([]predicate.UtxoSwap{}, usq.predicates...),
-		withUtxo:     usq.withUtxo.Clone(),
-		withTransfer: usq.withTransfer.Clone(),
+		config:                usq.config,
+		ctx:                   usq.ctx.Clone(),
+		order:                 append([]utxoswap.OrderOption{}, usq.order...),
+		inters:                append([]Interceptor{}, usq.inters...),
+		predicates:            append([]predicate.UtxoSwap{}, usq.predicates...),
+		withUtxo:              usq.withUtxo.Clone(),
+		withTransfer:          usq.withTransfer.Clone(),
+		withSecondaryTransfer: usq.withSecondaryTransfer.Clone(),
 		// clone intermediate query.
 		sql:       usq.sql.Clone(),
 		path:      usq.path,
@@ -330,6 +354,17 @@ func (usq *UtxoSwapQuery) WithTransfer(opts ...func(*TransferQuery)) *UtxoSwapQu
 		opt(query)
 	}
 	usq.withTransfer = query
+	return usq
+}
+
+// WithSecondaryTransfer tells the query-builder to eager-load the nodes that are connected to
+// the "secondary_transfer" edge. The optional arguments are used to configure the query builder of the edge.
+func (usq *UtxoSwapQuery) WithSecondaryTransfer(opts ...func(*TransferQuery)) *UtxoSwapQuery {
+	query := (&TransferClient{config: usq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	usq.withSecondaryTransfer = query
 	return usq
 }
 
@@ -412,12 +447,13 @@ func (usq *UtxoSwapQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Ut
 		nodes       = []*UtxoSwap{}
 		withFKs     = usq.withFKs
 		_spec       = usq.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [3]bool{
 			usq.withUtxo != nil,
 			usq.withTransfer != nil,
+			usq.withSecondaryTransfer != nil,
 		}
 	)
-	if usq.withUtxo != nil || usq.withTransfer != nil {
+	if usq.withUtxo != nil || usq.withTransfer != nil || usq.withSecondaryTransfer != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -453,6 +489,12 @@ func (usq *UtxoSwapQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Ut
 	if query := usq.withTransfer; query != nil {
 		if err := usq.loadTransfer(ctx, query, nodes, nil,
 			func(n *UtxoSwap, e *Transfer) { n.Edges.Transfer = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := usq.withSecondaryTransfer; query != nil {
+		if err := usq.loadSecondaryTransfer(ctx, query, nodes, nil,
+			func(n *UtxoSwap, e *Transfer) { n.Edges.SecondaryTransfer = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -516,6 +558,38 @@ func (usq *UtxoSwapQuery) loadTransfer(ctx context.Context, query *TransferQuery
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "utxo_swap_transfer" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (usq *UtxoSwapQuery) loadSecondaryTransfer(ctx context.Context, query *TransferQuery, nodes []*UtxoSwap, init func(*UtxoSwap), assign func(*UtxoSwap, *Transfer)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*UtxoSwap)
+	for i := range nodes {
+		if nodes[i].utxo_swap_secondary_transfer == nil {
+			continue
+		}
+		fk := *nodes[i].utxo_swap_secondary_transfer
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(transfer.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "utxo_swap_secondary_transfer" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)

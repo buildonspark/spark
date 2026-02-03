@@ -73,6 +73,11 @@ func CreditAmountSats(v uint64) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldCreditAmountSats, v))
 }
 
+// SecondaryCreditAmountSats applies equality check predicate on the "secondary_credit_amount_sats" field. It's identical to SecondaryCreditAmountSatsEQ.
+func SecondaryCreditAmountSats(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldEQ(FieldSecondaryCreditAmountSats, v))
+}
+
 // MaxFeeSats applies equality check predicate on the "max_fee_sats" field. It's identical to MaxFeeSatsEQ.
 func MaxFeeSats(v uint64) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldMaxFeeSats, v))
@@ -111,6 +116,16 @@ func RequestedTransferID(v uuid.UUID) predicate.UtxoSwap {
 // SpendTxSigningResult applies equality check predicate on the "spend_tx_signing_result" field. It's identical to SpendTxSigningResultEQ.
 func SpendTxSigningResult(v []byte) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldSpendTxSigningResult, v))
+}
+
+// ExpiryTime applies equality check predicate on the "expiry_time" field. It's identical to ExpiryTimeEQ.
+func ExpiryTime(v time.Time) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldEQ(FieldExpiryTime, v))
+}
+
+// UtxoValueSats applies equality check predicate on the "utxo_value_sats" field. It's identical to UtxoValueSatsEQ.
+func UtxoValueSats(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldEQ(FieldUtxoValueSats, v))
 }
 
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
@@ -301,6 +316,56 @@ func CreditAmountSatsIsNil() predicate.UtxoSwap {
 // CreditAmountSatsNotNil applies the NotNil predicate on the "credit_amount_sats" field.
 func CreditAmountSatsNotNil() predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldNotNull(FieldCreditAmountSats))
+}
+
+// SecondaryCreditAmountSatsEQ applies the EQ predicate on the "secondary_credit_amount_sats" field.
+func SecondaryCreditAmountSatsEQ(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldEQ(FieldSecondaryCreditAmountSats, v))
+}
+
+// SecondaryCreditAmountSatsNEQ applies the NEQ predicate on the "secondary_credit_amount_sats" field.
+func SecondaryCreditAmountSatsNEQ(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNEQ(FieldSecondaryCreditAmountSats, v))
+}
+
+// SecondaryCreditAmountSatsIn applies the In predicate on the "secondary_credit_amount_sats" field.
+func SecondaryCreditAmountSatsIn(vs ...uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldIn(FieldSecondaryCreditAmountSats, vs...))
+}
+
+// SecondaryCreditAmountSatsNotIn applies the NotIn predicate on the "secondary_credit_amount_sats" field.
+func SecondaryCreditAmountSatsNotIn(vs ...uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNotIn(FieldSecondaryCreditAmountSats, vs...))
+}
+
+// SecondaryCreditAmountSatsGT applies the GT predicate on the "secondary_credit_amount_sats" field.
+func SecondaryCreditAmountSatsGT(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldGT(FieldSecondaryCreditAmountSats, v))
+}
+
+// SecondaryCreditAmountSatsGTE applies the GTE predicate on the "secondary_credit_amount_sats" field.
+func SecondaryCreditAmountSatsGTE(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldGTE(FieldSecondaryCreditAmountSats, v))
+}
+
+// SecondaryCreditAmountSatsLT applies the LT predicate on the "secondary_credit_amount_sats" field.
+func SecondaryCreditAmountSatsLT(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldLT(FieldSecondaryCreditAmountSats, v))
+}
+
+// SecondaryCreditAmountSatsLTE applies the LTE predicate on the "secondary_credit_amount_sats" field.
+func SecondaryCreditAmountSatsLTE(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldLTE(FieldSecondaryCreditAmountSats, v))
+}
+
+// SecondaryCreditAmountSatsIsNil applies the IsNil predicate on the "secondary_credit_amount_sats" field.
+func SecondaryCreditAmountSatsIsNil() predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldIsNull(FieldSecondaryCreditAmountSats))
+}
+
+// SecondaryCreditAmountSatsNotNil applies the NotNil predicate on the "secondary_credit_amount_sats" field.
+func SecondaryCreditAmountSatsNotNil() predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNotNull(FieldSecondaryCreditAmountSats))
 }
 
 // MaxFeeSatsEQ applies the EQ predicate on the "max_fee_sats" field.
@@ -693,6 +758,106 @@ func SpendTxSigningResultNotNil() predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldNotNull(FieldSpendTxSigningResult))
 }
 
+// ExpiryTimeEQ applies the EQ predicate on the "expiry_time" field.
+func ExpiryTimeEQ(v time.Time) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldEQ(FieldExpiryTime, v))
+}
+
+// ExpiryTimeNEQ applies the NEQ predicate on the "expiry_time" field.
+func ExpiryTimeNEQ(v time.Time) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNEQ(FieldExpiryTime, v))
+}
+
+// ExpiryTimeIn applies the In predicate on the "expiry_time" field.
+func ExpiryTimeIn(vs ...time.Time) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldIn(FieldExpiryTime, vs...))
+}
+
+// ExpiryTimeNotIn applies the NotIn predicate on the "expiry_time" field.
+func ExpiryTimeNotIn(vs ...time.Time) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNotIn(FieldExpiryTime, vs...))
+}
+
+// ExpiryTimeGT applies the GT predicate on the "expiry_time" field.
+func ExpiryTimeGT(v time.Time) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldGT(FieldExpiryTime, v))
+}
+
+// ExpiryTimeGTE applies the GTE predicate on the "expiry_time" field.
+func ExpiryTimeGTE(v time.Time) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldGTE(FieldExpiryTime, v))
+}
+
+// ExpiryTimeLT applies the LT predicate on the "expiry_time" field.
+func ExpiryTimeLT(v time.Time) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldLT(FieldExpiryTime, v))
+}
+
+// ExpiryTimeLTE applies the LTE predicate on the "expiry_time" field.
+func ExpiryTimeLTE(v time.Time) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldLTE(FieldExpiryTime, v))
+}
+
+// ExpiryTimeIsNil applies the IsNil predicate on the "expiry_time" field.
+func ExpiryTimeIsNil() predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldIsNull(FieldExpiryTime))
+}
+
+// ExpiryTimeNotNil applies the NotNil predicate on the "expiry_time" field.
+func ExpiryTimeNotNil() predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNotNull(FieldExpiryTime))
+}
+
+// UtxoValueSatsEQ applies the EQ predicate on the "utxo_value_sats" field.
+func UtxoValueSatsEQ(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldEQ(FieldUtxoValueSats, v))
+}
+
+// UtxoValueSatsNEQ applies the NEQ predicate on the "utxo_value_sats" field.
+func UtxoValueSatsNEQ(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNEQ(FieldUtxoValueSats, v))
+}
+
+// UtxoValueSatsIn applies the In predicate on the "utxo_value_sats" field.
+func UtxoValueSatsIn(vs ...uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldIn(FieldUtxoValueSats, vs...))
+}
+
+// UtxoValueSatsNotIn applies the NotIn predicate on the "utxo_value_sats" field.
+func UtxoValueSatsNotIn(vs ...uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNotIn(FieldUtxoValueSats, vs...))
+}
+
+// UtxoValueSatsGT applies the GT predicate on the "utxo_value_sats" field.
+func UtxoValueSatsGT(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldGT(FieldUtxoValueSats, v))
+}
+
+// UtxoValueSatsGTE applies the GTE predicate on the "utxo_value_sats" field.
+func UtxoValueSatsGTE(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldGTE(FieldUtxoValueSats, v))
+}
+
+// UtxoValueSatsLT applies the LT predicate on the "utxo_value_sats" field.
+func UtxoValueSatsLT(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldLT(FieldUtxoValueSats, v))
+}
+
+// UtxoValueSatsLTE applies the LTE predicate on the "utxo_value_sats" field.
+func UtxoValueSatsLTE(v uint64) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldLTE(FieldUtxoValueSats, v))
+}
+
+// UtxoValueSatsIsNil applies the IsNil predicate on the "utxo_value_sats" field.
+func UtxoValueSatsIsNil() predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldIsNull(FieldUtxoValueSats))
+}
+
+// UtxoValueSatsNotNil applies the NotNil predicate on the "utxo_value_sats" field.
+func UtxoValueSatsNotNil() predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNotNull(FieldUtxoValueSats))
+}
+
 // HasUtxo applies the HasEdge predicate on the "utxo" edge.
 func HasUtxo() predicate.UtxoSwap {
 	return predicate.UtxoSwap(func(s *sql.Selector) {
@@ -731,6 +896,29 @@ func HasTransfer() predicate.UtxoSwap {
 func HasTransferWith(preds ...predicate.Transfer) predicate.UtxoSwap {
 	return predicate.UtxoSwap(func(s *sql.Selector) {
 		step := newTransferStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasSecondaryTransfer applies the HasEdge predicate on the "secondary_transfer" edge.
+func HasSecondaryTransfer() predicate.UtxoSwap {
+	return predicate.UtxoSwap(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, SecondaryTransferTable, SecondaryTransferColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSecondaryTransferWith applies the HasEdge predicate on the "secondary_transfer" edge with a given conditions (other predicates).
+func HasSecondaryTransferWith(preds ...predicate.Transfer) predicate.UtxoSwap {
+	return predicate.UtxoSwap(func(s *sql.Selector) {
+		step := newSecondaryTransferStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

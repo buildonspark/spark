@@ -42,6 +42,11 @@ func (UtxoSwap) Fields() []ent.Field {
 		field.Uint64("credit_amount_sats").
 			Optional().
 			Annotations(entexample.Default(19901)),
+		field.Uint64("secondary_credit_amount_sats").
+			Optional().
+			Nillable().
+			Comment("Secondary credit amount for instant static deposit with multiple payments.").
+			Annotations(entexample.Default(5000)),
 		field.Uint64("max_fee_sats").
 			Optional(),
 		field.Bytes("ssp_signature").
@@ -81,6 +86,16 @@ func (UtxoSwap) Fields() []ent.Field {
 		// the result of frost signing the spend transaction
 		field.Bytes("spend_tx_signing_result").
 			Optional(),
+		field.Time("expiry_time").
+			Optional().
+			Nillable().
+			Comment("When this swap offer/lock expires (if applicable)."),
+		// TODO: (LIG-8545) Remove Nillable and Optional once we backfill the two columns below.
+		// UTXO value in sats for static deposit matching.
+		field.Uint64("utxo_value_sats").
+			Optional().
+			Nillable().
+			Comment("Amount of sats for 0-conf swap matching."),
 	}
 }
 
@@ -91,5 +106,8 @@ func (UtxoSwap) Edges() []ent.Edge {
 			Unique().Required().Immutable(),
 		edge.To("transfer", Transfer.Type).
 			Unique(),
+		edge.To("secondary_transfer", Transfer.Type).
+			Unique().
+			Comment("Secondary transfer for instant static deposit with multiple payments."),
 	}
 }

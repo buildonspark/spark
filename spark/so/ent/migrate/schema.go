@@ -1414,8 +1414,9 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED", "COMPLETED", "CANCELLED"}},
-		{Name: "request_type", Type: field.TypeEnum, Enums: []string{"FIXED_AMOUNT", "MAX_FEE", "REFUND"}},
+		{Name: "request_type", Type: field.TypeEnum, Enums: []string{"FIXED_AMOUNT", "MAX_FEE", "REFUND", "INSTANT"}},
 		{Name: "credit_amount_sats", Type: field.TypeUint64, Nullable: true},
+		{Name: "secondary_credit_amount_sats", Type: field.TypeUint64, Nullable: true},
 		{Name: "max_fee_sats", Type: field.TypeUint64, Nullable: true},
 		{Name: "ssp_signature", Type: field.TypeBytes, Nullable: true},
 		{Name: "ssp_identity_public_key", Type: field.TypeBytes, Nullable: true},
@@ -1424,9 +1425,12 @@ var (
 		{Name: "coordinator_identity_public_key", Type: field.TypeBytes},
 		{Name: "requested_transfer_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "spend_tx_signing_result", Type: field.TypeBytes, Nullable: true},
+		{Name: "expiry_time", Type: field.TypeTime, Nullable: true},
+		{Name: "utxo_value_sats", Type: field.TypeUint64, Nullable: true},
 		{Name: "deposit_address_utxoswaps", Type: field.TypeUUID, Nullable: true},
 		{Name: "utxo_swap_utxo", Type: field.TypeUUID},
 		{Name: "utxo_swap_transfer", Type: field.TypeUUID, Nullable: true},
+		{Name: "utxo_swap_secondary_transfer", Type: field.TypeUUID, Nullable: true},
 	}
 	// UtxoSwapsTable holds the schema information for the "utxo_swaps" table.
 	UtxoSwapsTable = &schema.Table{
@@ -1436,19 +1440,25 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "utxo_swaps_deposit_addresses_utxoswaps",
-				Columns:    []*schema.Column{UtxoSwapsColumns[14]},
+				Columns:    []*schema.Column{UtxoSwapsColumns[17]},
 				RefColumns: []*schema.Column{DepositAddressesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "utxo_swaps_utxos_utxo",
-				Columns:    []*schema.Column{UtxoSwapsColumns[15]},
+				Columns:    []*schema.Column{UtxoSwapsColumns[18]},
 				RefColumns: []*schema.Column{UtxosColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "utxo_swaps_transfers_transfer",
-				Columns:    []*schema.Column{UtxoSwapsColumns[16]},
+				Columns:    []*schema.Column{UtxoSwapsColumns[19]},
+				RefColumns: []*schema.Column{TransfersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "utxo_swaps_transfers_secondary_transfer",
+				Columns:    []*schema.Column{UtxoSwapsColumns[20]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -1457,7 +1467,7 @@ var (
 			{
 				Name:    "utxoswap_utxo_swap_utxo",
 				Unique:  true,
-				Columns: []*schema.Column{UtxoSwapsColumns[15]},
+				Columns: []*schema.Column{UtxoSwapsColumns[18]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "status != 'CANCELLED'",
 				},
@@ -1620,6 +1630,7 @@ func init() {
 	UtxoSwapsTable.ForeignKeys[0].RefTable = DepositAddressesTable
 	UtxoSwapsTable.ForeignKeys[1].RefTable = UtxosTable
 	UtxoSwapsTable.ForeignKeys[2].RefTable = TransfersTable
+	UtxoSwapsTable.ForeignKeys[3].RefTable = TransfersTable
 	TokenOutputOutputSpentStartedTokenTransactionsTable.ForeignKeys[0].RefTable = TokenOutputsTable
 	TokenOutputOutputSpentStartedTokenTransactionsTable.ForeignKeys[1].RefTable = TokenTransactionsTable
 	TokenTransactionSparkInvoiceTable.ForeignKeys[0].RefTable = TokenTransactionsTable

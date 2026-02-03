@@ -27,6 +27,8 @@ const (
 	FieldRequestType = "request_type"
 	// FieldCreditAmountSats holds the string denoting the credit_amount_sats field in the database.
 	FieldCreditAmountSats = "credit_amount_sats"
+	// FieldSecondaryCreditAmountSats holds the string denoting the secondary_credit_amount_sats field in the database.
+	FieldSecondaryCreditAmountSats = "secondary_credit_amount_sats"
 	// FieldMaxFeeSats holds the string denoting the max_fee_sats field in the database.
 	FieldMaxFeeSats = "max_fee_sats"
 	// FieldSspSignature holds the string denoting the ssp_signature field in the database.
@@ -43,10 +45,16 @@ const (
 	FieldRequestedTransferID = "requested_transfer_id"
 	// FieldSpendTxSigningResult holds the string denoting the spend_tx_signing_result field in the database.
 	FieldSpendTxSigningResult = "spend_tx_signing_result"
+	// FieldExpiryTime holds the string denoting the expiry_time field in the database.
+	FieldExpiryTime = "expiry_time"
+	// FieldUtxoValueSats holds the string denoting the utxo_value_sats field in the database.
+	FieldUtxoValueSats = "utxo_value_sats"
 	// EdgeUtxo holds the string denoting the utxo edge name in mutations.
 	EdgeUtxo = "utxo"
 	// EdgeTransfer holds the string denoting the transfer edge name in mutations.
 	EdgeTransfer = "transfer"
+	// EdgeSecondaryTransfer holds the string denoting the secondary_transfer edge name in mutations.
+	EdgeSecondaryTransfer = "secondary_transfer"
 	// Table holds the table name of the utxoswap in the database.
 	Table = "utxo_swaps"
 	// UtxoTable is the table that holds the utxo relation/edge.
@@ -63,6 +71,13 @@ const (
 	TransferInverseTable = "transfers"
 	// TransferColumn is the table column denoting the transfer relation/edge.
 	TransferColumn = "utxo_swap_transfer"
+	// SecondaryTransferTable is the table that holds the secondary_transfer relation/edge.
+	SecondaryTransferTable = "utxo_swaps"
+	// SecondaryTransferInverseTable is the table name for the Transfer entity.
+	// It exists in this package in order to avoid circular dependency with the "transfer" package.
+	SecondaryTransferInverseTable = "transfers"
+	// SecondaryTransferColumn is the table column denoting the secondary_transfer relation/edge.
+	SecondaryTransferColumn = "utxo_swap_secondary_transfer"
 )
 
 // Columns holds all SQL columns for utxoswap fields.
@@ -73,6 +88,7 @@ var Columns = []string{
 	FieldStatus,
 	FieldRequestType,
 	FieldCreditAmountSats,
+	FieldSecondaryCreditAmountSats,
 	FieldMaxFeeSats,
 	FieldSspSignature,
 	FieldSspIdentityPublicKey,
@@ -81,6 +97,8 @@ var Columns = []string{
 	FieldCoordinatorIdentityPublicKey,
 	FieldRequestedTransferID,
 	FieldSpendTxSigningResult,
+	FieldExpiryTime,
+	FieldUtxoValueSats,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "utxo_swaps"
@@ -89,6 +107,7 @@ var ForeignKeys = []string{
 	"deposit_address_utxoswaps",
 	"utxo_swap_utxo",
 	"utxo_swap_transfer",
+	"utxo_swap_secondary_transfer",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -130,7 +149,7 @@ func StatusValidator(s schematype.UtxoSwapStatus) error {
 // RequestTypeValidator is a validator for the "request_type" field enum values. It is called by the builders before save.
 func RequestTypeValidator(rt schematype.UtxoSwapRequestType) error {
 	switch rt {
-	case "FIXED_AMOUNT", "MAX_FEE", "REFUND":
+	case "FIXED_AMOUNT", "MAX_FEE", "REFUND", "INSTANT":
 		return nil
 	default:
 		return fmt.Errorf("utxoswap: invalid enum value for request_type field: %q", rt)
@@ -170,6 +189,11 @@ func ByCreditAmountSats(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreditAmountSats, opts...).ToFunc()
 }
 
+// BySecondaryCreditAmountSats orders the results by the secondary_credit_amount_sats field.
+func BySecondaryCreditAmountSats(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSecondaryCreditAmountSats, opts...).ToFunc()
+}
+
 // ByMaxFeeSats orders the results by the max_fee_sats field.
 func ByMaxFeeSats(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMaxFeeSats, opts...).ToFunc()
@@ -178,6 +202,16 @@ func ByMaxFeeSats(opts ...sql.OrderTermOption) OrderOption {
 // ByRequestedTransferID orders the results by the requested_transfer_id field.
 func ByRequestedTransferID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequestedTransferID, opts...).ToFunc()
+}
+
+// ByExpiryTime orders the results by the expiry_time field.
+func ByExpiryTime(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExpiryTime, opts...).ToFunc()
+}
+
+// ByUtxoValueSats orders the results by the utxo_value_sats field.
+func ByUtxoValueSats(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUtxoValueSats, opts...).ToFunc()
 }
 
 // ByUtxoField orders the results by utxo field.
@@ -193,6 +227,13 @@ func ByTransferField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newTransferStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// BySecondaryTransferField orders the results by secondary_transfer field.
+func BySecondaryTransferField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSecondaryTransferStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newUtxoStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -205,5 +246,12 @@ func newTransferStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(TransferInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, TransferTable, TransferColumn),
+	)
+}
+func newSecondaryTransferStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SecondaryTransferInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, SecondaryTransferTable, SecondaryTransferColumn),
 	)
 }

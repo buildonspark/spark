@@ -417,9 +417,10 @@ func (PreimageRequestRole) EnumDescriptor() ([]byte, []int) {
 type UtxoSwapRequestType int32
 
 const (
-	UtxoSwapRequestType_Fixed  UtxoSwapRequestType = 0
-	UtxoSwapRequestType_MaxFee UtxoSwapRequestType = 1
-	UtxoSwapRequestType_Refund UtxoSwapRequestType = 2
+	UtxoSwapRequestType_Fixed   UtxoSwapRequestType = 0
+	UtxoSwapRequestType_MaxFee  UtxoSwapRequestType = 1
+	UtxoSwapRequestType_Refund  UtxoSwapRequestType = 2
+	UtxoSwapRequestType_Instant UtxoSwapRequestType = 3
 )
 
 // Enum value maps for UtxoSwapRequestType.
@@ -428,11 +429,13 @@ var (
 		0: "Fixed",
 		1: "MaxFee",
 		2: "Refund",
+		3: "Instant",
 	}
 	UtxoSwapRequestType_value = map[string]int32{
-		"Fixed":  0,
-		"MaxFee": 1,
-		"Refund": 2,
+		"Fixed":   0,
+		"MaxFee":  1,
+		"Refund":  2,
+		"Instant": 3,
 	}
 )
 
@@ -12241,13 +12244,14 @@ const file_spark_proto_rawDesc = "" +
 	"\x13PreimageRequestRole\x12\"\n" +
 	"\x1ePREIMAGE_REQUEST_ROLE_RECEIVER\x10\x00\x12 \n" +
 	"\x1cPREIMAGE_REQUEST_ROLE_SENDER\x10\x01\x12-\n" +
-	")PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER\x10\x02*8\n" +
+	")PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER\x10\x02*E\n" +
 	"\x13UtxoSwapRequestType\x12\t\n" +
 	"\x05Fixed\x10\x00\x12\n" +
 	"\n" +
 	"\x06MaxFee\x10\x01\x12\n" +
 	"\n" +
-	"\x06Refund\x10\x02*@\n" +
+	"\x06Refund\x10\x02\x12\v\n" +
+	"\aInstant\x10\x03*@\n" +
 	"\vHashVariant\x12\x1c\n" +
 	"\x18HASH_VARIANT_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fHASH_VARIANT_V2\x10\x01*N\n" +

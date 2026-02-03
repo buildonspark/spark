@@ -1378,6 +1378,7 @@ enum UtxoSwapRequestType {
   Fixed = 0;
   MaxFee = 1;
   Refund = 2;
+  Instant = 3;
 }
 
 // Which hash variant to use in cryptographic operations.

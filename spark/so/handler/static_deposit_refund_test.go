@@ -105,6 +105,7 @@ func createMockInitiateStaticDepositUtxoRefundRequest(
 	require.NoError(t, err, "unable to construct sig hash tx")
 
 	userSignature := createValidUserSignatureForTest(
+		t,
 		utxo.Txid,
 		utxo.Vout,
 		btcnetwork.Regtest,
@@ -184,6 +185,7 @@ func TestCreateStaticDepositUtxoRefundWithRollback_Success(t *testing.T) {
 	}
 
 	userSignature := createValidUserSignatureForTest(
+		t,
 		testUtxo.Txid,
 		testUtxo.Vout,
 		btcnetwork.Regtest,
@@ -707,6 +709,7 @@ func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxSpendingDifferentOutpoin
 	require.NoError(t, err)
 
 	userSignatureToRefundUtxoA := createValidUserSignatureForTest(
+		t,
 		utxoA.Txid,
 		utxoA.Vout,
 		btcnetwork.Regtest,
@@ -806,6 +809,7 @@ func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxWithMultipleInputs(t *te
 	require.NoError(t, err)
 
 	userSignature := createValidUserSignatureForTest(
+		t,
 		utxoA.Txid,
 		utxoA.Vout,
 		btcnetwork.Regtest,
@@ -884,6 +888,7 @@ func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxWithWrongSequence(t *tes
 	require.NoError(t, err)
 
 	userSignature := createValidUserSignatureForTest(
+		t,
 		testUtxo.Txid,
 		testUtxo.Vout,
 		btcnetwork.Regtest,
@@ -953,6 +958,7 @@ func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxWithZeroInputs(t *testin
 	// We'll provide dummy values for the signature.
 	dummySigHash := make([]byte, 32)
 	userSignature := createValidUserSignatureForTest(
+		t,
 		testUtxo.Txid,
 		testUtxo.Vout,
 		btcnetwork.Regtest,

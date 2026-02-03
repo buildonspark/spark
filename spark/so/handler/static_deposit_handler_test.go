@@ -135,6 +135,7 @@ func createOldBitcoinTxBytes(t *testing.T, receiverPubKey keys.Public) []byte {
 }
 
 func createValidUserSignatureForTest(
+	t *testing.T,
 	txid []byte,
 	vout uint32,
 	network btcnetwork.Network,
@@ -143,7 +144,8 @@ func createValidUserSignatureForTest(
 	sspSignature []byte,
 	userPrivateKey keys.Private,
 ) []byte {
-	hash := CreateUserStatement(hex.EncodeToString(txid), vout, network, requestType, totalAmount, sspSignature, pb.HashVariant_HASH_VARIANT_UNSPECIFIED)
+	hash, err := CreateUserStatement(hex.EncodeToString(txid), vout, network, requestType, totalAmount, sspSignature, pb.HashVariant_HASH_VARIANT_UNSPECIFIED)
+	require.NoError(t, err)
 	return ecdsa.Sign(userPrivateKey.ToBTCEC(), hash).Serialize()
 }
 

@@ -8,6 +8,7 @@ const (
 	UtxoSwapRequestTypeFixedAmount UtxoSwapRequestType = "FIXED_AMOUNT"
 	UtxoSwapRequestTypeMaxFee      UtxoSwapRequestType = "MAX_FEE"
 	UtxoSwapRequestTypeRefund      UtxoSwapRequestType = "REFUND"
+	UtxoSwapRequestTypeInstant     UtxoSwapRequestType = "INSTANT"
 )
 
 func (UtxoSwapRequestType) Values() []string {
@@ -15,6 +16,7 @@ func (UtxoSwapRequestType) Values() []string {
 		string(UtxoSwapRequestTypeFixedAmount),
 		string(UtxoSwapRequestTypeMaxFee),
 		string(UtxoSwapRequestTypeRefund),
+		string(UtxoSwapRequestTypeInstant),
 	}
 }
 
@@ -26,6 +28,8 @@ func UtxoSwapFromProtoRequestType(requestType pb.UtxoSwapRequestType) UtxoSwapRe
 		return UtxoSwapRequestTypeMaxFee
 	case pb.UtxoSwapRequestType_Refund:
 		return UtxoSwapRequestTypeRefund
+	case pb.UtxoSwapRequestType_Instant:
+		return UtxoSwapRequestTypeInstant
 	default:
 		return UtxoSwapRequestTypeFixedAmount
 	}

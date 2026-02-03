@@ -32,6 +32,8 @@ type UtxoSwap struct {
 	RequestType schematype.UtxoSwapRequestType `json:"request_type,omitempty"`
 	// CreditAmountSats holds the value of the "credit_amount_sats" field.
 	CreditAmountSats uint64 `json:"credit_amount_sats,omitempty"`
+	// Secondary credit amount for instant static deposit with multiple payments.
+	SecondaryCreditAmountSats *uint64 `json:"secondary_credit_amount_sats,omitempty"`
 	// MaxFeeSats holds the value of the "max_fee_sats" field.
 	MaxFeeSats uint64 `json:"max_fee_sats,omitempty"`
 	// SspSignature holds the value of the "ssp_signature" field.
@@ -48,13 +50,18 @@ type UtxoSwap struct {
 	RequestedTransferID uuid.UUID `json:"requested_transfer_id,omitempty"`
 	// SpendTxSigningResult holds the value of the "spend_tx_signing_result" field.
 	SpendTxSigningResult []byte `json:"spend_tx_signing_result,omitempty"`
+	// When this swap offer/lock expires (if applicable).
+	ExpiryTime *time.Time `json:"expiry_time,omitempty"`
+	// Amount of sats for 0-conf swap matching.
+	UtxoValueSats *uint64 `json:"utxo_value_sats,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UtxoSwapQuery when eager-loading is set.
-	Edges                     UtxoSwapEdges `json:"edges"`
-	deposit_address_utxoswaps *uuid.UUID
-	utxo_swap_utxo            *uuid.UUID
-	utxo_swap_transfer        *uuid.UUID
-	selectValues              sql.SelectValues
+	Edges                        UtxoSwapEdges `json:"edges"`
+	deposit_address_utxoswaps    *uuid.UUID
+	utxo_swap_utxo               *uuid.UUID
+	utxo_swap_transfer           *uuid.UUID
+	utxo_swap_secondary_transfer *uuid.UUID
+	selectValues                 sql.SelectValues
 }
 
 // UtxoSwapEdges holds the relations/edges for other nodes in the graph.
@@ -63,9 +70,11 @@ type UtxoSwapEdges struct {
 	Utxo *Utxo `json:"utxo,omitempty"`
 	// Transfer holds the value of the transfer edge.
 	Transfer *Transfer `json:"transfer,omitempty"`
+	// Secondary transfer for instant static deposit with multiple payments.
+	SecondaryTransfer *Transfer `json:"secondary_transfer,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // UtxoOrErr returns the Utxo value or an error if the edge
@@ -90,6 +99,17 @@ func (e UtxoSwapEdges) TransferOrErr() (*Transfer, error) {
 	return nil, &NotLoadedError{edge: "transfer"}
 }
 
+// SecondaryTransferOrErr returns the SecondaryTransfer value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e UtxoSwapEdges) SecondaryTransferOrErr() (*Transfer, error) {
+	if e.SecondaryTransfer != nil {
+		return e.SecondaryTransfer, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: transfer.Label}
+	}
+	return nil, &NotLoadedError{edge: "secondary_transfer"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*UtxoSwap) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -99,11 +119,11 @@ func (*UtxoSwap) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case utxoswap.FieldSspIdentityPublicKey, utxoswap.FieldUserIdentityPublicKey, utxoswap.FieldCoordinatorIdentityPublicKey:
 			values[i] = new(keys.Public)
-		case utxoswap.FieldCreditAmountSats, utxoswap.FieldMaxFeeSats:
+		case utxoswap.FieldCreditAmountSats, utxoswap.FieldSecondaryCreditAmountSats, utxoswap.FieldMaxFeeSats, utxoswap.FieldUtxoValueSats:
 			values[i] = new(sql.NullInt64)
 		case utxoswap.FieldStatus, utxoswap.FieldRequestType:
 			values[i] = new(sql.NullString)
-		case utxoswap.FieldCreateTime, utxoswap.FieldUpdateTime:
+		case utxoswap.FieldCreateTime, utxoswap.FieldUpdateTime, utxoswap.FieldExpiryTime:
 			values[i] = new(sql.NullTime)
 		case utxoswap.FieldID, utxoswap.FieldRequestedTransferID:
 			values[i] = new(uuid.UUID)
@@ -112,6 +132,8 @@ func (*UtxoSwap) scanValues(columns []string) ([]any, error) {
 		case utxoswap.ForeignKeys[1]: // utxo_swap_utxo
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case utxoswap.ForeignKeys[2]: // utxo_swap_transfer
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
+		case utxoswap.ForeignKeys[3]: // utxo_swap_secondary_transfer
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
@@ -164,6 +186,13 @@ func (us *UtxoSwap) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				us.CreditAmountSats = uint64(value.Int64)
 			}
+		case utxoswap.FieldSecondaryCreditAmountSats:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field secondary_credit_amount_sats", values[i])
+			} else if value.Valid {
+				us.SecondaryCreditAmountSats = new(uint64)
+				*us.SecondaryCreditAmountSats = uint64(value.Int64)
+			}
 		case utxoswap.FieldMaxFeeSats:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field max_fee_sats", values[i])
@@ -212,6 +241,20 @@ func (us *UtxoSwap) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				us.SpendTxSigningResult = *value
 			}
+		case utxoswap.FieldExpiryTime:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field expiry_time", values[i])
+			} else if value.Valid {
+				us.ExpiryTime = new(time.Time)
+				*us.ExpiryTime = value.Time
+			}
+		case utxoswap.FieldUtxoValueSats:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field utxo_value_sats", values[i])
+			} else if value.Valid {
+				us.UtxoValueSats = new(uint64)
+				*us.UtxoValueSats = uint64(value.Int64)
+			}
 		case utxoswap.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field deposit_address_utxoswaps", values[i])
@@ -232,6 +275,13 @@ func (us *UtxoSwap) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				us.utxo_swap_transfer = new(uuid.UUID)
 				*us.utxo_swap_transfer = *value.S.(*uuid.UUID)
+			}
+		case utxoswap.ForeignKeys[3]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field utxo_swap_secondary_transfer", values[i])
+			} else if value.Valid {
+				us.utxo_swap_secondary_transfer = new(uuid.UUID)
+				*us.utxo_swap_secondary_transfer = *value.S.(*uuid.UUID)
 			}
 		default:
 			us.selectValues.Set(columns[i], values[i])
@@ -254,6 +304,11 @@ func (us *UtxoSwap) QueryUtxo() *UtxoQuery {
 // QueryTransfer queries the "transfer" edge of the UtxoSwap entity.
 func (us *UtxoSwap) QueryTransfer() *TransferQuery {
 	return NewUtxoSwapClient(us.config).QueryTransfer(us)
+}
+
+// QuerySecondaryTransfer queries the "secondary_transfer" edge of the UtxoSwap entity.
+func (us *UtxoSwap) QuerySecondaryTransfer() *TransferQuery {
+	return NewUtxoSwapClient(us.config).QuerySecondaryTransfer(us)
 }
 
 // Update returns a builder for updating this UtxoSwap.
@@ -294,6 +349,11 @@ func (us *UtxoSwap) String() string {
 	builder.WriteString("credit_amount_sats=")
 	builder.WriteString(fmt.Sprintf("%v", us.CreditAmountSats))
 	builder.WriteString(", ")
+	if v := us.SecondaryCreditAmountSats; v != nil {
+		builder.WriteString("secondary_credit_amount_sats=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	builder.WriteString("max_fee_sats=")
 	builder.WriteString(fmt.Sprintf("%v", us.MaxFeeSats))
 	builder.WriteString(", ")
@@ -317,6 +377,16 @@ func (us *UtxoSwap) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("spend_tx_signing_result=")
 	builder.WriteString(fmt.Sprintf("%v", us.SpendTxSigningResult))
+	builder.WriteString(", ")
+	if v := us.ExpiryTime; v != nil {
+		builder.WriteString("expiry_time=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := us.UtxoValueSats; v != nil {
+		builder.WriteString("utxo_value_sats=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

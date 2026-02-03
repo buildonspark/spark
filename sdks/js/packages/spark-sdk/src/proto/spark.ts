@@ -376,6 +376,7 @@ export enum UtxoSwapRequestType {
   Fixed = 0,
   MaxFee = 1,
   Refund = 2,
+  Instant = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -390,6 +391,9 @@ export function utxoSwapRequestTypeFromJSON(object: any): UtxoSwapRequestType {
     case 2:
     case "Refund":
       return UtxoSwapRequestType.Refund;
+    case 3:
+    case "Instant":
+      return UtxoSwapRequestType.Instant;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -405,6 +409,8 @@ export function utxoSwapRequestTypeToJSON(object: UtxoSwapRequestType): string {
       return "MaxFee";
     case UtxoSwapRequestType.Refund:
       return "Refund";
+    case UtxoSwapRequestType.Instant:
+      return "Instant";
     case UtxoSwapRequestType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
