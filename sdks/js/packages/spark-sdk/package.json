@@ -10,6 +10,11 @@
   "type": "module",
   "description": "Spark SDK",
   "homepage": "https://github.com/buildonspark/spark",
+  "keywords": [
+    "bitcoin",
+    "spark",
+    "lightning"
+  ],
   "files": [
     "dist",
     "src",
