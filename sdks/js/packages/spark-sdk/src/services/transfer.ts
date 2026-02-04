@@ -11,6 +11,7 @@ import {
   ClaimLeafKeyTweak,
   ClaimTransferSignRefundsResponse,
   CounterLeafSwapResponse,
+  HashVariant,
   InitiateSwapPrimaryTransferResponse,
   LeafRefundTxSigningJob,
   LeafRefundTxSigningResult,
@@ -455,7 +456,7 @@ export class BaseTransferService {
       userSignature: new Uint8Array(),
       directLeavesToSend: directLeafSigningJobs,
       directFromCpfpLeavesToSend: directFromCpfpLeafSigningJobs,
-      hashVariant: 0,
+      hashVariant: HashVariant.HASH_VARIANT_V2,
     };
 
     const transferPackageSigningPayload = getTransferPackageSigningPayload(
@@ -538,6 +539,7 @@ export class BaseTransferService {
       userSignature: new Uint8Array(),
       directLeavesToSend: directLeafSigningJobs,
       directFromCpfpLeavesToSend: directFromCpfpLeafSigningJobs,
+      hashVariant: HashVariant.HASH_VARIANT_V2,
     });
 
     const transferPackageSigningPayload = getTransferPackageSigningPayload(

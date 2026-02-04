@@ -5,9 +5,10 @@ import { p2tr, Transaction } from "@scure/btc-signer";
 import { SparkRequestError, SparkValidationError } from "../errors/types.js";
 import {
   Address,
+  FinalizeDepositTreeCreationResponse,
   GenerateDepositAddressResponse,
   GetSigningCommitmentsResponse,
-  FinalizeDepositTreeCreationResponse,
+  HashVariant,
 } from "../proto/spark.js";
 import { KeyDerivation } from "../signer/types.js";
 import { getSigHashFromTx } from "../utils/bitcoin.js";
@@ -154,6 +155,7 @@ export class DepositService {
         signingPublicKey: signingPubkey,
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
         network: this.config.getNetworkProto(),
+        hashVariant: HashVariant.HASH_VARIANT_V2,
       });
     } catch (error) {
       throw new SparkRequestError("Failed to generate static deposit address", {
@@ -198,6 +200,7 @@ export class DepositService {
         network: this.config.getNetworkProto(),
         leafId: leafId,
         isStatic: isStatic,
+        hashVariant: HashVariant.HASH_VARIANT_V2,
       });
     } catch (error) {
       throw new SparkRequestError("Failed to generate deposit address", {
