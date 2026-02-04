@@ -17,7 +17,6 @@ import (
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // FakeLightningInvoiceCreator is a fake implementation of the LightningInvoiceCreator that always returns
@@ -1326,14 +1325,12 @@ func TestReceiveLightningPaymentWithTransferRequest(t *testing.T) {
 			OwnerIdentityPublicKey:    sspConfig.IdentityPublicKey().Serialize(),
 			ReceiverIdentityPublicKey: userConfig.IdentityPublicKey().Serialize(),
 			LeavesToSend:              userSignedLeavesToSend,
-			ExpiryTime:                timestamppb.New(time.Now().Add(2 * time.Minute)),
 		},
 		TransferRequest: &spark.StartTransferRequest{
 			TransferId:                transferID.String(),
 			OwnerIdentityPublicKey:    sspConfig.IdentityPublicKey().Serialize(),
 			ReceiverIdentityPublicKey: userConfig.IdentityPublicKey().Serialize(),
 			TransferPackage:           transferPackage,
-			ExpiryTime:                timestamppb.New(time.Now().Add(2 * time.Minute)),
 		},
 		ReceiverIdentityPublicKey: userConfig.IdentityPublicKey().Serialize(),
 		FeeSats:                   0,
