@@ -2,6 +2,7 @@ export * from "./address.js";
 export * from "./adaptor-signature.js";
 export * from "./bitcoin.js";
 export * from "./hashstructure.js";
+export * from "./idempotency.js";
 export * from "./keys.js";
 export * from "./mempool.js";
 export * from "./network.js";

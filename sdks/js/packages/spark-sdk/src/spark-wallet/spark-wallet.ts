@@ -3552,6 +3552,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     maxFeeSats,
     preferSpark = false,
     amountSatsToSend,
+    idempotencyKey,
   }: PayLightningInvoiceParams): Promise<
     LightningSendRequest | WalletTransfer
   > {
@@ -3714,6 +3715,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         startTransferRequest,
         expiryTime,
         transferID,
+        idempotencyKey,
       });
 
       if (!swapResponse.transfer) {

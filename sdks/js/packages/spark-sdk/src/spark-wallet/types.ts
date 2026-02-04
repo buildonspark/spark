@@ -8,6 +8,7 @@ import type { SparkSigner } from "../signer/signer.js";
 import { KeyDerivation } from "../signer/types.js";
 import { CoopExitFeeQuote, ExitSpeed, WalletTransfer } from "../types/index.js";
 import { SparkAddressFormat } from "../utils/address.js";
+import { type IdempotencyOptions } from "../utils/idempotency.js";
 import { Bech32mTokenIdentifier } from "../utils/token-identifier.js";
 import type { SparkWallet } from "./spark-wallet.js";
 
@@ -39,7 +40,7 @@ export type PayLightningInvoiceParams = {
   maxFeeSats: number;
   preferSpark?: boolean;
   amountSatsToSend?: number;
-};
+} & IdempotencyOptions;
 
 export type TransferParams = {
   amountSats: number;

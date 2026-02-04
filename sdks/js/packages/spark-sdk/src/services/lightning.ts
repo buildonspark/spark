@@ -20,6 +20,10 @@ import {
 } from "../proto/spark.js";
 import { getTxFromRawTxBytes } from "../utils/bitcoin.js";
 import { getCrypto } from "../utils/crypto.js";
+import {
+  optionsWithIdempotencyKey,
+  type IdempotencyOptions,
+} from "../utils/idempotency.js";
 import { decodeInvoice } from "./bolt11-spark.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection/connection.js";
@@ -55,7 +59,7 @@ export type SwapNodesForPreimageParams = {
   startTransferRequest?: StartTransferRequest;
   expiryTime?: Date;
   transferID?: string;
-};
+} & IdempotencyOptions;
 
 export class LightningService {
   private readonly config: WalletConfigService;
@@ -200,6 +204,7 @@ export class LightningService {
     expiryTime,
     startTransferRequest,
     transferID,
+    idempotencyKey,
   }: SwapNodesForPreimageParams): Promise<InitiatePreimageSwapResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
@@ -281,33 +286,36 @@ export class LightningService {
     let response: InitiatePreimageSwapResponse;
     // TODO(LIG-8126): Remove transfer inputs once SDK upgrade is complete
     try {
-      response = await sparkClient.initiate_preimage_swap_v3({
-        paymentHash,
-        invoiceAmount: {
-          invoiceAmountProof: {
-            bolt11Invoice: bolt11String,
+      response = await sparkClient.initiate_preimage_swap_v3(
+        {
+          paymentHash,
+          invoiceAmount: {
+            invoiceAmountProof: {
+              bolt11Invoice: bolt11String,
+            },
+            valueSats: amountSats,
           },
-          valueSats: amountSats,
-        },
-        reason,
-        transfer: {
-          transferId,
-          ownerIdentityPublicKey:
-            await this.config.signer.getIdentityPublicKey(),
-          leavesToSend: cpfpLeafSigningJobs,
-          directLeavesToSend: startTransferRequest
-            ? undefined
-            : directLeafSigningJobs,
-          directFromCpfpLeavesToSend: startTransferRequest
-            ? undefined
-            : directFromCpfpLeafSigningJobs,
+          reason,
+          transfer: {
+            transferId,
+            ownerIdentityPublicKey:
+              await this.config.signer.getIdentityPublicKey(),
+            leavesToSend: cpfpLeafSigningJobs,
+            directLeavesToSend: startTransferRequest
+              ? undefined
+              : directLeafSigningJobs,
+            directFromCpfpLeavesToSend: startTransferRequest
+              ? undefined
+              : directFromCpfpLeafSigningJobs,
+            receiverIdentityPublicKey: receiverIdentityPubkey,
+            expiryTime,
+          },
           receiverIdentityPublicKey: receiverIdentityPubkey,
-          expiryTime,
+          feeSats,
+          transferRequest: startTransferRequest,
         },
-        receiverIdentityPublicKey: receiverIdentityPubkey,
-        feeSats,
-        transferRequest: startTransferRequest,
-      });
+        idempotencyKey ? optionsWithIdempotencyKey(idempotencyKey) : undefined,
+      );
     } catch (error) {
       throw new SparkRequestError("Failed to initiate preimage swap", {
         operation: "initiate_preimage_swap_v3",
