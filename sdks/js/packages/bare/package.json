@@ -7,7 +7,13 @@
   "types": "./dist/index.d.ts",
   "module": "./dist/index.js",
   "type": "module",
-  "description": "Spark SDK",
+  "description": "Spark SDK for Bare runtime",
+  "keywords": [
+    "bitcoin",
+    "spark",
+    "bare",
+    "pear"
+  ],
   "homepage": "https://github.com/buildonspark/spark",
   "files": [
     "dist",

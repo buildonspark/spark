@@ -160,6 +160,6 @@ wallet.on(SparkWalletEvent.DepositConfirmed, (depositId, newBalance) => {
 
 The SDK supports multiple JavaScript runtimes:
 
-- **Browser** - Web applications with WASM crypto
-- **Node.js** - Server-side applications
-- **React Native** - Mobile applications
+- **Browser**
+- **Node.js**
+- **React Native**
