@@ -33,7 +33,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 )
@@ -207,7 +206,6 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		operatorSignatures[identifier] = sig.GetSignature()
 	}
 
-	knobsService := knobs.GetKnobsService(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -221,8 +219,7 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		return nil, fmt.Errorf("failed to load token transaction with txHash (%x) in ExchangeRevocationSecretsShares: %w", req.FinalTokenTransactionHash, err)
 	}
 
-	if knobsService.GetValue(knobs.KnobReclaimRemappedOutputsIfRevealRequested, 0) == 1 &&
-		len(tokenTransaction.Edges.SpentOutput) != len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()) {
+	if len(tokenTransaction.Edges.SpentOutput) != len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()) {
 		// Spent output was potentially re-assigned, if it is in SPENT_STARTED, re-assign it to this transaction.
 		err = h.reclaimOutputsSpentOnDifferentStartedTransaction(ctx, tokenTransaction, operatorSignatures, req)
 		if err != nil {

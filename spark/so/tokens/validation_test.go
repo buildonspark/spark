@@ -11,7 +11,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/entfixtures"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -60,11 +59,6 @@ func TestValidateMintDoesNotExceedMaxSupplyEnt(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-
-	k := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobUseNumericAmountForCurrentTokenSupply: 1,
-	})
-	ctx = knobs.InjectKnobsService(ctx, k)
 
 	seededRand := rand.NewChaCha8([32]byte{})
 	f := entfixtures.New(t, ctx, tx).WithRNG(seededRand)

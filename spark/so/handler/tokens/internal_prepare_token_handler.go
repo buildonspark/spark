@@ -15,13 +15,11 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
 
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/tokens"
 
 	"github.com/google/uuid"
@@ -143,14 +141,8 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 		if err = validateIssuerSignature(finalTokenTx, tokenTransactionSignatures, createPubKey); err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to validate create token transaction signature", finalTokenTx, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("failed to validate create token transaction signature: %w", err)))
 		}
-		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobAllowMultipleTokenCreatesPerIssuer, 0) != 0 {
-			if err = validateTokenIdentifierNotAlreadyCreated(ctx, finalTokenTx); err != nil {
-				return nil, err
-			}
-		} else {
-			if err = validateIssuerTokenNotAlreadyCreated(ctx, finalTokenTx); err != nil {
-				return nil, err
-			}
+		if err = validateTokenIdentifierNotAlreadyCreated(ctx, finalTokenTx); err != nil {
+			return nil, err
 		}
 	case utils.TokenTransactionTypeMint:
 		mintPubKey, err := keys.ParsePublicKey(finalTokenTx.GetMintInput().GetIssuerPublicKey())
@@ -541,43 +533,11 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 		}
 	}
 
-	if len(potentiallySpendableOutputs) > 0 {
-		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobFinalizeCreatedSignedOutputsJustInTime, 0) == 0 {
-			logger := logging.GetLoggerFromContext(ctx)
-			errs := make([]error, len(potentiallySpendableOutputs))
-			for i, output := range potentiallySpendableOutputs {
-				errs[i] = output.Err
-			}
-			partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
-			if err != nil {
-				return fmt.Errorf("failed to hash token transaction: %w", err)
-			}
-			finalTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, false)
-			if err != nil {
-				return fmt.Errorf("failed to hash token transaction: %w", err)
-			}
-			logger.Info(
-				"Just in time finalization is disabled for transaction",
-				zap.String("partial_transaction_hash", hex.EncodeToString(partialTokenTransactionHash)),
-				zap.String("final_transaction_hash", hex.EncodeToString(finalTokenTransactionHash)),
-				zap.Int("potentially_spendable_outputs", len(potentiallySpendableOutputs)),
-				zap.Errors("errors", errs),
-			)
-			return sparkerrors.FailedPreconditionInvalidState(
-				fmt.Errorf(
-					"just in time finalization is disabled, %d potentially spendable outputs. first spendable output error: %w",
-					len(potentiallySpendableOutputs),
-					potentiallySpendableOutputs[0].Err,
-				),
-			)
-		}
-
-		for _, outputResult := range potentiallySpendableOutputs {
-			output := outputResult.Output
-			outputErr := outputResult.Err
-			if err := tryFinalizeCreatedSignedOutput(ctx, h.config, output); err != nil {
-				return fmt.Errorf("%w: failed just in time finalization of created signed output %s: %w", outputErr, output.ID, err)
-			}
+	for _, outputResult := range potentiallySpendableOutputs {
+		output := outputResult.Output
+		outputErr := outputResult.Err
+		if err := tryFinalizeCreatedSignedOutput(ctx, h.config, output); err != nil {
+			return fmt.Errorf("%w: failed just in time finalization of created signed output %s: %w", outputErr, output.ID, err)
 		}
 	}
 
@@ -683,17 +643,6 @@ func validateFinalTokenTransaction(
 		return tokens.FormatErrorWithTransactionProto("failed to validate final token transaction structure", tokenTransaction, err)
 	}
 
-	return nil
-}
-
-func validateIssuerTokenNotAlreadyCreated(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) error {
-	existingTokenCreateMetadata, err := ent.GetTokenMetadataForTokenTransaction(ctx, tokenTransaction)
-	if err != nil {
-		return tokens.FormatErrorWithTransactionProto("failed to search for existing token create entity", tokenTransaction, err)
-	}
-	if existingTokenCreateMetadata != nil {
-		return tokens.NewTokenAlreadyCreatedError(tokenTransaction)
-	}
 	return nil
 }
 

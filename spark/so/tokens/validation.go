@@ -19,7 +19,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
-	"github.com/lightsparkdev/spark/so/knobs"
 )
 
 // ValidateMintDoesNotExceedMaxSupply validates that a mint transaction doesn't exceed the token's max supply.
@@ -167,63 +166,40 @@ func calculateCurrentSupply(ctx context.Context, whereClause func(*ent.TokenOutp
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get or create current tx for request: %w", err))
 	}
 
-	knobsService := knobs.GetKnobsService(ctx)
-	useNumericAmountForCurrentSupply := knobsService.GetValue(knobs.KnobUseNumericAmountForCurrentTokenSupply, 0)
-
-	totalMinted := new(big.Int)
-	if useNumericAmountForCurrentSupply == 1 {
-		var (
-			rows []struct {
-				Sum string `json:"sum_amount"` // match AS alias in Modify
-			}
-			qErr error
-		)
-		baseQuery := whereClause(db.TokenOutput.Query()).
-			Where(tokenoutput.HasOutputCreatedTokenTransactionWith(
-				tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
-				tokentransaction.HasMint(),
-			))
-		err := baseQuery.Modify(func(s *esql.Selector) {
-			switch s.Dialect() {
-			case dialect.Postgres:
-				// Postgres: SUM(amount) on NUMERIC is natively supported and efficient.
-				// CAST(SUM... AS TEXT) returns unambiguous decimal string representation of the sum, which our Uint128 scanner can parse
-				s.SelectExpr(esql.Expr("CAST(COALESCE(SUM(amount), 0) AS TEXT) AS sum_amount")).Limit(1)
-			case dialect.SQLite:
-				// SQLite: amount is stored as TEXT for precision; CAST(amount AS NUMERIC) forces numeric
-				// arithmetic for SUM; CAST(SUM... AS TEXT) returns unambiguous decimal string representation
-				// of the sum so we avoid float64 from the driver
-				s.SelectExpr(esql.Expr("CAST(COALESCE(SUM(CAST(amount AS NUMERIC)), 0) AS TEXT) AS sum_amount")).Limit(1)
-			default:
-				qErr = fmt.Errorf("unsupported dialect: %s", s.Dialect())
-			}
-		}).Scan(ctx, &rows)
-		if err = errors.Join(err, qErr); err != nil {
-			return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch signed mint outputs: %w", err))
+	var (
+		rows []struct {
+			Sum string `json:"sum_amount"` // match AS alias in Modify
 		}
-		total := uint128.New()
-		if len(rows) > 0 {
-			if err := total.Scan(rows[0].Sum); err != nil {
-				return nil, err
-			}
+		qErr error
+	)
+	baseQuery := whereClause(db.TokenOutput.Query()).
+		Where(tokenoutput.HasOutputCreatedTokenTransactionWith(
+			tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
+			tokentransaction.HasMint(),
+		))
+	err = baseQuery.Modify(func(s *esql.Selector) {
+		switch s.Dialect() {
+		case dialect.Postgres:
+			// Postgres: SUM(amount) on NUMERIC is natively supported and efficient.
+			// CAST(SUM... AS TEXT) returns unambiguous decimal string representation of the sum, which our Uint128 scanner can parse
+			s.SelectExpr(esql.Expr("CAST(COALESCE(SUM(amount), 0) AS TEXT) AS sum_amount")).Limit(1)
+		case dialect.SQLite:
+			// SQLite: amount is stored as TEXT for precision; CAST(amount AS NUMERIC) forces numeric
+			// arithmetic for SUM; CAST(SUM... AS TEXT) returns unambiguous decimal string representation
+			// of the sum so we avoid float64 from the driver
+			s.SelectExpr(esql.Expr("CAST(COALESCE(SUM(CAST(amount AS NUMERIC)), 0) AS TEXT) AS sum_amount")).Limit(1)
+		default:
+			qErr = fmt.Errorf("unsupported dialect: %s", s.Dialect())
 		}
-		totalMinted.Set(total.BigInt())
-	} else {
-		outputs, err := whereClause(db.TokenOutput.Query()).
-			Where(tokenoutput.HasOutputCreatedTokenTransactionWith(
-				tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
-				tokentransaction.HasMint(),
-			)).
-			Select(tokenoutput.FieldTokenAmount).
-			All(ctx)
-		if err != nil {
-			return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch signed mint outputs: %w", err))
-		}
-
-		for _, out := range outputs {
-			amount := new(big.Int).SetBytes(out.TokenAmount)
-			totalMinted.Add(totalMinted, amount)
+	}).Scan(ctx, &rows)
+	if err = errors.Join(err, qErr); err != nil {
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch signed mint outputs: %w", err))
+	}
+	total := uint128.New()
+	if len(rows) > 0 {
+		if err := total.Scan(rows[0].Sum); err != nil {
+			return nil, err
 		}
 	}
-	return totalMinted, nil
+	return total.BigInt(), nil
 }
