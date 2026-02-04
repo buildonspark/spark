@@ -19,11 +19,6 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
-const (
-	HTLCSequenceOffset   = 30
-	DirectSequenceOffset = 15
-)
-
 // CreateUserKeyPackage creates a user frost signing key package from a signing private key.
 func CreateUserKeyPackage(signingPrivateKey keys.Private) *pbfrost.KeyPackage {
 	const userIdentifier = "0000000000000000000000000000000000000000000000000000000000000063"
@@ -266,11 +261,11 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 		var nextSequence uint32
 		switch htlcType {
 		case PrepareFrostSigningJobsForUserSignedRefundHTLCTypeCPFPRefund:
-			nextSequence = refundTx.TxIn[0].Sequence - HTLCSequenceOffset
+			nextSequence = refundTx.TxIn[0].Sequence - bitcointransaction.HTLCSequenceOffset
 		case PrepareFrostSigningJobsForUserSignedRefundHTLCTypeDirectRefund:
-			nextSequence = refundTx.TxIn[0].Sequence - DirectSequenceOffset
+			nextSequence = refundTx.TxIn[0].Sequence - bitcointransaction.DirectHTLCSequenceOffset
 		case PrepareFrostSigningJobsForUserSignedRefundHTLCTypeDirectFromCpfpRefund:
-			nextSequence = refundTx.TxIn[0].Sequence - DirectSequenceOffset
+			nextSequence = refundTx.TxIn[0].Sequence - bitcointransaction.DirectHTLCSequenceOffset
 		}
 
 		var htlcTx *wire.MsgTx

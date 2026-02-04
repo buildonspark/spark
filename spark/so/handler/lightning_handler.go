@@ -50,8 +50,6 @@ import (
 const (
 	LightningPaymentExpiryDuration = 16 * 24 * time.Hour
 	LightningReceiveExpiryDuration = 4 * time.Hour
-	HTLCSequenceOffset             = 30
-	DirectSequenceOffset           = 15
 )
 
 // LightningHandler is the handler for the lightning service.
@@ -1012,11 +1010,11 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 			return nil, nil, nil, fmt.Errorf("failed to get refund tx: %w", err)
 		}
 		refundSequence := bitcointransaction.GetTimelockFromSequence(refundTx.TxIn[0].Sequence)
-		if refundSequence < HTLCSequenceOffset || refundSequence < DirectSequenceOffset {
-			return nil, nil, nil, fmt.Errorf("refund tx sequence is less than HTLCSequenceOffset: %d", refundSequence)
+		if refundSequence < bitcointransaction.HTLCSequenceOffset || refundSequence < bitcointransaction.DirectHTLCSequenceOffset {
+			return nil, nil, nil, fmt.Errorf("refund tx sequence is less than DirectHTLCSequenceOffset or HTLCSequenceOffset: %d", refundSequence)
 		}
-		currentSequence := refundTx.TxIn[0].Sequence - HTLCSequenceOffset
-		directSequence := refundTx.TxIn[0].Sequence - DirectSequenceOffset
+		currentSequence := refundTx.TxIn[0].Sequence - bitcointransaction.HTLCSequenceOffset
+		directSequence := refundTx.TxIn[0].Sequence - bitcointransaction.DirectHTLCSequenceOffset
 
 		// Build cpfp htlc tx.
 		builtTx, err := bitcointransaction.CreateLightningHTLCTransaction(nodeTx, 0, network, currentSequence, req.PaymentHash, receiverIdentityPubKey, ownerIdentityPubKey)
