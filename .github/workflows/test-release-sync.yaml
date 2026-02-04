@@ -36,15 +36,24 @@ jobs:
         with:
           cwd: "sdks/js"
           enable-corepack: "true"
-          # On main: use immutable mode to fail immediately if lockfile would change
-          # On PRs: update lockfile and commit if needed
-          install-mode: ${{ github.event_name == 'push' && 'install-prevent-lock-update' || 'update-lock-only' }}
-          # Since we may be in update-lock-only mode the resulting yarn cache is much smaller and less useful
+          install-mode: "update-lock-only"
+          # Since we are in update-lock-only mode the resulting yarn cache is much smaller and less useful
           # for the rest of the steps. But since this is the first step and the cache is restored for each
           # step in the workflow, they all get the same useless cache unless we set a different prefix here:
           cache-prefix: "update-lock-file-for-prs"
 
+      - name: "Fail if JS lockfile was modified on main"
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          if ! git diff --quiet -- sdks/js/yarn.lock; then
+            echo "sdks/js/yarn.lock would be modified on main."
+            echo "This should be handled by the JS SDK lockfile maintenance workflow (opens a PR)."
+            git diff --stat -- sdks/js/yarn.lock
+            exit 1
+          fi
+
       - name: "Commit and push changes if modified"
+        id: sync-lock-file
         if: github.event_name == 'pull_request'
         run: |
           git config --global user.name 'Lightspark Eng'
