@@ -1,9 +1,11 @@
 [tools]
 atlas-community = "1.0.0"
+github-cli = "latest"
 go = "1.25.1"
 golangci-lint = "2.8.0"
 gotestsum = "1.13.0"
 helm = "3.19.4"
+jq = "latest"
 lefthook = "latest"
 node = "20.19.0"
 protoc = "33.2"
@@ -176,6 +178,11 @@ echo "!!!!"
 description = "Generate SSP API code"
 dir = "{{config_root}}/spark"
 run = "go generate ./testing/wallet/ssp_api/..."
+
+[tasks.release]
+description = "Cut a prerelease (canary) from the RC branch (use flags to promote or skip canary)"
+dir = "{{config_root}}"
+run = "scripts/release.sh"
 
 [tasks.gen-protos]
 description = "Generate Go code from proto files (via Make)"

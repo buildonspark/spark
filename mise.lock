@@ -6,6 +6,15 @@ backend = "aqua:ariga/atlas/community"
 "platforms.macos-arm64" = { checksum = "sha256:44d0b1cf9441817c14f3bcc9f1ecd91d633d6999efbe916f0af26100e20dcbdf", url = "https://release.ariga.io/atlas/atlas-community-darwin-arm64-v1.0.0"}
 "platforms.macos-x64" = { checksum = "sha256:2591793722a8b45902f4fec12a4add2816720c995207a84ac2fd75c9cb509b78", url = "https://release.ariga.io/atlas/atlas-community-darwin-amd64-v1.0.0"}
 
+[[tools.github-cli]]
+version = "2.86.0"
+backend = "aqua:cli/cli"
+"platforms.linux-arm64" = { checksum = "sha256:83cf7a7962ea9dfcc2c123666695792916a87af32cba5f1f6e585db08fa57547", url = "https://github.com/cli/cli/releases/download/v2.86.0/gh_2.86.0_linux_arm64.tar.gz"}
+"platforms.linux-x64" = { checksum = "sha256:f3b08bd6a28420cc2229b0a1a687fa25f2b838d3f04b297414c1041ca68103c7", url = "https://github.com/cli/cli/releases/download/v2.86.0/gh_2.86.0_linux_amd64.tar.gz"}
+"platforms.macos-arm64" = { checksum = "sha256:bde753978a352c5ae6c4abec47334d516e82807af20c9dbbd45507a5a0aedaaa", url = "https://github.com/cli/cli/releases/download/v2.86.0/gh_2.86.0_macOS_arm64.zip"}
+"platforms.macos-x64" = { checksum = "sha256:ced7094d05702eb54a63542abd8a1dc570b7e5ae94951844eb1626ba74bc2c60", url = "https://github.com/cli/cli/releases/download/v2.86.0/gh_2.86.0_macOS_amd64.zip"}
+"platforms.windows-x64" = { checksum = "sha256:983c74a8c594366b198485187cd6d4d07638f0bf9a9948d51a2a81a5164d8bfd", url = "https://github.com/cli/cli/releases/download/v2.86.0/gh_2.86.0_windows_amd64.zip"}
+
 [[tools.go]]
 version = "1.25.1"
 backend = "core:go"
@@ -41,6 +50,15 @@ backend = "aqua:helm/helm"
 "platforms.macos-arm64" = { checksum = "sha256:7e82ca63fe80a298cecefad61d0c10bc47963ff3551e94ab6470be6393a6a74b", url = "https://get.helm.sh/helm-v3.19.4-darwin-arm64.tar.gz"}
 "platforms.macos-x64" = { checksum = "sha256:d9c9b1fc499c54282c4127c60cdd506da2c6202506b708a2b45fb6dfdb318f43", url = "https://get.helm.sh/helm-v3.19.4-darwin-amd64.tar.gz"}
 "platforms.windows-x64" = { checksum = "sha256:1f5599ec85fb15a82f7240c083d00067be5fa91c9fcf48f11c43b6fa59283cd8", url = "https://get.helm.sh/helm-v3.19.4-windows-amd64.tar.gz"}
+
+[[tools.jq]]
+version = "1.8.1"
+backend = "aqua:jqlang/jq"
+"platforms.linux-arm64" = { checksum = "sha256:6bc62f25981328edd3cfcfe6fe51b073f2d7e7710d7ef7fcdac28d4e384fc3d4", url = "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-arm64"}
+"platforms.linux-x64" = { checksum = "sha256:020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d", url = "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-amd64"}
+"platforms.macos-arm64" = { checksum = "sha256:a9fe3ea2f86dfc72f6728417521ec9067b343277152b114f4e98d8cb0e263603", url = "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-macos-arm64"}
+"platforms.macos-x64" = { checksum = "sha256:e80dbe0d2a2597e3c11c404f03337b981d74b4a8504b70586c354b7697a7c27f", url = "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-macos-amd64"}
+"platforms.windows-x64" = { checksum = "sha256:23cb60a1354eed6bcc8d9b9735e8c7b388cd1fdcb75726b93bc299ef22dd9334", url = "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-windows-amd64.exe"}
 
 [[tools.lefthook]]
 version = "2.0.12"
