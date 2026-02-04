@@ -6,12 +6,14 @@ import (
 	"strings"
 	"sync"
 
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -47,14 +49,23 @@ func (h *SendGossipHandler) postSendingGossipMessage(
 		err = handler.HandleGossipMessage(ctx, message, true)
 		if err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("Handling for gossip message ID %s after full delivery failed with error: %v", message.MessageId, err)
+			if status.Code(err) == codes.AlreadyExists {
+				logger.Sugar().Infof("Gossip message %s already processed (AlreadyExists), treating as success", message.MessageId)
+				return gossip, nil
+			}
 			if status.Code(err) == codes.Unavailable ||
 				status.Code(err) == codes.Canceled ||
 				strings.Contains(err.Error(), "context canceled") ||
-				strings.Contains(err.Error(), "unexpected HTTP status code") ||
-				(strings.Contains(err.Error(), "SQLSTATE") && !strings.Contains(err.Error(), "23505")) {
-				// Do not retry for pkey violation
+				strings.Contains(err.Error(), "unexpected HTTP status code") {
 				return nil, err
 			}
+			if isRetriableSQLStateError(err) {
+				logger.Warn("retriable SQL error in gossip handling, should investigate root cause",
+					zap.String("message_id", message.MessageId),
+					zap.Error(err))
+				return nil, err
+			}
+			logger.Sugar().Warnf("Non-retriable error for gossip message %s, not retrying: %v", message.MessageId, err)
 		}
 	}
 	return gossip, nil
@@ -75,17 +86,24 @@ func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, 
 	client := pbgossip.NewGossipServiceClient(conn)
 	_, err = client.Gossip(ctx, gossip)
 	if err != nil {
-		// Only retry for the following errors
+		if status.Code(err) == codes.AlreadyExists {
+			logger.Sugar().Infof("Gossip message already processed by participant %s (AlreadyExists), treating as success", participant)
+			return nil
+		}
 		if status.Code(err) == codes.Unavailable ||
 			status.Code(err) == codes.Canceled ||
 			strings.Contains(err.Error(), "context canceled") ||
-			strings.Contains(err.Error(), "unexpected HTTP status code") ||
-			(strings.Contains(err.Error(), "SQLSTATE") && !strings.Contains(err.Error(), "23505")) {
-			// Do not retry for pkey violation
+			strings.Contains(err.Error(), "unexpected HTTP status code") {
 			return err
 		}
-
-		logger.With(zap.Error(err)).Sugar().Errorf("Gossip message sent to participant %s with error", participant)
+		if isRetriableSQLStateError(err) {
+			logger.Warn("retriable SQL error sending gossip to participant, should investigate root cause",
+				zap.String("participant", participant),
+				zap.Error(err))
+			return err
+		}
+		logger.With(zap.Error(err)).Sugar().Errorf("Non-retriable error sending gossip to participant %s, not retrying", participant)
+		return nil
 	}
 
 	logger.Sugar().Infof("Gossip message sent to participant: %s", participant)
@@ -104,7 +122,10 @@ func (h *SendGossipHandler) CreateAndSendGossipMessage(ctx context.Context, goss
 	receipts := common.NewBitMap(len(participants)).Bytes()
 	gossip, err := db.Gossip.Create().SetMessage(messageBytes).SetParticipants(participants).SetReceipts(receipts).Save(ctx)
 	if err != nil {
-		return nil, err
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("gossip message already exists: %w", err))
+		}
+		return nil, fmt.Errorf("failed to create gossip message: %w", err)
 	}
 	gossip, err = h.SendGossipMessage(ctx, gossip)
 	if err != nil {
@@ -125,7 +146,10 @@ func (h *SendGossipHandler) CreateCommitAndSendGossipMessage(ctx context.Context
 	receipts := common.NewBitMap(len(participants)).Bytes()
 	gossip, err := db.Gossip.Create().SetMessage(messageBytes).SetParticipants(participants).SetReceipts(receipts).Save(ctx)
 	if err != nil {
-		return nil, err
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("gossip message already exists: %w", err))
+		}
+		return nil, fmt.Errorf("failed to create gossip message: %w", err)
 	}
 	err = ent.DbCommit(ctx)
 	if err != nil {
@@ -185,4 +209,27 @@ func (h *SendGossipHandler) SendGossipMessage(ctx context.Context, gossip *ent.G
 		return nil, err
 	}
 	return gossip, nil
+}
+
+// isRetriableSQLStateError returns true for transient database errors that might
+// succeed on retry (connection issues, timeouts, resource exhaustion).
+// Returns false for constraint violations which will always fail on retry.
+func isRetriableSQLStateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Constraint violations are never retriable
+	if sqlgraph.IsConstraintError(err) {
+		return false
+	}
+	errStr := err.Error()
+	// Only consider SQLSTATE errors as potentially retriable
+	if !strings.Contains(errStr, "SQLSTATE") {
+		return false
+	}
+	// Class 23 errors (integrity constraint violations) are not retriable
+	if strings.Contains(errStr, "SQLSTATE 23") {
+		return false
+	}
+	return true
 }

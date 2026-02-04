@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -217,6 +218,9 @@ func (o *DepositHandler) generateDepositAddress(ctx context.Context, config *so.
 	}
 
 	if _, err := depositAddressMutator.Save(ctx); err != nil {
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("deposit address already exists: %w", err))
+		}
 		return nil, fmt.Errorf("failed to save deposit address: %w", err)
 	}
 
@@ -430,6 +434,9 @@ func createStaticDepositAddress(ctx context.Context, config *so.Config, network 
 
 	depositAddressRecord, err := depositAddressMutator.Save(ctx)
 	if err != nil {
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("deposit address already exists: %w", err))
+		}
 		return nil, fmt.Errorf("failed to save deposit address: %w", err)
 	}
 

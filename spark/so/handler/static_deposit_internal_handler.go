@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -253,6 +254,9 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		SetRequestedTransferID(transferID).
 		Save(ctx)
 	if err != nil {
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap already exists: %w", err))
+		}
 		return nil, fmt.Errorf("unable to store utxo swap: %w", err)
 	}
 	// Add the utxo swap to the deposit address
@@ -383,6 +387,9 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
 		Save(ctx)
 	if err != nil {
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap already exists: %w", err))
+		}
 		return nil, fmt.Errorf("unable to store utxo swap: %w", err)
 	}
 

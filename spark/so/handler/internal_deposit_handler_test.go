@@ -19,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -404,4 +405,172 @@ func createTestTxBytesWithIndex(t *testing.T, value int64, outpointIndex uint32)
 	require.NoError(t, err)
 
 	return buf.Bytes()
+}
+
+func TestFinalizeTreeCreation_Idempotency(t *testing.T) {
+	t.Parallel()
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:         0,
+				Identifier: "test-operator",
+				AddressRpc: "localhost:8080",
+				AddressDkg: "localhost:8081",
+			},
+		},
+		SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	handler := NewInternalDepositHandler(config)
+
+	t.Run("returns AlreadyExists when all nodes already exist", func(t *testing.T) {
+		rawTx := createTestTxBytesWithIndex(t, 1000, 10)
+		node := createTestNode(t, ctx, rawTx, 10)
+
+		// First call should succeed
+		err := handler.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{
+			Network: pb.Network_REGTEST,
+			Nodes:   []*pbinternal.TreeNode{node},
+		})
+		require.NoError(t, err)
+
+		// Verify the node was created
+		dbTX, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+
+		nodeID, err := uuid.Parse(node.Id)
+		require.NoError(t, err)
+		exists, err := dbTX.TreeNode.Query().Where(treenode.IDEQ(nodeID)).Exist(ctx)
+		require.NoError(t, err)
+		require.True(t, exists, "node should have been created")
+
+		// Second call with same node should return AlreadyExists
+		// (tree already exists from first call, and the single node also exists)
+		err = handler.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{
+			Network: pb.Network_REGTEST,
+			Nodes:   []*pbinternal.TreeNode{node},
+		})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "already")
+	})
+}
+
+func TestFinalizeTreeCreation_FKValidation(t *testing.T) {
+	t.Parallel()
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:         0,
+				Identifier: "test-operator",
+				AddressRpc: "localhost:8080",
+				AddressDkg: "localhost:8081",
+			},
+		},
+		SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	handler := NewInternalDepositHandler(config)
+
+	t.Run("returns NotFound when child node signing keyshare does not exist", func(t *testing.T) {
+		rawTx := createTestTxBytesWithIndex(t, 1000, 0)
+		rootNode := createTestNode(t, ctx, rawTx, 0)
+
+		err := handler.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{
+			Network: pb.Network_REGTEST,
+			Nodes:   []*pbinternal.TreeNode{rootNode},
+		})
+		require.NoError(t, err)
+
+		ownerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
+		ownerSigningKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+		nonExistentKeyshareID := uuid.New()
+		childRawTx := createTestTxBytesWithIndex(t, 500, 1)
+		rootNodeID := rootNode.Id
+		childNode := &pbinternal.TreeNode{
+			Id:                  uuid.NewString(),
+			Value:               500,
+			VerifyingPubkey:     verifyingPubKey.Serialize(),
+			OwnerIdentityPubkey: ownerIdentity.Public().Serialize(),
+			OwnerSigningPubkey:  ownerSigningKey.Public().Serialize(),
+			RawTx:               childRawTx,
+			RawRefundTx:         childRawTx,
+			TreeId:              rootNode.TreeId,
+			ParentNodeId:        &rootNodeID,
+			SigningKeyshareId:   nonExistentKeyshareID.String(),
+			Vout:                1,
+		}
+
+		err = handler.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{
+			Network: pb.Network_REGTEST,
+			Nodes:   []*pbinternal.TreeNode{childNode},
+		})
+
+		require.Error(t, err)
+		require.ErrorContains(t, err, "signing keyshare")
+		require.ErrorContains(t, err, "does not exist")
+	})
+
+	t.Run("returns NotFound when parent node does not exist", func(t *testing.T) {
+		// Create a valid tree first
+		rawTx := createTestTxBytesWithIndex(t, 1000, 2)
+		rootNode := createTestNode(t, ctx, rawTx, 2)
+
+		// Create root node first
+		err := handler.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{
+			Network: pb.Network_REGTEST,
+			Nodes:   []*pbinternal.TreeNode{rootNode},
+		})
+		require.NoError(t, err)
+
+		// Now try to create a child node with non-existent parent
+		dbTX, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+
+		ownerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
+		ownerSigningKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+		verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+		keyshare, err := dbTX.SigningKeyshare.Create().
+			SetID(uuid.New()).
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(secretShare).
+			SetPublicShares(map[string]keys.Public{"1": secretShare.Public()}).
+			SetPublicKey(secretShare.Public()).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		childRawTx := createTestTxBytesWithIndex(t, 500, 3)
+		nonExistentParentID := uuid.NewString()
+		childNode := &pbinternal.TreeNode{
+			Id:                  uuid.NewString(),
+			Value:               500,
+			VerifyingPubkey:     verifyingPubKey.Serialize(),
+			OwnerIdentityPubkey: ownerIdentity.Public().Serialize(),
+			OwnerSigningPubkey:  ownerSigningKey.Public().Serialize(),
+			RawTx:               childRawTx,
+			RawRefundTx:         childRawTx,
+			TreeId:              rootNode.TreeId,
+			ParentNodeId:        &nonExistentParentID,
+			SigningKeyshareId:   keyshare.ID.String(),
+			Vout:                3,
+		}
+
+		err = handler.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{
+			Network: pb.Network_REGTEST,
+			Nodes:   []*pbinternal.TreeNode{childNode},
+		})
+
+		require.Error(t, err)
+		require.ErrorContains(t, err, "parent node")
+		require.ErrorContains(t, err, "does not exist")
+	})
 }

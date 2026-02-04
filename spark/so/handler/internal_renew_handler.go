@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -13,6 +14,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/errors"
 	"go.uber.org/zap"
 )
 
@@ -112,6 +114,14 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 	}
 	_, err = splitNodeMut.Save(ctx)
 	if err != nil {
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return errors.AlreadyExistsDuplicateOperation(
+				fmt.Errorf("split node %s already exists: %w", splitNodeID, err))
+		}
+		if sqlgraph.IsForeignKeyConstraintError(err) {
+			return errors.NotFoundMissingEntity(
+				fmt.Errorf("referenced entity not found for split node %s: %w", splitNodeID, err))
+		}
 		return fmt.Errorf("failed to create split node %s: %w", splitNodeID, err)
 	}
 	logger := logging.GetLoggerFromContext(ctx)

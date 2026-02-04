@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -21,6 +22,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 )
 
@@ -560,7 +562,10 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			}
 			savedTree, err = treeMutator.Save(ctx)
 			if err != nil {
-				return nil, nil, err
+				if sqlgraph.IsUniqueConstraintError(err) {
+					return nil, nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("tree already exists: %w", err))
+				}
+				return nil, nil, fmt.Errorf("failed to create tree: %w", err)
 			}
 			parentNodeID = nil
 		} else {
@@ -620,7 +625,13 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 
 		node, err := createNode.Save(ctx)
 		if err != nil {
-			return nil, nil, err
+			if sqlgraph.IsUniqueConstraintError(err) {
+				return nil, nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("tree node already exists: %w", err))
+			}
+			if sqlgraph.IsForeignKeyConstraintError(err) {
+				return nil, nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("referenced entity not found: %w", err))
+			}
+			return nil, nil, fmt.Errorf("failed to create tree node: %w", err)
 		}
 		nodes = append(nodes, node)
 		if currentElement.node.RefundTxSigningJob != nil {

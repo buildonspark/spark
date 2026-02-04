@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -15,6 +16,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/errors"
 	"go.uber.org/zap"
 )
 
@@ -165,6 +167,19 @@ func (h *SyncNodeHandler) updateExistingNode(ctx context.Context, existingNode *
 			return fmt.Errorf("unable to parse parent node id %s: %w", node.GetParentNodeId(), err)
 		}
 		if existingNode.Edges.Parent == nil || existingNode.Edges.Parent.ID != parentUUID {
+			// Validate parent node exists before setting to prevent FK violation
+			db, err := ent.GetDbFromContext(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get db context: %w", err)
+			}
+			parentExists, err := db.TreeNode.Query().Where(treenode.IDEQ(parentUUID)).Exist(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to check parent node existence: %w", err)
+			}
+			if !parentExists {
+				return errors.NotFoundMissingEntity(
+					fmt.Errorf("parent node %s does not exist, cannot update node %s", parentUUID, nodeUUID))
+			}
 			mut.SetParentID(parentUUID)
 			logger.Info("updated field ParentID", zap.Stringer("node_id", nodeUUID))
 		}
@@ -242,17 +257,30 @@ func (h *SyncNodeHandler) createMissingSplitNode(ctx context.Context, db *ent.Cl
 		createBuilder.SetDirectTx(node.DirectTx)
 	}
 
-	// Set parent if exists
+	// Set parent if exists, with FK validation
 	if node.ParentNodeId != nil {
 		parentUUID, err := uuid.Parse(node.GetParentNodeId())
 		if err != nil {
 			return fmt.Errorf("unable to parse parent node id %s: %w", node.GetParentNodeId(), err)
+		}
+		// Validate parent node exists before setting to prevent FK violation
+		parentExists, err := db.TreeNode.Query().Where(treenode.IDEQ(parentUUID)).Exist(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to check parent node existence: %w", err)
+		}
+		if !parentExists {
+			return errors.NotFoundMissingEntity(
+				fmt.Errorf("parent node %s does not exist, cannot create node %s", parentUUID, nodeUUID))
 		}
 		createBuilder.SetParentID(parentUUID)
 	}
 
 	_, err = createBuilder.Save(ctx)
 	if err != nil {
+		// Handle pkey violation as AlreadyExists (race condition)
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return nil
+		}
 		return fmt.Errorf("unable to create node %s: %w", node.Id, err)
 	}
 

@@ -9,16 +9,15 @@ import (
 	"math"
 	"strings"
 
-	"github.com/lightsparkdev/spark/common/btcnetwork"
-	"github.com/lightsparkdev/spark/common/hashstructure"
-	"github.com/lightsparkdev/spark/common/keys"
-	"go.uber.org/zap"
-
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/hashstructure"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -27,12 +26,14 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	transferHelper "github.com/lightsparkdev/spark/so/transfer"
 	"github.com/lightsparkdev/spark/so/utils"
+	"go.uber.org/zap"
 )
 
 // InternalDepositHandler is the deposit handler for so internal
@@ -200,7 +201,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			return fmt.Errorf("failed to get deposit address: %w", err)
 		}
 		if address.Edges.Tree != nil {
-			return fmt.Errorf("deposit address already has a tree")
+			return errors.AlreadyExistsDuplicateOperation(fmt.Errorf("deposit address already has a tree"))
 		}
 		markNodeAsAvailable = address.ConfirmationHeight != 0
 		logger.Sugar().Infof("Marking node as available: %v", markNodeAsAvailable)
@@ -257,6 +258,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if err != nil {
 			return err
 		}
+
 		if node.Vout > math.MaxInt16 {
 			return fmt.Errorf("node vout value %d overflows int16", node.Vout)
 		}
@@ -264,6 +266,16 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if err != nil {
 			return err
 		}
+
+		keyshareExists, err := db.SigningKeyshare.Query().Where(signingkeyshare.IDEQ(signingKeyshareID)).Exist(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to check signing keyshare existence: %w", err)
+		}
+		if !keyshareExists {
+			return errors.NotFoundMissingEntity(
+				fmt.Errorf("signing keyshare %s does not exist, cannot create tree node %s", signingKeyshareID, nodeID))
+		}
+
 		ownerIdentityPubKey, err := keys.ParsePublicKey(node.GetOwnerIdentityPubkey())
 		if err != nil {
 			return fmt.Errorf("failed to parse owner identity public key: %w", err)
@@ -298,6 +310,15 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			if err != nil {
 				return err
 			}
+			// Verify parent node exists before creating child to prevent FK violation
+			parentExists, err := db.TreeNode.Query().Where(treenode.IDEQ(parentID)).Exist(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to check parent node existence: %w", err)
+			}
+			if !parentExists {
+				return errors.NotFoundMissingEntity(
+					fmt.Errorf("parent node %s does not exist, cannot create child node %s", parentID, nodeID))
+			}
 			nodeMutator.SetParentID(parentID)
 		}
 
@@ -313,6 +334,10 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 
 		_, err = nodeMutator.Save(ctx)
 		if err != nil {
+			if sqlgraph.IsUniqueConstraintError(err) {
+				logger.Debug("skipped creating node that was concurrently created", zap.Stringer("node_id", nodeID))
+				continue
+			}
 			return err
 		}
 	}

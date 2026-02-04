@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -640,6 +641,9 @@ func (h *LightningHandler) storeUserSignedTransactions(
 	}
 	preimageRequest, err := preimageRequestMutator.Save(ctx)
 	if err != nil {
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("preimage request already exists: %w", err))
+		}
 		return nil, fmt.Errorf("unable to create preimage request: %w", err)
 	}
 

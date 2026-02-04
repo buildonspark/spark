@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uuids"
@@ -369,6 +370,9 @@ func (h *BaseTransferHandler) createTransfer(
 
 	transfer, err := transferCreate.SetNetwork(network).Save(ctx)
 	if err != nil {
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return nil, nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer already exists: %w", err))
+		}
 		return nil, nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
 
@@ -705,6 +709,12 @@ func createTransferLeaves(
 	if len(mutators) > 0 {
 		_, err := db.TransferLeaf.CreateBulk(mutators...).Save(ctx)
 		if err != nil {
+			if sqlgraph.IsUniqueConstraintError(err) {
+				return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer leaf already exists: %w", err))
+			}
+			if sqlgraph.IsForeignKeyConstraintError(err) {
+				return sparkerrors.NotFoundMissingEntity(fmt.Errorf("referenced entity not found: %w", err))
+			}
 			return fmt.Errorf("unable to create transfer leaf: %w", err)
 		}
 	}
