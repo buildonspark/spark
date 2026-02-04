@@ -1,5 +1,13 @@
 # @buildonspark/issuer-sdk
 
+## 0.1.9
+
+### Patch Changes
+
+- - Freeze/Unfreeze Return Type Change: freezeTokens() and unfreezeTokens() now return impactedTokenOutputs: TokenOutputRef[] instead of impactedOutputIds: string[]. This provides richer output information including the token ID for each affected output.
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.5.9
+
 ## 0.1.8
 
 ### Patch Changes

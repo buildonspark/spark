@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-react-native-app",
-  "version": "0.0.46",
+  "version": "0.0.47",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@azure/core-asynciterator-polyfill": "^1.0.2",
-    "@buildonspark/issuer-sdk": "0.1.8",
-    "@buildonspark/spark-sdk": "0.5.8",
+    "@buildonspark/issuer-sdk": "0.1.9",
+    "@buildonspark/spark-sdk": "0.5.9",
     "@react-native/new-app-screen": "0.80.1",
     "@react-navigation/bottom-tabs": "^7.4.8",
     "@react-navigation/drawer": "^7.5.9",

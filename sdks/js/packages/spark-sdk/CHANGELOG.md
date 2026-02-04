@@ -1,5 +1,18 @@
 # @buildonspark/spark-sdk
 
+## 0.5.9
+
+### Patch Changes
+
+- - Embedded Spark Invoices in Lightning: Added includeSparkInvoice parameter to createLightningInvoice() allowing Spark invoices to be embedded in Lightning invoice
+    routing hints for easier payment tracking. Mutually exclusive with includeSparkAddress.
+  - Pending Outbound Token Queries: Added pending_outbound field to queryTokenOutputs responses, allowing clients to see token outputs pending outbound transfers.
+  - SE Withdrawal Signatures for Tokens: Token outputs now include se_finalization_adaptor_sig and se_withdrawal_signature fields to enable offline L1 withdrawal
+    capability for BTKN token holders.
+  - Transfer Signing Hash Collision Fix: Fixed an issue with transfer signing payload hash collisions that could cause signature validation failures.
+  - SO1 Endpoint Update: Updated SO1 to use the Breeze Signing Operator.
+  - Instant Static Deposits: Extended UTXOSwap schema to support instant static deposit flow.
+
 ## 0.5.8
 
 ### Patch Changes

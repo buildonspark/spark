@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-sdk",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "author": "",
   "license": "Apache-2.0",
   "main": "./dist/index.browser.js",
