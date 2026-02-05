@@ -63,7 +63,8 @@ type TokenCreateOpts struct {
 
 // TokenTransactionOpts specifies options for creating a token transaction (mint or create).
 type TokenTransactionOpts struct {
-	Hash []byte // If nil, GetHash will generate random bytes
+	Hash       []byte     // If nil, GetHash will generate random bytes
+	ExpiryTime *time.Time // If nil, no expiry time is set
 }
 
 // GetHash returns the hash, generating and caching a random one if not set.
@@ -185,12 +186,15 @@ func (f *Fixtures) CreateMintTransactionWithOpts(tokenCreate *ent.TokenCreate, o
 	hash := opts.GetHash(f)
 	finalizedHash := f.RandomBytes(32)
 
-	tx, err := f.Client.TokenTransaction.Create().
+	txBuilder := f.Client.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(hash).
 		SetFinalizedTokenTransactionHash(finalizedHash).
 		SetStatus(status).
-		SetMint(mint).
-		Save(f.Ctx)
+		SetMint(mint)
+	if opts.ExpiryTime != nil {
+		txBuilder = txBuilder.SetExpiryTime(*opts.ExpiryTime)
+	}
+	tx, err := txBuilder.Save(f.Ctx)
 	f.RequireNoError(err)
 
 	outputs := make([]*ent.TokenOutput, len(outputSpecs))
@@ -445,7 +449,7 @@ func (f *Fixtures) CreateTransferTransactionWithProto(
 	tx, err := f.Client.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(finalTxHash).
 		SetFinalizedTokenTransactionHash(finalTxHash).
-		SetStatus(st.TokenTransactionStatusSigned).
+		SetStatus(status).
 		Save(f.Ctx)
 	f.RequireNoError(err)
 
@@ -476,11 +480,6 @@ func (f *Fixtures) CreateTransferTransactionWithProto(
 		spec.FinalizedTxHash = finalTxHash
 		outputs[i] = f.createOutputFromSpec(tokenCreate, spec, tx, int32(i))
 	}
-
-	tx, err = tx.Update().
-		SetStatus(status).
-		Save(f.Ctx)
-	f.RequireNoError(err)
 
 	return &TransferTransactionWithProtoResult{
 		Transaction: tx,

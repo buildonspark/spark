@@ -4,11 +4,13 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"time"
 
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/tokens"
+	"github.com/lightsparkdev/spark/so/utils"
 )
 
 type InternalFinalizeTokenHandler struct {
@@ -103,6 +105,21 @@ func (h *InternalFinalizeTokenHandler) FinalizeMintOrCreateTransaction(
 	invalidOutputs := validateOutputStatuses(tokenTransaction.Edges.CreatedOutput, st.TokenOutputStatusCreatedSigned)
 	if len(invalidOutputs) > 0 {
 		return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOutputs, tokenTransaction, stderrors.Join(invalidOutputs...))
+	}
+
+	// For MINT: re-validate max supply only for expired transactions. Non-expired SIGNED
+	// transactions are already counted in the current supply (FINALIZED + non-expired SIGNED),
+	// so finalizing them doesn't change the total. Expired SIGNED transactions are NOT counted
+	// in current supply, so we must verify that adding them won't exceed max supply. This guards
+	// against the race where an expired transaction's peer signatures arrive after a replacement
+	// transaction was signed.
+	if tokenTransaction.InferTokenTransactionTypeEnt() == utils.TokenTransactionTypeMint {
+		isExpired := !tokenTransaction.ExpiryTime.IsZero() && tokenTransaction.ExpiryTime.Before(time.Now().UTC())
+		if isExpired {
+			if err := tokens.ValidateMintDoesNotExceedMaxSupplyEnt(ctx, tokenTransaction); err != nil {
+				return tokens.FormatErrorWithTransactionEnt("cannot finalize mint that would exceed max supply", tokenTransaction, err)
+			}
+		}
 	}
 
 	err := ent.FinalizeMintOrCreateTransaction(ctx, tokenTransaction)

@@ -614,8 +614,8 @@ func (h *BroadcastTokenHandler) fanoutFinalizeMintOrCreateToNonCoordinators(
 		},
 	)
 	if err != nil {
-		logger.Sugar().Warnf("failed to fanout finalize to some operators for txHash %x: %v",
-			tokenTxEnt.FinalizedTokenTransactionHash, err)
+		logger.Warn("failed to fanout finalize to some operators",
+			append(tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTxEnt), zap.Error(err))...)
 	}
 	return err
 }

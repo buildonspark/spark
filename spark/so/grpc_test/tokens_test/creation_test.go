@@ -329,10 +329,6 @@ func TestCreateNativeSparkTokenScenarios(t *testing.T) {
 }
 
 func TestNativeTokenMaxSupplyEnforcement(t *testing.T) {
-	if broadcastTokenTestsUsePhase2 {
-		t.Skip("Skipping max supply enforcement test for TTV3 Phase2 - max supply checks not yet implemented in Phase2 broadcast path")
-	}
-
 	testCases := []struct {
 		name                 string
 		maxSupply            uint64
