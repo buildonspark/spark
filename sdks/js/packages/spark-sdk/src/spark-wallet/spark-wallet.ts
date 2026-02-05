@@ -151,6 +151,7 @@ import { sumAvailableTokens } from "../utils/token-transactions.js";
 import { doesTxnNeedRenewed, isZeroTimelock } from "../utils/transaction.js";
 import type {
   CreateHTLCParams,
+  CreateLightningHodlInvoiceParams,
   CreateLightningInvoiceParams,
   DepositParams,
   FulfillSparkInvoiceResponse,
@@ -3169,6 +3170,55 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     receiverIdentityPubkey,
     descriptionHash,
   }: CreateLightningInvoiceParams): Promise<LightningReceiveRequest> {
+    const requestLightningInvoice = async (
+      amountSats: number,
+      paymentHash: Uint8Array,
+      memo?: string,
+      receiverIdentityPubkey?: string,
+      descriptionHash?: string,
+    ) => {
+      return await this.validateAndCreateLightningInvoice({
+        amountSats,
+        paymentHashHex: bytesToHex(paymentHash),
+        memo,
+        expirySeconds,
+        includeSparkAddress,
+        includeSparkInvoice,
+        receiverIdentityPubkey,
+        descriptionHash,
+      });
+    };
+
+    const invoice = await this.lightningService.createLightningInvoice({
+      amountSats,
+      memo,
+      invoiceCreator: requestLightningInvoice,
+      receiverIdentityPubkey,
+      descriptionHash,
+    });
+
+    return invoice;
+  }
+
+  private async validateAndCreateLightningInvoice({
+    amountSats,
+    paymentHashHex,
+    memo,
+    expirySeconds,
+    includeSparkAddress,
+    includeSparkInvoice,
+    receiverIdentityPubkey,
+    descriptionHash,
+  }: {
+    amountSats: number;
+    paymentHashHex: string;
+    memo?: string;
+    expirySeconds: number;
+    includeSparkAddress: boolean;
+    includeSparkInvoice: boolean;
+    receiverIdentityPubkey?: string;
+    descriptionHash?: string;
+  }): Promise<LightningReceiveRequest> {
     const sspClient = this.getSspClient();
 
     if (isNaN(amountSats) || amountSats < 0) {
@@ -3243,148 +3293,175 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     }
 
-    const requestLightningInvoice = async (
-      amountSats: number,
-      paymentHash: Uint8Array,
-      memo?: string,
-      receiverIdentityPubkey?: string,
-      descriptionHash?: string,
-    ) => {
-      const network = this.config.getNetwork();
-      let bitcoinNetwork: BitcoinNetwork = BitcoinNetwork.REGTEST;
-      if (network === Network.MAINNET) {
-        bitcoinNetwork = BitcoinNetwork.MAINNET;
-      } else if (network === Network.REGTEST) {
-        bitcoinNetwork = BitcoinNetwork.REGTEST;
-      }
+    const network = this.config.getNetwork();
+    let bitcoinNetwork: BitcoinNetwork = BitcoinNetwork.REGTEST;
+    if (network === Network.MAINNET) {
+      bitcoinNetwork = BitcoinNetwork.MAINNET;
+    } else if (network === Network.REGTEST) {
+      bitcoinNetwork = BitcoinNetwork.REGTEST;
+    }
 
-      const invoice = await sspClient.requestLightningReceive({
-        amountSats,
-        network: bitcoinNetwork,
-        paymentHash: bytesToHex(paymentHash),
-        expirySecs: expirySeconds,
-        memo,
-        includeSparkAddress: includeSparkAddress,
-        receiverIdentityPubkey,
-        descriptionHash,
-        sparkInvoice,
+    const invoice = await sspClient.requestLightningReceive({
+      amountSats,
+      network: bitcoinNetwork,
+      paymentHash: paymentHashHex,
+      expirySecs: expirySeconds,
+      memo,
+      includeSparkAddress,
+      receiverIdentityPubkey,
+      descriptionHash,
+      sparkInvoice,
+    });
+
+    if (!invoice) {
+      throw new Error("Failed to create lightning invoice");
+    }
+
+    const decodedInvoice = decodeInvoice(invoice.invoice.encodedInvoice);
+
+    if (
+      invoice.invoice.paymentHash !== paymentHashHex ||
+      decodedInvoice.paymentHash !== paymentHashHex
+    ) {
+      throw new SparkValidationError("Payment hash mismatch", {
+        field: "paymentHash",
+        value: invoice.invoice.paymentHash,
+        expected: paymentHashHex,
       });
+    }
 
-      if (!invoice) {
-        throw new Error("Failed to create lightning invoice");
-      }
+    if (decodedInvoice.amountMSats === null && amountSats !== 0) {
+      throw new SparkValidationError("Amount mismatch", {
+        field: "amountMSats",
+        value: "null",
+        expected: amountSats * 1000,
+      });
+    }
 
-      const decodedInvoice = decodeInvoice(invoice.invoice.encodedInvoice);
+    if (
+      decodedInvoice.amountMSats !== null &&
+      decodedInvoice.amountMSats !== BigInt(amountSats * 1000)
+    ) {
+      throw new SparkValidationError("Amount mismatch", {
+        field: "amountMSats",
+        value: decodedInvoice.amountMSats.toString(),
+        expected: amountSats * 1000,
+      });
+    }
 
-      if (
-        invoice.invoice.paymentHash !== bytesToHex(paymentHash) ||
-        decodedInvoice.paymentHash !== bytesToHex(paymentHash)
-      ) {
-        throw new SparkValidationError("Payment hash mismatch", {
-          field: "paymentHash",
-          value: invoice.invoice.paymentHash,
-          expected: bytesToHex(paymentHash),
-        });
-      }
+    // Validate the spark address embedded in the lightning invoice
+    if (includeSparkAddress) {
+      const sparkFallbackAddress = decodedInvoice.fallbackAddress;
 
-      if (decodedInvoice.amountMSats === null && amountSats !== 0) {
-        throw new SparkValidationError("Amount mismatch", {
-          field: "amountMSats",
-          value: "null",
-          expected: amountSats * 1000,
-        });
-      }
-
-      if (
-        decodedInvoice.amountMSats !== null &&
-        decodedInvoice.amountMSats !== BigInt(amountSats * 1000)
-      ) {
-        throw new SparkValidationError("Amount mismatch", {
-          field: "amountMSats",
-          value: decodedInvoice.amountMSats,
-          expected: amountSats * 1000,
-        });
-      }
-
-      // Validate the spark address embedded in the lightning invoice
-      if (includeSparkAddress) {
-        const sparkFallbackAddress = decodedInvoice.fallbackAddress;
-
-        if (!sparkFallbackAddress) {
-          console.warn(
-            "No spark fallback address found in lightning invoice",
-            invoice.invoice.encodedInvoice,
-          );
-          throw new SparkValidationError(
-            "No spark fallback address found in lightning invoice",
-            {
-              field: "sparkFallbackAddress",
-              value: sparkFallbackAddress,
-              expected: "Valid spark fallback address",
-            },
-          );
-        }
-
-        const expectedIdentityPubkey =
-          receiverIdentityPubkey ?? (await this.getIdentityPublicKey());
-
-        if (sparkFallbackAddress !== expectedIdentityPubkey) {
-          throw new SparkValidationError(
-            "Mismatch between spark identity embedded in lightning invoice and designated recipient spark identity",
-            {
-              field: "sparkFallbackAddress",
-              value: sparkFallbackAddress,
-              expected: expectedIdentityPubkey,
-            },
-          );
-        }
-      } else if (includeSparkInvoice) {
-        // Validate the spark invoice embedded in the lightning invoice
-        const embeddedSparkInvoice = decodedInvoice.fallbackAddress;
-
-        if (!embeddedSparkInvoice) {
-          throw new SparkValidationError(
-            "No spark invoice found in lightning invoice",
-            {
-              field: "sparkInvoice",
-              value: embeddedSparkInvoice,
-              expected: "Valid spark invoice",
-            },
-          );
-        }
-
-        if (embeddedSparkInvoice !== sparkInvoice) {
-          throw new SparkValidationError(
-            "Mismatch between spark invoice embedded in lightning invoice and expected spark invoice",
-            {
-              field: "sparkInvoice",
-              value: embeddedSparkInvoice,
-              expected: sparkInvoice,
-            },
-          );
-        }
-      } else if (decodedInvoice.fallbackAddress !== undefined) {
+      if (!sparkFallbackAddress) {
+        console.warn(
+          "No spark fallback address found in lightning invoice",
+          invoice.invoice.encodedInvoice,
+        );
         throw new SparkValidationError(
-          "Spark fallback address found in lightning invoice but includeSparkAddress is false",
+          "No spark fallback address found in lightning invoice",
           {
             field: "sparkFallbackAddress",
-            value: decodedInvoice.fallbackAddress,
+            value: sparkFallbackAddress,
+            expected: "Valid spark fallback address",
           },
         );
       }
 
-      return invoice;
-    };
+      const expectedIdentityPubkey =
+        receiverIdentityPubkey ?? (await this.getIdentityPublicKey());
 
-    const invoice = await this.lightningService.createLightningInvoice({
+      if (sparkFallbackAddress !== expectedIdentityPubkey) {
+        throw new SparkValidationError(
+          "Mismatch between spark identity embedded in lightning invoice and designated recipient spark identity",
+          {
+            field: "sparkFallbackAddress",
+            value: sparkFallbackAddress,
+            expected: expectedIdentityPubkey,
+          },
+        );
+      }
+    } else if (includeSparkInvoice) {
+      // Validate the spark invoice embedded in the lightning invoice
+      const embeddedSparkInvoice = decodedInvoice.fallbackAddress;
+
+      if (!embeddedSparkInvoice) {
+        throw new SparkValidationError(
+          "No spark invoice found in lightning invoice",
+          {
+            field: "sparkInvoice",
+            value: embeddedSparkInvoice,
+            expected: "Valid spark invoice",
+          },
+        );
+      }
+
+      if (embeddedSparkInvoice !== sparkInvoice) {
+        throw new SparkValidationError(
+          "Mismatch between spark invoice embedded in lightning invoice and expected spark invoice",
+          {
+            field: "sparkInvoice",
+            value: embeddedSparkInvoice,
+            expected: sparkInvoice,
+          },
+        );
+      }
+    } else if (decodedInvoice.fallbackAddress !== undefined) {
+      throw new SparkValidationError(
+        "Spark fallback address found in lightning invoice but includeSparkAddress is false",
+        {
+          field: "sparkFallbackAddress",
+          value: decodedInvoice.fallbackAddress,
+        },
+      );
+    }
+
+    return invoice;
+  }
+
+  /**
+   * Creates a Lightning Hodl invoice with a user-provided payment hash.
+   * Hodl invoices allow the receiver to hold the HTLC until they decide to settle or fail it.
+   *
+   * @param {Object} params - Lightning invoice parameters
+   * @param {number} params.amountSats - Amount in satoshis
+   * @param {string} params.paymentHash - Payment hash as hex string (64 characters)
+   * @param {string} [params.memo] - Optional description of the invoice
+   * @param {number} [params.expirySeconds=2592000] - Invoice expiry time in seconds (default: 30 days)
+   * @param {boolean} [params.includeSparkAddress=false] - Whether to include a Spark address as fallback
+   * @param {boolean} [params.includeSparkInvoice=false] - Whether to include a Spark invoice as fallback
+   * @param {string} [params.receiverIdentityPubkey] - Optional receiver identity public key (hex)
+   * @param {string} [params.descriptionHash] - Optional h tag of the invoice. This is the hash of a longer description to include in the lightning invoice. It is used in LNURL and UMA as the hash of the metadata. This field is mutually exclusive with the memo field. Only one or the other should be provided.
+   * @returns {Promise<LightningReceiveRequest>} BOLT11 encoded invoice
+   */
+  public async createLightningHodlInvoice({
+    amountSats,
+    paymentHash,
+    memo,
+    expirySeconds = 60 * 60 * 24 * 30,
+    includeSparkAddress = false,
+    includeSparkInvoice = false,
+    receiverIdentityPubkey,
+    descriptionHash,
+  }: CreateLightningHodlInvoiceParams): Promise<LightningReceiveRequest> {
+    if (!/^[0-9a-fA-F]{64}$/.test(paymentHash)) {
+      throw new SparkValidationError("Invalid payment hash", {
+        field: "paymentHash",
+        value: paymentHash,
+        expected: "64 character hex string",
+      });
+    }
+
+    return await this.validateAndCreateLightningInvoice({
       amountSats,
+      paymentHashHex: paymentHash,
       memo,
-      invoiceCreator: requestLightningInvoice,
+      expirySeconds,
+      includeSparkAddress,
+      includeSparkInvoice,
       receiverIdentityPubkey,
       descriptionHash,
     });
-
-    return invoice;
   }
 
   /**
@@ -5959,6 +6036,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "queryHTLC",
   "createHTLCSenderSpendTx",
   "createHTLCReceiverSpendTx",
+  "createLightningHodlInvoice",
   "createLightningInvoice",
   "createSatsInvoice",
   "createTokensInvoice",

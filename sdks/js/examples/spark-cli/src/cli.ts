@@ -209,6 +209,7 @@ const commands = [
   "getutxosfordepositaddress",
   "createsparkinvoice",
   "createinvoice",
+  "createhodlinvoice",
   "payinvoice",
   "createhtlc",
   "claimhtlc",
@@ -669,6 +670,7 @@ async function runCLI() {
   refundandbroadcaststaticdeposit <depositTransactionId> <destinationAddress> <satsPerVbyteFee> [outputIndex] - Refund and broadcast a static deposit
   gettransfers [limit] [offset]                                       - Get a list of transfers
   createinvoice <amount> <memo> <includeSparkAddress> <includeSparkInvoice> [receiverIdentityPubkey] [descriptionHash] - Create a new lightning invoice (includeSparkAddress and includeSparkInvoice are mutually exclusive)
+  createhodlinvoice <amount> <paymentHash> <memo> <includeSparkAddress> <includeSparkInvoice> [receiverIdentityPubkey] [descriptionHash] - Create a HODL lightning invoice with payment hash (includeSparkAddress and includeSparkInvoice are mutually exclusive)
   payinvoice <invoice> <maxFeeSats> <preferSpark> [amountSatsToSend]  - Pay a lightning invoice
   createsparkinvoice <asset("btc" | tokenIdentifier)> [amount] [memo] [senderPublicKey] [expiryTime] - Create a spark payment request. Amount is optional. Use _ for empty optional fields eg createsparkinvoice btc _ memo _ _
   createhtlc <receiverSparkAddress> <amountSats> <expiryTimeMinutes> <preimage> - Create a HTLC
@@ -1322,6 +1324,28 @@ async function runCLI() {
             descriptionHash: args[5],
           });
           console.log(invoice);
+          break;
+        case "createhodlinvoice":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          if (args[3] === "true" && args[4] === "true") {
+            console.log(
+              "Error: includeSparkAddress and includeSparkInvoice are mutually exclusive",
+            );
+            break;
+          }
+          const hodlInvoice = await wallet.createLightningHodlInvoice({
+            amountSats: parseInt(args[0]),
+            paymentHash: args[1],
+            memo: args[2],
+            includeSparkAddress: args[3] === "true",
+            includeSparkInvoice: args[4] === "true",
+            receiverIdentityPubkey: args[5],
+            descriptionHash: args[6],
+          });
+          console.log(hodlInvoice);
           break;
         case "payinvoice":
           if (!wallet) {

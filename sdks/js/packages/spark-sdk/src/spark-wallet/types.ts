@@ -35,6 +35,17 @@ export type CreateLightningInvoiceParams = {
   descriptionHash?: string;
 };
 
+export type CreateLightningHodlInvoiceParams = {
+  amountSats: number;
+  paymentHash: string;
+  memo?: string;
+  expirySeconds?: number;
+  includeSparkAddress?: boolean;
+  includeSparkInvoice?: boolean;
+  receiverIdentityPubkey?: string;
+  descriptionHash?: string;
+};
+
 export type PayLightningInvoiceParams = {
   invoice: string;
   maxFeeSats: number;
