@@ -34,6 +34,14 @@ var (
 	// Metrics
 	nodeTxBroadcastCounter   metric.Int64Counter
 	refundTxBroadcastCounter metric.Int64Counter
+
+	// Terminal statuses where nodes no longer need watchtower protection.
+	terminalStatuses = []st.TreeNodeStatus{
+		st.TreeNodeStatusAggregated,
+		st.TreeNodeStatusExited,
+		st.TreeNodeStatusSplitted,
+		st.TreeNodeStatusReimbursed,
+	}
 )
 
 func init() {
@@ -104,6 +112,7 @@ func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHei
 			),
 			treenode.NodeConfirmationHeightIsNil(),
 			treenode.NetworkEQ(network),
+			treenode.StatusNotIn(terminalStatuses...),
 		).
 		WithParent().
 		All(ctx)
@@ -117,6 +126,7 @@ func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHei
 			treenode.NodeConfirmationHeightNotNil(),
 			treenode.RefundConfirmationHeightIsNil(),
 			treenode.NetworkEQ(network),
+			treenode.StatusNotIn(terminalStatuses...),
 		).
 		WithParent().
 		All(ctx)
@@ -147,6 +157,7 @@ func QueryBroadcastableTransferLeaves(ctx context.Context, dbClient *ent.Client,
 			treenode.NodeConfirmationHeightNotNil(),
 			treenode.RefundConfirmationHeightIsNil(),
 			treenode.NetworkEQ(network),
+			treenode.StatusNotIn(terminalStatuses...),
 		).
 		IDs(ctx)
 	if err != nil {
