@@ -14,13 +14,13 @@ const (
 	TreeNodeStatusTransferLocked TreeNodeStatus = "TRANSFER_LOCKED"
 	// TreeNodeStatusSplitLocked is the status of a tree node that is split locked.
 	TreeNodeStatusSplitLocked TreeNodeStatus = "SPLIT_LOCKED"
-	// TreeNodeStatusSplitted is the status of a tree node that is splitted.
+	// TreeNodeStatusSplitted is the status of a tree node that is splitted. Terminal for transfers.
 	TreeNodeStatusSplitted TreeNodeStatus = "SPLITTED"
-	// TreeNodeStatusAggregated is the status of a tree node that is aggregated, this is a terminal state.
+	// TreeNodeStatusAggregated is the status of a tree node that is aggregated. Terminal for transfers.
 	TreeNodeStatusAggregated TreeNodeStatus = "AGGREGATED"
-	// TreeNodeStatusOnChain is the status of a tree node that is on chain, this is a terminal state.
+	// TreeNodeStatusOnChain means the node tx is confirmed. Watchtower still needs to watch refund tx.
 	TreeNodeStatusOnChain TreeNodeStatus = "ON_CHAIN"
-	// TreeNodeStatusExited is the status of a tree node where the whole tree exited, this is a terminal state.
+	// TreeNodeStatusExited means the refund tx is confirmed. Fully terminal.
 	TreeNodeStatusExited TreeNodeStatus = "EXITED"
 	// TreeNodeStatusAggregateLock is the status of a tree node that is aggregate locked.
 	TreeNodeStatusAggregateLock TreeNodeStatus = "AGGREGATE_LOCK"
