@@ -4,11 +4,17 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uint128"
+	sparkpb "github.com/lightsparkdev/spark/proto/spark"
+	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/utils"
 )
 
 // Token-specific fixture methods
@@ -20,6 +26,7 @@ const (
 
 // OutputSpec specifies how to create a token output
 type OutputSpec struct {
+	ID                    uuid.UUID // zero value means generate random ID
 	Amount                *big.Int
 	Owner                 keys.Public // zero value means generate random owner
 	RevocationCommitment  []byte      // nil means use random keyshare public key
@@ -54,6 +61,11 @@ type TokenCreateOpts struct {
 	IsFreezable     bool
 }
 
+// MintTransactionOpts specifies options for creating a mint transaction.
+type MintTransactionOpts struct {
+	Hash []byte // If nil, generates random bytes
+}
+
 // CreateTokenCreate creates a test TokenCreate entity
 func (f *Fixtures) CreateTokenCreate(network btcnetwork.Network, tokenIdentifier []byte, maxSupply *big.Int) *ent.TokenCreate {
 	_, tokenCreate := f.CreateTokenCreateWithIssuer(network, tokenIdentifier, maxSupply)
@@ -85,7 +97,6 @@ func (f *Fixtures) CreateTokenCreateWithOpts(network btcnetwork.Network, opts To
 		issuerKey = f.GeneratePrivateKey()
 	}
 
-	// Get or create the entity DKG key for CreationEntityPublicKey.
 	creationEntityPubKey := f.getOrCreateEntityDkgKeyPublicKey()
 
 	tokenCreate, err := f.Client.TokenCreate.Create().
@@ -150,6 +161,11 @@ func (f *Fixtures) CreateKeyshareWithEntityDkgKey() *ent.SigningKeyshare {
 
 // CreateMintTransaction creates a mint transaction with outputs
 func (f *Fixtures) CreateMintTransaction(tokenCreate *ent.TokenCreate, outputSpecs []OutputSpec, status st.TokenTransactionStatus) (*ent.TokenTransaction, []*ent.TokenOutput) {
+	return f.CreateMintTransactionWithOpts(tokenCreate, outputSpecs, status, MintTransactionOpts{})
+}
+
+// CreateMintTransactionWithOpts creates a mint transaction with outputs using custom options
+func (f *Fixtures) CreateMintTransactionWithOpts(tokenCreate *ent.TokenCreate, outputSpecs []OutputSpec, status st.TokenTransactionStatus, opts MintTransactionOpts) (*ent.TokenTransaction, []*ent.TokenOutput) {
 	mint, err := f.Client.TokenMint.Create().
 		SetIssuerPublicKey(f.GeneratePrivateKey().Public()).
 		SetTokenIdentifier(tokenCreate.TokenIdentifier).
@@ -158,9 +174,14 @@ func (f *Fixtures) CreateMintTransaction(tokenCreate *ent.TokenCreate, outputSpe
 		Save(f.Ctx)
 	f.RequireNoError(err)
 
+	hash := opts.Hash
+	if hash == nil {
+		hash = f.RandomBytes(32)
+	}
+
 	tx, err := f.Client.TokenTransaction.Create().
-		SetPartialTokenTransactionHash(f.RandomBytes(32)).
-		SetFinalizedTokenTransactionHash(f.RandomBytes(32)).
+		SetPartialTokenTransactionHash(hash).
+		SetFinalizedTokenTransactionHash(hash).
 		SetStatus(status).
 		SetMint(mint).
 		Save(f.Ctx)
@@ -174,14 +195,30 @@ func (f *Fixtures) CreateMintTransaction(tokenCreate *ent.TokenCreate, outputSpe
 	return tx, outputs
 }
 
+// CreateCreateTransaction creates a CREATE transaction (no outputs) with optional custom hash
+func (f *Fixtures) CreateCreateTransaction(tokenCreate *ent.TokenCreate, status st.TokenTransactionStatus, opts MintTransactionOpts) *ent.TokenTransaction {
+	hash := opts.Hash
+	if hash == nil {
+		hash = f.RandomBytes(32)
+	}
+
+	tx, err := f.Client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(hash).
+		SetFinalizedTokenTransactionHash(hash).
+		SetStatus(status).
+		SetCreateID(tokenCreate.ID).
+		Save(f.Ctx)
+	f.RequireNoError(err)
+
+	return tx
+}
+
 // CreateOutputForTransaction creates an output linked to a transaction with a random owner
 func (f *Fixtures) CreateOutputForTransaction(tokenCreate *ent.TokenCreate, amount *big.Int, tx *ent.TokenTransaction, vout int32) *ent.TokenOutput {
 	return f.createOutputFromSpec(tokenCreate, OutputSpec{Amount: amount}, tx, vout)
 }
 
-// createOutputFromSpec creates an output linked to a transaction using an OutputSpec
 func (f *Fixtures) createOutputFromSpec(tokenCreate *ent.TokenCreate, spec OutputSpec, tx *ent.TokenTransaction, vout int32) *ent.TokenOutput {
-	// Generate random owner if not provided
 	owner := spec.Owner
 	if owner.IsZero() {
 		owner = f.GeneratePrivateKey().Public()
@@ -189,7 +226,6 @@ func (f *Fixtures) createOutputFromSpec(tokenCreate *ent.TokenCreate, spec Outpu
 
 	keyshare := f.CreateKeyshare()
 
-	// Use spec values or defaults
 	revocationCommitment := spec.RevocationCommitment
 	if revocationCommitment == nil {
 		revocationCommitment = keyshare.PublicKey.Serialize()
@@ -226,7 +262,7 @@ func (f *Fixtures) createOutputFromSpec(tokenCreate *ent.TokenCreate, spec Outpu
 	u128Amount, err := uint128.FromBytes(amountBytes)
 	f.RequireNoError(err)
 
-	output, err := f.Client.TokenOutput.Create().
+	builder := f.Client.TokenOutput.Create().
 		SetStatus(outputStatus).
 		SetOwnerPublicKey(owner).
 		SetWithdrawBondSats(bondSats).
@@ -240,8 +276,13 @@ func (f *Fixtures) createOutputFromSpec(tokenCreate *ent.TokenCreate, spec Outpu
 		SetRevocationKeyshare(keyshare).
 		SetNetwork(tokenCreate.Network).
 		SetOutputCreatedTokenTransaction(tx).
-		SetCreatedTransactionFinalizedHash(finalizedTxHash).
-		Save(f.Ctx)
+		SetCreatedTransactionFinalizedHash(finalizedTxHash)
+
+	if spec.ID != uuid.Nil {
+		builder = builder.SetID(spec.ID)
+	}
+
+	output, err := builder.Save(f.Ctx)
 	f.RequireNoError(err)
 	return output
 }
@@ -299,4 +340,148 @@ func (f *Fixtures) CreateBalancedTransferTransaction(
 	f.RequireNoError(err)
 
 	return tx, outputs
+}
+
+// TransferTransactionWithProtoResult holds the result of CreateTransferTransactionWithProto.
+type TransferTransactionWithProtoResult struct {
+	Transaction *ent.TokenTransaction
+	Outputs     []*ent.TokenOutput
+	Proto       *tokenpb.TokenTransaction
+	Hash        []byte
+}
+
+// TransferTransactionOpts specifies options for creating a transfer transaction with proto.
+type TransferTransactionOpts struct {
+	OperatorPublicKeys []keys.Public // Required: operator identity public keys for the proto
+	Status             st.TokenTransactionStatus
+}
+
+// CreateTransferTransactionWithProto creates a transfer transaction with a proto that hashes to match.
+// This is useful for tests that need to validate proto hashing (e.g., ExchangeRevocationSecretsShares).
+// The proto is built first, hashed, then DB entities are created with that hash.
+func (f *Fixtures) CreateTransferTransactionWithProto(
+	tokenCreate *ent.TokenCreate,
+	inputs []*ent.TokenOutput,
+	outputSpecs []OutputSpec,
+	opts TransferTransactionOpts,
+) *TransferTransactionWithProtoResult {
+	status := opts.Status
+	if status == "" {
+		status = st.TokenTransactionStatusSigned
+	}
+
+	populatedSpecs := make([]OutputSpec, len(outputSpecs))
+	for i, spec := range outputSpecs {
+		populatedSpecs[i] = spec
+		if populatedSpecs[i].ID == uuid.Nil {
+			populatedSpecs[i].ID = uuid.New()
+		}
+		if populatedSpecs[i].Owner.IsZero() {
+			populatedSpecs[i].Owner = f.GeneratePrivateKey().Public()
+		}
+		if populatedSpecs[i].RevocationCommitment == nil {
+			populatedSpecs[i].RevocationCommitment = f.GeneratePrivateKey().Public().Serialize()
+		}
+		if populatedSpecs[i].BondSats == 0 {
+			populatedSpecs[i].BondSats = testWithdrawBondSats
+		}
+		if populatedSpecs[i].RelativeBlockLocktime == 0 {
+			populatedSpecs[i].RelativeBlockLocktime = testWithdrawRelativeBlockLocktime
+		}
+	}
+
+	protoOutputs := make([]*tokenpb.TokenOutput, len(populatedSpecs))
+	for i, spec := range populatedSpecs {
+		outputID := spec.ID.String()
+		amountBytes := make([]byte, 16)
+		spec.Amount.FillBytes(amountBytes)
+
+		protoOutputs[i] = &tokenpb.TokenOutput{
+			Id:                            &outputID,
+			TokenIdentifier:               tokenCreate.TokenIdentifier,
+			OwnerPublicKey:                spec.Owner.Serialize(),
+			TokenAmount:                   amountBytes,
+			RevocationCommitment:          spec.RevocationCommitment,
+			WithdrawBondSats:              &spec.BondSats,
+			WithdrawRelativeBlockLocktime: &spec.RelativeBlockLocktime,
+		}
+	}
+
+	protoInputs := make([]*tokenpb.TokenOutputToSpend, len(inputs))
+	for i, input := range inputs {
+		protoInputs[i] = &tokenpb.TokenOutputToSpend{
+			PrevTokenTransactionHash: input.CreatedTransactionFinalizedHash,
+			PrevTokenTransactionVout: uint32(input.CreatedTransactionOutputVout),
+		}
+	}
+
+	operatorPubKeysBytes := make([][]byte, len(opts.OperatorPublicKeys))
+	for i, pk := range opts.OperatorPublicKeys {
+		operatorPubKeysBytes[i] = pk.Serialize()
+	}
+
+	validityDuration := uint64(3600)
+	tokenTxProto := &tokenpb.TokenTransaction{
+		Version: 3,
+		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+			TransferInput: &tokenpb.TokenTransferInput{
+				OutputsToSpend: protoInputs,
+			},
+		},
+		TokenOutputs:                    protoOutputs,
+		SparkOperatorIdentityPublicKeys: operatorPubKeysBytes,
+		Network:                         sparkpb.Network_REGTEST,
+		ClientCreatedTimestamp:          timestamppb.New(utils.ToMicrosecondPrecision(time.Now())),
+		ValidityDurationSeconds:         &validityDuration,
+	}
+
+	finalTxHash, err := utils.HashTokenTransaction(tokenTxProto, false)
+	f.RequireNoError(err)
+
+	tx, err := f.Client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(finalTxHash).
+		SetFinalizedTokenTransactionHash(finalTxHash).
+		SetStatus(st.TokenTransactionStatusSigned).
+		Save(f.Ctx)
+	f.RequireNoError(err)
+
+	for i, input := range inputs {
+		var inputStatus st.TokenOutputStatus
+		switch status {
+		case st.TokenTransactionStatusStarted:
+			inputStatus = st.TokenOutputStatusSpentStarted
+		case st.TokenTransactionStatusSigned:
+			inputStatus = st.TokenOutputStatusSpentSigned
+		case st.TokenTransactionStatusRevealed, st.TokenTransactionStatusFinalized:
+			inputStatus = st.TokenOutputStatusSpentFinalized
+		default:
+			inputStatus = st.TokenOutputStatusSpentStarted
+		}
+
+		_, err = input.Update().
+			SetOutputSpentTokenTransaction(tx).
+			AddOutputSpentStartedTokenTransactions(tx).
+			SetStatus(inputStatus).
+			SetSpentTransactionInputVout(int32(i)).
+			Save(f.Ctx)
+		f.RequireNoError(err)
+	}
+
+	outputs := make([]*ent.TokenOutput, len(populatedSpecs))
+	for i, spec := range populatedSpecs {
+		spec.FinalizedTxHash = finalTxHash
+		outputs[i] = f.createOutputFromSpec(tokenCreate, spec, tx, int32(i))
+	}
+
+	tx, err = tx.Update().
+		SetStatus(status).
+		Save(f.Ctx)
+	f.RequireNoError(err)
+
+	return &TransferTransactionWithProtoResult{
+		Transaction: tx,
+		Outputs:     outputs,
+		Proto:       tokenTxProto,
+		Hash:        finalTxHash,
+	}
 }

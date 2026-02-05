@@ -22,12 +22,12 @@ func NewInternalFinalizeTokenHandler(config *so.Config) *InternalFinalizeTokenHa
 	}
 }
 
-func (h *InternalFinalizeTokenHandler) FinalizeCoordinatedTokenTransactionInternal(
+func (h *InternalFinalizeTokenHandler) FinalizeTransferTransactionInternal(
 	ctx context.Context,
 	tokenTransactionHash []byte,
 	revocationSecretsToFinalize []*ent.RecoveredRevocationSecret,
 ) error {
-	ctx, span := GetTracer().Start(ctx, "InternalFinalizeTokenHandler.FinalizeCoordinatedTokenTransactionInternal")
+	ctx, span := GetTracer().Start(ctx, "InternalFinalizeTokenHandler.FinalizeTransferTransactionInternal")
 	defer span.End()
 	tokenTransaction, err := ent.FetchAndLockTokenTransactionDataByHash(ctx, tokenTransactionHash)
 	if err != nil {
@@ -55,7 +55,60 @@ func (h *InternalFinalizeTokenHandler) FinalizeCoordinatedTokenTransactionIntern
 			tokenTransaction, nil)
 	}
 
-	err = ent.FinalizeCoordinatedTokenTransactionWithRevocationKeys(ctx, tokenTransaction, revocationSecretsToFinalize)
+	err = ent.FinalizeTransferTransactionWithRevocationKeys(ctx, tokenTransaction, revocationSecretsToFinalize)
+	if err != nil {
+		return tokens.FormatErrorWithTransactionEnt(fmt.Sprintf(tokens.ErrFailedToUpdateOutputs, "finalizing"), tokenTransaction, err)
+	}
+	return nil
+}
+
+// FinalizeMintOrCreateTransactionInternal finalizes a MINT or CREATE token transaction by hash.
+// Fetches and locks the transaction, then delegates to FinalizeMintOrCreateTransaction.
+// Unlike transfers, MINT/CREATE transactions don't have revocation secrets to exchange.
+func (h *InternalFinalizeTokenHandler) FinalizeMintOrCreateTransactionInternal(
+	ctx context.Context,
+	tokenTransactionHash []byte,
+) error {
+	ctx, span := GetTracer().Start(ctx, "InternalFinalizeTokenHandler.FinalizeMintOrCreateTransactionInternal")
+	defer span.End()
+
+	tokenTransaction, err := ent.FetchAndLockTokenTransactionDataByHash(ctx, tokenTransactionHash)
+	if err != nil {
+		return tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToFetchTransaction, tokenTransaction, err)
+	}
+
+	return h.FinalizeMintOrCreateTransaction(ctx, tokenTransaction)
+}
+
+// FinalizeMintOrCreateTransaction finalizes a MINT or CREATE token transaction.
+// Use this when you already have the entity loaded and locked.
+// Unlike transfers, MINT/CREATE transactions don't have revocation secrets to exchange.
+func (h *InternalFinalizeTokenHandler) FinalizeMintOrCreateTransaction(
+	ctx context.Context,
+	tokenTransaction *ent.TokenTransaction,
+) error {
+	ctx, span := GetTracer().Start(ctx, "InternalFinalizeTokenHandler.FinalizeMintOrCreateTransaction")
+	defer span.End()
+
+	// Idempotency: if already finalized, return success
+	if tokenTransaction.Status == st.TokenTransactionStatusFinalized {
+		return nil
+	}
+
+	if tokenTransaction.Status != st.TokenTransactionStatusSigned {
+		return tokens.FormatErrorWithTransactionEnt(
+			fmt.Sprintf(tokens.ErrInvalidTransactionStatus,
+				tokenTransaction.Status, st.TokenTransactionStatusSigned),
+			tokenTransaction, nil)
+	}
+
+	// Validate all created outputs are in CreatedSigned state
+	invalidOutputs := validateOutputStatuses(tokenTransaction.Edges.CreatedOutput, st.TokenOutputStatusCreatedSigned)
+	if len(invalidOutputs) > 0 {
+		return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOutputs, tokenTransaction, stderrors.Join(invalidOutputs...))
+	}
+
+	err := ent.FinalizeMintOrCreateTransaction(ctx, tokenTransaction)
 	if err != nil {
 		return tokens.FormatErrorWithTransactionEnt(fmt.Sprintf(tokens.ErrFailedToUpdateOutputs, "finalizing"), tokenTransaction, err)
 	}

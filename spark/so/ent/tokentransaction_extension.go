@@ -138,11 +138,6 @@ func createTransactionEntities(
 		txStatus = st.TokenTransactionStatusSigned
 		inputStatus = st.TokenOutputStatusSpentSigned
 		outputStatus = st.TokenOutputStatusCreatedSigned
-		if tokenTransactionType == utils.TokenTransactionTypeMint {
-			// Mints do not require a follow-up finalize step; treat created outputs as finalized at signing time.
-			inputStatus = st.TokenOutputStatusSpentFinalized
-			outputStatus = st.TokenOutputStatusCreatedFinalized
-		}
 	}
 
 	switch tokenTransactionType {
@@ -508,23 +503,25 @@ func UpdateSignedTransaction(
 	newInputStatus := st.TokenOutputStatusSpentSigned
 	newOutputLeafStatus := st.TokenOutputStatusCreatedSigned
 	if txType == utils.TokenTransactionTypeMint {
-		// If this is a mint, update status straight to finalized because a follow up Finalize() call
-		// is not necessary for mint.
+		// Mints in the Phase1 flow (the only caller of UpdateSignedTransaction) do not require
+		// a separate finalize step; treat outputs as finalized at signing time.
 		newInputStatus = st.TokenOutputStatusSpentFinalized
 		newOutputLeafStatus = st.TokenOutputStatusCreatedFinalized
-		if tokenTransactionEnt.Version < 3 {
-			if len(operatorSpecificOwnershipSignatures) != 1 {
-				return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf(
-					"expected 1 ownership signature for mint, got %d",
-					len(operatorSpecificOwnershipSignatures),
-				))
-			}
-			_, err := db.TokenMint.UpdateOne(tokenTransactionEnt.Edges.Mint).
-				SetOperatorSpecificIssuerSignature(operatorSpecificOwnershipSignatures[0]).
-				Save(ctx)
-			if err != nil {
-				return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update mint with signature: %w", err))
-			}
+	}
+
+	// Handle version < 3 mint-specific signature storage
+	if txType == utils.TokenTransactionTypeMint && tokenTransactionEnt.Version < 3 {
+		if len(operatorSpecificOwnershipSignatures) != 1 {
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf(
+				"expected 1 ownership signature for mint, got %d",
+				len(operatorSpecificOwnershipSignatures),
+			))
+		}
+		_, err := db.TokenMint.UpdateOne(tokenTransactionEnt.Edges.Mint).
+			SetOperatorSpecificIssuerSignature(operatorSpecificOwnershipSignatures[0]).
+			Save(ctx)
+		if err != nil {
+			return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update mint with signature: %w", err))
 		}
 	}
 
@@ -649,7 +646,7 @@ type RecoveredRevocationSecret struct {
 	RevocationSecret keys.Private
 }
 
-func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
+func FinalizeTransferTransactionWithRevocationKeys(
 	ctx context.Context,
 	tokenTransactionEnt *TokenTransaction,
 	revocationSecrets []*RecoveredRevocationSecret,
@@ -701,25 +698,12 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 		}
 	}
 
-	// Update outputs.
-	outputIDs := make([]uuid.UUID, len(tokenTransactionEnt.Edges.CreatedOutput))
-	for i, output := range tokenTransactionEnt.Edges.CreatedOutput {
-		outputIDs[i] = output.ID
+	// Finalize created outputs and transaction status.
+	if err := finalizeCreatedOutputs(ctx, db, tokenTransactionEnt.Edges.CreatedOutput, txHash); err != nil {
+		return err
 	}
-	_, err = db.TokenOutput.Update().
-		Where(tokenoutput.IDIn(outputIDs...)).
-		SetStatus(st.TokenOutputStatusCreatedFinalized).
-		Save(ctx)
-	if err != nil {
-		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to bulk update output status to finalized for txHash %x: %w", txHash, err))
-	}
-
-	// Update the token transaction status to Finalized.
-	_, err = db.TokenTransaction.UpdateOne(tokenTransactionEnt).
-		SetStatus(st.TokenTransactionStatusFinalized).
-		Save(ctx)
-	if err != nil {
-		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update token transaction with finalized status for txHash %x: %w", txHash, err))
+	if err := finalizeTransactionStatus(ctx, db, tokenTransactionEnt); err != nil {
+		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to commit and replace transaction after finalizing token transaction: %w", err))
@@ -1139,4 +1123,55 @@ func (t *TokenTransaction) ValidateNotExpired() error {
 		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("unsupported token transaction version: %d", t.Version))
 	}
 	return nil
+}
+
+// finalizeCreatedOutputs updates created outputs to CREATED_FINALIZED status.
+func finalizeCreatedOutputs(ctx context.Context, db *Client, outputs []*TokenOutput, txHash []byte) error {
+	if len(outputs) == 0 {
+		return nil
+	}
+	outputIDs := make([]uuid.UUID, len(outputs))
+	for i, output := range outputs {
+		outputIDs[i] = output.ID
+	}
+	_, err := db.TokenOutput.Update().
+		Where(tokenoutput.IDIn(outputIDs...)).
+		SetStatus(st.TokenOutputStatusCreatedFinalized).
+		Save(ctx)
+	if err != nil {
+		return sparkerrors.InternalDatabaseWriteError(
+			fmt.Errorf("failed to finalize outputs for txHash %x: %w", txHash, err))
+	}
+	return nil
+}
+
+// finalizeTransactionStatus updates the transaction status to FINALIZED.
+func finalizeTransactionStatus(ctx context.Context, db *Client, tokenTx *TokenTransaction) error {
+	_, err := db.TokenTransaction.UpdateOne(tokenTx).
+		SetStatus(st.TokenTransactionStatusFinalized).
+		Save(ctx)
+	if err != nil {
+		return sparkerrors.InternalDatabaseWriteError(
+			fmt.Errorf("failed to finalize transaction %x: %w", tokenTx.FinalizedTokenTransactionHash, err))
+	}
+	return nil
+}
+
+// FinalizeMintOrCreateTransaction finalizes a MINT or CREATE transaction without revocation secrets.
+// This is used by non-coordinator SOs to finalize after receiving peer signatures from the coordinator.
+// For MINTs, it also updates output status from CREATED_SIGNED to CREATED_FINALIZED.
+// NOTE: Callers must validate transaction status before calling this function.
+func FinalizeMintOrCreateTransaction(
+	ctx context.Context,
+	tokenTxEnt *TokenTransaction,
+) error {
+	tx, err := GetTxFromContext(ctx)
+	if err != nil {
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get tx from context: %w", err))
+	}
+	db := tx.Client()
+	if err := finalizeCreatedOutputs(ctx, db, tokenTxEnt.Edges.CreatedOutput, tokenTxEnt.FinalizedTokenTransactionHash); err != nil {
+		return err
+	}
+	return finalizeTransactionStatus(ctx, db, tokenTxEnt)
 }

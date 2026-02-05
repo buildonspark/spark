@@ -180,16 +180,9 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 	defer span.End()
 	ctx, logger := logging.WithRequestAttrs(ctx, tokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 
-	if len(req.OperatorShares) == 0 {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no operator shares provided in request"))
-	}
 	reqPubKey, err := keys.ParsePublicKey(req.OperatorIdentityPublicKey)
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse request operator identity public key: %w", err))
-	}
-	err = h.validateTransactionHashAndSpentOutputsInRequest(req)
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to validate tx hash and spent outputs in request: %w", err))
 	}
 
 	reqOperatorIdentifier := h.config.GetOperatorIdentifierFromIdentityPublicKey(reqPubKey)
@@ -214,22 +207,45 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(req.FinalTokenTransactionHash)).
 		WithSpentOutput().
 		WithCreatedOutput().
+		WithMint().
+		WithCreate().
 		Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load token transaction with txHash (%x) in ExchangeRevocationSecretsShares: %w", req.FinalTokenTransactionHash, err)
 	}
 
-	if len(tokenTransaction.Edges.SpentOutput) != len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()) {
-		// Spent output was potentially re-assigned, if it is in SPENT_STARTED, re-assign it to this transaction.
-		err = h.reclaimOutputsSpentOnDifferentStartedTransaction(ctx, tokenTransaction, operatorSignatures, req)
-		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionEnt("failed to validate and reassign spent output to transaction", tokenTransaction, err)
+	switch txType := tokenTransaction.InferTokenTransactionTypeEnt(); txType {
+	case utils.TokenTransactionTypeMint, utils.TokenTransactionTypeCreate:
+		if err := h.validatePersistAndFinalizeMintOrCreate(ctx, operatorSignatures, tokenTransaction); err != nil {
+			return nil, tokens.FormatErrorWithTransactionEnt("failed to validate, persist, and finalize mint/create transaction", tokenTransaction, err)
 		}
+		return &pbtkinternal.ExchangeRevocationSecretsSharesResponse{}, nil
+
+	case utils.TokenTransactionTypeTransfer:
+		if len(req.OperatorShares) == 0 {
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no operator shares provided in request for transfer transaction"))
+		}
+		if req.FinalTokenTransaction == nil {
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("final_token_transaction is required for transfer transactions"))
+		}
+		if err := h.validateTransactionHashAndSpentOutputsInRequest(req); err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to validate tx hash and spent outputs in request: %w", err))
+		}
+		if len(tokenTransaction.Edges.SpentOutput) != len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()) {
+			err = h.reclaimOutputsSpentOnDifferentStartedTransaction(ctx, tokenTransaction, operatorSignatures, req)
+			if err != nil {
+				return nil, tokens.FormatErrorWithTransactionEnt("failed to validate and reassign spent output to transaction", tokenTransaction, err)
+			}
+		}
+		if err := h.validateAndPersistPeerSignatures(ctx, operatorSignatures, tokenTransaction); err != nil {
+			return nil, tokens.FormatErrorWithTransactionEnt("failed to validate and persist peer signatures", tokenTransaction, err)
+		}
+
+	default:
+		return nil, sparkerrors.InternalDataInconsistency(fmt.Errorf("unexpected token transaction type %v in ExchangeRevocationSecretsShares", txType))
 	}
 
-	if err := h.validateSignaturesPackageAndPersistPeerSignatures(ctx, operatorSignatures, tokenTransaction); err != nil {
-		return nil, tokens.FormatErrorWithTransactionEnt("failed to validate signature package and persist peer signatures", tokenTransaction, err)
-	}
+	// TRANSFER logic (for building revocation secret map) continues below
 	if tokenTransaction.Status == st.TokenTransactionStatusStarted {
 		lockedTx, lockErr := ent.FetchAndLockTokenTransactionDataByHash(ctx, req.FinalTokenTransactionHash)
 		if lockErr != nil {
@@ -1022,7 +1038,7 @@ func (h *InternalSignTokenHandler) RecoverFullRevocationSecretsAndFinalize(ctx c
 	}
 
 	internalFinalizeHandler := NewInternalFinalizeTokenHandler(h.config)
-	err = internalFinalizeHandler.FinalizeCoordinatedTokenTransactionInternal(ctx, tokenTransaction.FinalizedTokenTransactionHash, outputRecoveredSecrets)
+	err = internalFinalizeHandler.FinalizeTransferTransactionInternal(ctx, tokenTransaction.FinalizedTokenTransactionHash, outputRecoveredSecrets)
 	if err != nil {
 		return false, tokens.FormatErrorWithTransactionEnt("failed to finalize token transaction", tokenTransaction, err)
 	}
@@ -1175,7 +1191,7 @@ func (h *InternalSignTokenHandler) verifyOperatorSignaturesAndThreshold(
 	return nil
 }
 
-func (h *InternalSignTokenHandler) validateSignaturesPackageAndPersistPeerSignatures(
+func (h *InternalSignTokenHandler) validateAndPersistPeerSignatures(
 	ctx context.Context,
 	signatures operatorSignaturesMap,
 	tokenTransaction *ent.TokenTransaction,
@@ -1216,6 +1232,24 @@ func (h *InternalSignTokenHandler) validateSignaturesPackageAndPersistPeerSignat
 		}
 	}
 	return nil
+}
+
+// validatePersistAndFinalizeMintOrCreate validates threshold signatures, persists peer signatures,
+// and finalizes a MINT/CREATE transaction atomically. This ensures finalization only happens
+// if we have guaranteed valid threshold signatures.
+func (h *InternalSignTokenHandler) validatePersistAndFinalizeMintOrCreate(
+	ctx context.Context,
+	signatures operatorSignaturesMap,
+	tokenTransaction *ent.TokenTransaction,
+) error {
+	// Validate and persist peer signatures (reuses existing logic)
+	if err := h.validateAndPersistPeerSignatures(ctx, signatures, tokenTransaction); err != nil {
+		return err
+	}
+	// Finalize the transaction using the internal method which fetches and locks
+	// (consistent with how transfer finalization works)
+	finalizeHandler := NewInternalFinalizeTokenHandler(h.config)
+	return finalizeHandler.FinalizeMintOrCreateTransactionInternal(ctx, tokenTransaction.FinalizedTokenTransactionHash)
 }
 
 func validateInputTokenOutputsMatchSpentTokenOutputs(tokenOutputIDs []uuid.UUID, spentOutputs []*ent.TokenOutput) error {
