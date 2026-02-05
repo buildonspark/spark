@@ -1,5 +1,7 @@
 # Spark Issuer SDK
 
+Spark is the fastest, cheapest, and most UX-friendly way to build financial apps and launch assets natively on Bitcoin. It’s a Bitcoin L2 that lets developers move Bitcoin and Bitcoin-native assets (including stablecoins) instantly, at near-zero cost, while staying fully connected to Bitcoin’s infrastructure.
+
 For complete documentation, visit [https://docs.spark.money](https://docs.spark.money)
 
 ## Installation

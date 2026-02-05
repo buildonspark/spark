@@ -1,8 +1,8 @@
 # Spark SDK for Bare Runtime
 
-Spark SDK optimized for the [Bare](https://bare.pears.com/) JavaScript runtime environment.
+Spark SDK optimized for the [Bare](https://bare.pears.com/) JavaScript runtime environment. For other environments see [@buildonspark/spark-sdk](https://www.npmjs.com/package/@buildonspark/spark-sdk).
 
-## Documentation
+Spark is the fastest, cheapest, and most UX-friendly way to build financial apps and launch assets natively on Bitcoin. It’s a Bitcoin L2 that lets developers move Bitcoin and Bitcoin-native assets (including stablecoins) instantly, at near-zero cost, while staying fully connected to Bitcoin’s infrastructure.
 
 For complete documentation, visit [https://docs.spark.money](https://docs.spark.money)
 
@@ -109,7 +109,3 @@ const invoice = await wallet.createLightningInvoice({
 
 console.log("Invoice:", invoice.invoice.encodedInvoice);
 ```
-
-## When to Use This Package
-
-This package is intended for use with Bare runtime only. Use @buildonspark/spark-sdk for other platforms.
