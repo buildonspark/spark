@@ -74,11 +74,7 @@ const (
 	KnobWatchChainTweakKeysForCoopExitDelayEnabled = "spark.so.watch_chain.tweak_keys_for_coop_exit_delay.enabled"
 
 	// Tokens
-	KnobUseNumericAmountForCurrentTokenSupply   = "spark.so.tokens.use_numeric_amount_for_current_token_supply"
-	KnobReclaimRemappedOutputsIfRevealRequested = "spark.so.tokens.reclaim_remapped_outputs_if_reveal_requested"
-	KnobFinalizeCreatedSignedOutputsJustInTime  = "spark.so.tokens.finalize_created_signed_outputs_just_in_time"
-	KnobTokenTransactionV3Enabled               = "spark.so.tokens.token_transaction_v3_enabled"
-	KnobAllowMultipleTokenCreatesPerIssuer      = "spark.so.tokens.allow_multiple_token_creates_per_issuer"
+	KnobTokenTransactionV3Enabled = "spark.so.tokens.token_transaction_v3_enabled"
 	// Enable Phase 2 of the token transaction v3 migration which combines the internal prepare and sign RPCs into a single RPC.
 	// This will be flipped to true permanently (with Phase 1 and legacy handlers being cleaned up) once we are confident in the migration
 	// (which means passing integration tests, load tests, and likely an incremental production rollout).
