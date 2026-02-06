@@ -28,6 +28,7 @@ service SparkService {
     rpc claim_transfer_tweak_keys(ClaimTransferTweakKeysRequest) returns (google.protobuf.Empty) {}
 
     rpc store_preimage_share(StorePreimageShareRequest) returns (google.protobuf.Empty) {}
+    rpc store_preimage_share_v2(StorePreimageShareV2Request) returns (google.protobuf.Empty) {}
     // Gets a specified number of signing commmitments for a set of nodes, which can be used as
     // part of a transfer package.
     rpc get_signing_commitments(GetSigningCommitmentsRequest) returns (GetSigningCommitmentsResponse) {}
@@ -1009,6 +1010,16 @@ message StorePreimageShareRequest {
     uint32 threshold = 3;
     string invoice_string = 4;
     bytes user_identity_public_key = 5;
+}
+
+message StorePreimageShareV2Request {
+    bytes payment_hash = 1;
+    // SO identifier -> ECIES-encrypted SecretShare protobuf
+    map<string, bytes> encrypted_preimage_shares = 2;
+    uint32 threshold = 3;
+    string invoice_string = 4;
+    bytes user_identity_public_key = 5;
+    bytes user_signature = 6;
 }
 
 message RequestedSigningCommitments {

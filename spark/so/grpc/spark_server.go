@@ -140,6 +140,12 @@ func (s *SparkServer) StorePreimageShare(ctx context.Context, req *pb.StorePreim
 	return emptyResponse, lightningHandler.StorePreimageShare(ctx, req)
 }
 
+// StorePreimageShareV2 stores ECIES-encrypted preimage shares for all SOs via a single coordinator call.
+func (s *SparkServer) StorePreimageShareV2(ctx context.Context, req *pb.StorePreimageShareV2Request) (*emptypb.Empty, error) {
+	lightningHandler := handler.NewLightningHandler(s.config)
+	return emptyResponse, lightningHandler.StorePreimageShareV2(ctx, req)
+}
+
 // GetSigningCommitments gets the signing commitments for the given node ids.
 func (s *SparkServer) GetSigningCommitments(ctx context.Context, req *pb.GetSigningCommitmentsRequest) (*pb.GetSigningCommitmentsResponse, error) {
 	signingHandler := handler.NewSigningHandler(s.config)

@@ -10,6 +10,7 @@ service MockService {
     rpc update_nodes_status(UpdateNodesStatusRequest) returns (google.protobuf.Empty) {}
     // Triggers the execution of a scheduled task immediately by name. Used by hermetic tests
     rpc trigger_task(TriggerTaskRequest) returns (google.protobuf.Empty) {}
+    rpc query_preimage_share(QueryPreimageShareRequest) returns (QueryPreimageShareResponse) {}
 }
 
 message CleanUpPreimageShareRequest {
@@ -24,4 +25,14 @@ message UpdateNodesStatusRequest {
 // TriggerTaskRequest is used to trigger a scheduled task immediately in hermetic tests.
 message TriggerTaskRequest {
     string task_name = 1;
+}
+
+message QueryPreimageShareRequest {
+    bytes payment_hash = 1;
+}
+
+message QueryPreimageShareResponse {
+    bytes preimage_share = 1;
+    int32 threshold = 2;
+    string invoice_string = 3;
 }

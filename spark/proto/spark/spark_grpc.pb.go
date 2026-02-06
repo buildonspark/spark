@@ -30,6 +30,7 @@ const (
 	SparkService_QueryAllTransfers_FullMethodName                   = "/spark.SparkService/query_all_transfers"
 	SparkService_ClaimTransferTweakKeys_FullMethodName              = "/spark.SparkService/claim_transfer_tweak_keys"
 	SparkService_StorePreimageShare_FullMethodName                  = "/spark.SparkService/store_preimage_share"
+	SparkService_StorePreimageShareV2_FullMethodName                = "/spark.SparkService/store_preimage_share_v2"
 	SparkService_GetSigningCommitments_FullMethodName               = "/spark.SparkService/get_signing_commitments"
 	SparkService_ProvidePreimage_FullMethodName                     = "/spark.SparkService/provide_preimage"
 	SparkService_QueryPreimage_FullMethodName                       = "/spark.SparkService/query_preimage"
@@ -76,6 +77,7 @@ type SparkServiceClient interface {
 	QueryAllTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(ctx context.Context, in *ClaimTransferTweakKeysRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StorePreimageShare(ctx context.Context, in *StorePreimageShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	StorePreimageShareV2(ctx context.Context, in *StorePreimageShareV2Request, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Gets a specified number of signing commmitments for a set of nodes, which can be used as
 	// part of a transfer package.
 	GetSigningCommitments(ctx context.Context, in *GetSigningCommitmentsRequest, opts ...grpc.CallOption) (*GetSigningCommitmentsResponse, error)
@@ -224,6 +226,16 @@ func (c *sparkServiceClient) StorePreimageShare(ctx context.Context, in *StorePr
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, SparkService_StorePreimageShare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) StorePreimageShareV2(ctx context.Context, in *StorePreimageShareV2Request, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkService_StorePreimageShareV2_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -526,6 +538,7 @@ type SparkServiceServer interface {
 	QueryAllTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error)
 	StorePreimageShare(context.Context, *StorePreimageShareRequest) (*emptypb.Empty, error)
+	StorePreimageShareV2(context.Context, *StorePreimageShareV2Request) (*emptypb.Empty, error)
 	// Gets a specified number of signing commmitments for a set of nodes, which can be used as
 	// part of a transfer package.
 	GetSigningCommitments(context.Context, *GetSigningCommitmentsRequest) (*GetSigningCommitmentsResponse, error)
@@ -609,6 +622,9 @@ func (UnimplementedSparkServiceServer) ClaimTransferTweakKeys(context.Context, *
 }
 func (UnimplementedSparkServiceServer) StorePreimageShare(context.Context, *StorePreimageShareRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method StorePreimageShare not implemented")
+}
+func (UnimplementedSparkServiceServer) StorePreimageShareV2(context.Context, *StorePreimageShareV2Request) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method StorePreimageShareV2 not implemented")
 }
 func (UnimplementedSparkServiceServer) GetSigningCommitments(context.Context, *GetSigningCommitmentsRequest) (*GetSigningCommitmentsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSigningCommitments not implemented")
@@ -888,6 +904,24 @@ func _SparkService_StorePreimageShare_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkServiceServer).StorePreimageShare(ctx, req.(*StorePreimageShareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_StorePreimageShareV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StorePreimageShareV2Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).StorePreimageShareV2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_StorePreimageShareV2_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).StorePreimageShareV2(ctx, req.(*StorePreimageShareV2Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1417,6 +1451,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "store_preimage_share",
 			Handler:    _SparkService_StorePreimageShare_Handler,
+		},
+		{
+			MethodName: "store_preimage_share_v2",
+			Handler:    _SparkService_StorePreimageShareV2_Handler,
 		},
 		{
 			MethodName: "get_signing_commitments",

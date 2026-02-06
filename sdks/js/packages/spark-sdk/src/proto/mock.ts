@@ -25,6 +25,16 @@ export interface TriggerTaskRequest {
   taskName: string;
 }
 
+export interface QueryPreimageShareRequest {
+  paymentHash: Uint8Array;
+}
+
+export interface QueryPreimageShareResponse {
+  preimageShare: Uint8Array;
+  threshold: number;
+  invoiceString: string;
+}
+
 function createBaseCleanUpPreimageShareRequest(): CleanUpPreimageShareRequest {
   return { paymentHash: new Uint8Array(0) };
 }
@@ -217,6 +227,156 @@ export const TriggerTaskRequest: MessageFns<TriggerTaskRequest> = {
   },
 };
 
+function createBaseQueryPreimageShareRequest(): QueryPreimageShareRequest {
+  return { paymentHash: new Uint8Array(0) };
+}
+
+export const QueryPreimageShareRequest: MessageFns<QueryPreimageShareRequest> = {
+  encode(message: QueryPreimageShareRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.paymentHash.length !== 0) {
+      writer.uint32(10).bytes(message.paymentHash);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryPreimageShareRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryPreimageShareRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.paymentHash = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryPreimageShareRequest {
+    return { paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0) };
+  },
+
+  toJSON(message: QueryPreimageShareRequest): unknown {
+    const obj: any = {};
+    if (message.paymentHash.length !== 0) {
+      obj.paymentHash = base64FromBytes(message.paymentHash);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryPreimageShareRequest>): QueryPreimageShareRequest {
+    return QueryPreimageShareRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryPreimageShareRequest>): QueryPreimageShareRequest {
+    const message = createBaseQueryPreimageShareRequest();
+    message.paymentHash = object.paymentHash ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseQueryPreimageShareResponse(): QueryPreimageShareResponse {
+  return { preimageShare: new Uint8Array(0), threshold: 0, invoiceString: "" };
+}
+
+export const QueryPreimageShareResponse: MessageFns<QueryPreimageShareResponse> = {
+  encode(message: QueryPreimageShareResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.preimageShare.length !== 0) {
+      writer.uint32(10).bytes(message.preimageShare);
+    }
+    if (message.threshold !== 0) {
+      writer.uint32(16).int32(message.threshold);
+    }
+    if (message.invoiceString !== "") {
+      writer.uint32(26).string(message.invoiceString);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryPreimageShareResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryPreimageShareResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.preimageShare = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.threshold = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.invoiceString = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryPreimageShareResponse {
+    return {
+      preimageShare: isSet(object.preimageShare) ? bytesFromBase64(object.preimageShare) : new Uint8Array(0),
+      threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
+      invoiceString: isSet(object.invoiceString) ? globalThis.String(object.invoiceString) : "",
+    };
+  },
+
+  toJSON(message: QueryPreimageShareResponse): unknown {
+    const obj: any = {};
+    if (message.preimageShare.length !== 0) {
+      obj.preimageShare = base64FromBytes(message.preimageShare);
+    }
+    if (message.threshold !== 0) {
+      obj.threshold = Math.round(message.threshold);
+    }
+    if (message.invoiceString !== "") {
+      obj.invoiceString = message.invoiceString;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryPreimageShareResponse>): QueryPreimageShareResponse {
+    return QueryPreimageShareResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryPreimageShareResponse>): QueryPreimageShareResponse {
+    const message = createBaseQueryPreimageShareResponse();
+    message.preimageShare = object.preimageShare ?? new Uint8Array(0);
+    message.threshold = object.threshold ?? 0;
+    message.invoiceString = object.invoiceString ?? "";
+    return message;
+  },
+};
+
 export type MockServiceDefinition = typeof MockServiceDefinition;
 export const MockServiceDefinition = {
   name: "MockService",
@@ -247,6 +407,14 @@ export const MockServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    query_preimage_share: {
+      name: "query_preimage_share",
+      requestType: QueryPreimageShareRequest,
+      requestStream: false,
+      responseType: QueryPreimageShareResponse,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
 
@@ -261,6 +429,10 @@ export interface MockServiceImplementation<CallContextExt = {}> {
   ): Promise<DeepPartial<Empty>>;
   /** Triggers the execution of a scheduled task immediately by name. Used by hermetic tests */
   trigger_task(request: TriggerTaskRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
+  query_preimage_share(
+    request: QueryPreimageShareRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryPreimageShareResponse>>;
 }
 
 export interface MockServiceClient<CallOptionsExt = {}> {
@@ -274,6 +446,10 @@ export interface MockServiceClient<CallOptionsExt = {}> {
   ): Promise<Empty>;
   /** Triggers the execution of a scheduled task immediately by name. Used by hermetic tests */
   trigger_task(request: DeepPartial<TriggerTaskRequest>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
+  query_preimage_share(
+    request: DeepPartial<QueryPreimageShareRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryPreimageShareResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {

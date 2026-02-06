@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/wire"
+	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -33,6 +34,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -341,6 +343,100 @@ func TestStorePreimageShareEdgeCases(t *testing.T) {
 
 		err := lightningHandler.StorePreimageShare(ctx, req)
 		require.ErrorContains(t, err, "preimage share proofs is empty")
+	})
+}
+
+func TestStorePreimageShareV2EdgeCases(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	rng := rand.NewChaCha8([32]byte{2})
+	soIdentityKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	userIdentityKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	soIdentifier := "test-so-1"
+
+	config := &so.Config{
+		Identifier:                 soIdentifier,
+		IdentityPrivateKey:         soIdentityKey,
+		Threshold:                  2,
+		Index:                      0,
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	lightningHandler := NewLightningHandler(config)
+
+	encryptForSO := func(t *testing.T, data []byte) []byte {
+		t.Helper()
+		pubKey, err := eciesgo.NewPublicKeyFromBytes(soIdentityKey.Public().Serialize())
+		require.NoError(t, err)
+		encrypted, err := eciesgo.Encrypt(pubKey, data)
+		require.NoError(t, err)
+		return encrypted
+	}
+
+	t.Run("missing share for SO identifier", func(t *testing.T) {
+		req := &pb.StorePreimageShareV2Request{
+			EncryptedPreimageShares: map[string][]byte{
+				"other-so": []byte("some_data"),
+			},
+		}
+		err := lightningHandler.decryptAndStorePreimageShare(ctx, req)
+		require.ErrorContains(t, err, "no encrypted preimage share found for SO")
+	})
+
+	t.Run("invalid ciphertext", func(t *testing.T) {
+		req := &pb.StorePreimageShareV2Request{
+			EncryptedPreimageShares: map[string][]byte{
+				soIdentifier: []byte("not_valid_ecies"),
+			},
+		}
+		err := lightningHandler.decryptAndStorePreimageShare(ctx, req)
+		require.ErrorContains(t, err, "failed to decrypt preimage share")
+	})
+
+	t.Run("empty proofs after decryption", func(t *testing.T) {
+		shareProto := &pb.SecretShare{
+			SecretShare: []byte("test_share_data"),
+			Proofs:      [][]byte{},
+		}
+		shareBytes, err := proto.Marshal(shareProto)
+		require.NoError(t, err)
+		encrypted := encryptForSO(t, shareBytes)
+
+		req := &pb.StorePreimageShareV2Request{
+			EncryptedPreimageShares: map[string][]byte{
+				soIdentifier: encrypted,
+			},
+		}
+		err = lightningHandler.decryptAndStorePreimageShare(ctx, req)
+		require.ErrorContains(t, err, "preimage share proofs is empty")
+	})
+
+	t.Run("invalid user signature in StorePreimageShareInternal", func(t *testing.T) {
+		shareProto := &pb.SecretShare{
+			SecretShare: []byte("test_share_data"),
+			Proofs:      [][]byte{[]byte("proof1")},
+		}
+		shareBytes, err := proto.Marshal(shareProto)
+		require.NoError(t, err)
+		encryptedShare := encryptForSO(t, shareBytes)
+		req := &pb.StorePreimageShareV2Request{
+			PaymentHash:             []byte("test_payment_hash"),
+			EncryptedPreimageShares: map[string][]byte{soIdentifier: encryptedShare},
+			Threshold:               2,
+			InvoiceString:           "test_invoice",
+			UserIdentityPublicKey:   userIdentityKey.Public().Serialize(),
+			UserSignature:           []byte("invalid_signature"),
+		}
+		err = lightningHandler.StorePreimageShareInternal(ctx, req)
+		require.ErrorContains(t, err, "invalid user signature")
+	})
+
+	t.Run("invalid user identity public key", func(t *testing.T) {
+		req := &pb.StorePreimageShareV2Request{
+			UserIdentityPublicKey: []byte("bad_key"),
+		}
+		err := lightningHandler.StorePreimageShareInternal(ctx, req)
+		require.ErrorContains(t, err, "unable to parse user identity public key")
 	})
 }
 

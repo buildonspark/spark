@@ -347,3 +347,215 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = TriggerTaskRequestValidationError{}
+
+// Validate checks the field values on QueryPreimageShareRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryPreimageShareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryPreimageShareRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryPreimageShareRequestMultiError, or nil if none found.
+func (m *QueryPreimageShareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryPreimageShareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for PaymentHash
+
+	if len(errors) > 0 {
+		return QueryPreimageShareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryPreimageShareRequestMultiError is an error wrapping multiple validation
+// errors returned by QueryPreimageShareRequest.ValidateAll() if the
+// designated constraints aren't met.
+type QueryPreimageShareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryPreimageShareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryPreimageShareRequestMultiError) AllErrors() []error { return m }
+
+// QueryPreimageShareRequestValidationError is the validation error returned by
+// QueryPreimageShareRequest.Validate if the designated constraints aren't met.
+type QueryPreimageShareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryPreimageShareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryPreimageShareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryPreimageShareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryPreimageShareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryPreimageShareRequestValidationError) ErrorName() string {
+	return "QueryPreimageShareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryPreimageShareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryPreimageShareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryPreimageShareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryPreimageShareRequestValidationError{}
+
+// Validate checks the field values on QueryPreimageShareResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryPreimageShareResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryPreimageShareResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryPreimageShareResponseMultiError, or nil if none found.
+func (m *QueryPreimageShareResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryPreimageShareResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for PreimageShare
+
+	// no validation rules for Threshold
+
+	// no validation rules for InvoiceString
+
+	if len(errors) > 0 {
+		return QueryPreimageShareResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryPreimageShareResponseMultiError is an error wrapping multiple
+// validation errors returned by QueryPreimageShareResponse.ValidateAll() if
+// the designated constraints aren't met.
+type QueryPreimageShareResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryPreimageShareResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryPreimageShareResponseMultiError) AllErrors() []error { return m }
+
+// QueryPreimageShareResponseValidationError is the validation error returned
+// by QueryPreimageShareResponse.Validate if the designated constraints aren't met.
+type QueryPreimageShareResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryPreimageShareResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryPreimageShareResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryPreimageShareResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryPreimageShareResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryPreimageShareResponseValidationError) ErrorName() string {
+	return "QueryPreimageShareResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryPreimageShareResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryPreimageShareResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryPreimageShareResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryPreimageShareResponseValidationError{}

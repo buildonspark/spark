@@ -112,3 +112,23 @@ func (o *MockServer) TriggerTask(ctx context.Context, req *pbmock.TriggerTaskReq
 
 	return &emptypb.Empty{}, nil
 }
+
+func (o *MockServer) QueryPreimageShare(ctx context.Context, req *pbmock.QueryPreimageShareRequest) (*pbmock.QueryPreimageShareResponse, error) {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	share, err := db.PreimageShare.Query().Where(preimageshare.PaymentHashEQ(req.PaymentHash)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, status.Errorf(codes.NotFound, "preimage share not found for payment hash")
+		}
+		return nil, err
+	}
+	return &pbmock.QueryPreimageShareResponse{
+		PreimageShare: share.PreimageShare,
+		Threshold:     share.Threshold,
+		InvoiceString: share.InvoiceString,
+	}, nil
+}

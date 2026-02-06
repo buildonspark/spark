@@ -4,13 +4,20 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"math/big"
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
+	"google.golang.org/protobuf/proto"
 
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	"github.com/lightsparkdev/spark/proto/spark"
@@ -1389,5 +1396,85 @@ func TestReceiveLightningPaymentWithTransferRequest(t *testing.T) {
 			}
 		}
 		assert.True(t, found, "operator %s should have the transfer in its database", identifier)
+	}
+}
+
+func TestStorePreimageShareV2(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+
+	amountSats := uint64(100)
+	preimage, paymentHash := testPreimageHash(t, amountSats)
+	invoice := testInvoice
+
+	defer cleanUp(t, config, paymentHash)
+
+	// Split preimage into secret shares with VSS proofs
+	preimageAsInt := new(big.Int).SetBytes(preimage[:])
+	shares, err := secretsharing.SplitSecretWithProofs(
+		preimageAsInt,
+		secp256k1.Params().N,
+		config.Threshold,
+		len(config.SigningOperators),
+	)
+	require.NoError(t, err)
+
+	// ECIES-encrypt each share for the corresponding SO
+	encryptedShares := make(map[string][]byte)
+	for identifier, operator := range config.SigningOperators {
+		share := shares[operator.ID]
+		shareProto := share.MarshalProto()
+		shareBytes, err := proto.Marshal(shareProto)
+		require.NoError(t, err)
+
+		pubKey, err := eciesgo.NewPublicKeyFromBytes(operator.IdentityPublicKey.Serialize())
+		require.NoError(t, err)
+
+		encrypted, err := eciesgo.Encrypt(pubKey, shareBytes)
+		require.NoError(t, err)
+
+		encryptedShares[identifier] = encrypted
+	}
+
+	// Sign the payload with user identity key
+	payload := common.GetStorePreimageShareSigningPayload(
+		paymentHash[:], encryptedShares, uint32(config.Threshold), invoice,
+	)
+	sig := ecdsa.Sign(config.IdentityPrivateKey.ToBTCEC(), payload)
+
+	// Call store_preimage_share_v2 on the coordinator
+	coordinatorOp := config.SigningOperators[config.CoordinatorIdentifier]
+	conn, err := coordinatorOp.NewOperatorGRPCConnection()
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	sparkClient := spark.NewSparkServiceClient(conn)
+	_, err = sparkClient.StorePreimageShareV2(ctx, &spark.StorePreimageShareV2Request{
+		PaymentHash:             paymentHash[:],
+		EncryptedPreimageShares: encryptedShares,
+		Threshold:               uint32(config.Threshold),
+		InvoiceString:           invoice,
+		UserIdentityPublicKey:   config.IdentityPublicKey().Serialize(),
+		UserSignature:           sig.Serialize(),
+	})
+	require.NoError(t, err)
+
+	// Verify each SO has the preimage share stored in its DB
+	for identifier, operator := range config.SigningOperators {
+		opConn, err := operator.NewOperatorGRPCConnection()
+		require.NoError(t, err)
+
+		mockClient := pbmock.NewMockServiceClient(opConn)
+		resp, err := mockClient.QueryPreimageShare(t.Context(), &pbmock.QueryPreimageShareRequest{
+			PaymentHash: paymentHash[:],
+		})
+		require.NoError(t, err, "failed to query preimage share from operator %s", identifier)
+		assert.Equal(t, int32(config.Threshold), resp.Threshold, "operator %s threshold mismatch", identifier)
+		assert.Equal(t, invoice, resp.InvoiceString, "operator %s invoice mismatch", identifier)
+
+		opConn.Close()
 	}
 }

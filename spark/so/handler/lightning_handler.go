@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	dbSql "database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -17,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
@@ -116,6 +119,137 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 		SetOwnerIdentityPubkey(userIdentityPubKey).
 		Save(ctx)
 	if err != nil {
+		return fmt.Errorf("unable to store preimage share: %w", err)
+	}
+	return nil
+}
+
+// StorePreimageShareV2 stores preimage shares for all SOs via a single coordinator call.
+// The coordinator decrypts and stores its own share, then fans out to other SOs via internal RPC.
+func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspark.StorePreimageShareV2Request) error {
+	userPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
+	if err != nil {
+		return fmt.Errorf("unable to parse user identity public key: %w", err)
+	}
+
+	payload := common.GetStorePreimageShareSigningPayload(req.PaymentHash, req.EncryptedPreimageShares, req.Threshold, req.InvoiceString)
+	if err := common.VerifyECDSASignature(userPubKey, req.UserSignature, payload); err != nil {
+		return fmt.Errorf("invalid user signature: %w", err)
+	}
+
+	if err := h.decryptAndStorePreimageShare(ctx, req); err != nil {
+		return fmt.Errorf("unable to store coordinator preimage share: %w", err)
+	}
+
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+		conn, err := operator.NewOperatorGRPCConnection()
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		_, err = client.StorePreimageShare(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("unable to store preimage share on operator %s: %w", operator.Identifier, err)
+		}
+		return nil, nil
+	})
+	if err != nil {
+		return fmt.Errorf("unable to store preimage share on all operators: %w", err)
+	}
+
+	return nil
+}
+
+// StorePreimageShareInternal handles the internal RPC from the coordinator to store a preimage share.
+func (h *LightningHandler) StorePreimageShareInternal(ctx context.Context, req *pbspark.StorePreimageShareV2Request) error {
+	userPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
+	if err != nil {
+		return fmt.Errorf("unable to parse user identity public key: %w", err)
+	}
+
+	payload := common.GetStorePreimageShareSigningPayload(req.PaymentHash, req.EncryptedPreimageShares, req.Threshold, req.InvoiceString)
+	if err := common.VerifyECDSASignature(userPubKey, req.UserSignature, payload); err != nil {
+		return fmt.Errorf("invalid user signature: %w", err)
+	}
+
+	return h.decryptAndStorePreimageShare(ctx, req)
+}
+
+func (h *LightningHandler) decryptAndStorePreimageShare(ctx context.Context, req *pbspark.StorePreimageShareV2Request) error {
+	ciphertext, ok := req.EncryptedPreimageShares[h.config.Identifier]
+	if !ok {
+		return fmt.Errorf("no encrypted preimage share found for SO %s", h.config.Identifier)
+	}
+
+	decryptionPrivateKey := eciesgo.NewPrivateKeyFromBytes(h.config.IdentityPrivateKey.Serialize())
+	plaintext, err := eciesgo.Decrypt(decryptionPrivateKey, ciphertext)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt preimage share: %w", err)
+	}
+
+	secretShare := &pbspark.SecretShare{}
+	if err := proto.Unmarshal(plaintext, secretShare); err != nil {
+		return fmt.Errorf("failed to unmarshal preimage share: %w", err)
+	}
+
+	if len(secretShare.Proofs) == 0 {
+		return fmt.Errorf("preimage share proofs is empty")
+	}
+
+	if uint64(req.Threshold) != h.config.Threshold {
+		return fmt.Errorf("threshold mismatch: expected %d, got %d", h.config.Threshold, req.Threshold)
+	}
+
+	err = secretsharing.ValidateShare(
+		&secretsharing.VerifiableSecretShare{
+			SecretShare: secretsharing.SecretShare{
+				FieldModulus: secp256k1.S256().N,
+				Threshold:    int(h.config.Threshold),
+				Index:        big.NewInt(int64(h.config.Index + 1)),
+				Share:        new(big.Int).SetBytes(secretShare.SecretShare),
+			},
+			Proofs: secretShare.Proofs,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("unable to validate share: %w", err)
+	}
+
+	bolt11, err := decodepay.Decodepay(req.InvoiceString)
+	if err != nil {
+		return fmt.Errorf("unable to decode invoice: %w", err)
+	}
+
+	paymentHash, err := hex.DecodeString(bolt11.PaymentHash)
+	if err != nil {
+		return fmt.Errorf("unable to decode payment hash: %w", err)
+	}
+
+	if !bytes.Equal(paymentHash, req.PaymentHash) {
+		return fmt.Errorf("payment hash mismatch")
+	}
+
+	tx, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get db from context: %w", err)
+	}
+	userIdentityPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
+	if err != nil {
+		return fmt.Errorf("unable to parse user identity public key: %w", err)
+	}
+	err = tx.PreimageShare.Create().
+		SetPaymentHash(req.PaymentHash).
+		SetPreimageShare(secretShare.SecretShare).
+		SetThreshold(int32(req.Threshold)).
+		SetInvoiceString(req.InvoiceString).
+		SetOwnerIdentityPubkey(userIdentityPubKey).
+		OnConflictColumns(preimageshare.FieldPaymentHash).
+		DoNothing().
+		Exec(ctx)
+	if err != nil && !errors.Is(err, dbSql.ErrNoRows) {
 		return fmt.Errorf("unable to store preimage share: %w", err)
 	}
 	return nil

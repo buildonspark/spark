@@ -122,6 +122,12 @@ func (s *SparkInternalServer) UpdatePreimageRequest(ctx context.Context, req *pb
 	return &emptypb.Empty{}, lightningHandler.UpdatePreimageRequest(ctx, req)
 }
 
+// StorePreimageShare stores an ECIES-encrypted preimage share forwarded from the coordinator.
+func (s *SparkInternalServer) StorePreimageShare(ctx context.Context, req *pbspark.StorePreimageShareV2Request) (*emptypb.Empty, error) {
+	lightningHandler := handler.NewLightningHandler(s.config)
+	return &emptypb.Empty{}, lightningHandler.StorePreimageShareInternal(ctx, req)
+}
+
 // PrepareTreeAddress prepares the tree address.
 func (s *SparkInternalServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
 	treeCreationHandler := handler.NewInternalTreeCreationHandler(s.config)

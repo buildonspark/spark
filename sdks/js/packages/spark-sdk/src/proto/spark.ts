@@ -1580,6 +1580,21 @@ export interface StorePreimageShareRequest {
   userIdentityPublicKey: Uint8Array;
 }
 
+export interface StorePreimageShareV2Request {
+  paymentHash: Uint8Array;
+  /** SO identifier -> ECIES-encrypted SecretShare protobuf */
+  encryptedPreimageShares: { [key: string]: Uint8Array };
+  threshold: number;
+  invoiceString: string;
+  userIdentityPublicKey: Uint8Array;
+  userSignature: Uint8Array;
+}
+
+export interface StorePreimageShareV2Request_EncryptedPreimageSharesEntry {
+  key: string;
+  value: Uint8Array;
+}
+
 export interface RequestedSigningCommitments {
   signingNonceCommitments: { [key: string]: SigningCommitment };
 }
@@ -12354,6 +12369,264 @@ export const StorePreimageShareRequest: MessageFns<StorePreimageShareRequest> = 
   },
 };
 
+function createBaseStorePreimageShareV2Request(): StorePreimageShareV2Request {
+  return {
+    paymentHash: new Uint8Array(0),
+    encryptedPreimageShares: {},
+    threshold: 0,
+    invoiceString: "",
+    userIdentityPublicKey: new Uint8Array(0),
+    userSignature: new Uint8Array(0),
+  };
+}
+
+export const StorePreimageShareV2Request: MessageFns<StorePreimageShareV2Request> = {
+  encode(message: StorePreimageShareV2Request, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.paymentHash.length !== 0) {
+      writer.uint32(10).bytes(message.paymentHash);
+    }
+    Object.entries(message.encryptedPreimageShares).forEach(([key, value]) => {
+      StorePreimageShareV2Request_EncryptedPreimageSharesEntry.encode(
+        { key: key as any, value },
+        writer.uint32(18).fork(),
+      ).join();
+    });
+    if (message.threshold !== 0) {
+      writer.uint32(24).uint32(message.threshold);
+    }
+    if (message.invoiceString !== "") {
+      writer.uint32(34).string(message.invoiceString);
+    }
+    if (message.userIdentityPublicKey.length !== 0) {
+      writer.uint32(42).bytes(message.userIdentityPublicKey);
+    }
+    if (message.userSignature.length !== 0) {
+      writer.uint32(50).bytes(message.userSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): StorePreimageShareV2Request {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStorePreimageShareV2Request();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.paymentHash = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          const entry2 = StorePreimageShareV2Request_EncryptedPreimageSharesEntry.decode(reader, reader.uint32());
+          if (entry2.value !== undefined) {
+            message.encryptedPreimageShares[entry2.key] = entry2.value;
+          }
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.threshold = reader.uint32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.invoiceString = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.userIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.userSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StorePreimageShareV2Request {
+    return {
+      paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
+      encryptedPreimageShares: isObject(object.encryptedPreimageShares)
+        ? Object.entries(object.encryptedPreimageShares).reduce<{ [key: string]: Uint8Array }>((acc, [key, value]) => {
+          acc[key] = bytesFromBase64(value as string);
+          return acc;
+        }, {})
+        : {},
+      threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
+      invoiceString: isSet(object.invoiceString) ? globalThis.String(object.invoiceString) : "",
+      userIdentityPublicKey: isSet(object.userIdentityPublicKey)
+        ? bytesFromBase64(object.userIdentityPublicKey)
+        : new Uint8Array(0),
+      userSignature: isSet(object.userSignature) ? bytesFromBase64(object.userSignature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: StorePreimageShareV2Request): unknown {
+    const obj: any = {};
+    if (message.paymentHash.length !== 0) {
+      obj.paymentHash = base64FromBytes(message.paymentHash);
+    }
+    if (message.encryptedPreimageShares) {
+      const entries = Object.entries(message.encryptedPreimageShares);
+      if (entries.length > 0) {
+        obj.encryptedPreimageShares = {};
+        entries.forEach(([k, v]) => {
+          obj.encryptedPreimageShares[k] = base64FromBytes(v);
+        });
+      }
+    }
+    if (message.threshold !== 0) {
+      obj.threshold = Math.round(message.threshold);
+    }
+    if (message.invoiceString !== "") {
+      obj.invoiceString = message.invoiceString;
+    }
+    if (message.userIdentityPublicKey.length !== 0) {
+      obj.userIdentityPublicKey = base64FromBytes(message.userIdentityPublicKey);
+    }
+    if (message.userSignature.length !== 0) {
+      obj.userSignature = base64FromBytes(message.userSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<StorePreimageShareV2Request>): StorePreimageShareV2Request {
+    return StorePreimageShareV2Request.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<StorePreimageShareV2Request>): StorePreimageShareV2Request {
+    const message = createBaseStorePreimageShareV2Request();
+    message.paymentHash = object.paymentHash ?? new Uint8Array(0);
+    message.encryptedPreimageShares = Object.entries(object.encryptedPreimageShares ?? {}).reduce<
+      { [key: string]: Uint8Array }
+    >((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {});
+    message.threshold = object.threshold ?? 0;
+    message.invoiceString = object.invoiceString ?? "";
+    message.userIdentityPublicKey = object.userIdentityPublicKey ?? new Uint8Array(0);
+    message.userSignature = object.userSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseStorePreimageShareV2Request_EncryptedPreimageSharesEntry(): StorePreimageShareV2Request_EncryptedPreimageSharesEntry {
+  return { key: "", value: new Uint8Array(0) };
+}
+
+export const StorePreimageShareV2Request_EncryptedPreimageSharesEntry: MessageFns<
+  StorePreimageShareV2Request_EncryptedPreimageSharesEntry
+> = {
+  encode(
+    message: StorePreimageShareV2Request_EncryptedPreimageSharesEntry,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value.length !== 0) {
+      writer.uint32(18).bytes(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): StorePreimageShareV2Request_EncryptedPreimageSharesEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStorePreimageShareV2Request_EncryptedPreimageSharesEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StorePreimageShareV2Request_EncryptedPreimageSharesEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? bytesFromBase64(object.value) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: StorePreimageShareV2Request_EncryptedPreimageSharesEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value.length !== 0) {
+      obj.value = base64FromBytes(message.value);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<StorePreimageShareV2Request_EncryptedPreimageSharesEntry>,
+  ): StorePreimageShareV2Request_EncryptedPreimageSharesEntry {
+    return StorePreimageShareV2Request_EncryptedPreimageSharesEntry.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<StorePreimageShareV2Request_EncryptedPreimageSharesEntry>,
+  ): StorePreimageShareV2Request_EncryptedPreimageSharesEntry {
+    const message = createBaseStorePreimageShareV2Request_EncryptedPreimageSharesEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? new Uint8Array(0);
+    return message;
+  },
+};
+
 function createBaseRequestedSigningCommitments(): RequestedSigningCommitments {
   return { signingNonceCommitments: {} };
 }
@@ -21178,6 +21451,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    store_preimage_share_v2: {
+      name: "store_preimage_share_v2",
+      requestType: StorePreimageShareV2Request,
+      requestStream: false,
+      responseType: Empty,
+      responseStream: false,
+      options: {},
+    },
     /**
      * Gets a specified number of signing commmitments for a set of nodes, which can be used as
      * part of a transfer package.
@@ -21468,6 +21749,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StorePreimageShareRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<Empty>>;
+  store_preimage_share_v2(
+    request: StorePreimageShareV2Request,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<Empty>>;
   /**
    * Gets a specified number of signing commmitments for a set of nodes, which can be used as
    * part of a transfer package.
@@ -21641,6 +21926,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
   ): Promise<Empty>;
   store_preimage_share(
     request: DeepPartial<StorePreimageShareRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<Empty>;
+  store_preimage_share_v2(
+    request: DeepPartial<StorePreimageShareV2Request>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<Empty>;
   /**

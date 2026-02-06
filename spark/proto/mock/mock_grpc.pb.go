@@ -23,6 +23,7 @@ const (
 	MockService_CleanUpPreimageShare_FullMethodName = "/mock.MockService/clean_up_preimage_share"
 	MockService_UpdateNodesStatus_FullMethodName    = "/mock.MockService/update_nodes_status"
 	MockService_TriggerTask_FullMethodName          = "/mock.MockService/trigger_task"
+	MockService_QueryPreimageShare_FullMethodName   = "/mock.MockService/query_preimage_share"
 )
 
 // MockServiceClient is the client API for MockService service.
@@ -33,6 +34,7 @@ type MockServiceClient interface {
 	UpdateNodesStatus(ctx context.Context, in *UpdateNodesStatusRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Triggers the execution of a scheduled task immediately by name. Used by hermetic tests
 	TriggerTask(ctx context.Context, in *TriggerTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	QueryPreimageShare(ctx context.Context, in *QueryPreimageShareRequest, opts ...grpc.CallOption) (*QueryPreimageShareResponse, error)
 }
 
 type mockServiceClient struct {
@@ -73,6 +75,16 @@ func (c *mockServiceClient) TriggerTask(ctx context.Context, in *TriggerTaskRequ
 	return out, nil
 }
 
+func (c *mockServiceClient) QueryPreimageShare(ctx context.Context, in *QueryPreimageShareRequest, opts ...grpc.CallOption) (*QueryPreimageShareResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryPreimageShareResponse)
+	err := c.cc.Invoke(ctx, MockService_QueryPreimageShare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MockServiceServer is the server API for MockService service.
 // All implementations must embed UnimplementedMockServiceServer
 // for forward compatibility.
@@ -81,6 +93,7 @@ type MockServiceServer interface {
 	UpdateNodesStatus(context.Context, *UpdateNodesStatusRequest) (*emptypb.Empty, error)
 	// Triggers the execution of a scheduled task immediately by name. Used by hermetic tests
 	TriggerTask(context.Context, *TriggerTaskRequest) (*emptypb.Empty, error)
+	QueryPreimageShare(context.Context, *QueryPreimageShareRequest) (*QueryPreimageShareResponse, error)
 	mustEmbedUnimplementedMockServiceServer()
 }
 
@@ -99,6 +112,9 @@ func (UnimplementedMockServiceServer) UpdateNodesStatus(context.Context, *Update
 }
 func (UnimplementedMockServiceServer) TriggerTask(context.Context, *TriggerTaskRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method TriggerTask not implemented")
+}
+func (UnimplementedMockServiceServer) QueryPreimageShare(context.Context, *QueryPreimageShareRequest) (*QueryPreimageShareResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method QueryPreimageShare not implemented")
 }
 func (UnimplementedMockServiceServer) mustEmbedUnimplementedMockServiceServer() {}
 func (UnimplementedMockServiceServer) testEmbeddedByValue()                     {}
@@ -175,6 +191,24 @@ func _MockService_TriggerTask_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MockService_QueryPreimageShare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryPreimageShareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MockServiceServer).QueryPreimageShare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MockService_QueryPreimageShare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MockServiceServer).QueryPreimageShare(ctx, req.(*QueryPreimageShareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MockService_ServiceDesc is the grpc.ServiceDesc for MockService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -193,6 +227,10 @@ var MockService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "trigger_task",
 			Handler:    _MockService_TriggerTask_Handler,
+		},
+		{
+			MethodName: "query_preimage_share",
+			Handler:    _MockService_QueryPreimageShare_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

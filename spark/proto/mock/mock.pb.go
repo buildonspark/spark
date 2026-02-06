@@ -163,6 +163,110 @@ func (x *TriggerTaskRequest) GetTaskName() string {
 	return ""
 }
 
+type QueryPreimageShareRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PaymentHash   []byte                 `protobuf:"bytes,1,opt,name=payment_hash,json=paymentHash,proto3" json:"payment_hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueryPreimageShareRequest) Reset() {
+	*x = QueryPreimageShareRequest{}
+	mi := &file_mock_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryPreimageShareRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryPreimageShareRequest) ProtoMessage() {}
+
+func (x *QueryPreimageShareRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mock_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryPreimageShareRequest.ProtoReflect.Descriptor instead.
+func (*QueryPreimageShareRequest) Descriptor() ([]byte, []int) {
+	return file_mock_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *QueryPreimageShareRequest) GetPaymentHash() []byte {
+	if x != nil {
+		return x.PaymentHash
+	}
+	return nil
+}
+
+type QueryPreimageShareResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PreimageShare []byte                 `protobuf:"bytes,1,opt,name=preimage_share,json=preimageShare,proto3" json:"preimage_share,omitempty"`
+	Threshold     int32                  `protobuf:"varint,2,opt,name=threshold,proto3" json:"threshold,omitempty"`
+	InvoiceString string                 `protobuf:"bytes,3,opt,name=invoice_string,json=invoiceString,proto3" json:"invoice_string,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueryPreimageShareResponse) Reset() {
+	*x = QueryPreimageShareResponse{}
+	mi := &file_mock_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryPreimageShareResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryPreimageShareResponse) ProtoMessage() {}
+
+func (x *QueryPreimageShareResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mock_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryPreimageShareResponse.ProtoReflect.Descriptor instead.
+func (*QueryPreimageShareResponse) Descriptor() ([]byte, []int) {
+	return file_mock_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *QueryPreimageShareResponse) GetPreimageShare() []byte {
+	if x != nil {
+		return x.PreimageShare
+	}
+	return nil
+}
+
+func (x *QueryPreimageShareResponse) GetThreshold() int32 {
+	if x != nil {
+		return x.Threshold
+	}
+	return 0
+}
+
+func (x *QueryPreimageShareResponse) GetInvoiceString() string {
+	if x != nil {
+		return x.InvoiceString
+	}
+	return ""
+}
+
 var File_mock_proto protoreflect.FileDescriptor
 
 const file_mock_proto_rawDesc = "" +
@@ -175,11 +279,18 @@ const file_mock_proto_rawDesc = "" +
 	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\"1\n" +
 	"\x12TriggerTaskRequest\x12\x1b\n" +
-	"\ttask_name\x18\x01 \x01(\tR\btaskName2\xfa\x01\n" +
+	"\ttask_name\x18\x01 \x01(\tR\btaskName\">\n" +
+	"\x19QueryPreimageShareRequest\x12!\n" +
+	"\fpayment_hash\x18\x01 \x01(\fR\vpaymentHash\"\x88\x01\n" +
+	"\x1aQueryPreimageShareResponse\x12%\n" +
+	"\x0epreimage_share\x18\x01 \x01(\fR\rpreimageShare\x12\x1c\n" +
+	"\tthreshold\x18\x02 \x01(\x05R\tthreshold\x12%\n" +
+	"\x0einvoice_string\x18\x03 \x01(\tR\rinvoiceString2\xd7\x02\n" +
 	"\vMockService\x12V\n" +
 	"\x17clean_up_preimage_share\x12!.mock.CleanUpPreimageShareRequest\x1a\x16.google.protobuf.Empty\"\x00\x12O\n" +
 	"\x13update_nodes_status\x12\x1e.mock.UpdateNodesStatusRequest\x1a\x16.google.protobuf.Empty\"\x00\x12B\n" +
-	"\ftrigger_task\x12\x18.mock.TriggerTaskRequest\x1a\x16.google.protobuf.Empty\"\x00B+Z)github.com/lightsparkdev/spark/proto/mockb\x06proto3"
+	"\ftrigger_task\x12\x18.mock.TriggerTaskRequest\x1a\x16.google.protobuf.Empty\"\x00\x12[\n" +
+	"\x14query_preimage_share\x12\x1f.mock.QueryPreimageShareRequest\x1a .mock.QueryPreimageShareResponse\"\x00B+Z)github.com/lightsparkdev/spark/proto/mockb\x06proto3"
 
 var (
 	file_mock_proto_rawDescOnce sync.Once
@@ -193,22 +304,26 @@ func file_mock_proto_rawDescGZIP() []byte {
 	return file_mock_proto_rawDescData
 }
 
-var file_mock_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_mock_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_mock_proto_goTypes = []any{
 	(*CleanUpPreimageShareRequest)(nil), // 0: mock.CleanUpPreimageShareRequest
 	(*UpdateNodesStatusRequest)(nil),    // 1: mock.UpdateNodesStatusRequest
 	(*TriggerTaskRequest)(nil),          // 2: mock.TriggerTaskRequest
-	(*emptypb.Empty)(nil),               // 3: google.protobuf.Empty
+	(*QueryPreimageShareRequest)(nil),   // 3: mock.QueryPreimageShareRequest
+	(*QueryPreimageShareResponse)(nil),  // 4: mock.QueryPreimageShareResponse
+	(*emptypb.Empty)(nil),               // 5: google.protobuf.Empty
 }
 var file_mock_proto_depIdxs = []int32{
 	0, // 0: mock.MockService.clean_up_preimage_share:input_type -> mock.CleanUpPreimageShareRequest
 	1, // 1: mock.MockService.update_nodes_status:input_type -> mock.UpdateNodesStatusRequest
 	2, // 2: mock.MockService.trigger_task:input_type -> mock.TriggerTaskRequest
-	3, // 3: mock.MockService.clean_up_preimage_share:output_type -> google.protobuf.Empty
-	3, // 4: mock.MockService.update_nodes_status:output_type -> google.protobuf.Empty
-	3, // 5: mock.MockService.trigger_task:output_type -> google.protobuf.Empty
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
+	3, // 3: mock.MockService.query_preimage_share:input_type -> mock.QueryPreimageShareRequest
+	5, // 4: mock.MockService.clean_up_preimage_share:output_type -> google.protobuf.Empty
+	5, // 5: mock.MockService.update_nodes_status:output_type -> google.protobuf.Empty
+	5, // 6: mock.MockService.trigger_task:output_type -> google.protobuf.Empty
+	4, // 7: mock.MockService.query_preimage_share:output_type -> mock.QueryPreimageShareResponse
+	4, // [4:8] is the sub-list for method output_type
+	0, // [0:4] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -225,7 +340,7 @@ func file_mock_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mock_proto_rawDesc), len(file_mock_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

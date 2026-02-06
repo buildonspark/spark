@@ -36,6 +36,7 @@ service SparkInternalService {
     rpc initiate_preimage_swap_v2(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc provide_preimage(ProvidePreimageRequest) returns (google.protobuf.Empty) {}
     rpc update_preimage_request(UpdatePreimageRequestRequest) returns (google.protobuf.Empty) {}
+    rpc store_preimage_share(spark.StorePreimageShareV2Request) returns (google.protobuf.Empty) {}
 
     rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
 
