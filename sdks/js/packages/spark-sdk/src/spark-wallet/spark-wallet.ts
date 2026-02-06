@@ -987,6 +987,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @param {string} [params.memo] - The memo for the payment
    * @param {string} [params.senderSparkAddress] - The spark address of the expected sender
    * @param {Date} [params.expiryTime] - The expiry time of the payment
+   * @param {string} [params.receiverIdentityPubkey] - Optional public key of the wallet receiving the invoice. If not present, the receiver will be the creator of this request. If provided and different from the creator's identity public key, the created invoice will be unsigned.
    * @returns {Promise<SparkAddressFormat>} The Spark address for the sats payment
    */
   public async createSatsInvoice({
@@ -994,11 +995,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     memo,
     senderSparkAddress,
     expiryTime,
+    receiverIdentityPubkey,
   }: {
     amount?: number;
     memo?: string;
     senderSparkAddress?: SparkAddressFormat;
     expiryTime?: Date;
+    receiverIdentityPubkey?: string;
   }): Promise<SparkAddressFormat> {
     const MAX_SATS_AMOUNT = 2_100_000_000_000_000; // 21_000_000 BTC * 100_000_000 sats/BTC
     if (amount && (amount < 0 || amount > MAX_SATS_AMOUNT)) {
@@ -1033,15 +1036,23 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     };
     validateSparkInvoiceFields(invoiceFields);
     const identityPublicKey = await this.config.signer.getIdentityPublicKey();
-    const hash = HashSparkInvoice(
-      invoiceFields,
-      identityPublicKey,
-      this.config.getNetworkType(),
-    );
-    const signature = await this.config.signer.signSchnorrWithIdentityKey(hash);
+    const shouldSignInvoice =
+      !receiverIdentityPubkey ||
+      receiverIdentityPubkey.toLowerCase() ===
+        bytesToHex(identityPublicKey).toLowerCase();
+    let signature: Uint8Array | undefined = undefined;
+    if (shouldSignInvoice) {
+      const hash = HashSparkInvoice(
+        invoiceFields,
+        identityPublicKey,
+        this.config.getNetworkType(),
+      );
+      signature = await this.config.signer.signSchnorrWithIdentityKey(hash);
+    }
     return encodeSparkAddressWithSignature(
       {
-        identityPublicKey: bytesToHex(identityPublicKey),
+        identityPublicKey:
+          receiverIdentityPubkey ?? bytesToHex(identityPublicKey),
         network: this.config.getNetworkType(),
         sparkInvoiceFields: invoiceFields,
       },
@@ -3289,6 +3300,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       sparkInvoice = await this.createSatsInvoice({
         amount: sparkAmount,
         expiryTime: new Date(Date.now() + expirySeconds * 1000),
+        receiverIdentityPubkey: receiverIdentityPubkey,
         // Note: memo does not need to be duplicated in the spark invoice.
       });
     }
