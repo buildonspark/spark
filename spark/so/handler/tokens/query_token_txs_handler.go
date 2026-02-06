@@ -31,6 +31,7 @@ type QueryTokenTransactionsHandler struct {
 
 const (
 	maxTokenTransactionFilterValues = 500
+	maxTokenTransactionHashValues   = 100
 	maxTokenTransactionPageSize     = 100
 	defaultTokenTransactionPageSize = 50
 )

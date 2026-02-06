@@ -4789,10 +4789,10 @@ func (m *QueryTokenTransactionsByTxHash) validate(all bool) error {
 
 	var errors []error
 
-	if l := len(m.GetTokenTransactionHashes()); l < 1 || l > 100 {
+	if len(m.GetTokenTransactionHashes()) < 1 {
 		err := QueryTokenTransactionsByTxHashValidationError{
 			field:  "TokenTransactionHashes",
-			reason: "value must contain between 1 and 100 items, inclusive",
+			reason: "value must contain at least 1 item(s)",
 		}
 		if !all {
 			return err
