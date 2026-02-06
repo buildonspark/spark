@@ -1517,6 +1517,45 @@ export interface ClaimLeafKeyTweak_PubkeySharesTweakEntry {
   value: Uint8Array;
 }
 
+export interface ClaimLeafKeyTweaks {
+  leavesToReceive: ClaimLeafKeyTweak[];
+}
+
+/**
+ * ClaimPackage is a package of leaves to claim and key tweaks to apply.
+ * This is in the improved claim transfer flow where the receiver can claim the transfer in one call
+ * to the coordinator SO, similar to how TransferPackage works for the sender.
+ */
+export interface ClaimPackage {
+  /** The leaves to claim, with user signed cpfp refunds and signing package. */
+  leavesToClaim: UserSignedTxSigningJob[];
+  /** The map of SO identifier to serialized ClaimLeafKeyTweaks. */
+  keyTweakPackage: { [key: string]: Uint8Array };
+  /** The signature of user to prove that the key_tweak_package is not tampered. */
+  userSignature: Uint8Array;
+  /** The leaves to claim, with user signed direct refunds and signing package. */
+  directLeavesToClaim: UserSignedTxSigningJob[];
+  /** The leaves to claim, with user signed direct from cpfp refunds and signing package. */
+  directFromCpfpLeavesToClaim: UserSignedTxSigningJob[];
+  /** The hash variant to use for computing the claim package signing payload. */
+  hashVariant: HashVariant;
+}
+
+export interface ClaimPackage_KeyTweakPackageEntry {
+  key: string;
+  value: Uint8Array;
+}
+
+export interface ClaimTransferRequest {
+  transferId: string;
+  ownerIdentityPublicKey: Uint8Array;
+  claimPackage: ClaimPackage | undefined;
+}
+
+export interface ClaimTransferResponse {
+  transfer: Transfer | undefined;
+}
+
 export interface ClaimTransferTweakKeysRequest {
   transferId: string;
   ownerIdentityPublicKey: Uint8Array;
@@ -11455,6 +11494,478 @@ export const ClaimLeafKeyTweak_PubkeySharesTweakEntry: MessageFns<ClaimLeafKeyTw
   },
 };
 
+function createBaseClaimLeafKeyTweaks(): ClaimLeafKeyTweaks {
+  return { leavesToReceive: [] };
+}
+
+export const ClaimLeafKeyTweaks: MessageFns<ClaimLeafKeyTweaks> = {
+  encode(message: ClaimLeafKeyTweaks, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.leavesToReceive) {
+      ClaimLeafKeyTweak.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClaimLeafKeyTweaks {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClaimLeafKeyTweaks();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leavesToReceive.push(ClaimLeafKeyTweak.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ClaimLeafKeyTweaks {
+    return {
+      leavesToReceive: globalThis.Array.isArray(object?.leavesToReceive)
+        ? object.leavesToReceive.map((e: any) => ClaimLeafKeyTweak.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ClaimLeafKeyTweaks): unknown {
+    const obj: any = {};
+    if (message.leavesToReceive?.length) {
+      obj.leavesToReceive = message.leavesToReceive.map((e) => ClaimLeafKeyTweak.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ClaimLeafKeyTweaks>): ClaimLeafKeyTweaks {
+    return ClaimLeafKeyTweaks.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ClaimLeafKeyTweaks>): ClaimLeafKeyTweaks {
+    const message = createBaseClaimLeafKeyTweaks();
+    message.leavesToReceive = object.leavesToReceive?.map((e) => ClaimLeafKeyTweak.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseClaimPackage(): ClaimPackage {
+  return {
+    leavesToClaim: [],
+    keyTweakPackage: {},
+    userSignature: new Uint8Array(0),
+    directLeavesToClaim: [],
+    directFromCpfpLeavesToClaim: [],
+    hashVariant: 0,
+  };
+}
+
+export const ClaimPackage: MessageFns<ClaimPackage> = {
+  encode(message: ClaimPackage, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.leavesToClaim) {
+      UserSignedTxSigningJob.encode(v!, writer.uint32(10).fork()).join();
+    }
+    Object.entries(message.keyTweakPackage).forEach(([key, value]) => {
+      ClaimPackage_KeyTweakPackageEntry.encode({ key: key as any, value }, writer.uint32(18).fork()).join();
+    });
+    if (message.userSignature.length !== 0) {
+      writer.uint32(26).bytes(message.userSignature);
+    }
+    for (const v of message.directLeavesToClaim) {
+      UserSignedTxSigningJob.encode(v!, writer.uint32(34).fork()).join();
+    }
+    for (const v of message.directFromCpfpLeavesToClaim) {
+      UserSignedTxSigningJob.encode(v!, writer.uint32(42).fork()).join();
+    }
+    if (message.hashVariant !== 0) {
+      writer.uint32(48).int32(message.hashVariant);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClaimPackage {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClaimPackage();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leavesToClaim.push(UserSignedTxSigningJob.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          const entry2 = ClaimPackage_KeyTweakPackageEntry.decode(reader, reader.uint32());
+          if (entry2.value !== undefined) {
+            message.keyTweakPackage[entry2.key] = entry2.value;
+          }
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.userSignature = reader.bytes();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.directLeavesToClaim.push(UserSignedTxSigningJob.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.directFromCpfpLeavesToClaim.push(UserSignedTxSigningJob.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.hashVariant = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ClaimPackage {
+    return {
+      leavesToClaim: globalThis.Array.isArray(object?.leavesToClaim)
+        ? object.leavesToClaim.map((e: any) => UserSignedTxSigningJob.fromJSON(e))
+        : [],
+      keyTweakPackage: isObject(object.keyTweakPackage)
+        ? Object.entries(object.keyTweakPackage).reduce<{ [key: string]: Uint8Array }>((acc, [key, value]) => {
+          acc[key] = bytesFromBase64(value as string);
+          return acc;
+        }, {})
+        : {},
+      userSignature: isSet(object.userSignature) ? bytesFromBase64(object.userSignature) : new Uint8Array(0),
+      directLeavesToClaim: globalThis.Array.isArray(object?.directLeavesToClaim)
+        ? object.directLeavesToClaim.map((e: any) => UserSignedTxSigningJob.fromJSON(e))
+        : [],
+      directFromCpfpLeavesToClaim: globalThis.Array.isArray(object?.directFromCpfpLeavesToClaim)
+        ? object.directFromCpfpLeavesToClaim.map((e: any) => UserSignedTxSigningJob.fromJSON(e))
+        : [],
+      hashVariant: isSet(object.hashVariant) ? hashVariantFromJSON(object.hashVariant) : 0,
+    };
+  },
+
+  toJSON(message: ClaimPackage): unknown {
+    const obj: any = {};
+    if (message.leavesToClaim?.length) {
+      obj.leavesToClaim = message.leavesToClaim.map((e) => UserSignedTxSigningJob.toJSON(e));
+    }
+    if (message.keyTweakPackage) {
+      const entries = Object.entries(message.keyTweakPackage);
+      if (entries.length > 0) {
+        obj.keyTweakPackage = {};
+        entries.forEach(([k, v]) => {
+          obj.keyTweakPackage[k] = base64FromBytes(v);
+        });
+      }
+    }
+    if (message.userSignature.length !== 0) {
+      obj.userSignature = base64FromBytes(message.userSignature);
+    }
+    if (message.directLeavesToClaim?.length) {
+      obj.directLeavesToClaim = message.directLeavesToClaim.map((e) => UserSignedTxSigningJob.toJSON(e));
+    }
+    if (message.directFromCpfpLeavesToClaim?.length) {
+      obj.directFromCpfpLeavesToClaim = message.directFromCpfpLeavesToClaim.map((e) =>
+        UserSignedTxSigningJob.toJSON(e)
+      );
+    }
+    if (message.hashVariant !== 0) {
+      obj.hashVariant = hashVariantToJSON(message.hashVariant);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ClaimPackage>): ClaimPackage {
+    return ClaimPackage.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ClaimPackage>): ClaimPackage {
+    const message = createBaseClaimPackage();
+    message.leavesToClaim = object.leavesToClaim?.map((e) => UserSignedTxSigningJob.fromPartial(e)) || [];
+    message.keyTweakPackage = Object.entries(object.keyTweakPackage ?? {}).reduce<{ [key: string]: Uint8Array }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value;
+        }
+        return acc;
+      },
+      {},
+    );
+    message.userSignature = object.userSignature ?? new Uint8Array(0);
+    message.directLeavesToClaim = object.directLeavesToClaim?.map((e) => UserSignedTxSigningJob.fromPartial(e)) || [];
+    message.directFromCpfpLeavesToClaim =
+      object.directFromCpfpLeavesToClaim?.map((e) => UserSignedTxSigningJob.fromPartial(e)) || [];
+    message.hashVariant = object.hashVariant ?? 0;
+    return message;
+  },
+};
+
+function createBaseClaimPackage_KeyTweakPackageEntry(): ClaimPackage_KeyTweakPackageEntry {
+  return { key: "", value: new Uint8Array(0) };
+}
+
+export const ClaimPackage_KeyTweakPackageEntry: MessageFns<ClaimPackage_KeyTweakPackageEntry> = {
+  encode(message: ClaimPackage_KeyTweakPackageEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value.length !== 0) {
+      writer.uint32(18).bytes(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClaimPackage_KeyTweakPackageEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClaimPackage_KeyTweakPackageEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ClaimPackage_KeyTweakPackageEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? bytesFromBase64(object.value) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: ClaimPackage_KeyTweakPackageEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value.length !== 0) {
+      obj.value = base64FromBytes(message.value);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ClaimPackage_KeyTweakPackageEntry>): ClaimPackage_KeyTweakPackageEntry {
+    return ClaimPackage_KeyTweakPackageEntry.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ClaimPackage_KeyTweakPackageEntry>): ClaimPackage_KeyTweakPackageEntry {
+    const message = createBaseClaimPackage_KeyTweakPackageEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseClaimTransferRequest(): ClaimTransferRequest {
+  return { transferId: "", ownerIdentityPublicKey: new Uint8Array(0), claimPackage: undefined };
+}
+
+export const ClaimTransferRequest: MessageFns<ClaimTransferRequest> = {
+  encode(message: ClaimTransferRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transferId !== "") {
+      writer.uint32(10).string(message.transferId);
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+    }
+    if (message.claimPackage !== undefined) {
+      ClaimPackage.encode(message.claimPackage, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClaimTransferRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClaimTransferRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transferId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.claimPackage = ClaimPackage.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ClaimTransferRequest {
+    return {
+      transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      claimPackage: isSet(object.claimPackage) ? ClaimPackage.fromJSON(object.claimPackage) : undefined,
+    };
+  },
+
+  toJSON(message: ClaimTransferRequest): unknown {
+    const obj: any = {};
+    if (message.transferId !== "") {
+      obj.transferId = message.transferId;
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.claimPackage !== undefined) {
+      obj.claimPackage = ClaimPackage.toJSON(message.claimPackage);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ClaimTransferRequest>): ClaimTransferRequest {
+    return ClaimTransferRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ClaimTransferRequest>): ClaimTransferRequest {
+    const message = createBaseClaimTransferRequest();
+    message.transferId = object.transferId ?? "";
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.claimPackage = (object.claimPackage !== undefined && object.claimPackage !== null)
+      ? ClaimPackage.fromPartial(object.claimPackage)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseClaimTransferResponse(): ClaimTransferResponse {
+  return { transfer: undefined };
+}
+
+export const ClaimTransferResponse: MessageFns<ClaimTransferResponse> = {
+  encode(message: ClaimTransferResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClaimTransferResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClaimTransferResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ClaimTransferResponse {
+    return { transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined };
+  },
+
+  toJSON(message: ClaimTransferResponse): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ClaimTransferResponse>): ClaimTransferResponse {
+    return ClaimTransferResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ClaimTransferResponse>): ClaimTransferResponse {
+    const message = createBaseClaimTransferResponse();
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? Transfer.fromPartial(object.transfer)
+      : undefined;
+    return message;
+  },
+};
+
 function createBaseClaimTransferTweakKeysRequest(): ClaimTransferTweakKeysRequest {
   return { transferId: "", ownerIdentityPublicKey: new Uint8Array(0), leavesToReceive: [] };
 }
@@ -20857,6 +21368,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    claim_transfer: {
+      name: "claim_transfer",
+      requestType: ClaimTransferRequest,
+      requestStream: false,
+      responseType: ClaimTransferResponse,
+      responseStream: false,
+      options: {},
+    },
     get_utxos_for_address: {
       name: "get_utxos_for_address",
       requestType: GetUtxosForAddressRequest,
@@ -21049,6 +21568,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartTransferRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartTransferResponse>>;
+  claim_transfer(
+    request: ClaimTransferRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<ClaimTransferResponse>>;
   get_utxos_for_address(
     request: GetUtxosForAddressRequest,
     context: CallContext & CallContextExt,
@@ -21226,6 +21749,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartTransferResponse>;
+  claim_transfer(
+    request: DeepPartial<ClaimTransferRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<ClaimTransferResponse>;
   get_utxos_for_address(
     request: DeepPartial<GetUtxosForAddressRequest>,
     options?: CallOptions & CallOptionsExt,
