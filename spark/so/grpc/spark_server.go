@@ -122,6 +122,13 @@ func (s *SparkServer) ClaimTransferSignRefundsV2(ctx context.Context, req *pb.Cl
 	return transferHander.ClaimTransferSignRefundsV2(ctx, req)
 }
 
+// ClaimTransfer claims a transfer in a single call, combining key tweak delivery,
+// refund signing, signature aggregation, and finalization.
+func (s *SparkServer) ClaimTransfer(ctx context.Context, req *pb.ClaimTransferRequest) (*pb.ClaimTransferResponse, error) {
+	transferHandler := handler.NewTransferHandler(s.config)
+	return transferHandler.ClaimTransfer(ctx, req)
+}
+
 // ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
 func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
 	return nil, errors.UnimplementedMethodDisabled(errDeprecated)

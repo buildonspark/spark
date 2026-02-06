@@ -18,11 +18,13 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -2186,6 +2188,10 @@ func (h *TransferHandler) ValidateKeyTweakProof(ctx context.Context, transferLea
 	ctx, span := tracer.Start(ctx, "TransferHandler.ValidateKeyTweakProof")
 	defer span.End()
 
+	if len(transferLeaves) != len(keyTweakProofs) {
+		return fmt.Errorf("transfer has %d leaves but %d key tweak proofs provided", len(transferLeaves), len(keyTweakProofs))
+	}
+
 	for _, leaf := range transferLeaves {
 		treeNode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
@@ -2200,8 +2206,14 @@ func (h *TransferHandler) ValidateKeyTweakProof(ctx context.Context, transferLea
 		if err != nil {
 			return fmt.Errorf("unable to unmarshal key tweak for leaf %s: %w", leaf.ID.String(), err)
 		}
-		for i, proof := range proof.Proofs {
-			if !bytes.Equal(keyTweakProto.SecretShareTweak.Proofs[i], proof) {
+		if keyTweakProto.SecretShareTweak == nil {
+			return fmt.Errorf("missing secret share tweak for leaf %s", leaf.ID.String())
+		}
+		if len(keyTweakProto.SecretShareTweak.Proofs) != len(proof.Proofs) {
+			return fmt.Errorf("leaf %s has %d proofs but %d were provided", leaf.ID.String(), len(keyTweakProto.SecretShareTweak.Proofs), len(proof.Proofs))
+		}
+		for i, p := range proof.Proofs {
+			if !bytes.Equal(keyTweakProto.SecretShareTweak.Proofs[i], p) {
 				return fmt.Errorf("key tweak proof for leaf %s is invalid, the proof provided is not the same as key tweak proof. please check your implementation to see if you are claiming the same transfer multiple times at the same time", leaf.ID.String())
 			}
 		}
@@ -2243,6 +2255,18 @@ func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent
 }
 
 func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *ent.Transfer, keyTweakProofs map[string]*pb.SecretProof, userPublicKeys map[string][]byte) error {
+	return h.settleReceiverKeyTweakInternal(ctx, transfer, keyTweakProofs, userPublicKeys, nil, nil)
+}
+
+// settleReceiverKeyTweakWithClaimPackage is like settleReceiverKeyTweak but also delivers
+// ECIES-encrypted key tweaks to each SO as part of the two-phase commit.
+// encryptedKeyTweakPackage is the full map (SO identifier -> ciphertext) and claimSignature
+// is the user signature over the package. Both are forwarded so each SO can verify independently.
+func (h *TransferHandler) settleReceiverKeyTweakWithClaimPackage(ctx context.Context, transfer *ent.Transfer, keyTweakProofs map[string]*pb.SecretProof, userPublicKeys map[string][]byte, encryptedKeyTweakPackage map[string][]byte, claimSignature []byte) error {
+	return h.settleReceiverKeyTweakInternal(ctx, transfer, keyTweakProofs, userPublicKeys, encryptedKeyTweakPackage, claimSignature)
+}
+
+func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, transfer *ent.Transfer, keyTweakProofs map[string]*pb.SecretProof, userPublicKeys map[string][]byte, encryptedKeyTweakPackage map[string][]byte, claimSignature []byte) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.settleReceiverKeyTweak", trace.WithAttributes(
 		transferTypeKey.String(string(transfer.Type)),
 	))
@@ -2257,11 +2281,16 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 		}
 		defer conn.Close()
 		client := pbinternal.NewSparkInternalServiceClient(conn)
-		return client.InitiateSettleReceiverKeyTweak(ctx, &pbinternal.InitiateSettleReceiverKeyTweakRequest{
+		req := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
 			TransferId:     transfer.ID.String(),
 			KeyTweakProofs: keyTweakProofs,
 			UserPublicKeys: userPublicKeys,
-		})
+		}
+		if encryptedKeyTweakPackage != nil {
+			req.EncryptedClaimKeyTweakPackage = encryptedKeyTweakPackage
+			req.ClaimSignature = claimSignature
+		}
+		return client.InitiateSettleReceiverKeyTweak(ctx, req)
 	})
 	logger := logging.GetLoggerFromContext(ctx)
 	if err != nil {
@@ -2277,11 +2306,16 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 		action = pbinternal.SettleKeyTweakAction_ROLLBACK
 	}
 
-	err = h.InitiateSettleReceiverKeyTweak(ctx, &pbinternal.InitiateSettleReceiverKeyTweakRequest{
+	initiateReq := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
 		TransferId:     transfer.ID.String(),
 		KeyTweakProofs: keyTweakProofs,
 		UserPublicKeys: userPublicKeys,
-	})
+	}
+	if encryptedKeyTweakPackage != nil {
+		initiateReq.EncryptedClaimKeyTweakPackage = encryptedKeyTweakPackage
+		initiateReq.ClaimSignature = claimSignature
+	}
+	err = h.InitiateSettleReceiverKeyTweak(ctx, initiateReq)
 	if err != nil {
 		logger.Error("Unable to settle receiver key tweak internally, you might have a race condition in your implementation", zap.Error(err))
 		action = pbinternal.SettleKeyTweakAction_ROLLBACK
@@ -2363,6 +2397,615 @@ func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundT
 // ClaimTransferSignRefundsV2 signs new refund transactions as part of the transfer.
 func (h *TransferHandler) ClaimTransferSignRefundsV2(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
 	return h.claimTransferSignRefunds(ctx, req, true)
+}
+
+// ClaimTransfer claims a transfer in a single call. It combines key tweak delivery,
+// refund signing, signature aggregation, and finalization.
+func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransferRequest) (*pb.ClaimTransferResponse, error) {
+	ctx, span := tracer.Start(ctx, "TransferHandler.ClaimTransfer")
+	defer span.End()
+
+	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
+		return nil, err
+	}
+
+	transferID, err := uuid.Parse(req.GetTransferId())
+	if err != nil {
+		return nil, fmt.Errorf("invalid transfer ID: %w", err)
+	}
+
+	claimPackage := req.ClaimPackage
+	if claimPackage == nil {
+		return nil, fmt.Errorf("claim_package is required")
+	}
+
+	transfer, err := h.loadTransferForUpdate(ctx, transferID, sql.WithLockAction(sql.NoWait))
+	if err != nil {
+		return nil, fmt.Errorf("unable to load transfer %s: %w", transferID, err)
+	}
+	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
+	if !transfer.ReceiverIdentityPubkey.Equals(reqOwnerIDPubKey) {
+		return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", transferID)
+	}
+
+	switch transfer.Status {
+	case st.TransferStatusSenderKeyTweaked:
+	case st.TransferStatusReceiverKeyTweaked:
+	case st.TransferStatusReceiverRefundSigned:
+	case st.TransferStatusReceiverKeyTweakLocked:
+	case st.TransferStatusReceiverKeyTweakApplied:
+		// ok
+	case st.TransferStatusCompleted:
+		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", transferID))
+	default:
+		return nil, fmt.Errorf("transfer %s is not in a claimable status, current status: %s", transferID, transfer.Status)
+	}
+
+	leavesToTransfer, err := transfer.QueryTransferLeaves().All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load transfer leaves for transfer %s: %w", transferID, err)
+	}
+	if len(leavesToTransfer) != len(claimPackage.LeavesToClaim) {
+		return nil, fmt.Errorf("inconsistent leaves to claim for transfer %s: expected %d, got %d", transferID, len(leavesToTransfer), len(claimPackage.LeavesToClaim))
+	}
+
+	if len(claimPackage.KeyTweakPackage) == 0 {
+		return nil, fmt.Errorf("claim package key_tweak_package is required and must be non-empty")
+	}
+
+	// Verify user signature on the claim package.
+	if claimPackage.HashVariant != pb.HashVariant_HASH_VARIANT_V2 {
+		return nil, fmt.Errorf("claim package must use HASH_VARIANT_V2, got %s", claimPackage.HashVariant)
+	}
+	if len(claimPackage.UserSignature) == 0 {
+		return nil, fmt.Errorf("claim package user_signature is required")
+	}
+	signingPayload := common.GetClaimPackageSigningPayload(transferID, claimPackage.KeyTweakPackage)
+	if err := common.VerifyECDSASignature(reqOwnerIDPubKey, claimPackage.UserSignature, signingPayload); err != nil {
+		return nil, fmt.Errorf("unable to verify claim package signature: %w", err)
+	}
+
+	// Decrypt and extract key tweak proofs from the coordinator's portion of the claim package.
+	keyTweakProofs := map[string]*pb.SecretProof{}
+	coordinatorKeyTweaks := claimPackage.KeyTweakPackage[h.config.Identifier]
+	if len(coordinatorKeyTweaks) > 0 {
+		decryptionPrivateKey := eciesgo.NewPrivateKeyFromBytes(h.config.IdentityPrivateKey.Serialize())
+		decrypted, err := eciesgo.Decrypt(decryptionPrivateKey, coordinatorKeyTweaks)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decrypt coordinator claim key tweaks: %w", err)
+		}
+		claimKeyTweaks := &pb.ClaimLeafKeyTweaks{}
+		if err := proto.Unmarshal(decrypted, claimKeyTweaks); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal coordinator claim key tweaks: %w", err)
+		}
+		for _, leafTweak := range claimKeyTweaks.LeavesToReceive {
+			if leafTweak.SecretShareTweak == nil {
+				return nil, fmt.Errorf("missing secret share tweak for leaf %s", leafTweak.LeafId)
+			}
+			if len(leafTweak.SecretShareTweak.Proofs) != int(h.config.Threshold) {
+				return nil, fmt.Errorf("expected %d proofs for leaf %s, got %d", h.config.Threshold, leafTweak.LeafId, len(leafTweak.SecretShareTweak.Proofs))
+			}
+			keyTweakProofs[leafTweak.LeafId] = &pb.SecretProof{
+				Proofs: leafTweak.SecretShareTweak.Proofs,
+			}
+		}
+	} else {
+		// Key tweaks already stored (retry scenario), extract from transfer_leaves.
+		for _, leaf := range leavesToTransfer {
+			treeNode, err := leaf.QueryLeaf().Only(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("unable to get tree node for leaf %s: %w", leaf.ID, err)
+			}
+			if leaf.KeyTweak != nil {
+				leafKeyTweak := &pb.ClaimLeafKeyTweak{}
+				if err := proto.Unmarshal(leaf.KeyTweak, leafKeyTweak); err != nil {
+					return nil, fmt.Errorf("unable to unmarshal key tweak for leaf %s: %w", leaf.ID, err)
+				}
+				if leafKeyTweak.SecretShareTweak == nil {
+					return nil, fmt.Errorf("missing secret share tweak for leaf %s", treeNode.ID)
+				}
+				if len(leafKeyTweak.SecretShareTweak.Proofs) != int(h.config.Threshold) {
+					return nil, fmt.Errorf("expected %d proofs for leaf %s, got %d", h.config.Threshold, treeNode.ID, len(leafKeyTweak.SecretShareTweak.Proofs))
+				}
+				keyTweakProofs[treeNode.ID.String()] = &pb.SecretProof{
+					Proofs: leafKeyTweak.SecretShareTweak.Proofs,
+				}
+			}
+		}
+	}
+
+	userPublicKeys := make(map[string][]byte)
+	for _, job := range claimPackage.LeavesToClaim {
+		userPublicKeys[job.LeafId] = job.SigningPublicKey
+	}
+
+	err = h.settleReceiverKeyTweakWithClaimPackage(ctx, transfer, keyTweakProofs, userPublicKeys, claimPackage.KeyTweakPackage, claimPackage.UserSignature)
+	if err != nil {
+		return nil, fmt.Errorf("unable to settle receiver key tweak: %w", err)
+	}
+
+	// Reload the transfer after key tweak settlement.
+	transfer, err = h.loadTransferForUpdate(ctx, transferID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load transfer %s: %w", transferID, err)
+	}
+	if transfer.Status == st.TransferStatusCompleted {
+		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s is already completed", transferID))
+	}
+
+	// Update transfer status to ReceiverRefundSigned.
+	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverRefundSigned).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
+	}
+
+	leaves, err := h.getLeavesFromTransfer(ctx, transfer)
+	if err != nil {
+		return nil, err
+	}
+	if len(leaves) == 0 {
+		return nil, fmt.Errorf("leaves cannot be empty")
+	}
+
+	result, err := h.prepareClaimRefundSigningJobs(ctx, claimPackage, leaves, transfer)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs := result.signingJobs
+	leafJobMap := result.leafJobMap
+	jobIsDirectRefund := result.jobIsDirectRefund
+	jobIsDirectFromCpfpRefund := result.jobIsDirectFromCpfpRefund
+	cpfpUserRefundMap := result.cpfpUserRefundMap
+	directUserRefundMap := result.directUserRefundMap
+	directFromCpfpUserRefundMap := result.directFromCpfpUserRefundMap
+
+	// Sign with pregenerated nonces.
+	signingResults, err := helper.SignFrostWithPregeneratedNonce(ctx, h.config, signingJobs)
+	if err != nil {
+		return nil, fmt.Errorf("unable to sign frost: %w", err)
+	}
+
+	// Group signing results by leaf and type.
+	cpfpResults := make(map[string]*helper.SigningResult)
+	directResults := make(map[string]*helper.SigningResult)
+	directFromCpfpResults := make(map[string]*helper.SigningResult)
+
+	for _, signingResult := range signingResults {
+		leaf, ok := leafJobMap[signingResult.JobID]
+		if !ok {
+			return nil, fmt.Errorf("signing result for unknown job ID %s", signingResult.JobID)
+		}
+		if jobIsDirectRefund[signingResult.JobID] {
+			directResults[leaf.ID.String()] = signingResult
+		} else if jobIsDirectFromCpfpRefund[signingResult.JobID] {
+			directFromCpfpResults[leaf.ID.String()] = signingResult
+		} else {
+			cpfpResults[leaf.ID.String()] = signingResult
+		}
+	}
+
+	// Aggregate signatures (combine SO shares + user shares).
+	logger := logging.GetLoggerFromContext(ctx)
+	frostConn, err := h.config.NewFrostGRPCConnection()
+	if err != nil {
+		return nil, fmt.Errorf("unable to connect to frost: %w", err)
+	}
+	defer frostConn.Close()
+	frostClient := pbfrost.NewFrostServiceClient(frostConn)
+
+	nodeSignatures := make([]*pb.NodeSignatures, 0, len(cpfpResults))
+	for leafID, signingResult := range cpfpResults {
+		cpfpUserJob := cpfpUserRefundMap[leafID]
+		leaf, exists := leaves[leafID]
+		if !exists {
+			return nil, fmt.Errorf("leaf %s not found", leafID)
+		}
+
+		logger.Sugar().Infof("Aggregating cpfp frost signature for claim transfer leaf %s", leafID)
+		cpfpSig, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
+			Message:            signingResult.Message,
+			SignatureShares:    signingResult.SignatureShares,
+			PublicShares:       signingResult.PublicKeys,
+			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
+			Commitments:        cpfpUserJob.SigningCommitments.SigningCommitments,
+			UserCommitments:    cpfpUserJob.SigningNonceCommitment,
+			UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
+			UserSignatureShare: cpfpUserJob.UserSignature,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("unable to aggregate frost for cpfp refund of leaf %s: %w", leafID, err)
+		}
+
+		nodeSig := &pb.NodeSignatures{
+			NodeId:                          leafID,
+			NodeTxSignature:                 []byte{},
+			DirectNodeTxSignature:           []byte{},
+			RefundTxSignature:               cpfpSig.Signature,
+			DirectRefundTxSignature:         []byte{},
+			DirectFromCpfpRefundTxSignature: []byte{},
+		}
+
+		if directResult, ok := directResults[leafID]; ok {
+			directUserJob := directUserRefundMap[leafID]
+			logger.Sugar().Infof("Aggregating direct frost signature for claim transfer leaf %s", leafID)
+			directSig, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
+				Message:            directResult.Message,
+				SignatureShares:    directResult.SignatureShares,
+				PublicShares:       directResult.PublicKeys,
+				VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
+				Commitments:        directUserJob.SigningCommitments.SigningCommitments,
+				UserCommitments:    directUserJob.SigningNonceCommitment,
+				UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
+				UserSignatureShare: directUserJob.UserSignature,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("unable to aggregate frost for direct refund of leaf %s: %w", leafID, err)
+			}
+			nodeSig.DirectRefundTxSignature = directSig.Signature
+		}
+
+		if directFromCpfpResult, ok := directFromCpfpResults[leafID]; ok {
+			directFromCpfpUserJob := directFromCpfpUserRefundMap[leafID]
+			logger.Sugar().Infof("Aggregating direct from cpfp frost signature for claim transfer leaf %s", leafID)
+			directFromCpfpSig, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
+				Message:            directFromCpfpResult.Message,
+				SignatureShares:    directFromCpfpResult.SignatureShares,
+				PublicShares:       directFromCpfpResult.PublicKeys,
+				VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
+				Commitments:        directFromCpfpUserJob.SigningCommitments.SigningCommitments,
+				UserCommitments:    directFromCpfpUserJob.SigningNonceCommitment,
+				UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
+				UserSignatureShare: directFromCpfpUserJob.UserSignature,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("unable to aggregate frost for direct from cpfp refund of leaf %s: %w", leafID, err)
+			}
+			nodeSig.DirectFromCpfpRefundTxSignature = directFromCpfpSig.Signature
+		}
+
+		nodeSignatures = append(nodeSignatures, nodeSig)
+	}
+
+	// Finalize: update nodes with aggregated signatures and complete transfer.
+	finalizeHandler := NewFinalizeSignatureHandler(h.config)
+	var nodes []*pb.TreeNode
+	var internalNodes []*pbinternal.TreeNode
+	for _, nodeSig := range nodeSignatures {
+		node, internalNode, err := finalizeHandler.updateNode(ctx, nodeSig, pbcommon.SignatureIntent_TRANSFER, true)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update node %s: %w", nodeSig.NodeId, err)
+		}
+		nodes = append(nodes, node)
+		internalNodes = append(internalNodes, internalNode)
+	}
+
+	// Mark transfer as completed.
+	completionTime := time.Now()
+	transfer, err = transfer.Update().
+		SetStatus(st.TransferStatusCompleted).
+		SetCompletionTime(completionTime).
+		Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update transfer to completed: %w", err)
+	}
+
+	// Reload the transfer from a fresh DB client for marshaling.
+	// The settle key tweak phase performs explicit commits, and ent entities
+	// queried from a committed transaction cannot be used for further queries.
+	marshalDb, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get db for marshal: %w", err)
+	}
+	freshTransfer, err := marshalDb.Transfer.Get(ctx, transfer.ID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to reload transfer for marshal: %w", err)
+	}
+	transferProto, err := freshTransfer.MarshalProto(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
+	}
+
+	// Send gossip to other SOs.
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	participants, err := selection.OperatorIdentifierList(h.config)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get operator list: %w", err)
+	}
+	sendGossipHandler := NewSendGossipHandler(h.config)
+	completionTimestamp := timestamppb.New(completionTime)
+	_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_FinalizeTransfer{
+			FinalizeTransfer: &pbgossip.GossipMessageFinalizeTransfer{
+				TransferId:          transferID.String(),
+				InternalNodes:       internalNodes,
+				CompletionTimestamp: completionTimestamp,
+			},
+		},
+	}, participants)
+	if err != nil {
+		return nil, fmt.Errorf("unable to send finalize transfer gossip: %w", err)
+	}
+
+	return &pb.ClaimTransferResponse{Transfer: transferProto}, nil
+}
+
+// parseSigningCommitments extracts SO signing commitments from a UserSignedTxSigningJob.
+func parseSigningCommitments(job *pb.UserSignedTxSigningJob) (map[string]frost.SigningCommitment, error) {
+	round1Packages := make(map[string]frost.SigningCommitment)
+	signingCommitments := job.GetSigningCommitments()
+	if signingCommitments == nil {
+		return nil, fmt.Errorf("missing signing_commitments for leaf_id %s", job.LeafId)
+	}
+	for key, commitment := range signingCommitments.GetSigningCommitments() {
+		obj := frost.SigningCommitment{}
+		if err := obj.UnmarshalProto(commitment); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal signing commitment: %w", err)
+		}
+		if obj.IsZero() {
+			return nil, fmt.Errorf("signing commitment is invalid for key %s: hiding or binding is empty", key)
+		}
+		round1Packages[key] = obj
+	}
+	return round1Packages, nil
+}
+
+type claimRefundSigningJobsResult struct {
+	signingJobs                 []*helper.SigningJobWithPregeneratedNonce
+	leafJobMap                  map[uuid.UUID]*ent.TreeNode
+	jobIsDirectRefund           map[uuid.UUID]bool
+	jobIsDirectFromCpfpRefund   map[uuid.UUID]bool
+	cpfpUserRefundMap           map[string]*pb.UserSignedTxSigningJob
+	directUserRefundMap         map[string]*pb.UserSignedTxSigningJob
+	directFromCpfpUserRefundMap map[string]*pb.UserSignedTxSigningJob
+}
+
+func (h *TransferHandler) prepareClaimRefundSigningJobs(
+	ctx context.Context,
+	claimPackage *pb.ClaimPackage,
+	leaves map[string]*ent.TreeNode,
+	transfer *ent.Transfer,
+) (*claimRefundSigningJobsResult, error) {
+	leafJobMap := make(map[uuid.UUID]*ent.TreeNode)
+	jobIsDirectRefund := make(map[uuid.UUID]bool)
+	jobIsDirectFromCpfpRefund := make(map[uuid.UUID]bool)
+	var signingJobs []*helper.SigningJobWithPregeneratedNonce
+
+	cpfpUserRefundMap := make(map[string]*pb.UserSignedTxSigningJob)
+	directUserRefundMap := make(map[string]*pb.UserSignedTxSigningJob)
+	directFromCpfpUserRefundMap := make(map[string]*pb.UserSignedTxSigningJob)
+
+	for _, job := range claimPackage.LeavesToClaim {
+		cpfpUserRefundMap[job.LeafId] = job
+	}
+	for _, job := range claimPackage.DirectLeavesToClaim {
+		directUserRefundMap[job.LeafId] = job
+	}
+	for _, job := range claimPackage.DirectFromCpfpLeavesToClaim {
+		directFromCpfpUserRefundMap[job.LeafId] = job
+	}
+
+	for _, job := range claimPackage.LeavesToClaim {
+		leaf, exists := leaves[job.LeafId]
+		if !exists {
+			return nil, fmt.Errorf("unexpected leaf id %s", job.LeafId)
+		}
+
+		// Validate refund transactions.
+		leafRefundJob := &pb.LeafRefundTxSigningJob{
+			LeafId: job.LeafId,
+			RefundTxSigningJob: &pb.SigningJob{
+				RawTx:            job.RawTx,
+				SigningPublicKey: job.SigningPublicKey,
+			},
+		}
+		if directJob, ok := directUserRefundMap[job.LeafId]; ok {
+			leafRefundJob.DirectRefundTxSigningJob = &pb.SigningJob{
+				RawTx:            directJob.RawTx,
+				SigningPublicKey: directJob.SigningPublicKey,
+			}
+		}
+		if dfcJob, ok := directFromCpfpUserRefundMap[job.LeafId]; ok {
+			leafRefundJob.DirectFromCpfpRefundTxSigningJob = &pb.SigningJob{
+				RawTx:            dfcJob.RawTx,
+				SigningPublicKey: dfcJob.SigningPublicKey,
+			}
+		}
+		if err := validateReceivedRefundTransactions(ctx, leafRefundJob, leaf, transfer.Type); err != nil {
+			return nil, err
+		}
+
+		// Update CPFP refund tx on existing leaf.
+		rawRefundTx, err := common.TxFromRawTxBytes(job.RawTx)
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse cpfp raw_refund_tx for leaf %s: %w", job.LeafId, err))
+		}
+		rawRefundTxid := st.NewTxID(rawRefundTx.TxHash())
+
+		updateOp := leaf.Update().
+			SetRawRefundTx(job.RawTx).
+			SetRawRefundTxid(rawRefundTxid)
+
+		if directJob, ok := directUserRefundMap[job.LeafId]; ok {
+			directRefundTxParsed, err := common.TxFromRawTxBytes(directJob.RawTx)
+			if err != nil {
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse direct_refund_tx for leaf %s: %w", job.LeafId, err))
+			}
+			updateOp = updateOp.
+				SetDirectRefundTx(directJob.RawTx).
+				SetDirectRefundTxid(st.NewTxID(directRefundTxParsed.TxHash()))
+		}
+
+		if directFromCpfpJob, ok := directFromCpfpUserRefundMap[job.LeafId]; ok {
+			directFromCpfpRefundTxParsed, err := common.TxFromRawTxBytes(directFromCpfpJob.RawTx)
+			if err != nil {
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse direct_from_cpfp_refund_tx for leaf %s: %w", job.LeafId, err))
+			}
+			updateOp = updateOp.
+				SetDirectFromCpfpRefundTx(directFromCpfpJob.RawTx).
+				SetDirectFromCpfpRefundTxid(st.NewTxID(directFromCpfpRefundTxParsed.TxHash()))
+		}
+
+		if _, err := updateOp.Save(ctx); err != nil {
+			return nil, fmt.Errorf("unable to update refund txs for leaf %s: %w", job.LeafId, err)
+		}
+
+		// Create CPFP signing job with pregenerated nonces.
+		cpfpLeafTx, err := common.TxFromRawTxBytes(leaf.RawTx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load cpfp leaf tx for leaf %s: %w", job.LeafId, err)
+		}
+		if len(cpfpLeafTx.TxOut) == 0 {
+			return nil, fmt.Errorf("vout out of bounds for cpfp tx of leaf %s", job.LeafId)
+		}
+		refundTxSigHash, err := common.SigHashFromTx(rawRefundTx, 0, cpfpLeafTx.TxOut[0])
+		if err != nil {
+			return nil, fmt.Errorf("unable to calculate sighash for cpfp refund of leaf %s: %w", job.LeafId, err)
+		}
+
+		userNonceCommitment := frost.SigningCommitment{}
+		if err := userNonceCommitment.UnmarshalProto(job.GetSigningNonceCommitment()); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal signing nonce commitment for leaf %s: %w", job.LeafId, err)
+		}
+
+		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get signing keyshare for leaf %s: %w", job.LeafId, err)
+		}
+
+		round1Packages, err := parseSigningCommitments(job)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse signing commitments for cpfp refund of leaf %s: %w", job.LeafId, err)
+		}
+
+		cpfpJobID := uuid.New()
+		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
+			SigningJob: helper.SigningJob{
+				JobID:             cpfpJobID,
+				SigningKeyshareID: signingKeyshare.ID,
+				Message:           refundTxSigHash,
+				VerifyingKey:      &leaf.VerifyingPubkey,
+				UserCommitment:    &userNonceCommitment,
+			},
+			Round1Packages: round1Packages,
+		})
+		leafJobMap[cpfpJobID] = leaf
+		jobIsDirectRefund[cpfpJobID] = false
+		jobIsDirectFromCpfpRefund[cpfpJobID] = false
+	}
+
+	// Create signing jobs for DIRECT refund txs.
+	for _, job := range claimPackage.DirectLeavesToClaim {
+		leaf, exists := leaves[job.LeafId]
+		if !exists {
+			return nil, fmt.Errorf("unexpected leaf id %s for direct refund", job.LeafId)
+		}
+		directRefundTx, err := common.TxFromRawTxBytes(job.RawTx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse direct refund tx for leaf %s: %w", job.LeafId, err)
+		}
+		directTx, err := common.TxFromRawTxBytes(leaf.DirectTx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load direct leaf tx for leaf %s: %w", job.LeafId, err)
+		}
+		if len(directTx.TxOut) == 0 {
+			return nil, fmt.Errorf("vout out of bounds for direct tx of leaf %s", job.LeafId)
+		}
+		directRefundTxSigHash, err := common.SigHashFromTx(directRefundTx, 0, directTx.TxOut[0])
+		if err != nil {
+			return nil, fmt.Errorf("unable to calculate sighash for direct refund of leaf %s: %w", job.LeafId, err)
+		}
+
+		userNonceCommitment := frost.SigningCommitment{}
+		if err := userNonceCommitment.UnmarshalProto(job.GetSigningNonceCommitment()); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal signing nonce commitment for leaf %s: %w", job.LeafId, err)
+		}
+		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get signing keyshare for leaf %s: %w", job.LeafId, err)
+		}
+		round1Packages, err := parseSigningCommitments(job)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse signing commitments for direct refund of leaf %s: %w", job.LeafId, err)
+		}
+
+		directJobID := uuid.New()
+		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
+			SigningJob: helper.SigningJob{
+				JobID:             directJobID,
+				SigningKeyshareID: signingKeyshare.ID,
+				Message:           directRefundTxSigHash,
+				VerifyingKey:      &leaf.VerifyingPubkey,
+				UserCommitment:    &userNonceCommitment,
+			},
+			Round1Packages: round1Packages,
+		})
+		leafJobMap[directJobID] = leaf
+		jobIsDirectRefund[directJobID] = true
+	}
+
+	// Create signing jobs for DIRECT FROM CPFP refund txs.
+	for _, job := range claimPackage.DirectFromCpfpLeavesToClaim {
+		leaf, exists := leaves[job.LeafId]
+		if !exists {
+			return nil, fmt.Errorf("unexpected leaf id %s for direct from cpfp refund", job.LeafId)
+		}
+		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(job.RawTx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse direct from cpfp refund tx for leaf %s: %w", job.LeafId, err)
+		}
+		cpfpLeafTx, err := common.TxFromRawTxBytes(leaf.RawTx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load cpfp leaf tx for leaf %s: %w", job.LeafId, err)
+		}
+		if len(cpfpLeafTx.TxOut) == 0 {
+			return nil, fmt.Errorf("vout out of bounds for cpfp tx of leaf %s", job.LeafId)
+		}
+		directFromCpfpSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
+		if err != nil {
+			return nil, fmt.Errorf("unable to calculate sighash for direct from cpfp refund of leaf %s: %w", job.LeafId, err)
+		}
+
+		userNonceCommitment := frost.SigningCommitment{}
+		if err := userNonceCommitment.UnmarshalProto(job.GetSigningNonceCommitment()); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal signing nonce commitment for leaf %s: %w", job.LeafId, err)
+		}
+		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get signing keyshare for leaf %s: %w", job.LeafId, err)
+		}
+		round1Packages, err := parseSigningCommitments(job)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse signing commitments for direct from cpfp refund of leaf %s: %w", job.LeafId, err)
+		}
+
+		directFromCpfpJobID := uuid.New()
+		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
+			SigningJob: helper.SigningJob{
+				JobID:             directFromCpfpJobID,
+				SigningKeyshareID: signingKeyshare.ID,
+				Message:           directFromCpfpSigHash,
+				VerifyingKey:      &leaf.VerifyingPubkey,
+				UserCommitment:    &userNonceCommitment,
+			},
+			Round1Packages: round1Packages,
+		})
+		leafJobMap[directFromCpfpJobID] = leaf
+		jobIsDirectFromCpfpRefund[directFromCpfpJobID] = true
+	}
+
+	return &claimRefundSigningJobsResult{
+		signingJobs:                 signingJobs,
+		leafJobMap:                  leafJobMap,
+		jobIsDirectRefund:           jobIsDirectRefund,
+		jobIsDirectFromCpfpRefund:   jobIsDirectFromCpfpRefund,
+		cpfpUserRefundMap:           cpfpUserRefundMap,
+		directUserRefundMap:         directUserRefundMap,
+		directFromCpfpUserRefundMap: directFromCpfpUserRefundMap,
+	}, nil
 }
 
 // ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
@@ -2755,7 +3398,14 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		return nil
 	}
 
+	hasClaimPackage := len(req.EncryptedClaimKeyTweakPackage) > 0
+
 	switch transfer.Status {
+	case st.TransferStatusSenderKeyTweaked:
+		// Only valid when encrypted claim key tweak package is provided (from claim_transfer endpoint).
+		if !hasClaimPackage {
+			return fmt.Errorf("transfer %s is at status SenderKeyTweaked but no encrypted_claim_key_tweak_package provided", transferID)
+		}
 	case st.TransferStatusReceiverKeyTweaked:
 	case st.TransferStatusReceiverKeyTweakLocked:
 		// do nothing
@@ -2763,7 +3413,67 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		// The key tweak is already applied, return early.
 		return nil
 	default:
-		return fmt.Errorf("transfer %s is expected to be at status TransferStatusReceiverKeyTweaked or TransferStatusReceiverKeyTweakLocked or TransferStatusReceiverKeyTweakApplied but %s found", transferID, transfer.Status)
+		return fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderKeyTweaked, TransferStatusReceiverKeyTweaked, TransferStatusReceiverKeyTweakLocked, or TransferStatusReceiverKeyTweakApplied but %s found", transferID, transfer.Status)
+	}
+
+	// If encrypted claim key tweak package is provided, verify signature, decrypt, and store.
+	if hasClaimPackage {
+		// Verify user signature over the full encrypted key tweak package.
+		signingPayload := common.GetClaimPackageSigningPayload(transferID, req.EncryptedClaimKeyTweakPackage)
+		if err := common.VerifyECDSASignature(transfer.ReceiverIdentityPubkey, req.ClaimSignature, signingPayload); err != nil {
+			return fmt.Errorf("unable to verify claim package signature: %w", err)
+		}
+
+		// Decrypt this SO's portion.
+		myCiphertext := req.EncryptedClaimKeyTweakPackage[h.config.Identifier]
+		if len(myCiphertext) == 0 {
+			return fmt.Errorf("no encrypted claim key tweaks found for SO %s", h.config.Identifier)
+		}
+		decryptionPrivateKey := eciesgo.NewPrivateKeyFromBytes(h.config.IdentityPrivateKey.Serialize())
+		decryptedKeyTweaks, err := eciesgo.Decrypt(decryptionPrivateKey, myCiphertext)
+		if err != nil {
+			return fmt.Errorf("unable to decrypt claim key tweaks: %w", err)
+		}
+		claimKeyTweaks := &pb.ClaimLeafKeyTweaks{}
+		if err := proto.Unmarshal(decryptedKeyTweaks, claimKeyTweaks); err != nil {
+			return fmt.Errorf("unable to unmarshal claim key tweaks: %w", err)
+		}
+		transferLeaves, err := transfer.QueryTransferLeaves().WithLeaf().All(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to get transfer leaves for transfer %s: %w", transferID, err)
+		}
+		if len(transferLeaves) != len(claimKeyTweaks.LeavesToReceive) {
+			return fmt.Errorf("transfer has %d leaves but claim key tweaks has %d", len(transferLeaves), len(claimKeyTweaks.LeavesToReceive))
+		}
+		leafMap := make(map[string]*ent.TransferLeaf)
+		for _, leaf := range transferLeaves {
+			leafMap[leaf.Edges.Leaf.ID.String()] = leaf
+		}
+		for _, leafTweak := range claimKeyTweaks.LeavesToReceive {
+			leaf, exists := leafMap[leafTweak.LeafId]
+			if !exists {
+				return fmt.Errorf("unexpected leaf id %s in claim key tweaks", leafTweak.LeafId)
+			}
+			// Only store if not already stored.
+			if len(leaf.KeyTweak) == 0 {
+				leafTweakBytes, err := proto.Marshal(leafTweak)
+				if err != nil {
+					return fmt.Errorf("unable to marshal leaf tweak: %w", err)
+				}
+				_, err = leaf.Update().SetKeyTweak(leafTweakBytes).Save(ctx)
+				if err != nil {
+					return fmt.Errorf("unable to update leaf %s: %w", leafTweak.LeafId, err)
+				}
+			}
+		}
+		// Update status to ReceiverKeyTweaked if coming from SenderKeyTweaked.
+		if transfer.Status == st.TransferStatusSenderKeyTweaked {
+			_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweaked).Save(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
+			}
+			transfer.Status = st.TransferStatusReceiverKeyTweaked
+		}
 	}
 
 	leaves, err := transfer.QueryTransferLeaves().All(ctx)
