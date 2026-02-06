@@ -1,5 +1,14 @@
 # @buildonspark/spark-sdk
 
+## 0.6.0
+
+### Minor Changes
+
+- - Migrate to V2 hash variant
+  - Support idempotency key support for lightning payments to prevent duplicate transactions
+  - Fix bit manipulation when creating trees from L1 deposits (no longer sets the 30th bit)
+  - Introduce `createLightningHodlInvoice` for hold invoice support
+
 ## 0.5.9
 
 ### Patch Changes

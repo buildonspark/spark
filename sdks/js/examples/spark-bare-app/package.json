@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-bare-app",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,8 +13,8 @@
     "transfer": "bare transfer.js"
   },
   "dependencies": {
-    "@buildonspark/bare": "0.0.38",
-    "@buildonspark/spark-sdk": "0.5.9",
+    "@buildonspark/bare": "0.0.39",
+    "@buildonspark/spark-sdk": "0.6.0",
     "bare": "^1.23.3"
   },
   "devDependencies": {

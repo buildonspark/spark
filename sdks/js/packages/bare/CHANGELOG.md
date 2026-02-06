@@ -1,5 +1,12 @@
 # @buildonspark/bare
 
+## 0.0.39
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.6.0
+
 ## 0.0.38
 
 ### Patch Changes
