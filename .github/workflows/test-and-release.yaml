@@ -1,4 +1,4 @@
-name: Test, release, and sync
+name: Test and release
 
 on:
   pull_request:
