@@ -64,7 +64,7 @@ jobs:
         run: |
           echo "VERIFIED_LOCK_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  test:
+  build-and-test:
     # Wait to see if the lock file should be updated before running checks:
     needs: "update-lock-file"
     runs-on: "ubuntu-22.04"
@@ -95,46 +95,9 @@ jobs:
           }
           EOF
 
-  # turbo doesn't seem to parallelize builds with checks although they don't depend on one another,
-  # or else there's something in CI that prevents it from doing it well. Faster to keep them separate.
-  build:
-    # Wait to see if the lock file should be updated before running checks:
-    needs: "update-lock-file"
-    runs-on: "ubuntu-22.04"
-    strategy:
-      matrix:
-        include:
-          # 20 is minimum supported runtime, 24 is the latest LTS.
-          - node-version: "20.x"
-          - node-version: "24.x"
-    steps:
-      - name: "Checkout"
-        uses: "actions/checkout@v4"
-        with:
-          ref: ${{ needs.update-lock-file.outputs.VERIFIED_LOCK_COMMIT }}
-
-      - name: Setup Node.js and Yarn
-        uses: ./public/actions/setup-node-yarn-install
-        with:
-          node-version: ${{ matrix.node-version }}
-          cwd: "sdks/js"
-          enable-corepack: "true"
-
-      - run: "yarn build"
-        working-directory: "sdks/js"
-
-      - name: "Notify failure on Slack"
-        if: failure() && github.event_name == 'push'
-        run: |
-          curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
-          {
-            "text": ":x: ${{ github.workflow }} workflow by ${{ github.actor }} <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id}}|failed> in ${{ github.job }} on <${{ github.server_url }}/${{ github.repository }}/commit/$GITHUB_SHA|${{ github.ref_name }}>"
-          }
-          EOF
-
   release:
     name: Release
-    needs: ["test", "build"]
+    needs: ["build-and-test"]
     permissions:
       contents: write
       pull-requests: write
