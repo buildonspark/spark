@@ -634,6 +634,7 @@ func main() {
 					return handler(ctx, req)
 				}
 			}(),
+			sparkgrpc.InternalMethodInterceptor(GetProtectedServices()),
 			sparkgrpc.TimeoutInterceptor(knobsService, config.GRPC.ServerUnaryHandlerTimeout),
 			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
@@ -672,11 +673,11 @@ func main() {
 					return handler(srv, &grpcmiddleware.WrappedServerStream{ServerStream: ss, WrappedContext: ctx})
 				}
 			}(),
+			sparkgrpc.InternalMethodStreamInterceptor(GetProtectedServices()),
 			sparkgrpc.PanicRecoveryStreamInterceptor(),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).StreamAuthnInterceptor,
 			sparkgrpc.ConcurrencyStreamInterceptor(concurrencyStreamGuard, clientInfoProvider, knobsService),
 			func() grpc.StreamServerInterceptor {
-
 				if rateLimiter != nil {
 					return rateLimiter.StreamServerInterceptor()
 				}
@@ -925,7 +926,6 @@ func setUpPyroscope(args *args, logger *zap.Logger) (shutDown func()) {
 			pyroscope.ProfileBlockDuration,
 		},
 	})
-
 	// This is only possible if our configuration is bad.
 	if err != nil {
 		pyroLogger.Error("Failed to connect to Pyroscope. Profiling data will not be stored.", zap.Error(err))

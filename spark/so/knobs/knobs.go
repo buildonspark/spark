@@ -129,6 +129,11 @@ const (
 	KnobEnableInstantStaticDeposit = "spark.so.enable_instant_static_deposit"
 	// Total number of sats that can be pending in the instant static deposit flow
 	KnobMaxPendingInstantStaticDepositAmount = "spark.so.max_pending_instant_static_deposit_amount"
+
+	// Kill switch for internal (SO-to-SO) methods, analogous to KnobGrpcServerMethodEnabled for public methods.
+	// Defaults to enabled (100). Set to 0 with the full method name as target to disable that internal method.
+	// Example: "spark.so.grpc.server.internal_method.enabled@/service/Method" = 0 disables that method.
+	KnobGrpcServerInternalMethodEnabled = "spark.so.grpc.server.internal_method.enabled"
 )
 
 type Config struct {

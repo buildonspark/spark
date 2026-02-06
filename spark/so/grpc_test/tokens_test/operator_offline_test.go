@@ -7,6 +7,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	tokenpbinternal "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/utils"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -14,28 +15,64 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestTokenMintOperatorOfflineAutoRetry tests that a mint transaction can be retried
-// via the retry task when an operator comes back online before the transaction expires.
-func TestTokenMintOperatorOfflineAutoRetry(t *testing.T) {
+var internalBroadcastMethod = tokenpbinternal.SparkTokenInternalService_BroadcastTokenTransactionInternal_FullMethodName
+
+func disableInternalBroadcast(t *testing.T, kc *sparktesting.KnobController) {
+	t.Helper()
+	err := kc.SetKnobWithTarget(t, knobs.KnobGrpcServerInternalMethodEnabled, internalBroadcastMethod, 0)
+	require.NoError(t, err)
+}
+
+func enableInternalBroadcast(t *testing.T, kc *sparktesting.KnobController) {
+	t.Helper()
+	err := kc.DeleteKnob(t, knobs.KnobGrpcServerInternalMethodEnabled)
+	require.NoError(t, err)
+}
+
+func requirePartialCommit(t *testing.T, resp *tokenpb.BroadcastTransactionResponse) {
+	t.Helper()
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
+	require.Len(t, resp.CommitProgress.CommittedOperatorPublicKeys, 1, "only coordinator should be committed")
+	require.Len(t, resp.CommitProgress.UncommittedOperatorPublicKeys, 2, "non-coordinator operators should be uncommitted")
+}
+
+func triggerRetryTask(t *testing.T, config *wallet.TestWalletConfig) {
+	t.Helper()
+	conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
+	require.NoError(t, err)
+	defer conn.Close()
+
+	mockClient := pbmock.NewMockServiceClient(conn)
+	_, err = mockClient.TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{
+		TaskName: "retry_signed_token_transaction_broadcasts",
+	})
+	require.NoError(t, err)
+}
+
+func skipIfNotPhase2(t *testing.T) {
+	t.Helper()
 	if !broadcastTokenTestsUsePhase2 {
 		t.Skipf("Skipping %s - only runs for TTV3_Phase2", currentBroadcastRunLabel())
 	}
 	sparktesting.RequireMinikube(t)
+}
+
+// TestTokenMintOperatorOfflineAutoRetry tests that a mint transaction can be retried
+// via the retry task when an operator comes back online before the transaction expires.
+func TestTokenMintOperatorOfflineAutoRetry(t *testing.T) {
+	skipIfNotPhase2(t)
 
 	sparktesting.WithTimeout(t, 2*time.Minute, func(t *testing.T) {
-		knobController, err := sparktesting.NewKnobController(t)
+		kc, err := sparktesting.NewKnobController(t)
 		require.NoError(t, err)
-		err = knobController.SetKnob(t, knobs.KnobTokenTransactionV3Phase2RetryEnabled, 100)
+		err = kc.SetKnob(t, knobs.KnobTokenTransactionV3Phase2RetryEnabled, 100)
 		require.NoError(t, err)
 
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 		tokenPrivKey := config.IdentityPrivateKey
 		tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
 
-		soController, err := sparktesting.NewSparkOperatorController(t)
-		require.NoError(t, err)
-		err = soController.DisableOperator(t, 2)
-		require.NoError(t, err)
+		disableInternalBroadcast(t, kc)
 
 		recipientPrivKey := keys.GeneratePrivateKey()
 		mintTx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
@@ -47,29 +84,13 @@ func TestTokenMintOperatorOfflineAutoRetry(t *testing.T) {
 		require.NoError(t, err)
 		mintTx.TokenOutputs[0].OwnerPublicKey = recipientPrivKey.Public().Serialize()
 
-		// Broadcast returns COMMIT_PROCESSING with partial progress when operator is offline
-		resp, _ := wallet.BroadcastTokenTransactionV3WithResponse(t.Context(), config, mintTx, []keys.Private{tokenPrivKey}, wallet.DefaultValidityDuration)
-		require.NotNil(t, resp, "response should not be nil")
-		require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus,
-			"expected COMMIT_PROCESSING when operator is offline, got %s", resp.CommitStatus)
-		require.NotNil(t, resp.CommitProgress, "commit progress should be set")
-		require.GreaterOrEqual(t, len(resp.CommitProgress.CommittedOperatorPublicKeys), 1,
-			"should have at least 1 committed operator (coordinator)")
-		require.GreaterOrEqual(t, len(resp.CommitProgress.UncommittedOperatorPublicKeys), 1,
-			"should have at least 1 uncommitted operator (the disabled one)")
-
-		err = soController.EnableOperator(t, 2)
+		resp, err := wallet.BroadcastTokenTransactionV3WithResponse(
+			t.Context(), config, mintTx, []keys.Private{tokenPrivKey}, wallet.DefaultValidityDuration)
 		require.NoError(t, err)
+		requirePartialCommit(t, resp)
 
-		conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
-		require.NoError(t, err)
-		defer conn.Close()
-
-		mockClient := pbmock.NewMockServiceClient(conn)
-		_, err = mockClient.TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{
-			TaskName: "retry_signed_token_transaction_broadcasts",
-		})
-		require.NoError(t, err)
+		enableInternalBroadcast(t, kc)
+		triggerRetryTask(t, config)
 
 		verifyTokenBalance(t, recipientPrivKey, tokenPrivKey.Public(), 500, "mint auto-retry")
 	})
@@ -78,15 +99,12 @@ func TestTokenMintOperatorOfflineAutoRetry(t *testing.T) {
 // TestTokenTransferOperatorOfflineAutoRetry tests that a transfer transaction can be retried
 // via the retry task when an operator comes back online before the transaction expires.
 func TestTokenTransferOperatorOfflineAutoRetry(t *testing.T) {
-	if !broadcastTokenTestsUsePhase2 {
-		t.Skipf("Skipping %s - only runs for TTV3_Phase2", currentBroadcastRunLabel())
-	}
-	sparktesting.RequireMinikube(t)
+	skipIfNotPhase2(t)
 
 	sparktesting.WithTimeout(t, 2*time.Minute, func(t *testing.T) {
-		knobController, err := sparktesting.NewKnobController(t)
+		kc, err := sparktesting.NewKnobController(t)
 		require.NoError(t, err)
-		err = knobController.SetKnob(t, knobs.KnobTokenTransactionV3Phase2RetryEnabled, 100)
+		err = kc.SetKnob(t, knobs.KnobTokenTransactionV3Phase2RetryEnabled, 100)
 		require.NoError(t, err)
 
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -108,10 +126,7 @@ func TestTokenTransferOperatorOfflineAutoRetry(t *testing.T) {
 		mintTxHash, err := utils.HashTokenTransaction(finalMint, false)
 		require.NoError(t, err)
 
-		soController, err := sparktesting.NewSparkOperatorController(t)
-		require.NoError(t, err)
-		err = soController.DisableOperator(t, 2)
-		require.NoError(t, err)
+		disableInternalBroadcast(t, kc)
 
 		recipientPrivKey := keys.GeneratePrivateKey()
 		transferTx, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
@@ -124,29 +139,13 @@ func TestTokenTransferOperatorOfflineAutoRetry(t *testing.T) {
 		transferTx.TokenOutputs[0].OwnerPublicKey = recipientPrivKey.Public().Serialize()
 		transferTx.TokenOutputs[0].TokenAmount = int64ToUint128Bytes(0, 1000)
 
-		// Broadcast returns COMMIT_PROCESSING with partial progress when operator is offline
-		resp, _ := wallet.BroadcastTokenTransactionV3WithResponse(t.Context(), config, transferTx, []keys.Private{senderPrivKey}, wallet.DefaultValidityDuration)
-		require.NotNil(t, resp, "response should not be nil")
-		require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus,
-			"expected COMMIT_PROCESSING when operator is offline, got %s", resp.CommitStatus)
-		require.NotNil(t, resp.CommitProgress, "commit progress should be set")
-		require.GreaterOrEqual(t, len(resp.CommitProgress.CommittedOperatorPublicKeys), 1,
-			"should have at least 1 committed operator (coordinator)")
-		require.GreaterOrEqual(t, len(resp.CommitProgress.UncommittedOperatorPublicKeys), 1,
-			"should have at least 1 uncommitted operator (the disabled one)")
-
-		err = soController.EnableOperator(t, 2)
+		resp, err := wallet.BroadcastTokenTransactionV3WithResponse(
+			t.Context(), config, transferTx, []keys.Private{senderPrivKey}, wallet.DefaultValidityDuration)
 		require.NoError(t, err)
+		requirePartialCommit(t, resp)
 
-		conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
-		require.NoError(t, err)
-		defer conn.Close()
-
-		mockClient := pbmock.NewMockServiceClient(conn)
-		_, err = mockClient.TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{
-			TaskName: "retry_signed_token_transaction_broadcasts",
-		})
-		require.NoError(t, err)
+		enableInternalBroadcast(t, kc)
+		triggerRetryTask(t, config)
 
 		verifyTokenBalance(t, recipientPrivKey, tokenPrivKey.Public(), 1000, "transfer auto-retry")
 	})
@@ -155,15 +154,12 @@ func TestTokenTransferOperatorOfflineAutoRetry(t *testing.T) {
 // TestTokenTransferOperatorOfflineRetryAfterExpiry tests that a fresh transfer transaction
 // succeeds after the original transaction expires and the operator comes back online.
 func TestTokenTransferOperatorOfflineRetryAfterExpiry(t *testing.T) {
-	if !broadcastTokenTestsUsePhase2 {
-		t.Skipf("Skipping %s - only runs for TTV3_Phase2", currentBroadcastRunLabel())
-	}
-	sparktesting.RequireMinikube(t)
+	skipIfNotPhase2(t)
 
 	sparktesting.WithTimeout(t, 2*time.Minute, func(t *testing.T) {
-		knobController, err := sparktesting.NewKnobController(t)
+		kc, err := sparktesting.NewKnobController(t)
 		require.NoError(t, err)
-		err = knobController.SetKnob(t, knobs.KnobTokenTransactionV3Phase2RetryEnabled, 0)
+		err = kc.SetKnob(t, knobs.KnobTokenTransactionV3Phase2RetryEnabled, 0)
 		require.NoError(t, err)
 
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -185,10 +181,7 @@ func TestTokenTransferOperatorOfflineRetryAfterExpiry(t *testing.T) {
 		mintTxHash, err := utils.HashTokenTransaction(finalMint, false)
 		require.NoError(t, err)
 
-		soController, err := sparktesting.NewSparkOperatorController(t)
-		require.NoError(t, err)
-		err = soController.DisableOperator(t, 2)
-		require.NoError(t, err)
+		disableInternalBroadcast(t, kc)
 
 		recipientPrivKey := keys.GeneratePrivateKey()
 		transferTx, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
@@ -201,21 +194,13 @@ func TestTokenTransferOperatorOfflineRetryAfterExpiry(t *testing.T) {
 		transferTx.TokenOutputs[0].OwnerPublicKey = recipientPrivKey.Public().Serialize()
 		transferTx.TokenOutputs[0].TokenAmount = int64ToUint128Bytes(0, 1000)
 
-		// Broadcast with short validity returns COMMIT_PROCESSING with partial progress
-		resp, _ := wallet.BroadcastTokenTransactionV3WithResponse(t.Context(), config, transferTx, []keys.Private{senderPrivKey}, 5*time.Second)
-		require.NotNil(t, resp, "response should not be nil")
-		require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus,
-			"expected COMMIT_PROCESSING when operator is offline, got %s", resp.CommitStatus)
-		require.NotNil(t, resp.CommitProgress, "commit progress should be set")
-		require.GreaterOrEqual(t, len(resp.CommitProgress.CommittedOperatorPublicKeys), 1,
-			"should have at least 1 committed operator (coordinator)")
-		require.GreaterOrEqual(t, len(resp.CommitProgress.UncommittedOperatorPublicKeys), 1,
-			"should have at least 1 uncommitted operator (the disabled one)")
-
-		// Wait for expiry then re-enable operator
-		time.Sleep(6 * time.Second)
-		err = soController.EnableOperator(t, 2)
+		resp, err := wallet.BroadcastTokenTransactionV3WithResponse(t.Context(), config, transferTx, []keys.Private{senderPrivKey}, 5*time.Second)
 		require.NoError(t, err)
+		requirePartialCommit(t, resp)
+
+		// Wait for expiry then re-enable
+		time.Sleep(6 * time.Second)
+		enableInternalBroadcast(t, kc)
 
 		// Fresh transfer should succeed after expiry
 		transferTx2, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{

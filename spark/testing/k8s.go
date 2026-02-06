@@ -18,17 +18,18 @@ const (
 )
 
 // SparkOperatorController provides functionality to temporarily disable Spark operator services
-// by scaling their deployments to 0
+// by adding a non-matching label to their selectors
 type SparkOperatorController struct {
 	client    kubernetes.Interface
 	operators map[int]*sparkOperatorState
 	mu        sync.RWMutex
 }
 
-// sparkOperatorState tracks the state of a single operator
+// sparkOperatorState tracks the state of a single operator service
 type sparkOperatorState struct {
-	deploymentName string
-	disabled       bool
+	deploymentName   string
+	originalReplicas *int32
+	disabled         bool
 }
 
 // NewSparkOperatorController creates a new SparkOperatorController for managing multiple operators
@@ -44,10 +45,8 @@ func NewSparkOperatorController(t *testing.T) (*SparkOperatorController, error) 
 	}
 
 	// Initialize all operators
-	// Deployment names are 0-indexed (regtest-spark-rpc-0, regtest-spark-rpc-1, ...)
-	// but operatorNum is 1-indexed (1, 2, 3...) for user-facing API
-	for i := range numOperators {
-		controller.operators[i+1] = &sparkOperatorState{
+	for i := 1; i <= numOperators; i++ {
+		controller.operators[i] = &sparkOperatorState{
 			deploymentName: fmt.Sprintf("regtest-spark-rpc-%d", i),
 			disabled:       false,
 		}
@@ -61,7 +60,7 @@ func NewSparkOperatorController(t *testing.T) (*SparkOperatorController, error) 
 		//nolint: usetesting // Use the background context to ensure this will run even if the test is cancelled, since
 		// it deals with external resources. t.Context is canceled just before Cleanup-registered functions are called,
 		// so it's no help here.
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		for operatorNum := range controller.operators {
@@ -124,7 +123,8 @@ func (s *SparkOperatorController) GetEnabledOperators() []int {
 	return enabled
 }
 
-// getKubernetesClient creates a Kubernetes client using kubeconfig
+// getKubernetesClient creates a Kubernetes client, preferring in-cluster config
+// but falling back to kubeconfig
 func getKubernetesClient(t *testing.T) kubernetes.Interface {
 	var config *rest.Config
 	var err error
@@ -144,7 +144,7 @@ func getKubernetesClient(t *testing.T) kubernetes.Interface {
 	return client
 }
 
-// enableOperator scales the deployment back to 1 replica and waits for pod readiness
+// EnableOperator scales the specified operator's deployment back to its original replica count
 func (s *SparkOperatorController) enableOperator(ctx context.Context, operatorNum int) error {
 	operator, exists := s.operators[operatorNum]
 	if !exists {
@@ -158,31 +158,34 @@ func (s *SparkOperatorController) enableOperator(ctx context.Context, operatorNu
 		return fmt.Errorf("operator %d is not disabled", operatorNum)
 	}
 
-	ctx, cancelFunc := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancelFunc := context.WithTimeout(ctx, 30*time.Second)
 	defer cancelFunc()
 
-	// Scale deployment to 1
-	scale, err := s.client.AppsV1().Deployments(namespace).GetScale(ctx, operator.deploymentName, metav1.GetOptions{})
+	// Get the current deployment
+	deployment, err := s.client.AppsV1().Deployments(namespace).Get(ctx, operator.deploymentName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get deployment scale for %s: %w", operator.deploymentName, err)
+		return fmt.Errorf("failed to get deployment %s: %w", operator.deploymentName, err)
 	}
 
-	scale.Spec.Replicas = 1
-	_, err = s.client.AppsV1().Deployments(namespace).UpdateScale(ctx, operator.deploymentName, scale, metav1.UpdateOptions{})
+	// Restore the original replica count
+	deployment.Spec.Replicas = operator.originalReplicas
+
+	// Update the deployment
+	_, err = s.client.AppsV1().Deployments(namespace).Update(ctx, deployment, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to scale up deployment %s: %w", operator.deploymentName, err)
 	}
 
-	// Wait for the pod to be ready
-	if err := s.waitForPodReady(ctx, operator.deploymentName); err != nil {
-		return fmt.Errorf("failed waiting for pod ready: %w", err)
+	err = s.waitForDeploymentReplicas(ctx, operatorNum, int(*operator.originalReplicas))
+	if err != nil {
+		return fmt.Errorf("error waiting for deployment %s to scale up: %w", operator.deploymentName, err)
 	}
 
 	operator.disabled = false
+	operator.originalReplicas = nil
 	return nil
 }
 
-// disableOperator scales the deployment to 0 replicas and waits for pod termination
 func (s *SparkOperatorController) disableOperator(ctx context.Context, operatorNum int) error {
 	operator, exists := s.operators[operatorNum]
 	if !exists {
@@ -196,84 +199,66 @@ func (s *SparkOperatorController) disableOperator(ctx context.Context, operatorN
 		return fmt.Errorf("operator %d is already disabled", operatorNum)
 	}
 
-	ctx, cancelFunc := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancelFunc := context.WithTimeout(ctx, 30*time.Second)
 	defer cancelFunc()
 
-	// Scale deployment to 0
-	scale, err := s.client.AppsV1().Deployments(namespace).GetScale(ctx, operator.deploymentName, metav1.GetOptions{})
+	// Get the current deployment
+	deployment, err := s.client.AppsV1().Deployments(namespace).Get(ctx, operator.deploymentName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get deployment scale for %s: %w", operator.deploymentName, err)
+		return fmt.Errorf("failed to get deployment %s: %w", operator.deploymentName, err)
 	}
 
-	scale.Spec.Replicas = 0
-	_, err = s.client.AppsV1().Deployments(namespace).UpdateScale(ctx, operator.deploymentName, scale, metav1.UpdateOptions{})
+	// Store the original replica count for restoration
+	if deployment.Spec.Replicas != nil {
+		originalReplicas := *deployment.Spec.Replicas
+		operator.originalReplicas = &originalReplicas
+	} else {
+		// Default to 1 if replicas is nil
+		defaultReplicas := int32(1)
+		operator.originalReplicas = &defaultReplicas
+	}
+
+	// Scale down to 0 replicas
+	zeroReplicas := int32(0)
+	deployment.Spec.Replicas = &zeroReplicas
+
+	// Update the deployment
+	_, err = s.client.AppsV1().Deployments(namespace).Update(ctx, deployment, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to scale down deployment %s: %w", operator.deploymentName, err)
 	}
 
-	// Wait for the pod to be terminated
-	if err := s.waitForPodTerminated(ctx, operator.deploymentName); err != nil {
-		return fmt.Errorf("failed waiting for pod termination: %w", err)
+	err = s.waitForDeploymentReplicas(ctx, operatorNum, 0)
+	if err != nil {
+		return fmt.Errorf("error waiting for deployment %s to scale down: %w", operator.deploymentName, err)
 	}
 
 	operator.disabled = true
 	return nil
 }
+func (s *SparkOperatorController) waitForDeploymentReplicas(ctx context.Context, operatorNum int, expectedReplicas int) error {
+	operator := s.operators[operatorNum]
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 
-// waitForPodTerminated waits for all pods of the deployment to be terminated
-func (s *SparkOperatorController) waitForPodTerminated(ctx context.Context, deploymentName string) error {
-	labelSelector := fmt.Sprintf("app.kubernetes.io/name=rpc,app.kubernetes.io/instance=regtest,lightspark.com/operator=%s", deploymentName[len("regtest-spark-rpc-"):])
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		pods, err := s.client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to list pods: %w", err)
-		}
-
-		if len(pods.Items) == 0 {
-			return nil
-		}
-
-		time.Sleep(500 * time.Millisecond)
-	}
-}
-
-// waitForPodReady waits for the deployment's pod to be ready
-func (s *SparkOperatorController) waitForPodReady(ctx context.Context, deploymentName string) error {
-	labelSelector := fmt.Sprintf("app.kubernetes.io/name=rpc,app.kubernetes.io/instance=regtest,lightspark.com/operator=%s", deploymentName[len("regtest-spark-rpc-"):])
+	ticker := time.NewTicker(500 * time.Millisecond) // Check every 500ms for pod changes
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
+			return fmt.Errorf("timeout waiting for deployment %s to have %d ready replicas", operator.deploymentName, expectedReplicas)
+		case <-ticker.C:
+			deployment, err := s.client.AppsV1().Deployments(namespace).Get(ctx, operator.deploymentName, metav1.GetOptions{})
+			if err != nil {
+				continue
+			}
 
-		pods, err := s.client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to list pods: %w", err)
-		}
+			readyReplicas := int(deployment.Status.ReadyReplicas)
 
-		for _, pod := range pods.Items {
-			for _, cond := range pod.Status.Conditions {
-				if cond.Type == "Ready" && cond.Status == "True" {
-					// Give a bit more time for connections to be established
-					time.Sleep(2 * time.Second)
-					return nil
-				}
+			if readyReplicas == expectedReplicas {
+				return nil
 			}
 		}
-
-		time.Sleep(500 * time.Millisecond)
 	}
 }

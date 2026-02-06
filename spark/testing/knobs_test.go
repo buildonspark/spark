@@ -221,7 +221,7 @@ func TestKnobController_SetKnobWithTarget(t *testing.T) {
 	configMap, err := client.CoreV1().ConfigMaps(knobsNamespace).Get(t.Context(), knobsConfigMap, metav1.GetOptions{})
 	require.NoError(t, err)
 
-	assert.Equal(t, "REGTEST: 100", configMap.Data["test.knob"])
+	assert.Equal(t, "\"REGTEST\": 100", configMap.Data["test.knob"])
 }
 
 func TestKnobController_restoreOriginal_UsesProvidedContext(t *testing.T) {
