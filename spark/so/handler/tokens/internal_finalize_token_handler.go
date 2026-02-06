@@ -62,9 +62,7 @@ func (h *InternalFinalizeTokenHandler) FinalizeTransferTransactionInternal(
 	return nil
 }
 
-// FinalizeMintOrCreateTransactionInternal finalizes a MINT or CREATE token transaction by hash.
-// Fetches and locks the transaction, then delegates to FinalizeMintOrCreateTransaction.
-// Unlike transfers, MINT/CREATE transactions don't have revocation secrets to exchange.
+// FinalizeMintOrCreateTransactionInternal fetches and locks the transaction, then finalizes it.
 func (h *InternalFinalizeTokenHandler) FinalizeMintOrCreateTransactionInternal(
 	ctx context.Context,
 	tokenTransactionHash []byte,
@@ -82,7 +80,6 @@ func (h *InternalFinalizeTokenHandler) FinalizeMintOrCreateTransactionInternal(
 
 // FinalizeMintOrCreateTransaction finalizes a MINT or CREATE token transaction.
 // Use this when you already have the entity loaded and locked.
-// Unlike transfers, MINT/CREATE transactions don't have revocation secrets to exchange.
 func (h *InternalFinalizeTokenHandler) FinalizeMintOrCreateTransaction(
 	ctx context.Context,
 	tokenTransaction *ent.TokenTransaction,

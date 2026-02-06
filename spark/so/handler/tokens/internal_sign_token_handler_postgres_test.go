@@ -331,10 +331,7 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 	})
 }
 
-// Test byte array helpers for concise test data creation
-func hash32(b byte) []byte   { return bytes.Repeat([]byte{b}, 32) }
-func pubKey33(b byte) []byte { return bytes.Repeat([]byte{b}, 33) }
-func sig64(b byte) []byte    { return bytes.Repeat([]byte{b}, 64) }
+func hash32(b byte) []byte { return bytes.Repeat([]byte{b}, 32) }
 
 // setupThresholdOperators configures the handler with 3 operators and threshold 2.
 func (s *internalSignTokenPostgresTestSetup) setupThresholdOperators() []string {
@@ -445,17 +442,15 @@ func TestExchangeRevocationSecretsShares_MintTransaction(t *testing.T) {
 	signatures := setup.buildThresholdSignatures(operatorIDs, testHash)
 	operatorSigs := setup.buildOperatorSignaturesProto(signatures)
 
-	t.Run("succeeds with empty operator shares for MINT", func(t *testing.T) {
+	t.Run("finalizes MINT transaction", func(t *testing.T) {
 		req := &sparktokeninternal.ExchangeRevocationSecretsSharesRequest{
-			OperatorShares:                []*sparktokeninternal.OperatorRevocationShares{},
 			OperatorTransactionSignatures: operatorSigs,
-			FinalTokenTransaction:         nil,
 			FinalTokenTransactionHash:     testHash,
 			OperatorIdentityPublicKey:     setup.handler.config.IdentityPublicKey().Serialize(),
 		}
 
 		resp, err := setup.handler.ExchangeRevocationSecretsShares(setup.ctx, req)
-		require.NoError(t, err, "MINT transaction should succeed with empty operator shares")
+		require.NoError(t, err)
 		require.NotNil(t, resp)
 
 		// Verify transaction was finalized
@@ -481,72 +476,21 @@ func TestExchangeRevocationSecretsShares_CreateTransaction(t *testing.T) {
 	signatures := setup.buildThresholdSignatures(operatorIDs, testHash)
 	operatorSigs := setup.buildOperatorSignaturesProto(signatures)
 
-	t.Run("succeeds with empty operator shares for CREATE", func(t *testing.T) {
+	t.Run("finalizes CREATE transaction", func(t *testing.T) {
 		req := &sparktokeninternal.ExchangeRevocationSecretsSharesRequest{
-			OperatorShares:                []*sparktokeninternal.OperatorRevocationShares{},
 			OperatorTransactionSignatures: operatorSigs,
-			FinalTokenTransaction:         nil,
 			FinalTokenTransactionHash:     testHash,
 			OperatorIdentityPublicKey:     setup.handler.config.IdentityPublicKey().Serialize(),
 		}
 
 		resp, err := setup.handler.ExchangeRevocationSecretsShares(setup.ctx, req)
-		require.NoError(t, err, "CREATE transaction should succeed with empty operator shares")
+		require.NoError(t, err)
 		require.NotNil(t, resp)
 
 		// Verify transaction was finalized
 		updatedTx, err := setup.client.TokenTransaction.Get(setup.ctx, createTransaction.ID)
 		require.NoError(t, err)
 		require.Equal(t, st.TokenTransactionStatusFinalized, updatedTx.Status, "transaction should be FINALIZED")
-	})
-}
-
-func TestValidatePersistAndFinalizeMintOrCreate(t *testing.T) {
-	setup := setUpInternalSignTokenTestHandlerPostgres(t)
-
-	operatorIDs := setup.setupThresholdOperators()
-
-	t.Run("finalizes MINT transaction and updates output status", func(t *testing.T) {
-		testHash := hash32(0x45)
-		mintTransaction, output := setup.createMintTransactionWithOutput(testHash, st.TokenTransactionStatusSigned)
-		signatures := setup.buildThresholdSignatures(operatorIDs, testHash)
-
-		err := setup.handler.validatePersistAndFinalizeMintOrCreate(setup.ctx, signatures, mintTransaction)
-		require.NoError(t, err)
-
-		// Verify transaction status
-		updatedTx, err := setup.client.TokenTransaction.Get(setup.ctx, mintTransaction.ID)
-		require.NoError(t, err)
-		require.Equal(t, st.TokenTransactionStatusFinalized, updatedTx.Status)
-
-		// Verify output status changed from CREATED_SIGNED to CREATED_FINALIZED
-		updatedOutput, err := setup.client.TokenOutput.Get(setup.ctx, output.ID)
-		require.NoError(t, err)
-		require.Equal(t, st.TokenOutputStatusCreatedFinalized, updatedOutput.Status)
-	})
-
-	t.Run("fails with insufficient signatures", func(t *testing.T) {
-		testHash := hash32(0x46)
-		createTransaction := setup.createCreateTransaction(testHash, st.TokenTransactionStatusSigned)
-
-		// Only provide 1 signature when threshold is 2
-		sigs := make(map[string][]byte)
-		sig0 := ecdsa.Sign(setup.handler.config.IdentityPrivateKey.ToBTCEC(), testHash)
-		sigs[operatorIDs[0]] = sig0.Serialize()
-
-		err := setup.handler.validatePersistAndFinalizeMintOrCreate(setup.ctx, sigs, createTransaction)
-		require.Error(t, err, "should fail with insufficient signatures")
-		require.Contains(t, err.Error(), "expected")
-	})
-
-	t.Run("is idempotent for already finalized transaction", func(t *testing.T) {
-		testHash := hash32(0x47)
-		createTransaction := setup.createCreateTransaction(testHash, st.TokenTransactionStatusFinalized)
-		signatures := setup.buildThresholdSignatures(operatorIDs, testHash)
-
-		// Should succeed without error (idempotent)
-		err := setup.handler.validatePersistAndFinalizeMintOrCreate(setup.ctx, signatures, createTransaction)
-		require.NoError(t, err, "should be idempotent for already finalized transaction")
 	})
 }
 

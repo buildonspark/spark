@@ -216,8 +216,12 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 
 	switch txType := tokenTransaction.InferTokenTransactionTypeEnt(); txType {
 	case utils.TokenTransactionTypeMint, utils.TokenTransactionTypeCreate:
-		if err := h.validatePersistAndFinalizeMintOrCreate(ctx, operatorSignatures, tokenTransaction); err != nil {
-			return nil, tokens.FormatErrorWithTransactionEnt("failed to validate, persist, and finalize mint/create transaction", tokenTransaction, err)
+		if err := h.validateAndPersistPeerSignatures(ctx, operatorSignatures, tokenTransaction); err != nil {
+			return nil, tokens.FormatErrorWithTransactionEnt("failed to validate and persist peer signatures", tokenTransaction, err)
+		}
+		finalizeHandler := NewInternalFinalizeTokenHandler(h.config)
+		if err := finalizeHandler.FinalizeMintOrCreateTransactionInternal(ctx, tokenTransaction.FinalizedTokenTransactionHash); err != nil {
+			return nil, tokens.FormatErrorWithTransactionEnt("failed to finalize mint/create transaction", tokenTransaction, err)
 		}
 		return &pbtkinternal.ExchangeRevocationSecretsSharesResponse{}, nil
 
@@ -1232,24 +1236,6 @@ func (h *InternalSignTokenHandler) validateAndPersistPeerSignatures(
 		}
 	}
 	return nil
-}
-
-// validatePersistAndFinalizeMintOrCreate validates threshold signatures, persists peer signatures,
-// and finalizes a MINT/CREATE transaction atomically. This ensures finalization only happens
-// if we have guaranteed valid threshold signatures.
-func (h *InternalSignTokenHandler) validatePersistAndFinalizeMintOrCreate(
-	ctx context.Context,
-	signatures operatorSignaturesMap,
-	tokenTransaction *ent.TokenTransaction,
-) error {
-	// Validate and persist peer signatures (reuses existing logic)
-	if err := h.validateAndPersistPeerSignatures(ctx, signatures, tokenTransaction); err != nil {
-		return err
-	}
-	// Finalize the transaction using the internal method which fetches and locks
-	// (consistent with how transfer finalization works)
-	finalizeHandler := NewInternalFinalizeTokenHandler(h.config)
-	return finalizeHandler.FinalizeMintOrCreateTransactionInternal(ctx, tokenTransaction.FinalizedTokenTransactionHash)
 }
 
 func validateInputTokenOutputsMatchSpentTokenOutputs(tokenOutputIDs []uuid.UUID, spentOutputs []*ent.TokenOutput) error {

@@ -503,8 +503,8 @@ func UpdateSignedTransaction(
 	newInputStatus := st.TokenOutputStatusSpentSigned
 	newOutputLeafStatus := st.TokenOutputStatusCreatedSigned
 	if txType == utils.TokenTransactionTypeMint {
-		// Mints in the Phase1 flow (the only caller of UpdateSignedTransaction) do not require
-		// a separate finalize step; treat outputs as finalized at signing time.
+		// Mints called through UpdateSignedTransaction are finalized at signing time
+		// (no separate finalize step needed).
 		newInputStatus = st.TokenOutputStatusSpentFinalized
 		newOutputLeafStatus = st.TokenOutputStatusCreatedFinalized
 	}
@@ -698,7 +698,6 @@ func FinalizeTransferTransactionWithRevocationKeys(
 		}
 	}
 
-	// Finalize created outputs and transaction status.
 	if err := finalizeCreatedOutputs(ctx, db, tokenTransactionEnt.Edges.CreatedOutput, txHash); err != nil {
 		return err
 	}

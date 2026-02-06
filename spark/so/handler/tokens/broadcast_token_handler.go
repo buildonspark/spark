@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -22,6 +21,7 @@ import (
 	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -271,61 +271,34 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 	}
 
 	internalSignHandler := NewInternalSignTokenHandler(h.config)
+	if err := internalSignHandler.validateAndPersistPeerSignatures(ctx, signatures, tokenTxEnt); err != nil {
+		return nil, err
+	}
 
 	switch txType {
-	case utils.TokenTransactionTypeCreate:
-		// Validate, persist, and finalize atomically
-		if err := internalSignHandler.validatePersistAndFinalizeMintOrCreate(ctx, signatures, tokenTxEnt); err != nil {
+	case utils.TokenTransactionTypeCreate, utils.TokenTransactionTypeMint:
+		finalizeHandler := NewInternalFinalizeTokenHandler(h.config)
+		if err := finalizeHandler.FinalizeMintOrCreateTransaction(ctx, tokenTxEnt); err != nil {
 			return nil, err
 		}
 
-		// Fanout finalization to non-coordinator SOs (best-effort)
-		if err := h.fanoutFinalizeToNonCoordinators(ctx, tokenTxEnt, legacyTokenTx, signatures); err != nil {
-			// Log warning but don't fail - coordinator has finalized, peers will catch up via retry
-			logging.GetLoggerFromContext(ctx).Sugar().Warnf(
-				"failed to fanout finalize to some operators for CREATE txHash %x: %v",
-				tokenTxEnt.FinalizedTokenTransactionHash, err)
+		if err := h.fanoutFinalizeMintOrCreateToNonCoordinators(ctx, tokenTxEnt, legacyTokenTx, signatures); err != nil {
+			logging.GetLoggerFromContext(ctx).Warn(
+				"failed to fanout finalize to some operators",
+				append(tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTxEnt), zap.Error(err))...)
 		}
 
-		tokenMetadata, err := common.NewTokenMetadataFromCreateInput(legacyTokenTx.GetCreateInput(), legacyTokenTx.GetNetwork())
-		if err != nil {
-			return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to create token metadata: %w", err))
-		}
-		tokenIdentifier, err := tokenMetadata.ComputeTokenIdentifier()
-		if err != nil {
-			return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to compute token identifier: %w", err))
+		// Only return the token identifier for CREATE transactions (so client doesn't need to follow up with an explicit request for it).
+		var tokenIdentifier []byte
+		if tokenTxEnt.Edges.Create != nil {
+			tokenIdentifier = tokenTxEnt.Edges.Create.TokenIdentifier
 		}
 		return &tokenpb.BroadcastTransactionResponse{
 			FinalTokenTransaction: finalTx,
 			CommitStatus:          tokenpb.CommitStatus_COMMIT_FINALIZED,
-			CommitProgress:        nil,
 			TokenIdentifier:       tokenIdentifier,
 		}, nil
-	case utils.TokenTransactionTypeMint:
-		// Validate, persist, and finalize atomically
-		if err := internalSignHandler.validatePersistAndFinalizeMintOrCreate(ctx, signatures, tokenTxEnt); err != nil {
-			return nil, err
-		}
-
-		// Fanout finalization to non-coordinator SOs (best-effort)
-		if err := h.fanoutFinalizeToNonCoordinators(ctx, tokenTxEnt, legacyTokenTx, signatures); err != nil {
-			// Log warning but don't fail - coordinator has finalized, peers will catch up via retry
-			logging.GetLoggerFromContext(ctx).Sugar().Warnf(
-				"failed to fanout finalize to some operators for MINT txHash %x: %v",
-				tokenTxEnt.FinalizedTokenTransactionHash, err)
-		}
-
-		return &tokenpb.BroadcastTransactionResponse{
-			FinalTokenTransaction: finalTx,
-			CommitStatus:          tokenpb.CommitStatus_COMMIT_FINALIZED,
-			CommitProgress:        nil,
-			TokenIdentifier:       finalTx.GetMintInput().GetTokenIdentifier(),
-		}, nil
 	case utils.TokenTransactionTypeTransfer:
-		// For transfers, validate and persist, then continue with revocation exchange
-		if err := internalSignHandler.validateAndPersistPeerSignatures(ctx, signatures, tokenTxEnt); err != nil {
-			return nil, err
-		}
 		mappedSigs := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, len(signatures))
 		for k, v := range signatures {
 			mappedSigs[k] = &tokeninternalpb.SignTokenTransactionFromCoordinationResponse{SparkOperatorSignature: v}
@@ -338,7 +311,6 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 			FinalTokenTransaction: finalTx,
 			CommitStatus:          commitResp.GetCommitStatus(),
 			CommitProgress:        commitResp.GetCommitProgress(),
-			TokenIdentifier:       commitResp.GetTokenIdentifier(),
 		}, nil
 	default:
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction type not supported: %s", txType))
@@ -399,54 +371,32 @@ func (h *BroadcastTokenHandler) FanoutBroadcastAndFinalize(
 
 	internalSignHandler := NewInternalSignTokenHandler(h.config)
 
+	if err := internalSignHandler.validateAndPersistPeerSignatures(ctx, signatures, tokenTxEnt); err != nil {
+		return nil, err
+	}
+
 	switch txType {
-	case utils.TokenTransactionTypeCreate:
-		// Validate, persist, and finalize atomically
-		if err := internalSignHandler.validatePersistAndFinalizeMintOrCreate(ctx, signatures, tokenTxEnt); err != nil {
+	case utils.TokenTransactionTypeCreate, utils.TokenTransactionTypeMint:
+		finalizeHandler := NewInternalFinalizeTokenHandler(h.config)
+		if err := finalizeHandler.FinalizeMintOrCreateTransaction(ctx, tokenTxEnt); err != nil {
 			return nil, err
 		}
 
-		// Fanout finalization to non-coordinator SOs (best-effort)
-		if err := h.fanoutFinalizeToNonCoordinators(ctx, tokenTxEnt, legacyTokenTx, signatures); err != nil {
-			logging.GetLoggerFromContext(ctx).Sugar().Warnf(
-				"retry: failed to fanout finalize to some operators for CREATE txHash %x: %v",
-				tokenTxEnt.FinalizedTokenTransactionHash, err)
+		if err := h.fanoutFinalizeMintOrCreateToNonCoordinators(ctx, tokenTxEnt, legacyTokenTx, signatures); err != nil {
+			logging.GetLoggerFromContext(ctx).Warn(
+				"retry: failed to fanout finalize to some operators",
+				append(tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTxEnt), zap.Error(err))...)
 		}
 
-		tokenMetadata, err := common.NewTokenMetadataFromCreateInput(legacyTokenTx.GetCreateInput(), legacyTokenTx.GetNetwork())
-		if err != nil {
-			return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to create token metadata: %w", err))
-		}
-		tokenIdentifier, err := tokenMetadata.ComputeTokenIdentifier()
-		if err != nil {
-			return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to compute token identifier: %w", err))
+		var tokenIdentifier []byte
+		if tokenTxEnt.Edges.Create != nil {
+			tokenIdentifier = tokenTxEnt.Edges.Create.TokenIdentifier
 		}
 		return &tokenpb.BroadcastTransactionResponse{
 			CommitStatus:    tokenpb.CommitStatus_COMMIT_FINALIZED,
 			TokenIdentifier: tokenIdentifier,
 		}, nil
-	case utils.TokenTransactionTypeMint:
-		// Validate, persist, and finalize atomically
-		if err := internalSignHandler.validatePersistAndFinalizeMintOrCreate(ctx, signatures, tokenTxEnt); err != nil {
-			return nil, err
-		}
-
-		// Fanout finalization to non-coordinator SOs (best-effort)
-		if err := h.fanoutFinalizeToNonCoordinators(ctx, tokenTxEnt, legacyTokenTx, signatures); err != nil {
-			logging.GetLoggerFromContext(ctx).Sugar().Warnf(
-				"retry: failed to fanout finalize to some operators for MINT txHash %x: %v",
-				tokenTxEnt.FinalizedTokenTransactionHash, err)
-		}
-
-		return &tokenpb.BroadcastTransactionResponse{
-			CommitStatus:    tokenpb.CommitStatus_COMMIT_FINALIZED,
-			TokenIdentifier: legacyTokenTx.GetMintInput().GetTokenIdentifier(),
-		}, nil
 	case utils.TokenTransactionTypeTransfer:
-		// For transfers, validate and persist, then continue with revocation exchange
-		if err := internalSignHandler.validateAndPersistPeerSignatures(ctx, signatures, tokenTxEnt); err != nil {
-			return nil, err
-		}
 		mappedSigs := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, len(signatures))
 		for k, v := range signatures {
 			mappedSigs[k] = &tokeninternalpb.SignTokenTransactionFromCoordinationResponse{SparkOperatorSignature: v}
@@ -616,9 +566,9 @@ func (h *BroadcastTokenHandler) handleExistingTransaction(
 	}, nil
 }
 
-// fanoutFinalizeToNonCoordinators sends finalization requests to all non-coordinator SOs
+// fanoutFinalizeMintOrCreateToNonCoordinators sends finalization requests to all non-coordinator SOs
 // for MINT/CREATE transactions. This shares peer signatures so non-coordinators can finalize.
-func (h *BroadcastTokenHandler) fanoutFinalizeToNonCoordinators(
+func (h *BroadcastTokenHandler) fanoutFinalizeMintOrCreateToNonCoordinators(
 	ctx context.Context,
 	tokenTxEnt *ent.TokenTransaction,
 	legacyTokenTx *tokenpb.TokenTransaction,

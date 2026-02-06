@@ -178,10 +178,11 @@ func (f *Fixtures) CreateMintTransactionWithOpts(tokenCreate *ent.TokenCreate, o
 	if hash == nil {
 		hash = f.RandomBytes(32)
 	}
+	finalizedHash := f.RandomBytes(32)
 
 	tx, err := f.Client.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(hash).
-		SetFinalizedTokenTransactionHash(hash).
+		SetFinalizedTokenTransactionHash(finalizedHash).
 		SetStatus(status).
 		SetMint(mint).
 		Save(f.Ctx)
@@ -201,10 +202,11 @@ func (f *Fixtures) CreateCreateTransaction(tokenCreate *ent.TokenCreate, status 
 	if hash == nil {
 		hash = f.RandomBytes(32)
 	}
+	finalizedHash := f.RandomBytes(32)
 
 	tx, err := f.Client.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(hash).
-		SetFinalizedTokenTransactionHash(hash).
+		SetFinalizedTokenTransactionHash(finalizedHash).
 		SetStatus(status).
 		SetCreateID(tokenCreate.ID).
 		Save(f.Ctx)

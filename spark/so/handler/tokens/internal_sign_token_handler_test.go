@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -121,7 +122,7 @@ func (s *internalSignTokenTestSetup) createCreateTransaction(
 func TestBuildInputOperatorShareMap(t *testing.T) {
 	testHash := hash32(0xA1)
 	testSecret := hash32(0x42)
-	testOperatorPubKey := pubKey33(0x02)
+	testOperatorPubKey := keys.GeneratePrivateKey().Public().Serialize()
 	testUUID := uuid.New()
 
 	t.Run("parses new InputTtxoRef format", func(t *testing.T) {
@@ -237,15 +238,14 @@ func TestExchangeRevocationSecretsShares_TransferTransaction(t *testing.T) {
 		SaveX(setup.ctx)
 
 	t.Run("fails when no operator shares provided for transfer", func(t *testing.T) {
-		// Use proper 33-byte public keys to pass the parsing checks
-		validPubKey := pubKey33(0x02)
+		validPubKey := keys.GeneratePrivateKey().Public().Serialize()
 
 		req := &sparktokeninternal.ExchangeRevocationSecretsSharesRequest{
 			OperatorShares: []*sparktokeninternal.OperatorRevocationShares{},
 			OperatorTransactionSignatures: []*sparktokeninternal.OperatorTransactionSignature{
 				{
 					OperatorIdentityPublicKey: validPubKey,
-					Signature:                 sig64(0x01),
+					Signature:                 bytes.Repeat([]byte{0x01}, 64),
 				},
 			},
 			FinalTokenTransaction:     nil,
