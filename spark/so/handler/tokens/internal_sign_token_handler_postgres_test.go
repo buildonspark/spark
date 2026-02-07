@@ -382,7 +382,6 @@ func (s *internalSignTokenPostgresTestSetup) buildOperatorSignaturesProto(signat
 	return operatorSigs
 }
 
-// createMintTransactionWithOutput creates a MINT transaction with one output using fixtures.
 func (s *internalSignTokenPostgresTestSetup) createMintTransactionWithOutput(
 	testHash []byte,
 	txStatus st.TokenTransactionStatus,
@@ -408,7 +407,6 @@ func (s *internalSignTokenPostgresTestSetup) createMintTransactionWithOutput(
 	return tx, outputs[0]
 }
 
-// createCreateTransaction creates a CREATE transaction (no outputs) using fixtures.
 func (s *internalSignTokenPostgresTestSetup) createCreateTransaction(
 	testHash []byte,
 	status st.TokenTransactionStatus,
@@ -439,13 +437,14 @@ func TestExchangeRevocationSecretsShares_MintTransaction(t *testing.T) {
 		st.TokenTransactionStatusSigned,
 	)
 
-	signatures := setup.buildThresholdSignatures(operatorIDs, testHash)
+	finalizedHash := mintTransaction.FinalizedTokenTransactionHash
+	signatures := setup.buildThresholdSignatures(operatorIDs, finalizedHash)
 	operatorSigs := setup.buildOperatorSignaturesProto(signatures)
 
 	t.Run("finalizes MINT transaction", func(t *testing.T) {
 		req := &sparktokeninternal.ExchangeRevocationSecretsSharesRequest{
 			OperatorTransactionSignatures: operatorSigs,
-			FinalTokenTransactionHash:     testHash,
+			FinalTokenTransactionHash:     finalizedHash,
 			OperatorIdentityPublicKey:     setup.handler.config.IdentityPublicKey().Serialize(),
 		}
 
@@ -473,13 +472,14 @@ func TestExchangeRevocationSecretsShares_CreateTransaction(t *testing.T) {
 
 	createTransaction := setup.createCreateTransaction(testHash, st.TokenTransactionStatusSigned)
 
-	signatures := setup.buildThresholdSignatures(operatorIDs, testHash)
+	finalizedHash := createTransaction.FinalizedTokenTransactionHash
+	signatures := setup.buildThresholdSignatures(operatorIDs, finalizedHash)
 	operatorSigs := setup.buildOperatorSignaturesProto(signatures)
 
 	t.Run("finalizes CREATE transaction", func(t *testing.T) {
 		req := &sparktokeninternal.ExchangeRevocationSecretsSharesRequest{
 			OperatorTransactionSignatures: operatorSigs,
-			FinalTokenTransactionHash:     testHash,
+			FinalTokenTransactionHash:     finalizedHash,
 			OperatorIdentityPublicKey:     setup.handler.config.IdentityPublicKey().Serialize(),
 		}
 
@@ -492,6 +492,29 @@ func TestExchangeRevocationSecretsShares_CreateTransaction(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, st.TokenTransactionStatusFinalized, updatedTx.Status, "transaction should be FINALIZED")
 	})
+}
+
+func TestExchangeRevocationSecretsShares_RejectsThresholdSignaturesWhenFlagDisabled(t *testing.T) {
+	setup := setUpInternalSignTokenTestHandlerPostgres(t)
+
+	operatorIDs := setup.setupThresholdOperators()
+	setup.handler.config.Token.RequireThresholdOperators = false
+
+	createTransaction := setup.createCreateTransaction(hash32(0x45), st.TokenTransactionStatusSigned)
+
+	finalizedHash := createTransaction.FinalizedTokenTransactionHash
+	signatures := setup.buildThresholdSignatures(operatorIDs, finalizedHash)
+	operatorSigs := setup.buildOperatorSignaturesProto(signatures)
+
+	req := &sparktokeninternal.ExchangeRevocationSecretsSharesRequest{
+		OperatorTransactionSignatures: operatorSigs,
+		FinalTokenTransactionHash:     finalizedHash,
+		OperatorIdentityPublicKey:     setup.handler.config.IdentityPublicKey().Serialize(),
+	}
+
+	_, err := setup.handler.ExchangeRevocationSecretsShares(setup.ctx, req)
+	require.Error(t, err, "should reject threshold signatures when RequireThresholdOperators is false")
+	require.ErrorContains(t, err, "expected 3 signatures, got 2")
 }
 
 func TestExchangeRevocationSecretsShares_TransferTransaction_HappyPath(t *testing.T) {

@@ -425,7 +425,7 @@ func TestBroadcastTokenTransaction_Phase2_MintSuccess(t *testing.T) {
 	require.NotNil(t, resp)
 	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
 	assert.NotNil(t, resp.FinalTokenTransaction)
-	assert.Equal(t, tokenCreate.TokenIdentifier, resp.TokenIdentifier)
+	assert.Nil(t, resp.TokenIdentifier, "MINT transactions should not return token identifier")
 }
 
 func TestBroadcastTokenTransaction_Phase2_CreateSuccess(t *testing.T) {

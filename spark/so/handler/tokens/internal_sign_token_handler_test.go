@@ -3,11 +3,8 @@ package tokens
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
-	"fmt"
 	"testing"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
@@ -16,23 +13,20 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	sparktokeninternal "github.com/lightsparkdev/spark/proto/spark_token_internal"
-	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/entfixtures"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
 type internalSignTokenTestSetup struct {
-	t           *testing.T
-	handler     *InternalSignTokenHandler
-	ctx         context.Context
-	client      *ent.Client
-	fixtures    *entfixtures.Fixtures
-	cleanup     func()
-	operatorIDs []string // populated by setupThresholdOperators
+	t        *testing.T
+	handler  *InternalSignTokenHandler
+	ctx      context.Context
+	client   *ent.Client
+	fixtures *entfixtures.Fixtures
+	cleanup  func()
 }
 
 func setUpInternalSignTokenTestHandler(t *testing.T) *internalSignTokenTestSetup {
@@ -58,66 +52,6 @@ func setUpInternalSignTokenTestHandler(t *testing.T) *internalSignTokenTestSetup
 	}
 }
 
-// setupThresholdOperators configures the handler with 3 operators and threshold 2.
-// Sets RequireThresholdOperators to true. Returns operator IDs for signature building.
-func (s *internalSignTokenTestSetup) setupThresholdOperators() []string {
-	s.t.Helper()
-	limitedOperators := make(map[string]*so.SigningOperator)
-	ids := make([]string, 3)
-	for i := range ids {
-		id := fmt.Sprintf("%064x", i+1)
-		op, ok := s.handler.config.SigningOperatorMap[id]
-		require.True(s.t, ok, "operator %s must exist", id)
-		limitedOperators[id] = op
-		ids[i] = id
-	}
-	s.handler.config.SigningOperatorMap = limitedOperators
-	s.handler.config.Threshold = 2
-	s.handler.config.Token.RequireThresholdOperators = true
-	s.operatorIDs = ids
-	return ids
-}
-
-// buildThresholdSignatures creates valid signatures from threshold operators for the given hash.
-func (s *internalSignTokenTestSetup) buildThresholdSignatures(testHash []byte) map[string][]byte {
-	s.t.Helper()
-	require.NotEmpty(s.t, s.operatorIDs, "must call setupThresholdOperators first")
-
-	sigs := make(map[string][]byte)
-
-	// First operator uses handler's identity key
-	sig0 := ecdsa.Sign(s.handler.config.IdentityPrivateKey.ToBTCEC(), testHash)
-	sigs[s.operatorIDs[0]] = sig0.Serialize()
-
-	// Second operator uses known test key
-	const operator1PrivHex = "bc0f5b9055c4a88b881d4bb48d95b409cd910fb27c088380f8ecda2150ee8faf"
-	privBytes, _ := hex.DecodeString(operator1PrivHex)
-	privKey1, _ := keys.ParsePrivateKey(privBytes)
-	sig1 := ecdsa.Sign(privKey1.ToBTCEC(), testHash)
-	sigs[s.operatorIDs[1]] = sig1.Serialize()
-
-	return sigs
-}
-
-// createCreateTransaction creates a CREATE transaction (no outputs) using fixtures.
-func (s *internalSignTokenTestSetup) createCreateTransaction(
-	testHash []byte,
-	status st.TokenTransactionStatus,
-) *ent.TokenTransaction {
-	s.t.Helper()
-
-	tokenCreate := s.fixtures.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
-	tx := s.fixtures.CreateCreateTransaction(tokenCreate, status, entfixtures.MintTransactionOpts{Hash: testHash})
-
-	// Reload with edges
-	tx, err := s.client.TokenTransaction.Query().
-		Where(tokentransaction.IDEQ(tx.ID)).
-		WithCreate().
-		Only(s.ctx)
-	require.NoError(s.t, err)
-
-	return tx
-}
 
 func TestBuildInputOperatorShareMap(t *testing.T) {
 	testHash := hash32(0xA1)
@@ -288,27 +222,3 @@ func TestExchangeRevocationSecretsShares_TransferTransaction(t *testing.T) {
 	})
 }
 
-func TestValidateSignaturesPackageAndPersistPeerSignatures_RequireThresholdOperators(t *testing.T) {
-	setup := setUpInternalSignTokenTestHandler(t)
-	defer setup.cleanup()
-
-	setup.setupThresholdOperators()
-	// Temporarily disable RequireThresholdOperators for test setup
-	setup.handler.config.Token.RequireThresholdOperators = false
-
-	testHash := hash32(0x42)
-	tokenTransaction := setup.createCreateTransaction(testHash, st.TokenTransactionStatusStarted)
-	signatures := setup.buildThresholdSignatures(testHash)
-
-	t.Run("flag false with missing operator fails", func(t *testing.T) {
-		setup.handler.config.Token.RequireThresholdOperators = false
-		err := setup.handler.validateAndPersistPeerSignatures(setup.ctx, signatures, tokenTransaction)
-		require.Error(t, err, "expected failure when RequireThresholdOperators is false and not all operators signed")
-	})
-
-	t.Run("flag true with threshold signatures succeeds", func(t *testing.T) {
-		setup.handler.config.Token.RequireThresholdOperators = true
-		err := setup.handler.validateAndPersistPeerSignatures(setup.ctx, signatures, tokenTransaction)
-		require.NoError(t, err, "expected success when RequireThresholdOperators is true and threshold signatures provided")
-	})
-}
