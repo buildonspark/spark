@@ -634,7 +634,7 @@ func main() {
 					return handler(ctx, req)
 				}
 			}(),
-			sparkgrpc.InternalMethodInterceptor(GetProtectedServices()),
+			sparkgrpc.MethodDisableInterceptor(),
 			sparkgrpc.TimeoutInterceptor(knobsService, config.GRPC.ServerUnaryHandlerTimeout),
 			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
@@ -673,7 +673,7 @@ func main() {
 					return handler(srv, &grpcmiddleware.WrappedServerStream{ServerStream: ss, WrappedContext: ctx})
 				}
 			}(),
-			sparkgrpc.InternalMethodStreamInterceptor(GetProtectedServices()),
+			sparkgrpc.MethodDisableStreamInterceptor(),
 			sparkgrpc.PanicRecoveryStreamInterceptor(),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).StreamAuthnInterceptor,
 			sparkgrpc.ConcurrencyStreamInterceptor(concurrencyStreamGuard, clientInfoProvider, knobsService),

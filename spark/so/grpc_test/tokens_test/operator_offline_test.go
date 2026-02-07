@@ -19,13 +19,13 @@ var internalBroadcastMethod = tokenpbinternal.SparkTokenInternalService_Broadcas
 
 func disableInternalBroadcast(t *testing.T, kc *sparktesting.KnobController) {
 	t.Helper()
-	err := kc.SetKnobWithTarget(t, knobs.KnobGrpcServerInternalMethodEnabled, internalBroadcastMethod, 0)
+	err := kc.SetKnobWithTarget(t, knobs.KnobGrpcServerMethodEnabled, internalBroadcastMethod, 0)
 	require.NoError(t, err)
 }
 
 func enableInternalBroadcast(t *testing.T, kc *sparktesting.KnobController) {
 	t.Helper()
-	err := kc.DeleteKnob(t, knobs.KnobGrpcServerInternalMethodEnabled)
+	err := kc.SetKnobWithTarget(t, knobs.KnobGrpcServerMethodEnabled, internalBroadcastMethod, 100)
 	require.NoError(t, err)
 }
 
