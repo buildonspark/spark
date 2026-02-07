@@ -86,7 +86,7 @@ describe.each(TEST_CONFIGS)(
         userBalanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(userBalance.balance).toBe(100n);
+      expect(userBalance.ownedBalance).toBe(100n);
     });
 
     it("should prevent concurrent transactions from spending the same outputs using tokenOutputsLocks", async () => {
@@ -166,11 +166,12 @@ describe.each(TEST_CONFIGS)(
         tokenIdentifier!,
       );
 
-      const totalReceived = user1Balance.balance + user2Balance.balance;
+      const totalReceived =
+        user1Balance.ownedBalance + user2Balance.ownedBalance;
       expect(totalReceived).toBe(transferAmount);
       expect(
-        user1Balance.balance === transferAmount ||
-          user2Balance.balance === transferAmount,
+        user1Balance.ownedBalance === transferAmount ||
+          user2Balance.ownedBalance === transferAmount,
       ).toBe(true);
     });
   },

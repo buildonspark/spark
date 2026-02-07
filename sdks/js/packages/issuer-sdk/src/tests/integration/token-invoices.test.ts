@@ -83,7 +83,7 @@ describe.each(TEST_CONFIGS)(
         receiverBalanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(receiverBalance.balance).toEqual(tokenAmount);
+      expect(receiverBalance.ownedBalance).toEqual(tokenAmount);
     });
 
     it("should transfer tokens using multiple spark invoices", async () => {
@@ -176,14 +176,14 @@ describe.each(TEST_CONFIGS)(
         receiver1BalanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(receiver1Balance.balance).toEqual(amount1 + amount2);
+      expect(receiver1Balance.ownedBalance).toEqual(amount1 + amount2);
 
       const receiver2BalanceObj = await receiverWallet2.getBalance();
       const receiver2Balance = filterTokenBalanceForTokenIdentifier(
         receiver2BalanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(receiver2Balance.balance).toEqual(amount3);
+      expect(receiver2Balance.ownedBalance).toEqual(amount3);
     });
 
     it("should fail to fulfill an expired spark invoice", async () => {
@@ -236,7 +236,7 @@ describe.each(TEST_CONFIGS)(
         receiverBalanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(receiverBalance.balance).toEqual(0n);
+      expect(receiverBalance.ownedBalance).toEqual(0n);
     });
 
     it("should fulfill a spark invoice with null expiry", async () => {
@@ -306,7 +306,7 @@ describe.each(TEST_CONFIGS)(
         receiverBalanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(receiverBalance.balance).toEqual(tokenAmount);
+      expect(receiverBalance.ownedBalance).toEqual(tokenAmount);
     });
 
     it("should fulfill a tokens invoice without amount by passing amount parameter", async () => {
@@ -377,7 +377,7 @@ describe.each(TEST_CONFIGS)(
         receiverBalanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(receiverBalance.balance).toEqual(tokenAmount);
+      expect(receiverBalance.ownedBalance).toEqual(tokenAmount);
     });
 
     it(`fulfillSparkInvoice successfully handles multiple mixed tokens and sats invoices`, async () => {

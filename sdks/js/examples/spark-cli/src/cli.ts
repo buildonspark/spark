@@ -1110,7 +1110,12 @@ async function runCLI() {
               console.log(
                 `  ${bech32mTokenIdentifier} (${tokenInfo.tokenMetadata.tokenPublicKey}):`,
               );
-              console.log(`    Balance: ${tokenInfo.balance}`);
+              console.log(`    Owned balance: ${tokenInfo.ownedBalance}`);
+              if (tokenInfo.availableToSendBalance < tokenInfo.ownedBalance) {
+                console.log(
+                  `    Available to send: ${tokenInfo.availableToSendBalance}`,
+                );
+              }
             }
           }
           break;

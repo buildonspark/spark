@@ -44,7 +44,7 @@ import {
   decodeBech32mTokenIdentifier,
 } from "../../utils/token-identifier.js";
 import { validateTokenTransaction } from "../../utils/token-transaction-validation.js";
-import { sumAvailableTokens } from "../../utils/token-transactions.js";
+import { sumTokenOutputs } from "../../utils/token-transactions.js";
 import { WalletConfigService } from "../config.js";
 import { ConnectionManager } from "../connection/connection.js";
 import { SigningOperator } from "../wallet-config.js";
@@ -143,7 +143,7 @@ export class TokenTransactionService {
 
       // Take only the first MAX_TOKEN_OUTPUTS and calculate their total
       const maxOutputsToUse = sortedOutputs.slice(0, MAX_TOKEN_OUTPUTS_TX);
-      const maxAmount = sumAvailableTokens(maxOutputsToUse);
+      const maxAmount = sumTokenOutputs(maxOutputsToUse);
 
       throw new SparkValidationError(
         `Cannot transfer more than ${MAX_TOKEN_OUTPUTS_TX} TTXOs in a single transaction (${outputsToUse.length} selected). Maximum transferable amount is: ${maxAmount}`,
@@ -232,7 +232,7 @@ export class TokenTransactionService {
       (a, b) => a.previousTransactionVout - b.previousTransactionVout,
     );
 
-    const availableTokenAmount = sumAvailableTokens(selectedOutputs);
+    const availableTokenAmount = sumTokenOutputs(selectedOutputs);
     const totalRequestedAmount = tokenOutputData.reduce(
       (sum, output) => sum + output.tokenAmount,
       0n,
@@ -296,7 +296,7 @@ export class TokenTransactionService {
       (a, b) => a.previousTransactionVout - b.previousTransactionVout,
     );
 
-    const availableTokenAmount = sumAvailableTokens(selectedOutputs);
+    const availableTokenAmount = sumTokenOutputs(selectedOutputs);
     const totalRequestedAmount = tokenOutputData.reduce(
       (sum, output) => sum + output.tokenAmount,
       0n,
@@ -987,10 +987,10 @@ export class TokenTransactionService {
       });
     }
 
-    if (sumAvailableTokens(tokenOutputs) < tokenAmount) {
+    if (sumTokenOutputs(tokenOutputs) < tokenAmount) {
       throw new SparkValidationError("Insufficient token amount", {
         field: "tokenAmount",
-        value: sumAvailableTokens(tokenOutputs),
+        value: sumTokenOutputs(tokenOutputs),
         expected: tokenAmount,
       });
     }

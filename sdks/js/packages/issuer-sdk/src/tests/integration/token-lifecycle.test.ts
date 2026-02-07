@@ -55,7 +55,7 @@ describe.each(TEST_CONFIGS)(
         userBalanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
+      expect(userBalanceAfterTransfer.ownedBalance).toEqual(tokenAmount);
 
       const freezeResponse = await issuerWallet.freezeTokens(userSparkAddress);
       expect(freezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
@@ -145,7 +145,7 @@ describe.each(TEST_CONFIGS)(
         userBalanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
+      expect(userBalanceAfterTransfer.ownedBalance).toEqual(tokenAmount);
 
       await userWallet.transferTokens({
         tokenIdentifier,
@@ -159,7 +159,7 @@ describe.each(TEST_CONFIGS)(
         tokenIdentifier!,
       );
 
-      expect(userBalanceAfterTransferBack.balance).toEqual(0n);
+      expect(userBalanceAfterTransferBack.ownedBalance).toEqual(0n);
 
       const issuerTokenBalance = (await issuerWallet.getIssuerTokenBalance())
         .balance;
