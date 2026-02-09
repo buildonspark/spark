@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.6.1
+
+### Patch Changes
+
+- Support creating unsigned Spark invoices on behalf of other pubkeys
+- Include Spark invoice in the WalletTransfer type
+
 ## 0.6.0
 
 ### Minor Changes

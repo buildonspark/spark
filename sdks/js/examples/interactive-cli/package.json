@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/interactive-cli",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "description": "Interactive Ink CLI example for Spark SDK",
   "type": "module",
@@ -13,7 +13,7 @@
     "types": "tsc --noEmit"
   },
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.6.0",
+    "@buildonspark/spark-sdk": "0.6.1",
     "ink": "^6.6.0",
     "react": "19.0.0"
   },
