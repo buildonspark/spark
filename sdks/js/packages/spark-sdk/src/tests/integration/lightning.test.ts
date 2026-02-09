@@ -132,6 +132,166 @@ describe.each(walletTypes)(
       expect(invoice).toBeDefined();
     });
 
+    it(`${name} - should store preimage shares on all SOs via coordinator (v2)`, async () => {
+      const preimage = hexToBytes(
+        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
+      );
+      const paymentHash = sha256(preimage);
+
+      const invoice = await lightningService.createLightningInvoiceWithPreImage(
+        {
+          invoiceCreator: fakeInvoiceCreator,
+          amountSats: 100,
+          memo: "test",
+          preimage,
+        },
+      );
+
+      expect(invoice).toBeDefined();
+
+      const signingOperators = userWallet
+        .getConfigService()
+        .getSigningOperators();
+      const connectionManager = userWallet.getConnectionManager();
+      const threshold = userWallet.getConfigService().getThreshold();
+
+      for (const [_, operator] of Object.entries(signingOperators)) {
+        const mockClient = await connectionManager.createMockClient(
+          operator.address,
+        );
+        const resp = await mockClient.query_preimage_share({ paymentHash });
+        expect(resp.preimageShare.length).toBe(32);
+        expect(resp.threshold).toBe(threshold);
+        expect(resp.invoiceString).toBe(invoice.invoice.encodedInvoice);
+        mockClient.close();
+      }
+    });
+
+    it(`${name} - test receive lightning payment`, async () => {
+      const faucet = BitcoinFaucet.getInstance();
+
+      const preimage = hexToBytes(
+        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
+      );
+      const paymentHash = sha256(preimage);
+
+      const invoice = await lightningService.createLightningInvoiceWithPreImage(
+        {
+          invoiceCreator: fakeInvoiceCreator,
+          amountSats: 100,
+          memo: "test",
+          preimage,
+        },
+      );
+
+      expect(invoice).toBeDefined();
+
+      const leafId = uuidv7();
+      const nodeToSend = await createTree(sspWallet, leafId, faucet, 12345n);
+      const expiryTime = new Date(Date.now() + 2 * 60 * 1000);
+
+      const newDerivationPath = {
+        type: KeyDerivationType.LEAF,
+        path: uuidv7(),
+      } as const;
+
+      const leaves = [
+        {
+          leaf: nodeToSend,
+          keyDerivation: {
+            type: KeyDerivationType.LEAF,
+            path: leafId,
+          } as const,
+          newKeyDerivation: newDerivationPath,
+        },
+      ];
+
+      const response = await sspLightningService.swapNodesForPreimage({
+        leaves,
+        receiverIdentityPubkey: userIdentityPublicKey,
+        paymentHash,
+        isInboundPayment: true,
+        expiryTime,
+      });
+
+      expect(equalBytes(response.preimage, preimage)).toBe(true);
+
+      const senderTransfer = response.transfer;
+
+      if (!senderTransfer) {
+        throw new Error("test: Sender transfer not found");
+      }
+
+      const transfer = await sspTransferService.deliverTransferPackage(
+        senderTransfer,
+        leaves,
+        new Map(),
+        new Map(),
+        new Map(),
+      );
+
+      expect(transfer.status).toEqual(
+        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+      );
+
+      const pendingTransfer = await transferService.queryPendingTransfers();
+
+      expect(pendingTransfer.transfers.length).toBe(1);
+
+      const receiverTransfer = pendingTransfer.transfers[0];
+
+      if (!receiverTransfer) {
+        throw new Error("test: Receiver transfer not found");
+      }
+
+      expect(receiverTransfer.id).toEqual(senderTransfer.id);
+
+      const leafPrivKeyMap =
+        await transferService.verifyPendingTransfer(receiverTransfer);
+
+      const leafPrivKeyMapBytes = leafPrivKeyMap.get(nodeToSend.id);
+      if (!leafPrivKeyMapBytes) {
+        throw new Error("test: Leaf private key not found");
+      }
+      expect(
+        equalBytes(
+          leafPrivKeyMapBytes,
+          await sspWallet
+            .getSigner()
+            .getPublicKeyFromDerivation(newDerivationPath),
+        ),
+      ).toBe(true);
+
+      const receiverLeaf = receiverTransfer.leaves[0];
+      if (!receiverLeaf || !receiverLeaf.leaf) {
+        throw new Error("test: Receiver leaf not found");
+      }
+
+      const claimingNodes = receiverTransfer.leaves.map((leaf) => {
+        if (!leaf.leaf) {
+          throw new Error("test: Leaf not found");
+        }
+        return {
+          leaf: {
+            ...leaf.leaf,
+            refundTx: leaf.intermediateRefundTx,
+            directRefundTx: leaf.intermediateDirectRefundTx,
+            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+          },
+          keyDerivation: {
+            type: KeyDerivationType.ECIES,
+            path: leaf.secretCipher,
+          } as const,
+          newKeyDerivation: {
+            type: KeyDerivationType.LEAF,
+            path: leaf.leaf.id,
+          } as const,
+        };
+      });
+
+      await transferService.claimTransfer(receiverTransfer, claimingNodes);
+    }, 60000);
+
     it(`${name} - test receive lightning v2 payment`, async () => {
       const faucet = BitcoinFaucet.getInstance();
 

@@ -14,12 +14,15 @@ import {
   InitiatePreimageSwapResponse,
   ProvidePreimageResponse,
   QueryUserSignedRefundsResponse,
+  SecretShare as SecretShareProto,
   Transfer,
   StartTransferRequest,
   UserSignedRefund,
 } from "../proto/spark.js";
+import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
 import { getTxFromRawTxBytes } from "../utils/bitcoin.js";
 import { getCrypto } from "../utils/crypto.js";
+import { newHasher } from "../utils/hashstructure.js";
 import {
   optionsWithIdempotencyKey,
   type IdempotencyOptions,
@@ -122,58 +125,75 @@ export class LightningService {
       });
     }
 
+    const signingOperators = this.config.getSigningOperators();
     const shares = await this.config.signer.splitSecretWithProofs({
       secret: preimage,
       curveOrder: secp256k1.CURVE.n,
       threshold: this.config.getThreshold(),
-      numShares: Object.keys(this.config.getSigningOperators()).length,
+      numShares: Object.keys(signingOperators).length,
     });
 
-    const errors: Error[] = [];
-    const promises = Object.entries(this.config.getSigningOperators()).map(
-      async ([_, operator]) => {
-        const share = shares[operator.id];
-        if (!share) {
-          throw new SparkValidationError("Share not found for operator", {
-            field: "share",
-            value: operator.id,
-            expected: "Non-null share",
-          });
-        }
+    const sparkFrost = getSparkFrost();
+    const encryptedShares: Record<string, Uint8Array> = {};
+    for (const [identifier, operator] of Object.entries(signingOperators)) {
+      const share = shares[operator.id];
+      if (!share) {
+        throw new SparkValidationError("Share not found for operator", {
+          field: "share",
+          value: operator.id,
+          expected: "Non-null share",
+        });
+      }
 
-        const sparkClient = await this.connectionManager.createSparkClient(
-          operator.address,
-        );
+      const shareProto: SecretShareProto = {
+        secretShare: numberToBytesBE(share.share, 32),
+        proofs: share.proofs,
+      };
+      const shareBytes = SecretShareProto.encode(shareProto).finish();
 
-        const userIdentityPublicKey = receiverIdentityPubkey
-          ? hexToBytes(receiverIdentityPubkey)
-          : await this.config.signer.getIdentityPublicKey();
+      const encrypted = await sparkFrost.encryptEcies(
+        shareBytes,
+        hexToBytes(operator.identityPublicKey),
+      );
+      encryptedShares[identifier] = Uint8Array.from(encrypted);
+    }
 
-        try {
-          await sparkClient.store_preimage_share({
-            paymentHash,
-            preimageShare: {
-              secretShare: numberToBytesBE(share.share, 32),
-              proofs: share.proofs,
-            },
-            threshold: this.config.getThreshold(),
-            invoiceString: invoice.invoice.encodedInvoice,
-            userIdentityPublicKey,
-          });
-        } catch (e: any) {
-          errors.push(e);
-        }
-      },
+    const invoiceString = invoice.invoice.encodedInvoice;
+    const threshold = this.config.getThreshold();
+    const signingPayload = newHasher([
+      "spark",
+      "store_preimage_share",
+      "signing payload",
+    ])
+      .addBytes(paymentHash)
+      .addMapStringToBytes(encryptedShares)
+      .addUint32(threshold)
+      .addString(invoiceString)
+      .hash();
+
+    const userSignature =
+      await this.config.signer.signMessageWithIdentityKey(signingPayload);
+
+    const userIdentityPublicKey =
+      await this.config.signer.getIdentityPublicKey();
+
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
     );
 
-    await Promise.all(promises);
-
-    if (errors.length > 0) {
+    try {
+      await sparkClient.store_preimage_share_v2({
+        paymentHash,
+        encryptedPreimageShares: encryptedShares,
+        threshold,
+        invoiceString,
+        userIdentityPublicKey,
+        userSignature,
+      });
+    } catch (error) {
       throw new SparkRequestError("Failed to store preimage shares", {
-        operation: "store_preimage_share",
-        errorCount: errors.length,
-        errors: errors.map((e) => e.message).join(", "),
-        error: errors[0],
+        operation: "store_preimage_share_v2",
+        error,
       });
     }
 
