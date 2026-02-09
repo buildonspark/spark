@@ -132,131 +132,6 @@ describe.each(walletTypes)(
       expect(invoice).toBeDefined();
     });
 
-    it(`${name} - test receive lightning payment`, async () => {
-      const faucet = BitcoinFaucet.getInstance();
-
-      const preimage = hexToBytes(
-        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
-      );
-      const paymentHash = sha256(preimage);
-
-      const invoice = await lightningService.createLightningInvoiceWithPreImage(
-        {
-          invoiceCreator: fakeInvoiceCreator,
-          amountSats: 100,
-          memo: "test",
-          preimage,
-        },
-      );
-
-      expect(invoice).toBeDefined();
-
-      const leafId = uuidv7();
-      const nodeToSend = await createTree(sspWallet, leafId, faucet, 12345n);
-      const expiryTime = new Date(Date.now() + 2 * 60 * 1000);
-
-      const newDerivationPath = {
-        type: KeyDerivationType.LEAF,
-        path: uuidv7(),
-      } as const;
-
-      const leaves = [
-        {
-          leaf: nodeToSend,
-          keyDerivation: {
-            type: KeyDerivationType.LEAF,
-            path: leafId,
-          } as const,
-          newKeyDerivation: newDerivationPath,
-        },
-      ];
-
-      const response = await sspLightningService.swapNodesForPreimage({
-        leaves,
-        receiverIdentityPubkey: userIdentityPublicKey,
-        paymentHash,
-        isInboundPayment: true,
-        expiryTime,
-      });
-
-      expect(equalBytes(response.preimage, preimage)).toBe(true);
-
-      const senderTransfer = response.transfer;
-
-      if (!senderTransfer) {
-        throw new Error("test: Sender transfer not found");
-      }
-
-      const transfer = await sspTransferService.deliverTransferPackage(
-        senderTransfer,
-        leaves,
-        new Map(),
-        new Map(),
-        new Map(),
-      );
-
-      expect(transfer.status).toEqual(
-        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
-      );
-
-      const pendingTransfer = await transferService.queryPendingTransfers();
-
-      expect(pendingTransfer.transfers.length).toBe(1);
-
-      const receiverTransfer = pendingTransfer.transfers[0];
-
-      if (!receiverTransfer) {
-        throw new Error("test: Receiver transfer not found");
-      }
-
-      expect(receiverTransfer.id).toEqual(senderTransfer.id);
-
-      const leafPrivKeyMap =
-        await transferService.verifyPendingTransfer(receiverTransfer);
-
-      const leafPrivKeyMapBytes = leafPrivKeyMap.get(nodeToSend.id);
-      if (!leafPrivKeyMapBytes) {
-        throw new Error("test: Leaf private key not found");
-      }
-      expect(
-        equalBytes(
-          leafPrivKeyMapBytes,
-          await sspWallet
-            .getSigner()
-            .getPublicKeyFromDerivation(newDerivationPath),
-        ),
-      ).toBe(true);
-
-      const receiverLeaf = receiverTransfer.leaves[0];
-      if (!receiverLeaf || !receiverLeaf.leaf) {
-        throw new Error("test: Receiver leaf not found");
-      }
-
-      const claimingNodes = receiverTransfer.leaves.map((leaf) => {
-        if (!leaf.leaf) {
-          throw new Error("test: Leaf not found");
-        }
-        return {
-          leaf: {
-            ...leaf.leaf,
-            refundTx: leaf.intermediateRefundTx,
-            directRefundTx: leaf.intermediateDirectRefundTx,
-            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-          },
-          keyDerivation: {
-            type: KeyDerivationType.ECIES,
-            path: leaf.secretCipher,
-          } as const,
-          newKeyDerivation: {
-            type: KeyDerivationType.LEAF,
-            path: leaf.leaf.id,
-          } as const,
-        };
-      });
-
-      await transferService.claimTransfer(receiverTransfer, claimingNodes);
-    }, 60000);
-
     it(`${name} - test receive lightning v2 payment`, async () => {
       const faucet = BitcoinFaucet.getInstance();
 
@@ -280,6 +155,7 @@ describe.each(walletTypes)(
       const nodeToSend = await createTree(sspWallet, leafId, faucet, 12345n);
       const expiryTime = new Date(Date.now() + 2 * 60 * 1000);
 
+      const transferID = uuidv7();
       const newKeyDerivation = {
         type: KeyDerivationType.LEAF,
         path: uuidv7(),
@@ -295,29 +171,32 @@ describe.each(walletTypes)(
         },
       ];
 
+      const startTransferRequest =
+        await sspTransferService.prepareTransferForLightning(
+          leaves,
+          userIdentityPublicKey,
+          paymentHash,
+          expiryTime,
+          transferID,
+        );
+
       const response = await sspLightningService.swapNodesForPreimage({
         leaves,
         receiverIdentityPubkey: userIdentityPublicKey,
         paymentHash,
         isInboundPayment: true,
         expiryTime,
+        startTransferRequest,
+        transferID,
       });
 
       expect(equalBytes(response.preimage, preimage)).toBe(true);
 
-      const senderTransfer = response.transfer;
+      const transfer = response.transfer;
 
-      if (!senderTransfer) {
+      if (!transfer) {
         throw new Error("test: Sender transfer not found");
       }
-
-      const transfer = await sspTransferService.deliverTransferPackage(
-        senderTransfer,
-        leaves,
-        new Map(),
-        new Map(),
-        new Map(),
-      );
 
       expect(transfer.status).toEqual(
         TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
@@ -333,7 +212,7 @@ describe.each(walletTypes)(
         throw new Error("test: Receiver transfer not found");
       }
 
-      expect(receiverTransfer.id).toEqual(senderTransfer.id);
+      expect(receiverTransfer.id).toEqual(transfer.id);
 
       const leafPrivKeyMap =
         await transferService.verifyPendingTransfer(receiverTransfer);
@@ -379,129 +258,6 @@ describe.each(walletTypes)(
       });
 
       await transferService.claimTransfer(receiverTransfer, claimingNodes);
-    }, 60000);
-
-    it(`${name} - test send lightning payment`, async () => {
-      const faucet = BitcoinFaucet.getInstance();
-
-      const preimage = hexToBytes(
-        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
-      );
-      const paymentHash = sha256(preimage);
-
-      const leafId = uuidv7();
-      const expiryTime = new Date(Date.now() + 2 * 60 * 1000);
-      const nodeToSend = await createTree(userWallet, leafId, faucet, 12345n);
-
-      const newKeyDerivation = {
-        type: KeyDerivationType.LEAF,
-        path: uuidv7(),
-      } as const;
-
-      const leaves = [
-        {
-          leaf: nodeToSend,
-          keyDerivation: {
-            type: KeyDerivationType.LEAF,
-            path: leafId,
-          } as const,
-          newKeyDerivation,
-        },
-      ];
-
-      const response = await lightningService.swapNodesForPreimage({
-        leaves,
-        receiverIdentityPubkey: sspIdentityPublicKey,
-        paymentHash,
-        isInboundPayment: false,
-        invoiceString: (await fakeInvoiceCreator()).invoice.encodedInvoice,
-        expiryTime,
-      });
-
-      if (!response.transfer) {
-        throw new Error("test: Transfer not found");
-      }
-
-      const transfer = await transferService.deliverTransferPackage(
-        response.transfer,
-        leaves,
-        new Map(),
-        new Map(),
-        new Map(),
-      );
-
-      expect(transfer.status).toEqual(
-        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
-      );
-
-      const refunds =
-        await sspLightningService.queryUserSignedRefunds(paymentHash);
-
-      let expectedValue = 0n;
-      for (const leaf of transfer.leaves) {
-        const cpfpRefund = getTxFromRawTxBytes(leaf.intermediateRefundTx);
-        expectedValue += cpfpRefund.getOutput(0)?.amount || 0n;
-      }
-
-      let totalValue = 0n;
-      for (const refund of refunds) {
-        const value = sspLightningService.validateUserSignedRefund(refund);
-        totalValue += value;
-      }
-
-      expect(totalValue).toBe(expectedValue);
-      const receiverTransfer =
-        await sspLightningService.providePreimage(preimage);
-
-      expect(receiverTransfer.status).toEqual(
-        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
-      );
-      expect(receiverTransfer.id).toEqual(transfer.id);
-
-      const leafPrivKeyMap =
-        await sspTransferService.verifyPendingTransfer(receiverTransfer);
-
-      const leafPrivKeyMapBytes = leafPrivKeyMap.get(nodeToSend.id);
-      if (!leafPrivKeyMapBytes) {
-        throw new Error("test: Leaf private key not found");
-      }
-      expect(
-        equalBytes(
-          leafPrivKeyMapBytes,
-          await userWallet
-            .getSigner()
-            .getPublicKeyFromDerivation(newKeyDerivation),
-        ),
-      ).toBe(true);
-
-      const receiverLeaf = receiverTransfer.leaves[0];
-      if (!receiverLeaf || !receiverLeaf.leaf) {
-        throw new Error("test: Receiver leaf not found");
-      }
-
-      const claimingNodes = receiverTransfer.leaves.map((leaf) => {
-        if (!leaf.leaf) {
-          throw new Error("test: Leaf not found");
-        }
-        return {
-          leaf: {
-            ...leaf.leaf,
-            refundTx: leaf.intermediateRefundTx,
-            directRefundTx: leaf.intermediateDirectRefundTx,
-            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-          },
-          keyDerivation: {
-            type: KeyDerivationType.ECIES,
-            path: leaf.secretCipher,
-          } as const,
-          newKeyDerivation: {
-            type: KeyDerivationType.LEAF,
-            path: leaf.leaf.id,
-          } as const,
-        };
-      });
-
-      await sspTransferService.claimTransfer(receiverTransfer, claimingNodes);
     }, 60000);
 
     it(`${name} - test send lightning v2 payment`, async () => {
