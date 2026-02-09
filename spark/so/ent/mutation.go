@@ -30776,7 +30776,7 @@ func (m *UtxoSwapMutation) UtxoValueSats() (r uint64, exists bool) {
 // OldUtxoValueSats returns the old "utxo_value_sats" field's value of the UtxoSwap entity.
 // If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UtxoSwapMutation) OldUtxoValueSats(ctx context.Context) (v *uint64, err error) {
+func (m *UtxoSwapMutation) OldUtxoValueSats(ctx context.Context) (v uint64, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldUtxoValueSats is only allowed on UpdateOne operations")
 	}
@@ -30808,24 +30808,10 @@ func (m *UtxoSwapMutation) AddedUtxoValueSats() (r int64, exists bool) {
 	return *v, true
 }
 
-// ClearUtxoValueSats clears the value of the "utxo_value_sats" field.
-func (m *UtxoSwapMutation) ClearUtxoValueSats() {
-	m.utxo_value_sats = nil
-	m.addutxo_value_sats = nil
-	m.clearedFields[utxoswap.FieldUtxoValueSats] = struct{}{}
-}
-
-// UtxoValueSatsCleared returns if the "utxo_value_sats" field was cleared in this mutation.
-func (m *UtxoSwapMutation) UtxoValueSatsCleared() bool {
-	_, ok := m.clearedFields[utxoswap.FieldUtxoValueSats]
-	return ok
-}
-
 // ResetUtxoValueSats resets all changes to the "utxo_value_sats" field.
 func (m *UtxoSwapMutation) ResetUtxoValueSats() {
 	m.utxo_value_sats = nil
 	m.addutxo_value_sats = nil
-	delete(m.clearedFields, utxoswap.FieldUtxoValueSats)
 }
 
 // SetUtxoID sets the "utxo" edge to the Utxo entity by id.
@@ -31341,9 +31327,6 @@ func (m *UtxoSwapMutation) ClearedFields() []string {
 	if m.FieldCleared(utxoswap.FieldExpiryTime) {
 		fields = append(fields, utxoswap.FieldExpiryTime)
 	}
-	if m.FieldCleared(utxoswap.FieldUtxoValueSats) {
-		fields = append(fields, utxoswap.FieldUtxoValueSats)
-	}
 	return fields
 }
 
@@ -31387,9 +31370,6 @@ func (m *UtxoSwapMutation) ClearField(name string) error {
 		return nil
 	case utxoswap.FieldExpiryTime:
 		m.ClearExpiryTime()
-		return nil
-	case utxoswap.FieldUtxoValueSats:
-		m.ClearUtxoValueSats()
 		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap nullable field %s", name)

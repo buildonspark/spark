@@ -6719,6 +6719,8 @@ func (us *UtxoSwapExample) MustExec(ctx context.Context) *ent.UtxoSwap {
 	if us.UtxoValueSats != nil {
 		create.SetUtxoValueSats(*us.UtxoValueSats)
 	} else {
+		// Use default from annotation
+		create.SetUtxoValueSats(uint64(10000))
 	}
 
 	// Handle edges
@@ -6833,6 +6835,8 @@ func (us *UtxoSwapExample) Exec(ctx context.Context) (*ent.UtxoSwap, error) {
 	if us.UtxoValueSats != nil {
 		create.SetUtxoValueSats(*us.UtxoValueSats)
 	} else {
+		// Use default from annotation
+		create.SetUtxoValueSats(uint64(10000))
 	}
 
 	// Handle edges

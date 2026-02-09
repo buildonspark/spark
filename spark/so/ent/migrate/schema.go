@@ -1426,7 +1426,7 @@ var (
 		{Name: "requested_transfer_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "spend_tx_signing_result", Type: field.TypeBytes, Nullable: true},
 		{Name: "expiry_time", Type: field.TypeTime, Nullable: true},
-		{Name: "utxo_value_sats", Type: field.TypeUint64, Nullable: true},
+		{Name: "utxo_value_sats", Type: field.TypeUint64},
 		{Name: "deposit_address_utxoswaps", Type: field.TypeUUID, Nullable: true},
 		{Name: "utxo_swap_utxo", Type: field.TypeUUID},
 		{Name: "utxo_swap_transfer", Type: field.TypeUUID, Nullable: true},

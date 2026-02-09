@@ -53,7 +53,7 @@ type UtxoSwap struct {
 	// When this swap offer/lock expires (if applicable).
 	ExpiryTime *time.Time `json:"expiry_time,omitempty"`
 	// Amount of sats for 0-conf swap matching.
-	UtxoValueSats *uint64 `json:"utxo_value_sats,omitempty"`
+	UtxoValueSats uint64 `json:"utxo_value_sats,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UtxoSwapQuery when eager-loading is set.
 	Edges                        UtxoSwapEdges `json:"edges"`
@@ -252,8 +252,7 @@ func (us *UtxoSwap) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field utxo_value_sats", values[i])
 			} else if value.Valid {
-				us.UtxoValueSats = new(uint64)
-				*us.UtxoValueSats = uint64(value.Int64)
+				us.UtxoValueSats = uint64(value.Int64)
 			}
 		case utxoswap.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -383,10 +382,8 @@ func (us *UtxoSwap) String() string {
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
-	if v := us.UtxoValueSats; v != nil {
-		builder.WriteString("utxo_value_sats=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
+	builder.WriteString("utxo_value_sats=")
+	builder.WriteString(fmt.Sprintf("%v", us.UtxoValueSats))
 	builder.WriteByte(')')
 	return builder.String()
 }

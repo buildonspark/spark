@@ -848,16 +848,6 @@ func UtxoValueSatsLTE(v uint64) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldLTE(FieldUtxoValueSats, v))
 }
 
-// UtxoValueSatsIsNil applies the IsNil predicate on the "utxo_value_sats" field.
-func UtxoValueSatsIsNil() predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldIsNull(FieldUtxoValueSats))
-}
-
-// UtxoValueSatsNotNil applies the NotNil predicate on the "utxo_value_sats" field.
-func UtxoValueSatsNotNil() predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldNotNull(FieldUtxoValueSats))
-}
-
 // HasUtxo applies the HasEdge predicate on the "utxo" edge.
 func HasUtxo() predicate.UtxoSwap {
 	return predicate.UtxoSwap(func(s *sql.Selector) {
