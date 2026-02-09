@@ -36,10 +36,11 @@ func TestMain(m *testing.M) {
 }
 
 type internalSignTokenPostgresTestSetup struct {
-	handler  *InternalSignTokenHandler
-	ctx      context.Context
-	client   *ent.Client
-	fixtures *entfixtures.Fixtures
+	handler          *InternalSignTokenHandler
+	ctx              context.Context
+	client           *ent.Client
+	fixtures         *entfixtures.Fixtures
+	operator1PrivKey keys.Private
 }
 
 func setUpInternalSignTokenTestHandlerPostgres(t *testing.T) *internalSignTokenPostgresTestSetup {
@@ -58,7 +59,9 @@ func setUpInternalSignTokenTestHandlerPostgres(t *testing.T) *internalSignTokenP
 	}
 }
 
-// createTestSpentOutputWithShares creates a spent output with one partial share and returns it.
+// createTestSpentOutputWithShares creates a spent output with threshold recovery set up:
+// the coordinator's share is stored in the revocation keyshare, and one partial share from
+// operator 1 is stored as a TokenPartialRevocationSecretShare.
 func createTestSpentOutputWithShares(t *testing.T, setup *internalSignTokenPostgresTestSetup, tokenCreate *ent.TokenCreate, secretPriv keys.Private, shares []*secretsharing.SecretShare, operatorIDs []string) *ent.TokenOutput {
 	t.Helper()
 	coordinatorShare := shares[0]
@@ -349,6 +352,17 @@ func (s *internalSignTokenPostgresTestSetup) setupThresholdOperators() []string 
 	s.handler.config.SigningOperatorMap = limitedOperators
 	s.handler.config.Threshold = 2
 	s.handler.config.Token.RequireThresholdOperators = true
+
+	privBytes, err := hex.DecodeString("bc0f5b9055c4a88b881d4bb48d95b409cd910fb27c088380f8ecda2150ee8faf")
+	if err != nil {
+		panic(fmt.Sprintf("failed to decode operator1 private key hex: %v", err))
+	}
+	privKey, err := keys.ParsePrivateKey(privBytes)
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse operator1 private key: %v", err))
+	}
+	s.operator1PrivKey = privKey
+
 	return ids
 }
 
@@ -360,11 +374,8 @@ func (s *internalSignTokenPostgresTestSetup) buildThresholdSignatures(operatorID
 	sig0 := ecdsa.Sign(s.handler.config.IdentityPrivateKey.ToBTCEC(), testHash)
 	sigs[operatorIDs[0]] = sig0.Serialize()
 
-	// Second operator uses known test key
-	const operator1PrivHex = "bc0f5b9055c4a88b881d4bb48d95b409cd910fb27c088380f8ecda2150ee8faf"
-	privBytes, _ := hex.DecodeString(operator1PrivHex)
-	privKey1, _ := keys.ParsePrivateKey(privBytes)
-	sig1 := ecdsa.Sign(privKey1.ToBTCEC(), testHash)
+	// Second operator uses known test key parsed during setup
+	sig1 := ecdsa.Sign(s.operator1PrivKey.ToBTCEC(), testHash)
 	sigs[operatorIDs[1]] = sig1.Serialize()
 
 	return sigs
@@ -391,7 +402,7 @@ func (s *internalSignTokenPostgresTestSetup) createMintTransactionWithOutput(
 		tokenCreate,
 		entfixtures.OutputSpecs(big.NewInt(100)),
 		txStatus,
-		entfixtures.MintTransactionOpts{Hash: testHash},
+		&entfixtures.TokenTransactionOpts{Hash: testHash},
 	)
 
 	// Reload with edges
@@ -412,7 +423,7 @@ func (s *internalSignTokenPostgresTestSetup) createCreateTransaction(
 	status st.TokenTransactionStatus,
 ) *ent.TokenTransaction {
 	tokenCreate := s.fixtures.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
-	tx := s.fixtures.CreateCreateTransaction(tokenCreate, status, entfixtures.MintTransactionOpts{Hash: testHash})
+	tx := s.fixtures.CreateCreateTransaction(tokenCreate, status, &entfixtures.TokenTransactionOpts{Hash: testHash})
 
 	// Reload with edges
 	tx, err := s.client.TokenTransaction.Query().
@@ -452,12 +463,10 @@ func TestExchangeRevocationSecretsShares_MintTransaction(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 
-		// Verify transaction was finalized
 		updatedTx, err := setup.client.TokenTransaction.Get(setup.ctx, mintTransaction.ID)
 		require.NoError(t, err)
 		require.Equal(t, st.TokenTransactionStatusFinalized, updatedTx.Status, "transaction should be FINALIZED")
 
-		// Verify output was finalized
 		updatedOutput, err := setup.client.TokenOutput.Get(setup.ctx, output.ID)
 		require.NoError(t, err)
 		require.Equal(t, st.TokenOutputStatusCreatedFinalized, updatedOutput.Status, "output should be CREATED_FINALIZED")
@@ -487,7 +496,6 @@ func TestExchangeRevocationSecretsShares_CreateTransaction(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 
-		// Verify transaction was finalized
 		updatedTx, err := setup.client.TokenTransaction.Get(setup.ctx, createTransaction.ID)
 		require.NoError(t, err)
 		require.Equal(t, st.TokenTransactionStatusFinalized, updatedTx.Status, "transaction should be FINALIZED")
@@ -531,8 +539,6 @@ func TestExchangeRevocationSecretsShares_TransferTransaction_HappyPath(t *testin
 
 	tokenCreate := setup.fixtures.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
 
-	// Create a spent output with secret shares set up for threshold recovery
-	// This helper creates: coordinator's share in keyshare + one partial share from operator 1
 	spentOutput := createTestSpentOutputWithShares(t, setup, tokenCreate, revocationPriv, shares, operatorIDs)
 
 	// Get operator public keys for the proto
@@ -596,8 +602,6 @@ func TestExchangeRevocationSecretsShares_TransferTransaction_HappyPath(t *testin
 		require.NoError(t, err, "TRANSFER transaction should succeed with valid operator shares")
 		require.NotNil(t, resp)
 
-		// Verify the response contains operator shares
-		// (DB state verification is covered by unit tests for FinalizeTransferTransactionInternal)
 		require.NotEmpty(t, resp.ReceivedOperatorShares, "response should include revocation secret shares")
 	})
 }

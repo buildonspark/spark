@@ -61,9 +61,17 @@ type TokenCreateOpts struct {
 	IsFreezable     bool
 }
 
-// MintTransactionOpts specifies options for creating a mint transaction.
-type MintTransactionOpts struct {
-	Hash []byte // If nil, generates random bytes
+// TokenTransactionOpts specifies options for creating a token transaction (mint or create).
+type TokenTransactionOpts struct {
+	Hash []byte // If nil, GetHash will generate random bytes
+}
+
+// GetHash returns the hash, generating and caching a random one if not set.
+func (o *TokenTransactionOpts) GetHash(f *Fixtures) []byte {
+	if o.Hash == nil {
+		o.Hash = f.RandomBytes(32)
+	}
+	return o.Hash
 }
 
 // CreateTokenCreate creates a test TokenCreate entity
@@ -161,11 +169,11 @@ func (f *Fixtures) CreateKeyshareWithEntityDkgKey() *ent.SigningKeyshare {
 
 // CreateMintTransaction creates a mint transaction with outputs
 func (f *Fixtures) CreateMintTransaction(tokenCreate *ent.TokenCreate, outputSpecs []OutputSpec, status st.TokenTransactionStatus) (*ent.TokenTransaction, []*ent.TokenOutput) {
-	return f.CreateMintTransactionWithOpts(tokenCreate, outputSpecs, status, MintTransactionOpts{})
+	return f.CreateMintTransactionWithOpts(tokenCreate, outputSpecs, status, &TokenTransactionOpts{})
 }
 
 // CreateMintTransactionWithOpts creates a mint transaction with outputs using custom options
-func (f *Fixtures) CreateMintTransactionWithOpts(tokenCreate *ent.TokenCreate, outputSpecs []OutputSpec, status st.TokenTransactionStatus, opts MintTransactionOpts) (*ent.TokenTransaction, []*ent.TokenOutput) {
+func (f *Fixtures) CreateMintTransactionWithOpts(tokenCreate *ent.TokenCreate, outputSpecs []OutputSpec, status st.TokenTransactionStatus, opts *TokenTransactionOpts) (*ent.TokenTransaction, []*ent.TokenOutput) {
 	mint, err := f.Client.TokenMint.Create().
 		SetIssuerPublicKey(f.GeneratePrivateKey().Public()).
 		SetTokenIdentifier(tokenCreate.TokenIdentifier).
@@ -174,10 +182,7 @@ func (f *Fixtures) CreateMintTransactionWithOpts(tokenCreate *ent.TokenCreate, o
 		Save(f.Ctx)
 	f.RequireNoError(err)
 
-	hash := opts.Hash
-	if hash == nil {
-		hash = f.RandomBytes(32)
-	}
+	hash := opts.GetHash(f)
 	finalizedHash := f.RandomBytes(32)
 
 	tx, err := f.Client.TokenTransaction.Create().
@@ -197,11 +202,8 @@ func (f *Fixtures) CreateMintTransactionWithOpts(tokenCreate *ent.TokenCreate, o
 }
 
 // CreateCreateTransaction creates a CREATE transaction (no outputs) with optional custom hash
-func (f *Fixtures) CreateCreateTransaction(tokenCreate *ent.TokenCreate, status st.TokenTransactionStatus, opts MintTransactionOpts) *ent.TokenTransaction {
-	hash := opts.Hash
-	if hash == nil {
-		hash = f.RandomBytes(32)
-	}
+func (f *Fixtures) CreateCreateTransaction(tokenCreate *ent.TokenCreate, status st.TokenTransactionStatus, opts *TokenTransactionOpts) *ent.TokenTransaction {
+	hash := opts.GetHash(f)
 	finalizedHash := f.RandomBytes(32)
 
 	tx, err := f.Client.TokenTransaction.Create().

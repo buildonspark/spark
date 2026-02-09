@@ -15,6 +15,7 @@ func GetEntTokenTransactionZapAttrs(ctx context.Context, tokenTransaction *ent.T
 		zap.String("transaction_type", attrs.Type),
 		zap.String("partial_transaction_hash", attrs.PartialHashHex),
 		zap.String("final_transaction_hash", attrs.FinalHashHex),
+		zap.String("token_identifiers", attrs.Bech32mTokenIdentifiers),
 	}
 }
 
@@ -24,5 +25,6 @@ func GetProtoTokenTransactionZapAttrs(ctx context.Context, tokenTransaction *tok
 		zap.String("transaction_type", attrs.Type),
 		zap.String("partial_transaction_hash", attrs.PartialHashHex),
 		zap.String("final_transaction_hash", attrs.FinalHashHex),
+		zap.String("token_identifiers", attrs.Bech32mTokenIdentifiers),
 	}
 }

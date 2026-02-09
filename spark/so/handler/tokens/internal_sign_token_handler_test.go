@@ -52,7 +52,6 @@ func setUpInternalSignTokenTestHandler(t *testing.T) *internalSignTokenTestSetup
 	}
 }
 
-
 func TestBuildInputOperatorShareMap(t *testing.T) {
 	testHash := hash32(0xA1)
 	testSecret := hash32(0x42)
@@ -221,4 +220,3 @@ func TestExchangeRevocationSecretsShares_TransferTransaction(t *testing.T) {
 		require.ErrorContains(t, err, "unable to parse request operator identity public key")
 	})
 }
-

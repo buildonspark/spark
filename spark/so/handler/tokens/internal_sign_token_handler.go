@@ -244,12 +244,19 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		if err := h.validateAndPersistPeerSignatures(ctx, operatorSignatures, tokenTransaction); err != nil {
 			return nil, tokens.FormatErrorWithTransactionEnt("failed to validate and persist peer signatures", tokenTransaction, err)
 		}
+		return h.exchangeTransferRevocationSecrets(ctx, req, tokenTransaction, operatorSignatures)
 
 	default:
 		return nil, sparkerrors.InternalDataInconsistency(fmt.Errorf("unexpected token transaction type %v in ExchangeRevocationSecretsShares", txType))
 	}
+}
 
-	// TRANSFER logic (for building revocation secret map) continues below
+func (h *InternalSignTokenHandler) exchangeTransferRevocationSecrets(
+	ctx context.Context,
+	req *pbtkinternal.ExchangeRevocationSecretsSharesRequest,
+	tokenTransaction *ent.TokenTransaction,
+	operatorSignatures operatorSignaturesMap,
+) (*pbtkinternal.ExchangeRevocationSecretsSharesResponse, error) {
 	if tokenTransaction.Status == st.TokenTransactionStatusStarted {
 		lockedTx, lockErr := ent.FetchAndLockTokenTransactionDataByHash(ctx, req.FinalTokenTransactionHash)
 		if lockErr != nil {
@@ -258,7 +265,7 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		if err := validateTokenTransactionForSigning(ctx, h.config, lockedTx, req.FinalTokenTransaction); err != nil {
 			return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), lockedTx, err)
 		}
-		err = h.validateAndSignTransactionWithProvidedOwnSignature(ctx, lockedTx, operatorSignatures[h.config.Identifier])
+		err := h.validateAndSignTransactionWithProvidedOwnSignature(ctx, lockedTx, operatorSignatures[h.config.Identifier])
 		if err != nil {
 			return nil, err
 		}

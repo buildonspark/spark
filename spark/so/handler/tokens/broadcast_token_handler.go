@@ -575,6 +575,8 @@ func (h *BroadcastTokenHandler) fanoutFinalizeMintOrCreateToNonCoordinators(
 	signatures operatorSignaturesMap,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
+	logger.Info("fanning out finalize mint/create to non-coordinators",
+		tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTxEnt)...)
 
 	// Build operator signatures for request
 	operatorSigs := make([]*tokeninternalpb.OperatorTransactionSignature, 0, len(signatures))
