@@ -2453,6 +2453,19 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		return nil, fmt.Errorf("inconsistent leaves to claim for transfer %s: expected %d, got %d", transferID, len(leavesToTransfer), len(claimPackage.LeavesToClaim))
 	}
 
+	// Validate that every leaf in LeavesToClaim has a direct-from-cpfp refund entry.
+	// Direct refund is only required when the leaf has a DirectTx, which is checked
+	// later in prepareClaimRefundSigningJobs where leaf data is available.
+	directFromCpfpLeafIDs := make(map[string]struct{}, len(claimPackage.DirectFromCpfpLeavesToClaim))
+	for _, job := range claimPackage.DirectFromCpfpLeavesToClaim {
+		directFromCpfpLeafIDs[job.LeafId] = struct{}{}
+	}
+	for _, job := range claimPackage.LeavesToClaim {
+		if _, ok := directFromCpfpLeafIDs[job.LeafId]; !ok {
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing direct from CPFP refund transaction for leaf %s", job.LeafId))
+		}
+	}
+
 	if len(claimPackage.KeyTweakPackage) == 0 {
 		return nil, fmt.Errorf("claim package key_tweak_package is required and must be non-empty")
 	}
@@ -2763,6 +2776,10 @@ type claimRefundSigningJobsResult struct {
 	directFromCpfpUserRefundMap map[string]*pb.UserSignedTxSigningJob
 }
 
+// prepareClaimRefundSigningJobs validates refund transactions (cpfp, direct, and direct-from-cpfp) from the
+// claim package and persists them on the corresponding leaves. Direct-from-cpfp is required for all leaves;
+// direct refund is required only for leaves that have a DirectTx. It then builds FROST signing jobs with
+// pre-generated nonces and returns lookup maps (leaf-to-job, job type) to assist with signing and aggregation.
 func (h *TransferHandler) prepareClaimRefundSigningJobs(
 	ctx context.Context,
 	claimPackage *pb.ClaimPackage,
@@ -2802,17 +2819,20 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 				SigningPublicKey: job.SigningPublicKey,
 			},
 		}
+		// Direct refund is only required when the leaf has a DirectTx.
 		if directJob, ok := directUserRefundMap[job.LeafId]; ok {
 			leafRefundJob.DirectRefundTxSigningJob = &pb.SigningJob{
 				RawTx:            directJob.RawTx,
 				SigningPublicKey: directJob.SigningPublicKey,
 			}
+		} else if len(leaf.DirectTx) > 0 {
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing direct refund transaction for leaf %s", job.LeafId))
 		}
-		if dfcJob, ok := directFromCpfpUserRefundMap[job.LeafId]; ok {
-			leafRefundJob.DirectFromCpfpRefundTxSigningJob = &pb.SigningJob{
-				RawTx:            dfcJob.RawTx,
-				SigningPublicKey: dfcJob.SigningPublicKey,
-			}
+		// Direct-from-cpfp refund is always required (validated early in ClaimTransfer).
+		dfcJob := directFromCpfpUserRefundMap[job.LeafId]
+		leafRefundJob.DirectFromCpfpRefundTxSigningJob = &pb.SigningJob{
+			RawTx:            dfcJob.RawTx,
+			SigningPublicKey: dfcJob.SigningPublicKey,
 		}
 		if err := validateReceivedRefundTransactions(ctx, leafRefundJob, leaf, transfer.Type); err != nil {
 			return nil, err
@@ -2839,15 +2859,13 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 				SetDirectRefundTxid(st.NewTxID(directRefundTxParsed.TxHash()))
 		}
 
-		if directFromCpfpJob, ok := directFromCpfpUserRefundMap[job.LeafId]; ok {
-			directFromCpfpRefundTxParsed, err := common.TxFromRawTxBytes(directFromCpfpJob.RawTx)
-			if err != nil {
-				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse direct_from_cpfp_refund_tx for leaf %s: %w", job.LeafId, err))
-			}
-			updateOp = updateOp.
-				SetDirectFromCpfpRefundTx(directFromCpfpJob.RawTx).
-				SetDirectFromCpfpRefundTxid(st.NewTxID(directFromCpfpRefundTxParsed.TxHash()))
+		directFromCpfpRefundTxParsed, err := common.TxFromRawTxBytes(dfcJob.RawTx)
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse direct_from_cpfp_refund_tx for leaf %s: %w", job.LeafId, err))
 		}
+		updateOp = updateOp.
+			SetDirectFromCpfpRefundTx(dfcJob.RawTx).
+			SetDirectFromCpfpRefundTxid(st.NewTxID(directFromCpfpRefundTxParsed.TxHash()))
 
 		if _, err := updateOp.Save(ctx); err != nil {
 			return nil, fmt.Errorf("unable to update refund txs for leaf %s: %w", job.LeafId, err)
