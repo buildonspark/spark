@@ -174,7 +174,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
     intervalMs: 300000, // 5 minutes
     minOutputsThreshold: 50,
   },
-  tokenOutputLockExpiryMs: 30000, // 30 seconds
+  tokenOutputLockExpiryMs: 20000, // 20 seconds
   tokenTransactionVersion: "V3",
 };
 
