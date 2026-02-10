@@ -162,6 +162,24 @@ else \
   exit 2; \
 fi'"""
 
+[tasks.mempool-mk]
+description = "List all txids in mempool (pass 'true' for verbose details)"
+run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
+  bitcoin-cli \
+    -conf=/etc/bitcoin/bitcoin.conf \
+    -datadir=/data \
+    getrawmempool "$@"
+"""
+
+[tasks.mempool-info-mk]
+description = "Show mempool summary stats (count, size, fees)"
+run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
+  bitcoin-cli \
+    -conf=/etc/bitcoin/bitcoin.conf \
+    -datadir=/data \
+    getmempoolinfo
+"""
+
 [tasks.gen-ent]
 description = "Generate ent code for Spark schemas"
 dir = "{{config_root}}/spark"
