@@ -4677,6 +4677,8 @@ type TransferExample struct {
 	SparkInvoice        *ent.SparkInvoice
 	CounterSwapTransfer []*ent.Transfer
 	PrimarySwapTransfer *ent.Transfer
+	TransferSenders     []*ent.TransferSender
+	TransferReceivers   []*ent.TransferReceiver
 }
 
 // NewTransferExample creates a new TransferExample for testing.
@@ -4783,6 +4785,30 @@ func (t *TransferExample) SetPrimarySwapTransfer(v *ent.Transfer) *TransferExamp
 	return t
 }
 
+// AddTransferSender adds a TransferSender to the transfer_senders edge.
+func (t *TransferExample) AddTransferSender(v *ent.TransferSender) *TransferExample {
+	t.TransferSenders = append(t.TransferSenders, v)
+	return t
+}
+
+// SetTransferSenders sets the transfer_senders edge.
+func (t *TransferExample) SetTransferSenders(v []*ent.TransferSender) *TransferExample {
+	t.TransferSenders = v
+	return t
+}
+
+// AddTransferReceiver adds a TransferReceiver to the transfer_receivers edge.
+func (t *TransferExample) AddTransferReceiver(v *ent.TransferReceiver) *TransferExample {
+	t.TransferReceivers = append(t.TransferReceivers, v)
+	return t
+}
+
+// SetTransferReceivers sets the transfer_receivers edge.
+func (t *TransferExample) SetTransferReceivers(v []*ent.TransferReceiver) *TransferExample {
+	t.TransferReceivers = v
+	return t
+}
+
 // MustExec builds and saves the Transfer entity to the database.
 // It panics if the save fails.
 func (t *TransferExample) MustExec(ctx context.Context) *ent.Transfer {
@@ -4855,6 +4881,12 @@ func (t *TransferExample) MustExec(ctx context.Context) *ent.Transfer {
 	}
 	if t.PrimarySwapTransfer != nil {
 		create.SetPrimarySwapTransfer(t.PrimarySwapTransfer)
+	}
+	if len(t.TransferSenders) > 0 {
+		create.AddTransferSenders(t.TransferSenders...)
+	}
+	if len(t.TransferReceivers) > 0 {
+		create.AddTransferReceivers(t.TransferReceivers...)
 	}
 
 	entity, err := create.Save(ctx)
@@ -4938,6 +4970,12 @@ func (t *TransferExample) Exec(ctx context.Context) (*ent.Transfer, error) {
 	}
 	if t.PrimarySwapTransfer != nil {
 		create.SetPrimarySwapTransfer(t.PrimarySwapTransfer)
+	}
+	if len(t.TransferSenders) > 0 {
+		create.AddTransferSenders(t.TransferSenders...)
+	}
+	if len(t.TransferReceivers) > 0 {
+		create.AddTransferReceivers(t.TransferReceivers...)
 	}
 
 	return create.Save(ctx)
@@ -5387,6 +5425,264 @@ func (tl *TransferLeafExample) Exec(ctx context.Context) (*ent.TransferLeaf, err
 			return nil, fmt.Errorf("failed to create leaf: %w", err)
 		}
 		create.SetLeaf(tl.Leaf)
+	}
+
+	return create.Save(ctx)
+}
+
+// TransferReceiverExample is a test fixture builder for TransferReceiver.
+type TransferReceiverExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	TransferID     *uuid.UUID
+	IdentityPubkey *keys.Public
+	Status         *schematype.TransferReceiverStatus
+	CompletionTime *time.Time
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	Transfer *ent.Transfer
+}
+
+// NewTransferReceiverExample creates a new TransferReceiverExample for testing.
+func NewTransferReceiverExample(t *testing.T, client *ent.Client) *TransferReceiverExample {
+	return &TransferReceiverExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetTransferID sets the transfer_id field.
+func (tr *TransferReceiverExample) SetTransferID(v uuid.UUID) *TransferReceiverExample {
+	tr.TransferID = &v
+	return tr
+}
+
+// SetIdentityPubkey sets the identity_pubkey field.
+func (tr *TransferReceiverExample) SetIdentityPubkey(v keys.Public) *TransferReceiverExample {
+	tr.IdentityPubkey = &v
+	return tr
+}
+
+// SetStatus sets the status field.
+func (tr *TransferReceiverExample) SetStatus(v schematype.TransferReceiverStatus) *TransferReceiverExample {
+	tr.Status = &v
+	return tr
+}
+
+// SetCompletionTime sets the completion_time field.
+func (tr *TransferReceiverExample) SetCompletionTime(v time.Time) *TransferReceiverExample {
+	tr.CompletionTime = &v
+	return tr
+}
+
+// SetTransfer sets the transfer edge.
+func (tr *TransferReceiverExample) SetTransfer(v *ent.Transfer) *TransferReceiverExample {
+	tr.Transfer = v
+	return tr
+}
+
+// MustExec builds and saves the TransferReceiver entity to the database.
+// It panics if the save fails.
+func (tr *TransferReceiverExample) MustExec(ctx context.Context) *ent.TransferReceiver {
+	create := tr.client.TransferReceiver.Create()
+
+	// Set fields
+	if tr.TransferID != nil {
+		create.SetTransferID(*tr.TransferID)
+	} else {
+		// Use default from annotation
+		create.SetTransferID(uuid.MustParse("cbafb67d-09dc-45ee-ade4-00df51ba2722"))
+	}
+	if tr.IdentityPubkey != nil {
+		create.SetIdentityPubkey(*tr.IdentityPubkey)
+	} else {
+		// Use default from annotation
+		create.SetIdentityPubkey(keys.MustParsePublicKeyHex("02112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+	}
+	if tr.Status != nil {
+		create.SetStatus(*tr.Status)
+	} else {
+		// Use default from annotation
+		create.SetStatus("COMPLETED")
+	}
+	if tr.CompletionTime != nil {
+		create.SetCompletionTime(*tr.CompletionTime)
+	} else {
+	}
+
+	// Handle edges
+	if tr.Transfer != nil {
+		create.SetTransfer(tr.Transfer)
+	} else {
+		// Auto-create required edge
+		tr.t.Helper()
+		tr.Transfer = NewTransferExample(tr.t, tr.client).MustExec(ctx)
+		create.SetTransfer(tr.Transfer)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		tr.t.Helper()
+		tr.t.Fatalf("failed to create TransferReceiver: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the TransferReceiver entity to the database.
+// It returns an error if the save fails.
+func (tr *TransferReceiverExample) Exec(ctx context.Context) (*ent.TransferReceiver, error) {
+	create := tr.client.TransferReceiver.Create()
+
+	// Set fields
+	if tr.TransferID != nil {
+		create.SetTransferID(*tr.TransferID)
+	} else {
+		// Use default from annotation
+		create.SetTransferID(uuid.MustParse("cbafb67d-09dc-45ee-ade4-00df51ba2722"))
+	}
+	if tr.IdentityPubkey != nil {
+		create.SetIdentityPubkey(*tr.IdentityPubkey)
+	} else {
+		// Use default from annotation
+		create.SetIdentityPubkey(keys.MustParsePublicKeyHex("02112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+	}
+	if tr.Status != nil {
+		create.SetStatus(*tr.Status)
+	} else {
+		// Use default from annotation
+		create.SetStatus("COMPLETED")
+	}
+	if tr.CompletionTime != nil {
+		create.SetCompletionTime(*tr.CompletionTime)
+	} else {
+	}
+
+	// Handle edges
+	if tr.Transfer != nil {
+		create.SetTransfer(tr.Transfer)
+	} else {
+		// Auto-create required edge
+		var err error
+		tr.Transfer, err = NewTransferExample(tr.t, tr.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create transfer: %w", err)
+		}
+		create.SetTransfer(tr.Transfer)
+	}
+
+	return create.Save(ctx)
+}
+
+// TransferSenderExample is a test fixture builder for TransferSender.
+type TransferSenderExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	TransferID     *uuid.UUID
+	IdentityPubkey *keys.Public
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	Transfer *ent.Transfer
+}
+
+// NewTransferSenderExample creates a new TransferSenderExample for testing.
+func NewTransferSenderExample(t *testing.T, client *ent.Client) *TransferSenderExample {
+	return &TransferSenderExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetTransferID sets the transfer_id field.
+func (ts *TransferSenderExample) SetTransferID(v uuid.UUID) *TransferSenderExample {
+	ts.TransferID = &v
+	return ts
+}
+
+// SetIdentityPubkey sets the identity_pubkey field.
+func (ts *TransferSenderExample) SetIdentityPubkey(v keys.Public) *TransferSenderExample {
+	ts.IdentityPubkey = &v
+	return ts
+}
+
+// SetTransfer sets the transfer edge.
+func (ts *TransferSenderExample) SetTransfer(v *ent.Transfer) *TransferSenderExample {
+	ts.Transfer = v
+	return ts
+}
+
+// MustExec builds and saves the TransferSender entity to the database.
+// It panics if the save fails.
+func (ts *TransferSenderExample) MustExec(ctx context.Context) *ent.TransferSender {
+	create := ts.client.TransferSender.Create()
+
+	// Set fields
+	if ts.TransferID != nil {
+		create.SetTransferID(*ts.TransferID)
+	} else {
+		// Use default from annotation
+		create.SetTransferID(uuid.MustParse("cbafb67d-09dc-45ee-ade4-00df51ba2722"))
+	}
+	if ts.IdentityPubkey != nil {
+		create.SetIdentityPubkey(*ts.IdentityPubkey)
+	} else {
+		// Use default from annotation
+		create.SetIdentityPubkey(keys.MustParsePublicKeyHex("02112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+	}
+
+	// Handle edges
+	if ts.Transfer != nil {
+		create.SetTransfer(ts.Transfer)
+	} else {
+		// Auto-create required edge
+		ts.t.Helper()
+		ts.Transfer = NewTransferExample(ts.t, ts.client).MustExec(ctx)
+		create.SetTransfer(ts.Transfer)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		ts.t.Helper()
+		ts.t.Fatalf("failed to create TransferSender: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the TransferSender entity to the database.
+// It returns an error if the save fails.
+func (ts *TransferSenderExample) Exec(ctx context.Context) (*ent.TransferSender, error) {
+	create := ts.client.TransferSender.Create()
+
+	// Set fields
+	if ts.TransferID != nil {
+		create.SetTransferID(*ts.TransferID)
+	} else {
+		// Use default from annotation
+		create.SetTransferID(uuid.MustParse("cbafb67d-09dc-45ee-ade4-00df51ba2722"))
+	}
+	if ts.IdentityPubkey != nil {
+		create.SetIdentityPubkey(*ts.IdentityPubkey)
+	} else {
+		// Use default from annotation
+		create.SetIdentityPubkey(keys.MustParsePublicKeyHex("02112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+	}
+
+	// Handle edges
+	if ts.Transfer != nil {
+		create.SetTransfer(ts.Transfer)
+	} else {
+		// Auto-create required edge
+		var err error
+		ts.Transfer, err = NewTransferExample(ts.t, ts.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create transfer: %w", err)
+		}
+		create.SetTransfer(ts.Transfer)
 	}
 
 	return create.Save(ctx)

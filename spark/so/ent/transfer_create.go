@@ -20,6 +20,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
+	"github.com/lightsparkdev/spark/so/ent/transfersender"
 )
 
 // TransferCreate is the builder for creating a Transfer entity.
@@ -213,6 +215,36 @@ func (tc *TransferCreate) SetNillablePrimarySwapTransferID(id *uuid.UUID) *Trans
 // SetPrimarySwapTransfer sets the "primary_swap_transfer" edge to the Transfer entity.
 func (tc *TransferCreate) SetPrimarySwapTransfer(t *Transfer) *TransferCreate {
 	return tc.SetPrimarySwapTransferID(t.ID)
+}
+
+// AddTransferSenderIDs adds the "transfer_senders" edge to the TransferSender entity by IDs.
+func (tc *TransferCreate) AddTransferSenderIDs(ids ...uuid.UUID) *TransferCreate {
+	tc.mutation.AddTransferSenderIDs(ids...)
+	return tc
+}
+
+// AddTransferSenders adds the "transfer_senders" edges to the TransferSender entity.
+func (tc *TransferCreate) AddTransferSenders(t ...*TransferSender) *TransferCreate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tc.AddTransferSenderIDs(ids...)
+}
+
+// AddTransferReceiverIDs adds the "transfer_receivers" edge to the TransferReceiver entity by IDs.
+func (tc *TransferCreate) AddTransferReceiverIDs(ids ...uuid.UUID) *TransferCreate {
+	tc.mutation.AddTransferReceiverIDs(ids...)
+	return tc
+}
+
+// AddTransferReceivers adds the "transfer_receivers" edges to the TransferReceiver entity.
+func (tc *TransferCreate) AddTransferReceivers(t ...*TransferReceiver) *TransferCreate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tc.AddTransferReceiverIDs(ids...)
 }
 
 // Mutation returns the TransferMutation object of the builder.
@@ -477,6 +509,38 @@ func (tc *TransferCreate) createSpec() (*Transfer, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.transfer_counter_swap_transfer = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tc.mutation.TransferSendersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferSendersTable,
+			Columns: []string{transfer.TransferSendersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfersender.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tc.mutation.TransferReceiversIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferReceiversTable,
+			Columns: []string{transfer.TransferReceiversColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transferreceiver.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

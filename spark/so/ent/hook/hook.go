@@ -345,6 +345,30 @@ func (f TransferLeafFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TransferLeafMutation", m)
 }
 
+// The TransferReceiverFunc type is an adapter to allow the use of ordinary
+// function as TransferReceiver mutator.
+type TransferReceiverFunc func(context.Context, *ent.TransferReceiverMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TransferReceiverFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TransferReceiverMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TransferReceiverMutation", m)
+}
+
+// The TransferSenderFunc type is an adapter to allow the use of ordinary
+// function as TransferSender mutator.
+type TransferSenderFunc func(context.Context, *ent.TransferSenderMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TransferSenderFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TransferSenderMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TransferSenderMutation", m)
+}
+
 // The TreeFunc type is an adapter to allow the use of ordinary
 // function as Tree mutator.
 type TreeFunc func(context.Context, *ent.TreeMutation) (ent.Value, error)

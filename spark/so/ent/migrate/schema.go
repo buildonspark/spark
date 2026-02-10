@@ -1151,6 +1151,81 @@ var (
 			},
 		},
 	}
+	// TransferReceiversColumns holds the columns for the "transfer_receivers" table.
+	TransferReceiversColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "identity_pubkey", Type: field.TypeBytes},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "PENDING_RECEIVER_CLAIM", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_KEY_TWEAK_APPLIED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "CANCELLED"}},
+		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
+		{Name: "transfer_id", Type: field.TypeUUID},
+	}
+	// TransferReceiversTable holds the schema information for the "transfer_receivers" table.
+	TransferReceiversTable = &schema.Table{
+		Name:       "transfer_receivers",
+		Columns:    TransferReceiversColumns,
+		PrimaryKey: []*schema.Column{TransferReceiversColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "transfer_receivers_transfers_transfer",
+				Columns:    []*schema.Column{TransferReceiversColumns[6]},
+				RefColumns: []*schema.Column{TransfersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "transferreceiver_identity_pubkey",
+				Unique:  false,
+				Columns: []*schema.Column{TransferReceiversColumns[3]},
+			},
+			{
+				Name:    "transferreceiver_transfer_id_identity_pubkey",
+				Unique:  true,
+				Columns: []*schema.Column{TransferReceiversColumns[6], TransferReceiversColumns[3]},
+			},
+			{
+				Name:    "transferreceiver_transfer_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{TransferReceiversColumns[6], TransferReceiversColumns[4]},
+			},
+		},
+	}
+	// TransferSendersColumns holds the columns for the "transfer_senders" table.
+	TransferSendersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "identity_pubkey", Type: field.TypeBytes},
+		{Name: "transfer_id", Type: field.TypeUUID},
+	}
+	// TransferSendersTable holds the schema information for the "transfer_senders" table.
+	TransferSendersTable = &schema.Table{
+		Name:       "transfer_senders",
+		Columns:    TransferSendersColumns,
+		PrimaryKey: []*schema.Column{TransferSendersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "transfer_senders_transfers_transfer",
+				Columns:    []*schema.Column{TransferSendersColumns[4]},
+				RefColumns: []*schema.Column{TransfersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "transfersender_identity_pubkey",
+				Unique:  false,
+				Columns: []*schema.Column{TransferSendersColumns[3]},
+			},
+			{
+				Name:    "transfersender_transfer_id_identity_pubkey",
+				Unique:  true,
+				Columns: []*schema.Column{TransferSendersColumns[4], TransferSendersColumns[3]},
+			},
+		},
+	}
 	// TreesColumns holds the columns for the "trees" table.
 	TreesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1581,6 +1656,8 @@ var (
 		TokenTransactionPeerSignaturesTable,
 		TransfersTable,
 		TransferLeafsTable,
+		TransferReceiversTable,
+		TransferSendersTable,
 		TreesTable,
 		TreeNodesTable,
 		UserSignedTransactionsTable,
@@ -1619,6 +1696,8 @@ func init() {
 	TransfersTable.ForeignKeys[2].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable
+	TransferReceiversTable.ForeignKeys[0].RefTable = TransfersTable
+	TransferSendersTable.ForeignKeys[0].RefTable = TransfersTable
 	TreesTable.ForeignKeys[0].RefTable = DepositAddressesTable
 	TreesTable.ForeignKeys[1].RefTable = TreeNodesTable
 	TreeNodesTable.ForeignKeys[0].RefTable = TreesTable

@@ -86,6 +86,8 @@ func (Transfer) Edges() []ent.Edge {
 			Comment("Invoice that this transfer pays. Only set for transfers that paid an invoice."),
 		edge.To("counter_swap_transfer", Transfer.Type).Comment("For SWAP type transfer, this field references the corresponding counter transfer (type COUNTER_SWAP), which will establish this edge automatically upon creation."),
 		edge.From("primary_swap_transfer", Transfer.Type).Unique().Ref("counter_swap_transfer").Comment("For counter transfers of type COUNTER_SWAP, this field references the corresponding primary transfer (type SWAP) that initiated the atomic swap. There are multiple counter transfers possible for a single primary transfer, because if a counter transfer fails the SSP will create a new one."),
+		edge.From("transfer_senders", TransferSender.Type).Ref("transfer"),
+		edge.From("transfer_receivers", TransferReceiver.Type).Ref("transfer"),
 	}
 }
 
