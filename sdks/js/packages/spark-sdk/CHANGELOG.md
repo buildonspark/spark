@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.6.2
+
+### Patch Changes
+
+- Proactively re-authenticate with Spark Operators to improve session reliability
+- Split token balance into `owned` and `availableToSend` to distinguish pending outbound transfers
+
 ## 0.6.1
 
 ### Patch Changes

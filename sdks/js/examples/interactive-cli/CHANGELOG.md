@@ -1,5 +1,12 @@
 # @buildonspark/interactive-cli
 
+## 0.0.6
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.6.2
+
 ## 0.0.5
 
 ### Patch Changes
