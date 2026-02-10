@@ -34,7 +34,22 @@ type ChannelKey = string;
 type BrowserOrNodeJSChannel = Channel | ChannelWeb;
 
 type TokenKey = string;
-type CachedToken = { token: string; expiresAtMono: number };
+
+/**
+ * Track both monotonic and wall clock for redundancy
+ *
+ * Monotonic is used to prevent clock skew issues
+ * but it does not tick during sleep
+ * https://developer.mozilla.org/en-US/docs/Web/API/Performance/now#ticking_during_sleep
+ *
+ * Wall clock is used to handle device sleep/app backgrounding
+ * but it is not as precise as monotonic
+ */
+type CachedToken = {
+  token: string;
+  expiresAtMono: number;
+  expiresAtWallMs: number;
+};
 
 /**
  * Safety margin (in seconds) to proactively refresh tokens before server-side
@@ -135,12 +150,13 @@ export abstract class ConnectionManager {
     if (!entry) return undefined;
 
     // Proactively evict tokens that are within the buffer of server-side expiry.
-    // Uses monotonic time so the check is instance-independent and immune to
-    // wall-clock drift. The monotonic deadline was computed at cache-write time
-    // using server-synced time for the TTL calculation.
+    // Two complementary checks:
+    //   - Monotonic: immune to clock skew, but freezes during device sleep
+    //   - Wall-clock: survives device sleep, but vulnerable to clock adjustments
+    const bufferMs = TOKEN_EXPIRY_BUFFER_SEC * 1000;
     if (
-      getMonotonicTime() >=
-      entry.expiresAtMono - TOKEN_EXPIRY_BUFFER_SEC * 1000
+      getMonotonicTime() >= entry.expiresAtMono - bufferMs ||
+      Date.now() >= entry.expiresAtWallMs - bufferMs
     ) {
       ConnectionManager.authTokenCache.delete(key);
       return undefined;
@@ -158,10 +174,14 @@ export abstract class ConnectionManager {
   ) {
     // Convert server-relative expiry to a monotonic deadline so that all
     // future cache reads are instance-independent and clock-skew-safe.
-    const ttlSec = expiresAtSec - nowSec;
+    const ttlMs = (expiresAtSec - nowSec) * 1000;
     ConnectionManager.authTokenCache.set(
       ConnectionManager.makeAuthTokenKey(address, identityHex),
-      { token: authToken, expiresAtMono: getMonotonicTime() + ttlSec * 1000 },
+      {
+        token: authToken,
+        expiresAtMono: getMonotonicTime() + ttlMs,
+        expiresAtWallMs: Date.now() + ttlMs,
+      },
     );
   }
 
