@@ -23,6 +23,7 @@ const (
 	SparkTokenInternalService_SignTokenTransactionFromCoordination_FullMethodName = "/spark_token.SparkTokenInternalService/sign_token_transaction_from_coordination"
 	SparkTokenInternalService_ExchangeRevocationSecretsShares_FullMethodName      = "/spark_token.SparkTokenInternalService/exchange_revocation_secrets_shares"
 	SparkTokenInternalService_BroadcastTokenTransactionInternal_FullMethodName    = "/spark_token.SparkTokenInternalService/broadcast_token_transaction_internal"
+	SparkTokenInternalService_InternalFreezeTokens_FullMethodName                 = "/spark_token.SparkTokenInternalService/internal_freeze_tokens"
 )
 
 // SparkTokenInternalServiceClient is the client API for SparkTokenInternalService service.
@@ -39,6 +40,8 @@ type SparkTokenInternalServiceClient interface {
 	ExchangeRevocationSecretsShares(ctx context.Context, in *ExchangeRevocationSecretsSharesRequest, opts ...grpc.CallOption) (*ExchangeRevocationSecretsSharesResponse, error)
 	// Combined prepare and sign transaction (SO-to-SO) for broadcast flow
 	BroadcastTokenTransactionInternal(ctx context.Context, in *BroadcastTransactionInternalRequest, opts ...grpc.CallOption) (*BroadcastTransactionInternalResponse, error)
+	// Internal freeze tokens (SO-to-SO coordination)
+	InternalFreezeTokens(ctx context.Context, in *InternalFreezeTokensRequest, opts ...grpc.CallOption) (*InternalFreezeTokensResponse, error)
 }
 
 type sparkTokenInternalServiceClient struct {
@@ -89,6 +92,16 @@ func (c *sparkTokenInternalServiceClient) BroadcastTokenTransactionInternal(ctx 
 	return out, nil
 }
 
+func (c *sparkTokenInternalServiceClient) InternalFreezeTokens(ctx context.Context, in *InternalFreezeTokensRequest, opts ...grpc.CallOption) (*InternalFreezeTokensResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InternalFreezeTokensResponse)
+	err := c.cc.Invoke(ctx, SparkTokenInternalService_InternalFreezeTokens_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkTokenInternalServiceServer is the server API for SparkTokenInternalService service.
 // All implementations must embed UnimplementedSparkTokenInternalServiceServer
 // for forward compatibility.
@@ -103,6 +116,8 @@ type SparkTokenInternalServiceServer interface {
 	ExchangeRevocationSecretsShares(context.Context, *ExchangeRevocationSecretsSharesRequest) (*ExchangeRevocationSecretsSharesResponse, error)
 	// Combined prepare and sign transaction (SO-to-SO) for broadcast flow
 	BroadcastTokenTransactionInternal(context.Context, *BroadcastTransactionInternalRequest) (*BroadcastTransactionInternalResponse, error)
+	// Internal freeze tokens (SO-to-SO coordination)
+	InternalFreezeTokens(context.Context, *InternalFreezeTokensRequest) (*InternalFreezeTokensResponse, error)
 	mustEmbedUnimplementedSparkTokenInternalServiceServer()
 }
 
@@ -124,6 +139,9 @@ func (UnimplementedSparkTokenInternalServiceServer) ExchangeRevocationSecretsSha
 }
 func (UnimplementedSparkTokenInternalServiceServer) BroadcastTokenTransactionInternal(context.Context, *BroadcastTransactionInternalRequest) (*BroadcastTransactionInternalResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BroadcastTokenTransactionInternal not implemented")
+}
+func (UnimplementedSparkTokenInternalServiceServer) InternalFreezeTokens(context.Context, *InternalFreezeTokensRequest) (*InternalFreezeTokensResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InternalFreezeTokens not implemented")
 }
 func (UnimplementedSparkTokenInternalServiceServer) mustEmbedUnimplementedSparkTokenInternalServiceServer() {
 }
@@ -219,6 +237,24 @@ func _SparkTokenInternalService_BroadcastTokenTransactionInternal_Handler(srv in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkTokenInternalService_InternalFreezeTokens_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InternalFreezeTokensRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkTokenInternalServiceServer).InternalFreezeTokens(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkTokenInternalService_InternalFreezeTokens_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkTokenInternalServiceServer).InternalFreezeTokens(ctx, req.(*InternalFreezeTokensRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkTokenInternalService_ServiceDesc is the grpc.ServiceDesc for SparkTokenInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -241,6 +277,10 @@ var SparkTokenInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "broadcast_token_transaction_internal",
 			Handler:    _SparkTokenInternalService_BroadcastTokenTransactionInternal_Handler,
+		},
+		{
+			MethodName: "internal_freeze_tokens",
+			Handler:    _SparkTokenInternalService_InternalFreezeTokens_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

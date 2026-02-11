@@ -3682,6 +3682,10 @@ func (m *InitiateSettleReceiverKeyTweakRequest) validate(all bool) error {
 
 	// no validation rules for UserPublicKeys
 
+	// no validation rules for EncryptedClaimKeyTweakPackage
+
+	// no validation rules for ClaimSignature
+
 	if len(errors) > 0 {
 		return InitiateSettleReceiverKeyTweakRequestMultiError(errors)
 	}

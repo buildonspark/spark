@@ -86,6 +86,7 @@ export interface WalletTransfer {
   type: keyof typeof TransferType;
   transferDirection: keyof typeof TransferDirection;
   userRequest: Omit<UserRequestType, "transfer"> | undefined;
+  sparkInvoice: string | undefined;
 }
 
 export interface WalletTransferLeaf {
@@ -129,5 +130,6 @@ export function mapTransferToWalletTransfer(
         ? TransferDirection.INCOMING
         : TransferDirection.OUTGOING,
     userRequest: userRequest,
+    sparkInvoice: proto.sparkInvoice || undefined,
   };
 }

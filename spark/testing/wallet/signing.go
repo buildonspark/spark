@@ -35,6 +35,8 @@ func CreateUserKeyPackage(signingPrivateKey keys.Private) *pbfrost.KeyPackage {
 	return userKeyPackage
 }
 
+// prepareFrostSigningJobsForUserSignedRefund creates signing jobs for CPFP refund transactions.
+// If receiverIdentityPubKey is not provided (zero), the signing key will be used as the destination key.
 func prepareFrostSigningJobsForUserSignedRefund(
 	leaves []LeafKeyTweak,
 	signingCommitments []*pb.RequestedSigningCommitments,
@@ -44,8 +46,9 @@ func prepareFrostSigningJobsForUserSignedRefund(
 	return prepareFrostSigningJobsForUserSignedRefundWithType(leaves, signingCommitments, receiverIdentityPubKey, true, adaptorPublicKey)
 }
 
-// prepareFrostSigningJobsForUserSignedRefundDirect creates signing jobs for direct refund transactions (with fee deduction)
-// This is used for DirectFromCPFP path, which spends from NodeTx
+// prepareFrostSigningJobsForUserSignedRefundDirect creates signing jobs for direct refund transactions (with fee deduction).
+// This is used for DirectFromCPFP path, which spends from NodeTx.
+// If receiverIdentityPubKey is not provided (zero), the signing key will be used as the destination key.
 func prepareFrostSigningJobsForUserSignedRefundDirect(
 	leaves []LeafKeyTweak,
 	signingCommitments []*pb.RequestedSigningCommitments,
@@ -54,8 +57,9 @@ func prepareFrostSigningJobsForUserSignedRefundDirect(
 	return prepareFrostSigningJobsForUserSignedRefundWithType(leaves, signingCommitments, receiverIdentityPubKey, false, keys.Public{})
 }
 
-// prepareFrostSigningJobsForDirectRefund creates signing jobs for direct refund transactions
-// This is used for Direct path, which spends from DirectTx (not NodeTx)
+// prepareFrostSigningJobsForDirectRefund creates signing jobs for direct refund transactions.
+// This is used for Direct path, which spends from DirectTx (not NodeTx).
+// If receiverIdentityPubKey is not provided (zero), the signing key will be used as the destination key.
 func prepareFrostSigningJobsForDirectRefund(
 	leaves []LeafKeyTweak,
 	signingCommitments []*pb.RequestedSigningCommitments,
@@ -87,8 +91,13 @@ func prepareFrostSigningJobsForDirectRefund(
 		nextSequence -= spark.DirectTimelockOffset
 		amountSats := directTx.TxOut[0].Value
 
+		refundPubKey := receiverIdentityPubKey
+		if refundPubKey.IsZero() {
+			refundPubKey = leaf.SigningPrivKey.Public()
+		}
+
 		// Create new direct refund tx with shorter timelock
-		_, directRefundTx, err := CreateRefundTxs(nextSequence, nextDirectSequence, &directOutPoint, amountSats, receiverIdentityPubKey, true)
+		_, directRefundTx, err := CreateRefundTxs(nextSequence, nextDirectSequence, &directOutPoint, amountSats, refundPubKey, true)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -126,6 +135,9 @@ func prepareFrostSigningJobsForDirectRefund(
 	return signingJobs, refundTxs, userCommitments, nil
 }
 
+// prepareFrostSigningJobsForUserSignedRefundWithType creates signing jobs for refund transactions,
+// supporting both CPFP and direct refund types.
+// If receiverIdentityPubKey is not provided (zero), the signing key will be used as the destination key.
 func prepareFrostSigningJobsForUserSignedRefundWithType(
 	leaves []LeafKeyTweak,
 	signingCommitments []*pb.RequestedSigningCommitments,
@@ -157,15 +169,20 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 
 		amountSats := nodeTx.TxOut[0].Value
 
+		refundPubKey := receiverIdentityPubKey
+		if refundPubKey.IsZero() {
+			refundPubKey = leaf.SigningPrivKey.Public()
+		}
+
 		var refundTx *wire.MsgTx
 		if useCPFP {
-			cpfpRefundTx, _, err := CreateRefundTxs(nextNodeSequence, nextDirectSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, false)
+			cpfpRefundTx, _, err := CreateRefundTxs(nextNodeSequence, nextDirectSequence, &nodeOutPoint, amountSats, refundPubKey, false)
 			if err != nil {
 				return nil, nil, nil, err
 			}
 			refundTx = cpfpRefundTx
 		} else {
-			_, directRefundTx, err := CreateRefundTxs(nextNodeSequence, nextDirectSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, true)
+			_, directRefundTx, err := CreateRefundTxs(nextNodeSequence, nextDirectSequence, &nodeOutPoint, amountSats, refundPubKey, true)
 			if err != nil {
 				return nil, nil, nil, err
 			}

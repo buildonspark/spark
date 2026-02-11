@@ -36,6 +36,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
+	"github.com/lightsparkdev/spark/so/ent/transfersender"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
@@ -733,6 +735,46 @@ func init() {
 	transferleafDescID := transferleafMixinFields0[0].Descriptor()
 	// transferleaf.DefaultID holds the default value on creation for the id field.
 	transferleaf.DefaultID = transferleafDescID.Default.(func() uuid.UUID)
+	transferreceiverMixin := schema.TransferReceiver{}.Mixin()
+	transferreceiverMixinHooks1 := transferreceiverMixin[1].Hooks()
+	transferreceiver.Hooks[0] = transferreceiverMixinHooks1[0]
+	transferreceiverMixinFields0 := transferreceiverMixin[0].Fields()
+	_ = transferreceiverMixinFields0
+	transferreceiverFields := schema.TransferReceiver{}.Fields()
+	_ = transferreceiverFields
+	// transferreceiverDescCreateTime is the schema descriptor for create_time field.
+	transferreceiverDescCreateTime := transferreceiverMixinFields0[1].Descriptor()
+	// transferreceiver.DefaultCreateTime holds the default value on creation for the create_time field.
+	transferreceiver.DefaultCreateTime = transferreceiverDescCreateTime.Default.(func() time.Time)
+	// transferreceiverDescUpdateTime is the schema descriptor for update_time field.
+	transferreceiverDescUpdateTime := transferreceiverMixinFields0[2].Descriptor()
+	// transferreceiver.DefaultUpdateTime holds the default value on creation for the update_time field.
+	transferreceiver.DefaultUpdateTime = transferreceiverDescUpdateTime.Default.(func() time.Time)
+	// transferreceiver.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	transferreceiver.UpdateDefaultUpdateTime = transferreceiverDescUpdateTime.UpdateDefault.(func() time.Time)
+	// transferreceiverDescID is the schema descriptor for id field.
+	transferreceiverDescID := transferreceiverMixinFields0[0].Descriptor()
+	// transferreceiver.DefaultID holds the default value on creation for the id field.
+	transferreceiver.DefaultID = transferreceiverDescID.Default.(func() uuid.UUID)
+	transfersenderMixin := schema.TransferSender{}.Mixin()
+	transfersenderMixinFields0 := transfersenderMixin[0].Fields()
+	_ = transfersenderMixinFields0
+	transfersenderFields := schema.TransferSender{}.Fields()
+	_ = transfersenderFields
+	// transfersenderDescCreateTime is the schema descriptor for create_time field.
+	transfersenderDescCreateTime := transfersenderMixinFields0[1].Descriptor()
+	// transfersender.DefaultCreateTime holds the default value on creation for the create_time field.
+	transfersender.DefaultCreateTime = transfersenderDescCreateTime.Default.(func() time.Time)
+	// transfersenderDescUpdateTime is the schema descriptor for update_time field.
+	transfersenderDescUpdateTime := transfersenderMixinFields0[2].Descriptor()
+	// transfersender.DefaultUpdateTime holds the default value on creation for the update_time field.
+	transfersender.DefaultUpdateTime = transfersenderDescUpdateTime.Default.(func() time.Time)
+	// transfersender.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	transfersender.UpdateDefaultUpdateTime = transfersenderDescUpdateTime.UpdateDefault.(func() time.Time)
+	// transfersenderDescID is the schema descriptor for id field.
+	transfersenderDescID := transfersenderMixinFields0[0].Descriptor()
+	// transfersender.DefaultID holds the default value on creation for the id field.
+	transfersender.DefaultID = transfersenderDescID.Default.(func() uuid.UUID)
 	treeMixin := schema.Tree{}.Mixin()
 	treeMixinFields0 := treeMixin[0].Fields()
 	_ = treeMixinFields0

@@ -54,3 +54,11 @@ func getTransferPackageSigningPayloadV2(transferID uuid.UUID, transferPackage *p
 		AddMapStringToBytes(transferPackage.KeyTweakPackage).
 		Hash()
 }
+
+// GetClaimPackageSigningPayload returns the signing payload for a claim key tweak package.
+func GetClaimPackageSigningPayload(transferID uuid.UUID, keyTweakPackage map[string][]byte) []byte {
+	return hashstructure.NewHasher([]string{"spark", "claim", "signing payload"}).
+		AddBytes(transferID[:]).
+		AddMapStringToBytes(keyTweakPackage).
+		Hash()
+}

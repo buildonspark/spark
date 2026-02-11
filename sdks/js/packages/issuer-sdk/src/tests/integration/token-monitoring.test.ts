@@ -47,7 +47,7 @@ describe.each(TEST_CONFIGS)(
         userBalanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(userBalance.balance).toBeGreaterThanOrEqual(tokenAmount);
+      expect(userBalance.ownedBalance).toBeGreaterThanOrEqual(tokenAmount);
 
       const response = await issuerWallet.queryTokenTransactions({
         tokenIdentifiers: [tokenIdentifier!],

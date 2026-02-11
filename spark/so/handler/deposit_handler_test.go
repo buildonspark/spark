@@ -1100,6 +1100,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
 			SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetUtxo(utxo1).
+			SetUtxoValueSats(utxo1.Amount).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1109,6 +1110,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
 			SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetUtxo(utxo2).
+			SetUtxoValueSats(utxo2.Amount).
 			Save(ctx)
 		require.NoError(t, err)
 

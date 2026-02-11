@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/issuer-sdk",
-  "version": "0.1.9",
+  "version": "0.1.13",
   "description": "Spark Issuer SDK for token issuance",
   "license": "Apache-2.0",
   "keywords": [
@@ -68,10 +68,10 @@
     "docs": "typedoc src",
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
-    "lint:fix": "eslint --fix .",
-    "lint:fix:continue": "eslint --fix . || exit 0",
-    "lint:watch": "esw ./src -w --ext .ts,.tsx,.js --color",
-    "lint": "eslint .",
+    "lint:fix": "echo \"Not implemented yet\"",
+    "lint:fix:continue": "echo \"Not implemented yet\"",
+    "lint:watch": "echo \"Not implemented yet\"",
+    "lint": "echo \"Not implemented yet\"",
     "package:checks": "yarn depcheck && yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
     "postversion": "yarn build",
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --detectOpenHandles --forceExit",
@@ -82,7 +82,7 @@
     "types": "tsc"
   },
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.5.9",
+    "@buildonspark/spark-sdk": "0.6.3",
     "@noble/curves": "^1.8.0",
     "@scure/btc-signer": "^1.5.0",
     "buffer": "^6.0.3"

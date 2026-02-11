@@ -158,10 +158,22 @@ func PrepareTransferPackage(
 	// Organize commitments by leaf ID then index (0=CPFP, 1=Direct, 2=DirectFromCpfp)
 	commitmentsByLeafID := extractCommitmentsByLeaf(leaves, signingCommitments.SigningCommitments)
 
-	// Extract CPFP commitments
+	// Split leaves and commitments by refund type in a single pass.
 	cpfpCommitments := make([]*pb.RequestedSigningCommitments, len(leaves))
+	var leavesWithDirectFromCpfp []LeafKeyTweak
+	var directFromCpfpCommitments []*pb.RequestedSigningCommitments
+	var leavesWithDirectTx []LeafKeyTweak
+	var directCommitments []*pb.RequestedSigningCommitments
 	for i, leaf := range leaves {
 		cpfpCommitments[i] = commitmentsByLeafID[leaf.Leaf.Id][0]
+		if len(leaf.Leaf.DirectFromCpfpRefundTx) > 0 {
+			leavesWithDirectFromCpfp = append(leavesWithDirectFromCpfp, leaf)
+			directFromCpfpCommitments = append(directFromCpfpCommitments, commitmentsByLeafID[leaf.Leaf.Id][2])
+		}
+		if len(leaf.Leaf.DirectRefundTx) > 0 {
+			leavesWithDirectTx = append(leavesWithDirectTx, leaf)
+			directCommitments = append(directCommitments, commitmentsByLeafID[leaf.Leaf.Id][1])
+		}
 	}
 
 	// Sign user refund.
@@ -199,20 +211,7 @@ func PrepareTransferPackage(
 
 	// Create DirectFromCPFP refund transactions (direct refund, with fee deduction)
 	var directFromCpfpLeafSigningJobs []*pb.UserSignedTxSigningJob
-	var leavesWithDirectFromCpfp []LeafKeyTweak
-	for _, leaf := range leaves {
-		if len(leaf.Leaf.DirectFromCpfpRefundTx) > 0 {
-			leavesWithDirectFromCpfp = append(leavesWithDirectFromCpfp, leaf)
-		}
-	}
-
 	if len(leavesWithDirectFromCpfp) > 0 {
-		directFromCpfpCommitments := make([]*pb.RequestedSigningCommitments, len(leavesWithDirectFromCpfp))
-		for i, leaf := range leavesWithDirectFromCpfp {
-			// DirectFromCpfp uses index 2 (0=CPFP, 1=Direct, 2=DirectFromCpfp)
-			directFromCpfpCommitments[i] = commitmentsByLeafID[leaf.Leaf.Id][2]
-		}
-
 		directFromCpfpSigningJobs, directFromCpfpRefundTxs, directFromCpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefundDirect(leavesWithDirectFromCpfp, directFromCpfpCommitments, receiverIdentityPubKey)
 		if err != nil {
 			return nil, err
@@ -241,18 +240,7 @@ func PrepareTransferPackage(
 	// Create Direct refund transactions (only for leaves that have DirectRefundTx)
 	// Direct refunds spend from DirectTx (not NodeTx like DirectFromCPFP)
 	var directLeafSigningJobs []*pb.UserSignedTxSigningJob
-	leavesWithDirectTx := make([]LeafKeyTweak, 0)
-	for _, leaf := range leaves {
-		if len(leaf.Leaf.DirectRefundTx) > 0 {
-			leavesWithDirectTx = append(leavesWithDirectTx, leaf)
-		}
-	}
 	if len(leavesWithDirectTx) > 0 {
-		directCommitments := make([]*pb.RequestedSigningCommitments, len(leavesWithDirectTx))
-		for i, leaf := range leavesWithDirectTx {
-			// Direct uses index 1 (0=CPFP, 1=Direct, 2=DirectFromCpfp)
-			directCommitments[i] = commitmentsByLeafID[leaf.Leaf.Id][1]
-		}
 
 		directSigningJobs, directRefundTxs, directUserCommitments, err := prepareFrostSigningJobsForDirectRefund(leavesWithDirectTx, directCommitments, receiverIdentityPubKey)
 		if err != nil {
@@ -289,8 +277,8 @@ func PrepareTransferPackage(
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal proto to encrypt: %w", err)
 		}
-		encryptionKeyBytes := config.SigningOperators[identifier].IdentityPublicKey
-		encryptionKey, err := eciesgo.NewPublicKeyFromBytes(encryptionKeyBytes.Serialize())
+		encryptionPubKey := config.SigningOperators[identifier].IdentityPublicKey
+		encryptionKey, err := eciesgo.NewPublicKeyFromBytes(encryptionPubKey.Serialize())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse encryption key: %w", err)
 		}
@@ -348,8 +336,8 @@ func GenerateTransferPackageForSwapV3(
 		if err != nil {
 			return nil, transferID, fmt.Errorf("failed to marshal proto to encrypt: %w", err)
 		}
-		encryptionKeyBytes := config.SigningOperators[identifier].IdentityPublicKey
-		encryptionKey, err := eciesgo.NewPublicKeyFromBytes(encryptionKeyBytes.Serialize())
+		encryptionPubKey := config.SigningOperators[identifier].IdentityPublicKey
+		encryptionKey, err := eciesgo.NewPublicKeyFromBytes(encryptionPubKey.Serialize())
 		if err != nil {
 			return nil, transferID, fmt.Errorf("failed to parse encryption key: %w", err)
 		}
@@ -816,13 +804,232 @@ func ClaimTransferWithoutFinalizeSignatures(
 	return signatures, nil
 }
 
+// ClaimTransferV2 claims a pending transfer using the new claim_transfer endpoint
+// that combines key tweak delivery, refund signing, signature aggregation, and
+// finalization into a single RPC call.
+func ClaimTransferV2(
+	ctx context.Context,
+	transfer *pb.Transfer,
+	config *TestWalletConfig,
+	leaves []LeafKeyTweak,
+) (*pb.Transfer, error) {
+	// Prepare claim key tweaks for all SOs.
+	tweaksByOperator, _, err := prepareClaimLeavesKeyTweaks(config, leaves)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare claim key tweaks: %w", err)
+	}
+
+	transferID, err := uuid.Parse(transfer.Id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse transfer ID: %w", err)
+	}
+
+	// Build claim leaves where SigningPrivKey is the receiver's new key,
+	// since that's what refund signing will use after the transfer.
+	claimLeaves := make([]LeafKeyTweak, len(leaves))
+	for i, leaf := range leaves {
+		claimLeaves[i] = LeafKeyTweak{
+			Leaf:           leaf.Leaf,
+			SigningPrivKey: leaf.NewSigningPrivKey,
+		}
+	}
+
+	// Build the claim package with pre-signed refund txs and encrypted key tweaks.
+	claimPackage, err := PrepareClaimPackage(ctx, config, transferID, tweaksByOperator, claimLeaves)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare claim package: %w", err)
+	}
+
+	sparkConn, err := config.NewCoordinatorGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+
+	resp, err := sparkClient.ClaimTransfer(ctx, &pb.ClaimTransferRequest{
+		TransferId:             transfer.Id,
+		OwnerIdentityPublicKey: config.IdentityPublicKey().Serialize(),
+		ClaimPackage:           claimPackage,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to call ClaimTransfer: %w", err)
+	}
+
+	return resp.Transfer, nil
+}
+
+// PrepareClaimPackage builds a ClaimPackage containing pre-signed refund transactions
+// and per-SO key tweaks. It mirrors PrepareTransferPackage but for the receiver claim side.
+func PrepareClaimPackage(
+	ctx context.Context,
+	config *TestWalletConfig,
+	transferID uuid.UUID,
+	tweaksByOperator map[string][]*pb.ClaimLeafKeyTweak,
+	leaves []LeafKeyTweak,
+) (*pb.ClaimPackage, error) {
+	// Fetch 3 signing commitments per leaf (CPFP, Direct, DirectFromCpfp).
+	// Use NodeIdCount instead of NodeIds to avoid the ownership check,
+	// since the receiver doesn't own the leaves yet during claim.
+	const maxRefundTxsPerLeaf = 3
+
+	sparkConn, err := config.NewCoordinatorGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+
+	signingCommitments, err := sparkClient.GetSigningCommitments(ctx, &pb.GetSigningCommitmentsRequest{
+		NodeIdCount: uint32(len(leaves)),
+		Count:       maxRefundTxsPerLeaf,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing commitments: %w", err)
+	}
+
+	commitmentsByLeafID := extractCommitmentsByLeaf(leaves, signingCommitments.SigningCommitments)
+
+	// Split leaves and commitments by refund type in a single pass.
+	cpfpCommitments := make([]*pb.RequestedSigningCommitments, len(leaves))
+	var leavesWithDirectFromCpfp []LeafKeyTweak
+	var directFromCpfpCommitments []*pb.RequestedSigningCommitments
+	var leavesWithDirectTx []LeafKeyTweak
+	var directCommitments []*pb.RequestedSigningCommitments
+	for i, leaf := range leaves {
+		cpfpCommitments[i] = commitmentsByLeafID[leaf.Leaf.Id][0]
+		if len(leaf.Leaf.DirectFromCpfpRefundTx) > 0 {
+			leavesWithDirectFromCpfp = append(leavesWithDirectFromCpfp, leaf)
+			directFromCpfpCommitments = append(directFromCpfpCommitments, commitmentsByLeafID[leaf.Leaf.Id][2])
+		}
+		if len(leaf.Leaf.DirectRefundTx) > 0 {
+			leavesWithDirectTx = append(leavesWithDirectTx, leaf)
+			directCommitments = append(directCommitments, commitmentsByLeafID[leaf.Leaf.Id][1])
+		}
+	}
+
+	signerConn, err := config.NewFrostGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer signerConn.Close()
+	signerClient := pbfrost.NewFrostServiceClient(signerConn)
+
+	// Sign CPFP refund transactions.
+	cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(
+		leaves, cpfpCommitments, keys.Public{}, keys.Public{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare cpfp signing jobs: %w", err)
+	}
+
+	cpfpSigningResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
+		SigningJobs: cpfpSigningJobs,
+		Role:        pbfrost.SigningRole_USER,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign cpfp refunds: %w", err)
+	}
+
+	leafSigningJobs, err := prepareLeafSigningJobs(leaves, cpfpRefundTxs, cpfpSigningResults.Results, cpfpUserCommitments, cpfpCommitments)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare cpfp leaf signing jobs: %w", err)
+	}
+
+	// Sign DirectFromCPFP refund transactions.
+	var directFromCpfpLeafSigningJobs []*pb.UserSignedTxSigningJob
+	if len(leavesWithDirectFromCpfp) > 0 {
+		directFromCpfpSigningJobs, directFromCpfpRefundTxs, directFromCpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefundDirect(
+			leavesWithDirectFromCpfp, directFromCpfpCommitments, keys.Public{},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare direct from cpfp signing jobs: %w", err)
+		}
+		directFromCpfpSigningResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
+			SigningJobs: directFromCpfpSigningJobs,
+			Role:        pbfrost.SigningRole_USER,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign direct from cpfp refunds: %w", err)
+		}
+		directFromCpfpLeafSigningJobs, err = prepareLeafSigningJobs(
+			leavesWithDirectFromCpfp, directFromCpfpRefundTxs, directFromCpfpSigningResults.Results,
+			directFromCpfpUserCommitments, directFromCpfpCommitments,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare direct from cpfp leaf signing jobs: %w", err)
+		}
+	}
+
+	// Sign Direct refund transactions.
+	var directLeafSigningJobs []*pb.UserSignedTxSigningJob
+	if len(leavesWithDirectTx) > 0 {
+		directSigningJobs, directRefundTxs, directUserCommitments, err := prepareFrostSigningJobsForDirectRefund(
+			leavesWithDirectTx, directCommitments, keys.Public{},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare direct signing jobs: %w", err)
+		}
+		directSigningResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
+			SigningJobs: directSigningJobs,
+			Role:        pbfrost.SigningRole_USER,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign direct refunds: %w", err)
+		}
+		directLeafSigningJobs, err = prepareLeafSigningJobs(
+			leavesWithDirectTx, directRefundTxs, directSigningResults.Results,
+			directUserCommitments, directCommitments,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare direct leaf signing jobs: %w", err)
+		}
+	}
+
+	// Encrypt key tweaks per SO using ECIES with each SO's identity public key.
+	encryptedKeyTweaks := make(map[string][]byte)
+	for identifier, tweaks := range tweaksByOperator {
+		claimLeafKeyTweaks := &pb.ClaimLeafKeyTweaks{
+			LeavesToReceive: tweaks,
+		}
+		plaintext, err := proto.Marshal(claimLeafKeyTweaks)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal claim key tweaks for SO %s: %w", identifier, err)
+		}
+		encryptionPubKey := config.SigningOperators[identifier].IdentityPublicKey
+		encryptionKey, err := eciesgo.NewPublicKeyFromBytes(encryptionPubKey.Serialize())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse encryption key for SO %s: %w", identifier, err)
+		}
+		encrypted, err := eciesgo.Encrypt(encryptionKey, plaintext)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt claim key tweaks for SO %s: %w", identifier, err)
+		}
+		encryptedKeyTweaks[identifier] = encrypted
+	}
+
+	claimPackage := &pb.ClaimPackage{
+		LeavesToClaim:               leafSigningJobs,
+		DirectLeavesToClaim:         directLeafSigningJobs,
+		DirectFromCpfpLeavesToClaim: directFromCpfpLeafSigningJobs,
+		KeyTweakPackage:             encryptedKeyTweaks,
+		HashVariant:                 pb.HashVariant_HASH_VARIANT_V2,
+	}
+
+	signingPayload := common.GetClaimPackageSigningPayload(transferID, encryptedKeyTweaks)
+	signature := ecdsa.Sign(config.IdentityPrivateKey.ToBTCEC(), signingPayload)
+	claimPackage.UserSignature = signature.Serialize()
+
+	return claimPackage, nil
+}
+
 func ClaimTransferTweakKeys(
 	ctx context.Context,
 	transfer *pb.Transfer,
 	config *TestWalletConfig,
 	leaves []LeafKeyTweak,
 ) (map[string][][]byte, error) {
-	leavesTweaksMap, proofMap, err := prepareClaimLeavesKeyTweaks(config, leaves)
+	tweaksByOperator, proofMap, err := prepareClaimLeavesKeyTweaks(config, leaves)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
@@ -850,7 +1057,7 @@ func ClaimTransferTweakKeys(
 			_, err = sparkClient.ClaimTransferTweakKeys(tmpCtx, &pb.ClaimTransferTweakKeysRequest{
 				TransferId:             transfer.Id,
 				OwnerIdentityPublicKey: config.IdentityPublicKey().Serialize(),
-				LeavesToReceive:        leavesTweaksMap[identifier],
+				LeavesToReceive:        tweaksByOperator[identifier],
 			})
 			if err != nil {
 				results <- fmt.Errorf("failed to call ClaimTransferTweakKeys: %w", err)
@@ -867,8 +1074,12 @@ func ClaimTransferTweakKeys(
 	return proofMap, nil
 }
 
+// prepareClaimLeavesKeyTweaks prepares key tweaks for claiming multiple leaves and reorganizes them
+// from per-leaf (each leaf has tweaks for all operators) to per-operator (each operator gets tweaks
+// for all leaves), enabling efficient batch delivery to each SO.
+// Returns operator-indexed tweaks and leaf-indexed proofs.
 func prepareClaimLeavesKeyTweaks(config *TestWalletConfig, leaves []LeafKeyTweak) (map[string][]*pb.ClaimLeafKeyTweak, map[string][][]byte, error) {
-	leavesTweaksMap := make(map[string][]*pb.ClaimLeafKeyTweak)
+	tweaksByOperator := make(map[string][]*pb.ClaimLeafKeyTweak)
 	proofMap := make(map[string][][]byte)
 	for _, leaf := range leaves {
 		leafTweaks, proof, err := prepareClaimLeafKeyTweaks(config, leaf)
@@ -877,10 +1088,10 @@ func prepareClaimLeavesKeyTweaks(config *TestWalletConfig, leaves []LeafKeyTweak
 		}
 		proofMap[leaf.Leaf.Id] = proof
 		for identifier, leafTweak := range leafTweaks {
-			leavesTweaksMap[identifier] = append(leavesTweaksMap[identifier], leafTweak)
+			tweaksByOperator[identifier] = append(tweaksByOperator[identifier], leafTweak)
 		}
 	}
-	return leavesTweaksMap, proofMap, nil
+	return tweaksByOperator, proofMap, nil
 }
 
 func prepareClaimLeafKeyTweaks(config *TestWalletConfig, leaf LeafKeyTweak) (map[string]*pb.ClaimLeafKeyTweak, [][]byte, error) {

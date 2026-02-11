@@ -19,6 +19,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
+	"github.com/lightsparkdev/spark/so/ent/transfersender"
 )
 
 // TransferQuery is the builder for querying Transfer entities.
@@ -33,6 +35,8 @@ type TransferQuery struct {
 	withSparkInvoice        *SparkInvoiceQuery
 	withCounterSwapTransfer *TransferQuery
 	withPrimarySwapTransfer *TransferQuery
+	withTransferSenders     *TransferSenderQuery
+	withTransferReceivers   *TransferReceiverQuery
 	withFKs                 bool
 	modifiers               []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -174,6 +178,50 @@ func (tq *TransferQuery) QueryPrimarySwapTransfer() *TransferQuery {
 			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
 			sqlgraph.To(transfer.Table, transfer.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, transfer.PrimarySwapTransferTable, transfer.PrimarySwapTransferColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTransferSenders chains the current query on the "transfer_senders" edge.
+func (tq *TransferQuery) QueryTransferSenders() *TransferSenderQuery {
+	query := (&TransferSenderClient{config: tq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
+			sqlgraph.To(transfersender.Table, transfersender.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, transfer.TransferSendersTable, transfer.TransferSendersColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTransferReceivers chains the current query on the "transfer_receivers" edge.
+func (tq *TransferQuery) QueryTransferReceivers() *TransferReceiverQuery {
+	query := (&TransferReceiverClient{config: tq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
+			sqlgraph.To(transferreceiver.Table, transferreceiver.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, transfer.TransferReceiversTable, transfer.TransferReceiversColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
 		return fromU, nil
@@ -378,6 +426,8 @@ func (tq *TransferQuery) Clone() *TransferQuery {
 		withSparkInvoice:        tq.withSparkInvoice.Clone(),
 		withCounterSwapTransfer: tq.withCounterSwapTransfer.Clone(),
 		withPrimarySwapTransfer: tq.withPrimarySwapTransfer.Clone(),
+		withTransferSenders:     tq.withTransferSenders.Clone(),
+		withTransferReceivers:   tq.withTransferReceivers.Clone(),
 		// clone intermediate query.
 		sql:       tq.sql.Clone(),
 		path:      tq.path,
@@ -437,6 +487,28 @@ func (tq *TransferQuery) WithPrimarySwapTransfer(opts ...func(*TransferQuery)) *
 		opt(query)
 	}
 	tq.withPrimarySwapTransfer = query
+	return tq
+}
+
+// WithTransferSenders tells the query-builder to eager-load the nodes that are connected to
+// the "transfer_senders" edge. The optional arguments are used to configure the query builder of the edge.
+func (tq *TransferQuery) WithTransferSenders(opts ...func(*TransferSenderQuery)) *TransferQuery {
+	query := (&TransferSenderClient{config: tq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tq.withTransferSenders = query
+	return tq
+}
+
+// WithTransferReceivers tells the query-builder to eager-load the nodes that are connected to
+// the "transfer_receivers" edge. The optional arguments are used to configure the query builder of the edge.
+func (tq *TransferQuery) WithTransferReceivers(opts ...func(*TransferReceiverQuery)) *TransferQuery {
+	query := (&TransferReceiverClient{config: tq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tq.withTransferReceivers = query
 	return tq
 }
 
@@ -519,12 +591,14 @@ func (tq *TransferQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tra
 		nodes       = []*Transfer{}
 		withFKs     = tq.withFKs
 		_spec       = tq.querySpec()
-		loadedTypes = [5]bool{
+		loadedTypes = [7]bool{
 			tq.withTransferLeaves != nil,
 			tq.withPaymentIntent != nil,
 			tq.withSparkInvoice != nil,
 			tq.withCounterSwapTransfer != nil,
 			tq.withPrimarySwapTransfer != nil,
+			tq.withTransferSenders != nil,
+			tq.withTransferReceivers != nil,
 		}
 	)
 	if tq.withPaymentIntent != nil || tq.withPrimarySwapTransfer != nil {
@@ -583,6 +657,22 @@ func (tq *TransferQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tra
 	if query := tq.withPrimarySwapTransfer; query != nil {
 		if err := tq.loadPrimarySwapTransfer(ctx, query, nodes, nil,
 			func(n *Transfer, e *Transfer) { n.Edges.PrimarySwapTransfer = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := tq.withTransferSenders; query != nil {
+		if err := tq.loadTransferSenders(ctx, query, nodes,
+			func(n *Transfer) { n.Edges.TransferSenders = []*TransferSender{} },
+			func(n *Transfer, e *TransferSender) { n.Edges.TransferSenders = append(n.Edges.TransferSenders, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := tq.withTransferReceivers; query != nil {
+		if err := tq.loadTransferReceivers(ctx, query, nodes,
+			func(n *Transfer) { n.Edges.TransferReceivers = []*TransferReceiver{} },
+			func(n *Transfer, e *TransferReceiver) {
+				n.Edges.TransferReceivers = append(n.Edges.TransferReceivers, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -741,6 +831,66 @@ func (tq *TransferQuery) loadPrimarySwapTransfer(ctx context.Context, query *Tra
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (tq *TransferQuery) loadTransferSenders(ctx context.Context, query *TransferSenderQuery, nodes []*Transfer, init func(*Transfer), assign func(*Transfer, *TransferSender)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*Transfer)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(transfersender.FieldTransferID)
+	}
+	query.Where(predicate.TransferSender(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(transfer.TransferSendersColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.TransferID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "transfer_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (tq *TransferQuery) loadTransferReceivers(ctx context.Context, query *TransferReceiverQuery, nodes []*Transfer, init func(*Transfer), assign func(*Transfer, *TransferReceiver)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*Transfer)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(transferreceiver.FieldTransferID)
+	}
+	query.Where(predicate.TransferReceiver(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(transfer.TransferReceiversColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.TransferID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "transfer_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -86,6 +87,64 @@ func TestTransfer(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
+}
+
+func TestClaimTransfer(t *testing.T) {
+	senderConfig := wallet.NewTestWalletConfig(t)
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	receiverPrivKey := keys.GeneratePrivateKey()
+
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}
+	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
+
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
+	require.NoError(t, err, "failed to authenticate sender")
+	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
+
+	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
+		senderCtx,
+		senderConfig,
+		leavesToTransfer,
+		receiverPrivKey.Public(),
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send transfer")
+
+	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Len(t, pendingTransfer.Transfers, 1)
+	receiverTransfer := pendingTransfer.Transfers[0]
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+
+	finalLeafPrivKey := keys.GeneratePrivateKey()
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey,
+		NewSigningPrivKey: finalLeafPrivKey,
+	}
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
+
+	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
+	require.NoError(t, err, "failed to ClaimTransferV2")
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimedTransfer.Status)
+	require.Len(t, claimedTransfer.Leaves, 1)
+	require.Equal(t, claimingNode.Leaf.Id, claimedTransfer.Leaves[0].Leaf.Id)
 }
 
 func TestQueryPendingTransferByNetwork(t *testing.T) {
@@ -479,19 +538,19 @@ func TestDoubleClaimTransfer(t *testing.T) {
 	}
 	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
 
-	errCount := 0
+	var errCount atomic.Int32
 	wg := sync.WaitGroup{}
 	for range 5 {
 		wg.Go(func() {
-			_, err = wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
-			if err != nil {
-				errCount++
+			_, claimErr := wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
+			if claimErr != nil {
+				errCount.Add(1)
 			}
 		})
 	}
 	wg.Wait()
 
-	if errCount == 5 {
+	if errCount.Load() == 5 {
 		pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 		require.NoError(t, err, "failed to query pending transfers")
 		require.Len(t, pendingTransfer.Transfers, 1)

@@ -147,6 +147,7 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCreated(t *testing.T) {
 	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCreated).
 		SetUtxo(utxo).
+		SetUtxoValueSats(utxo.Amount).
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
@@ -195,6 +196,7 @@ func TestRollbackUtxoSwap_ErrorIfUtxoSwapCompleted(t *testing.T) {
 	_, err := sessionCtx.Client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCompleted).
 		SetUtxo(utxo).
+		SetUtxoValueSats(utxo.Amount).
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).

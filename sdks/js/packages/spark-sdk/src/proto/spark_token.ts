@@ -600,6 +600,12 @@ export interface TokenOutputRef {
   vout: number;
 }
 
+/** FreezeProgress tracks the coordinated freeze status across operators. */
+export interface FreezeProgress {
+  frozenOperatorPublicKeys: Uint8Array[];
+  unfrozenOperatorPublicKeys: Uint8Array[];
+}
+
 export interface FreezeTokensResponse {
   /**
    * Deprecated: Use impacted_token_outputs instead. UUIDs are SO-local and differ across SOs.
@@ -610,6 +616,7 @@ export interface FreezeTokensResponse {
   /** Decoded uint128 */
   impactedTokenAmount: Uint8Array;
   impactedTokenOutputs: TokenOutputRef[];
+  freezeProgress: FreezeProgress | undefined;
 }
 
 function createBaseTokenOutputToSpend(): TokenOutputToSpend {
@@ -4955,8 +4962,93 @@ export const TokenOutputRef: MessageFns<TokenOutputRef> = {
   },
 };
 
+function createBaseFreezeProgress(): FreezeProgress {
+  return { frozenOperatorPublicKeys: [], unfrozenOperatorPublicKeys: [] };
+}
+
+export const FreezeProgress: MessageFns<FreezeProgress> = {
+  encode(message: FreezeProgress, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.frozenOperatorPublicKeys) {
+      writer.uint32(10).bytes(v!);
+    }
+    for (const v of message.unfrozenOperatorPublicKeys) {
+      writer.uint32(18).bytes(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FreezeProgress {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFreezeProgress();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.frozenOperatorPublicKeys.push(reader.bytes());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.unfrozenOperatorPublicKeys.push(reader.bytes());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): FreezeProgress {
+    return {
+      frozenOperatorPublicKeys: globalThis.Array.isArray(object?.frozenOperatorPublicKeys)
+        ? object.frozenOperatorPublicKeys.map((e: any) => bytesFromBase64(e))
+        : [],
+      unfrozenOperatorPublicKeys: globalThis.Array.isArray(object?.unfrozenOperatorPublicKeys)
+        ? object.unfrozenOperatorPublicKeys.map((e: any) => bytesFromBase64(e))
+        : [],
+    };
+  },
+
+  toJSON(message: FreezeProgress): unknown {
+    const obj: any = {};
+    if (message.frozenOperatorPublicKeys?.length) {
+      obj.frozenOperatorPublicKeys = message.frozenOperatorPublicKeys.map((e) => base64FromBytes(e));
+    }
+    if (message.unfrozenOperatorPublicKeys?.length) {
+      obj.unfrozenOperatorPublicKeys = message.unfrozenOperatorPublicKeys.map((e) => base64FromBytes(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<FreezeProgress>): FreezeProgress {
+    return FreezeProgress.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<FreezeProgress>): FreezeProgress {
+    const message = createBaseFreezeProgress();
+    message.frozenOperatorPublicKeys = object.frozenOperatorPublicKeys?.map((e) => e) || [];
+    message.unfrozenOperatorPublicKeys = object.unfrozenOperatorPublicKeys?.map((e) => e) || [];
+    return message;
+  },
+};
+
 function createBaseFreezeTokensResponse(): FreezeTokensResponse {
-  return { impactedOutputIds: [], impactedTokenAmount: new Uint8Array(0), impactedTokenOutputs: [] };
+  return {
+    impactedOutputIds: [],
+    impactedTokenAmount: new Uint8Array(0),
+    impactedTokenOutputs: [],
+    freezeProgress: undefined,
+  };
 }
 
 export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
@@ -4969,6 +5061,9 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
     }
     for (const v of message.impactedTokenOutputs) {
       TokenOutputRef.encode(v!, writer.uint32(26).fork()).join();
+    }
+    if (message.freezeProgress !== undefined) {
+      FreezeProgress.encode(message.freezeProgress, writer.uint32(34).fork()).join();
     }
     return writer;
   },
@@ -5004,6 +5099,14 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
           message.impactedTokenOutputs.push(TokenOutputRef.decode(reader, reader.uint32()));
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.freezeProgress = FreezeProgress.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5024,6 +5127,7 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
       impactedTokenOutputs: globalThis.Array.isArray(object?.impactedTokenOutputs)
         ? object.impactedTokenOutputs.map((e: any) => TokenOutputRef.fromJSON(e))
         : [],
+      freezeProgress: isSet(object.freezeProgress) ? FreezeProgress.fromJSON(object.freezeProgress) : undefined,
     };
   },
 
@@ -5038,6 +5142,9 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
     if (message.impactedTokenOutputs?.length) {
       obj.impactedTokenOutputs = message.impactedTokenOutputs.map((e) => TokenOutputRef.toJSON(e));
     }
+    if (message.freezeProgress !== undefined) {
+      obj.freezeProgress = FreezeProgress.toJSON(message.freezeProgress);
+    }
     return obj;
   },
 
@@ -5049,6 +5156,9 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
     message.impactedOutputIds = object.impactedOutputIds?.map((e) => e) || [];
     message.impactedTokenAmount = object.impactedTokenAmount ?? new Uint8Array(0);
     message.impactedTokenOutputs = object.impactedTokenOutputs?.map((e) => TokenOutputRef.fromPartial(e)) || [];
+    message.freezeProgress = (object.freezeProgress !== undefined && object.freezeProgress !== null)
+      ? FreezeProgress.fromPartial(object.freezeProgress)
+      : undefined;
     return message;
   },
 };

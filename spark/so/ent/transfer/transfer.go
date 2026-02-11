@@ -51,6 +51,10 @@ const (
 	EdgeCounterSwapTransfer = "counter_swap_transfer"
 	// EdgePrimarySwapTransfer holds the string denoting the primary_swap_transfer edge name in mutations.
 	EdgePrimarySwapTransfer = "primary_swap_transfer"
+	// EdgeTransferSenders holds the string denoting the transfer_senders edge name in mutations.
+	EdgeTransferSenders = "transfer_senders"
+	// EdgeTransferReceivers holds the string denoting the transfer_receivers edge name in mutations.
+	EdgeTransferReceivers = "transfer_receivers"
 	// Table holds the table name of the transfer in the database.
 	Table = "transfers"
 	// TransferLeavesTable is the table that holds the transfer_leaves relation/edge.
@@ -82,6 +86,20 @@ const (
 	PrimarySwapTransferTable = "transfers"
 	// PrimarySwapTransferColumn is the table column denoting the primary_swap_transfer relation/edge.
 	PrimarySwapTransferColumn = "transfer_counter_swap_transfer"
+	// TransferSendersTable is the table that holds the transfer_senders relation/edge.
+	TransferSendersTable = "transfer_senders"
+	// TransferSendersInverseTable is the table name for the TransferSender entity.
+	// It exists in this package in order to avoid circular dependency with the "transfersender" package.
+	TransferSendersInverseTable = "transfer_senders"
+	// TransferSendersColumn is the table column denoting the transfer_senders relation/edge.
+	TransferSendersColumn = "transfer_id"
+	// TransferReceiversTable is the table that holds the transfer_receivers relation/edge.
+	TransferReceiversTable = "transfer_receivers"
+	// TransferReceiversInverseTable is the table name for the TransferReceiver entity.
+	// It exists in this package in order to avoid circular dependency with the "transferreceiver" package.
+	TransferReceiversInverseTable = "transfer_receivers"
+	// TransferReceiversColumn is the table column denoting the transfer_receivers relation/edge.
+	TransferReceiversColumn = "transfer_id"
 )
 
 // Columns holds all SQL columns for transfer fields.
@@ -270,6 +288,34 @@ func ByPrimarySwapTransferField(field string, opts ...sql.OrderTermOption) Order
 		sqlgraph.OrderByNeighborTerms(s, newPrimarySwapTransferStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByTransferSendersCount orders the results by transfer_senders count.
+func ByTransferSendersCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newTransferSendersStep(), opts...)
+	}
+}
+
+// ByTransferSenders orders the results by transfer_senders terms.
+func ByTransferSenders(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTransferSendersStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByTransferReceiversCount orders the results by transfer_receivers count.
+func ByTransferReceiversCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newTransferReceiversStep(), opts...)
+	}
+}
+
+// ByTransferReceivers orders the results by transfer_receivers terms.
+func ByTransferReceivers(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTransferReceiversStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newTransferLeavesStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -303,5 +349,19 @@ func newPrimarySwapTransferStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(Table, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, PrimarySwapTransferTable, PrimarySwapTransferColumn),
+	)
+}
+func newTransferSendersStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TransferSendersInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, true, TransferSendersTable, TransferSendersColumn),
+	)
+}
+func newTransferReceiversStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TransferReceiversInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, true, TransferReceiversTable, TransferReceiversColumn),
 	)
 }

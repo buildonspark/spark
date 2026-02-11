@@ -71,7 +71,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
     const balanceObj = await this.getBalance();
     const issuerBalance = [...balanceObj.tokenBalances.entries()].filter(
       ([, info]) => info.tokenMetadata.tokenPublicKey === publicKey,
-    ); // [tokenIdentifier, { balance, tokenMetadata }]
+    ); // [tokenIdentifier, { ownedBalance, availableToSendBalance, tokenMetadata }]
 
     if (issuerBalance.length > 1) {
       throw new SparkValidationError(
@@ -93,7 +93,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
 
     return {
       tokenIdentifier: issuerBalance[0][0],
-      balance: issuerBalance[0][1].balance,
+      balance: issuerBalance[0][1].ownedBalance,
     };
   }
 
@@ -111,7 +111,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
     const balanceObj = await this.getBalance();
     const issuerBalance = [...balanceObj.tokenBalances.entries()].filter(
       ([, info]) => info.tokenMetadata.tokenPublicKey === publicKey,
-    ); // [tokenIdentifier, { balance, tokenMetadata }]
+    ); // [tokenIdentifier, { ownedBalance, availableToSendBalance, tokenMetadata }]
 
     if (issuerBalance.length === 0) {
       return [
@@ -122,9 +122,9 @@ export abstract class IssuerSparkWallet extends SparkWallet {
       ];
     }
 
-    return issuerBalance.map(([tokenIdentifier, { balance }]) => ({
+    return issuerBalance.map(([tokenIdentifier, { ownedBalance }]) => ({
       tokenIdentifier,
-      balance,
+      balance: ownedBalance,
     }));
   }
 

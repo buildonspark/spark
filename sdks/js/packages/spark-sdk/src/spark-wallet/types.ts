@@ -154,7 +154,8 @@ export type UserTokenMetadata = {
 export type TokenBalanceMap = Map<
   Bech32mTokenIdentifier,
   {
-    balance: bigint;
+    ownedBalance: bigint;
+    availableToSendBalance: bigint;
     tokenMetadata: UserTokenMetadata;
   }
 >;
@@ -170,7 +171,6 @@ export type TokenOutputsMap = Map<
 
 export type {
   TokenOutputLock,
-  TokenOutputLockReason,
   AcquiredOutputs,
 } from "../services/tokens/output-manager.js";
 

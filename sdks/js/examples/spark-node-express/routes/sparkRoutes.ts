@@ -215,15 +215,20 @@ export const createSparkRouter = (
     const wallet = getWallet();
     try {
       const balance = await wallet!.getBalance();
-      const tokenBalances: Record<string, { balance: BigInt }> =
-        balance.tokenBalances
-          ? Object.fromEntries(
-              [...balance.tokenBalances].map(([key, value]) => [
-                key,
-                { balance: value.balance },
-              ]),
-            )
-          : {};
+      const tokenBalances: Record<
+        string,
+        { ownedBalance: BigInt; availableToSendBalance: BigInt }
+      > = balance.tokenBalances
+        ? Object.fromEntries(
+            [...balance.tokenBalances].map(([key, value]) => [
+              key,
+              {
+                ownedBalance: value.ownedBalance,
+                availableToSendBalance: value.availableToSendBalance,
+              },
+            ]),
+          )
+        : {};
 
       res.json({
         data: {

@@ -326,6 +326,40 @@ func BroadcastTokenTransactionV3Request(ctx context.Context,
 	return legacyTx, nil
 }
 
+// BroadcastTokenTransactionV3WithResponse uses the broadcast_token_handler endpoint and returns the full response.
+func BroadcastTokenTransactionV3WithResponse(
+	ctx context.Context,
+	config *TestWalletConfig,
+	tokenTransaction *tokenpb.TokenTransaction,
+	ownerPrivateKeys []keys.Private,
+	validityDuration time.Duration,
+) (*tokenpb.BroadcastTransactionResponse, error) {
+	req, err := convertTokenTransactionToV3Request(config, tokenTransaction, ownerPrivateKeys, validityDuration)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := config.NewCoordinatorGRPCConnection()
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to coordinator: %w", err)
+	}
+	defer conn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, config, conn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate: %w", err)
+	}
+	ctx = ContextWithToken(ctx, token)
+
+	client := tokenpb.NewSparkTokenServiceClient(conn)
+	response, err := client.BroadcastTransaction(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to broadcast token transaction: %w", err)
+	}
+
+	return response, nil
+}
+
 func convertTokenTransactionToV3Request(
 	config *TestWalletConfig,
 	tokenTransaction *tokenpb.TokenTransaction,

@@ -326,6 +326,7 @@ func TestInitiateStaticDepositUtxoRefund_ErrorIfUtxoSwapAlreadyCompletedAsClaim(
 		SetUserIdentityPublicKey(ownerIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetUtxo(testUtxo).
+		SetUtxoValueSats(testUtxo.Amount).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
 		SetSspIdentityPublicKey(ownerIdentityPubKey).
@@ -383,6 +384,7 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundAgainIfAlreadyRefinedBySameCal
 		SetUserIdentityPublicKey(ownerIdentityPubKey). // Same owner
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetUtxo(testUtxo).
+		SetUtxoValueSats(testUtxo.Amount).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
 		SetSspIdentityPublicKey(ownerIdentityPubKey).
@@ -450,6 +452,7 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundEvenWithPreviousFailedAttempts
 		SetUserIdentityPublicKey(ownerIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetUtxo(testUtxo).
+		SetUtxoValueSats(testUtxo.Amount).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
 		SetSspIdentityPublicKey(ownerIdentityPubKey).
@@ -463,6 +466,7 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundEvenWithPreviousFailedAttempts
 		SetUserIdentityPublicKey(ownerIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetUtxo(testUtxo).
+		SetUtxoValueSats(testUtxo.Amount).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
 		SetSspIdentityPublicKey(ownerIdentityPubKey).
@@ -615,6 +619,7 @@ func TestInitiateStaticDepositUtxoRefund_CanSignDifferentRefundTxMultipleTimes(t
 		SetUserIdentityPublicKey(ownerIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetUtxo(testUtxo).
+		SetUtxoValueSats(testUtxo.Amount).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
 		SetSspIdentityPublicKey(ownerIdentityPubKey).

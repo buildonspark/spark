@@ -621,12 +621,6 @@ func (r *RateLimiter) buildDimensions(ctx context.Context) []rateLimitDimensionC
 
 func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		// Check if the method is enabled.
-		methodEnabled := r.knobs.RolloutRandomTarget(knobs.KnobGrpcServerMethodEnabled, &info.FullMethod, 100)
-		if !methodEnabled {
-			return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("the method is currently unavailable, please try again later"))
-		}
-
 		dimensions := r.buildDimensions(ctx)
 		if err := r.enforceRateLimits(ctx, info.FullMethod, dimensions); err != nil {
 			return nil, err
@@ -638,12 +632,6 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 
 func (r *RateLimiter) StreamServerInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		// Check if the method is enabled.
-		methodEnabled := r.knobs.RolloutRandomTarget(knobs.KnobGrpcServerMethodEnabled, &info.FullMethod, 100)
-		if !methodEnabled {
-			return errors.UnimplementedMethodDisabled(fmt.Errorf("the method is currently unavailable, please try again later"))
-		}
-
 		ctx := ss.Context()
 		dimensions := r.buildDimensions(ctx)
 		if err := r.enforceRateLimits(ctx, info.FullMethod, dimensions); err != nil {

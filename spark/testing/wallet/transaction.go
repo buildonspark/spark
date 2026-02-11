@@ -61,6 +61,8 @@ func InitialRefundSequences() (refundSequence uint32, directSequence uint32) {
 	return
 }
 
+// CreateRefundTxs creates refund transactions. If no destination key is provided,
+// the signing key will be used as the destination key.
 func CreateRefundTxs(
 	sequence uint32,
 	directSequence uint32,

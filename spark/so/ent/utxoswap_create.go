@@ -196,14 +196,6 @@ func (usc *UtxoSwapCreate) SetUtxoValueSats(u uint64) *UtxoSwapCreate {
 	return usc
 }
 
-// SetNillableUtxoValueSats sets the "utxo_value_sats" field if the given value is not nil.
-func (usc *UtxoSwapCreate) SetNillableUtxoValueSats(u *uint64) *UtxoSwapCreate {
-	if u != nil {
-		usc.SetUtxoValueSats(*u)
-	}
-	return usc
-}
-
 // SetID sets the "id" field.
 func (usc *UtxoSwapCreate) SetID(u uuid.UUID) *UtxoSwapCreate {
 	usc.mutation.SetID(u)
@@ -343,6 +335,9 @@ func (usc *UtxoSwapCreate) check() error {
 	if _, ok := usc.mutation.CoordinatorIdentityPublicKey(); !ok {
 		return &ValidationError{Name: "coordinator_identity_public_key", err: errors.New(`ent: missing required field "UtxoSwap.coordinator_identity_public_key"`)}
 	}
+	if _, ok := usc.mutation.UtxoValueSats(); !ok {
+		return &ValidationError{Name: "utxo_value_sats", err: errors.New(`ent: missing required field "UtxoSwap.utxo_value_sats"`)}
+	}
 	if len(usc.mutation.UtxoIDs()) == 0 {
 		return &ValidationError{Name: "utxo", err: errors.New(`ent: missing required edge "UtxoSwap.utxo"`)}
 	}
@@ -444,7 +439,7 @@ func (usc *UtxoSwapCreate) createSpec() (*UtxoSwap, *sqlgraph.CreateSpec) {
 	}
 	if value, ok := usc.mutation.UtxoValueSats(); ok {
 		_spec.SetField(utxoswap.FieldUtxoValueSats, field.TypeUint64, value)
-		_node.UtxoValueSats = &value
+		_node.UtxoValueSats = value
 	}
 	if nodes := usc.mutation.UtxoIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -813,12 +808,6 @@ func (u *UtxoSwapUpsert) AddUtxoValueSats(v uint64) *UtxoSwapUpsert {
 	return u
 }
 
-// ClearUtxoValueSats clears the value of the "utxo_value_sats" field.
-func (u *UtxoSwapUpsert) ClearUtxoValueSats() *UtxoSwapUpsert {
-	u.SetNull(utxoswap.FieldUtxoValueSats)
-	return u
-}
-
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -1175,13 +1164,6 @@ func (u *UtxoSwapUpsertOne) AddUtxoValueSats(v uint64) *UtxoSwapUpsertOne {
 func (u *UtxoSwapUpsertOne) UpdateUtxoValueSats() *UtxoSwapUpsertOne {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.UpdateUtxoValueSats()
-	})
-}
-
-// ClearUtxoValueSats clears the value of the "utxo_value_sats" field.
-func (u *UtxoSwapUpsertOne) ClearUtxoValueSats() *UtxoSwapUpsertOne {
-	return u.Update(func(s *UtxoSwapUpsert) {
-		s.ClearUtxoValueSats()
 	})
 }
 
@@ -1708,13 +1690,6 @@ func (u *UtxoSwapUpsertBulk) AddUtxoValueSats(v uint64) *UtxoSwapUpsertBulk {
 func (u *UtxoSwapUpsertBulk) UpdateUtxoValueSats() *UtxoSwapUpsertBulk {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.UpdateUtxoValueSats()
-	})
-}
-
-// ClearUtxoValueSats clears the value of the "utxo_value_sats" field.
-func (u *UtxoSwapUpsertBulk) ClearUtxoValueSats() *UtxoSwapUpsertBulk {
-	return u.Update(func(s *UtxoSwapUpsert) {
-		s.ClearUtxoValueSats()
 	})
 }
 

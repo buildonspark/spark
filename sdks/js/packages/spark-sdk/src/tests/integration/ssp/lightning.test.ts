@@ -10,6 +10,11 @@ import { BitcoinFaucet } from "../../utils/test-faucet.js";
 import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
 import { waitForClaim } from "../../utils/utils.js";
 import { decodeInvoice } from "../../../services/bolt11-spark.js";
+import {
+  decodeSparkAddress,
+  validateSparkInvoiceSignature,
+  SparkAddressFormat,
+} from "../../../utils/address.js";
 
 const DEPOSIT_AMOUNT = 10000n;
 const INVOICE_AMOUNT = 1000;
@@ -440,5 +445,101 @@ describe("Lightning Network provider", () => {
       const { balance: bobBalance } = await bobWallet.getBalance();
       expect(bobBalance).toBe(BigInt(invoiceAmount));
     }, 120000);
+  });
+
+  describe("should create lightning invoice with receiverIdentityPubkey", () => {
+    it("should create signed spark invoice when receiverIdentityPubkey is not provided", async () => {
+      const { wallet } = await SparkWalletTestingWithStream.initialize({
+        options: { network: "LOCAL" },
+      });
+
+      const invoice = await wallet.createLightningInvoice({
+        amountSats: 5000,
+        memo: "test receiverIdentityPubkey default",
+        expirySeconds: 600,
+        includeSparkInvoice: true,
+      });
+
+      const decodedInvoice = decodeInvoice(invoice.invoice.encodedInvoice);
+      expect(decodedInvoice.fallbackAddress).toBeDefined();
+      const sparkInvoice = decodedInvoice.fallbackAddress!;
+
+      const decodedSparkInvoice = decodeSparkAddress(sparkInvoice, "LOCAL");
+
+      const creatorIdentityPubkey = await wallet.getIdentityPublicKey();
+
+      expect(decodedSparkInvoice.identityPublicKey).toBe(creatorIdentityPubkey);
+      expect(decodedSparkInvoice.signature).toBeDefined();
+
+      validateSparkInvoiceSignature(sparkInvoice as SparkAddressFormat);
+    }, 30000);
+
+    it("should create signed spark invoice when receiverIdentityPubkey matches creator", async () => {
+      const { wallet } = await SparkWalletTestingWithStream.initialize({
+        options: { network: "LOCAL" },
+      });
+
+      const creatorIdentityPubkey = await wallet.getIdentityPublicKey();
+
+      const invoice = await wallet.createLightningInvoice({
+        amountSats: 5000,
+        memo: "test receiverIdentityPubkey same as creator",
+        expirySeconds: 600,
+        includeSparkInvoice: true,
+        receiverIdentityPubkey: creatorIdentityPubkey,
+      });
+
+      const decodedInvoice = decodeInvoice(invoice.invoice.encodedInvoice);
+      expect(decodedInvoice.fallbackAddress).toBeDefined();
+      const sparkInvoice = decodedInvoice.fallbackAddress!;
+
+      const decodedSparkInvoice = decodeSparkAddress(sparkInvoice, "LOCAL");
+
+      expect(decodedSparkInvoice.identityPublicKey).toBe(creatorIdentityPubkey);
+      expect(decodedSparkInvoice.signature).toBeDefined();
+
+      validateSparkInvoiceSignature(sparkInvoice as SparkAddressFormat);
+    }, 30000);
+
+    it("should create unsigned spark invoice when receiverIdentityPubkey differs from creator", async () => {
+      const { wallet: creatorWallet } =
+        await SparkWalletTestingWithStream.initialize({
+          options: { network: "LOCAL" },
+        });
+
+      const { wallet: receiverWallet } =
+        await SparkWalletTestingWithStream.initialize({
+          options: { network: "LOCAL" },
+        });
+
+      const creatorIdentityPubkey = await creatorWallet.getIdentityPublicKey();
+      const receiverIdentityPubkey =
+        await receiverWallet.getIdentityPublicKey();
+
+      expect(creatorIdentityPubkey).not.toBe(receiverIdentityPubkey);
+
+      const invoice = await creatorWallet.createLightningInvoice({
+        amountSats: 5000,
+        memo: "test receiverIdentityPubkey different from creator",
+        expirySeconds: 600,
+        includeSparkInvoice: true,
+        receiverIdentityPubkey: receiverIdentityPubkey,
+      });
+
+      const decodedInvoice = decodeInvoice(invoice.invoice.encodedInvoice);
+      expect(decodedInvoice.fallbackAddress).toBeDefined();
+      const sparkInvoice = decodedInvoice.fallbackAddress!;
+
+      const decodedSparkInvoice = decodeSparkAddress(sparkInvoice, "LOCAL");
+
+      expect(decodedSparkInvoice.identityPublicKey).toBe(
+        receiverIdentityPubkey,
+      );
+      expect(decodedSparkInvoice.signature).toBeUndefined();
+
+      expect(() =>
+        validateSparkInvoiceSignature(sparkInvoice as SparkAddressFormat),
+      ).toThrow(SparkValidationError);
+    }, 30000);
   });
 });

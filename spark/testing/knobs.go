@@ -249,8 +249,9 @@ func (k *KnobController) SetKnobWithTarget(t *testing.T, knobName string, target
 		configMap.Data = make(map[string]string)
 	}
 
-	// Format as YAML map for target-specific values
-	configMap.Data[knobName] = fmt.Sprintf("%s: %s", target, strconv.FormatFloat(value, 'f', -1, 64))
+	// Format as YAML map for target-specific values.
+	// Quote the target to prevent YAML from interpreting numeric strings as integers.
+	configMap.Data[knobName] = fmt.Sprintf("\"%s\": %s", target, strconv.FormatFloat(value, 'f', -1, 64))
 
 	_, err = k.client.CoreV1().ConfigMaps(knobsNamespace).Update(ctx, configMap, metav1.UpdateOptions{})
 	if err != nil {

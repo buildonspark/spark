@@ -90,6 +90,12 @@ type Transfer func(*sql.Selector)
 // TransferLeaf is the predicate function for transferleaf builders.
 type TransferLeaf func(*sql.Selector)
 
+// TransferReceiver is the predicate function for transferreceiver builders.
+type TransferReceiver func(*sql.Selector)
+
+// TransferSender is the predicate function for transfersender builders.
+type TransferSender func(*sql.Selector)
+
 // Tree is the predicate function for tree builders.
 type Tree func(*sql.Selector)
 

@@ -299,12 +299,6 @@ func (usu *UtxoSwapUpdate) AddUtxoValueSats(u int64) *UtxoSwapUpdate {
 	return usu
 }
 
-// ClearUtxoValueSats clears the value of the "utxo_value_sats" field.
-func (usu *UtxoSwapUpdate) ClearUtxoValueSats() *UtxoSwapUpdate {
-	usu.mutation.ClearUtxoValueSats()
-	return usu
-}
-
 // SetTransferID sets the "transfer" edge to the Transfer entity by ID.
 func (usu *UtxoSwapUpdate) SetTransferID(id uuid.UUID) *UtxoSwapUpdate {
 	usu.mutation.SetTransferID(id)
@@ -518,9 +512,6 @@ func (usu *UtxoSwapUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := usu.mutation.AddedUtxoValueSats(); ok {
 		_spec.AddField(utxoswap.FieldUtxoValueSats, field.TypeUint64, value)
-	}
-	if usu.mutation.UtxoValueSatsCleared() {
-		_spec.ClearField(utxoswap.FieldUtxoValueSats, field.TypeUint64)
 	}
 	if usu.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -868,12 +859,6 @@ func (usuo *UtxoSwapUpdateOne) AddUtxoValueSats(u int64) *UtxoSwapUpdateOne {
 	return usuo
 }
 
-// ClearUtxoValueSats clears the value of the "utxo_value_sats" field.
-func (usuo *UtxoSwapUpdateOne) ClearUtxoValueSats() *UtxoSwapUpdateOne {
-	usuo.mutation.ClearUtxoValueSats()
-	return usuo
-}
-
 // SetTransferID sets the "transfer" edge to the Transfer entity by ID.
 func (usuo *UtxoSwapUpdateOne) SetTransferID(id uuid.UUID) *UtxoSwapUpdateOne {
 	usuo.mutation.SetTransferID(id)
@@ -1117,9 +1102,6 @@ func (usuo *UtxoSwapUpdateOne) sqlSave(ctx context.Context) (_node *UtxoSwap, er
 	}
 	if value, ok := usuo.mutation.AddedUtxoValueSats(); ok {
 		_spec.AddField(utxoswap.FieldUtxoValueSats, field.TypeUint64, value)
-	}
-	if usuo.mutation.UtxoValueSatsCleared() {
-		_spec.ClearField(utxoswap.FieldUtxoValueSats, field.TypeUint64)
 	}
 	if usuo.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{

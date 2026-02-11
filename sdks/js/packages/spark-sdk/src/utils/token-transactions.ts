@@ -6,7 +6,7 @@ import {
   decodeBech32mTokenIdentifier,
 } from "./token-identifier.js";
 
-export function sumAvailableTokens(
+export function sumTokenOutputs(
   outputs: OutputWithPreviousTransactionData[],
 ): bigint {
   try {
@@ -23,9 +23,9 @@ export function sumAvailableTokens(
 export function filterTokenBalanceForTokenIdentifier(
   tokenBalances: TokenBalanceMap,
   tokenIdentifier: Bech32mTokenIdentifier,
-): { balance: bigint } {
+): { ownedBalance: bigint; availableToSendBalance: bigint } {
   if (!tokenBalances) {
-    return { balance: 0n };
+    return { ownedBalance: 0n, availableToSendBalance: 0n };
   }
 
   const tokenIdentifierBytes =
@@ -37,10 +37,12 @@ export function filterTokenBalanceForTokenIdentifier(
 
   if (!tokenBalance) {
     return {
-      balance: 0n,
+      ownedBalance: 0n,
+      availableToSendBalance: 0n,
     };
   }
   return {
-    balance: tokenBalance[1].balance,
+    ownedBalance: tokenBalance[1].ownedBalance,
+    availableToSendBalance: tokenBalance[1].availableToSendBalance,
   };
 }

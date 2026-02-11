@@ -348,6 +348,11 @@ describe("ConnectionManager middleware", () => {
   class AuthCachingTestConnectionManager extends ConnectionManagerNodeJS {
     public getChallengeCalls = 0;
     public verifyChallengeCalls = 0;
+    // Fixed reference so token expiry is deterministic regardless of clock/time-sync.
+    private readonly fixedNow = new Date();
+    public getCurrentServerTime(): Date {
+      return this.fixedNow;
+    }
 
     protected async createChannelWithTLS(
       _address: string,
@@ -388,7 +393,12 @@ describe("ConnectionManager middleware", () => {
         },
         async verify_challenge() {
           self.verifyChallengeCalls += 1;
-          return { sessionToken: "cached-token", expirationTimestamp: 0 };
+          // Derive expiration from the stubbed server time so the TTL check is deterministic
+          return {
+            sessionToken: "cached-token",
+            expirationTimestamp:
+              Math.floor(self.fixedNow.getTime() / 1000) + 3600,
+          };
         },
         close,
       } as unknown as T & { close?: () => void };

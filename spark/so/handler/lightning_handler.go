@@ -276,12 +276,17 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		preimagerequest.PaymentHashEQ(paymentHash),
 		preimagerequest.ReceiverIdentityPubkeyEQ(destinationPubKey),
 		preimagerequest.StatusNEQ(st.PreimageRequestStatusReturned),
-	).All(ctx)
+	).WithTransfers().All(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get preimage request with paymentHash %x: %w ", paymentHash, err)
 	}
 	if len(preimageRequests) > 0 {
-		return fmt.Errorf("preimage request already exists for paymentHash %x", paymentHash)
+		transfer, _ := preimageRequests[0].Edges.TransfersOrErr()
+		if transfer == nil {
+			return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("preimage request already exists for paymentHash %x", paymentHash))
+		} else {
+			return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("preimage request already exists for paymentHash %x and transferId %s", paymentHash, transfer.ID))
+		}
 	}
 
 	// Step 1 validate all signatures are valid
