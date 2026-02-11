@@ -41,7 +41,7 @@ describe.each(TEST_CONFIGS)(
         balanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(userBalance.balance).toBeGreaterThanOrEqual(tokenAmount);
+      expect(userBalance.ownedBalance).toBeGreaterThanOrEqual(tokenAmount);
     });
 
     it("should create, mint, and batchtransfer tokens", async () => {
@@ -110,19 +110,19 @@ describe.each(TEST_CONFIGS)(
         balanceObj?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(destinationBalance.balance).toEqual(tokenAmount / 3n);
+      expect(destinationBalance.ownedBalance).toEqual(tokenAmount / 3n);
       const balanceObj2 = await destinationWallet2.getBalance();
       const destinationBalance2 = filterTokenBalanceForTokenIdentifier(
         balanceObj2?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(destinationBalance2.balance).toEqual(tokenAmount / 3n);
+      expect(destinationBalance2.ownedBalance).toEqual(tokenAmount / 3n);
       const balanceObj3 = await destinationWallet3.getBalance();
       const destinationBalance3 = filterTokenBalanceForTokenIdentifier(
         balanceObj3?.tokenBalances,
         tokenIdentifier!,
       );
-      expect(destinationBalance3.balance).toEqual(tokenAmount / 3n);
+      expect(destinationBalance3.ownedBalance).toEqual(tokenAmount / 3n);
     });
   },
 );

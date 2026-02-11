@@ -147,7 +147,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		signatures[operatorID] = sig.SparkOperatorSignature
 	}
 	internalSignTokenHandler := NewInternalSignTokenHandler(h.config)
-	if err := internalSignTokenHandler.validateSignaturesPackageAndPersistPeerSignatures(ctx, signatures, lockedTokenTransaction); err != nil {
+	if err := internalSignTokenHandler.validateAndPersistPeerSignatures(ctx, signatures, lockedTokenTransaction); err != nil {
 		return nil, err
 	}
 

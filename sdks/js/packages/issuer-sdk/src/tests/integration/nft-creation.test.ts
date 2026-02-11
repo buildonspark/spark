@@ -65,7 +65,9 @@ describe.each(TEST_CONFIGS)(
       expect(satsBalance).toEqual(0n);
       expect(tokenBalancesMap.size).toEqual(1);
       expect(tokenBalancesMap.get(bech32mTokenIdentifier)).toBeDefined();
-      expect(tokenBalancesMap.get(bech32mTokenIdentifier)?.balance).toEqual(1n);
+      expect(
+        tokenBalancesMap.get(bech32mTokenIdentifier)?.ownedBalance,
+      ).toEqual(1n);
 
       const tokenMetadata = tokenBalancesMap.get(
         bech32mTokenIdentifier,

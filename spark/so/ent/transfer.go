@@ -65,9 +65,13 @@ type TransferEdges struct {
 	CounterSwapTransfer []*Transfer `json:"counter_swap_transfer,omitempty"`
 	// For counter transfers of type COUNTER_SWAP, this field references the corresponding primary transfer (type SWAP) that initiated the atomic swap. There are multiple counter transfers possible for a single primary transfer, because if a counter transfer fails the SSP will create a new one.
 	PrimarySwapTransfer *Transfer `json:"primary_swap_transfer,omitempty"`
+	// TransferSenders holds the value of the transfer_senders edge.
+	TransferSenders []*TransferSender `json:"transfer_senders,omitempty"`
+	// TransferReceivers holds the value of the transfer_receivers edge.
+	TransferReceivers []*TransferReceiver `json:"transfer_receivers,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [7]bool
 }
 
 // TransferLeavesOrErr returns the TransferLeaves value or an error if the edge
@@ -119,6 +123,24 @@ func (e TransferEdges) PrimarySwapTransferOrErr() (*Transfer, error) {
 		return nil, &NotFoundError{label: transfer.Label}
 	}
 	return nil, &NotLoadedError{edge: "primary_swap_transfer"}
+}
+
+// TransferSendersOrErr returns the TransferSenders value or an error if the edge
+// was not loaded in eager-loading.
+func (e TransferEdges) TransferSendersOrErr() ([]*TransferSender, error) {
+	if e.loadedTypes[5] {
+		return e.TransferSenders, nil
+	}
+	return nil, &NotLoadedError{edge: "transfer_senders"}
+}
+
+// TransferReceiversOrErr returns the TransferReceivers value or an error if the edge
+// was not loaded in eager-loading.
+func (e TransferEdges) TransferReceiversOrErr() ([]*TransferReceiver, error) {
+	if e.loadedTypes[6] {
+		return e.TransferReceivers, nil
+	}
+	return nil, &NotLoadedError{edge: "transfer_receivers"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -280,6 +302,16 @@ func (t *Transfer) QueryCounterSwapTransfer() *TransferQuery {
 // QueryPrimarySwapTransfer queries the "primary_swap_transfer" edge of the Transfer entity.
 func (t *Transfer) QueryPrimarySwapTransfer() *TransferQuery {
 	return NewTransferClient(t.config).QueryPrimarySwapTransfer(t)
+}
+
+// QueryTransferSenders queries the "transfer_senders" edge of the Transfer entity.
+func (t *Transfer) QueryTransferSenders() *TransferSenderQuery {
+	return NewTransferClient(t.config).QueryTransferSenders(t)
+}
+
+// QueryTransferReceivers queries the "transfer_receivers" edge of the Transfer entity.
+func (t *Transfer) QueryTransferReceivers() *TransferReceiverQuery {
+	return NewTransferClient(t.config).QueryTransferReceivers(t)
 }
 
 // Update returns a builder for updating this Transfer.

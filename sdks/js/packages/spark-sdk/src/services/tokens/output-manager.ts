@@ -1,13 +1,13 @@
 import { Mutex } from "async-mutex";
-import { OutputWithPreviousTransactionData } from "../../proto/spark_token.js";
+import {
+  OutputWithPreviousTransactionData,
+  TokenOutputStatus,
+} from "../../proto/spark_token.js";
 import { TokenOutputsMap } from "../../spark-wallet/types.js";
 import { Bech32mTokenIdentifier } from "../../utils/token-identifier.js";
 
-export type TokenOutputLockReason = "pending_received" | "pending_sent";
-
 export type TokenOutputLock = {
   lockedAt: number;
-  reason: TokenOutputLockReason;
   operationId?: string;
 };
 
@@ -17,8 +17,15 @@ export type AcquiredOutputs = {
 };
 
 export class TokenOutputManager {
-  private outputs: TokenOutputsMap = new Map();
-  private locks: Map<string, TokenOutputLock> = new Map();
+  private availableOutputs: TokenOutputsMap = new Map();
+  // A local lock is created when a transaction is started from the wallet
+  // It's purely meant to prevent concurrent transactions from spending the same outputs.
+  // Local locks expire after a configurable time (default: 30 seconds), if they're not returned from the server (SO) as pending.
+  // This is in the case where the transaction does not get broadcasted to the SO for whatever reason.
+  private localPendingMap: Map<string, TokenOutputLock> = new Map();
+  // A server lock is created when an output is fetched from the server as pending (query_token_outputs)
+  // which removes the local lock.
+  private serverPendingMap: TokenOutputsMap = new Map();
   private readonly mutex = new Mutex();
   private readonly lockExpiryMs: number;
 
@@ -27,42 +34,96 @@ export class TokenOutputManager {
   }
 
   /**
-   * Set token outputs.
-   * @param newOutputs - The new outputs to set
+   * Sync all outputs from the server
+   *
+   * @param serverProvidedOutputs - All outputs from the server, grouped by token identifier
    * @param tokenIdentifiers - If provided, only update these tokens (preserving others).
    *                           If omitted or empty, replaces all outputs.
    */
   async setOutputs(
-    newOutputs: TokenOutputsMap,
+    serverProvidedOutputs: TokenOutputsMap,
     tokenIdentifiers?: Bech32mTokenIdentifier[],
   ): Promise<void> {
     await this.mutex.runExclusive(() => {
+      const availableByToken: TokenOutputsMap = new Map();
+      const pendingByToken: TokenOutputsMap = new Map();
+
+      for (const [tokenId, outputs] of serverProvidedOutputs) {
+        const available: OutputWithPreviousTransactionData[] = [];
+        const pending: OutputWithPreviousTransactionData[] = [];
+
+        for (const output of outputs) {
+          if (
+            output.output?.status ===
+            TokenOutputStatus.TOKEN_OUTPUT_STATUS_PENDING_OUTBOUND
+          ) {
+            pending.push(output);
+            if (output.output?.id) {
+              // Remove the local lock as the output is now pending on the server
+              this.localPendingMap.delete(output.output.id);
+            }
+          } else if (
+            output.output?.status ===
+            TokenOutputStatus.TOKEN_OUTPUT_STATUS_AVAILABLE
+          ) {
+            available.push(output);
+          }
+        }
+
+        if (available.length > 0) {
+          availableByToken.set(tokenId, available);
+        }
+        if (pending.length > 0) {
+          pendingByToken.set(tokenId, pending);
+        }
+      }
+
       if (tokenIdentifiers && tokenIdentifiers.length > 0) {
         for (const tokenId of tokenIdentifiers) {
-          const outputs = newOutputs.get(tokenId);
-          if (outputs && outputs.length > 0) {
-            this.outputs.set(tokenId, [...outputs]);
+          const available = availableByToken.get(tokenId);
+          if (available && available.length > 0) {
+            this.availableOutputs.set(tokenId, [...available]);
           } else {
-            this.outputs.delete(tokenId);
+            this.availableOutputs.delete(tokenId);
+          }
+
+          const pending = pendingByToken.get(tokenId);
+          if (pending && pending.length > 0) {
+            this.serverPendingMap.set(tokenId, [...pending]);
+          } else {
+            this.serverPendingMap.delete(tokenId);
           }
         }
       } else {
-        this.outputs = new Map(
-          [...newOutputs.entries()].map(([k, v]) => [k, [...v]]),
+        this.availableOutputs = new Map(
+          [...availableByToken.entries()].map(([k, v]) => [k, [...v]]),
+        );
+        this.serverPendingMap = new Map(
+          [...pendingByToken.entries()].map(([k, v]) => [k, [...v]]),
         );
       }
-      this.cleanupStaleLocks();
     });
   }
 
   /**
-   * Get all outputs for a token (including locked ones).
+   * Get pending outbound outputs for a token.
    */
-  async getAllOutputs(
+  async getPendingOutboundOutputs(
     tokenIdentifier: Bech32mTokenIdentifier,
   ): Promise<OutputWithPreviousTransactionData[]> {
     return await this.mutex.runExclusive(() => {
-      return [...(this.outputs.get(tokenIdentifier) ?? [])];
+      return [...(this.serverPendingMap.get(tokenIdentifier) ?? [])];
+    });
+  }
+
+  /**
+   * Get available outputs for a token (including client-locked pending ones)
+   */
+  async getAvailableOutputs(
+    tokenIdentifier: Bech32mTokenIdentifier,
+  ): Promise<OutputWithPreviousTransactionData[]> {
+    return await this.mutex.runExclusive(() => {
+      return [...(this.availableOutputs.get(tokenIdentifier) ?? [])];
     });
   }
 
@@ -73,7 +134,10 @@ export class TokenOutputManager {
     tokenIdentifier: Bech32mTokenIdentifier,
   ): Promise<boolean> {
     return await this.mutex.runExclusive(() => {
-      return this.outputs.has(tokenIdentifier);
+      return (
+        this.availableOutputs.has(tokenIdentifier) ||
+        this.serverPendingMap.has(tokenIdentifier)
+      );
     });
   }
 
@@ -82,7 +146,7 @@ export class TokenOutputManager {
    */
   async getTokenIdentifiers(): Promise<Bech32mTokenIdentifier[]> {
     return await this.mutex.runExclusive(() => {
-      return [...this.outputs.keys()];
+      return this.getAllKeys();
     });
   }
 
@@ -93,7 +157,7 @@ export class TokenOutputManager {
     [Bech32mTokenIdentifier, OutputWithPreviousTransactionData[]][]
   > {
     return await this.mutex.runExclusive(() => {
-      return [...this.outputs.entries()];
+      return [...this.availableOutputs.entries()];
     });
   }
 
@@ -139,11 +203,7 @@ export class TokenOutputManager {
       const lockedIds: string[] = [];
       for (const output of selected) {
         const id = output.output!.id!;
-        this.locks.set(id, {
-          lockedAt: now,
-          reason: "pending_sent",
-          operationId,
-        });
+        this.localPendingMap.set(id, { lockedAt: now, operationId });
         lockedIds.push(id);
       }
 
@@ -156,18 +216,17 @@ export class TokenOutputManager {
   }
 
   /**
-   * Lock specific outputs by their data.
+   * Lock outputs locally.
    */
   async lockOutputs(
     outputs: OutputWithPreviousTransactionData[],
-    reason: TokenOutputLockReason = "pending_sent",
     operationId?: string,
   ): Promise<void> {
     await this.mutex.runExclusive(() => {
       const now = Date.now();
       for (const output of outputs) {
         const id = output.output!.id!;
-        this.locks.set(id, { lockedAt: now, reason, operationId });
+        this.localPendingMap.set(id, { lockedAt: now, operationId });
       }
     });
   }
@@ -177,13 +236,12 @@ export class TokenOutputManager {
    */
   async lockOutputsByIds(
     outputIds: string[],
-    reason: TokenOutputLockReason,
     operationId?: string,
   ): Promise<void> {
     await this.mutex.runExclusive(() => {
       const now = Date.now();
       for (const id of outputIds) {
-        this.locks.set(id, { lockedAt: now, reason, operationId });
+        this.localPendingMap.set(id, { lockedAt: now, operationId });
       }
     });
   }
@@ -197,7 +255,7 @@ export class TokenOutputManager {
     await this.mutex.runExclusive(() => {
       for (const output of outputs) {
         const id = output.output!.id!;
-        this.locks.delete(id);
+        this.localPendingMap.delete(id);
       }
     });
   }
@@ -208,7 +266,7 @@ export class TokenOutputManager {
   async releaseOutputsByIds(outputIds: string[]): Promise<void> {
     await this.mutex.runExclusive(() => {
       for (const id of outputIds) {
-        this.locks.delete(id);
+        this.localPendingMap.delete(id);
       }
     });
   }
@@ -219,7 +277,7 @@ export class TokenOutputManager {
   async isLocked(outputId: string): Promise<boolean> {
     return await this.mutex.runExclusive(() => {
       this.cleanupExpiredLocks();
-      return this.locks.has(outputId);
+      return this.localPendingMap.has(outputId);
     });
   }
 
@@ -228,7 +286,9 @@ export class TokenOutputManager {
    */
   async isEmpty(): Promise<boolean> {
     return await this.mutex.runExclusive(() => {
-      return this.outputs.size === 0;
+      return (
+        this.availableOutputs.size === 0 && this.serverPendingMap.size === 0
+      );
     });
   }
 
@@ -237,7 +297,7 @@ export class TokenOutputManager {
    */
   async size(): Promise<number> {
     return await this.mutex.runExclusive(() => {
-      return this.outputs.size;
+      return this.getAllKeys().length;
     });
   }
 
@@ -246,38 +306,34 @@ export class TokenOutputManager {
    */
   async clear(): Promise<void> {
     await this.mutex.runExclusive(() => {
-      this.outputs.clear();
-      this.locks.clear();
+      this.availableOutputs.clear();
+      this.serverPendingMap.clear();
+      this.localPendingMap.clear();
     });
   }
 
   private getUnlockedOutputsInternal(
     tokenIdentifier: Bech32mTokenIdentifier,
   ): OutputWithPreviousTransactionData[] {
-    const outputs = this.outputs.get(tokenIdentifier) ?? [];
-    return outputs.filter((o) => !this.locks.has(o.output!.id!));
+    const outputs = this.availableOutputs.get(tokenIdentifier) ?? [];
+    return outputs.filter((o) => !this.localPendingMap.has(o.output!.id!));
   }
 
   private cleanupExpiredLocks(): void {
     const now = Date.now();
-    for (const [id, lock] of this.locks) {
+    for (const [id, lock] of this.localPendingMap) {
       if (now - lock.lockedAt > this.lockExpiryMs) {
-        this.locks.delete(id);
+        this.localPendingMap.delete(id);
       }
     }
   }
 
-  private cleanupStaleLocks(): void {
-    const allOutputIds = new Set<string>();
-    for (const outputs of this.outputs.values()) {
-      for (const o of outputs) {
-        allOutputIds.add(o.output!.id!);
-      }
-    }
-    for (const lockedId of this.locks.keys()) {
-      if (!allOutputIds.has(lockedId)) {
-        this.locks.delete(lockedId);
-      }
-    }
+  private getAllKeys(): Bech32mTokenIdentifier[] {
+    return Array.from(
+      new Set([
+        ...this.availableOutputs.keys(),
+        ...this.serverPendingMap.keys(),
+      ]),
+    );
   }
 }

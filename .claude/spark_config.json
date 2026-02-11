@@ -20,7 +20,7 @@
     },
     "ssp": {
       "description": "Spark Service Provider (SSP) implementation in Python",
-      "path": "/Users/dhruv/Documents/webdev",
+      "path": "../webdev",
       "key_directories": {
         "handlers": "sparkcore/spark/handlers",
         "clients": "sparkcore/spark/clients",

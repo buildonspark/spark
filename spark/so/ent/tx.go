@@ -70,6 +70,10 @@ type Tx struct {
 	Transfer *TransferClient
 	// TransferLeaf is the client for interacting with the TransferLeaf builders.
 	TransferLeaf *TransferLeafClient
+	// TransferReceiver is the client for interacting with the TransferReceiver builders.
+	TransferReceiver *TransferReceiverClient
+	// TransferSender is the client for interacting with the TransferSender builders.
+	TransferSender *TransferSenderClient
 	// Tree is the client for interacting with the Tree builders.
 	Tree *TreeClient
 	// TreeNode is the client for interacting with the TreeNode builders.
@@ -241,6 +245,8 @@ func (tx *Tx) init() {
 	tx.TokenTransactionPeerSignature = NewTokenTransactionPeerSignatureClient(tx.config)
 	tx.Transfer = NewTransferClient(tx.config)
 	tx.TransferLeaf = NewTransferLeafClient(tx.config)
+	tx.TransferReceiver = NewTransferReceiverClient(tx.config)
+	tx.TransferSender = NewTransferSenderClient(tx.config)
 	tx.Tree = NewTreeClient(tx.config)
 	tx.TreeNode = NewTreeNodeClient(tx.config)
 	tx.UserSignedTransaction = NewUserSignedTransactionClient(tx.config)

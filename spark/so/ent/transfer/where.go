@@ -614,6 +614,52 @@ func HasPrimarySwapTransferWith(preds ...predicate.Transfer) predicate.Transfer 
 	})
 }
 
+// HasTransferSenders applies the HasEdge predicate on the "transfer_senders" edge.
+func HasTransferSenders() predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, TransferSendersTable, TransferSendersColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTransferSendersWith applies the HasEdge predicate on the "transfer_senders" edge with a given conditions (other predicates).
+func HasTransferSendersWith(preds ...predicate.TransferSender) predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := newTransferSendersStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasTransferReceivers applies the HasEdge predicate on the "transfer_receivers" edge.
+func HasTransferReceivers() predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, TransferReceiversTable, TransferReceiversColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTransferReceiversWith applies the HasEdge predicate on the "transfer_receivers" edge with a given conditions (other predicates).
+func HasTransferReceiversWith(preds ...predicate.TransferReceiver) predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := newTransferReceiversStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Transfer) predicate.Transfer {
 	return predicate.Transfer(sql.AndPredicates(predicates...))

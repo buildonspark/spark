@@ -281,6 +281,11 @@ message InitiateSettleReceiverKeyTweakRequest {
     string transfer_id = 1;
     map<string, spark.SecretProof> key_tweak_proofs = 2;
     map<string, bytes> user_public_keys = 3;
+    // Full ECIES-encrypted key tweak package (SO identifier -> ciphertext).
+    // Each SO verifies the user signature against this full map, then decrypts its own portion.
+    map<string, bytes> encrypted_claim_key_tweak_package = 4;
+    // User signature over the encrypted claim key tweak package.
+    bytes claim_signature = 5;
 }
 
 enum SettleKeyTweakAction {

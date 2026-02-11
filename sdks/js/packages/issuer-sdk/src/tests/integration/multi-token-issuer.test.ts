@@ -234,8 +234,8 @@ describe.each(TEST_CONFIGS)(
       const receiverSecondBalance = receiverBalances.tokenBalances.get(
         secondTokenIdentifier,
       );
-      expect(receiverFirstBalance?.balance).toEqual(TOKEN_AMOUNT);
-      expect(receiverSecondBalance?.balance).toEqual(TOKEN_AMOUNT);
+      expect(receiverFirstBalance?.ownedBalance).toEqual(TOKEN_AMOUNT);
+      expect(receiverSecondBalance?.ownedBalance).toEqual(TOKEN_AMOUNT);
 
       // === Freezing tokens ===
       // Legacy single token issuer method - should fail when multiple tokens are created
@@ -304,8 +304,12 @@ describe.each(TEST_CONFIGS)(
         receiverBalancesAfterTransferBack.tokenBalances.get(
           secondTokenIdentifier,
         );
-      expect(receiverFirstBalanceAfterTransferBack?.balance).toBeUndefined();
-      expect(receiverSecondBalanceAfterTransferBack?.balance).toBeUndefined();
+      expect(
+        receiverFirstBalanceAfterTransferBack?.ownedBalance,
+      ).toBeUndefined();
+      expect(
+        receiverSecondBalanceAfterTransferBack?.ownedBalance,
+      ).toBeUndefined();
 
       // Verify that the issuer has the correct balances
       const issuerBalances = await issuerWallet.getIssuerTokenBalances();
@@ -389,7 +393,7 @@ describe.each(TEST_CONFIGS)(
       expect(
         issuerBalanceAfterMint.tokenBalances.get(
           createTransactionDetails.tokenIdentifier,
-        )?.balance,
+        )?.ownedBalance,
       ).toEqual(TOKEN_AMOUNT);
 
       const transferHash = await issuerWallet.transferTokens({
@@ -404,14 +408,14 @@ describe.each(TEST_CONFIGS)(
       expect(
         receiverBalance.tokenBalances.get(
           createTransactionDetails.tokenIdentifier,
-        )?.balance,
+        )?.ownedBalance,
       ).toEqual(TOKEN_AMOUNT);
 
       const issuerBalanceAfterTransfer = await issuerWallet.getBalance();
       expect(
         issuerBalanceAfterTransfer.tokenBalances.get(
           createTransactionDetails.tokenIdentifier,
-        )?.balance,
+        )?.ownedBalance,
       ).toBeUndefined();
 
       // === Freezing tokens ===
@@ -451,7 +455,7 @@ describe.each(TEST_CONFIGS)(
       expect(
         receiverBalanceAfterTransferOfUnfrozenToken.tokenBalances.get(
           createTransactionDetails.tokenIdentifier,
-        )?.balance,
+        )?.ownedBalance,
       ).toBeUndefined();
 
       const issuerBalanceAfterTransferOfUnfrozenToken =
@@ -459,7 +463,7 @@ describe.each(TEST_CONFIGS)(
       expect(
         issuerBalanceAfterTransferOfUnfrozenToken.tokenBalances.get(
           createTransactionDetails.tokenIdentifier,
-        )?.balance,
+        )?.ownedBalance,
       ).toEqual(TOKEN_AMOUNT);
 
       // === Burning tokens ===
@@ -472,7 +476,7 @@ describe.each(TEST_CONFIGS)(
       expect(
         issuerBalanceAfterBurn.tokenBalances.get(
           createTransactionDetails.tokenIdentifier,
-        )?.balance,
+        )?.ownedBalance,
       ).toBeUndefined();
     });
   },

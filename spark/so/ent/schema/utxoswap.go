@@ -90,12 +90,9 @@ func (UtxoSwap) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			Comment("When this swap offer/lock expires (if applicable)."),
-		// TODO: (LIG-8545) Remove Nillable and Optional once we backfill the two columns below.
-		// UTXO value in sats for static deposit matching.
 		field.Uint64("utxo_value_sats").
-			Optional().
-			Nillable().
-			Comment("Amount of sats for 0-conf swap matching."),
+			Comment("Amount of sats for 0-conf swap matching.").
+			Annotations(entexample.Default(10000)),
 	}
 }
 

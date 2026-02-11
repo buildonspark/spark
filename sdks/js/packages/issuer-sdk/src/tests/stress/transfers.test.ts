@@ -77,7 +77,7 @@ describe("Stress test for token transfers", () => {
           tokenIdentifier!,
         );
         expect(issuerBalance.balance).toEqual(0n);
-        expect(userBalance.balance).toEqual(TOKEN_AMOUNT);
+        expect(userBalance.ownedBalance).toEqual(TOKEN_AMOUNT);
 
         // Transfer tokens from user to issuer
         await userWallet.transferTokens({
@@ -94,7 +94,7 @@ describe("Stress test for token transfers", () => {
           );
         const issuerBalanceAfterTransferBack =
           await issuerWallet.getIssuerTokenBalance();
-        expect(userBalanceAfterTransferBack.balance).toEqual(0n);
+        expect(userBalanceAfterTransferBack.ownedBalance).toEqual(0n);
         expect(issuerBalanceAfterTransferBack.balance).toEqual(TOKEN_AMOUNT);
       } catch (error: any) {
         const end_time = Date.now();

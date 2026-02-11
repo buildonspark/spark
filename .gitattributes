@@ -1,0 +1,36 @@
+# Protobuf generated Go code
+spark/proto/**/*.pb.go linguist-generated=true
+spark/proto/**/*.pb.validate.go linguist-generated=true
+
+# Ent ORM generated code
+spark/so/ent/**/*.go linguist-generated=true
+# Hand-written ent files (not generated)
+spark/so/ent/schema/**/*.go linguist-generated=false
+spark/so/ent/generate.go linguist-generated=false
+spark/so/ent/entc.go linguist-generated=false
+spark/so/ent/telemetry.go linguist-generated=false
+spark/so/ent/context_extension.go linguist-generated=false
+spark/so/ent/*_extension*.go linguist-generated=false
+
+# genqlient GraphQL generated code
+spark/testing/wallet/ssp_api/mutations/generated.go linguist-generated=true
+
+# TypeScript protobuf generated code
+sdks/js/packages/spark-sdk/src/proto/** linguist-generated=true
+sdks/js/packages/issuer-sdk/src/proto/** linguist-generated=true
+
+# Proto descriptors
+sdks/js/packages/spark-sdk/src/spark_descriptors.pb linguist-generated=true
+sdks/js/packages/spark-sdk/src/spark-wallet/proto-descriptors.ts linguist-generated=true
+
+# Lock files
+sdks/js/yarn.lock linguist-generated=true
+signer/Cargo.lock linguist-generated=true
+
+# Go dependency sums
+spark/go.sum linguist-generated=true
+tools/vanity-token-generator/go.sum linguist-generated=true
+
+# Atlas migration checksum
+# spark/so/ent/migrate/migrations/atlas.sum linguist-generated=true
+

@@ -185,6 +185,7 @@ func createTestUtxoSwap(t *testing.T, ctx context.Context, rng io.Reader, client
 	utxoSwap, err := client.UtxoSwap.Create().
 		SetStatus(status).
 		SetUtxo(utxo).
+		SetUtxoValueSats(utxo.Amount).
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).

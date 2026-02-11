@@ -206,6 +206,10 @@ func UnimplementedMethodDisabled(err error) error {
 	return newGRPCError(codes.Unimplemented, err, ReasonUnavailableMethodDisabled)
 }
 
+func UnavailableMethodDisabled(err error) error {
+	return newGRPCError(codes.Unavailable, err, ReasonUnavailableMethodDisabled)
+}
+
 func UnavailableDatabaseTimeout(err error) error {
 	return newGRPCError(codes.Unavailable, err, ReasonUnavailableDatabaseTimeout)
 }

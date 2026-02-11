@@ -28,6 +28,10 @@ service SparkTokenInternalService {
     // Combined prepare and sign transaction (SO-to-SO) for broadcast flow
     rpc broadcast_token_transaction_internal(BroadcastTransactionInternalRequest)
         returns (BroadcastTransactionInternalResponse) {}
+
+    // Internal freeze tokens (SO-to-SO coordination)
+    rpc internal_freeze_tokens(InternalFreezeTokensRequest)
+        returns (InternalFreezeTokensResponse) {}
 }
 
 message PrepareTransactionRequest {
@@ -133,4 +137,15 @@ message BroadcastTransactionInternalResponse {
         (validate.rules).bytes.min_len = 64,
         (validate.rules).bytes.max_len = 73
     ];
+}
+
+// Internal freeze tokens request (SO-to-SO)
+message InternalFreezeTokensRequest {
+    spark_token.FreezeTokensPayload freeze_tokens_payload = 1;
+    bytes issuer_signature = 2 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+}
+
+message InternalFreezeTokensResponse {
+    repeated spark_token.TokenOutputRef impacted_token_outputs = 1;
+    bytes impacted_token_amount = 2;  // Decoded uint128
 }

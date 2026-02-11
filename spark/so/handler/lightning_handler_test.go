@@ -23,13 +23,16 @@ import (
 	"github.com/lightsparkdev/spark/so/authninternal"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/entexample"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -109,32 +112,31 @@ func (m *mockFrostServiceClient) ValidateSignatureShare(context.Context, *pbfros
 	return &emptypb.Empty{}, nil
 }
 
+func createSigningJob(leafID string) *pb.UserSignedTxSigningJob {
+	return &pb.UserSignedTxSigningJob{
+		LeafId: leafID,
+		SigningCommitments: &pb.SigningCommitments{
+			SigningCommitments: map[string]*pbcommon.SigningCommitment{
+				"test": {
+					Hiding:  []byte("test_hiding"),
+					Binding: []byte("test_binding"),
+				},
+			},
+		},
+		SigningNonceCommitment: &pbcommon.SigningCommitment{
+			Hiding:  []byte("test_nonce_hiding"),
+			Binding: []byte("test_nonce_binding"),
+		},
+		UserSignature: []byte("test_signature"),
+		RawTx:         []byte("test_raw_tx"),
+	}
+}
+
 func TestValidateDuplicateLeaves(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)
-
-	// Helper function to create a UserSignedTxSigningJob
-	createSigningJob := func(leafID string) *pb.UserSignedTxSigningJob {
-		return &pb.UserSignedTxSigningJob{
-			LeafId: leafID,
-			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: map[string]*pbcommon.SigningCommitment{
-					"test": {
-						Hiding:  []byte("test_hiding"),
-						Binding: []byte("test_binding"),
-					},
-				},
-			},
-			SigningNonceCommitment: &pbcommon.SigningCommitment{
-				Hiding:  []byte("test_nonce_hiding"),
-				Binding: []byte("test_nonce_binding"),
-			},
-			UserSignature: []byte("test_signature"),
-			RawTx:         []byte("test_raw_tx"),
-		}
-	}
 
 	t.Run("successful validation with no duplicates", func(t *testing.T) {
 		leavesToSend := []*pb.UserSignedTxSigningJob{
@@ -620,6 +622,52 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 			require.ErrorContains(t, err, tt.expectedErrMsg)
 		})
 	}
+}
+
+// Test payment hash collision - verifies error message includes both payment hash and transfer ID
+func TestValidateGetPreimageRequest_PaymentHashCollision(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	rng := rand.NewChaCha8([32]byte{42})
+	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	transfer := entexample.NewTransferExample(t, tx).
+		SetSenderIdentityPubkey(validPubKey).
+		SetReceiverIdentityPubkey(validPubKey).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		SetStatus(st.TransferStatusSenderInitiated).
+		SetType(st.TransferTypePreimageSwap).
+		MustExec(ctx)
+
+	preimageRequest := entexample.NewPreimageRequestExample(t, tx).
+		SetReceiverIdentityPubkey(validPubKey).
+		SetStatus(st.PreimageRequestStatusWaitingForPreimage).
+		SetTransfers(transfer).
+		MustExec(ctx)
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	err = NewLightningHandler(config).ValidateGetPreimageRequest(
+		ctx,
+		preimageRequest.PaymentHash,
+		[]*pb.UserSignedTxSigningJob{createSigningJob("leaf1")},
+		[]*pb.UserSignedTxSigningJob{},
+		[]*pb.UserSignedTxSigningJob{},
+		&pb.InvoiceAmount{ValueSats: transfer.TotalValue},
+		validPubKey,
+		0,
+		pb.InitiatePreimageSwapRequest_REASON_SEND,
+		false,
+	)
+
+	require.Error(t, err)
+	grpcErr, ok := status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, codes.AlreadyExists, grpcErr.Code())
+	require.Contains(t, grpcErr.Message(), "preimage request already exists for paymentHash")
+	require.Contains(t, grpcErr.Message(), transfer.ID.String())
 }
 
 func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {

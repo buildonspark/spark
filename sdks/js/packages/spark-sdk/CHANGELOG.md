@@ -1,5 +1,35 @@
 # @buildonspark/spark-sdk
 
+## 0.6.3
+
+### Patch Changes
+
+- Reduce local token output lock expiry from 30s to 20s for faster recovery from failed transactions
+- Add wall-clock fallback for auth token eviction to handle device sleep/backgrounding
+
+## 0.6.2
+
+### Patch Changes
+
+- Proactively re-authenticate with Spark Operators to improve session reliability
+- Split token balance into `owned` and `availableToSend` to distinguish pending outbound transfers
+
+## 0.6.1
+
+### Patch Changes
+
+- Support creating unsigned Spark invoices on behalf of other pubkeys
+- Include Spark invoice in the WalletTransfer type
+
+## 0.6.0
+
+### Minor Changes
+
+- - Migrate to V2 hash variant
+  - Support idempotency key support for lightning payments to prevent duplicate transactions
+  - Fix bit manipulation when creating trees from L1 deposits (no longer sets the 30th bit)
+  - Introduce `createLightningHodlInvoice` for hold invoice support
+
 ## 0.5.9
 
 ### Patch Changes

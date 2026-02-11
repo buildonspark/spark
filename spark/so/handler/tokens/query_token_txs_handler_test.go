@@ -145,7 +145,7 @@ func TestValidateQueryTokenTransactionsRequest_FilterLimits(t *testing.T) {
 		req := &tokenpb.QueryTokenTransactionsRequest{
 			QueryType: &tokenpb.QueryTokenTransactionsRequest_ByTxHash{
 				ByTxHash: &tokenpb.QueryTokenTransactionsByTxHash{
-					TokenTransactionHashes: make([][]byte, maxTokenTransactionFilterValues),
+					TokenTransactionHashes: make([][]byte, maxTokenTransactionHashValues),
 				},
 			},
 		}

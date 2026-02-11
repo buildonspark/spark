@@ -66,6 +66,7 @@ func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, db *en
 			SetRequestedTransferID(uuid.Must(uuid.NewRandomFromReader(rng))).
 			SetCoordinatorIdentityPublicKey(coordinatorIdentityPubKey).
 			SetUtxo(utxo).
+			SetUtxoValueSats(utxo.Amount).
 			Save(ctx)
 		require.NoError(t, err)
 		return utxo, utxoSwap

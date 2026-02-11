@@ -203,9 +203,9 @@ func validateNoActiveFreezesForOutputs(ctx context.Context, outputs []*ent.Token
 
 func validateQueryTokenTransactionsRequest(req *tokenpb.QueryTokenTransactionsRequest) error {
 	if req.GetByTxHash() != nil {
-		if len(req.GetByTxHash().TokenTransactionHashes) > maxTokenTransactionFilterValues {
+		if len(req.GetByTxHash().TokenTransactionHashes) > maxTokenTransactionHashValues {
 			return sparkerrors.InvalidArgumentOutOfRange(
-				fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.GetByTxHash().TokenTransactionHashes), maxTokenTransactionFilterValues),
+				fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.GetByTxHash().TokenTransactionHashes), maxTokenTransactionHashValues),
 			)
 		}
 		return nil

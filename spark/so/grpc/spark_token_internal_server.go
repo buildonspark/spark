@@ -77,3 +77,8 @@ func (s *SparkTokenInternalServer) BroadcastTokenTransactionInternal(ctx context
 	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 	return internalTokenTransactionHandler.BroadcastTokenTransactionInternal(ctx, req)
 }
+
+func (s *SparkTokenInternalServer) InternalFreezeTokens(ctx context.Context, req *tokeninternalpb.InternalFreezeTokensRequest) (*tokeninternalpb.InternalFreezeTokensResponse, error) {
+	internalFreezeHandler := tokens.NewInternalFreezeTokenHandler(s.soConfig)
+	return internalFreezeHandler.InternalFreezeTokens(ctx, req)
+}

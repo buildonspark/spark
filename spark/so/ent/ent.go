@@ -40,6 +40,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
+	"github.com/lightsparkdev/spark/so/ent/transfersender"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
@@ -134,6 +136,8 @@ func checkColumn(table, column string) error {
 			tokentransactionpeersignature.Table:     tokentransactionpeersignature.ValidColumn,
 			transfer.Table:                          transfer.ValidColumn,
 			transferleaf.Table:                      transferleaf.ValidColumn,
+			transferreceiver.Table:                  transferreceiver.ValidColumn,
+			transfersender.Table:                    transfersender.ValidColumn,
 			tree.Table:                              tree.ValidColumn,
 			treenode.Table:                          treenode.ValidColumn,
 			usersignedtransaction.Table:             usersignedtransaction.ValidColumn,

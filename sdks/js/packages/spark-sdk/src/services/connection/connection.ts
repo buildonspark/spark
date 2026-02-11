@@ -1,6 +1,7 @@
 import { isError } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha2";
 import type { Channel } from "nice-grpc";
+import type { RetryOptions } from "nice-grpc-client-middleware-retry";
 import type { ClientMiddleware } from "nice-grpc-common";
 import {
   ClientError,
@@ -9,6 +10,7 @@ import {
   Status,
 } from "nice-grpc-common";
 import { type Channel as ChannelWeb } from "nice-grpc-web";
+import { SparkError } from "../../errors/base.js";
 import { SparkAuthenticationError } from "../../errors/types.js";
 import {
   SparkServiceClient,
@@ -25,8 +27,6 @@ import {
 } from "../../proto/spark_token.js";
 import { SparkCallOptions } from "../../types/grpc.js";
 import { WalletConfigService } from "../config.js";
-import { SparkError } from "../../errors/base.js";
-import type { RetryOptions } from "nice-grpc-client-middleware-retry";
 import { ServerTimeSync, getMonotonicTime } from "../time-sync.js";
 
 // Module-level types used by shared caches
@@ -34,6 +34,30 @@ type ChannelKey = string;
 type BrowserOrNodeJSChannel = Channel | ChannelWeb;
 
 type TokenKey = string;
+
+/**
+ * Track both monotonic and wall clock for redundancy
+ *
+ * Monotonic is used to prevent clock skew issues
+ * but it does not tick during sleep
+ * https://developer.mozilla.org/en-US/docs/Web/API/Performance/now#ticking_during_sleep
+ *
+ * Wall clock is used to handle device sleep/app backgrounding
+ * but it is not as precise as monotonic
+ */
+type CachedToken = {
+  token: string;
+  expiresAtMono: number;
+  expiresAtWallMs: number;
+};
+
+/**
+ * Safety margin (in seconds) to proactively refresh tokens before server-side
+ * expiry. This prevents sending a valid-looking but about-to-expire token to
+ * unauthenticated endpoints (like query_nodes) where the server silently drops
+ * the session instead of returning UNAUTHENTICATED.
+ */
+const TOKEN_EXPIRY_BUFFER_SEC = 60;
 
 type SparkAuthnServiceClientWithClose = SparkAuthnServiceClient & {
   close?: () => void;
@@ -63,7 +87,7 @@ export abstract class ConnectionManager {
     ChannelKey,
     Promise<BrowserOrNodeJSChannel>
   > = new Map();
-  private static authTokenCache: Map<TokenKey, string> = new Map();
+  private static authTokenCache: Map<TokenKey, CachedToken> = new Map();
   private static authInflight: Map<TokenKey, Promise<string>> = new Map();
 
   protected makeChannelKey(address: Address, stream?: boolean): ChannelKey {
@@ -117,20 +141,47 @@ export abstract class ConnectionManager {
     return `${address}|${identityHex}`;
   }
 
-  private static getCachedAuthToken(address: Address, identityHex: string) {
-    return ConnectionManager.authTokenCache.get(
-      ConnectionManager.makeAuthTokenKey(address, identityHex),
-    );
+  private static getCachedAuthToken(
+    address: Address,
+    identityHex: string,
+  ): string | undefined {
+    const key = ConnectionManager.makeAuthTokenKey(address, identityHex);
+    const entry = ConnectionManager.authTokenCache.get(key);
+    if (!entry) return undefined;
+
+    // Proactively evict tokens that are within the buffer of server-side expiry.
+    // Two complementary checks:
+    //   - Monotonic: immune to clock skew, but freezes during device sleep
+    //   - Wall-clock: survives device sleep, but vulnerable to clock adjustments
+    const bufferMs = TOKEN_EXPIRY_BUFFER_SEC * 1000;
+    if (
+      getMonotonicTime() >= entry.expiresAtMono - bufferMs ||
+      Date.now() >= entry.expiresAtWallMs - bufferMs
+    ) {
+      ConnectionManager.authTokenCache.delete(key);
+      return undefined;
+    }
+
+    return entry.token;
   }
 
   private static setCachedAuthToken(
     address: Address,
     identityHex: string,
     authToken: string,
+    expiresAtSec: number,
+    nowSec: number,
   ) {
+    // Convert server-relative expiry to a monotonic deadline so that all
+    // future cache reads are instance-independent and clock-skew-safe.
+    const ttlMs = (expiresAtSec - nowSec) * 1000;
     ConnectionManager.authTokenCache.set(
       ConnectionManager.makeAuthTokenKey(address, identityHex),
-      authToken,
+      {
+        token: authToken,
+        expiresAtMono: getMonotonicTime() + ttlMs,
+        expiresAtWallMs: Date.now() + ttlMs,
+      },
     );
   }
 
@@ -146,7 +197,8 @@ export abstract class ConnectionManager {
   private static async getOrCreateAuthToken(
     address: Address,
     identityHex: string,
-    authenticate: () => Promise<string>,
+    getNowSec: () => number,
+    authenticate: () => Promise<{ token: string; expiresAtSec: number }>,
   ): Promise<string> {
     const cached = ConnectionManager.getCachedAuthToken(address, identityHex);
     if (cached) {
@@ -157,9 +209,15 @@ export abstract class ConnectionManager {
     let authPromise = ConnectionManager.authInflight.get(tokenKey);
     if (!authPromise) {
       authPromise = (async () => {
-        const authToken = await authenticate();
-        ConnectionManager.setCachedAuthToken(address, identityHex, authToken);
-        return authToken;
+        const result = await authenticate();
+        ConnectionManager.setCachedAuthToken(
+          address,
+          identityHex,
+          result.token,
+          result.expiresAtSec,
+          getNowSec(),
+        );
+        return result.token;
       })();
       ConnectionManager.authInflight.set(tokenKey, authPromise);
     }
@@ -329,9 +387,13 @@ export abstract class ConnectionManager {
 
   protected async authenticate(address: string) {
     const identityHex = await this.getIdentityPublicKeyHex();
+    // Use server-synced time when available to avoid clock-skew issues.
+    // The server sets token expiry based on its own clock, so we must compare
+    // against that same reference to avoid premature or late eviction.
     return ConnectionManager.getOrCreateAuthToken(
       address,
       identityHex,
+      () => Math.floor(this.getCurrentServerTime().getTime() / 1000),
       async () => {
         const MAX_ATTEMPTS = 8;
         let lastError: Error | undefined;
@@ -371,7 +433,10 @@ export abstract class ConnectionManager {
             if (sparkAuthnClient.close) {
               sparkAuthnClient.close();
             }
-            return verifyResp.sessionToken;
+            return {
+              token: verifyResp.sessionToken,
+              expiresAtSec: verifyResp.expirationTimestamp,
+            };
           } catch (error: unknown) {
             if (isError(error)) {
               if (sparkAuthnClient.close) {

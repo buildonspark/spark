@@ -15,6 +15,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/utils"
 	"go.uber.org/zap"
 )
 
@@ -163,18 +164,43 @@ func retryTokenTransactionBroadcast(
 		}
 	}
 
-	// Extract owner signatures from spent outputs
-	ownerSignatures := make([]*tokenpb.SignatureWithIndex, 0, len(tokenTx.Edges.SpentOutput))
-	for _, output := range tokenTx.Edges.SpentOutput {
-		if output.SpentOwnershipSignature != nil {
-			ownerSignatures = append(ownerSignatures, &tokenpb.SignatureWithIndex{
-				InputIndex: uint32(output.SpentTransactionInputVout),
-				Signature:  output.SpentOwnershipSignature,
+	// Extract signatures based on transaction type:
+	// - For creates and mints: use the issuer signature from the Create/Mint edge
+	// - For transfers: use owner signatures from spent outputs
+	var signatures []*tokenpb.SignatureWithIndex
+	txType := tokenTx.InferTokenTransactionTypeEnt()
+	switch txType {
+	case utils.TokenTransactionTypeCreate:
+		signatures = make([]*tokenpb.SignatureWithIndex, 0, 1)
+		if tokenTx.Edges.Create != nil && tokenTx.Edges.Create.IssuerSignature != nil {
+			signatures = append(signatures, &tokenpb.SignatureWithIndex{
+				InputIndex: 0,
+				Signature:  tokenTx.Edges.Create.IssuerSignature,
 			})
 		}
+	case utils.TokenTransactionTypeMint:
+		signatures = make([]*tokenpb.SignatureWithIndex, 0, 1)
+		if tokenTx.Edges.Mint != nil && tokenTx.Edges.Mint.IssuerSignature != nil {
+			signatures = append(signatures, &tokenpb.SignatureWithIndex{
+				InputIndex: 0,
+				Signature:  tokenTx.Edges.Mint.IssuerSignature,
+			})
+		}
+	case utils.TokenTransactionTypeTransfer:
+		signatures = make([]*tokenpb.SignatureWithIndex, 0, len(tokenTx.Edges.SpentOutput))
+		for _, output := range tokenTx.Edges.SpentOutput {
+			if output.SpentOwnershipSignature != nil {
+				signatures = append(signatures, &tokenpb.SignatureWithIndex{
+					InputIndex: uint32(output.SpentTransactionInputVout),
+					Signature:  output.SpentOwnershipSignature,
+				})
+			}
+		}
+	case utils.TokenTransactionTypeUnknown:
+		return sparkerrors.InternalObjectMalformedField(fmt.Errorf("retry broadcast: cannot determine transaction type for %s", id))
 	}
 
 	// Call FanoutBroadcastAndFinalize which is idempotent
-	_, err = broadcastHandler.FanoutBroadcastAndFinalize(ctx, tokenTx, legacyTokenTx, keyshareIDs, ownerSignatures)
+	_, err = broadcastHandler.FanoutBroadcastAndFinalize(ctx, tokenTx, legacyTokenTx, keyshareIDs, signatures)
 	return err
 }

@@ -77,6 +77,7 @@ service SparkService {
     rpc start_leaf_swap_v2(StartTransferRequest) returns (StartTransferResponse) {}
     rpc start_transfer_v2(StartTransferRequest) returns (StartTransferResponse) {}
 
+    rpc claim_transfer(ClaimTransferRequest) returns (ClaimTransferResponse) {}
 
     rpc get_utxos_for_address(GetUtxosForAddressRequest) returns (GetUtxosForAddressResponse) {}
 
@@ -949,6 +950,40 @@ message ClaimLeafKeyTweak {
     string leaf_id = 1;
     SecretShare secret_share_tweak = 2;
     map<string, bytes> pubkey_shares_tweak = 3;
+}
+
+message ClaimLeafKeyTweaks {
+    repeated ClaimLeafKeyTweak leaves_to_receive = 1;
+}
+
+/**
+ * ClaimPackage is a package of leaves to claim and key tweaks to apply.
+ * This is in the improved claim transfer flow where the receiver can claim the transfer in one call
+ * to the coordinator SO, similar to how TransferPackage works for the sender.
+ */
+message ClaimPackage {
+    // The leaves to claim, with user signed cpfp refunds and signing package.
+    repeated UserSignedTxSigningJob leaves_to_claim = 1;
+    // The map of SO identifier to serialized ClaimLeafKeyTweaks.
+    map<string, bytes> key_tweak_package = 2;
+    // The signature of user to prove that the key_tweak_package is not tampered.
+    bytes user_signature = 3;
+    // The leaves to claim, with user signed direct refunds and signing package.
+    repeated UserSignedTxSigningJob direct_leaves_to_claim = 4;
+    // The leaves to claim, with user signed direct from cpfp refunds and signing package.
+    repeated UserSignedTxSigningJob direct_from_cpfp_leaves_to_claim = 5;
+    // The hash variant to use for computing the claim package signing payload.
+    HashVariant hash_variant = 6;
+}
+
+message ClaimTransferRequest {
+    string transfer_id = 1;
+    bytes owner_identity_public_key = 2;
+    ClaimPackage claim_package = 3;
+}
+
+message ClaimTransferResponse {
+    Transfer transfer = 1;
 }
 
 message ClaimTransferTweakKeysRequest {

@@ -18,6 +18,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
+	"github.com/lightsparkdev/spark/so/ent/transfersender"
 )
 
 // TransferUpdate is the builder for updating Transfer entities.
@@ -202,6 +204,36 @@ func (tu *TransferUpdate) SetPrimarySwapTransfer(t *Transfer) *TransferUpdate {
 	return tu.SetPrimarySwapTransferID(t.ID)
 }
 
+// AddTransferSenderIDs adds the "transfer_senders" edge to the TransferSender entity by IDs.
+func (tu *TransferUpdate) AddTransferSenderIDs(ids ...uuid.UUID) *TransferUpdate {
+	tu.mutation.AddTransferSenderIDs(ids...)
+	return tu
+}
+
+// AddTransferSenders adds the "transfer_senders" edges to the TransferSender entity.
+func (tu *TransferUpdate) AddTransferSenders(t ...*TransferSender) *TransferUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tu.AddTransferSenderIDs(ids...)
+}
+
+// AddTransferReceiverIDs adds the "transfer_receivers" edge to the TransferReceiver entity by IDs.
+func (tu *TransferUpdate) AddTransferReceiverIDs(ids ...uuid.UUID) *TransferUpdate {
+	tu.mutation.AddTransferReceiverIDs(ids...)
+	return tu
+}
+
+// AddTransferReceivers adds the "transfer_receivers" edges to the TransferReceiver entity.
+func (tu *TransferUpdate) AddTransferReceivers(t ...*TransferReceiver) *TransferUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tu.AddTransferReceiverIDs(ids...)
+}
+
 // Mutation returns the TransferMutation object of the builder.
 func (tu *TransferUpdate) Mutation() *TransferMutation {
 	return tu.mutation
@@ -265,6 +297,48 @@ func (tu *TransferUpdate) RemoveCounterSwapTransfer(t ...*Transfer) *TransferUpd
 func (tu *TransferUpdate) ClearPrimarySwapTransfer() *TransferUpdate {
 	tu.mutation.ClearPrimarySwapTransfer()
 	return tu
+}
+
+// ClearTransferSenders clears all "transfer_senders" edges to the TransferSender entity.
+func (tu *TransferUpdate) ClearTransferSenders() *TransferUpdate {
+	tu.mutation.ClearTransferSenders()
+	return tu
+}
+
+// RemoveTransferSenderIDs removes the "transfer_senders" edge to TransferSender entities by IDs.
+func (tu *TransferUpdate) RemoveTransferSenderIDs(ids ...uuid.UUID) *TransferUpdate {
+	tu.mutation.RemoveTransferSenderIDs(ids...)
+	return tu
+}
+
+// RemoveTransferSenders removes "transfer_senders" edges to TransferSender entities.
+func (tu *TransferUpdate) RemoveTransferSenders(t ...*TransferSender) *TransferUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tu.RemoveTransferSenderIDs(ids...)
+}
+
+// ClearTransferReceivers clears all "transfer_receivers" edges to the TransferReceiver entity.
+func (tu *TransferUpdate) ClearTransferReceivers() *TransferUpdate {
+	tu.mutation.ClearTransferReceivers()
+	return tu
+}
+
+// RemoveTransferReceiverIDs removes the "transfer_receivers" edge to TransferReceiver entities by IDs.
+func (tu *TransferUpdate) RemoveTransferReceiverIDs(ids ...uuid.UUID) *TransferUpdate {
+	tu.mutation.RemoveTransferReceiverIDs(ids...)
+	return tu
+}
+
+// RemoveTransferReceivers removes "transfer_receivers" edges to TransferReceiver entities.
+func (tu *TransferUpdate) RemoveTransferReceivers(t ...*TransferReceiver) *TransferUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tu.RemoveTransferReceiverIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -540,6 +614,96 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if tu.mutation.TransferSendersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferSendersTable,
+			Columns: []string{transfer.TransferSendersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfersender.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tu.mutation.RemovedTransferSendersIDs(); len(nodes) > 0 && !tu.mutation.TransferSendersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferSendersTable,
+			Columns: []string{transfer.TransferSendersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfersender.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tu.mutation.TransferSendersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferSendersTable,
+			Columns: []string{transfer.TransferSendersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfersender.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if tu.mutation.TransferReceiversCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferReceiversTable,
+			Columns: []string{transfer.TransferReceiversColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transferreceiver.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tu.mutation.RemovedTransferReceiversIDs(); len(nodes) > 0 && !tu.mutation.TransferReceiversCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferReceiversTable,
+			Columns: []string{transfer.TransferReceiversColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transferreceiver.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tu.mutation.TransferReceiversIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferReceiversTable,
+			Columns: []string{transfer.TransferReceiversColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transferreceiver.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	_spec.AddModifiers(tu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -730,6 +894,36 @@ func (tuo *TransferUpdateOne) SetPrimarySwapTransfer(t *Transfer) *TransferUpdat
 	return tuo.SetPrimarySwapTransferID(t.ID)
 }
 
+// AddTransferSenderIDs adds the "transfer_senders" edge to the TransferSender entity by IDs.
+func (tuo *TransferUpdateOne) AddTransferSenderIDs(ids ...uuid.UUID) *TransferUpdateOne {
+	tuo.mutation.AddTransferSenderIDs(ids...)
+	return tuo
+}
+
+// AddTransferSenders adds the "transfer_senders" edges to the TransferSender entity.
+func (tuo *TransferUpdateOne) AddTransferSenders(t ...*TransferSender) *TransferUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tuo.AddTransferSenderIDs(ids...)
+}
+
+// AddTransferReceiverIDs adds the "transfer_receivers" edge to the TransferReceiver entity by IDs.
+func (tuo *TransferUpdateOne) AddTransferReceiverIDs(ids ...uuid.UUID) *TransferUpdateOne {
+	tuo.mutation.AddTransferReceiverIDs(ids...)
+	return tuo
+}
+
+// AddTransferReceivers adds the "transfer_receivers" edges to the TransferReceiver entity.
+func (tuo *TransferUpdateOne) AddTransferReceivers(t ...*TransferReceiver) *TransferUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tuo.AddTransferReceiverIDs(ids...)
+}
+
 // Mutation returns the TransferMutation object of the builder.
 func (tuo *TransferUpdateOne) Mutation() *TransferMutation {
 	return tuo.mutation
@@ -793,6 +987,48 @@ func (tuo *TransferUpdateOne) RemoveCounterSwapTransfer(t ...*Transfer) *Transfe
 func (tuo *TransferUpdateOne) ClearPrimarySwapTransfer() *TransferUpdateOne {
 	tuo.mutation.ClearPrimarySwapTransfer()
 	return tuo
+}
+
+// ClearTransferSenders clears all "transfer_senders" edges to the TransferSender entity.
+func (tuo *TransferUpdateOne) ClearTransferSenders() *TransferUpdateOne {
+	tuo.mutation.ClearTransferSenders()
+	return tuo
+}
+
+// RemoveTransferSenderIDs removes the "transfer_senders" edge to TransferSender entities by IDs.
+func (tuo *TransferUpdateOne) RemoveTransferSenderIDs(ids ...uuid.UUID) *TransferUpdateOne {
+	tuo.mutation.RemoveTransferSenderIDs(ids...)
+	return tuo
+}
+
+// RemoveTransferSenders removes "transfer_senders" edges to TransferSender entities.
+func (tuo *TransferUpdateOne) RemoveTransferSenders(t ...*TransferSender) *TransferUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tuo.RemoveTransferSenderIDs(ids...)
+}
+
+// ClearTransferReceivers clears all "transfer_receivers" edges to the TransferReceiver entity.
+func (tuo *TransferUpdateOne) ClearTransferReceivers() *TransferUpdateOne {
+	tuo.mutation.ClearTransferReceivers()
+	return tuo
+}
+
+// RemoveTransferReceiverIDs removes the "transfer_receivers" edge to TransferReceiver entities by IDs.
+func (tuo *TransferUpdateOne) RemoveTransferReceiverIDs(ids ...uuid.UUID) *TransferUpdateOne {
+	tuo.mutation.RemoveTransferReceiverIDs(ids...)
+	return tuo
+}
+
+// RemoveTransferReceivers removes "transfer_receivers" edges to TransferReceiver entities.
+func (tuo *TransferUpdateOne) RemoveTransferReceivers(t ...*TransferReceiver) *TransferUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tuo.RemoveTransferReceiverIDs(ids...)
 }
 
 // Where appends a list predicates to the TransferUpdate builder.
@@ -1091,6 +1327,96 @@ func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if tuo.mutation.TransferSendersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferSendersTable,
+			Columns: []string{transfer.TransferSendersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfersender.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tuo.mutation.RemovedTransferSendersIDs(); len(nodes) > 0 && !tuo.mutation.TransferSendersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferSendersTable,
+			Columns: []string{transfer.TransferSendersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfersender.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tuo.mutation.TransferSendersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferSendersTable,
+			Columns: []string{transfer.TransferSendersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfersender.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if tuo.mutation.TransferReceiversCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferReceiversTable,
+			Columns: []string{transfer.TransferReceiversColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transferreceiver.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tuo.mutation.RemovedTransferReceiversIDs(); len(nodes) > 0 && !tuo.mutation.TransferReceiversCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferReceiversTable,
+			Columns: []string{transfer.TransferReceiversColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transferreceiver.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tuo.mutation.TransferReceiversIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   transfer.TransferReceiversTable,
+			Columns: []string{transfer.TransferReceiversColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transferreceiver.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

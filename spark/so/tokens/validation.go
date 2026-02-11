@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"entgo.io/ent/dialect"
 	esql "entgo.io/ent/dialect/sql"
@@ -160,40 +161,50 @@ func calculateCurrentSupplyByIssuerKey(ctx context.Context, issuerPublicKey keys
 }
 
 // calculateCurrentSupply is a helper function that executes the common query logic.
+// It counts outputs from FINALIZED mint transactions and non-expired SIGNED mint transactions.
 func calculateCurrentSupply(ctx context.Context, whereClause func(*ent.TokenOutputQuery) *ent.TokenOutputQuery) (*big.Int, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get or create current tx for request: %w", err))
 	}
 
+	// Count outputs from:
+	// 1. FINALIZED mint transactions
+	// 2. SIGNED mint transactions that haven't expired
+	mintTransactionPredicate := tokentransaction.And(
+		tokentransaction.HasMint(),
+		tokentransaction.Or(
+			tokentransaction.StatusEQ(st.TokenTransactionStatusFinalized),
+			tokentransaction.And(
+				tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
+				tokentransaction.Or(
+					tokentransaction.ExpiryTimeIsNil(),
+					tokentransaction.ExpiryTimeGT(time.Now().UTC()),
+				),
+			),
+		),
+	)
+
 	var (
 		rows []struct {
-			Sum string `json:"sum_amount"` // match AS alias in Modify
+			Sum string `json:"sum_amount"`
 		}
 		qErr error
 	)
 	baseQuery := whereClause(db.TokenOutput.Query()).
-		Where(tokenoutput.HasOutputCreatedTokenTransactionWith(
-			tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
-			tokentransaction.HasMint(),
-		))
+		Where(tokenoutput.HasOutputCreatedTokenTransactionWith(mintTransactionPredicate))
 	err = baseQuery.Modify(func(s *esql.Selector) {
 		switch s.Dialect() {
 		case dialect.Postgres:
-			// Postgres: SUM(amount) on NUMERIC is natively supported and efficient.
-			// CAST(SUM... AS TEXT) returns unambiguous decimal string representation of the sum, which our Uint128 scanner can parse
 			s.SelectExpr(esql.Expr("CAST(COALESCE(SUM(amount), 0) AS TEXT) AS sum_amount")).Limit(1)
 		case dialect.SQLite:
-			// SQLite: amount is stored as TEXT for precision; CAST(amount AS NUMERIC) forces numeric
-			// arithmetic for SUM; CAST(SUM... AS TEXT) returns unambiguous decimal string representation
-			// of the sum so we avoid float64 from the driver
 			s.SelectExpr(esql.Expr("CAST(COALESCE(SUM(CAST(amount AS NUMERIC)), 0) AS TEXT) AS sum_amount")).Limit(1)
 		default:
 			qErr = fmt.Errorf("unsupported dialect: %s", s.Dialect())
 		}
 	}).Scan(ctx, &rows)
 	if err = errors.Join(err, qErr); err != nil {
-		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch signed mint outputs: %w", err))
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch mint outputs: %w", err))
 	}
 	total := uint128.New()
 	if len(rows) > 0 {
