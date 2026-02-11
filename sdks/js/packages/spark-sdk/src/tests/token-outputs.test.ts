@@ -6,7 +6,10 @@ import {
 } from "../proto/spark_token.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection/connection.js";
-import { TokenTransactionService } from "../services/tokens/token-transactions.js";
+import {
+  MAX_TOKEN_OUTPUTS_TX,
+  TokenTransactionService,
+} from "../services/tokens/token-transactions.js";
 import { TokenOutputManager } from "../services/tokens/output-manager.js";
 import { TokenOutputsMap } from "../spark-wallet/types.js";
 import { Bech32mTokenIdentifier } from "../utils/token-identifier.js";
@@ -40,11 +43,13 @@ describe("select token outputs", () => {
     tokenAmount: bigint,
     tokenPublicKey: Uint8Array = new Uint8Array(32).fill(1),
     ownerPublicKey: Uint8Array = new Uint8Array(32).fill(2),
+    tokenIdentifier: Uint8Array = new Uint8Array(32).fill(5),
   ): OutputWithPreviousTransactionData => ({
     output: {
       id,
       ownerPublicKey,
       tokenPublicKey,
+      tokenIdentifier,
       tokenAmount: numberToBytesBE(tokenAmount, 16),
       revocationCommitment: new Uint8Array(32).fill(3),
       status: TokenOutputStatus.TOKEN_OUTPUT_STATUS_AVAILABLE,
@@ -208,6 +213,68 @@ describe("select token outputs", () => {
 
       expect(result).toHaveLength(3);
       // Total: 600n >= 600n
+    });
+
+    it("should throw SparkValidationError when tokenOutputs map is missing a receiver token key", async () => {
+      const tokenIdentifier =
+        "btknrt1qqtpc5vxamq522ch9r89kkt0sgpfd2zac7uzvz4akhsmy2jrsjnsk6xuae" as Bech32mTokenIdentifier;
+
+      await expect(
+        tokenTransactionService.tokenTransfer({
+          tokenOutputs: new Map(),
+          receiverOutputs: [
+            {
+              tokenIdentifier,
+              tokenAmount: 100n,
+              receiverSparkAddress: "spark1invalid",
+            },
+          ],
+          outputSelectionStrategy: "SMALL_FIRST",
+        }),
+      ).rejects.toThrow(SparkValidationError);
+    });
+  });
+
+  describe("per-token output limit validation", () => {
+    const validateOutputCountPerToken = (
+      outputsToUse: OutputWithPreviousTransactionData[],
+    ) =>
+      (tokenTransactionService as any)["validateOutputCountPerToken"](
+        outputsToUse,
+      );
+
+    it("allows multi-token transfers when each token is within the limit", () => {
+      const tokenA = new Uint8Array(32).fill(10);
+      const tokenB = new Uint8Array(32).fill(11);
+      const ownerA = new Uint8Array(32).fill(20);
+      const ownerB = new Uint8Array(32).fill(21);
+
+      const tokenAOutputs = Array.from(
+        { length: MAX_TOKEN_OUTPUTS_TX },
+        (_, i) => createMockTokenOutput(`a-${i}`, 1n, tokenA, ownerA, tokenA),
+      );
+      const tokenBOutputs = Array.from(
+        { length: MAX_TOKEN_OUTPUTS_TX },
+        (_, i) => createMockTokenOutput(`b-${i}`, 1n, tokenB, ownerB, tokenB),
+      );
+
+      expect(() =>
+        validateOutputCountPerToken([...tokenAOutputs, ...tokenBOutputs]),
+      ).not.toThrow();
+    });
+
+    it("rejects transfers that exceed the limit for a single token type", () => {
+      const tokenA = new Uint8Array(32).fill(10);
+      const ownerA = new Uint8Array(32).fill(20);
+
+      const tokenAOutputs = Array.from(
+        { length: MAX_TOKEN_OUTPUTS_TX + 1 },
+        (_, i) => createMockTokenOutput(`a-${i}`, 1n, tokenA, ownerA, tokenA),
+      );
+
+      expect(() => validateOutputCountPerToken(tokenAOutputs)).toThrow(
+        SparkValidationError,
+      );
     });
   });
 

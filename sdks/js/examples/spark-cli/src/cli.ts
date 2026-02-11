@@ -707,7 +707,7 @@ async function runCLI() {
 
   Token Holder Commands:
     transfertokens <tokenIdentifier> <receiverAddress> <amount>        - Transfer tokens. If the token was created with 2 decimals, transfertokens _ _ 1 would transfer 0.01 tokens.
-    batchtransfertokens <tokenIdentifier> <receiverAddress1:amount1> <receiverAddress2:amount2> ... - Transfer tokens with multiple outputs
+    batchtransfertokens <tokenIdentifier1:receiverAddress1:amount1> <tokenIdentifier2:receiverAddress2:amount2> ... - Transfer tokens with multiple outputs (supports different token types)
     querytokentransactionsbytxhash <hash1> <hash2> ...                 - Query token transactions by transaction hashes
     querytokentransactions [--sparkAddresses] [--issuerPublicKeys] [--tokenIdentifiers] [--outputIds] [--pageSize] [--cursor] [--direction] - Query token transaction history with filters
 
@@ -1559,35 +1559,35 @@ async function runCLI() {
             console.log("Please initialize a wallet first");
             break;
           }
-          if (args.length < 2) {
+          if (args.length < 1) {
             console.log(
-              "Usage: batchtransfertokens <tokenIdentifier> <receiverAddress1:amount1> <receiverAddress2:amount2> ...",
+              "Usage: batchtransfertokens <tokenIdentifier1:receiverAddress1:amount1> <tokenIdentifier2:receiverAddress2:amount2> ...",
             );
             break;
           }
 
-          const batchTokenIdentifier = args[0] as Bech32mTokenIdentifier;
           let tokenTransfers = [];
 
-          for (let i = 1; i < args.length; i++) {
+          for (let i = 0; i < args.length; i++) {
             const parts = args[i].split(":");
-            if (parts.length !== 2) {
+            if (parts.length !== 3) {
               console.log(
-                `Invalid format for argument ${i}: ${args[i]}. Expected format: address:amount`,
+                `Invalid format for argument ${i + 1}: ${args[i]}. Expected format: tokenIdentifier:receiverAddress:amount`,
               );
               break;
             }
 
-            const receiverAddress = parts[0];
-            const amount = parseInt(parts[1]);
+            const tokenIdentifier = parts[0] as Bech32mTokenIdentifier;
+            const receiverAddress = parts[1];
+            const amount = parseInt(parts[2]);
 
             if (isNaN(amount)) {
-              console.log(`Invalid amount for argument ${i}: ${parts[1]}`);
+              console.log(`Invalid amount for argument ${i + 1}: ${parts[2]}`);
               break;
             }
 
             tokenTransfers.push({
-              tokenIdentifier: batchTokenIdentifier,
+              tokenIdentifier,
               tokenAmount: BigInt(amount),
               receiverSparkAddress: receiverAddress,
             });

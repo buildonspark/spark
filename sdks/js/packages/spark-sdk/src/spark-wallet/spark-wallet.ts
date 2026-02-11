@@ -5040,7 +5040,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
 
       await this.tokenOutputManager.lockOutputs(acquiredOutputs);
-
       return txHash;
     } finally {
       await release();
@@ -5076,18 +5075,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         },
       );
     }
-    const firstBech32mTokenIdentifier = receiverOutputs[0]!.tokenIdentifier;
     for (const output of receiverOutputs) {
-      if (output.tokenIdentifier !== firstBech32mTokenIdentifier) {
-        throw new SparkValidationError(
-          "All receiver outputs must have the same token identifier",
-          {
-            field: "receiverOutputs",
-            value: receiverOutputs,
-            expected: "All outputs must have the same token identifier",
-          },
-        );
-      }
       if (output.tokenAmount <= 0n) {
         throw new SparkValidationError("Token amount must be greater than 0", {
           field: "receiverOutputs",
@@ -5097,54 +5085,69 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       }
     }
 
-    await this.syncTokenOutputs([firstBech32mTokenIdentifier]);
+    // Group receiver outputs by token identifier
+    const amountsByToken = new Map<Bech32mTokenIdentifier, bigint>();
+    for (const output of receiverOutputs) {
+      const current = amountsByToken.get(output.tokenIdentifier) ?? 0n;
+      amountsByToken.set(output.tokenIdentifier, current + output.tokenAmount);
+    }
 
-    const totalTokenAmount = receiverOutputs.reduce(
-      (sum, o) => sum + o.tokenAmount,
-      0n,
-    );
+    const tokenIdentifiers = [...amountsByToken.keys()];
 
-    const { outputs: acquiredOutputs, release } =
-      await this.tokenOutputManager.acquireOutputs(
-        firstBech32mTokenIdentifier,
-        (available) => {
-          if (selectedOutputs) {
-            return selectedOutputs.filter((so) =>
-              available.some((a) => a.output?.id === so.output?.id),
-            );
-          }
-          return this.tokenTransactionService.selectTokenOutputs(
-            available,
-            totalTokenAmount,
-            outputSelectionStrategy,
-          );
-        },
-        `batch-transfer-${firstBech32mTokenIdentifier}`,
-      );
+    await this.syncTokenOutputs(tokenIdentifiers);
+
+    // Acquire output locks for each token identifier
+    const acquiredByToken = new Map<
+      Bech32mTokenIdentifier,
+      {
+        outputs: OutputWithPreviousTransactionData[];
+        release: () => Promise<void>;
+      }
+    >();
 
     try {
-      const transferOutputs = receiverOutputs.map((output) => ({
-        tokenIdentifier: firstBech32mTokenIdentifier,
-        tokenAmount: output.tokenAmount,
-        receiverSparkAddress: output.receiverSparkAddress,
-      }));
+      for (const tokenId of tokenIdentifiers) {
+        const totalForToken = amountsByToken.get(tokenId)!;
+        const { outputs, release } =
+          await this.tokenOutputManager.acquireOutputs(
+            tokenId,
+            (available) => {
+              if (selectedOutputs) {
+                return selectedOutputs.filter((so) =>
+                  available.some((a) => a.output?.id === so.output?.id),
+                );
+              }
+              return this.tokenTransactionService.selectTokenOutputs(
+                available,
+                totalForToken,
+                outputSelectionStrategy,
+              );
+            },
+            `batch-transfer-${tokenId}`,
+          );
+        acquiredByToken.set(tokenId, { outputs, release });
+      }
 
-      const tokenOutputsMap: TokenOutputsMap = new Map([
-        [firstBech32mTokenIdentifier, acquiredOutputs],
-      ]);
+      const tokenOutputsMap: TokenOutputsMap = new Map();
+      const allAcquiredOutputs: OutputWithPreviousTransactionData[] = [];
+      for (const [tokenId, { outputs }] of acquiredByToken) {
+        tokenOutputsMap.set(tokenId, outputs);
+        allAcquiredOutputs.push(...outputs);
+      }
 
       const txHash = await this.tokenTransactionService.tokenTransfer({
         tokenOutputs: tokenOutputsMap,
-        receiverOutputs: transferOutputs,
+        receiverOutputs,
         outputSelectionStrategy,
-        selectedOutputs: acquiredOutputs,
+        selectedOutputs: allAcquiredOutputs,
       });
 
-      await this.tokenOutputManager.lockOutputs(acquiredOutputs);
-
+      await this.tokenOutputManager.lockOutputs(allAcquiredOutputs);
       return txHash;
     } finally {
-      await release();
+      for (const { release } of acquiredByToken.values()) {
+        await release();
+      }
     }
   }
 

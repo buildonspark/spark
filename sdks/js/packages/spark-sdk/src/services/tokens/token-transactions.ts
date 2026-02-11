@@ -114,53 +114,222 @@ export class TokenTransactionService {
         expected: "Non-empty array",
       });
     }
+    const receiversByToken = this.groupReceiverOutputsByToken(receiverOutputs);
 
-    const totalTokenAmount = receiverOutputs.reduce(
-      (sum, transfer) => sum + transfer.tokenAmount,
-      0n,
-    );
-    let outputsToUse: OutputWithPreviousTransactionData[];
-
-    const tokenIdentifier: Bech32mTokenIdentifier =
-      receiverOutputs[0]!!.tokenIdentifier;
+    let allOutputsToUse: OutputWithPreviousTransactionData[];
 
     if (selectedOutputs) {
-      outputsToUse = selectedOutputs;
+      allOutputsToUse = selectedOutputs;
+      for (const output of selectedOutputs) {
+        const tokenId = bytesToHex(output.output!.tokenIdentifier!);
+        const bech32TokenId = this.findBech32TokenIdentifier(
+          tokenId,
+          receiversByToken,
+        );
+
+        if (!bech32TokenId) {
+          throw new SparkValidationError(
+            "Selected output does not match any receiver token type",
+            {
+              field: "selectedOutputs",
+              value: tokenId,
+              expected: "Token identifier matching one of the receivers",
+            },
+          );
+        }
+      }
     } else {
-      outputsToUse = this.selectTokenOutputs(
-        tokenOutputs.get(tokenIdentifier)!!,
-        totalTokenAmount,
-        outputSelectionStrategy,
+      // Select outputs for each token type
+      allOutputsToUse = [];
+      for (const [tokenIdentifier, receivers] of receiversByToken) {
+        const totalTokenAmount = receivers.reduce(
+          (sum, transfer) => sum + transfer.tokenAmount,
+          0n,
+        );
+
+        const availableOutputs = tokenOutputs.get(tokenIdentifier);
+        if (!availableOutputs) {
+          throw new SparkValidationError(
+            "No token outputs provided for receiver token type",
+            {
+              field: "tokenOutputs",
+              value: tokenIdentifier,
+              expected: "Map entry for each receiver token identifier",
+            },
+          );
+        }
+
+        const selectedForToken = this.selectTokenOutputs(
+          availableOutputs,
+          totalTokenAmount,
+          outputSelectionStrategy,
+        );
+
+        allOutputsToUse.push(...selectedForToken);
+      }
+    }
+
+    this.validateOutputCountPerToken(allOutputsToUse);
+
+    if (selectedOutputs) {
+      this.validateSelectedOutputInputAmounts(allOutputsToUse, receiverOutputs);
+    }
+
+    const { tokenOutputData, sparkInvoices } =
+      this.buildTokenOutputData(receiverOutputs);
+
+    if (this.config.getTokenTransactionVersion() === "V2") {
+      const tokenTransaction = await this.constructTransferTokenTransaction(
+        allOutputsToUse,
+        tokenOutputData,
+        sparkInvoices,
+      );
+
+      const txId = await this.broadcastTokenTransaction(
+        tokenTransaction,
+        allOutputsToUse.map((output) => output.output!.ownerPublicKey),
+        allOutputsToUse.map((output) => output.output!.revocationCommitment!),
+      );
+
+      return txId;
+    } else {
+      const partialTokenTransaction =
+        await this.constructPartialTransferTokenTransaction(
+          allOutputsToUse,
+          tokenOutputData,
+          sparkInvoices,
+        );
+
+      const txId = await this.broadcastTokenTransactionV3(
+        partialTokenTransaction,
+        allOutputsToUse.map((output) => output.output!.ownerPublicKey),
+      );
+
+      return txId;
+    }
+  }
+
+  private groupReceiverOutputsByToken(
+    receiverOutputs: {
+      tokenIdentifier: Bech32mTokenIdentifier;
+      tokenAmount: bigint;
+      receiverSparkAddress: string;
+    }[],
+  ): Map<
+    Bech32mTokenIdentifier,
+    {
+      tokenIdentifier: Bech32mTokenIdentifier;
+      tokenAmount: bigint;
+      receiverSparkAddress: string;
+    }[]
+  > {
+    const receiversByToken = new Map<
+      Bech32mTokenIdentifier,
+      {
+        tokenIdentifier: Bech32mTokenIdentifier;
+        tokenAmount: bigint;
+        receiverSparkAddress: string;
+      }[]
+    >();
+
+    for (const receiver of receiverOutputs) {
+      const existing = receiversByToken.get(receiver.tokenIdentifier) || [];
+      existing.push(receiver);
+      receiversByToken.set(receiver.tokenIdentifier, existing);
+    }
+
+    return receiversByToken;
+  }
+
+  private validateSelectedOutputInputAmounts(
+    selectedOutputs: OutputWithPreviousTransactionData[],
+    receiverOutputs: {
+      tokenIdentifier: Bech32mTokenIdentifier;
+      tokenAmount: bigint;
+      receiverSparkAddress: string;
+    }[],
+  ): void {
+    const inputAmountsByToken = new Map<string, bigint>();
+    for (const output of selectedOutputs) {
+      const tokenId = bytesToHex(output.output!.tokenIdentifier!);
+      const currentAmount = inputAmountsByToken.get(tokenId) || 0n;
+      inputAmountsByToken.set(
+        tokenId,
+        currentAmount + bytesToNumberBE(output.output!.tokenAmount!),
       );
     }
 
-    if (outputsToUse.length > MAX_TOKEN_OUTPUTS_TX) {
-      const availableOutputs = tokenOutputs.get(tokenIdentifier)!!;
+    const outputAmountsByToken = new Map<string, bigint>();
+    for (const receiver of receiverOutputs) {
+      const { tokenIdentifier: rawTokenId } = decodeBech32mTokenIdentifier(
+        receiver.tokenIdentifier,
+        this.config.getNetworkType(),
+      );
+      const tokenId = bytesToHex(rawTokenId);
+      const currentAmount = outputAmountsByToken.get(tokenId) || 0n;
+      outputAmountsByToken.set(tokenId, currentAmount + receiver.tokenAmount);
+    }
 
-      // Sort outputs by the same strategy as in selectTokenOutputs
-      const sortedOutputs = [...availableOutputs];
-      this.sortTokenOutputsByStrategy(sortedOutputs, outputSelectionStrategy);
+    for (const [tokenId, outputAmount] of outputAmountsByToken) {
+      const inputAmount = inputAmountsByToken.get(tokenId) || 0n;
+      if (inputAmount < outputAmount) {
+        throw new SparkValidationError(
+          `Insufficient input amount for token ${tokenId}`,
+          {
+            field: "tokenAmount",
+            value: inputAmount,
+            expected: outputAmount,
+          },
+        );
+      }
+    }
+  }
 
-      // Take only the first MAX_TOKEN_OUTPUTS and calculate their total
-      const maxOutputsToUse = sortedOutputs.slice(0, MAX_TOKEN_OUTPUTS_TX);
-      const maxAmount = sumTokenOutputs(maxOutputsToUse);
+  private validateOutputCountPerToken(
+    outputsToUse: OutputWithPreviousTransactionData[],
+  ): void {
+    const outputCountByToken = new Map<string, number>();
+
+    for (const output of outputsToUse) {
+      const tokenId = bytesToHex(output.output!.tokenIdentifier!);
+      outputCountByToken.set(
+        tokenId,
+        (outputCountByToken.get(tokenId) ?? 0) + 1,
+      );
+    }
+
+    for (const [tokenId, count] of outputCountByToken) {
+      if (count <= MAX_TOKEN_OUTPUTS_TX) {
+        continue;
+      }
 
       throw new SparkValidationError(
-        `Cannot transfer more than ${MAX_TOKEN_OUTPUTS_TX} TTXOs in a single transaction (${outputsToUse.length} selected). Maximum transferable amount is: ${maxAmount}`,
+        `Cannot transfer more than ${MAX_TOKEN_OUTPUTS_TX} TTXOs for token ${tokenId} in a single transaction (${count} selected).`,
         {
           field: "outputsToUse",
-          value: outputsToUse.length,
-          expected: `Less than or equal to ${MAX_TOKEN_OUTPUTS_TX}, with maximum transferable amount of ${maxAmount}`,
+          value: count,
+          expected: `Less than or equal to ${MAX_TOKEN_OUTPUTS_TX} per token type`,
         },
       );
     }
+  }
 
-    const rawTokenIdentifier: Uint8Array = decodeBech32mTokenIdentifier(
-      tokenIdentifier,
-      this.config.getNetworkType(),
-    ).tokenIdentifier;
-
-    let sparkInvoices: SparkAddressFormat[] = [];
+  private buildTokenOutputData(
+    receiverOutputs: {
+      tokenIdentifier: Bech32mTokenIdentifier;
+      tokenAmount: bigint;
+      receiverSparkAddress: string;
+    }[],
+  ): {
+    tokenOutputData: Array<{
+      receiverPublicKey: Uint8Array;
+      rawTokenIdentifier: Uint8Array;
+      tokenAmount: bigint;
+      sparkInvoice?: string;
+    }>;
+    sparkInvoices: SparkAddressFormat[];
+  } {
+    const sparkInvoices: SparkAddressFormat[] = [];
 
     const tokenOutputData = receiverOutputs.map((transfer) => {
       const receiverAddress = decodeSparkAddress(
@@ -168,11 +337,13 @@ export class TokenTransactionService {
         this.config.getNetworkType(),
       );
 
-      if (receiverAddress.sparkInvoiceFields) {
-        sparkInvoices.push(transfer.receiverSparkAddress as SparkAddressFormat);
-      }
+      const rawTokenIdentifier = decodeBech32mTokenIdentifier(
+        transfer.tokenIdentifier,
+        this.config.getNetworkType(),
+      ).tokenIdentifier;
 
       if (receiverAddress.sparkInvoiceFields) {
+        sparkInvoices.push(transfer.receiverSparkAddress as SparkAddressFormat);
         return {
           receiverPublicKey: hexToBytes(receiverAddress.identityPublicKey),
           rawTokenIdentifier,
@@ -188,34 +359,47 @@ export class TokenTransactionService {
       };
     });
 
-    if (this.config.getTokenTransactionVersion() === "V2") {
-      const tokenTransaction = await this.constructTransferTokenTransaction(
-        outputsToUse,
-        tokenOutputData,
-        sparkInvoices,
-      );
+    return { tokenOutputData, sparkInvoices };
+  }
 
-      const txId = await this.broadcastTokenTransaction(
-        tokenTransaction,
-        outputsToUse.map((output) => output.output!.ownerPublicKey),
-        outputsToUse.map((output) => output.output!.revocationCommitment!),
+  private findBech32TokenIdentifier(
+    hexTokenId: string,
+    receiversByToken: Map<Bech32mTokenIdentifier, any[]>,
+  ): Bech32mTokenIdentifier | undefined {
+    for (const [bech32TokenId, _] of receiversByToken) {
+      const { tokenIdentifier } = decodeBech32mTokenIdentifier(
+        bech32TokenId,
+        this.config.getNetworkType(),
       );
+      if (bytesToHex(tokenIdentifier) === hexTokenId) {
+        return bech32TokenId;
+      }
+    }
+    return undefined;
+  }
 
-      return txId;
-    } else {
-      const partialTokenTransaction =
-        await this.constructPartialTransferTokenTransaction(
-          outputsToUse,
-          tokenOutputData,
-          sparkInvoices,
+  private async appendChange<T>(
+    availableByToken: Map<string, bigint>,
+    requestedByToken: Map<string, bigint>,
+    outputs: T[],
+    buildOutput: (params: {
+      ownerPublicKey: Uint8Array;
+      tokenIdentifier: Uint8Array;
+      changeAmount: bigint;
+    }) => T,
+  ): Promise<void> {
+    const identityPublicKey = await this.config.signer.getIdentityPublicKey();
+    for (const [tokenId, availableAmount] of availableByToken) {
+      const requestedAmount = requestedByToken.get(tokenId) || 0n;
+      if (availableAmount > requestedAmount) {
+        outputs.push(
+          buildOutput({
+            ownerPublicKey: identityPublicKey,
+            tokenIdentifier: hexToBytes(tokenId),
+            changeAmount: availableAmount - requestedAmount,
+          }),
         );
-
-      const txId = await this.broadcastTokenTransactionV3(
-        partialTokenTransaction,
-        outputsToUse.map((output) => output.output!.ownerPublicKey),
-      );
-
-      return txId;
+      }
     }
   }
 
@@ -232,11 +416,23 @@ export class TokenTransactionService {
       (a, b) => a.previousTransactionVout - b.previousTransactionVout,
     );
 
-    const availableTokenAmount = sumTokenOutputs(selectedOutputs);
-    const totalRequestedAmount = tokenOutputData.reduce(
-      (sum, output) => sum + output.tokenAmount,
-      0n,
-    );
+    // Calculate available and requested amounts per token type
+    const availableByToken = new Map<string, bigint>();
+    for (const output of selectedOutputs) {
+      const tokenId = bytesToHex(output.output!.tokenIdentifier!);
+      const currentAmount = availableByToken.get(tokenId) || 0n;
+      availableByToken.set(
+        tokenId,
+        currentAmount + bytesToNumberBE(output.output!.tokenAmount!),
+      );
+    }
+
+    const requestedByToken = new Map<string, bigint>();
+    for (const output of tokenOutputData) {
+      const tokenId = bytesToHex(output.rawTokenIdentifier);
+      const currentAmount = requestedByToken.get(tokenId) || 0n;
+      requestedByToken.set(tokenId, currentAmount + output.tokenAmount);
+    }
 
     const tokenOutputs: TokenOutput[] = tokenOutputData.map(
       (output): TokenOutput => ({
@@ -246,16 +442,16 @@ export class TokenTransactionService {
       }),
     );
 
-    if (availableTokenAmount > totalRequestedAmount) {
-      const changeAmount = availableTokenAmount - totalRequestedAmount;
-      const firstTokenIdentifierBytes = tokenOutputData[0]!!.rawTokenIdentifier;
-
-      tokenOutputs.push({
-        ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
-        tokenIdentifier: firstTokenIdentifierBytes,
+    await this.appendChange(
+      availableByToken,
+      requestedByToken,
+      tokenOutputs,
+      ({ ownerPublicKey, tokenIdentifier, changeAmount }): TokenOutput => ({
+        ownerPublicKey,
+        tokenIdentifier,
         tokenAmount: numberToBytesBE(changeAmount, 16),
-      });
-    }
+      }),
+    );
 
     const sortedInvoiceAttachments = sparkInvoices
       ? sortInvoiceAttachments(
@@ -296,11 +492,22 @@ export class TokenTransactionService {
       (a, b) => a.previousTransactionVout - b.previousTransactionVout,
     );
 
-    const availableTokenAmount = sumTokenOutputs(selectedOutputs);
-    const totalRequestedAmount = tokenOutputData.reduce(
-      (sum, output) => sum + output.tokenAmount,
-      0n,
-    );
+    const availableByToken = new Map<string, bigint>();
+    for (const output of selectedOutputs) {
+      const tokenId = bytesToHex(output.output!.tokenIdentifier!);
+      const currentAmount = availableByToken.get(tokenId) || 0n;
+      availableByToken.set(
+        tokenId,
+        currentAmount + bytesToNumberBE(output.output!.tokenAmount!),
+      );
+    }
+
+    const requestedByToken = new Map<string, bigint>();
+    for (const output of tokenOutputData) {
+      const tokenId = bytesToHex(output.rawTokenIdentifier);
+      const currentAmount = requestedByToken.get(tokenId) || 0n;
+      requestedByToken.set(tokenId, currentAmount + output.tokenAmount);
+    }
 
     const partialTokenOutputs: PartialTokenOutput[] = tokenOutputData.map(
       (output): PartialTokenOutput => ({
@@ -313,19 +520,23 @@ export class TokenTransactionService {
       }),
     );
 
-    if (availableTokenAmount > totalRequestedAmount) {
-      const changeAmount = availableTokenAmount - totalRequestedAmount;
-      const firstTokenIdentifierBytes = tokenOutputData[0]!!.rawTokenIdentifier;
-
-      partialTokenOutputs.push({
-        ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
-        tokenIdentifier: firstTokenIdentifierBytes,
+    await this.appendChange(
+      availableByToken,
+      requestedByToken,
+      partialTokenOutputs,
+      ({
+        ownerPublicKey,
+        tokenIdentifier,
+        changeAmount,
+      }): PartialTokenOutput => ({
+        ownerPublicKey,
+        tokenIdentifier,
         withdrawBondSats: this.config.getExpectedWithdrawBondSats(),
         withdrawRelativeBlockLocktime:
           this.config.getExpectedWithdrawRelativeBlockLocktime(),
         tokenAmount: numberToBytesBE(changeAmount, 16),
-      });
-    }
+      }),
+    );
 
     const sortedInvoiceAttachments = sparkInvoices
       ? sortInvoiceAttachments(
@@ -1029,16 +1240,6 @@ export class TokenTransactionService {
         if (count >= MAX_TOKEN_OUTPUTS_TX) break;
       }
 
-      // If we've gone through all outputs and still don't have enough, check if we have more outputs available
-      if (count >= sortedOutputs.length) {
-        // No more outputs available - this should have been caught by the earlier check
-        throw new SparkValidationError("Insufficient funds", {
-          field: "tokenAmount",
-          value: sum,
-          expected: tokenAmount,
-        });
-      }
-
       // If we reached MAX_OUTPUTS but don't have enough, we need to swap some small
       // outputs for larger ones
       const smallOutputs = sortedOutputs.slice(0, MAX_TOKEN_OUTPUTS_TX);
@@ -1070,7 +1271,7 @@ export class TokenTransactionService {
       }
 
       if (smallSum < tokenAmount) {
-        throw new SparkValidationError("Insufficient funds", {
+        throw new SparkValidationError("Insufficient token amount", {
           field: "tokenAmount",
           value: smallSum,
           expected: tokenAmount,
@@ -1092,7 +1293,7 @@ export class TokenTransactionService {
       }
 
       if (remainingAmount > 0n) {
-        throw new SparkValidationError("Insufficient funds", {
+        throw new SparkValidationError("Insufficient token amount", {
           field: "remainingAmount",
           value: remainingAmount,
         });
