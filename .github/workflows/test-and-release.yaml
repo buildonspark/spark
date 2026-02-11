@@ -86,14 +86,14 @@ jobs:
           node-version: ${{ matrix.node-version }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: "Notify failure on Slack"
-        if: failure() && github.event_name == 'push'
-        run: |
-          curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
-          {
-            "text": ":x: ${{ github.workflow }} workflow by ${{ github.actor }} <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id}}|failed> in ${{ github.job }} on <${{ github.server_url }}/${{ github.repository }}/commit/$GITHUB_SHA|${{ github.ref_name }}>"
-          }
-          EOF
+      # - name: "Notify failure on Slack"
+      #   if: failure() && github.event_name == 'push'
+      #   run: |
+      #     curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
+      #     {
+      #       "text": ":x: ${{ github.workflow }} workflow by ${{ github.actor }} <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id}}|failed> in ${{ github.job }} on <${{ github.server_url }}/${{ github.repository }}/commit/$GITHUB_SHA|${{ github.ref_name }}>"
+      #     }
+      #     EOF
 
   release:
     name: Release
@@ -101,7 +101,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    if: success() && github.event_name == 'push'
+    # if: success() && github.event_name == 'push'
     runs-on: "ubuntu-22.04"
     environment: npm
     steps:
@@ -137,56 +137,56 @@ jobs:
           install-mode: "update-lock-only"
 
       # check if previous step updated the lock file and commit and push if so:
-      # - name: Update lock file for Version Packages PR
-      #   if: steps.changesets.outputs.published == 'false' && github.ref == 'refs/heads/main'
+      - name: Update lock file for Version Packages PR
+        if: steps.changesets.outputs.published == 'false' && github.ref == 'refs/heads/main'
+        run: |
+          if git ls-remote --exit-code --heads origin changeset-release/main; then
+            git fetch origin changeset-release/main
+            if git show-ref --quiet changeset-release/main; then
+              git checkout changeset-release/main
+              git push --set-upstream origin changeset-release/main
+              git config --global user.name 'Lightspark Eng'
+              git config --global user.email 'engineering@lightspark.com'
+              git add -A
+              git diff-index --quiet HEAD || git commit -nm "CI update lock file for PR"
+              git push
+              echo "$(git rev-parse HEAD)"
+            else
+              echo "changeset-release/main branch does not exist locally."
+            fi
+          else
+            echo "changeset-release/main branch does not exist on remote."
+          fi
+
+      # - name: Notify publish on Slack
+      #   if: steps.changesets.outputs.published == 'true'
+      #   # You can do something when a publish happens.
       #   run: |
-      #     if git ls-remote --exit-code --heads origin changeset-release/main; then
-      #       git fetch origin changeset-release/main
-      #       if git show-ref --quiet changeset-release/main; then
-      #         git checkout changeset-release/main
-      #         git push --set-upstream origin changeset-release/main
-      #         git config --global user.name 'Lightspark Eng'
-      #         git config --global user.email 'engineering@lightspark.com'
-      #         git add -A
-      #         git diff-index --quiet HEAD || git commit -nm "CI update lock file for PR"
-      #         git push
-      #         echo "$(git rev-parse HEAD)"
-      #       else
-      #         echo "changeset-release/main branch does not exist locally."
-      #       fi
-      #     else
-      #       echo "changeset-release/main branch does not exist on remote."
-      #     fi
+      #     json_escape () {
+      #       printf '%s' "$1" | python -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
+      #     }
 
-      - name: Notify publish on Slack
-        if: steps.changesets.outputs.published == 'true'
-        # You can do something when a publish happens.
-        run: |
-          json_escape () {
-            printf '%s' "$1" | python -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
-          }
+      #     format_packages() {
+      #       local json_input="$1"
+      #       local formatted_output
+      #       formatted_output=$(python -c "import json; data = $json_input; formatted_data = [f\"{item['name'].replace('@buildonspark/', '')}@{item['version']}\" for item in data]; print(', '.join(formatted_data))")
+      #       echo "$formatted_output"
+      #     }
 
-          format_packages() {
-            local json_input="$1"
-            local formatted_output
-            formatted_output=$(python -c "import json; data = $json_input; formatted_data = [f\"{item['name'].replace('@buildonspark/', '')}@{item['version']}\" for item in data]; print(', '.join(formatted_data))")
-            echo "$formatted_output"
-          }
+      #     formatted_packages=$(format_packages '${{ steps.changesets.outputs.publishedPackages }}')
+      #     text=$(json_escape ":white_check_mark: ${{ github.actor }} <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id}}|published> new Spark JS SDK versions from <${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}|${{ github.ref_name }}>: $formatted_packages")
 
-          formatted_packages=$(format_packages '${{ steps.changesets.outputs.publishedPackages }}')
-          text=$(json_escape ":white_check_mark: ${{ github.actor }} <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id}}|published> new Spark JS SDK versions from <${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}|${{ github.ref_name }}>: $formatted_packages")
+      #     curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
+      #     {
+      #       "text": $text
+      #     }
+      #     EOF
 
-          curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
-          {
-            "text": $text
-          }
-          EOF
-
-      - name: "Notify failure on Slack"
-        if: failure() && github.event_name == 'push'
-        run: |
-          curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
-          {
-            "text": ":x: spark public repo: ${{ github.workflow }} workflow by ${{ github.actor }} <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id}}|failed> in ${{ github.job }} on <${{ github.server_url }}/${{ github.repository }}/commit/$GITHUB_SHA|${{ github.ref_name }}>"
-          }
-          EOF
+      # - name: "Notify failure on Slack"
+      #   if: failure() && github.event_name == 'push'
+      #   run: |
+      #     curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
+      #     {
+      #       "text": ":x: spark public repo: ${{ github.workflow }} workflow by ${{ github.actor }} <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id}}|failed> in ${{ github.job }} on <${{ github.server_url }}/${{ github.repository }}/commit/$GITHUB_SHA|${{ github.ref_name }}>"
+      #     }
+      #     EOF
