@@ -1363,6 +1363,48 @@ func VerifiedTargetUtxoFromRequest(ctx context.Context, config *so.Config, db *e
 	return &VerifiedTargetUtxo{inner: targetUtxo, txid: *reqUtxoTxid}, nil
 }
 
+// VerifiedTargetUtxoFromRequestWithThreshold verifies a UTXO with an optional confirmation threshold override.
+// If the UTXO doesn't meet the confirmation requirement, returns (nil, nil) instead of an error.
+// This allows callers to handle unconfirmed UTXOs gracefully.
+func VerifiedTargetUtxoFromRequestWithThreshold(ctx context.Context, config *so.Config, db *ent.Client, network btcnetwork.Network, reqUtxo *pb.UTXO, threshold uint32) (*VerifiedTargetUtxo, error) {
+	if reqUtxo == nil {
+		return nil, fmt.Errorf("requested UTXO is nil")
+	}
+
+	if len(reqUtxo.Txid) != chainhash.HashSize {
+		return nil, fmt.Errorf("invalid txid length: expected %d bytes, got %d bytes", chainhash.HashSize, len(reqUtxo.Txid))
+	}
+
+	txidString := hex.EncodeToString(reqUtxo.Txid)
+	reqUtxoTxid, err := chainhash.NewHashFromStr(txidString)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse on-chain txid: %w", err)
+	}
+	blockHeight, err := db.BlockHeight.Query().Where(
+		blockheight.NetworkEQ(network),
+	).Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find block height: %w", err)
+	}
+
+	targetUtxo, err := db.Utxo.Query().
+		Where(entutxo.NetworkEQ(network)).
+		Where(entutxo.Txid(reqUtxo.Txid)).
+		Where(entutxo.Vout(reqUtxo.Vout)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil // UTXO not found, return nil without error
+		}
+		return nil, fmt.Errorf("failed to get target utxo: %w", err)
+	}
+
+	if blockHeight.Height-targetUtxo.BlockHeight+1 < int64(threshold) {
+		return nil, nil // Not enough confirmations, return nil without error
+	}
+	return &VerifiedTargetUtxo{inner: targetUtxo, txid: *reqUtxoTxid}, nil
+}
+
 // A helper function to generate a FROST signature for a spend transaction. This
 // function is used in the static deposit address flow to create a spending
 // transaction for the SSP.
