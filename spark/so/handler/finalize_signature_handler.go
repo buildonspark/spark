@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
@@ -270,19 +271,32 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		leafIDs = append(leafIDs, leafID)
 	}
 
+	// Convert UUIDs to []any for SQL IN clause
+	leafIDsAny := make([]any, len(leafIDs))
+	for i, id := range leafIDs {
+		leafIDsAny[i] = id
+	}
+
 	var transfer *ent.Transfer
 	if knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobEnableStrictFinalizeSignature, 0) {
 		// Find all ongoing transfers that involves any of these leaves. All these leaves should be
 		// part of a **single** transfer so we expect one result.
 		transfer, err = db.Transfer.Query().
-			WithTransferLeaves().
+			Select(enttransfer.FieldID, enttransfer.FieldStatus, enttransfer.FieldReceiverIdentityPubkey).
 			Where(
 				enttransfer.StatusNotIn(st.TransferStatusCompleted, st.TransferStatusExpired, st.TransferStatusReturned),
-				enttransfer.HasTransferLeavesWith(
-					transferleaf.HasLeafWith(
-						treenode.IDIn(leafIDs...),
-					),
-				),
+				func(s *sql.Selector) {
+					// Check transfer_leafs FK directly, avoiding tree_nodes join
+					s.Where(sql.Exists(
+						sql.Select("transfer_leaf_transfer").
+							From(sql.Table("transfer_leafs")).
+							Where(sql.ColumnsEQ(
+								s.C(enttransfer.FieldID),
+								"transfer_leaf_transfer",
+							)).
+							Where(sql.In("transfer_leaf_leaf", leafIDsAny...)),
+					))
+				},
 			).
 			ForUpdate().
 			Only(ctx)
@@ -302,14 +316,21 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		}
 	} else {
 		transfer, err = db.Transfer.Query().
-			WithTransferLeaves().
+			Select(enttransfer.FieldID).
 			Where(
 				enttransfer.StatusEQ(st.TransferStatusReceiverRefundSigned),
-				enttransfer.HasTransferLeavesWith(
-					transferleaf.HasLeafWith(
-						treenode.IDIn(leafIDs...),
-					),
-				),
+				func(s *sql.Selector) {
+					// Check transfer_leafs FK directly, avoiding tree_nodes join
+					s.Where(sql.Exists(
+						sql.Select("transfer_leaf_transfer").
+							From(sql.Table("transfer_leafs")).
+							Where(sql.ColumnsEQ(
+								s.C(enttransfer.FieldID),
+								"transfer_leaf_transfer",
+							)).
+							Where(sql.In("transfer_leaf_leaf", leafIDsAny...)),
+					))
+				},
 			).
 			ForUpdate().
 			Only(ctx)
@@ -318,7 +339,13 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		}
 	}
 
-	numTransferLeaves := len(transfer.Edges.TransferLeaves)
+	// Count transfer leaves without loading them
+	numTransferLeaves, err := db.TransferLeaf.Query().
+		Where(transferleaf.HasTransferWith(enttransfer.ID(transfer.ID))).
+		Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count transfer leaves for transfer %s: %w", transfer.ID.String(), err)
+	}
 	if len(req.NodeSignatures) != numTransferLeaves {
 		return nil, fmt.Errorf("missing signatures for transfer %s", transfer.ID.String())
 	}
