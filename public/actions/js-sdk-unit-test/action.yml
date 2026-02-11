@@ -41,7 +41,7 @@ runs:
       uses: Swatinem/rust-cache@v2
       with:
         workspaces: "signer"
-        save-if: ${{ github.event_name == 'push' }}"
+        save-if: ${{ github.event_name == 'push' }}
 
     - name: "Setup Node.js and Yarn"
       uses: ./public/actions/setup-node-yarn-install
