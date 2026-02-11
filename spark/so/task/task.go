@@ -211,26 +211,37 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
-					query := tx.Transfer.Query().Where(
-						transfer.Or(
-							transfer.And(
-								transfer.StatusEQ(st.TransferStatusSenderInitiated),
-								transfer.TypeNEQ(st.TransferTypeCounterSwap),
-								transfer.ExpiryTimeLT(time.Now()),
-								transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
-							),
-							transfer.And(
-								transfer.StatusEQ(st.TransferStatusSenderKeyTweakPending),
-								transfer.TypeEQ(st.TransferTypePreimageSwap),
-								transfer.ExpiryTimeLT(time.Now()),
-								transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
-							),
-						)).Limit(1000)
 
-					transfers, err := query.All(ctx)
+					// Split OR query into two separate queries for better index usage
+					// Query 1: SENDER_INITIATED transfers (not COUNTER_SWAP)
+					// Order by expiry_time ASC to cancel oldest expired transfers first
+					const maxTransfers = 1000
+					senderInitiatedTransferQuery := tx.Transfer.Query().Where(
+						transfer.StatusEQ(st.TransferStatusSenderInitiated),
+						transfer.TypeNEQ(st.TransferTypeCounterSwap),
+						transfer.ExpiryTimeLT(time.Now()),
+						transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
+					).Order(ent.Asc(transfer.FieldExpiryTime)).Limit(maxTransfers)
+
+					senderInitiatedTransfers, err := senderInitiatedTransferQuery.All(ctx)
 					if err != nil {
 						return err
 					}
+
+					// Query 2: SENDER_KEY_TWEAK_PENDING + PREIMAGE_SWAP
+					// Order by expiry_time ASC to cancel oldest expired transfers first
+					senderKeyTweakPendingTransferQuery := tx.Transfer.Query().Where(
+						transfer.StatusEQ(st.TransferStatusSenderKeyTweakPending),
+						transfer.TypeEQ(st.TransferTypePreimageSwap),
+						transfer.ExpiryTimeLT(time.Now()),
+						transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
+					).Order(ent.Asc(transfer.FieldExpiryTime)).Limit(maxTransfers)
+
+					senderKeyTweakPendingTransfers, err := senderKeyTweakPendingTransferQuery.All(ctx)
+					if err != nil {
+						return err
+					}
+					transfers := append(senderInitiatedTransfers, senderKeyTweakPendingTransfers...)
 
 					for _, dbTransfer := range transfers {
 						logger.Sugar().Infof("Cancelling transfer %s", dbTransfer.ID)

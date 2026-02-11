@@ -1004,9 +1004,20 @@ var (
 				Columns: []*schema.Column{TransfersColumns[5]},
 			},
 			{
-				Name:    "transfer_status_expiry_time_type",
+				Name:    "idx_transfers_cancel_sender_initiated",
 				Unique:  false,
 				Columns: []*schema.Column{TransfersColumns[7], TransfersColumns[9], TransfersColumns[8]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 'SENDER_INITIATED' AND type <> 'COUNTER_SWAP' AND expiry_time <> '1970-01-01 00:00:00+00'",
+				},
+			},
+			{
+				Name:    "idx_transfers_cancel_preimage_swap",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[7], TransfersColumns[9], TransfersColumns[8]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 'SENDER_KEY_TWEAK_PENDING' AND type = 'PREIMAGE_SWAP' AND expiry_time <> '1970-01-01 00:00:00+00'",
+				},
 			},
 			{
 				Name:    "idx_transfers_recv_status_create",

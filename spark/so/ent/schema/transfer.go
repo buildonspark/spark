@@ -100,8 +100,18 @@ func (Transfer) Indexes() []ent.Index {
 		index.Fields("update_time"),
 		// TODO(mhr): This is mostly for the backfill and can probably be removed later.
 		index.Fields("network"),
-		// Composite index for expired transfer cleanup queries that filter on status, expiry_time, and type
-		index.Fields("status", "expiry_time", "type"),
+
+		// Partial indexes for cancel_expired_transfers task - optimized for each OR branch
+		index.Fields("status", "expiry_time", "type").
+			Annotations(
+				entsql.IndexWhere("status = 'SENDER_INITIATED' AND type <> 'COUNTER_SWAP' AND expiry_time <> '1970-01-01 00:00:00+00'"),
+			).
+			StorageKey("idx_transfers_cancel_sender_initiated"),
+		index.Fields("status", "expiry_time", "type").
+			Annotations(
+				entsql.IndexWhere("status = 'SENDER_KEY_TWEAK_PENDING' AND type = 'PREIMAGE_SWAP' AND expiry_time <> '1970-01-01 00:00:00+00'"),
+			).
+			StorageKey("idx_transfers_cancel_preimage_swap"),
 
 		index.Fields("receiver_identity_pubkey", "status", "create_time").
 			Annotations(entsql.DescColumns("create_time")).
