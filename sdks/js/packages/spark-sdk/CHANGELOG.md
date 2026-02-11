@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.6.3
+
+### Patch Changes
+
+- Reduce local token output lock expiry from 30s to 20s for faster recovery from failed transactions
+- Add wall-clock fallback for auth token eviction to handle device sleep/backgrounding
+
 ## 0.6.2
 
 ### Patch Changes
