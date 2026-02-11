@@ -1,0 +1,1118 @@
+"""This is an enum identifying a particular Bitcoin Network."""
+enum BitcoinNetwork {
+  """The production version of the Bitcoin Blockchain."""
+  MAINNET
+
+  """A test version of the Bitcoin Blockchain, maintained by Lightspark."""
+  REGTEST
+
+  """
+  A test version of the Bitcoin Blockchain, maintained by a centralized organization. Not in use at Lightspark.
+  """
+  SIGNET
+
+  """A test version of the Bitcoin Blockchain, publicly available."""
+  TESTNET
+}
+
+type ClaimStaticDeposit implements UserRequest & Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+
+  """The network the lightning send request is on."""
+  network: BitcoinNetwork!
+
+  """A computed version of the status of this user request."""
+  request_status: SparkUserRequestStatus
+
+  """The amount originally requested to be deposited."""
+  deposit_amount: CurrencyAmount!
+
+  """The amount of credit to be added to the user's balance."""
+  credit_amount: CurrencyAmount!
+
+  """The maximum fee that the user is willing to pay."""
+  max_fee: CurrencyAmount!
+
+  """The status of the request."""
+  status: ClaimStaticDepositStatus!
+
+  """The transaction id of the deposit."""
+  transaction_id: String!
+
+  """The output index of the deposit."""
+  output_index: Int!
+
+  """The Bitcoin network of the deposit."""
+  bitcoin_network: BitcoinNetwork!
+
+  """The id of the transfer."""
+  transfer_spark_id: UUID
+
+  """Static deposit address."""
+  static_deposit_address: String
+}
+
+input ClaimStaticDepositInput {
+  """The transaction id of the deposit."""
+  transaction_id: String!
+
+  """The output index of the deposit."""
+  output_index: Int!
+
+  """The bitcoin network of the deposit."""
+  network: BitcoinNetwork!
+
+  """The type of the claim request."""
+  request_type: ClaimStaticDepositRequestType!
+
+  """The amount of sats to claim for FIXED_AMOUNT quote."""
+  credit_amount_sats: Long
+
+  """The amount of sats to deduct from the UTXO value for MAX_FEE quote."""
+  max_fee_sats: Long
+
+  """The deposit key of the user."""
+  deposit_secret_key: String!
+
+  """The signature of the claim provided by the user."""
+  signature: String!
+
+  """The signature of the quote provided by the SSP."""
+  quote_signature: String!
+}
+
+type ClaimStaticDepositOutput {
+  transfer_id: UUID!
+}
+
+enum ClaimStaticDepositRequestType {
+  FIXED_AMOUNT
+  MAX_FEE
+}
+
+enum ClaimStaticDepositStatus {
+  """
+  Initial status when the claim request is created in the database. Validation has passed and the spend transaction is prepared.
+  """
+  CREATED
+
+  """
+  Spark leaves have been locked and an outbound transfer record created. The SSP is preparing to give the user Spark balance in exchange for the UTXO.
+  """
+  TRANSFER_CREATED
+
+  """
+  Failed to lock leaves or create the transfer record. This typically happens due to insufficient SSP liquidity.
+  """
+  TRANSFER_CREATION_FAILED
+
+  """
+  The Spark leaves transfer to the user has been completed successfully. The user can now claim the balance. UTXO swap was finalized with the Signing Operator.
+  """
+  TRANSFER_COMPLETED
+
+  """
+  Failed during UTXO swap initiation with the Signing Operator (SO). The leaves are unlocked and the request is marked as failed.
+  """
+  UTXO_SWAPPING_FAILED
+
+  """
+  The L1 spend transaction has been signed (FROST aggregation completed) and is ready to be broadcast to the Bitcoin network.
+  """
+  SPEND_TX_CREATED
+
+  """
+  The L1 spend transaction has been broadcast to the Bitcoin network. Awaiting on-chain confirmation.
+  """
+  SPEND_TX_BROADCAST
+
+  """
+  The L1 spend transaction has been confirmed on-chain. This is the final successful state - the UTXO is now part of the SSP's confirmed balance.
+  """
+  SPEND_TX_CONFIRMED
+}
+
+input CompleteCoopExitInput {
+  user_outbound_transfer_external_id: UUID!
+  coop_exit_request_id: ID = null
+}
+
+type CompleteCoopExitOutput {
+  request: CoopExitRequest!
+}
+
+input CompleteLeavesSwapInput {
+  adaptor_secret_key: String!
+  user_outbound_transfer_external_id: UUID!
+  leaves_swap_request_id: ID!
+  direct_adaptor_secret_key: String = null
+  direct_from_cpfp_adaptor_secret_key: String = null
+}
+
+type CompleteLeavesSwapOutput {
+  request: LeavesSwapRequest!
+}
+
+input CompleteStuckLeavesSwapInput {
+  swap_request_id: UUID!
+}
+
+type CompleteStuckLeavesSwapOutput {
+  request: LeavesSwapRequest!
+}
+
+interface Connection {
+  """
+  The total count of objects in this connection, using the current filters. It is different from the number of objects returned in the current page (in the `entities` field).
+  """
+  count: Int!
+
+  """
+  An object that holds pagination information about the objects in this connection.
+  """
+  page_info: PageInfo!
+}
+
+type CoopExitFeeEstimate {
+  user_fee: CurrencyAmount!
+  l1_broadcast_fee: CurrencyAmount!
+}
+
+input CoopExitFeeEstimatesInput {
+  leaf_external_ids: [UUID!]!
+  withdrawal_address: String!
+}
+
+type CoopExitFeeEstimatesOutput {
+  speed_fast: CoopExitFeeEstimate
+  speed_medium: CoopExitFeeEstimate
+  speed_slow: CoopExitFeeEstimate
+}
+
+type CoopExitFeeQuote implements Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+
+  """The network the coop exit fee quote is on."""
+  network: BitcoinNetwork!
+
+  """
+  The total currency amount of all the nodes user swapped for the coop exit quote.
+  """
+  total_amount: CurrencyAmount!
+
+  """
+  The fee user pays for the coop exit not including the L1 broadcast fee when exit speed is fast.
+  """
+  user_fee_fast: CurrencyAmount!
+
+  """
+  The fee user pays for the coop exit not including the L1 broadcast fee when exit speed is medium.
+  """
+  user_fee_medium: CurrencyAmount!
+
+  """
+  The fee user pays for the coop exit not including the L1 broadcast fee when exit speed is slow.
+  """
+  user_fee_slow: CurrencyAmount!
+
+  """
+  The L1 broadcast fee user pays for the coop exit when exit speed is fast.
+  """
+  l1_broadcast_fee_fast: CurrencyAmount!
+
+  """
+  The L1 broadcast fee user pays for the coop exit when exit speed is medium.
+  """
+  l1_broadcast_fee_medium: CurrencyAmount!
+
+  """
+  The L1 broadcast fee user pays for the coop exit when exit speed is slow.
+  """
+  l1_broadcast_fee_slow: CurrencyAmount!
+
+  """The time when the coop exit fee quote expires."""
+  expires_at: DateTime!
+}
+
+input CoopExitFeeQuoteInput {
+  leaf_external_ids: [UUID!]!
+  withdrawal_address: String!
+}
+
+type CoopExitFeeQuoteOutput {
+  quote: CoopExitFeeQuote!
+}
+
+type CoopExitRequest implements UserRequest & Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+
+  """The network the lightning send request is on."""
+  network: BitcoinNetwork!
+
+  """A computed version of the status of this user request."""
+  request_status: SparkUserRequestStatus
+
+  """
+  The fee user pays for the coop exit not including the L1 broadcast fee.
+  """
+  fee: CurrencyAmount!
+
+  """The bitcoin address where user would like to coop exit to."""
+  withdrawal_address: String
+
+  """The L1 broadcast fee user pays for the coop exit."""
+  l1_broadcast_fee: CurrencyAmount!
+
+  """The fee quote user requested for this coop exit."""
+  fee_quote: CoopExitFeeQuote
+
+  """The exit speed user requested for this coop exit."""
+  exit_speed: ExitSpeed
+
+  """The status of this coop exit request."""
+  status: SparkCoopExitRequestStatus!
+
+  """
+  The time when the coop exit request expires and the UTXOs are released.
+  """
+  expires_at: DateTime!
+
+  """The raw connector transaction."""
+  raw_connector_transaction: String!
+
+  """The raw coop exit L1 transaction."""
+  raw_coop_exit_transaction: String!
+
+  """The transaction id of the coop exit transaction."""
+  coop_exit_txid: String!
+
+  """The spark id of the swap transfer."""
+  transfer_spark_id: UUID
+
+  """The swap transfer."""
+  transfer: Transfer
+}
+
+"""This object represents the value and unit for an amount of currency."""
+type CurrencyAmount {
+  """The original numeric value for this CurrencyAmount."""
+  original_value: Long!
+
+  """The original unit of currency for this CurrencyAmount."""
+  original_unit: CurrencyUnit!
+
+  """The unit of user's preferred currency."""
+  preferred_currency_unit: CurrencyUnit!
+
+  """
+  The rounded numeric value for this CurrencyAmount in the very base level of user's preferred currency. For example, for USD, the value will be in cents.
+  """
+  preferred_currency_value_rounded: Long!
+
+  """
+  The approximate float value for this CurrencyAmount in the very base level of user's preferred currency. For example, for USD, the value will be in cents.
+  """
+  preferred_currency_value_approx: Float!
+}
+
+"""
+This enum identifies the unit of currency associated with a CurrencyAmount.
+"""
+enum CurrencyUnit {
+  """
+  Bitcoin is the cryptocurrency native to the Bitcoin network. It is used as the native medium for value transfer for the Lightning Network.
+  """
+  BITCOIN
+
+  """
+  0.00000001 (10e-8) Bitcoin or one hundred millionth of a Bitcoin. This is the unit most commonly used in Lightning transactions.
+  """
+  SATOSHI
+
+  """
+  0.001 Satoshi, or 10e-11 Bitcoin. We recommend using the Satoshi unit instead when possible.
+  """
+  MILLISATOSHI
+
+  """United States Dollar."""
+  USD
+
+  """Mexican Peso."""
+  MXN
+
+  """Philippine Peso."""
+  PHP
+
+  """Euro."""
+  EUR
+
+  """British Pound."""
+  GBP
+
+  """Indian Rupee."""
+  INR
+
+  """Brazilian Real."""
+  BRL
+
+  """Canadian Dollar."""
+  CAD
+
+  """Danish Krone."""
+  DKK
+
+  """Hong Kong Dollar."""
+  HKD
+
+  """Indonesian Rupiah."""
+  IDR
+
+  """Malaysian Ringgit."""
+  MYR
+
+  """Singapore Dollar."""
+  SGD
+
+  """Thai Baht."""
+  THB
+
+  """Vietnamese Dong."""
+  VND
+
+  """Nigerian Naira."""
+  NGN
+
+  """South African Rand."""
+  ZAR
+
+  """Kenyan Shilling."""
+  KES
+
+  """Tanzanian Shilling."""
+  TZS
+
+  """Ugandan Shilling."""
+  UGX
+
+  """Botswana Pula."""
+  BWP
+
+  """West African CFA Franc."""
+  XOF
+
+  """Central African CFA Franc."""
+  XAF
+
+  """Malawian Kwacha."""
+  MWK
+
+  """Rwandan Franc."""
+  RWF
+
+  """Zambian Kwacha."""
+  ZMW
+
+  """United Arab Emirates Dirham."""
+  AED
+
+  """Guatemalan Quetzal."""
+  GTQ
+
+  """Tether"""
+  USDT
+
+  """USDC"""
+  USDC
+
+  """
+  0.000000001 (10e-9) Bitcoin or a billionth of a Bitcoin. We recommend using the Satoshi unit instead when possible.
+  """
+  NANOBITCOIN @deprecated(reason: "Use BITCOIN instead.")
+
+  """
+  0.000001 (10e-6) Bitcoin or a millionth of a Bitcoin. We recommend using the Satoshi unit instead when possible.
+  """
+  MICROBITCOIN @deprecated(reason: "Use BITCOIN instead.")
+
+  """
+  0.001 (10e-3) Bitcoin or a thousandth of a Bitcoin. We recommend using the Satoshi unit instead when possible.
+  """
+  MILLIBITCOIN @deprecated(reason: "Use BITCOIN instead.")
+}
+
+"""Date with time (isoformat)"""
+scalar DateTime
+
+"""
+This interface is used by all the entities in the Lightspark system. It defines a few core fields that are available everywhere. Any object that implements this interface can be queried using the `entity` query and its ID.
+"""
+interface Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+}
+
+enum ExitSpeed {
+  FAST
+  MEDIUM
+  SLOW
+}
+
+input GetChallengeInput {
+  public_key: PublicKey!
+}
+
+type GetChallengeOutput {
+  protected_challenge: String!
+}
+
+"""A 32-byte scalar value."""
+scalar Hash32
+
+type Invoice {
+  encoded_invoice: String!
+  bitcoin_network: BitcoinNetwork!
+  payment_hash: Hash32!
+  amount: CurrencyAmount!
+  created_at: DateTime!
+  expires_at: DateTime!
+  memo: String
+}
+
+type Leaf {
+  """The amount of the leaf."""
+  amount: CurrencyAmount!
+
+  """The id of the leaf known at signing operators."""
+  spark_node_id: UUID!
+}
+
+input LeavesSwapFeeEstimateInput {
+  total_amount_sats: Int!
+}
+
+type LeavesSwapFeeEstimateOutput {
+  fee_estimate: CurrencyAmount!
+}
+
+type LeavesSwapRequest implements UserRequest & Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+
+  """The network the lightning send request is on."""
+  network: BitcoinNetwork!
+
+  """A computed version of the status of this user request."""
+  request_status: SparkUserRequestStatus
+
+  """The status of the request for Spark users."""
+  status: SparkLeavesSwapRequestStatus!
+
+  """The total amount of leaves user sent for swap."""
+  total_amount: CurrencyAmount!
+
+  """The target amount of leaves user wanted to get from the swap."""
+  target_amount: CurrencyAmount!
+
+  """The fee user needs to pay for swap."""
+  fee: CurrencyAmount!
+
+  """The leaves transfer to user."""
+  inbound_transfer: Transfer
+
+  """The leaves transfer out from user."""
+  outbound_transfer: Transfer
+
+  """The time when the leaves swap request expires."""
+  expires_at: DateTime
+
+  """The swap leaves returned to the user"""
+  swap_leaves: [SwapLeaf!]
+}
+
+type LightningReceiveRequest implements UserRequest & Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+
+  """The network the lightning send request is on."""
+  network: BitcoinNetwork!
+
+  """A computed version of the status of this user request."""
+  request_status: SparkUserRequestStatus
+
+  """The lightning invoice generated to receive lightning payment."""
+  invoice: Invoice!
+
+  """The status of the request."""
+  status: LightningReceiveRequestStatus!
+
+  """The leaves transfer after lightning payment was received."""
+  transfer: Transfer
+
+  """The payment preimage of the invoice if retrieved from SE."""
+  payment_preimage: Hash32
+
+  """
+  The receiver's identity public key if different from owner of the request.
+  """
+  receiver_identity_public_key: PublicKey
+}
+
+enum LightningReceiveRequestStatus {
+  INVOICE_CREATED
+  HTLC_RECEIVED
+  TRANSFER_CREATED
+  TRANSFER_CREATION_FAILED
+  PAYMENT_PREIMAGE_PENDING
+  PAYMENT_PREIMAGE_RECOVERED
+  PAYMENT_PREIMAGE_QUERYING_FAILED
+  PAYMENT_PREIMAGE_RECOVERING_FAILED
+  TRANSFER_CANCELED
+  HTLC_FAILED
+  LIGHTNING_PAYMENT_RECEIVED
+  TRANSFER_FAILED
+  TRANSFER_COMPLETED
+  REFUND_SIGNING_COMMITMENTS_QUERYING_FAILED
+  REFUND_SIGNING_FAILED
+}
+
+input LightningSendFeeEstimateInput {
+  encoded_invoice: String!
+
+  """
+  The amount you will pay for this invoice in sats. It should ONLY be set when the invoice amount is zero.
+  """
+  amount_sats: Long = null
+}
+
+type LightningSendFeeEstimateOutput {
+  fee_estimate: CurrencyAmount!
+}
+
+type LightningSendRequest implements UserRequest & Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+
+  """The network the lightning send request is on."""
+  network: BitcoinNetwork!
+
+  """A computed version of the status of this user request."""
+  request_status: SparkUserRequestStatus
+
+  """The lightning invoice user requested to pay."""
+  encoded_invoice: String!
+
+  """The fee charged for paying the lightning invoice."""
+  fee: CurrencyAmount!
+
+  """The idempotency key of the request."""
+  idempotency_key: String!
+
+  """The status of the request."""
+  status: LightningSendRequestStatus!
+
+  """The leaves transfer after lightning payment was sent."""
+  transfer: Transfer
+
+  """The preimage of the payment."""
+  payment_preimage: String
+}
+
+enum LightningSendRequestStatus {
+  CREATED
+  USER_TRANSFER_VALIDATION_FAILED
+  LIGHTNING_PAYMENT_INITIATED
+  LIGHTNING_PAYMENT_FAILED
+  LIGHTNING_PAYMENT_SUCCEEDED
+  PREIMAGE_PROVIDED
+  PREIMAGE_PROVIDING_FAILED
+  TRANSFER_COMPLETED
+  TRANSFER_FAILED
+  PENDING_USER_SWAP_RETURN
+  USER_SWAP_RETURNED
+  USER_SWAP_RETURN_FAILED
+  REQUEST_VALIDATED @deprecated(reason: "Use CREATED instead")
+}
+
+"""The `Long` scalar type represents a 64 bit integer."""
+scalar Long
+
+type Mutation {
+  """For spark users to claim static deposits."""
+  claim_static_deposit(input: ClaimStaticDepositInput!): ClaimStaticDepositOutput!
+
+  """This API will broadcast the coop exit transaction."""
+  complete_coop_exit(input: CompleteCoopExitInput!): CompleteCoopExitOutput!
+
+  """For spark users to complete a leaves swap."""
+  complete_leaves_swap(input: CompleteLeavesSwapInput!): CompleteLeavesSwapOutput!
+
+  """For spark users to complete a stuck leaves swap."""
+  complete_stuck_leaves_swap(input: CompleteStuckLeavesSwapInput!): CompleteStuckLeavesSwapOutput!
+
+  """Get a new SSP authentication challenge."""
+  get_challenge(input: GetChallengeInput!): GetChallengeOutput!
+
+  """For spark users to initiate coop exit."""
+  request_coop_exit(input: RequestCoopExitInput!): RequestCoopExitOutput!
+
+  """For spark users to pay lightning invoices."""
+  request_lightning_send(input: RequestLightningSendInput!): RequestLightningSendOutput!
+
+  """For spark users to receive through lightning invoices."""
+  request_lightning_receive(input: RequestLightningReceiveInput!): RequestLightningReceiveOutput!
+
+  """For spark users to initiate a leaves swap."""
+  request_leaves_swap(input: RequestLeavesSwapInput!): RequestLeavesSwapOutput!
+
+  """For spark users to initiate a swap."""
+  request_swap(input: RequestSwapInput!): RequestSwapOutput!
+
+  """
+  This function sends regtest funds to a specified address. It is only available in test mode.
+  """
+  request_regtest_funds(input: RequestRegtestFundsInput!): RequestRegtestFundsOutput!
+
+  """Verify a signed SSP authentication challenge."""
+  verify_challenge(input: VerifyChallengeInput!): VerifyChallengeOutput!
+}
+
+"""
+This is an object representing information about a page returned by the Lightspark API. For more information, please see the “Pagination” section of our API docs for more information about its usage.
+"""
+type PageInfo {
+  has_next_page: Boolean
+  has_previous_page: Boolean
+  start_cursor: String
+  end_cursor: String
+}
+
+input Provider {
+  account_id: ID!
+  jwt: String!
+}
+
+"""A Secp256k1 public key."""
+scalar PublicKey
+
+type Query {
+  """
+  This is a query for estimating the fees to do a coop exit on spark in different speeds.
+  """
+  coop_exit_fee_estimates(input: CoopExitFeeEstimatesInput!): CoopExitFeeEstimatesOutput!
+
+  """
+  This is a query for getting the coop exit fee quote on spark in different speeds.
+  """
+  coop_exit_fee_quote(input: CoopExitFeeQuoteInput!): CoopExitFeeQuoteOutput!
+
+  """The current logged in spark wallet user."""
+  current_user: SparkWalletUser
+
+  """This is a query for estimating the fee to do a leaves swap on spark."""
+  leaves_swap_fee_estimate(input: LeavesSwapFeeEstimateInput!): LeavesSwapFeeEstimateOutput!
+
+  """
+  This is a query for estimating the fee to pay a lightning invoice on spark.
+  """
+  lightning_send_fee_estimate(input: LightningSendFeeEstimateInput!): LightningSendFeeEstimateOutput!
+
+  """
+  Get a FIXED_AMOUNT quote from this SSP to claim a deposit to a static deposit address.
+  """
+  static_deposit_quote(input: StaticDepositQuoteInput!): StaticDepositQuoteOutput!
+
+  """Query the user request of a given id."""
+  user_request(request_id: ID!): UserRequest
+
+  """Query the transfer of a given transfer spark id."""
+  transfer(transfer_spark_id: UUID!): Transfer @deprecated(reason: "Use `transfers` query instead, which supports multiple transfers at once.")
+
+  """Query transfers of a given list of transfer spark ids."""
+  transfers(transfer_spark_ids: [UUID!]!): [Transfer!]!
+}
+
+input RequestCoopExitInput {
+  leaf_external_ids: [UUID!]!
+  withdrawal_address: String!
+  exit_speed: ExitSpeed!
+  withdraw_all: Boolean! = true
+  fee_leaf_external_ids: [UUID!] = null
+  fee_quote_id: ID = null
+  idempotency_key: String = null
+  user_outbound_transfer_external_id: UUID = null
+}
+
+type RequestCoopExitOutput {
+  request: CoopExitRequest!
+}
+
+input RequestLeavesSwapInput {
+  adaptor_pubkey: PublicKey!
+  total_amount_sats: Long!
+  target_amount_sats: Long!
+  fee_sats: Long!
+  user_leaves: [UserLeafInput!]!
+  idempotency_key: String!
+  target_amount_sats_list: [Long!] = null
+  direct_adaptor_pubkey: PublicKey = null
+  direct_from_cpfp_adaptor_pubkey: PublicKey = null
+}
+
+type RequestLeavesSwapOutput {
+  request: LeavesSwapRequest!
+}
+
+input RequestLightningReceiveInput {
+  """The bitcoin network the lightning invoice is created on."""
+  network: BitcoinNetwork!
+
+  """
+  The amount for which the lightning invoice should be created in satoshis.
+  """
+  amount_sats: Long!
+
+  """
+  The 32-byte hash of the payment preimage to use when generating the lightning invoice.
+  """
+  payment_hash: Hash32!
+
+  """
+  The expiry of the lightning invoice in seconds. Default value is 86400 (1 day).
+  """
+  expiry_secs: Int = null
+
+  """
+  The memo to include in the lightning invoice. Should not be provided if the description_hash is provided.
+  """
+  memo: String = null
+
+  """
+  The public key of the user receiving the lightning invoice. If not present, the receiver will be the creator of this request.
+  """
+  receiver_identity_pubkey: PublicKey = null
+
+  """
+  Whether to embed the spark address in the fallback address field of the Bolt 11 lightning invoice. Spark-aware wallets can use this field to preferentially pay over spark if they find a spark address in the fallback address field.
+  """
+  include_spark_address: Boolean! = false
+
+  """
+  The h tag of the invoice. This is the hash of a longer description to include in the lightning invoice. It is used in LNURL and UMA as the hash of the metadata. This field is mutually exclusive with the memo field. Only one or the other should be provided.
+  """
+  description_hash: Hash32 = null
+
+  """
+  The spark invoice to embed in the routing hints of the Bolt 11 lightning invoice. Spark-aware wallets can use this field to preferentially pay over spark if they find a spark invoice in the routing hints. This is mutually exclusive with include_spark_address.
+  """
+  spark_invoice: String = null
+}
+
+type RequestLightningReceiveOutput {
+  request: LightningReceiveRequest!
+}
+
+input RequestLightningSendInput {
+  encoded_invoice: String!
+
+  """
+  The amount you will pay for this invoice in sats. It should ONLY be set when the invoice amount is zero.
+  """
+  amount_sats: Long = null
+  idempotency_key: String = null
+  user_outbound_transfer_external_id: UUID = null
+}
+
+type RequestLightningSendOutput {
+  request: LightningSendRequest!
+}
+
+input RequestRegtestFundsInput {
+  """
+  The amount of sats that are requested to be sent to the specified Regtest Bitcoin address.
+  """
+  amount_sats: Long!
+
+  """The Regtest Bitcoin address to which the funds will be sent."""
+  address: String!
+}
+
+type RequestRegtestFundsOutput {
+  transaction_hash: String!
+}
+
+input RequestSwapInput {
+  adaptor_pubkey: PublicKey!
+  total_amount_sats: Long!
+  target_amount_sats: [Long!]!
+  fee_sats: Long!
+  user_leaves: [UserLeafInput!]!
+  user_outbound_transfer_external_id: UUID!
+}
+
+type RequestSwapOutput {
+  request: LeavesSwapRequest!
+}
+
+enum SparkCoopExitRequestStatus {
+  INITIATED
+  COMPLETE_REQUEST_RECEIVED
+  INBOUND_TRANSFER_CHECKED
+  TX_BROADCASTED
+  ON_CHAIN_TX_CONFIRMED
+  INBOUND_TRANSFER_CLAIMING_FAILED
+  SUCCEEDED
+  EXPIRING_SCHEDULED
+  EXPIRING_FAILED
+  EXPIRED
+  FAILING_SCHEDULED
+  FAILING_FAILED
+  FAILED
+  TX_SIGNED @deprecated(reason: "No more needed")
+  WAITING_ON_TX_CONFIRMATIONS @deprecated(reason: "No more needed")
+  INBOUND_TRANSFER_CLAIMING_SCHEDULED @deprecated(reason: "No more needed")
+}
+
+enum SparkLeavesSwapRequestStatus {
+  CREATED
+  INBOUND_TRANSFER_VERIFIED
+  INBOUND_TRANSFER_VERIFYING_FAILED
+  OUTBOUND_TRANSFER_SENT
+  OUTBOUND_TRANSFER_SENDING_FAILED
+  TRANSFERS_COMPLETING_SCHEDULED
+  OUTBOUND_TRANSFER_COMPLETED
+  OUTBOUND_TRANSFER_COMPLETING_FAILED
+  INBOUND_TRANSFER_CLAIMING_FAILED
+  REQUEST_FAILING_FROM_VERIFYING_SCHEDULED
+  REQUEST_FAILING_FROM_SENDING_SCHEDULED
+  REQUEST_FAILING_FROM_VERIFYING_FAILED
+  REQUEST_FAILING_FROM_SENDING_FAILED
+  SUCCEEDED
+  FAILED @deprecated(reason: "No more needed")
+  INITIATED @deprecated(reason: "No more needed")
+  EXPIRED @deprecated(reason: "No more needed")
+  LEAVES_LOCKED @deprecated(reason: "No more needed")
+  REFUND_TX_ADAPTOR_SIGNED @deprecated(reason: "Adaptor is not needed in signing")
+  INBOUND_TRANSFER_CLAIMED @deprecated(reason: "No more needed")
+}
+
+type SparkTransferToLeavesConnection implements Connection {
+  """
+  The total count of objects in this connection, using the current filters. It is different from the number of objects returned in the current page (in the `entities` field).
+  """
+  count: Int!
+
+  """
+  An object that holds pagination information about the objects in this connection.
+  """
+  page_info: PageInfo!
+
+  """The leaves for the current page of this connection."""
+  entities: [Leaf!]!
+}
+
+enum SparkUserRequestStatus {
+  CREATED
+  IN_PROGRESS
+  SUCCEEDED
+  FAILED
+  CANCELED
+  UNKNOWN
+}
+
+enum SparkUserRequestType {
+  LIGHTNING_SEND
+  LIGHTNING_RECEIVE
+  COOP_EXIT
+  LEAVES_SWAP
+  CLAIM_STATIC_DEPOSIT
+}
+
+type SparkWalletUser implements Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+
+  """The identity public key of the user."""
+  identity_public_key: PublicKey!
+
+  """The user requests."""
+  user_requests(first: Int = null, after: String = null, types: [SparkUserRequestType!] = null, statuses: [SparkUserRequestStatus!] = null, networks: [BitcoinNetwork!] = null): SparkWalletUserToUserRequestsConnection!
+}
+
+type SparkWalletUserToUserRequestsConnection implements Connection {
+  """
+  The total count of objects in this connection, using the current filters. It is different from the number of objects returned in the current page (in the `entities` field).
+  """
+  count: Int!
+
+  """
+  An object that holds pagination information about the objects in this connection.
+  """
+  page_info: PageInfo!
+
+  """The Spark User Requests for the current page of this connection."""
+  entities: [UserRequest!]!
+}
+
+input StaticDepositQuoteInput {
+  """The transaction id of the deposit."""
+  transaction_id: String!
+
+  """The output index of the deposit."""
+  output_index: Int!
+
+  """The bitcoin network of the deposit."""
+  network: BitcoinNetwork!
+}
+
+type StaticDepositQuoteOutput {
+  """The transaction id of the deposit."""
+  transaction_id: String!
+
+  """The output index of the deposit."""
+  output_index: Int!
+
+  """The bitcoin network of the deposit."""
+  network: BitcoinNetwork!
+
+  """The amount of sats that will be credited to the user's balance."""
+  credit_amount_sats: Long!
+
+  """The signature of the quote."""
+  signature: String!
+}
+
+type SwapLeaf {
+  leaf_id: UUID!
+  raw_unsigned_refund_transaction: String!
+  adaptor_signed_signature: String!
+  direct_raw_unsigned_refund_transaction: String
+  direct_from_cpfp_raw_unsigned_refund_transaction: String
+  direct_adaptor_signed_signature: String
+  direct_from_cpfp_adaptor_signed_signature: String
+}
+
+type Transfer {
+  """The total amount of the transfer."""
+  total_amount: CurrencyAmount!
+
+  """
+  The id of the transfer known at signing operators. If not set, the transfer hasn't been initialized.
+  """
+  spark_id: UUID
+
+  """The leaves that got transferred."""
+  leaves(first: Int = null, after: String = null): SparkTransferToLeavesConnection!
+
+  """The user request this transfer belongs to, if there is any"""
+  user_request: UserRequest
+}
+
+scalar UUID
+
+input UserLeafInput {
+  leaf_id: UUID!
+  raw_unsigned_refund_transaction: String!
+  adaptor_added_signature: String!
+  direct_raw_unsigned_refund_transaction: String = null
+  direct_from_cpfp_raw_unsigned_refund_transaction: String = null
+  direct_adaptor_added_signature: String = null
+  direct_from_cpfp_adaptor_added_signature: String = null
+}
+
+interface UserRequest implements Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+
+  """The network the lightning send request is on."""
+  network: BitcoinNetwork!
+
+  """A computed version of the status of this user request."""
+  request_status: SparkUserRequestStatus
+}
+
+input VerifyChallengeInput {
+  protected_challenge: String!
+  signature: String!
+  identity_public_key: PublicKey!
+  provider: Provider = null
+}
+
+type VerifyChallengeOutput {
+  valid_until: DateTime!
+  session_token: String!
+}
