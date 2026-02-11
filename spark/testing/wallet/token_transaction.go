@@ -537,6 +537,58 @@ func FreezeTokens(
 	return lastResponse, nil
 }
 
+func GlobalPauseTokens(
+	ctx context.Context,
+	config *TestWalletConfig,
+	tokenIdentifier []byte,
+	shouldUnpause bool,
+) (*tokenpb.FreezeTokensResponse, error) {
+	var lastResponse *tokenpb.FreezeTokensResponse
+	timestamp := uint64(time.Now().UnixMilli())
+	for _, operator := range config.SigningOperators {
+		operatorConn, err := operator.NewOperatorGRPCConnection()
+		if err != nil {
+			return nil, fmt.Errorf("error connecting to operator %s: %w", operator.AddressRpc, err)
+		}
+		defer operatorConn.Close()
+
+		token, err := AuthenticateWithConnection(ctx, config, operatorConn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to authenticate with server: %w", err)
+		}
+		tmpCtx := ContextWithToken(ctx, token)
+		sparkTokenClient := tokenpb.NewSparkTokenServiceClient(operatorConn)
+
+		payloadTokenProto := &tokenpb.FreezeTokensPayload{
+			Version:                   1,
+			TokenIdentifier:           tokenIdentifier,
+			OperatorIdentityPublicKey: operator.IdentityPublicKey.Serialize(),
+			IssuerProvidedTimestamp:   timestamp,
+			ShouldUnfreeze:            shouldUnpause,
+		}
+		payloadHash, err := utils.HashFreezeTokensPayloadV1(payloadTokenProto)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash global pause payload: %w", err)
+		}
+
+		sig, err := SignHashSlice(config, config.IdentityPrivateKey, payloadHash)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create signature: %w", err)
+		}
+
+		request := &tokenpb.FreezeTokensRequest{
+			FreezeTokensPayload: payloadTokenProto,
+			IssuerSignature:     sig,
+		}
+
+		lastResponse, err = sparkTokenClient.FreezeTokens(tmpCtx, request)
+		if err != nil {
+			return nil, fmt.Errorf("failed to global pause/unpause tokens: %w", err)
+		}
+	}
+	return lastResponse, nil
+}
+
 func CreateOperatorSpecificSignatures(
 	config *TestWalletConfig,
 	ownerPrivateKeys []keys.Private,

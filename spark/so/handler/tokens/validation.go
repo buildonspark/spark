@@ -128,6 +128,11 @@ func validateTokenTransactionForSigning(
 		if err := tokens.ValidateMintDoesNotExceedMaxSupplyEnt(ctx, tokenTransactionEnt); err != nil {
 			return err
 		}
+		if len(tokenTransactionEnt.Edges.CreatedOutput) > 0 {
+			if err := validateTokenNotGloballyPaused(ctx, tokenTransactionEnt.Edges.CreatedOutput[0].TokenCreateID); err != nil {
+				return err
+			}
+		}
 	case utils.TokenTransactionTypeTransfer:
 		// If token outputs are being spent, verify the expected status of inputs and check for active freezes.
 		if len(tokenTransactionEnt.Edges.SpentOutput) == 0 {
@@ -180,7 +185,10 @@ func validateNoActiveFreezesForOutputs(ctx context.Context, outputs []*ent.Token
 
 	logger := logging.GetLoggerFromContext(ctx)
 	for tokenCreateID, owners := range ownersByToken {
-		// Bulk query to ensure none of the owners for this token are frozen.
+		if err := validateTokenNotGloballyPaused(ctx, tokenCreateID); err != nil {
+			return err
+		}
+
 		activeFreezes, err := ent.GetActiveFreezes(ctx, owners, tokenCreateID)
 		if err != nil {
 			return fmt.Errorf("%s: %w", tokens.ErrFailedToQueryTokenFreezeStatus, err)
@@ -189,14 +197,25 @@ func validateNoActiveFreezesForOutputs(ctx context.Context, outputs []*ent.Token
 			continue
 		}
 		for _, freeze := range activeFreezes {
-			logger.Sugar().Infof(
+			logger.Info(fmt.Sprintf(
 				"Found active freeze for owner %x (token: %x, timestamp: %d)",
 				freeze.OwnerPublicKey,
 				freeze.TokenPublicKey,
 				freeze.WalletProvidedFreezeTimestamp,
-			)
+			))
 		}
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("at least one input is frozen. Cannot proceed with transaction"))
+	}
+	return nil
+}
+
+func validateTokenNotGloballyPaused(ctx context.Context, tokenCreateID uuid.UUID) error {
+	globalPause, err := ent.GetActiveGlobalPause(ctx, tokenCreateID)
+	if err != nil {
+		return sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to check global pause status: %w", err))
+	}
+	if globalPause != nil {
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token is globally paused, cannot proceed"))
 	}
 	return nil
 }

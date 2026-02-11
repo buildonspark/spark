@@ -248,6 +248,16 @@ func OwnerPublicKeyLTE(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldLTE(FieldOwnerPublicKey, v))
 }
 
+// OwnerPublicKeyIsNil applies the IsNil predicate on the "owner_public_key" field.
+func OwnerPublicKeyIsNil() predicate.TokenFreeze {
+	return predicate.TokenFreeze(sql.FieldIsNull(FieldOwnerPublicKey))
+}
+
+// OwnerPublicKeyNotNil applies the NotNil predicate on the "owner_public_key" field.
+func OwnerPublicKeyNotNil() predicate.TokenFreeze {
+	return predicate.TokenFreeze(sql.FieldNotNull(FieldOwnerPublicKey))
+}
+
 // TokenPublicKeyEQ applies the EQ predicate on the "token_public_key" field.
 func TokenPublicKeyEQ(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldEQ(FieldTokenPublicKey, v))

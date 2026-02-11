@@ -6024,17 +6024,6 @@ func (m *FreezeTokensPayload) validate(all bool) error {
 
 	// no validation rules for Version
 
-	if len(m.GetOwnerPublicKey()) != 33 {
-		err := FreezeTokensPayloadValidationError{
-			field:  "OwnerPublicKey",
-			reason: "value length must be 33 bytes",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
 	// no validation rules for IssuerProvidedTimestamp
 
 	if len(m.GetOperatorIdentityPublicKey()) != 33 {
@@ -6049,6 +6038,21 @@ func (m *FreezeTokensPayload) validate(all bool) error {
 	}
 
 	// no validation rules for ShouldUnfreeze
+
+	if m.OwnerPublicKey != nil {
+
+		if len(m.GetOwnerPublicKey()) != 33 {
+			err := FreezeTokensPayloadValidationError{
+				field:  "OwnerPublicKey",
+				reason: "value length must be 33 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
 
 	if m.TokenPublicKey != nil {
 
@@ -6437,28 +6441,12 @@ func (m *FreezeProgress) validate(all bool) error {
 
 	var errors []error
 
-	for idx, item := range m.GetFrozenOperatorPublicKeys() {
+	for idx, item := range m.GetAppliedOperatorPublicKeys() {
 		_, _ = idx, item
 
 		if len(item) != 33 {
 			err := FreezeProgressValidationError{
-				field:  fmt.Sprintf("FrozenOperatorPublicKeys[%v]", idx),
-				reason: "value length must be 33 bytes",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		}
-
-	}
-
-	for idx, item := range m.GetUnfrozenOperatorPublicKeys() {
-		_, _ = idx, item
-
-		if len(item) != 33 {
-			err := FreezeProgressValidationError{
-				field:  fmt.Sprintf("UnfrozenOperatorPublicKeys[%v]", idx),
+				field:  fmt.Sprintf("AppliedOperatorPublicKeys[%v]", idx),
 				reason: "value length must be 33 bytes",
 			}
 			if !all {

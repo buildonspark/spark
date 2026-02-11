@@ -67,6 +67,14 @@ func (tfc *TokenFreezeCreate) SetOwnerPublicKey(k keys.Public) *TokenFreezeCreat
 	return tfc
 }
 
+// SetNillableOwnerPublicKey sets the "owner_public_key" field if the given value is not nil.
+func (tfc *TokenFreezeCreate) SetNillableOwnerPublicKey(k *keys.Public) *TokenFreezeCreate {
+	if k != nil {
+		tfc.SetOwnerPublicKey(*k)
+	}
+	return tfc
+}
+
 // SetTokenPublicKey sets the "token_public_key" field.
 func (tfc *TokenFreezeCreate) SetTokenPublicKey(k keys.Public) *TokenFreezeCreate {
 	tfc.mutation.SetTokenPublicKey(k)
@@ -196,9 +204,6 @@ func (tfc *TokenFreezeCreate) check() error {
 		if err := tokenfreeze.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenFreeze.status": %w`, err)}
 		}
-	}
-	if _, ok := tfc.mutation.OwnerPublicKey(); !ok {
-		return &ValidationError{Name: "owner_public_key", err: errors.New(`ent: missing required field "TokenFreeze.owner_public_key"`)}
 	}
 	if _, ok := tfc.mutation.IssuerSignature(); !ok {
 		return &ValidationError{Name: "issuer_signature", err: errors.New(`ent: missing required field "TokenFreeze.issuer_signature"`)}

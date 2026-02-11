@@ -1547,7 +1547,6 @@ func TestHashFreezeTokensPayloadErrors(t *testing.T) {
 	ownerPubKey := keys.GeneratePrivateKey().Public()
 	tokenPubKey := keys.GeneratePrivateKey().Public()
 	operatorPubKey := keys.GeneratePrivateKey().Public()
-	tokenIdentifier := []byte("test_token_identifier_32bytes___")
 
 	tests := []struct {
 		name    string
@@ -1607,18 +1606,7 @@ func TestHashFreezeTokensPayloadErrors(t *testing.T) {
 			},
 			wantErr: "operator identity public key cannot be empty",
 		},
-		{
-			name: "empty owner public key v1",
-			payload: &tokenpb.FreezeTokensPayload{
-				Version:                   1,
-				OwnerPublicKey:            []byte{},
-				TokenIdentifier:           tokenIdentifier,
-				ShouldUnfreeze:            false,
-				IssuerProvidedTimestamp:   1234567890,
-				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
-			},
-			wantErr: "owner public key cannot be empty",
-		},
+		// V1 with empty owner_public_key is allowed (global pause), tested separately.
 		{
 			name: "missing token identifier v1",
 			payload: &tokenpb.FreezeTokensPayload{
@@ -1906,7 +1894,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "owner public key cannot be empty",
+			wantErr:             "invalid freeze tokens payload version: 0",
 		},
 		{
 			name: "v0 nil token public key",

@@ -15724,9 +15724,22 @@ func (m *TokenFreezeMutation) OldOwnerPublicKey(ctx context.Context) (v keys.Pub
 	return oldValue.OwnerPublicKey, nil
 }
 
+// ClearOwnerPublicKey clears the value of the "owner_public_key" field.
+func (m *TokenFreezeMutation) ClearOwnerPublicKey() {
+	m.owner_public_key = nil
+	m.clearedFields[tokenfreeze.FieldOwnerPublicKey] = struct{}{}
+}
+
+// OwnerPublicKeyCleared returns if the "owner_public_key" field was cleared in this mutation.
+func (m *TokenFreezeMutation) OwnerPublicKeyCleared() bool {
+	_, ok := m.clearedFields[tokenfreeze.FieldOwnerPublicKey]
+	return ok
+}
+
 // ResetOwnerPublicKey resets all changes to the "owner_public_key" field.
 func (m *TokenFreezeMutation) ResetOwnerPublicKey() {
 	m.owner_public_key = nil
+	delete(m.clearedFields, tokenfreeze.FieldOwnerPublicKey)
 }
 
 // SetTokenPublicKey sets the "token_public_key" field.
@@ -16247,6 +16260,9 @@ func (m *TokenFreezeMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *TokenFreezeMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(tokenfreeze.FieldOwnerPublicKey) {
+		fields = append(fields, tokenfreeze.FieldOwnerPublicKey)
+	}
 	if m.FieldCleared(tokenfreeze.FieldTokenPublicKey) {
 		fields = append(fields, tokenfreeze.FieldTokenPublicKey)
 	}
@@ -16267,6 +16283,9 @@ func (m *TokenFreezeMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *TokenFreezeMutation) ClearField(name string) error {
 	switch name {
+	case tokenfreeze.FieldOwnerPublicKey:
+		m.ClearOwnerPublicKey()
+		return nil
 	case tokenfreeze.FieldTokenPublicKey:
 		m.ClearTokenPublicKey()
 		return nil

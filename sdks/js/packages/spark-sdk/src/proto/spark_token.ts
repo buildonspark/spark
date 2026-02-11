@@ -577,7 +577,7 @@ export interface TokenTransactionWithStatus {
 
 export interface FreezeTokensPayload {
   version: number;
-  ownerPublicKey: Uint8Array;
+  ownerPublicKey?: Uint8Array | undefined;
   tokenPublicKey?: Uint8Array | undefined;
   tokenIdentifier?: Uint8Array | undefined;
   issuerProvidedTimestamp: number;
@@ -602,8 +602,7 @@ export interface TokenOutputRef {
 
 /** FreezeProgress tracks the coordinated freeze status across operators. */
 export interface FreezeProgress {
-  frozenOperatorPublicKeys: Uint8Array[];
-  unfrozenOperatorPublicKeys: Uint8Array[];
+  appliedOperatorPublicKeys: Uint8Array[];
 }
 
 export interface FreezeTokensResponse {
@@ -4641,7 +4640,7 @@ export const TokenTransactionWithStatus: MessageFns<TokenTransactionWithStatus> 
 function createBaseFreezeTokensPayload(): FreezeTokensPayload {
   return {
     version: 0,
-    ownerPublicKey: new Uint8Array(0),
+    ownerPublicKey: undefined,
     tokenPublicKey: undefined,
     tokenIdentifier: undefined,
     issuerProvidedTimestamp: 0,
@@ -4655,7 +4654,7 @@ export const FreezeTokensPayload: MessageFns<FreezeTokensPayload> = {
     if (message.version !== 0) {
       writer.uint32(8).uint32(message.version);
     }
-    if (message.ownerPublicKey.length !== 0) {
+    if (message.ownerPublicKey !== undefined) {
       writer.uint32(18).bytes(message.ownerPublicKey);
     }
     if (message.tokenPublicKey !== undefined) {
@@ -4751,7 +4750,7 @@ export const FreezeTokensPayload: MessageFns<FreezeTokensPayload> = {
   fromJSON(object: any): FreezeTokensPayload {
     return {
       version: isSet(object.version) ? globalThis.Number(object.version) : 0,
-      ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : new Uint8Array(0),
+      ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : undefined,
       tokenPublicKey: isSet(object.tokenPublicKey) ? bytesFromBase64(object.tokenPublicKey) : undefined,
       tokenIdentifier: isSet(object.tokenIdentifier) ? bytesFromBase64(object.tokenIdentifier) : undefined,
       issuerProvidedTimestamp: isSet(object.issuerProvidedTimestamp)
@@ -4769,7 +4768,7 @@ export const FreezeTokensPayload: MessageFns<FreezeTokensPayload> = {
     if (message.version !== 0) {
       obj.version = Math.round(message.version);
     }
-    if (message.ownerPublicKey.length !== 0) {
+    if (message.ownerPublicKey !== undefined) {
       obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
     }
     if (message.tokenPublicKey !== undefined) {
@@ -4796,7 +4795,7 @@ export const FreezeTokensPayload: MessageFns<FreezeTokensPayload> = {
   fromPartial(object: DeepPartial<FreezeTokensPayload>): FreezeTokensPayload {
     const message = createBaseFreezeTokensPayload();
     message.version = object.version ?? 0;
-    message.ownerPublicKey = object.ownerPublicKey ?? new Uint8Array(0);
+    message.ownerPublicKey = object.ownerPublicKey ?? undefined;
     message.tokenPublicKey = object.tokenPublicKey ?? undefined;
     message.tokenIdentifier = object.tokenIdentifier ?? undefined;
     message.issuerProvidedTimestamp = object.issuerProvidedTimestamp ?? 0;
@@ -4963,16 +4962,13 @@ export const TokenOutputRef: MessageFns<TokenOutputRef> = {
 };
 
 function createBaseFreezeProgress(): FreezeProgress {
-  return { frozenOperatorPublicKeys: [], unfrozenOperatorPublicKeys: [] };
+  return { appliedOperatorPublicKeys: [] };
 }
 
 export const FreezeProgress: MessageFns<FreezeProgress> = {
   encode(message: FreezeProgress, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.frozenOperatorPublicKeys) {
+    for (const v of message.appliedOperatorPublicKeys) {
       writer.uint32(10).bytes(v!);
-    }
-    for (const v of message.unfrozenOperatorPublicKeys) {
-      writer.uint32(18).bytes(v!);
     }
     return writer;
   },
@@ -4989,15 +4985,7 @@ export const FreezeProgress: MessageFns<FreezeProgress> = {
             break;
           }
 
-          message.frozenOperatorPublicKeys.push(reader.bytes());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.unfrozenOperatorPublicKeys.push(reader.bytes());
+          message.appliedOperatorPublicKeys.push(reader.bytes());
           continue;
         }
       }
@@ -5011,22 +4999,16 @@ export const FreezeProgress: MessageFns<FreezeProgress> = {
 
   fromJSON(object: any): FreezeProgress {
     return {
-      frozenOperatorPublicKeys: globalThis.Array.isArray(object?.frozenOperatorPublicKeys)
-        ? object.frozenOperatorPublicKeys.map((e: any) => bytesFromBase64(e))
-        : [],
-      unfrozenOperatorPublicKeys: globalThis.Array.isArray(object?.unfrozenOperatorPublicKeys)
-        ? object.unfrozenOperatorPublicKeys.map((e: any) => bytesFromBase64(e))
+      appliedOperatorPublicKeys: globalThis.Array.isArray(object?.appliedOperatorPublicKeys)
+        ? object.appliedOperatorPublicKeys.map((e: any) => bytesFromBase64(e))
         : [],
     };
   },
 
   toJSON(message: FreezeProgress): unknown {
     const obj: any = {};
-    if (message.frozenOperatorPublicKeys?.length) {
-      obj.frozenOperatorPublicKeys = message.frozenOperatorPublicKeys.map((e) => base64FromBytes(e));
-    }
-    if (message.unfrozenOperatorPublicKeys?.length) {
-      obj.unfrozenOperatorPublicKeys = message.unfrozenOperatorPublicKeys.map((e) => base64FromBytes(e));
+    if (message.appliedOperatorPublicKeys?.length) {
+      obj.appliedOperatorPublicKeys = message.appliedOperatorPublicKeys.map((e) => base64FromBytes(e));
     }
     return obj;
   },
@@ -5036,8 +5018,7 @@ export const FreezeProgress: MessageFns<FreezeProgress> = {
   },
   fromPartial(object: DeepPartial<FreezeProgress>): FreezeProgress {
     const message = createBaseFreezeProgress();
-    message.frozenOperatorPublicKeys = object.frozenOperatorPublicKeys?.map((e) => e) || [];
-    message.unfrozenOperatorPublicKeys = object.unfrozenOperatorPublicKeys?.map((e) => e) || [];
+    message.appliedOperatorPublicKeys = object.appliedOperatorPublicKeys?.map((e) => e) || [];
     return message;
   },
 };

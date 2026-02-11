@@ -179,6 +179,15 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("max supply error", finalTokenTx, err)
 		}
+		if mintTokenIdentifier := finalTokenTx.GetMintInput().GetTokenIdentifier(); len(mintTokenIdentifier) > 0 {
+			tokenCreateEnt, err := ent.GetTokenCreateByIdentifier(ctx, mintTokenIdentifier)
+			if err != nil {
+				return nil, tokens.FormatErrorWithTransactionProto("failed to get token create for global pause check", finalTokenTx, sparkerrors.InternalDatabaseReadError(err))
+			}
+			if err := validateTokenNotGloballyPaused(ctx, tokenCreateEnt.ID); err != nil {
+				return nil, tokens.FormatErrorWithTransactionProto("global pause check", finalTokenTx, err)
+			}
+		}
 	case utils.TokenTransactionTypeTransfer:
 		inputTtxos, err = ent.FetchAndLockTokenInputs(ctx, finalTokenTx.GetTransferInput().GetOutputsToSpend())
 		if err != nil {

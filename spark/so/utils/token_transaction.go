@@ -829,6 +829,9 @@ func HashFreezeTokensPayloadV0(payload *tokenpb.FreezeTokensPayload) ([]byte, er
 	if payload == nil {
 		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("freeze tokens payload cannot be nil"))
 	}
+	if len(payload.GetOwnerPublicKey()) == 0 {
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("owner public key cannot be empty"))
+	}
 	h := sha256.New()
 
 	contentHashes, err := hashFreezePayloadContents(h, payload)
@@ -849,9 +852,6 @@ func hashFreezePayloadContents(h hash.Hash, payload *tokenpb.FreezeTokensPayload
 
 	h.Reset()
 	ownerPubKey := payload.GetOwnerPublicKey()
-	if len(ownerPubKey) == 0 {
-		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("owner public key cannot be empty"))
-	}
 	h.Write(ownerPubKey)
 	allHashes = append(allHashes, h.Sum(nil)...)
 
@@ -1277,9 +1277,6 @@ func ValidateFreezeTokensPayload(payload *tokenpb.FreezeTokensPayload, expectedS
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("freeze tokens payload cannot be nil"))
 	}
 
-	if len(payload.GetOwnerPublicKey()) == 0 {
-		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("owner public key cannot be empty"))
-	}
 	switch payload.Version {
 	case 1:
 		if payload.GetTokenPublicKey() != nil {

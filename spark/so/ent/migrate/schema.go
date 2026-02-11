@@ -599,7 +599,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"FROZEN", "THAWED"}},
-		{Name: "owner_public_key", Type: field.TypeBytes},
+		{Name: "owner_public_key", Type: field.TypeBytes, Nullable: true},
 		{Name: "token_public_key", Type: field.TypeBytes, Nullable: true},
 		{Name: "issuer_signature", Type: field.TypeBytes, Unique: true},
 		{Name: "wallet_provided_freeze_timestamp", Type: field.TypeUint64},
@@ -639,6 +639,27 @@ var (
 				Name:    "tokenfreeze_owner_public_key_token_create_id_wallet_provided_t",
 				Unique:  true,
 				Columns: []*schema.Column{TokenFreezesColumns[4], TokenFreezesColumns[9], TokenFreezesColumns[8]},
+			},
+			{
+				Name:    "tokenfreeze_token_create_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{TokenFreezesColumns[9], TokenFreezesColumns[3]},
+			},
+			{
+				Name:    "tokenfreeze_unique_active_global_pause",
+				Unique:  true,
+				Columns: []*schema.Column{TokenFreezesColumns[9]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "owner_public_key IS NULL AND status = 'FROZEN'",
+				},
+			},
+			{
+				Name:    "tokenfreeze_unique_active_per_owner_freeze",
+				Unique:  true,
+				Columns: []*schema.Column{TokenFreezesColumns[4], TokenFreezesColumns[9]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "owner_public_key IS NOT NULL AND status = 'FROZEN'",
+				},
 			},
 		},
 	}

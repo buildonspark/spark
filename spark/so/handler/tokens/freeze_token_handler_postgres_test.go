@@ -453,9 +453,8 @@ func TestFreezeTokens_CoordinatedFreezeAllSuccess(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.NotNil(t, resp.FreezeProgress)
-	// Self + 2 mock operators = 3 total frozen
-	assert.Len(t, resp.FreezeProgress.FrozenOperatorPublicKeys, 3)
-	assert.Empty(t, resp.FreezeProgress.UnfrozenOperatorPublicKeys)
+	// Self + 2 mock operators = 3 total applied
+	assert.Len(t, resp.FreezeProgress.AppliedOperatorPublicKeys, 3)
 }
 
 func TestFreezeTokens_CoordinatedFreezeAllOthersFailed(t *testing.T) {
@@ -471,10 +470,8 @@ func TestFreezeTokens_CoordinatedFreezeAllOthersFailed(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.NotNil(t, resp.FreezeProgress)
-	// Only self succeeded
-	assert.Len(t, resp.FreezeProgress.FrozenOperatorPublicKeys, 1)
-	// 2 mock operators failed
-	assert.Len(t, resp.FreezeProgress.UnfrozenOperatorPublicKeys, 2)
+	// Only self applied successfully
+	assert.Len(t, resp.FreezeProgress.AppliedOperatorPublicKeys, 1)
 }
 
 func TestFreezeTokens_CoordinatedFreezePartialSuccess(t *testing.T) {
@@ -490,9 +487,271 @@ func TestFreezeTokens_CoordinatedFreezePartialSuccess(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.NotNil(t, resp.FreezeProgress)
-	// Self + 1 mock operator succeeded, 1 failed
-	assert.Len(t, resp.FreezeProgress.FrozenOperatorPublicKeys, 2)
-	assert.Len(t, resp.FreezeProgress.UnfrozenOperatorPublicKeys, 1)
+	// Self + 1 mock operator applied successfully
+	assert.Len(t, resp.FreezeProgress.AppliedOperatorPublicKeys, 2)
+}
+
+// --- Global Pause Tests ---
+
+func createGlobalPauseRequest(t *testing.T, cfg *so.Config, tokenCreate *ent.TokenCreate, shouldUnpause bool, signingKey keys.Private, timestamp uint64) *tokenpb.FreezeTokensRequest {
+	t.Helper()
+
+	payload := &tokenpb.FreezeTokensPayload{
+		Version:                   1,
+		TokenIdentifier:           tokenCreate.TokenIdentifier,
+		ShouldUnfreeze:            shouldUnpause,
+		IssuerProvidedTimestamp:   timestamp,
+		OperatorIdentityPublicKey: cfg.IdentityPublicKey().Serialize(),
+	}
+
+	payloadHash, err := utils.HashFreezeTokensPayload(payload)
+	require.NoError(t, err)
+
+	signature := ecdsa.Sign(signingKey.ToBTCEC(), payloadHash)
+
+	return &tokenpb.FreezeTokensRequest{
+		FreezeTokensPayload: payload,
+		IssuerSignature:     signature.Serialize(),
+	}
+}
+
+func TestGlobalPause_Success(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewFreezeTokenHandler(cfg)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
+	req := createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(10*time.Second))
+
+	resp, err := handler.FreezeTokens(ctx, req)
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Empty(t, resp.ImpactedTokenOutputs)
+}
+
+func TestGlobalUnpause_Success(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewFreezeTokenHandler(cfg)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
+
+	pauseReq := createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(20*time.Second))
+	_, err := handler.FreezeTokens(ctx, pauseReq)
+	require.NoError(t, err)
+
+	unpauseReq := createGlobalPauseRequest(t, cfg, tokenCreate, true, freezeTestIssuerKey, recentTimestamp(10*time.Second))
+	resp, err := handler.FreezeTokens(ctx, unpauseReq)
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+}
+
+func TestGlobalPause_IdempotentSameTimestamp(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewFreezeTokenHandler(cfg)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
+	timestamp := recentTimestamp(10 * time.Second)
+
+	req1 := createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, timestamp)
+	_, err := handler.FreezeTokens(ctx, req1)
+	require.NoError(t, err)
+
+	req2 := createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, timestamp)
+	resp, err := handler.FreezeTokens(ctx, req2)
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+}
+
+func TestGlobalPause_RejectsDifferentTimestampWhenAlreadyPaused(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewFreezeTokenHandler(cfg)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
+
+	req1 := createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(20*time.Second))
+	_, err := handler.FreezeTokens(ctx, req1)
+	require.NoError(t, err)
+
+	req2 := createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(10*time.Second))
+	resp, err := handler.FreezeTokens(ctx, req2)
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Contains(t, err.Error(), "already frozen")
+}
+
+func TestGlobalPause_RejectsStaleUnpause(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewFreezeTokenHandler(cfg)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
+
+	pauseTs := recentTimestamp(30 * time.Second)
+	unpauseTs := recentTimestamp(20 * time.Second)
+	repauseTs := recentTimestamp(10 * time.Second)
+
+	_, err := handler.FreezeTokens(ctx, createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, pauseTs))
+	require.NoError(t, err)
+	_, err = handler.FreezeTokens(ctx, createGlobalPauseRequest(t, cfg, tokenCreate, true, freezeTestIssuerKey, unpauseTs))
+	require.NoError(t, err)
+	_, err = handler.FreezeTokens(ctx, createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, repauseTs))
+	require.NoError(t, err)
+
+	// Stale unpause (older than current pause)
+	_, err = handler.FreezeTokens(ctx, createGlobalPauseRequest(t, cfg, tokenCreate, true, freezeTestIssuerKey, unpauseTs))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "stale unfreeze request")
+}
+
+func TestGlobalPause_RejectsStalePause(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewFreezeTokenHandler(cfg)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
+
+	pauseTs := recentTimestamp(30 * time.Second)
+	unpauseTs := recentTimestamp(20 * time.Second)
+
+	_, err := handler.FreezeTokens(ctx, createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, pauseTs))
+	require.NoError(t, err)
+	_, err = handler.FreezeTokens(ctx, createGlobalPauseRequest(t, cfg, tokenCreate, true, freezeTestIssuerKey, unpauseTs))
+	require.NoError(t, err)
+
+	// Stale pause (older than most recent unpause)
+	stalePauseTs := recentTimestamp(25 * time.Second)
+	_, err = handler.FreezeTokens(ctx, createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, stalePauseTs))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "stale freeze request")
+}
+
+func TestGlobalPause_IndependentFromPerOwnerFreeze(t *testing.T) {
+	t.Run("freeze_user_then_global", func(t *testing.T) {
+		ctx, tc := db.ConnectToTestPostgres(t)
+		cfg := sparktesting.TestConfig(t)
+		handler := NewFreezeTokenHandler(cfg)
+		tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
+
+		freezeReq := createFreezeTestRequest(t, cfg, tokenCreate, false)
+		_, err := handler.FreezeTokens(ctx, freezeReq)
+		require.NoError(t, err)
+
+		pauseReq := createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(10*time.Second))
+		_, err = handler.FreezeTokens(ctx, pauseReq)
+		require.NoError(t, err)
+
+		unfreezeReq := createFreezeTestRequest(t, cfg, tokenCreate, true)
+		_, err = handler.FreezeTokens(ctx, unfreezeReq)
+		require.NoError(t, err)
+
+		output := &ent.TokenOutput{
+			TokenCreateID:  tokenCreate.ID,
+			OwnerPublicKey: freezeTestOwnerKey.Public(),
+		}
+		err = validateNoActiveFreezesForOutputs(ctx, []*ent.TokenOutput{output})
+		require.Error(t, err, "global pause should still block after per-owner unfreeze")
+		assert.Contains(t, err.Error(), "globally paused")
+
+		unpauseReq := createGlobalPauseRequest(t, cfg, tokenCreate, true, freezeTestIssuerKey, recentTimestamp(5*time.Second))
+		_, err = handler.FreezeTokens(ctx, unpauseReq)
+		require.NoError(t, err)
+
+		err = validateNoActiveFreezesForOutputs(ctx, []*ent.TokenOutput{output})
+		require.NoError(t, err, "should be unblocked after both unfreezes")
+	})
+
+	t.Run("freeze_global_then_user", func(t *testing.T) {
+		ctx, tc := db.ConnectToTestPostgres(t)
+		cfg := sparktesting.TestConfig(t)
+		handler := NewFreezeTokenHandler(cfg)
+		tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
+
+		pauseReq := createGlobalPauseRequest(t, cfg, tokenCreate, false, freezeTestIssuerKey, recentTimestamp(10*time.Second))
+		_, err := handler.FreezeTokens(ctx, pauseReq)
+		require.NoError(t, err)
+
+		freezeReq := createFreezeTestRequest(t, cfg, tokenCreate, false)
+		_, err = handler.FreezeTokens(ctx, freezeReq)
+		require.NoError(t, err)
+
+		unpauseReq := createGlobalPauseRequest(t, cfg, tokenCreate, true, freezeTestIssuerKey, recentTimestamp(5*time.Second))
+		_, err = handler.FreezeTokens(ctx, unpauseReq)
+		require.NoError(t, err)
+
+		output := &ent.TokenOutput{
+			TokenCreateID:  tokenCreate.ID,
+			OwnerPublicKey: freezeTestOwnerKey.Public(),
+		}
+		err = validateNoActiveFreezesForOutputs(ctx, []*ent.TokenOutput{output})
+		require.Error(t, err, "per-owner freeze should still block after global unpause")
+		assert.Contains(t, err.Error(), "frozen")
+
+		unfreezeReq := createFreezeTestRequest(t, cfg, tokenCreate, true)
+		_, err = handler.FreezeTokens(ctx, unfreezeReq)
+		require.NoError(t, err)
+
+		err = validateNoActiveFreezesForOutputs(ctx, []*ent.TokenOutput{output})
+		require.NoError(t, err, "should be unblocked after both unfreezes")
+	})
+}
+
+func TestGlobalPause_BlocksTransfer(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
+
+	// Activate global pause
+	err := ent.ActivateGlobalPause(ctx, tokenCreate.ID, []byte("test-sig-global-pause-blocks"), recentTimestamp(10*time.Second))
+	require.NoError(t, err)
+
+	// Create a mock token output referencing this token create
+	output := &ent.TokenOutput{
+		TokenCreateID:  tokenCreate.ID,
+		OwnerPublicKey: freezeTestOwnerKey.Public(),
+	}
+
+	err = validateNoActiveFreezesForOutputs(ctx, []*ent.TokenOutput{output})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "globally paused")
+}
+
+func TestGlobalPause_BlocksMint(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
+
+	err := ent.ActivateGlobalPause(ctx, tokenCreate.ID, []byte("test-sig-global-pause-mint"), recentTimestamp(10*time.Second))
+	require.NoError(t, err)
+
+	err = validateTokenNotGloballyPaused(ctx, tokenCreate.ID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "globally paused")
+}
+
+func TestGlobalPause_DoesNotBlockAfterUnpause(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	tokenCreate := createFreezeTestTokenCreate(t, ctx, tc.Client, true)
+
+	err := ent.ActivateGlobalPause(ctx, tokenCreate.ID, []byte("test-sig-pause-unpause-1"), recentTimestamp(20*time.Second))
+	require.NoError(t, err)
+
+	pause, err := ent.GetActiveGlobalPause(ctx, tokenCreate.ID)
+	require.NoError(t, err)
+	require.NotNil(t, pause)
+
+	err = ent.ThawActiveFreeze(ctx, pause.ID, recentTimestamp(10*time.Second))
+	require.NoError(t, err)
+
+	err = validateTokenNotGloballyPaused(ctx, tokenCreate.ID)
+	require.NoError(t, err)
 }
 
 func TestFreezeTokens_CoordinatedFreezeDisabled(t *testing.T) {

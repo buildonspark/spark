@@ -60,8 +60,8 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 		}
 
 		freezeProgress = h.fanOutFreezeToOtherOperators(ctx, req)
-		freezeProgress.FrozenOperatorPublicKeys = append(
-			freezeProgress.FrozenOperatorPublicKeys,
+		freezeProgress.AppliedOperatorPublicKeys = append(
+			freezeProgress.AppliedOperatorPublicKeys,
 			h.config.IdentityPublicKey().Serialize(),
 		)
 	}
@@ -74,7 +74,7 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 }
 
 // fanOutFreezeToOtherOperators sends freeze requests to all other operators.
-// Returns progress showing which operators succeeded/failed.
+// Returns progress showing which operators successfully applied the operation.
 func (h *FreezeTokenHandler) fanOutFreezeToOtherOperators(ctx context.Context, req *tokenpb.FreezeTokensRequest) *tokenpb.FreezeProgress {
 	logger := logging.GetLoggerFromContext(ctx)
 
@@ -118,22 +118,18 @@ func (h *FreezeTokenHandler) fanOutFreezeToOtherOperators(ctx context.Context, r
 
 // buildFreezeProgress builds a FreezeProgress from the fan-out results.
 func (h *FreezeTokenHandler) buildFreezeProgress(results *helper.PartialResults[*tokeninternalpb.InternalFreezeTokensResponse]) *tokenpb.FreezeProgress {
-	var frozen, unfrozen [][]byte
+	var applied [][]byte
 
 	for identifier, operator := range h.config.SigningOperatorMap {
 		if identifier == h.config.Identifier {
-			continue // Self is handled separately in FreezeTokens
+			continue // Self is added by the caller.
 		}
-
 		if _, ok := results.Successes[identifier]; ok {
-			frozen = append(frozen, operator.IdentityPublicKey.Serialize())
-		} else {
-			unfrozen = append(unfrozen, operator.IdentityPublicKey.Serialize())
+			applied = append(applied, operator.IdentityPublicKey.Serialize())
 		}
 	}
 
 	return &tokenpb.FreezeProgress{
-		FrozenOperatorPublicKeys:   frozen,
-		UnfrozenOperatorPublicKeys: unfrozen,
+		AppliedOperatorPublicKeys: applied,
 	}
 }

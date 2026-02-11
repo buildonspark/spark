@@ -2,6 +2,7 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -30,6 +31,7 @@ func (TokenFreeze) Fields() []ent.Field {
 			GoType(st.TokenFreezeStatus("")).
 			Annotations(entexample.Default(st.TokenFreezeStatusThawed)),
 		field.Bytes("owner_public_key").
+			Optional().
 			Immutable().
 			GoType(keys.Public{}).
 			Annotations(entexample.Default(
@@ -80,7 +82,7 @@ func (TokenFreeze) Edges() []ent.Edge {
 // Indexes are the indexes for the token leafs table.
 func (TokenFreeze) Indexes() []ent.Index {
 	return []ent.Index{
-		// Enforce uniqueness to ensure idempotency.
+		// Enforce uniqueness to ensure idempotency (per-owner freezes).
 		index.Fields("owner_public_key", "token_public_key", "wallet_provided_freeze_timestamp").Unique().
 			StorageKey("tokenfreeze_owner_public_key_token_public_key_wallet_provided_f"),
 		index.Fields("owner_public_key", "token_public_key", "wallet_provided_thaw_timestamp").Unique().
@@ -89,5 +91,16 @@ func (TokenFreeze) Indexes() []ent.Index {
 			StorageKey("tokenfreeze_owner_public_key_token_create_id_wallet_provided_f"),
 		index.Fields("owner_public_key", "token_create_id", "wallet_provided_thaw_timestamp").Unique().
 			StorageKey("tokenfreeze_owner_public_key_token_create_id_wallet_provided_t"),
+		// Index for efficient global pause lookups (owner_public_key IS NULL).
+		index.Fields("token_create_id", "status").
+			StorageKey("tokenfreeze_token_create_id_status"),
+		// Enforce at most one active global pause per token.
+		index.Fields("token_create_id").Unique().
+			Annotations(entsql.IndexWhere("owner_public_key IS NULL AND status = 'FROZEN'")).
+			StorageKey("tokenfreeze_unique_active_global_pause"),
+		// Enforce at most one active freeze per owner per token.
+		index.Fields("owner_public_key", "token_create_id").Unique().
+			Annotations(entsql.IndexWhere("owner_public_key IS NOT NULL AND status = 'FROZEN'")).
+			StorageKey("tokenfreeze_unique_active_per_owner_freeze"),
 	}
 }

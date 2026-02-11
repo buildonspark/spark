@@ -2738,7 +2738,7 @@ func (x *TokenTransactionWithStatus) GetTokenTransactionHash() []byte {
 type FreezeTokensPayload struct {
 	state                     protoimpl.MessageState `protogen:"open.v1"`
 	Version                   uint32                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
-	OwnerPublicKey            []byte                 `protobuf:"bytes,2,opt,name=owner_public_key,json=ownerPublicKey,proto3" json:"owner_public_key,omitempty"`
+	OwnerPublicKey            []byte                 `protobuf:"bytes,2,opt,name=owner_public_key,json=ownerPublicKey,proto3,oneof" json:"owner_public_key,omitempty"`
 	TokenPublicKey            []byte                 `protobuf:"bytes,3,opt,name=token_public_key,json=tokenPublicKey,proto3,oneof" json:"token_public_key,omitempty"`
 	TokenIdentifier           []byte                 `protobuf:"bytes,4,opt,name=token_identifier,json=tokenIdentifier,proto3,oneof" json:"token_identifier,omitempty"`
 	IssuerProvidedTimestamp   uint64                 `protobuf:"varint,5,opt,name=issuer_provided_timestamp,json=issuerProvidedTimestamp,proto3" json:"issuer_provided_timestamp,omitempty"`
@@ -2936,11 +2936,10 @@ func (x *TokenOutputRef) GetVout() uint32 {
 
 // FreezeProgress tracks the coordinated freeze status across operators.
 type FreezeProgress struct {
-	state                      protoimpl.MessageState `protogen:"open.v1"`
-	FrozenOperatorPublicKeys   [][]byte               `protobuf:"bytes,1,rep,name=frozen_operator_public_keys,json=frozenOperatorPublicKeys,proto3" json:"frozen_operator_public_keys,omitempty"`
-	UnfrozenOperatorPublicKeys [][]byte               `protobuf:"bytes,2,rep,name=unfrozen_operator_public_keys,json=unfrozenOperatorPublicKeys,proto3" json:"unfrozen_operator_public_keys,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	AppliedOperatorPublicKeys [][]byte               `protobuf:"bytes,1,rep,name=applied_operator_public_keys,json=appliedOperatorPublicKeys,proto3" json:"applied_operator_public_keys,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *FreezeProgress) Reset() {
@@ -2973,16 +2972,9 @@ func (*FreezeProgress) Descriptor() ([]byte, []int) {
 	return file_spark_token_proto_rawDescGZIP(), []int{37}
 }
 
-func (x *FreezeProgress) GetFrozenOperatorPublicKeys() [][]byte {
+func (x *FreezeProgress) GetAppliedOperatorPublicKeys() [][]byte {
 	if x != nil {
-		return x.FrozenOperatorPublicKeys
-	}
-	return nil
-}
-
-func (x *FreezeProgress) GetUnfrozenOperatorPublicKeys() [][]byte {
-	if x != nil {
-		return x.UnfrozenOperatorPublicKeys
+		return x.AppliedOperatorPublicKeys
 	}
 	return nil
 }
@@ -3272,15 +3264,16 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x11token_transaction\x18\x01 \x01(\v2\x1d.spark_token.TokenTransactionR\x10tokenTransaction\x12;\n" +
 	"\x06status\x18\x02 \x01(\x0e2#.spark_token.TokenTransactionStatusR\x06status\x12f\n" +
 	"\x15confirmation_metadata\x18\x03 \x01(\v21.spark_token.TokenTransactionConfirmationMetadataR\x14confirmationMetadata\x12=\n" +
-	"\x16token_transaction_hash\x18\x04 \x01(\fB\a\xfaB\x04z\x02h R\x14tokenTransactionHash\"\xac\x03\n" +
+	"\x16token_transaction_hash\x18\x04 \x01(\fB\a\xfaB\x04z\x02h R\x14tokenTransactionHash\"\xc6\x03\n" +
 	"\x13FreezeTokensPayload\x12\x18\n" +
-	"\aversion\x18\x01 \x01(\rR\aversion\x121\n" +
-	"\x10owner_public_key\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x0eownerPublicKey\x126\n" +
-	"\x10token_public_key\x18\x03 \x01(\fB\a\xfaB\x04z\x02h!H\x00R\x0etokenPublicKey\x88\x01\x01\x127\n" +
-	"\x10token_identifier\x18\x04 \x01(\fB\a\xfaB\x04z\x02h H\x01R\x0ftokenIdentifier\x88\x01\x01\x12:\n" +
+	"\aversion\x18\x01 \x01(\rR\aversion\x126\n" +
+	"\x10owner_public_key\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!H\x00R\x0eownerPublicKey\x88\x01\x01\x126\n" +
+	"\x10token_public_key\x18\x03 \x01(\fB\a\xfaB\x04z\x02h!H\x01R\x0etokenPublicKey\x88\x01\x01\x127\n" +
+	"\x10token_identifier\x18\x04 \x01(\fB\a\xfaB\x04z\x02h H\x02R\x0ftokenIdentifier\x88\x01\x01\x12:\n" +
 	"\x19issuer_provided_timestamp\x18\x05 \x01(\x04R\x17issuerProvidedTimestamp\x12H\n" +
 	"\x1coperator_identity_public_key\x18\x06 \x01(\fB\a\xfaB\x04z\x02h!R\x19operatorIdentityPublicKey\x12'\n" +
 	"\x0fshould_unfreeze\x18\a \x01(\bR\x0eshouldUnfreezeB\x13\n" +
+	"\x11_owner_public_keyB\x13\n" +
 	"\x11_token_public_keyB\x13\n" +
 	"\x11_token_identifier\"\xa1\x01\n" +
 	"\x13FreezeTokensRequest\x12T\n" +
@@ -3288,10 +3281,9 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x10issuer_signature\x18\x02 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\x0fissuerSignature\"X\n" +
 	"\x0eTokenOutputRef\x122\n" +
 	"\x10transaction_hash\x18\x01 \x01(\fB\a\xfaB\x04z\x02h R\x0ftransactionHash\x12\x12\n" +
-	"\x04vout\x18\x02 \x01(\rR\x04vout\"\xae\x01\n" +
-	"\x0eFreezeProgress\x12K\n" +
-	"\x1bfrozen_operator_public_keys\x18\x01 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x18frozenOperatorPublicKeys\x12O\n" +
-	"\x1dunfrozen_operator_public_keys\x18\x02 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x1aunfrozenOperatorPublicKeys\"\xa4\x02\n" +
+	"\x04vout\x18\x02 \x01(\rR\x04vout\"_\n" +
+	"\x0eFreezeProgress\x12M\n" +
+	"\x1capplied_operator_public_keys\x18\x01 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x19appliedOperatorPublicKeys\"\xa4\x02\n" +
 	"\x14FreezeTokensResponse\x12?\n" +
 	"\x13impacted_output_ids\x18\x01 \x03(\tB\x0f\xfaB\n" +
 	"\x92\x01\a\"\x05r\x03\xb0\x01\x01\x18\x01R\x11impactedOutputIds\x122\n" +

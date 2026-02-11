@@ -155,6 +155,9 @@ func (tfu *TokenFreezeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tfu.mutation.Status(); ok {
 		_spec.SetField(tokenfreeze.FieldStatus, field.TypeEnum, value)
 	}
+	if tfu.mutation.OwnerPublicKeyCleared() {
+		_spec.ClearField(tokenfreeze.FieldOwnerPublicKey, field.TypeBytes)
+	}
 	if tfu.mutation.TokenPublicKeyCleared() {
 		_spec.ClearField(tokenfreeze.FieldTokenPublicKey, field.TypeBytes)
 	}
@@ -343,6 +346,9 @@ func (tfuo *TokenFreezeUpdateOne) sqlSave(ctx context.Context) (_node *TokenFree
 	}
 	if value, ok := tfuo.mutation.Status(); ok {
 		_spec.SetField(tokenfreeze.FieldStatus, field.TypeEnum, value)
+	}
+	if tfuo.mutation.OwnerPublicKeyCleared() {
+		_spec.ClearField(tokenfreeze.FieldOwnerPublicKey, field.TypeBytes)
 	}
 	if tfuo.mutation.TokenPublicKeyCleared() {
 		_spec.ClearField(tokenfreeze.FieldTokenPublicKey, field.TypeBytes)

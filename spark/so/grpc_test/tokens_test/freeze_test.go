@@ -105,6 +105,98 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	}
 }
 
+func TestGlobalPauseBlocksTransferAndMint(t *testing.T) {
+	for _, tc := range signatureTypeTestCases {
+		t.Run(tc.name+" ["+currentBroadcastRunLabel()+"]", func(t *testing.T) {
+			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
+
+			tokenPrivKey := config.IdentityPrivateKey
+			tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+
+			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
+			require.NoError(t, err, "failed to create test token issuance transaction")
+
+			finalIssueTokenTransaction, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				issueTokenTransaction,
+				[]keys.Private{tokenPrivKey},
+			)
+			require.NoError(t, err, "failed to broadcast issuance token transaction")
+
+			finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
+			require.NoError(t, err)
+
+			pauseResp, err := wallet.GlobalPauseTokens(t.Context(), config, tokenIdentifier, false)
+			require.NoError(t, err, "failed to global pause token")
+			require.NotNil(t, pauseResp)
+
+			transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPb(
+				t, config, finalIssueTokenTransactionHash, tokenPrivKey.Public(), tokenIdentifier,
+			)
+			require.NoError(t, err)
+
+			transferResp, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				transferTokenTransaction,
+				[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
+			)
+			require.Error(t, err, "expected error when transferring globally paused tokens")
+			require.Nil(t, transferResp)
+
+			mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
+			require.NoError(t, err)
+
+			mintResp, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				mintTx,
+				[]keys.Private{tokenPrivKey},
+			)
+			require.Error(t, err, "expected error when minting globally paused tokens")
+			require.Nil(t, mintResp)
+
+			unpauseResp, err := wallet.GlobalPauseTokens(t.Context(), config, tokenIdentifier, true)
+			require.NoError(t, err, "failed to unpause token")
+			require.NotNil(t, unpauseResp)
+
+			// Transfer should now succeed
+			transferTokenTransactionPostUnpause, _, err := createTestTokenTransferTransactionTokenPb(
+				t, config, finalIssueTokenTransactionHash, tokenPrivKey.Public(), tokenIdentifier,
+			)
+			require.NoError(t, err)
+
+			transferRespPostUnpause, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				transferTokenTransactionPostUnpause,
+				[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
+			)
+			require.NoError(t, err, "failed to transfer after unpause")
+			require.NotNil(t, transferRespPostUnpause)
+
+			mintTxPostUnpause, _, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public(), tokenIdentifier)
+			require.NoError(t, err)
+
+			mintRespPostUnpause, err := broadcastTokenTransaction(
+				t,
+				t.Context(),
+				config,
+				mintTxPostUnpause,
+				[]keys.Private{tokenPrivKey},
+			)
+			require.NoError(t, err, "failed to mint after unpause")
+			require.NotNil(t, mintRespPostUnpause)
+		})
+	}
+}
+
 func TestFreezeBlocksMultiTokenTransfer(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name, func(t *testing.T) {

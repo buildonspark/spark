@@ -391,7 +391,7 @@ message TokenTransactionWithStatus {
 
 message FreezeTokensPayload {
     uint32 version = 1;
-    bytes owner_public_key = 2 [(validate.rules).bytes.len = 33];
+    optional bytes owner_public_key = 2 [(validate.rules).bytes.len = 33];
     optional bytes token_public_key = 3 [(validate.rules).bytes.len = 33];
     optional bytes token_identifier = 4 [(validate.rules).bytes.len = 32];
     uint64 issuer_provided_timestamp = 5;
@@ -414,8 +414,7 @@ message TokenOutputRef {
 
 // FreezeProgress tracks the coordinated freeze status across operators.
 message FreezeProgress {
-    repeated bytes frozen_operator_public_keys = 1 [(validate.rules).repeated.items.bytes.len = 33];
-    repeated bytes unfrozen_operator_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
+    repeated bytes applied_operator_public_keys = 1 [(validate.rules).repeated.items.bytes.len = 33];
 }
 
 message FreezeTokensResponse {

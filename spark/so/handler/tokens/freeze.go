@@ -19,6 +19,56 @@ type FreezeResult struct {
 	TotalAmount []byte
 }
 
+// validateFreezeState checks whether a freeze/unfreeze operation should proceed, is idempotent,
+// or should be rejected. Returns idempotent=true if the request was already applied (caller should
+// return success). Returns a non-nil error if the request is invalid.
+func validateFreezeState(
+	active *ent.TokenFreeze,
+	mostRecentThawTimestamp uint64,
+	shouldUnfreeze bool,
+	requestTimestamp uint64,
+) (idempotent bool, err error) {
+	if shouldUnfreeze {
+		if active == nil {
+			if mostRecentThawTimestamp == requestTimestamp {
+				return true, nil
+			}
+			if mostRecentThawTimestamp > 0 {
+				return false, errors.FailedPreconditionInvalidState(fmt.Errorf(
+					"token already unfrozen with timestamp %d, cannot unfreeze with different timestamp %d",
+					mostRecentThawTimestamp, requestTimestamp,
+				))
+			}
+			return true, nil
+		}
+		if active.WalletProvidedFreezeTimestamp > requestTimestamp {
+			return false, errors.FailedPreconditionReplay(fmt.Errorf(
+				"stale unfreeze request: active freeze timestamp %d is newer than unfreeze timestamp %d",
+				active.WalletProvidedFreezeTimestamp, requestTimestamp,
+			))
+		}
+		return false, nil
+	}
+
+	// Freeze path.
+	if active != nil {
+		if active.WalletProvidedFreezeTimestamp == requestTimestamp {
+			return true, nil
+		}
+		return false, errors.FailedPreconditionInvalidState(fmt.Errorf(
+			"token already frozen with timestamp %d, cannot freeze with different timestamp %d",
+			active.WalletProvidedFreezeTimestamp, requestTimestamp,
+		))
+	}
+	if mostRecentThawTimestamp > requestTimestamp {
+		return false, errors.FailedPreconditionReplay(fmt.Errorf(
+			"stale freeze request: most recent unfreeze timestamp %d is newer than freeze timestamp %d",
+			mostRecentThawTimestamp, requestTimestamp,
+		))
+	}
+	return false, nil
+}
+
 // ValidateAndApplyFreeze validates a freeze request and applies the freeze/unfreeze operation.
 // This is shared between the external FreezeTokenHandler and InternalFreezeTokenHandler.
 func ValidateAndApplyFreeze(
@@ -55,6 +105,60 @@ func ValidateAndApplyFreeze(
 		return nil, errors.FailedPreconditionBadSignature(fmt.Errorf("invalid issuer signature to freeze token with identifier %x: %w", freezePayload.GetTokenIdentifier(), err))
 	}
 
+	isGlobalPause := len(freezePayload.GetOwnerPublicKey()) == 0
+	if isGlobalPause {
+		return applyGlobalPause(ctx, freezePayload, issuerSignature, tokenCreateEnt)
+	}
+	return applyPerOwnerFreeze(ctx, freezePayload, issuerSignature, tokenCreateEnt)
+}
+
+func applyGlobalPause(
+	ctx context.Context,
+	freezePayload *tokenpb.FreezeTokensPayload,
+	issuerSignature []byte,
+	tokenCreateEnt *ent.TokenCreate,
+) (*FreezeResult, error) {
+	activePause, err := ent.GetActiveGlobalPause(ctx, tokenCreateEnt.ID)
+	if err != nil {
+		return nil, errors.InternalDatabaseReadError(fmt.Errorf("%s: %w", tokens.ErrFailedToQueryTokenFreezeStatus, err))
+	}
+
+	mostRecentThaw, err := ent.GetMostRecentGlobalThawTimestamp(ctx, tokenCreateEnt.ID)
+	if err != nil {
+		return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to check for recent global thaw: %w", err))
+	}
+
+	idempotent, err := validateFreezeState(activePause, mostRecentThaw, freezePayload.ShouldUnfreeze, freezePayload.IssuerProvidedTimestamp)
+	if err != nil {
+		return nil, err
+	}
+	if idempotent {
+		return &FreezeResult{}, nil
+	}
+
+	if freezePayload.ShouldUnfreeze {
+		if activePause == nil {
+			return nil, errors.InternalDataInconsistency(fmt.Errorf("expected active global pause but found none for token_create_id %s", tokenCreateEnt.ID))
+		}
+		if err := ent.ThawActiveFreeze(ctx, activePause.ID, freezePayload.IssuerProvidedTimestamp); err != nil {
+			return nil, errors.InternalDatabaseWriteError(fmt.Errorf("%s: %w", tokens.ErrFailedToUpdateTokenFreeze, err))
+		}
+	} else {
+		if err := ent.ActivateGlobalPause(ctx, tokenCreateEnt.ID, issuerSignature, freezePayload.IssuerProvidedTimestamp); err != nil {
+			return nil, errors.InternalDatabaseWriteError(fmt.Errorf("%s: %w", tokens.ErrFailedToCreateTokenFreeze, err))
+		}
+	}
+
+	// Global pause affects all owners, so we don't return per-owner output refs or amounts.
+	return &FreezeResult{}, nil
+}
+
+func applyPerOwnerFreeze(
+	ctx context.Context,
+	freezePayload *tokenpb.FreezeTokensPayload,
+	issuerSignature []byte,
+	tokenCreateEnt *ent.TokenCreate,
+) (*FreezeResult, error) {
 	ownerPubKey, err := keys.ParsePublicKey(freezePayload.OwnerPublicKey)
 	if err != nil {
 		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner public key: %w", err))
@@ -64,75 +168,37 @@ func ValidateAndApplyFreeze(
 	if err != nil {
 		return nil, errors.InternalDatabaseReadError(fmt.Errorf("%s: %w", tokens.ErrFailedToQueryTokenFreezeStatus, err))
 	}
+	if len(activeFreezes) > 1 {
+		return nil, errors.InternalDataInconsistency(fmt.Errorf(tokens.ErrMultipleActiveFreezes))
+	}
+
+	var activeFreeze *ent.TokenFreeze
+	if len(activeFreezes) == 1 {
+		activeFreeze = activeFreezes[0]
+	}
+
+	mostRecentThaw, err := ent.GetMostRecentThawTimestamp(ctx, ownerPubKey, tokenCreateEnt.ID)
+	if err != nil {
+		return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to check for recent thaw: %w", err))
+	}
+
+	idempotent, err := validateFreezeState(activeFreeze, mostRecentThaw, freezePayload.ShouldUnfreeze, freezePayload.IssuerProvidedTimestamp)
+	if err != nil {
+		return nil, err
+	}
+	if idempotent {
+		return buildFreezeResult(ctx, ownerPubKey, tokenCreateEnt)
+	}
 
 	if freezePayload.ShouldUnfreeze {
-		if len(activeFreezes) == 0 {
-			// Already unfrozen - check if this is an idempotent or conflicting request
-			mostRecentThaw, err := ent.GetMostRecentThawTimestamp(ctx, ownerPubKey, tokenCreateEnt.ID)
-			if err != nil {
-				return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to check for recent thaw: %w", err))
-			}
-			if mostRecentThaw == freezePayload.IssuerProvidedTimestamp {
-				// Same timestamp - idempotent request
-				return buildFreezeResult(ctx, ownerPubKey, tokenCreateEnt)
-			}
-			if mostRecentThaw > 0 {
-				// Different timestamp while already unfrozen - reject to maintain ordering consistency
-				return nil, errors.FailedPreconditionInvalidState(fmt.Errorf(
-					"tokens already unfrozen with timestamp %d, cannot unfreeze with different timestamp %d",
-					mostRecentThaw, freezePayload.IssuerProvidedTimestamp,
-				))
-			}
-			// No previous thaw record exists (tokens were never frozen) - this is a no-op
-			return buildFreezeResult(ctx, ownerPubKey, tokenCreateEnt)
+		if activeFreeze == nil {
+			return nil, errors.InternalDataInconsistency(fmt.Errorf("expected active freeze but found none for owner %x and token_create_id %s", freezePayload.GetOwnerPublicKey(), tokenCreateEnt.ID))
 		}
-		if len(activeFreezes) > 1 {
-			return nil, errors.InternalDataInconsistency(fmt.Errorf(tokens.ErrMultipleActiveFreezes))
-		}
-		// Reject stale unfreeze: if the active freeze is newer than this unfreeze request
-		activeFreeze := activeFreezes[0]
-		if activeFreeze.WalletProvidedFreezeTimestamp > freezePayload.IssuerProvidedTimestamp {
-			return nil, errors.FailedPreconditionReplay(fmt.Errorf(
-				"stale unfreeze request: active freeze timestamp %d is newer than unfreeze timestamp %d",
-				activeFreeze.WalletProvidedFreezeTimestamp, freezePayload.IssuerProvidedTimestamp,
-			))
-		}
-		err = ent.ThawActiveFreeze(ctx, activeFreeze.ID, freezePayload.IssuerProvidedTimestamp)
-		if err != nil {
+		if err := ent.ThawActiveFreeze(ctx, activeFreeze.ID, freezePayload.IssuerProvidedTimestamp); err != nil {
 			return nil, errors.InternalDatabaseWriteError(fmt.Errorf("%s: %w", tokens.ErrFailedToUpdateTokenFreeze, err))
 		}
 	} else {
-		// Freeze
-		if len(activeFreezes) > 0 {
-			activeFreeze := activeFreezes[0]
-			if activeFreeze.WalletProvidedFreezeTimestamp == freezePayload.IssuerProvidedTimestamp {
-				// Same timestamp - idempotent request
-				return buildFreezeResult(ctx, ownerPubKey, tokenCreateEnt)
-			}
-			// Different timestamp while already frozen - reject to maintain ordering consistency
-			return nil, errors.FailedPreconditionInvalidState(fmt.Errorf(
-				"tokens already frozen with timestamp %d, cannot freeze with different timestamp %d",
-				activeFreeze.WalletProvidedFreezeTimestamp, freezePayload.IssuerProvidedTimestamp,
-			))
-		}
-		// Check for replay: reject if there's a more recent thaw
-		mostRecentThaw, err := ent.GetMostRecentThawTimestamp(ctx, ownerPubKey, tokenCreateEnt.ID)
-		if err != nil {
-			return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to check for recent thaw: %w", err))
-		}
-		if mostRecentThaw > freezePayload.IssuerProvidedTimestamp {
-			return nil, errors.FailedPreconditionReplay(fmt.Errorf(
-				"stale freeze request: most recent thaw timestamp %d is newer than freeze timestamp %d",
-				mostRecentThaw, freezePayload.IssuerProvidedTimestamp,
-			))
-		}
-		err = ent.ActivateFreeze(ctx,
-			ownerPubKey,
-			tokenCreateEnt.ID,
-			issuerSignature,
-			freezePayload.IssuerProvidedTimestamp,
-		)
-		if err != nil {
+		if err := ent.ActivateFreeze(ctx, ownerPubKey, tokenCreateEnt.ID, issuerSignature, freezePayload.IssuerProvidedTimestamp); err != nil {
 			return nil, errors.InternalDatabaseWriteError(fmt.Errorf("%s: %w", tokens.ErrFailedToCreateTokenFreeze, err))
 		}
 	}
