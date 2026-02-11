@@ -2778,7 +2778,7 @@ type claimRefundSigningJobsResult struct {
 
 // prepareClaimRefundSigningJobs validates refund transactions (cpfp, direct, and direct-from-cpfp) from the
 // claim package and persists them on the corresponding leaves. Direct-from-cpfp is required for all leaves;
-// direct refund is required only for leaves that have a DirectTx. It then builds FROST signing jobs with
+// direct refund is required only for non-zero-timelock leaves that have a DirectTx. It then builds FROST signing jobs with
 // pre-generated nonces and returns lookup maps (leaf-to-job, job type) to assist with signing and aggregation.
 func (h *TransferHandler) prepareClaimRefundSigningJobs(
 	ctx context.Context,
@@ -2819,14 +2819,20 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 				SigningPublicKey: job.SigningPublicKey,
 			},
 		}
-		// Direct refund is only required when the leaf has a DirectTx.
+		// Direct refund is only required when the leaf has a DirectTx and is not a zero-timelock node.
 		if directJob, ok := directUserRefundMap[job.LeafId]; ok {
 			leafRefundJob.DirectRefundTxSigningJob = &pb.SigningJob{
 				RawTx:            directJob.RawTx,
 				SigningPublicKey: directJob.SigningPublicKey,
 			}
 		} else if len(leaf.DirectTx) > 0 {
-			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing direct refund transaction for leaf %s", job.LeafId))
+			isZeroNode, err := bitcointransaction.IsZeroNode(leaf)
+			if err != nil {
+				return nil, fmt.Errorf("failed to determine if node is zero node: %w", err)
+			}
+			if !isZeroNode {
+				return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing direct refund transaction for leaf %s", job.LeafId))
+			}
 		}
 		// Direct-from-cpfp refund is always required (validated early in ClaimTransfer).
 		dfcJob := directFromCpfpUserRefundMap[job.LeafId]
