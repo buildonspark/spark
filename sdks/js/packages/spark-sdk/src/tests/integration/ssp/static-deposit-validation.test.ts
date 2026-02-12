@@ -1,10 +1,7 @@
-import {
-  initTestingWallet,
-  SparkWalletTesting,
-} from "../../utils/spark-testing-wallet.js";
+import { initTestingWallet } from "../../utils/spark-testing-wallet.js";
 import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex } from "@noble/hashes/utils";
-import { BitcoinFaucet } from "../../utils/test-faucet.js";
+import { retryUntilSuccess } from "../../utils/utils.js";
 
 const DEPOSIT_AMOUNT = 10000n;
 
@@ -62,18 +59,15 @@ describe("SSP static deposit validation tests", () => {
       faucet,
     } = await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
-    await new Promise((resolve) => setTimeout(resolve, 30000));
-
-    expect(signedTx).toBeDefined();
-
-    const transactionId = signedTx.id;
+    const transactionId = await retryUntilSuccess(async () => {
+      if (!signedTx) throw new Error("Tx not mined yet");
+      return signedTx.id;
+    });
 
     // Invalid transaction ID
     await expect(
       userWallet.getClaimStaticDepositQuote("invalid-txid", vout!),
     ).rejects.toThrow(/InvalidInputException/);
-
-    await new Promise((resolve) => setTimeout(resolve, 5000));
 
     // Valid transaction ID but not same as signedTx.id
     await expect(
@@ -83,32 +77,30 @@ describe("SSP static deposit validation tests", () => {
       ),
     ).rejects.toThrow("Transaction not found");
 
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
     // Missing output index
     await expect(
       userWallet.getClaimStaticDepositQuote(transactionId, vout! + 10),
     ).rejects.toThrow(/Invalid(Operation|Input)Exception/);
 
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
     // Valid quote request for control
-    const quote = await userWallet.getClaimStaticDepositQuote(
-      transactionId,
-      vout!,
-    );
-    expect(quote).toBeDefined();
+    // Wait for chain watcher to detect the deposit by polling for a valid quote
+    const quote = await retryUntilSuccess(async () => {
+      const q = await userWallet.getClaimStaticDepositQuote(
+        transactionId,
+        vout!,
+      );
+      if (!q) throw new Error("Quote not available yet");
+      return q;
+    });
     console.log(
       "Static deposit quote validation passed for correct parameters.",
     );
-
-    await new Promise((resolve) => setTimeout(resolve, 10000));
 
     // Invalid claim: missing signature
     await expect(
       userWallet.claimStaticDeposit({
         transactionId,
-        creditAmountSats: quote!.creditAmountSats,
+        creditAmountSats: quote.creditAmountSats,
         outputIndex: vout!,
         sspSignature: "",
       }),
@@ -116,29 +108,25 @@ describe("SSP static deposit validation tests", () => {
       'Request ClaimStaticDeposit failed. [{"message":"Something went wrong."',
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 10000));
-
     // Invalid claim: invalid credit amount
     await expect(
       userWallet.claimStaticDeposit({
         transactionId,
-        creditAmountSats: quote!.creditAmountSats + 1000,
+        creditAmountSats: quote.creditAmountSats + 1000,
         outputIndex: vout!,
-        sspSignature: quote!.signature,
+        sspSignature: quote.signature,
       }),
     ).rejects.toThrow(
       "The utxo amount is not enough to cover the claim amount",
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 10000));
-
     // Invalid claim: wrong output index
     await expect(
       userWallet.claimStaticDeposit({
         transactionId,
-        creditAmountSats: quote!.creditAmountSats,
+        creditAmountSats: quote.creditAmountSats,
         outputIndex: vout! + 10,
-        sspSignature: quote!.signature,
+        sspSignature: quote.signature,
       }),
     ).rejects.toThrow(/Invalid(Operation|Input)Exception/);
   }, 600000);

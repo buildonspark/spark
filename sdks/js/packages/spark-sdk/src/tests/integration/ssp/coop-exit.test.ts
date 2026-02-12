@@ -6,6 +6,7 @@ import {
   initTestingWallet,
   SparkWalletTesting,
 } from "../../utils/spark-testing-wallet.js";
+import { retryUntilSuccess } from "../../utils/utils.js";
 
 export const DEPOSIT_AMOUNT = 30_000n;
 
@@ -15,26 +16,30 @@ describe("SSP coop exit integration", () => {
   let quoteAmount: number;
 
   beforeEach(async () => {
-    const { wallet, depositAddress, signedTx, vout, faucet } =
-      await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
+    const { wallet, signedTx, vout } = await initTestingWallet(
+      DEPOSIT_AMOUNT,
+      "LOCAL",
+    );
 
-    // Wait for the transaction to be mined
-    await new Promise((resolve) => setTimeout(resolve, 30000));
-
-    expect(signedTx).toBeDefined();
-
-    const transactionId = signedTx.id;
+    const transactionId = await retryUntilSuccess(async () => {
+      if (!signedTx) throw new Error("Tx not mined yet");
+      return signedTx.id;
+    });
 
     userWallet = wallet;
 
     console.log("Fetching claim quote for static deposit...");
-    const quote = await userWallet.getClaimStaticDepositQuote(
-      transactionId,
-      vout!,
-    );
+    const quote = await retryUntilSuccess(async () => {
+      const q = await userWallet.getClaimStaticDepositQuote(
+        transactionId,
+        vout!,
+      );
+      if (!q) throw new Error("Quote not available yet");
+      return q;
+    });
 
-    quoteAmount = quote!.creditAmountSats;
-    const sspSignature = quote!.signature;
+    quoteAmount = quote.creditAmountSats;
+    const sspSignature = quote.signature;
 
     console.log("Attempting to claim static deposit...");
     await userWallet.claimStaticDeposit({
@@ -44,10 +49,11 @@ describe("SSP coop exit integration", () => {
       outputIndex: vout!,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 30000));
-
-    const { balance } = await userWallet.getBalance();
-    expect(balance).toBe(BigInt(quoteAmount));
+    await retryUntilSuccess(async () => {
+      const { balance } = await userWallet.getBalance();
+      if (balance === BigInt(quoteAmount)) return balance;
+      throw new Error("Balance incorrect value");
+    });
 
     withdrawalAddress = await getNewAddress();
   }, 600000);
