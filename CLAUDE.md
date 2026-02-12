@@ -45,6 +45,20 @@ verifyOperatorSignatures(sigs)
 - Don't comment out code - delete it; git remembers
 - Link to issues/specs for complex business logic
 
+### Logging (Go)
+Use the structured logger (`logger.Info`, `logger.Error`, etc.), not `logger.Sugar()`. For dynamic values, prefer `fmt.Sprintf` over Sugar's template syntax:
+
+```go
+// Good
+logger.Info(fmt.Sprintf("transfer completed for %s", transferID))
+logger.Info("transfer completed", zap.String("transfer_id", transferID))
+
+// Bad - don't use Sugar
+logger.Sugar().Infof("transfer completed for %s", transferID)
+```
+
+**Structured fields:** Only use `zap.String`/`zap.Int`/etc. for reusable, well-established keys (e.g., `transfer_id`, `identity_public_key`, `token_create_id`). Check existing usage in the codebase before introducing a new key. Avoid ad-hoc structured fields that are only used in one place — use `fmt.Sprintf` in the message instead.
+
 ### Function Length
 Keep functions focused and reasonably short. If a function is doing too many things, consider splitting it - but avoid excessive indirection that makes code harder to follow.
 
