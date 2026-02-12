@@ -548,6 +548,8 @@ export abstract class ConnectionManager {
             );
 
             if (dateHeader && processingTimeHeader) {
+              const wasSynced = this.timeSync.isSynced();
+
               const serverProcessingTimeMs = parseFloat(processingTimeHeader);
               this.timeSync.recordSync(
                 dateHeader,
@@ -555,6 +557,14 @@ export abstract class ConnectionManager {
                 sendTime,
                 receiveTime.value,
               );
+
+              // Since the server time isn't known at the time,
+              // the first auth call computes TTL from the client clock (monotonic + wall clock)
+              // If the client clock is skewed these tokens may expire before the eviction check can catch them
+              // Invalidate any tokens that were cached before the server time was known.
+              if (!wasSynced && this.timeSync.isSynced()) {
+                ConnectionManager.authTokenCache.clear();
+              }
             }
           },
         });
