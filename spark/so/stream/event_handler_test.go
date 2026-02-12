@@ -288,7 +288,7 @@ func TestEventRouterTransferNotification(t *testing.T) {
 		stream.mu.Lock()
 		defer stream.mu.Unlock()
 		for _, msg := range stream.messages {
-			if msg.GetTransfer() != nil {
+			if msg.GetReceiverTransfer() != nil {
 				return true
 			}
 		}
@@ -299,14 +299,14 @@ func TestEventRouterTransferNotification(t *testing.T) {
 	defer stream.mu.Unlock()
 	var transferEvent *pb.SubscribeToEventsResponse
 	for _, msg := range stream.messages {
-		if msg.GetTransfer() != nil {
+		if msg.GetReceiverTransfer() != nil {
 			transferEvent = msg
 			break
 		}
 	}
 	require.NotNil(t, transferEvent, "expected transfer event")
 
-	receivedTransfer := transferEvent.GetTransfer().GetTransfer()
+	receivedTransfer := transferEvent.GetReceiverTransfer().GetTransfer()
 	require.Equal(t, transfer.ID.String(), receivedTransfer.GetId())
 	require.Equal(t, pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receivedTransfer.GetStatus())
 

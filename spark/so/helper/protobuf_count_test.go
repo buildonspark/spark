@@ -78,8 +78,8 @@ func TestCountMessageTypeInProto(t *testing.T) {
 		{
 			name: "count both parent and nested of same type",
 			message: &spark.SubscribeToEventsResponse{
-				Event: &spark.SubscribeToEventsResponse_Transfer{
-					Transfer: &spark.TransferEvent{
+				Event: &spark.SubscribeToEventsResponse_ReceiverTransfer{
+					ReceiverTransfer: &spark.TransferEvent{
 						Transfer: &spark.Transfer{},
 					},
 				},

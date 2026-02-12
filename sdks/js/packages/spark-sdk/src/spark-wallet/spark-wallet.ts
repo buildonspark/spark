@@ -85,7 +85,6 @@ import { SigningService } from "../services/signing.js";
 import { TokenOutputManager } from "../services/tokens/output-manager.js";
 import {
   MAX_TOKEN_OUTPUTS_TX,
-  QueryTokenTransactionsWithFiltersParams,
   TokenTransactionService,
 } from "../services/tokens/token-transactions.js";
 import type { LeafKeyTweak } from "../services/transfer.js";
@@ -314,20 +313,17 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   private async handleStreamEvent({ event }: SubscribeToEventsResponse) {
     try {
       if (
-        isTransferStreamEvent(event) &&
-        event.transfer.transfer.type !== TransferType.COUNTER_SWAP &&
-        event.transfer.transfer.type !== TransferType.COUNTER_SWAP_V3
+        isReceiverTransferStreamEvent(event) &&
+        event.receiverTransfer.transfer.type !== TransferType.COUNTER_SWAP &&
+        event.receiverTransfer.transfer.type !== TransferType.COUNTER_SWAP_V3
       ) {
         const { senderIdentityPublicKey, receiverIdentityPublicKey } =
-          event.transfer.transfer;
+          event.receiverTransfer.transfer;
 
         // Don't claim if this is a self transfer, that's handled elsewhere
-        if (
-          event.transfer.transfer &&
-          !equalBytes(senderIdentityPublicKey, receiverIdentityPublicKey)
-        ) {
+        if (!equalBytes(senderIdentityPublicKey, receiverIdentityPublicKey)) {
           await this.claimTransfer({
-            transfer: event.transfer.transfer,
+            transfer: event.receiverTransfer.transfer,
             emit: true,
           });
         }
@@ -395,8 +391,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             }
 
             if (
-              isTransferStreamEvent(data.event) &&
-              claimedTransfersIds.includes(data.event.transfer.transfer.id)
+              isReceiverTransferStreamEvent(data.event) &&
+              claimedTransfersIds.includes(
+                data.event.receiverTransfer.transfer.id,
+              )
             ) {
               continue;
             }
@@ -6016,10 +6014,15 @@ function isConnectedStreamEvent(
   return event?.$case === "connected";
 }
 
-function isTransferStreamEvent(
+function isReceiverTransferStreamEvent(
   event: SubscribeToEventsResponse["event"],
-): event is { $case: "transfer"; transfer: { transfer: Transfer } } {
-  return Boolean(event?.$case === "transfer" && event.transfer.transfer);
+): event is {
+  $case: "receiverTransfer";
+  receiverTransfer: { transfer: Transfer };
+} {
+  return Boolean(
+    event?.$case === "receiverTransfer" && event.receiverTransfer.transfer,
+  );
 }
 
 function isDepositStreamEvent(

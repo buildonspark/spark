@@ -590,10 +590,14 @@ export interface SubscribeToEventsRequest {
 }
 
 export interface SubscribeToEventsResponse {
-  event?: { $case: "transfer"; transfer: TransferEvent } | { $case: "deposit"; deposit: DepositEvent } | {
-    $case: "connected";
-    connected: ConnectedEvent;
-  } | undefined;
+  event?:
+    | //
+    /** Include json_name for backwards compatibility for those who are using json serialization. */
+    { $case: "receiverTransfer"; receiverTransfer: TransferEvent }
+    | { $case: "deposit"; deposit: DepositEvent }
+    | { $case: "connected"; connected: ConnectedEvent }
+    | { $case: "senderTransfer"; senderTransfer: TransferEvent }
+    | undefined;
 }
 
 export interface ConnectedEvent {
@@ -2349,14 +2353,17 @@ function createBaseSubscribeToEventsResponse(): SubscribeToEventsResponse {
 export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = {
   encode(message: SubscribeToEventsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     switch (message.event?.$case) {
-      case "transfer":
-        TransferEvent.encode(message.event.transfer, writer.uint32(10).fork()).join();
+      case "receiverTransfer":
+        TransferEvent.encode(message.event.receiverTransfer, writer.uint32(10).fork()).join();
         break;
       case "deposit":
         DepositEvent.encode(message.event.deposit, writer.uint32(18).fork()).join();
         break;
       case "connected":
         ConnectedEvent.encode(message.event.connected, writer.uint32(26).fork()).join();
+        break;
+      case "senderTransfer":
+        TransferEvent.encode(message.event.senderTransfer, writer.uint32(34).fork()).join();
         break;
     }
     return writer;
@@ -2374,7 +2381,10 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
             break;
           }
 
-          message.event = { $case: "transfer", transfer: TransferEvent.decode(reader, reader.uint32()) };
+          message.event = {
+            $case: "receiverTransfer",
+            receiverTransfer: TransferEvent.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 2: {
@@ -2393,6 +2403,14 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
           message.event = { $case: "connected", connected: ConnectedEvent.decode(reader, reader.uint32()) };
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.event = { $case: "senderTransfer", senderTransfer: TransferEvent.decode(reader, reader.uint32()) };
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2405,23 +2423,27 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
   fromJSON(object: any): SubscribeToEventsResponse {
     return {
       event: isSet(object.transfer)
-        ? { $case: "transfer", transfer: TransferEvent.fromJSON(object.transfer) }
+        ? { $case: "receiverTransfer", receiverTransfer: TransferEvent.fromJSON(object.transfer) }
         : isSet(object.deposit)
         ? { $case: "deposit", deposit: DepositEvent.fromJSON(object.deposit) }
         : isSet(object.connected)
         ? { $case: "connected", connected: ConnectedEvent.fromJSON(object.connected) }
+        : isSet(object.senderTransfer)
+        ? { $case: "senderTransfer", senderTransfer: TransferEvent.fromJSON(object.senderTransfer) }
         : undefined,
     };
   },
 
   toJSON(message: SubscribeToEventsResponse): unknown {
     const obj: any = {};
-    if (message.event?.$case === "transfer") {
-      obj.transfer = TransferEvent.toJSON(message.event.transfer);
+    if (message.event?.$case === "receiverTransfer") {
+      obj.transfer = TransferEvent.toJSON(message.event.receiverTransfer);
     } else if (message.event?.$case === "deposit") {
       obj.deposit = DepositEvent.toJSON(message.event.deposit);
     } else if (message.event?.$case === "connected") {
       obj.connected = ConnectedEvent.toJSON(message.event.connected);
+    } else if (message.event?.$case === "senderTransfer") {
+      obj.senderTransfer = TransferEvent.toJSON(message.event.senderTransfer);
     }
     return obj;
   },
@@ -2432,9 +2454,12 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
   fromPartial(object: DeepPartial<SubscribeToEventsResponse>): SubscribeToEventsResponse {
     const message = createBaseSubscribeToEventsResponse();
     switch (object.event?.$case) {
-      case "transfer": {
-        if (object.event?.transfer !== undefined && object.event?.transfer !== null) {
-          message.event = { $case: "transfer", transfer: TransferEvent.fromPartial(object.event.transfer) };
+      case "receiverTransfer": {
+        if (object.event?.receiverTransfer !== undefined && object.event?.receiverTransfer !== null) {
+          message.event = {
+            $case: "receiverTransfer",
+            receiverTransfer: TransferEvent.fromPartial(object.event.receiverTransfer),
+          };
         }
         break;
       }
@@ -2447,6 +2472,15 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
       case "connected": {
         if (object.event?.connected !== undefined && object.event?.connected !== null) {
           message.event = { $case: "connected", connected: ConnectedEvent.fromPartial(object.event.connected) };
+        }
+        break;
+      }
+      case "senderTransfer": {
+        if (object.event?.senderTransfer !== undefined && object.event?.senderTransfer !== null) {
+          message.event = {
+            $case: "senderTransfer",
+            senderTransfer: TransferEvent.fromPartial(object.event.senderTransfer),
+          };
         }
         break;
       }

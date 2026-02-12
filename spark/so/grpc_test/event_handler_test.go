@@ -84,8 +84,8 @@ func TestEventHandlerTransferNotification(t *testing.T) {
 		select {
 		case event := <-events:
 			require.NotNil(t, event)
-			require.NotNil(t, event.GetTransfer())
-			transfer := event.GetTransfer().Transfer
+			require.NotNil(t, event.GetReceiverTransfer())
+			transfer := event.GetReceiverTransfer().Transfer
 			require.NotNil(t, transfer)
 			require.Len(t, transfer.Leaves, 1)
 
@@ -236,12 +236,12 @@ func TestMultipleSubscriptions(t *testing.T) {
 	select {
 	case ev := <-events1:
 		require.NotNil(t, ev)
-		require.NotNil(t, ev.GetTransfer())
-		require.Equal(t, rootNode.Id, ev.GetTransfer().Transfer.Leaves[0].Leaf.Id)
+		require.NotNil(t, ev.GetReceiverTransfer())
+		require.Equal(t, rootNode.Id, ev.GetReceiverTransfer().Transfer.Leaves[0].Leaf.Id)
 	case event := <-events2:
 		require.NotNil(t, event)
-		require.NotNil(t, event.GetTransfer())
-		require.Equal(t, rootNode.Id, event.GetTransfer().Transfer.Leaves[0].Leaf.Id)
+		require.NotNil(t, event.GetReceiverTransfer())
+		require.Equal(t, rootNode.Id, event.GetReceiverTransfer().Transfer.Leaves[0].Leaf.Id)
 	case <-time.After(5 * time.Second):
 		t.Fatal("no event received on stream2")
 	}

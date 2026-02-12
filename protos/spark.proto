@@ -99,9 +99,11 @@ message SubscribeToEventsRequest {
 
 message SubscribeToEventsResponse {
     oneof event {
-        TransferEvent transfer = 1;
+        // Include json_name for backwards compatibility for those who are using json serialization.
+        TransferEvent receiver_transfer = 1 [json_name = "transfer"];
         DepositEvent deposit = 2;
         ConnectedEvent connected = 3;
+        TransferEvent sender_transfer = 4;
     }
 }
 

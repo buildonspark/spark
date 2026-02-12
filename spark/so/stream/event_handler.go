@@ -233,8 +233,8 @@ func (s *EventRouter) processTransferNotification(ctx context.Context, event pro
 			}
 
 			return &pb.SubscribeToEventsResponse{
-				Event: &pb.SubscribeToEventsResponse_Transfer{
-					Transfer: &pb.TransferEvent{
+				Event: &pb.SubscribeToEventsResponse_ReceiverTransfer{
+					ReceiverTransfer: &pb.TransferEvent{
 						Transfer: transferProto,
 					},
 				},

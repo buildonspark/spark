@@ -169,7 +169,7 @@ func (m *SubscribeToEventsResponse) validate(all bool) error {
 	var errors []error
 
 	switch v := m.Event.(type) {
-	case *SubscribeToEventsResponse_Transfer:
+	case *SubscribeToEventsResponse_ReceiverTransfer:
 		if v == nil {
 			err := SubscribeToEventsResponseValidationError{
 				field:  "Event",
@@ -182,11 +182,11 @@ func (m *SubscribeToEventsResponse) validate(all bool) error {
 		}
 
 		if all {
-			switch v := interface{}(m.GetTransfer()).(type) {
+			switch v := interface{}(m.GetReceiverTransfer()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, SubscribeToEventsResponseValidationError{
-						field:  "Transfer",
+						field:  "ReceiverTransfer",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -194,16 +194,16 @@ func (m *SubscribeToEventsResponse) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, SubscribeToEventsResponseValidationError{
-						field:  "Transfer",
+						field:  "ReceiverTransfer",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetReceiverTransfer()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return SubscribeToEventsResponseValidationError{
-					field:  "Transfer",
+					field:  "ReceiverTransfer",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
@@ -286,6 +286,47 @@ func (m *SubscribeToEventsResponse) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return SubscribeToEventsResponseValidationError{
 					field:  "Connected",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *SubscribeToEventsResponse_SenderTransfer:
+		if v == nil {
+			err := SubscribeToEventsResponseValidationError{
+				field:  "Event",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetSenderTransfer()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SubscribeToEventsResponseValidationError{
+						field:  "SenderTransfer",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SubscribeToEventsResponseValidationError{
+						field:  "SenderTransfer",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSenderTransfer()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SubscribeToEventsResponseValidationError{
+					field:  "SenderTransfer",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
