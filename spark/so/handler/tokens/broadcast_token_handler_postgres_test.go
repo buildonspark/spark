@@ -164,16 +164,16 @@ type mockBroadcastInternalServer struct {
 	privKey keys.Private
 }
 
-func (s *mockBroadcastInternalServer) BroadcastTokenTransactionInternal(
+func (s *mockBroadcastInternalServer) SignTokenTransaction(
 	_ context.Context,
-	req *tokeninternalpb.BroadcastTransactionInternalRequest,
-) (*tokeninternalpb.BroadcastTransactionInternalResponse, error) {
+	req *tokeninternalpb.SignTokenTransactionRequest,
+) (*tokeninternalpb.SignTokenTransactionResponse, error) {
 	finalTxHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, false)
 	if err != nil {
 		return nil, err
 	}
 	signature := ecdsa.Sign(s.privKey.ToBTCEC(), finalTxHash)
-	return &tokeninternalpb.BroadcastTransactionInternalResponse{
+	return &tokeninternalpb.SignTokenTransactionResponse{
 		SparkOperatorSignature: signature.Serialize(),
 	}, nil
 }

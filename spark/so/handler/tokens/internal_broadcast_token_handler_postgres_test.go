@@ -24,20 +24,19 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/entfixtures"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/utils"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
-type internalBroadcastTokenPostgresTestSetup struct {
-	handler  *InternalBroadcastTokenHandler
+type signTokenTransactionPostgresTestSetup struct {
+	handler  *SignTokenTransactionHandler
 	config   *so.Config
 	ctx      context.Context
 	client   *ent.Client
 	fixtures *entfixtures.Fixtures
 }
 
-func setUpInternalBroadcastTokenTestHandlerPostgres(t *testing.T) *internalBroadcastTokenPostgresTestSetup {
+func setUpSignTokenTransactionTestHandlerPostgres(t *testing.T) *signTokenTransactionPostgresTestSetup {
 	t.Helper()
 
 	config := sparktesting.TestConfig(t)
@@ -45,8 +44,8 @@ func setUpInternalBroadcastTokenTestHandlerPostgres(t *testing.T) *internalBroad
 	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	return &internalBroadcastTokenPostgresTestSetup{
-		handler:  NewInternalBroadcastTokenHandler(config),
+	return &signTokenTransactionPostgresTestSetup{
+		handler:  NewSignTokenTransactionHandler(config),
 		config:   config,
 		ctx:      ctx,
 		client:   dbClient,
@@ -54,20 +53,8 @@ func setUpInternalBroadcastTokenTestHandlerPostgres(t *testing.T) *internalBroad
 	}
 }
 
-func phase2EnabledKnobs() knobs.Knobs {
-	return knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobTokenTransactionV3Phase2Enabled: 100,
-	})
-}
-
-func phase2DisabledKnobs() knobs.Knobs {
-	return knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobTokenTransactionV3Phase2Enabled: 0,
-	})
-}
-
-// broadcastTestData holds all the data needed to construct a valid broadcast request.
-type broadcastTestData struct {
+// signTokenTxTestData holds all the data needed to construct a valid sign request.
+type signTokenTxTestData struct {
 	TokenCreate       *ent.TokenCreate
 	Keyshare          *ent.SigningKeyshare
 	TxProto           *tokenpb.TokenTransaction
@@ -75,9 +62,9 @@ type broadcastTestData struct {
 	CoordinatorPubKey []byte
 }
 
-// buildValidBroadcastRequest constructs a valid BroadcastTransactionInternalRequest from test data.
-func (d *broadcastTestData) buildValidBroadcastRequest() *tokeninternalpb.BroadcastTransactionInternalRequest {
-	return &tokeninternalpb.BroadcastTransactionInternalRequest{
+// buildValidSignRequest constructs a valid SignTokenTransactionRequest from test data.
+func (d *signTokenTxTestData) buildValidSignRequest() *tokeninternalpb.SignTokenTransactionRequest {
+	return &tokeninternalpb.SignTokenTransactionRequest{
 		FinalTokenTransaction:      d.TxProto,
 		TokenTransactionSignatures: []*tokenpb.SignatureWithIndex{{InputIndex: 0, Signature: d.Signature}},
 		KeyshareIds:                []string{d.Keyshare.ID.String()},
@@ -85,8 +72,8 @@ func (d *broadcastTestData) buildValidBroadcastRequest() *tokeninternalpb.Broadc
 	}
 }
 
-// createBroadcastTestData creates all the entities and builds a valid V3 mint transaction for testing.
-func createBroadcastTestData(t *testing.T, f *entfixtures.Fixtures, config *so.Config) *broadcastTestData {
+// createSignTokenTxTestData creates all the entities and builds a valid V3 mint transaction for testing.
+func createSignTokenTxTestData(t *testing.T, f *entfixtures.Fixtures, config *so.Config) *signTokenTxTestData {
 	t.Helper()
 	issuerPriv, tokenCreate := f.CreateTokenCreateWithIssuer(btcnetwork.Regtest, nil, nil)
 
@@ -152,7 +139,7 @@ func createBroadcastTestData(t *testing.T, f *entfixtures.Fixtures, config *so.C
 		break
 	}
 
-	return &broadcastTestData{
+	return &signTokenTxTestData{
 		TokenCreate:       tokenCreate,
 		Keyshare:          ks,
 		TxProto:           txProto,
@@ -161,40 +148,24 @@ func createBroadcastTestData(t *testing.T, f *entfixtures.Fixtures, config *so.C
 	}
 }
 
-func TestBroadcastTokenTransactionInternal_Phase2Disabled(t *testing.T) {
-	setup := setUpInternalBroadcastTokenTestHandlerPostgres(t)
-	ctx := knobs.InjectKnobsService(setup.ctx, phase2DisabledKnobs())
+func TestSignTokenTransaction_MissingFinalTransaction(t *testing.T) {
+	setup := setUpSignTokenTransactionTestHandlerPostgres(t)
 
-	testData := createBroadcastTestData(t, setup.fixtures, setup.config)
-	req := testData.buildValidBroadcastRequest()
-
-	resp, err := setup.handler.BroadcastTokenTransactionInternal(ctx, req)
-
-	require.Error(t, err)
-	require.Nil(t, resp)
-	assert.Contains(t, err.Error(), "broadcastTokenTransactionInternal flow is not enabled")
-}
-
-func TestBroadcastTokenTransactionInternal_MissingFinalTransaction(t *testing.T) {
-	setup := setUpInternalBroadcastTokenTestHandlerPostgres(t)
-	ctx := knobs.InjectKnobsService(setup.ctx, phase2EnabledKnobs())
-
-	req := &tokeninternalpb.BroadcastTransactionInternalRequest{
+	req := &tokeninternalpb.SignTokenTransactionRequest{
 		FinalTokenTransaction: nil,
 	}
 
-	resp, err := setup.handler.BroadcastTokenTransactionInternal(ctx, req)
+	resp, err := setup.handler.SignTokenTransaction(setup.ctx, req)
 
 	require.Error(t, err)
 	require.Nil(t, resp)
 	assert.Contains(t, err.Error(), "final token transaction is required")
 }
 
-func TestBroadcastTokenTransactionInternal_IdempotencyReturnsSigned(t *testing.T) {
-	setup := setUpInternalBroadcastTokenTestHandlerPostgres(t)
-	ctx := knobs.InjectKnobsService(setup.ctx, phase2EnabledKnobs())
+func TestSignTokenTransaction_IdempotencyReturnsSigned(t *testing.T) {
+	setup := setUpSignTokenTransactionTestHandlerPostgres(t)
 
-	testData := createBroadcastTestData(t, setup.fixtures, setup.config)
+	testData := createSignTokenTxTestData(t, setup.fixtures, setup.config)
 	hash, err := utils.HashTokenTransaction(testData.TxProto, false)
 	require.NoError(t, err)
 
@@ -206,22 +177,21 @@ func TestBroadcastTokenTransactionInternal_IdempotencyReturnsSigned(t *testing.T
 		SetStatus(st.TokenTransactionStatusSigned).
 		SetCreateID(testData.TokenCreate.ID).
 		SetOperatorSignature(operatorSig).
-		SaveX(ctx)
+		SaveX(setup.ctx)
 
-	req := testData.buildValidBroadcastRequest()
+	req := testData.buildValidSignRequest()
 
-	resp, err := setup.handler.BroadcastTokenTransactionInternal(ctx, req)
+	resp, err := setup.handler.SignTokenTransaction(setup.ctx, req)
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Equal(t, operatorSig, resp.SparkOperatorSignature)
 }
 
-func TestBroadcastTokenTransactionInternal_IdempotencyRejectsNonSigned(t *testing.T) {
-	setup := setUpInternalBroadcastTokenTestHandlerPostgres(t)
-	ctx := knobs.InjectKnobsService(setup.ctx, phase2EnabledKnobs())
+func TestSignTokenTransaction_IdempotencyRejectsNonSigned(t *testing.T) {
+	setup := setUpSignTokenTransactionTestHandlerPostgres(t)
 
-	testData := createBroadcastTestData(t, setup.fixtures, setup.config)
+	testData := createSignTokenTxTestData(t, setup.fixtures, setup.config)
 	hash, err := utils.HashTokenTransaction(testData.TxProto, false)
 	require.NoError(t, err)
 
@@ -231,42 +201,40 @@ func TestBroadcastTokenTransactionInternal_IdempotencyRejectsNonSigned(t *testin
 		SetFinalizedTokenTransactionHash(hash).
 		SetStatus(st.TokenTransactionStatusFinalized).
 		SetCreateID(testData.TokenCreate.ID).
-		SaveX(ctx)
+		SaveX(setup.ctx)
 
-	req := testData.buildValidBroadcastRequest()
+	req := testData.buildValidSignRequest()
 
-	resp, err := setup.handler.BroadcastTokenTransactionInternal(ctx, req)
+	resp, err := setup.handler.SignTokenTransaction(setup.ctx, req)
 
 	require.Error(t, err)
 	require.Nil(t, resp)
 	assert.Contains(t, err.Error(), "repeat sign attempt but the transaction is not in signed state")
 }
 
-func TestBroadcastTokenTransactionInternal_RejectsPreV3(t *testing.T) {
-	setup := setUpInternalBroadcastTokenTestHandlerPostgres(t)
-	ctx := knobs.InjectKnobsService(setup.ctx, phase2EnabledKnobs())
+func TestSignTokenTransaction_RejectsPreV3(t *testing.T) {
+	setup := setUpSignTokenTransactionTestHandlerPostgres(t)
 
 	// Build valid test data then modify version to v2.
-	testData := createBroadcastTestData(t, setup.fixtures, setup.config)
+	testData := createSignTokenTxTestData(t, setup.fixtures, setup.config)
 	testData.TxProto.Version = 2
 
-	req := testData.buildValidBroadcastRequest()
+	req := testData.buildValidSignRequest()
 
-	resp, err := setup.handler.BroadcastTokenTransactionInternal(ctx, req)
+	resp, err := setup.handler.SignTokenTransaction(setup.ctx, req)
 
 	// V2 transactions are rejected (fails at hash validation since v2 has different format requirements).
 	require.Error(t, err)
 	require.Nil(t, resp)
 }
 
-func TestBroadcastTokenTransactionInternal_Success(t *testing.T) {
-	setup := setUpInternalBroadcastTokenTestHandlerPostgres(t)
-	ctx := knobs.InjectKnobsService(setup.ctx, phase2EnabledKnobs())
+func TestSignTokenTransaction_Success(t *testing.T) {
+	setup := setUpSignTokenTransactionTestHandlerPostgres(t)
 
-	testData := createBroadcastTestData(t, setup.fixtures, setup.config)
-	req := testData.buildValidBroadcastRequest()
+	testData := createSignTokenTxTestData(t, setup.fixtures, setup.config)
+	req := testData.buildValidSignRequest()
 
-	resp, err := setup.handler.BroadcastTokenTransactionInternal(ctx, req)
+	resp, err := setup.handler.SignTokenTransaction(setup.ctx, req)
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)

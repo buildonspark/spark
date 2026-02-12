@@ -25,9 +25,9 @@ service SparkTokenInternalService {
         ExchangeRevocationSecretsSharesRequest)
         returns (ExchangeRevocationSecretsSharesResponse) {}
 
-    // Combined prepare and sign transaction (SO-to-SO) for broadcast flow
-    rpc broadcast_token_transaction_internal(BroadcastTransactionInternalRequest)
-        returns (BroadcastTransactionInternalResponse) {}
+    // Create and Sign a token transaction on non-coordinator operators (V3+).
+    rpc sign_token_transaction(SignTokenTransactionRequest)
+        returns (SignTokenTransactionResponse) {}
 
     // Internal freeze tokens (SO-to-SO coordination)
     rpc internal_freeze_tokens(InternalFreezeTokensRequest)
@@ -120,7 +120,7 @@ message UnencodedTokenIdentifier {
     bytes creation_entity_public_key = 9 [(validate.rules).bytes.len = 33];
     optional bytes extra_metadata = 10 [(validate.rules).bytes = {max_len: 1024}];
 }
-message BroadcastTransactionInternalRequest {
+message SignTokenTransactionRequest {
     // TODO: After the switch to require V3+ transactions, stop accepting the legacy tx shape in favor of the new Partial/Final shapes.
     spark_token.TokenTransaction final_token_transaction = 1;
     repeated spark_token.SignatureWithIndex
@@ -131,7 +131,7 @@ message BroadcastTransactionInternalRequest {
     bytes coordinator_public_key = 4  [(validate.rules).bytes.len = 33];
 }
 
-message BroadcastTransactionInternalResponse {
+message SignTokenTransactionResponse {
     // The signature from this SO
     bytes spark_operator_signature = 1 [
         (validate.rules).bytes.min_len = 64,

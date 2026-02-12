@@ -1770,23 +1770,22 @@ var _ interface {
 	ErrorName() string
 } = UnencodedTokenIdentifierValidationError{}
 
-// Validate checks the field values on BroadcastTransactionInternalRequest with
-// the rules defined in the proto definition for this message. If any rules
-// are violated, the first error encountered is returned, or nil if there are
-// no violations.
-func (m *BroadcastTransactionInternalRequest) Validate() error {
+// Validate checks the field values on SignTokenTransactionRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SignTokenTransactionRequest) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on BroadcastTransactionInternalRequest
-// with the rules defined in the proto definition for this message. If any
-// rules are violated, the result is a list of violation errors wrapped in
-// BroadcastTransactionInternalRequestMultiError, or nil if none found.
-func (m *BroadcastTransactionInternalRequest) ValidateAll() error {
+// ValidateAll checks the field values on SignTokenTransactionRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SignTokenTransactionRequestMultiError, or nil if none found.
+func (m *SignTokenTransactionRequest) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *BroadcastTransactionInternalRequest) validate(all bool) error {
+func (m *SignTokenTransactionRequest) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -1797,7 +1796,7 @@ func (m *BroadcastTransactionInternalRequest) validate(all bool) error {
 		switch v := interface{}(m.GetFinalTokenTransaction()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, BroadcastTransactionInternalRequestValidationError{
+				errors = append(errors, SignTokenTransactionRequestValidationError{
 					field:  "FinalTokenTransaction",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -1805,7 +1804,7 @@ func (m *BroadcastTransactionInternalRequest) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, BroadcastTransactionInternalRequestValidationError{
+				errors = append(errors, SignTokenTransactionRequestValidationError{
 					field:  "FinalTokenTransaction",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -1814,7 +1813,7 @@ func (m *BroadcastTransactionInternalRequest) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetFinalTokenTransaction()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return BroadcastTransactionInternalRequestValidationError{
+			return SignTokenTransactionRequestValidationError{
 				field:  "FinalTokenTransaction",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -1829,7 +1828,7 @@ func (m *BroadcastTransactionInternalRequest) validate(all bool) error {
 			switch v := interface{}(item).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, BroadcastTransactionInternalRequestValidationError{
+					errors = append(errors, SignTokenTransactionRequestValidationError{
 						field:  fmt.Sprintf("TokenTransactionSignatures[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -1837,7 +1836,7 @@ func (m *BroadcastTransactionInternalRequest) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, BroadcastTransactionInternalRequestValidationError{
+					errors = append(errors, SignTokenTransactionRequestValidationError{
 						field:  fmt.Sprintf("TokenTransactionSignatures[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -1846,7 +1845,7 @@ func (m *BroadcastTransactionInternalRequest) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return BroadcastTransactionInternalRequestValidationError{
+				return SignTokenTransactionRequestValidationError{
 					field:  fmt.Sprintf("TokenTransactionSignatures[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -1860,7 +1859,7 @@ func (m *BroadcastTransactionInternalRequest) validate(all bool) error {
 		_, _ = idx, item
 
 		if err := m._validateUuid(item); err != nil {
-			err = BroadcastTransactionInternalRequestValidationError{
+			err = SignTokenTransactionRequestValidationError{
 				field:  fmt.Sprintf("KeyshareIds[%v]", idx),
 				reason: "value must be a valid UUID",
 				cause:  err,
@@ -1874,7 +1873,7 @@ func (m *BroadcastTransactionInternalRequest) validate(all bool) error {
 	}
 
 	if len(m.GetCoordinatorPublicKey()) != 33 {
-		err := BroadcastTransactionInternalRequestValidationError{
+		err := SignTokenTransactionRequestValidationError{
 			field:  "CoordinatorPublicKey",
 			reason: "value length must be 33 bytes",
 		}
@@ -1885,13 +1884,13 @@ func (m *BroadcastTransactionInternalRequest) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return BroadcastTransactionInternalRequestMultiError(errors)
+		return SignTokenTransactionRequestMultiError(errors)
 	}
 
 	return nil
 }
 
-func (m *BroadcastTransactionInternalRequest) _validateUuid(uuid string) error {
+func (m *SignTokenTransactionRequest) _validateUuid(uuid string) error {
 	if matched := _spark_token_internal_uuidPattern.MatchString(uuid); !matched {
 		return errors.New("invalid uuid format")
 	}
@@ -1899,14 +1898,13 @@ func (m *BroadcastTransactionInternalRequest) _validateUuid(uuid string) error {
 	return nil
 }
 
-// BroadcastTransactionInternalRequestMultiError is an error wrapping multiple
-// validation errors returned by
-// BroadcastTransactionInternalRequest.ValidateAll() if the designated
-// constraints aren't met.
-type BroadcastTransactionInternalRequestMultiError []error
+// SignTokenTransactionRequestMultiError is an error wrapping multiple
+// validation errors returned by SignTokenTransactionRequest.ValidateAll() if
+// the designated constraints aren't met.
+type SignTokenTransactionRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m BroadcastTransactionInternalRequestMultiError) Error() string {
+func (m SignTokenTransactionRequestMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -1915,12 +1913,12 @@ func (m BroadcastTransactionInternalRequestMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m BroadcastTransactionInternalRequestMultiError) AllErrors() []error { return m }
+func (m SignTokenTransactionRequestMultiError) AllErrors() []error { return m }
 
-// BroadcastTransactionInternalRequestValidationError is the validation error
-// returned by BroadcastTransactionInternalRequest.Validate if the designated
-// constraints aren't met.
-type BroadcastTransactionInternalRequestValidationError struct {
+// SignTokenTransactionRequestValidationError is the validation error returned
+// by SignTokenTransactionRequest.Validate if the designated constraints
+// aren't met.
+type SignTokenTransactionRequestValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -1928,24 +1926,24 @@ type BroadcastTransactionInternalRequestValidationError struct {
 }
 
 // Field function returns field value.
-func (e BroadcastTransactionInternalRequestValidationError) Field() string { return e.field }
+func (e SignTokenTransactionRequestValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e BroadcastTransactionInternalRequestValidationError) Reason() string { return e.reason }
+func (e SignTokenTransactionRequestValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e BroadcastTransactionInternalRequestValidationError) Cause() error { return e.cause }
+func (e SignTokenTransactionRequestValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e BroadcastTransactionInternalRequestValidationError) Key() bool { return e.key }
+func (e SignTokenTransactionRequestValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e BroadcastTransactionInternalRequestValidationError) ErrorName() string {
-	return "BroadcastTransactionInternalRequestValidationError"
+func (e SignTokenTransactionRequestValidationError) ErrorName() string {
+	return "SignTokenTransactionRequestValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e BroadcastTransactionInternalRequestValidationError) Error() string {
+func (e SignTokenTransactionRequestValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -1957,14 +1955,14 @@ func (e BroadcastTransactionInternalRequestValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sBroadcastTransactionInternalRequest.%s: %s%s",
+		"invalid %sSignTokenTransactionRequest.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = BroadcastTransactionInternalRequestValidationError{}
+var _ error = SignTokenTransactionRequestValidationError{}
 
 var _ interface {
 	Field() string
@@ -1972,25 +1970,24 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = BroadcastTransactionInternalRequestValidationError{}
+} = SignTokenTransactionRequestValidationError{}
 
-// Validate checks the field values on BroadcastTransactionInternalResponse
-// with the rules defined in the proto definition for this message. If any
-// rules are violated, the first error encountered is returned, or nil if
-// there are no violations.
-func (m *BroadcastTransactionInternalResponse) Validate() error {
+// Validate checks the field values on SignTokenTransactionResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SignTokenTransactionResponse) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on BroadcastTransactionInternalResponse
-// with the rules defined in the proto definition for this message. If any
-// rules are violated, the result is a list of violation errors wrapped in
-// BroadcastTransactionInternalResponseMultiError, or nil if none found.
-func (m *BroadcastTransactionInternalResponse) ValidateAll() error {
+// ValidateAll checks the field values on SignTokenTransactionResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SignTokenTransactionResponseMultiError, or nil if none found.
+func (m *SignTokenTransactionResponse) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *BroadcastTransactionInternalResponse) validate(all bool) error {
+func (m *SignTokenTransactionResponse) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -1998,7 +1995,7 @@ func (m *BroadcastTransactionInternalResponse) validate(all bool) error {
 	var errors []error
 
 	if l := len(m.GetSparkOperatorSignature()); l < 64 || l > 73 {
-		err := BroadcastTransactionInternalResponseValidationError{
+		err := SignTokenTransactionResponseValidationError{
 			field:  "SparkOperatorSignature",
 			reason: "value length must be between 64 and 73 bytes, inclusive",
 		}
@@ -2009,20 +2006,19 @@ func (m *BroadcastTransactionInternalResponse) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return BroadcastTransactionInternalResponseMultiError(errors)
+		return SignTokenTransactionResponseMultiError(errors)
 	}
 
 	return nil
 }
 
-// BroadcastTransactionInternalResponseMultiError is an error wrapping multiple
-// validation errors returned by
-// BroadcastTransactionInternalResponse.ValidateAll() if the designated
-// constraints aren't met.
-type BroadcastTransactionInternalResponseMultiError []error
+// SignTokenTransactionResponseMultiError is an error wrapping multiple
+// validation errors returned by SignTokenTransactionResponse.ValidateAll() if
+// the designated constraints aren't met.
+type SignTokenTransactionResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m BroadcastTransactionInternalResponseMultiError) Error() string {
+func (m SignTokenTransactionResponseMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -2031,12 +2027,12 @@ func (m BroadcastTransactionInternalResponseMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m BroadcastTransactionInternalResponseMultiError) AllErrors() []error { return m }
+func (m SignTokenTransactionResponseMultiError) AllErrors() []error { return m }
 
-// BroadcastTransactionInternalResponseValidationError is the validation error
-// returned by BroadcastTransactionInternalResponse.Validate if the designated
-// constraints aren't met.
-type BroadcastTransactionInternalResponseValidationError struct {
+// SignTokenTransactionResponseValidationError is the validation error returned
+// by SignTokenTransactionResponse.Validate if the designated constraints
+// aren't met.
+type SignTokenTransactionResponseValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -2044,24 +2040,24 @@ type BroadcastTransactionInternalResponseValidationError struct {
 }
 
 // Field function returns field value.
-func (e BroadcastTransactionInternalResponseValidationError) Field() string { return e.field }
+func (e SignTokenTransactionResponseValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e BroadcastTransactionInternalResponseValidationError) Reason() string { return e.reason }
+func (e SignTokenTransactionResponseValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e BroadcastTransactionInternalResponseValidationError) Cause() error { return e.cause }
+func (e SignTokenTransactionResponseValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e BroadcastTransactionInternalResponseValidationError) Key() bool { return e.key }
+func (e SignTokenTransactionResponseValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e BroadcastTransactionInternalResponseValidationError) ErrorName() string {
-	return "BroadcastTransactionInternalResponseValidationError"
+func (e SignTokenTransactionResponseValidationError) ErrorName() string {
+	return "SignTokenTransactionResponseValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e BroadcastTransactionInternalResponseValidationError) Error() string {
+func (e SignTokenTransactionResponseValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -2073,14 +2069,14 @@ func (e BroadcastTransactionInternalResponseValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sBroadcastTransactionInternalResponse.%s: %s%s",
+		"invalid %sSignTokenTransactionResponse.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = BroadcastTransactionInternalResponseValidationError{}
+var _ error = SignTokenTransactionResponseValidationError{}
 
 var _ interface {
 	Field() string
@@ -2088,7 +2084,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = BroadcastTransactionInternalResponseValidationError{}
+} = SignTokenTransactionResponseValidationError{}
 
 // Validate checks the field values on InternalFreezeTokensRequest with the
 // rules defined in the proto definition for this message. If any rules are

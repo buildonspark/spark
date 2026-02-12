@@ -723,7 +723,7 @@ func (x *UnencodedTokenIdentifier) GetExtraMetadata() []byte {
 	return nil
 }
 
-type BroadcastTransactionInternalRequest struct {
+type SignTokenTransactionRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// TODO: After the switch to require V3+ transactions, stop accepting the legacy tx shape in favor of the new Partial/Final shapes.
 	FinalTokenTransaction      *spark_token.TokenTransaction     `protobuf:"bytes,1,opt,name=final_token_transaction,json=finalTokenTransaction,proto3" json:"final_token_transaction,omitempty"`
@@ -734,20 +734,20 @@ type BroadcastTransactionInternalRequest struct {
 	sizeCache                  protoimpl.SizeCache
 }
 
-func (x *BroadcastTransactionInternalRequest) Reset() {
-	*x = BroadcastTransactionInternalRequest{}
+func (x *SignTokenTransactionRequest) Reset() {
+	*x = SignTokenTransactionRequest{}
 	mi := &file_spark_token_internal_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BroadcastTransactionInternalRequest) String() string {
+func (x *SignTokenTransactionRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BroadcastTransactionInternalRequest) ProtoMessage() {}
+func (*SignTokenTransactionRequest) ProtoMessage() {}
 
-func (x *BroadcastTransactionInternalRequest) ProtoReflect() protoreflect.Message {
+func (x *SignTokenTransactionRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_spark_token_internal_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -759,40 +759,40 @@ func (x *BroadcastTransactionInternalRequest) ProtoReflect() protoreflect.Messag
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BroadcastTransactionInternalRequest.ProtoReflect.Descriptor instead.
-func (*BroadcastTransactionInternalRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use SignTokenTransactionRequest.ProtoReflect.Descriptor instead.
+func (*SignTokenTransactionRequest) Descriptor() ([]byte, []int) {
 	return file_spark_token_internal_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *BroadcastTransactionInternalRequest) GetFinalTokenTransaction() *spark_token.TokenTransaction {
+func (x *SignTokenTransactionRequest) GetFinalTokenTransaction() *spark_token.TokenTransaction {
 	if x != nil {
 		return x.FinalTokenTransaction
 	}
 	return nil
 }
 
-func (x *BroadcastTransactionInternalRequest) GetTokenTransactionSignatures() []*spark_token.SignatureWithIndex {
+func (x *SignTokenTransactionRequest) GetTokenTransactionSignatures() []*spark_token.SignatureWithIndex {
 	if x != nil {
 		return x.TokenTransactionSignatures
 	}
 	return nil
 }
 
-func (x *BroadcastTransactionInternalRequest) GetKeyshareIds() []string {
+func (x *SignTokenTransactionRequest) GetKeyshareIds() []string {
 	if x != nil {
 		return x.KeyshareIds
 	}
 	return nil
 }
 
-func (x *BroadcastTransactionInternalRequest) GetCoordinatorPublicKey() []byte {
+func (x *SignTokenTransactionRequest) GetCoordinatorPublicKey() []byte {
 	if x != nil {
 		return x.CoordinatorPublicKey
 	}
 	return nil
 }
 
-type BroadcastTransactionInternalResponse struct {
+type SignTokenTransactionResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The signature from this SO
 	SparkOperatorSignature []byte `protobuf:"bytes,1,opt,name=spark_operator_signature,json=sparkOperatorSignature,proto3" json:"spark_operator_signature,omitempty"`
@@ -800,20 +800,20 @@ type BroadcastTransactionInternalResponse struct {
 	sizeCache              protoimpl.SizeCache
 }
 
-func (x *BroadcastTransactionInternalResponse) Reset() {
-	*x = BroadcastTransactionInternalResponse{}
+func (x *SignTokenTransactionResponse) Reset() {
+	*x = SignTokenTransactionResponse{}
 	mi := &file_spark_token_internal_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BroadcastTransactionInternalResponse) String() string {
+func (x *SignTokenTransactionResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BroadcastTransactionInternalResponse) ProtoMessage() {}
+func (*SignTokenTransactionResponse) ProtoMessage() {}
 
-func (x *BroadcastTransactionInternalResponse) ProtoReflect() protoreflect.Message {
+func (x *SignTokenTransactionResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_spark_token_internal_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -825,12 +825,12 @@ func (x *BroadcastTransactionInternalResponse) ProtoReflect() protoreflect.Messa
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BroadcastTransactionInternalResponse.ProtoReflect.Descriptor instead.
-func (*BroadcastTransactionInternalResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use SignTokenTransactionResponse.ProtoReflect.Descriptor instead.
+func (*SignTokenTransactionResponse) Descriptor() ([]byte, []int) {
 	return file_spark_token_internal_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *BroadcastTransactionInternalResponse) GetSparkOperatorSignature() []byte {
+func (x *SignTokenTransactionResponse) GetSparkOperatorSignature() []byte {
 	if x != nil {
 		return x.SparkOperatorSignature
 	}
@@ -999,26 +999,26 @@ const file_spark_token_internal_proto_rawDesc = "" +
 	"\x1acreation_entity_public_key\x18\t \x01(\fB\a\xfaB\x04z\x02h!R\x17creationEntityPublicKey\x124\n" +
 	"\x0eextra_metadata\x18\n" +
 	" \x01(\fB\b\xfaB\x05z\x03\x18\x80\bH\x00R\rextraMetadata\x88\x01\x01B\x11\n" +
-	"\x0f_extra_metadata\"\xd0\x02\n" +
-	"#BroadcastTransactionInternalRequest\x12U\n" +
+	"\x0f_extra_metadata\"\xc8\x02\n" +
+	"\x1bSignTokenTransactionRequest\x12U\n" +
 	"\x17final_token_transaction\x18\x01 \x01(\v2\x1d.spark_token.TokenTransactionR\x15finalTokenTransaction\x12a\n" +
 	"\x1ctoken_transaction_signatures\x18\x02 \x03(\v2\x1f.spark_token.SignatureWithIndexR\x1atokenTransactionSignatures\x120\n" +
 	"\fkeyshare_ids\x18\x03 \x03(\tB\r\xfaB\n" +
 	"\x92\x01\a\"\x05r\x03\xb0\x01\x01R\vkeyshareIds\x12=\n" +
-	"\x16coordinator_public_key\x18\x04 \x01(\fB\a\xfaB\x04z\x02h!R\x14coordinatorPublicKey\"k\n" +
-	"$BroadcastTransactionInternalResponse\x12C\n" +
+	"\x16coordinator_public_key\x18\x04 \x01(\fB\a\xfaB\x04z\x02h!R\x14coordinatorPublicKey\"c\n" +
+	"\x1cSignTokenTransactionResponse\x12C\n" +
 	"\x18spark_operator_signature\x18\x01 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\x16sparkOperatorSignature\"\xa9\x01\n" +
 	"\x1bInternalFreezeTokensRequest\x12T\n" +
 	"\x15freeze_tokens_payload\x18\x01 \x01(\v2 .spark_token.FreezeTokensPayloadR\x13freezeTokensPayload\x124\n" +
 	"\x10issuer_signature\x18\x02 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\x0fissuerSignature\"\xa5\x01\n" +
 	"\x1cInternalFreezeTokensResponse\x12Q\n" +
 	"\x16impacted_token_outputs\x18\x01 \x03(\v2\x1b.spark_token.TokenOutputRefR\x14impactedTokenOutputs\x122\n" +
-	"\x15impacted_token_amount\x18\x02 \x01(\fR\x13impactedTokenAmount2\xbe\x05\n" +
+	"\x15impacted_token_amount\x18\x02 \x01(\fR\x13impactedTokenAmount2\x9f\x05\n" +
 	"\x19SparkTokenInternalService\x12h\n" +
 	"\x13prepare_transaction\x12&.spark_token.PrepareTransactionRequest\x1a'.spark_token.PrepareTransactionResponse\"\x00\x12\xa1\x01\n" +
 	"(sign_token_transaction_from_coordination\x128.spark_token.SignTokenTransactionFromCoordinationRequest\x1a9.spark_token.SignTokenTransactionFromCoordinationResponse\"\x00\x12\x91\x01\n" +
-	"\"exchange_revocation_secrets_shares\x123.spark_token.ExchangeRevocationSecretsSharesRequest\x1a4.spark_token.ExchangeRevocationSecretsSharesResponse\"\x00\x12\x8d\x01\n" +
-	"$broadcast_token_transaction_internal\x120.spark_token.BroadcastTransactionInternalRequest\x1a1.spark_token.BroadcastTransactionInternalResponse\"\x00\x12o\n" +
+	"\"exchange_revocation_secrets_shares\x123.spark_token.ExchangeRevocationSecretsSharesRequest\x1a4.spark_token.ExchangeRevocationSecretsSharesResponse\"\x00\x12o\n" +
+	"\x16sign_token_transaction\x12(.spark_token.SignTokenTransactionRequest\x1a).spark_token.SignTokenTransactionResponse\"\x00\x12o\n" +
 	"\x16internal_freeze_tokens\x12(.spark_token.InternalFreezeTokensRequest\x1a).spark_token.InternalFreezeTokensResponse\"\x00B;Z9github.com/lightsparkdev/spark/proto/spark_token_internalb\x06proto3"
 
 var (
@@ -1046,8 +1046,8 @@ var file_spark_token_internal_proto_goTypes = []any{
 	(*ExchangeRevocationSecretsSharesResponse)(nil),      // 8: spark_token.ExchangeRevocationSecretsSharesResponse
 	(*OutputToSpend)(nil),                                // 9: spark_token.OutputToSpend
 	(*UnencodedTokenIdentifier)(nil),                     // 10: spark_token.UnencodedTokenIdentifier
-	(*BroadcastTransactionInternalRequest)(nil),          // 11: spark_token.BroadcastTransactionInternalRequest
-	(*BroadcastTransactionInternalResponse)(nil),         // 12: spark_token.BroadcastTransactionInternalResponse
+	(*SignTokenTransactionRequest)(nil),                  // 11: spark_token.SignTokenTransactionRequest
+	(*SignTokenTransactionResponse)(nil),                 // 12: spark_token.SignTokenTransactionResponse
 	(*InternalFreezeTokensRequest)(nil),                  // 13: spark_token.InternalFreezeTokensRequest
 	(*InternalFreezeTokensResponse)(nil),                 // 14: spark_token.InternalFreezeTokensResponse
 	(*spark_token.TokenTransaction)(nil),                 // 15: spark_token.TokenTransaction
@@ -1071,19 +1071,19 @@ var file_spark_token_internal_proto_depIdxs = []int32{
 	9,  // 9: spark_token.ExchangeRevocationSecretsSharesRequest.outputs_to_spend:type_name -> spark_token.OutputToSpend
 	6,  // 10: spark_token.ExchangeRevocationSecretsSharesResponse.received_operator_shares:type_name -> spark_token.OperatorRevocationShares
 	19, // 11: spark_token.UnencodedTokenIdentifier.network:type_name -> spark.Network
-	15, // 12: spark_token.BroadcastTransactionInternalRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
-	16, // 13: spark_token.BroadcastTransactionInternalRequest.token_transaction_signatures:type_name -> spark_token.SignatureWithIndex
+	15, // 12: spark_token.SignTokenTransactionRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
+	16, // 13: spark_token.SignTokenTransactionRequest.token_transaction_signatures:type_name -> spark_token.SignatureWithIndex
 	20, // 14: spark_token.InternalFreezeTokensRequest.freeze_tokens_payload:type_name -> spark_token.FreezeTokensPayload
 	21, // 15: spark_token.InternalFreezeTokensResponse.impacted_token_outputs:type_name -> spark_token.TokenOutputRef
 	0,  // 16: spark_token.SparkTokenInternalService.prepare_transaction:input_type -> spark_token.PrepareTransactionRequest
 	2,  // 17: spark_token.SparkTokenInternalService.sign_token_transaction_from_coordination:input_type -> spark_token.SignTokenTransactionFromCoordinationRequest
 	7,  // 18: spark_token.SparkTokenInternalService.exchange_revocation_secrets_shares:input_type -> spark_token.ExchangeRevocationSecretsSharesRequest
-	11, // 19: spark_token.SparkTokenInternalService.broadcast_token_transaction_internal:input_type -> spark_token.BroadcastTransactionInternalRequest
+	11, // 19: spark_token.SparkTokenInternalService.sign_token_transaction:input_type -> spark_token.SignTokenTransactionRequest
 	13, // 20: spark_token.SparkTokenInternalService.internal_freeze_tokens:input_type -> spark_token.InternalFreezeTokensRequest
 	1,  // 21: spark_token.SparkTokenInternalService.prepare_transaction:output_type -> spark_token.PrepareTransactionResponse
 	3,  // 22: spark_token.SparkTokenInternalService.sign_token_transaction_from_coordination:output_type -> spark_token.SignTokenTransactionFromCoordinationResponse
 	8,  // 23: spark_token.SparkTokenInternalService.exchange_revocation_secrets_shares:output_type -> spark_token.ExchangeRevocationSecretsSharesResponse
-	12, // 24: spark_token.SparkTokenInternalService.broadcast_token_transaction_internal:output_type -> spark_token.BroadcastTransactionInternalResponse
+	12, // 24: spark_token.SparkTokenInternalService.sign_token_transaction:output_type -> spark_token.SignTokenTransactionResponse
 	14, // 25: spark_token.SparkTokenInternalService.internal_freeze_tokens:output_type -> spark_token.InternalFreezeTokensResponse
 	21, // [21:26] is the sub-list for method output_type
 	16, // [16:21] is the sub-list for method input_type

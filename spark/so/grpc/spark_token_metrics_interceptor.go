@@ -21,6 +21,7 @@ var tokenMethods = map[string]struct{}{
 	"/spark_token.SparkTokenInternalService/prepare_transaction":                      {},
 	"/spark_token.SparkTokenInternalService/sign_token_transaction_from_coordination": {},
 	"/spark_token.SparkTokenInternalService/exchange_revocation_secrets_shares":       {},
+	"/spark_token.SparkTokenInternalService/sign_token_transaction":                   {},
 }
 
 // SparkTokenMetricsInterceptor collects metrics for Spark token transactions with the transaction type dimension.

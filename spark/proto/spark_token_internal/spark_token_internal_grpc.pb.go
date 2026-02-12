@@ -22,7 +22,7 @@ const (
 	SparkTokenInternalService_PrepareTransaction_FullMethodName                   = "/spark_token.SparkTokenInternalService/prepare_transaction"
 	SparkTokenInternalService_SignTokenTransactionFromCoordination_FullMethodName = "/spark_token.SparkTokenInternalService/sign_token_transaction_from_coordination"
 	SparkTokenInternalService_ExchangeRevocationSecretsShares_FullMethodName      = "/spark_token.SparkTokenInternalService/exchange_revocation_secrets_shares"
-	SparkTokenInternalService_BroadcastTokenTransactionInternal_FullMethodName    = "/spark_token.SparkTokenInternalService/broadcast_token_transaction_internal"
+	SparkTokenInternalService_SignTokenTransaction_FullMethodName                 = "/spark_token.SparkTokenInternalService/sign_token_transaction"
 	SparkTokenInternalService_InternalFreezeTokens_FullMethodName                 = "/spark_token.SparkTokenInternalService/internal_freeze_tokens"
 )
 
@@ -38,8 +38,8 @@ type SparkTokenInternalServiceClient interface {
 	// Once an SO has all the revocation secret shares, it can finalize the
 	// transaction.
 	ExchangeRevocationSecretsShares(ctx context.Context, in *ExchangeRevocationSecretsSharesRequest, opts ...grpc.CallOption) (*ExchangeRevocationSecretsSharesResponse, error)
-	// Combined prepare and sign transaction (SO-to-SO) for broadcast flow
-	BroadcastTokenTransactionInternal(ctx context.Context, in *BroadcastTransactionInternalRequest, opts ...grpc.CallOption) (*BroadcastTransactionInternalResponse, error)
+	// Create and Sign a token transaction on non-coordinator operators (V3+).
+	SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error)
 	// Internal freeze tokens (SO-to-SO coordination)
 	InternalFreezeTokens(ctx context.Context, in *InternalFreezeTokensRequest, opts ...grpc.CallOption) (*InternalFreezeTokensResponse, error)
 }
@@ -82,10 +82,10 @@ func (c *sparkTokenInternalServiceClient) ExchangeRevocationSecretsShares(ctx co
 	return out, nil
 }
 
-func (c *sparkTokenInternalServiceClient) BroadcastTokenTransactionInternal(ctx context.Context, in *BroadcastTransactionInternalRequest, opts ...grpc.CallOption) (*BroadcastTransactionInternalResponse, error) {
+func (c *sparkTokenInternalServiceClient) SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BroadcastTransactionInternalResponse)
-	err := c.cc.Invoke(ctx, SparkTokenInternalService_BroadcastTokenTransactionInternal_FullMethodName, in, out, cOpts...)
+	out := new(SignTokenTransactionResponse)
+	err := c.cc.Invoke(ctx, SparkTokenInternalService_SignTokenTransaction_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -114,8 +114,8 @@ type SparkTokenInternalServiceServer interface {
 	// Once an SO has all the revocation secret shares, it can finalize the
 	// transaction.
 	ExchangeRevocationSecretsShares(context.Context, *ExchangeRevocationSecretsSharesRequest) (*ExchangeRevocationSecretsSharesResponse, error)
-	// Combined prepare and sign transaction (SO-to-SO) for broadcast flow
-	BroadcastTokenTransactionInternal(context.Context, *BroadcastTransactionInternalRequest) (*BroadcastTransactionInternalResponse, error)
+	// Create and Sign a token transaction on non-coordinator operators (V3+).
+	SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error)
 	// Internal freeze tokens (SO-to-SO coordination)
 	InternalFreezeTokens(context.Context, *InternalFreezeTokensRequest) (*InternalFreezeTokensResponse, error)
 	mustEmbedUnimplementedSparkTokenInternalServiceServer()
@@ -137,8 +137,8 @@ func (UnimplementedSparkTokenInternalServiceServer) SignTokenTransactionFromCoor
 func (UnimplementedSparkTokenInternalServiceServer) ExchangeRevocationSecretsShares(context.Context, *ExchangeRevocationSecretsSharesRequest) (*ExchangeRevocationSecretsSharesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExchangeRevocationSecretsShares not implemented")
 }
-func (UnimplementedSparkTokenInternalServiceServer) BroadcastTokenTransactionInternal(context.Context, *BroadcastTransactionInternalRequest) (*BroadcastTransactionInternalResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method BroadcastTokenTransactionInternal not implemented")
+func (UnimplementedSparkTokenInternalServiceServer) SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SignTokenTransaction not implemented")
 }
 func (UnimplementedSparkTokenInternalServiceServer) InternalFreezeTokens(context.Context, *InternalFreezeTokensRequest) (*InternalFreezeTokensResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InternalFreezeTokens not implemented")
@@ -219,20 +219,20 @@ func _SparkTokenInternalService_ExchangeRevocationSecretsShares_Handler(srv inte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkTokenInternalService_BroadcastTokenTransactionInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BroadcastTransactionInternalRequest)
+func _SparkTokenInternalService_SignTokenTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SignTokenTransactionRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkTokenInternalServiceServer).BroadcastTokenTransactionInternal(ctx, in)
+		return srv.(SparkTokenInternalServiceServer).SignTokenTransaction(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkTokenInternalService_BroadcastTokenTransactionInternal_FullMethodName,
+		FullMethod: SparkTokenInternalService_SignTokenTransaction_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkTokenInternalServiceServer).BroadcastTokenTransactionInternal(ctx, req.(*BroadcastTransactionInternalRequest))
+		return srv.(SparkTokenInternalServiceServer).SignTokenTransaction(ctx, req.(*SignTokenTransactionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -275,8 +275,8 @@ var SparkTokenInternalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkTokenInternalService_ExchangeRevocationSecretsShares_Handler,
 		},
 		{
-			MethodName: "broadcast_token_transaction_internal",
-			Handler:    _SparkTokenInternalService_BroadcastTokenTransactionInternal_Handler,
+			MethodName: "sign_token_transaction",
+			Handler:    _SparkTokenInternalService_SignTokenTransaction_Handler,
 		},
 		{
 			MethodName: "internal_freeze_tokens",

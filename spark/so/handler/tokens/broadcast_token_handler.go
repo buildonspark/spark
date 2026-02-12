@@ -27,19 +27,19 @@ import (
 )
 
 type BroadcastTokenHandler struct {
-	config                   *so.Config
-	startTokenHandler        *StartTokenTransactionHandler
-	signTokenHandler         *SignTokenHandler
-	internalBroadcastHandler *InternalBroadcastTokenHandler
+	config             *so.Config
+	startTokenHandler  *StartTokenTransactionHandler
+	signTokenHandler   *SignTokenHandler
+	signTokenTxHandler *SignTokenTransactionHandler
 }
 
 // NewBroadcastTokenHandler creates a new BroadcastTokenHandler.
 func NewBroadcastTokenHandler(config *so.Config) *BroadcastTokenHandler {
 	return &BroadcastTokenHandler{
-		config:                   config,
-		startTokenHandler:        NewStartTokenTransactionHandler(config),
-		signTokenHandler:         NewSignTokenHandler(config),
-		internalBroadcastHandler: NewInternalBroadcastTokenHandler(config),
+		config:             config,
+		startTokenHandler:  NewStartTokenTransactionHandler(config),
+		signTokenHandler:   NewSignTokenHandler(config),
+		signTokenTxHandler: NewSignTokenTransactionHandler(config),
 	}
 }
 
@@ -208,7 +208,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 
 	// Sign and save the transaction on the coordinator *before* signing with other operators.
 	// This allows the coordinator to re-attempt failed signing requests to non-coordinators in the event of a failure (up until expiration time).
-	localResp, err := h.internalBroadcastHandler.BroadcastTokenTransactionInternal(ctx, &tokeninternalpb.BroadcastTransactionInternalRequest{
+	localResp, err := h.signTokenTxHandler.SignTokenTransaction(ctx, &tokeninternalpb.SignTokenTransactionRequest{
 		KeyshareIds:                keyshareIDs,
 		FinalTokenTransaction:      legacyTokenTx,
 		TokenTransactionSignatures: req.GetTokenTransactionOwnerSignatures(),
@@ -223,7 +223,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 
 	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	internalSignatures, fanoutErr := helper.ExecuteTaskWithAllOperators(ctx, h.config, &excludeSelf,
-		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.BroadcastTransactionInternalResponse, error) {
+		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.SignTokenTransactionResponse, error) {
 			conn, err := operator.NewOperatorGRPCConnection()
 			if err != nil {
 				return nil, err
@@ -231,7 +231,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 			defer conn.Close()
 
 			client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
-			return client.BroadcastTokenTransactionInternal(ctx, &tokeninternalpb.BroadcastTransactionInternalRequest{
+			return client.SignTokenTransaction(ctx, &tokeninternalpb.SignTokenTransactionRequest{
 				KeyshareIds:                keyshareIDs,
 				FinalTokenTransaction:      legacyTokenTx,
 				TokenTransactionSignatures: req.GetTokenTransactionOwnerSignatures(),
@@ -336,10 +336,10 @@ func (h *BroadcastTokenHandler) FanoutBroadcastAndFinalize(
 	signatures[h.config.Identifier] = tokenTxEnt.OperatorSignature
 
 	// Fanout to all other SOs (excluding self). This is idempotent since
-	// BroadcastTokenTransactionInternal returns cached signatures for already-signed transactions.
+	// SignTokenTransaction returns cached signatures for already-signed transactions.
 	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	internalSignatures, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &excludeSelf,
-		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.BroadcastTransactionInternalResponse, error) {
+		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.SignTokenTransactionResponse, error) {
 			conn, err := operator.NewOperatorGRPCConnection()
 			if err != nil {
 				return nil, err
@@ -347,7 +347,7 @@ func (h *BroadcastTokenHandler) FanoutBroadcastAndFinalize(
 			defer conn.Close()
 
 			client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
-			return client.BroadcastTokenTransactionInternal(ctx, &tokeninternalpb.BroadcastTransactionInternalRequest{
+			return client.SignTokenTransaction(ctx, &tokeninternalpb.SignTokenTransactionRequest{
 				KeyshareIds:                keyshareIDs,
 				FinalTokenTransaction:      legacyTokenTx,
 				TokenTransactionSignatures: ownerSignatures,

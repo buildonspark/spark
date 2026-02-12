@@ -13,36 +13,29 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
-type InternalBroadcastTokenHandler struct {
+type SignTokenTransactionHandler struct {
 	config         *so.Config
 	prepareHandler *InternalPrepareTokenHandler
 	signHandler    *InternalSignTokenHandler
 }
 
-func NewInternalBroadcastTokenHandler(config *so.Config) *InternalBroadcastTokenHandler {
-	return &InternalBroadcastTokenHandler{
+func NewSignTokenTransactionHandler(config *so.Config) *SignTokenTransactionHandler {
+	return &SignTokenTransactionHandler{
 		config:         config,
 		prepareHandler: NewInternalPrepareTokenHandler(config),
 		signHandler:    NewInternalSignTokenHandler(config),
 	}
 }
 
-func (h *InternalBroadcastTokenHandler) BroadcastTokenTransactionInternal(
+func (h *SignTokenTransactionHandler) SignTokenTransaction(
 	ctx context.Context,
-	req *tokeninternalpb.BroadcastTransactionInternalRequest,
-) (*tokeninternalpb.BroadcastTransactionInternalResponse, error) {
-	ctx, span := GetTracer().Start(ctx, "InternalBroadcastTokenHandler.BroadcastTokenTransactionInternal")
+	req *tokeninternalpb.SignTokenTransactionRequest,
+) (*tokeninternalpb.SignTokenTransactionResponse, error) {
+	ctx, span := GetTracer().Start(ctx, "SignTokenTransactionHandler.SignTokenTransaction")
 	defer span.End()
-
-	knobService := knobs.GetKnobsService(ctx)
-	phase2Enabled := knobService != nil && knobService.RolloutRandom(knobs.KnobTokenTransactionV3Phase2Enabled, 0)
-	if !phase2Enabled {
-		return nil, sparkerrors.UnimplementedMethodDisabled(fmt.Errorf("broadcastTokenTransactionInternal flow is not enabled"))
-	}
 
 	finalTokenTX := req.GetFinalTokenTransaction()
 	if finalTokenTX == nil {
@@ -66,7 +59,7 @@ func (h *InternalBroadcastTokenHandler) BroadcastTokenTransactionInternal(
 			if err != nil {
 				return nil, err
 			}
-			return &tokeninternalpb.BroadcastTransactionInternalResponse{
+			return &tokeninternalpb.SignTokenTransactionResponse{
 				SparkOperatorSignature: signature,
 			}, nil
 		} else {
@@ -102,12 +95,12 @@ func (h *InternalBroadcastTokenHandler) BroadcastTokenTransactionInternal(
 		return nil, fmt.Errorf("sign phase failed: %w", err)
 	}
 
-	return &tokeninternalpb.BroadcastTransactionInternalResponse{
+	return &tokeninternalpb.SignTokenTransactionResponse{
 		SparkOperatorSignature: sig,
 	}, nil
 }
 
-func (h *InternalBroadcastTokenHandler) createSignedTokenTransactionEntitiesAndSign(
+func (h *SignTokenTransactionHandler) createSignedTokenTransactionEntitiesAndSign(
 	ctx context.Context,
 	finalTokenTransaction *tokenpb.TokenTransaction,
 	finalTokenTransactionHash []byte,
@@ -116,14 +109,14 @@ func (h *InternalBroadcastTokenHandler) createSignedTokenTransactionEntitiesAndS
 	orderedOutputToSpendEnts []*ent.TokenOutput,
 	coordinatorPublicKey keys.Public,
 ) ([]byte, error) {
-	ctx, span := GetTracer().Start(ctx, "InternalBroadcastTokenHandler.CreateSignedTokenTransactionEntitiesAndSign", GetProtoTokenTransactionTraceAttributes(ctx, finalTokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "SignTokenTransactionHandler.CreateSignedTokenTransactionEntitiesAndSign", GetProtoTokenTransactionTraceAttributes(ctx, finalTokenTransaction))
 	defer span.End()
 
 	if finalTokenTransaction == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("final token transaction cannot be nil"))
 	}
 	if finalTokenTransaction.GetVersion() < 3 {
-		return nil, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("broadcast requires version 3+ token transaction, got %d", finalTokenTransaction.GetVersion()))
+		return nil, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("sign_token_transaction requires version 3+ token transaction, got %d", finalTokenTransaction.GetVersion()))
 	}
 
 	calculatedHash, err := utils.HashTokenTransaction(finalTokenTransaction, false)

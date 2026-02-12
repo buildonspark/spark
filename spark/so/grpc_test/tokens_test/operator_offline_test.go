@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var internalBroadcastMethod = tokenpbinternal.SparkTokenInternalService_BroadcastTokenTransactionInternal_FullMethodName
+var internalBroadcastMethod = tokenpbinternal.SparkTokenInternalService_SignTokenTransaction_FullMethodName
 
 func disableInternalBroadcast(t *testing.T, kc *sparktesting.KnobController) {
 	t.Helper()
