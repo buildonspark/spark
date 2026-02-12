@@ -810,6 +810,305 @@ pub fn random_secret_key_bytes() -> Result<Vec<u8>, Error> {
     Ok(secret_key.secret_bytes().to_vec())
 }
 
+// ---------------------------------------------------------------------------
+// Timelock functions — thin wrappers around spark_frost::transaction
+// ---------------------------------------------------------------------------
+
+#[wasm_bindgen]
+pub fn get_timelock_from_sequence(sequence: u32) -> u32 {
+    spark_frost::transaction::get_timelock_from_sequence(sequence)
+}
+
+#[wasm_bindgen]
+pub fn check_if_valid_sequence(sequence: u32) -> Result<(), Error> {
+    spark_frost::transaction::check_if_valid_sequence(sequence).map_err(Error::Spark)
+}
+
+#[wasm_bindgen]
+pub fn is_zero_timelock(sequence: u32) -> bool {
+    spark_frost::transaction::is_zero_timelock(sequence)
+}
+
+#[wasm_bindgen]
+pub fn round_down_to_timelock_interval(timelock: u32, time_lock_interval: u32) -> u32 {
+    spark_frost::transaction::round_down_to_timelock_interval(timelock, time_lock_interval)
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct TimelockResult {
+    #[wasm_bindgen]
+    pub next_sequence: u32,
+    #[wasm_bindgen]
+    pub next_direct_sequence: u32,
+}
+
+#[wasm_bindgen]
+pub fn next_sequence(
+    curr_sequence: u32,
+    time_lock_interval: u32,
+    direct_timelock_offset: u32,
+) -> Result<TimelockResult, Error> {
+    let (next_seq, next_direct_seq) = spark_frost::transaction::next_sequence(
+        curr_sequence,
+        time_lock_interval,
+        direct_timelock_offset,
+    )
+    .map_err(Error::Spark)?;
+    Ok(TimelockResult {
+        next_sequence: next_seq,
+        next_direct_sequence: next_direct_seq,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Node tx pair and refund tx trio
+// ---------------------------------------------------------------------------
+
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct NodeTxPairResult {
+    #[wasm_bindgen(getter_with_clone)]
+    pub cpfp: TransactionResult,
+    #[wasm_bindgen(getter_with_clone)]
+    pub direct: TransactionResult,
+}
+
+fn internal_to_tx_result(
+    r: spark_frost::transaction::InternalTransactionResult,
+) -> Result<TransactionResult, Error> {
+    let tx: Transaction = deserialize(&r.tx_bytes)
+        .map_err(|e| Error::Spark(format!("failed to deserialize tx: {e}")))?;
+    Ok(TransactionResult {
+        tx: r.tx_bytes,
+        sighash: r.sighash,
+        inputs: tx.input.into_iter().map(|i| i.into()).collect(),
+    })
+}
+
+#[wasm_bindgen]
+pub fn construct_node_tx_pair(
+    parent_tx: Vec<u8>,
+    vout: u32,
+    address: String,
+    sequence: u32,
+    direct_sequence: u32,
+    fee_sats: u64,
+) -> Result<NodeTxPairResult, Error> {
+    let result = spark_frost::transaction::construct_node_tx_pair(
+        &parent_tx,
+        vout,
+        &address,
+        sequence,
+        direct_sequence,
+        fee_sats,
+    )
+    .map_err(Error::Spark)?;
+
+    Ok(NodeTxPairResult {
+        cpfp: internal_to_tx_result(result.cpfp)?,
+        direct: internal_to_tx_result(result.direct)?,
+    })
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct RefundTxTrioResult {
+    #[wasm_bindgen(getter_with_clone)]
+    pub cpfp_refund: TransactionResult,
+    #[wasm_bindgen(getter_with_clone)]
+    pub direct_refund: Option<TransactionResult>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub direct_from_cpfp_refund: TransactionResult,
+}
+
+#[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
+pub fn construct_refund_tx_trio(
+    cpfp_node_tx: Vec<u8>,
+    direct_node_tx: Option<Vec<u8>>,
+    vout: u32,
+    receiving_pubkey: Vec<u8>,
+    network: String,
+    sequence: u32,
+    direct_sequence: u32,
+    fee_sats: u64,
+) -> Result<RefundTxTrioResult, Error> {
+    let direct_ref = direct_node_tx.as_deref();
+    let result = spark_frost::transaction::construct_refund_tx_trio(
+        &cpfp_node_tx,
+        direct_ref,
+        vout,
+        &receiving_pubkey,
+        &network,
+        sequence,
+        direct_sequence,
+        fee_sats,
+    )
+    .map_err(Error::Spark)?;
+
+    Ok(RefundTxTrioResult {
+        cpfp_refund: internal_to_tx_result(result.cpfp_refund)?,
+        direct_refund: result
+            .direct_refund
+            .map(internal_to_tx_result)
+            .transpose()?,
+        direct_from_cpfp_refund: internal_to_tx_result(result.direct_from_cpfp_refund)?,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Multi-input sighash
+// ---------------------------------------------------------------------------
+
+#[wasm_bindgen]
+pub fn compute_multi_input_sighash(
+    tx: Vec<u8>,
+    input_index: u32,
+    prev_out_scripts: JsValue,
+    prev_out_values: JsValue,
+) -> Result<Vec<u8>, Error> {
+    let scripts: Vec<Vec<u8>> = serde_wasm_bindgen::from_value(prev_out_scripts)
+        .map_err(|e| Error::Spark(format!("failed to deserialize prev_out_scripts: {e}")))?;
+    let values: Vec<u64> = serde_wasm_bindgen::from_value(prev_out_values)
+        .map_err(|e| Error::Spark(format!("failed to deserialize prev_out_values: {e}")))?;
+    spark_frost::transaction::compute_multi_input_sighash(&tx, input_index, &scripts, &values)
+        .map_err(Error::Spark)
+}
+
+pub fn compute_multi_input_sighash_uniffi(
+    tx: Vec<u8>,
+    input_index: u32,
+    prev_out_scripts: Vec<Vec<u8>>,
+    prev_out_values: Vec<u64>,
+) -> Result<Vec<u8>, Error> {
+    spark_frost::transaction::compute_multi_input_sighash(
+        &tx,
+        input_index,
+        &prev_out_scripts,
+        &prev_out_values,
+    )
+    .map_err(Error::Spark)
+}
+
+// ---------------------------------------------------------------------------
+// HTLC functions
+// ---------------------------------------------------------------------------
+
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct HTLCSpendResult {
+    #[wasm_bindgen(getter_with_clone)]
+    pub tx: Vec<u8>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub sighash: Vec<u8>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub script: Vec<u8>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub control_block: Vec<u8>,
+}
+
+#[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
+pub fn construct_htlc_transaction(
+    node_tx: Vec<u8>,
+    vout: u32,
+    sequence: u32,
+    payment_hash: Vec<u8>,
+    hashlock_pubkey: Vec<u8>,
+    seqlock_pubkey: Vec<u8>,
+    htlc_sequence: u32,
+    apply_fee: bool,
+    fee_sats: u64,
+    network: String,
+) -> Result<TransactionResult, Error> {
+    let hash: [u8; 32] = payment_hash
+        .try_into()
+        .map_err(|_| Error::Spark("payment_hash must be 32 bytes".to_string()))?;
+    let result = spark_frost::htlc::construct_htlc_transaction(
+        &node_tx,
+        vout,
+        sequence,
+        &hash,
+        &hashlock_pubkey,
+        &seqlock_pubkey,
+        htlc_sequence,
+        apply_fee,
+        fee_sats,
+        &network,
+    )
+    .map_err(Error::Spark)?;
+    internal_to_tx_result(result)
+}
+
+#[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
+pub fn construct_htlc_sender_spend(
+    htlc_tx: Vec<u8>,
+    destination_pubkey: Vec<u8>,
+    payment_hash: Vec<u8>,
+    hashlock_pubkey: Vec<u8>,
+    seqlock_pubkey: Vec<u8>,
+    htlc_sequence: u32,
+    fee_sats: u64,
+    network: String,
+) -> Result<HTLCSpendResult, Error> {
+    let hash: [u8; 32] = payment_hash
+        .try_into()
+        .map_err(|_| Error::Spark("payment_hash must be 32 bytes".to_string()))?;
+    let result = spark_frost::htlc::construct_htlc_sender_spend(
+        &htlc_tx,
+        &destination_pubkey,
+        &hash,
+        &hashlock_pubkey,
+        &seqlock_pubkey,
+        htlc_sequence,
+        fee_sats,
+        &network,
+    )
+    .map_err(Error::Spark)?;
+    Ok(HTLCSpendResult {
+        tx: result.tx_bytes,
+        sighash: result.sighash,
+        script: result.script,
+        control_block: result.control_block,
+    })
+}
+
+#[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
+pub fn construct_htlc_receiver_spend(
+    htlc_tx: Vec<u8>,
+    destination_pubkey: Vec<u8>,
+    payment_hash: Vec<u8>,
+    hashlock_pubkey: Vec<u8>,
+    seqlock_pubkey: Vec<u8>,
+    htlc_sequence: u32,
+    fee_sats: u64,
+    network: String,
+) -> Result<HTLCSpendResult, Error> {
+    let hash: [u8; 32] = payment_hash
+        .try_into()
+        .map_err(|_| Error::Spark("payment_hash must be 32 bytes".to_string()))?;
+    let result = spark_frost::htlc::construct_htlc_receiver_spend(
+        &htlc_tx,
+        &destination_pubkey,
+        &hash,
+        &hashlock_pubkey,
+        &seqlock_pubkey,
+        htlc_sequence,
+        fee_sats,
+        &network,
+    )
+    .map_err(Error::Spark)?;
+    Ok(HTLCSpendResult {
+        tx: result.tx_bytes,
+        sighash: result.sighash,
+        script: result.script,
+        control_block: result.control_block,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

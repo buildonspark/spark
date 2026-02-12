@@ -1,4 +1,4 @@
-namespace spark_frost { 
+namespace spark_frost {
     [Throws=Error]
     NonceResult frost_nonce(KeyPackage key_package);
 
@@ -42,6 +42,44 @@ namespace spark_frost {
 
     [Throws=Error]
     bytes random_secret_key_bytes();
+
+    // --- Timelock functions ---
+
+    u32 get_timelock_from_sequence(u32 sequence);
+
+    [Throws=Error]
+    void check_if_valid_sequence(u32 sequence);
+
+    boolean is_zero_timelock(u32 sequence);
+
+    u32 round_down_to_timelock_interval(u32 timelock, u32 time_lock_interval);
+
+    [Throws=Error]
+    TimelockResult next_sequence(u32 curr_sequence, u32 time_lock_interval, u32 direct_timelock_offset);
+
+    // --- Node tx pair and refund tx trio ---
+
+    [Throws=Error]
+    NodeTxPairResult construct_node_tx_pair(bytes parent_tx, u32 vout, string address, u32 sequence, u32 direct_sequence, u64 fee_sats);
+
+    [Throws=Error]
+    RefundTxTrioResult construct_refund_tx_trio(bytes cpfp_node_tx, bytes? direct_node_tx, u32 vout, bytes receiving_pubkey, string network, u32 sequence, u32 direct_sequence, u64 fee_sats);
+
+    // --- Multi-input sighash ---
+
+    [Throws=Error]
+    bytes compute_multi_input_sighash_uniffi(bytes tx, u32 input_index, sequence<bytes> prev_out_scripts, sequence<u64> prev_out_values);
+
+    // --- HTLC functions ---
+
+    [Throws=Error]
+    TransactionResult construct_htlc_transaction(bytes node_tx, u32 vout, u32 sequence, bytes payment_hash, bytes hashlock_pubkey, bytes seqlock_pubkey, u32 htlc_sequence, boolean apply_fee, u64 fee_sats, string network);
+
+    [Throws=Error]
+    HTLCSpendResult construct_htlc_sender_spend(bytes htlc_tx, bytes destination_pubkey, bytes payment_hash, bytes hashlock_pubkey, bytes seqlock_pubkey, u32 htlc_sequence, u64 fee_sats, string network);
+
+    [Throws=Error]
+    HTLCSpendResult construct_htlc_receiver_spend(bytes htlc_tx, bytes destination_pubkey, bytes payment_hash, bytes hashlock_pubkey, bytes seqlock_pubkey, u32 htlc_sequence, u64 fee_sats, string network);
 };
 
 [Error]
@@ -83,4 +121,27 @@ dictionary TxInResult {
 dictionary DummyTx {
     bytes tx;
     string txid;
+};
+
+dictionary TimelockResult {
+    u32 next_sequence;
+    u32 next_direct_sequence;
+};
+
+dictionary NodeTxPairResult {
+    TransactionResult cpfp;
+    TransactionResult direct;
+};
+
+dictionary RefundTxTrioResult {
+    TransactionResult cpfp_refund;
+    TransactionResult? direct_refund;
+    TransactionResult direct_from_cpfp_refund;
+};
+
+dictionary HTLCSpendResult {
+    bytes tx;
+    bytes sighash;
+    bytes script;
+    bytes control_block;
 };
