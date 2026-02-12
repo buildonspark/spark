@@ -54,10 +54,18 @@ const (
 	FieldSenderKeyTweakProof = "sender_key_tweak_proof"
 	// FieldReceiverKeyTweak holds the string denoting the receiver_key_tweak field in the database.
 	FieldReceiverKeyTweak = "receiver_key_tweak"
+	// FieldTransferReceiverID holds the string denoting the transfer_receiver_id field in the database.
+	FieldTransferReceiverID = "transfer_receiver_id"
+	// FieldTransferSenderID holds the string denoting the transfer_sender_id field in the database.
+	FieldTransferSenderID = "transfer_sender_id"
 	// EdgeTransfer holds the string denoting the transfer edge name in mutations.
 	EdgeTransfer = "transfer"
 	// EdgeLeaf holds the string denoting the leaf edge name in mutations.
 	EdgeLeaf = "leaf"
+	// EdgeTransferReceiver holds the string denoting the transfer_receiver edge name in mutations.
+	EdgeTransferReceiver = "transfer_receiver"
+	// EdgeTransferSender holds the string denoting the transfer_sender edge name in mutations.
+	EdgeTransferSender = "transfer_sender"
 	// Table holds the table name of the transferleaf in the database.
 	Table = "transfer_leafs"
 	// TransferTable is the table that holds the transfer relation/edge.
@@ -74,6 +82,20 @@ const (
 	LeafInverseTable = "tree_nodes"
 	// LeafColumn is the table column denoting the leaf relation/edge.
 	LeafColumn = "transfer_leaf_leaf"
+	// TransferReceiverTable is the table that holds the transfer_receiver relation/edge.
+	TransferReceiverTable = "transfer_leafs"
+	// TransferReceiverInverseTable is the table name for the TransferReceiver entity.
+	// It exists in this package in order to avoid circular dependency with the "transferreceiver" package.
+	TransferReceiverInverseTable = "transfer_receivers"
+	// TransferReceiverColumn is the table column denoting the transfer_receiver relation/edge.
+	TransferReceiverColumn = "transfer_receiver_id"
+	// TransferSenderTable is the table that holds the transfer_sender relation/edge.
+	TransferSenderTable = "transfer_leafs"
+	// TransferSenderInverseTable is the table name for the TransferSender entity.
+	// It exists in this package in order to avoid circular dependency with the "transfersender" package.
+	TransferSenderInverseTable = "transfer_senders"
+	// TransferSenderColumn is the table column denoting the transfer_sender relation/edge.
+	TransferSenderColumn = "transfer_sender_id"
 )
 
 // Columns holds all SQL columns for transferleaf fields.
@@ -98,6 +120,8 @@ var Columns = []string{
 	FieldKeyTweak,
 	FieldSenderKeyTweakProof,
 	FieldReceiverKeyTweak,
+	FieldTransferReceiverID,
+	FieldTransferSenderID,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "transfer_leafs"
@@ -176,6 +200,16 @@ func ByIntermediateDirectFromCpfpRefundTimelock(opts ...sql.OrderTermOption) Ord
 	return sql.OrderByField(FieldIntermediateDirectFromCpfpRefundTimelock, opts...).ToFunc()
 }
 
+// ByTransferReceiverID orders the results by the transfer_receiver_id field.
+func ByTransferReceiverID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTransferReceiverID, opts...).ToFunc()
+}
+
+// ByTransferSenderID orders the results by the transfer_sender_id field.
+func ByTransferSenderID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTransferSenderID, opts...).ToFunc()
+}
+
 // ByTransferField orders the results by transfer field.
 func ByTransferField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -187,6 +221,20 @@ func ByTransferField(field string, opts ...sql.OrderTermOption) OrderOption {
 func ByLeafField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newLeafStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByTransferReceiverField orders the results by transfer_receiver field.
+func ByTransferReceiverField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTransferReceiverStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByTransferSenderField orders the results by transfer_sender field.
+func ByTransferSenderField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTransferSenderStep(), sql.OrderByField(field, opts...))
 	}
 }
 func newTransferStep() *sqlgraph.Step {
@@ -201,5 +249,19 @@ func newLeafStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(LeafInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, LeafTable, LeafColumn),
+	)
+}
+func newTransferReceiverStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TransferReceiverInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, TransferReceiverTable, TransferReceiverColumn),
+	)
+}
+func newTransferSenderStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TransferSenderInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, TransferSenderTable, TransferSenderColumn),
 	)
 }

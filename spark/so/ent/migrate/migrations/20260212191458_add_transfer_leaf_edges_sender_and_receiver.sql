@@ -1,0 +1,2 @@
+-- Modify "transfer_leafs" table
+ALTER TABLE "transfer_leafs" ADD COLUMN "transfer_receiver_id" uuid NULL, ADD COLUMN "transfer_sender_id" uuid NULL, ADD CONSTRAINT "transfer_leafs_transfer_receivers_transfer_receiver" FOREIGN KEY ("transfer_receiver_id") REFERENCES "transfer_receivers" ("id") ON UPDATE NO ACTION ON DELETE SET NULL, ADD CONSTRAINT "transfer_leafs_transfer_senders_transfer_sender" FOREIGN KEY ("transfer_sender_id") REFERENCES "transfer_senders" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;

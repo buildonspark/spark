@@ -16,20 +16,24 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
+	"github.com/lightsparkdev/spark/so/ent/transfersender"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
 // TransferLeafQuery is the builder for querying TransferLeaf entities.
 type TransferLeafQuery struct {
 	config
-	ctx          *QueryContext
-	order        []transferleaf.OrderOption
-	inters       []Interceptor
-	predicates   []predicate.TransferLeaf
-	withTransfer *TransferQuery
-	withLeaf     *TreeNodeQuery
-	withFKs      bool
-	modifiers    []func(*sql.Selector)
+	ctx                  *QueryContext
+	order                []transferleaf.OrderOption
+	inters               []Interceptor
+	predicates           []predicate.TransferLeaf
+	withTransfer         *TransferQuery
+	withLeaf             *TreeNodeQuery
+	withTransferReceiver *TransferReceiverQuery
+	withTransferSender   *TransferSenderQuery
+	withFKs              bool
+	modifiers            []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -103,6 +107,50 @@ func (tlq *TransferLeafQuery) QueryLeaf() *TreeNodeQuery {
 			sqlgraph.From(transferleaf.Table, transferleaf.FieldID, selector),
 			sqlgraph.To(treenode.Table, treenode.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, transferleaf.LeafTable, transferleaf.LeafColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tlq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTransferReceiver chains the current query on the "transfer_receiver" edge.
+func (tlq *TransferLeafQuery) QueryTransferReceiver() *TransferReceiverQuery {
+	query := (&TransferReceiverClient{config: tlq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tlq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tlq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transferleaf.Table, transferleaf.FieldID, selector),
+			sqlgraph.To(transferreceiver.Table, transferreceiver.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transferleaf.TransferReceiverTable, transferleaf.TransferReceiverColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tlq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTransferSender chains the current query on the "transfer_sender" edge.
+func (tlq *TransferLeafQuery) QueryTransferSender() *TransferSenderQuery {
+	query := (&TransferSenderClient{config: tlq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tlq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tlq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transferleaf.Table, transferleaf.FieldID, selector),
+			sqlgraph.To(transfersender.Table, transfersender.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transferleaf.TransferSenderTable, transferleaf.TransferSenderColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tlq.driver.Dialect(), step)
 		return fromU, nil
@@ -297,13 +345,15 @@ func (tlq *TransferLeafQuery) Clone() *TransferLeafQuery {
 		return nil
 	}
 	return &TransferLeafQuery{
-		config:       tlq.config,
-		ctx:          tlq.ctx.Clone(),
-		order:        append([]transferleaf.OrderOption{}, tlq.order...),
-		inters:       append([]Interceptor{}, tlq.inters...),
-		predicates:   append([]predicate.TransferLeaf{}, tlq.predicates...),
-		withTransfer: tlq.withTransfer.Clone(),
-		withLeaf:     tlq.withLeaf.Clone(),
+		config:               tlq.config,
+		ctx:                  tlq.ctx.Clone(),
+		order:                append([]transferleaf.OrderOption{}, tlq.order...),
+		inters:               append([]Interceptor{}, tlq.inters...),
+		predicates:           append([]predicate.TransferLeaf{}, tlq.predicates...),
+		withTransfer:         tlq.withTransfer.Clone(),
+		withLeaf:             tlq.withLeaf.Clone(),
+		withTransferReceiver: tlq.withTransferReceiver.Clone(),
+		withTransferSender:   tlq.withTransferSender.Clone(),
 		// clone intermediate query.
 		sql:       tlq.sql.Clone(),
 		path:      tlq.path,
@@ -330,6 +380,28 @@ func (tlq *TransferLeafQuery) WithLeaf(opts ...func(*TreeNodeQuery)) *TransferLe
 		opt(query)
 	}
 	tlq.withLeaf = query
+	return tlq
+}
+
+// WithTransferReceiver tells the query-builder to eager-load the nodes that are connected to
+// the "transfer_receiver" edge. The optional arguments are used to configure the query builder of the edge.
+func (tlq *TransferLeafQuery) WithTransferReceiver(opts ...func(*TransferReceiverQuery)) *TransferLeafQuery {
+	query := (&TransferReceiverClient{config: tlq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tlq.withTransferReceiver = query
+	return tlq
+}
+
+// WithTransferSender tells the query-builder to eager-load the nodes that are connected to
+// the "transfer_sender" edge. The optional arguments are used to configure the query builder of the edge.
+func (tlq *TransferLeafQuery) WithTransferSender(opts ...func(*TransferSenderQuery)) *TransferLeafQuery {
+	query := (&TransferSenderClient{config: tlq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tlq.withTransferSender = query
 	return tlq
 }
 
@@ -412,9 +484,11 @@ func (tlq *TransferLeafQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([
 		nodes       = []*TransferLeaf{}
 		withFKs     = tlq.withFKs
 		_spec       = tlq.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [4]bool{
 			tlq.withTransfer != nil,
 			tlq.withLeaf != nil,
+			tlq.withTransferReceiver != nil,
+			tlq.withTransferSender != nil,
 		}
 	)
 	if tlq.withTransfer != nil || tlq.withLeaf != nil {
@@ -453,6 +527,18 @@ func (tlq *TransferLeafQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([
 	if query := tlq.withLeaf; query != nil {
 		if err := tlq.loadLeaf(ctx, query, nodes, nil,
 			func(n *TransferLeaf, e *TreeNode) { n.Edges.Leaf = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := tlq.withTransferReceiver; query != nil {
+		if err := tlq.loadTransferReceiver(ctx, query, nodes, nil,
+			func(n *TransferLeaf, e *TransferReceiver) { n.Edges.TransferReceiver = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := tlq.withTransferSender; query != nil {
+		if err := tlq.loadTransferSender(ctx, query, nodes, nil,
+			func(n *TransferLeaf, e *TransferSender) { n.Edges.TransferSender = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -523,6 +609,70 @@ func (tlq *TransferLeafQuery) loadLeaf(ctx context.Context, query *TreeNodeQuery
 	}
 	return nil
 }
+func (tlq *TransferLeafQuery) loadTransferReceiver(ctx context.Context, query *TransferReceiverQuery, nodes []*TransferLeaf, init func(*TransferLeaf), assign func(*TransferLeaf, *TransferReceiver)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*TransferLeaf)
+	for i := range nodes {
+		if nodes[i].TransferReceiverID == nil {
+			continue
+		}
+		fk := *nodes[i].TransferReceiverID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(transferreceiver.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "transfer_receiver_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (tlq *TransferLeafQuery) loadTransferSender(ctx context.Context, query *TransferSenderQuery, nodes []*TransferLeaf, init func(*TransferLeaf), assign func(*TransferLeaf, *TransferSender)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*TransferLeaf)
+	for i := range nodes {
+		if nodes[i].TransferSenderID == nil {
+			continue
+		}
+		fk := *nodes[i].TransferSenderID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(transfersender.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "transfer_sender_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 
 func (tlq *TransferLeafQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := tlq.querySpec()
@@ -551,6 +701,12 @@ func (tlq *TransferLeafQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != transferleaf.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if tlq.withTransferReceiver != nil {
+			_spec.Node.AddColumnOnce(transferleaf.FieldTransferReceiverID)
+		}
+		if tlq.withTransferSender != nil {
+			_spec.Node.AddColumnOnce(transferleaf.FieldTransferSenderID)
 		}
 	}
 	if ps := tlq.predicates; len(ps) > 0 {

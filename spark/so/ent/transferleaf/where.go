@@ -152,6 +152,16 @@ func ReceiverKeyTweak(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldReceiverKeyTweak, v))
 }
 
+// TransferReceiverID applies equality check predicate on the "transfer_receiver_id" field. It's identical to TransferReceiverIDEQ.
+func TransferReceiverID(v uuid.UUID) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldTransferReceiverID, v))
+}
+
+// TransferSenderID applies equality check predicate on the "transfer_sender_id" field. It's identical to TransferSenderIDEQ.
+func TransferSenderID(v uuid.UUID) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldTransferSenderID, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldCreateTime, v))
@@ -1062,6 +1072,66 @@ func ReceiverKeyTweakNotNil() predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldNotNull(FieldReceiverKeyTweak))
 }
 
+// TransferReceiverIDEQ applies the EQ predicate on the "transfer_receiver_id" field.
+func TransferReceiverIDEQ(v uuid.UUID) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldTransferReceiverID, v))
+}
+
+// TransferReceiverIDNEQ applies the NEQ predicate on the "transfer_receiver_id" field.
+func TransferReceiverIDNEQ(v uuid.UUID) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNEQ(FieldTransferReceiverID, v))
+}
+
+// TransferReceiverIDIn applies the In predicate on the "transfer_receiver_id" field.
+func TransferReceiverIDIn(vs ...uuid.UUID) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIn(FieldTransferReceiverID, vs...))
+}
+
+// TransferReceiverIDNotIn applies the NotIn predicate on the "transfer_receiver_id" field.
+func TransferReceiverIDNotIn(vs ...uuid.UUID) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotIn(FieldTransferReceiverID, vs...))
+}
+
+// TransferReceiverIDIsNil applies the IsNil predicate on the "transfer_receiver_id" field.
+func TransferReceiverIDIsNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIsNull(FieldTransferReceiverID))
+}
+
+// TransferReceiverIDNotNil applies the NotNil predicate on the "transfer_receiver_id" field.
+func TransferReceiverIDNotNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotNull(FieldTransferReceiverID))
+}
+
+// TransferSenderIDEQ applies the EQ predicate on the "transfer_sender_id" field.
+func TransferSenderIDEQ(v uuid.UUID) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldTransferSenderID, v))
+}
+
+// TransferSenderIDNEQ applies the NEQ predicate on the "transfer_sender_id" field.
+func TransferSenderIDNEQ(v uuid.UUID) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNEQ(FieldTransferSenderID, v))
+}
+
+// TransferSenderIDIn applies the In predicate on the "transfer_sender_id" field.
+func TransferSenderIDIn(vs ...uuid.UUID) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIn(FieldTransferSenderID, vs...))
+}
+
+// TransferSenderIDNotIn applies the NotIn predicate on the "transfer_sender_id" field.
+func TransferSenderIDNotIn(vs ...uuid.UUID) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotIn(FieldTransferSenderID, vs...))
+}
+
+// TransferSenderIDIsNil applies the IsNil predicate on the "transfer_sender_id" field.
+func TransferSenderIDIsNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIsNull(FieldTransferSenderID))
+}
+
+// TransferSenderIDNotNil applies the NotNil predicate on the "transfer_sender_id" field.
+func TransferSenderIDNotNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotNull(FieldTransferSenderID))
+}
+
 // HasTransfer applies the HasEdge predicate on the "transfer" edge.
 func HasTransfer() predicate.TransferLeaf {
 	return predicate.TransferLeaf(func(s *sql.Selector) {
@@ -1100,6 +1170,52 @@ func HasLeaf() predicate.TransferLeaf {
 func HasLeafWith(preds ...predicate.TreeNode) predicate.TransferLeaf {
 	return predicate.TransferLeaf(func(s *sql.Selector) {
 		step := newLeafStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasTransferReceiver applies the HasEdge predicate on the "transfer_receiver" edge.
+func HasTransferReceiver() predicate.TransferLeaf {
+	return predicate.TransferLeaf(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, TransferReceiverTable, TransferReceiverColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTransferReceiverWith applies the HasEdge predicate on the "transfer_receiver" edge with a given conditions (other predicates).
+func HasTransferReceiverWith(preds ...predicate.TransferReceiver) predicate.TransferLeaf {
+	return predicate.TransferLeaf(func(s *sql.Selector) {
+		step := newTransferReceiverStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasTransferSender applies the HasEdge predicate on the "transfer_sender" edge.
+func HasTransferSender() predicate.TransferLeaf {
+	return predicate.TransferLeaf(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, TransferSenderTable, TransferSenderColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTransferSenderWith applies the HasEdge predicate on the "transfer_sender" edge with a given conditions (other predicates).
+func HasTransferSenderWith(preds ...predicate.TransferSender) predicate.TransferLeaf {
+	return predicate.TransferLeaf(func(s *sql.Selector) {
+		step := newTransferSenderStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

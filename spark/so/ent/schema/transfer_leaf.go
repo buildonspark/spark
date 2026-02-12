@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	gen "github.com/lightsparkdev/spark/so/ent"
@@ -111,6 +112,14 @@ func (TransferLeaf) Fields() []ent.Field {
 			Optional(),
 		field.Bytes("receiver_key_tweak").
 			Optional(),
+		field.UUID("transfer_receiver_id", uuid.UUID{}).
+			Optional().
+			Nillable().
+			Comment("The TransferReceiver this leaf is assigned to."),
+		field.UUID("transfer_sender_id", uuid.UUID{}).
+			Optional().
+			Nillable().
+			Comment("The TransferSender this leaf originated from."),
 	}
 }
 
@@ -125,6 +134,12 @@ func (TransferLeaf) Edges() []ent.Edge {
 			Unique().
 			Immutable().
 			Required(),
+		edge.To("transfer_receiver", TransferReceiver.Type).
+			Unique().
+			Field("transfer_receiver_id"),
+		edge.To("transfer_sender", TransferSender.Type).
+			Unique().
+			Field("transfer_sender_id"),
 	}
 }
 

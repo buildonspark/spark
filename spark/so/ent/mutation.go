@@ -23722,6 +23722,10 @@ type TransferLeafMutation struct {
 	clearedtransfer                                  bool
 	leaf                                             *uuid.UUID
 	clearedleaf                                      bool
+	transfer_receiver                                *uuid.UUID
+	clearedtransfer_receiver                         bool
+	transfer_sender                                  *uuid.UUID
+	clearedtransfer_sender                           bool
 	done                                             bool
 	oldValue                                         func(context.Context) (*TransferLeaf, error)
 	predicates                                       []predicate.TransferLeaf
@@ -24773,6 +24777,104 @@ func (m *TransferLeafMutation) ResetReceiverKeyTweak() {
 	delete(m.clearedFields, transferleaf.FieldReceiverKeyTweak)
 }
 
+// SetTransferReceiverID sets the "transfer_receiver_id" field.
+func (m *TransferLeafMutation) SetTransferReceiverID(u uuid.UUID) {
+	m.transfer_receiver = &u
+}
+
+// TransferReceiverID returns the value of the "transfer_receiver_id" field in the mutation.
+func (m *TransferLeafMutation) TransferReceiverID() (r uuid.UUID, exists bool) {
+	v := m.transfer_receiver
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTransferReceiverID returns the old "transfer_receiver_id" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldTransferReceiverID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTransferReceiverID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTransferReceiverID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTransferReceiverID: %w", err)
+	}
+	return oldValue.TransferReceiverID, nil
+}
+
+// ClearTransferReceiverID clears the value of the "transfer_receiver_id" field.
+func (m *TransferLeafMutation) ClearTransferReceiverID() {
+	m.transfer_receiver = nil
+	m.clearedFields[transferleaf.FieldTransferReceiverID] = struct{}{}
+}
+
+// TransferReceiverIDCleared returns if the "transfer_receiver_id" field was cleared in this mutation.
+func (m *TransferLeafMutation) TransferReceiverIDCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldTransferReceiverID]
+	return ok
+}
+
+// ResetTransferReceiverID resets all changes to the "transfer_receiver_id" field.
+func (m *TransferLeafMutation) ResetTransferReceiverID() {
+	m.transfer_receiver = nil
+	delete(m.clearedFields, transferleaf.FieldTransferReceiverID)
+}
+
+// SetTransferSenderID sets the "transfer_sender_id" field.
+func (m *TransferLeafMutation) SetTransferSenderID(u uuid.UUID) {
+	m.transfer_sender = &u
+}
+
+// TransferSenderID returns the value of the "transfer_sender_id" field in the mutation.
+func (m *TransferLeafMutation) TransferSenderID() (r uuid.UUID, exists bool) {
+	v := m.transfer_sender
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTransferSenderID returns the old "transfer_sender_id" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldTransferSenderID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTransferSenderID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTransferSenderID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTransferSenderID: %w", err)
+	}
+	return oldValue.TransferSenderID, nil
+}
+
+// ClearTransferSenderID clears the value of the "transfer_sender_id" field.
+func (m *TransferLeafMutation) ClearTransferSenderID() {
+	m.transfer_sender = nil
+	m.clearedFields[transferleaf.FieldTransferSenderID] = struct{}{}
+}
+
+// TransferSenderIDCleared returns if the "transfer_sender_id" field was cleared in this mutation.
+func (m *TransferLeafMutation) TransferSenderIDCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldTransferSenderID]
+	return ok
+}
+
+// ResetTransferSenderID resets all changes to the "transfer_sender_id" field.
+func (m *TransferLeafMutation) ResetTransferSenderID() {
+	m.transfer_sender = nil
+	delete(m.clearedFields, transferleaf.FieldTransferSenderID)
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by id.
 func (m *TransferLeafMutation) SetTransferID(id uuid.UUID) {
 	m.transfer = &id
@@ -24851,6 +24953,60 @@ func (m *TransferLeafMutation) ResetLeaf() {
 	m.clearedleaf = false
 }
 
+// ClearTransferReceiver clears the "transfer_receiver" edge to the TransferReceiver entity.
+func (m *TransferLeafMutation) ClearTransferReceiver() {
+	m.clearedtransfer_receiver = true
+	m.clearedFields[transferleaf.FieldTransferReceiverID] = struct{}{}
+}
+
+// TransferReceiverCleared reports if the "transfer_receiver" edge to the TransferReceiver entity was cleared.
+func (m *TransferLeafMutation) TransferReceiverCleared() bool {
+	return m.TransferReceiverIDCleared() || m.clearedtransfer_receiver
+}
+
+// TransferReceiverIDs returns the "transfer_receiver" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TransferReceiverID instead. It exists only for internal usage by the builders.
+func (m *TransferLeafMutation) TransferReceiverIDs() (ids []uuid.UUID) {
+	if id := m.transfer_receiver; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTransferReceiver resets all changes to the "transfer_receiver" edge.
+func (m *TransferLeafMutation) ResetTransferReceiver() {
+	m.transfer_receiver = nil
+	m.clearedtransfer_receiver = false
+}
+
+// ClearTransferSender clears the "transfer_sender" edge to the TransferSender entity.
+func (m *TransferLeafMutation) ClearTransferSender() {
+	m.clearedtransfer_sender = true
+	m.clearedFields[transferleaf.FieldTransferSenderID] = struct{}{}
+}
+
+// TransferSenderCleared reports if the "transfer_sender" edge to the TransferSender entity was cleared.
+func (m *TransferLeafMutation) TransferSenderCleared() bool {
+	return m.TransferSenderIDCleared() || m.clearedtransfer_sender
+}
+
+// TransferSenderIDs returns the "transfer_sender" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TransferSenderID instead. It exists only for internal usage by the builders.
+func (m *TransferLeafMutation) TransferSenderIDs() (ids []uuid.UUID) {
+	if id := m.transfer_sender; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTransferSender resets all changes to the "transfer_sender" edge.
+func (m *TransferLeafMutation) ResetTransferSender() {
+	m.transfer_sender = nil
+	m.clearedtransfer_sender = false
+}
+
 // Where appends a list predicates to the TransferLeafMutation builder.
 func (m *TransferLeafMutation) Where(ps ...predicate.TransferLeaf) {
 	m.predicates = append(m.predicates, ps...)
@@ -24885,7 +25041,7 @@ func (m *TransferLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferLeafMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 21)
 	if m.create_time != nil {
 		fields = append(fields, transferleaf.FieldCreateTime)
 	}
@@ -24943,6 +25099,12 @@ func (m *TransferLeafMutation) Fields() []string {
 	if m.receiver_key_tweak != nil {
 		fields = append(fields, transferleaf.FieldReceiverKeyTweak)
 	}
+	if m.transfer_receiver != nil {
+		fields = append(fields, transferleaf.FieldTransferReceiverID)
+	}
+	if m.transfer_sender != nil {
+		fields = append(fields, transferleaf.FieldTransferSenderID)
+	}
 	return fields
 }
 
@@ -24989,6 +25151,10 @@ func (m *TransferLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.SenderKeyTweakProof()
 	case transferleaf.FieldReceiverKeyTweak:
 		return m.ReceiverKeyTweak()
+	case transferleaf.FieldTransferReceiverID:
+		return m.TransferReceiverID()
+	case transferleaf.FieldTransferSenderID:
+		return m.TransferSenderID()
 	}
 	return nil, false
 }
@@ -25036,6 +25202,10 @@ func (m *TransferLeafMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldSenderKeyTweakProof(ctx)
 	case transferleaf.FieldReceiverKeyTweak:
 		return m.OldReceiverKeyTweak(ctx)
+	case transferleaf.FieldTransferReceiverID:
+		return m.OldTransferReceiverID(ctx)
+	case transferleaf.FieldTransferSenderID:
+		return m.OldTransferSenderID(ctx)
 	}
 	return nil, fmt.Errorf("unknown TransferLeaf field %s", name)
 }
@@ -25178,6 +25348,20 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetReceiverKeyTweak(v)
 		return nil
+	case transferleaf.FieldTransferReceiverID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTransferReceiverID(v)
+		return nil
+	case transferleaf.FieldTransferSenderID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTransferSenderID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)
 }
@@ -25292,6 +25476,12 @@ func (m *TransferLeafMutation) ClearedFields() []string {
 	if m.FieldCleared(transferleaf.FieldReceiverKeyTweak) {
 		fields = append(fields, transferleaf.FieldReceiverKeyTweak)
 	}
+	if m.FieldCleared(transferleaf.FieldTransferReceiverID) {
+		fields = append(fields, transferleaf.FieldTransferReceiverID)
+	}
+	if m.FieldCleared(transferleaf.FieldTransferSenderID) {
+		fields = append(fields, transferleaf.FieldTransferSenderID)
+	}
 	return fields
 }
 
@@ -25350,6 +25540,12 @@ func (m *TransferLeafMutation) ClearField(name string) error {
 		return nil
 	case transferleaf.FieldReceiverKeyTweak:
 		m.ClearReceiverKeyTweak()
+		return nil
+	case transferleaf.FieldTransferReceiverID:
+		m.ClearTransferReceiverID()
+		return nil
+	case transferleaf.FieldTransferSenderID:
+		m.ClearTransferSenderID()
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf nullable field %s", name)
@@ -25416,18 +25612,30 @@ func (m *TransferLeafMutation) ResetField(name string) error {
 	case transferleaf.FieldReceiverKeyTweak:
 		m.ResetReceiverKeyTweak()
 		return nil
+	case transferleaf.FieldTransferReceiverID:
+		m.ResetTransferReceiverID()
+		return nil
+	case transferleaf.FieldTransferSenderID:
+		m.ResetTransferSenderID()
+		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)
 }
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TransferLeafMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 4)
 	if m.transfer != nil {
 		edges = append(edges, transferleaf.EdgeTransfer)
 	}
 	if m.leaf != nil {
 		edges = append(edges, transferleaf.EdgeLeaf)
+	}
+	if m.transfer_receiver != nil {
+		edges = append(edges, transferleaf.EdgeTransferReceiver)
+	}
+	if m.transfer_sender != nil {
+		edges = append(edges, transferleaf.EdgeTransferSender)
 	}
 	return edges
 }
@@ -25444,13 +25652,21 @@ func (m *TransferLeafMutation) AddedIDs(name string) []ent.Value {
 		if id := m.leaf; id != nil {
 			return []ent.Value{*id}
 		}
+	case transferleaf.EdgeTransferReceiver:
+		if id := m.transfer_receiver; id != nil {
+			return []ent.Value{*id}
+		}
+	case transferleaf.EdgeTransferSender:
+		if id := m.transfer_sender; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TransferLeafMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 4)
 	return edges
 }
 
@@ -25462,12 +25678,18 @@ func (m *TransferLeafMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TransferLeafMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 4)
 	if m.clearedtransfer {
 		edges = append(edges, transferleaf.EdgeTransfer)
 	}
 	if m.clearedleaf {
 		edges = append(edges, transferleaf.EdgeLeaf)
+	}
+	if m.clearedtransfer_receiver {
+		edges = append(edges, transferleaf.EdgeTransferReceiver)
+	}
+	if m.clearedtransfer_sender {
+		edges = append(edges, transferleaf.EdgeTransferSender)
 	}
 	return edges
 }
@@ -25480,6 +25702,10 @@ func (m *TransferLeafMutation) EdgeCleared(name string) bool {
 		return m.clearedtransfer
 	case transferleaf.EdgeLeaf:
 		return m.clearedleaf
+	case transferleaf.EdgeTransferReceiver:
+		return m.clearedtransfer_receiver
+	case transferleaf.EdgeTransferSender:
+		return m.clearedtransfer_sender
 	}
 	return false
 }
@@ -25494,6 +25720,12 @@ func (m *TransferLeafMutation) ClearEdge(name string) error {
 	case transferleaf.EdgeLeaf:
 		m.ClearLeaf()
 		return nil
+	case transferleaf.EdgeTransferReceiver:
+		m.ClearTransferReceiver()
+		return nil
+	case transferleaf.EdgeTransferSender:
+		m.ClearTransferSender()
+		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf unique edge %s", name)
 }
@@ -25507,6 +25739,12 @@ func (m *TransferLeafMutation) ResetEdge(name string) error {
 		return nil
 	case transferleaf.EdgeLeaf:
 		m.ResetLeaf()
+		return nil
+	case transferleaf.EdgeTransferReceiver:
+		m.ResetTransferReceiver()
+		return nil
+	case transferleaf.EdgeTransferSender:
+		m.ResetTransferSender()
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf edge %s", name)

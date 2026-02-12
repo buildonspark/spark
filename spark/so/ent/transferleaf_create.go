@@ -16,6 +16,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
+	"github.com/lightsparkdev/spark/so/ent/transfersender"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
@@ -205,6 +207,34 @@ func (tlc *TransferLeafCreate) SetReceiverKeyTweak(b []byte) *TransferLeafCreate
 	return tlc
 }
 
+// SetTransferReceiverID sets the "transfer_receiver_id" field.
+func (tlc *TransferLeafCreate) SetTransferReceiverID(u uuid.UUID) *TransferLeafCreate {
+	tlc.mutation.SetTransferReceiverID(u)
+	return tlc
+}
+
+// SetNillableTransferReceiverID sets the "transfer_receiver_id" field if the given value is not nil.
+func (tlc *TransferLeafCreate) SetNillableTransferReceiverID(u *uuid.UUID) *TransferLeafCreate {
+	if u != nil {
+		tlc.SetTransferReceiverID(*u)
+	}
+	return tlc
+}
+
+// SetTransferSenderID sets the "transfer_sender_id" field.
+func (tlc *TransferLeafCreate) SetTransferSenderID(u uuid.UUID) *TransferLeafCreate {
+	tlc.mutation.SetTransferSenderID(u)
+	return tlc
+}
+
+// SetNillableTransferSenderID sets the "transfer_sender_id" field if the given value is not nil.
+func (tlc *TransferLeafCreate) SetNillableTransferSenderID(u *uuid.UUID) *TransferLeafCreate {
+	if u != nil {
+		tlc.SetTransferSenderID(*u)
+	}
+	return tlc
+}
+
 // SetID sets the "id" field.
 func (tlc *TransferLeafCreate) SetID(u uuid.UUID) *TransferLeafCreate {
 	tlc.mutation.SetID(u)
@@ -239,6 +269,16 @@ func (tlc *TransferLeafCreate) SetLeafID(id uuid.UUID) *TransferLeafCreate {
 // SetLeaf sets the "leaf" edge to the TreeNode entity.
 func (tlc *TransferLeafCreate) SetLeaf(t *TreeNode) *TransferLeafCreate {
 	return tlc.SetLeafID(t.ID)
+}
+
+// SetTransferReceiver sets the "transfer_receiver" edge to the TransferReceiver entity.
+func (tlc *TransferLeafCreate) SetTransferReceiver(t *TransferReceiver) *TransferLeafCreate {
+	return tlc.SetTransferReceiverID(t.ID)
+}
+
+// SetTransferSender sets the "transfer_sender" edge to the TransferSender entity.
+func (tlc *TransferLeafCreate) SetTransferSender(t *TransferSender) *TransferLeafCreate {
+	return tlc.SetTransferSenderID(t.ID)
 }
 
 // Mutation returns the TransferLeafMutation object of the builder.
@@ -476,6 +516,40 @@ func (tlc *TransferLeafCreate) createSpec() (*TransferLeaf, *sqlgraph.CreateSpec
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.transfer_leaf_leaf = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tlc.mutation.TransferReceiverIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   transferleaf.TransferReceiverTable,
+			Columns: []string{transferleaf.TransferReceiverColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transferreceiver.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.TransferReceiverID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tlc.mutation.TransferSenderIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   transferleaf.TransferSenderTable,
+			Columns: []string{transferleaf.TransferSenderColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfersender.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.TransferSenderID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -803,6 +877,42 @@ func (u *TransferLeafUpsert) UpdateReceiverKeyTweak() *TransferLeafUpsert {
 // ClearReceiverKeyTweak clears the value of the "receiver_key_tweak" field.
 func (u *TransferLeafUpsert) ClearReceiverKeyTweak() *TransferLeafUpsert {
 	u.SetNull(transferleaf.FieldReceiverKeyTweak)
+	return u
+}
+
+// SetTransferReceiverID sets the "transfer_receiver_id" field.
+func (u *TransferLeafUpsert) SetTransferReceiverID(v uuid.UUID) *TransferLeafUpsert {
+	u.Set(transferleaf.FieldTransferReceiverID, v)
+	return u
+}
+
+// UpdateTransferReceiverID sets the "transfer_receiver_id" field to the value that was provided on create.
+func (u *TransferLeafUpsert) UpdateTransferReceiverID() *TransferLeafUpsert {
+	u.SetExcluded(transferleaf.FieldTransferReceiverID)
+	return u
+}
+
+// ClearTransferReceiverID clears the value of the "transfer_receiver_id" field.
+func (u *TransferLeafUpsert) ClearTransferReceiverID() *TransferLeafUpsert {
+	u.SetNull(transferleaf.FieldTransferReceiverID)
+	return u
+}
+
+// SetTransferSenderID sets the "transfer_sender_id" field.
+func (u *TransferLeafUpsert) SetTransferSenderID(v uuid.UUID) *TransferLeafUpsert {
+	u.Set(transferleaf.FieldTransferSenderID, v)
+	return u
+}
+
+// UpdateTransferSenderID sets the "transfer_sender_id" field to the value that was provided on create.
+func (u *TransferLeafUpsert) UpdateTransferSenderID() *TransferLeafUpsert {
+	u.SetExcluded(transferleaf.FieldTransferSenderID)
+	return u
+}
+
+// ClearTransferSenderID clears the value of the "transfer_sender_id" field.
+func (u *TransferLeafUpsert) ClearTransferSenderID() *TransferLeafUpsert {
+	u.SetNull(transferleaf.FieldTransferSenderID)
 	return u
 }
 
@@ -1185,6 +1295,48 @@ func (u *TransferLeafUpsertOne) UpdateReceiverKeyTweak() *TransferLeafUpsertOne 
 func (u *TransferLeafUpsertOne) ClearReceiverKeyTweak() *TransferLeafUpsertOne {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.ClearReceiverKeyTweak()
+	})
+}
+
+// SetTransferReceiverID sets the "transfer_receiver_id" field.
+func (u *TransferLeafUpsertOne) SetTransferReceiverID(v uuid.UUID) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetTransferReceiverID(v)
+	})
+}
+
+// UpdateTransferReceiverID sets the "transfer_receiver_id" field to the value that was provided on create.
+func (u *TransferLeafUpsertOne) UpdateTransferReceiverID() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateTransferReceiverID()
+	})
+}
+
+// ClearTransferReceiverID clears the value of the "transfer_receiver_id" field.
+func (u *TransferLeafUpsertOne) ClearTransferReceiverID() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearTransferReceiverID()
+	})
+}
+
+// SetTransferSenderID sets the "transfer_sender_id" field.
+func (u *TransferLeafUpsertOne) SetTransferSenderID(v uuid.UUID) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetTransferSenderID(v)
+	})
+}
+
+// UpdateTransferSenderID sets the "transfer_sender_id" field to the value that was provided on create.
+func (u *TransferLeafUpsertOne) UpdateTransferSenderID() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateTransferSenderID()
+	})
+}
+
+// ClearTransferSenderID clears the value of the "transfer_sender_id" field.
+func (u *TransferLeafUpsertOne) ClearTransferSenderID() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearTransferSenderID()
 	})
 }
 
@@ -1734,6 +1886,48 @@ func (u *TransferLeafUpsertBulk) UpdateReceiverKeyTweak() *TransferLeafUpsertBul
 func (u *TransferLeafUpsertBulk) ClearReceiverKeyTweak() *TransferLeafUpsertBulk {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.ClearReceiverKeyTweak()
+	})
+}
+
+// SetTransferReceiverID sets the "transfer_receiver_id" field.
+func (u *TransferLeafUpsertBulk) SetTransferReceiverID(v uuid.UUID) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetTransferReceiverID(v)
+	})
+}
+
+// UpdateTransferReceiverID sets the "transfer_receiver_id" field to the value that was provided on create.
+func (u *TransferLeafUpsertBulk) UpdateTransferReceiverID() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateTransferReceiverID()
+	})
+}
+
+// ClearTransferReceiverID clears the value of the "transfer_receiver_id" field.
+func (u *TransferLeafUpsertBulk) ClearTransferReceiverID() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearTransferReceiverID()
+	})
+}
+
+// SetTransferSenderID sets the "transfer_sender_id" field.
+func (u *TransferLeafUpsertBulk) SetTransferSenderID(v uuid.UUID) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetTransferSenderID(v)
+	})
+}
+
+// UpdateTransferSenderID sets the "transfer_sender_id" field to the value that was provided on create.
+func (u *TransferLeafUpsertBulk) UpdateTransferSenderID() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateTransferSenderID()
+	})
+}
+
+// ClearTransferSenderID clears the value of the "transfer_sender_id" field.
+func (u *TransferLeafUpsertBulk) ClearTransferSenderID() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearTransferSenderID()
 	})
 }
 

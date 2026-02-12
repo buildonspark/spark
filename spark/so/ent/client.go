@@ -5074,6 +5074,38 @@ func (c *TransferLeafClient) QueryLeaf(tl *TransferLeaf) *TreeNodeQuery {
 	return query
 }
 
+// QueryTransferReceiver queries the transfer_receiver edge of a TransferLeaf.
+func (c *TransferLeafClient) QueryTransferReceiver(tl *TransferLeaf) *TransferReceiverQuery {
+	query := (&TransferReceiverClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tl.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transferleaf.Table, transferleaf.FieldID, id),
+			sqlgraph.To(transferreceiver.Table, transferreceiver.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transferleaf.TransferReceiverTable, transferleaf.TransferReceiverColumn),
+		)
+		fromV = sqlgraph.Neighbors(tl.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryTransferSender queries the transfer_sender edge of a TransferLeaf.
+func (c *TransferLeafClient) QueryTransferSender(tl *TransferLeaf) *TransferSenderQuery {
+	query := (&TransferSenderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tl.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transferleaf.Table, transferleaf.FieldID, id),
+			sqlgraph.To(transfersender.Table, transfersender.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transferleaf.TransferSenderTable, transferleaf.TransferSenderColumn),
+		)
+		fromV = sqlgraph.Neighbors(tl.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *TransferLeafClient) Hooks() []Hook {
 	hooks := c.hooks.TransferLeaf

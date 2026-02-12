@@ -13,6 +13,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
+	"github.com/lightsparkdev/spark/so/ent/transfersender"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
@@ -59,6 +61,10 @@ type TransferLeaf struct {
 	SenderKeyTweakProof []byte `json:"sender_key_tweak_proof,omitempty"`
 	// ReceiverKeyTweak holds the value of the "receiver_key_tweak" field.
 	ReceiverKeyTweak []byte `json:"receiver_key_tweak,omitempty"`
+	// The TransferReceiver this leaf is assigned to.
+	TransferReceiverID *uuid.UUID `json:"transfer_receiver_id,omitempty"`
+	// The TransferSender this leaf originated from.
+	TransferSenderID *uuid.UUID `json:"transfer_sender_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferLeafQuery when eager-loading is set.
 	Edges                  TransferLeafEdges `json:"edges"`
@@ -73,9 +79,13 @@ type TransferLeafEdges struct {
 	Transfer *Transfer `json:"transfer,omitempty"`
 	// Leaf holds the value of the leaf edge.
 	Leaf *TreeNode `json:"leaf,omitempty"`
+	// TransferReceiver holds the value of the transfer_receiver edge.
+	TransferReceiver *TransferReceiver `json:"transfer_receiver,omitempty"`
+	// TransferSender holds the value of the transfer_sender edge.
+	TransferSender *TransferSender `json:"transfer_sender,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [4]bool
 }
 
 // TransferOrErr returns the Transfer value or an error if the edge
@@ -100,11 +110,35 @@ func (e TransferLeafEdges) LeafOrErr() (*TreeNode, error) {
 	return nil, &NotLoadedError{edge: "leaf"}
 }
 
+// TransferReceiverOrErr returns the TransferReceiver value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TransferLeafEdges) TransferReceiverOrErr() (*TransferReceiver, error) {
+	if e.TransferReceiver != nil {
+		return e.TransferReceiver, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: transferreceiver.Label}
+	}
+	return nil, &NotLoadedError{edge: "transfer_receiver"}
+}
+
+// TransferSenderOrErr returns the TransferSender value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TransferLeafEdges) TransferSenderOrErr() (*TransferSender, error) {
+	if e.TransferSender != nil {
+		return e.TransferSender, nil
+	} else if e.loadedTypes[3] {
+		return nil, &NotFoundError{label: transfersender.Label}
+	}
+	return nil, &NotLoadedError{edge: "transfer_sender"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*TransferLeaf) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case transferleaf.FieldTransferReceiverID, transferleaf.FieldTransferSenderID:
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case transferleaf.FieldSecretCipher, transferleaf.FieldSignature, transferleaf.FieldPreviousRefundTx, transferleaf.FieldPreviousDirectRefundTx, transferleaf.FieldPreviousDirectFromCpfpRefundTx, transferleaf.FieldIntermediateRefundTx, transferleaf.FieldIntermediateDirectRefundTx, transferleaf.FieldIntermediateDirectFromCpfpRefundTx, transferleaf.FieldKeyTweak, transferleaf.FieldSenderKeyTweakProof, transferleaf.FieldReceiverKeyTweak:
 			values[i] = new([]byte)
 		case transferleaf.FieldIntermediateRefundTxid, transferleaf.FieldIntermediateDirectRefundTxid, transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
@@ -254,6 +288,20 @@ func (tl *TransferLeaf) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				tl.ReceiverKeyTweak = *value
 			}
+		case transferleaf.FieldTransferReceiverID:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field transfer_receiver_id", values[i])
+			} else if value.Valid {
+				tl.TransferReceiverID = new(uuid.UUID)
+				*tl.TransferReceiverID = *value.S.(*uuid.UUID)
+			}
+		case transferleaf.FieldTransferSenderID:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field transfer_sender_id", values[i])
+			} else if value.Valid {
+				tl.TransferSenderID = new(uuid.UUID)
+				*tl.TransferSenderID = *value.S.(*uuid.UUID)
+			}
 		case transferleaf.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field transfer_leaf_transfer", values[i])
@@ -289,6 +337,16 @@ func (tl *TransferLeaf) QueryTransfer() *TransferQuery {
 // QueryLeaf queries the "leaf" edge of the TransferLeaf entity.
 func (tl *TransferLeaf) QueryLeaf() *TreeNodeQuery {
 	return NewTransferLeafClient(tl.config).QueryLeaf(tl)
+}
+
+// QueryTransferReceiver queries the "transfer_receiver" edge of the TransferLeaf entity.
+func (tl *TransferLeaf) QueryTransferReceiver() *TransferReceiverQuery {
+	return NewTransferLeafClient(tl.config).QueryTransferReceiver(tl)
+}
+
+// QueryTransferSender queries the "transfer_sender" edge of the TransferLeaf entity.
+func (tl *TransferLeaf) QueryTransferSender() *TransferSenderQuery {
+	return NewTransferLeafClient(tl.config).QueryTransferSender(tl)
 }
 
 // Update returns a builder for updating this TransferLeaf.
@@ -370,6 +428,16 @@ func (tl *TransferLeaf) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("receiver_key_tweak=")
 	builder.WriteString(fmt.Sprintf("%v", tl.ReceiverKeyTweak))
+	builder.WriteString(", ")
+	if v := tl.TransferReceiverID; v != nil {
+		builder.WriteString("transfer_receiver_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := tl.TransferSenderID; v != nil {
+		builder.WriteString("transfer_sender_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

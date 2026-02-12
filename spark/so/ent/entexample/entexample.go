@@ -5004,10 +5004,14 @@ type TransferLeafExample struct {
 	KeyTweak                                 *[]byte
 	SenderKeyTweakProof                      *[]byte
 	ReceiverKeyTweak                         *[]byte
+	TransferReceiverID                       *uuid.UUID
+	TransferSenderID                         *uuid.UUID
 
 	// Edges - if set, use the provided entity; if nil, create a default one
-	Transfer *ent.Transfer
-	Leaf     *ent.TreeNode
+	Transfer         *ent.Transfer
+	Leaf             *ent.TreeNode
+	TransferReceiver *ent.TransferReceiver
+	TransferSender   *ent.TransferSender
 }
 
 // NewTransferLeafExample creates a new TransferLeafExample for testing.
@@ -5120,6 +5124,18 @@ func (tl *TransferLeafExample) SetReceiverKeyTweak(v []byte) *TransferLeafExampl
 	return tl
 }
 
+// SetTransferReceiverID sets the transfer_receiver_id field.
+func (tl *TransferLeafExample) SetTransferReceiverID(v uuid.UUID) *TransferLeafExample {
+	tl.TransferReceiverID = &v
+	return tl
+}
+
+// SetTransferSenderID sets the transfer_sender_id field.
+func (tl *TransferLeafExample) SetTransferSenderID(v uuid.UUID) *TransferLeafExample {
+	tl.TransferSenderID = &v
+	return tl
+}
+
 // SetTransfer sets the transfer edge.
 func (tl *TransferLeafExample) SetTransfer(v *ent.Transfer) *TransferLeafExample {
 	tl.Transfer = v
@@ -5129,6 +5145,18 @@ func (tl *TransferLeafExample) SetTransfer(v *ent.Transfer) *TransferLeafExample
 // SetLeaf sets the leaf edge.
 func (tl *TransferLeafExample) SetLeaf(v *ent.TreeNode) *TransferLeafExample {
 	tl.Leaf = v
+	return tl
+}
+
+// SetTransferReceiver sets the transfer_receiver edge.
+func (tl *TransferLeafExample) SetTransferReceiver(v *ent.TransferReceiver) *TransferLeafExample {
+	tl.TransferReceiver = v
+	return tl
+}
+
+// SetTransferSender sets the transfer_sender edge.
+func (tl *TransferLeafExample) SetTransferSender(v *ent.TransferSender) *TransferLeafExample {
+	tl.TransferSender = v
 	return tl
 }
 
@@ -5253,6 +5281,14 @@ func (tl *TransferLeafExample) MustExec(ctx context.Context) *ent.TransferLeaf {
 		create.SetReceiverKeyTweak(*tl.ReceiverKeyTweak)
 	} else {
 	}
+	if tl.TransferReceiverID != nil {
+		create.SetTransferReceiverID(*tl.TransferReceiverID)
+	} else {
+	}
+	if tl.TransferSenderID != nil {
+		create.SetTransferSenderID(*tl.TransferSenderID)
+	} else {
+	}
 
 	// Handle edges
 	if tl.Transfer != nil {
@@ -5270,6 +5306,12 @@ func (tl *TransferLeafExample) MustExec(ctx context.Context) *ent.TransferLeaf {
 		tl.t.Helper()
 		tl.Leaf = NewTreeNodeExample(tl.t, tl.client).MustExec(ctx)
 		create.SetLeaf(tl.Leaf)
+	}
+	if tl.TransferReceiver != nil {
+		create.SetTransferReceiver(tl.TransferReceiver)
+	}
+	if tl.TransferSender != nil {
+		create.SetTransferSender(tl.TransferSender)
 	}
 
 	entity, err := create.Save(ctx)
@@ -5402,6 +5444,14 @@ func (tl *TransferLeafExample) Exec(ctx context.Context) (*ent.TransferLeaf, err
 		create.SetReceiverKeyTweak(*tl.ReceiverKeyTweak)
 	} else {
 	}
+	if tl.TransferReceiverID != nil {
+		create.SetTransferReceiverID(*tl.TransferReceiverID)
+	} else {
+	}
+	if tl.TransferSenderID != nil {
+		create.SetTransferSenderID(*tl.TransferSenderID)
+	} else {
+	}
 
 	// Handle edges
 	if tl.Transfer != nil {
@@ -5425,6 +5475,12 @@ func (tl *TransferLeafExample) Exec(ctx context.Context) (*ent.TransferLeaf, err
 			return nil, fmt.Errorf("failed to create leaf: %w", err)
 		}
 		create.SetLeaf(tl.Leaf)
+	}
+	if tl.TransferReceiver != nil {
+		create.SetTransferReceiver(tl.TransferReceiver)
+	}
+	if tl.TransferSender != nil {
+		create.SetTransferSender(tl.TransferSender)
 	}
 
 	return create.Save(ctx)

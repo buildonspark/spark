@@ -1081,6 +1081,8 @@ var (
 		{Name: "receiver_key_tweak", Type: field.TypeBytes, Nullable: true},
 		{Name: "transfer_leaf_transfer", Type: field.TypeUUID},
 		{Name: "transfer_leaf_leaf", Type: field.TypeUUID},
+		{Name: "transfer_receiver_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "transfer_sender_id", Type: field.TypeUUID, Nullable: true},
 	}
 	// TransferLeafsTable holds the schema information for the "transfer_leafs" table.
 	TransferLeafsTable = &schema.Table{
@@ -1099,6 +1101,18 @@ var (
 				Columns:    []*schema.Column{TransferLeafsColumns[21]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "transfer_leafs_transfer_receivers_transfer_receiver",
+				Columns:    []*schema.Column{TransferLeafsColumns[22]},
+				RefColumns: []*schema.Column{TransferReceiversColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "transfer_leafs_transfer_senders_transfer_sender",
+				Columns:    []*schema.Column{TransferLeafsColumns[23]},
+				RefColumns: []*schema.Column{TransferSendersColumns[0]},
+				OnDelete:   schema.SetNull,
 			},
 		},
 		Indexes: []*schema.Index{
@@ -1707,6 +1721,8 @@ func init() {
 	TransfersTable.ForeignKeys[2].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable
+	TransferLeafsTable.ForeignKeys[2].RefTable = TransferReceiversTable
+	TransferLeafsTable.ForeignKeys[3].RefTable = TransferSendersTable
 	TransferReceiversTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferSendersTable.ForeignKeys[0].RefTable = TransfersTable
 	TreesTable.ForeignKeys[0].RefTable = DepositAddressesTable
