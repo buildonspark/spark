@@ -1,7 +1,7 @@
 # The codegen configuration for the mutations in ./mutations.
 # To regenerate the code, use the go:generate command in typed_api.go.
 # For full documentation see: https://github.com/Khan/genqlient/blob/main/docs/genqlient.yaml
-schema: ../../../../schemas/ssp_schema.graphql
+schema: ../../../../schemas/ssp_rc_schema.graphql
 operations:
 - 'mutations/*.graphql'
 generated: mutations/generated.go

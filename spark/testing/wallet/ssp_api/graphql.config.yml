@@ -1,3 +1,3 @@
 # Specifies the GraphQL schema for the mutations in ./mutations.
-schema: ../../../../schemas/ssp_schema.graphql
+schema: ../../../../schemas/ssp_rc_schema.graphql
 documents: '**/*.graphql'
