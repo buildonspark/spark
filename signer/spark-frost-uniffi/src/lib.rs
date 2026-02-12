@@ -1109,6 +1109,76 @@ pub fn construct_htlc_receiver_spend(
     })
 }
 
+// ---------------------------------------------------------------------------
+// Adaptor signature functions
+// ---------------------------------------------------------------------------
+
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct AdaptorSignatureResult {
+    #[wasm_bindgen(getter_with_clone)]
+    pub signature: Vec<u8>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub adaptor_private_key: Vec<u8>,
+}
+
+#[wasm_bindgen]
+pub fn generate_adaptor_from_signature(
+    signature: Vec<u8>,
+) -> Result<AdaptorSignatureResult, Error> {
+    let (adaptor_sig, adaptor_key) =
+        spark_frost::adaptor_signature::generate_adaptor_from_signature(&signature)
+            .map_err(Error::Spark)?;
+    Ok(AdaptorSignatureResult {
+        signature: adaptor_sig,
+        adaptor_private_key: adaptor_key,
+    })
+}
+
+#[wasm_bindgen]
+pub fn generate_signature_from_existing_adaptor(
+    signature: Vec<u8>,
+    adaptor_private_key: Vec<u8>,
+) -> Result<Vec<u8>, Error> {
+    spark_frost::adaptor_signature::generate_signature_from_existing_adaptor(
+        &signature,
+        &adaptor_private_key,
+    )
+    .map_err(Error::Spark)
+}
+
+#[wasm_bindgen]
+pub fn validate_adaptor_signature(
+    pub_key: Vec<u8>,
+    hash: Vec<u8>,
+    signature: Vec<u8>,
+    adaptor_pub_key: Vec<u8>,
+) -> Result<(), Error> {
+    spark_frost::adaptor_signature::validate_adaptor_signature(
+        &pub_key,
+        &hash,
+        &signature,
+        &adaptor_pub_key,
+    )
+    .map_err(Error::Spark)
+}
+
+#[wasm_bindgen]
+pub fn apply_adaptor_to_signature(
+    pub_key: Vec<u8>,
+    hash: Vec<u8>,
+    signature: Vec<u8>,
+    adaptor_private_key: Vec<u8>,
+) -> Result<Vec<u8>, Error> {
+    spark_frost::adaptor_signature::apply_adaptor_to_signature(
+        &pub_key,
+        &hash,
+        &signature,
+        &adaptor_private_key,
+    )
+    .map_err(Error::Spark)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

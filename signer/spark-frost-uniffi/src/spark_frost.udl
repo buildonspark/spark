@@ -80,6 +80,20 @@ namespace spark_frost {
 
     [Throws=Error]
     HTLCSpendResult construct_htlc_receiver_spend(bytes htlc_tx, bytes destination_pubkey, bytes payment_hash, bytes hashlock_pubkey, bytes seqlock_pubkey, u32 htlc_sequence, u64 fee_sats, string network);
+
+    // --- Adaptor signature functions ---
+
+    [Throws=Error]
+    AdaptorSignatureResult generate_adaptor_from_signature(bytes signature);
+
+    [Throws=Error]
+    bytes generate_signature_from_existing_adaptor(bytes signature, bytes adaptor_private_key);
+
+    [Throws=Error]
+    void validate_adaptor_signature(bytes pub_key, bytes hash, bytes signature, bytes adaptor_pub_key);
+
+    [Throws=Error]
+    bytes apply_adaptor_to_signature(bytes pub_key, bytes hash, bytes signature, bytes adaptor_private_key);
 };
 
 [Error]
@@ -144,4 +158,9 @@ dictionary HTLCSpendResult {
     bytes sighash;
     bytes script;
     bytes control_block;
+};
+
+dictionary AdaptorSignatureResult {
+    bytes signature;
+    bytes adaptor_private_key;
 };
