@@ -195,7 +195,7 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 
 		err = h.validateTransferTokenTransactionUsingPreviousTransactionDataAndFinalizeCreatedSignedOutputsIfPossible(ctx, finalTokenTx, tokenTransactionSignatures, inputTtxos, h.config.Lrc20Configs[strings.ToLower(finalTokenTx.Network.String())].TransactionExpiryDuration)
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("error validating transfer using previous output data", finalTokenTx, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("error validating transfer using previous output data: %w", err)))
+			return nil, tokens.FormatErrorWithTransactionProto("error validating transfer using previous output data", finalTokenTx, err)
 		}
 		if anyTtxosHaveSpentTransactions(inputTtxos) {
 			if err := preemptOrRejectTransactionsWithInputEnts(ctx, finalTokenTx, inputTtxos); err != nil {
@@ -563,6 +563,9 @@ func tryFinalizeCreatedSignedOutput(ctx context.Context, config *so.Config, outp
 		ForUpdate().
 		Only(ctx)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("parent transaction not in a state ready to finalize just in time to spend the output: %w", err))
+		}
 		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get parent transaction: %w", err))
 	}
 
