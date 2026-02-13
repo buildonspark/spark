@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "./.cursor/hooks/format.sh"
+      }
+    ],
+    "afterTabFileEdit": [
+      {
+        "command": "./.cursor/hooks/format.sh"
+      }
+    ]
+  }
+}

@@ -41,9 +41,6 @@ _data/
 *.dev.*
 *.dev
 
-# Cursor files
-/.cursor*
-
 *.code-workspace
 
 # Claude Code settings
