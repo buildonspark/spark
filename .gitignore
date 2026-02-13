@@ -48,6 +48,7 @@ _data/
 
 # Claude Code settings
 .claude/settings.local.json
+.claude/settings.json
 
 # Claude Code thoughts/plans
 /thoughts/
@@ -57,3 +58,6 @@ tilt/tilt_config.json
 
 # Trunk
 .trunk/
+
+# MCP
+.mcp.json
