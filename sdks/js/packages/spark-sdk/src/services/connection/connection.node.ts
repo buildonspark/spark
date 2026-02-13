@@ -21,13 +21,13 @@ import { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
 import { SparkTokenServiceDefinition } from "../../proto/spark_token.js";
 import { WalletConfigService } from "../config.js";
 import { getMonotonicTime } from "../time-sync.js";
-import { ConnectionManager } from "./connection.js";
+import { AuthMode, ConnectionManager } from "./connection.js";
 
 export class ConnectionManagerNodeJS extends ConnectionManager {
   private certPath: string | null = null;
 
-  constructor(config: WalletConfigService) {
-    super(config);
+  constructor(config: WalletConfigService, authMode: AuthMode = "identity") {
+    super(config, authMode);
   }
 
   protected getMonotonicTime(): number {

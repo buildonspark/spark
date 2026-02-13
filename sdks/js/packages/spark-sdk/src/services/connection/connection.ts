@@ -68,6 +68,11 @@ type ClientWithClose<T> = T & {
 };
 
 export type SparkClientType = "spark" | "stream" | "tokens";
+/**
+ * 'none' means that the client will not authenticate with the SOs.
+ * 'identity' means that the client will authenticate and sign the challenge with the identity key.
+ */
+export type AuthMode = "none" | "identity";
 
 /* From nice-grpc/lib/client/channel.d.ts: The address of the server,
  * in the form `protocol://host:port`, where `protocol` is one of `http`
@@ -246,6 +251,7 @@ export abstract class ConnectionManager {
 
   private config: WalletConfigService;
   private timeSync: ServerTimeSync;
+  private authMode: AuthMode;
 
   // Note clientsByType is a per instance cache whereas channelCache is static and shared by all instances
   private clientsByType: Map<
@@ -259,9 +265,10 @@ export abstract class ConnectionManager {
 
   private identityPublicKeyHex?: string;
 
-  constructor(config: WalletConfigService) {
+  constructor(config: WalletConfigService, authMode: AuthMode = "identity") {
     this.config = config;
     this.timeSync = new ServerTimeSync();
+    this.authMode = authMode;
   }
 
   public getCurrentServerTime(): Date {
@@ -325,7 +332,9 @@ export abstract class ConnectionManager {
       return existing.client as ClientWithClose<T>;
     }
 
-    await this.authenticate(address);
+    if (this.authMode === "identity") {
+      await this.authenticate(address);
+    }
     const isStreamClientType = ConnectionManager.isStreamClientType(type);
     const key = this.makeChannelKey(address, isStreamClientType);
     const channel = await ConnectionManager.acquireChannel(key, () =>
@@ -531,7 +540,10 @@ export abstract class ConnectionManager {
       options: SparkCallOptions,
     ) {
       const metadata = this.prepareMetadata(Metadata(options.metadata));
-      const authToken = await this.authenticate(address);
+      const authToken =
+        this.authMode === "identity"
+          ? await this.authenticate(address)
+          : undefined;
       const sendTime = this.getMonotonicTime();
       const receiveTime = { value: 0 };
 
@@ -605,7 +617,10 @@ export abstract class ConnectionManager {
       if (error.message.includes("token has expired")) {
         const identityHex = await this.getIdentityPublicKeyHex();
         ConnectionManager.invalidateCachedAuthToken(address, identityHex);
-        const newAuthToken = await this.authenticate(address);
+        const newAuthToken =
+          this.authMode === "identity"
+            ? await this.authenticate(address)
+            : undefined;
 
         return yield* call.next(call.request as Req, {
           ...options,
