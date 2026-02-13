@@ -18,6 +18,7 @@ import {
   NetworkType,
   protoToNetwork,
   SparkAddressFormat,
+  SparkReadonlyClient,
   SparkSdkLogger,
   SparkWalletEvent,
   validateSparkInvoiceSignature,
@@ -258,6 +259,19 @@ const commands = [
   "fulfillsparkinvoice",
   "querysparkinvoices",
   "validateinvoicesig",
+
+  // Readonly client commands
+  "ro:init",
+  "ro:balance",
+  "ro:tokenbalance",
+  "ro:transfers",
+  "ro:transfersbyids",
+  "ro:pendingtransfers",
+  "ro:depositaddresses",
+  "ro:staticdepositaddresses",
+  "ro:utxos",
+  "ro:invoices",
+  "ro:tokentransactions",
 
   "enablelogging",
   "setloggerlevel",
@@ -638,6 +652,7 @@ async function runCLI() {
 
   let wallet: IssuerSparkWallet | undefined;
   let coopExitFeeQuote: CoopExitFeeQuote | undefined;
+  let readonlyClient: SparkReadonlyClient | undefined;
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -723,6 +738,20 @@ async function runCLI() {
   unfreezetokens <sparkAddress> <tokenIdentifier>                     - Unfreeze tokens for a specific address
   createtoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> <extraMetadata> - Create a new token. Use "_", or leave blank, to denote empty extra metadata.
   decodetokenidentifier <tokenIdentifier>                             - Returns the raw token identifier as a hex string
+
+  Readonly Client Commands (read-only queries against any spark address, no wallet required):
+  ro:init public                                                      - Initialize a public (unauthenticated) readonly client
+  ro:init master <mnemonic|seed> [accountNumber]                      - Initialize an authenticated readonly client with a master key
+  ro:balance <sparkAddress>                                           - Get available sats balance for a spark address
+  ro:tokenbalance <sparkAddress> [tokenIdentifier1,tokenIdentifier2]  - Get token balances for a spark address
+  ro:transfers <sparkAddress> [limit] [offset]                        - Query transfers for a spark address
+  ro:transfersbyids <id1> [id2] ...                                   - Look up specific transfers by their IDs
+  ro:pendingtransfers <sparkAddress>                                  - Query pending inbound transfers
+  ro:depositaddresses <sparkAddress> [limit] [offset]                 - Query unused deposit addresses
+  ro:staticdepositaddresses <sparkAddress>                            - Query static deposit addresses
+  ro:utxos <depositAddress> [limit] [offset] [excludeClaimed]         - Get UTXOs for a deposit address
+  ro:invoices <invoice1> [invoice2] ... [--limit N] [--offset N]      - Query spark invoice statuses
+  ro:tokentransactions [--sparkAddresses] [--issuerPublicKeys] [--tokenIdentifiers] [--pageSize] [--cursor] [--direction] - Query token transactions
 
   enablelogging <true|false>                                          - Enable or disable logging
   setloggerlevel <trace|info>                                         - Set the logging level
@@ -2189,6 +2218,416 @@ async function runCLI() {
             console.log(
               `  Previous cursor: ${filterRes.pageResponse.previousCursor}`,
             );
+          }
+          break;
+        }
+        // ── Readonly Client Commands ─────────────────────────────────
+        case "ro:init": {
+          const mode = args[0]?.toLowerCase();
+          if (mode === "public") {
+            readonlyClient = SparkReadonlyClient.createPublic({
+              ...config,
+              network,
+            });
+            console.log("✅ Public readonly client initialized (no auth)");
+          } else if (mode === "master") {
+            if (args.length < 2) {
+              console.log(
+                "Usage: ro:init master <mnemonic|seed> [accountNumber]",
+              );
+              break;
+            }
+            let mnemonicOrSeed: string;
+            let accountNumber: number | undefined;
+            // 12-word mnemonic
+            if (args.length >= 13 && args.length <= 14) {
+              mnemonicOrSeed = args.slice(1, 13).join(" ");
+              if (args.length === 14) {
+                accountNumber = parseInt(args[13]);
+              }
+            } else if (args.length === 2 || args.length === 3) {
+              mnemonicOrSeed = args[1];
+              if (args.length === 3) {
+                accountNumber = parseInt(args[2]);
+              }
+            } else {
+              console.log(
+                "Usage: ro:init master <mnemonic (12 words)|seed> [accountNumber]",
+              );
+              break;
+            }
+            readonlyClient = await SparkReadonlyClient.createWithMasterKey(
+              { ...config, network },
+              mnemonicOrSeed,
+              accountNumber,
+            );
+            console.log(
+              "✅ Authenticated readonly client initialized with master key",
+            );
+          } else {
+            console.log("Usage: ro:init <public|master> [args...]");
+            console.log(
+              "  ro:init public                              - Unauthenticated client",
+            );
+            console.log(
+              "  ro:init master <mnemonic|seed> [accountNum] - Authenticated client",
+            );
+          }
+          break;
+        }
+        case "ro:balance": {
+          if (!readonlyClient) {
+            console.log(
+              "Please initialize a readonly client first with ro:init",
+            );
+            break;
+          }
+          if (args.length < 1) {
+            console.log("Usage: ro:balance <sparkAddress>");
+            break;
+          }
+          const balance = await readonlyClient.getAvailableBalance(args[0]);
+          console.log("Available Balance:", balance.toString(), "sats");
+          break;
+        }
+        case "ro:tokenbalance": {
+          if (!readonlyClient) {
+            console.log(
+              "Please initialize a readonly client first with ro:init",
+            );
+            break;
+          }
+          if (args.length < 1) {
+            console.log(
+              "Usage: ro:tokenbalance <sparkAddress> [tokenIdentifier1,tokenIdentifier2,...]",
+            );
+            break;
+          }
+          const sparkAddr = args[0];
+          const tokenIds =
+            args[1] && args[1] !== "_"
+              ? args[1].split(",").filter((id) => id.trim() !== "")
+              : undefined;
+          const tokenBalances = await readonlyClient.getTokenBalance(
+            sparkAddr,
+            tokenIds,
+          );
+          if (tokenBalances.size === 0) {
+            console.log("No token balances found");
+          } else {
+            console.log("Token Balances:");
+            for (const [bech32mId, tokenInfo] of tokenBalances.entries()) {
+              console.log(
+                `  ${bech32mId} (${tokenInfo.tokenMetadata.tokenPublicKey}):`,
+              );
+              console.log(`    Owned balance: ${tokenInfo.ownedBalance}`);
+              console.log(
+                `    Available to send: ${tokenInfo.availableToSendBalance}`,
+              );
+              console.log(
+                `    Token name: ${tokenInfo.tokenMetadata.tokenName}`,
+              );
+            }
+          }
+          break;
+        }
+        case "ro:transfers": {
+          if (!readonlyClient) {
+            console.log(
+              "Please initialize a readonly client first with ro:init",
+            );
+            break;
+          }
+          if (args.length < 1) {
+            console.log("Usage: ro:transfers <sparkAddress> [limit] [offset]");
+            break;
+          }
+          const limit = args[1] ? parseInt(args[1]) : 20;
+          const offset = args[2] ? parseInt(args[2]) : 0;
+          if (isNaN(limit) || isNaN(offset)) {
+            console.log("Invalid limit or offset");
+            break;
+          }
+          const result = await readonlyClient.getTransfers({
+            sparkAddress: args[0],
+            limit,
+            offset,
+          });
+          console.log(`Transfers (offset: ${result.offset}):`);
+          for (const transfer of result.transfers) {
+            console.log("  ---");
+            console.log(`  ID: ${transfer.id}`);
+            console.log(`  Type: ${transfer.type}`);
+            console.log(`  Status: ${transfer.status}`);
+            console.log(`  Total Value: ${transfer.totalValue} sats`);
+            console.log(
+              `  Created: ${transfer.createdTime?.toISOString() ?? "N/A"}`,
+            );
+          }
+          if (result.transfers.length === 0) {
+            console.log("  No transfers found");
+          }
+          break;
+        }
+        case "ro:transfersbyids": {
+          if (!readonlyClient) {
+            console.log(
+              "Please initialize a readonly client first with ro:init",
+            );
+            break;
+          }
+          if (args.length < 1) {
+            console.log("Usage: ro:transfersbyids <id1> [id2] ...");
+            break;
+          }
+          const transfers = await readonlyClient.getTransfersByIds(args);
+          console.log(`Found ${transfers.length} transfer(s):`);
+          for (const transfer of transfers) {
+            console.log("  ---");
+            console.log(`  ID: ${transfer.id}`);
+            console.log(`  Type: ${transfer.type}`);
+            console.log(`  Status: ${transfer.status}`);
+            console.log(`  Total Value: ${transfer.totalValue} sats`);
+            console.log(
+              `  Created: ${transfer.createdTime?.toISOString() ?? "N/A"}`,
+            );
+          }
+          break;
+        }
+        case "ro:pendingtransfers": {
+          if (!readonlyClient) {
+            console.log(
+              "Please initialize a readonly client first with ro:init",
+            );
+            break;
+          }
+          if (args.length < 1) {
+            console.log("Usage: ro:pendingtransfers <sparkAddress>");
+            break;
+          }
+          const pending = await readonlyClient.getPendingTransfers(args[0]);
+          console.log(`Found ${pending.length} pending transfer(s):`);
+          for (const transfer of pending) {
+            console.log("  ---");
+            console.log(`  ID: ${transfer.id}`);
+            console.log(`  Type: ${transfer.type}`);
+            console.log(`  Total Value: ${transfer.totalValue} sats`);
+          }
+          break;
+        }
+        case "ro:depositaddresses": {
+          if (!readonlyClient) {
+            console.log(
+              "Please initialize a readonly client first with ro:init",
+            );
+            break;
+          }
+          if (args.length < 1) {
+            console.log(
+              "Usage: ro:depositaddresses <sparkAddress> [limit] [offset]",
+            );
+            break;
+          }
+          const limit = args[1] ? parseInt(args[1]) : 100;
+          const offset = args[2] ? parseInt(args[2]) : 0;
+          const result = await readonlyClient.getUnusedDepositAddresses({
+            sparkAddress: args[0],
+            limit,
+            offset,
+          });
+          console.log(`Unused deposit addresses (offset: ${result.offset}):`);
+          for (const addr of result.depositAddresses) {
+            console.log(`  ${addr.depositAddress}`);
+          }
+          if (result.depositAddresses.length === 0) {
+            console.log("  No unused deposit addresses found");
+          }
+          break;
+        }
+        case "ro:staticdepositaddresses": {
+          if (!readonlyClient) {
+            console.log(
+              "Please initialize a readonly client first with ro:init",
+            );
+            break;
+          }
+          if (args.length < 1) {
+            console.log("Usage: ro:staticdepositaddresses <sparkAddress>");
+            break;
+          }
+          const addresses = await readonlyClient.getStaticDepositAddresses(
+            args[0],
+          );
+          console.log(`Static deposit addresses:`);
+          for (const addr of addresses) {
+            console.log(`  ${addr.depositAddress}`);
+          }
+          if (addresses.length === 0) {
+            console.log("  No static deposit addresses found");
+          }
+          break;
+        }
+        case "ro:utxos": {
+          if (!readonlyClient) {
+            console.log(
+              "Please initialize a readonly client first with ro:init",
+            );
+            break;
+          }
+          if (args.length < 1) {
+            console.log(
+              "Usage: ro:utxos <depositAddress> [limit] [offset] [excludeClaimed(true|false)]",
+            );
+            break;
+          }
+          const limit = args[1] ? parseInt(args[1]) : 100;
+          const offset = args[2] ? parseInt(args[2]) : 0;
+          const excludeClaimed = args[3] === "true";
+          const result = await readonlyClient.getUtxosForDepositAddress({
+            depositAddress: args[0],
+            limit,
+            offset,
+            excludeClaimed,
+          });
+          console.log(`UTXOs (offset: ${result.offset}):`);
+          for (const utxo of result.utxos) {
+            console.log(`  ${utxo.txid}:${utxo.vout}`);
+          }
+          if (result.utxos.length === 0) {
+            console.log("  No UTXOs found");
+          }
+          break;
+        }
+        case "ro:invoices": {
+          if (!readonlyClient) {
+            console.log(
+              "Please initialize a readonly client first with ro:init",
+            );
+            break;
+          }
+          // Separate flags from invoice strings
+          const invoiceArgs: string[] = [];
+          let invoiceLimit = 20;
+          let invoiceOffset = 0;
+          for (let i = 0; i < args.length; i++) {
+            if (args[i] === "--limit" && args[i + 1]) {
+              invoiceLimit = parseInt(args[++i]);
+            } else if (args[i] === "--offset" && args[i + 1]) {
+              invoiceOffset = parseInt(args[++i]);
+            } else {
+              invoiceArgs.push(args[i]);
+            }
+          }
+          if (invoiceArgs.length < 1) {
+            console.log(
+              "Usage: ro:invoices <invoice1> [invoice2] ... [--limit N] [--offset N]",
+            );
+            break;
+          }
+          const invoiceResult = await readonlyClient.getSparkInvoices({
+            invoices: invoiceArgs,
+            limit: invoiceLimit,
+            offset: invoiceOffset,
+          });
+          console.log(`Invoice statuses (offset: ${invoiceResult.offset}):`);
+          for (const inv of invoiceResult.invoiceStatuses) {
+            console.log("  ---");
+            console.log(`  Invoice: ${inv.invoice}`);
+            console.log(`  Status: ${InvoiceStatus[inv.status]}`);
+          }
+          if (invoiceResult.invoiceStatuses.length === 0) {
+            console.log("  No invoice results found");
+          }
+          break;
+        }
+        case "ro:tokentransactions": {
+          if (!readonlyClient) {
+            console.log(
+              "Please initialize a readonly client first with ro:init",
+            );
+            break;
+          }
+          try {
+            const parsed = yargs(args)
+              .option("sparkAddresses", {
+                type: "string",
+                description: "Comma-separated list of Spark addresses",
+                coerce: (value: string) => {
+                  if (!value || value === ",") return undefined;
+                  return value.split(",").filter((s) => s.trim() !== "");
+                },
+              })
+              .option("issuerPublicKeys", {
+                type: "string",
+                description: "Comma-separated list of issuer public keys",
+                coerce: (value: string) => {
+                  if (!value || value === ",") return undefined;
+                  return value.split(",").filter((s) => s.trim() !== "");
+                },
+              })
+              .option("tokenIdentifiers", {
+                type: "string",
+                description: "Comma-separated list of token identifiers",
+                coerce: (value: string) => {
+                  if (!value) return undefined;
+                  return value.split(",").filter((s) => s.trim() !== "");
+                },
+              })
+              .option("outputIds", {
+                type: "string",
+                description: "Comma-separated list of output IDs",
+                coerce: (value: string) => {
+                  if (!value) return undefined;
+                  return value.split(",").filter((s) => s.trim() !== "");
+                },
+              })
+              .option("pageSize", {
+                type: "number",
+                description: "Number of results per page",
+                default: 50,
+              })
+              .option("cursor", {
+                type: "string",
+                description: "Pagination cursor",
+              })
+              .option("direction", {
+                type: "string",
+                description: "Pagination direction: NEXT or PREVIOUS",
+                default: "NEXT",
+                choices: ["NEXT", "PREVIOUS"],
+              })
+              .help(false)
+              .parseSync();
+
+            if (args.includes("--help")) {
+              console.log(
+                "Usage: ro:tokentransactions [--sparkAddresses addr1,addr2] [--issuerPublicKeys key1] [--tokenIdentifiers id1,id2] [--pageSize N] [--cursor C] [--direction NEXT|PREVIOUS]",
+              );
+              break;
+            }
+
+            const tokenTxResult = await readonlyClient.getTokenTransactions({
+              sparkAddresses: parsed.sparkAddresses,
+              issuerPublicKeys: parsed.issuerPublicKeys,
+              tokenIdentifiers: parsed.tokenIdentifiers,
+              outputIds: parsed.outputIds,
+              pageSize: parsed.pageSize,
+              cursor: parsed.cursor,
+              direction: parsed.direction as "NEXT" | "PREVIOUS",
+            });
+            displayTokenTransactions(tokenTxResult.transactions);
+            if (tokenTxResult.pageResponse?.nextCursor) {
+              console.log(
+                `\n  Next cursor: ${tokenTxResult.pageResponse.nextCursor}`,
+              );
+            }
+            if (tokenTxResult.pageResponse?.previousCursor) {
+              console.log(
+                `  Previous cursor: ${tokenTxResult.pageResponse.previousCursor}`,
+              );
+            }
+          } catch (error) {
+            console.error("Error querying token transactions:", error);
           }
           break;
         }
