@@ -376,6 +376,22 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
 
+	transferSender, err := db.TransferSender.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(senderIdentityPubKey).
+		Save(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create transfer sender: %w", err)
+	}
+	transferReceiver, err := db.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverIdentityPubKey).
+		SetStatus(st.TransferReceiverStatusSenderInitiated).
+		Save(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create transfer receiver: %w", err)
+	}
+
 	if len(leafCpfpRefundMap) == 0 {
 		return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("must provide at least one leaf for transfer"))
 	}
@@ -396,7 +412,7 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to validate transfer leaves: %w", err)
 	}
 
-	err = createTransferLeaves(ctx, db, transfer, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, leafTweakMap)
+	err = createTransferLeaves(ctx, db, transfer, transferSender, transferReceiver, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, leafTweakMap)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer leaves: %w", err)
 	}
@@ -675,6 +691,8 @@ func createTransferLeaves(
 	ctx context.Context,
 	db *ent.Client,
 	transfer *ent.Transfer,
+	transferSender *ent.TransferSender,
+	transferReceiver *ent.TransferReceiver,
 	leaves []*ent.TreeNode,
 	cpfpLeafRefundMap map[string][]byte,
 	directLeafRefundMap map[string][]byte,
@@ -689,6 +707,8 @@ func createTransferLeaves(
 		mutator := db.TransferLeaf.Create().
 			SetTransfer(transfer).
 			SetLeaf(leaf).
+			SetTransferSender(transferSender).
+			SetTransferReceiver(transferReceiver).
 			SetPreviousRefundTx(leaf.RawRefundTx).
 			SetPreviousDirectRefundTx(leaf.DirectRefundTx).
 			SetIntermediateRefundTx(rawRefundTx).
