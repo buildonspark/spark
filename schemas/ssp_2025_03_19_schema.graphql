@@ -71,9 +71,6 @@ input ClaimStaticDepositInput {
   """The bitcoin network of the deposit."""
   network: BitcoinNetwork!
 
-  """The type of the claim request."""
-  request_type: ClaimStaticDepositRequestType!
-
   """The amount of sats to claim for FIXED_AMOUNT quote."""
   credit_amount_sats: Long
 
@@ -88,6 +85,9 @@ input ClaimStaticDepositInput {
 
   """The signature of the quote provided by the SSP."""
   quote_signature: String!
+
+  """The type of the claim request."""
+  request_type: ClaimStaticDepositRequestType = null @deprecated(reason: "Different types of claim requests are no longer supported.")
 }
 
 type ClaimStaticDepositOutput {

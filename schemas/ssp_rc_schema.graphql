@@ -85,9 +85,6 @@ input ClaimStaticDepositInput {
   """The bitcoin network of the deposit."""
   network: BitcoinNetwork!
 
-  """The type of the claim request."""
-  request_type: ClaimStaticDepositRequestType!
-
   """The amount of sats to claim for FIXED_AMOUNT quote."""
   credit_amount_sats: Long
 
@@ -102,6 +99,9 @@ input ClaimStaticDepositInput {
 
   """The signature of the quote provided by the SSP."""
   quote_signature: String!
+
+  """The type of the claim request."""
+  request_type: ClaimStaticDepositRequestType = null @deprecated(reason: "Different types of claim requests are no longer supported.")
 }
 
 type ClaimStaticDepositOutput {
@@ -374,8 +374,13 @@ input CreateInstantStaticDepositQuoteInput {
 }
 
 type CreateInstantStaticDepositQuoteOutput {
-  """A stub field."""
-  stub: Int!
+  """The static deposit quote with pricing information."""
+  quote: StaticDepositQuote!
+
+  """
+  The fulfillment plans indicating when funds will be available based on confirmation probability.
+  """
+  fulfillment_plans: [StaticDepositPlan!]!
 }
 
 """This object represents the value and unit for an amount of currency."""
@@ -1119,6 +1124,39 @@ type SparkWalletUserToUserRequestsConnection implements Connection {
 
 input StartSeedReleaseInput {
   phone_number: String!
+}
+
+type StaticDepositPlan implements Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+
+  """The amount to be fulfilled with this plan."""
+  amount: CurrencyAmount!
+
+  """The number of confirmations required before fulfilling this plan."""
+  confirmations: Int!
+
+  """The current status of this fulfillment plan."""
+  status: StaticDepositPlanStatus!
+}
+
+enum StaticDepositPlanStatus {
+  """Initial status when the plan is created."""
+  CREATED
+
+  """The plan has started, state is unknown."""
+  PENDING
+
+  """The plan has been completed successfully."""
+  COMPLETED
 }
 
 type StaticDepositQuote implements Entity {
