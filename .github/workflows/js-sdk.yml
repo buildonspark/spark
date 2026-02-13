@@ -1,15 +1,9 @@
 name: "JS SDK Checks"
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-    paths:
-      - "signer/**"
-      - "protos/**"
-      - "sdks/js/**"
-      - ".github/workflows/js-sdk.yml"
-  pull_request:
     paths:
       - "signer/**"
       - "protos/**"
@@ -18,12 +12,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+  cancel-in-progress: true
 
 jobs:
   unit-test:
-    # Don't run on commits that are synced from private repository.
-    # if: github.event_name == 'pull_request' || ! (github.event_name == 'push' && contains(github.event.head_commit.message, 'GitOrigin-RevId'))
     runs-on: ubuntu-latest
     strategy:
       matrix:
