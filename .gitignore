@@ -45,7 +45,7 @@ _data/
 
 # Claude Code settings
 .claude/settings.local.json
-.claude/settings.json
+.claude/CLAUDE.local.md
 
 # Claude Code thoughts/plans
 /thoughts/
