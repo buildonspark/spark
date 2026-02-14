@@ -116,6 +116,9 @@ ENTRYPOINT ["spark-operator"]
 
 ARG DEBUG=0
 COPY --from=atlas /atlas /usr/local/bin/atlas
+# The amd64 atlas binary ships with restrictive permissions (0001) from the
+# upstream image, causing "Permission denied" when pods run as non-root.
+RUN chmod 0755 /usr/local/bin/atlas
 COPY --from=builder-go /go/bin/spark-operator /usr/local/bin/spark-operator
 COPY --from=builder-go /go/bin/dlv /usr/local/bin/dlv
 COPY --from=builder-go /bin/grpc_health_probe /usr/local/bin/grpc_health_probe
