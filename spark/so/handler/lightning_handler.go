@@ -134,7 +134,7 @@ func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspar
 
 	payload := common.GetStorePreimageShareSigningPayload(req.PaymentHash, req.EncryptedPreimageShares, req.Threshold, req.InvoiceString)
 	if err := common.VerifyECDSASignature(userPubKey, req.UserSignature, payload); err != nil {
-		return fmt.Errorf("invalid user signature: %w", err)
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("invalid user signature: %w", err))
 	}
 
 	if err := h.decryptAndStorePreimageShare(ctx, req); err != nil {
@@ -172,7 +172,7 @@ func (h *LightningHandler) StorePreimageShareInternal(ctx context.Context, req *
 
 	payload := common.GetStorePreimageShareSigningPayload(req.PaymentHash, req.EncryptedPreimageShares, req.Threshold, req.InvoiceString)
 	if err := common.VerifyECDSASignature(userPubKey, req.UserSignature, payload); err != nil {
-		return fmt.Errorf("invalid user signature: %w", err)
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("invalid user signature: %w", err))
 	}
 
 	return h.decryptAndStorePreimageShare(ctx, req)
