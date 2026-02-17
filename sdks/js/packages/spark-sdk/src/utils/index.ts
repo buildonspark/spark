@@ -1,4 +1,5 @@
 export * from "./address.js";
+export * from "./adaptor-signature.js";
 export * from "./bitcoin.js";
 export * from "./hashstructure.js";
 export * from "./idempotency.js";
