@@ -1,5 +1,14 @@
 # @buildonspark/spark-sdk
 
+## 0.6.4
+
+### Patch Changes
+
+- Clear auth tokens created before the client clock is synced to the server
+- Add a read only client for authenticated requests and master seed wallet queries
+- Store Lightning payment preimages in the SE in a single round-trip call
+- Support multi-token transfers in a single transaction
+
 ## 0.6.3
 
 ### Patch Changes
