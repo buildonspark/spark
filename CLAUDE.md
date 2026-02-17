@@ -1,6 +1,7 @@
 # Spark Repository
 
 Spark is a Bitcoin Layer 2 protocol enabling instant, low-cost Bitcoin transactions using FROST threshold signatures.
+For deep protocol and architecture context, see [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
 
 ## Setup
 
