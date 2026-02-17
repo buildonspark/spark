@@ -233,7 +233,7 @@ Spark uses a modified **FROST** (Flexible Round-Optimized Schnorr Threshold) sch
 4. **Tree Creation**: SO creates tree structure and publishes to L1
 5. **Confirmation**: After sufficient confirmations, leaves become available
 
-**Flow Documentation:** See `.claude_code/flows/static_deposits.md` and `.claude_code/flows/non_static_deposits.md`
+**Flow Documentation:** See `.claude/flows/static_deposits.md` and `.claude/flows/non_static_deposits.md`
 
 ### Transfer (Off-chain)
 
@@ -244,7 +244,7 @@ Spark uses a modified **FROST** (Flexible Round-Optimized Schnorr Threshold) sch
 3. **Validation**: Receiver verifies SE deleted old key shares (1-of-N trust model)
 4. **New Exit Tx**: Receiver gets new pre-signed exit transaction with shorter timelock
 
-**Flow Documentation:** See `.claude_code/flows/transfers.md`
+**Flow Documentation:** See `.claude/flows/transfers.md`
 
 ### Lightning Integration
 
@@ -254,20 +254,20 @@ Spark supports Lightning via **Atomic Swaps** with SSP:
 1. Client initiates preimage swap with SO, locking leaves for payment hash
 2. SSP pays Lightning invoice, learns preimage
 3. SSP provides preimage to SO, claims locked leaves
-4. **Flow Documentation:** See `.claude_code/flows/lightning_send_flow.md`
+4. **Flow Documentation:** See `.claude/flows/lightning_send_flow.md`
 
 **Lightning Receive:**
 1. Client generates preimage, requests invoice from SSP
 2. SSP creates Lightning invoice, waits for payment
 3. When paid, SSP transfers leaves to user, user provides preimage
-4. **Flow Documentation:** See `.claude_code/flows/lightning_receive_flow.md`
+4. **Flow Documentation:** See `.claude/flows/lightning_receive_flow.md`
 
 ### Withdrawal (Spark → L1)
 
 **Cooperative Exit:**
 1. User requests withdrawal, SSP creates connector transaction
 2. User signs refund transactions, SSP finalizes and broadcasts exit
-3. **Flow Documentation:** See `.claude_code/flows/coop_exit_detailed_flow.md`
+3. **Flow Documentation:** See `.claude/flows/coop_exit_detailed_flow.md`
 
 **Unilateral Exit:**
 1. User broadcasts pre-signed Branch Tx
@@ -403,7 +403,7 @@ Spark supports native tokens (BTKN) as metadata on leaves:
 - Token operations coordinated via two-phase commit across SOs
 - Token metadata does not appear on Bitcoin blockchain
 
-**Flow Documentation:** See `.claude_code/flows/token_creation_flow_CORRECTED.md` and related token flow docs
+**Flow Documentation:** See `.claude/flows/token_creation_flow_CORRECTED.md` and related token flow docs
 
 ## 10. Code Organization
 
@@ -551,7 +551,7 @@ make
 cd sdks/js/packages/spark-sdk/
 mise exec -- yarn generate:proto
 ```
-**NOTE**: Must use `mise exec --` to ensure correct protoc version (29.3) is used. See section 13.4 for tool version requirements.
+**NOTE**: Must use `mise exec --` to ensure correct protoc version (33.2) is used. See section 13.4 for tool version requirements.
 
 **Ent Generation** (When schema changes):
 ```bash
@@ -656,7 +656,7 @@ yarn test:integration
 ```bash
 mise exec -- yarn generate:proto
 ```
-**CRITICAL**: When proto files (`.proto`) are modified in the SO codebase, you MUST regenerate the JS SDK proto bindings. Run this from `sdks/js/packages/spark-sdk/` directory after running `make` in the SO repository. Must use `mise exec --` to ensure correct protoc version (29.3) is used.
+**CRITICAL**: When proto files (`.proto`) are modified in the SO codebase, you MUST regenerate the JS SDK proto bindings. Run this from `sdks/js/packages/spark-sdk/` directory after running `make` in the SO repository. Must use `mise exec --` to ensure correct protoc version (33.2) is used.
 
 **Example Scripts Verification** (Required if examples modified):
 ```bash
@@ -733,8 +733,8 @@ yarn build              # Verify examples compile
 - Configuration files are source of truth - do not second-guess or "improve" them
 
 **Examples:**
-- ✅ Use protoc version specified in config: `protoc v5.29.3`
-- ❌ Update to latest protoc version without asking: `protoc v5.30.0`
+- ✅ Use protoc version specified in config: `protoc 33.2`
+- ❌ Update to latest protoc version without asking: `protoc 34.0`
 - ✅ Ask: "This feature requires Go 1.22+, but your config specifies 1.21. Should I update?"
 - ❌ Silently update Go version in go.mod
 
@@ -770,32 +770,34 @@ yarn build              # Verify examples compile
 
 ## 15. Flow Documentation Structure
 
-All flow analyses are documented in `.claude_code/flows/`:
+All flow analyses are documented in `.claude/flows/`:
 
 **Core Flows:**
+- `static_deposits.md` - Deposit to pre-generated addresses ✅
+
+**Additional flows (planned/TODO):**
 - `transfers.md` - Standard Spark-to-Spark transfers
 - `lightning_send_flow.md` - Pay Lightning invoices with Spark leaves
 - `lightning_receive_flow.md` - Receive Lightning payments to Spark leaves
-- `static_deposits.md` - Deposit to pre-generated addresses
 - `non_static_deposits.md` - Deposit to one-time addresses
 - `coop_exit_detailed_flow.md` - Cooperative withdrawals to L1
 - `swap_counterswap_flow.md` - Atomic leaf swaps
 
-**Token Flows:**
+**Token Flows (planned/TODO):**
 - `token_creation_flow_CORRECTED.md` - Token issuance
 - `token_minting_flow_CORRECTED.md` - Minting new token outputs
 - `token_transfer_flow_CORRECTED.md` - Token transfers between users
 
-**System Architecture:**
+**System Architecture (planned/TODO):**
 - `spark_system_architecture.md` - Comprehensive system overview
 - `ssp_system_architecture.md` - SSP-specific architecture
 - `so_architecture_diagram.md` - SO cluster architecture
 
 ## 16. Security Review Resources
 
-**Primary Security Documents:**
-- `.claude_code/spark_security_review_guide.md` - Methodology and checklist
-- `.claude_code/security_framework.md` - Vulnerability categories and patterns
+**Primary Security Documents (planned/TODO):**
+- `.claude/spark_security_review_guide.md` - Methodology and checklist
+- `.claude/security_framework.md` - Vulnerability categories and patterns
 
 **Key Security Principles:**
 1. Always start client-side and trace through entire system
@@ -812,7 +814,7 @@ When analyzing Spark code or flows:
 
 1. **Load Configuration**: Reference `spark_config.json` for all code paths
 2. **Identify Component**: Determine if analyzing SO, SSP, or SDK code
-3. **Find Flow Documentation**: Check `.claude_code/flows/` for relevant flow
+3. **Find Flow Documentation**: Check `.claude/flows/` for relevant flow (currently only `static_deposits.md` available)
 4. **Understand Authentication**: Know which auth model applies (identity vs IP)
 5. **Consider Unilateral Exits**: Always think about user exit scenarios
 6. **Check Database Locking**: Look for `ForUpdate()` and transaction boundaries
@@ -821,11 +823,11 @@ When analyzing Spark code or flows:
 ## 18. Key Contact Points in Codebase
 
 **Starting a transfer:**
-- Client: `transfer.ts:243` - `sendTransferWithKeyTweaks()`
-- SO: `transfer_handler.go:468` - `startTransferInternal()`
+- Client: `transfer.ts:236` - `sendTransferWithKeyTweaks()`
+- SO: `transfer_handler.go:162` - `startTransferInternal()`
 
 **Lightning send:**
-- Client: `spark-wallet.ts:3338` - `payLightningInvoice()`
+- Client: `spark-wallet.ts:3614` - `payLightningInvoice()`
 - SO: `lightning_handler.go` - `initiate_preimage_swap_v2()`
 - SSP: State machine in `SparkLightningSendStateMachine`
 
@@ -835,7 +837,7 @@ When analyzing Spark code or flows:
 - SSP: `claim_static_deposit_fixed_amount` mutation
 
 **Cooperative exit:**
-- Client: `spark-wallet.ts:3912` - `withdraw()`
+- Client: `spark-wallet.ts:4512` - `withdraw()`
 - SSP: `request_coop_exit` mutation
 - SO: `coop_exit_handler.go` - `CooperativeExit()`
 
@@ -843,4 +845,4 @@ When analyzing Spark code or flows:
 
 **Philosophy:** "Bitcoin is the only network that will likely be around on every timeline; it's the natural bedrock for a radically new global payment network."
 
-This guide provides the foundational context for understanding Spark's architecture, codebase structure, and development practices. For detailed security analysis, flow-specific documentation, and implementation details, reference the specialized documents in `.claude_code/`.
+This guide provides the foundational context for understanding Spark's architecture, codebase structure, and development practices. For detailed security analysis, flow-specific documentation, and implementation details, reference the specialized documents in `.claude/`.
