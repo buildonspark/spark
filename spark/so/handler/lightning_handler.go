@@ -1929,12 +1929,16 @@ func (h *LightningHandler) QueryPreimage(ctx context.Context, req *pbspark.Query
 
 	receiverIdentityPubKey, err := keys.ParsePublicKey(req.ReceiverIdentityPubkey)
 	if err != nil {
-		return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(
+			fmt.Errorf("invalid receiver identity public key: %w", err),
+		)
 	}
 
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get database context: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(
+			fmt.Errorf("failed to get database context: %w", err),
+		)
 	}
 
 	preimageRequest, err := tx.PreimageRequest.Query().
@@ -1945,16 +1949,29 @@ func (h *LightningHandler) QueryPreimage(ctx context.Context, req *pbspark.Query
 		WithTransfers().
 		First(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query preimage request: %w", err)
+		if ent.IsNotFound(err) {
+			return nil, sparkerrors.NotFoundMissingEntity(
+				fmt.Errorf("preimage request not found for payment hash %x and receiver %x",
+					req.PaymentHash, receiverIdentityPubKey.Serialize()),
+			)
+		}
+		return nil, sparkerrors.InternalDatabaseReadError(
+			fmt.Errorf("failed to query preimage request: %w", err),
+		)
 	}
 
 	transfer := preimageRequest.Edges.Transfers
 	if transfer == nil {
-		return nil, fmt.Errorf("no transfer found for preimage request")
+		return nil, sparkerrors.InternalDataInconsistency(
+			fmt.Errorf("no transfer found for preimage request with payment hash %x", req.PaymentHash),
+		)
 	}
 
 	if !transfer.SenderIdentityPubkey.Equals(identityPubKey) {
-		return nil, fmt.Errorf("unauthorized: authenticated identity does not match transfer sender")
+		return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(
+			fmt.Errorf("authenticated identity %x does not match transfer sender %x",
+				identityPubKey.Serialize(), transfer.SenderIdentityPubkey.Serialize()),
+		)
 	}
 
 	response := &pbspark.QueryPreimageResponse{}
