@@ -15,6 +15,8 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@azure/core-asynciterator-polyfill": "^1.0.2",
+    "@buildonspark/issuer-sdk": "0.1.14",
     "@buildonspark/spark-sdk": "0.6.4",
     "@expo/vector-icons": "^14.1.0",
     "@react-native-community/cli": "19.0.0",
@@ -39,17 +41,20 @@
     "react-native": "0.79.4",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-get-random-values": "^1.11.0",
+    "react-native-keyboard-aware-scroll-view": "^0.9.5",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "^5.6.1",
     "react-native-screens": "~4.18.0",
     "react-native-web": "~0.20.0",
-    "react-native-webview": "13.13.5"
+    "react-native-webview": "13.13.5",
+    "text-encoding": "^0.7.0"
   },
   "devDependencies": {
     "@babel/core": "^7.27.3",
     "@babel/plugin-transform-class-static-block": "^7.28.3",
     "@types/react": "^19.0.10",
     "@types/react-native-get-random-values": "^1",
+    "@types/text-encoding": "^0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
     "prettier": "^3.7.4",
