@@ -732,6 +732,10 @@ func main() {
 		grpcweb.WithOriginFunc(func(_ string) bool {
 			return true
 		}),
+		grpcweb.WithWebsockets(true),
+		grpcweb.WithWebsocketOriginFunc(func(_ *http.Request) bool {
+			return true
+		}),
 		grpcweb.WithCorsForRegisteredEndpointsOnly(false),
 	)
 
