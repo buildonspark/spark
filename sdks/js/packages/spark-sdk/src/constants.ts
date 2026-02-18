@@ -67,4 +67,16 @@ function parseUserAgent(userAgent: string) {
   return `${browserName}-${browserVersion}/${osName}-${osVersion}`;
 }
 
-export const clientEnv = `js-spark-sdk/${packageVersion} ${baseEnvStr}`;
+export function setReactNativeEnvDetails(
+  rnVersion: string,
+  os: string,
+  osVersion: string | number,
+) {
+  if (isReactNative) {
+    baseEnvStr = `react-native/${rnVersion}/${os}-${osVersion}`;
+  }
+}
+
+export function getClientEnv() {
+  return `js-spark-sdk/${packageVersion} ${baseEnvStr}`;
+}

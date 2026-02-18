@@ -11,7 +11,7 @@ import {
   type Channel as ChannelWeb,
   type ClientFactory as ClientFactoryWeb,
 } from "nice-grpc-web";
-import { clientEnv } from "../../constants.js";
+import { getClientEnv } from "../../constants.js";
 import { SparkRequestError } from "../../errors/types.js";
 import type { SparkServiceDefinition } from "../../proto/spark.js";
 import type { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
@@ -42,7 +42,7 @@ export class ConnectionManagerBrowser extends ConnectionManager {
     return metadata
       .set("X-Requested-With", "XMLHttpRequest")
       .set("X-Grpc-Web", "1")
-      .set("X-Client-Env", clientEnv)
+      .set("X-Client-Env", getClientEnv())
       .set("Content-Type", "application/grpc-web+proto");
   }
 

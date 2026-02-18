@@ -1,9 +1,21 @@
 /* Root React Native entrypoint */
 import "../buffer.js";
 
+import { Platform } from "react-native";
+
+import { setReactNativeEnvDetails } from "./constants.js";
 import { setSparkFrostOnce } from "./spark-bindings/spark-bindings.js";
 import { SparkFrost } from "./spark-bindings/spark-bindings.react-native.js";
 import { setCrypto } from "./utils/crypto.js";
+
+const rv = Platform.constants?.reactNativeVersion;
+if (rv) {
+  setReactNativeEnvDetails(
+    `${rv.major}.${rv.minor}.${rv.patch}`,
+    Platform.OS,
+    Platform.Version,
+  );
+}
 
 setCrypto(globalThis.crypto);
 setSparkFrostOnce(new SparkFrost());

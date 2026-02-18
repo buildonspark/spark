@@ -1,5 +1,5 @@
 import { bytesToHex } from "@noble/hashes/utils";
-import { clientEnv } from "../constants.js";
+import { getClientEnv } from "../constants.js";
 
 export type SparkErrorContextArg = Record<string, unknown> & {
   error?: unknown;
@@ -13,7 +13,7 @@ export class SparkError extends Error {
   constructor(message: string, contextArg: SparkErrorContextArg = {}) {
     const context = {
       ...contextArg,
-      clientEnv,
+      clientEnv: getClientEnv(),
     };
     let originalError: Error | undefined;
     if (context.error) {

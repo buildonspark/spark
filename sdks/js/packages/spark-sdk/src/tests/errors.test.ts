@@ -1,11 +1,13 @@
 import { SparkError } from "../errors/base.js";
-import { clientEnv } from "../constants.js";
+import { getClientEnv } from "../constants.js";
 
 describe("SparkError", () => {
   it("stringifies BigInt values in context", () => {
     const err = new SparkError("Test BigInt", { big: 123n });
 
-    expect(err.message).toBe(`Test BigInt [big: 123, clientEnv: ${clientEnv}]`);
+    expect(err.message).toBe(
+      `Test BigInt [big: 123, clientEnv: ${getClientEnv()}]`,
+    );
   });
 
   it("stringifies primitive context values and strips punctuation", () => {
@@ -16,7 +18,7 @@ describe("SparkError", () => {
     });
 
     expect(err.message).toBe(
-      `Test primitives [num: 1, str: abc, bool: true, clientEnv: ${clientEnv}]`,
+      `Test primitives [num: 1, str: abc, bool: true, clientEnv: ${getClientEnv()}]`,
     );
   });
 
@@ -25,7 +27,7 @@ describe("SparkError", () => {
     const err = new SparkError("Wrapper error.", { error: original });
 
     expect(err.message).toBe(
-      `Wrapper error: something broke [clientEnv: ${clientEnv}]`,
+      `Wrapper error: something broke [clientEnv: ${getClientEnv()}]`,
     );
   });
 
@@ -34,7 +36,7 @@ describe("SparkError", () => {
     const err = new SparkError("Uint8Array test", { bytes });
 
     expect(err.message).toBe(
-      `Uint8Array test [bytes: Uint8Array(0x010203), clientEnv: ${clientEnv}]`,
+      `Uint8Array test [bytes: Uint8Array(0x010203), clientEnv: ${getClientEnv()}]`,
     );
   });
 
@@ -44,7 +46,7 @@ describe("SparkError", () => {
     err.update({ context: { traceId: "abc123" } });
 
     expect(err.message).toBe(
-      `Needs update [foo: bar, clientEnv: ${clientEnv}, traceId: abc123]`,
+      `Needs update [foo: bar, clientEnv: ${getClientEnv()}, traceId: abc123]`,
     );
   });
 });

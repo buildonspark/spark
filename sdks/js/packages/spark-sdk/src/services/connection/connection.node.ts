@@ -13,7 +13,7 @@ import {
 import type { ClientMiddleware } from "nice-grpc-common";
 import { Metadata, Status } from "nice-grpc-common";
 import { openTelemetryClientMiddleware } from "nice-grpc-opentelemetry";
-import { clientEnv } from "../../constants.js";
+import { getClientEnv } from "../../constants.js";
 import { SparkRequestError } from "../../errors/types.js";
 import { MockServiceClient, MockServiceDefinition } from "../../proto/mock.js";
 import { SparkServiceDefinition } from "../../proto/spark.js";
@@ -35,7 +35,7 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
   }
 
   protected prepareMetadata(metadata: Metadata): Metadata {
-    return metadata.set("X-Client-Env", clientEnv);
+    return metadata.set("X-Client-Env", getClientEnv());
   }
 
   public async createMockClient(address: string): Promise<
