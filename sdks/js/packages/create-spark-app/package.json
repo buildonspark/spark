@@ -1,0 +1,46 @@
+{
+  "name": "@buildonspark/create-spark-app",
+  "version": "0.0.0",
+  "description": "Create a new Spark application from a template",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": "./dist/index.cjs",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "clean": "rm -rf dist",
+    "format:fix": "prettier . --write",
+    "format": "prettier . --check",
+    "types": "tsc",
+    "package:checks": "yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\""
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.0.0",
+    "tar": "^7.0.0"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.17.4",
+    "@types/node": "^22.13.2",
+    "prettier": "^3.7.4",
+    "publint": "^0.3.9",
+    "tsdown": "^0.20.0-beta.3",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://github.com/buildonspark/spark",
+  "keywords": [
+    "bitcoin",
+    "spark",
+    "create-app",
+    "scaffold",
+    "template"
+  ]
+}
