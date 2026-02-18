@@ -22,7 +22,6 @@ import {
 import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
 import { getTxFromRawTxBytes } from "../utils/bitcoin.js";
 import { getCrypto } from "../utils/crypto.js";
-import { newHasher } from "../utils/hashstructure.js";
 import {
   optionsWithIdempotencyKey,
   type IdempotencyOptions,
@@ -160,19 +159,6 @@ export class LightningService {
 
     const invoiceString = invoice.invoice.encodedInvoice;
     const threshold = this.config.getThreshold();
-    const signingPayload = newHasher([
-      "spark",
-      "store_preimage_share",
-      "signing payload",
-    ])
-      .addBytes(paymentHash)
-      .addMapStringToBytes(encryptedShares)
-      .addUint32(threshold)
-      .addString(invoiceString)
-      .hash();
-
-    const userSignature =
-      await this.config.signer.signMessageWithIdentityKey(signingPayload);
 
     const userIdentityPublicKey =
       await this.config.signer.getIdentityPublicKey();
@@ -188,7 +174,6 @@ export class LightningService {
         threshold,
         invoiceString,
         userIdentityPublicKey,
-        userSignature,
       });
     } catch (error) {
       throw new SparkRequestError("Failed to store preimage shares", {
