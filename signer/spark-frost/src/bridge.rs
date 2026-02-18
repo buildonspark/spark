@@ -5,8 +5,7 @@ use bitcoin::{
     Address, Amount, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, Witness,
 };
 use ecies::{decrypt, encrypt};
-use std::io::Write;
-use std::{collections::HashMap, fs::OpenOptions, str::FromStr};
+use std::{collections::HashMap, str::FromStr};
 
 use crate::{proto, signing};
 
@@ -14,16 +13,6 @@ use crate::{proto, signing};
 pub struct DummyTx {
     pub tx: Vec<u8>,
     pub txid: String,
-}
-
-fn log_to_file(message: &str) {
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/Users/zhenlu/rust.log")
-    {
-        writeln!(file, "{message}").ok();
-    }
 }
 
 pub fn create_dummy_tx(address: &str, amount_sats: u64) -> Result<DummyTx, String> {
@@ -79,7 +68,6 @@ pub fn sign_frost(
     statechain_commitments: HashMap<String, proto::common::SigningCommitment>,
     adaptor_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, String> {
-    log_to_file("Entering sign_frost");
     // Using a fixed UUID instead of generating a random one
     let job_id = "00000000-0000-0000-0000-000000000000".to_string();
 

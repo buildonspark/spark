@@ -13,6 +13,8 @@ rand = { workspace = true }
 bitcoin = "0.32.5"
 ecies = { workspace = true }
 rayon = { workspace = true }
+k256 = { version = "0.13", features = ["arithmetic"] }
+vsss-rs = { version = "5", default-features = false, features = ["alloc", "primitive"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tonic = { workspace = true }

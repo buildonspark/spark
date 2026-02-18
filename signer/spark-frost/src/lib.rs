@@ -6,6 +6,7 @@ pub mod htlc;
 pub mod proto;
 pub mod signing;
 pub mod transaction;
+pub mod vss;
 
 /// Convert a hex string to an identifier.
 pub fn hex_string_to_identifier(identifier: &str) -> Result<Identifier, String> {

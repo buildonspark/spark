@@ -2,8 +2,7 @@
 #![allow(clippy::empty_line_after_doc_comments)]
 uniffi::include_scaffolding!("spark_frost");
 
-use std::io::Write;
-use std::{collections::HashMap, fs::OpenOptions, str::FromStr};
+use std::{collections::HashMap, str::FromStr};
 
 use bitcoin::{
     absolute::LockTime,
@@ -228,10 +227,8 @@ pub fn wasm_sign_frost(
     adaptor_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
     let statechain_commitments: HashMap<String, SigningCommitment> =
-        serde_wasm_bindgen::from_value(statechain_commitments).map_err(|e| {
-            log_to_file(&format!("Deserialization error: {e:?}"));
-            Error::Spark(format!("Failed to deserialize commitments: {e}"))
-        })?;
+        serde_wasm_bindgen::from_value(statechain_commitments)
+            .map_err(|e| Error::Spark(format!("Failed to deserialize commitments: {e}")))?;
     sign_frost(
         msg,
         key_package,
@@ -254,8 +251,6 @@ pub fn aggregate_frost(
     verifying_key: Vec<u8>,
     adaptor_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
-    log_to_file("Entering aggregate_frost");
-
     let commitments_proto: HashMap<_, _> = statechain_commitments
         .into_iter()
         .map(|(k, v)| (k, v.into()))
@@ -718,16 +713,6 @@ pub fn create_dummy_tx(address: String, amount_sats: u64) -> Result<DummyTx, Err
     }
 }
 
-fn log_to_file(message: &str) {
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/Users/zhenlu/rust.log")
-    {
-        writeln!(file, "{message}").ok();
-    }
-}
-
 #[wasm_bindgen]
 pub fn encrypt_ecies(msg: Vec<u8>, public_key_bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
     match spark_frost::bridge::encrypt_ecies(&msg, &public_key_bytes) {
@@ -1177,6 +1162,174 @@ pub fn apply_adaptor_to_signature(
         &adaptor_private_key,
     )
     .map_err(Error::Spark)
+}
+
+// ---------------------------------------------------------------------------
+// VSS (Verifiable Secret Sharing) functions
+// ---------------------------------------------------------------------------
+
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct SecretShareResult {
+    #[wasm_bindgen]
+    pub threshold: u32,
+    #[wasm_bindgen]
+    pub index: u32,
+    #[wasm_bindgen(getter_with_clone)]
+    pub share: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl SecretShareResult {
+    #[wasm_bindgen(constructor)]
+    pub fn new(threshold: u32, index: u32, share: Vec<u8>) -> Self {
+        Self {
+            threshold,
+            index,
+            share,
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub fn split_secret(
+    secret: Vec<u8>,
+    threshold: u32,
+    num_shares: u32,
+) -> Result<Vec<SecretShareResult>, Error> {
+    let shares = spark_frost::vss::split_secret(&secret, threshold as usize, num_shares as usize)
+        .map_err(Error::Spark)?;
+    Ok(shares
+        .into_iter()
+        .map(|s| SecretShareResult {
+            threshold: s.threshold as u32,
+            index: s.index,
+            share: s.share,
+        })
+        .collect())
+}
+
+#[wasm_bindgen]
+pub fn split_secret_with_proofs(
+    secret: Vec<u8>,
+    threshold: u32,
+    num_shares: u32,
+) -> Result<JsValue, Error> {
+    let shares = spark_frost::vss::split_secret_with_proofs(
+        &secret,
+        threshold as usize,
+        num_shares as usize,
+    )
+    .map_err(Error::Spark)?;
+
+    let results: Vec<VerifiableSecretShareData> = shares
+        .into_iter()
+        .map(|vs| VerifiableSecretShareData {
+            threshold: vs.share.threshold as u32,
+            index: vs.share.index,
+            share: vs.share.share,
+            proofs: vs.proofs,
+        })
+        .collect();
+
+    serde_wasm_bindgen::to_value(&results)
+        .map_err(|e| Error::Spark(format!("failed to serialize: {e}")))
+}
+
+pub fn split_secret_with_proofs_uniffi(
+    secret: Vec<u8>,
+    threshold: u32,
+    num_shares: u32,
+) -> Result<Vec<VerifiableSecretShareResult>, Error> {
+    let shares = spark_frost::vss::split_secret_with_proofs(
+        &secret,
+        threshold as usize,
+        num_shares as usize,
+    )
+    .map_err(Error::Spark)?;
+
+    Ok(shares
+        .into_iter()
+        .map(|vs| VerifiableSecretShareResult {
+            threshold: vs.share.threshold as u32,
+            index: vs.share.index,
+            share: vs.share.share,
+            proofs: vs.proofs,
+        })
+        .collect())
+}
+
+#[wasm_bindgen]
+pub fn recover_secret_wasm(shares: JsValue) -> Result<Vec<u8>, Error> {
+    let data: Vec<SecretShareData> = serde_wasm_bindgen::from_value(shares)
+        .map_err(|e| Error::Spark(format!("failed to deserialize shares: {e}")))?;
+    let shares: Vec<spark_frost::vss::SecretShare> = data
+        .into_iter()
+        .map(|d| spark_frost::vss::SecretShare {
+            threshold: d.threshold as usize,
+            index: d.index,
+            share: d.share,
+        })
+        .collect();
+    spark_frost::vss::recover_secret(&shares).map_err(Error::Spark)
+}
+
+pub fn recover_secret_uniffi(shares: Vec<SecretShareResult>) -> Result<Vec<u8>, Error> {
+    let shares: Vec<spark_frost::vss::SecretShare> = shares
+        .into_iter()
+        .map(|s| spark_frost::vss::SecretShare {
+            threshold: s.threshold as usize,
+            index: s.index,
+            share: s.share,
+        })
+        .collect();
+    spark_frost::vss::recover_secret(&shares).map_err(Error::Spark)
+}
+
+#[wasm_bindgen]
+pub fn validate_share(
+    share: Vec<u8>,
+    index: u32,
+    threshold: u32,
+    proofs: JsValue,
+) -> Result<(), Error> {
+    let proofs: Vec<Vec<u8>> = serde_wasm_bindgen::from_value(proofs)
+        .map_err(|e| Error::Spark(format!("failed to deserialize proofs: {e}")))?;
+    spark_frost::vss::validate_share(&share, index, threshold as usize, &proofs)
+        .map_err(Error::Spark)
+}
+
+pub fn validate_share_uniffi(
+    share: Vec<u8>,
+    index: u32,
+    threshold: u32,
+    proofs: Vec<Vec<u8>>,
+) -> Result<(), Error> {
+    spark_frost::vss::validate_share(&share, index, threshold as usize, &proofs)
+        .map_err(Error::Spark)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SecretShareData {
+    threshold: u32,
+    index: u32,
+    share: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct VerifiableSecretShareData {
+    threshold: u32,
+    index: u32,
+    share: Vec<u8>,
+    proofs: Vec<Vec<u8>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct VerifiableSecretShareResult {
+    pub threshold: u32,
+    pub index: u32,
+    pub share: Vec<u8>,
+    pub proofs: Vec<Vec<u8>>,
 }
 
 #[cfg(test)]

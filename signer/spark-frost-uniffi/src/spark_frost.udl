@@ -94,6 +94,20 @@ namespace spark_frost {
 
     [Throws=Error]
     bytes apply_adaptor_to_signature(bytes pub_key, bytes hash, bytes signature, bytes adaptor_private_key);
+
+    // --- VSS (Verifiable Secret Sharing) functions ---
+
+    [Throws=Error]
+    sequence<SecretShareResult> split_secret(bytes secret, u32 threshold, u32 num_shares);
+
+    [Throws=Error]
+    sequence<VerifiableSecretShareResult> split_secret_with_proofs_uniffi(bytes secret, u32 threshold, u32 num_shares);
+
+    [Throws=Error]
+    bytes recover_secret_uniffi(sequence<SecretShareResult> shares);
+
+    [Throws=Error]
+    void validate_share_uniffi(bytes share, u32 index, u32 threshold, sequence<bytes> proofs);
 };
 
 [Error]
@@ -163,4 +177,17 @@ dictionary HTLCSpendResult {
 dictionary AdaptorSignatureResult {
     bytes signature;
     bytes adaptor_private_key;
+};
+
+dictionary SecretShareResult {
+    u32 threshold;
+    u32 index;
+    bytes share;
+};
+
+dictionary VerifiableSecretShareResult {
+    u32 threshold;
+    u32 index;
+    bytes share;
+    sequence<bytes> proofs;
 };
