@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"math/rand/v2"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -500,4 +501,267 @@ func TestEventRouter_PrivacyEnabled_NoSession(t *testing.T) {
 	stream.mu.Lock()
 	require.Empty(t, stream.messages, "Stream should not have received any messages")
 	stream.mu.Unlock()
+}
+
+func TestEventRouter_TransferNotifications(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	router := NewEventRouter(dbClient, dbEvents, logger, &so.Config{})
+	rng := rand.NewChaCha8([32]byte{})
+
+	senderKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	thirdPartyKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	selfTransferKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Create and subscribe all streams
+	senderStreamCtx, senderCancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer senderCancel()
+	senderStream := &mockStream{ctx: senderStreamCtx}
+
+	receiverStreamCtx, receiverCancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer receiverCancel()
+	receiverStream := &mockStream{ctx: receiverStreamCtx}
+
+	thirdPartyStreamCtx, thirdPartyCancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer thirdPartyCancel()
+	thirdPartyStream := &mockStream{ctx: thirdPartyStreamCtx}
+
+	selfTransferStreamCtx, selfTransferCancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer selfTransferCancel()
+	selfTransferStream := &mockStream{ctx: selfTransferStreamCtx}
+
+	errCh := make(chan error, 4)
+	go func() { errCh <- router.SubscribeToEvents(senderKey, senderStream) }()
+	go func() { errCh <- router.SubscribeToEvents(receiverKey, receiverStream) }()
+	go func() { errCh <- router.SubscribeToEvents(thirdPartyKey, thirdPartyStream) }()
+	go func() { errCh <- router.SubscribeToEvents(selfTransferKey, selfTransferStream) }()
+
+	time.Sleep(200 * time.Millisecond)
+
+	sessionFactory := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs())
+
+	// Helper to get statuses from stream
+	getSenderStatuses := func(stream *mockStream) []pb.TransferStatus {
+		stream.mu.Lock()
+		defer stream.mu.Unlock()
+		var result []pb.TransferStatus
+		for _, msg := range stream.messages {
+			if msg.GetSenderTransfer() != nil {
+				result = append(result, msg.GetSenderTransfer().GetTransfer().GetStatus())
+			}
+		}
+		return result
+	}
+
+	getReceiverStatuses := func(stream *mockStream) []pb.TransferStatus {
+		stream.mu.Lock()
+		defer stream.mu.Unlock()
+		var result []pb.TransferStatus
+		for _, msg := range stream.messages {
+			if msg.GetReceiverTransfer() != nil {
+				result = append(result, msg.GetReceiverTransfer().GetTransfer().GetStatus())
+			}
+		}
+		return result
+	}
+
+	// Statuses that should trigger sender notifications
+	senderNotifyStatuses := []schematype.TransferStatus{
+		schematype.TransferStatusSenderInitiated,
+		schematype.TransferStatusSenderInitiatedCoordinator,
+		schematype.TransferStatusSenderKeyTweakPending,
+		schematype.TransferStatusReturned,
+		schematype.TransferStatusSenderKeyTweaked, // Also triggers receiver
+	}
+
+	// Unhandled statuses (from Values() minus handled)
+	handledStatuses := map[schematype.TransferStatus]bool{
+		schematype.TransferStatusSenderInitiated:            true,
+		schematype.TransferStatusSenderInitiatedCoordinator: true,
+		schematype.TransferStatusSenderKeyTweakPending:      true,
+		schematype.TransferStatusReturned:                   true,
+		schematype.TransferStatusSenderKeyTweaked:           true,
+	}
+	var unhandledStatuses []schematype.TransferStatus
+	for _, s := range schematype.TransferStatus("").Values() {
+		status := schematype.TransferStatus(s)
+		if !handledStatuses[status] {
+			unhandledStatuses = append(unhandledStatuses, status)
+		}
+	}
+
+	statusToProto := map[schematype.TransferStatus]pb.TransferStatus{
+		schematype.TransferStatusSenderInitiated:            pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED,
+		schematype.TransferStatusSenderInitiatedCoordinator: pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
+		schematype.TransferStatusSenderKeyTweakPending:      pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
+		schematype.TransferStatusReturned:                   pb.TransferStatus_TRANSFER_STATUS_RETURNED,
+		schematype.TransferStatusSenderKeyTweaked:           pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+	}
+
+	containsStatus := func(statuses []pb.TransferStatus, want pb.TransferStatus) bool {
+		return slices.Contains(statuses, want)
+	}
+
+	uniqueStatuses := func(statuses []pb.TransferStatus) []pb.TransferStatus {
+		seen := make(map[pb.TransferStatus]struct{}, len(statuses))
+		unique := make([]pb.TransferStatus, 0, len(statuses))
+		for _, status := range statuses {
+			if _, ok := seen[status]; ok {
+				continue
+			}
+			seen[status] = struct{}{}
+			unique = append(unique, status)
+		}
+		return unique
+	}
+
+	waitForStatus := func(name string, stream *mockStream, getStatuses func(*mockStream) []pb.TransferStatus, want pb.TransferStatus) {
+		t.Helper()
+		require.Eventuallyf(t, func() bool {
+			return containsStatus(getStatuses(stream), want)
+		}, 5*time.Second, 50*time.Millisecond, "expected %s status %v", name, want)
+	}
+
+	// Create main transfer and update through all statuses
+	session := sessionFactory.NewSession(t.Context())
+	mutationCtx := ent.InjectNotifier(ent.Inject(t.Context(), session), session)
+	tx, err := session.GetOrBeginTx(mutationCtx)
+	require.NoError(t, err)
+
+	expiry := time.Now().Add(5 * time.Minute)
+	transfer, err := tx.Transfer.Create().
+		SetNetwork(btcnetwork.Regtest).
+		SetSenderIdentityPubkey(senderKey).
+		SetReceiverIdentityPubkey(receiverKey).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeTransfer).
+		SetExpiryTime(expiry).
+		SetTotalValue(100).
+		Save(mutationCtx)
+	require.NoError(t, err)
+
+	// Create self-transfer
+	selfTransfer, err := tx.Transfer.Create().
+		SetNetwork(btcnetwork.Regtest).
+		SetSenderIdentityPubkey(selfTransferKey).
+		SetReceiverIdentityPubkey(selfTransferKey).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeTransfer).
+		SetExpiryTime(expiry).
+		SetTotalValue(100).
+		Save(mutationCtx)
+	require.NoError(t, err)
+
+	ent.MarkTxDirty(mutationCtx)
+	require.NoError(t, tx.Commit())
+
+	// Wait for the initial sender notifications before advancing statuses so the
+	// router snapshots the expected state for each event.
+	waitForStatus("sender initiated (sender)", senderStream, getSenderStatuses, statusToProto[schematype.TransferStatusSenderInitiated])
+	waitForStatus("sender initiated (self)", selfTransferStream, getSenderStatuses, statusToProto[schematype.TransferStatusSenderInitiated])
+
+	// Update main transfer through remaining handled statuses
+	for _, status := range senderNotifyStatuses[1:] { // Skip first (already created with it)
+		session := sessionFactory.NewSession(t.Context())
+		mutationCtx := ent.InjectNotifier(ent.Inject(t.Context(), session), session)
+		tx, err := session.GetOrBeginTx(mutationCtx)
+		require.NoError(t, err)
+
+		_, err = tx.Transfer.UpdateOneID(transfer.ID).
+			SetStatus(status).
+			Save(mutationCtx)
+		require.NoError(t, err)
+		ent.MarkTxDirty(mutationCtx)
+		require.NoError(t, tx.Commit())
+
+		protoStatus := statusToProto[status]
+		waitForStatus("sender update", senderStream, getSenderStatuses, protoStatus)
+		if status == schematype.TransferStatusSenderKeyTweaked {
+			waitForStatus("receiver update", receiverStream, getReceiverStatuses, protoStatus)
+		}
+	}
+
+	// Update self-transfer to SenderKeyTweaked
+	session2 := sessionFactory.NewSession(t.Context())
+	mutationCtx2 := ent.InjectNotifier(ent.Inject(t.Context(), session2), session2)
+	tx2, err := session2.GetOrBeginTx(mutationCtx2)
+	require.NoError(t, err)
+	_, err = tx2.Transfer.UpdateOneID(selfTransfer.ID).
+		SetStatus(schematype.TransferStatusSenderKeyTweaked).
+		Save(mutationCtx2)
+	require.NoError(t, err)
+	ent.MarkTxDirty(mutationCtx2)
+	require.NoError(t, tx2.Commit())
+	waitForStatus("self sender key tweaked (sender)", selfTransferStream, getSenderStatuses, statusToProto[schematype.TransferStatusSenderKeyTweaked])
+	waitForStatus("self sender key tweaked (receiver)", selfTransferStream, getReceiverStatuses, statusToProto[schematype.TransferStatusSenderKeyTweaked])
+
+	// Update main transfer through unhandled statuses (should NOT notify)
+	for _, status := range unhandledStatuses {
+		session := sessionFactory.NewSession(t.Context())
+		mutationCtx := ent.InjectNotifier(ent.Inject(t.Context(), session), session)
+		tx, err := session.GetOrBeginTx(mutationCtx)
+		require.NoError(t, err)
+
+		_, err = tx.Transfer.UpdateOneID(transfer.ID).
+			SetStatus(status).
+			Save(mutationCtx)
+		require.NoError(t, err)
+		ent.MarkTxDirty(mutationCtx)
+		require.NoError(t, tx.Commit())
+	}
+	time.Sleep(300 * time.Millisecond)
+
+	// Expected statuses
+	expectedSenderStatuses := []pb.TransferStatus{
+		pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED,
+		pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
+		pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
+		pb.TransferStatus_TRANSFER_STATUS_RETURNED,
+		pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+	}
+
+	// Verify exact statuses
+	t.Run("sender receives correct statuses", func(t *testing.T) {
+		require.ElementsMatch(t, expectedSenderStatuses, getSenderStatuses(senderStream))
+	})
+
+	t.Run("receiver only receives SenderKeyTweaked", func(t *testing.T) {
+		require.Equal(t, []pb.TransferStatus{
+			pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+		}, getReceiverStatuses(receiverStream))
+	})
+
+	t.Run("third party receives nothing", func(t *testing.T) {
+		require.Empty(t, getSenderStatuses(thirdPartyStream))
+		require.Empty(t, getReceiverStatuses(thirdPartyStream))
+	})
+
+	t.Run("self-transfer receives both events with correct statuses", func(t *testing.T) {
+		selfSender := uniqueStatuses(getSenderStatuses(selfTransferStream))
+		selfReceiver := uniqueStatuses(getReceiverStatuses(selfTransferStream))
+		require.ElementsMatch(t, []pb.TransferStatus{
+			pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED,
+			pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+		}, selfSender)
+		require.Equal(t, []pb.TransferStatus{
+			pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+		}, selfReceiver)
+	})
+
+	// Cleanup
+	senderCancel()
+	receiverCancel()
+	thirdPartyCancel()
+	selfTransferCancel()
+	for range 4 {
+		select {
+		case err := <-errCh:
+			require.NoError(t, err)
+		case <-time.After(time.Second):
+			t.Fatal("router did not exit after cancel")
+		}
+	}
 }

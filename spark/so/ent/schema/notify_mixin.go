@@ -103,11 +103,13 @@ func (n NotifyMixin) buildPayload(v ent.Value) map[string]any {
 		if val, ok := fields[f]; ok {
 			switch val := val.(type) {
 			case string:
-				if decoded, err := base64.StdEncoding.DecodeString(val); err == nil {
-					payload[f] = hex.EncodeToString(decoded)
-				} else {
-					payload[f] = val
+				if strings.HasSuffix(f, "_pubkey") {
+					if decoded, err := base64.StdEncoding.DecodeString(val); err == nil {
+						payload[f] = hex.EncodeToString(decoded)
+						break
+					}
 				}
+				payload[f] = val
 			case []byte:
 				payload[f] = hex.EncodeToString(val)
 			default:

@@ -24,7 +24,7 @@ type Transfer struct {
 func (Transfer) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
-		NotifyMixin{AdditionalFields: []string{"receiver_identity_pubkey", "status"}},
+		NotifyMixin{AdditionalFields: []string{"receiver_identity_pubkey", "sender_identity_pubkey", "status"}},
 	}
 }
 

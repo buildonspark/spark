@@ -80,13 +80,15 @@ func (s *EventRouter) SubscribeToEvents(identityPublicKey keys.Public, stream pb
 				return nil
 			}
 
-			notification, err := s.processNotification(stream.Context(), eventData, identityPublicKey)
+			notifications, err := s.processNotification(stream.Context(), eventData, identityPublicKey)
 
 			if err != nil {
 				s.logger.With(zap.Error(err)).Error("Failed to process notification")
-			} else if notification != nil {
-				if err := stream.Send(notification); err != nil {
-					return nil
+			} else {
+				for _, notification := range notifications {
+					if err := stream.Send(notification); err != nil {
+						return nil
+					}
 				}
 			}
 		}
@@ -105,6 +107,11 @@ func (s *EventRouter) createNotificationChannel(identityPublicKey keys.Public) (
 			Field:     transfer.FieldReceiverIdentityPubkey,
 			Value:     identityPublicKey.String(),
 		},
+		{
+			EventName: eventNameTransfer,
+			Field:     transfer.FieldSenderIdentityPubkey,
+			Value:     identityPublicKey.String(),
+		},
 	})
 
 	return notificationChan, cleanup
@@ -115,7 +122,7 @@ type processEventPayload struct {
 	Fields map[string]any
 }
 
-func (s *EventRouter) processNotification(ctx context.Context, eventData db.EventData, identityPublicKey keys.Public) (*pb.SubscribeToEventsResponse, error) {
+func (s *EventRouter) processNotification(ctx context.Context, eventData db.EventData, identityPublicKey keys.Public) ([]*pb.SubscribeToEventsResponse, error) {
 	var eventJson map[string]any
 	err := json.Unmarshal([]byte(eventData.Payload), &eventJson)
 	if err != nil {
@@ -140,17 +147,19 @@ func (s *EventRouter) processNotification(ctx context.Context, eventData db.Even
 		Fields: eventJson,
 	}
 
-	var notification *pb.SubscribeToEventsResponse
+	var notifications []*pb.SubscribeToEventsResponse
 	switch eventData.Channel {
 	case eventNameDepositAddress:
-		notification = s.processDepositNotification(ctx, event)
+		if notification := s.processDepositNotification(ctx, event); notification != nil {
+			notifications = append(notifications, notification)
+		}
 	case eventNameTransfer:
-		notification = s.processTransferNotification(ctx, event)
+		notifications = s.processTransferNotification(ctx, event, identityPublicKey)
 	default:
 		return nil, fmt.Errorf("unknown event type: %s", eventData.Channel)
 	}
 
-	return notification, nil
+	return notifications, nil
 }
 
 func (s *EventRouter) processDepositNotification(ctx context.Context, event processEventPayload) *pb.SubscribeToEventsResponse {
@@ -213,7 +222,7 @@ func (s *EventRouter) processDepositNotification(ctx context.Context, event proc
 	}
 }
 
-func (s *EventRouter) processTransferNotification(ctx context.Context, event processEventPayload) *pb.SubscribeToEventsResponse {
+func (s *EventRouter) processTransferNotification(ctx context.Context, event processEventPayload, identityPublicKey keys.Public) []*pb.SubscribeToEventsResponse {
 	if rawStatus, exists := event.Fields["status"]; exists {
 		statusStr, ok := rawStatus.(string)
 		if !ok {
@@ -221,25 +230,68 @@ func (s *EventRouter) processTransferNotification(ctx context.Context, event pro
 		}
 		status := schematype.TransferStatus(statusStr)
 
-		if status == schematype.TransferStatusSenderKeyTweaked {
-			transferEnt, err := s.dbClient.Transfer.Query().Where(transfer.ID(event.ID)).Only(ctx)
-			if err != nil {
-				return nil
-			}
+		senderPubkey, ok := event.Fields["sender_identity_pubkey"].(string)
+		if !ok {
+			return nil
+		}
+		receiverPubkey, ok := event.Fields["receiver_identity_pubkey"].(string)
+		if !ok {
+			return nil
+		}
+		subscriptionPubkey := identityPublicKey.String()
 
-			transferProto, err := transferEnt.MarshalProto(ctx)
-			if err != nil {
-				return nil
-			}
+		var notifications []*pb.SubscribeToEventsResponse
 
-			return &pb.SubscribeToEventsResponse{
-				Event: &pb.SubscribeToEventsResponse_ReceiverTransfer{
-					ReceiverTransfer: &pb.TransferEvent{
-						Transfer: transferProto,
-					},
-				},
+		switch status {
+		case schematype.TransferStatusSenderInitiated,
+			schematype.TransferStatusSenderInitiatedCoordinator,
+			schematype.TransferStatusSenderKeyTweakPending,
+			schematype.TransferStatusReturned:
+			if senderPubkey == subscriptionPubkey {
+				if notification := s.buildTransferEvent(ctx, event.ID, true); notification != nil {
+					notifications = append(notifications, notification)
+				}
 			}
+		case schematype.TransferStatusSenderKeyTweaked:
+			if senderPubkey == subscriptionPubkey {
+				if notification := s.buildTransferEvent(ctx, event.ID, true); notification != nil {
+					notifications = append(notifications, notification)
+				}
+			}
+			if receiverPubkey == subscriptionPubkey {
+				if notification := s.buildTransferEvent(ctx, event.ID, false); notification != nil {
+					notifications = append(notifications, notification)
+				}
+			}
+		default:
+			return []*pb.SubscribeToEventsResponse{}
+		}
+		return notifications
+	}
+	return []*pb.SubscribeToEventsResponse{}
+}
+
+func (s *EventRouter) buildTransferEvent(ctx context.Context, transferID uuid.UUID, isSender bool) *pb.SubscribeToEventsResponse {
+	transferEnt, err := s.dbClient.Transfer.Query().Where(transfer.ID(transferID)).Only(ctx)
+	if err != nil {
+		return nil
+	}
+
+	transferProto, err := transferEnt.MarshalProto(ctx)
+	if err != nil {
+		return nil
+	}
+
+	if isSender {
+		return &pb.SubscribeToEventsResponse{
+			Event: &pb.SubscribeToEventsResponse_SenderTransfer{
+				SenderTransfer: &pb.TransferEvent{Transfer: transferProto},
+			},
 		}
 	}
-	return nil
+	return &pb.SubscribeToEventsResponse{
+		Event: &pb.SubscribeToEventsResponse_ReceiverTransfer{
+			ReceiverTransfer: &pb.TransferEvent{Transfer: transferProto},
+		},
+	}
 }
