@@ -127,22 +127,12 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 // StorePreimageShareV2 stores preimage shares for all SOs via a single coordinator call.
 // The coordinator decrypts and stores its own share, then fans out to other SOs via internal RPC.
 func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspark.StorePreimageShareV2Request) error {
-	userPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
-	if err != nil {
-		return fmt.Errorf("unable to parse user identity public key: %w", err)
-	}
-
-	payload := common.GetStorePreimageShareSigningPayload(req.PaymentHash, req.EncryptedPreimageShares, req.Threshold, req.InvoiceString)
-	if err := common.VerifyECDSASignature(userPubKey, req.UserSignature, payload); err != nil {
-		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("invalid user signature: %w", err))
-	}
-
 	if err := h.decryptAndStorePreimageShare(ctx, req); err != nil {
 		return fmt.Errorf("unable to store coordinator preimage share: %w", err)
 	}
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
 			return nil, err
@@ -165,16 +155,6 @@ func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspar
 
 // StorePreimageShareInternal handles the internal RPC from the coordinator to store a preimage share.
 func (h *LightningHandler) StorePreimageShareInternal(ctx context.Context, req *pbspark.StorePreimageShareV2Request) error {
-	userPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
-	if err != nil {
-		return fmt.Errorf("unable to parse user identity public key: %w", err)
-	}
-
-	payload := common.GetStorePreimageShareSigningPayload(req.PaymentHash, req.EncryptedPreimageShares, req.Threshold, req.InvoiceString)
-	if err := common.VerifyECDSASignature(userPubKey, req.UserSignature, payload); err != nil {
-		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("invalid user signature: %w", err))
-	}
-
 	return h.decryptAndStorePreimageShare(ctx, req)
 }
 

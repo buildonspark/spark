@@ -8,11 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
@@ -1435,12 +1433,6 @@ func TestStorePreimageShareV2(t *testing.T) {
 		encryptedShares[identifier] = encrypted
 	}
 
-	// Sign the payload with user identity key
-	payload := common.GetStorePreimageShareSigningPayload(
-		paymentHash[:], encryptedShares, uint32(config.Threshold), invoice,
-	)
-	sig := ecdsa.Sign(config.IdentityPrivateKey.ToBTCEC(), payload)
-
 	// Call store_preimage_share_v2 on the coordinator
 	coordinatorOp := config.SigningOperators[config.CoordinatorIdentifier]
 	conn, err := coordinatorOp.NewOperatorGRPCConnection()
@@ -1458,7 +1450,6 @@ func TestStorePreimageShareV2(t *testing.T) {
 		Threshold:               uint32(config.Threshold),
 		InvoiceString:           invoice,
 		UserIdentityPublicKey:   config.IdentityPublicKey().Serialize(),
-		UserSignature:           sig.Serialize(),
 	})
 	require.NoError(t, err)
 

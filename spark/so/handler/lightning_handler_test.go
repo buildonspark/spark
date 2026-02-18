@@ -351,7 +351,6 @@ func TestStorePreimageShareV2EdgeCases(t *testing.T) {
 
 	rng := rand.NewChaCha8([32]byte{2})
 	soIdentityKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	userIdentityKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	soIdentifier := "test-so-1"
 
@@ -411,33 +410,6 @@ func TestStorePreimageShareV2EdgeCases(t *testing.T) {
 		require.ErrorContains(t, err, "preimage share proofs is empty")
 	})
 
-	t.Run("invalid user signature in StorePreimageShareInternal", func(t *testing.T) {
-		shareProto := &pb.SecretShare{
-			SecretShare: []byte("test_share_data"),
-			Proofs:      [][]byte{[]byte("proof1")},
-		}
-		shareBytes, err := proto.Marshal(shareProto)
-		require.NoError(t, err)
-		encryptedShare := encryptForSO(t, shareBytes)
-		req := &pb.StorePreimageShareV2Request{
-			PaymentHash:             []byte("test_payment_hash"),
-			EncryptedPreimageShares: map[string][]byte{soIdentifier: encryptedShare},
-			Threshold:               2,
-			InvoiceString:           "test_invoice",
-			UserIdentityPublicKey:   userIdentityKey.Public().Serialize(),
-			UserSignature:           []byte("invalid_signature"),
-		}
-		err = lightningHandler.StorePreimageShareInternal(ctx, req)
-		require.ErrorContains(t, err, "invalid user signature")
-	})
-
-	t.Run("invalid user identity public key", func(t *testing.T) {
-		req := &pb.StorePreimageShareV2Request{
-			UserIdentityPublicKey: []byte("bad_key"),
-		}
-		err := lightningHandler.StorePreimageShareInternal(ctx, req)
-		require.ErrorContains(t, err, "unable to parse user identity public key")
-	})
 }
 
 func TestGetSigningCommitments(t *testing.T) {
