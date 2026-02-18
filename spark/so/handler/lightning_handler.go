@@ -851,7 +851,9 @@ func (h *LightningHandler) GetPreimageShare(
 				return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
 			}
 		} else if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
-			return nil, fmt.Errorf("preimage share owner identity public key mismatch")
+			return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(
+				fmt.Errorf("preimage share owner identity public key mismatch for payment hash: %x", req.PaymentHash),
+			)
 		}
 	}
 
@@ -1273,7 +1275,9 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 				return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
 			}
 		} else if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
-			return nil, fmt.Errorf("preimage share owner identity public key mismatch for payment hash: %x", req.PaymentHash)
+			return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(
+				fmt.Errorf("preimage share owner identity public key mismatch for payment hash: %x", req.PaymentHash),
+			)
 		}
 	}
 
