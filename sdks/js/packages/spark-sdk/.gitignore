@@ -11,3 +11,5 @@ ios/Pods/
 android/build/
 android/.gradle/
 android/local.properties
+
+wasm/browser/

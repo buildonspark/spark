@@ -1,12 +1,16 @@
 import { bytesToHex } from "@noble/curves/utils";
 import {
+  apply_adaptor_to_signature,
   create_dummy_tx,
   decrypt_ecies,
   DummyTx,
   encrypt_ecies,
+  generate_adaptor_from_signature,
+  generate_signature_from_existing_adaptor,
   KeyPackage,
   SigningCommitment,
   SigningNonce,
+  validate_adaptor_signature,
   wasm_aggregate_frost,
   wasm_sign_frost,
   default as initWasm,
@@ -142,6 +146,48 @@ class SparkFrostBrowser extends SparkFrostBase {
     await this.init();
     const plaintext = decrypt_ecies(encryptedMsg, privateKey);
     return Promise.resolve(plaintext);
+  }
+
+  override generateAdaptorFromSignature(signature: Uint8Array) {
+    const result = generate_adaptor_from_signature(signature);
+    return {
+      adaptorSignature: result.signature,
+      adaptorPrivateKey: result.adaptor_private_key,
+    };
+  }
+
+  override generateSignatureFromExistingAdaptor(
+    signature: Uint8Array,
+    adaptorPrivateKeyBytes: Uint8Array,
+  ) {
+    return generate_signature_from_existing_adaptor(
+      signature,
+      adaptorPrivateKeyBytes,
+    );
+  }
+
+  override validateAdaptorSignature(
+    pubkey: Uint8Array,
+    hash: Uint8Array,
+    signature: Uint8Array,
+    adaptorPubkey: Uint8Array,
+  ) {
+    validate_adaptor_signature(pubkey, hash, signature, adaptorPubkey);
+    return true;
+  }
+
+  override applyAdaptorToSignature(
+    pubkey: Uint8Array,
+    hash: Uint8Array,
+    signature: Uint8Array,
+    adaptorPrivateKeyBytes: Uint8Array,
+  ) {
+    return apply_adaptor_to_signature(
+      pubkey,
+      hash,
+      signature,
+      adaptorPrivateKeyBytes,
+    );
   }
 }
 
