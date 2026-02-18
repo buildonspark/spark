@@ -83,7 +83,7 @@
   },
   "dependencies": {
     "@buildonspark/spark-sdk": "0.6.4",
-    "@noble/curves": "^1.8.0",
+    "@noble/curves": "^1.9.7",
     "@scure/btc-signer": "^1.5.0",
     "buffer": "^6.0.3"
   },

@@ -19,7 +19,7 @@
     "@buildonspark/issuer-sdk": "0.1.14",
     "@buildonspark/spark-sdk": "0.6.4",
     "@lightsparkdev/core": "^1.4.9",
-    "@noble/curves": "^1.8.0",
+    "@noble/curves": "^1.9.7",
     "express": "^4.21.2"
   },
   "devDependencies": {
