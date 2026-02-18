@@ -24,6 +24,11 @@ const (
 	// TokenMaxValidityDuration is the max duration a token transaction can be valid for
 	TokenMaxValidityDuration = 300 * time.Second
 
+	// TokenMaxExecuteBeforeWindow is the maximum allowed window between client_created_timestamp
+	// and execute_before timestamp. If set, execute_before must be within this window of
+	// the client_created_timestamp.
+	TokenMaxExecuteBeforeWindow = 14 * 24 * time.Hour // 2 weeks
+
 	// SigningCommitmentReserve is the reserve for the signing commitments.
 	SigningCommitmentReserve = 100000
 

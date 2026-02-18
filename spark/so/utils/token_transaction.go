@@ -1580,3 +1580,58 @@ func ValidateFinalTokenTransaction(
 func ToMicrosecondPrecision(t time.Time) time.Time {
 	return t.UTC().Truncate(time.Microsecond)
 }
+
+// ValidateExecuteBefore validates the execute_before timestamp field of a partial token transaction.
+// If execute_before is set, it must:
+// 1. Have microsecond precision (for database compatibility)
+// 2. Be strictly after client_created_timestamp
+// 3. Be within maxWindow of client_created_timestamp
+// 4. Not have already passed (based on current server time)
+func ValidateExecuteBefore(
+	executeBefore *time.Time,
+	clientCreatedTimestamp time.Time,
+	maxWindow time.Duration,
+) error {
+	// execute_before is optional; if not set, skip validation
+	if executeBefore == nil {
+		return nil
+	}
+
+	eb := *executeBefore
+
+	// Check microsecond precision (PostgreSQL only stores microsecond precision)
+	if !eb.Equal(ToMicrosecondPrecision(eb)) {
+		return sparkerrors.InvalidArgumentMalformedField(
+			fmt.Errorf("execute_before has sub-microsecond precision (nanos=%d); truncate to microseconds",
+				eb.Nanosecond()),
+		)
+	}
+
+	// execute_before must be strictly after client_created_timestamp
+	if !eb.After(clientCreatedTimestamp) {
+		return sparkerrors.FailedPreconditionTokenRulesViolation(
+			fmt.Errorf("execute_before (%v) must be after client_created_timestamp (%v)",
+				eb, clientCreatedTimestamp),
+		)
+	}
+
+	// execute_before must be within max window of client_created_timestamp
+	maxAllowed := clientCreatedTimestamp.Add(maxWindow)
+	if eb.After(maxAllowed) {
+		return sparkerrors.FailedPreconditionTokenRulesViolation(
+			fmt.Errorf("execute_before (%v) exceeds max window of %v from client_created_timestamp (%v); max allowed: %v",
+				eb, maxWindow, clientCreatedTimestamp, maxAllowed),
+		)
+	}
+
+	// execute_before must not have already passed
+	now := time.Now()
+	if now.After(eb) {
+		return sparkerrors.FailedPreconditionExpired(
+			fmt.Errorf("execute_before (%v) has already passed; current time: %v",
+				eb, now),
+		)
+	}
+
+	return nil
+}

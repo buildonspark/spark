@@ -169,7 +169,11 @@ message PartialTokenTransaction {
         TokenCreateInput create_input = 5;
     }
     repeated PartialTokenOutput partial_token_outputs = 6;
-
+    // Optional client-specified deadline for transaction execution.
+    // If set, the server must reject the transaction if current time > execute_before.
+    // Must be after client_created_timestamp, within a configurable max window,
+    // and truncated to microsecond precision.
+    optional google.protobuf.Timestamp execute_before = 7;
 }
 
 message FinalTokenTransaction {

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -175,6 +176,14 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 		expectedRelativeBlockLocktime,
 	); err != nil {
 		return nil, err
+	}
+
+	if partial.ExecuteBefore != nil {
+		clientCreatedTs := metadata.GetClientCreatedTimestamp().AsTime()
+		executeBefore := partial.GetExecuteBefore().AsTime()
+		if err := utils.ValidateExecuteBefore(&executeBefore, clientCreatedTs, spark.TokenMaxExecuteBeforeWindow); err != nil {
+			return nil, err
+		}
 	}
 
 	partialHash, err := utils.HashTokenTransaction(partialTxV2Shape, true)

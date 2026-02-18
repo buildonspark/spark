@@ -357,6 +357,13 @@ export interface PartialTokenTransaction {
     | { $case: "createInput"; createInput: TokenCreateInput }
     | undefined;
   partialTokenOutputs: PartialTokenOutput[];
+  /**
+   * Optional client-specified deadline for transaction execution.
+   * If set, the server must reject the transaction if current time > execute_before.
+   * Must be after client_created_timestamp, within a configurable max window,
+   * and truncated to microsecond precision.
+   */
+  executeBefore?: Date | undefined;
 }
 
 export interface FinalTokenTransaction {
@@ -1866,7 +1873,13 @@ export const TokenTransactionMetadata: MessageFns<TokenTransactionMetadata> = {
 };
 
 function createBasePartialTokenTransaction(): PartialTokenTransaction {
-  return { version: 0, tokenTransactionMetadata: undefined, tokenInputs: undefined, partialTokenOutputs: [] };
+  return {
+    version: 0,
+    tokenTransactionMetadata: undefined,
+    tokenInputs: undefined,
+    partialTokenOutputs: [],
+    executeBefore: undefined,
+  };
 }
 
 export const PartialTokenTransaction: MessageFns<PartialTokenTransaction> = {
@@ -1890,6 +1903,9 @@ export const PartialTokenTransaction: MessageFns<PartialTokenTransaction> = {
     }
     for (const v of message.partialTokenOutputs) {
       PartialTokenOutput.encode(v!, writer.uint32(50).fork()).join();
+    }
+    if (message.executeBefore !== undefined) {
+      Timestamp.encode(toTimestamp(message.executeBefore), writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -1952,6 +1968,14 @@ export const PartialTokenTransaction: MessageFns<PartialTokenTransaction> = {
           message.partialTokenOutputs.push(PartialTokenOutput.decode(reader, reader.uint32()));
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.executeBefore = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1977,6 +2001,7 @@ export const PartialTokenTransaction: MessageFns<PartialTokenTransaction> = {
       partialTokenOutputs: globalThis.Array.isArray(object?.partialTokenOutputs)
         ? object.partialTokenOutputs.map((e: any) => PartialTokenOutput.fromJSON(e))
         : [],
+      executeBefore: isSet(object.executeBefore) ? fromJsonTimestamp(object.executeBefore) : undefined,
     };
   },
 
@@ -1997,6 +2022,9 @@ export const PartialTokenTransaction: MessageFns<PartialTokenTransaction> = {
     }
     if (message.partialTokenOutputs?.length) {
       obj.partialTokenOutputs = message.partialTokenOutputs.map((e) => PartialTokenOutput.toJSON(e));
+    }
+    if (message.executeBefore !== undefined) {
+      obj.executeBefore = message.executeBefore.toISOString();
     }
     return obj;
   },
@@ -2041,6 +2069,7 @@ export const PartialTokenTransaction: MessageFns<PartialTokenTransaction> = {
       }
     }
     message.partialTokenOutputs = object.partialTokenOutputs?.map((e) => PartialTokenOutput.fromPartial(e)) || [];
+    message.executeBefore = object.executeBefore ?? undefined;
     return message;
   },
 };

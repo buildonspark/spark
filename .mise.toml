@@ -214,6 +214,13 @@ description = "Clean generated proto files"
 dir = "{{config_root}}"
 run = "make clean"
 
+[tasks.gen-protos-with-ts]
+description = "Generates Go code from protos AND the typescript client changes"
+depends = ["gen-protos"]
+dir = "{{config_root}}/sdks/js/packages/spark-sdk/"
+run = "yarn generate:proto"
+
+
 [settings]
 activate_aggressive = true
 disable_backends = ["asdf"]

@@ -410,6 +410,31 @@ func TestBroadcastTokenTransaction_RejectsPreV3(t *testing.T) {
 	assert.Contains(t, err.Error(), "broadcast transaction requires version 3+")
 }
 
+func TestBroadcastTokenTransaction_RejectsExpiredExecuteBefore(t *testing.T) {
+	setup := setUpPhase2BroadcastTestHandlerPostgres(t)
+	ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())
+
+	issuerPriv, tokenCreate := setup.fixtures.CreateTokenCreateWithIssuer(btcnetwork.Regtest, nil, nil)
+	setup.fixtures.CreateKeyshare()
+
+	partial := setup.buildMintPartial(issuerPriv, tokenCreate)
+	// Set timestamps so execute_before is after client_created but has already passed
+	// client_created: 10 seconds ago, execute_before: 1 second ago (passed but after client_created)
+	now := time.Now().UTC()
+	clientCreatedTs := utils.ToMicrosecondPrecision(now.Add(-10 * time.Second))
+	expiredExecuteBefore := utils.ToMicrosecondPrecision(now.Add(-1 * time.Second))
+	partial.TokenTransactionMetadata.ClientCreatedTimestamp = timestamppb.New(clientCreatedTs)
+	partial.ExecuteBefore = timestamppb.New(expiredExecuteBefore)
+
+	req := setup.signAndBuildRequest(partial, issuerPriv)
+
+	resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Contains(t, err.Error(), "has already passed")
+}
+
 func TestBroadcastTokenTransaction_Phase2_MintSuccess(t *testing.T) {
 	setup := setUpPhase2BroadcastTestHandlerPostgres(t)
 	ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())

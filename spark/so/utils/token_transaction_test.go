@@ -2232,3 +2232,120 @@ func TestHashTokenTransactionTransferV2(t *testing.T) {
 	}
 	assert.Equal(t, want, hash)
 }
+
+func TestValidateExecuteBefore(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	maxWindow := 300 * time.Second
+
+	tests := []struct {
+		name                   string
+		executeBefore          *time.Time
+		clientCreatedTimestamp time.Time
+		maxWindow              time.Duration
+		wantErr                bool
+		errContains            string
+	}{
+		{
+			name:                   "nil execute_before is valid",
+			executeBefore:          nil,
+			clientCreatedTimestamp: now,
+			maxWindow:              maxWindow,
+			wantErr:                false,
+		},
+		{
+			name:                   "valid execute_before within window",
+			executeBefore:          ptr(now.Add(100 * time.Second)),
+			clientCreatedTimestamp: now.Add(-10 * time.Second),
+			maxWindow:              maxWindow,
+			wantErr:                false,
+		},
+		{
+			name:                   "execute_before at max window boundary",
+			executeBefore:          ptr(now.Add(maxWindow)),
+			clientCreatedTimestamp: now,
+			maxWindow:              maxWindow,
+			wantErr:                false,
+		},
+		{
+			name:                   "execute_before 1 microsecond past max window",
+			executeBefore:          ptr(now.Add(maxWindow + time.Microsecond)),
+			clientCreatedTimestamp: now,
+			maxWindow:              maxWindow,
+			wantErr:                true,
+			errContains:            "exceeds max window",
+		},
+		{
+			name:                   "execute_before exceeds max window",
+			executeBefore:          ptr(now.Add(maxWindow + time.Second)),
+			clientCreatedTimestamp: now,
+			maxWindow:              maxWindow,
+			wantErr:                true,
+			errContains:            "exceeds max window",
+		},
+		{
+			name:                   "execute_before before client_created_timestamp",
+			executeBefore:          ptr(now.Add(-10 * time.Second)),
+			clientCreatedTimestamp: now,
+			maxWindow:              maxWindow,
+			wantErr:                true,
+			errContains:            "must be after client_created_timestamp",
+		},
+		{
+			name:                   "execute_before equal to client_created_timestamp",
+			executeBefore:          ptr(now),
+			clientCreatedTimestamp: now,
+			maxWindow:              maxWindow,
+			wantErr:                true,
+			errContains:            "must be after client_created_timestamp",
+		},
+		{
+			name:                   "execute_before 1 microsecond after client_created_timestamp",
+			executeBefore:          ptr(now.Add(100 * time.Second)),
+			clientCreatedTimestamp: now.Add(100*time.Second - time.Microsecond),
+			maxWindow:              maxWindow,
+			wantErr:                false,
+		},
+		{
+			name:                   "zero max window rejects any execute_before",
+			executeBefore:          ptr(now.Add(time.Microsecond)),
+			clientCreatedTimestamp: now,
+			maxWindow:              0,
+			wantErr:                true,
+			errContains:            "exceeds max window",
+		},
+		{
+			name:                   "execute_before has already passed",
+			executeBefore:          ptr(now.Add(-1 * time.Second)),
+			clientCreatedTimestamp: now.Add(-10 * time.Second),
+			maxWindow:              maxWindow,
+			wantErr:                true,
+			errContains:            "has already passed",
+		},
+		{
+			name:                   "execute_before with sub-microsecond precision",
+			executeBefore:          ptr(now.Add(100*time.Second + 123*time.Nanosecond)),
+			clientCreatedTimestamp: now,
+			maxWindow:              maxWindow,
+			wantErr:                true,
+			errContains:            "sub-microsecond precision",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateExecuteBefore(tt.executeBefore, tt.clientCreatedTimestamp, tt.maxWindow)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
+}
