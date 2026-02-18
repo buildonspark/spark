@@ -884,6 +884,8 @@ func init() {
 	// utxo.DefaultID holds the default value on creation for the id field.
 	utxo.DefaultID = utxoDescID.Default.(func() uuid.UUID)
 	utxoswapMixin := schema.UtxoSwap{}.Mixin()
+	utxoswapHooks := schema.UtxoSwap{}.Hooks()
+	utxoswap.Hooks[0] = utxoswapHooks[0]
 	utxoswapMixinFields0 := utxoswapMixin[0].Fields()
 	_ = utxoswapMixinFields0
 	utxoswapFields := schema.UtxoSwap{}.Fields()

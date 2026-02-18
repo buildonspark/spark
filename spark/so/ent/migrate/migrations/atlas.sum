@@ -1,4 +1,4 @@
-h1:Cn8vFTAmRGPAAc5tIoWaj01INLBuqzXTAq9Z1kIyAnU=
+h1:rkBqosmZxNPt5/97Km4u9fYwueX8RuiCQ8YaqYp9QRI=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -124,3 +124,5 @@ h1:Cn8vFTAmRGPAAc5tIoWaj01INLBuqzXTAq9Z1kIyAnU=
 20260211201949_cancel_expired_transfer_indexes.sql.sql h1:jYfUFWrIhtCO6dRaSf41iRIT9Pp9VicCCYEiruc1KGo=
 20260212191458_add_transfer_leaf_edges_sender_and_receiver.sql h1:amANfNQCLULE6a1mycMeoYp+0sCMrCUH4sC1D9Z6r0s=
 20260213000000_add_global_pause_support.sql h1:Ug2WpQw//oKU2jZredWKbP9lDi3pZQMGlJgDpWLTLZ0=
+20260217000000_make_utxo_optional_on_creation.sql h1:LUt0wX1czGhdr8r2Y+Pp+dJU64SNUVs5OfSZG+7pO8k=
+20260217000001_validate_utxo_swap_fk.sql h1:mKcqUuRvGmZROYxD82u+53a8Szy595WajV0bbspH6h8=

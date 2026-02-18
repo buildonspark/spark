@@ -1,6 +1,9 @@
 package schema
 
 import (
+	"context"
+	"fmt"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
@@ -8,7 +11,10 @@ import (
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	gen "github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/hook"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/entexample"
 )
 
@@ -26,6 +32,65 @@ func (UtxoSwap) Mixin() []ent.Mixin {
 func (UtxoSwap) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Edges("utxo").Unique().Annotations(entsql.IndexWhere("status != 'CANCELLED'")),
+	}
+}
+
+func (UtxoSwap) Hooks() []ent.Hook {
+	return []ent.Hook{
+		func(next ent.Mutator) ent.Mutator {
+			return hook.UtxoSwapFunc(func(ctx context.Context, m *gen.UtxoSwapMutation) (ent.Value, error) {
+				isCreate := m.Op().Is(ent.OpCreate)
+				status, hasStatus := m.Status()
+
+				// Require utxo edge when status is being set to COMPLETED.
+				if hasStatus && status == st.UtxoSwapStatusCompleted {
+					if m.UtxoCleared() {
+						return nil, fmt.Errorf("utxo edge is required when status is COMPLETED")
+					}
+					if _, utxoExists := m.UtxoID(); !utxoExists {
+						if isCreate {
+							return nil, fmt.Errorf("utxo edge is required when status is COMPLETED")
+						}
+						swapIDs, err := m.IDs(ctx)
+						if err != nil {
+							return nil, fmt.Errorf("failed to get swap IDs: %w", err)
+						}
+						for _, swapID := range swapIDs {
+							hasUtxo, err := m.Client().UtxoSwap.Query().
+								Where(utxoswap.ID(swapID)).
+								QueryUtxo().
+								Exist(ctx)
+							if err != nil {
+								return nil, fmt.Errorf("failed to check utxo edge: %w", err)
+							}
+							if !hasUtxo {
+								return nil, fmt.Errorf("utxo edge is required when status is COMPLETED")
+							}
+						}
+					}
+				}
+
+				// Prevent clearing utxo on swaps that are already COMPLETED,
+				// even when status is not part of the mutation.
+				if !isCreate && m.UtxoCleared() && !hasStatus {
+					swapIDs, err := m.IDs(ctx)
+					if err != nil {
+						return nil, fmt.Errorf("failed to get swap IDs: %w", err)
+					}
+					for _, swapID := range swapIDs {
+						existing, err := m.Client().UtxoSwap.Get(ctx, swapID)
+						if err != nil {
+							return nil, fmt.Errorf("failed to get swap: %w", err)
+						}
+						if existing.Status == st.UtxoSwapStatusCompleted {
+							return nil, fmt.Errorf("utxo edge is required when status is COMPLETED")
+						}
+					}
+				}
+
+				return next.Mutate(ctx, m)
+			})
+		},
 	}
 }
 
@@ -100,7 +165,7 @@ func (UtxoSwap) Fields() []ent.Field {
 func (UtxoSwap) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("utxo", Utxo.Type).
-			Unique().Required().Immutable(),
+			Unique(),
 		edge.To("transfer", Transfer.Type).
 			Unique(),
 		edge.To("secondary_transfer", Transfer.Type).

@@ -216,6 +216,14 @@ func (usc *UtxoSwapCreate) SetUtxoID(id uuid.UUID) *UtxoSwapCreate {
 	return usc
 }
 
+// SetNillableUtxoID sets the "utxo" edge to the Utxo entity by ID if the given value is not nil.
+func (usc *UtxoSwapCreate) SetNillableUtxoID(id *uuid.UUID) *UtxoSwapCreate {
+	if id != nil {
+		usc = usc.SetUtxoID(*id)
+	}
+	return usc
+}
+
 // SetUtxo sets the "utxo" edge to the Utxo entity.
 func (usc *UtxoSwapCreate) SetUtxo(u *Utxo) *UtxoSwapCreate {
 	return usc.SetUtxoID(u.ID)
@@ -266,7 +274,9 @@ func (usc *UtxoSwapCreate) Mutation() *UtxoSwapMutation {
 
 // Save creates the UtxoSwap in the database.
 func (usc *UtxoSwapCreate) Save(ctx context.Context) (*UtxoSwap, error) {
-	usc.defaults()
+	if err := usc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, usc.sqlSave, usc.mutation, usc.hooks)
 }
 
@@ -293,19 +303,29 @@ func (usc *UtxoSwapCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (usc *UtxoSwapCreate) defaults() {
+func (usc *UtxoSwapCreate) defaults() error {
 	if _, ok := usc.mutation.CreateTime(); !ok {
+		if utxoswap.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized utxoswap.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := utxoswap.DefaultCreateTime()
 		usc.mutation.SetCreateTime(v)
 	}
 	if _, ok := usc.mutation.UpdateTime(); !ok {
+		if utxoswap.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized utxoswap.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := utxoswap.DefaultUpdateTime()
 		usc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := usc.mutation.ID(); !ok {
+		if utxoswap.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized utxoswap.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := utxoswap.DefaultID()
 		usc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -337,9 +357,6 @@ func (usc *UtxoSwapCreate) check() error {
 	}
 	if _, ok := usc.mutation.UtxoValueSats(); !ok {
 		return &ValidationError{Name: "utxo_value_sats", err: errors.New(`ent: missing required field "UtxoSwap.utxo_value_sats"`)}
-	}
-	if len(usc.mutation.UtxoIDs()) == 0 {
-		return &ValidationError{Name: "utxo", err: errors.New(`ent: missing required edge "UtxoSwap.utxo"`)}
 	}
 	return nil
 }

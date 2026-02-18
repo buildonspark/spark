@@ -554,6 +554,8 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						// Only try to auto complete utxo swaps older than 300 seconds
 						// allowing the core flow to complete the utxo swap first.
 						Where(utxoswap.CreateTimeLT(time.Now().Add(-5 * time.Minute))).
+						// Do not complete instant utxo swaps, these will be completed by another task.
+						Where(utxoswap.RequestTypeNEQ(st.UtxoSwapRequestTypeInstant)).
 						Order(utxoswap.ByCreateTime(sql.OrderDesc())).
 						Limit(100)
 
@@ -584,6 +586,10 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 
 							utxo, err := utxoSwap.QueryUtxo().Only(ctx)
 							if err != nil {
+								if ent.IsNotFound(err) {
+									logger.Sugar().Debugf("No utxo found for utxo swap %s, skipping", utxoSwap.ID)
+									continue
+								}
 								return fmt.Errorf("unable to get utxo: %w", err)
 							}
 							protoNetwork, err := utxo.Network.MarshalProto()

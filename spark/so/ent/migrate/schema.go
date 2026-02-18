@@ -1549,7 +1549,7 @@ var (
 		{Name: "expiry_time", Type: field.TypeTime, Nullable: true},
 		{Name: "utxo_value_sats", Type: field.TypeUint64},
 		{Name: "deposit_address_utxoswaps", Type: field.TypeUUID, Nullable: true},
-		{Name: "utxo_swap_utxo", Type: field.TypeUUID},
+		{Name: "utxo_swap_utxo", Type: field.TypeUUID, Nullable: true},
 		{Name: "utxo_swap_transfer", Type: field.TypeUUID, Nullable: true},
 		{Name: "utxo_swap_secondary_transfer", Type: field.TypeUUID, Nullable: true},
 	}
@@ -1569,7 +1569,7 @@ var (
 				Symbol:     "utxo_swaps_utxos_utxo",
 				Columns:    []*schema.Column{UtxoSwapsColumns[18]},
 				RefColumns: []*schema.Column{UtxosColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "utxo_swaps_transfers_transfer",

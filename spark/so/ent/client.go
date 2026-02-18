@@ -6282,7 +6282,8 @@ func (c *UtxoSwapClient) QuerySecondaryTransfer(us *UtxoSwap) *TransferQuery {
 
 // Hooks returns the client hooks.
 func (c *UtxoSwapClient) Hooks() []Hook {
-	return c.hooks.UtxoSwap
+	hooks := c.hooks.UtxoSwap
+	return append(hooks[:len(hooks):len(hooks)], utxoswap.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.

@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
 
@@ -299,6 +300,25 @@ func (usu *UtxoSwapUpdate) AddUtxoValueSats(u int64) *UtxoSwapUpdate {
 	return usu
 }
 
+// SetUtxoID sets the "utxo" edge to the Utxo entity by ID.
+func (usu *UtxoSwapUpdate) SetUtxoID(id uuid.UUID) *UtxoSwapUpdate {
+	usu.mutation.SetUtxoID(id)
+	return usu
+}
+
+// SetNillableUtxoID sets the "utxo" edge to the Utxo entity by ID if the given value is not nil.
+func (usu *UtxoSwapUpdate) SetNillableUtxoID(id *uuid.UUID) *UtxoSwapUpdate {
+	if id != nil {
+		usu = usu.SetUtxoID(*id)
+	}
+	return usu
+}
+
+// SetUtxo sets the "utxo" edge to the Utxo entity.
+func (usu *UtxoSwapUpdate) SetUtxo(u *Utxo) *UtxoSwapUpdate {
+	return usu.SetUtxoID(u.ID)
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by ID.
 func (usu *UtxoSwapUpdate) SetTransferID(id uuid.UUID) *UtxoSwapUpdate {
 	usu.mutation.SetTransferID(id)
@@ -342,6 +362,12 @@ func (usu *UtxoSwapUpdate) Mutation() *UtxoSwapMutation {
 	return usu.mutation
 }
 
+// ClearUtxo clears the "utxo" edge to the Utxo entity.
+func (usu *UtxoSwapUpdate) ClearUtxo() *UtxoSwapUpdate {
+	usu.mutation.ClearUtxo()
+	return usu
+}
+
 // ClearTransfer clears the "transfer" edge to the Transfer entity.
 func (usu *UtxoSwapUpdate) ClearTransfer() *UtxoSwapUpdate {
 	usu.mutation.ClearTransfer()
@@ -356,7 +382,9 @@ func (usu *UtxoSwapUpdate) ClearSecondaryTransfer() *UtxoSwapUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (usu *UtxoSwapUpdate) Save(ctx context.Context) (int, error) {
-	usu.defaults()
+	if err := usu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, usu.sqlSave, usu.mutation, usu.hooks)
 }
 
@@ -383,11 +411,15 @@ func (usu *UtxoSwapUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (usu *UtxoSwapUpdate) defaults() {
+func (usu *UtxoSwapUpdate) defaults() error {
 	if _, ok := usu.mutation.UpdateTime(); !ok {
+		if utxoswap.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized utxoswap.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := utxoswap.UpdateDefaultUpdateTime()
 		usu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -401,9 +433,6 @@ func (usu *UtxoSwapUpdate) check() error {
 		if err := utxoswap.RequestTypeValidator(v); err != nil {
 			return &ValidationError{Name: "request_type", err: fmt.Errorf(`ent: validator failed for field "UtxoSwap.request_type": %w`, err)}
 		}
-	}
-	if usu.mutation.UtxoCleared() && len(usu.mutation.UtxoIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "UtxoSwap.utxo"`)
 	}
 	return nil
 }
@@ -512,6 +541,35 @@ func (usu *UtxoSwapUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := usu.mutation.AddedUtxoValueSats(); ok {
 		_spec.AddField(utxoswap.FieldUtxoValueSats, field.TypeUint64, value)
+	}
+	if usu.mutation.UtxoCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   utxoswap.UtxoTable,
+			Columns: []string{utxoswap.UtxoColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := usu.mutation.UtxoIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   utxoswap.UtxoTable,
+			Columns: []string{utxoswap.UtxoColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if usu.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -859,6 +917,25 @@ func (usuo *UtxoSwapUpdateOne) AddUtxoValueSats(u int64) *UtxoSwapUpdateOne {
 	return usuo
 }
 
+// SetUtxoID sets the "utxo" edge to the Utxo entity by ID.
+func (usuo *UtxoSwapUpdateOne) SetUtxoID(id uuid.UUID) *UtxoSwapUpdateOne {
+	usuo.mutation.SetUtxoID(id)
+	return usuo
+}
+
+// SetNillableUtxoID sets the "utxo" edge to the Utxo entity by ID if the given value is not nil.
+func (usuo *UtxoSwapUpdateOne) SetNillableUtxoID(id *uuid.UUID) *UtxoSwapUpdateOne {
+	if id != nil {
+		usuo = usuo.SetUtxoID(*id)
+	}
+	return usuo
+}
+
+// SetUtxo sets the "utxo" edge to the Utxo entity.
+func (usuo *UtxoSwapUpdateOne) SetUtxo(u *Utxo) *UtxoSwapUpdateOne {
+	return usuo.SetUtxoID(u.ID)
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by ID.
 func (usuo *UtxoSwapUpdateOne) SetTransferID(id uuid.UUID) *UtxoSwapUpdateOne {
 	usuo.mutation.SetTransferID(id)
@@ -902,6 +979,12 @@ func (usuo *UtxoSwapUpdateOne) Mutation() *UtxoSwapMutation {
 	return usuo.mutation
 }
 
+// ClearUtxo clears the "utxo" edge to the Utxo entity.
+func (usuo *UtxoSwapUpdateOne) ClearUtxo() *UtxoSwapUpdateOne {
+	usuo.mutation.ClearUtxo()
+	return usuo
+}
+
 // ClearTransfer clears the "transfer" edge to the Transfer entity.
 func (usuo *UtxoSwapUpdateOne) ClearTransfer() *UtxoSwapUpdateOne {
 	usuo.mutation.ClearTransfer()
@@ -929,7 +1012,9 @@ func (usuo *UtxoSwapUpdateOne) Select(field string, fields ...string) *UtxoSwapU
 
 // Save executes the query and returns the updated UtxoSwap entity.
 func (usuo *UtxoSwapUpdateOne) Save(ctx context.Context) (*UtxoSwap, error) {
-	usuo.defaults()
+	if err := usuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, usuo.sqlSave, usuo.mutation, usuo.hooks)
 }
 
@@ -956,11 +1041,15 @@ func (usuo *UtxoSwapUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (usuo *UtxoSwapUpdateOne) defaults() {
+func (usuo *UtxoSwapUpdateOne) defaults() error {
 	if _, ok := usuo.mutation.UpdateTime(); !ok {
+		if utxoswap.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized utxoswap.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := utxoswap.UpdateDefaultUpdateTime()
 		usuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -974,9 +1063,6 @@ func (usuo *UtxoSwapUpdateOne) check() error {
 		if err := utxoswap.RequestTypeValidator(v); err != nil {
 			return &ValidationError{Name: "request_type", err: fmt.Errorf(`ent: validator failed for field "UtxoSwap.request_type": %w`, err)}
 		}
-	}
-	if usuo.mutation.UtxoCleared() && len(usuo.mutation.UtxoIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "UtxoSwap.utxo"`)
 	}
 	return nil
 }
@@ -1102,6 +1188,35 @@ func (usuo *UtxoSwapUpdateOne) sqlSave(ctx context.Context) (_node *UtxoSwap, er
 	}
 	if value, ok := usuo.mutation.AddedUtxoValueSats(); ok {
 		_spec.AddField(utxoswap.FieldUtxoValueSats, field.TypeUint64, value)
+	}
+	if usuo.mutation.UtxoCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   utxoswap.UtxoTable,
+			Columns: []string{utxoswap.UtxoColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := usuo.mutation.UtxoIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   utxoswap.UtxoTable,
+			Columns: []string{utxoswap.UtxoColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if usuo.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{

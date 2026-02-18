@@ -7078,11 +7078,6 @@ func (us *UtxoSwapExample) MustExec(ctx context.Context) *ent.UtxoSwap {
 	// Handle edges
 	if us.Utxo != nil {
 		create.SetUtxo(us.Utxo)
-	} else {
-		// Auto-create required edge
-		us.t.Helper()
-		us.Utxo = NewUtxoExample(us.t, us.client).MustExec(ctx)
-		create.SetUtxo(us.Utxo)
 	}
 	if us.Transfer != nil {
 		create.SetTransfer(us.Transfer)
@@ -7193,14 +7188,6 @@ func (us *UtxoSwapExample) Exec(ctx context.Context) (*ent.UtxoSwap, error) {
 
 	// Handle edges
 	if us.Utxo != nil {
-		create.SetUtxo(us.Utxo)
-	} else {
-		// Auto-create required edge
-		var err error
-		us.Utxo, err = NewUtxoExample(us.t, us.client).Exec(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create utxo: %w", err)
-		}
 		create.SetUtxo(us.Utxo)
 	}
 	if us.Transfer != nil {
