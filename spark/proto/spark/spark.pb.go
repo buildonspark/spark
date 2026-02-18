@@ -6477,7 +6477,6 @@ type StorePreimageShareV2Request struct {
 	Threshold               uint32            `protobuf:"varint,3,opt,name=threshold,proto3" json:"threshold,omitempty"`
 	InvoiceString           string            `protobuf:"bytes,4,opt,name=invoice_string,json=invoiceString,proto3" json:"invoice_string,omitempty"`
 	UserIdentityPublicKey   []byte            `protobuf:"bytes,5,opt,name=user_identity_public_key,json=userIdentityPublicKey,proto3" json:"user_identity_public_key,omitempty"`
-	UserSignature           []byte            `protobuf:"bytes,6,opt,name=user_signature,json=userSignature,proto3" json:"user_signature,omitempty"`
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -6543,13 +6542,6 @@ func (x *StorePreimageShareV2Request) GetInvoiceString() string {
 func (x *StorePreimageShareV2Request) GetUserIdentityPublicKey() []byte {
 	if x != nil {
 		return x.UserIdentityPublicKey
-	}
-	return nil
-}
-
-func (x *StorePreimageShareV2Request) GetUserSignature() []byte {
-	if x != nil {
-		return x.UserSignature
 	}
 	return nil
 }
@@ -12182,17 +12174,16 @@ const file_spark_proto_rawDesc = "" +
 	"\x0epreimage_share\x18\x02 \x01(\v2\x12.spark.SecretShareR\rpreimageShare\x12\x1c\n" +
 	"\tthreshold\x18\x03 \x01(\rR\tthreshold\x12%\n" +
 	"\x0einvoice_string\x18\x04 \x01(\tR\rinvoiceString\x127\n" +
-	"\x18user_identity_public_key\x18\x05 \x01(\fR\x15userIdentityPublicKey\"\xae\x03\n" +
+	"\x18user_identity_public_key\x18\x05 \x01(\fR\x15userIdentityPublicKey\"\x9d\x03\n" +
 	"\x1bStorePreimageShareV2Request\x12!\n" +
 	"\fpayment_hash\x18\x01 \x01(\fR\vpaymentHash\x12{\n" +
 	"\x19encrypted_preimage_shares\x18\x02 \x03(\v2?.spark.StorePreimageShareV2Request.EncryptedPreimageSharesEntryR\x17encryptedPreimageShares\x12\x1c\n" +
 	"\tthreshold\x18\x03 \x01(\rR\tthreshold\x12%\n" +
 	"\x0einvoice_string\x18\x04 \x01(\tR\rinvoiceString\x127\n" +
-	"\x18user_identity_public_key\x18\x05 \x01(\fR\x15userIdentityPublicKey\x12%\n" +
-	"\x0euser_signature\x18\x06 \x01(\fR\ruserSignature\x1aJ\n" +
+	"\x18user_identity_public_key\x18\x05 \x01(\fR\x15userIdentityPublicKey\x1aJ\n" +
 	"\x1cEncryptedPreimageSharesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\x81\x02\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01J\x04\b\x06\x10\aR\x0euser_signature\"\x81\x02\n" +
 	"\x1bRequestedSigningCommitments\x12{\n" +
 	"\x19signing_nonce_commitments\x18\x01 \x03(\v2?.spark.RequestedSigningCommitments.SigningNonceCommitmentsEntryR\x17signingNonceCommitments\x1ae\n" +
 	"\x1cSigningNonceCommitmentsEntry\x12\x10\n" +

@@ -1021,7 +1021,8 @@ message StorePreimageShareV2Request {
     uint32 threshold = 3;
     string invoice_string = 4;
     bytes user_identity_public_key = 5;
-    bytes user_signature = 6;
+    reserved 6;
+    reserved "user_signature";
 }
 
 message RequestedSigningCommitments {

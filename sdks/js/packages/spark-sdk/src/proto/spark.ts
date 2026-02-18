@@ -1591,7 +1591,6 @@ export interface StorePreimageShareV2Request {
   threshold: number;
   invoiceString: string;
   userIdentityPublicKey: Uint8Array;
-  userSignature: Uint8Array;
 }
 
 export interface StorePreimageShareV2Request_EncryptedPreimageSharesEntry {
@@ -12410,7 +12409,6 @@ function createBaseStorePreimageShareV2Request(): StorePreimageShareV2Request {
     threshold: 0,
     invoiceString: "",
     userIdentityPublicKey: new Uint8Array(0),
-    userSignature: new Uint8Array(0),
   };
 }
 
@@ -12433,9 +12431,6 @@ export const StorePreimageShareV2Request: MessageFns<StorePreimageShareV2Request
     }
     if (message.userIdentityPublicKey.length !== 0) {
       writer.uint32(42).bytes(message.userIdentityPublicKey);
-    }
-    if (message.userSignature.length !== 0) {
-      writer.uint32(50).bytes(message.userSignature);
     }
     return writer;
   },
@@ -12490,14 +12485,6 @@ export const StorePreimageShareV2Request: MessageFns<StorePreimageShareV2Request
           message.userIdentityPublicKey = reader.bytes();
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.userSignature = reader.bytes();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -12521,7 +12508,6 @@ export const StorePreimageShareV2Request: MessageFns<StorePreimageShareV2Request
       userIdentityPublicKey: isSet(object.userIdentityPublicKey)
         ? bytesFromBase64(object.userIdentityPublicKey)
         : new Uint8Array(0),
-      userSignature: isSet(object.userSignature) ? bytesFromBase64(object.userSignature) : new Uint8Array(0),
     };
   },
 
@@ -12548,9 +12534,6 @@ export const StorePreimageShareV2Request: MessageFns<StorePreimageShareV2Request
     if (message.userIdentityPublicKey.length !== 0) {
       obj.userIdentityPublicKey = base64FromBytes(message.userIdentityPublicKey);
     }
-    if (message.userSignature.length !== 0) {
-      obj.userSignature = base64FromBytes(message.userSignature);
-    }
     return obj;
   },
 
@@ -12571,7 +12554,6 @@ export const StorePreimageShareV2Request: MessageFns<StorePreimageShareV2Request
     message.threshold = object.threshold ?? 0;
     message.invoiceString = object.invoiceString ?? "";
     message.userIdentityPublicKey = object.userIdentityPublicKey ?? new Uint8Array(0);
-    message.userSignature = object.userSignature ?? new Uint8Array(0);
     return message;
   },
 };

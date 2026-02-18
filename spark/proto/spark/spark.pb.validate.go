@@ -12839,8 +12839,6 @@ func (m *StorePreimageShareV2Request) validate(all bool) error {
 
 	// no validation rules for UserIdentityPublicKey
 
-	// no validation rules for UserSignature
-
 	if len(errors) > 0 {
 		return StorePreimageShareV2RequestMultiError(errors)
 	}
