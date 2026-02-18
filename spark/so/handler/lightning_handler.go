@@ -68,10 +68,10 @@ func NewLightningHandler(config *so.Config) *LightningHandler {
 // StorePreimageShare stores the preimage share for the given payment hash.
 func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.StorePreimageShareRequest) error {
 	if req.PreimageShare == nil {
-		return fmt.Errorf("preimage share is nil")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("preimage share is nil"))
 	}
 	if len(req.PreimageShare.Proofs) == 0 {
-		return fmt.Errorf("preimage share proofs is empty")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("preimage share proofs is empty"))
 	}
 
 	err := secretsharing.ValidateShare(
@@ -86,21 +86,21 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("unable to validate share: %w", err)
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate share: %w", err))
 	}
 
 	bolt11, err := decodepay.Decodepay(req.InvoiceString)
 	if err != nil {
-		return fmt.Errorf("unable to decode invoice: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode invoice: %w", err))
 	}
 
 	paymentHash, err := hex.DecodeString(bolt11.PaymentHash)
 	if err != nil {
-		return fmt.Errorf("unable to decode payment hash: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode payment hash: %w", err))
 	}
 
 	if !bytes.Equal(paymentHash, req.PaymentHash) {
-		return fmt.Errorf("payment hash mismatch")
+		return sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("payment hash mismatch"))
 	}
 
 	tx, err := ent.GetDbFromContext(ctx)
@@ -109,7 +109,7 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 	}
 	userIdentityPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
 	if err != nil {
-		return fmt.Errorf("unable to parse user identity public key: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse user identity public key: %w", err))
 	}
 	_, err = tx.PreimageShare.Create().
 		SetPaymentHash(req.PaymentHash).
@@ -161,26 +161,26 @@ func (h *LightningHandler) StorePreimageShareInternal(ctx context.Context, req *
 func (h *LightningHandler) decryptAndStorePreimageShare(ctx context.Context, req *pbspark.StorePreimageShareV2Request) error {
 	ciphertext, ok := req.EncryptedPreimageShares[h.config.Identifier]
 	if !ok {
-		return fmt.Errorf("no encrypted preimage share found for SO %s", h.config.Identifier)
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no encrypted preimage share found for SO %s", h.config.Identifier))
 	}
 
 	decryptionPrivateKey := eciesgo.NewPrivateKeyFromBytes(h.config.IdentityPrivateKey.Serialize())
 	plaintext, err := eciesgo.Decrypt(decryptionPrivateKey, ciphertext)
 	if err != nil {
-		return fmt.Errorf("failed to decrypt preimage share: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decrypt preimage share: %w", err))
 	}
 
 	secretShare := &pbspark.SecretShare{}
 	if err := proto.Unmarshal(plaintext, secretShare); err != nil {
-		return fmt.Errorf("failed to unmarshal preimage share: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to unmarshal preimage share: %w", err))
 	}
 
 	if len(secretShare.Proofs) == 0 {
-		return fmt.Errorf("preimage share proofs is empty")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("preimage share proofs is empty"))
 	}
 
 	if uint64(req.Threshold) != h.config.Threshold {
-		return fmt.Errorf("threshold mismatch: expected %d, got %d", h.config.Threshold, req.Threshold)
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("threshold mismatch: expected %d, got %d", h.config.Threshold, req.Threshold))
 	}
 
 	err = secretsharing.ValidateShare(
@@ -195,21 +195,21 @@ func (h *LightningHandler) decryptAndStorePreimageShare(ctx context.Context, req
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("unable to validate share: %w", err)
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate share: %w", err))
 	}
 
 	bolt11, err := decodepay.Decodepay(req.InvoiceString)
 	if err != nil {
-		return fmt.Errorf("unable to decode invoice: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode invoice: %w", err))
 	}
 
 	paymentHash, err := hex.DecodeString(bolt11.PaymentHash)
 	if err != nil {
-		return fmt.Errorf("unable to decode payment hash: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode payment hash: %w", err))
 	}
 
 	if !bytes.Equal(paymentHash, req.PaymentHash) {
-		return fmt.Errorf("payment hash mismatch")
+		return sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("payment hash mismatch"))
 	}
 
 	tx, err := ent.GetDbFromContext(ctx)
@@ -218,7 +218,7 @@ func (h *LightningHandler) decryptAndStorePreimageShare(ctx context.Context, req
 	}
 	userIdentityPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
 	if err != nil {
-		return fmt.Errorf("unable to parse user identity public key: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse user identity public key: %w", err))
 	}
 	err = tx.PreimageShare.Create().
 		SetPaymentHash(req.PaymentHash).
@@ -282,25 +282,25 @@ func (h *LightningHandler) ValidateDuplicateLeaves(
 	directFromCpfpLeavesMap := make(map[string]bool)
 	for _, leaf := range leavesToSend {
 		if leavesMap[leaf.LeafId] {
-			return fmt.Errorf("duplicate leaf id: %s", leaf.LeafId)
+			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", leaf.LeafId))
 		}
 		leavesMap[leaf.LeafId] = true
 	}
 	for _, leaf := range directLeavesToSend {
 		if directLeavesMap[leaf.LeafId] {
-			return fmt.Errorf("duplicate leaf id: %s", leaf.LeafId)
+			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", leaf.LeafId))
 		}
 		if !leavesMap[leaf.LeafId] {
-			return fmt.Errorf("leaf id %s not found in leaves to send", leaf.LeafId)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("leaf id %s not found in leaves to send", leaf.LeafId))
 		}
 		directLeavesMap[leaf.LeafId] = true
 	}
 	for _, leaf := range directFromCpfpLeavesToSend {
 		if directFromCpfpLeavesMap[leaf.LeafId] {
-			return fmt.Errorf("duplicate leaf id: %s", leaf.LeafId)
+			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", leaf.LeafId))
 		}
 		if !leavesMap[leaf.LeafId] {
-			return fmt.Errorf("leaf id %s not found in leaves to send", leaf.LeafId)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("leaf id %s not found in leaves to send", leaf.LeafId))
 		}
 		directFromCpfpLeavesMap[leaf.LeafId] = true
 	}
@@ -366,18 +366,18 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 ) error {
 	// Validate input parameters
 	if len(paymentHash) != 32 {
-		return fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(paymentHash))
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(paymentHash)))
 	}
 
 	if len(cpfpTransactions) == 0 && len(directTransactions) == 0 && len(directFromCpfpTransactions) == 0 {
-		return fmt.Errorf("at least one transaction type must be provided")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one transaction type must be provided"))
 	}
 
 	// Validate transaction limits to prevent DoS
 	maxTransactionsPerRequest := int(knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoMaxTransactionsPerRequest, 100))
 	totalTransactions := len(cpfpTransactions) + len(directTransactions) + len(directFromCpfpTransactions)
 	if totalTransactions > maxTransactionsPerRequest {
-		return fmt.Errorf("too many transactions: %d, maximum allowed: %d", totalTransactions, maxTransactionsPerRequest)
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("too many transactions: %d, maximum allowed: %d", totalTransactions, maxTransactionsPerRequest))
 	}
 
 	// Step 0 Validate that there's no existing preimage request for this payment hash
@@ -416,35 +416,35 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		cpfpTransaction := cpfpTransactions[i]
 
 		if cpfpTransaction == nil {
-			return fmt.Errorf("cpfp transaction is nil")
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("cpfp transaction is nil"))
 		}
 
 		// Validate leaf ID format
 		if len(cpfpTransaction.LeafId) == 0 {
-			return fmt.Errorf("leaf ID cannot be empty")
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaf ID cannot be empty"))
 		}
 
 		nodeID, err := uuid.Parse(cpfpTransaction.LeafId)
 		if err != nil {
-			return fmt.Errorf("unable to parse node id: %w", err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse node id: %w", err))
 		}
 
 		if cpfpTransaction.SigningCommitments == nil {
-			return fmt.Errorf("signing commitments is nil for cpfpTransaction, leaf_id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("signing commitments is nil for cpfpTransaction, leaf_id: %s", nodeID))
 		}
 
 		if cpfpTransaction.SigningNonceCommitment == nil {
-			return fmt.Errorf("signing nonce commitment is nil for cpfpTransaction, leaf_id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("signing nonce commitment is nil for cpfpTransaction, leaf_id: %s", nodeID))
 		}
 
 		// Validate raw transaction data
 		if len(cpfpTransaction.RawTx) == 0 {
-			return fmt.Errorf("raw transaction data cannot be empty for cpfpTransaction, leaf_id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("raw transaction data cannot be empty for cpfpTransaction, leaf_id: %s", nodeID))
 		}
 
 		const MaxTransactionSize = 100000 // 100KB limit for individual transactions
 		if len(cpfpTransaction.RawTx) > MaxTransactionSize {
-			return fmt.Errorf("raw transaction too large: %d bytes, maximum allowed: %d bytes for leaf_id: %s", len(cpfpTransaction.RawTx), MaxTransactionSize, nodeID)
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("raw transaction too large: %d bytes, maximum allowed: %d bytes for leaf_id: %s", len(cpfpTransaction.RawTx), MaxTransactionSize, nodeID))
 		}
 
 		node, err := tx.TreeNode.Query().Where(treenode.IDEQ(nodeID)).ForUpdate().Only(ctx)
@@ -453,7 +453,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		}
 		nodes = append(nodes, node)
 		if node.Status != st.TreeNodeStatusAvailable {
-			return fmt.Errorf("node %v is not available: %v", node.ID, node.Status)
+			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("node %v is not available: %v", node.ID, node.Status))
 		}
 		cpfpTx, err := common.TxFromRawTxBytes(node.RawTx)
 		if err != nil {
@@ -461,28 +461,28 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		}
 
 		if err := common.ValidateBitcoinTxVersion(cpfpTx); err != nil {
-			return fmt.Errorf("cpfpTx version validation failed for tree_node id: %s: %w", nodeID, err)
+			return sparkerrors.InternalDataInconsistency(fmt.Errorf("cpfpTx version validation failed for tree_node id: %s: %w", nodeID, err))
 		}
 
 		cpfpRefundTx, err := common.TxFromRawTxBytes(cpfpTransaction.RawTx)
 		if err != nil {
-			return fmt.Errorf("unable to get cpfp refund tx for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get cpfp refund tx for cpfpTransaction, tree_node id: %s: %w", nodeID, err))
 		}
 
 		if err := common.ValidateBitcoinTxVersion(cpfpRefundTx); err != nil {
-			return fmt.Errorf("cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err))
 		}
 
 		if len(cpfpRefundTx.TxIn) == 0 {
-			return fmt.Errorf("cpfp refund tx has no inputs for tree_node id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cpfp refund tx has no inputs for tree_node id: %s", nodeID))
 		}
 		expectedCpfpOutpoint := wire.OutPoint{Hash: cpfpTx.TxHash(), Index: 0}
 		if cpfpRefundTx.TxIn[0].PreviousOutPoint != expectedCpfpOutpoint {
-			return fmt.Errorf("cpfp refund tx must spend from cpfp tx for tree_node id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cpfp refund tx must spend from cpfp tx for tree_node id: %s", nodeID))
 		}
 
 		if len(cpfpTx.TxOut) == 0 {
-			return fmt.Errorf("cpfpTx vout out of bounds for cpfpTransaction, tree_node id: %s", nodeID)
+			return sparkerrors.InternalDataInconsistency(fmt.Errorf("cpfpTx vout out of bounds for cpfpTransaction, tree_node id: %s", nodeID))
 		}
 		cpfpSighash, err := common.SigHashFromTx(cpfpRefundTx, 0, cpfpTx.TxOut[0])
 		if err != nil {
@@ -498,7 +498,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			UserCommitments: cpfpTransaction.SigningNonceCommitment,
 		})
 		if err != nil {
-			return fmt.Errorf("unable to validate cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(cpfpSighash), node.OwnerSigningPubkey)
+			return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(cpfpSighash), node.OwnerSigningPubkey))
 		}
 	}
 
@@ -507,20 +507,20 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		directTransaction := directTransactions[i]
 
 		if directTransaction == nil {
-			return fmt.Errorf("direct transaction is nil")
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("direct transaction is nil"))
 		}
 
 		nodeID, err := uuid.Parse(directTransaction.LeafId)
 		if err != nil {
-			return fmt.Errorf("unable to parse node id: %w", err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse node id: %w", err))
 		}
 
 		if directTransaction.SigningCommitments == nil {
-			return fmt.Errorf("signing commitments is nil for directTransaction, leaf_id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("signing commitments is nil for directTransaction, leaf_id: %s", nodeID))
 		}
 
 		if directTransaction.SigningNonceCommitment == nil {
-			return fmt.Errorf("signing nonce commitment is nil for directTransaction, leaf_id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("signing nonce commitment is nil for directTransaction, leaf_id: %s", nodeID))
 		}
 
 		node, err := tx.TreeNode.Get(ctx, nodeID)
@@ -534,28 +534,28 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		}
 
 		if err := common.ValidateBitcoinTxVersion(directTx); err != nil {
-			return fmt.Errorf("directTx version validation failed for tree_node id: %s: %w", nodeID, err)
+			return sparkerrors.InternalDataInconsistency(fmt.Errorf("directTx version validation failed for tree_node id: %s: %w", nodeID, err))
 		}
 
 		directRefundTx, err := common.TxFromRawTxBytes(directTransaction.RawTx)
 		if err != nil {
-			return fmt.Errorf("unable to get direct refund tx for directTransaction, tree_node id: %s: %w", nodeID, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get direct refund tx for directTransaction, tree_node id: %s: %w", nodeID, err))
 		}
 
 		if err := common.ValidateBitcoinTxVersion(directRefundTx); err != nil {
-			return fmt.Errorf("direct refund tx version validation failed for tree_node id: %s: %w", nodeID, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx version validation failed for tree_node id: %s: %w", nodeID, err))
 		}
 
 		if len(directRefundTx.TxIn) == 0 {
-			return fmt.Errorf("direct refund tx has no inputs for tree_node id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx has no inputs for tree_node id: %s", nodeID))
 		}
 		expectedDirectOutpoint := wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
 		if directRefundTx.TxIn[0].PreviousOutPoint != expectedDirectOutpoint {
-			return fmt.Errorf("direct refund tx must spend from direct tx for tree_node id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx must spend from direct tx for tree_node id: %s", nodeID))
 		}
 
 		if len(directTx.TxOut) == 0 {
-			return fmt.Errorf("direct tx vout out of bounds for directTransaction, tree_node id: %s", nodeID)
+			return sparkerrors.InternalDataInconsistency(fmt.Errorf("direct tx vout out of bounds for directTransaction, tree_node id: %s", nodeID))
 		}
 		directSighash, err := common.SigHashFromTx(directRefundTx, 0, directTx.TxOut[0])
 		if err != nil {
@@ -572,7 +572,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			UserCommitments: directTransaction.SigningNonceCommitment,
 		})
 		if err != nil {
-			return fmt.Errorf("unable to validate direct signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(directSighash), node.OwnerSigningPubkey)
+			return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(directSighash), node.OwnerSigningPubkey))
 		}
 	}
 
@@ -580,20 +580,20 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	for i := range directFromCpfpTransactions {
 		directFromCpfpTransaction := directFromCpfpTransactions[i]
 		if directFromCpfpTransaction == nil {
-			return fmt.Errorf("direct from cpfp transaction is nil")
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("direct from cpfp transaction is nil"))
 		}
 
 		nodeID, err := uuid.Parse(directFromCpfpTransaction.LeafId)
 		if err != nil {
-			return fmt.Errorf("unable to parse node id for directFromCpfpTransaction: %w", err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse node id for directFromCpfpTransaction: %w", err))
 		}
 
 		if directFromCpfpTransaction.SigningCommitments == nil {
-			return fmt.Errorf("signing commitments is nil for directFromCpfpTransaction, leaf_id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("signing commitments is nil for directFromCpfpTransaction, leaf_id: %s", nodeID))
 		}
 
 		if directFromCpfpTransaction.SigningNonceCommitment == nil {
-			return fmt.Errorf("signing nonce commitment is nil for directFromCpfpTransaction, leaf_id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("signing nonce commitment is nil for directFromCpfpTransaction, leaf_id: %s", nodeID))
 		}
 
 		node, err := tx.TreeNode.Get(ctx, nodeID)
@@ -607,28 +607,28 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		}
 
 		if err := common.ValidateBitcoinTxVersion(cpfpTx); err != nil {
-			return fmt.Errorf("cpfpTx version validation failed for directFromCpfpTransaction, tree_node id: %s: %w", nodeID, err)
+			return sparkerrors.InternalDataInconsistency(fmt.Errorf("cpfpTx version validation failed for directFromCpfpTransaction, tree_node id: %s: %w", nodeID, err))
 		}
 
 		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpTransaction.RawTx)
 		if err != nil {
-			return fmt.Errorf("unable to get direct from cpfp refund tx for directFromCpfpTransaction, tree_node id: %s: %w", nodeID, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get direct from cpfp refund tx for directFromCpfpTransaction, tree_node id: %s: %w", nodeID, err))
 		}
 
 		if err := common.ValidateBitcoinTxVersion(directFromCpfpRefundTx); err != nil {
-			return fmt.Errorf("direct from cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err))
 		}
 
 		if len(directFromCpfpRefundTx.TxIn) == 0 {
-			return fmt.Errorf("direct from cpfp refund tx has no inputs for tree_node id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from cpfp refund tx has no inputs for tree_node id: %s", nodeID))
 		}
 		expectedDirectFromCpfpOutpoint := wire.OutPoint{Hash: cpfpTx.TxHash(), Index: 0}
 		if directFromCpfpRefundTx.TxIn[0].PreviousOutPoint != expectedDirectFromCpfpOutpoint {
-			return fmt.Errorf("direct from cpfp refund tx must spend from cpfp tx for tree_node id: %s", nodeID)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from cpfp refund tx must spend from cpfp tx for tree_node id: %s", nodeID))
 		}
 
 		if len(cpfpTx.TxOut) == 0 {
-			return fmt.Errorf("direct from cpfp vout out of bounds for directFromCpfpTransaction, tree_node id: %s", nodeID)
+			return sparkerrors.InternalDataInconsistency(fmt.Errorf("direct from cpfp vout out of bounds for directFromCpfpTransaction, tree_node id: %s", nodeID))
 		}
 		directFromCpfpSighash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpTx.TxOut[0])
 		if err != nil {
@@ -645,7 +645,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			UserCommitments: directFromCpfpTransaction.SigningNonceCommitment,
 		})
 		if err != nil {
-			return fmt.Errorf("unable to validate direct from cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(directFromCpfpSighash), node.OwnerSigningPubkey)
+			return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct from cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(directFromCpfpSighash), node.OwnerSigningPubkey))
 		}
 	}
 
@@ -664,18 +664,18 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		cpfpTransaction := cpfpTransactions[i]
 		cpfpRefundTx, err := common.TxFromRawTxBytes(cpfpTransaction.RawTx)
 		if err != nil {
-			return fmt.Errorf("unable to get cpfp refund tx: %w", err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get cpfp refund tx: %w", err))
 		}
 
 		pubkeyScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
 		if err != nil {
-			return fmt.Errorf("unable to extract pubkey from tx: %w", err)
+			return sparkerrors.InternalObjectMalformedField(fmt.Errorf("unable to extract pubkey from tx: %w", err))
 		}
 		if len(cpfpRefundTx.TxOut) == 0 {
-			return fmt.Errorf("cpfp tx vout out of bounds")
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cpfp tx vout out of bounds"))
 		}
 		if !bytes.Equal(pubkeyScript, cpfpRefundTx.TxOut[0].PkScript) {
-			return fmt.Errorf("invalid cpfp destination pubkey")
+			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid cpfp destination pubkey"))
 		}
 		totalAmountSats += uint64(cpfpRefundTx.TxOut[0].Value)
 	}
@@ -685,18 +685,18 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		directTransaction := directTransactions[i]
 		directRefundTx, err := common.TxFromRawTxBytes(directTransaction.RawTx)
 		if err != nil {
-			return fmt.Errorf("unable to get direct refund tx for directTransaction leaf_id: %s: %w", directTransaction.LeafId, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get direct refund tx for directTransaction leaf_id: %s: %w", directTransaction.LeafId, err))
 		}
 
 		pubkeyScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
 		if err != nil {
-			return fmt.Errorf("unable to extract pubkey from tx for directTransaction leaf_id: %s: %w", directTransaction.LeafId, err)
+			return sparkerrors.InternalObjectMalformedField(fmt.Errorf("unable to extract pubkey from tx for directTransaction leaf_id: %s: %w", directTransaction.LeafId, err))
 		}
 		if len(directRefundTx.TxOut) == 0 {
-			return fmt.Errorf("direct tx vout out of bounds for directTransaction leaf_id: %s", directTransaction.LeafId)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct tx vout out of bounds for directTransaction leaf_id: %s", directTransaction.LeafId))
 		}
 		if !bytes.Equal(pubkeyScript, directRefundTx.TxOut[0].PkScript) {
-			return fmt.Errorf("invalid direct destination pubkey for directTransaction leaf_id: %s", directTransaction.LeafId)
+			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid direct destination pubkey for directTransaction leaf_id: %s", directTransaction.LeafId))
 		}
 	}
 
@@ -705,30 +705,30 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		directFromCpfpTransaction := directFromCpfpTransactions[i]
 		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpTransaction.RawTx)
 		if err != nil {
-			return fmt.Errorf("unable to get direct from cpfp refund tx for directFromCpfpTransaction leaf_id: %s: %w", directFromCpfpTransaction.LeafId, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get direct from cpfp refund tx for directFromCpfpTransaction leaf_id: %s: %w", directFromCpfpTransaction.LeafId, err))
 		}
 
 		pubkeyScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
 		if err != nil {
-			return fmt.Errorf("unable to extract pubkey from tx for directFromCpfpTransaction leaf_id: %s: %w", directFromCpfpTransaction.LeafId, err)
+			return sparkerrors.InternalObjectMalformedField(fmt.Errorf("unable to extract pubkey from tx for directFromCpfpTransaction leaf_id: %s: %w", directFromCpfpTransaction.LeafId, err))
 		}
 		if len(directFromCpfpRefundTx.TxOut) == 0 {
-			return fmt.Errorf("direct from cpfp tx vout out of bounds for directFromCpfpTransaction leaf_id: %s", directFromCpfpTransaction.LeafId)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from cpfp tx vout out of bounds for directFromCpfpTransaction leaf_id: %s", directFromCpfpTransaction.LeafId))
 		}
 		if !bytes.Equal(pubkeyScript, directFromCpfpRefundTx.TxOut[0].PkScript) {
-			return fmt.Errorf("invalid direct from cpfp destination pubkey for directFromCpfpTransaction leaf_id: %s", directFromCpfpTransaction.LeafId)
+			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid direct from cpfp destination pubkey for directFromCpfpTransaction leaf_id: %s", directFromCpfpTransaction.LeafId))
 		}
 	}
 
 	if reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
 		if feeSats >= totalAmountSats {
-			return fmt.Errorf("fee exceeds total amount, fee: %d, total amount: %d", feeSats, totalAmountSats)
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("fee exceeds total amount, fee: %d, total amount: %d", feeSats, totalAmountSats))
 		}
 
 		totalAmountSats -= feeSats
 	}
 	if amount.ValueSats != 0 && totalAmountSats < amount.ValueSats {
-		return fmt.Errorf("invalid amount, expected: %d or more, got: %d", amount.ValueSats, totalAmountSats)
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("invalid amount, expected: %d or more, got: %d", amount.ValueSats, totalAmountSats))
 	}
 	return nil
 }
@@ -872,7 +872,7 @@ func (h *LightningHandler) GetPreimageShare(
 	}
 	err = h.ValidateDuplicateLeaves(ctx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
 	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer leaves validation failed: %w", err))
+		return nil, err
 	}
 
 	// TODO: Once SSP has removed the query user refund call, we can replace everything with transfer request and remove this validation.
@@ -1299,7 +1299,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 
 	err = h.ValidateDuplicateLeaves(ctx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
 	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer leaves validation failed: %w", err))
+		return nil, err
 	}
 
 	// TODO: Once SSP has removed the query user refund call, we can replace everything with transfer request and remove this validation.

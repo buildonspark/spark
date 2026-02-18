@@ -26,6 +26,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/entexample"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
@@ -183,6 +184,9 @@ func TestValidateDuplicateLeaves(t *testing.T) {
 
 		err := lightningHandler.ValidateDuplicateLeaves(ctx, leavesToSend, []*pb.UserSignedTxSigningJob{}, []*pb.UserSignedTxSigningJob{})
 		require.ErrorContains(t, err, "duplicate leaf id: leaf1")
+		code, reason := sparkerrors.CodeAndReasonFrom(err)
+		require.Equal(t, codes.InvalidArgument, code)
+		require.Equal(t, "DUPLICATE_FIELD", reason)
 	})
 
 	t.Run("duplicate in directLeavesToSend", func(t *testing.T) {
@@ -225,6 +229,9 @@ func TestValidateDuplicateLeaves(t *testing.T) {
 
 		err := lightningHandler.ValidateDuplicateLeaves(ctx, leavesToSend, directLeavesToSend, []*pb.UserSignedTxSigningJob{})
 		require.ErrorContains(t, err, "leaf id leaf3 not found in leaves to send")
+		code, reason := sparkerrors.CodeAndReasonFrom(err)
+		require.Equal(t, codes.InvalidArgument, code)
+		require.Equal(t, "MALFORMED_FIELD", reason)
 	})
 
 	t.Run("leaf id not found in leavesToSend for directFromCpfpLeavesToSend", func(t *testing.T) {
@@ -330,6 +337,9 @@ func TestStorePreimageShareEdgeCases(t *testing.T) {
 
 		err := lightningHandler.StorePreimageShare(ctx, req)
 		require.ErrorContains(t, err, "preimage share is nil")
+		code, reason := sparkerrors.CodeAndReasonFrom(err)
+		require.Equal(t, codes.InvalidArgument, code)
+		require.Equal(t, "MISSING_FIELD", reason)
 	})
 
 	t.Run("empty proofs array returns error", func(t *testing.T) {
@@ -343,6 +353,9 @@ func TestStorePreimageShareEdgeCases(t *testing.T) {
 
 		err := lightningHandler.StorePreimageShare(ctx, req)
 		require.ErrorContains(t, err, "preimage share proofs is empty")
+		code, reason := sparkerrors.CodeAndReasonFrom(err)
+		require.Equal(t, codes.InvalidArgument, code)
+		require.Equal(t, "MISSING_FIELD", reason)
 	})
 }
 
@@ -1114,6 +1127,9 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	)
 
 	require.ErrorContains(t, err, "invalid amount, expected: 1000 or more, got: 500")
+	code, reason := sparkerrors.CodeAndReasonFrom(err)
+	require.Equal(t, codes.InvalidArgument, code)
+	require.Equal(t, "OUT_OF_RANGE", reason)
 }
 
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8043
