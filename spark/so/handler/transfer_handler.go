@@ -2441,8 +2441,10 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		// ok
 	case st.TransferStatusCompleted:
 		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", transferID))
+	case st.TransferStatusExpired, st.TransferStatusReturned:
+		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in terminal state %s and cannot be claimed", transferID, transfer.Status))
 	default:
-		return nil, fmt.Errorf("transfer %s is not in a claimable status, current status: %s", transferID, transfer.Status)
+		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is not in a claimable status, current status: %s", transferID, transfer.Status))
 	}
 
 	leavesToTransfer, err := transfer.QueryTransferLeaves().All(ctx)
