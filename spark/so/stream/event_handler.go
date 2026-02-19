@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/handler"
 	"go.uber.org/zap"
 
@@ -55,7 +56,7 @@ func (s *EventRouter) SubscribeToEvents(identityPublicKey keys.Public, stream pb
 		return fmt.Errorf("failed to check read access: %w", err)
 	}
 	if !hasReadAccess {
-		return fmt.Errorf("user does not have read access to the wallet")
+		return sparkerrors.PermissionDeniedNoReadAccess(fmt.Errorf("user does not have read access to the wallet"))
 	}
 
 	notificationChan, cleanup := s.createNotificationChannel(identityPublicKey)

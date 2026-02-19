@@ -47,6 +47,8 @@ const (
 	ReasonResourceExhaustedRateLimitExceeded        = "RATE_LIMIT_EXCEEDED"
 	ReasonResourceExhaustedConcurrencyLimitExceeded = "CONCURRENCY_LIMIT_EXCEEDED"
 
+	ReasonPermissionDeniedNoReadAccess = "NO_READ_ACCESS"
+
 	ReasonUnavailableMethodDisabled   = "METHOD_DISABLED"
 	ReasonUnavailableDataStore        = "DATA_STORE_UNAVAILABLE"
 	ReasonUnavailableDatabaseTimeout  = "DATABASE_TIMEOUT"
@@ -200,6 +202,10 @@ func ResourceExhaustedRateLimitExceeded(err error) error {
 
 func ResourceExhaustedConcurrencyLimitExceeded(err error) error {
 	return newGRPCError(codes.ResourceExhausted, err, ReasonResourceExhaustedConcurrencyLimitExceeded)
+}
+
+func PermissionDeniedNoReadAccess(err error) error {
+	return newGRPCError(codes.PermissionDenied, err, ReasonPermissionDeniedNoReadAccess)
 }
 
 func UnimplementedMethodDisabled(err error) error {

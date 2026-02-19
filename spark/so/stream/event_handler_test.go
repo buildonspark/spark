@@ -453,6 +453,10 @@ func TestEventRouter_PrivacyEnabled_NoAccess(t *testing.T) {
 	require.Error(t, err, "Non-owner should not have read access")
 	require.Contains(t, err.Error(), "user does not have read access to the wallet")
 
+	st, ok := status.FromError(err)
+	require.True(t, ok, "Error should be a gRPC status error")
+	require.Equal(t, codes.PermissionDenied, st.Code(), "Error should be PERMISSION_DENIED")
+
 	// Stream should not have received any messages
 	stream.mu.Lock()
 	require.Empty(t, stream.messages, "Stream should not have received any messages")
@@ -497,6 +501,10 @@ func TestEventRouter_PrivacyEnabled_NoSession(t *testing.T) {
 	err = router.SubscribeToEvents(walletOwnerPubKey, stream)
 	require.Error(t, err, "Should fail without session")
 	require.Contains(t, err.Error(), "user does not have read access to the wallet")
+
+	st, ok := status.FromError(err)
+	require.True(t, ok, "Error should be a gRPC status error")
+	require.Equal(t, codes.PermissionDenied, st.Code(), "Error should be PERMISSION_DENIED")
 
 	stream.mu.Lock()
 	require.Empty(t, stream.messages, "Stream should not have received any messages")
