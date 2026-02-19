@@ -613,16 +613,67 @@ function parseCreateSparkInvoiceArgsWithYargs(
   }
 }
 
-async function runCLI() {
-  // Get network from environment variable
-  const network = (() => {
-    const envNetwork = process.env.NETWORK?.toUpperCase();
-    if (envNetwork === "MAINNET") return "MAINNET";
-    if (envNetwork === "LOCAL") return "LOCAL";
-    return "REGTEST"; // default
-  })();
+const CLI_VERSION: string = process.env.SPARK_CLI_VERSION ?? "dev";
 
-  const configFile = process.env.CONFIG_FILE;
+function parseCliArgs(): {
+  network: NetworkType;
+  configFile: string | undefined;
+} {
+  const argv = process.argv.slice(2);
+
+  if (argv.includes("--version") || argv.includes("-v")) {
+    console.log(`@buildonspark/cli v${CLI_VERSION}`);
+    process.exit(0);
+  }
+
+  if (argv.includes("--help") || argv.includes("-h")) {
+    console.log(`Usage: spark-cli [options]
+
+Options:
+  --network <network>  Network to connect to (mainnet, regtest, local) [default: regtest]
+  --config <path>      Path to a JSON config file
+  -v, --version        Print version
+  -h, --help           Show this help message
+
+Environment variables:
+  NETWORK              Network override (same values as --network)
+  CONFIG_FILE          Config file path override
+  NODE_ENV             Set to "development" for dev mode`);
+    process.exit(0);
+  }
+
+  // Parse --network flag (overrides NETWORK env var)
+  let networkArg: string | undefined;
+  const networkIdx = argv.indexOf("--network");
+  if (networkIdx !== -1 && networkIdx + 1 < argv.length) {
+    networkArg = argv[networkIdx + 1];
+  }
+
+  // Parse --config flag (overrides CONFIG_FILE env var)
+  let configArg: string | undefined;
+  const configIdx = argv.indexOf("--config");
+  if (configIdx !== -1 && configIdx + 1 < argv.length) {
+    configArg = argv[configIdx + 1];
+  }
+
+  const rawNetwork = (
+    networkArg ??
+    process.env.NETWORK ??
+    "regtest"
+  ).toUpperCase();
+
+  let network: NetworkType;
+  if (rawNetwork === "MAINNET") network = "MAINNET";
+  else if (rawNetwork === "LOCAL") network = "LOCAL";
+  else network = "REGTEST";
+
+  const configFile = configArg ?? process.env.CONFIG_FILE;
+
+  return { network, configFile };
+}
+
+async function runCLI() {
+  const { network, configFile } = parseCliArgs();
   let config: ConfigOptions = {};
   if (configFile) {
     try {

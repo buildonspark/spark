@@ -35,7 +35,6 @@ npx @buildonspark/create-spark-app my-app
 | `nestjs`            | NestJS server       |
 | `webpack`           | React + Webpack     |
 | `browser-extension` | Browser extension   |
-| `cli`               | CLI application     |
 | `bare`              | Bare runtime        |
 | `nodejs-scripts`    | Node.js scripts     |
 

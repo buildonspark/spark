@@ -57,11 +57,6 @@ export const TEMPLATES = {
     description: "Browser extension",
     steps: ["{pm} install", "{run} build:chrome"],
   },
-  cli: {
-    dir: "spark-cli",
-    description: "CLI application",
-    steps: ["{pm} install", "{run} cli"],
-  },
   bare: {
     dir: "spark-bare-app",
     description: "Bare runtime",
