@@ -9,6 +9,8 @@ import { SignatureIntent } from "../proto/common.js";
 import { Timestamp } from "../proto/google/protobuf/timestamp.js";
 import {
   ClaimLeafKeyTweak,
+  ClaimLeafKeyTweaks,
+  type ClaimTransferResponse,
   ClaimTransferSignRefundsResponse,
   CounterLeafSwapResponse,
   HashVariant,
@@ -26,7 +28,6 @@ import {
   StartTransferResponse,
   Transfer,
   TransferPackage,
-  TransferStatus,
   TransferType,
   TreeNode,
 } from "../proto/spark.js";
@@ -53,7 +54,10 @@ import {
   createZeroTimelockNodeTx,
   getCurrentTimelock,
 } from "../utils/transaction.js";
-import { getTransferPackageSigningPayload } from "../utils/transfer_package.js";
+import {
+  getClaimPackageSigningPayload,
+  getTransferPackageSigningPayload,
+} from "../utils/transfer_package.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection/connection.js";
 import {
@@ -422,7 +426,10 @@ export class BaseTransferService {
         leaves.length,
         2 * leaves.length,
       ),
-      signingCommitments.signingCommitments.slice(2 * leaves.length),
+      signingCommitments.signingCommitments.slice(
+        2 * leaves.length,
+        3 * leaves.length,
+      ),
       adaptorPubKey,
     );
 
@@ -504,7 +511,10 @@ export class BaseTransferService {
         leaves.length,
         2 * leaves.length,
       ),
-      signingCommitments.signingCommitments.slice(2 * leaves.length),
+      signingCommitments.signingCommitments.slice(
+        2 * leaves.length,
+        3 * leaves.length,
+      ),
       paymentHash,
     );
 
@@ -882,12 +892,36 @@ export class TransferService extends BaseTransferService {
     super(config, connectionManager, signingService);
   }
 
-  async claimTransfer(transfer: Transfer, leaves: LeafKeyTweak[]) {
-    if (transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED) {
-      await this.claimTransferTweakKeys(transfer, leaves);
+  async claimTransfer(
+    transfer: Transfer,
+    leaves: LeafKeyTweak[],
+  ): Promise<{ nodes: TreeNode[] }> {
+    const claimPackage = await this.prepareClaimPackage(transfer.id, leaves);
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    let response: ClaimTransferResponse;
+    try {
+      response = await sparkClient.claim_transfer({
+        transferId: transfer.id,
+        ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        claimPackage,
+      });
+    } catch (error: any) {
+      throw new SparkRequestError("Failed to claim transfer", {
+        method: "POST",
+        error,
+      });
     }
-    const signatures = await this.claimTransferSignRefunds(transfer, leaves);
-    return await this.finalizeNodeSignatures(signatures);
+    if (!response.transfer) {
+      throw new SparkValidationError(
+        "No transfer response from claim_transfer",
+      );
+    }
+    const nodes = response.transfer.leaves.flatMap((leaf) =>
+      leaf.leaf ? [leaf.leaf] : [],
+    );
+    return { nodes };
   }
 
   // When transferIds is not provided, all pending transfers for the receiver will be returned.
@@ -1207,7 +1241,7 @@ export class TransferService extends BaseTransferService {
         const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
 
         const currentSequence = currRefundTx.getInput(0).sequence;
-        if (!currentSequence) {
+        if (currentSequence == null) {
           throw new SparkValidationError("Invalid refund transaction", {
             field: "sequence",
             value: currRefundTx.getInput(0),
@@ -1330,6 +1364,111 @@ export class TransferService extends BaseTransferService {
     if (errors.length > 0) {
       throw errors[0];
     }
+  }
+
+  private async prepareClaimPackage(
+    transferId: string,
+    leaves: LeafKeyTweak[],
+  ) {
+    // 1. Prepare key tweaks per SO
+    const leavesTweaksMap = await this.prepareClaimLeavesKeyTweaks(leaves);
+
+    // 2. ECIES-encrypt key tweaks per SO
+    const sparkFrost = getSparkFrost();
+    const encryptedKeyTweaksEntries = await Promise.all(
+      Array.from(leavesTweaksMap.entries()).map(async ([key, value]) => {
+        const protoToEncrypt: ClaimLeafKeyTweaks = {
+          leavesToReceive: value,
+        };
+        const protoToEncryptBinary =
+          ClaimLeafKeyTweaks.encode(protoToEncrypt).finish();
+
+        const operator = this.config.getSigningOperators()[key];
+        if (!operator) {
+          throw new SparkValidationError("Operator not found");
+        }
+        const encryptedProto = await sparkFrost.encryptEcies(
+          protoToEncryptBinary,
+          hexToBytes(operator.identityPublicKey),
+        );
+        return [key, Uint8Array.from(encryptedProto)] as const;
+      }),
+    );
+    const keyTweakPackage: Record<string, Uint8Array> = Object.fromEntries(
+      encryptedKeyTweaksEntries,
+    );
+
+    // 3. Get signing commitments (use nodeIdCount since receiver doesn't own leaves yet)
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    const signingCommitments = await sparkClient.get_signing_commitments({
+      nodeIdCount: leaves.length,
+      count: 3,
+    });
+    const expectedCommitments = 3 * leaves.length;
+    if (signingCommitments.signingCommitments.length !== expectedCommitments) {
+      throw new SparkValidationError(
+        `Expected ${expectedCommitments} signing commitments, got ${signingCommitments.signingCommitments.length}`,
+      );
+    }
+
+    // 4. Build claim leaves with receiver's key derivation for FROST signing
+    const claimLeaves: LeafKeyTweak[] = leaves.map((leaf) => ({
+      leaf: leaf.leaf,
+      keyDerivation: leaf.newKeyDerivation,
+      newKeyDerivation: leaf.newKeyDerivation,
+    }));
+
+    // 5. Compute per-leaf receiving pubkeys from newKeyDerivation
+    const receivingPubkeys = new Map<string, Uint8Array>();
+    await Promise.all(
+      leaves.map(async (leaf) => {
+        const pubkey = await this.config.signer.getPublicKeyFromDerivation(
+          leaf.newKeyDerivation,
+        );
+        receivingPubkeys.set(leaf.leaf.id, pubkey);
+      }),
+    );
+
+    // 6. Sign refunds using current timelock (not decremented)
+    const {
+      cpfpLeafSigningJobs,
+      directLeafSigningJobs,
+      directFromCpfpLeafSigningJobs,
+    } = await this.signingService.signRefundsForClaim(
+      claimLeaves,
+      receivingPubkeys,
+      signingCommitments.signingCommitments.slice(0, leaves.length),
+      signingCommitments.signingCommitments.slice(
+        leaves.length,
+        2 * leaves.length,
+      ),
+      signingCommitments.signingCommitments.slice(
+        2 * leaves.length,
+        3 * leaves.length,
+      ),
+    );
+
+    // 7. Assemble and sign ClaimPackage
+    const claimPackage = {
+      leavesToClaim: cpfpLeafSigningJobs,
+      keyTweakPackage,
+      userSignature: new Uint8Array(),
+      directLeavesToClaim: directLeafSigningJobs,
+      directFromCpfpLeavesToClaim: directFromCpfpLeafSigningJobs,
+      hashVariant: HashVariant.HASH_VARIANT_V2,
+    };
+
+    const signingPayload = getClaimPackageSigningPayload(
+      transferId,
+      keyTweakPackage,
+    );
+    const signature =
+      await this.config.signer.signMessageWithIdentityKey(signingPayload);
+    claimPackage.userSignature = new Uint8Array(signature);
+
+    return claimPackage;
   }
 
   private async prepareClaimLeavesKeyTweaks(

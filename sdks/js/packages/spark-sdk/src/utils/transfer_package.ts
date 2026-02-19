@@ -14,3 +14,14 @@ export function getTransferPackageSigningPayload(
     .addMapStringToBytes(transferPackage.keyTweakPackage)
     .hash();
 }
+
+export function getClaimPackageSigningPayload(
+  transferID: string,
+  keyTweakPackage: Record<string, Uint8Array>,
+): Uint8Array {
+  const transferIdBytes = hexToBytes(transferID.replaceAll("-", ""));
+  return newHasher(["spark", "claim", "signing payload"])
+    .addBytes(transferIdBytes)
+    .addMapStringToBytes(keyTweakPackage)
+    .hash();
+}
