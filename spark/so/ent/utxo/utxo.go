@@ -33,8 +33,12 @@ const (
 	FieldNetwork = "network"
 	// FieldPkScript holds the string denoting the pk_script field in the database.
 	FieldPkScript = "pk_script"
+	// FieldAvailabilityConfirmedAt holds the string denoting the availability_confirmed_at field in the database.
+	FieldAvailabilityConfirmedAt = "availability_confirmed_at"
 	// EdgeDepositAddress holds the string denoting the deposit_address edge name in mutations.
 	EdgeDepositAddress = "deposit_address"
+	// EdgeTree holds the string denoting the tree edge name in mutations.
+	EdgeTree = "tree"
 	// Table holds the table name of the utxo in the database.
 	Table = "utxos"
 	// DepositAddressTable is the table that holds the deposit_address relation/edge.
@@ -44,6 +48,13 @@ const (
 	DepositAddressInverseTable = "deposit_addresses"
 	// DepositAddressColumn is the table column denoting the deposit_address relation/edge.
 	DepositAddressColumn = "deposit_address_utxo"
+	// TreeTable is the table that holds the tree relation/edge.
+	TreeTable = "utxos"
+	// TreeInverseTable is the table name for the Tree entity.
+	// It exists in this package in order to avoid circular dependency with the "tree" package.
+	TreeInverseTable = "trees"
+	// TreeColumn is the table column denoting the tree relation/edge.
+	TreeColumn = "tree_utxos"
 )
 
 // Columns holds all SQL columns for utxo fields.
@@ -57,12 +68,14 @@ var Columns = []string{
 	FieldAmount,
 	FieldNetwork,
 	FieldPkScript,
+	FieldAvailabilityConfirmedAt,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "utxos"
 // table and are not defined as standalone fields in the schema.
 var ForeignKeys = []string{
 	"deposit_address_utxo",
+	"tree_utxos",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -141,10 +154,22 @@ func ByNetwork(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNetwork, opts...).ToFunc()
 }
 
+// ByAvailabilityConfirmedAt orders the results by the availability_confirmed_at field.
+func ByAvailabilityConfirmedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAvailabilityConfirmedAt, opts...).ToFunc()
+}
+
 // ByDepositAddressField orders the results by deposit_address field.
 func ByDepositAddressField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newDepositAddressStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByTreeField orders the results by tree field.
+func ByTreeField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTreeStep(), sql.OrderByField(field, opts...))
 	}
 }
 func newDepositAddressStep() *sqlgraph.Step {
@@ -152,5 +177,12 @@ func newDepositAddressStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(DepositAddressInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, DepositAddressTable, DepositAddressColumn),
+	)
+}
+func newTreeStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TreeInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, TreeTable, TreeColumn),
 	)
 }

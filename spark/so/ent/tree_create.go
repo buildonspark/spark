@@ -19,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
 )
 
 // TreeCreate is the builder for creating a Tree entity.
@@ -118,6 +119,21 @@ func (tc *TreeCreate) SetNillableRootID(id *uuid.UUID) *TreeCreate {
 // SetRoot sets the "root" edge to the TreeNode entity.
 func (tc *TreeCreate) SetRoot(t *TreeNode) *TreeCreate {
 	return tc.SetRootID(t.ID)
+}
+
+// AddUtxoIDs adds the "utxos" edge to the Utxo entity by IDs.
+func (tc *TreeCreate) AddUtxoIDs(ids ...uuid.UUID) *TreeCreate {
+	tc.mutation.AddUtxoIDs(ids...)
+	return tc
+}
+
+// AddUtxos adds the "utxos" edges to the Utxo entity.
+func (tc *TreeCreate) AddUtxos(u ...*Utxo) *TreeCreate {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return tc.AddUtxoIDs(ids...)
 }
 
 // AddNodeIDs adds the "nodes" edge to the TreeNode entity by IDs.
@@ -320,6 +336,22 @@ func (tc *TreeCreate) createSpec() (*Tree, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.tree_root = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tc.mutation.UtxosIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tree.UtxosTable,
+			Columns: []string{tree.UtxosColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := tc.mutation.NodesIDs(); len(nodes) > 0 {

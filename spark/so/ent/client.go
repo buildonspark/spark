@@ -5555,6 +5555,22 @@ func (c *TreeClient) QueryRoot(t *Tree) *TreeNodeQuery {
 	return query
 }
 
+// QueryUtxos queries the utxos edge of a Tree.
+func (c *TreeClient) QueryUtxos(t *Tree) *UtxoQuery {
+	query := (&UtxoClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := t.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tree.Table, tree.FieldID, id),
+			sqlgraph.To(utxo.Table, utxo.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, tree.UtxosTable, tree.UtxosColumn),
+		)
+		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryNodes queries the nodes edge of a Tree.
 func (c *TreeClient) QueryNodes(t *Tree) *TreeNodeQuery {
 	query := (&TreeNodeClient{config: c.config}).Query()
@@ -6092,6 +6108,22 @@ func (c *UtxoClient) QueryDepositAddress(u *Utxo) *DepositAddressQuery {
 			sqlgraph.From(utxo.Table, utxo.FieldID, id),
 			sqlgraph.To(depositaddress.Table, depositaddress.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, utxo.DepositAddressTable, utxo.DepositAddressColumn),
+		)
+		fromV = sqlgraph.Neighbors(u.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryTree queries the tree edge of a Utxo.
+func (c *UtxoClient) QueryTree(u *Utxo) *TreeQuery {
+	query := (&TreeClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := u.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(utxo.Table, utxo.FieldID, id),
+			sqlgraph.To(tree.Table, tree.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, utxo.TreeTable, utxo.TreeColumn),
 		)
 		fromV = sqlgraph.Neighbors(u.driver.Dialect(), step)
 		return fromV, nil

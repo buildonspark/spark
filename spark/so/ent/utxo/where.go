@@ -92,6 +92,11 @@ func PkScript(v []byte) predicate.Utxo {
 	return predicate.Utxo(sql.FieldEQ(FieldPkScript, v))
 }
 
+// AvailabilityConfirmedAt applies equality check predicate on the "availability_confirmed_at" field. It's identical to AvailabilityConfirmedAtEQ.
+func AvailabilityConfirmedAt(v time.Time) predicate.Utxo {
+	return predicate.Utxo(sql.FieldEQ(FieldAvailabilityConfirmedAt, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.Utxo {
 	return predicate.Utxo(sql.FieldEQ(FieldCreateTime, v))
@@ -392,6 +397,56 @@ func PkScriptLTE(v []byte) predicate.Utxo {
 	return predicate.Utxo(sql.FieldLTE(FieldPkScript, v))
 }
 
+// AvailabilityConfirmedAtEQ applies the EQ predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtEQ(v time.Time) predicate.Utxo {
+	return predicate.Utxo(sql.FieldEQ(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtNEQ applies the NEQ predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtNEQ(v time.Time) predicate.Utxo {
+	return predicate.Utxo(sql.FieldNEQ(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtIn applies the In predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtIn(vs ...time.Time) predicate.Utxo {
+	return predicate.Utxo(sql.FieldIn(FieldAvailabilityConfirmedAt, vs...))
+}
+
+// AvailabilityConfirmedAtNotIn applies the NotIn predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtNotIn(vs ...time.Time) predicate.Utxo {
+	return predicate.Utxo(sql.FieldNotIn(FieldAvailabilityConfirmedAt, vs...))
+}
+
+// AvailabilityConfirmedAtGT applies the GT predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtGT(v time.Time) predicate.Utxo {
+	return predicate.Utxo(sql.FieldGT(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtGTE applies the GTE predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtGTE(v time.Time) predicate.Utxo {
+	return predicate.Utxo(sql.FieldGTE(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtLT applies the LT predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtLT(v time.Time) predicate.Utxo {
+	return predicate.Utxo(sql.FieldLT(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtLTE applies the LTE predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtLTE(v time.Time) predicate.Utxo {
+	return predicate.Utxo(sql.FieldLTE(FieldAvailabilityConfirmedAt, v))
+}
+
+// AvailabilityConfirmedAtIsNil applies the IsNil predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtIsNil() predicate.Utxo {
+	return predicate.Utxo(sql.FieldIsNull(FieldAvailabilityConfirmedAt))
+}
+
+// AvailabilityConfirmedAtNotNil applies the NotNil predicate on the "availability_confirmed_at" field.
+func AvailabilityConfirmedAtNotNil() predicate.Utxo {
+	return predicate.Utxo(sql.FieldNotNull(FieldAvailabilityConfirmedAt))
+}
+
 // HasDepositAddress applies the HasEdge predicate on the "deposit_address" edge.
 func HasDepositAddress() predicate.Utxo {
 	return predicate.Utxo(func(s *sql.Selector) {
@@ -407,6 +462,29 @@ func HasDepositAddress() predicate.Utxo {
 func HasDepositAddressWith(preds ...predicate.DepositAddress) predicate.Utxo {
 	return predicate.Utxo(func(s *sql.Selector) {
 		step := newDepositAddressStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasTree applies the HasEdge predicate on the "tree" edge.
+func HasTree() predicate.Utxo {
+	return predicate.Utxo(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, TreeTable, TreeColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTreeWith applies the HasEdge predicate on the "tree" edge with a given conditions (other predicates).
+func HasTreeWith(preds ...predicate.Tree) predicate.Utxo {
+	return predicate.Utxo(func(s *sql.Selector) {
+		step := newTreeStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

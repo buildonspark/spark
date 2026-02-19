@@ -5758,6 +5758,7 @@ type TreeExample struct {
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 	Root           *ent.TreeNode
+	Utxos          []*ent.Utxo
 	Nodes          []*ent.TreeNode
 	DepositAddress *ent.DepositAddress
 }
@@ -5803,6 +5804,18 @@ func (t *TreeExample) SetVout(v int16) *TreeExample {
 // SetRoot sets the root edge.
 func (t *TreeExample) SetRoot(v *ent.TreeNode) *TreeExample {
 	t.Root = v
+	return t
+}
+
+// AddUtxo adds a Utxo to the utxos edge.
+func (t *TreeExample) AddUtxo(v *ent.Utxo) *TreeExample {
+	t.Utxos = append(t.Utxos, v)
+	return t
+}
+
+// SetUtxos sets the utxos edge.
+func (t *TreeExample) SetUtxos(v []*ent.Utxo) *TreeExample {
+	t.Utxos = v
 	return t
 }
 
@@ -5865,6 +5878,9 @@ func (t *TreeExample) MustExec(ctx context.Context) *ent.Tree {
 	if t.Root != nil {
 		create.SetRoot(t.Root)
 	}
+	if len(t.Utxos) > 0 {
+		create.AddUtxos(t.Utxos...)
+	}
 	if len(t.Nodes) > 0 {
 		create.AddNodes(t.Nodes...)
 	}
@@ -5921,6 +5937,9 @@ func (t *TreeExample) Exec(ctx context.Context) (*ent.Tree, error) {
 	// Handle edges
 	if t.Root != nil {
 		create.SetRoot(t.Root)
+	}
+	if len(t.Utxos) > 0 {
+		create.AddUtxos(t.Utxos...)
 	}
 	if len(t.Nodes) > 0 {
 		create.AddNodes(t.Nodes...)
@@ -6653,15 +6672,17 @@ type UtxoExample struct {
 	t      *testing.T
 
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
-	BlockHeight *int64
-	Txid        *[]byte
-	Vout        *uint32
-	Amount      *uint64
-	Network     *btcnetwork.Network
-	PkScript    *[]byte
+	BlockHeight             *int64
+	Txid                    *[]byte
+	Vout                    *uint32
+	Amount                  *uint64
+	Network                 *btcnetwork.Network
+	PkScript                *[]byte
+	AvailabilityConfirmedAt *time.Time
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 	DepositAddress *ent.DepositAddress
+	Tree           *ent.Tree
 }
 
 // NewUtxoExample creates a new UtxoExample for testing.
@@ -6708,9 +6729,21 @@ func (u *UtxoExample) SetPkScript(v []byte) *UtxoExample {
 	return u
 }
 
+// SetAvailabilityConfirmedAt sets the availability_confirmed_at field.
+func (u *UtxoExample) SetAvailabilityConfirmedAt(v time.Time) *UtxoExample {
+	u.AvailabilityConfirmedAt = &v
+	return u
+}
+
 // SetDepositAddress sets the deposit_address edge.
 func (u *UtxoExample) SetDepositAddress(v *ent.DepositAddress) *UtxoExample {
 	u.DepositAddress = v
+	return u
+}
+
+// SetTree sets the tree edge.
+func (u *UtxoExample) SetTree(v *ent.Tree) *UtxoExample {
+	u.Tree = v
 	return u
 }
 
@@ -6762,6 +6795,10 @@ func (u *UtxoExample) MustExec(ctx context.Context) *ent.Utxo {
 			return b
 		}())
 	}
+	if u.AvailabilityConfirmedAt != nil {
+		create.SetAvailabilityConfirmedAt(*u.AvailabilityConfirmedAt)
+	} else {
+	}
 
 	// Handle edges
 	if u.DepositAddress != nil {
@@ -6771,6 +6808,9 @@ func (u *UtxoExample) MustExec(ctx context.Context) *ent.Utxo {
 		u.t.Helper()
 		u.DepositAddress = NewDepositAddressExample(u.t, u.client).MustExec(ctx)
 		create.SetDepositAddress(u.DepositAddress)
+	}
+	if u.Tree != nil {
+		create.SetTree(u.Tree)
 	}
 
 	entity, err := create.Save(ctx)
@@ -6830,6 +6870,10 @@ func (u *UtxoExample) Exec(ctx context.Context) (*ent.Utxo, error) {
 			return b
 		}())
 	}
+	if u.AvailabilityConfirmedAt != nil {
+		create.SetAvailabilityConfirmedAt(*u.AvailabilityConfirmedAt)
+	} else {
+	}
 
 	// Handle edges
 	if u.DepositAddress != nil {
@@ -6842,6 +6886,9 @@ func (u *UtxoExample) Exec(ctx context.Context) (*ent.Utxo, error) {
 			return nil, fmt.Errorf("failed to create deposit_address: %w", err)
 		}
 		create.SetDepositAddress(u.DepositAddress)
+	}
+	if u.Tree != nil {
+		create.SetTree(u.Tree)
 	}
 
 	return create.Save(ctx)

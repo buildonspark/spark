@@ -27012,6 +27012,9 @@ type TreeMutation struct {
 	clearedFields          map[string]struct{}
 	root                   *uuid.UUID
 	clearedroot            bool
+	utxos                  map[uuid.UUID]struct{}
+	removedutxos           map[uuid.UUID]struct{}
+	clearedutxos           bool
 	nodes                  map[uuid.UUID]struct{}
 	removednodes           map[uuid.UUID]struct{}
 	clearednodes           bool
@@ -27437,6 +27440,60 @@ func (m *TreeMutation) ResetRoot() {
 	m.clearedroot = false
 }
 
+// AddUtxoIDs adds the "utxos" edge to the Utxo entity by ids.
+func (m *TreeMutation) AddUtxoIDs(ids ...uuid.UUID) {
+	if m.utxos == nil {
+		m.utxos = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.utxos[ids[i]] = struct{}{}
+	}
+}
+
+// ClearUtxos clears the "utxos" edge to the Utxo entity.
+func (m *TreeMutation) ClearUtxos() {
+	m.clearedutxos = true
+}
+
+// UtxosCleared reports if the "utxos" edge to the Utxo entity was cleared.
+func (m *TreeMutation) UtxosCleared() bool {
+	return m.clearedutxos
+}
+
+// RemoveUtxoIDs removes the "utxos" edge to the Utxo entity by IDs.
+func (m *TreeMutation) RemoveUtxoIDs(ids ...uuid.UUID) {
+	if m.removedutxos == nil {
+		m.removedutxos = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.utxos, ids[i])
+		m.removedutxos[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedUtxos returns the removed IDs of the "utxos" edge to the Utxo entity.
+func (m *TreeMutation) RemovedUtxosIDs() (ids []uuid.UUID) {
+	for id := range m.removedutxos {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// UtxosIDs returns the "utxos" edge IDs in the mutation.
+func (m *TreeMutation) UtxosIDs() (ids []uuid.UUID) {
+	for id := range m.utxos {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetUtxos resets all changes to the "utxos" edge.
+func (m *TreeMutation) ResetUtxos() {
+	m.utxos = nil
+	m.clearedutxos = false
+	m.removedutxos = nil
+}
+
 // AddNodeIDs adds the "nodes" edge to the TreeNode entity by ids.
 func (m *TreeMutation) AddNodeIDs(ids ...uuid.UUID) {
 	if m.nodes == nil {
@@ -27780,9 +27837,12 @@ func (m *TreeMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TreeMutation) AddedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.root != nil {
 		edges = append(edges, tree.EdgeRoot)
+	}
+	if m.utxos != nil {
+		edges = append(edges, tree.EdgeUtxos)
 	}
 	if m.nodes != nil {
 		edges = append(edges, tree.EdgeNodes)
@@ -27801,6 +27861,12 @@ func (m *TreeMutation) AddedIDs(name string) []ent.Value {
 		if id := m.root; id != nil {
 			return []ent.Value{*id}
 		}
+	case tree.EdgeUtxos:
+		ids := make([]ent.Value, 0, len(m.utxos))
+		for id := range m.utxos {
+			ids = append(ids, id)
+		}
+		return ids
 	case tree.EdgeNodes:
 		ids := make([]ent.Value, 0, len(m.nodes))
 		for id := range m.nodes {
@@ -27817,7 +27883,10 @@ func (m *TreeMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TreeMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
+	if m.removedutxos != nil {
+		edges = append(edges, tree.EdgeUtxos)
+	}
 	if m.removednodes != nil {
 		edges = append(edges, tree.EdgeNodes)
 	}
@@ -27828,6 +27897,12 @@ func (m *TreeMutation) RemovedEdges() []string {
 // the given name in this mutation.
 func (m *TreeMutation) RemovedIDs(name string) []ent.Value {
 	switch name {
+	case tree.EdgeUtxos:
+		ids := make([]ent.Value, 0, len(m.removedutxos))
+		for id := range m.removedutxos {
+			ids = append(ids, id)
+		}
+		return ids
 	case tree.EdgeNodes:
 		ids := make([]ent.Value, 0, len(m.removednodes))
 		for id := range m.removednodes {
@@ -27840,9 +27915,12 @@ func (m *TreeMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TreeMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.clearedroot {
 		edges = append(edges, tree.EdgeRoot)
+	}
+	if m.clearedutxos {
+		edges = append(edges, tree.EdgeUtxos)
 	}
 	if m.clearednodes {
 		edges = append(edges, tree.EdgeNodes)
@@ -27859,6 +27937,8 @@ func (m *TreeMutation) EdgeCleared(name string) bool {
 	switch name {
 	case tree.EdgeRoot:
 		return m.clearedroot
+	case tree.EdgeUtxos:
+		return m.clearedutxos
 	case tree.EdgeNodes:
 		return m.clearednodes
 	case tree.EdgeDepositAddress:
@@ -27887,6 +27967,9 @@ func (m *TreeMutation) ResetEdge(name string) error {
 	switch name {
 	case tree.EdgeRoot:
 		m.ResetRoot()
+		return nil
+	case tree.EdgeUtxos:
+		m.ResetUtxos()
 		return nil
 	case tree.EdgeNodes:
 		m.ResetNodes()
@@ -30660,26 +30743,29 @@ func (m *UserSignedTransactionMutation) ResetEdge(name string) error {
 // UtxoMutation represents an operation that mutates the Utxo nodes in the graph.
 type UtxoMutation struct {
 	config
-	op                     Op
-	typ                    string
-	id                     *uuid.UUID
-	create_time            *time.Time
-	update_time            *time.Time
-	block_height           *int64
-	addblock_height        *int64
-	txid                   *[]byte
-	vout                   *uint32
-	addvout                *int32
-	amount                 *uint64
-	addamount              *int64
-	network                *btcnetwork.Network
-	pk_script              *[]byte
-	clearedFields          map[string]struct{}
-	deposit_address        *uuid.UUID
-	cleareddeposit_address bool
-	done                   bool
-	oldValue               func(context.Context) (*Utxo, error)
-	predicates             []predicate.Utxo
+	op                        Op
+	typ                       string
+	id                        *uuid.UUID
+	create_time               *time.Time
+	update_time               *time.Time
+	block_height              *int64
+	addblock_height           *int64
+	txid                      *[]byte
+	vout                      *uint32
+	addvout                   *int32
+	amount                    *uint64
+	addamount                 *int64
+	network                   *btcnetwork.Network
+	pk_script                 *[]byte
+	availability_confirmed_at *time.Time
+	clearedFields             map[string]struct{}
+	deposit_address           *uuid.UUID
+	cleareddeposit_address    bool
+	tree                      *uuid.UUID
+	clearedtree               bool
+	done                      bool
+	oldValue                  func(context.Context) (*Utxo, error)
+	predicates                []predicate.Utxo
 }
 
 var _ ent.Mutation = (*UtxoMutation)(nil)
@@ -31134,6 +31220,55 @@ func (m *UtxoMutation) ResetPkScript() {
 	m.pk_script = nil
 }
 
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (m *UtxoMutation) SetAvailabilityConfirmedAt(t time.Time) {
+	m.availability_confirmed_at = &t
+}
+
+// AvailabilityConfirmedAt returns the value of the "availability_confirmed_at" field in the mutation.
+func (m *UtxoMutation) AvailabilityConfirmedAt() (r time.Time, exists bool) {
+	v := m.availability_confirmed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAvailabilityConfirmedAt returns the old "availability_confirmed_at" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldAvailabilityConfirmedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAvailabilityConfirmedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAvailabilityConfirmedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAvailabilityConfirmedAt: %w", err)
+	}
+	return oldValue.AvailabilityConfirmedAt, nil
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (m *UtxoMutation) ClearAvailabilityConfirmedAt() {
+	m.availability_confirmed_at = nil
+	m.clearedFields[utxo.FieldAvailabilityConfirmedAt] = struct{}{}
+}
+
+// AvailabilityConfirmedAtCleared returns if the "availability_confirmed_at" field was cleared in this mutation.
+func (m *UtxoMutation) AvailabilityConfirmedAtCleared() bool {
+	_, ok := m.clearedFields[utxo.FieldAvailabilityConfirmedAt]
+	return ok
+}
+
+// ResetAvailabilityConfirmedAt resets all changes to the "availability_confirmed_at" field.
+func (m *UtxoMutation) ResetAvailabilityConfirmedAt() {
+	m.availability_confirmed_at = nil
+	delete(m.clearedFields, utxo.FieldAvailabilityConfirmedAt)
+}
+
 // SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by id.
 func (m *UtxoMutation) SetDepositAddressID(id uuid.UUID) {
 	m.deposit_address = &id
@@ -31173,6 +31308,45 @@ func (m *UtxoMutation) ResetDepositAddress() {
 	m.cleareddeposit_address = false
 }
 
+// SetTreeID sets the "tree" edge to the Tree entity by id.
+func (m *UtxoMutation) SetTreeID(id uuid.UUID) {
+	m.tree = &id
+}
+
+// ClearTree clears the "tree" edge to the Tree entity.
+func (m *UtxoMutation) ClearTree() {
+	m.clearedtree = true
+}
+
+// TreeCleared reports if the "tree" edge to the Tree entity was cleared.
+func (m *UtxoMutation) TreeCleared() bool {
+	return m.clearedtree
+}
+
+// TreeID returns the "tree" edge ID in the mutation.
+func (m *UtxoMutation) TreeID() (id uuid.UUID, exists bool) {
+	if m.tree != nil {
+		return *m.tree, true
+	}
+	return
+}
+
+// TreeIDs returns the "tree" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TreeID instead. It exists only for internal usage by the builders.
+func (m *UtxoMutation) TreeIDs() (ids []uuid.UUID) {
+	if id := m.tree; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTree resets all changes to the "tree" edge.
+func (m *UtxoMutation) ResetTree() {
+	m.tree = nil
+	m.clearedtree = false
+}
+
 // Where appends a list predicates to the UtxoMutation builder.
 func (m *UtxoMutation) Where(ps ...predicate.Utxo) {
 	m.predicates = append(m.predicates, ps...)
@@ -31207,7 +31381,7 @@ func (m *UtxoMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UtxoMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.create_time != nil {
 		fields = append(fields, utxo.FieldCreateTime)
 	}
@@ -31231,6 +31405,9 @@ func (m *UtxoMutation) Fields() []string {
 	}
 	if m.pk_script != nil {
 		fields = append(fields, utxo.FieldPkScript)
+	}
+	if m.availability_confirmed_at != nil {
+		fields = append(fields, utxo.FieldAvailabilityConfirmedAt)
 	}
 	return fields
 }
@@ -31256,6 +31433,8 @@ func (m *UtxoMutation) Field(name string) (ent.Value, bool) {
 		return m.Network()
 	case utxo.FieldPkScript:
 		return m.PkScript()
+	case utxo.FieldAvailabilityConfirmedAt:
+		return m.AvailabilityConfirmedAt()
 	}
 	return nil, false
 }
@@ -31281,6 +31460,8 @@ func (m *UtxoMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldNetwork(ctx)
 	case utxo.FieldPkScript:
 		return m.OldPkScript(ctx)
+	case utxo.FieldAvailabilityConfirmedAt:
+		return m.OldAvailabilityConfirmedAt(ctx)
 	}
 	return nil, fmt.Errorf("unknown Utxo field %s", name)
 }
@@ -31345,6 +31526,13 @@ func (m *UtxoMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPkScript(v)
+		return nil
+	case utxo.FieldAvailabilityConfirmedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAvailabilityConfirmedAt(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Utxo field %s", name)
@@ -31414,7 +31602,11 @@ func (m *UtxoMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *UtxoMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(utxo.FieldAvailabilityConfirmedAt) {
+		fields = append(fields, utxo.FieldAvailabilityConfirmedAt)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -31427,6 +31619,11 @@ func (m *UtxoMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *UtxoMutation) ClearField(name string) error {
+	switch name {
+	case utxo.FieldAvailabilityConfirmedAt:
+		m.ClearAvailabilityConfirmedAt()
+		return nil
+	}
 	return fmt.Errorf("unknown Utxo nullable field %s", name)
 }
 
@@ -31458,15 +31655,21 @@ func (m *UtxoMutation) ResetField(name string) error {
 	case utxo.FieldPkScript:
 		m.ResetPkScript()
 		return nil
+	case utxo.FieldAvailabilityConfirmedAt:
+		m.ResetAvailabilityConfirmedAt()
+		return nil
 	}
 	return fmt.Errorf("unknown Utxo field %s", name)
 }
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UtxoMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.deposit_address != nil {
 		edges = append(edges, utxo.EdgeDepositAddress)
+	}
+	if m.tree != nil {
+		edges = append(edges, utxo.EdgeTree)
 	}
 	return edges
 }
@@ -31479,13 +31682,17 @@ func (m *UtxoMutation) AddedIDs(name string) []ent.Value {
 		if id := m.deposit_address; id != nil {
 			return []ent.Value{*id}
 		}
+	case utxo.EdgeTree:
+		if id := m.tree; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UtxoMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	return edges
 }
 
@@ -31497,9 +31704,12 @@ func (m *UtxoMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UtxoMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.cleareddeposit_address {
 		edges = append(edges, utxo.EdgeDepositAddress)
+	}
+	if m.clearedtree {
+		edges = append(edges, utxo.EdgeTree)
 	}
 	return edges
 }
@@ -31510,6 +31720,8 @@ func (m *UtxoMutation) EdgeCleared(name string) bool {
 	switch name {
 	case utxo.EdgeDepositAddress:
 		return m.cleareddeposit_address
+	case utxo.EdgeTree:
+		return m.clearedtree
 	}
 	return false
 }
@@ -31521,6 +31733,9 @@ func (m *UtxoMutation) ClearEdge(name string) error {
 	case utxo.EdgeDepositAddress:
 		m.ClearDepositAddress()
 		return nil
+	case utxo.EdgeTree:
+		m.ClearTree()
+		return nil
 	}
 	return fmt.Errorf("unknown Utxo unique edge %s", name)
 }
@@ -31531,6 +31746,9 @@ func (m *UtxoMutation) ResetEdge(name string) error {
 	switch name {
 	case utxo.EdgeDepositAddress:
 		m.ResetDepositAddress()
+		return nil
+	case utxo.EdgeTree:
+		m.ResetTree()
 		return nil
 	}
 	return fmt.Errorf("unknown Utxo edge %s", name)

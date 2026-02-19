@@ -19,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
 )
 
 // TreeUpdate is the builder for updating Tree entities.
@@ -137,6 +138,21 @@ func (tu *TreeUpdate) SetRoot(t *TreeNode) *TreeUpdate {
 	return tu.SetRootID(t.ID)
 }
 
+// AddUtxoIDs adds the "utxos" edge to the Utxo entity by IDs.
+func (tu *TreeUpdate) AddUtxoIDs(ids ...uuid.UUID) *TreeUpdate {
+	tu.mutation.AddUtxoIDs(ids...)
+	return tu
+}
+
+// AddUtxos adds the "utxos" edges to the Utxo entity.
+func (tu *TreeUpdate) AddUtxos(u ...*Utxo) *TreeUpdate {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return tu.AddUtxoIDs(ids...)
+}
+
 // AddNodeIDs adds the "nodes" edge to the TreeNode entity by IDs.
 func (tu *TreeUpdate) AddNodeIDs(ids ...uuid.UUID) *TreeUpdate {
 	tu.mutation.AddNodeIDs(ids...)
@@ -180,6 +196,27 @@ func (tu *TreeUpdate) Mutation() *TreeMutation {
 func (tu *TreeUpdate) ClearRoot() *TreeUpdate {
 	tu.mutation.ClearRoot()
 	return tu
+}
+
+// ClearUtxos clears all "utxos" edges to the Utxo entity.
+func (tu *TreeUpdate) ClearUtxos() *TreeUpdate {
+	tu.mutation.ClearUtxos()
+	return tu
+}
+
+// RemoveUtxoIDs removes the "utxos" edge to Utxo entities by IDs.
+func (tu *TreeUpdate) RemoveUtxoIDs(ids ...uuid.UUID) *TreeUpdate {
+	tu.mutation.RemoveUtxoIDs(ids...)
+	return tu
+}
+
+// RemoveUtxos removes "utxos" edges to Utxo entities.
+func (tu *TreeUpdate) RemoveUtxos(u ...*Utxo) *TreeUpdate {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return tu.RemoveUtxoIDs(ids...)
 }
 
 // ClearNodes clears all "nodes" edges to the TreeNode entity.
@@ -326,6 +363,51 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if tu.mutation.UtxosCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tree.UtxosTable,
+			Columns: []string{tree.UtxosColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tu.mutation.RemovedUtxosIDs(); len(nodes) > 0 && !tu.mutation.UtxosCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tree.UtxosTable,
+			Columns: []string{tree.UtxosColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tu.mutation.UtxosIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tree.UtxosTable,
+			Columns: []string{tree.UtxosColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
@@ -531,6 +613,21 @@ func (tuo *TreeUpdateOne) SetRoot(t *TreeNode) *TreeUpdateOne {
 	return tuo.SetRootID(t.ID)
 }
 
+// AddUtxoIDs adds the "utxos" edge to the Utxo entity by IDs.
+func (tuo *TreeUpdateOne) AddUtxoIDs(ids ...uuid.UUID) *TreeUpdateOne {
+	tuo.mutation.AddUtxoIDs(ids...)
+	return tuo
+}
+
+// AddUtxos adds the "utxos" edges to the Utxo entity.
+func (tuo *TreeUpdateOne) AddUtxos(u ...*Utxo) *TreeUpdateOne {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return tuo.AddUtxoIDs(ids...)
+}
+
 // AddNodeIDs adds the "nodes" edge to the TreeNode entity by IDs.
 func (tuo *TreeUpdateOne) AddNodeIDs(ids ...uuid.UUID) *TreeUpdateOne {
 	tuo.mutation.AddNodeIDs(ids...)
@@ -574,6 +671,27 @@ func (tuo *TreeUpdateOne) Mutation() *TreeMutation {
 func (tuo *TreeUpdateOne) ClearRoot() *TreeUpdateOne {
 	tuo.mutation.ClearRoot()
 	return tuo
+}
+
+// ClearUtxos clears all "utxos" edges to the Utxo entity.
+func (tuo *TreeUpdateOne) ClearUtxos() *TreeUpdateOne {
+	tuo.mutation.ClearUtxos()
+	return tuo
+}
+
+// RemoveUtxoIDs removes the "utxos" edge to Utxo entities by IDs.
+func (tuo *TreeUpdateOne) RemoveUtxoIDs(ids ...uuid.UUID) *TreeUpdateOne {
+	tuo.mutation.RemoveUtxoIDs(ids...)
+	return tuo
+}
+
+// RemoveUtxos removes "utxos" edges to Utxo entities.
+func (tuo *TreeUpdateOne) RemoveUtxos(u ...*Utxo) *TreeUpdateOne {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return tuo.RemoveUtxoIDs(ids...)
 }
 
 // ClearNodes clears all "nodes" edges to the TreeNode entity.
@@ -750,6 +868,51 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if tuo.mutation.UtxosCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tree.UtxosTable,
+			Columns: []string{tree.UtxosColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tuo.mutation.RemovedUtxosIDs(); len(nodes) > 0 && !tuo.mutation.UtxosCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tree.UtxosTable,
+			Columns: []string{tree.UtxosColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tuo.mutation.UtxosIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tree.UtxosTable,
+			Columns: []string{tree.UtxosColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 )
 
@@ -26,6 +27,7 @@ type UtxoQuery struct {
 	inters             []Interceptor
 	predicates         []predicate.Utxo
 	withDepositAddress *DepositAddressQuery
+	withTree           *TreeQuery
 	withFKs            bool
 	modifiers          []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -79,6 +81,28 @@ func (uq *UtxoQuery) QueryDepositAddress() *DepositAddressQuery {
 			sqlgraph.From(utxo.Table, utxo.FieldID, selector),
 			sqlgraph.To(depositaddress.Table, depositaddress.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, utxo.DepositAddressTable, utxo.DepositAddressColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTree chains the current query on the "tree" edge.
+func (uq *UtxoQuery) QueryTree() *TreeQuery {
+	query := (&TreeClient{config: uq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := uq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := uq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(utxo.Table, utxo.FieldID, selector),
+			sqlgraph.To(tree.Table, tree.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, utxo.TreeTable, utxo.TreeColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
 		return fromU, nil
@@ -279,6 +303,7 @@ func (uq *UtxoQuery) Clone() *UtxoQuery {
 		inters:             append([]Interceptor{}, uq.inters...),
 		predicates:         append([]predicate.Utxo{}, uq.predicates...),
 		withDepositAddress: uq.withDepositAddress.Clone(),
+		withTree:           uq.withTree.Clone(),
 		// clone intermediate query.
 		sql:       uq.sql.Clone(),
 		path:      uq.path,
@@ -294,6 +319,17 @@ func (uq *UtxoQuery) WithDepositAddress(opts ...func(*DepositAddressQuery)) *Utx
 		opt(query)
 	}
 	uq.withDepositAddress = query
+	return uq
+}
+
+// WithTree tells the query-builder to eager-load the nodes that are connected to
+// the "tree" edge. The optional arguments are used to configure the query builder of the edge.
+func (uq *UtxoQuery) WithTree(opts ...func(*TreeQuery)) *UtxoQuery {
+	query := (&TreeClient{config: uq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	uq.withTree = query
 	return uq
 }
 
@@ -376,11 +412,12 @@ func (uq *UtxoQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Utxo, e
 		nodes       = []*Utxo{}
 		withFKs     = uq.withFKs
 		_spec       = uq.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [2]bool{
 			uq.withDepositAddress != nil,
+			uq.withTree != nil,
 		}
 	)
-	if uq.withDepositAddress != nil {
+	if uq.withDepositAddress != nil || uq.withTree != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -413,6 +450,12 @@ func (uq *UtxoQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Utxo, e
 			return nil, err
 		}
 	}
+	if query := uq.withTree; query != nil {
+		if err := uq.loadTree(ctx, query, nodes, nil,
+			func(n *Utxo, e *Tree) { n.Edges.Tree = e }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
 }
 
@@ -441,6 +484,38 @@ func (uq *UtxoQuery) loadDepositAddress(ctx context.Context, query *DepositAddre
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "deposit_address_utxo" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (uq *UtxoQuery) loadTree(ctx context.Context, query *TreeQuery, nodes []*Utxo, init func(*Utxo), assign func(*Utxo, *Tree)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*Utxo)
+	for i := range nodes {
+		if nodes[i].tree_utxos == nil {
+			continue
+		}
+		fk := *nodes[i].tree_utxos
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(tree.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "tree_utxos" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)

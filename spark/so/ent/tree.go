@@ -49,13 +49,15 @@ type Tree struct {
 type TreeEdges struct {
 	// Root holds the value of the root edge.
 	Root *TreeNode `json:"root,omitempty"`
+	// Utxos holds the value of the utxos edge.
+	Utxos []*Utxo `json:"utxos,omitempty"`
 	// Nodes holds the value of the nodes edge.
 	Nodes []*TreeNode `json:"nodes,omitempty"`
 	// DepositAddress holds the value of the deposit_address edge.
 	DepositAddress *DepositAddress `json:"deposit_address,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
 }
 
 // RootOrErr returns the Root value or an error if the edge
@@ -69,10 +71,19 @@ func (e TreeEdges) RootOrErr() (*TreeNode, error) {
 	return nil, &NotLoadedError{edge: "root"}
 }
 
+// UtxosOrErr returns the Utxos value or an error if the edge
+// was not loaded in eager-loading.
+func (e TreeEdges) UtxosOrErr() ([]*Utxo, error) {
+	if e.loadedTypes[1] {
+		return e.Utxos, nil
+	}
+	return nil, &NotLoadedError{edge: "utxos"}
+}
+
 // NodesOrErr returns the Nodes value or an error if the edge
 // was not loaded in eager-loading.
 func (e TreeEdges) NodesOrErr() ([]*TreeNode, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.Nodes, nil
 	}
 	return nil, &NotLoadedError{edge: "nodes"}
@@ -83,7 +94,7 @@ func (e TreeEdges) NodesOrErr() ([]*TreeNode, error) {
 func (e TreeEdges) DepositAddressOrErr() (*DepositAddress, error) {
 	if e.DepositAddress != nil {
 		return e.DepositAddress, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: depositaddress.Label}
 	}
 	return nil, &NotLoadedError{edge: "deposit_address"}
@@ -205,6 +216,11 @@ func (t *Tree) Value(name string) (ent.Value, error) {
 // QueryRoot queries the "root" edge of the Tree entity.
 func (t *Tree) QueryRoot() *TreeNodeQuery {
 	return NewTreeClient(t.config).QueryRoot(t)
+}
+
+// QueryUtxos queries the "utxos" edge of the Tree entity.
+func (t *Tree) QueryUtxos() *UtxoQuery {
+	return NewTreeClient(t.config).QueryUtxos(t)
 }
 
 // QueryNodes queries the "nodes" edge of the Tree entity.

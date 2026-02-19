@@ -34,6 +34,8 @@ const (
 	FieldVout = "vout"
 	// EdgeRoot holds the string denoting the root edge name in mutations.
 	EdgeRoot = "root"
+	// EdgeUtxos holds the string denoting the utxos edge name in mutations.
+	EdgeUtxos = "utxos"
 	// EdgeNodes holds the string denoting the nodes edge name in mutations.
 	EdgeNodes = "nodes"
 	// EdgeDepositAddress holds the string denoting the deposit_address edge name in mutations.
@@ -47,6 +49,13 @@ const (
 	RootInverseTable = "tree_nodes"
 	// RootColumn is the table column denoting the root relation/edge.
 	RootColumn = "tree_root"
+	// UtxosTable is the table that holds the utxos relation/edge.
+	UtxosTable = "utxos"
+	// UtxosInverseTable is the table name for the Utxo entity.
+	// It exists in this package in order to avoid circular dependency with the "utxo" package.
+	UtxosInverseTable = "utxos"
+	// UtxosColumn is the table column denoting the utxos relation/edge.
+	UtxosColumn = "tree_utxos"
 	// NodesTable is the table that holds the nodes relation/edge.
 	NodesTable = "tree_nodes"
 	// NodesInverseTable is the table name for the TreeNode entity.
@@ -170,6 +179,20 @@ func ByRootField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// ByUtxosCount orders the results by utxos count.
+func ByUtxosCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newUtxosStep(), opts...)
+	}
+}
+
+// ByUtxos orders the results by utxos terms.
+func ByUtxos(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newUtxosStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByNodesCount orders the results by nodes count.
 func ByNodesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -195,6 +218,13 @@ func newRootStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(RootInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, RootTable, RootColumn),
+	)
+}
+func newUtxosStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(UtxosInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, UtxosTable, UtxosColumn),
 	)
 }
 func newNodesStep() *sqlgraph.Step {

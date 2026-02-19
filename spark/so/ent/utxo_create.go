@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 )
 
@@ -90,6 +91,20 @@ func (uc *UtxoCreate) SetPkScript(b []byte) *UtxoCreate {
 	return uc
 }
 
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (uc *UtxoCreate) SetAvailabilityConfirmedAt(t time.Time) *UtxoCreate {
+	uc.mutation.SetAvailabilityConfirmedAt(t)
+	return uc
+}
+
+// SetNillableAvailabilityConfirmedAt sets the "availability_confirmed_at" field if the given value is not nil.
+func (uc *UtxoCreate) SetNillableAvailabilityConfirmedAt(t *time.Time) *UtxoCreate {
+	if t != nil {
+		uc.SetAvailabilityConfirmedAt(*t)
+	}
+	return uc
+}
+
 // SetID sets the "id" field.
 func (uc *UtxoCreate) SetID(u uuid.UUID) *UtxoCreate {
 	uc.mutation.SetID(u)
@@ -113,6 +128,25 @@ func (uc *UtxoCreate) SetDepositAddressID(id uuid.UUID) *UtxoCreate {
 // SetDepositAddress sets the "deposit_address" edge to the DepositAddress entity.
 func (uc *UtxoCreate) SetDepositAddress(d *DepositAddress) *UtxoCreate {
 	return uc.SetDepositAddressID(d.ID)
+}
+
+// SetTreeID sets the "tree" edge to the Tree entity by ID.
+func (uc *UtxoCreate) SetTreeID(id uuid.UUID) *UtxoCreate {
+	uc.mutation.SetTreeID(id)
+	return uc
+}
+
+// SetNillableTreeID sets the "tree" edge to the Tree entity by ID if the given value is not nil.
+func (uc *UtxoCreate) SetNillableTreeID(id *uuid.UUID) *UtxoCreate {
+	if id != nil {
+		uc = uc.SetTreeID(*id)
+	}
+	return uc
+}
+
+// SetTree sets the "tree" edge to the Tree entity.
+func (uc *UtxoCreate) SetTree(t *Tree) *UtxoCreate {
+	return uc.SetTreeID(t.ID)
 }
 
 // Mutation returns the UtxoMutation object of the builder.
@@ -271,6 +305,10 @@ func (uc *UtxoCreate) createSpec() (*Utxo, *sqlgraph.CreateSpec) {
 		_spec.SetField(utxo.FieldPkScript, field.TypeBytes, value)
 		_node.PkScript = value
 	}
+	if value, ok := uc.mutation.AvailabilityConfirmedAt(); ok {
+		_spec.SetField(utxo.FieldAvailabilityConfirmedAt, field.TypeTime, value)
+		_node.AvailabilityConfirmedAt = &value
+	}
 	if nodes := uc.mutation.DepositAddressIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -286,6 +324,23 @@ func (uc *UtxoCreate) createSpec() (*Utxo, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.deposit_address_utxo = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := uc.mutation.TreeIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   utxo.TreeTable,
+			Columns: []string{utxo.TreeColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tree.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.tree_utxos = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -367,6 +422,24 @@ func (u *UtxoUpsert) UpdateBlockHeight() *UtxoUpsert {
 // AddBlockHeight adds v to the "block_height" field.
 func (u *UtxoUpsert) AddBlockHeight(v int64) *UtxoUpsert {
 	u.Add(utxo.FieldBlockHeight, v)
+	return u
+}
+
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (u *UtxoUpsert) SetAvailabilityConfirmedAt(v time.Time) *UtxoUpsert {
+	u.Set(utxo.FieldAvailabilityConfirmedAt, v)
+	return u
+}
+
+// UpdateAvailabilityConfirmedAt sets the "availability_confirmed_at" field to the value that was provided on create.
+func (u *UtxoUpsert) UpdateAvailabilityConfirmedAt() *UtxoUpsert {
+	u.SetExcluded(utxo.FieldAvailabilityConfirmedAt)
+	return u
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (u *UtxoUpsert) ClearAvailabilityConfirmedAt() *UtxoUpsert {
+	u.SetNull(utxo.FieldAvailabilityConfirmedAt)
 	return u
 }
 
@@ -468,6 +541,27 @@ func (u *UtxoUpsertOne) AddBlockHeight(v int64) *UtxoUpsertOne {
 func (u *UtxoUpsertOne) UpdateBlockHeight() *UtxoUpsertOne {
 	return u.Update(func(s *UtxoUpsert) {
 		s.UpdateBlockHeight()
+	})
+}
+
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (u *UtxoUpsertOne) SetAvailabilityConfirmedAt(v time.Time) *UtxoUpsertOne {
+	return u.Update(func(s *UtxoUpsert) {
+		s.SetAvailabilityConfirmedAt(v)
+	})
+}
+
+// UpdateAvailabilityConfirmedAt sets the "availability_confirmed_at" field to the value that was provided on create.
+func (u *UtxoUpsertOne) UpdateAvailabilityConfirmedAt() *UtxoUpsertOne {
+	return u.Update(func(s *UtxoUpsert) {
+		s.UpdateAvailabilityConfirmedAt()
+	})
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (u *UtxoUpsertOne) ClearAvailabilityConfirmedAt() *UtxoUpsertOne {
+	return u.Update(func(s *UtxoUpsert) {
+		s.ClearAvailabilityConfirmedAt()
 	})
 }
 
@@ -736,6 +830,27 @@ func (u *UtxoUpsertBulk) AddBlockHeight(v int64) *UtxoUpsertBulk {
 func (u *UtxoUpsertBulk) UpdateBlockHeight() *UtxoUpsertBulk {
 	return u.Update(func(s *UtxoUpsert) {
 		s.UpdateBlockHeight()
+	})
+}
+
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (u *UtxoUpsertBulk) SetAvailabilityConfirmedAt(v time.Time) *UtxoUpsertBulk {
+	return u.Update(func(s *UtxoUpsert) {
+		s.SetAvailabilityConfirmedAt(v)
+	})
+}
+
+// UpdateAvailabilityConfirmedAt sets the "availability_confirmed_at" field to the value that was provided on create.
+func (u *UtxoUpsertBulk) UpdateAvailabilityConfirmedAt() *UtxoUpsertBulk {
+	return u.Update(func(s *UtxoUpsert) {
+		s.UpdateAvailabilityConfirmedAt()
+	})
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (u *UtxoUpsertBulk) ClearAvailabilityConfirmedAt() *UtxoUpsertBulk {
+	return u.Update(func(s *UtxoUpsert) {
+		s.ClearAvailabilityConfirmedAt()
 	})
 }
 

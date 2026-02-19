@@ -357,6 +357,29 @@ func HasRootWith(preds ...predicate.TreeNode) predicate.Tree {
 	})
 }
 
+// HasUtxos applies the HasEdge predicate on the "utxos" edge.
+func HasUtxos() predicate.Tree {
+	return predicate.Tree(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, UtxosTable, UtxosColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasUtxosWith applies the HasEdge predicate on the "utxos" edge with a given conditions (other predicates).
+func HasUtxosWith(preds ...predicate.Utxo) predicate.Tree {
+	return predicate.Tree(func(s *sql.Selector) {
+		step := newUtxosStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasNodes applies the HasEdge predicate on the "nodes" edge.
 func HasNodes() predicate.Tree {
 	return predicate.Tree(func(s *sql.Selector) {

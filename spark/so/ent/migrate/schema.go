@@ -1506,7 +1506,9 @@ var (
 		{Name: "amount", Type: field.TypeUint64},
 		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "pk_script", Type: field.TypeBytes},
+		{Name: "availability_confirmed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "deposit_address_utxo", Type: field.TypeUUID},
+		{Name: "tree_utxos", Type: field.TypeUUID, Nullable: true},
 	}
 	// UtxosTable holds the schema information for the "utxos" table.
 	UtxosTable = &schema.Table{
@@ -1516,9 +1518,15 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "utxos_deposit_addresses_utxo",
-				Columns:    []*schema.Column{UtxosColumns[9]},
+				Columns:    []*schema.Column{UtxosColumns[10]},
 				RefColumns: []*schema.Column{DepositAddressesColumns[0]},
 				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "utxos_trees_utxos",
+				Columns:    []*schema.Column{UtxosColumns[11]},
+				RefColumns: []*schema.Column{TreesColumns[0]},
+				OnDelete:   schema.SetNull,
 			},
 		},
 		Indexes: []*schema.Index{
@@ -1754,6 +1762,7 @@ func init() {
 	UserSignedTransactionsTable.ForeignKeys[0].RefTable = TreeNodesTable
 	UserSignedTransactionsTable.ForeignKeys[1].RefTable = PreimageRequestsTable
 	UtxosTable.ForeignKeys[0].RefTable = DepositAddressesTable
+	UtxosTable.ForeignKeys[1].RefTable = TreesTable
 	UtxoSwapsTable.ForeignKeys[0].RefTable = DepositAddressesTable
 	UtxoSwapsTable.ForeignKeys[1].RefTable = UtxosTable
 	UtxoSwapsTable.ForeignKeys[2].RefTable = TransfersTable

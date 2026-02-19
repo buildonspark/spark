@@ -48,15 +48,22 @@ func (Utxo) Fields() []ent.Field {
 			Annotations(entexample.Default(
 				"512089f1097344ab882061ea9aee058ed84910be8e2f92429b8835af58284c0f59d6",
 			)),
+		field.Time("availability_confirmed_at").
+			Optional().
+			Nillable().
+			Comment("Timestamp when the UTXO was confirmed available after meeting the confirmation threshold."),
 	}
 }
 
-// Edges of the UtxoSwap.
+// Edges of the Utxo.
 func (Utxo) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("deposit_address", DepositAddress.Type).
 			Ref("utxo").
 			Unique().Required(),
+		edge.From("tree", Tree.Type).
+			Ref("utxos").
+			Unique(),
 	}
 }
 

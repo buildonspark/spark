@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 )
 
@@ -36,10 +37,13 @@ type Utxo struct {
 	Network btcnetwork.Network `json:"network,omitempty"`
 	// PkScript holds the value of the "pk_script" field.
 	PkScript []byte `json:"pk_script,omitempty"`
+	// Timestamp when the UTXO was confirmed available after meeting the confirmation threshold.
+	AvailabilityConfirmedAt *time.Time `json:"availability_confirmed_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UtxoQuery when eager-loading is set.
 	Edges                UtxoEdges `json:"edges"`
 	deposit_address_utxo *uuid.UUID
+	tree_utxos           *uuid.UUID
 	selectValues         sql.SelectValues
 }
 
@@ -47,9 +51,11 @@ type Utxo struct {
 type UtxoEdges struct {
 	// DepositAddress holds the value of the deposit_address edge.
 	DepositAddress *DepositAddress `json:"deposit_address,omitempty"`
+	// Tree holds the value of the tree edge.
+	Tree *Tree `json:"tree,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // DepositAddressOrErr returns the DepositAddress value or an error if the edge
@@ -63,6 +69,17 @@ func (e UtxoEdges) DepositAddressOrErr() (*DepositAddress, error) {
 	return nil, &NotLoadedError{edge: "deposit_address"}
 }
 
+// TreeOrErr returns the Tree value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e UtxoEdges) TreeOrErr() (*Tree, error) {
+	if e.Tree != nil {
+		return e.Tree, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: tree.Label}
+	}
+	return nil, &NotLoadedError{edge: "tree"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*Utxo) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -74,11 +91,13 @@ func (*Utxo) scanValues(columns []string) ([]any, error) {
 			values[i] = new(btcnetwork.Network)
 		case utxo.FieldBlockHeight, utxo.FieldVout, utxo.FieldAmount:
 			values[i] = new(sql.NullInt64)
-		case utxo.FieldCreateTime, utxo.FieldUpdateTime:
+		case utxo.FieldCreateTime, utxo.FieldUpdateTime, utxo.FieldAvailabilityConfirmedAt:
 			values[i] = new(sql.NullTime)
 		case utxo.FieldID:
 			values[i] = new(uuid.UUID)
 		case utxo.ForeignKeys[0]: // deposit_address_utxo
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
+		case utxo.ForeignKeys[1]: // tree_utxos
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
@@ -149,12 +168,26 @@ func (u *Utxo) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				u.PkScript = *value
 			}
+		case utxo.FieldAvailabilityConfirmedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field availability_confirmed_at", values[i])
+			} else if value.Valid {
+				u.AvailabilityConfirmedAt = new(time.Time)
+				*u.AvailabilityConfirmedAt = value.Time
+			}
 		case utxo.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field deposit_address_utxo", values[i])
 			} else if value.Valid {
 				u.deposit_address_utxo = new(uuid.UUID)
 				*u.deposit_address_utxo = *value.S.(*uuid.UUID)
+			}
+		case utxo.ForeignKeys[1]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field tree_utxos", values[i])
+			} else if value.Valid {
+				u.tree_utxos = new(uuid.UUID)
+				*u.tree_utxos = *value.S.(*uuid.UUID)
 			}
 		default:
 			u.selectValues.Set(columns[i], values[i])
@@ -172,6 +205,11 @@ func (u *Utxo) Value(name string) (ent.Value, error) {
 // QueryDepositAddress queries the "deposit_address" edge of the Utxo entity.
 func (u *Utxo) QueryDepositAddress() *DepositAddressQuery {
 	return NewUtxoClient(u.config).QueryDepositAddress(u)
+}
+
+// QueryTree queries the "tree" edge of the Utxo entity.
+func (u *Utxo) QueryTree() *TreeQuery {
+	return NewUtxoClient(u.config).QueryTree(u)
 }
 
 // Update returns a builder for updating this Utxo.
@@ -220,6 +258,11 @@ func (u *Utxo) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("pk_script=")
 	builder.WriteString(fmt.Sprintf("%v", u.PkScript))
+	builder.WriteString(", ")
+	if v := u.AvailabilityConfirmedAt; v != nil {
+		builder.WriteString("availability_confirmed_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 )
 
@@ -58,6 +59,26 @@ func (uu *UtxoUpdate) AddBlockHeight(i int64) *UtxoUpdate {
 	return uu
 }
 
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (uu *UtxoUpdate) SetAvailabilityConfirmedAt(t time.Time) *UtxoUpdate {
+	uu.mutation.SetAvailabilityConfirmedAt(t)
+	return uu
+}
+
+// SetNillableAvailabilityConfirmedAt sets the "availability_confirmed_at" field if the given value is not nil.
+func (uu *UtxoUpdate) SetNillableAvailabilityConfirmedAt(t *time.Time) *UtxoUpdate {
+	if t != nil {
+		uu.SetAvailabilityConfirmedAt(*t)
+	}
+	return uu
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (uu *UtxoUpdate) ClearAvailabilityConfirmedAt() *UtxoUpdate {
+	uu.mutation.ClearAvailabilityConfirmedAt()
+	return uu
+}
+
 // SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID.
 func (uu *UtxoUpdate) SetDepositAddressID(id uuid.UUID) *UtxoUpdate {
 	uu.mutation.SetDepositAddressID(id)
@@ -69,6 +90,25 @@ func (uu *UtxoUpdate) SetDepositAddress(d *DepositAddress) *UtxoUpdate {
 	return uu.SetDepositAddressID(d.ID)
 }
 
+// SetTreeID sets the "tree" edge to the Tree entity by ID.
+func (uu *UtxoUpdate) SetTreeID(id uuid.UUID) *UtxoUpdate {
+	uu.mutation.SetTreeID(id)
+	return uu
+}
+
+// SetNillableTreeID sets the "tree" edge to the Tree entity by ID if the given value is not nil.
+func (uu *UtxoUpdate) SetNillableTreeID(id *uuid.UUID) *UtxoUpdate {
+	if id != nil {
+		uu = uu.SetTreeID(*id)
+	}
+	return uu
+}
+
+// SetTree sets the "tree" edge to the Tree entity.
+func (uu *UtxoUpdate) SetTree(t *Tree) *UtxoUpdate {
+	return uu.SetTreeID(t.ID)
+}
+
 // Mutation returns the UtxoMutation object of the builder.
 func (uu *UtxoUpdate) Mutation() *UtxoMutation {
 	return uu.mutation
@@ -77,6 +117,12 @@ func (uu *UtxoUpdate) Mutation() *UtxoMutation {
 // ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
 func (uu *UtxoUpdate) ClearDepositAddress() *UtxoUpdate {
 	uu.mutation.ClearDepositAddress()
+	return uu
+}
+
+// ClearTree clears the "tree" edge to the Tree entity.
+func (uu *UtxoUpdate) ClearTree() *UtxoUpdate {
+	uu.mutation.ClearTree()
 	return uu
 }
 
@@ -151,6 +197,12 @@ func (uu *UtxoUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := uu.mutation.AddedBlockHeight(); ok {
 		_spec.AddField(utxo.FieldBlockHeight, field.TypeInt64, value)
 	}
+	if value, ok := uu.mutation.AvailabilityConfirmedAt(); ok {
+		_spec.SetField(utxo.FieldAvailabilityConfirmedAt, field.TypeTime, value)
+	}
+	if uu.mutation.AvailabilityConfirmedAtCleared() {
+		_spec.ClearField(utxo.FieldAvailabilityConfirmedAt, field.TypeTime)
+	}
 	if uu.mutation.DepositAddressCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -173,6 +225,35 @@ func (uu *UtxoUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if uu.mutation.TreeCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   utxo.TreeTable,
+			Columns: []string{utxo.TreeColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tree.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uu.mutation.TreeIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   utxo.TreeTable,
+			Columns: []string{utxo.TreeColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tree.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
@@ -229,6 +310,26 @@ func (uuo *UtxoUpdateOne) AddBlockHeight(i int64) *UtxoUpdateOne {
 	return uuo
 }
 
+// SetAvailabilityConfirmedAt sets the "availability_confirmed_at" field.
+func (uuo *UtxoUpdateOne) SetAvailabilityConfirmedAt(t time.Time) *UtxoUpdateOne {
+	uuo.mutation.SetAvailabilityConfirmedAt(t)
+	return uuo
+}
+
+// SetNillableAvailabilityConfirmedAt sets the "availability_confirmed_at" field if the given value is not nil.
+func (uuo *UtxoUpdateOne) SetNillableAvailabilityConfirmedAt(t *time.Time) *UtxoUpdateOne {
+	if t != nil {
+		uuo.SetAvailabilityConfirmedAt(*t)
+	}
+	return uuo
+}
+
+// ClearAvailabilityConfirmedAt clears the value of the "availability_confirmed_at" field.
+func (uuo *UtxoUpdateOne) ClearAvailabilityConfirmedAt() *UtxoUpdateOne {
+	uuo.mutation.ClearAvailabilityConfirmedAt()
+	return uuo
+}
+
 // SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID.
 func (uuo *UtxoUpdateOne) SetDepositAddressID(id uuid.UUID) *UtxoUpdateOne {
 	uuo.mutation.SetDepositAddressID(id)
@@ -240,6 +341,25 @@ func (uuo *UtxoUpdateOne) SetDepositAddress(d *DepositAddress) *UtxoUpdateOne {
 	return uuo.SetDepositAddressID(d.ID)
 }
 
+// SetTreeID sets the "tree" edge to the Tree entity by ID.
+func (uuo *UtxoUpdateOne) SetTreeID(id uuid.UUID) *UtxoUpdateOne {
+	uuo.mutation.SetTreeID(id)
+	return uuo
+}
+
+// SetNillableTreeID sets the "tree" edge to the Tree entity by ID if the given value is not nil.
+func (uuo *UtxoUpdateOne) SetNillableTreeID(id *uuid.UUID) *UtxoUpdateOne {
+	if id != nil {
+		uuo = uuo.SetTreeID(*id)
+	}
+	return uuo
+}
+
+// SetTree sets the "tree" edge to the Tree entity.
+func (uuo *UtxoUpdateOne) SetTree(t *Tree) *UtxoUpdateOne {
+	return uuo.SetTreeID(t.ID)
+}
+
 // Mutation returns the UtxoMutation object of the builder.
 func (uuo *UtxoUpdateOne) Mutation() *UtxoMutation {
 	return uuo.mutation
@@ -248,6 +368,12 @@ func (uuo *UtxoUpdateOne) Mutation() *UtxoMutation {
 // ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
 func (uuo *UtxoUpdateOne) ClearDepositAddress() *UtxoUpdateOne {
 	uuo.mutation.ClearDepositAddress()
+	return uuo
+}
+
+// ClearTree clears the "tree" edge to the Tree entity.
+func (uuo *UtxoUpdateOne) ClearTree() *UtxoUpdateOne {
+	uuo.mutation.ClearTree()
 	return uuo
 }
 
@@ -352,6 +478,12 @@ func (uuo *UtxoUpdateOne) sqlSave(ctx context.Context) (_node *Utxo, err error) 
 	if value, ok := uuo.mutation.AddedBlockHeight(); ok {
 		_spec.AddField(utxo.FieldBlockHeight, field.TypeInt64, value)
 	}
+	if value, ok := uuo.mutation.AvailabilityConfirmedAt(); ok {
+		_spec.SetField(utxo.FieldAvailabilityConfirmedAt, field.TypeTime, value)
+	}
+	if uuo.mutation.AvailabilityConfirmedAtCleared() {
+		_spec.ClearField(utxo.FieldAvailabilityConfirmedAt, field.TypeTime)
+	}
 	if uuo.mutation.DepositAddressCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -374,6 +506,35 @@ func (uuo *UtxoUpdateOne) sqlSave(ctx context.Context) (_node *Utxo, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if uuo.mutation.TreeCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   utxo.TreeTable,
+			Columns: []string{utxo.TreeColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tree.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uuo.mutation.TreeIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   utxo.TreeTable,
+			Columns: []string{utxo.TreeColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tree.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
