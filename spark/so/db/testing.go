@@ -159,11 +159,6 @@ func ConnectToTestPostgres(t testing.TB) (context.Context, *TestContext) {
 		Port:                      postgresPort,
 		Options:                   "sslmode=disable",
 		ForceTerminateConnections: true,
-		TestRole: &pgtestdb.Role{
-			Username:     pgtestdb.DefaultRoleUsername,
-			Password:     pgtestdb.DefaultRolePassword,
-			Capabilities: "SUPERUSER",
-		},
 	}
 
 	// We have to find the module root in order to get the path to the migrations folder, since the working directory
