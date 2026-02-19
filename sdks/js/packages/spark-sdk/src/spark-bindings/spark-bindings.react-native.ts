@@ -151,6 +151,80 @@ class SparkFrostReactNative extends SparkFrostBase {
     return toUint8Array(result);
   }
 
+  async splitSecretWithProofs(
+    secret: Uint8Array,
+    threshold: number,
+    numShares: number,
+  ) {
+    const result = await SparkFrostReactNative.callNativeModule(
+      "splitSecretWithProofs",
+      {
+        secret: toNumberArray(secret),
+        threshold,
+        numShares,
+      },
+    );
+    return (
+      result as {
+        threshold: number;
+        index: number;
+        share: number[];
+        proofs: number[][];
+      }[]
+    ).map(
+      (s: {
+        threshold: number;
+        index: number;
+        share: number[];
+        proofs: number[][];
+      }) => ({
+        threshold: s.threshold,
+        index: s.index,
+        share: toUint8Array(s.share),
+        proofs: s.proofs.map((p: number[]) => toUint8Array(p)),
+      }),
+    );
+  }
+
+  async recoverSecret(
+    shares: { threshold: number; index: number; share: Uint8Array }[],
+  ) {
+    const nativeShares = shares.map((s) => ({
+      threshold: s.threshold,
+      index: s.index,
+      share: toNumberArray(s.share),
+    }));
+    const result = await SparkFrostReactNative.callNativeModule(
+      "recoverSecret",
+      { shares: nativeShares },
+    );
+    return toUint8Array(result as number[]);
+  }
+
+  async validateShare(
+    share: Uint8Array,
+    index: number,
+    threshold: number,
+    proofs: Uint8Array[],
+  ) {
+    await SparkFrostReactNative.callNativeModule("validateShare", {
+      share: toNumberArray(share),
+      index,
+      threshold,
+      proofs: proofs.map(toNumberArray),
+    });
+  }
+
+  private static async callNativeModule(
+    method: string,
+    params: any,
+  ): Promise<any> {
+    if (!SparkFrostModule) {
+      throw new Error("SparkFrostModule is not available in this environment");
+    }
+    return SparkFrostModule[method](params);
+  }
+
   static async getPublicKey(
     privateKey: Uint8Array,
     compressed: boolean = true,

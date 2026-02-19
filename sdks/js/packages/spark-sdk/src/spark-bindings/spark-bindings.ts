@@ -7,6 +7,13 @@ import type {
   SignFrostBindingParams,
 } from "./types.js";
 
+export type WasmVerifiableSecretShare = {
+  threshold: number;
+  index: number;
+  share: Uint8Array;
+  proofs: Uint8Array[];
+};
+
 export abstract class SparkFrostBase {
   abstract signFrost(params: SignFrostBindingParams): Promise<Uint8Array>;
   abstract aggregateFrost(
@@ -90,6 +97,21 @@ export abstract class SparkFrostBase {
 
     throw new Error("Cannot apply adaptor to signature");
   }
+
+  abstract splitSecretWithProofs(
+    secret: Uint8Array,
+    threshold: number,
+    numShares: number,
+  ): Promise<WasmVerifiableSecretShare[]>;
+  abstract recoverSecret(
+    shares: { threshold: number; index: number; share: Uint8Array }[],
+  ): Promise<Uint8Array>;
+  abstract validateShare(
+    share: Uint8Array,
+    index: number,
+    threshold: number,
+    proofs: Uint8Array[],
+  ): Promise<void>;
 
   // These will be moved to bindings in the future
   getPublicKeyBytes(privateKey: Uint8Array): Uint8Array {

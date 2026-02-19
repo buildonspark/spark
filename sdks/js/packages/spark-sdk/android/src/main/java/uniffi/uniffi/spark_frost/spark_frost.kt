@@ -777,12 +777,71 @@ internal interface UniffiLib : Library {
     uniffi_out_err: UniffiRustCallStatus,
   ): RustBuffer.ByValue
 
+  fun uniffi_spark_frost_fn_func_apply_adaptor_to_signature(
+    `pubKey`: RustBuffer.ByValue,
+    `hash`: RustBuffer.ByValue,
+    `signature`: RustBuffer.ByValue,
+    `adaptorPrivateKey`: RustBuffer.ByValue,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
+  fun uniffi_spark_frost_fn_func_check_if_valid_sequence(
+    `sequence`: Int,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Unit
+
+  fun uniffi_spark_frost_fn_func_compute_multi_input_sighash_uniffi(
+    `tx`: RustBuffer.ByValue,
+    `inputIndex`: Int,
+    `prevOutScripts`: RustBuffer.ByValue,
+    `prevOutValues`: RustBuffer.ByValue,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
   fun uniffi_spark_frost_fn_func_construct_direct_refund_tx(
     `tx`: RustBuffer.ByValue,
     `vout`: Int,
     `pubkey`: RustBuffer.ByValue,
     `network`: RustBuffer.ByValue,
     `sequence`: Int,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
+  fun uniffi_spark_frost_fn_func_construct_htlc_receiver_spend(
+    `htlcTx`: RustBuffer.ByValue,
+    `destinationPubkey`: RustBuffer.ByValue,
+    `paymentHash`: RustBuffer.ByValue,
+    `hashlockPubkey`: RustBuffer.ByValue,
+    `seqlockPubkey`: RustBuffer.ByValue,
+    `htlcSequence`: Int,
+    `feeSats`: Long,
+    `network`: RustBuffer.ByValue,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
+  fun uniffi_spark_frost_fn_func_construct_htlc_sender_spend(
+    `htlcTx`: RustBuffer.ByValue,
+    `destinationPubkey`: RustBuffer.ByValue,
+    `paymentHash`: RustBuffer.ByValue,
+    `hashlockPubkey`: RustBuffer.ByValue,
+    `seqlockPubkey`: RustBuffer.ByValue,
+    `htlcSequence`: Int,
+    `feeSats`: Long,
+    `network`: RustBuffer.ByValue,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
+  fun uniffi_spark_frost_fn_func_construct_htlc_transaction(
+    `nodeTx`: RustBuffer.ByValue,
+    `vout`: Int,
+    `sequence`: Int,
+    `paymentHash`: RustBuffer.ByValue,
+    `hashlockPubkey`: RustBuffer.ByValue,
+    `seqlockPubkey`: RustBuffer.ByValue,
+    `htlcSequence`: Int,
+    `applyFee`: Byte,
+    `feeSats`: Long,
+    `network`: RustBuffer.ByValue,
     uniffi_out_err: UniffiRustCallStatus,
   ): RustBuffer.ByValue
 
@@ -794,12 +853,34 @@ internal interface UniffiLib : Library {
     uniffi_out_err: UniffiRustCallStatus,
   ): RustBuffer.ByValue
 
+  fun uniffi_spark_frost_fn_func_construct_node_tx_pair(
+    `parentTx`: RustBuffer.ByValue,
+    `vout`: Int,
+    `address`: RustBuffer.ByValue,
+    `sequence`: Int,
+    `directSequence`: Int,
+    `feeSats`: Long,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
   fun uniffi_spark_frost_fn_func_construct_refund_tx(
     `tx`: RustBuffer.ByValue,
     `vout`: Int,
     `pubkey`: RustBuffer.ByValue,
     `network`: RustBuffer.ByValue,
     `sequence`: Int,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
+  fun uniffi_spark_frost_fn_func_construct_refund_tx_trio(
+    `cpfpNodeTx`: RustBuffer.ByValue,
+    `directNodeTx`: RustBuffer.ByValue,
+    `vout`: Int,
+    `receivingPubkey`: RustBuffer.ByValue,
+    `network`: RustBuffer.ByValue,
+    `sequence`: Int,
+    `directSequence`: Int,
+    `feeSats`: Long,
     uniffi_out_err: UniffiRustCallStatus,
   ): RustBuffer.ByValue
 
@@ -834,6 +915,17 @@ internal interface UniffiLib : Library {
     uniffi_out_err: UniffiRustCallStatus,
   ): RustBuffer.ByValue
 
+  fun uniffi_spark_frost_fn_func_generate_adaptor_from_signature(
+    `signature`: RustBuffer.ByValue,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
+  fun uniffi_spark_frost_fn_func_generate_signature_from_existing_adaptor(
+    `signature`: RustBuffer.ByValue,
+    `adaptorPrivateKey`: RustBuffer.ByValue,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
   fun uniffi_spark_frost_fn_func_get_public_key_bytes(
     `privateKeyBytes`: RustBuffer.ByValue,
     `compressed`: Byte,
@@ -845,7 +937,35 @@ internal interface UniffiLib : Library {
     uniffi_out_err: UniffiRustCallStatus,
   ): RustBuffer.ByValue
 
+  fun uniffi_spark_frost_fn_func_get_timelock_from_sequence(
+    `sequence`: Int,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Int
+
+  fun uniffi_spark_frost_fn_func_is_zero_timelock(
+    `sequence`: Int,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Byte
+
+  fun uniffi_spark_frost_fn_func_next_sequence(
+    `currSequence`: Int,
+    `timeLockInterval`: Int,
+    `directTimelockOffset`: Int,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
   fun uniffi_spark_frost_fn_func_random_secret_key_bytes(uniffi_out_err: UniffiRustCallStatus): RustBuffer.ByValue
+
+  fun uniffi_spark_frost_fn_func_recover_secret_uniffi(
+    `shares`: RustBuffer.ByValue,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
+  fun uniffi_spark_frost_fn_func_round_down_to_timelock_interval(
+    `timelock`: Int,
+    `timeLockInterval`: Int,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Int
 
   fun uniffi_spark_frost_fn_func_sign_frost(
     `msg`: RustBuffer.ByValue,
@@ -856,6 +976,36 @@ internal interface UniffiLib : Library {
     `adaptorPublicKey`: RustBuffer.ByValue,
     uniffi_out_err: UniffiRustCallStatus,
   ): RustBuffer.ByValue
+
+  fun uniffi_spark_frost_fn_func_split_secret(
+    `secret`: RustBuffer.ByValue,
+    `threshold`: Int,
+    `numShares`: Int,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
+  fun uniffi_spark_frost_fn_func_split_secret_with_proofs_uniffi(
+    `secret`: RustBuffer.ByValue,
+    `threshold`: Int,
+    `numShares`: Int,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): RustBuffer.ByValue
+
+  fun uniffi_spark_frost_fn_func_validate_adaptor_signature(
+    `pubKey`: RustBuffer.ByValue,
+    `hash`: RustBuffer.ByValue,
+    `signature`: RustBuffer.ByValue,
+    `adaptorPubKey`: RustBuffer.ByValue,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Unit
+
+  fun uniffi_spark_frost_fn_func_validate_share_uniffi(
+    `share`: RustBuffer.ByValue,
+    `index`: Int,
+    `threshold`: Int,
+    `proofs`: RustBuffer.ByValue,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Unit
 
   fun uniffi_spark_frost_fn_func_validate_signature_share(
     `msg`: RustBuffer.ByValue,
@@ -1092,11 +1242,27 @@ internal interface UniffiLib : Library {
 
   fun uniffi_spark_frost_checksum_func_aggregate_frost(): Short
 
+  fun uniffi_spark_frost_checksum_func_apply_adaptor_to_signature(): Short
+
+  fun uniffi_spark_frost_checksum_func_check_if_valid_sequence(): Short
+
+  fun uniffi_spark_frost_checksum_func_compute_multi_input_sighash_uniffi(): Short
+
   fun uniffi_spark_frost_checksum_func_construct_direct_refund_tx(): Short
+
+  fun uniffi_spark_frost_checksum_func_construct_htlc_receiver_spend(): Short
+
+  fun uniffi_spark_frost_checksum_func_construct_htlc_sender_spend(): Short
+
+  fun uniffi_spark_frost_checksum_func_construct_htlc_transaction(): Short
 
   fun uniffi_spark_frost_checksum_func_construct_node_tx(): Short
 
+  fun uniffi_spark_frost_checksum_func_construct_node_tx_pair(): Short
+
   fun uniffi_spark_frost_checksum_func_construct_refund_tx(): Short
+
+  fun uniffi_spark_frost_checksum_func_construct_refund_tx_trio(): Short
 
   fun uniffi_spark_frost_checksum_func_construct_split_tx(): Short
 
@@ -1108,13 +1274,35 @@ internal interface UniffiLib : Library {
 
   fun uniffi_spark_frost_checksum_func_frost_nonce(): Short
 
+  fun uniffi_spark_frost_checksum_func_generate_adaptor_from_signature(): Short
+
+  fun uniffi_spark_frost_checksum_func_generate_signature_from_existing_adaptor(): Short
+
   fun uniffi_spark_frost_checksum_func_get_public_key_bytes(): Short
 
   fun uniffi_spark_frost_checksum_func_get_taproot_pubkey(): Short
 
+  fun uniffi_spark_frost_checksum_func_get_timelock_from_sequence(): Short
+
+  fun uniffi_spark_frost_checksum_func_is_zero_timelock(): Short
+
+  fun uniffi_spark_frost_checksum_func_next_sequence(): Short
+
   fun uniffi_spark_frost_checksum_func_random_secret_key_bytes(): Short
 
+  fun uniffi_spark_frost_checksum_func_recover_secret_uniffi(): Short
+
+  fun uniffi_spark_frost_checksum_func_round_down_to_timelock_interval(): Short
+
   fun uniffi_spark_frost_checksum_func_sign_frost(): Short
+
+  fun uniffi_spark_frost_checksum_func_split_secret(): Short
+
+  fun uniffi_spark_frost_checksum_func_split_secret_with_proofs_uniffi(): Short
+
+  fun uniffi_spark_frost_checksum_func_validate_adaptor_signature(): Short
+
+  fun uniffi_spark_frost_checksum_func_validate_share_uniffi(): Short
 
   fun uniffi_spark_frost_checksum_func_validate_signature_share(): Short
 
@@ -1138,13 +1326,37 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
   if (lib.uniffi_spark_frost_checksum_func_aggregate_frost() != 50841.toShort()) {
     throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
   }
+  if (lib.uniffi_spark_frost_checksum_func_apply_adaptor_to_signature() != 54040.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_check_if_valid_sequence() != 4423.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_compute_multi_input_sighash_uniffi() != 17203.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
   if (lib.uniffi_spark_frost_checksum_func_construct_direct_refund_tx() != 36543.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_construct_htlc_receiver_spend() != 51844.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_construct_htlc_sender_spend() != 61474.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_construct_htlc_transaction() != 22858.toShort()) {
     throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
   }
   if (lib.uniffi_spark_frost_checksum_func_construct_node_tx() != 50549.toShort()) {
     throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
   }
+  if (lib.uniffi_spark_frost_checksum_func_construct_node_tx_pair() != 27137.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
   if (lib.uniffi_spark_frost_checksum_func_construct_refund_tx() != 31658.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_construct_refund_tx_trio() != 54483.toShort()) {
     throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
   }
   if (lib.uniffi_spark_frost_checksum_func_construct_split_tx() != 55511.toShort()) {
@@ -1162,16 +1374,49 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
   if (lib.uniffi_spark_frost_checksum_func_frost_nonce() != 5111.toShort()) {
     throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
   }
+  if (lib.uniffi_spark_frost_checksum_func_generate_adaptor_from_signature() != 53829.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_generate_signature_from_existing_adaptor() != 37886.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
   if (lib.uniffi_spark_frost_checksum_func_get_public_key_bytes() != 20406.toShort()) {
     throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
   }
   if (lib.uniffi_spark_frost_checksum_func_get_taproot_pubkey() != 13153.toShort()) {
     throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
   }
+  if (lib.uniffi_spark_frost_checksum_func_get_timelock_from_sequence() != 29556.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_is_zero_timelock() != 12763.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_next_sequence() != 1516.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
   if (lib.uniffi_spark_frost_checksum_func_random_secret_key_bytes() != 35662.toShort()) {
     throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
   }
+  if (lib.uniffi_spark_frost_checksum_func_recover_secret_uniffi() != 55746.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_round_down_to_timelock_interval() != 47844.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
   if (lib.uniffi_spark_frost_checksum_func_sign_frost() != 4845.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_split_secret() != 58536.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_split_secret_with_proofs_uniffi() != 24021.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_validate_adaptor_signature() != 6960.toShort()) {
+    throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
+  if (lib.uniffi_spark_frost_checksum_func_validate_share_uniffi() != 40553.toShort()) {
     throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
   }
   if (lib.uniffi_spark_frost_checksum_func_validate_signature_share() != 64132.toShort()) {
@@ -1390,6 +1635,38 @@ public object FfiConverterByteArray : FfiConverterRustBuffer<ByteArray> {
   }
 }
 
+data class AdaptorSignatureResult(
+  var `signature`: kotlin.ByteArray,
+  var `adaptorPrivateKey`: kotlin.ByteArray,
+) {
+  companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAdaptorSignatureResult : FfiConverterRustBuffer<AdaptorSignatureResult> {
+  override fun read(buf: ByteBuffer): AdaptorSignatureResult =
+    AdaptorSignatureResult(
+      FfiConverterByteArray.read(buf),
+      FfiConverterByteArray.read(buf),
+    )
+
+  override fun allocationSize(value: AdaptorSignatureResult) =
+    (
+      FfiConverterByteArray.allocationSize(value.`signature`) +
+        FfiConverterByteArray.allocationSize(value.`adaptorPrivateKey`)
+    )
+
+  override fun write(
+    value: AdaptorSignatureResult,
+    buf: ByteBuffer,
+  ) {
+    FfiConverterByteArray.write(value.`signature`, buf)
+    FfiConverterByteArray.write(value.`adaptorPrivateKey`, buf)
+  }
+}
+
 data class DummyTx(
   var `tx`: kotlin.ByteArray,
   var `txid`: kotlin.String,
@@ -1419,6 +1696,46 @@ public object FfiConverterTypeDummyTx : FfiConverterRustBuffer<DummyTx> {
   ) {
     FfiConverterByteArray.write(value.`tx`, buf)
     FfiConverterString.write(value.`txid`, buf)
+  }
+}
+
+data class HtlcSpendResult(
+  var `tx`: kotlin.ByteArray,
+  var `sighash`: kotlin.ByteArray,
+  var `script`: kotlin.ByteArray,
+  var `controlBlock`: kotlin.ByteArray,
+) {
+  companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeHTLCSpendResult : FfiConverterRustBuffer<HtlcSpendResult> {
+  override fun read(buf: ByteBuffer): HtlcSpendResult =
+    HtlcSpendResult(
+      FfiConverterByteArray.read(buf),
+      FfiConverterByteArray.read(buf),
+      FfiConverterByteArray.read(buf),
+      FfiConverterByteArray.read(buf),
+    )
+
+  override fun allocationSize(value: HtlcSpendResult) =
+    (
+      FfiConverterByteArray.allocationSize(value.`tx`) +
+        FfiConverterByteArray.allocationSize(value.`sighash`) +
+        FfiConverterByteArray.allocationSize(value.`script`) +
+        FfiConverterByteArray.allocationSize(value.`controlBlock`)
+    )
+
+  override fun write(
+    value: HtlcSpendResult,
+    buf: ByteBuffer,
+  ) {
+    FfiConverterByteArray.write(value.`tx`, buf)
+    FfiConverterByteArray.write(value.`sighash`, buf)
+    FfiConverterByteArray.write(value.`script`, buf)
+    FfiConverterByteArray.write(value.`controlBlock`, buf)
   }
 }
 
@@ -1458,6 +1775,38 @@ public object FfiConverterTypeKeyPackage : FfiConverterRustBuffer<KeyPackage> {
   }
 }
 
+data class NodeTxPairResult(
+  var `cpfp`: TransactionResult,
+  var `direct`: TransactionResult,
+) {
+  companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeNodeTxPairResult : FfiConverterRustBuffer<NodeTxPairResult> {
+  override fun read(buf: ByteBuffer): NodeTxPairResult =
+    NodeTxPairResult(
+      FfiConverterTypeTransactionResult.read(buf),
+      FfiConverterTypeTransactionResult.read(buf),
+    )
+
+  override fun allocationSize(value: NodeTxPairResult) =
+    (
+      FfiConverterTypeTransactionResult.allocationSize(value.`cpfp`) +
+        FfiConverterTypeTransactionResult.allocationSize(value.`direct`)
+    )
+
+  override fun write(
+    value: NodeTxPairResult,
+    buf: ByteBuffer,
+  ) {
+    FfiConverterTypeTransactionResult.write(value.`cpfp`, buf)
+    FfiConverterTypeTransactionResult.write(value.`direct`, buf)
+  }
+}
+
 data class NonceResult(
   var `nonce`: SigningNonce,
   var `commitment`: SigningCommitment,
@@ -1487,6 +1836,78 @@ public object FfiConverterTypeNonceResult : FfiConverterRustBuffer<NonceResult> 
   ) {
     FfiConverterTypeSigningNonce.write(value.`nonce`, buf)
     FfiConverterTypeSigningCommitment.write(value.`commitment`, buf)
+  }
+}
+
+data class RefundTxTrioResult(
+  var `cpfpRefund`: TransactionResult,
+  var `directRefund`: TransactionResult?,
+  var `directFromCpfpRefund`: TransactionResult,
+) {
+  companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRefundTxTrioResult : FfiConverterRustBuffer<RefundTxTrioResult> {
+  override fun read(buf: ByteBuffer): RefundTxTrioResult =
+    RefundTxTrioResult(
+      FfiConverterTypeTransactionResult.read(buf),
+      FfiConverterOptionalTypeTransactionResult.read(buf),
+      FfiConverterTypeTransactionResult.read(buf),
+    )
+
+  override fun allocationSize(value: RefundTxTrioResult) =
+    (
+      FfiConverterTypeTransactionResult.allocationSize(value.`cpfpRefund`) +
+        FfiConverterOptionalTypeTransactionResult.allocationSize(value.`directRefund`) +
+        FfiConverterTypeTransactionResult.allocationSize(value.`directFromCpfpRefund`)
+    )
+
+  override fun write(
+    value: RefundTxTrioResult,
+    buf: ByteBuffer,
+  ) {
+    FfiConverterTypeTransactionResult.write(value.`cpfpRefund`, buf)
+    FfiConverterOptionalTypeTransactionResult.write(value.`directRefund`, buf)
+    FfiConverterTypeTransactionResult.write(value.`directFromCpfpRefund`, buf)
+  }
+}
+
+data class SecretShareResult(
+  var `threshold`: kotlin.UInt,
+  var `index`: kotlin.UInt,
+  var `share`: kotlin.ByteArray,
+) {
+  companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSecretShareResult : FfiConverterRustBuffer<SecretShareResult> {
+  override fun read(buf: ByteBuffer): SecretShareResult =
+    SecretShareResult(
+      FfiConverterUInt.read(buf),
+      FfiConverterUInt.read(buf),
+      FfiConverterByteArray.read(buf),
+    )
+
+  override fun allocationSize(value: SecretShareResult) =
+    (
+      FfiConverterUInt.allocationSize(value.`threshold`) +
+        FfiConverterUInt.allocationSize(value.`index`) +
+        FfiConverterByteArray.allocationSize(value.`share`)
+    )
+
+  override fun write(
+    value: SecretShareResult,
+    buf: ByteBuffer,
+  ) {
+    FfiConverterUInt.write(value.`threshold`, buf)
+    FfiConverterUInt.write(value.`index`, buf)
+    FfiConverterByteArray.write(value.`share`, buf)
   }
 }
 
@@ -1554,6 +1975,38 @@ public object FfiConverterTypeSigningNonce : FfiConverterRustBuffer<SigningNonce
   }
 }
 
+data class TimelockResult(
+  var `nextSequence`: kotlin.UInt,
+  var `nextDirectSequence`: kotlin.UInt,
+) {
+  companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeTimelockResult : FfiConverterRustBuffer<TimelockResult> {
+  override fun read(buf: ByteBuffer): TimelockResult =
+    TimelockResult(
+      FfiConverterUInt.read(buf),
+      FfiConverterUInt.read(buf),
+    )
+
+  override fun allocationSize(value: TimelockResult) =
+    (
+      FfiConverterUInt.allocationSize(value.`nextSequence`) +
+        FfiConverterUInt.allocationSize(value.`nextDirectSequence`)
+    )
+
+  override fun write(
+    value: TimelockResult,
+    buf: ByteBuffer,
+  ) {
+    FfiConverterUInt.write(value.`nextSequence`, buf)
+    FfiConverterUInt.write(value.`nextDirectSequence`, buf)
+  }
+}
+
 data class TransactionResult(
   var `tx`: kotlin.ByteArray,
   var `sighash`: kotlin.ByteArray,
@@ -1615,6 +2068,46 @@ public object FfiConverterTypeTxInResult : FfiConverterRustBuffer<TxInResult> {
     buf: ByteBuffer,
   ) {
     FfiConverterUInt.write(value.`sequence`, buf)
+  }
+}
+
+data class VerifiableSecretShareResult(
+  var `threshold`: kotlin.UInt,
+  var `index`: kotlin.UInt,
+  var `share`: kotlin.ByteArray,
+  var `proofs`: List<kotlin.ByteArray>,
+) {
+  companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeVerifiableSecretShareResult : FfiConverterRustBuffer<VerifiableSecretShareResult> {
+  override fun read(buf: ByteBuffer): VerifiableSecretShareResult =
+    VerifiableSecretShareResult(
+      FfiConverterUInt.read(buf),
+      FfiConverterUInt.read(buf),
+      FfiConverterByteArray.read(buf),
+      FfiConverterSequenceByteArray.read(buf),
+    )
+
+  override fun allocationSize(value: VerifiableSecretShareResult) =
+    (
+      FfiConverterUInt.allocationSize(value.`threshold`) +
+        FfiConverterUInt.allocationSize(value.`index`) +
+        FfiConverterByteArray.allocationSize(value.`share`) +
+        FfiConverterSequenceByteArray.allocationSize(value.`proofs`)
+    )
+
+  override fun write(
+    value: VerifiableSecretShareResult,
+    buf: ByteBuffer,
+  ) {
+    FfiConverterUInt.write(value.`threshold`, buf)
+    FfiConverterUInt.write(value.`index`, buf)
+    FfiConverterByteArray.write(value.`share`, buf)
+    FfiConverterSequenceByteArray.write(value.`proofs`, buf)
   }
 }
 
@@ -1690,6 +2183,66 @@ public object FfiConverterOptionalByteArray : FfiConverterRustBuffer<kotlin.Byte
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeTransactionResult : FfiConverterRustBuffer<TransactionResult?> {
+  override fun read(buf: ByteBuffer): TransactionResult? {
+    if (buf.get().toInt() == 0) {
+      return null
+    }
+    return FfiConverterTypeTransactionResult.read(buf)
+  }
+
+  override fun allocationSize(value: TransactionResult?): ULong {
+    if (value == null) {
+      return 1UL
+    } else {
+      return 1UL + FfiConverterTypeTransactionResult.allocationSize(value)
+    }
+  }
+
+  override fun write(
+    value: TransactionResult?,
+    buf: ByteBuffer,
+  ) {
+    if (value == null) {
+      buf.put(0)
+    } else {
+      buf.put(1)
+      FfiConverterTypeTransactionResult.write(value, buf)
+    }
+  }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceULong : FfiConverterRustBuffer<List<kotlin.ULong>> {
+  override fun read(buf: ByteBuffer): List<kotlin.ULong> {
+    val len = buf.getInt()
+    return List<kotlin.ULong>(len) {
+      FfiConverterULong.read(buf)
+    }
+  }
+
+  override fun allocationSize(value: List<kotlin.ULong>): ULong {
+    val sizeForLength = 4UL
+    val sizeForItems = value.map { FfiConverterULong.allocationSize(it) }.sum()
+    return sizeForLength + sizeForItems
+  }
+
+  override fun write(
+    value: List<kotlin.ULong>,
+    buf: ByteBuffer,
+  ) {
+    buf.putInt(value.size)
+    value.iterator().forEach {
+      FfiConverterULong.write(it, buf)
+    }
+  }
+}
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceString : FfiConverterRustBuffer<List<kotlin.String>> {
   override fun read(buf: ByteBuffer): List<kotlin.String> {
     val len = buf.getInt()
@@ -1718,6 +2271,62 @@ public object FfiConverterSequenceString : FfiConverterRustBuffer<List<kotlin.St
 /**
  * @suppress
  */
+public object FfiConverterSequenceByteArray : FfiConverterRustBuffer<List<kotlin.ByteArray>> {
+  override fun read(buf: ByteBuffer): List<kotlin.ByteArray> {
+    val len = buf.getInt()
+    return List<kotlin.ByteArray>(len) {
+      FfiConverterByteArray.read(buf)
+    }
+  }
+
+  override fun allocationSize(value: List<kotlin.ByteArray>): ULong {
+    val sizeForLength = 4UL
+    val sizeForItems = value.map { FfiConverterByteArray.allocationSize(it) }.sum()
+    return sizeForLength + sizeForItems
+  }
+
+  override fun write(
+    value: List<kotlin.ByteArray>,
+    buf: ByteBuffer,
+  ) {
+    buf.putInt(value.size)
+    value.iterator().forEach {
+      FfiConverterByteArray.write(it, buf)
+    }
+  }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeSecretShareResult : FfiConverterRustBuffer<List<SecretShareResult>> {
+  override fun read(buf: ByteBuffer): List<SecretShareResult> {
+    val len = buf.getInt()
+    return List<SecretShareResult>(len) {
+      FfiConverterTypeSecretShareResult.read(buf)
+    }
+  }
+
+  override fun allocationSize(value: List<SecretShareResult>): ULong {
+    val sizeForLength = 4UL
+    val sizeForItems = value.map { FfiConverterTypeSecretShareResult.allocationSize(it) }.sum()
+    return sizeForLength + sizeForItems
+  }
+
+  override fun write(
+    value: List<SecretShareResult>,
+    buf: ByteBuffer,
+  ) {
+    buf.putInt(value.size)
+    value.iterator().forEach {
+      FfiConverterTypeSecretShareResult.write(it, buf)
+    }
+  }
+}
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeTxInResult : FfiConverterRustBuffer<List<TxInResult>> {
   override fun read(buf: ByteBuffer): List<TxInResult> {
     val len = buf.getInt()
@@ -1739,6 +2348,34 @@ public object FfiConverterSequenceTypeTxInResult : FfiConverterRustBuffer<List<T
     buf.putInt(value.size)
     value.iterator().forEach {
       FfiConverterTypeTxInResult.write(it, buf)
+    }
+  }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeVerifiableSecretShareResult : FfiConverterRustBuffer<List<VerifiableSecretShareResult>> {
+  override fun read(buf: ByteBuffer): List<VerifiableSecretShareResult> {
+    val len = buf.getInt()
+    return List<VerifiableSecretShareResult>(len) {
+      FfiConverterTypeVerifiableSecretShareResult.read(buf)
+    }
+  }
+
+  override fun allocationSize(value: List<VerifiableSecretShareResult>): ULong {
+    val sizeForLength = 4UL
+    val sizeForItems = value.map { FfiConverterTypeVerifiableSecretShareResult.allocationSize(it) }.sum()
+    return sizeForLength + sizeForItems
+  }
+
+  override fun write(
+    value: List<VerifiableSecretShareResult>,
+    buf: ByteBuffer,
+  ) {
+    buf.putInt(value.size)
+    value.iterator().forEach {
+      FfiConverterTypeVerifiableSecretShareResult.write(it, buf)
     }
   }
 }
@@ -1855,6 +2492,50 @@ fun `aggregateFrost`(
   )
 
 @Throws(Exception::class)
+fun `applyAdaptorToSignature`(
+  `pubKey`: kotlin.ByteArray,
+  `hash`: kotlin.ByteArray,
+  `signature`: kotlin.ByteArray,
+  `adaptorPrivateKey`: kotlin.ByteArray,
+): kotlin.ByteArray =
+  FfiConverterByteArray.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_apply_adaptor_to_signature(
+        FfiConverterByteArray.lower(`pubKey`),
+        FfiConverterByteArray.lower(`hash`),
+        FfiConverterByteArray.lower(`signature`),
+        FfiConverterByteArray.lower(`adaptorPrivateKey`),
+        _status,
+      )
+    },
+  )
+
+@Throws(Exception::class)
+fun `checkIfValidSequence`(`sequence`: kotlin.UInt) =
+  uniffiRustCallWithError(Exception) { _status ->
+    UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_check_if_valid_sequence(FfiConverterUInt.lower(`sequence`), _status)
+  }
+
+@Throws(Exception::class)
+fun `computeMultiInputSighashUniffi`(
+  `tx`: kotlin.ByteArray,
+  `inputIndex`: kotlin.UInt,
+  `prevOutScripts`: List<kotlin.ByteArray>,
+  `prevOutValues`: List<kotlin.ULong>,
+): kotlin.ByteArray =
+  FfiConverterByteArray.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_compute_multi_input_sighash_uniffi(
+        FfiConverterByteArray.lower(`tx`),
+        FfiConverterUInt.lower(`inputIndex`),
+        FfiConverterSequenceByteArray.lower(`prevOutScripts`),
+        FfiConverterSequenceULong.lower(`prevOutValues`),
+        _status,
+      )
+    },
+  )
+
+@Throws(Exception::class)
 fun `constructDirectRefundTx`(
   `tx`: kotlin.ByteArray,
   `vout`: kotlin.UInt,
@@ -1870,6 +2551,91 @@ fun `constructDirectRefundTx`(
         FfiConverterByteArray.lower(`pubkey`),
         FfiConverterString.lower(`network`),
         FfiConverterUInt.lower(`sequence`),
+        _status,
+      )
+    },
+  )
+
+@Throws(Exception::class)
+fun `constructHtlcReceiverSpend`(
+  `htlcTx`: kotlin.ByteArray,
+  `destinationPubkey`: kotlin.ByteArray,
+  `paymentHash`: kotlin.ByteArray,
+  `hashlockPubkey`: kotlin.ByteArray,
+  `seqlockPubkey`: kotlin.ByteArray,
+  `htlcSequence`: kotlin.UInt,
+  `feeSats`: kotlin.ULong,
+  `network`: kotlin.String,
+): HtlcSpendResult =
+  FfiConverterTypeHTLCSpendResult.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_construct_htlc_receiver_spend(
+        FfiConverterByteArray.lower(`htlcTx`),
+        FfiConverterByteArray.lower(`destinationPubkey`),
+        FfiConverterByteArray.lower(`paymentHash`),
+        FfiConverterByteArray.lower(`hashlockPubkey`),
+        FfiConverterByteArray.lower(`seqlockPubkey`),
+        FfiConverterUInt.lower(`htlcSequence`),
+        FfiConverterULong.lower(`feeSats`),
+        FfiConverterString.lower(`network`),
+        _status,
+      )
+    },
+  )
+
+@Throws(Exception::class)
+fun `constructHtlcSenderSpend`(
+  `htlcTx`: kotlin.ByteArray,
+  `destinationPubkey`: kotlin.ByteArray,
+  `paymentHash`: kotlin.ByteArray,
+  `hashlockPubkey`: kotlin.ByteArray,
+  `seqlockPubkey`: kotlin.ByteArray,
+  `htlcSequence`: kotlin.UInt,
+  `feeSats`: kotlin.ULong,
+  `network`: kotlin.String,
+): HtlcSpendResult =
+  FfiConverterTypeHTLCSpendResult.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_construct_htlc_sender_spend(
+        FfiConverterByteArray.lower(`htlcTx`),
+        FfiConverterByteArray.lower(`destinationPubkey`),
+        FfiConverterByteArray.lower(`paymentHash`),
+        FfiConverterByteArray.lower(`hashlockPubkey`),
+        FfiConverterByteArray.lower(`seqlockPubkey`),
+        FfiConverterUInt.lower(`htlcSequence`),
+        FfiConverterULong.lower(`feeSats`),
+        FfiConverterString.lower(`network`),
+        _status,
+      )
+    },
+  )
+
+@Throws(Exception::class)
+fun `constructHtlcTransaction`(
+  `nodeTx`: kotlin.ByteArray,
+  `vout`: kotlin.UInt,
+  `sequence`: kotlin.UInt,
+  `paymentHash`: kotlin.ByteArray,
+  `hashlockPubkey`: kotlin.ByteArray,
+  `seqlockPubkey`: kotlin.ByteArray,
+  `htlcSequence`: kotlin.UInt,
+  `applyFee`: kotlin.Boolean,
+  `feeSats`: kotlin.ULong,
+  `network`: kotlin.String,
+): TransactionResult =
+  FfiConverterTypeTransactionResult.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_construct_htlc_transaction(
+        FfiConverterByteArray.lower(`nodeTx`),
+        FfiConverterUInt.lower(`vout`),
+        FfiConverterUInt.lower(`sequence`),
+        FfiConverterByteArray.lower(`paymentHash`),
+        FfiConverterByteArray.lower(`hashlockPubkey`),
+        FfiConverterByteArray.lower(`seqlockPubkey`),
+        FfiConverterUInt.lower(`htlcSequence`),
+        FfiConverterBoolean.lower(`applyFee`),
+        FfiConverterULong.lower(`feeSats`),
+        FfiConverterString.lower(`network`),
         _status,
       )
     },
@@ -1895,6 +2661,29 @@ fun `constructNodeTx`(
   )
 
 @Throws(Exception::class)
+fun `constructNodeTxPair`(
+  `parentTx`: kotlin.ByteArray,
+  `vout`: kotlin.UInt,
+  `address`: kotlin.String,
+  `sequence`: kotlin.UInt,
+  `directSequence`: kotlin.UInt,
+  `feeSats`: kotlin.ULong,
+): NodeTxPairResult =
+  FfiConverterTypeNodeTxPairResult.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_construct_node_tx_pair(
+        FfiConverterByteArray.lower(`parentTx`),
+        FfiConverterUInt.lower(`vout`),
+        FfiConverterString.lower(`address`),
+        FfiConverterUInt.lower(`sequence`),
+        FfiConverterUInt.lower(`directSequence`),
+        FfiConverterULong.lower(`feeSats`),
+        _status,
+      )
+    },
+  )
+
+@Throws(Exception::class)
 fun `constructRefundTx`(
   `tx`: kotlin.ByteArray,
   `vout`: kotlin.UInt,
@@ -1910,6 +2699,33 @@ fun `constructRefundTx`(
         FfiConverterByteArray.lower(`pubkey`),
         FfiConverterString.lower(`network`),
         FfiConverterUInt.lower(`sequence`),
+        _status,
+      )
+    },
+  )
+
+@Throws(Exception::class)
+fun `constructRefundTxTrio`(
+  `cpfpNodeTx`: kotlin.ByteArray,
+  `directNodeTx`: kotlin.ByteArray?,
+  `vout`: kotlin.UInt,
+  `receivingPubkey`: kotlin.ByteArray,
+  `network`: kotlin.String,
+  `sequence`: kotlin.UInt,
+  `directSequence`: kotlin.UInt,
+  `feeSats`: kotlin.ULong,
+): RefundTxTrioResult =
+  FfiConverterTypeRefundTxTrioResult.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_construct_refund_tx_trio(
+        FfiConverterByteArray.lower(`cpfpNodeTx`),
+        FfiConverterOptionalByteArray.lower(`directNodeTx`),
+        FfiConverterUInt.lower(`vout`),
+        FfiConverterByteArray.lower(`receivingPubkey`),
+        FfiConverterString.lower(`network`),
+        FfiConverterUInt.lower(`sequence`),
+        FfiConverterUInt.lower(`directSequence`),
+        FfiConverterULong.lower(`feeSats`),
         _status,
       )
     },
@@ -1988,6 +2804,29 @@ fun `frostNonce`(`keyPackage`: KeyPackage): NonceResult =
   )
 
 @Throws(Exception::class)
+fun `generateAdaptorFromSignature`(`signature`: kotlin.ByteArray): AdaptorSignatureResult =
+  FfiConverterTypeAdaptorSignatureResult.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_generate_adaptor_from_signature(FfiConverterByteArray.lower(`signature`), _status)
+    },
+  )
+
+@Throws(Exception::class)
+fun `generateSignatureFromExistingAdaptor`(
+  `signature`: kotlin.ByteArray,
+  `adaptorPrivateKey`: kotlin.ByteArray,
+): kotlin.ByteArray =
+  FfiConverterByteArray.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_generate_signature_from_existing_adaptor(
+        FfiConverterByteArray.lower(`signature`),
+        FfiConverterByteArray.lower(`adaptorPrivateKey`),
+        _status,
+      )
+    },
+  )
+
+@Throws(Exception::class)
 fun `getPublicKeyBytes`(
   `privateKeyBytes`: kotlin.ByteArray,
   `compressed`: kotlin.Boolean,
@@ -2010,11 +2849,67 @@ fun `getTaprootPubkey`(`verifyingPubkey`: kotlin.ByteArray): kotlin.ByteArray =
     },
   )
 
+fun `getTimelockFromSequence`(`sequence`: kotlin.UInt): kotlin.UInt =
+  FfiConverterUInt.lift(
+    uniffiRustCall { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_get_timelock_from_sequence(FfiConverterUInt.lower(`sequence`), _status)
+    },
+  )
+
+fun `isZeroTimelock`(`sequence`: kotlin.UInt): kotlin.Boolean =
+  FfiConverterBoolean.lift(
+    uniffiRustCall { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_is_zero_timelock(FfiConverterUInt.lower(`sequence`), _status)
+    },
+  )
+
+@Throws(Exception::class)
+fun `nextSequence`(
+  `currSequence`: kotlin.UInt,
+  `timeLockInterval`: kotlin.UInt,
+  `directTimelockOffset`: kotlin.UInt,
+): TimelockResult =
+  FfiConverterTypeTimelockResult.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_next_sequence(
+        FfiConverterUInt.lower(`currSequence`),
+        FfiConverterUInt.lower(`timeLockInterval`),
+        FfiConverterUInt.lower(`directTimelockOffset`),
+        _status,
+      )
+    },
+  )
+
 @Throws(Exception::class)
 fun `randomSecretKeyBytes`(): kotlin.ByteArray =
   FfiConverterByteArray.lift(
     uniffiRustCallWithError(Exception) { _status ->
       UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_random_secret_key_bytes(_status)
+    },
+  )
+
+@Throws(Exception::class)
+fun `recoverSecretUniffi`(`shares`: List<SecretShareResult>): kotlin.ByteArray =
+  FfiConverterByteArray.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_recover_secret_uniffi(
+        FfiConverterSequenceTypeSecretShareResult.lower(`shares`),
+        _status,
+      )
+    },
+  )
+
+fun `roundDownToTimelockInterval`(
+  `timelock`: kotlin.UInt,
+  `timeLockInterval`: kotlin.UInt,
+): kotlin.UInt =
+  FfiConverterUInt.lift(
+    uniffiRustCall { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_round_down_to_timelock_interval(
+        FfiConverterUInt.lower(`timelock`),
+        FfiConverterUInt.lower(`timeLockInterval`),
+        _status,
+      )
     },
   )
 
@@ -2040,6 +2935,72 @@ fun `signFrost`(
       )
     },
   )
+
+@Throws(Exception::class)
+fun `splitSecret`(
+  `secret`: kotlin.ByteArray,
+  `threshold`: kotlin.UInt,
+  `numShares`: kotlin.UInt,
+): List<SecretShareResult> =
+  FfiConverterSequenceTypeSecretShareResult.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_split_secret(
+        FfiConverterByteArray.lower(`secret`),
+        FfiConverterUInt.lower(`threshold`),
+        FfiConverterUInt.lower(`numShares`),
+        _status,
+      )
+    },
+  )
+
+@Throws(Exception::class)
+fun `splitSecretWithProofsUniffi`(
+  `secret`: kotlin.ByteArray,
+  `threshold`: kotlin.UInt,
+  `numShares`: kotlin.UInt,
+): List<VerifiableSecretShareResult> =
+  FfiConverterSequenceTypeVerifiableSecretShareResult.lift(
+    uniffiRustCallWithError(Exception) { _status ->
+      UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_split_secret_with_proofs_uniffi(
+        FfiConverterByteArray.lower(`secret`),
+        FfiConverterUInt.lower(`threshold`),
+        FfiConverterUInt.lower(`numShares`),
+        _status,
+      )
+    },
+  )
+
+@Throws(Exception::class)
+fun `validateAdaptorSignature`(
+  `pubKey`: kotlin.ByteArray,
+  `hash`: kotlin.ByteArray,
+  `signature`: kotlin.ByteArray,
+  `adaptorPubKey`: kotlin.ByteArray,
+) = uniffiRustCallWithError(Exception) { _status ->
+  UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_validate_adaptor_signature(
+    FfiConverterByteArray.lower(`pubKey`),
+    FfiConverterByteArray.lower(`hash`),
+    FfiConverterByteArray.lower(`signature`),
+    FfiConverterByteArray.lower(`adaptorPubKey`),
+    _status,
+  )
+}
+
+@Throws(Exception::class)
+fun `validateShareUniffi`(
+  `share`: kotlin.ByteArray,
+  `index`: kotlin.UInt,
+  `threshold`: kotlin.UInt,
+  `proofs`: List<kotlin.ByteArray>,
+) = uniffiRustCallWithError(Exception) { _status ->
+  UniffiLib.INSTANCE.uniffi_spark_frost_fn_func_validate_share_uniffi(
+    FfiConverterByteArray.lower(`share`),
+    FfiConverterUInt.lower(`index`),
+    FfiConverterUInt.lower(`threshold`),
+    FfiConverterSequenceByteArray.lower(`proofs`),
+    _status,
+  )
+}
 
 fun `validateSignatureShare`(
   `msg`: kotlin.ByteArray,

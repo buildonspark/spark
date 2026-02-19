@@ -10,7 +10,10 @@ import {
   KeyPackage,
   SigningCommitment,
   SigningNonce,
+  split_secret_with_proofs,
+  recover_secret_wasm,
   validate_adaptor_signature,
+  validate_share,
   wasm_aggregate_frost,
   wasm_sign_frost,
   default as initWasm,
@@ -146,6 +149,52 @@ class SparkFrostBrowser extends SparkFrostBase {
     await this.init();
     const plaintext = decrypt_ecies(encryptedMsg, privateKey);
     return Promise.resolve(plaintext);
+  }
+
+  async splitSecretWithProofs(
+    secret: Uint8Array,
+    threshold: number,
+    numShares: number,
+  ) {
+    await this.init();
+    const result = split_secret_with_proofs(secret, threshold, numShares);
+    return (
+      result as {
+        threshold: number;
+        index: number;
+        share: number[];
+        proofs: number[][];
+      }[]
+    ).map(
+      (s: {
+        threshold: number;
+        index: number;
+        share: number[];
+        proofs: number[][];
+      }) => ({
+        threshold: s.threshold,
+        index: s.index,
+        share: new Uint8Array(s.share),
+        proofs: s.proofs.map((p: number[]) => new Uint8Array(p)),
+      }),
+    );
+  }
+
+  async recoverSecret(
+    shares: { threshold: number; index: number; share: Uint8Array }[],
+  ) {
+    await this.init();
+    return recover_secret_wasm(shares);
+  }
+
+  async validateShare(
+    share: Uint8Array,
+    index: number,
+    threshold: number,
+    proofs: Uint8Array[],
+  ) {
+    await this.init();
+    validate_share(share, index, threshold, proofs);
   }
 
   override generateAdaptorFromSignature(signature: Uint8Array) {

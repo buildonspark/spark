@@ -6,3 +6,6 @@ exports.encryptEcies = binding.encryptEcies;
 exports.decryptEcies = binding.decryptEcies;
 exports.signFrost = binding.signFrost;
 exports.aggregateFrost = binding.aggregateFrost;
+exports.splitSecretWithProofs = binding.splitSecretWithProofs;
+exports.recoverSecret = binding.recoverSecret;
+exports.validateShare = binding.validateShare;

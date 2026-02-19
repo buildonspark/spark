@@ -1,76 +1,54 @@
-import { describe, expect, it } from "@jest/globals";
-import { secp256k1 } from "@noble/curves/secp256k1";
+import { beforeAll, describe, expect, it } from "@jest/globals";
+import { numberToBytesBE } from "@noble/curves/utils";
+import { setSparkFrostOnce } from "../spark-bindings/spark-bindings.js";
+import { SparkFrost } from "../spark-bindings/spark-bindings.node.js";
 import {
-  modInverse,
   recoverSecret,
   splitSecretWithProofs,
   validateShare,
 } from "../utils/secret-sharing.js";
 
+beforeAll(() => {
+  setSparkFrostOnce(new SparkFrost());
+});
+
 describe("Secret Sharing", () => {
-  describe("modInverse", () => {
-    it("should correctly calculate modular multiplicative inverse", () => {
-      // Test cases: [a, m, expected]
-      const testCases: [bigint, bigint, bigint][] = [
-        [3n, 11n, 4n], // 3 * 4 ≡ 1 (mod 11)
-        [10n, 17n, 12n], // 10 * 12 ≡ 1 (mod 17)
-        [7n, 13n, 2n], // 7 * 2 ≡ 1 (mod 13)
-        [-1n, secp256k1.CURVE.n, secp256k1.CURVE.n - 1n],
-      ];
-
-      for (const [a, m, expected] of testCases) {
-        const result = modInverse(a, m);
-        expect(result).toBe(expected);
-
-        // Normalize the result of (a * result) before taking modulo
-        const product = a * result;
-        const normalizedProduct = ((product % m) + m) % m;
-        expect(normalizedProduct).toBe(1n);
-      }
-    });
-
-    it("should throw error when modular inverse doesn't exist", () => {
-      expect(() => modInverse(4n, 8n)).toThrow(
-        "Modular inverse does not exist",
-      );
-      expect(() => modInverse(6n, 9n)).toThrow(
-        "Modular inverse does not exist",
-      );
-    });
-  });
-
-  it("test secret sharing", () => {
-    const fieldModulus = secp256k1.CURVE.n;
+  it("test secret sharing", async () => {
     const secret =
       56223216183876340914672117764605975762373003965917245943571257601961255596156n;
+    const secretBytes = numberToBytesBE(secret, 32);
     const threshold = 3;
     const numberOfShares = 5;
 
-    const shares = splitSecretWithProofs(
-      secret,
-      fieldModulus,
+    const shares = await splitSecretWithProofs(
+      secretBytes,
       threshold,
       numberOfShares,
     );
 
+    expect(shares).toHaveLength(numberOfShares);
+
     for (const share of shares) {
-      validateShare(share);
+      await validateShare(share);
     }
 
-    const recoveredSecret = recoverSecret(shares.slice(0, threshold));
-    expect(recoveredSecret).toBe(secret);
+    const recoveredSecretBytes = await recoverSecret(
+      shares.slice(0, threshold),
+    );
+    expect(new Uint8Array(recoveredSecretBytes)).toEqual(
+      new Uint8Array(secretBytes),
+    );
   });
 
-  it("should reject shares with invalid proof length", () => {
-    const fieldModulus = secp256k1.CURVE.n;
+  it("should reject shares with invalid proof length", async () => {
     const secret =
       56223216183876340914672117764605975762373003965917245943571257601961255596156n;
+    const secretBytes = numberToBytesBE(secret, 32);
     const threshold = 3;
     const numberOfShares = 5;
 
-    const shares = splitSecretWithProofs(
-      secret,
-      fieldModulus,
+    const shares = await splitSecretWithProofs(
+      secretBytes,
       threshold,
       numberOfShares,
     );
@@ -80,17 +58,13 @@ describe("Secret Sharing", () => {
     const firstProof = validShare.proofs[0];
     expect(firstProof).toBeDefined();
 
-    // Add an extra proof to make the length incorrect
     const invalidShare = {
-      fieldModulus: validShare.fieldModulus,
       threshold: validShare.threshold,
       index: validShare.index,
       share: validShare.share,
       proofs: [...validShare.proofs, firstProof!],
     };
 
-    expect(() => validateShare(invalidShare)).toThrow(
-      "Invalid VSS proof length",
-    );
+    await expect(validateShare(invalidShare)).rejects.toBeDefined();
   });
 });

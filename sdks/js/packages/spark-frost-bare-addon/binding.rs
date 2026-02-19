@@ -1,6 +1,6 @@
 use bare_rust::{
     ffi::{js_env_t, js_value_t},
-    Env, Function, Object, String, Uint8Array, TypedArray, Value, BigInt, Array
+    Env, Function, Object, String, Uint8Array, TypedArray, Value, BigInt, Array, Number, Undefined
 };
 use spark_frost::bridge::{create_dummy_tx};
 
@@ -267,6 +267,104 @@ pub extern "C" fn bare_addon_exports(
     }).unwrap();
 
     exports.set_named_property("aggregateFrost", aggregate_frost_fn).unwrap();
+
+    // splitSecretWithProofs(secret: Uint8Array, threshold: number, numShares: number) -> Array<{ threshold, index, share, proofs }>
+    let split_secret_fn = Function::new(&env, |env, info| -> Result<Value, Value> {
+        let secret_arr: Uint8Array = info.arg(0).ok_or(js_err(env, "secret argument missing"))?;
+        let threshold_num: Number = info.arg(1).ok_or(js_err(env, "threshold argument missing"))?;
+        let num_shares_num: Number = info.arg(2).ok_or(js_err(env, "numShares argument missing"))?;
+        let threshold = u32::from(threshold_num);
+        let num_shares = u32::from(num_shares_num);
+
+        let shares = spark_frost::vss::split_secret_with_proofs(
+            secret_arr.as_slice(),
+            threshold as usize,
+            num_shares as usize,
+        ).map_err(|e| js_err(env, &format!("split_secret_with_proofs error: {e}")))?;
+
+        let mut result = Array::new(env, shares.len())?;
+        for (i, vss) in shares.iter().enumerate() {
+            let mut obj = Object::new(env)?;
+
+            let threshold_val: Value = Number::with_u32(env, vss.share.threshold as u32).into();
+            obj.set_named_property("threshold", threshold_val)?;
+
+            let index_val: Value = Number::with_u32(env, vss.share.index).into();
+            obj.set_named_property("index", index_val)?;
+
+            let share_arr = Uint8Array::new(env, vss.share.share.len())?;
+            share_arr.as_mut_slice().copy_from_slice(&vss.share.share);
+            obj.set_named_property("share", share_arr)?;
+
+            let mut proofs_arr = Array::new(env, vss.proofs.len())?;
+            for (j, proof) in vss.proofs.iter().enumerate() {
+                let proof_arr = Uint8Array::new(env, proof.len())?;
+                proof_arr.as_mut_slice().copy_from_slice(proof);
+                proofs_arr.set(j as u32, proof_arr)?;
+            }
+            obj.set_named_property("proofs", proofs_arr)?;
+
+            result.set(i as u32, obj)?;
+        }
+        Ok(result.into())
+    }).unwrap();
+
+    exports.set_named_property("splitSecretWithProofs", split_secret_fn).unwrap();
+
+    // recoverSecret(shares: Array<{ threshold, index, share }>) -> Uint8Array
+    let recover_secret_fn = Function::new(&env, |env, info| -> Result<Value, Value> {
+        let shares_arr: Array = info.arg(0).ok_or(js_err(env, "shares argument missing"))?;
+
+        let mut shares = Vec::new();
+        for i in 0..shares_arr.len() {
+            let obj: Object = shares_arr.get(i)?;
+            let threshold_num: Number = obj.get_named_property("threshold")
+                .map_err(|_| js_err(env, "missing threshold field"))?;
+            let index_num: Number = obj.get_named_property("index")
+                .map_err(|_| js_err(env, "missing index field"))?;
+            let share_bytes = get_uint8_vec(env, &obj, "share")?;
+
+            shares.push(spark_frost::vss::SecretShare {
+                threshold: u32::from(threshold_num) as usize,
+                index: u32::from(index_num),
+                share: share_bytes,
+            });
+        }
+
+        let secret = spark_frost::vss::recover_secret(&shares)
+            .map_err(|e| js_err(env, &format!("recover_secret error: {e}")))?;
+
+        let js_secret = Uint8Array::new(env, secret.len())?;
+        js_secret.as_mut_slice().copy_from_slice(&secret);
+        Ok(js_secret.into())
+    }).unwrap();
+
+    exports.set_named_property("recoverSecret", recover_secret_fn).unwrap();
+
+    // validateShare(share: Uint8Array, index: number, threshold: number, proofs: Array<Uint8Array>) -> void
+    let validate_share_fn = Function::new(&env, |env, info| -> Result<Value, Value> {
+        let share_arr: Uint8Array = info.arg(0).ok_or(js_err(env, "share argument missing"))?;
+        let index_num: Number = info.arg(1).ok_or(js_err(env, "index argument missing"))?;
+        let threshold_num: Number = info.arg(2).ok_or(js_err(env, "threshold argument missing"))?;
+        let proofs_arr: Array = info.arg(3).ok_or(js_err(env, "proofs argument missing"))?;
+
+        let mut proofs = Vec::new();
+        for i in 0..proofs_arr.len() {
+            let proof: Uint8Array = proofs_arr.get(i)?;
+            proofs.push(proof.as_slice().to_vec());
+        }
+
+        spark_frost::vss::validate_share(
+            share_arr.as_slice(),
+            u32::from(index_num),
+            u32::from(threshold_num) as usize,
+            &proofs,
+        ).map_err(|e| js_err(env, &format!("validate_share error: {e}")))?;
+
+        Ok(Undefined::new(env).into())
+    }).unwrap();
+
+    exports.set_named_property("validateShare", validate_share_fn).unwrap();
 
     exports.into()
 }

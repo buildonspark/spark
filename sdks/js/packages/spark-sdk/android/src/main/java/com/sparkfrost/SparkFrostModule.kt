@@ -300,6 +300,96 @@ class SparkFrostModule(reactContext: ReactApplicationContext) : ReactContextBase
     }
 
     @ReactMethod
+    fun splitSecretWithProofs(params: ReadableMap, promise: Promise) {
+        try {
+            val secret = params.getArray("secret")?.toByteArray()
+                ?: throw Exception("Invalid secret format")
+            val threshold = params.getInt("threshold").toUInt()
+            val numShares = params.getInt("numShares").toUInt()
+
+            val result = uniffi.spark_frost.splitSecretWithProofsUniffi(
+                secret = secret,
+                threshold = threshold,
+                numShares = numShares
+            )
+
+            val sharesArray = Arguments.createArray()
+            for (share in result) {
+                val shareMap = Arguments.createMap().apply {
+                    putInt("threshold", share.threshold.toInt())
+                    putInt("index", share.index.toInt())
+                    putArray("share", share.share.toWritableArray())
+                    val proofsArray = Arguments.createArray()
+                    for (proof in share.proofs) {
+                        proofsArray.pushArray(proof.toWritableArray())
+                    }
+                    putArray("proofs", proofsArray)
+                }
+                sharesArray.pushMap(shareMap)
+            }
+
+            promise.resolve(sharesArray)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e)
+        }
+    }
+
+    @ReactMethod
+    fun recoverSecret(params: ReadableMap, promise: Promise) {
+        try {
+            val sharesArray = params.getArray("shares")
+                ?: throw Exception("Invalid shares format")
+
+            val shares = mutableListOf<uniffi.spark_frost.SecretShareResult>()
+            for (i in 0 until sharesArray.size()) {
+                val shareMap = sharesArray.getMap(i)
+                    ?: throw Exception("Invalid share at index $i")
+                shares.add(uniffi.spark_frost.SecretShareResult(
+                    threshold = shareMap.getInt("threshold").toUInt(),
+                    index = shareMap.getInt("index").toUInt(),
+                    share = shareMap.getArray("share")?.toByteArray()
+                        ?: throw Exception("Invalid share bytes at index $i")
+                ))
+            }
+
+            val result = uniffi.spark_frost.recoverSecretUniffi(shares = shares)
+            promise.resolve(result.toWritableArray())
+        } catch (e: Exception) {
+            promise.reject("ERROR", e)
+        }
+    }
+
+    @ReactMethod
+    fun validateShare(params: ReadableMap, promise: Promise) {
+        try {
+            val share = params.getArray("share")?.toByteArray()
+                ?: throw Exception("Invalid share format")
+            val index = params.getInt("index").toUInt()
+            val threshold = params.getInt("threshold").toUInt()
+
+            val proofsArray = params.getArray("proofs")
+                ?: throw Exception("Invalid proofs format")
+            val proofs = mutableListOf<ByteArray>()
+            for (i in 0 until proofsArray.size()) {
+                val proof = proofsArray.getArray(i)?.toByteArray()
+                    ?: throw Exception("Invalid proof at index $i")
+                proofs.add(proof)
+            }
+
+            uniffi.spark_frost.validateShareUniffi(
+                share = share,
+                index = index,
+                threshold = threshold,
+                proofs = proofs
+            )
+
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e)
+        }
+    }
+
+    @ReactMethod
     fun verifySignature(params: ReadableMap, promise: Promise) {
         try {
             val signature = params.getArray("signature")?.toByteArray()

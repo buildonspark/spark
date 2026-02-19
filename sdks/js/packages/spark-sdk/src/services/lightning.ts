@@ -145,7 +145,7 @@ export class LightningService {
       }
 
       const shareProto: SecretShareProto = {
-        secretShare: numberToBytesBE(share.share, 32),
+        secretShare: share.share,
         proofs: share.proofs,
       };
       const shareBytes = SecretShareProto.encode(shareProto).finish();

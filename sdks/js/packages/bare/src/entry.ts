@@ -6,6 +6,9 @@ import {
   aggregateFrost,
   encryptEcies,
   decryptEcies,
+  splitSecretWithProofs,
+  recoverSecret,
+  validateShare,
 } from "@buildonspark/spark-frost-bare-addon";
 import {
   SparkFrostBase,
@@ -91,6 +94,46 @@ class SparkFrostBare extends SparkFrostBase {
   }
   decryptEcies(encryptedMsg, privateKey) {
     return decryptEcies(encryptedMsg, privateKey);
+  }
+
+  splitSecretWithProofs(
+    secret: Uint8Array,
+    threshold: number,
+    numShares: number,
+  ) {
+    const result = splitSecretWithProofs(secret, threshold, numShares);
+    return Promise.resolve(
+      (
+        result as {
+          threshold: number;
+          index: number;
+          share: Uint8Array;
+          proofs: Uint8Array[];
+        }[]
+      ).map((s) => ({
+        threshold: s.threshold,
+        index: s.index,
+        share: new Uint8Array(s.share),
+        proofs: s.proofs.map((p: Uint8Array) => new Uint8Array(p)),
+      })),
+    );
+  }
+
+  recoverSecret(
+    shares: { threshold: number; index: number; share: Uint8Array }[],
+  ) {
+    const result = recoverSecret(shares);
+    return Promise.resolve(result);
+  }
+
+  validateShare(
+    share: Uint8Array,
+    index: number,
+    threshold: number,
+    proofs: Uint8Array[],
+  ) {
+    validateShare(share, index, threshold, proofs);
+    return Promise.resolve();
   }
 }
 

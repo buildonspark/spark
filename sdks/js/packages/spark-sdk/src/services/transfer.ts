@@ -1,5 +1,5 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { equalBytes, hexToBytes, numberToBytesBE } from "@noble/curves/utils";
+import { equalBytes, hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionOutput } from "@scure/btc-signer/psbt";
@@ -812,10 +812,7 @@ export class BaseTransferService {
         throw new Error(`Share not found for operator ${operator.id}`);
       }
 
-      const pubkeyTweak = secp256k1.getPublicKey(
-        numberToBytesBE(share.share, 32),
-        true,
-      );
+      const pubkeyTweak = secp256k1.getPublicKey(share.share, true);
       pubkeySharesTweak.set(identifier, pubkeyTweak);
     }
 
@@ -842,7 +839,7 @@ export class BaseTransferService {
       leafTweaksMap.set(identifier, {
         leafId: leaf.leaf.id,
         secretShareTweak: {
-          secretShare: numberToBytesBE(share.share, 32),
+          secretShare: share.share,
           proofs: share.proofs,
         },
         pubkeySharesTweak: Object.fromEntries(pubkeySharesTweak),
@@ -859,7 +856,7 @@ export class BaseTransferService {
   }
 
   protected findShare(shares: VerifiableSecretShare[], operatorID: number) {
-    const targetShareIndex = BigInt(operatorID + 1);
+    const targetShareIndex = operatorID + 1;
     for (const s of shares) {
       if (s.index === targetShareIndex) {
         return s;
@@ -1516,9 +1513,7 @@ export class TransferService extends BaseTransferService {
       if (!share) {
         throw new Error(`Share not found for operator ${operator.id}`);
       }
-      const pubkeyTweak = secp256k1.getPublicKey(
-        numberToBytesBE(share.share, 32),
-      );
+      const pubkeyTweak = secp256k1.getPublicKey(share.share);
       pubkeySharesTweak.set(identifier, pubkeyTweak);
     }
 
@@ -1532,7 +1527,7 @@ export class TransferService extends BaseTransferService {
       leafTweaksMap.set(identifier, {
         leafId: leaf.leaf.id,
         secretShareTweak: {
-          secretShare: numberToBytesBE(share.share, 32),
+          secretShare: share.share,
           proofs: share.proofs,
         },
         pubkeySharesTweak: Object.fromEntries(pubkeySharesTweak),

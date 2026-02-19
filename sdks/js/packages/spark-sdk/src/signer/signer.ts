@@ -1,11 +1,6 @@
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { hmac } from "@noble/hashes/hmac";
-import {
-  bytesToHex,
-  bytesToNumberBE,
-  equalBytes,
-  hexToBytes,
-} from "@noble/curves/utils";
+import { bytesToHex, equalBytes, hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { HDKey } from "@scure/bip32";
 import { generateMnemonic, mnemonicToSeed } from "@scure/bip39";
@@ -19,10 +14,7 @@ import {
   SignFrostBindingParams,
 } from "../spark-bindings/types.js";
 import { subtractPrivateKeys } from "../utils/keys.js";
-import {
-  splitSecretWithProofs,
-  type VerifiableSecretShare,
-} from "../utils/secret-sharing.js";
+import { type VerifiableSecretShare } from "../utils/secret-sharing.js";
 import {
   getRandomSigningNonce,
   getSigningCommitmentFromNonce,
@@ -512,8 +504,8 @@ class DefaultSparkSigner implements SparkSigner {
     threshold,
     numShares,
   }: SplitSecretWithProofsParams): Promise<VerifiableSecretShare[]> {
-    const secretAsInt = bytesToNumberBE(secret);
-    return splitSecretWithProofs(secretAsInt, curveOrder, threshold, numShares);
+    const sparkFrost = getSparkFrost();
+    return sparkFrost.splitSecretWithProofs(secret, threshold, numShares);
   }
 
   getNonceForSelfCommitment(
