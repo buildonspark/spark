@@ -1,3 +1,8 @@
+---
+name: resolving-rebase-conflicts
+description: Resolve rebase conflicts in Ent generated code and Atlas migrations using repository scripts.
+---
+
 # Resolving Rebase Conflicts in Ent and Atlas Migrations
 
 ## Triggers
