@@ -58,7 +58,14 @@ test-grpc-minikube-oss = """
     -- \
     -p 1
 """
-atlas-hash="atlas migrate hash --dir 'file://so/ent/migrate/migrations'"
 # Ent field deprecation lint - checks that fields are deprecated before removal
 ent-field-lint = "go run ./tools/entfieldlint/cmd/entfieldlint check"
 ent-field-diff = "go run ./tools/entfieldlint/cmd/entfieldlint diff"
+
+[tasks.atlas-hash]
+dir = "so/ent"
+run = "atlas migrate hash --dir 'file://migrate/migrations'"
+
+[tasks.atlas-diff]
+dir = "so/ent"
+run = "atlas migrate diff \"$@\" --env local"
