@@ -24,7 +24,10 @@
       "Bash(git shortlog:*)",
       "Bash(git name-rev:*)",
       "Bash(git cat-file:*)",
-      "Bash(git worktree list:*)",
+      "Bash(git add:*)",
+      "Bash(git checkout:*)",
+      "Bash(git mv:*)",
+      "Bash(git worktree:*)",
       "Bash(git --version:*)",
       "Bash(git help:*)",
       "Bash(git check-ignore:*)",
@@ -55,7 +58,7 @@
       "Bash(gt checkout:*)",
       "Bash(gt sync:*)",
       "Bash(gt restack:*)",
-      "Bash(gt squash:*)",
+      "Bash(gt add:*)",
       "Bash(gt continue:*)",
 
       "Bash(cat:*)",
@@ -70,12 +73,14 @@
       "Bash(tree:*)",
       "Bash(grep:*)",
       "Bash(rg:*)",
+      "Bash(awk:*)",
 
       "Bash(which:*)",
       "Bash(command -v:*)",
       "Bash(type:*)",
       "Bash(pwd:*)",
       "Bash(echo:*)",
+      "Bash(ln:*)",
       "Bash(uname:*)",
       "Bash(whoami:*)",
       "Bash(env:*)",
@@ -108,10 +113,28 @@
       "Bash(mise format:*)",
       "Bash(mise gen-ent:*)",
       "Bash(mise gen-protos:*)",
+      "Bash(mise gen-protos-with-ts:*)",
+      "Bash(mise clean-protos:*)",
+      "Bash(mise fix-atlas-conflicts:*)",
+      "Bash(mise fix-ent-conflicts:*)",
       "Bash(mise test-go:*)",
       "Bash(mise test-unit:*)",
       "Bash(mise test-grpc-minikube:*)",
       "Bash(mise atlas-hash:*)",
+      "Bash(mise run lint:*)",
+      "Bash(mise run format:*)",
+      "Bash(mise run gen-ent:*)",
+      "Bash(mise run gen-protos:*)",
+      "Bash(mise run gen-protos-with-ts:*)",
+      "Bash(mise run clean-protos:*)",
+      "Bash(mise run fix-atlas-conflicts:*)",
+      "Bash(mise run fix-ent-conflicts:*)",
+      "Bash(mise run test-go:*)",
+      "Bash(mise run test-unit:*)",
+      "Bash(mise run test-grpc-minikube:*)",
+      "Bash(mise run atlas-hash:*)",
+
+      "Bash(bd:*)",
 
       "Bash(make:*)",
       "Bash(atlas version:*)",
@@ -119,14 +142,37 @@
       "Bash(atlas migrate validate:*)",
       "Bash(atlas migrate diff:*)",
       "Bash(minikube status:*)",
-      "Bash(./scripts/gen-migration.sh:*)"
+      "Bash(./scripts/gen-migration.sh:*)",
+      "Bash(./scripts/build-to-minikube.sh:*)",
+      "Bash(./scripts/local-test.sh:*)",
+      "Bash(./scripts/fix-atlas-conflicts.sh:*)",
+      "Bash(./scripts/fix-ent-conflicts.sh:*)"
     ],
     "deny": []
   },
   "hooks": {
     "UserPromptSubmit": [],
-    "PreToolUse": [],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/pr-template-reminder.sh"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [],
-    "SessionStart": []
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f \"$(git rev-parse --git-common-dir 2>/dev/null)/.graphite_repo_config\" ]; then echo 'GRAPHITE REPO: Use gt for all branch and PR operations. Load the ls-claude:graphite skill for workflow details.'; fi"
+          }
+        ]
+      }
+    ]
   }
 }
