@@ -191,6 +191,51 @@ function App() {
   return (
     <>
       <h1>Spark + Vite</h1>
+      <p>{new window.s.SparkError("test").message}</p>
+
+      <p>wallet one:</p>
+      <div
+        className="code clickable"
+        onClick={() =>
+          copyToClipboard(
+            "defy only anchor dish kid decorate twist great soon organ moon impulse",
+          )
+        }
+      >
+        defy only anchor dish kid decorate twist great soon organ moon impulse
+      </div>
+      <div
+        className="code clickable"
+        onClick={() =>
+          copyToClipboard(
+            "sprt1pgssx5d7xymk5yq0mfz7823e73fjqrgjez5k8lafch6ldd37aae5uaaek8re32",
+          )
+        }
+      >
+        sprt1pgssx5d7xymk5yq0mfz7823e73fjqrgjez5k8lafch6ldd37aae5uaaek8re32
+      </div>
+      <p>wallet two:</p>
+      <div
+        className="code clickable"
+        onClick={() =>
+          copyToClipboard(
+            "vacuum victory garden veteran bone speak valid today sea bid bench butter",
+          )
+        }
+      >
+        vacuum victory garden veteran bone speak valid today sea bid bench
+        butter
+      </div>
+      <div
+        className="code clickable"
+        onClick={() =>
+          copyToClipboard(
+            "sparkrt1pgss8s364j06fdhptuukgvz2vqkwt0w866yfn9tmx3v0wd57a5yd0rje2c4us7",
+          )
+        }
+      >
+        sparkrt1pgss8s364j06fdhptuukgvz2vqkwt0w866yfn9tmx3v0wd57a5yd0rje2c4us7
+      </div>
 
       <div className={`status ${status.type}`}>{status.message}</div>
 

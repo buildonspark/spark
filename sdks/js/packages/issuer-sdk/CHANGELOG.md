@@ -1,5 +1,13 @@
 # @buildonspark/issuer-sdk
 
+## 0.1.15
+
+### Patch Changes
+
+- - Upgrade `@noble/curves` minimum version to `^1.9.7`
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.6.5
+
 ## 0.1.14
 
 ### Patch Changes

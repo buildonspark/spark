@@ -1,5 +1,11 @@
 # @buildonspark/spark-frost-bare-addon
 
+## 0.0.7
+
+### Patch Changes
+
+- - Upgrade `@noble/curves` minimum version to `^1.9.7`
+
 ## 0.0.6
 
 ### Patch Changes

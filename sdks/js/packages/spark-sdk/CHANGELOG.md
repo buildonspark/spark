@@ -1,5 +1,18 @@
 # @buildonspark/spark-sdk
 
+## 0.6.5
+
+### Patch Changes
+
+- Bug fixes and improvements
+  - Upgrade `@noble/curves` minimum version to `^1.9.7` (resolves missing `secp256k1.Point.fromHex()` export for users on older versions)
+  - Include React Native version and OS details in client environment for improved diagnostics
+  - Move adaptor signature operations to Rust WASM for better performance
+  - Remove user signature requirement from Lightning preimage storage
+  - Fix receiver identity public key for Lightning preimage storage (use provided key with fallback)
+  - Fix token output locks being released prematurely during transfers and consolidation
+  - Add optional `executeBefore` timestamp to token transactions
+
 ## 0.6.4
 
 ### Patch Changes
