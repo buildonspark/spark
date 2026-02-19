@@ -1006,3 +1006,240 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 	assert.True(t, confirmedTransferIDs[transfer2.ID], "Exit 2 (transfer2) should be confirmed")
 	assert.False(t, confirmedTransferIDs[transfer3.ID], "Exit 3 (transfer3) should NOT be confirmed")
 }
+
+func createTestDepositAddress(
+	t *testing.T,
+	ctx context.Context,
+	dbClient *ent.Client,
+	rng *rand.ChaCha8,
+	address string,
+	isStatic bool,
+	network btcnetwork.Network,
+) *ent.DepositAddress {
+	t.Helper()
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	keyshare, err := dbClient.SigningKeyshare.Create().
+		SetPublicKey(signingPubKey).
+		SetSecretShare(secretShare).
+		SetMinSigners(1).
+		SetPublicShares(map[string]keys.Public{}).
+		SetStatus(schematype.KeyshareStatusAvailable).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	deposit, err := dbClient.DepositAddress.Create().
+		SetAddress(address).
+		SetOwnerIdentityPubkey(ownerPubKey).
+		SetOwnerSigningPubkey(ownerPubKey).
+		SetSigningKeyshare(keyshare).
+		SetIsStatic(isStatic).
+		SetNetwork(network).
+		Save(ctx)
+	require.NoError(t, err)
+	return deposit
+}
+
+func createTestTx(t *testing.T, value int64, pkScript []byte) *wire.MsgTx {
+	t.Helper()
+	tx := &wire.MsgTx{
+		Version: 1,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut:   []*wire.TxOut{{Value: value, PkScript: pkScript}},
+	}
+	return tx
+}
+
+func TestStoreUtxosForAddress(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	ctx, _ := db.NewTestSQLiteContext(t)
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	pkScript := []byte{0x51, 0x20, 0x01, 0x02, 0x03}
+
+	t.Run("single utxo", func(t *testing.T) {
+		deposit := createTestDepositAddress(t, ctx, dbClient, rng, "addr-single", false, btcnetwork.Regtest)
+		tx := createTestTx(t, 5000, pkScript)
+		utxos := []AddressDepositUtxo{{tx: tx, amount: 5000, idx: 0}}
+
+		err := storeUtxosForAddress(ctx, dbClient, deposit, utxos, btcnetwork.Regtest, 100)
+		require.NoError(t, err)
+
+		stored, err := dbClient.DepositAddress.QueryUtxo(deposit).All(ctx)
+		require.NoError(t, err)
+		require.Len(t, stored, 1)
+		assert.Equal(t, uint64(5000), stored[0].Amount)
+		assert.Equal(t, uint32(0), stored[0].Vout)
+		assert.Equal(t, int64(100), stored[0].BlockHeight)
+	})
+
+	t.Run("multiple utxos", func(t *testing.T) {
+		deposit := createTestDepositAddress(t, ctx, dbClient, rng, "addr-multi", false, btcnetwork.Regtest)
+		tx1 := createTestTx(t, 3000, pkScript)
+		tx2 := createTestTx(t, 7000, pkScript)
+		utxos := []AddressDepositUtxo{
+			{tx: tx1, amount: 3000, idx: 0},
+			{tx: tx2, amount: 7000, idx: 0},
+		}
+
+		err := storeUtxosForAddress(ctx, dbClient, deposit, utxos, btcnetwork.Regtest, 200)
+		require.NoError(t, err)
+
+		stored, err := dbClient.DepositAddress.QueryUtxo(deposit).All(ctx)
+		require.NoError(t, err)
+		require.Len(t, stored, 2)
+	})
+
+	t.Run("upsert does not duplicate", func(t *testing.T) {
+		deposit := createTestDepositAddress(t, ctx, dbClient, rng, "addr-upsert", false, btcnetwork.Regtest)
+		tx := createTestTx(t, 4000, pkScript)
+		utxos := []AddressDepositUtxo{{tx: tx, amount: 4000, idx: 0}}
+
+		err := storeUtxosForAddress(ctx, dbClient, deposit, utxos, btcnetwork.Regtest, 300)
+		require.NoError(t, err)
+
+		// Call again with the same UTXO
+		err = storeUtxosForAddress(ctx, dbClient, deposit, utxos, btcnetwork.Regtest, 300)
+		require.NoError(t, err)
+
+		stored, err := dbClient.DepositAddress.QueryUtxo(deposit).All(ctx)
+		require.NoError(t, err)
+		require.Len(t, stored, 1)
+	})
+}
+
+func TestStoreDepositUtxos(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{1})
+	ctx, _ := db.NewTestSQLiteContext(t)
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	pkScript := []byte{0x51, 0x20, 0x01, 0x02, 0x03}
+
+	t.Run("stores utxos for both static and non-static addresses", func(t *testing.T) {
+		staticAddr := createTestDepositAddress(t, ctx, dbClient, rng, "static-addr-1", true, btcnetwork.Regtest)
+		nonStaticAddr := createTestDepositAddress(t, ctx, dbClient, rng, "nonstatic-addr-1", false, btcnetwork.Regtest)
+
+		tx1 := createTestTx(t, 1000, pkScript)
+		tx2 := createTestTx(t, 2000, pkScript)
+
+		addressToUtxoMap := map[string][]AddressDepositUtxo{
+			staticAddr.Address:    {{tx: tx1, amount: 1000, idx: 0}},
+			nonStaticAddr.Address: {{tx: tx2, amount: 2000, idx: 0}},
+		}
+		creditedAddresses := []string{staticAddr.Address, nonStaticAddr.Address}
+
+		err := storeDepositUtxos(ctx, dbClient, creditedAddresses, addressToUtxoMap, btcnetwork.Regtest, 100)
+		require.NoError(t, err)
+
+		staticUtxos, err := dbClient.DepositAddress.QueryUtxo(staticAddr).All(ctx)
+		require.NoError(t, err)
+		require.Len(t, staticUtxos, 1)
+		assert.Equal(t, uint64(1000), staticUtxos[0].Amount)
+
+		nonStaticUtxos, err := dbClient.DepositAddress.QueryUtxo(nonStaticAddr).All(ctx)
+		require.NoError(t, err)
+		require.Len(t, nonStaticUtxos, 1)
+		assert.Equal(t, uint64(2000), nonStaticUtxos[0].Amount)
+	})
+
+	t.Run("non-static address picks up utxos across blocks", func(t *testing.T) {
+		addr := createTestDepositAddress(t, ctx, dbClient, rng, "nonstatic-multiblock", false, btcnetwork.Regtest)
+
+		// Block 1: first UTXO arrives
+		tx1 := createTestTx(t, 5000, pkScript)
+		addressToUtxoMap := map[string][]AddressDepositUtxo{
+			addr.Address: {{tx: tx1, amount: 5000, idx: 0}},
+		}
+		err := storeDepositUtxos(ctx, dbClient, []string{addr.Address}, addressToUtxoMap, btcnetwork.Regtest, 100)
+		require.NoError(t, err)
+
+		stored, err := dbClient.DepositAddress.QueryUtxo(addr).All(ctx)
+		require.NoError(t, err)
+		require.Len(t, stored, 1)
+
+		// Block 2: second UTXO arrives at the same address
+		tx2 := createTestTx(t, 8000, pkScript)
+		addressToUtxoMap = map[string][]AddressDepositUtxo{
+			addr.Address: {{tx: tx2, amount: 8000, idx: 0}},
+		}
+		err = storeDepositUtxos(ctx, dbClient, []string{addr.Address}, addressToUtxoMap, btcnetwork.Regtest, 101)
+		require.NoError(t, err)
+
+		stored, err = dbClient.DepositAddress.QueryUtxo(addr).All(ctx)
+		require.NoError(t, err)
+		require.Len(t, stored, 2)
+	})
+
+	t.Run("ignores addresses not in database", func(t *testing.T) {
+		utxoCountBefore, err := dbClient.Utxo.Query().Count(ctx)
+		require.NoError(t, err)
+
+		addressToUtxoMap := map[string][]AddressDepositUtxo{
+			"unknown-addr": {{tx: createTestTx(t, 1000, pkScript), amount: 1000, idx: 0}},
+		}
+		err = storeDepositUtxos(ctx, dbClient, []string{"unknown-addr"}, addressToUtxoMap, btcnetwork.Regtest, 500)
+		require.NoError(t, err)
+
+		utxoCountAfter, err := dbClient.Utxo.Query().Count(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, utxoCountBefore, utxoCountAfter)
+	})
+}
+
+func TestHandleBlock_NonStaticDeposit_SetsConfirmationTxid(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{2})
+	ctx, _ := db.NewTestSQLiteContext(t)
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	// Create a taproot-style script so processTransactions can decode an address
+	params := &chaincfg.RegressionNetParams
+	privKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	taprootKey := txscript.ComputeTaprootKeyNoScript(privKey.Public().ToBTCEC())
+	taprootScript, err := txscript.PayToTaprootScript(taprootKey)
+	require.NoError(t, err)
+
+	// Decode the address string for the deposit address entity
+	_, addrs, _, err := txscript.ExtractPkScriptAddrs(taprootScript, params)
+	require.NoError(t, err)
+	require.Len(t, addrs, 1)
+	addrStr := addrs[0].EncodeAddress()
+
+	deposit := createTestDepositAddress(t, ctx, dbClient, rng, addrStr, false, btcnetwork.Regtest)
+
+	// Two transactions to the same address with different amounts
+	smallTx := wire.MsgTx{Version: 1, TxIn: []*wire.TxIn{{}}, TxOut: []*wire.TxOut{{Value: 1000, PkScript: taprootScript}}}
+	largeTx := wire.MsgTx{Version: 1, TxIn: []*wire.TxIn{{}}, TxOut: []*wire.TxOut{{Value: 5000, PkScript: taprootScript}}}
+
+	config := so.Config{
+		SupportedNetworks: []btcnetwork.Network{btcnetwork.Regtest},
+		Lrc20Configs: map[string]so.Lrc20Config{
+			btcnetwork.Regtest.String(): {DisableRpcs: true},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	connCfg := &rpcclient.ConnConfig{DisableTLS: true, HTTPPostMode: true}
+	bitcoinClient, err := rpcclient.New(connCfg, nil)
+	require.NoError(t, err)
+
+	// Block 1: both transactions confirm
+	blockTxs := []wire.MsgTx{smallTx, largeTx}
+	err = handleBlock(ctx, &config, dbClient, bitcoinClient, blockTxs, 100, chainhash.Hash{}, btcnetwork.Regtest)
+	require.NoError(t, err)
+
+	// Verify confirmation_txid is set to the largest UTXO's txid
+	updated, err := dbClient.DepositAddress.Get(ctx, deposit.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(100), updated.ConfirmationHeight)
+	assert.Equal(t, largeTx.TxHash().String(), updated.ConfirmationTxid)
+
+	// Verify both UTXOs are stored as Utxo entities
+	utxos, err := dbClient.DepositAddress.QueryUtxo(updated).All(ctx)
+	require.NoError(t, err)
+	assert.Len(t, utxos, 2)
+}

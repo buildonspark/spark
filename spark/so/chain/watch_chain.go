@@ -664,10 +664,10 @@ func handleBlock(
 		}
 	}
 
-	logger.Sugar().Infof("Started processing static deposits at block height %d", blockHeight)
-	err = storeStaticDeposits(ctx, dbClient, creditedAddresses, addressToUtxoMap, network, blockHeight)
+	logger.Sugar().Infof("Started storing deposit UTXOs at block height %d", blockHeight)
+	err = storeDepositUtxos(ctx, dbClient, creditedAddresses, addressToUtxoMap, network, blockHeight)
 	if err != nil {
-		return fmt.Errorf("failed to store static deposits: %w", err)
+		return fmt.Errorf("failed to store deposit utxos: %w", err)
 	}
 
 	logger.Sugar().Infof("Started processing confirmed deposits at block height %d", blockHeight)
@@ -970,11 +970,44 @@ func markDepositAddressUTXOConfirmed(
 	return nil
 }
 
-func storeStaticDeposits(ctx context.Context, dbClient *ent.Client, creditedAddresses []string, addressToUtxoMap map[string][]AddressDepositUtxo, network btcnetwork.Network, blockHeight int64) error {
+func storeUtxosForAddress(ctx context.Context, dbClient *ent.Client, address *ent.DepositAddress, utxos []AddressDepositUtxo, network btcnetwork.Network, blockHeight int64) error {
 	logger := logging.GetLoggerFromContext(ctx)
+	for _, utxo := range utxos {
+		// Convert transaction ID string to bytes for storage.
+		// Note: Bitcoin transaction IDs are displayed as hex strings with reversed byte order,
+		// but we convert it to the byte representation in the database for faster lookup
+		// while keeping the reversed byte order.
+		txidStringBytes, err := hex.DecodeString(utxo.tx.TxID())
+		if err != nil {
+			return fmt.Errorf("unable to decode txid for a new utxo: %w", err)
+		}
+		err = dbClient.Utxo.Create().
+			SetTxid(txidStringBytes).
+			SetVout(utxo.idx).
+			SetAmount(utxo.amount).
+			SetPkScript(utxo.tx.TxOut[utxo.idx].PkScript).
+			SetNetwork(network).
+			SetBlockHeight(blockHeight).
+			SetDepositAddress(address).
+			OnConflictColumns("network", "txid", "vout").
+			UpdateNewValues().
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to store a new utxo: %w", err)
+		}
+		logger.Sugar().Debugf(
+			"Stored an L1 utxo for deposit address %s (txid: %x, vout: %v, amount: %v)",
+			address.Address,
+			utxo.tx.TxID(),
+			utxo.idx,
+			utxo.amount,
+		)
+	}
+	return nil
+}
 
-	staticDepositAddresses, err := dbClient.DepositAddress.Query().
-		Where(depositaddress.IsStaticEQ(true)).
+func storeDepositUtxos(ctx context.Context, dbClient *ent.Client, creditedAddresses []string, addressToUtxoMap map[string][]AddressDepositUtxo, network btcnetwork.Network, blockHeight int64) error {
+	depositAddresses, err := dbClient.DepositAddress.Query().
 		Where(depositaddress.NetworkEQ(network)).
 		Where(depositaddress.AddressIn(creditedAddresses...)).
 		All(ctx)
@@ -982,38 +1015,10 @@ func storeStaticDeposits(ctx context.Context, dbClient *ent.Client, creditedAddr
 		return err
 	}
 
-	for _, address := range staticDepositAddresses {
+	for _, address := range depositAddresses {
 		if utxos, ok := addressToUtxoMap[address.Address]; ok {
-			for _, utxo := range utxos {
-				// Convert transaction ID string to bytes for storage.
-				// Note: Bitcoin transaction IDs are displayed as hex strings with reversed byte order,
-				// but we convert it to the byte representation in the database for faster lookup
-				// while keeping the reversed byte order.
-				txidStringBytes, err := hex.DecodeString(utxo.tx.TxID())
-				if err != nil {
-					return fmt.Errorf("unable to decode txid for a new utxo: %w", err)
-				}
-				err = dbClient.Utxo.Create().
-					SetTxid(txidStringBytes).
-					SetVout(utxo.idx).
-					SetAmount(utxo.amount).
-					SetPkScript(utxo.tx.TxOut[utxo.idx].PkScript).
-					SetNetwork(network).
-					SetBlockHeight(blockHeight).
-					SetDepositAddress(address).
-					OnConflictColumns("network", "txid", "vout").
-					UpdateNewValues().
-					Exec(ctx)
-				if err != nil {
-					return fmt.Errorf("unable to store a new utxo: %w", err)
-				}
-				logger.Sugar().Debugf(
-					"Stored an L1 utxo to a static deposit address %s (txid: %x, vout: %v, amount: %v)",
-					address.Address,
-					utxo.tx.TxID(),
-					utxo.idx,
-					utxo.amount,
-				)
+			if err := storeUtxosForAddress(ctx, dbClient, address, utxos, network, blockHeight); err != nil {
+				return err
 			}
 		}
 	}
