@@ -606,6 +606,9 @@ type LightningReceiveRequest implements UserRequest & Entity {
   The receiver's identity public key if different from owner of the request.
   """
   receiver_identity_public_key: PublicKey
+
+  """The spark invoice of the lightning receive request."""
+  spark_invoice: String
 }
 
 enum LightningReceiveRequestStatus {
