@@ -1,20 +1,20 @@
 import { describe, expect, it } from "@jest/globals";
+import { SparkValidationError } from "../../../errors/types.js";
+import { decodeInvoice } from "../../../services/bolt11-spark.js";
 import { ConfigOptions } from "../../../services/wallet-config.js";
 import { SparkWallet } from "../../../spark-wallet/spark-wallet.node.js";
 import {
   CurrencyUnit,
   LightningReceiveRequestStatus,
 } from "../../../types/index.js";
-import { SparkValidationError } from "../../../errors/types.js";
-import { BitcoinFaucet } from "../../utils/test-faucet.js";
-import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
-import { waitForClaim } from "../../utils/utils.js";
-import { decodeInvoice } from "../../../services/bolt11-spark.js";
 import {
   decodeSparkAddress,
-  validateSparkInvoiceSignature,
   SparkAddressFormat,
+  validateSparkInvoiceSignature,
 } from "../../../utils/address.js";
+import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
+import { BitcoinFaucet } from "../../utils/test-faucet.js";
+import { waitForClaim } from "../../utils/utils.js";
 
 const DEPOSIT_AMOUNT = 10000n;
 const INVOICE_AMOUNT = 1000;
@@ -541,5 +541,56 @@ describe("Lightning Network provider", () => {
         validateSparkInvoiceSignature(sparkInvoice as SparkAddressFormat),
       ).toThrow(SparkValidationError);
     }, 30000);
+  });
+
+  describe("creating an invoice with receiverIdentityPubkey", () => {
+    it("should successfully create and pay an invoice with receiverIdentityPubkey", async () => {
+      const faucet = BitcoinFaucet.getInstance();
+
+      const { wallet: alice } = await SparkWalletTestingWithStream.initialize({
+        options: { network: "LOCAL" },
+      });
+
+      const { wallet: bob } = await SparkWalletTestingWithStream.initialize({
+        options: { network: "LOCAL" },
+      });
+
+      const depositAddress = await alice.getSingleUseDepositAddress();
+      expect(depositAddress).toBeDefined();
+
+      const signedTx = await faucet.sendToAddress(
+        depositAddress,
+        DEPOSIT_AMOUNT,
+      );
+
+      // Wait for the transaction to be mined
+      await faucet.mineBlocksAndWaitForMiningToComplete(6);
+
+      await alice.claimDeposit(signedTx.id);
+
+      await waitForClaim({ wallet: alice });
+
+      const { balance } = await alice.getBalance();
+      expect(balance).toBe(DEPOSIT_AMOUNT);
+
+      const invoice = await alice.createLightningInvoice({
+        amountSats: 1000,
+        memo: "test invoice",
+        expirySeconds: 600,
+        receiverIdentityPubkey: await bob.getIdentityPublicKey(),
+      });
+
+      expect(invoice).toBeDefined();
+
+      await alice.payLightningInvoice({
+        invoice: invoice.invoice.encodedInvoice,
+        maxFeeSats: 100,
+      });
+
+      await waitForClaim({ wallet: bob });
+
+      const { balance: bobBalance } = await bob.getBalance();
+      expect(bobBalance).toBe(BigInt(1000));
+    }, 120_000);
   });
 });
