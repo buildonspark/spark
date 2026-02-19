@@ -790,9 +790,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   /**
    * Optimizes token outputs by consolidating them when there are more than the configured threshold.
-   * Processes one token at a time that has more than 50 outputs (configurable).
-   * On each run, it will find the next token identifier that needs consolidation and process it.
-   * Respects the maximum of 500 outputs per transaction.
+   * Processes as many token outputs as possible in one transaction, up to MAX_TOKEN_OUTPUTS_TX.
+   * Consolidates each eligible token identifier into a single output for this wallet address.
    */
   public async optimizeTokenOutputs(): Promise<void> {
     if (this.tokenOptimizationInProgress) {
@@ -808,49 +807,67 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       const minOutputsThreshold = tokenOptConfig?.minOutputsThreshold ?? 50;
 
       const entries = await this.tokenOutputManager.entries();
-      for (const [tokenIdentifier, allOutputs] of entries) {
-        if (allOutputs.length <= minOutputsThreshold) {
+      const acquireRequests = entries
+        .filter(([, allOutputs]) => allOutputs.length > minOutputsThreshold)
+        .map(([tokenIdentifier]) => ({
+          tokenIdentifier,
+          selector: (
+            available: OutputWithPreviousTransactionData[],
+            remainingCapacity: number,
+          ) => available.slice(0, remainingCapacity),
+        }));
+
+      if (acquireRequests.length === 0) {
+        return;
+      }
+
+      const outputsByToken = await this.tokenOutputManager.acquireOutputsBatch(
+        acquireRequests,
+        MAX_TOKEN_OUTPUTS_TX,
+        "optimize-token-outputs",
+      );
+
+      if (outputsByToken.size === 0) {
+        return;
+      }
+
+      const receiverSparkAddress = await this.getSparkAddress();
+      const receiverOutputs: {
+        tokenIdentifier: Bech32mTokenIdentifier;
+        tokenAmount: bigint;
+        receiverSparkAddress: string;
+      }[] = [];
+      const selectedOutputs: OutputWithPreviousTransactionData[] = [];
+
+      for (const [tokenIdentifier, outputs] of outputsByToken) {
+        if (outputs.length === 0) {
           continue;
         }
+        receiverOutputs.push({
+          tokenIdentifier,
+          tokenAmount: sumTokenOutputs(outputs),
+          receiverSparkAddress,
+        });
+        selectedOutputs.push(...outputs);
+      }
 
-        const outputsToConsolidate =
-          await this.tokenOutputManager.acquireOutputs(
-            tokenIdentifier,
-            (available) => available.slice(0, MAX_TOKEN_OUTPUTS_TX),
-            `optimize-${tokenIdentifier}`,
-          );
+      if (receiverOutputs.length === 0) {
+        return;
+      }
 
-        if (outputsToConsolidate.length === 0) {
-          continue;
-        }
+      try {
+        const txId = await this.tokenTransactionService.tokenTransfer({
+          tokenOutputs: outputsByToken,
+          receiverOutputs,
+          outputSelectionStrategy: "SMALL_FIRST",
+          selectedOutputs,
+        });
 
-        try {
-          const receiverSparkAddress = await this.getSparkAddress();
-          const totalAmount = sumTokenOutputs(outputsToConsolidate);
-
-          const txId = await this.tokenTransactionService.tokenTransfer({
-            tokenOutputs: new Map([[tokenIdentifier, outputsToConsolidate]]),
-            receiverOutputs: [
-              {
-                tokenIdentifier,
-                tokenAmount: totalAmount,
-                receiverSparkAddress,
-              },
-            ],
-            outputSelectionStrategy: "SMALL_FIRST",
-          });
-
-          console.log(
-            `Consolidated ${outputsToConsolidate.length} outputs for token ${tokenIdentifier} in transaction ${txId}`,
-          );
-
-          break;
-        } catch (error) {
-          console.error(
-            `Failed to optimize token outputs for ${tokenIdentifier}:`,
-            error,
-          );
-        }
+        console.log(
+          `Consolidated ${selectedOutputs.length} outputs across ${receiverOutputs.length} tokens in transaction ${txId}`,
+        );
+      } catch (error) {
+        console.error("Failed to optimize token outputs:", error);
       }
     } finally {
       this.tokenOptimizationInProgress = false;

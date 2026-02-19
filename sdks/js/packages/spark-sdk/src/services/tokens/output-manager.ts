@@ -1,4 +1,5 @@
 import { Mutex } from "async-mutex";
+import { SparkValidationError } from "../../errors/types.js";
 import {
   OutputWithPreviousTransactionData,
   TokenOutputStatus,
@@ -10,6 +11,16 @@ export type TokenOutputLock = {
   lockedAt: number;
   operationId?: string;
 };
+
+export type TokenOutputAcquireRequest = {
+  tokenIdentifier: Bech32mTokenIdentifier;
+  selector: (
+    outputs: OutputWithPreviousTransactionData[],
+    remainingCapacity: number,
+  ) => OutputWithPreviousTransactionData[];
+};
+
+type AcquireOutputsMode = "single" | "batch";
 
 export class TokenOutputManager {
   private availableOutputs: TokenOutputsMap = new Map();
@@ -185,29 +196,41 @@ export class TokenOutputManager {
     return await this.mutex.runExclusive(() => {
       this.cleanupExpiredLocks();
 
-      const available = this.getUnlockedOutputsInternal(tokenIdentifier);
-      const selected = selector(available);
+      const selectedByToken = this.acquireOutputsInternal(
+        [
+          {
+            tokenIdentifier,
+            selector: (outputs) => selector(outputs),
+          },
+        ],
+        Number.MAX_SAFE_INTEGER,
+        operationId,
+        "single",
+      );
+      return selectedByToken.get(tokenIdentifier) ?? [];
+    });
+  }
 
-      if (selected.length === 0) {
-        return [];
-      }
-
-      // Validate that all selected outputs are from the available set
-      const availableIds = new Set(available.map((o) => o.output!.id!));
-      for (const output of selected) {
-        const id = output.output!.id!;
-        if (!availableIds.has(id)) {
-          throw new Error(`Selected output ${id} is not in the available set`);
-        }
-      }
-
-      const now = Date.now();
-      for (const output of selected) {
-        const id = output.output!.id!;
-        this.localPendingMap.set(id, { lockedAt: now, operationId });
-      }
-
-      return selected;
+  /**
+   * Atomically acquires and locks outputs across multiple token identifiers.
+   *
+   * @param requests - Per-token acquire requests in priority order
+   * @param maxTotalOutputs - Maximum number of outputs to acquire across all requests
+   * @param operationId - name of the operation for debugging purposes
+   */
+  async acquireOutputsBatch(
+    requests: TokenOutputAcquireRequest[],
+    maxTotalOutputs: number,
+    operationId?: string,
+  ): Promise<TokenOutputsMap> {
+    return await this.mutex.runExclusive(() => {
+      this.cleanupExpiredLocks();
+      return this.acquireOutputsInternal(
+        requests,
+        maxTotalOutputs,
+        operationId,
+        "batch",
+      );
     });
   }
 
@@ -288,6 +311,123 @@ export class TokenOutputManager {
   ): OutputWithPreviousTransactionData[] {
     const outputs = this.availableOutputs.get(tokenIdentifier) ?? [];
     return outputs.filter((o) => !this.localPendingMap.has(o.output!.id!));
+  }
+
+  private acquireOutputsInternal(
+    requests: TokenOutputAcquireRequest[],
+    maxTotalOutputs: number,
+    operationId: string | undefined,
+    mode: AcquireOutputsMode,
+  ): TokenOutputsMap {
+    if (maxTotalOutputs <= 0 || requests.length === 0) {
+      return new Map();
+    }
+
+    const selectedByToken: TokenOutputsMap = new Map();
+    const selectedIds = new Set<string>();
+    let remainingCapacity = maxTotalOutputs;
+
+    for (const request of requests) {
+      if (remainingCapacity <= 0) {
+        break;
+      }
+
+      const available = this.getUnlockedOutputsInternal(
+        request.tokenIdentifier,
+      );
+      const selected = request.selector(available, remainingCapacity);
+      if (selected.length === 0) {
+        continue;
+      }
+
+      if (mode === "batch" && selected.length > remainingCapacity) {
+        this.throwRemainingCapacityExceeded(
+          request.tokenIdentifier,
+          selected.length,
+          remainingCapacity,
+        );
+        continue;
+      }
+
+      const availableIds = new Set(available.map((o) => o.output!.id!));
+      for (const output of selected) {
+        const id = output.output!.id!;
+        if (!availableIds.has(id)) {
+          this.throwInvalidSelectedOutput(id, request.tokenIdentifier, mode);
+        }
+        if (mode === "batch" && selectedIds.has(id)) {
+          this.throwDuplicateSelectedOutput(id, request.tokenIdentifier);
+        }
+        selectedIds.add(id);
+      }
+
+      selectedByToken.set(request.tokenIdentifier, selected);
+      if (mode === "batch") {
+        remainingCapacity -= selected.length;
+      }
+    }
+
+    if (selectedIds.size === 0) {
+      return new Map();
+    }
+
+    const now = Date.now();
+    for (const id of selectedIds) {
+      this.localPendingMap.set(id, { lockedAt: now, operationId });
+    }
+
+    return selectedByToken;
+  }
+
+  private throwRemainingCapacityExceeded(
+    tokenIdentifier: Bech32mTokenIdentifier,
+    selectedLength: number,
+    remainingCapacity: number,
+  ): never {
+    throw new SparkValidationError(
+      `Selector for token ${tokenIdentifier} exceeded remaining capacity`,
+      {
+        field: "selectedOutputs",
+        value: selectedLength,
+        expected: `Less than or equal to remaining capacity (${remainingCapacity})`,
+        tokenIdentifier,
+      },
+    );
+  }
+
+  private throwInvalidSelectedOutput(
+    id: string,
+    tokenIdentifier: Bech32mTokenIdentifier,
+    mode: AcquireOutputsMode,
+  ): never {
+    if (mode === "single") {
+      throw new Error(`Selected output ${id} is not in the available set`);
+    }
+
+    throw new SparkValidationError(
+      `Selected output ${id} is not in the available set for token ${tokenIdentifier}`,
+      {
+        field: "selectedOutputs",
+        value: id,
+        expected: "Output ID from the token's available unlocked set",
+        tokenIdentifier,
+      },
+    );
+  }
+
+  private throwDuplicateSelectedOutput(
+    id: string,
+    tokenIdentifier: Bech32mTokenIdentifier,
+  ): never {
+    throw new SparkValidationError(
+      `Selected output ${id} was selected more than once`,
+      {
+        field: "selectedOutputs",
+        value: id,
+        expected: "Each selected output ID must be unique in the batch",
+        tokenIdentifier,
+      },
+    );
   }
 
   private cleanupExpiredLocks(): void {
