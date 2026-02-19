@@ -1755,9 +1755,10 @@ type InitiateSettleReceiverKeyTweakRequest struct {
 	// Each SO verifies the user signature against this full map, then decrypts its own portion.
 	EncryptedClaimKeyTweakPackage map[string][]byte `protobuf:"bytes,4,rep,name=encrypted_claim_key_tweak_package,json=encryptedClaimKeyTweakPackage,proto3" json:"encrypted_claim_key_tweak_package,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// User signature over the encrypted claim key tweak package.
-	ClaimSignature []byte `protobuf:"bytes,5,opt,name=claim_signature,json=claimSignature,proto3" json:"claim_signature,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	ClaimSignature            []byte `protobuf:"bytes,5,opt,name=claim_signature,json=claimSignature,proto3" json:"claim_signature,omitempty"`
+	ReceiverIdentityPublicKey []byte `protobuf:"bytes,6,opt,name=receiver_identity_public_key,json=receiverIdentityPublicKey,proto3" json:"receiver_identity_public_key,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *InitiateSettleReceiverKeyTweakRequest) Reset() {
@@ -1825,12 +1826,20 @@ func (x *InitiateSettleReceiverKeyTweakRequest) GetClaimSignature() []byte {
 	return nil
 }
 
+func (x *InitiateSettleReceiverKeyTweakRequest) GetReceiverIdentityPublicKey() []byte {
+	if x != nil {
+		return x.ReceiverIdentityPublicKey
+	}
+	return nil
+}
+
 type SettleReceiverKeyTweakRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TransferId    string                 `protobuf:"bytes,1,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
-	Action        SettleKeyTweakAction   `protobuf:"varint,3,opt,name=action,proto3,enum=spark_internal.SettleKeyTweakAction" json:"action,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	TransferId                string                 `protobuf:"bytes,1,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
+	Action                    SettleKeyTweakAction   `protobuf:"varint,3,opt,name=action,proto3,enum=spark_internal.SettleKeyTweakAction" json:"action,omitempty"`
+	ReceiverIdentityPublicKey []byte                 `protobuf:"bytes,4,opt,name=receiver_identity_public_key,json=receiverIdentityPublicKey,proto3" json:"receiver_identity_public_key,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *SettleReceiverKeyTweakRequest) Reset() {
@@ -1875,6 +1884,13 @@ func (x *SettleReceiverKeyTweakRequest) GetAction() SettleKeyTweakAction {
 		return x.Action
 	}
 	return SettleKeyTweakAction_NONE
+}
+
+func (x *SettleReceiverKeyTweakRequest) GetReceiverIdentityPublicKey() []byte {
+	if x != nil {
+		return x.ReceiverIdentityPublicKey
+	}
+	return nil
 }
 
 type SettleSenderKeyTweakRequest struct {
@@ -3361,14 +3377,15 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x1cUpdatePreimageRequestRequest\x12.\n" +
 	"\x13preimage_request_id\x18\x01 \x01(\tR\x11preimageRequestId\x12\x1a\n" +
 	"\bpreimage\x18\x02 \x01(\fR\bpreimage\x12.\n" +
-	"\x13identity_public_key\x18\x03 \x01(\fR\x11identityPublicKey\"\xec\x05\n" +
+	"\x13identity_public_key\x18\x03 \x01(\fR\x11identityPublicKey\"\xad\x06\n" +
 	"%InitiateSettleReceiverKeyTweakRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x12s\n" +
 	"\x10key_tweak_proofs\x18\x02 \x03(\v2I.spark_internal.InitiateSettleReceiverKeyTweakRequest.KeyTweakProofsEntryR\x0ekeyTweakProofs\x12s\n" +
 	"\x10user_public_keys\x18\x03 \x03(\v2I.spark_internal.InitiateSettleReceiverKeyTweakRequest.UserPublicKeysEntryR\x0euserPublicKeys\x12\xa2\x01\n" +
 	"!encrypted_claim_key_tweak_package\x18\x04 \x03(\v2X.spark_internal.InitiateSettleReceiverKeyTweakRequest.EncryptedClaimKeyTweakPackageEntryR\x1dencryptedClaimKeyTweakPackage\x12'\n" +
-	"\x0fclaim_signature\x18\x05 \x01(\fR\x0eclaimSignature\x1aU\n" +
+	"\x0fclaim_signature\x18\x05 \x01(\fR\x0eclaimSignature\x12?\n" +
+	"\x1creceiver_identity_public_key\x18\x06 \x01(\fR\x19receiverIdentityPublicKey\x1aU\n" +
 	"\x13KeyTweakProofsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12(\n" +
 	"\x05value\x18\x02 \x01(\v2\x12.spark.SecretProofR\x05value:\x028\x01\x1aA\n" +
@@ -3377,11 +3394,12 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\x1aP\n" +
 	"\"EncryptedClaimKeyTweakPackageEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\x84\x01\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\xc5\x01\n" +
 	"\x1dSettleReceiverKeyTweakRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x12<\n" +
-	"\x06action\x18\x03 \x01(\x0e2$.spark_internal.SettleKeyTweakActionR\x06actionJ\x04\b\x02\x10\x03\"|\n" +
+	"\x06action\x18\x03 \x01(\x0e2$.spark_internal.SettleKeyTweakActionR\x06action\x12?\n" +
+	"\x1creceiver_identity_public_key\x18\x04 \x01(\fR\x19receiverIdentityPublicKeyJ\x04\b\x02\x10\x03\"|\n" +
 	"\x1bSettleSenderKeyTweakRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x12<\n" +

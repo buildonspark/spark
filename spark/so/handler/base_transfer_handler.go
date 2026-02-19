@@ -37,6 +37,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
+	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -1042,6 +1043,53 @@ func (h *BaseTransferHandler) loadTransferNoUpdate(ctx context.Context, transfer
 		return nil, fmt.Errorf("unable to find transfer %s: %w", transferID, err)
 	}
 	return transfer, nil
+}
+
+// Fetch all TransferReceivers for this Transfer, returns the one associated with this request
+// Returns whether MIMO receive is enabled, the receiver, and an error if one occurred
+func (h *BaseTransferHandler) loadTransferReceiverByPublicKeyForUpdate(ctx context.Context, transfer *ent.Transfer, pubkey *keys.Public) (bool, *ent.TransferReceiver, error) {
+	if transfer == nil || pubkey == nil {
+		return false, nil, nil
+	}
+
+	isMimoReceiveEnabled := knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoTransferMultiReceiverEnabled, 0) > 0
+
+	receivers, err := transfer.QueryTransferReceivers().
+		Where(enttransferreceiver.IdentityPubkeyEQ(*pubkey)).
+		ForUpdate(sql.WithLockAction(sql.NoWait)).
+		All(ctx)
+	if err != nil {
+		return false, nil, fmt.Errorf("unable to query transfer receivers: %w", err)
+	}
+
+	// MIMO receive is enabled IFF the knob is enabled and there is a corresponding receiver.
+	switch len(receivers) {
+	case 0:
+		if isMimoReceiveEnabled {
+			return false, nil, fmt.Errorf("no transfer receivers found for transfer %s", transfer.ID)
+		}
+		return false, nil, nil
+	case 1:
+		return isMimoReceiveEnabled, receivers[0], nil
+	default:
+		return false, nil, fmt.Errorf("multiple transfer receivers found for transfer %s", transfer.ID)
+	}
+}
+
+// loadSingleTransferReceiver loads the sole TransferReceiver for a transfer, if one exists.
+// Returns an error if the transfer has multiple receivers (legacy endpoints do not support MIMO).
+func (h *BaseTransferHandler) loadSingleTransferReceiverForUnsupportedMimoPath(ctx context.Context, transfer *ent.Transfer) (*ent.TransferReceiver, error) {
+	receivers, err := transfer.QueryTransferReceivers().ForUpdate().All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query transfer receivers for transfer %s: %w", transfer.ID, err)
+	}
+	if len(receivers) > 1 {
+		return nil, fmt.Errorf("transfer %s has multiple receivers; please upgrade to the latest SDK version and use ClaimTransfer", transfer.ID)
+	}
+	if len(receivers) == 1 {
+		return receivers[0], nil
+	}
+	return nil, nil
 }
 
 // ValidateTransferPackage validates the transfer package, to ensure the key tweaks are valid.

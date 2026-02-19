@@ -125,6 +125,11 @@ const (
 	// This knob filters out these transfers from the query transfers endpoint if counter swaps are not explicitly requested.
 	KnobFilterSSPCounterSwapAsTransfer = "spark.so.filter_ssp_counter_swap_as_transfer"
 
+	// KnobMimoTransferMultiReceiverEnabled enables multi-input multi-output transfer support
+	// with multiple independent receivers. When enabled, ClaimTransfer resolves the receiver
+	// by identity public key and tracks per-receiver claim status.
+	KnobMimoTransferMultiReceiverEnabled = "spark.so.mimo_transfer_multi_receiver_enabled"
+
 	// Enable instant static deposit flow.
 	KnobEnableInstantStaticDeposit = "spark.so.enable_instant_static_deposit"
 	// Total number of sats that can be pending in the instant static deposit flow

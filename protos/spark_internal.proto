@@ -287,6 +287,7 @@ message InitiateSettleReceiverKeyTweakRequest {
     map<string, bytes> encrypted_claim_key_tweak_package = 4;
     // User signature over the encrypted claim key tweak package.
     bytes claim_signature = 5;
+    bytes receiver_identity_public_key = 6;
 }
 
 enum SettleKeyTweakAction {
@@ -298,6 +299,7 @@ enum SettleKeyTweakAction {
 message SettleReceiverKeyTweakRequest {
     string transfer_id = 1;
     SettleKeyTweakAction action = 3;
+    bytes receiver_identity_public_key = 4;
 
     reserved 2;
 }

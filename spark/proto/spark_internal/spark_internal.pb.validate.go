@@ -3686,6 +3686,8 @@ func (m *InitiateSettleReceiverKeyTweakRequest) validate(all bool) error {
 
 	// no validation rules for ClaimSignature
 
+	// no validation rules for ReceiverIdentityPublicKey
+
 	if len(errors) > 0 {
 		return InitiateSettleReceiverKeyTweakRequestMultiError(errors)
 	}
@@ -3793,6 +3795,8 @@ func (m *SettleReceiverKeyTweakRequest) validate(all bool) error {
 	// no validation rules for TransferId
 
 	// no validation rules for Action
+
+	// no validation rules for ReceiverIdentityPublicKey
 
 	if len(errors) > 0 {
 		return SettleReceiverKeyTweakRequestMultiError(errors)

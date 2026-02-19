@@ -1203,7 +1203,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "identity_pubkey", Type: field.TypeBytes},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "PENDING_RECEIVER_CLAIM", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_KEY_TWEAK_APPLIED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "CANCELLED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_KEY_TWEAK_APPLIED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "CANCELLED"}},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
 		{Name: "transfer_id", Type: field.TypeUUID},
 	}

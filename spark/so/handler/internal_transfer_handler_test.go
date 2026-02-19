@@ -274,6 +274,144 @@ func TestFinalizeTransfer(t *testing.T) {
 		assert.Equal(t, directRefundTxUpdated, updatedLeaf2.DirectRefundTx)
 		assert.Equal(t, directFromCpfpRefundTxUpdated, updatedLeaf2.DirectFromCpfpRefundTx)
 	})
+
+	t.Run("marks receivers completed", func(t *testing.T) {
+		rng := rand.NewChaCha8([32]byte{2})
+
+		rawTx := createTestTxBytes(t, 5000)
+		rawRefundTx := createTestTxBytes(t, 5001)
+		directTx := createTestTxBytes(t, 5002)
+		directRefundTx := createTestTxBytes(t, 5003)
+		directFromCpfpRefundTx := createTestTxBytes(t, 5004)
+		rawTxUpdated := createTestTxBytes(t, 6000)
+		rawRefundTxUpdated := createTestTxBytes(t, 6001)
+		directRefundTxUpdated := createTestTxBytes(t, 6003)
+		directFromCpfpRefundTxUpdated := createTestTxBytes(t, 6004)
+
+		keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		verifyingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		ownerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		receiverIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		otherReceiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+		signingKeyshare, err := dbCtx.Client.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(keysharePrivKey).
+			SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+			SetPublicKey(keysharePrivKey.Public()).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		baseTxid := st.NewRandomTxIDForTesting(t)
+		tree, err := dbCtx.Client.Tree.Create().
+			SetStatus(st.TreeStatusAvailable).
+			SetNetwork(btcnetwork.Regtest).
+			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+			SetBaseTxid(baseTxid).
+			SetVout(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		leaf, err := dbCtx.Client.TreeNode.Create().
+			SetStatus(st.TreeNodeStatusAvailable).
+			SetTree(tree).
+			SetNetwork(tree.Network).
+			SetSigningKeyshare(signingKeyshare).
+			SetValue(5000).
+			SetVerifyingPubkey(verifyingPrivKey.Public()).
+			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+			SetOwnerSigningPubkey(ownerSigningPrivKey.Public()).
+			SetRawTx(rawTx).
+			SetRawRefundTx(rawRefundTx).
+			SetDirectTx(directTx).
+			SetDirectRefundTx(directRefundTx).
+			SetDirectFromCpfpRefundTx(directFromCpfpRefundTx).
+			SetVout(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		transfer, err := dbCtx.Client.Transfer.Create().
+			SetNetwork(tree.Network).
+			SetStatus(st.TransferStatusReceiverRefundSigned).
+			SetType(st.TransferTypeTransfer).
+			SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+			SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+			SetTotalValue(5000).
+			SetExpiryTime(time.Now().Add(24 * time.Hour)).
+			SetCompletionTime(time.Now()).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = dbCtx.Client.TransferLeaf.Create().
+			SetTransfer(transfer).
+			SetLeaf(leaf).
+			SetPreviousRefundTx(createTestTxBytes(t, 7000)).
+			SetIntermediateRefundTx(createTestTxBytes(t, 7001)).
+			Save(ctx)
+		require.NoError(t, err)
+
+		// Create a receiver pending completion.
+		pendingReceiver, err := dbCtx.Client.TransferReceiver.Create().
+			SetTransfer(transfer).
+			SetIdentityPubkey(receiverIdentityPrivKey.Public()).
+			SetStatus(st.TransferReceiverStatusRefundSigned).
+			Save(ctx)
+		require.NoError(t, err)
+
+		// Create a second receiver already completed — should not be modified.
+		alreadyDoneReceiver, err := dbCtx.Client.TransferReceiver.Create().
+			SetTransfer(transfer).
+			SetIdentityPubkey(otherReceiverPrivKey.Public()).
+			SetStatus(st.TransferReceiverStatusCompleted).
+			SetCompletionTime(time.Now()).
+			Save(ctx)
+		require.NoError(t, err)
+
+		internalNode := &pbinternal.TreeNode{
+			Id:                     leaf.ID.String(),
+			Value:                  5000,
+			VerifyingPubkey:        verifyingPrivKey.Public().Serialize(),
+			OwnerIdentityPubkey:    keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
+			OwnerSigningPubkey:     keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
+			RawTx:                  rawTxUpdated,
+			RawRefundTx:            rawRefundTxUpdated,
+			DirectTx:               createTestTxBytes(t, 7002),
+			DirectRefundTx:         directRefundTxUpdated,
+			DirectFromCpfpRefundTx: directFromCpfpRefundTxUpdated,
+			TreeId:                 tree.ID.String(),
+			SigningKeyshareId:      signingKeyshare.ID.String(),
+			Vout:                   1,
+		}
+
+		internalTransferHandler := NewInternalTransferHandler(config)
+		err = internalTransferHandler.FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{
+			TransferId: transfer.ID.String(),
+			Nodes:      []*pbinternal.TreeNode{internalNode},
+			Timestamp:  timestamppb.New(time.Now()),
+		})
+		require.NoError(t, err)
+
+		entTx, err := ent.GetTxFromContext(ctx)
+		require.NoError(t, err)
+		err = entTx.Commit()
+		require.NoError(t, err)
+
+		// Pending receiver is now completed.
+		updatedPending, err := dbCtx.Client.TransferReceiver.Get(ctx, pendingReceiver.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferReceiverStatusCompleted, updatedPending.Status)
+		assert.NotNil(t, updatedPending.CompletionTime)
+
+		// Already-completed receiver is unchanged.
+		updatedDone, err := dbCtx.Client.TransferReceiver.Get(ctx, alreadyDoneReceiver.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferReceiverStatusCompleted, updatedDone.Status)
+	})
 }
 
 func TestApplySignatures(t *testing.T) {

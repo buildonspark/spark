@@ -5,8 +5,6 @@ type TransferReceiverStatus string
 const (
 	// TransferReceiverStatusSenderInitiated is the status of a transfer receiver that has been initiated.
 	TransferReceiverStatusSenderInitiated TransferReceiverStatus = "INITIATED"
-	// TransferReceiverStatusPendingReceiverClaim is the status of transfer receiver awaiting claim from the receiver themselves.
-	TransferReceiverStatusPendingReceiverClaim TransferReceiverStatus = "PENDING_RECEIVER_CLAIM"
 	// TransferReceiverStatusKeyTweaked is the status of transfer receiver where key has been tweaked for the receiver.
 	TransferReceiverStatusKeyTweaked TransferReceiverStatus = "RECEIVER_KEY_TWEAKED"
 	// TransferReceiverStatusKeyTweakLocked is the status of transfer receiver where key has been tweaked and locked for update.
@@ -24,7 +22,6 @@ const (
 func (TransferReceiverStatus) Values() []string {
 	return []string{
 		string(TransferReceiverStatusSenderInitiated),
-		string(TransferReceiverStatusPendingReceiverClaim),
 		string(TransferReceiverStatusKeyTweaked),
 		string(TransferReceiverStatusKeyTweakLocked),
 		string(TransferReceiverStatusKeyTweakApplied),

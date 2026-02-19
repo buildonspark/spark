@@ -22,6 +22,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
+	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"google.golang.org/protobuf/proto"
@@ -137,6 +138,24 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 			}
 		}
 	}
+
+	receivers, err := transfer.QueryTransferReceivers().
+		Where(enttransferreceiver.StatusNEQ(st.TransferReceiverStatusCompleted)).
+		ForUpdate().
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query receivers for transfer %s: %w", transferID, err)
+	}
+	for _, r := range receivers {
+		_, err = r.Update().
+			SetStatus(st.TransferReceiverStatusCompleted).
+			SetCompletionTime(req.Timestamp.AsTime()).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to mark receiver %s completed for transfer %s: %w", r.ID, transferID, err)
+		}
+	}
+
 	return nil
 }
 

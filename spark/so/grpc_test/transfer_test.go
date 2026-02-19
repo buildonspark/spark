@@ -18,6 +18,9 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/lightsparkdev/spark/common"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/db"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
 )
@@ -145,6 +148,78 @@ func TestClaimTransfer(t *testing.T) {
 	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimedTransfer.Status)
 	require.Len(t, claimedTransfer.Leaves, 1)
 	require.Equal(t, claimingNode.Leaf.Id, claimedTransfer.Leaves[0].Leaf.Id)
+}
+
+func TestMimoClaimTransferSingleReceiver(t *testing.T) {
+	senderConfig := wallet.NewTestWalletConfig(t)
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	receiverPrivKey := keys.GeneratePrivateKey()
+
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}
+	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
+
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
+	require.NoError(t, err, "failed to authenticate sender")
+	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
+
+	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
+		senderCtx,
+		senderConfig,
+		leavesToTransfer,
+		receiverPrivKey.Public(),
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send transfer")
+
+	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Len(t, pendingTransfer.Transfers, 1)
+	receiverTransfer := pendingTransfer.Transfers[0]
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+
+	finalLeafPrivKey := keys.GeneratePrivateKey()
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey,
+		NewSigningPrivKey: finalLeafPrivKey,
+	}
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
+
+	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
+	require.NoError(t, err, "failed to ClaimTransferV2")
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimedTransfer.Status)
+	require.Len(t, claimedTransfer.Leaves, 1)
+	require.Equal(t, claimingNode.Leaf.Id, claimedTransfer.Leaves[0].Leaf.Id)
+
+	// Verify the TransferReceiver status is Completed in the coordinator DB.
+	transferUUID, err := uuid.Parse(claimedTransfer.Id)
+	require.NoError(t, err)
+	entClient := db.NewPostgresEntClientForIntegrationTest(t, receiverConfig.CoordinatorDatabaseURI)
+	defer entClient.Close()
+	receiver, err := entClient.TransferReceiver.Query().
+		Where(
+			transferreceiver.TransferIDEQ(transferUUID),
+			transferreceiver.IdentityPubkeyEQ(receiverPrivKey.Public()),
+		).
+		Only(t.Context())
+	require.NoError(t, err, "failed to query transfer receiver")
+	require.Equal(t, st.TransferReceiverStatusCompleted, receiver.Status)
 }
 
 func TestQueryPendingTransferByNetwork(t *testing.T) {

@@ -40,6 +40,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
+	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -2060,6 +2061,13 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return fmt.Errorf("failed to unlock transfer %s: %w", transferID, err)
 	}
 
+	// This guarantees that the transfer has only one receiver and logic changes to filter leaves, etc
+	// are not necessary for this endpoint. We only dual-write the status changes to the receiver object for consistency.
+	receiver, err := h.loadSingleTransferReceiverForUnsupportedMimoPath(ctx, transfer)
+	if err != nil {
+		return err
+	}
+
 	// Validate leaves count
 	transferLeaves, err := transfer.QueryTransferLeaves().WithLeaf().All(ctx)
 	if err != nil {
@@ -2090,10 +2098,16 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		}
 	}
 
-	// Update transfer status
+	// MIMO - Dual write status changes
 	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweaked).Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to update transfer status %v: %w", transfer.ID, err)
+	}
+	if receiver != nil {
+		_, err = receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweaked).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update transfer receiver status %v: %w", receiver.ID, err)
+		}
 	}
 
 	return nil
@@ -2221,30 +2235,54 @@ func (h *TransferHandler) ValidateKeyTweakProof(ctx context.Context, transferLea
 	return nil
 }
 
-func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent.Transfer, transferLeaves []*ent.TransferLeaf) error {
+func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent.Transfer, receiver *ent.TransferReceiver, transferLeaves []*ent.TransferLeaf) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.revertClaimTransfer", trace.WithAttributes(
 		transferTypeKey.String(string(transfer.Type)),
 	))
 	defer span.End()
 
-	switch transfer.Status {
-	case st.TransferStatusReceiverKeyTweakApplied:
-	case st.TransferStatusCompleted:
-	case st.TransferStatusReturned:
-	case st.TransferStatusReceiverRefundSigned:
-		return fmt.Errorf("transfer %s key tweak is already applied, but other operator is trying to revert it", transfer.ID.String())
-	case st.TransferStatusReceiverKeyTweakLocked:
-	case st.TransferStatusReceiverKeyTweaked:
-		// do nothing
-	default:
-		// do nothing and return to prevent advance state
-		return nil
+	if isMimoReceiveEnabled(ctx, receiver) {
+		switch receiver.Status {
+		case st.TransferReceiverStatusKeyTweakApplied,
+			st.TransferReceiverStatusRefundSigned,
+			st.TransferReceiverStatusCompleted:
+			return fmt.Errorf("transfer %s key tweak is already applied, cannot revert it", transfer.ID.String())
+		case st.TransferReceiverStatusKeyTweakLocked,
+			st.TransferReceiverStatusKeyTweaked:
+			// ok to revert
+		default:
+			return nil
+		}
+	} else {
+		switch transfer.Status {
+		case st.TransferStatusReceiverKeyTweakApplied,
+			st.TransferStatusCompleted,
+			st.TransferStatusReturned,
+			st.TransferStatusReceiverRefundSigned:
+			return fmt.Errorf("transfer %s key tweak is already applied, cannot revert it", transfer.ID.String())
+		case st.TransferStatusReceiverKeyTweakLocked,
+			st.TransferStatusReceiverKeyTweaked:
+			// ok to revert
+		default:
+			return nil
+		}
 	}
 
+	// Revert transfer status to sender key tweaked and transfer receiver to SenderInitiated
+	// so the receiver can try to claim again
+	// MIMO - Dual write status changes
 	_, err := transfer.Update().SetStatus(st.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to update transfer status %v: %w", transfer.ID, err)
 	}
+	if receiver != nil {
+		_, err = receiver.Update().SetStatus(st.TransferReceiverStatusSenderInitiated).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update transfer receiver status %v: %w", receiver.ID, err)
+		}
+	}
+
+	// Revert key tweaks for all leaves
 	for _, leaf := range transferLeaves {
 		_, err := leaf.Update().SetKeyTweak(nil).Save(ctx)
 		if err != nil {
@@ -2254,24 +2292,31 @@ func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent
 	return nil
 }
 
-func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *ent.Transfer, keyTweakProofs map[string]*pb.SecretProof, userPublicKeys map[string][]byte) error {
-	return h.settleReceiverKeyTweakInternal(ctx, transfer, keyTweakProofs, userPublicKeys, nil, nil)
+func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *ent.Transfer, receiver *ent.TransferReceiver, keyTweakProofs map[string]*pb.SecretProof, userPublicKeys map[string][]byte) error {
+	return h.settleReceiverKeyTweakInternal(ctx, transfer, receiver, keyTweakProofs, userPublicKeys, nil, nil)
 }
 
 // settleReceiverKeyTweakWithClaimPackage is like settleReceiverKeyTweak but also delivers
 // ECIES-encrypted key tweaks to each SO as part of the two-phase commit.
 // encryptedKeyTweakPackage is the full map (SO identifier -> ciphertext) and claimSignature
 // is the user signature over the package. Both are forwarded so each SO can verify independently.
-func (h *TransferHandler) settleReceiverKeyTweakWithClaimPackage(ctx context.Context, transfer *ent.Transfer, keyTweakProofs map[string]*pb.SecretProof, userPublicKeys map[string][]byte, encryptedKeyTweakPackage map[string][]byte, claimSignature []byte) error {
-	return h.settleReceiverKeyTweakInternal(ctx, transfer, keyTweakProofs, userPublicKeys, encryptedKeyTweakPackage, claimSignature)
+func (h *TransferHandler) settleReceiverKeyTweakWithClaimPackage(ctx context.Context, transfer *ent.Transfer, receiver *ent.TransferReceiver, keyTweakProofs map[string]*pb.SecretProof, userPublicKeys map[string][]byte, encryptedKeyTweakPackage map[string][]byte, claimSignature []byte) error {
+	return h.settleReceiverKeyTweakInternal(ctx, transfer, receiver, keyTweakProofs, userPublicKeys, encryptedKeyTweakPackage, claimSignature)
 }
 
-func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, transfer *ent.Transfer, keyTweakProofs map[string]*pb.SecretProof, userPublicKeys map[string][]byte, encryptedKeyTweakPackage map[string][]byte, claimSignature []byte) error {
+func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, transfer *ent.Transfer, receiver *ent.TransferReceiver, keyTweakProofs map[string]*pb.SecretProof, userPublicKeys map[string][]byte, encryptedKeyTweakPackage map[string][]byte, claimSignature []byte) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.settleReceiverKeyTweak", trace.WithAttributes(
 		transferTypeKey.String(string(transfer.Type)),
 	))
 	defer span.End()
 
+	// Send the receiver identity public key IFF MIMO receive is enabled
+	var receiverIdentityPublicKeyBytes []byte
+	if isMimoReceiveEnabled(ctx, receiver) {
+		receiverIdentityPublicKeyBytes = receiver.IdentityPubkey.Serialize()
+	}
+
+	// Phase 1: PREPARE - Distribute the receiver's key tweak request to all SOs
 	action := pbinternal.SettleKeyTweakAction_COMMIT
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
@@ -2282,9 +2327,10 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 		defer conn.Close()
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		req := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
-			TransferId:     transfer.ID.String(),
-			KeyTweakProofs: keyTweakProofs,
-			UserPublicKeys: userPublicKeys,
+			TransferId:                transfer.ID.String(),
+			KeyTweakProofs:            keyTweakProofs,
+			UserPublicKeys:            userPublicKeys,
+			ReceiverIdentityPublicKey: receiverIdentityPublicKeyBytes,
 		}
 		if encryptedKeyTweakPackage != nil {
 			req.EncryptedClaimKeyTweakPackage = encryptedKeyTweakPackage
@@ -2307,9 +2353,10 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 	}
 
 	initiateReq := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
-		TransferId:     transfer.ID.String(),
-		KeyTweakProofs: keyTweakProofs,
-		UserPublicKeys: userPublicKeys,
+		TransferId:                transfer.ID.String(),
+		KeyTweakProofs:            keyTweakProofs,
+		UserPublicKeys:            userPublicKeys,
+		ReceiverIdentityPublicKey: receiverIdentityPublicKeyBytes,
 	}
 	if encryptedKeyTweakPackage != nil {
 		initiateReq.EncryptedClaimKeyTweakPackage = encryptedKeyTweakPackage
@@ -2321,6 +2368,7 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 		action = pbinternal.SettleKeyTweakAction_ROLLBACK
 	}
 
+	// Phase 2: COMMIT - Settle the receiver's key tweak request to all SOs
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
@@ -2329,8 +2377,9 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 		defer conn.Close()
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		return client.SettleReceiverKeyTweak(ctx, &pbinternal.SettleReceiverKeyTweakRequest{
-			TransferId: transfer.ID.String(),
-			Action:     action,
+			TransferId:                transfer.ID.String(),
+			Action:                    action,
+			ReceiverIdentityPublicKey: receiverIdentityPublicKeyBytes,
 		})
 	})
 	if err != nil {
@@ -2338,8 +2387,9 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 		return fmt.Errorf("unable to settle receiver key tweak: %w", err)
 	} else {
 		err = h.SettleReceiverKeyTweak(ctx, &pbinternal.SettleReceiverKeyTweakRequest{
-			TransferId: transfer.ID.String(),
-			Action:     action,
+			TransferId:                transfer.ID.String(),
+			Action:                    action,
+			ReceiverIdentityPublicKey: receiverIdentityPublicKeyBytes,
 		})
 		if err != nil {
 			return fmt.Errorf("unable to settle receiver key tweak: %w", err)
@@ -2394,6 +2444,35 @@ func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundT
 	return nil
 }
 
+// assert that the claim package contains a valid signature over the contained key tweak package
+func verifyClaimPackageSignature(transferID uuid.UUID, claimPackage *pb.ClaimPackage, reqOwnerIDPubKey keys.Public) error {
+	if claimPackage.HashVariant != pb.HashVariant_HASH_VARIANT_V2 {
+		return fmt.Errorf("claim package must use HASH_VARIANT_V2, got %s", claimPackage.HashVariant)
+	}
+	if len(claimPackage.UserSignature) == 0 {
+		return fmt.Errorf("claim package user_signature is required")
+	}
+	signingPayload := common.GetClaimPackageSigningPayload(transferID, claimPackage.KeyTweakPackage)
+	if err := common.VerifyECDSASignature(reqOwnerIDPubKey, claimPackage.UserSignature, signingPayload); err != nil {
+		return fmt.Errorf("unable to verify claim package signature: %w", err)
+	}
+	return nil
+}
+
+// MIMO receive is enabled IFF the knob is enabled and there is a corresponding receiver.
+func isMimoReceiveEnabled(ctx context.Context, receiver *ent.TransferReceiver) bool {
+	return receiver != nil && knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoTransferMultiReceiverEnabled, 0) > 0
+}
+
+// Create a query to fetch all the leaves for the current transfer; scoped to the receiver if one is provided.
+func getTransferLeavesForReceiverQuery(ctx context.Context, transfer *ent.Transfer, receiver *ent.TransferReceiver) *ent.TransferLeafQuery {
+	transferLeavesQuery := transfer.QueryTransferLeaves()
+	if isMimoReceiveEnabled(ctx, receiver) {
+		transferLeavesQuery = transferLeavesQuery.Where(enttransferleaf.TransferReceiverID(receiver.ID))
+	}
+	return transferLeavesQuery
+}
+
 // ClaimTransferSignRefundsV2 signs new refund transactions as part of the transfer.
 func (h *TransferHandler) ClaimTransferSignRefundsV2(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
 	return h.claimTransferSignRefunds(ctx, req, true)
@@ -2428,26 +2507,52 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		return nil, fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
-	if !transfer.ReceiverIdentityPubkey.Equals(reqOwnerIDPubKey) {
-		return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", transferID)
+
+	// find the transfer receiver associated with this request, if there is one
+	isMimoReceiveEnabled, receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transfer, &reqOwnerIDPubKey)
+	if err != nil {
+		return nil, err
 	}
 
-	switch transfer.Status {
-	case st.TransferStatusSenderKeyTweaked:
-	case st.TransferStatusReceiverKeyTweaked:
-	case st.TransferStatusReceiverRefundSigned:
-	case st.TransferStatusReceiverKeyTweakLocked:
-	case st.TransferStatusReceiverKeyTweakApplied:
-		// ok
-	case st.TransferStatusCompleted:
-		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", transferID))
-	case st.TransferStatusExpired, st.TransferStatusReturned:
-		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in terminal state %s and cannot be claimed", transferID, transfer.Status))
-	default:
-		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is not in a claimable status, current status: %s", transferID, transfer.Status))
+	// If MIMO receive is enabled, the receiver is guaranteed to match the request owner identity public key.
+	if !isMimoReceiveEnabled {
+		if !transfer.ReceiverIdentityPubkey.Equals(reqOwnerIDPubKey) {
+			return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", transferID)
+		}
 	}
 
-	leavesToTransfer, err := transfer.QueryTransferLeaves().All(ctx)
+	// Read model determined by MIMO state
+	if isMimoReceiveEnabled {
+		switch receiver.Status {
+		case st.TransferReceiverStatusSenderInitiated:
+		case st.TransferReceiverStatusKeyTweaked:
+		case st.TransferReceiverStatusKeyTweakLocked:
+		case st.TransferReceiverStatusKeyTweakApplied:
+		case st.TransferReceiverStatusRefundSigned:
+			// ok
+		case st.TransferReceiverStatusCompleted:
+			return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed by this receiver", transferID))
+		default:
+			return nil, fmt.Errorf("transfer %s receiver is not in a claimable status, current status: %s", transferID, receiver.Status)
+		}
+	} else {
+		switch transfer.Status {
+		case st.TransferStatusSenderKeyTweaked:
+		case st.TransferStatusReceiverKeyTweaked:
+		case st.TransferStatusReceiverRefundSigned:
+		case st.TransferStatusReceiverKeyTweakLocked:
+		case st.TransferStatusReceiverKeyTweakApplied:
+			// ok
+		case st.TransferStatusCompleted:
+			return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", transferID))
+		case st.TransferStatusExpired, st.TransferStatusReturned:
+			return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in terminal state %s and cannot be claimed", transferID, transfer.Status))
+		default:
+			return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is not in a claimable status, current status: %s", transferID, transfer.Status))
+		}
+	}
+
+	leavesToTransfer, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load transfer leaves for transfer %s: %w", transferID, err)
 	}
@@ -2472,16 +2577,8 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		return nil, fmt.Errorf("claim package key_tweak_package is required and must be non-empty")
 	}
 
-	// Verify user signature on the claim package.
-	if claimPackage.HashVariant != pb.HashVariant_HASH_VARIANT_V2 {
-		return nil, fmt.Errorf("claim package must use HASH_VARIANT_V2, got %s", claimPackage.HashVariant)
-	}
-	if len(claimPackage.UserSignature) == 0 {
-		return nil, fmt.Errorf("claim package user_signature is required")
-	}
-	signingPayload := common.GetClaimPackageSigningPayload(transferID, claimPackage.KeyTweakPackage)
-	if err := common.VerifyECDSASignature(reqOwnerIDPubKey, claimPackage.UserSignature, signingPayload); err != nil {
-		return nil, fmt.Errorf("unable to verify claim package signature: %w", err)
+	if err := verifyClaimPackageSignature(transferID, claimPackage, reqOwnerIDPubKey); err != nil {
+		return nil, err
 	}
 
 	// Decrypt and extract key tweak proofs from the coordinator's portion of the claim package.
@@ -2533,40 +2630,65 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		}
 	}
 
+	// Perform the 2PC commit with other SOs
 	userPublicKeys := make(map[string][]byte)
 	for _, job := range claimPackage.LeavesToClaim {
 		userPublicKeys[job.LeafId] = job.SigningPublicKey
 	}
-
-	err = h.settleReceiverKeyTweakWithClaimPackage(ctx, transfer, keyTweakProofs, userPublicKeys, claimPackage.KeyTweakPackage, claimPackage.UserSignature)
+	err = h.settleReceiverKeyTweakWithClaimPackage(ctx, transfer, receiver, keyTweakProofs, userPublicKeys, claimPackage.KeyTweakPackage, claimPackage.UserSignature)
 	if err != nil {
 		return nil, fmt.Errorf("unable to settle receiver key tweak: %w", err)
 	}
 
-	// Reload the transfer after key tweak settlement.
+	// Reload the transfer and transfer receiver after key tweak settlement.
 	transfer, err = h.loadTransferForUpdate(ctx, transferID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
-	if transfer.Status == st.TransferStatusCompleted {
-		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s is already completed", transferID))
+	if receiver != nil {
+		_, receiver, err = h.loadTransferReceiverByPublicKeyForUpdate(ctx, transfer, &receiver.IdentityPubkey)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	// Update transfer status to ReceiverRefundSigned.
+	if isMimoReceiveEnabled {
+		if receiver.Status == st.TransferReceiverStatusCompleted {
+			return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s is already completed", transferID))
+		}
+	} else {
+		if transfer.Status == st.TransferStatusCompleted {
+			return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s is already completed", transferID))
+		}
+	}
+
+	// MIMO - Dual write status changes
 	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverRefundSigned).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
 	}
+	if receiver != nil {
+		_, err = receiver.Update().SetStatus(st.TransferReceiverStatusRefundSigned).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update transfer receiver status to refund signed: %w", err)
+		}
+	}
 
-	leaves, err := h.getLeavesFromTransfer(ctx, transfer)
+	transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).WithLeaf(func(tnq *ent.TreeNodeQuery) {
+		tnq.WithTree().WithSigningKeyshare()
+	}).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(leaves) == 0 {
+	leavesById := make(map[string]*ent.TreeNode, len(transferLeaves))
+	for _, transferLeaf := range transferLeaves {
+		leavesById[transferLeaf.Edges.Leaf.ID.String()] = transferLeaf.Edges.Leaf
+	}
+	if len(leavesById) == 0 {
 		return nil, fmt.Errorf("leaves cannot be empty")
 	}
 
-	result, err := h.prepareClaimRefundSigningJobs(ctx, claimPackage, leaves, transfer)
+	result, err := h.prepareClaimRefundSigningJobs(ctx, claimPackage, leavesById, transfer)
 	if err != nil {
 		return nil, err
 	}
@@ -2615,7 +2737,7 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 	nodeSignatures := make([]*pb.NodeSignatures, 0, len(cpfpResults))
 	for leafID, signingResult := range cpfpResults {
 		cpfpUserJob := cpfpUserRefundMap[leafID]
-		leaf, exists := leaves[leafID]
+		leaf, exists := leavesById[leafID]
 		if !exists {
 			return nil, fmt.Errorf("leaf %s not found", leafID)
 		}
@@ -2698,14 +2820,41 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		internalNodes = append(internalNodes, internalNode)
 	}
 
-	// Mark transfer as completed.
+	// MIMO - Always write the Receiver status to completed when a receiver claims a transfer
+	// In this case, the MIMO logic dictates that we should only update the transfer status
+	// to completed when all receivers are completed.
+	// We also must still do this for the legacy (non-MIMO) case for now.
 	completionTime := time.Now()
-	transfer, err = transfer.Update().
-		SetStatus(st.TransferStatusCompleted).
-		SetCompletionTime(completionTime).
-		Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to update transfer to completed: %w", err)
+	if receiver != nil {
+		_, err = receiver.Update().
+			SetStatus(st.TransferReceiverStatusCompleted).
+			SetCompletionTime(completionTime).
+			Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update transfer receiver to completed: %w", err)
+		}
+	}
+
+	// MIMO - Transfer is complete when all receivers are completed
+	allReceiversComplete := true
+	if isMimoReceiveEnabled {
+		incompleteCount, err := transfer.QueryTransferReceivers().
+			Where(enttransferreceiver.StatusNEQ(st.TransferReceiverStatusCompleted)).
+			Count(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to count incomplete transfer receivers: %w", err)
+		}
+		allReceiversComplete = incompleteCount == 0
+	}
+
+	if !isMimoReceiveEnabled || allReceiversComplete {
+		transfer, err = transfer.Update().
+			SetStatus(st.TransferStatusCompleted).
+			SetCompletionTime(completionTime).
+			Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update transfer to completed: %w", err)
+		}
 	}
 
 	// Reload the transfer from a fresh DB client for marshaling.
@@ -3077,6 +3226,13 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusKeyTweaked or TransferStatusReceiverRefundSigned or TransferStatusReceiverKeyTweakLocked or TransferStatusReceiverKeyTweakApplied but %s found", transferID, transfer.Status)
 	}
 
+	// This guarantees that the transfer has only one receiver and logic changes to filter leaves, etc
+	// are not necessary for this endpoint. We only dual-write the status changes to the receiver object for consistency.
+	receiver, err := h.loadSingleTransferReceiverForUnsupportedMimoPath(ctx, transfer)
+	if err != nil {
+		return nil, err
+	}
+
 	// Validate leaves count
 	leavesToTransfer, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
@@ -3108,12 +3264,13 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	for _, job := range req.SigningJobs {
 		userPublicKeys[job.LeafId] = job.RefundTxSigningJob.SigningPublicKey
 	}
-	err = h.settleReceiverKeyTweak(ctx, transfer, keyTweakProofs, userPublicKeys)
+	err = h.settleReceiverKeyTweak(ctx, transfer, receiver, keyTweakProofs, userPublicKeys)
 	if err != nil {
 		return nil, fmt.Errorf("unable to settle receiver key tweak: %w", err)
 	}
 
-	// Lock the transfer after the key tweak is settled.
+	// Lock the transfer after the key tweak is settled. The settle phase commits the previous
+	// transaction, so we must reload both transfer and receiver from the new transaction.
 	transfer, err = h.loadTransferForUpdate(ctx, transferID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load transfer %s: %w", transferID, err)
@@ -3122,10 +3279,24 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s is already completed", transferID))
 	}
 
-	// Update transfer status.
+	// Reload the receiver in the new transaction (the settle phase committed the old one).
+	if receiver != nil {
+		receiver, err = h.loadSingleTransferReceiverForUnsupportedMimoPath(ctx, transfer)
+		if err != nil {
+			return nil, fmt.Errorf("unable to reload transfer receiver for transfer %s: %w", transferID, err)
+		}
+	}
+
+	// MIMO - Dual write status changes
 	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverRefundSigned).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
+	}
+	if receiver != nil {
+		_, err = receiver.Update().SetStatus(st.TransferReceiverStatusRefundSigned).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update transfer receiver status %v: %w", receiver.ID, err)
+		}
 	}
 
 	leaves, err := h.getLeavesFromTransfer(ctx, transfer)
@@ -3396,57 +3567,112 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	if err != nil {
 		return fmt.Errorf("invalid transfer ID: %w", err)
 	}
-
 	transfer, err := h.loadTransferForUpdate(ctx, transferID)
 	if err != nil {
 		return fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
 
-	if transfer.Status == st.TransferStatusCompleted {
-		// The transfer is already completed, return early.
-		return nil
+	// get the receiver by identity public key from the request, currently optional
+	var receiverIdentityPublicKey *keys.Public
+	if len(req.GetReceiverIdentityPublicKey()) > 0 {
+		publicKeyBytes := req.GetReceiverIdentityPublicKey()
+		publicKey, err := keys.ParsePublicKey(publicKeyBytes)
+		if err != nil {
+			return fmt.Errorf("invalid identity public key: %w", err)
+		}
+		receiverIdentityPublicKey = &publicKey
+	} else {
+		receiverIdentityPublicKey = &transfer.ReceiverIdentityPubkey
+	}
+	isMimoReceiveEnabled, receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transfer, receiverIdentityPublicKey)
+	if err != nil {
+		return err
 	}
 
+	// Read logic determined by MIMO receive state
+	if isMimoReceiveEnabled {
+		if receiver.Status == st.TransferReceiverStatusCompleted {
+			// This receiver has already completed their claim, return early.
+			return nil
+		}
+	} else {
+		if transfer.Status == st.TransferStatusCompleted {
+			// The key tweak is already applied, return early.
+			return nil
+		}
+	}
+
+	// Check if the transfer leaves already contain the current key tweaks and return early if so
 	userPubKeys, err := keys.ParsePublicKeyMap(req.GetUserPublicKeys())
 	if err != nil {
 		return err
 	}
-	applied, err := h.checkIfKeyTweakApplied(ctx, transfer, userPubKeys)
+	applied, err := h.checkIfKeyTweakApplied(ctx, transfer, receiver, userPubKeys)
 	if err != nil {
 		return fmt.Errorf("unable to check if key tweak is applied: %w", err)
 	}
 	if applied {
+		// MIMO - Dual write status changes
 		_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakApplied).Save(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
 		}
+		if receiver != nil {
+			_, err = receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweakApplied).Save(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to update transfer receiver status %s: %w", transfer.ID, err)
+			}
+		}
+
 		return nil
 	}
 
 	hasClaimPackage := len(req.EncryptedClaimKeyTweakPackage) > 0
 
-	switch transfer.Status {
-	case st.TransferStatusSenderKeyTweaked:
-		// Only valid when encrypted claim key tweak package is provided (from claim_transfer endpoint).
-		if !hasClaimPackage {
-			return fmt.Errorf("transfer %s is at status SenderKeyTweaked but no encrypted_claim_key_tweak_package provided", transferID)
+	// Read logic determined by MIMO receive state
+	if isMimoReceiveEnabled {
+		if receiver != nil {
+			switch receiver.Status {
+			case st.TransferReceiverStatusSenderInitiated:
+				if !hasClaimPackage {
+					return fmt.Errorf("receiver %s is at status SenderInitiated but no encrypted_claim_key_tweak_package provided", receiver.ID)
+				}
+			case st.TransferReceiverStatusKeyTweaked,
+				st.TransferReceiverStatusKeyTweakLocked:
+				// do nothing
+			case st.TransferReceiverStatusKeyTweakApplied,
+				st.TransferReceiverStatusRefundSigned:
+				// The key tweak is already applied, return early.
+				return nil
+			default:
+				return fmt.Errorf("unexpected transfer receiver status %s for receiver %s", receiver.Status, receiver.ID)
+			}
 		}
-	case st.TransferStatusReceiverKeyTweaked:
-	case st.TransferStatusReceiverKeyTweakLocked:
-		// do nothing
-	case st.TransferStatusReceiverKeyTweakApplied:
-		// The key tweak is already applied, return early.
-		return nil
-	default:
-		return fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderKeyTweaked, TransferStatusReceiverKeyTweaked, TransferStatusReceiverKeyTweakLocked, or TransferStatusReceiverKeyTweakApplied but %s found", transferID, transfer.Status)
+	} else {
+		switch transfer.Status {
+		case st.TransferStatusSenderKeyTweaked:
+			// Only valid when encrypted claim key tweak package is provided (from claim_transfer endpoint).
+			if !hasClaimPackage {
+				return fmt.Errorf("transfer %s is at status SenderKeyTweaked but no encrypted_claim_key_tweak_package provided", transferID)
+			}
+		case st.TransferStatusReceiverKeyTweaked:
+		case st.TransferStatusReceiverKeyTweakLocked:
+			// do nothing
+		case st.TransferStatusReceiverKeyTweakApplied,
+			st.TransferStatusReceiverRefundSigned:
+			// The key tweak is already applied, return early.
+			return nil
+		default:
+			return fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderKeyTweaked, TransferStatusReceiverKeyTweaked, TransferStatusReceiverKeyTweakLocked, TransferStatusReceiverKeyTweakApplied, or TransferStatusReceiverRefundSigned but %s found", transferID, transfer.Status)
+		}
 	}
 
 	// If encrypted claim key tweak package is provided, verify signature, decrypt, and store.
 	if hasClaimPackage {
-		// Verify user signature over the full encrypted key tweak package.
+		// Verify receiver signature over the full encrypted key tweak package.
 		signingPayload := common.GetClaimPackageSigningPayload(transferID, req.EncryptedClaimKeyTweakPackage)
-		if err := common.VerifyECDSASignature(transfer.ReceiverIdentityPubkey, req.ClaimSignature, signingPayload); err != nil {
+		if err := common.VerifyECDSASignature(*receiverIdentityPublicKey, req.ClaimSignature, signingPayload); err != nil {
 			return fmt.Errorf("unable to verify claim package signature: %w", err)
 		}
 
@@ -3464,13 +3690,17 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		if err := proto.Unmarshal(decryptedKeyTweaks, claimKeyTweaks); err != nil {
 			return fmt.Errorf("unable to unmarshal claim key tweaks: %w", err)
 		}
-		transferLeaves, err := transfer.QueryTransferLeaves().WithLeaf().All(ctx)
+
+		transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).WithLeaf().All(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get transfer leaves for transfer %s: %w", transferID, err)
 		}
 		if len(transferLeaves) != len(claimKeyTweaks.LeavesToReceive) {
 			return fmt.Errorf("transfer has %d leaves but claim key tweaks has %d", len(transferLeaves), len(claimKeyTweaks.LeavesToReceive))
 		}
+
+		// Verify that all LeavesToReceive are found in the queried transfer leaves
+		// and set the provided tweaks into the leaf if necessary
 		leafMap := make(map[string]*ent.TransferLeaf)
 		for _, leaf := range transferLeaves {
 			leafMap[leaf.Edges.Leaf.ID.String()] = leaf
@@ -3480,6 +3710,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 			if !exists {
 				return fmt.Errorf("unexpected leaf id %s in claim key tweaks", leafTweak.LeafId)
 			}
+
 			// Only store if not already stored.
 			if len(leaf.KeyTweak) == 0 {
 				leafTweakBytes, err := proto.Marshal(leafTweak)
@@ -3492,6 +3723,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 				}
 			}
 		}
+
 		// Update status to ReceiverKeyTweaked if coming from SenderKeyTweaked.
 		if transfer.Status == st.TransferStatusSenderKeyTweaked {
 			_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweaked).Save(ctx)
@@ -3500,15 +3732,25 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 			}
 			transfer.Status = st.TransferStatusReceiverKeyTweaked
 		}
+
+		// Update receiver status to StatusKeyTweaked if coming from SenderInitiated.
+		if receiver != nil && receiver.Status == st.TransferReceiverStatusSenderInitiated {
+			_, err = receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweaked).Save(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to update transfer receiver status %s: %w", transfer.ID, err)
+			}
+			receiver.Status = st.TransferReceiverStatusKeyTweaked
+		}
 	}
 
-	leaves, err := transfer.QueryTransferLeaves().All(ctx)
+	transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).All(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get leaves from transfer %s: %w", transferID, err)
 	}
 
+	// This check must take place here and may not fail fast- retry attempts may load the key tweaks from db
 	if req.KeyTweakProofs != nil {
-		err = h.ValidateKeyTweakProof(ctx, leaves, req.KeyTweakProofs)
+		err = h.ValidateKeyTweakProof(ctx, transferLeaves, req.KeyTweakProofs)
 		if err != nil {
 			return fmt.Errorf("unable to validate key tweak proof: %w", err)
 		}
@@ -3516,9 +3758,16 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		return fmt.Errorf("key tweak proof is required")
 	}
 
+	// update transfer and transfer receiver states to TweakLocked
 	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakLocked).Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
+	}
+	if receiver != nil {
+		_, err = receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweakLocked).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update transfer receiver status %s: %w", transfer.ID, err)
+		}
 	}
 
 	entTx, err := ent.GetTxFromContext(ctx)
@@ -3533,8 +3782,8 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	return nil
 }
 
-func (h *TransferHandler) checkIfKeyTweakApplied(ctx context.Context, transfer *ent.Transfer, userPublicKeys map[string]keys.Public) (bool, error) {
-	leaves, err := transfer.QueryTransferLeaves().QueryLeaf().WithSigningKeyshare().All(ctx)
+func (h *TransferHandler) checkIfKeyTweakApplied(ctx context.Context, transfer *ent.Transfer, receiver *ent.TransferReceiver, userPublicKeys map[string]keys.Public) (bool, error) {
+	leaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).QueryLeaf().WithSigningKeyshare().All(ctx)
 	if err != nil {
 		return false, fmt.Errorf("unable to get leaves from transfer %v: %w", transfer.ID, err)
 	}
@@ -3562,6 +3811,7 @@ func (h *TransferHandler) checkIfKeyTweakApplied(ctx context.Context, transfer *
 func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbinternal.SettleReceiverKeyTweakRequest) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.SettleReceiverKeyTweak")
 	defer span.End()
+
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
 		return fmt.Errorf("invalid transfer ID: %w", err)
@@ -3572,20 +3822,59 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
 
-	switch transfer.Status {
-	case st.TransferStatusReceiverKeyTweakApplied, st.TransferStatusCompleted, st.TransferStatusReceiverRefundSigned:
-		// The receiver key tweak is already applied, return early.
-		return nil
-	case st.TransferStatusReceiverKeyTweakLocked, st.TransferStatusReceiverKeyTweaked:
-		// Do nothing
-	default:
-		if req.Action == pbinternal.SettleKeyTweakAction_COMMIT {
-			return fmt.Errorf("transfer %s is in an invalid status %s to settle receiver key tweak", transfer.ID, transfer.Status)
+	// get the receiver by identity public key from the request, currently optional
+	var receiverIdentityPublicKey *keys.Public
+	if len(req.GetReceiverIdentityPublicKey()) > 0 {
+		publicKeyBytes := req.GetReceiverIdentityPublicKey()
+		publicKey, err := keys.ParsePublicKey(publicKeyBytes)
+		if err != nil {
+			return fmt.Errorf("invalid identity public key: %w", err)
+		}
+		receiverIdentityPublicKey = &publicKey
+	} else {
+		receiverIdentityPublicKey = &transfer.ReceiverIdentityPubkey
+	}
+	isMimoReceiveEnabled, receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transfer, receiverIdentityPublicKey)
+	if err != nil {
+		return err
+	}
+
+	if isMimoReceiveEnabled {
+		switch receiver.Status {
+		case st.TransferReceiverStatusKeyTweakApplied,
+			st.TransferReceiverStatusRefundSigned,
+			st.TransferReceiverStatusCompleted:
+			// The receiver key tweak is already applied, return early.
+			return nil
+		case st.TransferReceiverStatusKeyTweakLocked,
+			st.TransferReceiverStatusKeyTweaked,
+			st.TransferReceiverStatusSenderInitiated:
+			// Do nothing
+		default:
+			if req.Action == pbinternal.SettleKeyTweakAction_COMMIT {
+				return fmt.Errorf("transfer receiver %s is in an invalid status %s to settle receiver key tweak", receiver.ID, receiver.Status)
+			}
+		}
+	} else {
+		switch transfer.Status {
+		case st.TransferStatusReceiverKeyTweakApplied,
+			st.TransferStatusCompleted,
+			st.TransferStatusReceiverRefundSigned:
+			// The receiver key tweak is already applied, return early.
+			return nil
+		case st.TransferStatusReceiverKeyTweakLocked,
+			st.TransferStatusReceiverKeyTweaked:
+			// Do nothing
+		default:
+			if req.Action == pbinternal.SettleKeyTweakAction_COMMIT {
+				return fmt.Errorf("transfer %s is in an invalid status %s to settle receiver key tweak", transfer.ID, transfer.Status)
+			}
 		}
 	}
+
 	switch req.Action {
 	case pbinternal.SettleKeyTweakAction_COMMIT:
-		leaves, err := transfer.QueryTransferLeaves().WithLeaf(func(tnq *ent.TreeNodeQuery) {
+		leaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).WithLeaf(func(tnq *ent.TreeNodeQuery) {
 			tnq.WithTree().WithSigningKeyshare()
 		}).All(ctx)
 		if err != nil {
@@ -3613,7 +3902,7 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 				return fmt.Errorf("unable to unmarshal key tweak for leaf %v: %w", leaf.ID, err)
 			}
 			// claimLeafTweakKey now returns the key update instead of mutating the leaf
-			keyUpdate, err := h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, transfer.ReceiverIdentityPubkey)
+			keyUpdate, err := h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, *receiverIdentityPublicKey)
 			if err != nil {
 				return fmt.Errorf("unable to claim leaf tweak key for leaf %v: %w", leaf.ID, err)
 			}
@@ -3659,16 +3948,25 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 				return fmt.Errorf("unable to batch clear leaf key tweaks: %w", err)
 			}
 		}
+
+		// MIMO - Dual write status changes
 		_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakApplied).Save(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to update transfer status %v: %w", transferID, err)
 		}
+		if receiver != nil {
+			_, err = receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweakApplied).Save(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to update transfer receiver status %v: %w", transferID, err)
+			}
+		}
+
 	case pbinternal.SettleKeyTweakAction_ROLLBACK:
-		leaves, err := transfer.QueryTransferLeaves().All(ctx)
+		leaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).All(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get leaves from transfer %s: %w", transferID, err)
 		}
-		if err := h.revertClaimTransfer(ctx, transfer, leaves); err != nil {
+		if err := h.revertClaimTransfer(ctx, transfer, receiver, leaves); err != nil {
 			return fmt.Errorf("unable to revert claim transfer %v: %w", transferID, err)
 		}
 	default:
