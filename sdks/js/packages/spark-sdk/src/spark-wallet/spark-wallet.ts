@@ -813,7 +813,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           continue;
         }
 
-        const { outputs: outputsToConsolidate, release } =
+        const outputsToConsolidate =
           await this.tokenOutputManager.acquireOutputs(
             tokenIdentifier,
             (available) => available.slice(0, MAX_TOKEN_OUTPUTS_TX),
@@ -840,8 +840,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             outputSelectionStrategy: "SMALL_FIRST",
           });
 
-          await this.tokenOutputManager.lockOutputs(outputsToConsolidate);
-
           console.log(
             `Consolidated ${outputsToConsolidate.length} outputs for token ${tokenIdentifier} in transaction ${txId}`,
           );
@@ -852,8 +850,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             `Failed to optimize token outputs for ${tokenIdentifier}:`,
             error,
           );
-        } finally {
-          await release();
         }
       }
     } finally {
@@ -4207,9 +4203,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
         tokenTransferTasks.push(
           (async () => {
-            let release = async () => {};
             try {
-              const { outputs: acquiredOutputs, release: lockRelease } =
+              const acquiredOutputs =
                 await this.tokenOutputManager.acquireOutputs(
                   tokenIdB32,
                   (available) =>
@@ -4220,7 +4215,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
                     ),
                   `fulfill-invoice-${tokenIdB32}`,
                 );
-              release = lockRelease;
 
               const tokenOutputsMap: TokenOutputsMap = new Map([
                 [tokenIdB32, acquiredOutputs],
@@ -4230,8 +4224,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
                 receiverOutputs,
                 selectedOutputs: acquiredOutputs,
               });
-
-              await this.tokenOutputManager.lockOutputs(acquiredOutputs);
 
               return {
                 ok: true as const,
@@ -4246,8 +4238,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
                 invoices,
                 error: e instanceof Error ? e : new Error(String(e)),
               };
-            } finally {
-              await release();
             }
           })(),
         );
@@ -5002,46 +4992,40 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     await this.syncTokenOutputs([tokenIdentifier]);
 
     const strategy = outputSelectionStrategy ?? "SMALL_FIRST";
-    const { outputs: acquiredOutputs, release } =
-      await this.tokenOutputManager.acquireOutputs(
-        tokenIdentifier,
-        (available) => {
-          if (selectedOutputs) {
-            return selectedOutputs.filter((so) =>
-              available.some((a) => a.output?.id === so.output?.id),
-            );
-          }
-          return this.tokenTransactionService.selectTokenOutputs(
-            available,
-            tokenAmount,
-            strategy,
+    const acquiredOutputs = await this.tokenOutputManager.acquireOutputs(
+      tokenIdentifier,
+      (available) => {
+        if (selectedOutputs) {
+          return selectedOutputs.filter((so) =>
+            available.some((a) => a.output?.id === so.output?.id),
           );
+        }
+        return this.tokenTransactionService.selectTokenOutputs(
+          available,
+          tokenAmount,
+          strategy,
+        );
+      },
+      `transfer-${tokenIdentifier}`,
+    );
+
+    const tokenOutputsMap: TokenOutputsMap = new Map([
+      [tokenIdentifier, acquiredOutputs],
+    ]);
+    const txHash = await this.tokenTransactionService.tokenTransfer({
+      tokenOutputs: tokenOutputsMap,
+      receiverOutputs: [
+        {
+          tokenIdentifier,
+          tokenAmount,
+          receiverSparkAddress,
         },
-        `transfer-${tokenIdentifier}`,
-      );
+      ],
+      outputSelectionStrategy: strategy,
+      selectedOutputs: acquiredOutputs,
+    });
 
-    try {
-      const tokenOutputsMap: TokenOutputsMap = new Map([
-        [tokenIdentifier, acquiredOutputs],
-      ]);
-      const txHash = await this.tokenTransactionService.tokenTransfer({
-        tokenOutputs: tokenOutputsMap,
-        receiverOutputs: [
-          {
-            tokenIdentifier,
-            tokenAmount,
-            receiverSparkAddress,
-          },
-        ],
-        outputSelectionStrategy: strategy,
-        selectedOutputs: acquiredOutputs,
-      });
-
-      await this.tokenOutputManager.lockOutputs(acquiredOutputs);
-      return txHash;
-    } finally {
-      await release();
-    }
+    return txHash;
   }
 
   /**
@@ -5091,62 +5075,50 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     const tokenIdentifiers = [...amountsByToken.keys()];
-
     await this.syncTokenOutputs(tokenIdentifiers);
 
     // Acquire output locks for each token identifier
     const acquiredByToken = new Map<
       Bech32mTokenIdentifier,
-      {
-        outputs: OutputWithPreviousTransactionData[];
-        release: () => Promise<void>;
-      }
+      OutputWithPreviousTransactionData[]
     >();
 
-    try {
-      for (const tokenId of tokenIdentifiers) {
-        const totalForToken = amountsByToken.get(tokenId)!;
-        const { outputs, release } =
-          await this.tokenOutputManager.acquireOutputs(
-            tokenId,
-            (available) => {
-              if (selectedOutputs) {
-                return selectedOutputs.filter((so) =>
-                  available.some((a) => a.output?.id === so.output?.id),
-                );
-              }
-              return this.tokenTransactionService.selectTokenOutputs(
-                available,
-                totalForToken,
-                outputSelectionStrategy,
-              );
-            },
-            `batch-transfer-${tokenId}`,
+    for (const tokenId of tokenIdentifiers) {
+      const totalForToken = amountsByToken.get(tokenId)!;
+      const acquiredOutputs = await this.tokenOutputManager.acquireOutputs(
+        tokenId,
+        (available) => {
+          if (selectedOutputs) {
+            return selectedOutputs.filter((so) =>
+              available.some((a) => a.output?.id === so.output?.id),
+            );
+          }
+          return this.tokenTransactionService.selectTokenOutputs(
+            available,
+            totalForToken,
+            outputSelectionStrategy,
           );
-        acquiredByToken.set(tokenId, { outputs, release });
-      }
-
-      const tokenOutputsMap: TokenOutputsMap = new Map();
-      const allAcquiredOutputs: OutputWithPreviousTransactionData[] = [];
-      for (const [tokenId, { outputs }] of acquiredByToken) {
-        tokenOutputsMap.set(tokenId, outputs);
-        allAcquiredOutputs.push(...outputs);
-      }
-
-      const txHash = await this.tokenTransactionService.tokenTransfer({
-        tokenOutputs: tokenOutputsMap,
-        receiverOutputs,
-        outputSelectionStrategy,
-        selectedOutputs: allAcquiredOutputs,
-      });
-
-      await this.tokenOutputManager.lockOutputs(allAcquiredOutputs);
-      return txHash;
-    } finally {
-      for (const { release } of acquiredByToken.values()) {
-        await release();
-      }
+        },
+        `batch-transfer-${tokenId}`,
+      );
+      acquiredByToken.set(tokenId, acquiredOutputs);
     }
+
+    const tokenOutputsMap: TokenOutputsMap = new Map();
+    const allAcquiredOutputs: OutputWithPreviousTransactionData[] = [];
+    for (const [tokenId, outputs] of acquiredByToken) {
+      tokenOutputsMap.set(tokenId, outputs);
+      allAcquiredOutputs.push(...outputs);
+    }
+
+    const txHash = await this.tokenTransactionService.tokenTransfer({
+      tokenOutputs: tokenOutputsMap,
+      receiverOutputs,
+      outputSelectionStrategy,
+      selectedOutputs: allAcquiredOutputs,
+    });
+
+    return txHash;
   }
 
   /**

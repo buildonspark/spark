@@ -169,10 +169,7 @@ export type TokenOutputsMap = Map<
   OutputWithPreviousTransactionData[]
 >;
 
-export type {
-  TokenOutputLock,
-  AcquiredOutputs,
-} from "../services/tokens/output-manager.js";
+export type { TokenOutputLock } from "../services/tokens/output-manager.js";
 
 export type TokenMetadataMap = Map<Bech32mTokenIdentifier, TokenMetadata>;
 

@@ -284,6 +284,11 @@ describe.each(TEST_CONFIGS)(
       expect(unfreezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
       expect(unfreezeResponse.impactedTokenAmount).toEqual(TOKEN_AMOUNT);
 
+      // Wait for local token output lock from before to expire before spending once-frozen outputs.
+      await new Promise((resolve) =>
+        setTimeout(resolve, config.tokenOutputLockExpiryMs),
+      );
+
       // Outputs unfrozen, transfer should succeed
       const transferBackToIssuerOfOnceFrozenToken =
         await receiverWallet.transferTokens({

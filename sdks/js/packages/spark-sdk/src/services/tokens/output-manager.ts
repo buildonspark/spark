@@ -11,11 +11,6 @@ export type TokenOutputLock = {
   operationId?: string;
 };
 
-export type AcquiredOutputs = {
-  outputs: OutputWithPreviousTransactionData[];
-  release: () => Promise<void>;
-};
-
 export class TokenOutputManager {
   private availableOutputs: TokenOutputsMap = new Map();
   // A local lock is created when a transaction is started from the wallet
@@ -112,7 +107,17 @@ export class TokenOutputManager {
     tokenIdentifier: Bech32mTokenIdentifier,
   ): Promise<OutputWithPreviousTransactionData[]> {
     return await this.mutex.runExclusive(() => {
-      return [...(this.serverPendingMap.get(tokenIdentifier) ?? [])];
+      const serverPending = this.serverPendingMap.get(tokenIdentifier) ?? [];
+      const availableForToken =
+        this.availableOutputs.get(tokenIdentifier) ?? [];
+
+      const localPendingIds = new Set(this.localPendingMap.keys());
+      const localPendingOutputs = availableForToken.filter((output) => {
+        const id = output.output?.id;
+        return id != null && localPendingIds.has(id);
+      });
+
+      return [...serverPending, ...localPendingOutputs];
     });
   }
 
@@ -163,12 +168,12 @@ export class TokenOutputManager {
 
   /**
    * Atomically select and lock outputs.
-   * Returns the selected outputs and a release function.
+   * Returns the selected outputs
    *
    * @param tokenIdentifier - The token to select from
    * @param selector - Function to select outputs from available (unlocked) outputs
    * @param operationId - name of the operation for debugging purposes
-   * @returns AcquiredOutputs with outputs and release function
+   * @returns outputs that were selected and locked
    */
   async acquireOutputs(
     tokenIdentifier: Bech32mTokenIdentifier,
@@ -176,7 +181,7 @@ export class TokenOutputManager {
       outputs: OutputWithPreviousTransactionData[],
     ) => OutputWithPreviousTransactionData[],
     operationId?: string,
-  ): Promise<AcquiredOutputs> {
+  ): Promise<OutputWithPreviousTransactionData[]> {
     return await this.mutex.runExclusive(() => {
       this.cleanupExpiredLocks();
 
@@ -184,10 +189,7 @@ export class TokenOutputManager {
       const selected = selector(available);
 
       if (selected.length === 0) {
-        return {
-          outputs: [],
-          release: async () => {},
-        };
+        return [];
       }
 
       // Validate that all selected outputs are from the available set
@@ -200,18 +202,12 @@ export class TokenOutputManager {
       }
 
       const now = Date.now();
-      const lockedIds: string[] = [];
       for (const output of selected) {
         const id = output.output!.id!;
         this.localPendingMap.set(id, { lockedAt: now, operationId });
-        lockedIds.push(id);
       }
 
-      const release = async () => {
-        await this.releaseOutputsByIds(lockedIds);
-      };
-
-      return { outputs: selected, release };
+      return selected;
     });
   }
 
@@ -242,31 +238,6 @@ export class TokenOutputManager {
       const now = Date.now();
       for (const id of outputIds) {
         this.localPendingMap.set(id, { lockedAt: now, operationId });
-      }
-    });
-  }
-
-  /**
-   * Release outputs.
-   */
-  async releaseOutputs(
-    outputs: OutputWithPreviousTransactionData[],
-  ): Promise<void> {
-    await this.mutex.runExclusive(() => {
-      for (const output of outputs) {
-        const id = output.output!.id!;
-        this.localPendingMap.delete(id);
-      }
-    });
-  }
-
-  /**
-   * Release outputs by ID.
-   */
-  async releaseOutputsByIds(outputIds: string[]): Promise<void> {
-    await this.mutex.runExclusive(() => {
-      for (const id of outputIds) {
-        this.localPendingMap.delete(id);
       }
     });
   }
