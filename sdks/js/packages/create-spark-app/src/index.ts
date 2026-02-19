@@ -121,7 +121,9 @@ function detectPackageManager(): string {
 }
 
 function printHelp(): void {
-  console.log("Usage: create-spark-app [project-name] [options]");
+  console.log(
+    "Usage: npx @buildonspark/create-spark-app [project-name] [options]",
+  );
   console.log();
   console.log("Options:");
   console.log("  --template, -t   Template to use");

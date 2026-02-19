@@ -11,7 +11,13 @@ npm install
 npm run dev
 ```
 
-Or run without arguments for an interactive template picker:
+Or use the `npm create` shorthand:
+
+```bash
+npm create @buildonspark/spark-app my-app
+```
+
+Run without `--template` for an interactive template picker:
 
 ```bash
 npx @buildonspark/create-spark-app my-app
@@ -36,7 +42,7 @@ npx @buildonspark/create-spark-app my-app
 ## Options
 
 ```
-Usage: create-spark-app [project-name] [options]
+Usage: npx @buildonspark/create-spark-app [project-name] [options]
 
 Options:
   --template, -t  Template to use
