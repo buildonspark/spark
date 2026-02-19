@@ -157,7 +157,7 @@ func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, expecte
 	newTimeLock := refundTx.TxIn[0].Sequence & 0xFFFF
 	oldTimeLock := oldSequence & 0xFFFF
 	if newTimeLock+spark.TimeLockInterval > oldTimeLock {
-		return fmt.Errorf("time lock on the new refund tx %d must be less than the old one %d", newTimeLock, oldTimeLock)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("time lock on the new refund tx %d must be less than the old one %d", newTimeLock, oldTimeLock))
 	}
 	if len(refundTx.TxIn) != int(expectedInputCount) {
 		return fmt.Errorf("refund tx should have %d inputs, but has %d", expectedInputCount, len(refundTx.TxIn))
@@ -282,7 +282,7 @@ func (h *BaseTransferHandler) createTransfer(
 	connectorTx []byte,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
-		return nil, nil, fmt.Errorf("invalid expiry_time %v", expiryTime)
+		return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid expiry_time %v", expiryTime))
 	}
 
 	if transferType == st.TransferTypePrimarySwapV3 {
@@ -679,7 +679,7 @@ func (h *BaseTransferHandler) LeafAvailableToTransfer(ctx context.Context, leaf 
 				}
 			}
 		}
-		return fmt.Errorf("leaf %v is not available to transfer, status: %s", leaf.ID, leaf.Status)
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf %v is not available to transfer, status: %s", leaf.ID, leaf.Status))
 	}
 	if !leaf.OwnerIdentityPubkey.Equals(transfer.SenderIdentityPubkey) {
 		return fmt.Errorf("leaf %v is not owned by sender", leaf.ID)
