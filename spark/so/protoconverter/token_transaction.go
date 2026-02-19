@@ -4,21 +4,21 @@ import (
 	"fmt"
 	"time"
 
-	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	legacypb "github.com/lightsparkdev/spark/proto/spark_token_legacy"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // SparkTokenTransactionFromTokenProto converts a spark_token.TokenTransaction to a spark.TokenTransaction.
-func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*pb.TokenTransaction, error) {
+func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*legacypb.TokenTransaction, error) {
 	if tokenTx == nil {
 		return nil, fmt.Errorf("input token transaction cannot be nil")
 	}
 
-	tokenOutputs := make([]*pb.TokenOutput, len(tokenTx.TokenOutputs))
+	tokenOutputs := make([]*legacypb.TokenOutput, len(tokenTx.TokenOutputs))
 	for i, o := range tokenTx.TokenOutputs {
-		tokenOutputs[i] = &pb.TokenOutput{
+		tokenOutputs[i] = &legacypb.TokenOutput{
 			Id:                            o.Id,
 			OwnerPublicKey:                o.OwnerPublicKey,
 			RevocationCommitment:          o.RevocationCommitment,
@@ -30,11 +30,11 @@ func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*pb
 		}
 	}
 
-	transaction := &pb.TokenTransaction{
+	transaction := &legacypb.TokenTransaction{
 		TokenOutputs:                    tokenOutputs,
 		SparkOperatorIdentityPublicKeys: tokenTx.SparkOperatorIdentityPublicKeys,
 		Network:                         tokenTx.Network,
-		// Note: ExpiryTime and Version fields are omitted as they do not exist in pb.TokenTransaction.
+		// Note: ExpiryTime and Version fields are omitted as they do not exist in legacypb.TokenTransaction.
 	}
 
 	switch x := tokenTx.TokenInputs.(type) {
@@ -42,8 +42,8 @@ func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*pb
 		if x.CreateInput == nil {
 			return nil, fmt.Errorf("create_input is nil")
 		}
-		transaction.TokenInputs = &pb.TokenTransaction_CreateInput{
-			CreateInput: &pb.TokenCreateInput{
+		transaction.TokenInputs = &legacypb.TokenTransaction_CreateInput{
+			CreateInput: &legacypb.TokenCreateInput{
 				IssuerPublicKey:         x.CreateInput.IssuerPublicKey,
 				TokenName:               x.CreateInput.TokenName,
 				TokenTicker:             x.CreateInput.TokenTicker,
@@ -61,8 +61,8 @@ func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*pb
 		if tokenTx.ClientCreatedTimestamp != nil {
 			issuerProvidedTimestamp = uint64(tokenTx.ClientCreatedTimestamp.AsTime().UnixMilli())
 		}
-		transaction.TokenInputs = &pb.TokenTransaction_MintInput{
-			MintInput: &pb.TokenMintInput{
+		transaction.TokenInputs = &legacypb.TokenTransaction_MintInput{
+			MintInput: &legacypb.TokenMintInput{
 				IssuerPublicKey:         x.MintInput.IssuerPublicKey,
 				TokenIdentifier:         x.MintInput.TokenIdentifier,
 				IssuerProvidedTimestamp: issuerProvidedTimestamp,
@@ -72,15 +72,15 @@ func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*pb
 		if x.TransferInput == nil {
 			return nil, fmt.Errorf("transfer_input is nil")
 		}
-		outputsToSpend := make([]*pb.TokenOutputToSpend, len(x.TransferInput.OutputsToSpend))
+		outputsToSpend := make([]*legacypb.TokenOutputToSpend, len(x.TransferInput.OutputsToSpend))
 		for i, o := range x.TransferInput.OutputsToSpend {
-			outputsToSpend[i] = &pb.TokenOutputToSpend{
+			outputsToSpend[i] = &legacypb.TokenOutputToSpend{
 				PrevTokenTransactionHash: o.PrevTokenTransactionHash,
 				PrevTokenTransactionVout: o.PrevTokenTransactionVout,
 			}
 		}
-		transaction.TokenInputs = &pb.TokenTransaction_TransferInput{
-			TransferInput: &pb.TokenTransferInput{
+		transaction.TokenInputs = &legacypb.TokenTransaction_TransferInput{
+			TransferInput: &legacypb.TokenTransferInput{
 				OutputsToSpend: outputsToSpend,
 			},
 		}
@@ -92,7 +92,7 @@ func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*pb
 }
 
 // TokenProtoFromSparkTokenTransaction converts a spark TokenTransaction proto to a spark_token TokenTransaction proto.
-func TokenProtoFromSparkTokenTransaction(sparkTx *pb.TokenTransaction) (*tokenpb.TokenTransaction, error) {
+func TokenProtoFromSparkTokenTransaction(sparkTx *legacypb.TokenTransaction) (*tokenpb.TokenTransaction, error) {
 	if sparkTx == nil {
 		return nil, fmt.Errorf("input spark token transaction cannot be nil")
 	}
@@ -119,7 +119,7 @@ func TokenProtoFromSparkTokenTransaction(sparkTx *pb.TokenTransaction) (*tokenpb
 	}
 
 	switch x := sparkTx.TokenInputs.(type) {
-	case *pb.TokenTransaction_CreateInput:
+	case *legacypb.TokenTransaction_CreateInput:
 		if x.CreateInput == nil {
 			return nil, fmt.Errorf("create_input is nil")
 		}
@@ -134,7 +134,7 @@ func TokenProtoFromSparkTokenTransaction(sparkTx *pb.TokenTransaction) (*tokenpb
 				CreationEntityPublicKey: x.CreateInput.CreationEntityPublicKey,
 			},
 		}
-	case *pb.TokenTransaction_MintInput:
+	case *legacypb.TokenTransaction_MintInput:
 		if x.MintInput == nil {
 			return nil, fmt.Errorf("mint_input is nil")
 		}
@@ -149,7 +149,7 @@ func TokenProtoFromSparkTokenTransaction(sparkTx *pb.TokenTransaction) (*tokenpb
 			},
 		}
 		tokenTx.ClientCreatedTimestamp = clientCreatedTimestamp
-	case *pb.TokenTransaction_TransferInput:
+	case *legacypb.TokenTransaction_TransferInput:
 		if x.TransferInput == nil {
 			return nil, fmt.Errorf("transfer_input is nil")
 		}

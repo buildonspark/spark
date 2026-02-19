@@ -23,6 +23,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	legacypb "github.com/lightsparkdev/spark/proto/spark_token_legacy"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/protoconverter"
@@ -474,7 +475,7 @@ func hashMintInputV1(h hash.Hash, mintInput *tokenpb.TokenMintInput) ([]byte, er
 	return mintHashes, nil
 }
 
-func HashTokenTransactionV0(tokenTransaction *sparkpb.TokenTransaction, partialHash bool) ([]byte, error) {
+func HashTokenTransactionV0(tokenTransaction *legacypb.TokenTransaction, partialHash bool) ([]byte, error) {
 	if tokenTransaction == nil {
 		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token transaction cannot be nil"))
 	}
@@ -525,7 +526,7 @@ func HashTokenTransactionV0(tokenTransaction *sparkpb.TokenTransaction, partialH
 	return finalHash, nil
 }
 
-func hashTransferInputV0(h hash.Hash, transferSource *sparkpb.TokenTransferInput) ([]byte, error) {
+func hashTransferInputV0(h hash.Hash, transferSource *legacypb.TokenTransferInput) ([]byte, error) {
 	var allHashes []byte
 	if transferSource == nil {
 		return nil, fmt.Errorf("transfer input cannot be nil when hashing transfer transaction")
@@ -555,7 +556,7 @@ func hashTransferInputV0(h hash.Hash, transferSource *sparkpb.TokenTransferInput
 	return allHashes, nil
 }
 
-func hashCreateInputV0(h hash.Hash, createInput *sparkpb.TokenCreateInput, partialHash bool) ([]byte, error) {
+func hashCreateInputV0(h hash.Hash, createInput *legacypb.TokenCreateInput, partialHash bool) ([]byte, error) {
 	if createInput == nil {
 		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("create input cannot be nil when hashing create transaction"))
 	}
@@ -631,7 +632,7 @@ func hashCreateInputV0(h hash.Hash, createInput *sparkpb.TokenCreateInput, parti
 	return allHashes, nil
 }
 
-func hashMintInputV0(h hash.Hash, mintInput *sparkpb.TokenMintInput) ([]byte, error) {
+func hashMintInputV0(h hash.Hash, mintInput *legacypb.TokenMintInput) ([]byte, error) {
 	if mintInput == nil {
 		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("mint input cannot be nil when hashing mint transaction"))
 	}
@@ -655,7 +656,7 @@ func hashMintInputV0(h hash.Hash, mintInput *sparkpb.TokenMintInput) ([]byte, er
 	return allHashes, nil
 }
 
-func hashTokenOutputs(h hash.Hash, tokenOutputs []*sparkpb.TokenOutput, partialHash bool) ([]byte, error) {
+func hashTokenOutputs(h hash.Hash, tokenOutputs []*legacypb.TokenOutput, partialHash bool) ([]byte, error) {
 	var allHashes []byte
 	for i, output := range tokenOutputs {
 		if output == nil {
@@ -901,7 +902,7 @@ func hashFreezePayloadContents(h hash.Hash, payload *tokenpb.FreezeTokensPayload
 }
 
 // InferTokenTransactionTypeSparkProtos validates that exactly one input type is present and returns it
-func InferTokenTransactionTypeSparkProtos(tokenTransaction *sparkpb.TokenTransaction) (TokenTransactionType, error) {
+func InferTokenTransactionTypeSparkProtos(tokenTransaction *legacypb.TokenTransaction) (TokenTransactionType, error) {
 	hasCreateInput := tokenTransaction.GetCreateInput() != nil
 	hasMintInput := tokenTransaction.GetMintInput() != nil
 	hasTransferInput := tokenTransaction.GetTransferInput() != nil

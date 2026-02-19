@@ -24,6 +24,7 @@ ARGS=(
   "--descriptor_set_out=./src/spark_descriptors.pb"
   "--include_imports"
   "--proto_path=../../../../protos"
+  "spark_token_legacy.proto"
   "spark.proto"
   "spark_token.proto"
   "mock.proto"
@@ -43,5 +44,3 @@ echo "[generate-proto] Formatting generated code..."
 yarn format:fix
 
 echo "[generate-proto] Done."
-
-

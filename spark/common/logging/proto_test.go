@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	legacypb "github.com/lightsparkdev/spark/proto/spark_token_legacy"
 )
 
 func TestProtoWithNilMessage(t *testing.T) {
@@ -40,7 +41,7 @@ func TestProtoWithBytes(t *testing.T) {
 
 func TestProtoWithUnspecifiedFields(t *testing.T) {
 	// Leave everything except Network unspecified.
-	tokenTransaction := &pb.TokenTransaction{
+	tokenTransaction := &legacypb.TokenTransaction{
 		Network: pb.Network_TESTNET,
 	}
 

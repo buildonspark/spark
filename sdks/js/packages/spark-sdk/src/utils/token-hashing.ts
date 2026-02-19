@@ -2,7 +2,6 @@ import { sha256 } from "@noble/hashes/sha2";
 import { SparkValidationError } from "../errors/types.js";
 import { bech32m } from "@scure/base";
 import { SparkAddress } from "../proto/spark.js";
-import { OperatorSpecificTokenTransactionSignablePayload } from "../proto/spark.js";
 import {
   TokenTransaction,
   TokenTransactionType,
@@ -11,6 +10,11 @@ import {
   FinalTokenTransaction,
 } from "../proto/spark_token.js";
 import { createProtoHasher } from "../spark-wallet/proto-hash.js";
+
+export interface OperatorSpecificTokenTransactionSignablePayload {
+  finalTokenTransactionHash?: Uint8Array;
+  operatorIdentityPublicKey?: Uint8Array;
+}
 
 export function hashTokenTransaction(
   tokenTransaction: TokenTransaction,

@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	legacypb "github.com/lightsparkdev/spark/proto/spark_token_legacy"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -101,7 +102,7 @@ var testData = testTokenTransactionData{
 	},
 }
 
-func createTestTransactions() (*tokenpb.TokenTransaction, *pb.TokenTransaction) {
+func createTestTransactions() (*tokenpb.TokenTransaction, *legacypb.TokenTransaction) {
 	tokenTx := &tokenpb.TokenTransaction{
 		TokenInputs: &tokenpb.TokenTransaction_MintInput{
 			MintInput: &tokenpb.TokenMintInput{
@@ -125,14 +126,14 @@ func createTestTransactions() (*tokenpb.TokenTransaction, *pb.TokenTransaction) 
 		ClientCreatedTimestamp:          timestamppb.New(time.UnixMilli(100)),
 	}
 
-	sparkTx := &pb.TokenTransaction{
-		TokenInputs: &pb.TokenTransaction_MintInput{
-			MintInput: &pb.TokenMintInput{
+	sparkTx := &legacypb.TokenTransaction{
+		TokenInputs: &legacypb.TokenTransaction_MintInput{
+			MintInput: &legacypb.TokenMintInput{
 				IssuerPublicKey:         testData.tokenPublicKey.Serialize(),
 				IssuerProvidedTimestamp: 100,
 			},
 		},
-		TokenOutputs: []*pb.TokenOutput{
+		TokenOutputs: []*legacypb.TokenOutput{
 			{
 				Id:                            &testData.leafID,
 				OwnerPublicKey:                testData.identityPubKey.Serialize(),
@@ -166,14 +167,14 @@ func TestHashTokenTransactionV0MintLegacyVector(t *testing.T) {
 	locktime := uint64(100)
 
 	// Create the token transaction matching the JavaScript object
-	partialTokenTransaction := &pb.TokenTransaction{
-		TokenInputs: &pb.TokenTransaction_MintInput{
-			MintInput: &pb.TokenMintInput{
+	partialTokenTransaction := &legacypb.TokenTransaction{
+		TokenInputs: &legacypb.TokenTransaction_MintInput{
+			MintInput: &legacypb.TokenMintInput{
 				IssuerPublicKey:         tokenPublicKey,
 				IssuerProvidedTimestamp: 100,
 			},
 		},
-		TokenOutputs: []*pb.TokenOutput{
+		TokenOutputs: []*legacypb.TokenOutput{
 			{
 				Id:                            &leafID,
 				OwnerPublicKey:                identityPubKey,
@@ -203,14 +204,14 @@ func TestHashTokenTransactionV0MintLegacyVector(t *testing.T) {
 }
 
 func TestHashTokenTransactionMintV0(t *testing.T) {
-	partialTokenTransaction := &pb.TokenTransaction{
-		TokenInputs: &pb.TokenTransaction_MintInput{
-			MintInput: &pb.TokenMintInput{
+	partialTokenTransaction := &legacypb.TokenTransaction{
+		TokenInputs: &legacypb.TokenTransaction_MintInput{
+			MintInput: &legacypb.TokenMintInput{
 				IssuerPublicKey:         testTokenPublicKey.Serialize(),
 				IssuerProvidedTimestamp: testData.issuerTimestamp,
 			},
 		},
-		TokenOutputs: []*pb.TokenOutput{
+		TokenOutputs: []*legacypb.TokenOutput{
 			{
 				Id:                            &testData.leafID,
 				OwnerPublicKey:                testIdentityPubKey.Serialize(),
@@ -240,9 +241,9 @@ func TestHashTokenTransactionMintV0(t *testing.T) {
 }
 
 func TestHashTokenTransactionCreateV0(t *testing.T) {
-	createTransaction := &pb.TokenTransaction{
-		TokenInputs: &pb.TokenTransaction_CreateInput{
-			CreateInput: &pb.TokenCreateInput{
+	createTransaction := &legacypb.TokenTransaction{
+		TokenInputs: &legacypb.TokenTransaction_CreateInput{
+			CreateInput: &legacypb.TokenCreateInput{
 				IssuerPublicKey: testTokenPublicKey.Serialize(),
 				TokenName:       testData.tokenName,
 				TokenTicker:     testData.tokenTicker,
@@ -251,7 +252,7 @@ func TestHashTokenTransactionCreateV0(t *testing.T) {
 				IsFreezable:     false,
 			},
 		},
-		TokenOutputs:                    []*pb.TokenOutput{},
+		TokenOutputs:                    []*legacypb.TokenOutput{},
 		SparkOperatorIdentityPublicKeys: [][]byte{testSparkOperatorPubKey.Serialize()},
 		Network:                         pb.Network_REGTEST,
 	}
@@ -273,10 +274,10 @@ func TestHashTokenTransactionCreateV0(t *testing.T) {
 
 func TestHashTokenTransactionTransferV0(t *testing.T) {
 	// Create V0 transfer transaction
-	transferTransaction := &pb.TokenTransaction{
-		TokenInputs: &pb.TokenTransaction_TransferInput{
-			TransferInput: &pb.TokenTransferInput{
-				OutputsToSpend: []*pb.TokenOutputToSpend{
+	transferTransaction := &legacypb.TokenTransaction{
+		TokenInputs: &legacypb.TokenTransaction_TransferInput{
+			TransferInput: &legacypb.TokenTransferInput{
+				OutputsToSpend: []*legacypb.TokenOutputToSpend{
 					{
 						PrevTokenTransactionHash: testData.prevTxHash[:],
 						PrevTokenTransactionVout: 0,
@@ -284,7 +285,7 @@ func TestHashTokenTransactionTransferV0(t *testing.T) {
 				},
 			},
 		},
-		TokenOutputs: []*pb.TokenOutput{
+		TokenOutputs: []*legacypb.TokenOutput{
 			{
 				Id:                            &testData.leafID,
 				OwnerPublicKey:                testIdentityPubKey.Serialize(),
@@ -324,9 +325,9 @@ func TestHashTokenTransactionV0Nil(t *testing.T) {
 
 // TestHashTokenTransactionV0Empty checks that hashing an empty transaction does not produce an error.
 func TestHashTokenTransactionV0Empty(t *testing.T) {
-	tx := &pb.TokenTransaction{
-		TokenInputs:                     &pb.TokenTransaction_MintInput{},
-		TokenOutputs:                    []*pb.TokenOutput{},
+	tx := &legacypb.TokenTransaction{
+		TokenInputs:                     &legacypb.TokenTransaction_MintInput{},
+		TokenOutputs:                    []*legacypb.TokenOutput{},
 		SparkOperatorIdentityPublicKeys: [][]byte{},
 	}
 	_, err := HashTokenTransactionV0(tx, false)
@@ -342,13 +343,13 @@ func TestHashTokenTransactionV0UniqueHash(t *testing.T) {
 		bytes.Repeat([]byte{0x06}, 32),
 	}
 
-	partialMintTokenTransaction := &pb.TokenTransaction{
-		TokenInputs: &pb.TokenTransaction_MintInput{
-			MintInput: &pb.TokenMintInput{
+	partialMintTokenTransaction := &legacypb.TokenTransaction{
+		TokenInputs: &legacypb.TokenTransaction_MintInput{
+			MintInput: &legacypb.TokenMintInput{
 				IssuerPublicKey: bytes.Repeat([]byte{0x01}, 32),
 			},
 		},
-		TokenOutputs: []*pb.TokenOutput{
+		TokenOutputs: []*legacypb.TokenOutput{
 			{
 				OwnerPublicKey: bytes.Repeat([]byte{0x01}, 32),
 				TokenPublicKey: bytes.Repeat([]byte{0x02}, 32),
@@ -358,10 +359,10 @@ func TestHashTokenTransactionV0UniqueHash(t *testing.T) {
 		SparkOperatorIdentityPublicKeys: operatorKeys,
 	}
 
-	partialTransferTokenTransaction := &pb.TokenTransaction{
-		TokenInputs: &pb.TokenTransaction_TransferInput{
-			TransferInput: &pb.TokenTransferInput{
-				OutputsToSpend: []*pb.TokenOutputToSpend{
+	partialTransferTokenTransaction := &legacypb.TokenTransaction{
+		TokenInputs: &legacypb.TokenTransaction_TransferInput{
+			TransferInput: &legacypb.TokenTransferInput{
+				OutputsToSpend: []*legacypb.TokenOutputToSpend{
 					{
 						PrevTokenTransactionHash: bytes.Repeat([]byte{0x01}, 32),
 						PrevTokenTransactionVout: 1,
@@ -369,7 +370,7 @@ func TestHashTokenTransactionV0UniqueHash(t *testing.T) {
 				},
 			},
 		},
-		TokenOutputs: []*pb.TokenOutput{
+		TokenOutputs: []*legacypb.TokenOutput{
 			{
 				OwnerPublicKey: bytes.Repeat([]byte{0x01}, 32),
 				TokenPublicKey: bytes.Repeat([]byte{0x02}, 32),

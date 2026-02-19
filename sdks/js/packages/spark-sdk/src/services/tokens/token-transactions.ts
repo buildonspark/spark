@@ -5,11 +5,7 @@ import {
 } from "@noble/curves/utils";
 import { hexToBytes } from "@noble/hashes/utils";
 import { SparkRequestError, SparkValidationError } from "../../errors/types.js";
-import {
-  Direction,
-  OperatorSpecificTokenTransactionSignablePayload,
-  Order,
-} from "../../proto/spark.js";
+import { Direction, Order } from "../../proto/spark.js";
 import {
   BroadcastTransactionResponse,
   CommitProgress,
@@ -1369,7 +1365,7 @@ export class TokenTransactionService {
           });
         }
 
-        const payload: OperatorSpecificTokenTransactionSignablePayload = {
+        const payload = {
           finalTokenTransactionHash: finalTokenTransactionHash,
           operatorIdentityPublicKey: hexToBytes(operator.identityPublicKey),
         };
@@ -1397,7 +1393,7 @@ export class TokenTransactionService {
           });
         }
 
-        const payload: OperatorSpecificTokenTransactionSignablePayload = {
+        const payload = {
           finalTokenTransactionHash: finalTokenTransactionHash,
           operatorIdentityPublicKey: hexToBytes(operator.identityPublicKey),
         };
@@ -1419,7 +1415,7 @@ export class TokenTransactionService {
 
         // Create signatures for each input
         for (let i = 0; i < transferInput.outputsToSpend.length; i++) {
-          const payload: OperatorSpecificTokenTransactionSignablePayload = {
+          const payload = {
             finalTokenTransactionHash: finalTokenTransactionHash,
             operatorIdentityPublicKey: hexToBytes(operator.identityPublicKey),
           };

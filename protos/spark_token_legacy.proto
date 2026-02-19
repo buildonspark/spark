@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package spark_token_legacy;
+
+option go_package = "github.com/lightsparkdev/spark/proto/spark_token_legacy";
+import "validate/validate.proto";
+import "spark.proto";
+
+// Legacy token v0/v2 transaction protos kept for hashing and compatibility paths.
+// Deprecated: Use definitions in spark_token.proto instead.
+
+// This proto is constructed by the wallet to specify leaves it wants to spend as
+// part of the token transaction.
+message TokenOutputToSpend {
+    bytes prev_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
+    uint32 prev_token_transaction_vout = 2;
+}
+
+message TokenTransferInput {
+    repeated TokenOutputToSpend outputs_to_spend = 1;
+}
+
+message TokenMintInput {
+    bytes issuer_public_key = 1 [(validate.rules).bytes.len = 33];
+    // Issuer provided timestamp of when the transaction was signed/constructed.
+    // Helps provide idempotency and ensures that each mint input signature is unique
+    // as long as multiple mint signatures are not happening at the same time. Also gives a
+    // potentially useful data point for when the issuer authorized from their
+    // perspective. Note that we have no way of proving this is accurate.
+    uint64 issuer_provided_timestamp = 2;
+    optional bytes token_identifier = 3 [(validate.rules).bytes.len = 32];
+}
+
+message TokenCreateInput {
+    bytes issuer_public_key = 1 [(validate.rules).bytes.len = 33];
+    string token_name = 2 [(validate.rules).string = {max_len: 20}]; // No minimum length because a single utf-8 character can be 3 bytes.
+    string token_ticker = 3 [(validate.rules).string = {max_len: 6}]; // No minimum length because a single utf-8 character can be 3 bytes.
+    uint32 decimals = 4 [(validate.rules).uint32.lte = 255];
+    bytes max_supply = 5 [(validate.rules).bytes.len = 16]; // Decoded uint128
+    bool is_freezable = 6;
+    optional bytes creation_entity_public_key = 7 [(validate.rules).bytes.len = 33];
+}
+
+// This proto is constructed by the wallet to specify outputs it wants to create
+// as part of a token transaction. Output id and revocation public key should remain unfilled
+// so that the SE can fill them as part of the StartTokenTransaction() call.
+message TokenOutput {
+    optional string id = 1 [(validate.rules).string.uuid = true];
+    bytes owner_public_key = 2 [(validate.rules).bytes.len = 33];
+    optional bytes revocation_commitment = 3 [(validate.rules).bytes.len = 33];
+    optional uint64 withdraw_bond_sats = 4;
+    optional uint64 withdraw_relative_block_locktime = 5;
+    optional bytes token_public_key = 6 [(validate.rules).bytes = {len: 33}];
+    optional bytes token_identifier = 8 [(validate.rules).bytes.len = 32];
+    bytes token_amount = 7 [(validate.rules).bytes.len = 16]; // Decoded uint128
+}
+
+// This proto is constructed by the wallet and is the core transaction data structure.
+// This proto is deterministically hashed to generate the token_transaction_hash that
+// is cooperatively signed by the SO group to confirm a token transaction.
+message TokenTransaction {
+    oneof token_inputs {
+        TokenMintInput mint_input = 1;
+        TokenTransferInput transfer_input = 2;
+        TokenCreateInput create_input = 5;
+    }
+    repeated TokenOutput token_outputs = 3;
+    repeated bytes spark_operator_identity_public_keys = 4 [(validate.rules).repeated.items.bytes.len = 33];
+    spark.Network network = 10 [(validate.rules).enum = {not_in: [0]}];
+}
