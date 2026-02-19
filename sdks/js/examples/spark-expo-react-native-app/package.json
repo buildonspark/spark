@@ -6,7 +6,7 @@
   "scripts": {
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
-    "start": "expo start",
+    "start": "expo start --dev-client",
     "build": "yarn tsc",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
