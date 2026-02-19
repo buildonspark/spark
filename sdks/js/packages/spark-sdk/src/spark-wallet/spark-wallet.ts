@@ -71,6 +71,7 @@ import {
   OutputWithPreviousTransactionData,
   QueryTokenTransactionsResponse,
 } from "../proto/spark_token.js";
+import type { DecodedInvoice } from "../services/bolt11-spark.js";
 import {
   decodeInvoice,
   getNetworkFromInvoice,
@@ -173,7 +174,6 @@ import type {
   WithdrawParams,
 } from "./types.js";
 import { SparkWalletEvent } from "./types.js";
-import type { DecodedInvoice } from "../services/bolt11-spark.js";
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
@@ -1447,8 +1447,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   /**
    * Gets the current balance of the wallet.
-   * You can use the forceRefetch option to synchronize your wallet and claim any
-   * pending incoming lightning payment, spark transfer, or bitcoin deposit before returning the balance.
    *
    * @returns {Promise<Object>} Object containing:
    *   - balance: The wallet's current balance in satoshis
