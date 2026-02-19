@@ -135,33 +135,34 @@ func TestValidateMintDoesNotExceedMaxSupply_FinalizedAndExpiredTransactions(t *t
 		require.Contains(t, err.Error(), "exceed max supply")
 	})
 
-	t.Run("expired SIGNED transactions do not count toward supply", func(t *testing.T) {
-		tokenCreate := f.CreateTokenCreate(btcnetwork.Regtest, nil, maxSupply)
-
-		pastTime := time.Now().Add(-time.Hour)
-		_, _ = f.CreateMintTransactionWithOpts(
-			tokenCreate,
-			entfixtures.OutputSpecs(maxSupply),
-			st.TokenTransactionStatusSigned,
-			&entfixtures.TokenTransactionOpts{ExpiryTime: &pastTime},
-		)
-
-		newMint, _ := f.CreateMintTransaction(
-			tokenCreate,
-			entfixtures.OutputSpecs(maxSupply),
-			st.TokenTransactionStatusStarted,
-		)
-		newMintTx, err := dbClient.TokenTransaction.Query().
-			Where(tokentransaction.ID(newMint.ID)).
-			WithMint().
-			WithCreatedOutput().
-			Only(ctx)
-		require.NoError(t, err)
-
-		err = ValidateMintDoesNotExceedMaxSupplyEnt(ctx, newMintTx)
-		require.NoError(t, err, "should succeed because expired SIGNED mint doesn't count")
-	})
-
+	// TODO: Re-enable these tests after expiry check is added back
+	// t.Run("expired SIGNED transactions do not count toward supply", func(t *testing.T) {
+	// 	tokenCreate := f.CreateTokenCreate(btcnetwork.Regtest, nil, maxSupply)
+	//
+	// 	pastTime := time.Now().Add(-time.Hour)
+	// 	_, _ = f.CreateMintTransactionWithOpts(
+	// 		tokenCreate,
+	// 		entfixtures.OutputSpecs(maxSupply),
+	// 		st.TokenTransactionStatusSigned,
+	// 		&entfixtures.TokenTransactionOpts{ExpiryTime: &pastTime},
+	// 	)
+	//
+	// 	newMint, _ := f.CreateMintTransaction(
+	// 		tokenCreate,
+	// 		entfixtures.OutputSpecs(maxSupply),
+	// 		st.TokenTransactionStatusStarted,
+	// 	)
+	// 	newMintTx, err := dbClient.TokenTransaction.Query().
+	// 		Where(tokentransaction.ID(newMint.ID)).
+	// 		WithMint().
+	// 		WithCreatedOutput().
+	// 		Only(ctx)
+	// 	require.NoError(t, err)
+	//
+	// 	err = ValidateMintDoesNotExceedMaxSupplyEnt(ctx, newMintTx)
+	// 	require.NoError(t, err, "should succeed because expired SIGNED mint doesn't count")
+	// })
+	//
 	t.Run("non-expired SIGNED transactions count toward supply", func(t *testing.T) {
 		tokenCreate := f.CreateTokenCreate(btcnetwork.Regtest, nil, maxSupply)
 

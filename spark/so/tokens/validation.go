@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
 	"entgo.io/ent/dialect"
 	esql "entgo.io/ent/dialect/sql"
@@ -168,20 +167,15 @@ func calculateCurrentSupply(ctx context.Context, whereClause func(*ent.TokenOutp
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get or create current tx for request: %w", err))
 	}
 
-	// Count outputs from:
-	// 1. FINALIZED mint transactions
-	// 2. SIGNED mint transactions that haven't expired
+	// Count outputs from both FINALIZED and SIGNED mint transactions.
+	// We include SIGNED because v3 mint transactions may be stuck in SIGNED status
+	// until a backfill task updates them to FINALIZED.
+	// Expiry checks will be added in a future PR after backfill completes.
 	mintTransactionPredicate := tokentransaction.And(
 		tokentransaction.HasMint(),
 		tokentransaction.Or(
 			tokentransaction.StatusEQ(st.TokenTransactionStatusFinalized),
-			tokentransaction.And(
-				tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
-				tokentransaction.Or(
-					tokentransaction.ExpiryTimeIsNil(),
-					tokentransaction.ExpiryTimeGT(time.Now().UTC()),
-				),
-			),
+			tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
 		),
 	)
 
