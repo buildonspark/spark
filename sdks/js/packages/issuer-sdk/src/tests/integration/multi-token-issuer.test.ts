@@ -2,6 +2,14 @@ import { jest } from "@jest/globals";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { TEST_CONFIGS } from "./test-configs.js";
 import { IssuerSparkWallet } from "../../issuer-wallet/issuer-spark-wallet.js";
+import {
+  burnSingleIssuerToken,
+  freezeSingleIssuerToken,
+  getSingleIssuerTokenBalance,
+  getSingleIssuerTokenIdentifier,
+  mintSingleIssuerToken,
+  unfreezeSingleIssuerToken,
+} from "../utils/multi-token-utils.js";
 
 const TX_HASH_REGEX = /^[a-f0-9]{64}$/i; // valid tx hash: hex string of 64 characters
 
@@ -350,139 +358,6 @@ describe.each(TEST_CONFIGS)(
       );
       expect(issuerFirstBalanceAfterBurn?.balance).toBe(0n);
       expect(issuerSecondBalanceAfterBurn?.balance).toEqual(TOKEN_AMOUNT);
-    });
-
-    // CNT-608: skip until we migrate existing tests to use multi token methods
-    it.skip("should allow legacy methods to be used with a single token", async () => {
-      const { wallet: issuerWallet } =
-        await IssuerSparkWalletTesting.initialize({
-          options: config,
-        });
-      const issuerSparkAddress = await issuerWallet.getSparkAddress();
-
-      const { wallet: receiverWallet } =
-        await IssuerSparkWalletTesting.initialize({
-          options: config,
-        });
-      const receiverSparkAddress = await receiverWallet.getSparkAddress();
-
-      const createTransactionDetails = await issuerWallet.createToken(
-        TOKEN_ONE_CREATE_TRANSACTION_PARAMS,
-      );
-      expect(createTransactionDetails).toBeDefined();
-      expect(createTransactionDetails.tokenIdentifier).toBeDefined();
-      expect(createTransactionDetails.tokenIdentifier.length).toBeGreaterThan(
-        0,
-      );
-      expect(createTransactionDetails.transactionHash).toBeDefined();
-      expect(createTransactionDetails.transactionHash.length).toBeGreaterThan(
-        0,
-      );
-
-      // Legacy single token issuer method should succeed when only one token is created
-      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
-      expect(tokenIdentifier).toBeDefined();
-      expect(tokenIdentifier).toEqual(createTransactionDetails.tokenIdentifier);
-
-      // === Minting tokens ===
-      const mintHash = await issuerWallet.mintTokens(TOKEN_AMOUNT);
-      expect(mintHash).toBeDefined();
-      expect(mintHash).toMatch(TX_HASH_REGEX);
-
-      // Legacy single token issuer method should succeed when only one token is created
-      const tokenBalance = await issuerWallet.getIssuerTokenBalance();
-      expect(tokenBalance).toBeDefined();
-      expect(tokenBalance.balance).toEqual(TOKEN_AMOUNT);
-
-      const issuerBalanceAfterMint = await issuerWallet.getBalance();
-      expect(
-        issuerBalanceAfterMint.tokenBalances.get(
-          createTransactionDetails.tokenIdentifier,
-        )?.ownedBalance,
-      ).toEqual(TOKEN_AMOUNT);
-
-      const transferHash = await issuerWallet.transferTokens({
-        tokenAmount: TOKEN_AMOUNT,
-        tokenIdentifier: createTransactionDetails.tokenIdentifier,
-        receiverSparkAddress: receiverSparkAddress,
-      });
-      expect(transferHash).toBeDefined();
-      expect(transferHash).toMatch(TX_HASH_REGEX);
-
-      const receiverBalance = await receiverWallet.getBalance();
-      expect(
-        receiverBalance.tokenBalances.get(
-          createTransactionDetails.tokenIdentifier,
-        )?.ownedBalance,
-      ).toEqual(TOKEN_AMOUNT);
-
-      const issuerBalanceAfterTransfer = await issuerWallet.getBalance();
-      expect(
-        issuerBalanceAfterTransfer.tokenBalances.get(
-          createTransactionDetails.tokenIdentifier,
-        )?.ownedBalance,
-      ).toBeUndefined();
-
-      // === Freezing tokens ===
-      // Legacy single token issuer method should succeed when only one token is created
-      const freezeResponse =
-        await issuerWallet.freezeTokens(receiverSparkAddress);
-      expect(freezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
-      expect(freezeResponse.impactedTokenAmount).toEqual(TOKEN_AMOUNT);
-
-      // Should fail to transfer tokens because the outputs are frozen
-      await expect(
-        receiverWallet.transferTokens({
-          tokenAmount: TOKEN_AMOUNT,
-          tokenIdentifier: createTransactionDetails.tokenIdentifier,
-          receiverSparkAddress: issuerSparkAddress,
-        }),
-      ).rejects.toThrow();
-
-      // === Unfreezing tokens ===
-      // Legacy single token issuer method should succeed when only one token is created
-      const unfreezeResponse =
-        await issuerWallet.unfreezeTokens(receiverSparkAddress);
-      expect(unfreezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
-      expect(unfreezeResponse.impactedTokenAmount).toEqual(TOKEN_AMOUNT);
-
-      const transferBackToIssuerOfUnfrozenToken =
-        await receiverWallet.transferTokens({
-          tokenAmount: TOKEN_AMOUNT,
-          tokenIdentifier: createTransactionDetails.tokenIdentifier,
-          receiverSparkAddress: issuerSparkAddress,
-        });
-      expect(transferBackToIssuerOfUnfrozenToken).toBeDefined();
-      expect(transferBackToIssuerOfUnfrozenToken).toMatch(TX_HASH_REGEX);
-
-      const receiverBalanceAfterTransferOfUnfrozenToken =
-        await receiverWallet.getBalance();
-      expect(
-        receiverBalanceAfterTransferOfUnfrozenToken.tokenBalances.get(
-          createTransactionDetails.tokenIdentifier,
-        )?.ownedBalance,
-      ).toBeUndefined();
-
-      const issuerBalanceAfterTransferOfUnfrozenToken =
-        await issuerWallet.getBalance();
-      expect(
-        issuerBalanceAfterTransferOfUnfrozenToken.tokenBalances.get(
-          createTransactionDetails.tokenIdentifier,
-        )?.ownedBalance,
-      ).toEqual(TOKEN_AMOUNT);
-
-      // === Burning tokens ===
-      // Legacy single token issuer method should succeed when only one token is created
-      const burnHash = await issuerWallet.burnTokens(TOKEN_AMOUNT);
-      expect(burnHash).toBeDefined();
-      expect(burnHash).toMatch(TX_HASH_REGEX);
-
-      const issuerBalanceAfterBurn = await issuerWallet.getBalance();
-      expect(
-        issuerBalanceAfterBurn.tokenBalances.get(
-          createTransactionDetails.tokenIdentifier,
-        )?.ownedBalance,
-      ).toBeUndefined();
     });
   },
 );

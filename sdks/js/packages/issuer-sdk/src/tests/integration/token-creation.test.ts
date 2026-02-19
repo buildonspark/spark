@@ -1,5 +1,6 @@
 import { jest } from "@jest/globals";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
+import { getSingleIssuerTokenMetadata } from "../utils/multi-token-utils.js";
 import { TEST_CONFIGS } from "./test-configs.js";
 
 describe.each(TEST_CONFIGS)(
@@ -28,7 +29,7 @@ describe.each(TEST_CONFIGS)(
       expect(typeof txId).toBe("string");
       expect(txId.length).toBeGreaterThan(0);
 
-      const metadata = await issuerWallet.getIssuerTokenMetadata();
+      const metadata = await getSingleIssuerTokenMetadata(issuerWallet);
       expect(metadata.tokenName).toEqual(tokenName);
       expect(metadata.tokenTicker).toEqual(tokenTicker);
       expect(metadata.maxSupply).toEqual(maxSupply);
@@ -51,6 +52,8 @@ describe.each(TEST_CONFIGS)(
         isFreezable: false,
         maxSupply: 100n,
       });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       await expect(
         issuerWallet.createToken({

@@ -1,5 +1,10 @@
 import { jest } from "@jest/globals";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
+import {
+  getSingleIssuerTokenBalance,
+  getSingleIssuerTokenMetadata,
+  mintSingleIssuerToken,
+} from "../utils/multi-token-utils.js";
 import { TEST_CONFIGS } from "./test-configs.js";
 
 describe.each(TEST_CONFIGS)(
@@ -13,7 +18,9 @@ describe.each(TEST_CONFIGS)(
         options: config,
       });
 
-      await expect(wallet.mintTokens(tokenAmount)).rejects.toThrow();
+      await expect(
+        mintSingleIssuerToken(wallet, tokenAmount),
+      ).rejects.toThrow();
     });
 
     it("should create, and fail when minting more than max supply", async () => {
@@ -29,7 +36,9 @@ describe.each(TEST_CONFIGS)(
         isFreezable: false,
         maxSupply: 2n,
       });
-      await expect(wallet.mintTokens(tokenAmount)).rejects.toThrow();
+      await expect(
+        mintSingleIssuerToken(wallet, tokenAmount),
+      ).rejects.toThrow();
     });
 
     it("should create, and mint tokens successfully", async () => {
@@ -47,7 +56,7 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 1_000_000n,
       });
 
-      const tokenMetadata = await issuerWallet.getIssuerTokenMetadata();
+      const tokenMetadata = await getSingleIssuerTokenMetadata(issuerWallet);
 
       const identityPublicKey = await issuerWallet.getIdentityPublicKey();
       expect(tokenMetadata?.tokenName).toEqual(`${name}M`);
@@ -59,9 +68,9 @@ describe.each(TEST_CONFIGS)(
       const metadataPubkey = tokenMetadata?.tokenPublicKey;
       expect(metadataPubkey).toEqual(identityPublicKey);
 
-      await issuerWallet.mintTokens(tokenAmount);
+      await mintSingleIssuerToken(issuerWallet, tokenAmount);
 
-      const tokenBalance = await issuerWallet.getIssuerTokenBalance();
+      const tokenBalance = await getSingleIssuerTokenBalance(issuerWallet);
       expect(tokenBalance.balance).toBeGreaterThanOrEqual(tokenAmount);
     });
 
@@ -79,9 +88,9 @@ describe.each(TEST_CONFIGS)(
         isFreezable: false,
         maxSupply: 1n,
       });
-      await issuerWallet.mintTokens(tokenAmount);
+      await mintSingleIssuerToken(issuerWallet, tokenAmount);
 
-      const tokenBalance = await issuerWallet.getIssuerTokenBalance();
+      const tokenBalance = await getSingleIssuerTokenBalance(issuerWallet);
       expect(tokenBalance.balance).toEqual(tokenAmount);
     });
   },

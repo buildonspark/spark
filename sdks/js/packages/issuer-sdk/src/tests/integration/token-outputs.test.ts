@@ -2,6 +2,11 @@ import { filterTokenBalanceForTokenIdentifier } from "@buildonspark/spark-sdk";
 import { jest } from "@jest/globals";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { SparkWalletTesting } from "@buildonspark/spark-sdk/test-utils";
+import {
+  getSingleIssuerTokenBalance,
+  getSingleIssuerTokenIdentifier,
+  mintSingleIssuerToken,
+} from "../utils/multi-token-utils.js";
 import { TEST_CONFIGS } from "./test-configs.js";
 
 describe.each(TEST_CONFIGS)(
@@ -30,8 +35,9 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 1_000_000n,
       });
 
-      await issuerWallet.mintTokens(totalAmount);
-      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      await mintSingleIssuerToken(issuerWallet, totalAmount);
+      const tokenIdentifier =
+        await getSingleIssuerTokenIdentifier(issuerWallet);
       expect(tokenIdentifier).toBeDefined();
 
       const userSparkAddress = await userWallet.getSparkAddress();
@@ -54,7 +60,7 @@ describe.each(TEST_CONFIGS)(
       await userWallet.batchTransferTokens(transfersToIssuer);
 
       const balanceBeforeOptimization =
-        await issuerWallet.getIssuerTokenBalance();
+        await getSingleIssuerTokenBalance(issuerWallet);
       expect(balanceBeforeOptimization.balance).toBe(totalAmount);
 
       const outputsBeforeOptimization =
@@ -67,7 +73,7 @@ describe.each(TEST_CONFIGS)(
       await (issuerWallet as any).syncTokenOutputs();
 
       const balanceAfterOptimization =
-        await issuerWallet.getIssuerTokenBalance();
+        await getSingleIssuerTokenBalance(issuerWallet);
       expect(balanceAfterOptimization.balance).toBe(totalAmount);
 
       const outputsAfterOptimization =

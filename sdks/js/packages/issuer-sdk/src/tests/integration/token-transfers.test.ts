@@ -6,6 +6,11 @@ import { OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto
 import { jest } from "@jest/globals";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { SparkWalletTesting } from "@buildonspark/spark-sdk/test-utils";
+import {
+  getSingleIssuerTokenBalance,
+  getSingleIssuerTokenIdentifier,
+  mintSingleIssuerToken,
+} from "../utils/multi-token-utils.js";
 import { TEST_CONFIGS } from "./test-configs.js";
 
 describe.each(TEST_CONFIGS)(
@@ -31,9 +36,10 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 1_000_000n,
       });
 
-      await issuerWallet.mintTokens(tokenAmount);
+      await mintSingleIssuerToken(issuerWallet, tokenAmount);
 
-      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      const tokenIdentifier =
+        await getSingleIssuerTokenIdentifier(issuerWallet);
       await issuerWallet.transferTokens({
         tokenAmount,
         tokenIdentifier: tokenIdentifier!,
@@ -78,8 +84,9 @@ describe.each(TEST_CONFIGS)(
           options: config,
         });
 
-      await issuerWallet.mintTokens(tokenAmount);
-      const sharedIssuerBalance = await issuerWallet.getIssuerTokenBalance();
+      await mintSingleIssuerToken(issuerWallet, tokenAmount);
+      const sharedIssuerBalance =
+        await getSingleIssuerTokenBalance(issuerWallet);
       expect(sharedIssuerBalance).toBeDefined();
       expect(sharedIssuerBalance.tokenIdentifier).toBeDefined();
 
@@ -104,8 +111,9 @@ describe.each(TEST_CONFIGS)(
         },
       ]);
 
-      const sourceBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
-        .balance;
+      const sourceBalanceAfter = (
+        await getSingleIssuerTokenBalance(issuerWallet)
+      ).balance;
       expect(sourceBalanceAfter).toEqual(sourceBalanceBefore - tokenAmount);
 
       const balanceObj = await destinationWallet1.getBalance();
@@ -166,13 +174,13 @@ describe.each(TEST_CONFIGS)(
 
       await Promise.all(
         issuerWallets.map((wallet, i) =>
-          wallet.mintTokens(tokenConfigs[i].amount),
+          mintSingleIssuerToken(wallet, tokenConfigs[i].amount),
         ),
       );
 
       const tokenIdentifiers = await Promise.all(
         issuerWallets.map(async (wallet) => {
-          const balance = await wallet.getIssuerTokenBalance();
+          const balance = await getSingleIssuerTokenBalance(wallet);
           expect(balance.tokenIdentifier).toBeDefined();
           return balance.tokenIdentifier!;
         }),
@@ -246,8 +254,9 @@ describe.each(TEST_CONFIGS)(
           options: config,
         });
 
-      await issuerWallet.mintTokens(mintAmount);
-      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      await mintSingleIssuerToken(issuerWallet, mintAmount);
+      const tokenIdentifier =
+        await getSingleIssuerTokenIdentifier(issuerWallet);
 
       await expect(
         issuerWallet.transferTokens({
@@ -284,8 +293,9 @@ describe.each(TEST_CONFIGS)(
           options: config,
         });
 
-      await issuerWallet.mintTokens(mintAmount);
-      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      await mintSingleIssuerToken(issuerWallet, mintAmount);
+      const tokenIdentifier =
+        await getSingleIssuerTokenIdentifier(issuerWallet);
 
       await expect(
         issuerWallet.batchTransferTokens([
@@ -346,11 +356,11 @@ describe.each(TEST_CONFIGS)(
           options: config,
         });
 
-      await issuerWallet1.mintTokens(tokenAmount1);
-      await issuerWallet2.mintTokens(tokenAmount2);
+      await mintSingleIssuerToken(issuerWallet1, tokenAmount1);
+      await mintSingleIssuerToken(issuerWallet2, tokenAmount2);
 
-      const issuerBalance1 = await issuerWallet1.getIssuerTokenBalance();
-      const issuerBalance2 = await issuerWallet2.getIssuerTokenBalance();
+      const issuerBalance1 = await getSingleIssuerTokenBalance(issuerWallet1);
+      const issuerBalance2 = await getSingleIssuerTokenBalance(issuerWallet2);
 
       const tokenIdentifier1 = issuerBalance1.tokenIdentifier!;
       const tokenIdentifier2 = issuerBalance2.tokenIdentifier!;
@@ -421,11 +431,11 @@ describe.each(TEST_CONFIGS)(
         },
       );
 
-      await issuerWallet1.mintTokens(tokenAmount);
-      await issuerWallet2.mintTokens(tokenAmount);
+      await mintSingleIssuerToken(issuerWallet1, tokenAmount);
+      await mintSingleIssuerToken(issuerWallet2, tokenAmount);
 
-      const issuerBalance1 = await issuerWallet1.getIssuerTokenBalance();
-      const issuerBalance2 = await issuerWallet2.getIssuerTokenBalance();
+      const issuerBalance1 = await getSingleIssuerTokenBalance(issuerWallet1);
+      const issuerBalance2 = await getSingleIssuerTokenBalance(issuerWallet2);
 
       const tokenIdentifier1 = issuerBalance1.tokenIdentifier!;
       const tokenIdentifier2 = issuerBalance2.tokenIdentifier!;
@@ -477,8 +487,9 @@ describe.each(TEST_CONFIGS)(
           options: config,
         });
 
-      await issuerWallet.mintTokens(mintAmount);
-      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      await mintSingleIssuerToken(issuerWallet, mintAmount);
+      const tokenIdentifier =
+        await getSingleIssuerTokenIdentifier(issuerWallet);
 
       await expect(
         issuerWallet.batchTransferTokens([
@@ -517,8 +528,9 @@ describe.each(TEST_CONFIGS)(
         },
       );
 
-      await issuerWallet.mintTokens(mintAmount);
-      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      await mintSingleIssuerToken(issuerWallet, mintAmount);
+      const tokenIdentifier =
+        await getSingleIssuerTokenIdentifier(issuerWallet);
       const { tokenIdentifier: rawTokenIdentifier } =
         decodeBech32mTokenIdentifier(tokenIdentifier!);
 
@@ -578,11 +590,13 @@ describe.each(TEST_CONFIGS)(
         },
       );
 
-      await issuerWallet1.mintTokens(mintAmount);
-      await issuerWallet2.mintTokens(mintAmount);
+      await mintSingleIssuerToken(issuerWallet1, mintAmount);
+      await mintSingleIssuerToken(issuerWallet2, mintAmount);
 
-      const tokenIdentifier1 = await issuerWallet1.getIssuerTokenIdentifier();
-      const tokenIdentifier2 = await issuerWallet2.getIssuerTokenIdentifier();
+      const tokenIdentifier1 =
+        await getSingleIssuerTokenIdentifier(issuerWallet1);
+      const tokenIdentifier2 =
+        await getSingleIssuerTokenIdentifier(issuerWallet2);
       const { tokenIdentifier: rawTokenIdentifier2 } =
         decodeBech32mTokenIdentifier(tokenIdentifier2!);
 
@@ -647,11 +661,11 @@ describe.each(TEST_CONFIGS)(
         },
       );
 
-      await issuerWallet1.mintTokens(tokenAmount);
-      await issuerWallet2.mintTokens(tokenAmount);
+      await mintSingleIssuerToken(issuerWallet1, tokenAmount);
+      await mintSingleIssuerToken(issuerWallet2, tokenAmount);
 
-      const issuerBalance1 = await issuerWallet1.getIssuerTokenBalance();
-      const issuerBalance2 = await issuerWallet2.getIssuerTokenBalance();
+      const issuerBalance1 = await getSingleIssuerTokenBalance(issuerWallet1);
+      const issuerBalance2 = await getSingleIssuerTokenBalance(issuerWallet2);
       const tokenIdentifier1 = issuerBalance1.tokenIdentifier!;
       const tokenIdentifier2 = issuerBalance2.tokenIdentifier!;
 

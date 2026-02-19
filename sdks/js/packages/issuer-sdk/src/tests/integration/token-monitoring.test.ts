@@ -6,6 +6,11 @@ import { jest } from "@jest/globals";
 import { bytesToHex, bytesToNumberBE } from "@noble/curves/utils";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { SparkWalletTesting } from "@buildonspark/spark-sdk/test-utils";
+import {
+  burnSingleIssuerToken,
+  getSingleIssuerTokenIdentifier,
+  mintSingleIssuerToken,
+} from "../utils/multi-token-utils.js";
 import { TEST_CONFIGS } from "./test-configs.js";
 
 describe.each(TEST_CONFIGS)(
@@ -32,8 +37,9 @@ describe.each(TEST_CONFIGS)(
         isFreezable: true,
         maxSupply: 100000n,
       });
-      await issuerWallet.mintTokens(tokenAmount);
-      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      await mintSingleIssuerToken(issuerWallet, tokenAmount);
+      const tokenIdentifier =
+        await getSingleIssuerTokenIdentifier(issuerWallet);
       const issuerPublicKey = await issuerWallet.getIdentityPublicKey();
 
       await issuerWallet.transferTokens({
@@ -49,7 +55,7 @@ describe.each(TEST_CONFIGS)(
       );
       expect(userBalance.ownedBalance).toBeGreaterThanOrEqual(tokenAmount);
 
-      const response = await issuerWallet.queryTokenTransactions({
+      const response = await issuerWallet.queryTokenTransactionsWithFilters({
         tokenIdentifiers: [tokenIdentifier!],
         sparkAddresses: [await issuerWallet.getSparkAddress()],
       });
@@ -91,9 +97,10 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 1_000_000n,
       });
 
-      await issuerWallet.mintTokens(tokenAmount);
+      await mintSingleIssuerToken(issuerWallet, tokenAmount);
 
-      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      const tokenIdentifier =
+        await getSingleIssuerTokenIdentifier(issuerWallet);
       const issuerPublicKey = await issuerWallet.getIdentityPublicKey();
 
       await issuerWallet.transferTokens({
@@ -110,7 +117,7 @@ describe.each(TEST_CONFIGS)(
 
       const BURN_ADDRESS = "02".repeat(33);
 
-      await issuerWallet.burnTokens(250n);
+      await burnSingleIssuerToken(issuerWallet, 250n);
 
       const res = await issuerWallet.queryTokenTransactionsWithFilters({
         tokenIdentifiers: [tokenIdentifier!],
@@ -158,15 +165,16 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 100000n,
       });
 
-      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      const tokenIdentifier =
+        await getSingleIssuerTokenIdentifier(issuerWallet);
       const issuerPublicKey = await issuerWallet.getIdentityPublicKey();
       const issuerSparkAddress = await issuerWallet.getSparkAddress();
       const userSparkAddress = await userWallet.getSparkAddress();
 
-      const mintTxHash = await issuerWallet.mintTokens(tokenAmount);
+      const mintTxHash = await mintSingleIssuerToken(issuerWallet, tokenAmount);
 
       {
-        const res = await issuerWallet.queryTokenTransactions({
+        const res = await issuerWallet.queryTokenTransactionsWithFilters({
           tokenIdentifiers: [tokenIdentifier!],
         });
         const transactions = res.tokenTransactionsWithStatus;
@@ -190,7 +198,7 @@ describe.each(TEST_CONFIGS)(
       });
 
       {
-        const res = await issuerWallet.queryTokenTransactions({
+        const res = await issuerWallet.queryTokenTransactionsWithFilters({
           tokenIdentifiers: [tokenIdentifier!],
         });
         const transactions = res.tokenTransactionsWithStatus;
@@ -209,7 +217,7 @@ describe.each(TEST_CONFIGS)(
 
       for (let index = 0; index < 100; ++index) {
         const dynamicAmount = BigInt(index + 1);
-        await issuerWallet.mintTokens(dynamicAmount);
+        await mintSingleIssuerToken(issuerWallet, dynamicAmount);
         await issuerWallet.transferTokens({
           tokenAmount: dynamicAmount,
           tokenIdentifier: tokenIdentifier!,
@@ -245,7 +253,7 @@ describe.each(TEST_CONFIGS)(
       }
 
       {
-        const res = await issuerWallet.queryTokenTransactions({
+        const res = await issuerWallet.queryTokenTransactionsWithFilters({
           tokenIdentifiers: [tokenIdentifier!],
           pageSize: 10,
         });
@@ -330,15 +338,15 @@ describe.each(TEST_CONFIGS)(
       {
         let hashset_of_all_transactions: Set<String> = new Set();
 
-        let pageSize = 10;
-        let offset = 0;
+        const pageSize = 10;
         let page_num = 0;
+        let cursor: string | undefined = undefined;
 
         while (true) {
-          const res = await issuerWallet.queryTokenTransactions({
+          const res = await issuerWallet.queryTokenTransactionsWithFilters({
             tokenIdentifiers: [tokenIdentifier!],
             pageSize,
-            offset,
+            cursor,
           });
           const transactions = res.tokenTransactionsWithStatus;
 
@@ -346,7 +354,7 @@ describe.each(TEST_CONFIGS)(
             break;
           }
 
-          if (offset === 0) {
+          if (page_num === 0) {
             expect(transactions.length).toEqual(pageSize);
           }
 
@@ -368,7 +376,10 @@ describe.each(TEST_CONFIGS)(
             }
           }
 
-          offset += transactions.length;
+          if (!res.pageResponse?.hasNextPage) {
+            break;
+          }
+          cursor = res.pageResponse.nextCursor;
           page_num += 1;
         }
 

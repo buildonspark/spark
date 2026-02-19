@@ -9,6 +9,11 @@ import {
   SparkWalletTesting,
 } from "@buildonspark/spark-sdk/test-utils";
 import { InvoiceStatus } from "@buildonspark/spark-sdk/proto/spark";
+import {
+  getSingleIssuerTokenBalance,
+  getSingleIssuerTokenIdentifier,
+  mintSingleIssuerToken,
+} from "../utils/multi-token-utils.js";
 import { TEST_CONFIGS } from "./test-configs.js";
 
 describe.each(TEST_CONFIGS)(
@@ -36,9 +41,10 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 1_000_000n,
       });
 
-      await issuerWallet.mintTokens(initialIssuerBalance);
+      await mintSingleIssuerToken(issuerWallet, initialIssuerBalance);
 
-      const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
+      const issuerBalanceAfterMint =
+        await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceAfterMint).toBeDefined();
       expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
       const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
@@ -72,8 +78,9 @@ describe.each(TEST_CONFIGS)(
       expect(tokenTransactionSuccess[0].txid).toBeDefined();
       expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
 
-      const issuerBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
-        .balance;
+      const issuerBalanceAfter = (
+        await getSingleIssuerTokenBalance(issuerWallet)
+      ).balance;
       expect(issuerBalanceAfter).toEqual(
         issuerBalanceBeforeTransfer - tokenAmount,
       );
@@ -112,9 +119,10 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 1_000_000n,
       });
 
-      await issuerWallet.mintTokens(initialIssuerBalance);
+      await mintSingleIssuerToken(issuerWallet, initialIssuerBalance);
 
-      const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
+      const issuerBalanceAfterMint =
+        await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceAfterMint).toBeDefined();
       expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
       const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
@@ -165,8 +173,9 @@ describe.each(TEST_CONFIGS)(
       expect(tokenTransactionSuccess[0].txid).toBeDefined();
       expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
 
-      const issuerBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
-        .balance;
+      const issuerBalanceAfter = (
+        await getSingleIssuerTokenBalance(issuerWallet)
+      ).balance;
       expect(issuerBalanceAfter).toEqual(
         issuerBalanceBeforeTransfer - totalAmount,
       );
@@ -206,9 +215,10 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 1_000_000n,
       });
 
-      await issuerWallet.mintTokens(initialIssuerBalance);
+      await mintSingleIssuerToken(issuerWallet, initialIssuerBalance);
 
-      const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
+      const issuerBalanceAfterMint =
+        await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceAfterMint).toBeDefined();
       expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
       const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
@@ -227,8 +237,9 @@ describe.each(TEST_CONFIGS)(
       expect(invalidInvoices.length).toBe(1);
       expect(invalidInvoices[0].invoice).toBe(expiredInvoice);
 
-      const issuerBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
-        .balance;
+      const issuerBalanceAfter = (
+        await getSingleIssuerTokenBalance(issuerWallet)
+      ).balance;
       expect(issuerBalanceAfter).toEqual(issuerBalanceBefore);
 
       const receiverBalanceObj = await receiverWallet.getBalance();
@@ -259,9 +270,10 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 1_000_000n,
       });
 
-      await issuerWallet.mintTokens(initialIssuerBalance);
+      await mintSingleIssuerToken(issuerWallet, initialIssuerBalance);
 
-      const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
+      const issuerBalanceAfterMint =
+        await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceAfterMint).toBeDefined();
       expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
       const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
@@ -297,8 +309,9 @@ describe.each(TEST_CONFIGS)(
       expect(tokenTransactionSuccess[0].txid).toBeDefined();
       expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
 
-      const issuerBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
-        .balance;
+      const issuerBalanceAfter = (
+        await getSingleIssuerTokenBalance(issuerWallet)
+      ).balance;
       expect(issuerBalanceAfter).toEqual(issuerBalanceBefore - tokenAmount);
 
       const receiverBalanceObj = await receiverWallet.getBalance();
@@ -329,9 +342,10 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 1_000_000n,
       });
 
-      await issuerWallet.mintTokens(initialIssuerBalance);
+      await mintSingleIssuerToken(issuerWallet, initialIssuerBalance);
 
-      const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
+      const issuerBalanceAfterMint =
+        await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceAfterMint).toBeDefined();
       expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
       const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
@@ -366,8 +380,9 @@ describe.each(TEST_CONFIGS)(
       expect(tokenTransactionSuccess[0].txid).toBeDefined();
       expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
 
-      const issuerBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
-        .balance;
+      const issuerBalanceAfter = (
+        await getSingleIssuerTokenBalance(issuerWallet)
+      ).balance;
       expect(issuerBalanceAfter).toEqual(
         issuerBalanceBeforeTransfer - tokenAmount,
       );
@@ -403,11 +418,11 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 1_000_000n,
       });
 
-      await sdk.mintTokens(1_000_000n);
-      await sdk2.mintTokens(1_000_000n);
+      await mintSingleIssuerToken(sdk, 1_000_000n);
+      await mintSingleIssuerToken(sdk2, 1_000_000n);
 
-      const sdkOneTokenIdentifier = await sdk.getIssuerTokenIdentifier();
-      const sdkTwoTokenIdentifier = await sdk2.getIssuerTokenIdentifier();
+      const sdkOneTokenIdentifier = await getSingleIssuerTokenIdentifier(sdk);
+      const sdkTwoTokenIdentifier = await getSingleIssuerTokenIdentifier(sdk2);
 
       await sdk2.transferTokens({
         tokenAmount: 1_000_000n,

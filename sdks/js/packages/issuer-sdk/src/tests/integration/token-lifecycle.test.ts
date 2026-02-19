@@ -2,6 +2,13 @@ import { filterTokenBalanceForTokenIdentifier } from "@buildonspark/spark-sdk";
 import { jest } from "@jest/globals";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { SparkWalletTesting } from "@buildonspark/spark-sdk/test-utils";
+import {
+  burnSingleIssuerToken,
+  freezeSingleIssuerToken,
+  getSingleIssuerTokenBalance,
+  mintSingleIssuerToken,
+  unfreezeSingleIssuerToken,
+} from "../utils/multi-token-utils.js";
 import { TEST_CONFIGS } from "./test-configs.js";
 
 describe.each(TEST_CONFIGS)(
@@ -23,10 +30,10 @@ describe.each(TEST_CONFIGS)(
         isFreezable: true,
         maxSupply: 100000n,
       });
-      await issuerWallet.mintTokens(tokenAmount);
+      await mintSingleIssuerToken(issuerWallet, tokenAmount);
 
       const issuerBalanceObjAfterMint =
-        await issuerWallet.getIssuerTokenBalance();
+        await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceObjAfterMint).toBeDefined();
       expect(issuerBalanceObjAfterMint.tokenIdentifier).toBeDefined();
 
@@ -46,7 +53,7 @@ describe.each(TEST_CONFIGS)(
         receiverSparkAddress: userSparkAddress,
       });
       const issuerBalanceAfterTransfer = (
-        await issuerWallet.getIssuerTokenBalance()
+        await getSingleIssuerTokenBalance(issuerWallet)
       ).balance;
       expect(issuerBalanceAfterTransfer).toEqual(0n);
 
@@ -57,12 +64,17 @@ describe.each(TEST_CONFIGS)(
       );
       expect(userBalanceAfterTransfer.ownedBalance).toEqual(tokenAmount);
 
-      const freezeResponse = await issuerWallet.freezeTokens(userSparkAddress);
+      const freezeResponse = await freezeSingleIssuerToken(
+        issuerWallet,
+        userSparkAddress,
+      );
       expect(freezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
       expect(freezeResponse.impactedTokenAmount).toEqual(tokenAmount);
 
-      const unfreezeResponse =
-        await issuerWallet.unfreezeTokens(userSparkAddress);
+      const unfreezeResponse = await unfreezeSingleIssuerToken(
+        issuerWallet,
+        userSparkAddress,
+      );
       expect(unfreezeResponse.impactedTokenOutputs.length).toBeGreaterThan(0);
       expect(unfreezeResponse.impactedTokenAmount).toEqual(tokenAmount);
     });
@@ -82,15 +94,16 @@ describe.each(TEST_CONFIGS)(
         maxSupply: 1_000_000n,
       });
 
-      await issuerWallet.mintTokens(tokenAmount);
-      const issuerTokenBalance = (await issuerWallet.getIssuerTokenBalance())
-        .balance;
+      await mintSingleIssuerToken(issuerWallet, tokenAmount);
+      const issuerTokenBalance = (
+        await getSingleIssuerTokenBalance(issuerWallet)
+      ).balance;
       expect(issuerTokenBalance).toBeGreaterThanOrEqual(tokenAmount);
 
-      await issuerWallet.burnTokens(tokenAmount);
+      await burnSingleIssuerToken(issuerWallet, tokenAmount);
 
       const issuerTokenBalanceAfterBurn = (
-        await issuerWallet.getIssuerTokenBalance()
+        await getSingleIssuerTokenBalance(issuerWallet)
       ).balance;
       expect(issuerTokenBalanceAfterBurn).toEqual(
         issuerTokenBalance - tokenAmount,
@@ -116,12 +129,12 @@ describe.each(TEST_CONFIGS)(
         options: config,
       });
 
-      const initialBalance = (await issuerWallet.getIssuerTokenBalance())
+      const initialBalance = (await getSingleIssuerTokenBalance(issuerWallet))
         .balance;
 
-      await issuerWallet.mintTokens(tokenAmount);
+      await mintSingleIssuerToken(issuerWallet, tokenAmount);
       const issuerBalanceObjAfterMint =
-        await issuerWallet.getIssuerTokenBalance();
+        await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceObjAfterMint).toBeDefined();
       const issuerBalanceAfterMint = issuerBalanceObjAfterMint.balance;
       expect(issuerBalanceAfterMint).toEqual(initialBalance + tokenAmount);
@@ -136,7 +149,7 @@ describe.each(TEST_CONFIGS)(
       });
 
       const issuerBalanceAfterTransfer = (
-        await issuerWallet.getIssuerTokenBalance()
+        await getSingleIssuerTokenBalance(issuerWallet)
       ).balance;
       expect(issuerBalanceAfterTransfer).toEqual(initialBalance);
 
@@ -161,14 +174,15 @@ describe.each(TEST_CONFIGS)(
 
       expect(userBalanceAfterTransferBack.ownedBalance).toEqual(0n);
 
-      const issuerTokenBalance = (await issuerWallet.getIssuerTokenBalance())
-        .balance;
+      const issuerTokenBalance = (
+        await getSingleIssuerTokenBalance(issuerWallet)
+      ).balance;
       expect(issuerTokenBalance).toEqual(initialBalance + tokenAmount);
 
-      await issuerWallet.burnTokens(tokenAmount);
+      await burnSingleIssuerToken(issuerWallet, tokenAmount);
 
       const issuerTokenBalanceAfterBurn = (
-        await issuerWallet.getIssuerTokenBalance()
+        await getSingleIssuerTokenBalance(issuerWallet)
       ).balance;
       expect(issuerTokenBalanceAfterBurn).toEqual(initialBalance);
     });
