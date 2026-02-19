@@ -160,8 +160,9 @@ export class LightningService {
     const invoiceString = invoice.invoice.encodedInvoice;
     const threshold = this.config.getThreshold();
 
-    const userIdentityPublicKey =
-      await this.config.signer.getIdentityPublicKey();
+    const userIdentityPublicKey = receiverIdentityPubkey
+      ? hexToBytes(receiverIdentityPubkey)
+      : await this.config.signer.getIdentityPublicKey();
 
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
