@@ -1,4 +1,6 @@
-# @buildonspark/spark-token-cli
+# @buildonspark/lrc20-l1-announcer
+
+> **Note:** This package was previously named `@buildonspark/spark-token-cli`
 
 ## 0.0.76
 

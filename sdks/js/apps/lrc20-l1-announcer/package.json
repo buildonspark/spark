@@ -1,7 +1,8 @@
 {
-  "name": "@buildonspark/spark-token-cli",
+  "name": "@buildonspark/lrc20-l1-announcer",
   "version": "0.0.76",
   "private": true,
+  "description": "Low-level tool for announcing token public keys directly on Bitcoin L1 using OP_RETURN transactions",
   "type": "module",
   "bin": {
     "announce-token": "announce-token.ts"
@@ -14,7 +15,7 @@
     "format": "prettier . --check"
   },
   "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "devDependencies": {
     "@types/node": "^22.13.2",
     "prettier": "^3.7.4",
