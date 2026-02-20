@@ -463,6 +463,7 @@ describe("Lightning Network provider", () => {
       const decodedInvoice = decodeInvoice(invoice.invoice.encodedInvoice);
       expect(decodedInvoice.fallbackAddress).toBeDefined();
       const sparkInvoice = decodedInvoice.fallbackAddress!;
+      expect(invoice.sparkInvoice).toBe(sparkInvoice);
 
       const decodedSparkInvoice = decodeSparkAddress(sparkInvoice, "LOCAL");
 
@@ -492,6 +493,7 @@ describe("Lightning Network provider", () => {
       const decodedInvoice = decodeInvoice(invoice.invoice.encodedInvoice);
       expect(decodedInvoice.fallbackAddress).toBeDefined();
       const sparkInvoice = decodedInvoice.fallbackAddress!;
+      expect(invoice.sparkInvoice).toBe(sparkInvoice);
 
       const decodedSparkInvoice = decodeSparkAddress(sparkInvoice, "LOCAL");
 
@@ -529,6 +531,7 @@ describe("Lightning Network provider", () => {
       const decodedInvoice = decodeInvoice(invoice.invoice.encodedInvoice);
       expect(decodedInvoice.fallbackAddress).toBeDefined();
       const sparkInvoice = decodedInvoice.fallbackAddress!;
+      expect(invoice.sparkInvoice).toBe(sparkInvoice);
 
       const decodedSparkInvoice = decodeSparkAddress(sparkInvoice, "LOCAL");
 

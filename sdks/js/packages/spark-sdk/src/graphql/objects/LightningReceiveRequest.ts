@@ -39,6 +39,9 @@ interface LightningReceiveRequest {
 
   /** The receiver's identity public key if different from owner of the request. **/
   receiverIdentityPublicKey?: string | undefined;
+
+  /** The spark invoice of the lightning receive request. **/
+  sparkInvoice?: string | undefined;
 }
 
 export const LightningReceiveRequestFromJson = (
@@ -62,6 +65,7 @@ export const LightningReceiveRequestFromJson = (
     paymentPreimage: obj["lightning_receive_request_payment_preimage"],
     receiverIdentityPublicKey:
       obj["lightning_receive_request_receiver_identity_public_key"],
+    sparkInvoice: obj["lightning_receive_request_spark_invoice"],
   } as LightningReceiveRequest;
 };
 export const LightningReceiveRequestToJson = (
@@ -81,6 +85,7 @@ export const LightningReceiveRequestToJson = (
     lightning_receive_request_payment_preimage: obj.paymentPreimage,
     lightning_receive_request_receiver_identity_public_key:
       obj.receiverIdentityPublicKey,
+    lightning_receive_request_spark_invoice: obj.sparkInvoice,
   };
 };
 
@@ -120,6 +125,7 @@ fragment LightningReceiveRequestFragment on LightningReceiveRequest {
     }
     lightning_receive_request_payment_preimage: payment_preimage
     lightning_receive_request_receiver_identity_public_key: receiver_identity_public_key
+    lightning_receive_request_spark_invoice: spark_invoice
 }`;
 
 export const getLightningReceiveRequestQuery = (
