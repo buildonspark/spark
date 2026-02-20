@@ -58,3 +58,6 @@ tilt/tilt_config.json
 
 # MCP
 .mcp.json
+
+# Git worktrees
+.worktrees/
