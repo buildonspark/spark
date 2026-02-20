@@ -538,6 +538,8 @@ message FinalizeDepositTreeCreationRequest {
     UserSignedTxSigningJob root_tx_signing_job = 3;
     UserSignedTxSigningJob refund_tx_signing_job = 4;
     UserSignedTxSigningJob direct_from_cpfp_refund_tx_signing_job = 5;
+    // Additional on-chain UTXOs for non-static deposits with multiple UTXOs.
+    repeated UTXO additional_on_chain_utxos = 6;
 }
 
 /**
@@ -646,6 +648,20 @@ message UserSignedTxSigningJob {
     common.SigningCommitment signing_nonce_commitment = 4;
     bytes user_signature = 5;
     SigningCommitments signing_commitments = 6;
+    // Additional inputs for multi-UTXO root transactions. Each entry carries
+    // the signing data for one additional root tx input (inputs 1..N).
+    // Input 0 uses the fields above for backward compatibility.
+    repeated InputSigningData additional_inputs = 7;
+}
+
+// InputSigningData carries the per-input signing data for additional root tx
+// inputs in a multi-UTXO deposit.
+message InputSigningData {
+    // The user's nonce commitment for this input's FROST signing round.
+    common.SigningCommitment signing_nonce_commitment = 1;
+    bytes user_signature = 2;
+    // The SE (Signing Entity) operators' nonce commitments for this input, keyed by operator identifier.
+    SigningCommitments signing_commitments = 3;
 }
 
 message LeafRefundTxSigningResult {

@@ -1090,7 +1090,11 @@ export interface FinalizeDepositTreeCreationRequest {
   /** User-signed transactions (with user signature shares, aggregated by server) */
   rootTxSigningJob: UserSignedTxSigningJob | undefined;
   refundTxSigningJob: UserSignedTxSigningJob | undefined;
-  directFromCpfpRefundTxSigningJob: UserSignedTxSigningJob | undefined;
+  directFromCpfpRefundTxSigningJob:
+    | UserSignedTxSigningJob
+    | undefined;
+  /** Additional on-chain UTXOs for non-static deposits with multiple UTXOs. */
+  additionalOnChainUtxos: UTXO[];
 }
 
 /** FinalizeDepositTreeCreationResponse is the response to the request to finalize the tree creation for a tree root node. */
@@ -1204,6 +1208,26 @@ export interface UserSignedTxSigningJob {
   rawTx: Uint8Array;
   signingNonceCommitment: SigningCommitment | undefined;
   userSignature: Uint8Array;
+  signingCommitments:
+    | SigningCommitments
+    | undefined;
+  /**
+   * Additional inputs for multi-UTXO root transactions. Each entry carries
+   * the signing data for one additional root tx input (inputs 1..N).
+   * Input 0 uses the fields above for backward compatibility.
+   */
+  additionalInputs: InputSigningData[];
+}
+
+/**
+ * InputSigningData carries the per-input signing data for additional root tx
+ * inputs in a multi-UTXO deposit.
+ */
+export interface InputSigningData {
+  /** The user's nonce commitment for this input's FROST signing round. */
+  signingNonceCommitment: SigningCommitment | undefined;
+  userSignature: Uint8Array;
+  /** The SE (Signing Entity) operators' nonce commitments for this input, keyed by operator identifier. */
   signingCommitments: SigningCommitments | undefined;
 }
 
@@ -6410,6 +6434,7 @@ function createBaseFinalizeDepositTreeCreationRequest(): FinalizeDepositTreeCrea
     rootTxSigningJob: undefined,
     refundTxSigningJob: undefined,
     directFromCpfpRefundTxSigningJob: undefined,
+    additionalOnChainUtxos: [],
   };
 }
 
@@ -6429,6 +6454,9 @@ export const FinalizeDepositTreeCreationRequest: MessageFns<FinalizeDepositTreeC
     }
     if (message.directFromCpfpRefundTxSigningJob !== undefined) {
       UserSignedTxSigningJob.encode(message.directFromCpfpRefundTxSigningJob, writer.uint32(42).fork()).join();
+    }
+    for (const v of message.additionalOnChainUtxos) {
+      UTXO.encode(v!, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -6480,6 +6508,14 @@ export const FinalizeDepositTreeCreationRequest: MessageFns<FinalizeDepositTreeC
           message.directFromCpfpRefundTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
           continue;
         }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.additionalOnChainUtxos.push(UTXO.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6504,6 +6540,9 @@ export const FinalizeDepositTreeCreationRequest: MessageFns<FinalizeDepositTreeC
       directFromCpfpRefundTxSigningJob: isSet(object.directFromCpfpRefundTxSigningJob)
         ? UserSignedTxSigningJob.fromJSON(object.directFromCpfpRefundTxSigningJob)
         : undefined,
+      additionalOnChainUtxos: globalThis.Array.isArray(object?.additionalOnChainUtxos)
+        ? object.additionalOnChainUtxos.map((e: any) => UTXO.fromJSON(e))
+        : [],
     };
   },
 
@@ -6523,6 +6562,9 @@ export const FinalizeDepositTreeCreationRequest: MessageFns<FinalizeDepositTreeC
     }
     if (message.directFromCpfpRefundTxSigningJob !== undefined) {
       obj.directFromCpfpRefundTxSigningJob = UserSignedTxSigningJob.toJSON(message.directFromCpfpRefundTxSigningJob);
+    }
+    if (message.additionalOnChainUtxos?.length) {
+      obj.additionalOnChainUtxos = message.additionalOnChainUtxos.map((e) => UTXO.toJSON(e));
     }
     return obj;
   },
@@ -6546,6 +6588,7 @@ export const FinalizeDepositTreeCreationRequest: MessageFns<FinalizeDepositTreeC
       (object.directFromCpfpRefundTxSigningJob !== undefined && object.directFromCpfpRefundTxSigningJob !== null)
         ? UserSignedTxSigningJob.fromPartial(object.directFromCpfpRefundTxSigningJob)
         : undefined;
+    message.additionalOnChainUtxos = object.additionalOnChainUtxos?.map((e) => UTXO.fromPartial(e)) || [];
     return message;
   },
 };
@@ -7376,6 +7419,7 @@ function createBaseUserSignedTxSigningJob(): UserSignedTxSigningJob {
     signingNonceCommitment: undefined,
     userSignature: new Uint8Array(0),
     signingCommitments: undefined,
+    additionalInputs: [],
   };
 }
 
@@ -7398,6 +7442,9 @@ export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
     }
     if (message.signingCommitments !== undefined) {
       SigningCommitments.encode(message.signingCommitments, writer.uint32(50).fork()).join();
+    }
+    for (const v of message.additionalInputs) {
+      InputSigningData.encode(v!, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -7457,6 +7504,14 @@ export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
           message.signingCommitments = SigningCommitments.decode(reader, reader.uint32());
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.additionalInputs.push(InputSigningData.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7478,6 +7533,9 @@ export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
       signingCommitments: isSet(object.signingCommitments)
         ? SigningCommitments.fromJSON(object.signingCommitments)
         : undefined,
+      additionalInputs: globalThis.Array.isArray(object?.additionalInputs)
+        ? object.additionalInputs.map((e: any) => InputSigningData.fromJSON(e))
+        : [],
     };
   },
 
@@ -7501,6 +7559,9 @@ export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
     if (message.signingCommitments !== undefined) {
       obj.signingCommitments = SigningCommitments.toJSON(message.signingCommitments);
     }
+    if (message.additionalInputs?.length) {
+      obj.additionalInputs = message.additionalInputs.map((e) => InputSigningData.toJSON(e));
+    }
     return obj;
   },
 
@@ -7512,6 +7573,108 @@ export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
     message.leafId = object.leafId ?? "";
     message.signingPublicKey = object.signingPublicKey ?? new Uint8Array(0);
     message.rawTx = object.rawTx ?? new Uint8Array(0);
+    message.signingNonceCommitment =
+      (object.signingNonceCommitment !== undefined && object.signingNonceCommitment !== null)
+        ? SigningCommitment.fromPartial(object.signingNonceCommitment)
+        : undefined;
+    message.userSignature = object.userSignature ?? new Uint8Array(0);
+    message.signingCommitments = (object.signingCommitments !== undefined && object.signingCommitments !== null)
+      ? SigningCommitments.fromPartial(object.signingCommitments)
+      : undefined;
+    message.additionalInputs = object.additionalInputs?.map((e) => InputSigningData.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseInputSigningData(): InputSigningData {
+  return { signingNonceCommitment: undefined, userSignature: new Uint8Array(0), signingCommitments: undefined };
+}
+
+export const InputSigningData: MessageFns<InputSigningData> = {
+  encode(message: InputSigningData, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.signingNonceCommitment !== undefined) {
+      SigningCommitment.encode(message.signingNonceCommitment, writer.uint32(10).fork()).join();
+    }
+    if (message.userSignature.length !== 0) {
+      writer.uint32(18).bytes(message.userSignature);
+    }
+    if (message.signingCommitments !== undefined) {
+      SigningCommitments.encode(message.signingCommitments, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InputSigningData {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInputSigningData();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.signingNonceCommitment = SigningCommitment.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userSignature = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.signingCommitments = SigningCommitments.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InputSigningData {
+    return {
+      signingNonceCommitment: isSet(object.signingNonceCommitment)
+        ? SigningCommitment.fromJSON(object.signingNonceCommitment)
+        : undefined,
+      userSignature: isSet(object.userSignature) ? bytesFromBase64(object.userSignature) : new Uint8Array(0),
+      signingCommitments: isSet(object.signingCommitments)
+        ? SigningCommitments.fromJSON(object.signingCommitments)
+        : undefined,
+    };
+  },
+
+  toJSON(message: InputSigningData): unknown {
+    const obj: any = {};
+    if (message.signingNonceCommitment !== undefined) {
+      obj.signingNonceCommitment = SigningCommitment.toJSON(message.signingNonceCommitment);
+    }
+    if (message.userSignature.length !== 0) {
+      obj.userSignature = base64FromBytes(message.userSignature);
+    }
+    if (message.signingCommitments !== undefined) {
+      obj.signingCommitments = SigningCommitments.toJSON(message.signingCommitments);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<InputSigningData>): InputSigningData {
+    return InputSigningData.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<InputSigningData>): InputSigningData {
+    const message = createBaseInputSigningData();
     message.signingNonceCommitment =
       (object.signingNonceCommitment !== undefined && object.signingNonceCommitment !== null)
         ? SigningCommitment.fromPartial(object.signingNonceCommitment)
