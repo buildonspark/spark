@@ -870,6 +870,98 @@ func AllStartupTasks() []StartupTaskSpec {
 
 	return []StartupTaskSpec{
 		{
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "backfill_create_mint_finalized_status",
+				RunInTestEnv: false,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					if knobsService == nil || !knobsService.RolloutRandom(knobs.KnobBackfillCreateMintFinalizedStatusEnabled, 0) {
+						return nil
+					}
+					logger := logging.GetLoggerFromContext(ctx)
+					db, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get database: %w", err)
+					}
+
+					const batchSize = 1000
+					totalUpdated := 0
+					var cursor uuid.UUID
+
+					for {
+						query := db.TokenTransaction.Query().
+							Where(
+								tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
+								tokentransaction.Or(
+									tokentransaction.HasMint(),
+									tokentransaction.HasCreate(),
+								),
+								tokentransaction.VersionEQ(3),
+							).
+							WithCreatedOutput().
+							Order(ent.Asc(tokentransaction.FieldID)).
+							Limit(batchSize)
+
+						if cursor != uuid.Nil {
+							query = query.Where(tokentransaction.IDGT(cursor))
+						}
+
+						transactions, err := query.All(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to query transactions: %w", err)
+						}
+
+						if len(transactions) == 0 {
+							break
+						}
+
+						cursor = transactions[len(transactions)-1].ID
+
+						var toUpdate []uuid.UUID
+						for _, tx := range transactions {
+							allOutputsValid := true
+							for _, output := range tx.Edges.CreatedOutput {
+								if output.Status != st.TokenOutputStatusCreatedFinalized &&
+									output.Status != st.TokenOutputStatusSpentStarted &&
+									output.Status != st.TokenOutputStatusSpentSigned &&
+									output.Status != st.TokenOutputStatusSpentFinalized {
+									allOutputsValid = false
+									break
+								}
+							}
+
+							if allOutputsValid {
+								toUpdate = append(toUpdate, tx.ID)
+							}
+						}
+
+						if len(toUpdate) > 0 {
+							updated, err := db.TokenTransaction.Update().
+								Where(
+									tokentransaction.IDIn(toUpdate...),
+									tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
+								).
+								SetStatus(st.TokenTransactionStatusFinalized).
+								Save(ctx)
+							if err != nil {
+								return fmt.Errorf("failed to update transactions: %w", err)
+							}
+							totalUpdated += updated
+							logger.Sugar().Infof("Updated %d v3 mint/create transactions to FINALIZED (total: %d)", updated, totalUpdated)
+						}
+
+						if len(transactions) < batchSize {
+							break
+						}
+					}
+
+					if totalUpdated > 0 {
+						logger.Sugar().Infof("Backfill complete: %d total v3 mint/create transactions updated to FINALIZED", totalUpdated)
+					}
+					return nil
+				},
+			},
+		},
+		{
 			RetryInterval: &entityDkgRetryInterval,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "maybe_reserve_entity_dkg",
