@@ -19,6 +19,7 @@ import (
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/backfill"
 	"github.com/lightsparkdev/spark/so/db"
 	sodkg "github.com/lightsparkdev/spark/so/dkg"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -44,10 +45,11 @@ import (
 )
 
 var (
-	confirmPendingDKGKeysCutoffAge  = 15 * time.Minute
-	defaultTaskTimeout              = 1 * time.Minute
-	dkgTaskTimeout                  = 3 * time.Minute
-	deleteStaleTreeNodesTaskTimeout = 10 * time.Minute
+	confirmPendingDKGKeysCutoffAge   = 15 * time.Minute
+	defaultTaskTimeout               = 1 * time.Minute
+	dkgTaskTimeout                   = 3 * time.Minute
+	deleteStaleTreeNodesTaskTimeout  = 10 * time.Minute
+	backfillMimoTransfersTaskTimeout = 2 * time.Minute
 
 	meter                       = otel.Meter("gossip")
 	oldestPendingGossipAgeGauge metric.Int64Gauge
@@ -835,6 +837,26 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						}
 					}
 
+					return nil
+				},
+			},
+		},
+		{
+			ExecutionInterval: 30 * time.Second,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "backfill_mimo_transfers",
+				RunInTestEnv: true,
+				Disabled:     true,
+				Timeout:      &backfillMimoTransfersTaskTimeout,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					result, err := backfill.BackfillMimoTransfers(ctx, config, 1000)
+					if err != nil {
+						return err
+					}
+					if result.TransfersCreated > 0 || result.ReceiverStatusesUpdated > 0 {
+						logger := logging.GetLoggerFromContext(ctx)
+						logger.Info(fmt.Sprintf("backfill_mimo_transfers: created %d transfer records, updated %d receiver statuses", result.TransfersCreated, result.ReceiverStatusesUpdated))
+					}
 					return nil
 				},
 			},
