@@ -6,6 +6,7 @@ import React, {
   useContext,
   useState,
 } from 'react';
+import { CONFIG } from '../config';
 
 // Define the shape of wallet state
 interface WalletState {
@@ -52,9 +53,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
       setError(null);
 
       const { wallet: newWallet } = await IssuerSparkWallet.initialize({
-        options: {
-          network: 'REGTEST',
-        },
+        options: CONFIG,
         mnemonicOrSeed: mnemonic,
       });
 

@@ -18,6 +18,17 @@ const config = {
       path.resolve(projectRoot, 'node_modules'),
       path.resolve(workspaceRoot, 'node_modules'),
     ],
+    resolveRequest: (context, moduleName, platform) => {
+      // In the public repo, return an empty module for private config so the app falls back to defaults.
+      if (moduleName.includes('/private/config/')) {
+        try {
+          return context.resolveRequest(context, moduleName, platform);
+        } catch {
+          return { type: 'empty' };
+        }
+      }
+      return context.resolveRequest(context, moduleName, platform);
+    },
   },
 };
 

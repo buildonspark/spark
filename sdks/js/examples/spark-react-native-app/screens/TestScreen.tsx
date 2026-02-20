@@ -1,6 +1,7 @@
 import { IssuerSparkWallet } from '@buildonspark/issuer-sdk';
 import { getSparkFrost } from '@buildonspark/spark-sdk';
 import { Fragment, useState } from 'react';
+import { CONFIG } from '../config';
 import {
   Button,
   SafeAreaView,
@@ -33,9 +34,7 @@ function App() {
       setDummyTx(null);
       setTestTokenTxId(null);
       const { wallet } = await IssuerSparkWallet.initialize({
-        options: {
-          network: 'REGTEST',
-        },
+        options: CONFIG,
       });
       setWallet(wallet);
       const addr = await wallet.getSparkAddress();
