@@ -157,10 +157,26 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 			return nil, err
 		}
 
-		// When disconnecting LRC20, we must have token metadata
-		if h.config.Token.DisconnectLRC20Node && tokenMetadata == nil {
-			return nil, tokens.FormatErrorWithTransactionProto("minting not allowed because a created token was not found", finalTokenTx,
-				sparkerrors.NotFoundMissingEntity(fmt.Errorf("no tokencreate entity found for token")))
+		// Token metadata must exist for minting
+		if tokenMetadata == nil {
+			return nil, tokens.FormatErrorWithTransactionProto(
+				"token not found",
+				finalTokenTx,
+				sparkerrors.NotFoundMissingEntity(fmt.Errorf("cannot mint on non-existent token")),
+			)
+		}
+
+		// Validate that the mint issuer key matches the token creator's key
+		if !mintPubKey.Equals(tokenMetadata.IssuerPublicKey) {
+			return nil, tokens.FormatErrorWithTransactionProto(
+				"issuer key mismatch",
+				finalTokenTx,
+				sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf(
+					"mint issuer public key %x does not match token creator %x",
+					mintPubKey.Serialize(),
+					tokenMetadata.IssuerPublicKey.Serialize(),
+				)),
+			)
 		}
 
 		txNet, err := btcnetwork.FromProtoNetwork(finalTokenTx.Network)
