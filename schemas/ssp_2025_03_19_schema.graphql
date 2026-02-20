@@ -890,11 +890,13 @@ type RequestLightningSendOutput {
 
 input RequestRegtestFundsInput {
   """
-  The amount of sats that are requested to be sent to the specified Regtest Bitcoin address.
+  The amount of sats that are requested to be sent to the specified Regtest address (Bitcoin or Spark).
   """
   amount_sats: Long!
 
-  """The Regtest Bitcoin address to which the funds will be sent."""
+  """
+  The Regtest address to which the funds will be sent (Bitcoin bcrt1... or Spark sparkrt1...).
+  """
   address: String!
 }
 
