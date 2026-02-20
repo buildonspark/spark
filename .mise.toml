@@ -21,13 +21,13 @@ MISE_NODE_COREPACK = true
 build-to-minikube = { dir = "{{config_root}}", run = 'scripts/build-to-minikube.sh' }
 rds = { dir = "{{config_root}}", run = 'scripts/rds.sh' }
 run-minikube = { dir = "{{config_root}}", run = 'scripts/local-test.sh' }
-spark-cli-local = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd examples/spark-cli && yarn build && yarn run cli:local' }
-spark-cli-minikube = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd examples/spark-cli && yarn build && yarn run cli:minikube' }
-spark-cli-regtest = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd examples/spark-cli && yarn build && yarn run cli' }
-spark-cli-mainnet = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd examples/spark-cli && yarn build && yarn run cli:mainnet' }
-spark-cli-dev = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd examples/spark-cli && yarn build && yarn run cli:dev' }
-spark-cli-dev-mainnet = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd examples/spark-cli && yarn build && yarn run cli:dev:mainnet' }
-spark-cli-loadtest = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd examples/spark-cli && yarn build && yarn run cli:loadtest' }
+spark-cli-local = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:local' }
+spark-cli-minikube = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:minikube' }
+spark-cli-regtest = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli' }
+spark-cli-mainnet = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:mainnet' }
+spark-cli-dev = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:dev' }
+spark-cli-dev-mainnet = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:dev:mainnet' }
+spark-cli-loadtest = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:loadtest' }
 test-go = { dir = "{{config_root}}/spark", run = 'mise test-unit' }
 test-grpc = { dir = "{{config_root}}/spark", run = 'mise test-grpc' }
 test-grpc-minikube = { dir = "{{config_root}}/spark", run = 'mise test-grpc-minikube' }
