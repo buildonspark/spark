@@ -511,19 +511,24 @@ func TestValidateSequence_ServerSequenceConstruction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Provide a client sequence where forbidden bits are set and lower 16 bits match expected
-			upperWithForbidden := uint32(0xAAAA0000) | disableBit | typeBit
-			clientSeq := upperWithForbidden | (tc.expectedTimelock & 0xFFFF)
+			// Bit 31 and bit 22 must be rejected
+			clientSeqWithBit31 := disableBit | (tc.expectedTimelock & 0xFFFF)
+			_, err := bitcointransaction.ValidateSequence(currTimelock, tc.txType, clientSeqWithBit31)
+			require.ErrorContains(t, err, "bit 31 clear")
 
-			// validateSequence should clear the forbidden bits and keep the expected timelock
+			clientSeqWithBit22 := typeBit | (tc.expectedTimelock & 0xFFFF)
+			_, err = bitcointransaction.ValidateSequence(currTimelock, tc.txType, clientSeqWithBit22)
+			require.ErrorContains(t, err, "bit 22 clear")
+
+			// Provide a client sequence with only harmless upper bits (e.g., bit 30)
+			upperHarmless := uint32(0x28200000) // bits that are not 31 or 22
+			clientSeq := upperHarmless | (tc.expectedTimelock & 0xFFFF)
+
 			serverSeq, err := bitcointransaction.ValidateSequence(currTimelock, tc.txType, clientSeq)
 			require.NoError(t, err)
 
-			sanitizedUpper := (upperWithForbidden & 0xFFFF0000) &^ (disableBit | typeBit)
-			expectedServerSeq := sanitizedUpper | (tc.expectedTimelock & 0xFFFF)
+			expectedServerSeq := upperHarmless | (tc.expectedTimelock & 0xFFFF)
 			assert.Equal(t, expectedServerSeq, serverSeq)
-
-			// The constructed transaction should use exactly the server-generated sequence
 
 			tx, err := bitcointransaction.ConstructExpectedTransaction(dbLeaf.RawTx, uint32(0), currTimelock, tc.txType, refundDestPubkey, clientSeq, defaultVersion)
 			require.NoError(t, err)
@@ -542,13 +547,13 @@ func TestValidateSequence_TimelockMismatchErrorContains(t *testing.T) {
 	currTimelock := rawRefundTx.TxIn[0].Sequence & 0xFFFF
 	expectedCpfp := currTimelock - spark.TimeLockInterval
 
-	// For CPFP, expected is expectedCpfp. Provide an off-by-one timelock.
-	const (
-		disableBit = uint32(1 << 31)
-		typeBit    = uint32(1 << 22)
-	)
-	upperWithForbidden := uint32(0x12340000) | disableBit | typeBit
-	mismatchedClientSeq := upperWithForbidden | ((expectedCpfp + 1) & 0xFFFF)
+	// Build a client sequence whose lower 16 bits (the actual timelock value)
+	// are off-by-one from expectedCpfp, so ValidateSequence returns a mismatch
+	// error. The upper bits are set to an arbitrary value (0x1234) that avoids
+	// bit 31 (SequenceLockTimeDisabled) and bit 22 (SequenceLockTimeIsSeconds),
+	// which would be rejected earlier with a different error.
+	upperHarmless := uint32(0x12340000)
+	mismatchedClientSeq := upperHarmless | ((expectedCpfp + 1) & 0xFFFF)
 
 	_, err = bitcointransaction.ValidateSequence(currTimelock, bitcointransaction.TxTypeRefundCPFP, mismatchedClientSeq)
 	require.ErrorContains(t, err, "does not match expected timelock")

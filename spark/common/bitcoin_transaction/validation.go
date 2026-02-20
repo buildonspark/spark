@@ -268,6 +268,12 @@ func constructDirectFromCPFPRefundTransaction(sourceTx *wire.MsgTx, vout uint32,
 
 // validateSequence validates the client's sequence number against existing database transactions
 func ValidateSequence(cpfpTimelock uint32, txType TxType, clientSequence uint32) (uint32, error) {
+	if clientSequence&wire.SequenceLockTimeDisabled != 0 {
+		return 0, fmt.Errorf("sequence must have bit 31 clear to enable relative locktime, got 0x%08X", clientSequence)
+	}
+	if clientSequence&wire.SequenceLockTimeIsSeconds != 0 {
+		return 0, fmt.Errorf("sequence must have bit 22 clear to use block-based relative locktime, got 0x%08X", clientSequence)
+	}
 
 	var expectedCPFPTimelock uint32
 

@@ -196,14 +196,19 @@ func validateSendLeafDirectRefundTxs(senderLeaf *ent.TreeNode, receiverDirectRef
 	}
 	expectedReceiverDirectFromCpfpRefundOutPoint := senderRefundTx.TxIn[0].PreviousOutPoint
 
-	receiverRefundTxSequence := senderRefundTx.TxIn[0].Sequence - spark.TimeLockInterval
+	cpfpTimelock := bitcointransaction.GetTimelockFromSequence(senderRefundTx.TxIn[0].Sequence)
 
-	seq := receiverRefundTxSequence + spark.DirectTimelockOffset
-	expectedReceiverDirectRefundTxSequence := seq
-	expectedReceiverDirectFromCpfpRefundTxSequence := seq
-
+	expectedReceiverDirectRefundTxSequence, err := bitcointransaction.ValidateSequence(cpfpTimelock, bitcointransaction.TxTypeRefundDirect, receiverDirectRefundTx.TxIn[0].Sequence)
+	if err != nil {
+		return fmt.Errorf("unable to validate direct refund tx inputs: %w", err)
+	}
 	if err := validateLeafRefundTxInputExact(receiverDirectRefundTx, expectedReceiverDirectRefundTxSequence, &expectedReceiverDirectRefundOutPoint, expectedInputCount); err != nil {
 		return fmt.Errorf("unable to validate direct refund tx inputs: %w", err)
+	}
+
+	expectedReceiverDirectFromCpfpRefundTxSequence, err := bitcointransaction.ValidateSequence(cpfpTimelock, bitcointransaction.TxTypeRefundDirectFromCPFP, receiverDirectFromCpfpRefundTx.TxIn[0].Sequence)
+	if err != nil {
+		return fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err)
 	}
 	if err := validateLeafRefundTxInputExact(receiverDirectFromCpfpRefundTx, expectedReceiverDirectFromCpfpRefundTxSequence, &expectedReceiverDirectFromCpfpRefundOutPoint, expectedInputCount); err != nil {
 		return fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err)
