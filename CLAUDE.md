@@ -52,18 +52,38 @@ verifyOperatorSignatures(sigs)
 
 ### Logging (Go)
 
-Use the structured logger (`logger.Info`, `logger.Error`, etc.), not `logger.Sugar()`. For dynamic values, prefer `fmt.Sprintf` over Sugar's template syntax:
+We use **Zap** (`go.uber.org/zap`) for all logging, replacing `log/slog` from the standard library. Zap has two logger types:
+
+- **`Logger`** (default from `logging.GetLoggerFromContext(ctx)`) — use for regular messages or messages with well-known attributes.
+- **`SugaredLogger`** — use for printf-style formatting via `logger.Sugar()`.
+
+**When to use which:**
+
+- Default to `Logger` for most logging. Use structured fields (`zap.String`, `zap.Error`, etc.) only for well-established, indexable keys (e.g., `identity_public_key`, `transfer_id`, `token_create_id`).
+- Use `Sugar()` when you need printf-style formatting with multiple dynamic values that don't need to be indexed.
+- If unsure whether something should be an attribute, it probably shouldn't be — use `fmt.Sprintf` in the message or `Sugar().Infof()` instead.
 
 ```go
-// Good
-logger.Info(fmt.Sprintf("transfer completed for %s", transferID))
+// Good - Logger with structured field for a well-known key
 logger.Info("transfer completed", zap.String("transfer_id", transferID))
 
-// Bad - don't use Sugar
-logger.Sugar().Infof("transfer completed for %s", transferID)
+// Good - Logger with fmt.Sprintf for ad-hoc dynamic values
+logger.Info(fmt.Sprintf("transfer completed for %s", transferID))
+
+// Good - SugaredLogger for printf-style with multiple values
+logger.Sugar().Infof("rate limiter: enabled %t, window %s, max %d", enabled, window, max)
+
+// Good - combining Logger attributes with Sugar for mixed use
+logger.With(zap.Error(err)).Sugar().Infof("failed to broadcast node tx for node %s", node.ID)
+
+// Bad - generic attribute names like "got", "expected", "count", "duration"
+// These cause type conflicts in OpenSearch when different log sites use different types
+logger.Info("validation failed", zap.String("got", value), zap.Int("count", n))
 ```
 
-**Structured fields:** Only use `zap.String`/`zap.Int`/etc. for reusable, well-established keys (e.g., `transfer_id`, `identity_public_key`, `token_create_id`). Check existing usage in the codebase before introducing a new key. Avoid ad-hoc structured fields that are only used in one place — use `fmt.Sprintf` in the message instead.
+**Structured fields:** Only use `zap.String`/`zap.Int`/etc. for reusable, well-established keys. Check existing usage in the codebase before introducing a new key. Avoid generic attribute names (`got`, `expected`, `count`, `duration`) — these cause type conflicts in OpenSearch when different log sites use different types for the same key. Use `fmt.Sprintf` in the message instead.
+
+**Converting between loggers:** Use `logger.Sugar()` to get a `SugaredLogger`, and `sugaredLogger.Desugar()` to get back a `Logger`. Use `logger.With(fields...)` to create a logger that includes attributes in all subsequent logs (used in middlewares to attach `identity_public_key`, etc.).
 
 ### Function Length
 
