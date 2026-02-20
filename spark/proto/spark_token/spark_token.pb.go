@@ -334,9 +334,14 @@ func (x *TokenTransferInput) GetOutputsToSpend() []*TokenOutputToSpend {
 }
 
 type TokenMintInput struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	IssuerPublicKey []byte                 `protobuf:"bytes,1,opt,name=issuer_public_key,json=issuerPublicKey,proto3" json:"issuer_public_key,omitempty"`
-	TokenIdentifier []byte                 `protobuf:"bytes,2,opt,name=token_identifier,json=tokenIdentifier,proto3,oneof" json:"token_identifier,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Deprecated: The SO now uses token_identifier to look up the issuer public key
+	// from the TokenCreate record. This field is still included in the transaction hash,
+	// so it must be set correctly, but will be removed in a future version bump.
+	//
+	// Deprecated: Marked as deprecated in spark_token.proto.
+	IssuerPublicKey []byte `protobuf:"bytes,1,opt,name=issuer_public_key,json=issuerPublicKey,proto3" json:"issuer_public_key,omitempty"`
+	TokenIdentifier []byte `protobuf:"bytes,2,opt,name=token_identifier,json=tokenIdentifier,proto3,oneof" json:"token_identifier,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -371,6 +376,7 @@ func (*TokenMintInput) Descriptor() ([]byte, []int) {
 	return file_spark_token_proto_rawDescGZIP(), []int{2}
 }
 
+// Deprecated: Marked as deprecated in spark_token.proto.
 func (x *TokenMintInput) GetIssuerPublicKey() []byte {
 	if x != nil {
 		return x.IssuerPublicKey
@@ -3072,9 +3078,9 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x1bprev_token_transaction_hash\x18\x01 \x01(\fB\a\xfaB\x04z\x02h R\x18prevTokenTransactionHash\x12=\n" +
 	"\x1bprev_token_transaction_vout\x18\x02 \x01(\rR\x18prevTokenTransactionVout\"_\n" +
 	"\x12TokenTransferInput\x12I\n" +
-	"\x10outputs_to_spend\x18\x01 \x03(\v2\x1f.spark_token.TokenOutputToSpendR\x0eoutputsToSpend\"\x93\x01\n" +
-	"\x0eTokenMintInput\x123\n" +
-	"\x11issuer_public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\x0fissuerPublicKey\x127\n" +
+	"\x10outputs_to_spend\x18\x01 \x03(\v2\x1f.spark_token.TokenOutputToSpendR\x0eoutputsToSpend\"\x95\x01\n" +
+	"\x0eTokenMintInput\x125\n" +
+	"\x11issuer_public_key\x18\x01 \x01(\fB\t\xfaB\x04z\x02h!\x18\x01R\x0fissuerPublicKey\x127\n" +
 	"\x10token_identifier\x18\x02 \x01(\fB\a\xfaB\x04z\x02h H\x00R\x0ftokenIdentifier\x88\x01\x01B\x13\n" +
 	"\x11_token_identifier\"\xbf\x03\n" +
 	"\x10TokenCreateInput\x123\n" +

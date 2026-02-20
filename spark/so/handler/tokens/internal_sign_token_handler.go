@@ -76,7 +76,7 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 
 	// V3+ does NOT require operator-specific owner signatures. The initial user signature on 'Start' is sufficient.
 	if tokenTransaction.Version < st.TokenTransactionVersionV3 {
-		if err := validateOperatorSpecificOwnerSignatures(h.config.IdentityPublicKey(), ownerSignatures, tokenTransaction, finalTokenTransactionHash); err != nil {
+		if err := validateOperatorSpecificOwnerSignatures(ctx, h.config.IdentityPublicKey(), ownerSignatures, tokenTransaction, finalTokenTransactionHash); err != nil {
 			return nil, err
 		}
 	}

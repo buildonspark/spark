@@ -222,6 +222,13 @@ export interface TokenTransferInput {
 }
 
 export interface TokenMintInput {
+  /**
+   * Deprecated: The SO now uses token_identifier to look up the issuer public key
+   * from the TokenCreate record. This field is still included in the transaction hash,
+   * so it must be set correctly, but will be removed in a future version bump.
+   *
+   * @deprecated
+   */
   issuerPublicKey: Uint8Array;
   tokenIdentifier?: Uint8Array | undefined;
 }

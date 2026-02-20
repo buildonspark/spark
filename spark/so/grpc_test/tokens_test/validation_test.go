@@ -303,6 +303,37 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 	}
 }
 
+func TestTokenMintWithWrongIssuerPublicKeyFails(t *testing.T) {
+	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
+		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+		config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
+
+		tokenPrivKey := config.IdentityPrivateKey
+		tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+
+		// Generate a different key to use as the issuer public key in the MintInput
+		wrongKey := keys.GeneratePrivateKey()
+
+		mintTx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+			TokenIdentityPubKey: wrongKey.Public(),
+			TokenIdentifier:     tokenIdentifier,
+			NumOutputs:          1,
+			OutputAmounts:       []uint64{uint64(testIssueOutput1Amount)},
+		})
+		require.NoError(t, err)
+
+		_, err = broadcastTokenTransaction(
+			t,
+			t.Context(),
+			config,
+			mintTx,
+			[]keys.Private{wrongKey},
+		)
+		require.Error(t, err, "expected mint with wrong issuer public key to be rejected")
+		require.ErrorContains(t, err, "issuer key mismatch")
+	})
+}
+
 func TestTokenMintAndTransferTokensTooManyOutputsFails(t *testing.T) {
 	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())

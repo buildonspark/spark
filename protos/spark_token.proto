@@ -46,7 +46,10 @@ message TokenTransferInput {
 }
 
 message TokenMintInput {
-    bytes issuer_public_key = 1 [(validate.rules).bytes.len = 33];
+    // Deprecated: The SO now uses token_identifier to look up the issuer public key
+    // from the TokenCreate record. This field is still included in the transaction hash,
+    // so it must be set correctly, but will be removed in a future version bump.
+    bytes issuer_public_key = 1 [deprecated = true, (validate.rules).bytes.len = 33];
     optional bytes token_identifier = 2 [(validate.rules).bytes.len = 32];
 }
 

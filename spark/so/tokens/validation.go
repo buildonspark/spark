@@ -8,8 +8,6 @@ import (
 
 	"entgo.io/ent/dialect"
 	esql "entgo.io/ent/dialect/sql"
-	"github.com/lightsparkdev/spark/common/btcnetwork"
-	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/uint128"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -30,32 +28,15 @@ func ValidateMintDoesNotExceedMaxSupply(ctx context.Context, tokenTransaction *t
 		mintAmount.Add(mintAmount, amount)
 	}
 
-	// Extract token identification from proto transaction
 	var tokenIdentifier []byte
-	var issuerPublicKey keys.Public
-
 	if tokenTransaction.GetMintInput() != nil {
 		tokenIdentifier = tokenTransaction.GetMintInput().GetTokenIdentifier()
-		mintPublicKey, err := keys.ParsePublicKey(tokenTransaction.GetMintInput().GetIssuerPublicKey())
-		if err != nil {
-			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to get issuer public key: %w", err))
-		}
-		issuerPublicKey = mintPublicKey
-	} else if len(tokenTransaction.GetTokenOutputs()) > 0 {
-		output := tokenTransaction.GetTokenOutputs()[0]
-		tokenIdentifier = output.GetTokenIdentifier()
-		tokenPublicKey, err := keys.ParsePublicKey(output.GetTokenPublicKey())
-		if err != nil {
-			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to get token public key: %w", err))
-		}
-		issuerPublicKey = tokenPublicKey
+	}
+	if len(tokenIdentifier) == 0 {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token_identifier is required on MintInput for max supply validation"))
 	}
 
-	network, err := btcnetwork.FromProtoNetwork(tokenTransaction.Network)
-	if err != nil {
-		return err
-	}
-	return validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey, network)
+	return validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier)
 }
 
 // ValidateMintDoesNotExceedMaxSupplyEnt validates that a mint transaction doesn't exceed the token's max supply.
@@ -71,47 +52,28 @@ func ValidateMintDoesNotExceedMaxSupplyEnt(ctx context.Context, tokenTransaction
 		return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("cannot verify max supply for mint transaction because no mint input was found"))
 	}
 	tokenIdentifier := tokenTransaction.Edges.Mint.TokenIdentifier
-	issuerPublicKey := tokenTransaction.Edges.Mint.IssuerPublicKey
-
-	if len(tokenTransaction.Edges.CreatedOutput) == 0 {
-		return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("cannot determine network for mint transaction because no outputs were found"))
+	if len(tokenIdentifier) == 0 {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token_identifier is required on mint for max supply validation"))
 	}
-	network := tokenTransaction.Edges.CreatedOutput[0].Network
 
-	return validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey, network)
+	return validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier)
 }
 
 // validateMintAgainstMaxSupplyCore contains the core validation logic that both proto and Ent versions can use.
-func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, tokenIdentifier []byte, issuerPublicKey keys.Public, network btcnetwork.Network) error {
+func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, tokenIdentifier []byte) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get or create current tx for request: %w", err))
 	}
 
-	// Get token metadata
-	var tokenCreate *ent.TokenCreate
-	var identifierInfo string
-	if tokenIdentifier != nil {
-		tokenCreate, err = db.TokenCreate.Query().
-			Where(tokencreate.TokenIdentifierEQ(tokenIdentifier)).
-			ForUpdate().
-			First(ctx)
-		identifierInfo = fmt.Sprintf("token identifier: %x", tokenIdentifier)
-	} else if !issuerPublicKey.IsZero() { // CNT-607: Clean up legacy code
-		tokenCreate, err = db.TokenCreate.Query().
-			Where(
-				tokencreate.IssuerPublicKeyEQ(issuerPublicKey),
-				tokencreate.NetworkEQ(network),
-			).
-			ForUpdate().
-			First(ctx)
-		identifierInfo = fmt.Sprintf("issuer public key: %v", issuerPublicKey)
-	} else {
-		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no token identifier or issuer public key provided"))
-	}
+	identifierInfo := fmt.Sprintf("token identifier: %x", tokenIdentifier)
+	tokenCreate, err := db.TokenCreate.Query().
+		Where(tokencreate.TokenIdentifierEQ(tokenIdentifier)).
+		ForUpdate().
+		First(ctx)
 	if ent.IsNotFound(err) {
-		logger.Sugar().Infof("Token metadata not found - minting not allowed for %s", identifierInfo)
+		logger.Info(fmt.Sprintf("Token metadata not found - minting not allowed for %s", identifierInfo))
 		return sparkerrors.NotFoundMissingEntity(fmt.Errorf("minting not allowed because a created token was not found for %s", identifierInfo))
 	}
 	if err != nil {
@@ -120,22 +82,14 @@ func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, 
 
 	maxSupply := new(big.Int).SetBytes(tokenCreate.MaxSupply)
 	if maxSupply.Cmp(big.NewInt(0)) == 0 {
-		// Max supply of 0 means infinite supply.
 		return nil
 	}
 
-	// Calculate current supply
-	var currentSupply *big.Int
-	if tokenIdentifier != nil {
-		currentSupply, err = calculateCurrentSupplyByTokenIdentifier(ctx, tokenIdentifier)
-	} else {
-		currentSupply, err = calculateCurrentSupplyByIssuerKey(ctx, issuerPublicKey)
-	}
+	currentSupply, err := calculateCurrentSupplyByTokenIdentifier(ctx, tokenIdentifier)
 	if err != nil {
 		return sparkerrors.WrapErrorWithMessage(err, "failed to calculate current minted supply")
 	}
 
-	// Validate against max supply
 	newTotalSupply := new(big.Int).Add(currentSupply, mintAmount)
 	if newTotalSupply.Cmp(maxSupply) > 0 {
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("mint would exceed max supply: total supply after mint (%s) would exceed max supply (%s)",
@@ -149,13 +103,6 @@ func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, 
 func calculateCurrentSupplyByTokenIdentifier(ctx context.Context, tokenIdentifier []byte) (*big.Int, error) {
 	return calculateCurrentSupply(ctx, func(q *ent.TokenOutputQuery) *ent.TokenOutputQuery {
 		return q.Where(tokenoutput.TokenIdentifierEQ(tokenIdentifier))
-	})
-}
-
-// calculateCurrentSupplyByIssuerKey calculates the current minted supply for a token by issuer public key.
-func calculateCurrentSupplyByIssuerKey(ctx context.Context, issuerPublicKey keys.Public) (*big.Int, error) {
-	return calculateCurrentSupply(ctx, func(q *ent.TokenOutputQuery) *ent.TokenOutputQuery {
-		return q.Where(tokenoutput.TokenPublicKeyEQ(issuerPublicKey))
 	})
 }
 
