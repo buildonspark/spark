@@ -1,5 +1,5 @@
 // Example Bare script using Spark SDK and Frost addon
-import { SparkWallet } from "@buildonspark/bare";
+import { SparkWallet, decodeSparkAddress } from "@buildonspark/bare";
 import process from "bare-process";
 import walletConfig from "./wallet-config.js";
 
@@ -12,11 +12,13 @@ async function getWalletDetails(mnemonicInit) {
   });
   const balance = await wallet.getBalance();
   const sparkAddress = await wallet.getSparkAddress();
+  const decodedAddress = decodeSparkAddress(sparkAddress, "REGTEST");
   await wallet.cleanupConnections();
   return {
     mnemonic,
     balance,
     sparkAddress,
+    decodedAddress,
   };
 }
 
