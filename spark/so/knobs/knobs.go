@@ -32,6 +32,8 @@ const (
 	KnobRateLimitMemcacheMaxIdleConns = "spark.so.ratelimit.memcache.max_idle_conns"
 	KnobSoTransferLimit               = "spark.so.transfer_limit"
 
+	KnobReadMIMODataModelTransferSend = "spark.so.read_mimo_data_model_transfer_send"
+
 	KnobSoSigningCommitmentNodeLimit  = "spark.so.signing_commitments.nodes_limit"
 	KnobSoSigningCommitmentCountLimit = "spark.so.signing_commitments.count_limit"
 
