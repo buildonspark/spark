@@ -256,6 +256,33 @@ func TestBackfillMimoTransfers(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, result.TransfersCreated)
 	})
+
+	t.Run("skips transfers with UNSPECIFIED network", func(t *testing.T) {
+		client, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+
+		senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		unspecifiedTransfer, err := client.Transfer.Create().
+			SetNetwork(btcnetwork.Unspecified).
+			SetStatus(st.TransferStatusReturned).
+			SetType(st.TransferTypeTransfer).
+			SetSenderIdentityPubkey(senderPubKey).
+			SetReceiverIdentityPubkey(receiverPubKey).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(24 * time.Hour)).
+			Save(ctx)
+		require.NoError(t, err)
+
+		result, err := BackfillMimoTransfers(ctx, nil, 1000)
+		require.NoError(t, err)
+		assert.Equal(t, 0, result.TransfersCreated)
+
+		senders, err := client.TransferSender.Query().
+			Where(transfersender.TransferIDEQ(unspecifiedTransfer.ID)).All(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, senders, "UNSPECIFIED network transfers should not be backfilled")
+	})
 }
 
 func TestBackfillMimoTransfers_SyncsReceiverStatuses(t *testing.T) {

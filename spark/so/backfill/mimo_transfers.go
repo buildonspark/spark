@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -55,7 +56,10 @@ func backfillCreateMimoRecords(ctx context.Context, batchSize int) (int, error) 
 	}
 
 	transfers, err := db.Transfer.Query().
-		Where(enttransfer.Not(enttransfer.HasTransferSenders())).
+		Where(
+			enttransfer.Not(enttransfer.HasTransferSenders()),
+			enttransfer.NetworkNEQ(btcnetwork.Unspecified),
+		).
 		Order(enttransfer.ByCreateTime(sql.OrderAsc())).
 		Limit(batchSize).
 		ForUpdate(sql.WithLockAction(sql.SkipLocked)).
