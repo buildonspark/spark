@@ -57,6 +57,8 @@ func FromString(network string) (Network, error) {
 		return Testnet, nil
 	case "SIGNET":
 		return Signet, nil
+	case "UNSPECIFIED":
+		return Unspecified, nil
 	default:
 		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network: %s", network))
 	}

@@ -100,3 +100,75 @@ func TestToProtoNetworkUnknownValue(t *testing.T) {
 	_, err := Network(999).ToProtoNetwork()
 	require.Error(t, err)
 }
+
+func TestFromString(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  Network
+	}{
+		{
+			name:  "mainnet uppercase",
+			input: "MAINNET",
+			want:  Mainnet,
+		},
+		{
+			name:  "mainnet lowercase",
+			input: "mainnet",
+			want:  Mainnet,
+		},
+		{
+			name:  "regtest uppercase",
+			input: "REGTEST",
+			want:  Regtest,
+		},
+		{
+			name:  "regtest lowercase",
+			input: "regtest",
+			want:  Regtest,
+		},
+		{
+			name:  "testnet uppercase",
+			input: "TESTNET",
+			want:  Testnet,
+		},
+		{
+			name:  "testnet lowercase",
+			input: "testnet",
+			want:  Testnet,
+		},
+		{
+			name:  "signet uppercase",
+			input: "SIGNET",
+			want:  Signet,
+		},
+		{
+			name:  "signet lowercase",
+			input: "signet",
+			want:  Signet,
+		},
+		{
+			name:  "unspecified uppercase",
+			input: "UNSPECIFIED",
+			want:  Unspecified,
+		},
+		{
+			name:  "unspecified lowercase",
+			input: "unspecified",
+			want:  Unspecified,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := FromString(tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestFromStringUnknownValue(t *testing.T) {
+	_, err := FromString("invalid_network")
+	require.Error(t, err)
+}
