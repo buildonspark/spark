@@ -1152,6 +1152,9 @@ type StaticDepositPlan implements Entity {
 
   """The current status of this fulfillment plan."""
   status: StaticDepositPlanStatus!
+
+  """The id of the outbound transfer associated with this plan."""
+  transfer_spark_id: UUID
 }
 
 enum StaticDepositPlanStatus {
