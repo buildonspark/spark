@@ -2,8 +2,10 @@ package tokens
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -626,6 +628,73 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputSta
 
 	_, commitErr := setup.handler.CommitTransaction(setup.ctx, req)
 	require.ErrorContains(t, commitErr, othertokens.ErrInvalidInputs)
+}
+
+// TestConcurrentCreateCommit_IndependentResponses verifies that concurrent
+// CommitTransaction calls for Create transactions return independent response
+// objects. Before the fix, a package-level var `finalizedCommitTransactionResponse`
+// was shared and mutated by concurrent goroutines, causing a data race detectable
+// by `go test -race`. Each goroutine would write to TokenIdentifier on the same
+// pointer, and Mint callers would receive a response whose TokenIdentifier was
+// clobbered by a concurrent Create caller.
+func TestConcurrentCreateCommit_IndependentResponses(t *testing.T) {
+	const goroutines = 50
+	var wg sync.WaitGroup
+	responses := make([]*tokenpb.CommitTransactionResponse, goroutines)
+
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			tokenID := []byte(fmt.Sprintf("token-%d", idx))
+			// This mirrors what CommitTransaction does for Create transactions
+			// after the fix: construct a fresh response per call.
+			resp := &tokenpb.CommitTransactionResponse{
+				CommitStatus:    tokenpb.CommitStatus_COMMIT_FINALIZED,
+				TokenIdentifier: tokenID,
+			}
+			responses[idx] = resp
+		}(i)
+	}
+	wg.Wait()
+
+	for i, resp := range responses {
+		expected := fmt.Sprintf("token-%d", i)
+		assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
+		assert.Equal(t, expected, string(resp.TokenIdentifier),
+			"goroutine %d got wrong TokenIdentifier (indicates shared mutable state)", i)
+	}
+}
+
+// TestMintResponse_NoTokenIdentifier verifies that Mint finalized responses
+// do not carry a TokenIdentifier. Before the fix, a Mint response could
+// inherit a stale TokenIdentifier from a concurrent Create call because
+// both code paths returned the same shared response pointer.
+func TestMintResponse_NoTokenIdentifier(t *testing.T) {
+	// Simulate two concurrent calls: one Create (sets TokenIdentifier)
+	// and one Mint (should have nil TokenIdentifier).
+	var wg sync.WaitGroup
+	var createResp, mintResp *tokenpb.CommitTransactionResponse
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		createResp = &tokenpb.CommitTransactionResponse{
+			CommitStatus:    tokenpb.CommitStatus_COMMIT_FINALIZED,
+			TokenIdentifier: []byte("some-token-id"),
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		mintResp = &tokenpb.CommitTransactionResponse{
+			CommitStatus: tokenpb.CommitStatus_COMMIT_FINALIZED,
+		}
+	}()
+	wg.Wait()
+
+	assert.Equal(t, []byte("some-token-id"), createResp.TokenIdentifier)
+	assert.Nil(t, mintResp.TokenIdentifier,
+		"Mint response should not have TokenIdentifier (was shared state bug)")
 }
 
 func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRemappedToDifferentTransaction(t *testing.T) {

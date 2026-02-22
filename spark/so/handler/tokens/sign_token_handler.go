@@ -31,10 +31,6 @@ import (
 
 const queryTokenOutputsWithPartialRevocationSecretSharesBatchSize = 50
 
-var finalizedCommitTransactionResponse = &tokenpb.CommitTransactionResponse{
-	CommitStatus: tokenpb.CommitStatus_COMMIT_FINALIZED,
-}
-
 type operatorSignaturesMap map[string][]byte
 
 type SignTokenHandler struct {
@@ -158,11 +154,15 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		if err != nil {
 			return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("token create edge not eager loaded or not found: %w", err))
 		}
-		finalizedCommitTransactionResponse.TokenIdentifier = tokenCreate.TokenIdentifier
-		return finalizedCommitTransactionResponse, nil
+		return &tokenpb.CommitTransactionResponse{
+			CommitStatus:    tokenpb.CommitStatus_COMMIT_FINALIZED,
+			TokenIdentifier: tokenCreate.TokenIdentifier,
+		}, nil
 	case utils.TokenTransactionTypeMint:
 		// We validated the signatures package above, so we know that it is finalized.
-		return finalizedCommitTransactionResponse, nil
+		return &tokenpb.CommitTransactionResponse{
+			CommitStatus: tokenpb.CommitStatus_COMMIT_FINALIZED,
+		}, nil
 	case utils.TokenTransactionTypeTransfer:
 		// Include the coordinator's own signature when exchanging shares so peers validate against all operators
 		allOperatorSignatures := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, len(internalSignatures)+1)
@@ -213,7 +213,9 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to exchange revocation secret shares after finalization", tokenTransactionProto, err)
 		}
-		return finalizedCommitTransactionResponse, nil
+		return &tokenpb.CommitTransactionResponse{
+			CommitStatus: tokenpb.CommitStatus_COMMIT_FINALIZED,
+		}, nil
 
 	} else {
 		// Refetch the token transaction (for-read) to pick up newly committed partial revocation secret shares
@@ -300,12 +302,16 @@ func (h *SignTokenHandler) checkShouldReturnEarlyWithoutProcessing(
 				return nil, fmt.Errorf("failed to get create/mint signed commit progress: %w", err)
 			}
 			if len(commitProgress.UncommittedOperatorPublicKeys) == 0 {
-				return finalizedCommitTransactionResponse, nil
+				return &tokenpb.CommitTransactionResponse{
+					CommitStatus: tokenpb.CommitStatus_COMMIT_FINALIZED,
+				}, nil
 			}
 		}
 	case utils.TokenTransactionTypeTransfer:
 		if tokenTransaction.Status == st.TokenTransactionStatusFinalized {
-			return finalizedCommitTransactionResponse, nil
+			return &tokenpb.CommitTransactionResponse{
+				CommitStatus: tokenpb.CommitStatus_COMMIT_FINALIZED,
+			}, nil
 		}
 		if tokenTransaction.Status == st.TokenTransactionStatusRevealed {
 			// If this SO is in revealed, the user is no longer responsible for any further actions.
