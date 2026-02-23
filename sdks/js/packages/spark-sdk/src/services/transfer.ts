@@ -43,6 +43,7 @@ import {
   getSigHashFromTx,
   getTxFromRawTxBytes,
 } from "../utils/bitcoin.js";
+import { optionsWithIdempotencyKey } from "../utils/idempotency.js";
 import { NetworkToProto } from "../utils/network.js";
 import { VerifiableSecretShare } from "../utils/secret-sharing.js";
 import {
@@ -1676,13 +1677,16 @@ export class TransferService extends BaseTransferService {
         userSignedTxSigningJobs.get("directFromCpfp"),
     };
 
-    const response = await sparkClient.renew_leaf({
-      leafId: node.id,
-      signingJobs: {
-        $case: "renewRefundTimelockSigningJob",
-        renewRefundTimelockSigningJob,
+    const response = await sparkClient.renew_leaf(
+      {
+        leafId: node.id,
+        signingJobs: {
+          $case: "renewRefundTimelockSigningJob",
+          renewRefundTimelockSigningJob,
+        },
       },
-    });
+      optionsWithIdempotencyKey(getTxFromRawTxBytes(node.refundTx).id),
+    );
 
     if (
       response.renewResult?.$case !== "renewRefundTimelockResult" ||
@@ -1724,23 +1728,26 @@ export class TransferService extends BaseTransferService {
     const userSignedTxSigningJobs =
       await this.signingService.signSigningJobs(mappedSigningJobs);
 
-    const response = await sparkClient.renew_leaf({
-      leafId: node.id,
-      signingJobs: {
-        $case: "renewNodeTimelockSigningJob",
-        renewNodeTimelockSigningJob: {
-          splitNodeTxSigningJob: userSignedTxSigningJobs.get("split"),
-          splitNodeDirectTxSigningJob:
-            userSignedTxSigningJobs.get("directSplit"),
-          nodeTxSigningJob: userSignedTxSigningJobs.get("node"),
-          directNodeTxSigningJob: userSignedTxSigningJobs.get("directNode"),
-          refundTxSigningJob: userSignedTxSigningJobs.get("cpfp"),
-          directRefundTxSigningJob: userSignedTxSigningJobs.get("direct"),
-          directFromCpfpRefundTxSigningJob:
-            userSignedTxSigningJobs.get("directFromCpfp"),
+    const response = await sparkClient.renew_leaf(
+      {
+        leafId: node.id,
+        signingJobs: {
+          $case: "renewNodeTimelockSigningJob",
+          renewNodeTimelockSigningJob: {
+            splitNodeTxSigningJob: userSignedTxSigningJobs.get("split"),
+            splitNodeDirectTxSigningJob:
+              userSignedTxSigningJobs.get("directSplit"),
+            nodeTxSigningJob: userSignedTxSigningJobs.get("node"),
+            directNodeTxSigningJob: userSignedTxSigningJobs.get("directNode"),
+            refundTxSigningJob: userSignedTxSigningJobs.get("cpfp"),
+            directRefundTxSigningJob: userSignedTxSigningJobs.get("direct"),
+            directFromCpfpRefundTxSigningJob:
+              userSignedTxSigningJobs.get("directFromCpfp"),
+          },
         },
       },
-    });
+      optionsWithIdempotencyKey(getTxFromRawTxBytes(node.refundTx).id),
+    );
 
     if (
       response.renewResult?.$case !== "renewNodeTimelockResult" ||
@@ -2086,13 +2093,16 @@ export class TransferService extends BaseTransferService {
         userSignedTxSigningJobs.get("directFromCpfp"),
     };
 
-    const response = await sparkClient.renew_leaf({
-      leafId: node.id,
-      signingJobs: {
-        $case: "renewNodeZeroTimelockSigningJob",
-        renewNodeZeroTimelockSigningJob: renewZeroTimelockNodeSigningJob,
+    const response = await sparkClient.renew_leaf(
+      {
+        leafId: node.id,
+        signingJobs: {
+          $case: "renewNodeZeroTimelockSigningJob",
+          renewNodeZeroTimelockSigningJob: renewZeroTimelockNodeSigningJob,
+        },
       },
-    });
+      optionsWithIdempotencyKey(getTxFromRawTxBytes(node.refundTx).id),
+    );
 
     if (
       response.renewResult?.$case !== "renewNodeZeroTimelockResult" ||
