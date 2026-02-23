@@ -1,5 +1,17 @@
 # @buildonspark/spark-sdk
 
+## 0.6.6
+
+### Patch Changes
+
+- - Single-call transfer claiming — claimTransfer() now completes the entire receive flow in one RPC round-trip, replacing the previous multi-step
+    key-tweak/sign-refunds/finalize sequence (#5193)
+  - sparkInvoice on LightningReceiveRequest — New optional field provides direct access to the Spark invoice embedded in a Lightning receive request, without needing to
+    decode the Lightning invoice manually (#5393)
+  - Batch token consolidation — optimizeTokenOutputs() now consolidates outputs across multiple token identifiers in a single transaction instead of one token per call.
+    New acquireOutputsBatch() method on TokenOutputManager enables atomic multi-token output locking (#5235)
+  - Multi-UTXO deposit proto support — New InputSigningData type and additionalOnChainUtxos/additionalInputs fields for future multi-UTXO deposit flows (#5366)
+
 ## 0.6.5
 
 ### Patch Changes
