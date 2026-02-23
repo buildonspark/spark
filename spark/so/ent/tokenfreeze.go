@@ -25,19 +25,19 @@ type TokenFreeze struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Status holds the value of the "status" field.
+	// Current freeze status of the token output (FROZEN or THAWED).
 	Status schematype.TokenFreezeStatus `json:"status,omitempty"`
-	// OwnerPublicKey holds the value of the "owner_public_key" field.
+	// The public key of the token owner being frozen; null for a global pause.
 	OwnerPublicKey keys.Public `json:"owner_public_key,omitempty"`
-	// TokenPublicKey holds the value of the "token_public_key" field.
+	// The public key identifying the specific token type being frozen.
 	TokenPublicKey keys.Public `json:"token_public_key,omitempty"`
-	// IssuerSignature holds the value of the "issuer_signature" field.
+	// The issuer's signature authorizing this freeze or thaw action.
 	IssuerSignature []byte `json:"issuer_signature,omitempty"`
-	// WalletProvidedFreezeTimestamp holds the value of the "wallet_provided_freeze_timestamp" field.
+	// Wallet-provided timestamp when the freeze was initiated.
 	WalletProvidedFreezeTimestamp uint64 `json:"wallet_provided_freeze_timestamp,omitempty"`
-	// WalletProvidedThawTimestamp holds the value of the "wallet_provided_thaw_timestamp" field.
+	// Wallet-provided timestamp when the thaw was initiated.
 	WalletProvidedThawTimestamp uint64 `json:"wallet_provided_thaw_timestamp,omitempty"`
-	// TokenCreateID holds the value of the "token_create_id" field.
+	// Foreign key referencing the associated TokenCreate record.
 	TokenCreateID uuid.UUID `json:"token_create_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenFreezeQuery when eager-loading is set.

@@ -24,13 +24,13 @@ type UserSignedTransaction struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Transaction holds the value of the "transaction" field.
+	// Raw serialized Bitcoin transaction signed by the user.
 	Transaction []byte `json:"transaction,omitempty"`
-	// UserSignature holds the value of the "user_signature" field.
+	// The user's Schnorr signature over the transaction.
 	UserSignature []byte `json:"user_signature,omitempty"`
-	// SigningCommitments holds the value of the "signing_commitments" field.
+	// Serialized FROST signing commitments used during threshold signing.
 	SigningCommitments []byte `json:"signing_commitments,omitempty"`
-	// UserSignatureCommitment holds the value of the "user_signature_commitment" field.
+	// The user's nonce commitment for the FROST signing round.
 	UserSignatureCommitment []byte `json:"user_signature_commitment,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UserSignedTransactionQuery when eager-loading is set.

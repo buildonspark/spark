@@ -23,15 +23,15 @@ type TokenMint struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// IssuerPublicKey holds the value of the "issuer_public_key" field.
+	// The public key of the token issuer authorizing this mint.
 	IssuerPublicKey keys.Public `json:"issuer_public_key,omitempty"`
-	// WalletProvidedTimestamp holds the value of the "wallet_provided_timestamp" field.
+	// Wallet-provided timestamp for this mint operation.
 	WalletProvidedTimestamp uint64 `json:"wallet_provided_timestamp,omitempty"`
-	// IssuerSignature holds the value of the "issuer_signature" field.
+	// The issuer's signature authorizing this mint.
 	IssuerSignature []byte `json:"issuer_signature,omitempty"`
-	// OperatorSpecificIssuerSignature holds the value of the "operator_specific_issuer_signature" field.
+	// An operator-specific variant of the issuer signature, if applicable.
 	OperatorSpecificIssuerSignature []byte `json:"operator_specific_issuer_signature,omitempty"`
-	// TokenIdentifier holds the value of the "token_identifier" field.
+	// The identifier of the token type being minted.
 	TokenIdentifier []byte `json:"token_identifier,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenMintQuery when eager-loading is set.

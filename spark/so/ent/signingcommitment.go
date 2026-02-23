@@ -24,11 +24,11 @@ type SigningCommitment struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// OperatorIndex holds the value of the "operator_index" field.
+	// The index of this operator within the FROST signing group.
 	OperatorIndex uint `json:"operator_index,omitempty"`
-	// Status holds the value of the "status" field.
+	// Current availability status of the signing commitment.
 	Status schematype.SigningCommitmentStatus `json:"status,omitempty"`
-	// NonceCommitment holds the value of the "nonce_commitment" field.
+	// The FROST signing commitment (nonce commitment pair) for this signing round.
 	NonceCommitment frost.SigningCommitment `json:"nonce_commitment,omitempty"`
 	selectValues    sql.SelectValues
 }

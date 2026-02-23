@@ -31,9 +31,11 @@ func (TokenPartialRevocationSecretShare) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("operator_identity_public_key").
 			GoType(keys.Public{}).
+			Comment("The identity public key of the peer operator providing this secret share.").
 			Annotations(entexample.Default("02d2d103cacb1d6355efeab27637c74484e2a7459e49110c3fe885210369782e23")),
 		field.Bytes("secret_share").
 			GoType(keys.Private{}).
+			Comment("The partial revocation secret share from a peer operator.").
 			Annotations(entexample.Default("e6d2b44c26c0c1b507fab0d5e66c388c5676c109b9ee41520ceba5b52e3a2a92")),
 	}
 }

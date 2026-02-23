@@ -24,15 +24,15 @@ type PreimageShare struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// PaymentHash holds the value of the "payment_hash" field.
+	// The Lightning payment hash that this preimage share corresponds to.
 	PaymentHash []byte `json:"payment_hash,omitempty"`
-	// PreimageShare holds the value of the "preimage_share" field.
+	// A threshold secret share of the Lightning payment preimage.
 	PreimageShare []byte `json:"preimage_share,omitempty"`
-	// Threshold holds the value of the "threshold" field.
+	// The number of shares required to reconstruct the full preimage.
 	Threshold int32 `json:"threshold,omitempty"`
-	// OwnerIdentityPubkey holds the value of the "owner_identity_pubkey" field.
+	// The identity public key of the operator that owns this preimage share.
 	OwnerIdentityPubkey keys.Public `json:"owner_identity_pubkey,omitempty"`
-	// InvoiceString holds the value of the "invoice_string" field.
+	// The original Lightning invoice string associated with the payment.
 	InvoiceString string `json:"invoice_string,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PreimageShareQuery when eager-loading is set.

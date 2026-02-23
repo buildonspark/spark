@@ -27,10 +27,12 @@ func (PendingSendTransfer) Fields() []ent.Field {
 		field.UUID("transfer_id", uuid.UUID{}).
 			Unique().
 			Immutable().
+			Comment("The UUID of the associated transfer.").
 			Annotations(entexample.Default("019a02dd-8468-7bfe-9a73-d9b03681710e")),
 		field.Enum("status").
 			GoType(st.PendingSendTransferStatus("")).
 			Default(string(st.PendingSendTransferStatusPending)).
+			Comment("Current processing status of the pending send transfer.").
 			Annotations(entexample.Default(st.PendingSendTransferStatusPending)),
 	}
 }

@@ -29,11 +29,13 @@ func (TokenFreeze) Fields() []ent.Field {
 	return []ent.Field{
 		field.Enum("status").
 			GoType(st.TokenFreezeStatus("")).
+			Comment("Current freeze status of the token output (FROZEN or THAWED).").
 			Annotations(entexample.Default(st.TokenFreezeStatusThawed)),
 		field.Bytes("owner_public_key").
 			Optional().
 			Immutable().
 			GoType(keys.Public{}).
+			Comment("The public key of the token owner being frozen; null for a global pause.").
 			Annotations(entexample.Default(
 				"02ca75659458529755b77663f18282f4aa130313e098fac40deffb1208207a2ffe",
 			)),
@@ -41,6 +43,7 @@ func (TokenFreeze) Fields() []ent.Field {
 			Optional().
 			Immutable().
 			GoType(keys.Public{}).
+			Comment("The public key identifying the specific token type being frozen.").
 			Annotations(entexample.Default(
 				"033e40d72117ee89f7bda15d2b3d779843e6721e8e4c5078c192b50fb3782de2f5",
 			)),
@@ -48,17 +51,21 @@ func (TokenFreeze) Fields() []ent.Field {
 			NotEmpty().
 			Immutable().
 			Unique().
+			Comment("The issuer's signature authorizing this freeze or thaw action.").
 			Annotations(entexample.Default(
 				"304402207608dd0339b19f4be059b9ca48bfe17f580f887227e30451eb35f6eb5c59ec7e02201950d40ae09d7d6c2c7ede109573021ac59a65347b0512d94172758ab4a3918f",
 			)),
 		field.Uint64("wallet_provided_freeze_timestamp").
 			Immutable().
+			Comment("Wallet-provided timestamp when the freeze was initiated.").
 			Annotations(entexample.Default(1747337980820)),
 		field.Uint64("wallet_provided_thaw_timestamp").
 			Optional().
+			Comment("Wallet-provided timestamp when the thaw was initiated.").
 			Annotations(entexample.Default(1747338083725)),
 		field.UUID("token_create_id", uuid.UUID{}).
 			Immutable().
+			Comment("Foreign key referencing the associated TokenCreate record.").
 			Annotations(entexample.Default("01982f4a-791d-78cd-892b-8e558d509271")),
 	}
 }

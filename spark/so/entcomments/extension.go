@@ -20,7 +20,6 @@ func (e *Extension) Hooks() []gen.Hook {
 }
 
 // validateFieldComments validates that all fields have comments.
-// Fields in the legacyUncommentedFields allowlist are exempt (grandfathered).
 func validateFieldComments() gen.Hook {
 	return func(next gen.Generator) gen.Generator {
 		return gen.GenerateFunc(func(g *gen.Graph) error {
@@ -31,16 +30,11 @@ func validateFieldComments() gen.Hook {
 						continue
 					}
 
-					// Skip fields that are in the legacy allowlist
-					if isLegacyUncommentedField(node.Name, field.Name) {
-						continue
-					}
-
 					// Check if the field has a comment
 					if field.Comment() == "" {
 						return fmt.Errorf(
 							"schema %q: field %q is missing a .Comment() call. "+
-								"All new fields must have documentation. "+
+								"All fields must have documentation. "+
 								"Add .Comment(\"description\") to the field definition in the appropriate schema file",
 							node.Name, field.Name,
 						)

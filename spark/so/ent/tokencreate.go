@@ -25,31 +25,31 @@ type TokenCreate struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// IssuerPublicKey holds the value of the "issuer_public_key" field.
+	// The public key of the token issuer.
 	IssuerPublicKey keys.Public `json:"issuer_public_key,omitempty"`
-	// TokenName holds the value of the "token_name" field.
+	// The human-readable name of the token.
 	TokenName string `json:"token_name,omitempty"`
-	// TokenTicker holds the value of the "token_ticker" field.
+	// The ticker symbol of the token (e.g., 'AURA').
 	TokenTicker string `json:"token_ticker,omitempty"`
-	// Decimals holds the value of the "decimals" field.
+	// The number of decimal places for the token.
 	Decimals uint8 `json:"decimals,omitempty"`
-	// MaxSupply holds the value of the "max_supply" field.
+	// The maximum total supply of the token as a uint128.
 	MaxSupply []byte `json:"max_supply,omitempty"`
-	// IsFreezable holds the value of the "is_freezable" field.
+	// Whether the issuer can freeze individual token outputs.
 	IsFreezable bool `json:"is_freezable,omitempty"`
-	// Network holds the value of the "network" field.
+	// The Bitcoin network this token operates on.
 	Network btcnetwork.Network `json:"network,omitempty"`
 	// Extra metadata is used to store user-defined metadata about the token.
 	ExtraMetadata []byte `json:"extra_metadata,omitempty"`
-	// TokenIdentifier holds the value of the "token_identifier" field.
+	// Derived hash uniquely identifying the token; stored explicitly to enable efficient indexed lookups.
 	TokenIdentifier []byte `json:"token_identifier,omitempty"`
-	// IssuerSignature holds the value of the "issuer_signature" field.
+	// The issuer's signature over the token creation transaction.
 	IssuerSignature []byte `json:"issuer_signature,omitempty"`
-	// OperatorSpecificIssuerSignature holds the value of the "operator_specific_issuer_signature" field.
+	// An operator-specific variant of the issuer signature, if applicable.
 	OperatorSpecificIssuerSignature []byte `json:"operator_specific_issuer_signature,omitempty"`
-	// CreationEntityPublicKey holds the value of the "creation_entity_public_key" field.
+	// The public key of the Spark Entity at the time this token was created.
 	CreationEntityPublicKey keys.Public `json:"creation_entity_public_key,omitempty"`
-	// WalletProvidedTimestamp holds the value of the "wallet_provided_timestamp" field.
+	// Deprecated wallet-provided creation timestamp.
 	//
 	// Deprecated: Field "wallet_provided_timestamp" was marked as deprecated in the schema.
 	WalletProvidedTimestamp uint64 `json:"wallet_provided_timestamp,omitempty"`

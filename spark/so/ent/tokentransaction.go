@@ -27,23 +27,23 @@ type TokenTransaction struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// PartialTokenTransactionHash holds the value of the "partial_token_transaction_hash" field.
+	// Hash of the partially-signed token transaction, before all signers have signed.
 	PartialTokenTransactionHash []byte `json:"partial_token_transaction_hash,omitempty"`
-	// FinalizedTokenTransactionHash holds the value of the "finalized_token_transaction_hash" field.
+	// Hash of the fully-finalized token transaction.
 	FinalizedTokenTransactionHash []byte `json:"finalized_token_transaction_hash,omitempty"`
-	// OperatorSignature holds the value of the "operator_signature" field.
+	// This operator's signature over the token transaction.
 	OperatorSignature []byte `json:"operator_signature,omitempty"`
-	// Status holds the value of the "status" field.
+	// Current processing status of the token transaction.
 	Status schematype.TokenTransactionStatus `json:"status,omitempty"`
-	// ExpiryTime holds the value of the "expiry_time" field.
+	// When this token transaction expires if not finalized.
 	ExpiryTime time.Time `json:"expiry_time,omitempty"`
-	// CoordinatorPublicKey holds the value of the "coordinator_public_key" field.
+	// Public key of the coordinator operator orchestrating this transaction.
 	CoordinatorPublicKey keys.Public `json:"coordinator_public_key,omitempty"`
-	// ClientCreatedTimestamp holds the value of the "client_created_timestamp" field.
+	// Client-provided timestamp for when this transaction was created.
 	ClientCreatedTimestamp time.Time `json:"client_created_timestamp,omitempty"`
-	// Version holds the value of the "version" field.
+	// Protocol version of the token transaction format.
 	Version schematype.TokenTransactionVersion `json:"version,omitempty"`
-	// ValidityDurationSeconds holds the value of the "validity_duration_seconds" field.
+	// Duration in seconds for which this transaction is valid.
 	ValidityDurationSeconds uint64 `json:"validity_duration_seconds,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenTransactionQuery when eager-loading is set.

@@ -23,9 +23,9 @@ type PendingSendTransfer struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// TransferID holds the value of the "transfer_id" field.
+	// The UUID of the associated transfer.
 	TransferID uuid.UUID `json:"transfer_id,omitempty"`
-	// Status holds the value of the "status" field.
+	// Current processing status of the pending send transfer.
 	Status       schematype.PendingSendTransferStatus `json:"status,omitempty"`
 	selectValues sql.SelectValues
 }

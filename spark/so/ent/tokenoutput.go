@@ -31,23 +31,23 @@ type TokenOutput struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Status holds the value of the "status" field.
+	// Current lifecycle status of the token output (e.g., CREATED_FINALIZED, SPENT).
 	Status schematype.TokenOutputStatus `json:"status,omitempty"`
-	// OwnerPublicKey holds the value of the "owner_public_key" field.
+	// The public key of the owner of this token output.
 	OwnerPublicKey keys.Public `json:"owner_public_key,omitempty"`
-	// WithdrawBondSats holds the value of the "withdraw_bond_sats" field.
+	// Bond amount in satoshis required to initiate an L1 withdrawal.
 	WithdrawBondSats uint64 `json:"withdraw_bond_sats,omitempty"`
-	// WithdrawRelativeBlockLocktime holds the value of the "withdraw_relative_block_locktime" field.
+	// Relative block locktime for the L1 withdrawal transaction.
 	WithdrawRelativeBlockLocktime uint64 `json:"withdraw_relative_block_locktime,omitempty"`
-	// WithdrawRevocationCommitment holds the value of the "withdraw_revocation_commitment" field.
+	// Commitment to the revocation secret, used to punish invalid withdrawals.
 	WithdrawRevocationCommitment []byte `json:"withdraw_revocation_commitment,omitempty"`
-	// TokenPublicKey holds the value of the "token_public_key" field.
+	// The public key identifying the token type held in this output.
 	TokenPublicKey keys.Public `json:"token_public_key,omitempty"`
-	// TokenAmount holds the value of the "token_amount" field.
+	// The token amount held in this output as raw bytes (uint128).
 	TokenAmount []byte `json:"token_amount,omitempty"`
 	// The uint128 token amount in this output as a numeric.
 	Amount uint128.Uint128 `json:"amount,omitempty"`
-	// CreatedTransactionOutputVout holds the value of the "created_transaction_output_vout" field.
+	// The vout index of this output in the creating token transaction.
 	CreatedTransactionOutputVout int32 `json:"created_transaction_output_vout,omitempty"`
 	// Denormalized finalized transaction hash from the output_created_token_transaction edge. Auto-populated by hook.
 	CreatedTransactionFinalizedHash []byte `json:"created_transaction_finalized_hash,omitempty"`
@@ -55,19 +55,19 @@ type TokenOutput struct {
 	SeFinalizationAdaptorSig []byte `json:"se_finalization_adaptor_sig,omitempty"`
 	// Final SE Schnorr signature over SparkExitReceipt. Computed by adapting se_finalization_adaptor_sig with the finalization secret (Phase 2). Enables offline L1 withdrawal capability.
 	SeWithdrawalSignature []byte `json:"se_withdrawal_signature,omitempty"`
-	// SpentOwnershipSignature holds the value of the "spent_ownership_signature" field.
+	// The ownership signature provided when this output was spent.
 	SpentOwnershipSignature []byte `json:"spent_ownership_signature,omitempty"`
-	// SpentOperatorSpecificOwnershipSignature holds the value of the "spent_operator_specific_ownership_signature" field.
+	// An operator-specific ownership signature provided when this output was spent.
 	SpentOperatorSpecificOwnershipSignature []byte `json:"spent_operator_specific_ownership_signature,omitempty"`
-	// SpentTransactionInputVout holds the value of the "spent_transaction_input_vout" field.
+	// The vout index used as input in the spending token transaction.
 	SpentTransactionInputVout int32 `json:"spent_transaction_input_vout,omitempty"`
-	// SpentRevocationSecret holds the value of the "spent_revocation_secret" field.
+	// The revocation secret revealed when this output was spent.
 	SpentRevocationSecret keys.Private `json:"spent_revocation_secret,omitempty"`
-	// Network holds the value of the "network" field.
+	// The Bitcoin network this token output belongs to.
 	Network btcnetwork.Network `json:"network,omitempty"`
-	// TokenIdentifier holds the value of the "token_identifier" field.
+	// The identifier of the token type held in this output.
 	TokenIdentifier []byte `json:"token_identifier,omitempty"`
-	// TokenCreateID holds the value of the "token_create_id" field.
+	// Foreign key referencing the associated TokenCreate record.
 	TokenCreateID uuid.UUID `json:"token_create_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenOutputQuery when eager-loading is set.

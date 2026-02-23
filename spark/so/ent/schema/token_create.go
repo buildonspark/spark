@@ -26,18 +26,22 @@ func (TokenCreate) Fields() []ent.Field {
 			NotEmpty().
 			Optional().
 			Unique().
+			Comment("The issuer's signature over the token creation transaction.").
 			Annotations(entexample.Default("c4d0f7f4ed725175ea7f93e3c3864a4fe8f386c5652964b736c7ab7752c939c84d40affa0876733deb843a466c74662e82c94857324e07bcb597097034b3c949")),
 		field.Bytes("operator_specific_issuer_signature").
 			Optional().
-			Unique(),
+			Unique().
+			Comment("An operator-specific variant of the issuer signature, if applicable."),
 		field.Bytes("creation_entity_public_key").
 			Immutable().
 			GoType(keys.Public{}).
+			Comment("The public key of the Spark Entity at the time this token was created.").
 			Annotations(entexample.Default("0264a6f0a4f02477123875eceb43592369848081d329f3db0eba7445a4abed23b8")),
 		field.Uint64("wallet_provided_timestamp").
 			Optional().
 			Immutable().
-			Deprecated(),
+			Deprecated().
+			Comment("Deprecated wallet-provided creation timestamp."),
 	}
 }
 

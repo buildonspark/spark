@@ -24,24 +24,29 @@ func (TokenMint) Fields() []ent.Field {
 		field.Bytes("issuer_public_key").
 			Immutable().
 			GoType(keys.Public{}).
+			Comment("The public key of the token issuer authorizing this mint.").
 			Annotations(entexample.Default(
 				"02dcfd188fc97e7a3573c3cf089cb58802d6d2b737dec1e118ba2f7aa3c73926ea",
 			)),
 		field.Uint64("wallet_provided_timestamp").
 			Immutable().
+			Comment("Wallet-provided timestamp for this mint operation.").
 			Annotations(entexample.Default(1761323419265)),
 		field.Bytes("issuer_signature").
 			NotEmpty().
 			Immutable().
+			Comment("The issuer's signature authorizing this mint.").
 			Annotations(entexample.Default(
 				"225e8bac0e3b46296f894025b306756302e8febad2bb00a2a4156e623eb9f6d3eab9263bdfbdc7fa71810ea8a7376592791ad3818c4f5bb929a31de71e9022bb",
 			)),
 		field.Bytes("operator_specific_issuer_signature").
 			Optional().
-			Unique(),
+			Unique().
+			Comment("An operator-specific variant of the issuer signature, if applicable."),
 		field.Bytes("token_identifier").
 			Immutable().
 			Optional().
+			Comment("The identifier of the token type being minted.").
 			Annotations(entexample.Default(
 				"f43eceedac2f690f3f583b53010b56e8f3babf37849c97186e05034b48a2eab4",
 			)),

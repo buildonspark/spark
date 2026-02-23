@@ -26,29 +26,29 @@ type UtxoSwap struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Status holds the value of the "status" field.
+	// Current status of the UTXO swap offer (e.g., PENDING, COMPLETED, CANCELLED).
 	Status schematype.UtxoSwapStatus `json:"status,omitempty"`
-	// RequestType holds the value of the "request_type" field.
+	// The type of swap request (e.g., fixed amount).
 	RequestType schematype.UtxoSwapRequestType `json:"request_type,omitempty"`
-	// CreditAmountSats holds the value of the "credit_amount_sats" field.
+	// Amount in satoshis to be credited to the user after fees.
 	CreditAmountSats uint64 `json:"credit_amount_sats,omitempty"`
 	// Secondary credit amount for instant static deposit with multiple payments.
 	SecondaryCreditAmountSats *uint64 `json:"secondary_credit_amount_sats,omitempty"`
-	// MaxFeeSats holds the value of the "max_fee_sats" field.
+	// Maximum fee in satoshis the user is willing to pay for this swap.
 	MaxFeeSats uint64 `json:"max_fee_sats,omitempty"`
-	// SspSignature holds the value of the "ssp_signature" field.
+	// SSP's signature authorizing the swap terms.
 	SspSignature []byte `json:"ssp_signature,omitempty"`
-	// SspIdentityPublicKey holds the value of the "ssp_identity_public_key" field.
+	// The identity public key of the SSP or user owning this swap.
 	SspIdentityPublicKey keys.Public `json:"ssp_identity_public_key,omitempty"`
-	// UserSignature holds the value of the "user_signature" field.
+	// User's signature authorizing the SSP to claim the UTXO after fulfilling the quote.
 	UserSignature []byte `json:"user_signature,omitempty"`
-	// UserIdentityPublicKey holds the value of the "user_identity_public_key" field.
+	// The identity public key of the user requesting the swap.
 	UserIdentityPublicKey keys.Public `json:"user_identity_public_key,omitempty"`
-	// CoordinatorIdentityPublicKey holds the value of the "coordinator_identity_public_key" field.
+	// The identity public key of the distributed transaction coordinator.
 	CoordinatorIdentityPublicKey keys.Public `json:"coordinator_identity_public_key,omitempty"`
-	// RequestedTransferID holds the value of the "requested_transfer_id" field.
+	// The transfer ID requested by the user, unique across all operators.
 	RequestedTransferID uuid.UUID `json:"requested_transfer_id,omitempty"`
-	// SpendTxSigningResult holds the value of the "spend_tx_signing_result" field.
+	// The result of FROST signing the UTXO spend transaction.
 	SpendTxSigningResult []byte `json:"spend_tx_signing_result,omitempty"`
 	// When this swap offer/lock expires (if applicable).
 	ExpiryTime *time.Time `json:"expiry_time,omitempty"`

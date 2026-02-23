@@ -33,14 +33,17 @@ func (SigningCommitment) Fields() []ent.Field {
 	return []ent.Field{
 		field.Uint("operator_index").
 			Immutable().
+			Comment("The index of this operator within the FROST signing group.").
 			Annotations(entexample.Default(2)),
 		field.Enum("status").
 			GoType(schematype.SigningCommitmentStatus("")).
+			Comment("Current availability status of the signing commitment.").
 			Annotations(entexample.Default(schematype.SigningCommitmentStatusAvailable)),
 		field.Bytes("nonce_commitment").
 			Immutable().
 			Unique().
 			GoType(frost.SigningCommitment{}).
+			Comment("The FROST signing commitment (nonce commitment pair) for this signing round.").
 			Annotations(entexample.Default("0358372b399f94031a235ce325a9d6ac3d700af8be5fe3fcfbbbed0bb08169e4d8029f40d1454d33ec3992ed89fd89b8c7bc2cb4afae14e03b33b36f702c978afc17")),
 	}
 }

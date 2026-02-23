@@ -24,9 +24,9 @@ type TokenPartialRevocationSecretShare struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// OperatorIdentityPublicKey holds the value of the "operator_identity_public_key" field.
+	// The identity public key of the peer operator providing this secret share.
 	OperatorIdentityPublicKey keys.Public `json:"operator_identity_public_key,omitempty"`
-	// SecretShare holds the value of the "secret_share" field.
+	// The partial revocation secret share from a peer operator.
 	SecretShare keys.Private `json:"secret_share,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenPartialRevocationSecretShareQuery when eager-loading is set.

@@ -21,10 +21,10 @@ func (EntityDkgKey) Mixin() []ent.Mixin {
 
 func (EntityDkgKey) Fields() []ent.Field {
 	return []ent.Field{
-		// Key type field to ensure only one entity DKG key can exist
 		field.String("key_type").
 			Default("initial_entity_dkg_key").
-			Immutable(),
+			Immutable().
+			Comment("Singleton key type field with a fixed value of 'initial_entity_dkg_key'. Enforces that only one entity DKG key can exist."),
 	}
 }
 

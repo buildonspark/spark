@@ -25,17 +25,17 @@ type Utxo struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// BlockHeight holds the value of the "block_height" field.
+	// The block height at which this UTXO was confirmed on-chain.
 	BlockHeight int64 `json:"block_height,omitempty"`
-	// Txid holds the value of the "txid" field.
+	// The transaction ID of the transaction containing this UTXO.
 	Txid []byte `json:"txid,omitempty"`
-	// Vout holds the value of the "vout" field.
+	// The output index within the transaction.
 	Vout uint32 `json:"vout,omitempty"`
-	// Amount holds the value of the "amount" field.
+	// The value of this UTXO in satoshis.
 	Amount uint64 `json:"amount,omitempty"`
-	// Network holds the value of the "network" field.
+	// The Bitcoin network this UTXO belongs to.
 	Network btcnetwork.Network `json:"network,omitempty"`
-	// PkScript holds the value of the "pk_script" field.
+	// The locking script (scriptPubKey) of this UTXO.
 	PkScript []byte `json:"pk_script,omitempty"`
 	// Timestamp when the UTXO was confirmed available after meeting the confirmation threshold.
 	AvailabilityConfirmedAt *time.Time `json:"availability_confirmed_at,omitempty"`

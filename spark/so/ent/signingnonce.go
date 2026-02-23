@@ -23,11 +23,11 @@ type SigningNonce struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Nonce holds the value of the "nonce" field.
+	// The FROST signing nonce used during threshold signature generation.
 	Nonce frost.SigningNonce `json:"nonce,omitempty"`
-	// NonceCommitment holds the value of the "nonce_commitment" field.
+	// The public commitment to the signing nonce, shared with other operators.
 	NonceCommitment frost.SigningCommitment `json:"nonce_commitment,omitempty"`
-	// RetryFingerprint holds the value of the "retry_fingerprint" field.
+	// Fingerprint used to deduplicate nonce generation retries.
 	RetryFingerprint []byte `json:"retry_fingerprint,omitempty"`
 	selectValues     sql.SelectValues
 }

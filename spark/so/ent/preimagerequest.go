@@ -26,15 +26,15 @@ type PreimageRequest struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// PaymentHash holds the value of the "payment_hash" field.
+	// The Lightning payment hash for which this preimage is being requested.
 	PaymentHash []byte `json:"payment_hash,omitempty"`
-	// Status holds the value of the "status" field.
+	// Current status of the preimage request.
 	Status schematype.PreimageRequestStatus `json:"status,omitempty"`
-	// ReceiverIdentityPubkey holds the value of the "receiver_identity_pubkey" field.
+	// The identity public key of the receiver in the Lightning payment.
 	ReceiverIdentityPubkey keys.Public `json:"receiver_identity_pubkey,omitempty"`
-	// Preimage holds the value of the "preimage" field.
+	// The full Lightning payment preimage; set by the coordinator after reconstructing from threshold shares, or received via gossip by peer operators.
 	Preimage []byte `json:"preimage,omitempty"`
-	// SenderIdentityPubkey holds the value of the "sender_identity_pubkey" field.
+	// The identity public key of the sender initiating the Lightning payment.
 	SenderIdentityPubkey keys.Public `json:"sender_identity_pubkey,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PreimageRequestQuery when eager-loading is set.

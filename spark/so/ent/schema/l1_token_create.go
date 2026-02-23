@@ -25,6 +25,7 @@ func (L1TokenCreate) Fields() []ent.Field {
 			GoType(schematype.TxID{}).
 			Immutable().
 			Unique().
+			Comment("The L1 Bitcoin transaction ID in which this token creation was announced on-chain.").
 			Annotations(entexample.Default("26c83883d1d642dea2108725fefae1867620753d51f9539dfc2d52676bd5a4fd")),
 	}
 }

@@ -24,13 +24,13 @@ type Gossip struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Participants holds the value of the "participants" field.
+	// List of operator identity public keys that should receive this gossip message.
 	Participants []string `json:"participants,omitempty"`
-	// Message holds the value of the "message" field.
+	// Serialized GossipMessage proto payload to be delivered to participants.
 	Message []byte `json:"message,omitempty"`
-	// Receipts holds the value of the "receipts" field.
+	// Bitmap tracking which participants have received the message; bit positions correspond to order in the participants list.
 	Receipts *[]byte `json:"receipts,omitempty"`
-	// Status holds the value of the "status" field.
+	// Delivery status of the gossip message; set to DELIVERED once all participants have received it.
 	Status       schematype.GossipStatus `json:"status,omitempty"`
 	selectValues sql.SelectValues
 }

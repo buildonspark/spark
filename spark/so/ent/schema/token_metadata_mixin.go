@@ -20,30 +20,37 @@ func (TokenMetadataMixin) Fields() []ent.Field {
 		field.Bytes("issuer_public_key").
 			Immutable().
 			GoType(keys.Public{}).
+			Comment("The public key of the token issuer.").
 			Annotations(
 				entexample.Default("0375a9121cd7c3684ca1941978cc0dc42ce316fddf70261643f17ba3eeca6d10f2"),
 			),
 		field.String("token_name").
 			NotEmpty().
 			Immutable().
+			Comment("The human-readable name of the token.").
 			Annotations(entexample.Default("Aura")),
 		field.String("token_ticker").
 			NotEmpty().
 			Immutable().
+			Comment("The ticker symbol of the token (e.g., 'AURA').").
 			Annotations(entexample.Default("AURA")),
 		field.Uint8("decimals").
 			Immutable().
+			Comment("The number of decimal places for the token.").
 			Annotations(entexample.Default(8)),
 		field.Bytes("max_supply").
 			NotEmpty().
 			Immutable().
+			Comment("The maximum total supply of the token as a uint128.").
 			Annotations(entexample.Default("0000000000000000002386f26fc10000")),
 		field.Bool("is_freezable").
 			Immutable().
+			Comment("Whether the issuer can freeze individual token outputs.").
 			Annotations(entexample.Default(true)),
 		field.Enum("network").
 			GoType(btcnetwork.Unspecified).
 			Immutable().
+			Comment("The Bitcoin network this token operates on.").
 			Annotations(entexample.Default(btcnetwork.Regtest)),
 		field.Bytes("extra_metadata").
 			Optional().
@@ -56,6 +63,7 @@ func (TokenMetadataMixin) Fields() []ent.Field {
 			NotEmpty().
 			Immutable().
 			Unique().
+			Comment("Derived hash uniquely identifying the token; stored explicitly to enable efficient indexed lookups.").
 			Annotations(entexample.Default("3e534a8d9798fe5e20516f9b1aa05f5d78d718ece893e8af89d678c3d88f2451")),
 	}
 }

@@ -24,9 +24,9 @@ type TokenTransactionPeerSignature struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// OperatorIdentityPublicKey holds the value of the "operator_identity_public_key" field.
+	// The identity public key of the peer operator providing this signature.
 	OperatorIdentityPublicKey keys.Public `json:"operator_identity_public_key,omitempty"`
-	// Signature holds the value of the "signature" field.
+	// The peer operator's signature over the token transaction.
 	Signature []byte `json:"signature,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenTransactionPeerSignatureQuery when eager-loading is set.

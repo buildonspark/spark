@@ -23,7 +23,7 @@ type EntityDkgKey struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// KeyType holds the value of the "key_type" field.
+	// Singleton key type field with a fixed value of 'initial_entity_dkg_key'. Enforces that only one entity DKG key can exist.
 	KeyType string `json:"key_type,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the EntityDkgKeyQuery when eager-loading is set.

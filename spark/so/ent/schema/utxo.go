@@ -26,25 +26,31 @@ func (Utxo) Mixin() []ent.Mixin {
 func (Utxo) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int64("block_height").
+			Comment("The block height at which this UTXO was confirmed on-chain.").
 			Annotations(entexample.Default(2236097)),
 		field.Bytes("txid").
 			NotEmpty().
 			Immutable().
+			Comment("The transaction ID of the transaction containing this UTXO.").
 			Annotations(entexample.Default(
 				"2f9841624fae808464440f897d189ef3f1e14ea86922d6550c49b34d4cb6effd",
 			)),
 		field.Uint32("vout").
 			Immutable().
+			Comment("The output index within the transaction.").
 			Annotations(entexample.Default(0)),
 		field.Uint64("amount").
 			Immutable().
+			Comment("The value of this UTXO in satoshis.").
 			Annotations(entexample.Default(10000)),
 		field.Enum("network").
 			GoType(btcnetwork.Unspecified).
 			Immutable().
+			Comment("The Bitcoin network this UTXO belongs to.").
 			Annotations(entexample.Default(btcnetwork.Regtest)),
 		field.Bytes("pk_script").
 			Immutable().
+			Comment("The locking script (scriptPubKey) of this UTXO.").
 			Annotations(entexample.Default(
 				"512089f1097344ab882061ea9aee058ed84910be8e2f92429b8835af58284c0f59d6",
 			)),

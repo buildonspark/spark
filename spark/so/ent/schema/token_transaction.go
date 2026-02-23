@@ -31,39 +31,47 @@ func (TokenTransaction) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("partial_token_transaction_hash").
 			NotEmpty().
+			Comment("Hash of the partially-signed token transaction, before all signers have signed.").
 			Annotations(entexample.Default(
 				"4a564baefd28df39d7636f4c01d9bb4cf1c2e000fb6f3cf263733ae3b248c01c",
 			)),
 		field.Bytes("finalized_token_transaction_hash").
 			NotEmpty().
 			Unique().
+			Comment("Hash of the fully-finalized token transaction.").
 			Annotations(entexample.Default(
 				"b080d44c77359c710a077d27defc304f35ca29f9a9e2640229932754c280e1f3",
 			)),
 		field.Bytes("operator_signature").
 			Optional().
 			Unique().
+			Comment("This operator's signature over the token transaction.").
 			Annotations(entexample.Default(
 				"3045022100b4c13a5981906feb26537785b20df6a6780a18ebdc5485fac482871a6f046e640220251ec169ec46fa06195577f3549bfcc6d74b5b8dd2ec0b5b595d844bfb53a211",
 			)),
 		field.Enum("status").
 			GoType(st.TokenTransactionStatus("")).
 			Optional().
+			Comment("Current processing status of the token transaction.").
 			Annotations(entexample.Default(st.TokenTransactionStatusFinalized)),
 		field.Time("expiry_time").
 			Optional().
-			Immutable(),
+			Immutable().
+			Comment("When this token transaction expires if not finalized."),
 		field.Bytes("coordinator_public_key").
 			Optional().
 			GoType(keys.Public{}).
+			Comment("Public key of the coordinator operator orchestrating this transaction.").
 			Annotations(entexample.Default(
 				"03acd9a5a88db102730ff83dee69d69088cc4c9d93bbee893e90fd5051b7da9651",
 			)),
 		field.Time("client_created_timestamp").
-			Optional(),
+			Optional().
+			Comment("Client-provided timestamp for when this transaction was created."),
 		field.Int("version").
 			GoType(st.TokenTransactionVersion(0)).
 			Default(int(st.TokenTransactionVersionV0)).
+			Comment("Protocol version of the token transaction format.").
 			Validate(func(v int) error {
 				if !st.TokenTransactionVersion(v).IsValid() {
 					return fmt.Errorf("invalid token transaction version: %d", v)
@@ -72,7 +80,8 @@ func (TokenTransaction) Fields() []ent.Field {
 			}).
 			Annotations(entexample.Default(st.TokenTransactionVersionV2)),
 		field.Uint64("validity_duration_seconds").
-			Optional(),
+			Optional().
+			Comment("Duration in seconds for which this transaction is valid."),
 	}
 }
 
