@@ -846,7 +846,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "backfill_mimo_transfers",
 				RunInTestEnv: true,
-				Disabled:     true,
+				Disabled:     false,
 				Timeout:      &backfillMimoTransfersTaskTimeout,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					result, err := backfill.BackfillMimoTransfers(ctx, config, 1000)
