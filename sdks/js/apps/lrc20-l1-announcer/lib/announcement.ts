@@ -1,7 +1,7 @@
 import { Buffer } from "buffer";
 import { TokenPubkey } from "./types.js";
 
-const MAX_NAME_SIZE = 17;
+const MAX_NAME_SIZE = 20;
 const MIN_NAME_SIZE = 3;
 const MAX_SYMBOL_SIZE = 6;
 const MIN_SYMBOL_SIZE = 3;
@@ -26,6 +26,18 @@ export class TokenPubkeyAnnouncement {
     if (symbolBytes < MIN_SYMBOL_SIZE || symbolBytes > MAX_SYMBOL_SIZE) {
       throw new Error(
         `Byte length of token ticker: ${symbol} is out of range. ${symbolBytes}, must be between ${MIN_SYMBOL_SIZE} and ${MAX_SYMBOL_SIZE}`,
+      );
+    }
+
+    if (!Number.isSafeInteger(decimal) || decimal < 0 || decimal > 255) {
+      throw new Error(
+        `decimal must be an integer between 0 and 255, got ${decimal}`,
+      );
+    }
+
+    if (maxSupply < 0n || maxSupply > 2n ** 128n - 1n) {
+      throw new Error(
+        `maxSupply must be between 0 and 2^128-1, got ${maxSupply}`,
       );
     }
   }
