@@ -1649,6 +1649,9 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pbsp
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
 	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqIdentityPubKey); err != nil {
+		return nil, err
+	}
 
 	preimageRequest, err := tx.PreimageRequest.Query().Where(
 		preimagerequest.PaymentHashEQ(req.PaymentHash),
