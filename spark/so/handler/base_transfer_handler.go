@@ -341,7 +341,7 @@ func (h *BaseTransferHandler) createTransfer(
 
 	// For counter swap v3, we need to validate the primary transfer is in the right status and has enough time left.
 	if transferType == st.TransferTypeCounterSwapV3 {
-		primaryTransfer, err := db.Transfer.Query().Where(enttransfer.IDEQ(primaryTransferId)).Only(ctx)
+		primaryTransfer, err := db.Transfer.Query().Where(enttransfer.IDEQ(primaryTransferId)).ForUpdate().Only(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to find primary swap transfer id=%s", primaryTransferId.String())
 		}

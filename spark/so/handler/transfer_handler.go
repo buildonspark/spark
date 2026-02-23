@@ -4084,7 +4084,7 @@ func updateSwapPrimaryTransferToStatus(ctx context.Context, counterTransfer *ent
 	if err != nil {
 		return fmt.Errorf("unable to get db before updating transfer status: %w", err)
 	}
-	primaryTransfer, err := db.Transfer.QueryPrimarySwapTransfer(counterTransfer).Only(ctx)
+	primaryTransfer, err := db.Transfer.QueryPrimarySwapTransfer(counterTransfer).ForUpdate().Only(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to load primary transfer: %w", err)
 	}
