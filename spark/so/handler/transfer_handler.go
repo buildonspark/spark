@@ -3194,7 +3194,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	defer span.End()
 	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
 		return nil, err
@@ -3202,7 +3202,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
-		return nil, fmt.Errorf("invalid transfer ID: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer ID: %w", err))
 	}
 
 	transfer, err := h.loadTransferForUpdate(ctx, transferID, sql.WithLockAction(sql.NoWait))
@@ -3211,7 +3211,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
 	if !transfer.ReceiverIdentityPubkey.Equals(reqOwnerIDPubKey) {
-		return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", transferID)
+		return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", transferID))
 	}
 
 	switch transfer.Status {
@@ -3239,7 +3239,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, fmt.Errorf("unable to load leaves to transfer for transfer %s: %w", transferID, err)
 	}
 	if len(leavesToTransfer) != len(req.SigningJobs) {
-		return nil, fmt.Errorf("inconsistent leaves to claim for transfer %s", transferID)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("inconsistent leaves to claim for transfer %s", transferID))
 	}
 
 	keyTweakProofs := map[string]*pb.SecretProof{}
@@ -3636,7 +3636,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 			switch receiver.Status {
 			case st.TransferReceiverStatusSenderInitiated:
 				if !hasClaimPackage {
-					return fmt.Errorf("receiver %s is at status SenderInitiated but no encrypted_claim_key_tweak_package provided", receiver.ID)
+					return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("receiver %s is at status SenderInitiated but no encrypted_claim_key_tweak_package provided", receiver.ID))
 				}
 			case st.TransferReceiverStatusKeyTweaked,
 				st.TransferReceiverStatusKeyTweakLocked:
@@ -3654,7 +3654,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		case st.TransferStatusSenderKeyTweaked:
 			// Only valid when encrypted claim key tweak package is provided (from claim_transfer endpoint).
 			if !hasClaimPackage {
-				return fmt.Errorf("transfer %s is at status SenderKeyTweaked but no encrypted_claim_key_tweak_package provided", transferID)
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer %s is at status SenderKeyTweaked but no encrypted_claim_key_tweak_package provided", transferID))
 			}
 		case st.TransferStatusReceiverKeyTweaked:
 		case st.TransferStatusReceiverKeyTweakLocked:

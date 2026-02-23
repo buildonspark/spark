@@ -1231,12 +1231,12 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pbspar
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, requireDirectTx bool, expireTimeOverride *time.Time) (*pbspark.InitiatePreimageSwapResponse, error) {
 	if req.Transfer == nil {
-		return nil, fmt.Errorf("transfer is required")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
 	}
 
 	ownerIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse owner identity public key: %w", err))
 	}
 
 	if err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerIdentityPubKey); err != nil {
@@ -1244,20 +1244,20 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	}
 
 	if len(req.Transfer.LeavesToSend) == 0 {
-		return nil, fmt.Errorf("at least one cpfp leaf tx must be provided")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one cpfp leaf tx must be provided"))
 	}
 
 	if req.Transfer.ReceiverIdentityPublicKey == nil {
-		return nil, fmt.Errorf("receiver identity public key is required")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("receiver identity public key is required"))
 	}
 
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && req.FeeSats != 0 {
-		return nil, fmt.Errorf("fee is not allowed for receive preimage swap")
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("fee is not allowed for receive preimage swap"))
 	}
 
 	receiverIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetReceiverIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse receiver identity public key: %w", err))
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
@@ -1355,14 +1355,14 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	// TODO: (LIG-8397) Remove once we can remove transfer
 	expiryTime := req.Transfer.ExpiryTime.AsTime()
 	if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
-		return nil, fmt.Errorf("expiry time is before current time")
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expiry time is before current time"))
 	}
 
 	transferHandler := NewTransferHandler(h.config)
 	var keyTweakMap map[string]*pbspark.SendLeafKeyTweak
 	transferID, err := uuid.Parse(req.GetTransfer().GetTransferId())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer id: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer id: %w", err))
 	}
 	if req.TransferRequest != nil {
 		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, transferID, req.TransferRequest.TransferPackage, ownerIdentityPubKey)

@@ -1375,7 +1375,7 @@ func validateSingleLeafRefundTxs(
 
 		if hasDirectRefundTx {
 			if isZeroNode && enforceDirectRefundTxValidation {
-				return fmt.Errorf("leaf %s is a zero node, zero nodes must not have a direct refund tx", node.ID.String())
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("leaf %s is a zero node, zero nodes must not have a direct refund tx", node.ID.String()))
 			}
 			if err := bitcointransaction.VerifyTransactionWithDatabase(
 				ctx,
@@ -1793,11 +1793,11 @@ func (h *BaseTransferHandler) validateKeyTweakProofs(ctx context.Context, transf
 
 		keyTweakProof, ok := senderKeyTweakProofs[keyTweakProto.LeafId]
 		if !ok {
-			return fmt.Errorf("key tweak proof not found for leaf: %s", keyTweakProto.LeafId)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("key tweak proof not found for leaf: %s", keyTweakProto.LeafId))
 		}
 
 		if !slices.EqualFunc(keyTweakProof.Proofs, keyTweakProto.SecretShareTweak.Proofs, bytes.Equal) {
-			return fmt.Errorf("sender key tweak proof mismatch")
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof mismatch"))
 		}
 	}
 	return nil
