@@ -349,9 +349,9 @@ func (h *BaseTransferHandler) createTransfer(
 		if primaryTransfer.Status != st.TransferStatusSenderKeyTweakPending && primaryTransfer.Status != st.TransferStatusSenderInitiatedCoordinator {
 			return nil, nil, fmt.Errorf("primary swap transfer %s is not in the right status, got %s", primaryTransferId.String(), primaryTransfer.Status)
 		}
-		// Add 30 second buffer to prevent counter transfer creation too close to expiry time
+		// Add safety buffer to prevent counter transfer creation too close to expiry time
 		if primaryTransfer.ExpiryTime.Before(time.Now().Add(PrimaryTransferExpiryTimeSafetyBuffer)) {
-			return nil, nil, fmt.Errorf("primary swap transfer %s has expired or expires within 30 seconds, expiry time is %s", primaryTransferId.String(), primaryTransfer.ExpiryTime.String())
+			return nil, nil, fmt.Errorf("primary swap transfer %s has expired or is about to expire (within safety buffer of %v), expiry time is %s", primaryTransferId.String(), PrimaryTransferExpiryTimeSafetyBuffer, primaryTransfer.ExpiryTime.String())
 		}
 		transferCreate.SetPrimarySwapTransfer(primaryTransfer)
 		// The counter transfer amount should be the same as the primary transfer amount until we implement fees. Then we should probably validate a statement from the user that they accepted the fees.
