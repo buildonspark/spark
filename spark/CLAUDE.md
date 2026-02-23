@@ -29,6 +29,8 @@ mise format       # or: golangci-lint fmt
 ### Database Migrations
 ```bash
 ./scripts/gen-migration.sh <migration_name>   # After schema changes
+./scripts/check-migration-safety.sh <file>    # Check for locking hazards
+/review-migration                             # Detailed analysis with safe rewrites (ls-claude plugin)
 ```
 
 ### Development Environment
@@ -77,6 +79,8 @@ Key entities in `so/ent/schema/`:
 1. Edit files in `so/ent/schema/`
 2. Run `mise gen-ent`
 3. Run `./scripts/gen-migration.sh <name>`
+4. Run `./scripts/check-migration-safety.sh` on the generated file — auto-generated migrations use unsafe locking patterns for FK additions, indexes, and constraints on existing tables
+5. If issues are flagged, run `/review-migration` for detailed analysis with safe rewrites (requires the [ls-claude](https://github.com/lightsparkdev/ls-claude) plugin)
 
 ### Transaction Management
 Transactions are automatically managed by the gRPC middleware (`so/grpc/database_middleware.go`):
