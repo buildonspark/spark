@@ -643,9 +643,7 @@ func TestConcurrentCreateCommit_IndependentResponses(t *testing.T) {
 	responses := make([]*tokenpb.CommitTransactionResponse, goroutines)
 
 	for i := range goroutines {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			tokenID := fmt.Appendf(nil, "token-%d", i)
 			// This mirrors what CommitTransaction does for Create transactions
 			// after the fix: construct a fresh response per call.
@@ -654,7 +652,7 @@ func TestConcurrentCreateCommit_IndependentResponses(t *testing.T) {
 				TokenIdentifier: tokenID,
 			}
 			responses[i] = resp
-		}()
+		})
 	}
 	wg.Wait()
 
