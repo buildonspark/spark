@@ -719,6 +719,56 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		assert.Equal(t, confirmationTxid, hex.EncodeToString(response.Utxos[0].Txid))
 	})
 
+	t.Run("non-static deposit address with confirmation txid and UTXO record returns actual vout", func(t *testing.T) {
+		// This test verifies that when a UTXO record exists for a non-static deposit,
+		// the actual vout from the UTXO table is returned instead of hardcoded 0.
+		nonStaticAddress := "bcrt1p_nonstatic_with_utxo_record"
+		confirmationTxid := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+		confirmationTxidBytes, err := hex.DecodeString(confirmationTxid)
+		require.NoError(t, err)
+
+		rng := rand.NewChaCha8([32]byte{10})
+		nsIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		nsSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+		depositAddress, err := tx.DepositAddress.Create().
+			SetAddress(nonStaticAddress).
+			SetOwnerIdentityPubkey(nsIdentityPubKey).
+			SetOwnerSigningPubkey(nsSigningPubKey).
+			SetSigningKeyshare(signingKeyshare).
+			SetIsStatic(false).
+			SetConfirmationTxid(confirmationTxid).
+			SetConfirmationHeight(190).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		// Create a UTXO record linked to this deposit address with vout=2
+		_, err = tx.Utxo.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetTxid(confirmationTxidBytes).
+			SetVout(2).
+			SetBlockHeight(190).
+			SetAmount(5000).
+			SetPkScript([]byte("test_script_nonstatic")).
+			SetDepositAddress(depositAddress).
+			Save(ctx)
+		require.NoError(t, err)
+
+		req := &pb.GetUtxosForAddressRequest{
+			Address: nonStaticAddress,
+			Network: pb.Network_REGTEST,
+			Offset:  0,
+			Limit:   10,
+		}
+
+		response, err := handler.GetUtxosForAddress(ctx, req)
+		require.NoError(t, err)
+		require.Len(t, response.Utxos, 1)
+		assert.Equal(t, confirmationTxid, hex.EncodeToString(response.Utxos[0].Txid))
+		assert.Equal(t, uint32(2), response.Utxos[0].Vout)
+	})
+
 	t.Run("non-static deposit address without confirmation txid", func(t *testing.T) {
 		// Create non-static deposit address without confirmation txid
 		nonStaticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e4"

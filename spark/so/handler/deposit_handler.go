@@ -1607,11 +1607,27 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 		}
 
 		if depositAddress.ConfirmationHeight <= currentBlockHeight.Height-int64(threshold) {
-			utxosResult = append(utxosResult, &pb.UTXO{
-				Txid:    txid,
-				Vout:    0,
-				Network: req.Network,
-			})
+			utxos, err := depositAddress.QueryUtxo().
+				Where(entutxo.Txid(txid)).
+				All(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to query UTXOs for deposit address: %w", err)
+			}
+			if len(utxos) > 0 {
+				for _, u := range utxos {
+					utxosResult = append(utxosResult, &pb.UTXO{
+						Txid:    u.Txid,
+						Vout:    u.Vout,
+						Network: req.Network,
+					})
+				}
+			} else {
+				utxosResult = append(utxosResult, &pb.UTXO{
+					Txid:    txid,
+					Vout:    0,
+					Network: req.Network,
+				})
+			}
 		}
 	}
 
