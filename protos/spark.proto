@@ -539,6 +539,10 @@ message FinalizeDepositTreeCreationRequest {
     UserSignedTxSigningJob refund_tx_signing_job = 4;
     UserSignedTxSigningJob direct_from_cpfp_refund_tx_signing_job = 5;
     // Additional on-chain UTXOs for non-static deposits with multiple UTXOs.
+    // All additional UTXOs must pay to the same deposit address as on_chain_utxo.
+    // For multi-UTXO deposits, all UTXOs (primary + additional) must be confirmed
+    // on-chain before finalization. The root_tx_signing_job.additional_inputs must
+    // contain one InputSigningData per additional UTXO, in the same order.
     repeated UTXO additional_on_chain_utxos = 6;
 }
 

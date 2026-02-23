@@ -1093,7 +1093,13 @@ export interface FinalizeDepositTreeCreationRequest {
   directFromCpfpRefundTxSigningJob:
     | UserSignedTxSigningJob
     | undefined;
-  /** Additional on-chain UTXOs for non-static deposits with multiple UTXOs. */
+  /**
+   * Additional on-chain UTXOs for non-static deposits with multiple UTXOs.
+   * All additional UTXOs must pay to the same deposit address as on_chain_utxo.
+   * For multi-UTXO deposits, all UTXOs (primary + additional) must be confirmed
+   * on-chain before finalization. The root_tx_signing_job.additional_inputs must
+   * contain one InputSigningData per additional UTXO, in the same order.
+   */
   additionalOnChainUtxos: UTXO[];
 }
 

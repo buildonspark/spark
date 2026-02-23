@@ -3140,6 +3140,10 @@ type FinalizeDepositTreeCreationRequest struct {
 	RefundTxSigningJob               *UserSignedTxSigningJob `protobuf:"bytes,4,opt,name=refund_tx_signing_job,json=refundTxSigningJob,proto3" json:"refund_tx_signing_job,omitempty"`
 	DirectFromCpfpRefundTxSigningJob *UserSignedTxSigningJob `protobuf:"bytes,5,opt,name=direct_from_cpfp_refund_tx_signing_job,json=directFromCpfpRefundTxSigningJob,proto3" json:"direct_from_cpfp_refund_tx_signing_job,omitempty"`
 	// Additional on-chain UTXOs for non-static deposits with multiple UTXOs.
+	// All additional UTXOs must pay to the same deposit address as on_chain_utxo.
+	// For multi-UTXO deposits, all UTXOs (primary + additional) must be confirmed
+	// on-chain before finalization. The root_tx_signing_job.additional_inputs must
+	// contain one InputSigningData per additional UTXO, in the same order.
 	AdditionalOnChainUtxos []*UTXO `protobuf:"bytes,6,rep,name=additional_on_chain_utxos,json=additionalOnChainUtxos,proto3" json:"additional_on_chain_utxos,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache

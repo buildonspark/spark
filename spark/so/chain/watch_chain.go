@@ -31,6 +31,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	entutxo "github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/tree"
@@ -264,6 +265,25 @@ func scanChainUpdates(
 		err = setDepositAvailability(ctx, dbClient, deposits, network)
 		if err != nil {
 			return fmt.Errorf("failed to set deposit availability: %w", err)
+		}
+
+		// Mark individual UTXOs as confirmed once they meet the confirmation threshold.
+		// Each UTXO is tracked independently since new UTXOs can arrive at the same
+		// deposit address after the first one was confirmed.
+		// UTXOs are only created in connectBlocks (above) when scanning chain data for
+		// outputs matching deposit addresses, with BlockHeight set to the block they
+		// were found in. This bulk update catches all UTXOs that have reached the
+		// required number of confirmations.
+		threshold := getNonStaticConfirmationThreshold(bitcoindConfig)
+		maxUtxoBlockHeight := latestBlockHeight - threshold + 1
+		_, err = dbClient.Utxo.Update().
+			Where(entutxo.AvailabilityConfirmedAtIsNil()).
+			Where(entutxo.BlockHeightLTE(maxUtxoBlockHeight)).
+			Where(entutxo.NetworkEQ(network)).
+			SetAvailabilityConfirmedAt(time.Now()).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to mark UTXOs as confirmed: %w", err)
 		}
 	}
 
@@ -711,6 +731,21 @@ func handleBlock(
 			if err != nil {
 				return err
 			}
+		}
+	}
+
+	// Mark individual UTXOs as confirmed when the multi-confirmation knob is off.
+	// Each UTXO is tracked independently since new UTXOs can arrive at the same
+	// deposit address after the first one was confirmed.
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMultipleConfirmationForNonStaticDeposit, 0) == 0 {
+		_, err = dbClient.Utxo.Update().
+			Where(entutxo.AvailabilityConfirmedAtIsNil()).
+			Where(entutxo.BlockHeight(blockHeight)).
+			Where(entutxo.NetworkEQ(network)).
+			SetAvailabilityConfirmedAt(time.Now()).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to mark UTXOs as confirmed at block %d: %w", blockHeight, err)
 		}
 	}
 

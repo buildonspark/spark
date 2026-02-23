@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark/so/frost"
 	"github.com/lightsparkdev/spark/so/handler"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
@@ -379,7 +380,10 @@ func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
 	require.Nil(t, resp.RootNode.ParentNodeId, "must be a root node")
 	require.Equal(t, resp.RootNode.Id, leafID)
 	require.Equal(t, uint64(100_000), resp.RootNode.Value)
-	require.Equal(t, resp.RootNode.Status, string(st.TreeNodeStatusCreating))
+	require.True(t,
+		resp.RootNode.Status == string(st.TreeNodeStatusCreating) ||
+			resp.RootNode.Status == string(st.TreeNodeStatusAvailable),
+		"status should be CREATING or AVAILABLE depending on confirmation, got %s", resp.RootNode.Status)
 
 	tx, err := common.TxFromRawTxBytes(resp.RootNode.NodeTx)
 	require.NoError(t, err)
@@ -1475,6 +1479,161 @@ func TestStartDepositTreeCreationDirectTxValidation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 	})
+}
+
+func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	privKey := keys.GeneratePrivateKey()
+	leafID := uuid.NewString()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+	require.NoError(t, err)
+
+	client := sparktesting.GetBitcoinClient()
+
+	// Fund two separate UTXOs to the same deposit address
+	coin1, err := faucet.Fund()
+	require.NoError(t, err)
+	depositTx1, err := sparktesting.CreateTestDepositTransaction(coin1.OutPoint, depositResp.DepositAddress.Address, 60_000)
+	require.NoError(t, err)
+	signedDepositTx1, err := sparktesting.SignFaucetCoin(depositTx1, coin1.TxOut, coin1.Key)
+	require.NoError(t, err)
+	_, err = client.SendRawTransaction(signedDepositTx1, true)
+	require.NoError(t, err)
+
+	coin2, err := faucet.Fund()
+	require.NoError(t, err)
+	depositTx2, err := sparktesting.CreateTestDepositTransaction(coin2.OutPoint, depositResp.DepositAddress.Address, 40_000)
+	require.NoError(t, err)
+	signedDepositTx2, err := sparktesting.SignFaucetCoin(depositTx2, coin2.TxOut, coin2.Key)
+	require.NoError(t, err)
+	_, err = client.SendRawTransaction(signedDepositTx2, true)
+	require.NoError(t, err)
+
+	// Mine 3 blocks to meet confirmation threshold
+	randomKey := keys.GeneratePrivateKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
+	require.NoError(t, err)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
+	require.NoError(t, err)
+
+	time.Sleep(3 * time.Second)
+
+	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	require.NoError(t, err)
+
+	utxos := []wallet.DepositUTXO{
+		{Tx: depositTx1, Vout: 0},
+		{Tx: depositTx2, Vout: 0},
+	}
+
+	resp, err := wallet.CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(ctx, config, privKey, verifyingKey, utxos)
+	require.NoError(t, err, "multi-UTXO FinalizeDepositTreeCreation should succeed")
+
+	require.NotNil(t, resp.RootNode)
+	require.Nil(t, resp.RootNode.ParentNodeId)
+	require.Equal(t, leafID, resp.RootNode.Id)
+	require.Equal(t, uint64(100_000), resp.RootNode.Value)
+	require.Equal(t, string(st.TreeNodeStatusAvailable), resp.RootNode.Status)
+
+	// Verify root tx has 2 inputs (multi-UTXO) and 2 outputs
+	tx, err := common.TxFromRawTxBytes(resp.RootNode.NodeTx)
+	require.NoError(t, err)
+	require.Len(t, tx.TxIn, 2)
+	require.Len(t, tx.TxOut, 2)
+
+	// Verify all root tx input signatures are valid using multi-input verification
+	prevOutputs := make(map[wire.OutPoint]*wire.TxOut)
+	prevOutputs[wire.OutPoint{Hash: signedDepositTx1.TxHash(), Index: 0}] = signedDepositTx1.TxOut[0]
+	prevOutputs[wire.OutPoint{Hash: signedDepositTx2.TxHash(), Index: 0}] = signedDepositTx2.TxOut[0]
+	prevOutputFetcher := txscript.NewMultiPrevOutFetcher(prevOutputs)
+	err = common.VerifySignatureMultiInput(tx, prevOutputFetcher)
+	require.NoError(t, err, "root tx multi-input signatures should be valid")
+
+	// Verify refund tx signature is valid
+	refundTx, err := common.TxFromRawTxBytes(resp.RootNode.RefundTx)
+	require.NoError(t, err)
+	require.Len(t, refundTx.TxIn, 1)
+	require.Len(t, refundTx.TxIn[0].Witness, 1)
+	nodeTxPrevOut := &wire.TxOut{
+		Value:    tx.TxOut[0].Value,
+		PkScript: tx.TxOut[0].PkScript,
+	}
+	err = common.VerifySignatureSingleInput(refundTx, 0, nodeTxPrevOut)
+	require.NoError(t, err, "refund tx signature should be valid")
+
+	// Verify directFromCpfpRefund tx signature is valid
+	directFromCpfpRefundTx, err := common.TxFromRawTxBytes(resp.RootNode.DirectFromCpfpRefundTx)
+	require.NoError(t, err)
+	require.Len(t, directFromCpfpRefundTx.TxIn, 1)
+	require.Len(t, directFromCpfpRefundTx.TxIn[0].Witness, 1)
+	err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, nodeTxPrevOut)
+	require.NoError(t, err, "directFromCpfpRefund tx signature should be valid")
+
+}
+
+func TestFinalizeDepositTreeCreationMultiUtxoWrongInputOrder(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	privKey := keys.GeneratePrivateKey()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), nil, false)
+	require.NoError(t, err)
+
+	client := sparktesting.GetBitcoinClient()
+
+	// Fund two separate UTXOs to the same deposit address
+	coin1, err := faucet.Fund()
+	require.NoError(t, err)
+	depositTx1, err := sparktesting.CreateTestDepositTransaction(coin1.OutPoint, depositResp.DepositAddress.Address, 60_000)
+	require.NoError(t, err)
+	signedDepositTx1, err := sparktesting.SignFaucetCoin(depositTx1, coin1.TxOut, coin1.Key)
+	require.NoError(t, err)
+	_, err = client.SendRawTransaction(signedDepositTx1, true)
+	require.NoError(t, err)
+
+	coin2, err := faucet.Fund()
+	require.NoError(t, err)
+	depositTx2, err := sparktesting.CreateTestDepositTransaction(coin2.OutPoint, depositResp.DepositAddress.Address, 40_000)
+	require.NoError(t, err)
+	signedDepositTx2, err := sparktesting.SignFaucetCoin(depositTx2, coin2.TxOut, coin2.Key)
+	require.NoError(t, err)
+	_, err = client.SendRawTransaction(signedDepositTx2, true)
+	require.NoError(t, err)
+
+	// Mine 3 blocks to meet confirmation threshold
+	randomKey := keys.GeneratePrivateKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
+	require.NoError(t, err)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
+	require.NoError(t, err)
+
+	time.Sleep(3 * time.Second)
+
+	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	require.NoError(t, err)
+
+	// Build a root tx with SWAPPED input order: depositTx2 first (should be depositTx1 since
+	// depositTx1 is declared as primary UTXO in the request).
+	// The server expects primary UTXO as input 0, but we put the additional UTXO first.
+	_, err = wallet.CreateTreeRootWithFinalizeDepositTreeCreationWrongOrder(
+		ctx, config, privKey, verifyingKey, depositTx1, depositTx2,
+	)
+	require.Error(t, err, "should reject root tx with wrong input order")
+	assert.Contains(t, err.Error(), "multi-input root tx does not match expected construction")
 }
 
 func signingJobFromTx(t *testing.T, publicKey keys.Public, tx *wire.MsgTx) *pb.SigningJob {

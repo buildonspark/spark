@@ -1728,7 +1728,7 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 	}
 
 	// Step 1: Validate request and get deposit address
-	depositAddress, onChainTx, onChainOutput, err := loadAndValidateDepositAddress(ctx, network, req, reqIDPubKey)
+	depositAddress, onChainTx, onChainOutput, additionalUtxos, err := loadAndValidateDepositAddress(ctx, network, req, reqIDPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1741,13 +1741,13 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 	logger.Sugar().Infof("Finalizing deposit tree creation for address %s", depositAddress.Address)
 
 	// Step 2: Prepare signing jobs with pregenerated nonces
-	signingJobs, verifyingKey, err := o.prepareSigningJobs(req, depositAddress, onChainTx, onChainOutput)
+	signingJobs, verifyingKey, rootTxInputCount, err := o.prepareSigningJobs(req, depositAddress, onChainTx, onChainOutput, additionalUtxos)
 	if err != nil {
 		return nil, err
 	}
 
 	// Convert to SigningJobWithPregeneratedNonce using SE commitments from request
-	signingJobsWithNonce, err := o.convertToSigningJobsWithPregeneratedNonce(signingJobs, req)
+	signingJobsWithNonce, err := o.convertToSigningJobsWithPregeneratedNonce(signingJobs, req, rootTxInputCount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert signing jobs: %w", err)
 	}
@@ -1772,7 +1772,7 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse root signing key: %w", err)
 	}
-	signatures, err := o.aggregateSignatures(ctx, config, req, signingResults, verifyingKey, rootSigningPubKey)
+	signatures, err := o.aggregateSignatures(ctx, config, req, signingResults, verifyingKey, rootSigningPubKey, rootTxInputCount)
 	if err != nil {
 		return nil, err
 	}
@@ -1780,14 +1780,19 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 	logger.Sugar().Infof("Successfully aggregated %d signatures", len(signatures))
 
 	// Step 5: Apply signatures to transactions
-	signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx, err := o.applySignaturesToTransactions(req, signatures)
+	signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx, err := o.applySignaturesToTransactions(req, signatures, rootTxInputCount)
 	if err != nil {
 		return nil, err
 	}
 
+	// Step 5b: Verify signed transactions using Bitcoin script engine
+	if err := o.verifySignedTransactions(signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx, onChainTx, onChainOutput, additionalUtxos); err != nil {
+		return nil, fmt.Errorf("signed transaction verification failed: %w", err)
+	}
+
 	// Step 6: Create tree and node in database with signed transactions
 	// Note: The tree is automatically linked to deposit address via SetDepositAddress() in createTreeAndNode
-	createdTree, createdNode, err := o.createTreeAndNode(ctx, depositAddress, onChainTx, onChainOutput, req, network, verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
+	createdTree, createdNode, err := o.createTreeAndNode(ctx, depositAddress, onChainTx, onChainOutput, additionalUtxos, req.OnChainUtxo.Vout, network, verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
 	if err != nil {
 		return nil, err
 	}
