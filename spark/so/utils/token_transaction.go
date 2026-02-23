@@ -1554,6 +1554,13 @@ func ValidateFinalTokenTransaction(
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("creation entity public key does not match the reserved entity public key"))
 		}
 	case TokenTransactionTypeMint, TokenTransactionTypeTransfer:
+		if len(tokenTransaction.TokenOutputs) != len(config.ExpectedRevocationPublicKeys) {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
+				"number of token outputs (%d) does not match number of expected revocation public keys (%d)",
+				len(tokenTransaction.TokenOutputs),
+				len(config.ExpectedRevocationPublicKeys),
+			))
+		}
 		for i, output := range tokenTransaction.TokenOutputs {
 			revocationCommitment, err := keys.ParsePublicKey(output.GetRevocationCommitment())
 			if err != nil {

@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"math/big"
 	"math/rand/v2"
 	"strings"
 	"testing"
@@ -21,6 +22,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/entfixtures"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/utils"
@@ -325,4 +327,162 @@ func TestPrepareTokenTransactionInternal_MintIssuerAuthorizationCheck(t *testing
 
 	_, err = handler.PrepareTokenTransactionInternal(ctx, legitimateReq)
 	require.NoError(t, err, "Legitimate issuer should be able to mint")
+}
+
+// TestPrepareTokenTransactionInternal_TransferSignatureIndexNormalization proves that
+// ownership signatures passed out-of-order (by InputIndex) are correctly stored in
+// the database after the C3 fix.
+//
+// Before the fix, createTransactionEntities used positional indexing:
+//
+//	signaturesWithIndex[outputIndex].Signature
+//
+// If the caller passed [{InputIndex:1, sig1}, {InputIndex:0, sig0}], the signature
+// intended for input 1 would be stored for input 0 and vice versa. On retry/finalization
+// this would cause signature-verification failures.
+//
+// After the fix, the slice is sorted by InputIndex before the loop, so sig0 is always
+// stored with input 0 and sig1 with input 1, regardless of the order they arrive in.
+func TestPrepareTokenTransactionInternal_TransferSignatureIndexNormalization(t *testing.T) {
+	t.Parallel()
+	rng := rand.NewChaCha8([32]byte{99})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbtx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	f := entfixtures.New(t, ctx, dbtx).WithRNG(rng)
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewInternalPrepareTokenHandler(cfg)
+	network := btcnetwork.Regtest
+
+	// Two owner key pairs: each input will be owned by a different key so we can
+	// detect a cross-assignment if signatures are stored under the wrong input.
+	ownerKey0 := keys.MustGeneratePrivateKeyFromRand(rng) // signs InputIndex=0
+	ownerKey1 := keys.MustGeneratePrivateKeyFromRand(rng) // signs InputIndex=1
+
+	_, tokenCreate := f.CreateTokenCreateWithIssuer(network, f.RandomBytes(32), big.NewInt(1000000))
+
+	// Create two finalized mint outputs with distinct owner keys.
+	amount := big.NewInt(100)
+	_, mintOutputs := f.CreateMintTransaction(
+		tokenCreate,
+		[]entfixtures.OutputSpec{
+			{Amount: amount, Owner: ownerKey0.Public()},
+			{Amount: amount, Owner: ownerKey1.Public()},
+		},
+		st.TokenTransactionStatusFinalized,
+	)
+	input0 := mintOutputs[0] // CreatedTransactionOutputVout == 0, owned by ownerKey0
+	input1 := mintOutputs[1] // CreatedTransactionOutputVout == 1, owned by ownerKey1
+
+	// Create a keyshare for the single transfer output's revocation commitment.
+	ks := f.CreateKeyshare()
+
+	// Build the final transfer proto: 2 inputs → 1 output (balanced).
+	now := time.Now()
+	pbNet, err := network.MarshalProto()
+	require.NoError(t, err)
+	cfgVals := cfg.Lrc20Configs[strings.ToLower(network.String())]
+
+	recipientPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	transferAmountBytes := make([]byte, 16)
+	big.NewInt(200).FillBytes(transferAmountBytes)
+
+	txProto := &tokenpb.TokenTransaction{
+		Version: 2,
+		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+			TransferInput: &tokenpb.TokenTransferInput{
+				OutputsToSpend: []*tokenpb.TokenOutputToSpend{
+					// InputIndex=0 → owned by ownerKey0
+					{
+						PrevTokenTransactionHash: input0.CreatedTransactionFinalizedHash,
+						PrevTokenTransactionVout: uint32(input0.CreatedTransactionOutputVout),
+					},
+					// InputIndex=1 → owned by ownerKey1
+					{
+						PrevTokenTransactionHash: input1.CreatedTransactionFinalizedHash,
+						PrevTokenTransactionVout: uint32(input1.CreatedTransactionOutputVout),
+					},
+				},
+			},
+		},
+		TokenOutputs: []*tokenpb.TokenOutput{
+			{
+				Id:                            proto.String(uuid.Must(uuid.NewV7()).String()),
+				OwnerPublicKey:                recipientPub.Serialize(),
+				TokenIdentifier:               tokenCreate.TokenIdentifier,
+				TokenAmount:                   transferAmountBytes,
+				RevocationCommitment:          ks.PublicKey.Serialize(),
+				WithdrawBondSats:              &cfgVals.WithdrawBondSats,
+				WithdrawRelativeBlockLocktime: &cfgVals.WithdrawRelativeBlockLocktime,
+			},
+		},
+		Network:                         pbNet,
+		ExpiryTime:                      timestamppb.New(now.Add(24 * time.Hour)),
+		ClientCreatedTimestamp:          timestamppb.New(now),
+		SparkOperatorIdentityPublicKeys: nil, // populated below
+	}
+	for _, op := range cfg.GetSigningOperatorList() {
+		txProto.SparkOperatorIdentityPublicKeys = append(txProto.SparkOperatorIdentityPublicKeys, op.PublicKey)
+	}
+
+	// Sign the PARTIAL hash with each owner key.
+	partialHash, err := utils.HashTokenTransaction(txProto, true)
+	require.NoError(t, err)
+
+	sig0Schnorr, err := schnorr.Sign(ownerKey0.ToBTCEC(), partialHash)
+	require.NoError(t, err)
+	sig1Schnorr, err := schnorr.Sign(ownerKey1.ToBTCEC(), partialHash)
+	require.NoError(t, err)
+
+	// KEY PART: pass signatures in REVERSED order.
+	// InputIndex=1 comes first, InputIndex=0 comes second.
+	// Without the fix, sig1 ends up stored for input 0 (positional mismatch).
+	// With the fix (sort before persist), each sig is stored with its correct input.
+	signaturesOutOfOrder := []*tokenpb.SignatureWithIndex{
+		{InputIndex: 1, Signature: sig1Schnorr.Serialize()},
+		{InputIndex: 0, Signature: sig0Schnorr.Serialize()},
+	}
+
+	operatorList := cfg.GetSigningOperatorList()
+	var firstOperator *sparkpb.SigningOperatorInfo
+	for _, op := range operatorList {
+		firstOperator = op
+		break
+	}
+
+	req := &tokeninternalpb.PrepareTransactionRequest{
+		FinalTokenTransaction:      txProto,
+		TokenTransactionSignatures: signaturesOutOfOrder,
+		KeyshareIds:                []string{ks.ID.String()},
+		CoordinatorPublicKey:       firstOperator.PublicKey,
+	}
+
+	// The handler should accept the request (validation uses InputIndex correctly).
+	_, err = handler.PrepareTokenTransactionInternal(ctx, req)
+	require.NoError(t, err, "transfer with out-of-order signatures should be accepted")
+
+	// Reload the spent inputs from the database.
+	spentOutputs, err := dbtx.TokenOutput.Query().
+		Where(tokenoutput.IDIn(input0.ID, input1.ID)).
+		All(ctx)
+	require.NoError(t, err)
+	require.Len(t, spentOutputs, 2)
+
+	sigByID := make(map[uuid.UUID][]byte, 2)
+	for _, o := range spentOutputs {
+		sigByID[o.ID] = o.SpentOwnershipSignature
+	}
+
+	// With the fix, sig0 must be stored against input0 (ownerKey0),
+	// and sig1 must be stored against input1 (ownerKey1).
+	// Without the fix these assertions fail because the signatures are swapped.
+	require.NoError(t,
+		utils.ValidateOwnershipSignature(sigByID[input0.ID], partialHash, ownerKey0.Public()),
+		"input0 must carry ownerKey0's signature after normalization",
+	)
+	require.NoError(t,
+		utils.ValidateOwnershipSignature(sigByID[input1.ID], partialHash, ownerKey1.Public()),
+		"input1 must carry ownerKey1's signature after normalization",
+	)
 }

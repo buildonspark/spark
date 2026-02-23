@@ -252,12 +252,17 @@ func createTransactionEntities(
 		if err != nil {
 			return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create transfer token transaction: %w", err))
 		}
-		for outputIndex, outputToSpendEnt := range orderedOutputToSpendEnts {
+		outputsToSpend := tokenTransaction.GetTransferInput().GetOutputsToSpend()
+		for _, outputToSpendEnt := range orderedOutputToSpendEnts {
+			sig, inputIndex, sigErr := fetchSignatureForOutputToSpend(signaturesWithIndex, outputsToSpend, outputToSpendEnt)
+			if sigErr != nil {
+				return nil, sparkerrors.FailedPreconditionTokenRulesViolation(sigErr)
+			}
 			update := db.TokenOutput.UpdateOne(outputToSpendEnt).
 				SetStatus(inputStatus).
 				SetOutputSpentTokenTransactionID(tokenTransactionEnt.ID).
-				SetSpentOwnershipSignature(signaturesWithIndex[outputIndex].Signature).
-				SetSpentTransactionInputVout(int32(outputIndex)).
+				SetSpentOwnershipSignature(sig).
+				SetSpentTransactionInputVout(int32(inputIndex)).
 				AddOutputSpentStartedTokenTransactions(tokenTransactionEnt)
 			_, err = update.Save(ctx)
 			if err != nil {
@@ -445,6 +450,43 @@ func createTransactionEntities(
 		return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create token outputs: %w", err))
 	}
 	return tokenTransactionEnt, nil
+}
+
+// fetchSignatureForOutputToSpend returns the ownership signature and the transaction input index
+// for the given token output. It locates the output's position in the proto's outputsToSpend list
+// by matching (PrevTokenTransactionHash, PrevTokenTransactionVout) against the entity's stored
+// (CreatedTransactionFinalizedHash, CreatedTransactionOutputVout), then uses that position to
+// look up the correct signature. This makes signature selection independent of the ordering of
+// orderedOutputToSpendEnts.
+func fetchSignatureForOutputToSpend(
+	signaturesWithIndex []*tokenpb.SignatureWithIndex,
+	outputsToSpend []*tokenpb.TokenOutputToSpend,
+	outputToSpendEnt *TokenOutput,
+) (sig []byte, inputIndex uint32, err error) {
+	for i, o := range outputsToSpend {
+		if bytes.Equal(o.PrevTokenTransactionHash, outputToSpendEnt.CreatedTransactionFinalizedHash) &&
+			o.PrevTokenTransactionVout == uint32(outputToSpendEnt.CreatedTransactionOutputVout) {
+			sig, err = fetchSignatureForInput(signaturesWithIndex, uint32(i))
+			return sig, uint32(i), err
+		}
+	}
+	return nil, 0, fmt.Errorf("no output-to-spend entry found for output %s (hash=%x, vout=%d)",
+		outputToSpendEnt.ID,
+		outputToSpendEnt.CreatedTransactionFinalizedHash,
+		outputToSpendEnt.CreatedTransactionOutputVout,
+	)
+}
+
+// fetchSignatureForInput returns the ownership signature whose InputIndex matches
+// inputIndex. It returns an error if no matching entry is found, which prevents
+// out-of-order or missing signatures from being silently persisted against the wrong input.
+func fetchSignatureForInput(signaturesWithIndex []*tokenpb.SignatureWithIndex, inputIndex uint32) ([]byte, error) {
+	for _, s := range signaturesWithIndex {
+		if s.InputIndex == inputIndex {
+			return s.Signature, nil
+		}
+	}
+	return nil, fmt.Errorf("no signature found for input index %d", inputIndex)
 }
 
 func prepareSparkInvoiceCreates(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction, tokenTransactionEnt *TokenTransaction) (map[uuid.UUID]struct{}, []*SparkInvoiceCreate, error) {

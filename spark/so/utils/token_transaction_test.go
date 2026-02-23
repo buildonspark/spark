@@ -2347,6 +2347,165 @@ func TestValidateExecuteBefore(t *testing.T) {
 	}
 }
 
+// TestValidateFinalTokenTransaction_RevocationKeyCardinalityMismatch verifies that
+// ValidateFinalTokenTransaction returns a clear error (not a panic) when the number of
+// token outputs exceeds the number of expected revocation public keys.
+//
+// Before the fix this caused a runtime index-out-of-range panic inside the SO, which
+// a malicious coordinator could exploit to crash all peer operators by submitting a
+// PrepareTransactionRequest with more token outputs than keyshare IDs.
+func TestValidateFinalTokenTransaction_RevocationKeyCardinalityMismatch(t *testing.T) {
+	t.Parallel()
+	rng := rand.NewChaCha8([32]byte{42})
+
+	issuerPriv := keys.MustGeneratePrivateKeyFromRand(rng)
+	revKey1 := keys.MustGeneratePrivateKeyFromRand(rng)
+	revKey2 := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	network := pb.Network_REGTEST
+	bondSats := uint64(1000)
+	locktime := uint64(144)
+	opPub := testSparkOperatorPubKey
+
+	// tokenID must be identical in both MintInput and every output.
+	tokenID := make([]byte, 32)
+	tokenID[0] = 1
+
+	makeOutput := func(revKey keys.Public, id string) *tokenpb.TokenOutput {
+		amount := make([]byte, 16)
+		amount[15] = 10
+		return &tokenpb.TokenOutput{
+			Id:                            proto.String(id),
+			OwnerPublicKey:                issuerPriv.Public().Serialize(),
+			TokenIdentifier:               tokenID,
+			TokenAmount:                   amount,
+			RevocationCommitment:          revKey.Serialize(),
+			WithdrawBondSats:              &bondSats,
+			WithdrawRelativeBlockLocktime: &locktime,
+		}
+	}
+
+	ts := timestamppb.New(time.Now())
+	expiry := timestamppb.New(time.Now().Add(24 * time.Hour))
+
+	// Build a mint transaction with 2 outputs
+	tx2Outputs := &tokenpb.TokenTransaction{
+		Version: 2,
+		TokenInputs: &tokenpb.TokenTransaction_MintInput{
+			MintInput: &tokenpb.TokenMintInput{
+				IssuerPublicKey: issuerPriv.Public().Serialize(),
+				TokenIdentifier: tokenID,
+			},
+		},
+		TokenOutputs: []*tokenpb.TokenOutput{
+			makeOutput(revKey1.Public(), "output-a"),
+			makeOutput(revKey2.Public(), "output-b"),
+		},
+		SparkOperatorIdentityPublicKeys: [][]byte{opPub.Serialize()},
+		Network:                         network,
+		ClientCreatedTimestamp:          ts,
+		ExpiryTime:                      expiry,
+	}
+
+	// Config supplies only ONE revocation public key, but the transaction has TWO outputs.
+	// Before the fix: panic (index out of range at config.ExpectedRevocationPublicKeys[1])
+	// After the fix:  returns an InvalidArgument error describing the mismatch.
+	config := &FinalValidationConfig{
+		ExpectedSparkOperators: map[string]*pb.SigningOperatorInfo{
+			"op1": {PublicKey: opPub.Serialize(), Identifier: "op1"},
+		},
+		SupportedNetworks:             []btcnetwork.Network{btcnetwork.Regtest},
+		ExpectedRevocationPublicKeys:  []keys.Public{revKey1.Public()}, // only 1, but tx has 2 outputs
+		ExpectedBondSats:              bondSats,
+		ExpectedRelativeBlockLocktime: locktime,
+	}
+
+	// Sign with issuer key so the base validation passes
+	partialHash, err := HashTokenTransaction(tx2Outputs, true)
+	require.NoError(t, err)
+	schnorrSig, err := schnorr.Sign(issuerPriv.ToBTCEC(), partialHash)
+	require.NoError(t, err)
+	sigs := []*tokenpb.SignatureWithIndex{{InputIndex: 0, Signature: schnorrSig.Serialize()}}
+
+	err = ValidateFinalTokenTransaction(tx2Outputs, sigs, config)
+	require.Error(t, err, "should reject when output count != revocation key count")
+	require.Contains(t, err.Error(), "number of token outputs",
+		"error message should identify the cardinality mismatch")
+}
+
+// TestValidateFinalTokenTransaction_RevocationKeyCardinalityMatch verifies that
+// ValidateFinalTokenTransaction succeeds when output count equals revocation key count.
+func TestValidateFinalTokenTransaction_RevocationKeyCardinalityMatch(t *testing.T) {
+	t.Parallel()
+	rng := rand.NewChaCha8([32]byte{43})
+
+	issuerPriv := keys.MustGeneratePrivateKeyFromRand(rng)
+	revKey1 := keys.MustGeneratePrivateKeyFromRand(rng)
+	revKey2 := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	network := pb.Network_REGTEST
+	bondSats := uint64(1000)
+	locktime := uint64(144)
+	opPub := testSparkOperatorPubKey
+
+	tokenID := make([]byte, 32)
+	tokenID[0] = 1
+
+	makeOutput := func(revKey keys.Public, idx int) *tokenpb.TokenOutput {
+		amount := make([]byte, 16)
+		amount[15] = 10
+		return &tokenpb.TokenOutput{
+			Id:                            proto.String(fmt.Sprintf("output-%d", idx)),
+			OwnerPublicKey:                issuerPriv.Public().Serialize(),
+			TokenIdentifier:               tokenID,
+			TokenAmount:                   amount,
+			RevocationCommitment:          revKey.Serialize(),
+			WithdrawBondSats:              &bondSats,
+			WithdrawRelativeBlockLocktime: &locktime,
+		}
+	}
+
+	ts := timestamppb.New(time.Now())
+	expiry := timestamppb.New(time.Now().Add(24 * time.Hour))
+
+	tx := &tokenpb.TokenTransaction{
+		Version: 2,
+		TokenInputs: &tokenpb.TokenTransaction_MintInput{
+			MintInput: &tokenpb.TokenMintInput{
+				IssuerPublicKey: issuerPriv.Public().Serialize(),
+				TokenIdentifier: tokenID,
+			},
+		},
+		TokenOutputs: []*tokenpb.TokenOutput{
+			makeOutput(revKey1.Public(), 0),
+			makeOutput(revKey2.Public(), 1),
+		},
+		SparkOperatorIdentityPublicKeys: [][]byte{opPub.Serialize()},
+		Network:                         network,
+		ClientCreatedTimestamp:          ts,
+		ExpiryTime:                      expiry,
+	}
+
+	config := &FinalValidationConfig{
+		ExpectedSparkOperators: map[string]*pb.SigningOperatorInfo{
+			"op1": {PublicKey: opPub.Serialize(), Identifier: "op1"},
+		},
+		SupportedNetworks:             []btcnetwork.Network{btcnetwork.Regtest},
+		ExpectedRevocationPublicKeys:  []keys.Public{revKey1.Public(), revKey2.Public()}, // matches output count
+		ExpectedBondSats:              bondSats,
+		ExpectedRelativeBlockLocktime: locktime,
+	}
+
+	partialHash, err := HashTokenTransaction(tx, true)
+	require.NoError(t, err)
+	schnorrSig, err := schnorr.Sign(issuerPriv.ToBTCEC(), partialHash)
+	require.NoError(t, err)
+	sigs := []*tokenpb.SignatureWithIndex{{InputIndex: 0, Signature: schnorrSig.Serialize()}}
+
+	err = ValidateFinalTokenTransaction(tx, sigs, config)
+	require.NoError(t, err, "matching output and revocation key counts should succeed")
+}
+
 func ptr[T any](v T) *T {
 	return &v
 }
