@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
 )
@@ -504,4 +505,100 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedParties(t *testing.T) {
 			require.ErrorContains(t, err, tt.expectedErrSubstr)
 		})
 	}
+}
+
+func TestCancelTransferInternal_PreimageSwap(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	senderPub := keys.GeneratePrivateKey().Public()
+	receiverPub := keys.GeneratePrivateKey().Public()
+
+	// Cancellation must succeed even when PreimageRequest is PREIMAGE_SHARED.
+	// This handles the wrong-hash scenario: InitiatePreimageSwap sets PREIMAGE_SHARED
+	// during setup, then rolls back after hash mismatch and cancels via gossip.
+	// ReturnStuckTransfers handles its own race via atomic update (n==0 check).
+	t.Run("allows cancellation when preimage already shared", func(t *testing.T) {
+		transfer, err := client.Transfer.Create().
+			SetSenderIdentityPubkey(senderPub).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetStatus(st.TransferStatusSenderKeyTweakPending).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			SetType(st.TransferTypePreimageSwap).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = client.PreimageRequest.Create().
+			SetPaymentHash([]byte("test_hash_shared_32_bytes_long__")).
+			SetStatus(st.PreimageRequestStatusPreimageShared).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetTransfers(transfer).
+			Save(ctx)
+		require.NoError(t, err)
+
+		h := NewBaseTransferHandler(config)
+		err = h.CancelTransferInternal(ctx, transfer.ID)
+		require.NoError(t, err)
+
+		// Verify transfer status was changed to RETURNED
+		updated, err := client.Transfer.Query().Where(enttransfer.ID(transfer.ID)).Only(ctx)
+		require.NoError(t, err)
+		require.Equal(t, st.TransferStatusReturned, updated.Status)
+	})
+
+	t.Run("allows cancellation when preimage not shared", func(t *testing.T) {
+		transfer, err := client.Transfer.Create().
+			SetSenderIdentityPubkey(senderPub).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetStatus(st.TransferStatusSenderKeyTweakPending).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			SetType(st.TransferTypePreimageSwap).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = client.PreimageRequest.Create().
+			SetPaymentHash([]byte("test_hash_waiting_32_bytes_long_")).
+			SetStatus(st.PreimageRequestStatusWaitingForPreimage).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetTransfers(transfer).
+			Save(ctx)
+		require.NoError(t, err)
+
+		h := NewBaseTransferHandler(config)
+		err = h.CancelTransferInternal(ctx, transfer.ID)
+		require.NoError(t, err)
+
+		// Verify transfer status was changed to RETURNED
+		updated, err := client.Transfer.Query().Where(enttransfer.ID(transfer.ID)).Only(ctx)
+		require.NoError(t, err)
+		require.Equal(t, st.TransferStatusReturned, updated.Status)
+	})
+
+	t.Run("allows cancellation of non-preimage-swap transfers", func(t *testing.T) {
+		transfer, err := client.Transfer.Create().
+			SetSenderIdentityPubkey(senderPub).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetStatus(st.TransferStatusSenderKeyTweakPending).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			SetType(st.TransferTypeTransfer).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		h := NewBaseTransferHandler(config)
+		err = h.CancelTransferInternal(ctx, transfer.ID)
+		require.NoError(t, err)
+
+		// Verify transfer status was changed to RETURNED
+		updated, err := client.Transfer.Query().Where(enttransfer.ID(transfer.ID)).Only(ctx)
+		require.NoError(t, err)
+		require.Equal(t, st.TransferStatusReturned, updated.Status)
+	})
 }
