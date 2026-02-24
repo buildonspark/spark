@@ -1329,6 +1329,13 @@ enum UtxoSwapRequestType {
   Instant = 3;
 }
 
+enum UtxoSwapStatus {
+    UTXO_SWAP_STATUS_UNSPECIFIED = 0;
+    UTXO_SWAP_STATUS_CREATED = 1;
+    UTXO_SWAP_STATUS_COMPLETED = 2;
+    UTXO_SWAP_STATUS_CANCELLED = 3;
+}
+
 // Which hash variant to use in cryptographic operations.
 enum HashVariant {
   HASH_VARIANT_UNSPECIFIED = 0;  // Legacy

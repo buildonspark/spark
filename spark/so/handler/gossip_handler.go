@@ -98,6 +98,9 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	case *pbgossip.GossipMessage_RollbackUtxoSwap:
 		rollbackUtxoSwap := gossipMessage.GetRollbackUtxoSwap()
 		err = h.handleRollbackUtxoSwapGossipMessage(ctx, rollbackUtxoSwap)
+	case *pbgossip.GossipMessage_RollbackInstantUtxoSwap:
+		rollbackInstantUtxoSwap := gossipMessage.GetRollbackInstantUtxoSwap()
+		err = h.handleRollbackInstantUtxoSwapGossipMessage(ctx, rollbackInstantUtxoSwap)
 	case *pbgossip.GossipMessage_DepositCleanup:
 		depositCleanup := gossipMessage.GetDepositCleanup()
 		err = h.handleDepositCleanupGossipMessage(ctx, depositCleanup)
@@ -361,6 +364,24 @@ func (h *GossipHandler) handleRollbackUtxoSwapGossipMessage(ctx context.Context,
 	})
 	if err != nil {
 		logger.Error("failed to rollback utxo swap with gossip message", zap.Error(err))
+	}
+	return err
+}
+
+func (h *GossipHandler) handleRollbackInstantUtxoSwapGossipMessage(ctx context.Context, rollbackInstantUtxoSwap *pbgossip.GossipMessageRollbackInstantUtxoSwap) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Info("Handling rollback instant utxo swap gossip message")
+
+	depositHandler := NewInternalDepositHandler(h.config)
+	_, err := depositHandler.RollbackInstantUtxoSwap(ctx, h.config, &pbinternal.RollbackInstantUtxoSwapRequest{
+		OnChainUtxo:          rollbackInstantUtxoSwap.OnChainUtxo,
+		Signature:            rollbackInstantUtxoSwap.Signature,
+		CoordinatorPublicKey: rollbackInstantUtxoSwap.CoordinatorPublicKey,
+		RollbackFromStatuses: rollbackInstantUtxoSwap.RollbackFromStatuses,
+		RollbackToStatus:     rollbackInstantUtxoSwap.RollbackToStatus,
+	})
+	if err != nil {
+		logger.Error("failed to rollback instant utxo swap with gossip message", zap.Error(err))
 	}
 	return err
 }

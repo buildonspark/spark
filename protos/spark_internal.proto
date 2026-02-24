@@ -59,6 +59,8 @@ service SparkInternalService {
 
     // Internal method to cancel a swap for other SOs if one of them failed to ack it
     rpc rollback_utxo_swap(RollbackUtxoSwapRequest) returns (RollbackUtxoSwapResponse) {}
+    // Internal method to cancel an instant UTXO swap for other SOs if one of them failed to ack it
+    rpc rollback_instant_utxo_swap(RollbackInstantUtxoSwapRequest) returns (RollbackInstantUtxoSwapResponse) {}
     // Internal method to mark a swap as COMPLETE in all SOs
     rpc utxo_swap_completed(UtxoSwapCompletedRequest) returns (UtxoSwapCompletedResponse) {}
 
@@ -386,6 +388,17 @@ message RollbackUtxoSwapRequest {
 }
 
 message RollbackUtxoSwapResponse {
+}
+
+message RollbackInstantUtxoSwapRequest {
+    spark.UTXO on_chain_utxo = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+    repeated spark.UtxoSwapStatus rollback_from_statuses = 4;
+    spark.UtxoSwapStatus rollback_to_status = 5;
+}
+
+message RollbackInstantUtxoSwapResponse {
 }
 
 message UtxoSwapCompletedRequest {

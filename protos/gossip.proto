@@ -32,6 +32,7 @@ message GossipMessage {
         GossipMessageSettleSwapKeyTweak settle_swap_key_tweak = 16;
         GossipMessageUpdateWalletSetting update_wallet_setting = 17;
         GossipMessageArchiveStaticDepositAddress archive_static_deposit_address = 18;
+        GossipMessageRollbackInstantUtxoSwap rollback_instant_utxo_swap = 19;
     }
 }
 
@@ -96,6 +97,22 @@ message GossipMessageRollbackUtxoSwap {
     bytes signature = 2;
     // Identity key of the Coordinator
     bytes coordinator_public_key = 3;
+}
+
+// Rollback UTXO swap is called when Create UTXO swap transaction failed to
+// fully complete. This reverts the state back to before the swap, allowing the
+// user to initiate the UTXO swap again.
+message GossipMessageRollbackInstantUtxoSwap {
+    // UTXO swap is identified by UTXO
+    spark.UTXO on_chain_utxo = 1;
+    // Signature of the Coordinator that started the Create UTXO swap transaction
+    bytes signature = 2;
+    // Identity key of the Coordinator
+    bytes coordinator_public_key = 3;
+    // Statuses that are ok to rollback from
+    repeated spark.UtxoSwapStatus rollback_from_statuses = 4;
+    // Status that we want to rollback to
+    spark.UtxoSwapStatus rollback_to_status = 5;
 }
 
 message GossipMessageDepositCleanup {

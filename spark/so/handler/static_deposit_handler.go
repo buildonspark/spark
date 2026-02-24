@@ -32,6 +32,27 @@ type StaticDepositHandler struct {
 	config *so.Config
 }
 
+func schemaToProtoUtxoSwapStatus(s st.UtxoSwapStatus) pb.UtxoSwapStatus {
+	switch s {
+	case st.UtxoSwapStatusCreated:
+		return pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CREATED
+	case st.UtxoSwapStatusCompleted:
+		return pb.UtxoSwapStatus_UTXO_SWAP_STATUS_COMPLETED
+	case st.UtxoSwapStatusCancelled:
+		return pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CANCELLED
+	default:
+		return pb.UtxoSwapStatus_UTXO_SWAP_STATUS_UNSPECIFIED
+	}
+}
+
+func schemaToProtoUtxoSwapStatuses(statuses []st.UtxoSwapStatus) []pb.UtxoSwapStatus {
+	result := make([]pb.UtxoSwapStatus, len(statuses))
+	for i, s := range statuses {
+		result[i] = schemaToProtoUtxoSwapStatus(s)
+	}
+	return result
+}
+
 // NewStaticDepositHandler creates a new StaticDepositHandler.
 func NewStaticDepositHandler(config *so.Config) *StaticDepositHandler {
 	return &StaticDepositHandler{
@@ -177,6 +198,39 @@ func (o *StaticDepositHandler) CreateInstantStaticDepositUtxoSwapForAllOperators
 	internalDepositHandler := NewStaticDepositInternalHandler(config)
 	_, err = internalDepositHandler.CreateInstantStaticDepositUtxoSwap(ctx, config, request)
 	return err
+}
+
+func (o *StaticDepositHandler) rollbackInstantStaticDepositUtxoSwapUsingGossip(ctx context.Context, config *so.Config, utxo *pb.UTXO, rollbackFromStatus []st.UtxoSwapStatus, rollbackToStatus st.UtxoSwapStatus) {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	participants, err := selection.OperatorIdentifierList(config)
+	if err != nil {
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to get operator list for rollback instant utxo swap %x:%d", utxo.Txid, utxo.Vout)
+		return
+	}
+	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, config, utxo)
+	if err != nil {
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to create rollback request for rollback utxo swap %x:%d", utxo.Txid, utxo.Vout)
+		return
+	}
+	sendGossipHandler := NewSendGossipHandler(config)
+	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_RollbackInstantUtxoSwap{
+			RollbackInstantUtxoSwap: &pbgossip.GossipMessageRollbackInstantUtxoSwap{
+				OnChainUtxo:          utxo,
+				Signature:            rollbackRequest.Signature,
+				CoordinatorPublicKey: rollbackRequest.CoordinatorPublicKey,
+				RollbackFromStatuses: schemaToProtoUtxoSwapStatuses(rollbackFromStatus),
+				RollbackToStatus:     schemaToProtoUtxoSwapStatus(rollbackToStatus),
+			},
+		},
+	}, participants)
+	if err != nil {
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to create and send gossip message for rollback utxo swap %x:%d", utxo.Txid, utxo.Vout)
+		return
+	}
+	logger.Sugar().Infof("UTXO swap rollback for %x:%d with gossip completed", utxo.Txid, utxo.Vout)
 }
 
 // InitiateStaticDepositUtxoRefund processes a request to refund a UTXO back to the User.

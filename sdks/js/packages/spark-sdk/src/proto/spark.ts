@@ -417,6 +417,51 @@ export function utxoSwapRequestTypeToJSON(object: UtxoSwapRequestType): string {
   }
 }
 
+export enum UtxoSwapStatus {
+  UTXO_SWAP_STATUS_UNSPECIFIED = 0,
+  UTXO_SWAP_STATUS_CREATED = 1,
+  UTXO_SWAP_STATUS_COMPLETED = 2,
+  UTXO_SWAP_STATUS_CANCELLED = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function utxoSwapStatusFromJSON(object: any): UtxoSwapStatus {
+  switch (object) {
+    case 0:
+    case "UTXO_SWAP_STATUS_UNSPECIFIED":
+      return UtxoSwapStatus.UTXO_SWAP_STATUS_UNSPECIFIED;
+    case 1:
+    case "UTXO_SWAP_STATUS_CREATED":
+      return UtxoSwapStatus.UTXO_SWAP_STATUS_CREATED;
+    case 2:
+    case "UTXO_SWAP_STATUS_COMPLETED":
+      return UtxoSwapStatus.UTXO_SWAP_STATUS_COMPLETED;
+    case 3:
+    case "UTXO_SWAP_STATUS_CANCELLED":
+      return UtxoSwapStatus.UTXO_SWAP_STATUS_CANCELLED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return UtxoSwapStatus.UNRECOGNIZED;
+  }
+}
+
+export function utxoSwapStatusToJSON(object: UtxoSwapStatus): string {
+  switch (object) {
+    case UtxoSwapStatus.UTXO_SWAP_STATUS_UNSPECIFIED:
+      return "UTXO_SWAP_STATUS_UNSPECIFIED";
+    case UtxoSwapStatus.UTXO_SWAP_STATUS_CREATED:
+      return "UTXO_SWAP_STATUS_CREATED";
+    case UtxoSwapStatus.UTXO_SWAP_STATUS_COMPLETED:
+      return "UTXO_SWAP_STATUS_COMPLETED";
+    case UtxoSwapStatus.UTXO_SWAP_STATUS_CANCELLED:
+      return "UTXO_SWAP_STATUS_CANCELLED";
+    case UtxoSwapStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /** Which hash variant to use in cryptographic operations. */
 export enum HashVariant {
   /** HASH_VARIANT_UNSPECIFIED - Legacy */

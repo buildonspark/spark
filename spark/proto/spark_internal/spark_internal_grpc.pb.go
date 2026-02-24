@@ -49,6 +49,7 @@ const (
 	SparkInternalService_CreateStaticDepositUtxoRefund_FullMethodName      = "/spark_internal.SparkInternalService/create_static_deposit_utxo_refund"
 	SparkInternalService_CreateInstantStaticDepositUtxoSwap_FullMethodName = "/spark_internal.SparkInternalService/create_instant_static_deposit_utxo_swap"
 	SparkInternalService_RollbackUtxoSwap_FullMethodName                   = "/spark_internal.SparkInternalService/rollback_utxo_swap"
+	SparkInternalService_RollbackInstantUtxoSwap_FullMethodName            = "/spark_internal.SparkInternalService/rollback_instant_utxo_swap"
 	SparkInternalService_UtxoSwapCompleted_FullMethodName                  = "/spark_internal.SparkInternalService/utxo_swap_completed"
 	SparkInternalService_QueryLeafSigningPubkeys_FullMethodName            = "/spark_internal.SparkInternalService/query_leaf_signing_pubkeys"
 	SparkInternalService_ResolveLeafInvestigation_FullMethodName           = "/spark_internal.SparkInternalService/resolve_leaf_investigation"
@@ -98,6 +99,8 @@ type SparkInternalServiceClient interface {
 	CreateInstantStaticDepositUtxoSwap(ctx context.Context, in *CreateInstantStaticDepositUtxoSwapRequest, opts ...grpc.CallOption) (*CreateInstantStaticDepositUtxoSwapResponse, error)
 	// Internal method to cancel a swap for other SOs if one of them failed to ack it
 	RollbackUtxoSwap(ctx context.Context, in *RollbackUtxoSwapRequest, opts ...grpc.CallOption) (*RollbackUtxoSwapResponse, error)
+	// Internal method to cancel an instant UTXO swap for other SOs if one of them failed to ack it
+	RollbackInstantUtxoSwap(ctx context.Context, in *RollbackInstantUtxoSwapRequest, opts ...grpc.CallOption) (*RollbackInstantUtxoSwapResponse, error)
 	// Internal method to mark a swap as COMPLETE in all SOs
 	UtxoSwapCompleted(ctx context.Context, in *UtxoSwapCompletedRequest, opts ...grpc.CallOption) (*UtxoSwapCompletedResponse, error)
 	QueryLeafSigningPubkeys(ctx context.Context, in *QueryLeafSigningPubkeysRequest, opts ...grpc.CallOption) (*QueryLeafSigningPubkeysResponse, error)
@@ -405,6 +408,16 @@ func (c *sparkInternalServiceClient) RollbackUtxoSwap(ctx context.Context, in *R
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) RollbackInstantUtxoSwap(ctx context.Context, in *RollbackInstantUtxoSwapRequest, opts ...grpc.CallOption) (*RollbackInstantUtxoSwapResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RollbackInstantUtxoSwapResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_RollbackInstantUtxoSwap_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkInternalServiceClient) UtxoSwapCompleted(ctx context.Context, in *UtxoSwapCompletedRequest, opts ...grpc.CallOption) (*UtxoSwapCompletedResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UtxoSwapCompletedResponse)
@@ -533,6 +546,8 @@ type SparkInternalServiceServer interface {
 	CreateInstantStaticDepositUtxoSwap(context.Context, *CreateInstantStaticDepositUtxoSwapRequest) (*CreateInstantStaticDepositUtxoSwapResponse, error)
 	// Internal method to cancel a swap for other SOs if one of them failed to ack it
 	RollbackUtxoSwap(context.Context, *RollbackUtxoSwapRequest) (*RollbackUtxoSwapResponse, error)
+	// Internal method to cancel an instant UTXO swap for other SOs if one of them failed to ack it
+	RollbackInstantUtxoSwap(context.Context, *RollbackInstantUtxoSwapRequest) (*RollbackInstantUtxoSwapResponse, error)
 	// Internal method to mark a swap as COMPLETE in all SOs
 	UtxoSwapCompleted(context.Context, *UtxoSwapCompletedRequest) (*UtxoSwapCompletedResponse, error)
 	QueryLeafSigningPubkeys(context.Context, *QueryLeafSigningPubkeysRequest) (*QueryLeafSigningPubkeysResponse, error)
@@ -641,6 +656,9 @@ func (UnimplementedSparkInternalServiceServer) CreateInstantStaticDepositUtxoSwa
 }
 func (UnimplementedSparkInternalServiceServer) RollbackUtxoSwap(context.Context, *RollbackUtxoSwapRequest) (*RollbackUtxoSwapResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RollbackUtxoSwap not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) RollbackInstantUtxoSwap(context.Context, *RollbackInstantUtxoSwapRequest) (*RollbackInstantUtxoSwapResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RollbackInstantUtxoSwap not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) UtxoSwapCompleted(context.Context, *UtxoSwapCompletedRequest) (*UtxoSwapCompletedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UtxoSwapCompleted not implemented")
@@ -1194,6 +1212,24 @@ func _SparkInternalService_RollbackUtxoSwap_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_RollbackInstantUtxoSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RollbackInstantUtxoSwapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).RollbackInstantUtxoSwap(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_RollbackInstantUtxoSwap_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).RollbackInstantUtxoSwap(ctx, req.(*RollbackInstantUtxoSwapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkInternalService_UtxoSwapCompleted_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UtxoSwapCompletedRequest)
 	if err := dec(in); err != nil {
@@ -1474,6 +1510,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "rollback_utxo_swap",
 			Handler:    _SparkInternalService_RollbackUtxoSwap_Handler,
+		},
+		{
+			MethodName: "rollback_instant_utxo_swap",
+			Handler:    _SparkInternalService_RollbackInstantUtxoSwap_Handler,
 		},
 		{
 			MethodName: "utxo_swap_completed",
