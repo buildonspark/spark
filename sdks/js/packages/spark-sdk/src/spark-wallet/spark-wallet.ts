@@ -41,10 +41,8 @@ import {
   LightningSendFeeEstimateInput,
   LightningSendRequest,
   RequestCoopExitInput,
-  SparkLeavesSwapRequestStatus,
   SparkWalletUserToUserRequestsConnection,
   StaticDepositQuoteOutput,
-  UserLeafInput,
 } from "../graphql/objects/index.js";
 import {
   ConnectedEvent,
@@ -82,6 +80,7 @@ import { CoopExitService } from "../services/coop-exit.js";
 import { DepositService } from "../services/deposit.js";
 import { LightningService } from "../services/lightning.js";
 import { SigningService } from "../services/signing.js";
+import SwapService from "../services/swap.js";
 import { TokenOutputManager } from "../services/tokens/output-manager.js";
 import {
   MAX_TOKEN_OUTPUTS_TX,
@@ -125,7 +124,6 @@ import {
   getTxFromRawTxHex,
   getTxId,
 } from "../utils/bitcoin.js";
-import { chunkArray } from "../utils/chunkArray.js";
 import { getFetch } from "../utils/fetch.js";
 import {
   createReceiverSpendTx,
@@ -188,6 +186,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   protected sspClient: SspClient | null = null;
   protected tokenTransactionService: TokenTransactionService;
   protected transferService: TransferService;
+  protected swapService: SwapService;
 
   private claimTransferMutex = new Mutex();
   private claimTransfersInterval: Interval | null = null;
@@ -250,6 +249,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       this.connectionManager,
       this.signingService,
     );
+    this.sspClient = new SspClient(this.config);
+    this.swapService = new SwapService(
+      this.config,
+      this.transferService,
+      this.sspClient,
+    );
 
     if (this.getTracer()) {
       this.initializeTracer(this);
@@ -281,7 +286,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   private async createClientsAndSyncWallet() {
-    this.sspClient = new SspClient(this.config);
     await this.connectionManager.createClients();
 
     if (isReactNative) {
@@ -653,13 +657,27 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     );
 
     if (!foundSelections) {
-      const newLeaves = await this.requestLeavesSwap({ targetAmounts });
+      const leaves = await this.selectLeavesForSwap(totalTargetAmount);
+      const newLeaves = await this.swapService.requestLeavesSwap({
+        leaves,
+        targetAmounts,
+      });
 
-      newLeaves.sort((a, b) => b.value - a.value);
+      const renewedLeaves = await this.checkRenewLeaves(newLeaves);
+      renewedLeaves.sort((a, b) => b.value - a.value);
+      const sentIds = new Set(leaves.map((leaf) => leaf.id));
+      this.leaves = this.leaves.filter((leaf) => !sentIds.has(leaf.id));
+
+      const existingIds = new Set(this.leaves.map((leaf) => leaf.id));
+      const uniqueResults = renewedLeaves.filter(
+        (node) => !existingIds.has(node.id),
+      );
+
+      this.leaves.push(...uniqueResults);
 
       ({ results, foundSelections } = selectLeavesForTargets(
         targetAmounts,
-        newLeaves,
+        renewedLeaves,
       ));
     }
 
@@ -767,10 +785,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         }
 
         // TODO: Parallelize this.
-        await this.requestLeavesSwap({
+        const leaves = await this.swapService.requestLeavesSwap({
           leaves: leavesToSend,
           targetAmounts: swap.outLeaves,
         });
+
+        await this.checkRenewLeaves(leaves);
 
         yield {
           step: swaps.indexOf(swap) + 1,
@@ -1245,219 +1265,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     return feeEstimate;
-  }
-
-  /**
-   * Requests a swap of leaves to optimize wallet structure.
-   *
-   * @param {Object} params - Parameters for the leaves swap
-   * @param {number} [params.targetAmount] - Target amount for the swap
-   * @param {TreeNode[]} [params.leaves] - Specific leaves to swap
-   * @returns {Promise<Object>} The completed swap response
-   * @private
-   */
-  private async requestLeavesSwap({
-    targetAmounts,
-    leaves,
-  }: {
-    targetAmounts?: number[];
-    leaves?: TreeNode[];
-  }): Promise<TreeNode[]> {
-    if (targetAmounts && targetAmounts.some((amount) => amount <= 0)) {
-      throw new Error("specified targetAmount must be positive");
-    }
-
-    if (
-      targetAmounts &&
-      targetAmounts.some((amount) => !Number.isSafeInteger(amount))
-    ) {
-      throw new SparkValidationError("targetAmount must be less than 2^53", {
-        field: "targetAmounts",
-        value: targetAmounts,
-        expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
-      });
-    }
-
-    let leavesToSwap: TreeNode[];
-    const totalTargetAmount = targetAmounts?.reduce(
-      (acc, amount) => acc + amount,
-      0,
-    );
-
-    if (totalTargetAmount) {
-      const totalBalance = this.getInternalBalance();
-
-      if (totalTargetAmount > totalBalance) {
-        throw new SparkValidationError(
-          "Total target amount exceeds available balance",
-          {
-            field: "targetAmounts",
-            value: totalTargetAmount,
-            expected: `less than or equal to ${totalBalance}`,
-          },
-        );
-      }
-    }
-
-    if (totalTargetAmount && leaves && leaves.length > 0) {
-      if (
-        totalTargetAmount < leaves.reduce((acc, leaf) => acc + leaf.value, 0)
-      ) {
-        throw new Error("targetAmount is less than the sum of leaves");
-      }
-      leavesToSwap = leaves;
-    } else if (totalTargetAmount) {
-      leavesToSwap = await this.selectLeavesForSwap(totalTargetAmount);
-    } else if (leaves && leaves.length > 0) {
-      leavesToSwap = leaves;
-    } else {
-      throw new Error("targetAmount or leaves must be provided");
-    }
-
-    leavesToSwap.sort((a, b) => a.value - b.value);
-
-    const batches = chunkArray(leavesToSwap, 64);
-
-    const results: TreeNode[] = [];
-    for (const batch of batches) {
-      const result = await this.processSwapBatch(batch, targetAmounts);
-      results.push(...result);
-    }
-
-    return results;
-  }
-
-  /**
-   * Processes a single batch of leaves for swapping.
-   */
-  private async processSwapBatch(
-    leavesBatch: TreeNode[],
-    targetAmounts?: number[],
-  ): Promise<TreeNode[]> {
-    if (!targetAmounts) {
-      targetAmounts = leavesBatch.map((leaf) => leaf.value);
-    }
-
-    const leafKeyTweaks: LeafKeyTweak[] = await Promise.all(
-      leavesBatch.map(async (leaf) => ({
-        leaf,
-        keyDerivation: {
-          type: KeyDerivationType.LEAF,
-          path: leaf.id,
-        },
-        newKeyDerivation: {
-          type: KeyDerivationType.RANDOM,
-        },
-      })),
-    );
-
-    const { swapTransfer, adaptorPubkey, adaptorAddedSignatureMap } =
-      await this.transferService.sendSwapTransfer(
-        leafKeyTweaks,
-        hexToBytes(this.config.getSspIdentityPublicKey()),
-      );
-
-    if (!swapTransfer.transfer) {
-      throw new SparkValidationError("Transfer is missing in swap response", {
-        field: "transfer",
-        value: swapTransfer.transfer,
-        expected: "not null",
-      });
-    }
-    if (swapTransfer.transfer.leaves.some((leaf) => !leaf.leaf)) {
-      throw new SparkValidationError("Leaf is missing in swap response", {
-        field: "leaves",
-        value: swapTransfer.transfer.leaves,
-        expected: "not null",
-      });
-    }
-
-    const transfer = swapTransfer.transfer;
-
-    try {
-      const userLeaves: UserLeafInput[] = [];
-      for (let i = 0; i < transfer.leaves.length; i++) {
-        const leaf = transfer.leaves[i];
-        if (!leaf?.leaf) {
-          console.error(`[processSwapBatch] Leaf ${i + 1} is missing`);
-          throw new Error("Failed to get leaf");
-        }
-
-        const adaptorAddedSignature = adaptorAddedSignatureMap.get(
-          leaf.leaf.id,
-        );
-
-        if (!adaptorAddedSignature) {
-          throw new Error("Adaptor added signature not found");
-        }
-        userLeaves.push({
-          leaf_id: leaf.leaf.id,
-          raw_unsigned_refund_transaction: bytesToHex(
-            leaf.intermediateRefundTx,
-          ),
-          direct_raw_unsigned_refund_transaction: bytesToHex(
-            leaf.intermediateDirectRefundTx,
-          ),
-          direct_from_cpfp_raw_unsigned_refund_transaction: bytesToHex(
-            leaf.intermediateDirectFromCpfpRefundTx,
-          ),
-          adaptor_added_signature: bytesToHex(adaptorAddedSignature),
-          direct_adaptor_added_signature: bytesToHex(adaptorAddedSignature),
-          direct_from_cpfp_adaptor_added_signature: bytesToHex(
-            adaptorAddedSignature,
-          ),
-        });
-      }
-
-      const sspClient = this.getSspClient();
-
-      const request = await sspClient.requestLeavesSwap({
-        userLeaves,
-        adaptorPubkey: bytesToHex(adaptorPubkey),
-        targetAmountSats: targetAmounts,
-        totalAmountSats: leavesBatch.reduce((acc, leaf) => acc + leaf.value, 0),
-        // TODO: Request fee from SSP
-        feeSats: 0,
-        userOutboundTransferExternalId: transfer.id,
-      });
-
-      if (
-        !request ||
-        !request.swapLeaves ||
-        request.swapLeaves.length === 0 ||
-        request.status === SparkLeavesSwapRequestStatus.FAILED ||
-        !request.inboundTransfer?.sparkId
-      ) {
-        console.error("[processSwapBatch] Leave swap request returned null");
-        throw new Error("Failed to request leaves swap. Request failed.");
-      }
-
-      await this.updateLeaves(
-        leavesBatch.map((leaf) => leaf.id),
-        [],
-      );
-
-      const incomingTransfer = await this.transferService.queryTransfer(
-        request.inboundTransfer.sparkId,
-      );
-
-      if (!incomingTransfer) {
-        console.error("[processSwapBatch] No incoming transfer found");
-        throw new Error("Failed to get incoming transfer");
-      }
-
-      return await this.claimTransfer({
-        transfer: incomingTransfer,
-        emit: false,
-      });
-    } catch (e) {
-      console.error("[processSwapBatch] Error details:", {
-        error: e,
-        message: (e as Error).message,
-        stack: (e as Error).stack,
-      });
-      throw new Error(`Failed to request leaves swap: ${e}`);
-    }
   }
 
   /**
