@@ -68,5 +68,3 @@ rm -rf build
 yarn bare-make generate --platform ios --arch x64 && yarn bare-make build && yarn bare-make install
 rm -rf build
 ```
-
-<!-- todo -->
