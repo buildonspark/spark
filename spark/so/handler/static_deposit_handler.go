@@ -144,6 +144,41 @@ func (o *StaticDepositHandler) rollbackUtxoSwapUsingGossip(ctx context.Context, 
 	logger.Sugar().Infof("UTXO swap rollback for %x:%d with gossip completed", utxo.Txid, utxo.Vout)
 }
 
+func (o *StaticDepositHandler) CreateInstantStaticDepositUtxoSwapForAllOperators(ctx context.Context, config *so.Config, request *pbinternal.CreateInstantStaticDepositUtxoSwapRequest) error {
+	ctx, span := tracer.Start(ctx, "StaticDepositHandler.CreateInstantStaticDepositUtxoSwapForAllOperators")
+	defer span.End()
+
+	logger := logging.GetLoggerFromContext(ctx)
+
+	// Try to complete with other operators first.
+	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (*pbinternal.CreateInstantStaticDepositUtxoSwapResponse, error) {
+		conn, err := operator.NewOperatorGRPCConnection()
+		if err != nil {
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to connect to operator %s", operator.Identifier)
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		internalResp, err := client.CreateInstantStaticDepositUtxoSwap(ctx, request)
+		if err != nil {
+			logger.With(zap.Error(err)).Sugar().Errorf(
+				"Failed to execute instant utxo swap creation task with operator %s",
+				operator.Identifier,
+			)
+			return nil, err
+		}
+		return internalResp, err
+	})
+	if err != nil {
+		return err
+	}
+	// If other operators return success, we can complete the swap in self.
+	internalDepositHandler := NewStaticDepositInternalHandler(config)
+	_, err = internalDepositHandler.CreateInstantStaticDepositUtxoSwap(ctx, config, request)
+	return err
+}
+
 // InitiateStaticDepositUtxoRefund processes a request to refund a UTXO back to the User.
 func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Context, config *so.Config, req *pb.InitiateStaticDepositUtxoRefundRequest) (*pb.InitiateStaticDepositUtxoRefundResponse, error) {
 	ctx, span := tracer.Start(ctx, "StaticDepositHandler.InitiateStaticDepositUtxoRefund", trace.WithAttributes(

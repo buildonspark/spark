@@ -54,6 +54,8 @@ service SparkInternalService {
     rpc create_static_deposit_utxo_swap(CreateStaticDepositUtxoSwapRequest) returns (CreateStaticDepositUtxoSwapResponse) {}
     // Create UTXO swap record to refund UTXO to the user in the static deposit flow
     rpc create_static_deposit_utxo_refund(CreateStaticDepositUtxoRefundRequest) returns (CreateStaticDepositUtxoRefundResponse) {}
+    // Create instant static deposit UTXO swap record across all SOs
+    rpc create_instant_static_deposit_utxo_swap(CreateInstantStaticDepositUtxoSwapRequest) returns (CreateInstantStaticDepositUtxoSwapResponse) {}
 
     // Internal method to cancel a swap for other SOs if one of them failed to ack it
     rpc rollback_utxo_swap(RollbackUtxoSwapRequest) returns (RollbackUtxoSwapResponse) {}
@@ -307,6 +309,38 @@ message SettleReceiverKeyTweakRequest {
 message SettleSenderKeyTweakRequest {
     string transfer_id = 1;
     SettleKeyTweakAction action = 2;
+}
+
+message ReserveInstantStaticDepositUtxoSwapRequest {
+    spark.UTXO on_chain_utxo = 1;
+    // SSP signature of a message consenting to transfer a specific amount of funds
+    // in exchange for a specific UTXO.
+    bytes ssp_signature = 2;
+    // User signature of a message consenting to exchange a specific UTXO for a fund
+    // transfer from a specific SSP.
+    bytes user_signature = 3;
+    // Transfer package to send from SSP to User.
+    spark.StartTransferRequest transfer = 4;
+    // Destination address for the static deposit UTXO.
+    string destination_address = 5;
+    // UTXO output value in satoshis.
+    int64 value_sats = 6;
+    // credit amount in satoshis.
+    int64 credit_amount_sats = 7;
+    // secondary credit amount in satoshis.
+    int64 secondary_credit_amount_sats = 8;
+    // expiry time of the swap
+    google.protobuf.Timestamp expiry_time = 9;
+}
+
+message CreateInstantStaticDepositUtxoSwapRequest {
+    ReserveInstantStaticDepositUtxoSwapRequest request = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+}
+
+message CreateInstantStaticDepositUtxoSwapResponse {
+    string swap_id = 1;
 }
 
 message InitiateStaticDepositUtxoSwapRequest {

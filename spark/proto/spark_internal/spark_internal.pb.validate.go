@@ -3986,6 +3986,458 @@ var _ interface {
 	ErrorName() string
 } = SettleSenderKeyTweakRequestValidationError{}
 
+// Validate checks the field values on
+// ReserveInstantStaticDepositUtxoSwapRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *ReserveInstantStaticDepositUtxoSwapRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// ReserveInstantStaticDepositUtxoSwapRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// ReserveInstantStaticDepositUtxoSwapRequestMultiError, or nil if none found.
+func (m *ReserveInstantStaticDepositUtxoSwapRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ReserveInstantStaticDepositUtxoSwapRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOnChainUtxo()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ReserveInstantStaticDepositUtxoSwapRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ReserveInstantStaticDepositUtxoSwapRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOnChainUtxo()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ReserveInstantStaticDepositUtxoSwapRequestValidationError{
+				field:  "OnChainUtxo",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for SspSignature
+
+	// no validation rules for UserSignature
+
+	if all {
+		switch v := interface{}(m.GetTransfer()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ReserveInstantStaticDepositUtxoSwapRequestValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ReserveInstantStaticDepositUtxoSwapRequestValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ReserveInstantStaticDepositUtxoSwapRequestValidationError{
+				field:  "Transfer",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for DestinationAddress
+
+	// no validation rules for ValueSats
+
+	// no validation rules for CreditAmountSats
+
+	// no validation rules for SecondaryCreditAmountSats
+
+	if all {
+		switch v := interface{}(m.GetExpiryTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ReserveInstantStaticDepositUtxoSwapRequestValidationError{
+					field:  "ExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ReserveInstantStaticDepositUtxoSwapRequestValidationError{
+					field:  "ExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetExpiryTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ReserveInstantStaticDepositUtxoSwapRequestValidationError{
+				field:  "ExpiryTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return ReserveInstantStaticDepositUtxoSwapRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ReserveInstantStaticDepositUtxoSwapRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// ReserveInstantStaticDepositUtxoSwapRequest.ValidateAll() if the designated
+// constraints aren't met.
+type ReserveInstantStaticDepositUtxoSwapRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ReserveInstantStaticDepositUtxoSwapRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ReserveInstantStaticDepositUtxoSwapRequestMultiError) AllErrors() []error { return m }
+
+// ReserveInstantStaticDepositUtxoSwapRequestValidationError is the validation
+// error returned by ReserveInstantStaticDepositUtxoSwapRequest.Validate if
+// the designated constraints aren't met.
+type ReserveInstantStaticDepositUtxoSwapRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ReserveInstantStaticDepositUtxoSwapRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ReserveInstantStaticDepositUtxoSwapRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ReserveInstantStaticDepositUtxoSwapRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ReserveInstantStaticDepositUtxoSwapRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ReserveInstantStaticDepositUtxoSwapRequestValidationError) ErrorName() string {
+	return "ReserveInstantStaticDepositUtxoSwapRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ReserveInstantStaticDepositUtxoSwapRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sReserveInstantStaticDepositUtxoSwapRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ReserveInstantStaticDepositUtxoSwapRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ReserveInstantStaticDepositUtxoSwapRequestValidationError{}
+
+// Validate checks the field values on
+// CreateInstantStaticDepositUtxoSwapRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *CreateInstantStaticDepositUtxoSwapRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// CreateInstantStaticDepositUtxoSwapRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// CreateInstantStaticDepositUtxoSwapRequestMultiError, or nil if none found.
+func (m *CreateInstantStaticDepositUtxoSwapRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateInstantStaticDepositUtxoSwapRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CreateInstantStaticDepositUtxoSwapRequestValidationError{
+					field:  "Request",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CreateInstantStaticDepositUtxoSwapRequestValidationError{
+					field:  "Request",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CreateInstantStaticDepositUtxoSwapRequestValidationError{
+				field:  "Request",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for Signature
+
+	// no validation rules for CoordinatorPublicKey
+
+	if len(errors) > 0 {
+		return CreateInstantStaticDepositUtxoSwapRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateInstantStaticDepositUtxoSwapRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// CreateInstantStaticDepositUtxoSwapRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CreateInstantStaticDepositUtxoSwapRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateInstantStaticDepositUtxoSwapRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateInstantStaticDepositUtxoSwapRequestMultiError) AllErrors() []error { return m }
+
+// CreateInstantStaticDepositUtxoSwapRequestValidationError is the validation
+// error returned by CreateInstantStaticDepositUtxoSwapRequest.Validate if the
+// designated constraints aren't met.
+type CreateInstantStaticDepositUtxoSwapRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateInstantStaticDepositUtxoSwapRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateInstantStaticDepositUtxoSwapRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateInstantStaticDepositUtxoSwapRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateInstantStaticDepositUtxoSwapRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateInstantStaticDepositUtxoSwapRequestValidationError) ErrorName() string {
+	return "CreateInstantStaticDepositUtxoSwapRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateInstantStaticDepositUtxoSwapRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateInstantStaticDepositUtxoSwapRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateInstantStaticDepositUtxoSwapRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateInstantStaticDepositUtxoSwapRequestValidationError{}
+
+// Validate checks the field values on
+// CreateInstantStaticDepositUtxoSwapResponse with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *CreateInstantStaticDepositUtxoSwapResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// CreateInstantStaticDepositUtxoSwapResponse with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// CreateInstantStaticDepositUtxoSwapResponseMultiError, or nil if none found.
+func (m *CreateInstantStaticDepositUtxoSwapResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateInstantStaticDepositUtxoSwapResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for SwapId
+
+	if len(errors) > 0 {
+		return CreateInstantStaticDepositUtxoSwapResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateInstantStaticDepositUtxoSwapResponseMultiError is an error wrapping
+// multiple validation errors returned by
+// CreateInstantStaticDepositUtxoSwapResponse.ValidateAll() if the designated
+// constraints aren't met.
+type CreateInstantStaticDepositUtxoSwapResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateInstantStaticDepositUtxoSwapResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateInstantStaticDepositUtxoSwapResponseMultiError) AllErrors() []error { return m }
+
+// CreateInstantStaticDepositUtxoSwapResponseValidationError is the validation
+// error returned by CreateInstantStaticDepositUtxoSwapResponse.Validate if
+// the designated constraints aren't met.
+type CreateInstantStaticDepositUtxoSwapResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateInstantStaticDepositUtxoSwapResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateInstantStaticDepositUtxoSwapResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateInstantStaticDepositUtxoSwapResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateInstantStaticDepositUtxoSwapResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateInstantStaticDepositUtxoSwapResponseValidationError) ErrorName() string {
+	return "CreateInstantStaticDepositUtxoSwapResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateInstantStaticDepositUtxoSwapResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateInstantStaticDepositUtxoSwapResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateInstantStaticDepositUtxoSwapResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateInstantStaticDepositUtxoSwapResponseValidationError{}
+
 // Validate checks the field values on InitiateStaticDepositUtxoSwapRequest
 // with the rules defined in the proto definition for this message. If any
 // rules are violated, the first error encountered is returned, or nil if
