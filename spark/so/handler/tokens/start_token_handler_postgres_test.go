@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"bytes"
+	"math/big"
 	"slices"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -139,6 +140,161 @@ func TestStartTokenTransaction_DuplicateV3SignedSameCoordinatorRejects(t *testin
 	require.True(t, ok)
 	t.Logf("error: %v", sts.Message())
 	require.Equal(t, codes.AlreadyExists, sts.Code())
+}
+
+// TestStartTokenTransaction_RevealedExpiredTransactionBlocksNewTransaction verifies that
+// a StartTokenTransaction call is rejected when its inputs are consumed by an existing
+// REVEALED transaction, even if that transaction has crossed its expiry time. REVEALED is
+// a non-preemptable state — all operators have committed to revealing revocation secrets —
+// so expiry must not cause it to be silently skipped during pre-emption filtering.
+func TestStartTokenTransaction_RevealedExpiredTransactionBlocksNewTransaction(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	f := entfixtures.New(t, ctx, dbClient)
+	tokenCreate := f.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
+
+	_, mintOutputs := f.CreateMintTransaction(tokenCreate, entfixtures.OutputSpecs(big.NewInt(1000)), st.TokenTransactionStatusFinalized)
+	mintOutput := mintOutputs[0]
+
+	pastTimestamp := time.Now().Add(-2 * time.Hour)
+	validitySeconds := uint64(60)
+	competingTx, _ := f.CreateBalancedTransferTransactionWithOpts(
+		tokenCreate,
+		[]*ent.TokenOutput{mintOutput},
+		entfixtures.OutputSpecs(big.NewInt(1000)),
+		st.TokenTransactionStatusRevealed,
+		&entfixtures.BalancedTransferTransactionOpts{
+			ClientCreatedTimestamp:  &pastTimestamp,
+			ValidityDurationSeconds: &validitySeconds,
+		},
+	)
+
+	require.Equal(t, st.TokenTransactionStatusRevealed, competingTx.Status)
+	require.Error(t, competingTx.ValidateNotExpired(), "competing tx must be expired for this test to be meaningful")
+
+	validity := uint64(60)
+	clientCreated := utils.ToMicrosecondPrecision(time.Now().UTC())
+	newTransferProto := buildV3TransferTransactionProto(t, cfg, tokenCreate, mintOutput.CreatedTransactionFinalizedHash, validity, clientCreated)
+
+	ownerSigs := []*tokenpb.SignatureWithIndex{
+		{Signature: []byte{1}, InputIndex: 0},
+	}
+
+	handler := NewStartTokenTransactionHandler(cfg)
+	_, err = handler.StartTokenTransaction(ctx, &tokenpb.StartTransactionRequest{
+		PartialTokenTransaction:                newTransferProto,
+		PartialTokenTransactionOwnerSignatures: ownerSigs,
+		IdentityPublicKey:                      cfg.IdentityPublicKey().Serialize(),
+		ValidityDurationSeconds:                validity,
+	})
+
+	require.Error(t, err, "expected the new transaction to be rejected because the competing REVEALED tx is non-preemptable even when expired")
+}
+
+// TestStartTokenTransaction_FinalizedExpiredTransactionBlocksNewTransaction verifies the
+// same invariant as the REVEALED test above, but for FINALIZED transactions.
+func TestStartTokenTransaction_FinalizedExpiredTransactionBlocksNewTransaction(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	f := entfixtures.New(t, ctx, dbClient)
+	tokenCreate := f.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
+
+	_, mintOutputs := f.CreateMintTransaction(tokenCreate, entfixtures.OutputSpecs(big.NewInt(1000)), st.TokenTransactionStatusFinalized)
+	mintOutput := mintOutputs[0]
+
+	pastTimestamp := time.Now().Add(-2 * time.Hour)
+	validitySeconds := uint64(60)
+	competingTx, _ := f.CreateBalancedTransferTransactionWithOpts(
+		tokenCreate,
+		[]*ent.TokenOutput{mintOutput},
+		entfixtures.OutputSpecs(big.NewInt(1000)),
+		st.TokenTransactionStatusFinalized,
+		&entfixtures.BalancedTransferTransactionOpts{
+			ClientCreatedTimestamp:  &pastTimestamp,
+			ValidityDurationSeconds: &validitySeconds,
+		},
+	)
+
+	require.Equal(t, st.TokenTransactionStatusFinalized, competingTx.Status)
+	require.Error(t, competingTx.ValidateNotExpired(), "competing tx must be expired for this test to be meaningful")
+
+	validity := uint64(60)
+	clientCreated := utils.ToMicrosecondPrecision(time.Now().UTC())
+	newTransferProto := buildV3TransferTransactionProto(t, cfg, tokenCreate, mintOutput.CreatedTransactionFinalizedHash, validity, clientCreated)
+
+	ownerSigs := []*tokenpb.SignatureWithIndex{
+		{Signature: []byte{1}, InputIndex: 0},
+	}
+
+	handler := NewStartTokenTransactionHandler(cfg)
+	_, err = handler.StartTokenTransaction(ctx, &tokenpb.StartTransactionRequest{
+		PartialTokenTransaction:                newTransferProto,
+		PartialTokenTransactionOwnerSignatures: ownerSigs,
+		IdentityPublicKey:                      cfg.IdentityPublicKey().Serialize(),
+		ValidityDurationSeconds:                validity,
+	})
+
+	require.Error(t, err, "expected the new transaction to be rejected because the competing FINALIZED tx is non-preemptable even when expired")
+}
+
+func buildV3TransferTransactionProto(
+	t *testing.T,
+	cfg *so.Config,
+	tokenCreate *ent.TokenCreate,
+	prevTxFinalizedHash []byte,
+	validity uint64,
+	clientCreated time.Time,
+) *tokenpb.TokenTransaction {
+	t.Helper()
+
+	operatorKeys := make([][]byte, 0, len(cfg.SigningOperatorMap))
+	for _, op := range cfg.SigningOperatorMap {
+		operatorKeys = append(operatorKeys, op.IdentityPublicKey.Serialize())
+	}
+	slices.SortFunc(operatorKeys, func(a, b []byte) int {
+		return bytes.Compare(a, b)
+	})
+
+	amountBytes := make([]byte, 16)
+	big.NewInt(1000).FillBytes(amountBytes)
+
+	// expectedBondSats/expectedRelativeBlockLocktime are read from Lrc20Configs which
+	// is nil in TestConfig, so the zero values are expected by validation.
+	bondSats := cfg.Lrc20Configs["regtest"].WithdrawBondSats
+	relativeBlockLocktime := cfg.Lrc20Configs["regtest"].WithdrawRelativeBlockLocktime
+
+	return &tokenpb.TokenTransaction{
+		Version: 3,
+		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+			TransferInput: &tokenpb.TokenTransferInput{
+				OutputsToSpend: []*tokenpb.TokenOutputToSpend{
+					{
+						PrevTokenTransactionHash: prevTxFinalizedHash,
+						PrevTokenTransactionVout: 0,
+					},
+				},
+			},
+		},
+		TokenOutputs: []*tokenpb.TokenOutput{
+			{
+				OwnerPublicKey:                cfg.IdentityPublicKey().Serialize(),
+				TokenIdentifier:               tokenCreate.TokenIdentifier,
+				TokenAmount:                   amountBytes,
+				WithdrawBondSats:              &bondSats,
+				WithdrawRelativeBlockLocktime: &relativeBlockLocktime,
+			},
+		},
+		SparkOperatorIdentityPublicKeys: operatorKeys,
+		Network:                         sparkpb.Network_REGTEST,
+		ValidityDurationSeconds:         &validity,
+		ClientCreatedTimestamp:          timestamppb.New(clientCreated),
+	}
 }
 
 func buildV3CreateTransactionProto(

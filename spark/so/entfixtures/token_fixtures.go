@@ -301,6 +301,15 @@ func (f *Fixtures) CreateStandaloneOutput(tokenCreate *ent.TokenCreate, amount *
 	return outputs[0]
 }
 
+// BalancedTransferTransactionOpts specifies options for creating a balanced transfer transaction.
+type BalancedTransferTransactionOpts struct {
+	// ClientCreatedTimestamp and ValidityDurationSeconds control V3 expiry. When set, the
+	// transaction is created as V3 with these fields, which allows tests to create
+	// already-expired transactions.
+	ClientCreatedTimestamp  *time.Time
+	ValidityDurationSeconds *uint64
+}
+
 // CreateBalancedTransferTransaction creates a balanced transfer transaction
 func (f *Fixtures) CreateBalancedTransferTransaction(
 	tokenCreate *ent.TokenCreate,
@@ -308,11 +317,35 @@ func (f *Fixtures) CreateBalancedTransferTransaction(
 	outputSpecs []OutputSpec,
 	status st.TokenTransactionStatus,
 ) (*ent.TokenTransaction, []*ent.TokenOutput) {
-	tx, err := f.Client.TokenTransaction.Create().
+	return f.CreateBalancedTransferTransactionWithOpts(tokenCreate, inputs, outputSpecs, status, nil)
+}
+
+// CreateBalancedTransferTransactionWithOpts creates a balanced transfer transaction with
+// optional V3 expiry fields.
+func (f *Fixtures) CreateBalancedTransferTransactionWithOpts(
+	tokenCreate *ent.TokenCreate,
+	inputs []*ent.TokenOutput,
+	outputSpecs []OutputSpec,
+	status st.TokenTransactionStatus,
+	opts *BalancedTransferTransactionOpts,
+) (*ent.TokenTransaction, []*ent.TokenOutput) {
+	txBuilder := f.Client.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(f.RandomBytes(32)).
 		SetFinalizedTokenTransactionHash(f.RandomBytes(32)).
-		SetStatus(st.TokenTransactionStatusSigned).
-		Save(f.Ctx)
+		SetStatus(st.TokenTransactionStatusSigned)
+
+	if opts != nil {
+		if opts.ClientCreatedTimestamp != nil {
+			txBuilder = txBuilder.
+				SetVersion(st.TokenTransactionVersionV3).
+				SetClientCreatedTimestamp(*opts.ClientCreatedTimestamp)
+		}
+		if opts.ValidityDurationSeconds != nil {
+			txBuilder = txBuilder.SetValidityDurationSeconds(*opts.ValidityDurationSeconds)
+		}
+	}
+
+	tx, err := txBuilder.Save(f.Ctx)
 	f.RequireNoError(err)
 
 	for i, input := range inputs {

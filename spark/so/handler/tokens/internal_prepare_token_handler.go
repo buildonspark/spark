@@ -614,6 +614,13 @@ func validateOutputIsSpendable(ctx context.Context, index int, output *ent.Token
 				index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status))
 		}
 
+		// REVEALED and FINALIZED are non-preemptable regardless of expiry.
+		if spentTx.Status == st.TokenTransactionStatusRevealed ||
+			spentTx.Status == st.TokenTransactionStatusFinalized {
+			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: status must be %s or %s (was %s), or have been spent by an expired or pre-emptable transaction (transaction is %s and cannot be pre-empted, id: %s)",
+				index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status, spentTx.Status, spentTx.ID))
+		}
+
 		// If the previous transaction has expired, we allow the output to be spent again.
 		// ValidateNotExpired only fails when the transaction is expired, so any error
 		// here means the previous transaction should automatically lose.
