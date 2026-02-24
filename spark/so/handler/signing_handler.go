@@ -130,6 +130,10 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 		keyshareIDcount = req.NodeIdCount
 	}
 
+	if keyshareIDcount == 0 {
+		return &pb.GetSigningCommitmentsResponse{}, nil
+	}
+
 	commitments, err := helper.GetSigningCommitments(ctx, h.config, keyshareIDcount, count)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get signing commitments: %w", err)

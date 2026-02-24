@@ -529,6 +529,13 @@ func GetSigningCommitmentsInternal(ctx context.Context, config *so.Config, keysh
 	if count == 0 {
 		return nil, errors.New("count cannot be 0")
 	}
+	if keyshareIDcount == 0 {
+		return nil, errors.New("keyshareIDcount cannot be 0")
+	}
+
+	if uint64(count)*uint64(keyshareIDcount) > math.MaxUint32 {
+		return nil, fmt.Errorf("count (%d) * keyshareIDcount (%d) overflows uint32", count, keyshareIDcount)
+	}
 
 	selection := OperatorSelection{Option: OperatorSelectionOptionThreshold, Threshold: int(config.Threshold)}
 	total := count * keyshareIDcount

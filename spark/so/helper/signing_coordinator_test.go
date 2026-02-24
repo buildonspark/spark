@@ -726,6 +726,30 @@ func TestGetSigningCommitments(t *testing.T) {
 	t.Run("ErrorCases", func(t *testing.T) {
 		config := sparktesting.TestConfig(t)
 
+		t.Run("ZeroKeyshareIDcount", func(t *testing.T) {
+			frostSignerFactory := &mockSparkServiceFrostSignerFactory{
+				conn: &mockSparkServiceFrostSigner{},
+			}
+			_, err := helper.GetSigningCommitmentsInternal(t.Context(), config, 0, 1, frostSignerFactory)
+			require.ErrorContains(t, err, "keyshareIDcount cannot be 0")
+		})
+
+		t.Run("ZeroCount", func(t *testing.T) {
+			frostSignerFactory := &mockSparkServiceFrostSignerFactory{
+				conn: &mockSparkServiceFrostSigner{},
+			}
+			_, err := helper.GetSigningCommitmentsInternal(t.Context(), config, 1, 0, frostSignerFactory)
+			require.ErrorContains(t, err, "count cannot be 0")
+		})
+
+		t.Run("Uint32Overflow", func(t *testing.T) {
+			frostSignerFactory := &mockSparkServiceFrostSignerFactory{
+				conn: &mockSparkServiceFrostSigner{},
+			}
+			_, err := helper.GetSigningCommitmentsInternal(t.Context(), config, math.MaxUint32, 2, frostSignerFactory)
+			require.ErrorContains(t, err, "overflows uint32")
+		})
+
 		t.Run("FrostRound1Error", func(t *testing.T) {
 			frostSignerFactory := &mockSparkServiceFrostSignerFactory{
 				conn: &mockSparkServiceFrostSigner{
@@ -739,7 +763,6 @@ func TestGetSigningCommitments(t *testing.T) {
 			require.ErrorContains(t, err, "frost round 1 failed")
 		})
 
-		// Test with getKeyPackages error
 		t.Run("GetKeyPackagesError", func(t *testing.T) {
 			frostSignerFactory := &mockSparkServiceFrostSignerFactory{
 				conn: &mockSparkServiceFrostSigner{frostRound1Error: errors.New("database connection failed")},
