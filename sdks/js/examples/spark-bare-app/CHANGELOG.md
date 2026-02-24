@@ -1,5 +1,11 @@
 # @buildonspark/spark-bare-app
 
+## 0.1.17
+
+### Patch Changes
+
+- @buildonspark/bare@0.0.46
+
 ## 0.1.16
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @buildonspark/spark-frost-bare-addon
 
+## 0.0.8
+
+### Patch Changes
+
+- - Add native VSS (Verifiable Secret Sharing) functions to the bare addon:
+    - splitSecretWithProofs(secret, threshold, numShares) - Split a secret into verifiable shares with commitment proofs
+    - recoverSecret(shares) - Recover a secret from a threshold number of shares
+    - validateShare(share, index, threshold, proofs) - Validate a share against its commitment proofs
+
 ## 0.0.7
 
 ### Patch Changes
