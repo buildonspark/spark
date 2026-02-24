@@ -2513,6 +2513,135 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
+   * Claims a multi-UTXO deposit where multiple on-chain transactions sent
+   * funds to the same deposit address. All UTXOs are consolidated into a
+   * single root node via a multi-input root transaction.
+   *
+   * @param {string[]} txids - Transaction IDs of the deposit transactions
+   * @returns {Promise<WalletLeaf[]>} The wallet leaf created from the consolidated deposit
+   */
+  public async claimMultiUtxoDeposit(txids: string[]): Promise<WalletLeaf[]> {
+    if (txids.length < 2) {
+      throw new SparkValidationError(
+        "claimMultiUtxoDeposit requires at least 2 transaction IDs",
+        {
+          field: "txids",
+          value: txids.length,
+          expected: "At least 2 transaction IDs",
+        },
+      );
+    }
+
+    // Use a composite mutex key to prevent concurrent claims of the same set
+    const mutexKey = txids.slice().sort().join(",");
+    let mutex = this.mutexes.get(mutexKey);
+    if (!mutex) {
+      mutex = new Mutex();
+      this.mutexes.set(mutexKey, mutex);
+    }
+
+    const nodes = await mutex.runExclusive(async () => {
+      // Fetch all deposit transactions
+      const depositTxs = await Promise.all(
+        txids.map((txid) => this.getDepositTransaction(txid)),
+      );
+
+      const unusedDepositAddresses: Map<string, DepositAddressQueryResult> =
+        new Map(
+          (
+            await this.queryAllUnusedDepositAddresses({
+              identityPublicKey:
+                await this.config.signer.getIdentityPublicKey(),
+              network: NetworkToProto[this.config.getNetwork()],
+            })
+          ).map((addr) => [addr.depositAddress, addr]),
+        );
+
+      // For each fetched tx, find the output matching a deposit address.
+      // All UTXOs must match the same deposit address for multi-UTXO consolidation.
+      let depositAddress: DepositAddressQueryResult | undefined;
+      const matchedTxs: { tx: Transaction; vout: number }[] = [];
+
+      for (const depositTx of depositTxs) {
+        let found = false;
+        for (let i = 0; i < depositTx.outputsLength; i++) {
+          const output = depositTx.getOutput(i);
+          if (!output) continue;
+          const parsedScript = OutScript.decode(output.script!);
+          const address = Address(getNetwork(this.config.getNetwork())).encode(
+            parsedScript,
+          );
+
+          const matchedAddr = unusedDepositAddresses.get(address);
+          if (matchedAddr) {
+            if (depositAddress && depositAddress.depositAddress !== address) {
+              throw new SparkValidationError(
+                "All UTXOs must be to the same deposit address for multi-UTXO claim",
+                {
+                  field: "depositAddress",
+                  value: address,
+                  expected: depositAddress.depositAddress,
+                },
+              );
+            }
+            depositAddress = matchedAddr;
+            matchedTxs.push({ tx: depositTx, vout: i });
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          throw new SparkValidationError(
+            "No matching unused deposit address found for transaction",
+            {
+              field: "txid",
+              value: getTxId(depositTx),
+            },
+          );
+        }
+      }
+
+      if (!depositAddress) {
+        throw new SparkValidationError(
+          "No matching unused deposit address found",
+          { field: "depositAddress" },
+        );
+      }
+
+      let keyDerivation: KeyDerivation;
+      if (!depositAddress.leafId) {
+        keyDerivation = {
+          type: KeyDerivationType.DEPOSIT,
+        };
+      } else {
+        keyDerivation = {
+          type: KeyDerivationType.LEAF,
+          path: depositAddress.leafId,
+        };
+      }
+
+      const res = await this.depositService!.createTreeRootMultiUtxo({
+        keyDerivation,
+        verifyingKey: depositAddress.verifyingPublicKey,
+        depositTxs: matchedTxs,
+      });
+
+      await this.withLeaves(async () => {
+        const availableNodes = res.nodes.filter(
+          (node) => node.status === "AVAILABLE",
+        );
+        this.leaves.push(...availableNodes);
+      });
+
+      return res.nodes;
+    });
+
+    this.mutexes.delete(mutexKey);
+
+    return nodes.map(mapTreeNodeToWalletLeaf);
+  }
+
+  /**
    * Non-trusty flow for depositing funds to the wallet.
    * Construct the tx spending from an L1 wallet to the Spark address.
    * After calling this function, you must sign and broadcast the tx.
@@ -5828,6 +5957,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "batchTransferTokens",
   "checkTimelock",
   "claimDeposit",
+  "claimMultiUtxoDeposit",
   "claimStaticDeposit",
   "claimStaticDepositWithMaxFee",
   "cleanupConnections",

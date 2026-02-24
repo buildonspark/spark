@@ -11,12 +11,16 @@ import {
   HashVariant,
 } from "../proto/spark.js";
 import { KeyDerivation } from "../signer/types.js";
-import { getSigHashFromTx } from "../utils/bitcoin.js";
+import {
+  getSigHashFromMultiInputTx,
+  getSigHashFromTx,
+} from "../utils/bitcoin.js";
 import { subtractPublicKeys } from "../utils/keys.js";
 import { getNetwork } from "../utils/network.js";
 import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof.js";
 import {
   createInitialTimelockRefundTxs,
+  createMultiInputRootTx,
   createRootNodeTx,
 } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
@@ -43,6 +47,12 @@ export type CreateTreeRootParams = {
   verifyingKey: Uint8Array;
   depositTx: Transaction;
   vout: number;
+};
+
+export type CreateTreeRootMultiUtxoParams = {
+  keyDerivation: KeyDerivation;
+  verifyingKey: Uint8Array;
+  depositTxs: { tx: Transaction; vout: number }[];
 };
 
 export class DepositService {
@@ -418,6 +428,240 @@ export class DepositService {
         operation: "finalize_deposit_tree_creation",
         error,
       });
+    }
+
+    if (finalizeResp.rootNode === undefined) {
+      throw new SparkRequestError(
+        "root node not returned from finalize tree request",
+        {
+          operation: "finalize_deposit_tree_creation",
+        },
+      );
+    }
+    return { nodes: [finalizeResp.rootNode] };
+  }
+
+  async createTreeRootMultiUtxo({
+    keyDerivation,
+    verifyingKey,
+    depositTxs,
+  }: CreateTreeRootMultiUtxoParams) {
+    if (depositTxs.length < 2) {
+      throw new SparkValidationError(
+        "createTreeRootMultiUtxo requires at least 2 deposit transactions",
+        {
+          field: "depositTxs",
+          value: depositTxs.length,
+          expected: "At least 2 deposit transactions",
+        },
+      );
+    }
+
+    const cpfpRootTx = createMultiInputRootTx(depositTxs);
+
+    // Build prevOutputs array for multi-input sighash computation
+    const prevOutputs = depositTxs.map(({ tx, vout }) => tx.getOutput(vout));
+
+    // Compute sighash for each root tx input
+    const rootSighashes = depositTxs.map((_, i) =>
+      getSigHashFromMultiInputTx(cpfpRootTx, i, prevOutputs),
+    );
+
+    // Generate user nonce commitment for each root tx input
+    const rootNonces = await Promise.all(
+      depositTxs.map(() => this.config.signer.getRandomSigningCommitment()),
+    );
+
+    const signingPubKey =
+      await this.config.signer.getPublicKeyFromDerivation(keyDerivation);
+
+    // Refund txs spend root tx output 0 — same as single-input path
+    const { cpfpRefundTx, directFromCpfpRefundTx } =
+      createInitialTimelockRefundTxs({
+        nodeTx: cpfpRootTx,
+        receivingPubkey: signingPubKey,
+        network: this.config.getNetwork(),
+      });
+
+    const cpfpRefundNonceCommitment =
+      await this.config.signer.getRandomSigningCommitment();
+    const directFromCpfpRefundNonceCommitment =
+      await this.config.signer.getRandomSigningCommitment();
+
+    const cpfpRefundTxSighash = getSigHashFromTx(
+      cpfpRefundTx,
+      0,
+      cpfpRootTx.getOutput(0),
+    );
+
+    if (!directFromCpfpRefundTx) {
+      throw new SparkValidationError(
+        "Expected direct from cpfp refund transaction for tree creation",
+        {
+          field: "directFromCpfpRefundTx",
+          value: directFromCpfpRefundTx,
+        },
+      );
+    }
+
+    const directFromCpfpRefundTxSighash = getSigHashFromTx(
+      directFromCpfpRefundTx,
+      0,
+      cpfpRootTx.getOutput(0),
+    );
+
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    // Total commitments: N root inputs + 1 cpfpRefund + 1 directFromCpfpRefund
+    const totalCommitments = depositTxs.length + 2;
+
+    let signingCommittmentResp: GetSigningCommitmentsResponse;
+    try {
+      signingCommittmentResp = await sparkClient.get_signing_commitments({
+        count: totalCommitments,
+        nodeIdCount: 1,
+      });
+    } catch (error) {
+      throw new SparkRequestError(
+        "Failed to get signing commitments for multi-UTXO deposit",
+        {
+          operation: "get_signing_commitments",
+          error,
+        },
+      );
+    }
+
+    if (signingCommittmentResp.signingCommitments.length !== totalCommitments) {
+      throw new SparkValidationError(
+        "Incorrect number of signing commitments returned",
+        {
+          field: "signingCommitments",
+          value: signingCommittmentResp.signingCommitments.length,
+          expected: totalCommitments,
+        },
+      );
+    }
+
+    // Commitments 0..N-1 are for root tx inputs, N for cpfpRefund, N+1 for directFromCpfpRefund
+    const rootCommitments = signingCommittmentResp.signingCommitments.slice(
+      0,
+      depositTxs.length,
+    );
+    const cpfpRefundCommitment =
+      signingCommittmentResp.signingCommitments[depositTxs.length];
+    const directFromCpfpRefundCommitment =
+      signingCommittmentResp.signingCommitments[depositTxs.length + 1];
+
+    if (cpfpRefundCommitment === undefined) {
+      throw new SparkValidationError(
+        "Empty refund commitment returned from get_signing_commitments",
+      );
+    }
+    if (directFromCpfpRefundCommitment === undefined) {
+      throw new SparkValidationError(
+        "Empty direct from cpfp refund commitment returned from get_signing_commitments",
+      );
+    }
+
+    // Sign each root tx input
+    const rootSignatures = await Promise.all(
+      rootSighashes.map((sighash, i) =>
+        this.config.signer.signFrost({
+          message: sighash,
+          publicKey: signingPubKey,
+          keyDerivation,
+          verifyingKey,
+          selfCommitment: rootNonces[i]!,
+          statechainCommitments: rootCommitments[i]!.signingNonceCommitments,
+          adaptorPubKey: new Uint8Array(),
+        }),
+      ),
+    );
+
+    const cpfpRefundSignature = await this.config.signer.signFrost({
+      message: cpfpRefundTxSighash,
+      publicKey: signingPubKey,
+      keyDerivation,
+      verifyingKey,
+      selfCommitment: cpfpRefundNonceCommitment,
+      statechainCommitments: cpfpRefundCommitment.signingNonceCommitments,
+      adaptorPubKey: new Uint8Array(),
+    });
+
+    const directFromCpfpRefundSignature = await this.config.signer.signFrost({
+      message: directFromCpfpRefundTxSighash,
+      publicKey: signingPubKey,
+      keyDerivation,
+      verifyingKey,
+      selfCommitment: directFromCpfpRefundNonceCommitment,
+      statechainCommitments:
+        directFromCpfpRefundCommitment.signingNonceCommitments,
+      adaptorPubKey: new Uint8Array(),
+    });
+
+    let finalizeResp: FinalizeDepositTreeCreationResponse;
+
+    try {
+      finalizeResp = await sparkClient.finalize_deposit_tree_creation({
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        onChainUtxo: {
+          vout: depositTxs[0]!.vout,
+          rawTx: depositTxs[0]!.tx.toBytes(true),
+          network: this.config.getNetworkProto(),
+        },
+        rootTxSigningJob: {
+          signingPublicKey: signingPubKey,
+          rawTx: cpfpRootTx.toBytes(),
+          signingNonceCommitment: rootNonces[0]!.commitment,
+          userSignature: rootSignatures[0]!,
+          signingCommitments: {
+            signingCommitments: rootCommitments[0]!.signingNonceCommitments,
+          },
+          additionalInputs: rootSignatures.slice(1).map((sig, i) => ({
+            signingNonceCommitment: rootNonces[i + 1]!.commitment,
+            userSignature: sig,
+            signingCommitments: {
+              signingCommitments:
+                rootCommitments[i + 1]!.signingNonceCommitments,
+            },
+          })),
+        },
+        refundTxSigningJob: {
+          signingPublicKey: signingPubKey,
+          rawTx: cpfpRefundTx.toBytes(),
+          signingNonceCommitment: cpfpRefundNonceCommitment.commitment,
+          userSignature: cpfpRefundSignature,
+          signingCommitments: {
+            signingCommitments: cpfpRefundCommitment.signingNonceCommitments,
+          },
+        },
+        directFromCpfpRefundTxSigningJob: {
+          signingPublicKey: signingPubKey,
+          rawTx: directFromCpfpRefundTx.toBytes(),
+          signingNonceCommitment:
+            directFromCpfpRefundNonceCommitment.commitment,
+          userSignature: directFromCpfpRefundSignature,
+          signingCommitments: {
+            signingCommitments:
+              directFromCpfpRefundCommitment.signingNonceCommitments,
+          },
+        },
+        additionalOnChainUtxos: depositTxs.slice(1).map(({ tx, vout }) => ({
+          vout,
+          rawTx: tx.toBytes(true),
+          network: this.config.getNetworkProto(),
+        })),
+      });
+    } catch (error) {
+      throw new SparkRequestError(
+        "Failed to finalize multi-UTXO tree creation",
+        {
+          operation: "finalize_deposit_tree_creation",
+          error,
+        },
+      );
     }
 
     if (finalizeResp.rootNode === undefined) {

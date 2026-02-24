@@ -246,6 +246,64 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
   }, 30000);
 });
 
+describe.each(walletTypes)(
+  "multi-utxo deposit",
+  ({ name, Signer, createTree }) => {
+    it(`${name} - should claim multi-utxo deposit`, async () => {
+      const faucet = BitcoinFaucet.getInstance();
+
+      const { wallet: sdk } = await SparkWalletTesting.initialize({
+        options: {
+          network: "LOCAL",
+        },
+        signer: new Signer(),
+      });
+
+      const depositAddress = await sdk.getSingleUseDepositAddress();
+      if (!depositAddress) {
+        throw new SparkError("Deposit address not found");
+      }
+
+      const amount1 = 60_000n;
+      const amount2 = 40_000n;
+
+      // Send two separate transactions to the same deposit address
+      const signedTx1 = await faucet.sendToAddress(depositAddress, amount1, 0);
+      const signedTx2 = await faucet.sendToAddress(depositAddress, amount2, 0);
+
+      // Mine enough blocks for confirmation (3-block threshold)
+      await faucet.mineBlocksAndWaitForMiningToComplete(3);
+
+      // Wait for chain watcher to catch up
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      const result = await sdk.claimMultiUtxoDeposit([
+        signedTx1.id,
+        signedTx2.id,
+      ]);
+
+      expect(result).toBeDefined();
+      expect(result.length).toBe(1);
+
+      const balance = await sdk.getBalance();
+      expect(balance.balance).toEqual(amount1 + amount2);
+    }, 60000);
+
+    it(`${name} - should reject multi-utxo deposit with fewer than 2 txids`, async () => {
+      const { wallet: sdk } = await SparkWalletTesting.initialize({
+        options: {
+          network: "LOCAL",
+        },
+        signer: new Signer(),
+      });
+
+      await expect(sdk.claimMultiUtxoDeposit(["singletxid"])).rejects.toThrow(
+        "claimMultiUtxoDeposit requires at least 2 transaction IDs",
+      );
+    }, 30000);
+  },
+);
+
 describe.each(walletTypes)("refund static deposit", ({ name }) => {
   it(`${name} - should refund a static deposit`, async () => {
     const faucet = BitcoinFaucet.getInstance();

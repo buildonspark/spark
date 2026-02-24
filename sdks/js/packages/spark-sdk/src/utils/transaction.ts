@@ -543,3 +543,63 @@ export function getEphemeralAnchorOutput(): TransactionOutput {
     amount: 0n,
   };
 }
+
+// Matches Go spark.ZeroSequence — avoids bit 31 (timelock disabled flag) being set.
+export const ZERO_SEQUENCE = 1 << 30;
+
+/**
+ * Creates a multi-input root transaction that consolidates multiple on-chain
+ * UTXOs (all to the same deposit address) into a single root output.
+ *
+ * Input ordering: primary UTXO first, then additional UTXOs in array order.
+ * The output uses the pkScript from the first deposit output and sums all amounts.
+ */
+export function createMultiInputRootTx(
+  depositTxs: { tx: Transaction; vout: number }[],
+): Transaction {
+  if (depositTxs.length === 0) {
+    throw new SparkValidationError("depositTxs must not be empty", {
+      field: "depositTxs",
+      value: depositTxs.length,
+      expected: "At least 1 deposit transaction",
+    });
+  }
+
+  const rootTx = new Transaction({
+    version: 3,
+    allowUnknownOutputs: true,
+  });
+
+  let totalAmount = 0n;
+  for (const { tx, vout } of depositTxs) {
+    const output = tx.getOutput(vout);
+    if (output.amount === undefined || !output.script) {
+      throw new SparkValidationError(
+        "Deposit transaction output missing amount or script",
+        {
+          field: "depositTxOutput",
+          value: {
+            vout,
+            hasAmount: !!output.amount,
+            hasScript: !!output.script,
+          },
+        },
+      );
+    }
+    rootTx.addInput({
+      txid: hexToBytes(getTxId(tx)),
+      index: vout,
+      sequence: ZERO_SEQUENCE,
+    });
+    totalAmount += output.amount;
+  }
+
+  const firstOutput = depositTxs[0]!.tx.getOutput(depositTxs[0]!.vout);
+  rootTx.addOutput({
+    script: firstOutput.script,
+    amount: totalAmount,
+  });
+  rootTx.addOutput(getEphemeralAnchorOutput());
+
+  return rootTx;
+}
