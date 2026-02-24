@@ -41,6 +41,7 @@ import (
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
+	enttransfersender "github.com/lightsparkdev/spark/so/ent/transfersender"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -1542,7 +1543,17 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
-	err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, transfer.SenderIdentityPubkey)
+	var senderPubkey keys.Public
+	transferNetworkStr := transfer.Network.String()
+	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &transferNetworkStr, 0) > 0 {
+		senderPubkey, _, err = GetTransferSenderReceiver(transfer)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		senderPubkey = transfer.SenderIdentityPubkey
+	}
+	err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderPubkey)
 	if err != nil {
 		return nil, err
 	}
@@ -1671,39 +1682,59 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	return &pb.FinalizeTransferResponse{Transfer: transferProto}, err
 }
 
-// checkTransferAccess checks if the viewer has read access to either the sender or receiver wallet.
+// checkTransferAccessWithPubkeys checks if the viewer has read access to either the sender or receiver wallet.
 // It updates the accessMap cache to avoid redundant database queries.
-// Returns true if the viewer has access, false otherwise, and an error if the check fails.
-func (h *TransferHandler) checkTransferAccess(
+func (h *TransferHandler) checkTransferAccessWithPubkeys(
 	ctx context.Context,
-	transfer *ent.Transfer,
+	transferID uuid.UUID,
+	senderPubkey, receiverPubkey keys.Public,
 	accessMap map[keys.Public]bool,
 ) (bool, error) {
-	// Check sender access first
-	hasReadAccess, exists := accessMap[transfer.SenderIdentityPubkey]
+	hasReadAccess, exists := accessMap[senderPubkey]
 	if !exists {
 		var err error
-		hasReadAccess, err = NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, transfer.SenderIdentityPubkey)
+		hasReadAccess, err = NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, senderPubkey)
 		if err != nil {
-			return false, fmt.Errorf("failed to check if viewer has read access to transfer %s: %w", transfer.ID.String(), err)
+			return false, fmt.Errorf("failed to check if viewer has read access to transfer %s: %w", transferID.String(), err)
 		}
-		accessMap[transfer.SenderIdentityPubkey] = hasReadAccess
+		accessMap[senderPubkey] = hasReadAccess
 	}
 	if hasReadAccess {
 		return true, nil
 	}
 
-	// If sender doesn't have access, check receiver access
-	hasReadAccess, exists = accessMap[transfer.ReceiverIdentityPubkey]
+	hasReadAccess, exists = accessMap[receiverPubkey]
 	if !exists {
 		var err error
-		hasReadAccess, err = NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, transfer.ReceiverIdentityPubkey)
+		hasReadAccess, err = NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, receiverPubkey)
 		if err != nil {
-			return false, fmt.Errorf("failed to check if viewer has read access to transfer %s: %w", transfer.ID.String(), err)
+			return false, fmt.Errorf("failed to check if viewer has read access to transfer %s: %w", transferID.String(), err)
 		}
-		accessMap[transfer.ReceiverIdentityPubkey] = hasReadAccess
+		accessMap[receiverPubkey] = hasReadAccess
 	}
 	return hasReadAccess, nil
+}
+
+// checkTransferAccessLegacy checks if the viewer has read access using the transfer's legacy sender/receiver identity fields.
+func (h *TransferHandler) checkTransferAccessLegacy(
+	ctx context.Context,
+	transfer *ent.Transfer,
+	accessMap map[keys.Public]bool,
+) (bool, error) {
+	return h.checkTransferAccessWithPubkeys(ctx, transfer.ID, transfer.SenderIdentityPubkey, transfer.ReceiverIdentityPubkey, accessMap)
+}
+
+// checkTransferAccessMIMO checks if the viewer has read access using the transfer's edges (transfer must be loaded with WithTransferSenders/WithTransferReceivers).
+func (h *TransferHandler) checkTransferAccessMIMO(
+	ctx context.Context,
+	transfer *ent.Transfer,
+	accessMap map[keys.Public]bool,
+) (bool, error) {
+	senderPubkey, receiverPubkey, err := GetTransferSenderReceiver(transfer)
+	if err != nil {
+		return false, err
+	}
+	return h.checkTransferAccessWithPubkeys(ctx, transfer.ID, senderPubkey, receiverPubkey, accessMap)
 }
 
 func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, isPending bool, isSSP bool) (*pb.QueryTransfersResponse, error) {
@@ -1722,6 +1753,19 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	if isPending && len(filter.Statuses) > 0 {
 		return nil, fmt.Errorf("cannot specify both isPending=true and filter.Statuses")
 	}
+
+	var network btcnetwork.Network
+	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
+		network = btcnetwork.Mainnet
+	} else {
+		n, err := btcnetwork.FromProtoNetwork(filter.GetNetwork())
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
+		}
+		network = n
+	}
+	networkStr := network.String()
+	useMIMO := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &networkStr, 0) > 0
 
 	var transferPredicate []predicate.Transfer
 
@@ -1744,7 +1788,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if err != nil {
 			return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
 		}
-		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(receiverIDPubKey))
+		if useMIMO {
+			transferPredicate = append(transferPredicate, enttransfer.HasTransferReceiversWith(enttransferreceiver.IdentityPubkeyEQ(receiverIDPubKey)))
+		} else {
+			transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(receiverIDPubKey))
+		}
 		if isPending {
 			transferPredicate = append(transferPredicate, enttransfer.StatusIn(receiverPendingStatuses...))
 		}
@@ -1754,7 +1802,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if err != nil {
 			return nil, fmt.Errorf("invalid sender identity public key: %w", err)
 		}
-		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(senderIDPubKey))
+		if useMIMO {
+			transferPredicate = append(transferPredicate, enttransfer.HasTransferSendersWith(enttransfersender.IdentityPubkeyEQ(senderIDPubKey)))
+		} else {
+			transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(senderIDPubKey))
+		}
 		if isPending {
 			transferPredicate = append(transferPredicate,
 				enttransfer.StatusIn(senderPendingStatuses...),
@@ -1767,23 +1819,21 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if err != nil {
 			return nil, fmt.Errorf("invalid sender or receiver identity public key: %w", err)
 		}
+		var receiverMatchesIdentity, senderMatchesIdentity predicate.Transfer
+		if useMIMO {
+			receiverMatchesIdentity = enttransfer.HasTransferReceiversWith(enttransferreceiver.IdentityPubkeyEQ(identityPubKey))
+			senderMatchesIdentity = enttransfer.HasTransferSendersWith(enttransfersender.IdentityPubkeyEQ(identityPubKey))
+		} else {
+			receiverMatchesIdentity = enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey)
+			senderMatchesIdentity = enttransfer.SenderIdentityPubkeyEQ(identityPubKey)
+		}
 		if isPending {
 			transferPredicate = append(transferPredicate, enttransfer.Or(
-				enttransfer.And(
-					enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey),
-					enttransfer.StatusIn(receiverPendingStatuses...),
-				),
-				enttransfer.And(
-					enttransfer.SenderIdentityPubkeyEQ(identityPubKey),
-					enttransfer.StatusIn(senderPendingStatuses...),
-					enttransfer.ExpiryTimeLT(time.Now()),
-				),
+				enttransfer.And(receiverMatchesIdentity, enttransfer.StatusIn(receiverPendingStatuses...)),
+				enttransfer.And(senderMatchesIdentity, enttransfer.StatusIn(senderPendingStatuses...), enttransfer.ExpiryTimeLT(time.Now())),
 			))
 		} else {
-			transferPredicate = append(transferPredicate, enttransfer.Or(
-				enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey),
-				enttransfer.SenderIdentityPubkeyEQ(identityPubKey),
-			))
+			transferPredicate = append(transferPredicate, enttransfer.Or(receiverMatchesIdentity, senderMatchesIdentity))
 		}
 		walletIdentityPubkey = &identityPubKey
 	default:
@@ -1813,17 +1863,6 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			return nil, fmt.Errorf("unable to parse transfer IDs as UUIDs: %w", err)
 		}
 		transferPredicate = append(transferPredicate, enttransfer.IDIn(transferUUIDs...))
-	}
-
-	var network btcnetwork.Network
-	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
-		network = btcnetwork.Mainnet
-	} else {
-		var err error
-		network, err = btcnetwork.FromProtoNetwork(filter.GetNetwork())
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
-		}
 	}
 
 	if len(filter.Types) > 0 {
@@ -1882,6 +1921,9 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	}
 
 	baseQuery := db.Transfer.Query().WithSparkInvoice()
+	if useMIMO {
+		baseQuery = baseQuery.WithTransferSenders().WithTransferReceivers()
+	}
 	if len(transferPredicate) > 0 {
 		baseQuery = baseQuery.Where(enttransfer.And(transferPredicate...))
 	}
@@ -1912,7 +1954,12 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	for _, transfer := range transfers {
 		if walletIdentityPubkey == nil && !isSSP {
 			// If no participant is set and not SSP, we need to check if the viewer has read access to either the sender or receiver
-			hasReadAccess, err := h.checkTransferAccess(ctx, transfer, accessMap)
+			var hasReadAccess bool
+			if useMIMO {
+				hasReadAccess, err = h.checkTransferAccessMIMO(ctx, transfer, accessMap)
+			} else {
+				hasReadAccess, err = h.checkTransferAccessLegacy(ctx, transfer, accessMap)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -1942,25 +1989,46 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 }
 
 func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.Client, network btcnetwork.Network, walletIdentityPubkey keys.Public) predicate.Transfer {
-	swap, err := db.Transfer.Query().
-		Where(
-			enttransfer.And(
-				enttransfer.TypeIn(st.TransferTypeSwap, st.TransferTypePrimarySwapV3),
-				enttransfer.NetworkEQ(network),
-				enttransfer.SenderIdentityPubkeyEQ(walletIdentityPubkey),
-			),
-		).
-		Order(ent.Desc(enttransfer.FieldCreateTime)).
-		First(ctx)
+	networkStr := network.String()
+	useMIMO := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &networkStr, 0) > 0
+
+	swapQuery := db.Transfer.Query().
+		Where(enttransfer.And(
+			enttransfer.TypeIn(st.TransferTypeSwap, st.TransferTypePrimarySwapV3),
+			enttransfer.NetworkEQ(network),
+		)).
+		WithTransferSenders().
+		WithTransferReceivers()
+	if useMIMO {
+		swapQuery = swapQuery.Where(enttransfer.HasTransferSendersWith(enttransfersender.IdentityPubkeyEQ(walletIdentityPubkey)))
+	} else {
+		swapQuery = swapQuery.Where(enttransfer.SenderIdentityPubkeyEQ(walletIdentityPubkey))
+	}
+	swap, err := swapQuery.Order(ent.Desc(enttransfer.FieldCreateTime)).First(ctx)
 
 	if err != nil || swap == nil {
 		logger := logging.GetLoggerFromContext(ctx)
 		logger.Sugar().Warnf("failed to find swap for wallet %s: %v", walletIdentityPubkey.String(), err)
-		// Don't want to fail the entire query if we can't find a swap or error here, just return nil
+		// Don't want to fail the entire query if we can't find a swap or error here
 		return nil
 	}
 
 	// include if !(sender is SSP and type is transfer)
+	// i.e. exclude SSP counter-swap transfers
+	if useMIMO {
+		_, swapReceiverPubkey, err := GetTransferSenderReceiver(swap)
+		if err != nil {
+			logger := logging.GetLoggerFromContext(ctx)
+			logger.Sugar().Warnf("failed to get swap receiver for wallet %s: %v", walletIdentityPubkey.String(), err)
+			return nil
+		}
+		return enttransfer.Not(
+			enttransfer.And(
+				enttransfer.HasTransferSendersWith(enttransfersender.IdentityPubkeyEQ(swapReceiverPubkey)),
+				enttransfer.TypeEQ(st.TransferTypeTransfer),
+			),
+		)
+	}
 	return enttransfer.Not(
 		enttransfer.And(
 			enttransfer.SenderIdentityPubkeyEQ(swap.ReceiverIdentityPubkey),

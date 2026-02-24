@@ -341,7 +341,12 @@ func (h *BaseTransferHandler) createTransfer(
 
 	// For counter swap v3, we need to validate the primary transfer is in the right status and has enough time left.
 	if transferType == st.TransferTypeCounterSwapV3 {
-		primaryTransfer, err := db.Transfer.Query().Where(enttransfer.IDEQ(primaryTransferId)).ForUpdate().Only(ctx)
+		primaryTransfer, err := db.Transfer.Query().
+			Where(enttransfer.IDEQ(primaryTransferId)).
+			WithTransferSenders().
+			WithTransferReceivers().
+			ForUpdate().
+			Only(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to find primary swap transfer id=%s", primaryTransferId.String())
 		}
@@ -360,11 +365,22 @@ func (h *BaseTransferHandler) createTransfer(
 			return nil, nil, fmt.Errorf("primary swap transfer %s amount %d does not match counter transfer amount %d", primaryTransferId.String(), primaryTransfer.TotalValue, counterTransferAmount)
 		}
 		// Validate that the parties in the Swap V3 counter transfer are the reverse of the primary transfer to ensure atomic swap correctness
-		if !primaryTransfer.SenderIdentityPubkey.Equals(receiverIdentityPubKey) {
-			return nil, nil, fmt.Errorf("counter transfer receiver must be the primary transfer sender: expected %s, got %s", primaryTransfer.SenderIdentityPubkey, receiverIdentityPubKey)
+		var primarySender, primaryReceiver keys.Public
+		primaryNetworkStr := primaryTransfer.Network.String()
+		if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &primaryNetworkStr, 0) > 0 {
+			primarySender, primaryReceiver, err = GetTransferSenderReceiver(primaryTransfer)
+			if err != nil {
+				return nil, nil, err
+			}
+		} else {
+			primarySender = primaryTransfer.SenderIdentityPubkey
+			primaryReceiver = primaryTransfer.ReceiverIdentityPubkey
 		}
-		if !primaryTransfer.ReceiverIdentityPubkey.Equals(senderIdentityPubKey) {
-			return nil, nil, fmt.Errorf("counter transfer sender must be the primary transfer receiver: expected %s, got %s", primaryTransfer.ReceiverIdentityPubkey, senderIdentityPubKey)
+		if !primarySender.Equals(receiverIdentityPubKey) {
+			return nil, nil, fmt.Errorf("counter transfer receiver must be the primary transfer sender: expected %s, got %s", primarySender, receiverIdentityPubKey)
+		}
+		if !primaryReceiver.Equals(senderIdentityPubKey) {
+			return nil, nil, fmt.Errorf("counter transfer sender must be the primary transfer receiver: expected %s, got %s", primaryReceiver, senderIdentityPubKey)
 		}
 	}
 
@@ -396,6 +412,15 @@ func (h *BaseTransferHandler) createTransfer(
 		Save(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer receiver: %w", err)
+	}
+
+	transfer, err = db.Transfer.Query().
+		Where(enttransfer.ID(transfer.ID)).
+		WithTransferSenders().
+		WithTransferReceivers().
+		Only(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to load transfer with edges: %w", err)
 	}
 
 	if len(leafCpfpRefundMap) == 0 {
@@ -687,7 +712,18 @@ func (h *BaseTransferHandler) LeafAvailableToTransfer(ctx context.Context, leaf 
 		}
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf %v is not available to transfer, status: %s", leaf.ID, leaf.Status))
 	}
-	if !leaf.OwnerIdentityPubkey.Equals(transfer.SenderIdentityPubkey) {
+	var senderPubkey keys.Public
+	transferNetworkStr := transfer.Network.String()
+	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &transferNetworkStr, 0) > 0 {
+		var err error
+		senderPubkey, _, err = GetTransferSenderReceiver(transfer)
+		if err != nil {
+			return err
+		}
+	} else {
+		senderPubkey = transfer.SenderIdentityPubkey
+	}
+	if !leaf.OwnerIdentityPubkey.Equals(senderPubkey) {
 		return fmt.Errorf("leaf %v is not owned by sender", leaf.ID)
 	}
 	return nil
@@ -811,7 +847,18 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 		logger.Sugar().Infof("Transfer %v not found", transferID)
 		return &pbspark.CancelTransferResponse{}, nil
 	}
-	if !transfer.SenderIdentityPubkey.Equals(reqSenderIDPubKey) {
+	var senderPubkey keys.Public
+	transferNetworkStr := transfer.Network.String()
+	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &transferNetworkStr, 0) > 0 {
+		var err error
+		senderPubkey, _, err = GetTransferSenderReceiver(transfer)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		senderPubkey = transfer.SenderIdentityPubkey
+	}
+	if !senderPubkey.Equals(reqSenderIDPubKey) {
 		return nil, fmt.Errorf("only sender is eligible to cancel the transfer %s", transferID)
 	}
 
@@ -1030,7 +1077,12 @@ func (h *BaseTransferHandler) loadTransferForUpdate(ctx context.Context, transfe
 		return nil, err
 	}
 
-	transfer, err := db.Transfer.Query().Where(enttransfer.ID(transferID)).ForUpdate(opts...).Only(ctx)
+	transfer, err := db.Transfer.Query().
+		Where(enttransfer.ID(transferID)).
+		ForUpdate(opts...).
+		WithTransferSenders().
+		WithTransferReceivers().
+		Only(ctx)
 	if err != nil || transfer == nil {
 		return nil, fmt.Errorf("unable to find transfer %s: %w", transferID, err)
 	}
@@ -1043,7 +1095,11 @@ func (h *BaseTransferHandler) loadTransferNoUpdate(ctx context.Context, transfer
 		return nil, err
 	}
 
-	transfer, err := db.Transfer.Query().Where(enttransfer.ID(transferID)).Only(ctx)
+	transfer, err := db.Transfer.Query().
+		Where(enttransfer.ID(transferID)).
+		WithTransferSenders().
+		WithTransferReceivers().
+		Only(ctx)
 	if err != nil || transfer == nil {
 		return nil, fmt.Errorf("unable to find transfer %s: %w", transferID, err)
 	}

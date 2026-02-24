@@ -272,6 +272,14 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedAmount(t *testing.T) {
 		SetNetwork(btcnetwork.Regtest).
 		Save(ctx)
 	require.NoError(t, err)
+	_, err = client.TransferSender.Create().SetTransferID(primaryTransfer.ID).SetIdentityPubkey(senderPub).Save(ctx)
+	require.NoError(t, err)
+	_, err = client.TransferReceiver.Create().
+		SetTransferID(primaryTransfer.ID).
+		SetIdentityPubkey(receiverPub).
+		SetStatus(st.TransferReceiverStatusSenderInitiated).
+		Save(ctx)
+	require.NoError(t, err)
 
 	tree, err := client.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
@@ -387,6 +395,14 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedParties(t *testing.T) {
 		SetExpiryTime(time.Now().Add(10 * time.Minute)).
 		SetType(st.TransferTypePrimarySwapV3).
 		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = client.TransferSender.Create().SetTransferID(primaryTransfer.ID).SetIdentityPubkey(alicePub).Save(ctx)
+	require.NoError(t, err)
+	_, err = client.TransferReceiver.Create().
+		SetTransferID(primaryTransfer.ID).
+		SetIdentityPubkey(bobPub).
+		SetStatus(st.TransferReceiverStatusSenderInitiated).
 		Save(ctx)
 	require.NoError(t, err)
 
