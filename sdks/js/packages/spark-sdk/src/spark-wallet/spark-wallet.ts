@@ -19,7 +19,6 @@ import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { Mutex } from "async-mutex";
 import { EventEmitter } from "eventemitter3";
-import { ClientError, Status } from "nice-grpc-common";
 import { uuidv7, uuidv7obj } from "uuidv7";
 import { isReactNative } from "../constants.js";
 import {
@@ -141,7 +140,6 @@ import {
   NetworkType,
 } from "../utils/network.js";
 import { optimize, shouldOptimize } from "../utils/optimize.js";
-import { RetryContext, withRetry } from "../utils/retry.js";
 import {
   Bech32mTokenIdentifier,
   decodeBech32mTokenIdentifier,
@@ -2936,46 +2934,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return validNodes;
   }
 
-  private async claimTransferCore(transfer: Transfer) {
-    return await this.claimTransferMutex.runExclusive(async () => {
-      const leafPubKeyMap =
-        await this.transferService.verifyPendingTransfer(transfer);
-
-      let leavesToClaim: LeafKeyTweak[] = [];
-
-      for (const leaf of transfer.leaves) {
-        if (leaf.leaf) {
-          const leafPubKey = leafPubKeyMap.get(leaf.leaf.id);
-          if (leafPubKey) {
-            leavesToClaim.push({
-              leaf: {
-                ...leaf.leaf,
-                refundTx: leaf.intermediateRefundTx,
-                directRefundTx: leaf.intermediateDirectRefundTx,
-                directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-              },
-              keyDerivation: {
-                type: KeyDerivationType.ECIES,
-                path: leaf.secretCipher,
-              },
-              newKeyDerivation: {
-                type: KeyDerivationType.LEAF,
-                path: leaf.leaf.id,
-              },
-            });
-          }
-        }
-      }
-
-      const response = await this.transferService.claimTransfer(
-        transfer,
-        leavesToClaim,
-      );
-
-      return response.nodes;
-    });
-  }
-
   private async processClaimedTransferResults(
     result: TreeNode[],
     transfer: Transfer,
@@ -3028,74 +2986,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }: {
     transfer: Transfer;
     emit?: boolean;
-  }) {
-    const onError = async (
-      context: RetryContext<TreeNode[], Transfer>,
-    ): Promise<TreeNode[] | undefined> => {
-      const error = context.error;
-      if (
-        error instanceof SparkRequestError &&
-        error.originalError instanceof ClientError &&
-        error.originalError.code === Status.ALREADY_EXISTS
-      ) {
-        const transferToUse = context.data || transfer;
-        const updatedTransfer = await this.transferService.queryTransfer(
-          transferToUse.id,
-        );
-
-        if (!updatedTransfer) {
-          return undefined;
-        }
-
-        const leaves = updatedTransfer.leaves.flatMap((leaf) =>
-          leaf.leaf ? [leaf.leaf] : [],
-        );
-
-        return leaves;
-      }
-      return;
-    };
-
-    const fetchData = async (context: RetryContext<TreeNode[], Transfer>) => {
-      const transferToUse = context.data || transfer;
-      const updatedTransfer = await this.transferService.queryPendingTransfers([
-        transferToUse.id,
-      ]);
-      if (!updatedTransfer.transfers[0]) {
-        return undefined;
-      }
-      return updatedTransfer.transfers[0];
-    };
-
-    try {
-      const result = await withRetry(
-        async (updatedTransfer?: Transfer) => {
-          const transferToUse = updatedTransfer ?? transfer;
-          return await this.claimTransferCore(transferToUse);
-        },
-        {
-          callbacks: {
-            onError,
-            fetchData,
-          },
-        },
-      );
-
-      if (result.length === 0) {
-        return [];
-      }
-
-      return await this.processClaimedTransferResults(result, transfer, emit);
-    } catch (error) {
-      console.warn(
-        `Failed to claim transfer after all retries. Please try reinitializing your wallet in a few minutes. Transfer ID: ${transfer.id}`,
-        error,
-      );
-
-      throw new SparkError("Failed to claim transfer", { error });
-    }
+  }): Promise<TreeNode[]> {
+    const result = await this.claimTransferMutex.runExclusive(async () => {
+      return await this.transferService.claimTransfer(transfer);
+    });
+    return await this.processClaimedTransferResults(result, transfer, emit);
   }
-
   /**
    * Claims all pending transfers.
    *

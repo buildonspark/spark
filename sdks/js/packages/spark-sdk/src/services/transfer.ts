@@ -3,8 +3,13 @@ import { equalBytes, hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionOutput } from "@scure/btc-signer/psbt";
+import { ClientError, Status } from "nice-grpc-common";
 import { uuidv7 } from "uuidv7";
-import { SparkRequestError, SparkValidationError } from "../errors/index.js";
+import {
+  SparkError,
+  SparkRequestError,
+  SparkValidationError,
+} from "../errors/index.js";
 import { SignatureIntent } from "../proto/common.js";
 import { Timestamp } from "../proto/google/protobuf/timestamp.js";
 import {
@@ -28,6 +33,7 @@ import {
   StartTransferResponse,
   Transfer,
   TransferPackage,
+  TransferStatus,
   TransferType,
   TreeNode,
 } from "../proto/spark.js";
@@ -45,6 +51,7 @@ import {
 } from "../utils/bitcoin.js";
 import { optionsWithIdempotencyKey } from "../utils/idempotency.js";
 import { NetworkToProto } from "../utils/network.js";
+import { RetryContext, withRetry } from "../utils/retry.js";
 import { VerifiableSecretShare } from "../utils/secret-sharing.js";
 import {
   createCurrentTimelockRefundTxs,
@@ -890,10 +897,35 @@ export class TransferService extends BaseTransferService {
     super(config, connectionManager, signingService);
   }
 
-  async claimTransfer(
-    transfer: Transfer,
-    leaves: LeafKeyTweak[],
-  ): Promise<{ nodes: TreeNode[] }> {
+  async claimTransferCore(transfer: Transfer): Promise<TreeNode[]> {
+    const leafPubKeyMap = await this.verifyPendingTransfer(transfer);
+
+    let leaves: LeafKeyTweak[] = [];
+
+    for (const leaf of transfer.leaves) {
+      if (leaf.leaf) {
+        const leafPubKey = leafPubKeyMap.get(leaf.leaf.id);
+        if (leafPubKey) {
+          leaves.push({
+            leaf: {
+              ...leaf.leaf,
+              refundTx: leaf.intermediateRefundTx,
+              directRefundTx: leaf.intermediateDirectRefundTx,
+              directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+            },
+            keyDerivation: {
+              type: KeyDerivationType.ECIES,
+              path: leaf.secretCipher,
+            },
+            newKeyDerivation: {
+              type: KeyDerivationType.LEAF,
+              path: leaf.leaf.id,
+            },
+          });
+        }
+      }
+    }
+
     const claimPackage = await this.prepareClaimPackage(transfer.id, leaves);
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
@@ -919,7 +951,7 @@ export class TransferService extends BaseTransferService {
     const nodes = response.transfer.leaves.flatMap((leaf) =>
       leaf.leaf ? [leaf.leaf] : [],
     );
-    return { nodes };
+    return nodes;
   }
 
   // When transferIds is not provided, all pending transfers for the receiver will be returned.
@@ -2196,5 +2228,74 @@ export class TransferService extends BaseTransferService {
     });
 
     return signingJobs;
+  }
+
+  async claimTransfer(transfer: Transfer): Promise<TreeNode[]> {
+    const onError = async (
+      context: RetryContext<TreeNode[], Transfer>,
+    ): Promise<TreeNode[] | undefined> => {
+      const error = context.error;
+      if (
+        error instanceof SparkRequestError &&
+        error.originalError instanceof ClientError &&
+        error.originalError.code === Status.ALREADY_EXISTS
+      ) {
+        const transferToUse = context.data || transfer;
+        const updatedTransfer = await this.queryTransfer(transferToUse.id);
+
+        if (
+          !updatedTransfer ||
+          updatedTransfer.status !== TransferStatus.TRANSFER_STATUS_COMPLETED
+        ) {
+          return undefined;
+        }
+
+        const leaves = updatedTransfer.leaves.flatMap((leaf) =>
+          leaf.leaf ? [leaf.leaf] : [],
+        );
+
+        return leaves;
+      }
+      return;
+    };
+
+    const fetchData = async (context: RetryContext<TreeNode[], Transfer>) => {
+      const transferToUse = context.data || transfer;
+      const updatedTransfer = await this.queryPendingTransfers([
+        transferToUse.id,
+      ]);
+      if (!updatedTransfer.transfers[0]) {
+        return undefined;
+      }
+      return updatedTransfer.transfers[0];
+    };
+
+    try {
+      const result = await withRetry(
+        async (updatedTransfer?: Transfer) => {
+          const transferToUse = updatedTransfer ?? transfer;
+          return await this.claimTransferCore(transferToUse);
+        },
+        {
+          callbacks: {
+            onError,
+            fetchData,
+          },
+        },
+      );
+
+      if (result.length === 0) {
+        return [];
+      }
+
+      return result;
+    } catch (error) {
+      console.warn(
+        `Failed to claim transfer after all retries. Please try reinitializing your wallet in a few minutes. Transfer ID: ${transfer.id}`,
+        error,
+      );
+
+      throw new SparkError("Failed to claim transfer", { error });
+    }
   }
 }

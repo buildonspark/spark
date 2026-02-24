@@ -5,6 +5,7 @@ import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { equalBytes } from "@scure/btc-signer/utils";
 import { uuidv7 } from "uuidv7";
+import { TransferStatus } from "../../proto/spark.js";
 import { WalletConfigService } from "../../services/config.js";
 import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
 import { CoopExitService } from "../../services/coop-exit.js";
@@ -12,6 +13,7 @@ import { SigningService } from "../../services/signing.js";
 import type { LeafKeyTweak } from "../../services/transfer.js";
 import { TransferService } from "../../services/transfer.js";
 import { ConfigOptions } from "../../services/wallet-config.js";
+import { KeyDerivation, KeyDerivationType } from "../../signer/types.js";
 import {
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
@@ -21,8 +23,6 @@ import { getNetwork, Network } from "../../utils/network.js";
 import { walletTypes } from "../test-utils.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
-import { KeyDerivation, KeyDerivationType } from "../../signer/types.js";
-import { TransferStatus } from "../../proto/spark.js";
 
 describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
   it(`${name} - test coop exit`, async () => {
@@ -190,28 +190,10 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
     ).toBe(true);
 
     // Try to claim leaf before exit tx confirms -> should fail
-    const leavesToClaim: LeafKeyTweak[] = receiverTransfer!.leaves.map(
-      (leaf) => ({
-        leaf: {
-          ...leaf.leaf!,
-          refundTx: leaf.intermediateRefundTx,
-          directRefundTx: leaf.intermediateDirectRefundTx,
-          directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-        },
-        keyDerivation: {
-          type: KeyDerivationType.ECIES,
-          path: leaf.secretCipher,
-        },
-        newKeyDerivation: {
-          type: KeyDerivationType.LEAF,
-          path: leaf.leaf!.id,
-        },
-      }),
-    );
 
     let hasError = false;
     try {
-      await sspTransferService.claimTransfer(receiverTransfer!, leavesToClaim);
+      await sspTransferService.claimTransfer(receiverTransfer!);
     } catch (e) {
       hasError = true;
     }
@@ -252,9 +234,6 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
       retries++;
     }
     expect(transfers.transfers.length).toBe(1);
-    await sspTransferService.claimTransfer(
-      transfers.transfers[0]!,
-      leavesToClaim,
-    );
+    await sspTransferService.claimTransfer(transfers.transfers[0]!);
   }, 30000);
 });

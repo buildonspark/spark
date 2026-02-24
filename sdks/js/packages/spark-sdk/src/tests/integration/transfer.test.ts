@@ -4,14 +4,14 @@ import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { uuidv7 } from "uuidv7";
 import { SparkError } from "../../errors/index.js";
-import { KeyDerivation, KeyDerivationType } from "../../signer/types.js";
-import { SparkWalletEvent } from "../../spark-wallet/types.js";
 import { InvoiceStatus, TransferStatus } from "../../proto/spark.js";
 import type { LeafKeyTweak } from "../../services/transfer.js";
 import {
   type ConfigOptions,
   getLocalSigningOperators,
 } from "../../services/wallet-config.js";
+import { KeyDerivation, KeyDerivationType } from "../../signer/types.js";
+import { SparkWalletEvent } from "../../spark-wallet/types.js";
 import { NetworkType } from "../../utils/network.js";
 import { walletTypes } from "../test-utils.js";
 import {
@@ -97,35 +97,13 @@ describe.each(walletTypes)(
         ),
       );
 
-      const claimingNodes: LeafKeyTweak[] = receiverTransfer!.leaves.map(
-        (leaf) => ({
-          leaf: {
-            ...leaf.leaf!,
-            refundTx: leaf.intermediateRefundTx,
-            directRefundTx: leaf.intermediateDirectRefundTx,
-            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-          },
-          keyDerivation: {
-            type: KeyDerivationType.ECIES,
-            path: leaf.secretCipher,
-          },
-          newKeyDerivation: {
-            type: KeyDerivationType.LEAF,
-            path: leaf.leaf!.id,
-          },
-        }),
-      );
-
-      await receiverTransferService.claimTransfer(
-        receiverTransfer!,
-        claimingNodes,
-      );
+      await receiverTransferService.claimTransfer(receiverTransfer!);
 
       const balance = await receiverWallet.getBalance();
       expect(balance.balance).toBe(1000n);
     }, 30000);
 
-    testLocalOnly(`${name} - test transfer with separate`, async () => {
+    it(`${name} - test transfer with separate`, async () => {
       const faucet = BitcoinFaucet.getInstance();
 
       const options: ConfigOptions = {
@@ -257,7 +235,6 @@ describe.each(walletTypes)(
 
       await receiverTransferService.claimTransfer(
         newNewPendingTransfer.transfers[0]!,
-        claimingNodes,
       );
     });
 
@@ -333,29 +310,7 @@ describe.each(walletTypes)(
 
       expect(leafPrivKeyMap.size).toBe(1);
 
-      const claimingNodes: LeafKeyTweak[] = receiverTransfer!.leaves.map(
-        (leaf) => ({
-          leaf: {
-            ...leaf.leaf!,
-            refundTx: leaf.intermediateRefundTx,
-            directRefundTx: leaf.intermediateDirectRefundTx,
-            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-          },
-          keyDerivation: {
-            type: KeyDerivationType.ECIES,
-            path: leaf.secretCipher,
-          },
-          newKeyDerivation: {
-            type: KeyDerivationType.LEAF,
-            path: leaf.leaf!.id,
-          },
-        }),
-      );
-
-      await receiverTransferServiceRecovered.claimTransfer(
-        receiverTransfer!,
-        claimingNodes,
-      );
+      await receiverTransferServiceRecovered.claimTransfer(receiverTransfer!);
 
       const balance = await receiverWalletRecovered.getBalance();
       expect(balance.balance).toBe(1000n);
@@ -617,29 +572,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
       ),
     );
 
-    const claimingNodes: LeafKeyTweak[] = receiverTransfer!.leaves.map(
-      (leaf) => ({
-        leaf: {
-          ...leaf.leaf!,
-          refundTx: leaf.intermediateRefundTx,
-          directRefundTx: leaf.intermediateDirectRefundTx,
-          directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-        },
-        keyDerivation: {
-          type: KeyDerivationType.ECIES,
-          path: leaf.secretCipher,
-        },
-        newKeyDerivation: {
-          type: KeyDerivationType.LEAF,
-          path: leaf.leaf!.id,
-        },
-      }),
-    );
-
-    await receiverTransferService.claimTransfer(
-      receiverTransfer!,
-      claimingNodes,
-    );
+    await receiverTransferService.claimTransfer(receiverTransfer!);
 
     const balance = await receiverWallet.getBalance();
     expect(balance.balance).toBe(1000n);
@@ -684,25 +617,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
       Date.now(),
     );
 
-    const claimingNodes: LeafKeyTweak[] = receiverTransfer!.leaves.map(
-      (leaf) => ({
-        leaf: {
-          ...rootNode,
-          refundTx: leaf.intermediateRefundTx,
-          directRefundTx: leaf.intermediateDirectRefundTx,
-          directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-        },
-        keyDerivation: {
-          type: KeyDerivationType.ECIES,
-          path: receiverTransfer!.leaves[0]!.secretCipher,
-        },
-        newKeyDerivation: {
-          type: KeyDerivationType.LEAF,
-          path: leaf.leaf!.id,
-        },
-      }),
-    );
-    await senderTransferService.claimTransfer(receiverTransfer!, claimingNodes);
+    await senderTransferService.claimTransfer(receiverTransfer!);
 
     const balance = await senderWallet.getBalance();
     expect(balance.balance).toBe(1000n);
@@ -785,17 +700,17 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     expect(pendingTransfers.transfers.length).toBe(1);
     const transfer = pendingTransfers.transfers[0]!;
 
-    const originalClaimTransferCore = (sdk2 as any).claimTransferCore.bind(
-      sdk2,
-    );
+    const transferService = sdk2.getTransferService();
+    const originalClaimTransferCore =
+      transferService.claimTransferCore.bind(transferService);
     const claimTransferCoreSpy = jest
-      .spyOn(sdk2 as any, "claimTransferCore")
+      .spyOn(transferService, "claimTransferCore")
       .mockRejectedValueOnce(new Error("Network error"))
       .mockImplementation(async (transfer) => {
         return await originalClaimTransferCore(transfer);
       });
 
-    await (sdk2 as any).claimTransfer({ transfer });
+    await transferService.claimTransfer(transfer);
 
     expect(claimTransferCoreSpy).toHaveBeenCalledTimes(2);
     expect((await sdk2.getBalance()).balance).toBe(1000n);
@@ -842,29 +757,24 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     expect(pendingTransfers.transfers.length).toBe(1);
     const transfer = pendingTransfers.transfers[0]!;
 
-    await (sdk2 as any).claimTransfer({ transfer });
+    const transferService = sdk2.getTransferService();
+    await transferService.claimTransfer(transfer);
 
-    const claimTransferCoreSpy = jest.spyOn(sdk2 as any, "claimTransferCore");
+    const claimTransferCoreSpy = jest.spyOn(
+      transferService,
+      "claimTransferCore",
+    );
 
-    const claim1 = await (sdk2 as any).claimTransfer({
-      transfer: {
-        ...transfer,
-        status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
-      },
-    });
+    const claim1 = await transferService.claimTransfer(transfer);
     expect(claim1.length).toBe(1);
 
-    const claim2 = await (sdk2 as any).claimTransfer({
-      transfer: {
-        ...transfer,
-        status: TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED,
-      },
+    const claim2 = await transferService.claimTransfer({
+      ...transfer,
+      status: TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED,
     });
     expect(claim2.length).toBe(1);
 
-    const claim3 = await (sdk2 as any).claimTransfer({
-      transfer,
-    });
+    const claim3 = await transferService.claimTransfer(transfer);
 
     expect(claim3.length).toBe(1);
 
@@ -939,9 +849,12 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
 
     await receiverTransferService.claimTransferTweakKeys(transfer, leaves);
 
-    const claimTransferCoreSpy = jest.spyOn(sdk2 as any, "claimTransferCore");
+    const claimTransferCoreSpy = jest.spyOn(
+      receiverTransferService,
+      "claimTransferCore",
+    );
 
-    const res = await (sdk2 as any).claimTransfer({ transfer });
+    const res = await receiverTransferService.claimTransfer(transfer);
     expect(res.length).toBe(1);
 
     expect(claimTransferCoreSpy).toHaveBeenCalledTimes(2);
@@ -994,24 +907,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     expect(pendingTransfers.transfers.length).toBe(1);
     const transfer = pendingTransfers.transfers[0]!;
 
-    const claimingNodes: LeafKeyTweak[] = transfer!.leaves.map((leaf) => ({
-      leaf: {
-        ...leaf.leaf!,
-        refundTx: leaf.intermediateRefundTx,
-        directRefundTx: leaf.intermediateDirectRefundTx,
-        directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-      },
-      keyDerivation: {
-        type: KeyDerivationType.ECIES,
-        path: leaf.secretCipher,
-      },
-      newKeyDerivation: {
-        type: KeyDerivationType.LEAF,
-        path: leaf.leaf!.id,
-      },
-    }));
-
-    await bobTransferService.claimTransfer(transfer!, claimingNodes);
+    await bobTransferService.claimTransfer(transfer!);
   });
 
   it(`${name} - test transfer with new spark address`, async () => {
@@ -1061,24 +957,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     expect(pendingTransfers.transfers.length).toBe(1);
     const transfer = pendingTransfers.transfers[0]!;
 
-    const claimingNodes: LeafKeyTweak[] = transfer!.leaves.map((leaf) => ({
-      leaf: {
-        ...leaf.leaf!,
-        refundTx: leaf.intermediateRefundTx,
-        directRefundTx: leaf.intermediateDirectRefundTx,
-        directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-      },
-      keyDerivation: {
-        type: KeyDerivationType.ECIES,
-        path: leaf.secretCipher,
-      },
-      newKeyDerivation: {
-        type: KeyDerivationType.LEAF,
-        path: leaf.leaf!.id,
-      },
-    }));
-
-    await bobTransferService.claimTransfer(transfer!, claimingNodes);
+    await bobTransferService.claimTransfer(transfer!);
   });
 });
 
@@ -1185,7 +1064,7 @@ describe.each(walletTypes)(
         await receiverTransferService.claimTransferTweakKeys(transfer, leaves);
         const beforeClaimBalance = await sdk2.getBalance();
 
-        const res = await (sdk2 as any).claimTransfer({ transfer });
+        const res = await receiverTransferService.claimTransfer(transfer);
         expect(res.length).toBe(1);
 
         const newBalance = await sdk2.getBalance();

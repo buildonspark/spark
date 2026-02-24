@@ -3,6 +3,7 @@ import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { equalBytes } from "@scure/btc-signer/utils";
 import { uuidv7 } from "uuidv7";
+import { KeyDerivationType } from "../../signer/types.js";
 import {
   BitcoinNetwork,
   CurrencyUnit,
@@ -10,10 +11,9 @@ import {
   LightningReceiveRequestStatus,
   SparkProto,
 } from "../../types/index.js";
+import { getTxFromRawTxBytes } from "../../utils/bitcoin.js";
 import { BitcoinFaucet, walletTypes } from "../test-utils.js";
 import { SparkWalletTestingIntegration } from "../utils/spark-testing-wallet.js";
-import { getTxFromRawTxBytes } from "../../utils/bitcoin.js";
-import { KeyDerivationType } from "../../signer/types.js";
 
 const { TransferStatus } = SparkProto;
 
@@ -289,7 +289,7 @@ describe.each(walletTypes)(
         };
       });
 
-      await transferService.claimTransfer(receiverTransfer, claimingNodes);
+      await transferService.claimTransfer(receiverTransfer);
     }, 60000);
 
     it(`${name} - test receive lightning v2 payment`, async () => {
@@ -395,29 +395,7 @@ describe.each(walletTypes)(
         throw new Error("test: Receiver leaf not found");
       }
 
-      const claimingNodes = receiverTransfer.leaves.map((leaf) => {
-        if (!leaf.leaf) {
-          throw new Error("test: Leaf not found");
-        }
-        return {
-          leaf: {
-            ...leaf.leaf,
-            refundTx: leaf.intermediateRefundTx,
-            directRefundTx: leaf.intermediateDirectRefundTx,
-            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-          },
-          keyDerivation: {
-            type: KeyDerivationType.ECIES,
-            path: leaf.secretCipher,
-          } as const,
-          newKeyDerivation: {
-            type: KeyDerivationType.LEAF,
-            path: leaf.leaf.id,
-          } as const,
-        };
-      });
-
-      await transferService.claimTransfer(receiverTransfer, claimingNodes);
+      await transferService.claimTransfer(receiverTransfer);
     }, 60000);
 
     it(`${name} - test send lightning v2 payment`, async () => {
@@ -524,29 +502,7 @@ describe.each(walletTypes)(
         throw new Error("test: Receiver leaf not found");
       }
 
-      const claimingNodes = receiverTransfer.leaves.map((leaf) => {
-        if (!leaf.leaf) {
-          throw new Error("test: Leaf not found");
-        }
-        return {
-          leaf: {
-            ...leaf.leaf,
-            refundTx: leaf.intermediateRefundTx,
-            directRefundTx: leaf.intermediateDirectRefundTx,
-            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-          },
-          keyDerivation: {
-            type: KeyDerivationType.ECIES,
-            path: leaf.secretCipher,
-          } as const,
-          newKeyDerivation: {
-            type: KeyDerivationType.LEAF,
-            path: leaf.leaf.id,
-          } as const,
-        };
-      });
-
-      await sspTransferService.claimTransfer(receiverTransfer, claimingNodes);
+      await sspTransferService.claimTransfer(receiverTransfer);
     }, 60000);
   },
 );
