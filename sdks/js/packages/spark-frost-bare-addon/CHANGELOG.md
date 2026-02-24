@@ -1,5 +1,11 @@
 # @buildonspark/spark-frost-bare-addon
 
+## 0.0.9
+
+### Patch Changes
+
+- - Regenerate all prebuilds
+
 ## 0.0.8
 
 ### Patch Changes
