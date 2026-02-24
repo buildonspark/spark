@@ -19,6 +19,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
+	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
+	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -398,6 +400,60 @@ func (f TraverseL1WithdrawalTransaction) Traverse(ctx context.Context, q ent.Que
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.L1WithdrawalTransactionQuery", q)
+}
+
+// The MultisigConfigFunc type is an adapter to allow the use of ordinary function as a Querier.
+type MultisigConfigFunc func(context.Context, *ent.MultisigConfigQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f MultisigConfigFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.MultisigConfigQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.MultisigConfigQuery", q)
+}
+
+// The TraverseMultisigConfig type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseMultisigConfig func(context.Context, *ent.MultisigConfigQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseMultisigConfig) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseMultisigConfig) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.MultisigConfigQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.MultisigConfigQuery", q)
+}
+
+// The MultisigMemberFunc type is an adapter to allow the use of ordinary function as a Querier.
+type MultisigMemberFunc func(context.Context, *ent.MultisigMemberQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f MultisigMemberFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.MultisigMemberQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.MultisigMemberQuery", q)
+}
+
+// The TraverseMultisigMember type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseMultisigMember func(context.Context, *ent.MultisigMemberQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseMultisigMember) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseMultisigMember) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.MultisigMemberQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.MultisigMemberQuery", q)
 }
 
 // The PaymentIntentFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1100,6 +1156,10 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.L1TokenOutputWithdrawalQuery, predicate.L1TokenOutputWithdrawal, l1tokenoutputwithdrawal.OrderOption]{typ: ent.TypeL1TokenOutputWithdrawal, tq: q}, nil
 	case *ent.L1WithdrawalTransactionQuery:
 		return &query[*ent.L1WithdrawalTransactionQuery, predicate.L1WithdrawalTransaction, l1withdrawaltransaction.OrderOption]{typ: ent.TypeL1WithdrawalTransaction, tq: q}, nil
+	case *ent.MultisigConfigQuery:
+		return &query[*ent.MultisigConfigQuery, predicate.MultisigConfig, multisigconfig.OrderOption]{typ: ent.TypeMultisigConfig, tq: q}, nil
+	case *ent.MultisigMemberQuery:
+		return &query[*ent.MultisigMemberQuery, predicate.MultisigMember, multisigmember.OrderOption]{typ: ent.TypeMultisigMember, tq: q}, nil
 	case *ent.PaymentIntentQuery:
 		return &query[*ent.PaymentIntentQuery, predicate.PaymentIntent, paymentintent.OrderOption]{typ: ent.TypePaymentIntent, tq: q}, nil
 	case *ent.PendingSendTransferQuery:

@@ -27,6 +27,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
+	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
+	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -77,6 +79,8 @@ const (
 	TypeL1TokenJusticeTransaction         = "L1TokenJusticeTransaction"
 	TypeL1TokenOutputWithdrawal           = "L1TokenOutputWithdrawal"
 	TypeL1WithdrawalTransaction           = "L1WithdrawalTransaction"
+	TypeMultisigConfig                    = "MultisigConfig"
+	TypeMultisigMember                    = "MultisigMember"
 	TypePaymentIntent                     = "PaymentIntent"
 	TypePendingSendTransfer               = "PendingSendTransfer"
 	TypePreimageRequest                   = "PreimageRequest"
@@ -8425,6 +8429,1223 @@ func (m *L1WithdrawalTransactionMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown L1WithdrawalTransaction edge %s", name)
+}
+
+// MultisigConfigMutation represents an operation that mutates the MultisigConfig nodes in the graph.
+type MultisigConfigMutation struct {
+	config
+	op                       Op
+	typ                      string
+	id                       *uuid.UUID
+	create_time              *time.Time
+	update_time              *time.Time
+	multisig_identifier      *[]byte
+	num_signers_threshold    *uint32
+	addnum_signers_threshold *int32
+	num_signers_total        *uint32
+	addnum_signers_total     *int32
+	clearedFields            map[string]struct{}
+	members                  map[uuid.UUID]struct{}
+	removedmembers           map[uuid.UUID]struct{}
+	clearedmembers           bool
+	done                     bool
+	oldValue                 func(context.Context) (*MultisigConfig, error)
+	predicates               []predicate.MultisigConfig
+}
+
+var _ ent.Mutation = (*MultisigConfigMutation)(nil)
+
+// multisigconfigOption allows management of the mutation configuration using functional options.
+type multisigconfigOption func(*MultisigConfigMutation)
+
+// newMultisigConfigMutation creates new mutation for the MultisigConfig entity.
+func newMultisigConfigMutation(c config, op Op, opts ...multisigconfigOption) *MultisigConfigMutation {
+	m := &MultisigConfigMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeMultisigConfig,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withMultisigConfigID sets the ID field of the mutation.
+func withMultisigConfigID(id uuid.UUID) multisigconfigOption {
+	return func(m *MultisigConfigMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *MultisigConfig
+		)
+		m.oldValue = func(ctx context.Context) (*MultisigConfig, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().MultisigConfig.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withMultisigConfig sets the old MultisigConfig of the mutation.
+func withMultisigConfig(node *MultisigConfig) multisigconfigOption {
+	return func(m *MultisigConfigMutation) {
+		m.oldValue = func(context.Context) (*MultisigConfig, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m MultisigConfigMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m MultisigConfigMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of MultisigConfig entities.
+func (m *MultisigConfigMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *MultisigConfigMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *MultisigConfigMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().MultisigConfig.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *MultisigConfigMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *MultisigConfigMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the MultisigConfig entity.
+// If the MultisigConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MultisigConfigMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *MultisigConfigMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *MultisigConfigMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *MultisigConfigMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the MultisigConfig entity.
+// If the MultisigConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MultisigConfigMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *MultisigConfigMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetMultisigIdentifier sets the "multisig_identifier" field.
+func (m *MultisigConfigMutation) SetMultisigIdentifier(b []byte) {
+	m.multisig_identifier = &b
+}
+
+// MultisigIdentifier returns the value of the "multisig_identifier" field in the mutation.
+func (m *MultisigConfigMutation) MultisigIdentifier() (r []byte, exists bool) {
+	v := m.multisig_identifier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMultisigIdentifier returns the old "multisig_identifier" field's value of the MultisigConfig entity.
+// If the MultisigConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MultisigConfigMutation) OldMultisigIdentifier(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMultisigIdentifier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMultisigIdentifier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMultisigIdentifier: %w", err)
+	}
+	return oldValue.MultisigIdentifier, nil
+}
+
+// ResetMultisigIdentifier resets all changes to the "multisig_identifier" field.
+func (m *MultisigConfigMutation) ResetMultisigIdentifier() {
+	m.multisig_identifier = nil
+}
+
+// SetNumSignersThreshold sets the "num_signers_threshold" field.
+func (m *MultisigConfigMutation) SetNumSignersThreshold(u uint32) {
+	m.num_signers_threshold = &u
+	m.addnum_signers_threshold = nil
+}
+
+// NumSignersThreshold returns the value of the "num_signers_threshold" field in the mutation.
+func (m *MultisigConfigMutation) NumSignersThreshold() (r uint32, exists bool) {
+	v := m.num_signers_threshold
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNumSignersThreshold returns the old "num_signers_threshold" field's value of the MultisigConfig entity.
+// If the MultisigConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MultisigConfigMutation) OldNumSignersThreshold(ctx context.Context) (v uint32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNumSignersThreshold is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNumSignersThreshold requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNumSignersThreshold: %w", err)
+	}
+	return oldValue.NumSignersThreshold, nil
+}
+
+// AddNumSignersThreshold adds u to the "num_signers_threshold" field.
+func (m *MultisigConfigMutation) AddNumSignersThreshold(u int32) {
+	if m.addnum_signers_threshold != nil {
+		*m.addnum_signers_threshold += u
+	} else {
+		m.addnum_signers_threshold = &u
+	}
+}
+
+// AddedNumSignersThreshold returns the value that was added to the "num_signers_threshold" field in this mutation.
+func (m *MultisigConfigMutation) AddedNumSignersThreshold() (r int32, exists bool) {
+	v := m.addnum_signers_threshold
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetNumSignersThreshold resets all changes to the "num_signers_threshold" field.
+func (m *MultisigConfigMutation) ResetNumSignersThreshold() {
+	m.num_signers_threshold = nil
+	m.addnum_signers_threshold = nil
+}
+
+// SetNumSignersTotal sets the "num_signers_total" field.
+func (m *MultisigConfigMutation) SetNumSignersTotal(u uint32) {
+	m.num_signers_total = &u
+	m.addnum_signers_total = nil
+}
+
+// NumSignersTotal returns the value of the "num_signers_total" field in the mutation.
+func (m *MultisigConfigMutation) NumSignersTotal() (r uint32, exists bool) {
+	v := m.num_signers_total
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNumSignersTotal returns the old "num_signers_total" field's value of the MultisigConfig entity.
+// If the MultisigConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MultisigConfigMutation) OldNumSignersTotal(ctx context.Context) (v uint32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNumSignersTotal is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNumSignersTotal requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNumSignersTotal: %w", err)
+	}
+	return oldValue.NumSignersTotal, nil
+}
+
+// AddNumSignersTotal adds u to the "num_signers_total" field.
+func (m *MultisigConfigMutation) AddNumSignersTotal(u int32) {
+	if m.addnum_signers_total != nil {
+		*m.addnum_signers_total += u
+	} else {
+		m.addnum_signers_total = &u
+	}
+}
+
+// AddedNumSignersTotal returns the value that was added to the "num_signers_total" field in this mutation.
+func (m *MultisigConfigMutation) AddedNumSignersTotal() (r int32, exists bool) {
+	v := m.addnum_signers_total
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetNumSignersTotal resets all changes to the "num_signers_total" field.
+func (m *MultisigConfigMutation) ResetNumSignersTotal() {
+	m.num_signers_total = nil
+	m.addnum_signers_total = nil
+}
+
+// AddMemberIDs adds the "members" edge to the MultisigMember entity by ids.
+func (m *MultisigConfigMutation) AddMemberIDs(ids ...uuid.UUID) {
+	if m.members == nil {
+		m.members = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.members[ids[i]] = struct{}{}
+	}
+}
+
+// ClearMembers clears the "members" edge to the MultisigMember entity.
+func (m *MultisigConfigMutation) ClearMembers() {
+	m.clearedmembers = true
+}
+
+// MembersCleared reports if the "members" edge to the MultisigMember entity was cleared.
+func (m *MultisigConfigMutation) MembersCleared() bool {
+	return m.clearedmembers
+}
+
+// RemoveMemberIDs removes the "members" edge to the MultisigMember entity by IDs.
+func (m *MultisigConfigMutation) RemoveMemberIDs(ids ...uuid.UUID) {
+	if m.removedmembers == nil {
+		m.removedmembers = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.members, ids[i])
+		m.removedmembers[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedMembers returns the removed IDs of the "members" edge to the MultisigMember entity.
+func (m *MultisigConfigMutation) RemovedMembersIDs() (ids []uuid.UUID) {
+	for id := range m.removedmembers {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// MembersIDs returns the "members" edge IDs in the mutation.
+func (m *MultisigConfigMutation) MembersIDs() (ids []uuid.UUID) {
+	for id := range m.members {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetMembers resets all changes to the "members" edge.
+func (m *MultisigConfigMutation) ResetMembers() {
+	m.members = nil
+	m.clearedmembers = false
+	m.removedmembers = nil
+}
+
+// Where appends a list predicates to the MultisigConfigMutation builder.
+func (m *MultisigConfigMutation) Where(ps ...predicate.MultisigConfig) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the MultisigConfigMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *MultisigConfigMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.MultisigConfig, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *MultisigConfigMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *MultisigConfigMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (MultisigConfig).
+func (m *MultisigConfigMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *MultisigConfigMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.create_time != nil {
+		fields = append(fields, multisigconfig.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, multisigconfig.FieldUpdateTime)
+	}
+	if m.multisig_identifier != nil {
+		fields = append(fields, multisigconfig.FieldMultisigIdentifier)
+	}
+	if m.num_signers_threshold != nil {
+		fields = append(fields, multisigconfig.FieldNumSignersThreshold)
+	}
+	if m.num_signers_total != nil {
+		fields = append(fields, multisigconfig.FieldNumSignersTotal)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *MultisigConfigMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case multisigconfig.FieldCreateTime:
+		return m.CreateTime()
+	case multisigconfig.FieldUpdateTime:
+		return m.UpdateTime()
+	case multisigconfig.FieldMultisigIdentifier:
+		return m.MultisigIdentifier()
+	case multisigconfig.FieldNumSignersThreshold:
+		return m.NumSignersThreshold()
+	case multisigconfig.FieldNumSignersTotal:
+		return m.NumSignersTotal()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *MultisigConfigMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case multisigconfig.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case multisigconfig.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case multisigconfig.FieldMultisigIdentifier:
+		return m.OldMultisigIdentifier(ctx)
+	case multisigconfig.FieldNumSignersThreshold:
+		return m.OldNumSignersThreshold(ctx)
+	case multisigconfig.FieldNumSignersTotal:
+		return m.OldNumSignersTotal(ctx)
+	}
+	return nil, fmt.Errorf("unknown MultisigConfig field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MultisigConfigMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case multisigconfig.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case multisigconfig.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case multisigconfig.FieldMultisigIdentifier:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMultisigIdentifier(v)
+		return nil
+	case multisigconfig.FieldNumSignersThreshold:
+		v, ok := value.(uint32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNumSignersThreshold(v)
+		return nil
+	case multisigconfig.FieldNumSignersTotal:
+		v, ok := value.(uint32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNumSignersTotal(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MultisigConfig field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *MultisigConfigMutation) AddedFields() []string {
+	var fields []string
+	if m.addnum_signers_threshold != nil {
+		fields = append(fields, multisigconfig.FieldNumSignersThreshold)
+	}
+	if m.addnum_signers_total != nil {
+		fields = append(fields, multisigconfig.FieldNumSignersTotal)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *MultisigConfigMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case multisigconfig.FieldNumSignersThreshold:
+		return m.AddedNumSignersThreshold()
+	case multisigconfig.FieldNumSignersTotal:
+		return m.AddedNumSignersTotal()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MultisigConfigMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case multisigconfig.FieldNumSignersThreshold:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddNumSignersThreshold(v)
+		return nil
+	case multisigconfig.FieldNumSignersTotal:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddNumSignersTotal(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MultisigConfig numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *MultisigConfigMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *MultisigConfigMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *MultisigConfigMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown MultisigConfig nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *MultisigConfigMutation) ResetField(name string) error {
+	switch name {
+	case multisigconfig.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case multisigconfig.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case multisigconfig.FieldMultisigIdentifier:
+		m.ResetMultisigIdentifier()
+		return nil
+	case multisigconfig.FieldNumSignersThreshold:
+		m.ResetNumSignersThreshold()
+		return nil
+	case multisigconfig.FieldNumSignersTotal:
+		m.ResetNumSignersTotal()
+		return nil
+	}
+	return fmt.Errorf("unknown MultisigConfig field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *MultisigConfigMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.members != nil {
+		edges = append(edges, multisigconfig.EdgeMembers)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *MultisigConfigMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case multisigconfig.EdgeMembers:
+		ids := make([]ent.Value, 0, len(m.members))
+		for id := range m.members {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *MultisigConfigMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.removedmembers != nil {
+		edges = append(edges, multisigconfig.EdgeMembers)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *MultisigConfigMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case multisigconfig.EdgeMembers:
+		ids := make([]ent.Value, 0, len(m.removedmembers))
+		for id := range m.removedmembers {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *MultisigConfigMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedmembers {
+		edges = append(edges, multisigconfig.EdgeMembers)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *MultisigConfigMutation) EdgeCleared(name string) bool {
+	switch name {
+	case multisigconfig.EdgeMembers:
+		return m.clearedmembers
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *MultisigConfigMutation) ClearEdge(name string) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown MultisigConfig unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *MultisigConfigMutation) ResetEdge(name string) error {
+	switch name {
+	case multisigconfig.EdgeMembers:
+		m.ResetMembers()
+		return nil
+	}
+	return fmt.Errorf("unknown MultisigConfig edge %s", name)
+}
+
+// MultisigMemberMutation represents an operation that mutates the MultisigMember nodes in the graph.
+type MultisigMemberMutation struct {
+	config
+	op             Op
+	typ            string
+	id             *uuid.UUID
+	create_time    *time.Time
+	update_time    *time.Time
+	public_key     *keys.Public
+	clearedFields  map[string]struct{}
+	_config        *uuid.UUID
+	cleared_config bool
+	done           bool
+	oldValue       func(context.Context) (*MultisigMember, error)
+	predicates     []predicate.MultisigMember
+}
+
+var _ ent.Mutation = (*MultisigMemberMutation)(nil)
+
+// multisigmemberOption allows management of the mutation configuration using functional options.
+type multisigmemberOption func(*MultisigMemberMutation)
+
+// newMultisigMemberMutation creates new mutation for the MultisigMember entity.
+func newMultisigMemberMutation(c config, op Op, opts ...multisigmemberOption) *MultisigMemberMutation {
+	m := &MultisigMemberMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeMultisigMember,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withMultisigMemberID sets the ID field of the mutation.
+func withMultisigMemberID(id uuid.UUID) multisigmemberOption {
+	return func(m *MultisigMemberMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *MultisigMember
+		)
+		m.oldValue = func(ctx context.Context) (*MultisigMember, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().MultisigMember.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withMultisigMember sets the old MultisigMember of the mutation.
+func withMultisigMember(node *MultisigMember) multisigmemberOption {
+	return func(m *MultisigMemberMutation) {
+		m.oldValue = func(context.Context) (*MultisigMember, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m MultisigMemberMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m MultisigMemberMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of MultisigMember entities.
+func (m *MultisigMemberMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *MultisigMemberMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *MultisigMemberMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().MultisigMember.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *MultisigMemberMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *MultisigMemberMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the MultisigMember entity.
+// If the MultisigMember object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MultisigMemberMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *MultisigMemberMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *MultisigMemberMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *MultisigMemberMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the MultisigMember entity.
+// If the MultisigMember object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MultisigMemberMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *MultisigMemberMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetPublicKey sets the "public_key" field.
+func (m *MultisigMemberMutation) SetPublicKey(k keys.Public) {
+	m.public_key = &k
+}
+
+// PublicKey returns the value of the "public_key" field in the mutation.
+func (m *MultisigMemberMutation) PublicKey() (r keys.Public, exists bool) {
+	v := m.public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublicKey returns the old "public_key" field's value of the MultisigMember entity.
+// If the MultisigMember object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MultisigMemberMutation) OldPublicKey(ctx context.Context) (v keys.Public, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublicKey: %w", err)
+	}
+	return oldValue.PublicKey, nil
+}
+
+// ResetPublicKey resets all changes to the "public_key" field.
+func (m *MultisigMemberMutation) ResetPublicKey() {
+	m.public_key = nil
+}
+
+// SetConfigID sets the "config" edge to the MultisigConfig entity by id.
+func (m *MultisigMemberMutation) SetConfigID(id uuid.UUID) {
+	m._config = &id
+}
+
+// ClearConfig clears the "config" edge to the MultisigConfig entity.
+func (m *MultisigMemberMutation) ClearConfig() {
+	m.cleared_config = true
+}
+
+// ConfigCleared reports if the "config" edge to the MultisigConfig entity was cleared.
+func (m *MultisigMemberMutation) ConfigCleared() bool {
+	return m.cleared_config
+}
+
+// ConfigID returns the "config" edge ID in the mutation.
+func (m *MultisigMemberMutation) ConfigID() (id uuid.UUID, exists bool) {
+	if m._config != nil {
+		return *m._config, true
+	}
+	return
+}
+
+// ConfigIDs returns the "config" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ConfigID instead. It exists only for internal usage by the builders.
+func (m *MultisigMemberMutation) ConfigIDs() (ids []uuid.UUID) {
+	if id := m._config; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetConfig resets all changes to the "config" edge.
+func (m *MultisigMemberMutation) ResetConfig() {
+	m._config = nil
+	m.cleared_config = false
+}
+
+// Where appends a list predicates to the MultisigMemberMutation builder.
+func (m *MultisigMemberMutation) Where(ps ...predicate.MultisigMember) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the MultisigMemberMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *MultisigMemberMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.MultisigMember, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *MultisigMemberMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *MultisigMemberMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (MultisigMember).
+func (m *MultisigMemberMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *MultisigMemberMutation) Fields() []string {
+	fields := make([]string, 0, 3)
+	if m.create_time != nil {
+		fields = append(fields, multisigmember.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, multisigmember.FieldUpdateTime)
+	}
+	if m.public_key != nil {
+		fields = append(fields, multisigmember.FieldPublicKey)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *MultisigMemberMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case multisigmember.FieldCreateTime:
+		return m.CreateTime()
+	case multisigmember.FieldUpdateTime:
+		return m.UpdateTime()
+	case multisigmember.FieldPublicKey:
+		return m.PublicKey()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *MultisigMemberMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case multisigmember.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case multisigmember.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case multisigmember.FieldPublicKey:
+		return m.OldPublicKey(ctx)
+	}
+	return nil, fmt.Errorf("unknown MultisigMember field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MultisigMemberMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case multisigmember.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case multisigmember.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case multisigmember.FieldPublicKey:
+		v, ok := value.(keys.Public)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublicKey(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MultisigMember field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *MultisigMemberMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *MultisigMemberMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MultisigMemberMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown MultisigMember numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *MultisigMemberMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *MultisigMemberMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *MultisigMemberMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown MultisigMember nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *MultisigMemberMutation) ResetField(name string) error {
+	switch name {
+	case multisigmember.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case multisigmember.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case multisigmember.FieldPublicKey:
+		m.ResetPublicKey()
+		return nil
+	}
+	return fmt.Errorf("unknown MultisigMember field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *MultisigMemberMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m._config != nil {
+		edges = append(edges, multisigmember.EdgeConfig)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *MultisigMemberMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case multisigmember.EdgeConfig:
+		if id := m._config; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *MultisigMemberMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *MultisigMemberMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *MultisigMemberMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.cleared_config {
+		edges = append(edges, multisigmember.EdgeConfig)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *MultisigMemberMutation) EdgeCleared(name string) bool {
+	switch name {
+	case multisigmember.EdgeConfig:
+		return m.cleared_config
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *MultisigMemberMutation) ClearEdge(name string) error {
+	switch name {
+	case multisigmember.EdgeConfig:
+		m.ClearConfig()
+		return nil
+	}
+	return fmt.Errorf("unknown MultisigMember unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *MultisigMemberMutation) ResetEdge(name string) error {
+	switch name {
+	case multisigmember.EdgeConfig:
+		m.ResetConfig()
+		return nil
+	}
+	return fmt.Errorf("unknown MultisigMember edge %s", name)
 }
 
 // PaymentIntentMutation represents an operation that mutates the PaymentIntent nodes in the graph.

@@ -23,6 +23,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
+	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
+	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -119,6 +121,8 @@ func checkColumn(table, column string) error {
 			l1tokenjusticetransaction.Table:         l1tokenjusticetransaction.ValidColumn,
 			l1tokenoutputwithdrawal.Table:           l1tokenoutputwithdrawal.ValidColumn,
 			l1withdrawaltransaction.Table:           l1withdrawaltransaction.ValidColumn,
+			multisigconfig.Table:                    multisigconfig.ValidColumn,
+			multisigmember.Table:                    multisigmember.ValidColumn,
 			paymentintent.Table:                     paymentintent.ValidColumn,
 			pendingsendtransfer.Table:               pendingsendtransfer.ValidColumn,
 			preimagerequest.Table:                   preimagerequest.ValidColumn,

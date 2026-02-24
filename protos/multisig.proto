@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package multisig;
+
+import "validate/validate.proto";
+
+option go_package = "github.com/lightsparkdev/spark/proto/multisig";
+
+message MultisigConfig {
+    uint32 version = 1;
+    uint32 threshold = 2 [(validate.rules).uint32.gte = 1];
+    // Public keys sorted lexicographically. Order determines canonical hash.
+    repeated bytes public_keys = 3 [(validate.rules).repeated = {
+        min_items: 2,
+        items: { bytes: { len: 33 } }
+    }];
+}
+
+message MultisigSignature {
+    bytes public_key = 1 [(validate.rules).bytes.len = 33];
+    bytes signature = 2 [
+        (validate.rules).bytes.min_len = 64,
+        (validate.rules).bytes.max_len = 73
+    ];
+}
+
+message MultisigSignatureSet {
+    bytes multisig_identifier = 1 [(validate.rules).bytes.len = 32];
+    repeated MultisigSignature signatures = 2;
+}

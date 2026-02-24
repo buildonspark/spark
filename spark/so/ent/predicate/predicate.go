@@ -39,6 +39,12 @@ type L1TokenOutputWithdrawal func(*sql.Selector)
 // L1WithdrawalTransaction is the predicate function for l1withdrawaltransaction builders.
 type L1WithdrawalTransaction func(*sql.Selector)
 
+// MultisigConfig is the predicate function for multisigconfig builders.
+type MultisigConfig func(*sql.Selector)
+
+// MultisigMember is the predicate function for multisigmember builders.
+type MultisigMember func(*sql.Selector)
+
 // PaymentIntent is the predicate function for paymentintent builders.
 type PaymentIntent func(*sql.Selector)
 

@@ -36,6 +36,10 @@ type Tx struct {
 	L1TokenOutputWithdrawal *L1TokenOutputWithdrawalClient
 	// L1WithdrawalTransaction is the client for interacting with the L1WithdrawalTransaction builders.
 	L1WithdrawalTransaction *L1WithdrawalTransactionClient
+	// MultisigConfig is the client for interacting with the MultisigConfig builders.
+	MultisigConfig *MultisigConfigClient
+	// MultisigMember is the client for interacting with the MultisigMember builders.
+	MultisigMember *MultisigMemberClient
 	// PaymentIntent is the client for interacting with the PaymentIntent builders.
 	PaymentIntent *PaymentIntentClient
 	// PendingSendTransfer is the client for interacting with the PendingSendTransfer builders.
@@ -228,6 +232,8 @@ func (tx *Tx) init() {
 	tx.L1TokenJusticeTransaction = NewL1TokenJusticeTransactionClient(tx.config)
 	tx.L1TokenOutputWithdrawal = NewL1TokenOutputWithdrawalClient(tx.config)
 	tx.L1WithdrawalTransaction = NewL1WithdrawalTransactionClient(tx.config)
+	tx.MultisigConfig = NewMultisigConfigClient(tx.config)
+	tx.MultisigMember = NewMultisigMemberClient(tx.config)
 	tx.PaymentIntent = NewPaymentIntentClient(tx.config)
 	tx.PendingSendTransfer = NewPendingSendTransferClient(tx.config)
 	tx.PreimageRequest = NewPreimageRequestClient(tx.config)

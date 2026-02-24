@@ -1702,6 +1702,229 @@ func (lt *L1WithdrawalTransactionExample) Exec(ctx context.Context) (*ent.L1With
 	return create.Save(ctx)
 }
 
+// MultisigConfigExample is a test fixture builder for MultisigConfig.
+type MultisigConfigExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	MultisigIdentifier  *[]byte
+	NumSignersThreshold *uint32
+	NumSignersTotal     *uint32
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	Members []*ent.MultisigMember
+}
+
+// NewMultisigConfigExample creates a new MultisigConfigExample for testing.
+func NewMultisigConfigExample(t *testing.T, client *ent.Client) *MultisigConfigExample {
+	return &MultisigConfigExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetMultisigIdentifier sets the multisig_identifier field.
+func (mc *MultisigConfigExample) SetMultisigIdentifier(v []byte) *MultisigConfigExample {
+	mc.MultisigIdentifier = &v
+	return mc
+}
+
+// SetNumSignersThreshold sets the num_signers_threshold field.
+func (mc *MultisigConfigExample) SetNumSignersThreshold(v uint32) *MultisigConfigExample {
+	mc.NumSignersThreshold = &v
+	return mc
+}
+
+// SetNumSignersTotal sets the num_signers_total field.
+func (mc *MultisigConfigExample) SetNumSignersTotal(v uint32) *MultisigConfigExample {
+	mc.NumSignersTotal = &v
+	return mc
+}
+
+// AddMember adds a MultisigMember to the members edge.
+func (mc *MultisigConfigExample) AddMember(v *ent.MultisigMember) *MultisigConfigExample {
+	mc.Members = append(mc.Members, v)
+	return mc
+}
+
+// SetMembers sets the members edge.
+func (mc *MultisigConfigExample) SetMembers(v []*ent.MultisigMember) *MultisigConfigExample {
+	mc.Members = v
+	return mc
+}
+
+// MustExec builds and saves the MultisigConfig entity to the database.
+// It panics if the save fails.
+func (mc *MultisigConfigExample) MustExec(ctx context.Context) *ent.MultisigConfig {
+	create := mc.client.MultisigConfig.Create()
+
+	// Set fields
+	if mc.MultisigIdentifier != nil {
+		create.SetMultisigIdentifier(*mc.MultisigIdentifier)
+	} else {
+		// Use default from annotation
+		create.SetMultisigIdentifier(func() []byte {
+			b, _ := hex.DecodeString("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+			return b
+		}())
+	}
+	if mc.NumSignersThreshold != nil {
+		create.SetNumSignersThreshold(*mc.NumSignersThreshold)
+	} else {
+		// Use default from annotation
+		create.SetNumSignersThreshold(uint32(2))
+	}
+	if mc.NumSignersTotal != nil {
+		create.SetNumSignersTotal(*mc.NumSignersTotal)
+	} else {
+		// Use default from annotation
+		create.SetNumSignersTotal(uint32(3))
+	}
+
+	// Handle edges
+	if len(mc.Members) > 0 {
+		create.AddMembers(mc.Members...)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		mc.t.Helper()
+		mc.t.Fatalf("failed to create MultisigConfig: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the MultisigConfig entity to the database.
+// It returns an error if the save fails.
+func (mc *MultisigConfigExample) Exec(ctx context.Context) (*ent.MultisigConfig, error) {
+	create := mc.client.MultisigConfig.Create()
+
+	// Set fields
+	if mc.MultisigIdentifier != nil {
+		create.SetMultisigIdentifier(*mc.MultisigIdentifier)
+	} else {
+		// Use default from annotation
+		create.SetMultisigIdentifier(func() []byte {
+			b, _ := hex.DecodeString("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+			return b
+		}())
+	}
+	if mc.NumSignersThreshold != nil {
+		create.SetNumSignersThreshold(*mc.NumSignersThreshold)
+	} else {
+		// Use default from annotation
+		create.SetNumSignersThreshold(uint32(2))
+	}
+	if mc.NumSignersTotal != nil {
+		create.SetNumSignersTotal(*mc.NumSignersTotal)
+	} else {
+		// Use default from annotation
+		create.SetNumSignersTotal(uint32(3))
+	}
+
+	// Handle edges
+	if len(mc.Members) > 0 {
+		create.AddMembers(mc.Members...)
+	}
+
+	return create.Save(ctx)
+}
+
+// MultisigMemberExample is a test fixture builder for MultisigMember.
+type MultisigMemberExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	PublicKey *keys.Public
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	Config *ent.MultisigConfig
+}
+
+// NewMultisigMemberExample creates a new MultisigMemberExample for testing.
+func NewMultisigMemberExample(t *testing.T, client *ent.Client) *MultisigMemberExample {
+	return &MultisigMemberExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetPublicKey sets the public_key field.
+func (mm *MultisigMemberExample) SetPublicKey(v keys.Public) *MultisigMemberExample {
+	mm.PublicKey = &v
+	return mm
+}
+
+// SetConfig sets the config edge.
+func (mm *MultisigMemberExample) SetConfig(v *ent.MultisigConfig) *MultisigMemberExample {
+	mm.Config = v
+	return mm
+}
+
+// MustExec builds and saves the MultisigMember entity to the database.
+// It panics if the save fails.
+func (mm *MultisigMemberExample) MustExec(ctx context.Context) *ent.MultisigMember {
+	create := mm.client.MultisigMember.Create()
+
+	// Set fields
+	if mm.PublicKey != nil {
+		create.SetPublicKey(*mm.PublicKey)
+	} else {
+		// Use default from annotation
+		create.SetPublicKey(keys.MustParsePublicKeyHex("0350f07ffc21bfd59d31e0a7a600e2995273938444447cb9bc4c75b8a895dbb853"))
+	}
+
+	// Handle edges
+	if mm.Config != nil {
+		create.SetConfig(mm.Config)
+	} else {
+		// Auto-create required edge
+		mm.t.Helper()
+		mm.Config = NewMultisigConfigExample(mm.t, mm.client).MustExec(ctx)
+		create.SetConfig(mm.Config)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		mm.t.Helper()
+		mm.t.Fatalf("failed to create MultisigMember: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the MultisigMember entity to the database.
+// It returns an error if the save fails.
+func (mm *MultisigMemberExample) Exec(ctx context.Context) (*ent.MultisigMember, error) {
+	create := mm.client.MultisigMember.Create()
+
+	// Set fields
+	if mm.PublicKey != nil {
+		create.SetPublicKey(*mm.PublicKey)
+	} else {
+		// Use default from annotation
+		create.SetPublicKey(keys.MustParsePublicKeyHex("0350f07ffc21bfd59d31e0a7a600e2995273938444447cb9bc4c75b8a895dbb853"))
+	}
+
+	// Handle edges
+	if mm.Config != nil {
+		create.SetConfig(mm.Config)
+	} else {
+		// Auto-create required edge
+		var err error
+		mm.Config, err = NewMultisigConfigExample(mm.t, mm.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create config: %w", err)
+		}
+		create.SetConfig(mm.Config)
+	}
+
+	return create.Save(ctx)
+}
+
 // PaymentIntentExample is a test fixture builder for PaymentIntent.
 type PaymentIntentExample struct {
 	client *ent.Client

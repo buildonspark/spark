@@ -17,6 +17,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
+	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
+	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -315,6 +317,60 @@ func init() {
 	l1withdrawaltransactionDescID := l1withdrawaltransactionMixinFields0[0].Descriptor()
 	// l1withdrawaltransaction.DefaultID holds the default value on creation for the id field.
 	l1withdrawaltransaction.DefaultID = l1withdrawaltransactionDescID.Default.(func() uuid.UUID)
+	multisigconfigMixin := schema.MultisigConfig{}.Mixin()
+	multisigconfigHooks := schema.MultisigConfig{}.Hooks()
+	multisigconfig.Hooks[0] = multisigconfigHooks[0]
+	multisigconfigMixinFields0 := multisigconfigMixin[0].Fields()
+	_ = multisigconfigMixinFields0
+	multisigconfigFields := schema.MultisigConfig{}.Fields()
+	_ = multisigconfigFields
+	// multisigconfigDescCreateTime is the schema descriptor for create_time field.
+	multisigconfigDescCreateTime := multisigconfigMixinFields0[1].Descriptor()
+	// multisigconfig.DefaultCreateTime holds the default value on creation for the create_time field.
+	multisigconfig.DefaultCreateTime = multisigconfigDescCreateTime.Default.(func() time.Time)
+	// multisigconfigDescUpdateTime is the schema descriptor for update_time field.
+	multisigconfigDescUpdateTime := multisigconfigMixinFields0[2].Descriptor()
+	// multisigconfig.DefaultUpdateTime holds the default value on creation for the update_time field.
+	multisigconfig.DefaultUpdateTime = multisigconfigDescUpdateTime.Default.(func() time.Time)
+	// multisigconfig.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	multisigconfig.UpdateDefaultUpdateTime = multisigconfigDescUpdateTime.UpdateDefault.(func() time.Time)
+	// multisigconfigDescMultisigIdentifier is the schema descriptor for multisig_identifier field.
+	multisigconfigDescMultisigIdentifier := multisigconfigFields[0].Descriptor()
+	// multisigconfig.MultisigIdentifierValidator is a validator for the "multisig_identifier" field. It is called by the builders before save.
+	multisigconfig.MultisigIdentifierValidator = multisigconfigDescMultisigIdentifier.Validators[0].(func([]byte) error)
+	// multisigconfigDescNumSignersThreshold is the schema descriptor for num_signers_threshold field.
+	multisigconfigDescNumSignersThreshold := multisigconfigFields[1].Descriptor()
+	// multisigconfig.NumSignersThresholdValidator is a validator for the "num_signers_threshold" field. It is called by the builders before save.
+	multisigconfig.NumSignersThresholdValidator = multisigconfigDescNumSignersThreshold.Validators[0].(func(uint32) error)
+	// multisigconfigDescNumSignersTotal is the schema descriptor for num_signers_total field.
+	multisigconfigDescNumSignersTotal := multisigconfigFields[2].Descriptor()
+	// multisigconfig.NumSignersTotalValidator is a validator for the "num_signers_total" field. It is called by the builders before save.
+	multisigconfig.NumSignersTotalValidator = multisigconfigDescNumSignersTotal.Validators[0].(func(uint32) error)
+	// multisigconfigDescID is the schema descriptor for id field.
+	multisigconfigDescID := multisigconfigMixinFields0[0].Descriptor()
+	// multisigconfig.DefaultID holds the default value on creation for the id field.
+	multisigconfig.DefaultID = multisigconfigDescID.Default.(func() uuid.UUID)
+	multisigmemberMixin := schema.MultisigMember{}.Mixin()
+	multisigmemberHooks := schema.MultisigMember{}.Hooks()
+	multisigmember.Hooks[0] = multisigmemberHooks[0]
+	multisigmemberMixinFields0 := multisigmemberMixin[0].Fields()
+	_ = multisigmemberMixinFields0
+	multisigmemberFields := schema.MultisigMember{}.Fields()
+	_ = multisigmemberFields
+	// multisigmemberDescCreateTime is the schema descriptor for create_time field.
+	multisigmemberDescCreateTime := multisigmemberMixinFields0[1].Descriptor()
+	// multisigmember.DefaultCreateTime holds the default value on creation for the create_time field.
+	multisigmember.DefaultCreateTime = multisigmemberDescCreateTime.Default.(func() time.Time)
+	// multisigmemberDescUpdateTime is the schema descriptor for update_time field.
+	multisigmemberDescUpdateTime := multisigmemberMixinFields0[2].Descriptor()
+	// multisigmember.DefaultUpdateTime holds the default value on creation for the update_time field.
+	multisigmember.DefaultUpdateTime = multisigmemberDescUpdateTime.Default.(func() time.Time)
+	// multisigmember.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	multisigmember.UpdateDefaultUpdateTime = multisigmemberDescUpdateTime.UpdateDefault.(func() time.Time)
+	// multisigmemberDescID is the schema descriptor for id field.
+	multisigmemberDescID := multisigmemberMixinFields0[0].Descriptor()
+	// multisigmember.DefaultID holds the default value on creation for the id field.
+	multisigmember.DefaultID = multisigmemberDescID.Default.(func() uuid.UUID)
 	paymentintentMixin := schema.PaymentIntent{}.Mixin()
 	paymentintentHooks := schema.PaymentIntent{}.Hooks()
 	paymentintent.Hooks[0] = paymentintentHooks[0]

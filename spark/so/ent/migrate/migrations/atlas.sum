@@ -1,4 +1,4 @@
-h1:gOp/eDrRCfnEZOa2eZr23m42RDM8P0aKm3e+Lzyza4c=
+h1:YbMJU4fZxrzDKBJFmB0HTo3iYdYYoIPbDaXiUUyGll4=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -127,3 +127,4 @@ h1:gOp/eDrRCfnEZOa2eZr23m42RDM8P0aKm3e+Lzyza4c=
 20260217000000_make_utxo_optional_on_creation.sql h1:LUt0wX1czGhdr8r2Y+Pp+dJU64SNUVs5OfSZG+7pO8k=
 20260217000001_validate_utxo_swap_fk.sql h1:mKcqUuRvGmZROYxD82u+53a8Szy595WajV0bbspH6h8=
 20260217001001_add_tree_utxo_edge.sql h1:kEGiIqqhpJ1kFIRnjd9sJdK62aTvD+5DW5vqUuv5q7k=
+20260217002001_add_multisig_config.sql h1:N2LQ/Sero+icXb+b+K9N7yyNcvgcO9Mh6O6Rhk3H9Lo=

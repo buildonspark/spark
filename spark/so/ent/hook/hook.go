@@ -141,6 +141,30 @@ func (f L1WithdrawalTransactionFunc) Mutate(ctx context.Context, m ent.Mutation)
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.L1WithdrawalTransactionMutation", m)
 }
 
+// The MultisigConfigFunc type is an adapter to allow the use of ordinary
+// function as MultisigConfig mutator.
+type MultisigConfigFunc func(context.Context, *ent.MultisigConfigMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f MultisigConfigFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.MultisigConfigMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MultisigConfigMutation", m)
+}
+
+// The MultisigMemberFunc type is an adapter to allow the use of ordinary
+// function as MultisigMember mutator.
+type MultisigMemberFunc func(context.Context, *ent.MultisigMemberMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f MultisigMemberFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.MultisigMemberMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MultisigMemberMutation", m)
+}
+
 // The PaymentIntentFunc type is an adapter to allow the use of ordinary
 // function as PaymentIntent mutator.
 type PaymentIntentFunc func(context.Context, *ent.PaymentIntentMutation) (ent.Value, error)

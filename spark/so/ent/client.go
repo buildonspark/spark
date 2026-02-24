@@ -27,6 +27,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
+	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
+	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -83,6 +85,10 @@ type Client struct {
 	L1TokenOutputWithdrawal *L1TokenOutputWithdrawalClient
 	// L1WithdrawalTransaction is the client for interacting with the L1WithdrawalTransaction builders.
 	L1WithdrawalTransaction *L1WithdrawalTransactionClient
+	// MultisigConfig is the client for interacting with the MultisigConfig builders.
+	MultisigConfig *MultisigConfigClient
+	// MultisigMember is the client for interacting with the MultisigMember builders.
+	MultisigMember *MultisigMemberClient
 	// PaymentIntent is the client for interacting with the PaymentIntent builders.
 	PaymentIntent *PaymentIntentClient
 	// PendingSendTransfer is the client for interacting with the PendingSendTransfer builders.
@@ -155,6 +161,8 @@ func (c *Client) init() {
 	c.L1TokenJusticeTransaction = NewL1TokenJusticeTransactionClient(c.config)
 	c.L1TokenOutputWithdrawal = NewL1TokenOutputWithdrawalClient(c.config)
 	c.L1WithdrawalTransaction = NewL1WithdrawalTransactionClient(c.config)
+	c.MultisigConfig = NewMultisigConfigClient(c.config)
+	c.MultisigMember = NewMultisigMemberClient(c.config)
 	c.PaymentIntent = NewPaymentIntentClient(c.config)
 	c.PendingSendTransfer = NewPendingSendTransferClient(c.config)
 	c.PreimageRequest = NewPreimageRequestClient(c.config)
@@ -283,6 +291,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		L1TokenJusticeTransaction:         NewL1TokenJusticeTransactionClient(cfg),
 		L1TokenOutputWithdrawal:           NewL1TokenOutputWithdrawalClient(cfg),
 		L1WithdrawalTransaction:           NewL1WithdrawalTransactionClient(cfg),
+		MultisigConfig:                    NewMultisigConfigClient(cfg),
+		MultisigMember:                    NewMultisigMemberClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
 		PendingSendTransfer:               NewPendingSendTransferClient(cfg),
 		PreimageRequest:                   NewPreimageRequestClient(cfg),
@@ -338,6 +348,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		L1TokenJusticeTransaction:         NewL1TokenJusticeTransactionClient(cfg),
 		L1TokenOutputWithdrawal:           NewL1TokenOutputWithdrawalClient(cfg),
 		L1WithdrawalTransaction:           NewL1WithdrawalTransactionClient(cfg),
+		MultisigConfig:                    NewMultisigConfigClient(cfg),
+		MultisigMember:                    NewMultisigMemberClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
 		PendingSendTransfer:               NewPendingSendTransferClient(cfg),
 		PreimageRequest:                   NewPreimageRequestClient(cfg),
@@ -395,12 +407,12 @@ func (c *Client) Use(hooks ...Hook) {
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
 		c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
 		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
-		c.L1WithdrawalTransaction, c.PaymentIntent, c.PendingSendTransfer,
-		c.PreimageRequest, c.PreimageShare, c.SigningCommitment, c.SigningKeyshare,
-		c.SigningNonce, c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint,
-		c.TokenOutput, c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf,
-		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
+		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.PaymentIntent,
+		c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare, c.SigningCommitment,
+		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenCreate,
+		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
+		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
+		c.TransferLeaf, c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
 		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
 	} {
 		n.Use(hooks...)
@@ -414,12 +426,12 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
 		c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
 		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
-		c.L1WithdrawalTransaction, c.PaymentIntent, c.PendingSendTransfer,
-		c.PreimageRequest, c.PreimageShare, c.SigningCommitment, c.SigningKeyshare,
-		c.SigningNonce, c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint,
-		c.TokenOutput, c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf,
-		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
+		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.PaymentIntent,
+		c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare, c.SigningCommitment,
+		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenCreate,
+		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
+		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
+		c.TransferLeaf, c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
 		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
 	} {
 		n.Intercept(interceptors...)
@@ -451,6 +463,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.L1TokenOutputWithdrawal.mutate(ctx, m)
 	case *L1WithdrawalTransactionMutation:
 		return c.L1WithdrawalTransaction.mutate(ctx, m)
+	case *MultisigConfigMutation:
+		return c.MultisigConfig.mutate(ctx, m)
+	case *MultisigMemberMutation:
+		return c.MultisigMember.mutate(ctx, m)
 	case *PaymentIntentMutation:
 		return c.PaymentIntent.mutate(ctx, m)
 	case *PendingSendTransferMutation:
@@ -2175,6 +2191,306 @@ func (c *L1WithdrawalTransactionClient) mutate(ctx context.Context, m *L1Withdra
 		return (&L1WithdrawalTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown L1WithdrawalTransaction mutation op: %q", m.Op())
+	}
+}
+
+// MultisigConfigClient is a client for the MultisigConfig schema.
+type MultisigConfigClient struct {
+	config
+}
+
+// NewMultisigConfigClient returns a client for the MultisigConfig from the given config.
+func NewMultisigConfigClient(c config) *MultisigConfigClient {
+	return &MultisigConfigClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `multisigconfig.Hooks(f(g(h())))`.
+func (c *MultisigConfigClient) Use(hooks ...Hook) {
+	c.hooks.MultisigConfig = append(c.hooks.MultisigConfig, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `multisigconfig.Intercept(f(g(h())))`.
+func (c *MultisigConfigClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MultisigConfig = append(c.inters.MultisigConfig, interceptors...)
+}
+
+// Create returns a builder for creating a MultisigConfig entity.
+func (c *MultisigConfigClient) Create() *MultisigConfigCreate {
+	mutation := newMultisigConfigMutation(c.config, OpCreate)
+	return &MultisigConfigCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MultisigConfig entities.
+func (c *MultisigConfigClient) CreateBulk(builders ...*MultisigConfigCreate) *MultisigConfigCreateBulk {
+	return &MultisigConfigCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MultisigConfigClient) MapCreateBulk(slice any, setFunc func(*MultisigConfigCreate, int)) *MultisigConfigCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MultisigConfigCreateBulk{err: fmt.Errorf("calling to MultisigConfigClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MultisigConfigCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MultisigConfigCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MultisigConfig.
+func (c *MultisigConfigClient) Update() *MultisigConfigUpdate {
+	mutation := newMultisigConfigMutation(c.config, OpUpdate)
+	return &MultisigConfigUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MultisigConfigClient) UpdateOne(mc *MultisigConfig) *MultisigConfigUpdateOne {
+	mutation := newMultisigConfigMutation(c.config, OpUpdateOne, withMultisigConfig(mc))
+	return &MultisigConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MultisigConfigClient) UpdateOneID(id uuid.UUID) *MultisigConfigUpdateOne {
+	mutation := newMultisigConfigMutation(c.config, OpUpdateOne, withMultisigConfigID(id))
+	return &MultisigConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MultisigConfig.
+func (c *MultisigConfigClient) Delete() *MultisigConfigDelete {
+	mutation := newMultisigConfigMutation(c.config, OpDelete)
+	return &MultisigConfigDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MultisigConfigClient) DeleteOne(mc *MultisigConfig) *MultisigConfigDeleteOne {
+	return c.DeleteOneID(mc.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MultisigConfigClient) DeleteOneID(id uuid.UUID) *MultisigConfigDeleteOne {
+	builder := c.Delete().Where(multisigconfig.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MultisigConfigDeleteOne{builder}
+}
+
+// Query returns a query builder for MultisigConfig.
+func (c *MultisigConfigClient) Query() *MultisigConfigQuery {
+	return &MultisigConfigQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMultisigConfig},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MultisigConfig entity by its id.
+func (c *MultisigConfigClient) Get(ctx context.Context, id uuid.UUID) (*MultisigConfig, error) {
+	return c.Query().Where(multisigconfig.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MultisigConfigClient) GetX(ctx context.Context, id uuid.UUID) *MultisigConfig {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryMembers queries the members edge of a MultisigConfig.
+func (c *MultisigConfigClient) QueryMembers(mc *MultisigConfig) *MultisigMemberQuery {
+	query := (&MultisigMemberClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := mc.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(multisigconfig.Table, multisigconfig.FieldID, id),
+			sqlgraph.To(multisigmember.Table, multisigmember.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, multisigconfig.MembersTable, multisigconfig.MembersColumn),
+		)
+		fromV = sqlgraph.Neighbors(mc.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *MultisigConfigClient) Hooks() []Hook {
+	hooks := c.hooks.MultisigConfig
+	return append(hooks[:len(hooks):len(hooks)], multisigconfig.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *MultisigConfigClient) Interceptors() []Interceptor {
+	return c.inters.MultisigConfig
+}
+
+func (c *MultisigConfigClient) mutate(ctx context.Context, m *MultisigConfigMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MultisigConfigCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MultisigConfigUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MultisigConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MultisigConfigDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MultisigConfig mutation op: %q", m.Op())
+	}
+}
+
+// MultisigMemberClient is a client for the MultisigMember schema.
+type MultisigMemberClient struct {
+	config
+}
+
+// NewMultisigMemberClient returns a client for the MultisigMember from the given config.
+func NewMultisigMemberClient(c config) *MultisigMemberClient {
+	return &MultisigMemberClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `multisigmember.Hooks(f(g(h())))`.
+func (c *MultisigMemberClient) Use(hooks ...Hook) {
+	c.hooks.MultisigMember = append(c.hooks.MultisigMember, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `multisigmember.Intercept(f(g(h())))`.
+func (c *MultisigMemberClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MultisigMember = append(c.inters.MultisigMember, interceptors...)
+}
+
+// Create returns a builder for creating a MultisigMember entity.
+func (c *MultisigMemberClient) Create() *MultisigMemberCreate {
+	mutation := newMultisigMemberMutation(c.config, OpCreate)
+	return &MultisigMemberCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MultisigMember entities.
+func (c *MultisigMemberClient) CreateBulk(builders ...*MultisigMemberCreate) *MultisigMemberCreateBulk {
+	return &MultisigMemberCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MultisigMemberClient) MapCreateBulk(slice any, setFunc func(*MultisigMemberCreate, int)) *MultisigMemberCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MultisigMemberCreateBulk{err: fmt.Errorf("calling to MultisigMemberClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MultisigMemberCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MultisigMemberCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MultisigMember.
+func (c *MultisigMemberClient) Update() *MultisigMemberUpdate {
+	mutation := newMultisigMemberMutation(c.config, OpUpdate)
+	return &MultisigMemberUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MultisigMemberClient) UpdateOne(mm *MultisigMember) *MultisigMemberUpdateOne {
+	mutation := newMultisigMemberMutation(c.config, OpUpdateOne, withMultisigMember(mm))
+	return &MultisigMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MultisigMemberClient) UpdateOneID(id uuid.UUID) *MultisigMemberUpdateOne {
+	mutation := newMultisigMemberMutation(c.config, OpUpdateOne, withMultisigMemberID(id))
+	return &MultisigMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MultisigMember.
+func (c *MultisigMemberClient) Delete() *MultisigMemberDelete {
+	mutation := newMultisigMemberMutation(c.config, OpDelete)
+	return &MultisigMemberDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MultisigMemberClient) DeleteOne(mm *MultisigMember) *MultisigMemberDeleteOne {
+	return c.DeleteOneID(mm.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MultisigMemberClient) DeleteOneID(id uuid.UUID) *MultisigMemberDeleteOne {
+	builder := c.Delete().Where(multisigmember.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MultisigMemberDeleteOne{builder}
+}
+
+// Query returns a query builder for MultisigMember.
+func (c *MultisigMemberClient) Query() *MultisigMemberQuery {
+	return &MultisigMemberQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMultisigMember},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MultisigMember entity by its id.
+func (c *MultisigMemberClient) Get(ctx context.Context, id uuid.UUID) (*MultisigMember, error) {
+	return c.Query().Where(multisigmember.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MultisigMemberClient) GetX(ctx context.Context, id uuid.UUID) *MultisigMember {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryConfig queries the config edge of a MultisigMember.
+func (c *MultisigMemberClient) QueryConfig(mm *MultisigMember) *MultisigConfigQuery {
+	query := (&MultisigConfigClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := mm.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(multisigmember.Table, multisigmember.FieldID, id),
+			sqlgraph.To(multisigconfig.Table, multisigconfig.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, multisigmember.ConfigTable, multisigmember.ConfigColumn),
+		)
+		fromV = sqlgraph.Neighbors(mm.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *MultisigMemberClient) Hooks() []Hook {
+	hooks := c.hooks.MultisigMember
+	return append(hooks[:len(hooks):len(hooks)], multisigmember.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *MultisigMemberClient) Interceptors() []Interceptor {
+	return c.inters.MultisigMember
+}
+
+func (c *MultisigMemberClient) mutate(ctx context.Context, m *MultisigMemberMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MultisigMemberCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MultisigMemberUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MultisigMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MultisigMemberDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MultisigMember mutation op: %q", m.Op())
 	}
 }
 
@@ -6476,10 +6792,11 @@ type (
 	hooks struct {
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
 		Gossip, IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
-		L1TokenOutputWithdrawal, L1WithdrawalTransaction, PaymentIntent,
-		PendingSendTransfer, PreimageRequest, PreimageShare, SigningCommitment,
-		SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate, TokenFreeze,
-		TokenMint, TokenOutput, TokenPartialRevocationSecretShare, TokenTransaction,
+		L1TokenOutputWithdrawal, L1WithdrawalTransaction, MultisigConfig,
+		MultisigMember, PaymentIntent, PendingSendTransfer, PreimageRequest,
+		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
+		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		TokenPartialRevocationSecretShare, TokenTransaction,
 		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferReceiver,
 		TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo, UtxoSwap,
 		WalletSetting []ent.Hook
@@ -6487,10 +6804,11 @@ type (
 	inters struct {
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
 		Gossip, IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
-		L1TokenOutputWithdrawal, L1WithdrawalTransaction, PaymentIntent,
-		PendingSendTransfer, PreimageRequest, PreimageShare, SigningCommitment,
-		SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate, TokenFreeze,
-		TokenMint, TokenOutput, TokenPartialRevocationSecretShare, TokenTransaction,
+		L1TokenOutputWithdrawal, L1WithdrawalTransaction, MultisigConfig,
+		MultisigMember, PaymentIntent, PendingSendTransfer, PreimageRequest,
+		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
+		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		TokenPartialRevocationSecretShare, TokenTransaction,
 		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferReceiver,
 		TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo, UtxoSwap,
 		WalletSetting []ent.Interceptor

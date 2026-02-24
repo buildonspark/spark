@@ -342,6 +342,55 @@ var (
 			},
 		},
 	}
+	// MultisigConfigsColumns holds the columns for the "multisig_configs" table.
+	MultisigConfigsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "multisig_identifier", Type: field.TypeBytes, Unique: true},
+		{Name: "num_signers_threshold", Type: field.TypeUint32},
+		{Name: "num_signers_total", Type: field.TypeUint32},
+	}
+	// MultisigConfigsTable holds the schema information for the "multisig_configs" table.
+	MultisigConfigsTable = &schema.Table{
+		Name:       "multisig_configs",
+		Columns:    MultisigConfigsColumns,
+		PrimaryKey: []*schema.Column{MultisigConfigsColumns[0]},
+	}
+	// MultisigMembersColumns holds the columns for the "multisig_members" table.
+	MultisigMembersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "public_key", Type: field.TypeBytes},
+		{Name: "multisig_config_members", Type: field.TypeUUID},
+	}
+	// MultisigMembersTable holds the schema information for the "multisig_members" table.
+	MultisigMembersTable = &schema.Table{
+		Name:       "multisig_members",
+		Columns:    MultisigMembersColumns,
+		PrimaryKey: []*schema.Column{MultisigMembersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "multisig_members_multisig_configs_members",
+				Columns:    []*schema.Column{MultisigMembersColumns[4]},
+				RefColumns: []*schema.Column{MultisigConfigsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "multisigmember_multisig_config_members",
+				Unique:  false,
+				Columns: []*schema.Column{MultisigMembersColumns[4]},
+			},
+			{
+				Name:    "multisigmember_public_key_multisig_config_members",
+				Unique:  true,
+				Columns: []*schema.Column{MultisigMembersColumns[3], MultisigMembersColumns[4]},
+			},
+		},
+	}
 	// PaymentIntentsColumns holds the columns for the "payment_intents" table.
 	PaymentIntentsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1693,6 +1742,8 @@ var (
 		L1tokenJusticeTransactionsTable,
 		L1tokenOutputWithdrawalsTable,
 		L1withdrawalTransactionsTable,
+		MultisigConfigsTable,
+		MultisigMembersTable,
 		PaymentIntentsTable,
 		PendingSendTransfersTable,
 		PreimageRequestsTable,
@@ -1732,6 +1783,7 @@ func init() {
 	L1tokenOutputWithdrawalsTable.ForeignKeys[0].RefTable = L1withdrawalTransactionsTable
 	L1tokenOutputWithdrawalsTable.ForeignKeys[1].RefTable = TokenOutputsTable
 	L1withdrawalTransactionsTable.ForeignKeys[0].RefTable = EntityDkgKeysTable
+	MultisigMembersTable.ForeignKeys[0].RefTable = MultisigConfigsTable
 	PreimageRequestsTable.ForeignKeys[0].RefTable = TransfersTable
 	PreimageSharesTable.ForeignKeys[0].RefTable = PreimageRequestsTable
 	TokenCreatesTable.ForeignKeys[0].RefTable = L1tokenCreatesTable
