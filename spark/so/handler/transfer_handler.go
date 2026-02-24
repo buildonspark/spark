@@ -2296,7 +2296,7 @@ func (h *TransferHandler) ValidateKeyTweakProof(ctx context.Context, transferLea
 		}
 		for i, p := range proof.Proofs {
 			if !bytes.Equal(keyTweakProto.SecretShareTweak.Proofs[i], p) {
-				return fmt.Errorf("key tweak proof for leaf %s is invalid, the proof provided is not the same as key tweak proof. please check your implementation to see if you are claiming the same transfer multiple times at the same time", leaf.ID.String())
+				return sparkerrors.AbortedConcurrentClaimConflict(fmt.Errorf("key tweak proof for leaf %s is invalid, the proof provided is not the same as key tweak proof. please check your implementation to see if you are claiming the same transfer multiple times at the same time", leaf.ID.String()))
 			}
 		}
 	}
@@ -2407,6 +2407,7 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 		return client.InitiateSettleReceiverKeyTweak(ctx, req)
 	})
 	logger := logging.GetLoggerFromContext(ctx)
+	var rollbackCause error
 	if err != nil {
 		if status.Code(err) == codes.Unavailable ||
 			status.Code(err) == codes.Canceled ||
@@ -2418,6 +2419,7 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 		}
 		logger.Error("Unable to settle receiver key tweak, you might have a race condition in your implementation", zap.Error(err))
 		action = pbinternal.SettleKeyTweakAction_ROLLBACK
+		rollbackCause = err
 	}
 
 	initiateReq := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
@@ -2434,6 +2436,7 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 	if err != nil {
 		logger.Error("Unable to settle receiver key tweak internally, you might have a race condition in your implementation", zap.Error(err))
 		action = pbinternal.SettleKeyTweakAction_ROLLBACK
+		rollbackCause = err
 	}
 
 	// Phase 2: COMMIT - Settle the receiver's key tweak request to all SOs
@@ -2464,7 +2467,7 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 		}
 	}
 	if action == pbinternal.SettleKeyTweakAction_ROLLBACK {
-		return fmt.Errorf("unable to settle receiver key tweak; rolled back")
+		return fmt.Errorf("unable to settle receiver key tweak; rolled back: %w", rollbackCause)
 	}
 	return nil
 }
@@ -2572,6 +2575,9 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 
 	transfer, err := h.loadTransferForUpdate(ctx, transferID, sql.WithLockAction(sql.NoWait))
 	if err != nil {
+		if strings.Contains(err.Error(), "SQLSTATE 55P03") {
+			return nil, sparkerrors.AbortedConcurrentClaimConflict(fmt.Errorf("unable to load transfer %s: %w", transferID, err))
+		}
 		return nil, fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))

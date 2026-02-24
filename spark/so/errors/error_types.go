@@ -37,7 +37,8 @@ const (
 	ReasonFailedPreconditionReplay                    = "REPLAY"
 	ReasonFailedPreconditionHashMismatch              = "HASH_MISMATCH"
 
-	ReasonAbortedTransactionPreempted = "TRANSACTION_PREEMPTED"
+	ReasonAbortedTransactionPreempted    = "TRANSACTION_PREEMPTED"
+	ReasonAbortedConcurrentClaimConflict = "CONCURRENT_CLAIM_CONFLICT"
 
 	ReasonAlreadyExistsDuplicateOperation = "DUPLICATE_OPERATION"
 	ReasonAlreadyExistsExpiredTransaction = "EXPIRED_TRANSACTION"
@@ -182,6 +183,10 @@ func FailedPreconditionHashMismatch(err error) error {
 
 func AbortedTransactionPreempted(err error) error {
 	return newGRPCError(codes.Aborted, err, ReasonAbortedTransactionPreempted)
+}
+
+func AbortedConcurrentClaimConflict(err error) error {
+	return newGRPCError(codes.Aborted, err, ReasonAbortedConcurrentClaimConflict)
 }
 
 func AlreadyExistsDuplicateOperation(err error) error {
