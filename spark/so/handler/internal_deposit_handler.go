@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -388,6 +389,26 @@ func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte,
 	return common.VerifyECDSASignature(userIdentityPubKey, userSignature, messageHash)
 }
 
+// validateInstantUserSignature verifies that the user has authorized an instant static deposit UTXO swap
+// by validating their signature over the instant deposit statement.
+func validateInstantUserSignature(
+	userIdentityPubKey keys.Public,
+	userSignature []byte,
+	sspSignature []byte,
+	network btcnetwork.Network,
+	creditAmountSats uint64,
+	secondaryCreditAmountSats uint64,
+	expiryTime time.Time,
+	destinationAddress string,
+	satsValue uint64,
+) error {
+	if len(userSignature) == 0 {
+		return fmt.Errorf("user signature is required")
+	}
+	messageHash := CreateInstantUserStatement(network, creditAmountSats, secondaryCreditAmountSats, expiryTime, destinationAddress, satsValue, sspSignature)
+	return common.VerifyECDSASignature(userIdentityPubKey, userSignature, messageHash)
+}
+
 // CreateUserStatement creates a user statement to authorize the UTXO swap.
 // The signature is expected to be a DER-encoded ECDSA signature of sha256 of the message
 // composed of:
@@ -473,6 +494,39 @@ func createUserStatementV2(
 		AddBytes(sspSignature).
 		Hash()
 	return hash, nil
+}
+
+// CreateInstantUserStatement creates a user statement to authorize an instant static deposit UTXO swap.
+// The signature is expected to be a DER-encoded ECDSA signature of the tagged hash of the message
+// composed of:
+//   - network: the lowercase network name (e.g., "bitcoin", "testnet")
+//   - requestType: Instant (3)
+//   - creditAmountSats: the primary credit amount in satoshis
+//   - secondaryCreditAmountSats: the secondary credit amount in satoshis
+//   - expiryTime: the expiry time as a unix timestamp
+//   - destinationAddress: the destination static deposit address
+//   - satsValue: the total UTXO value in satoshis
+//   - sspSignature: the SSP signature bytes
+func CreateInstantUserStatement(
+	network btcnetwork.Network,
+	creditAmountSats uint64,
+	secondaryCreditAmountSats uint64,
+	expiryTime time.Time,
+	destinationAddress string,
+	satsValue uint64,
+	sspSignature []byte,
+) []byte {
+	hash := hashstructure.NewHasher([]string{"spark", "claim_instant_static_deposit"}).
+		AddString(strings.ToLower(network.String())).
+		AddUint8(3). // requestType = Instant
+		AddUint64(creditAmountSats).
+		AddUint64(secondaryCreditAmountSats).
+		AddUint64(uint64(expiryTime.Unix())).
+		AddString(destinationAddress).
+		AddUint64(satsValue).
+		AddBytes(sspSignature).
+		Hash()
+	return hash
 }
 
 func CancelUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {

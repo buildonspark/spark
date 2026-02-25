@@ -394,6 +394,44 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		return nil, fmt.Errorf("unable to get deposit address: %w", err)
 	}
 
+	// Validate general transfer signatures and leaves
+	if err = validateTransfer(req.Transfer); err != nil {
+		return nil, fmt.Errorf("transfer validation failed: %w", err)
+	}
+
+	leafRefundMap := make(map[string][]byte)
+	for _, leaf := range req.Transfer.TransferPackage.LeavesToSend {
+		leafRefundMap[leaf.LeafId] = leaf.RawTx
+	}
+
+	// Load leaves and compute total transfer value
+	leaves, _, err := loadLeavesWithLock(ctx, db, leafRefundMap)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load leaves: %w", err)
+	}
+	if len(leaves) == 0 {
+		return nil, fmt.Errorf("no leaves found")
+	}
+	totalAmount := getTotalTransferValue(leaves)
+	if totalAmount != uint64(req.CreditAmountSats) {
+		return nil, fmt.Errorf("instant static deposit total leaf amount %d does not match credit_amount_sats %d", totalAmount, req.CreditAmountSats)
+	}
+
+	// Validate user signature
+	if err = validateInstantUserSignature(
+		reqTransferReceiverIdentityPubKey,
+		req.UserSignature,
+		req.SspSignature,
+		network,
+		totalAmount,
+		uint64(req.SecondaryCreditAmountSats),
+		req.ExpiryTime.AsTime(),
+		req.DestinationAddress,
+		uint64(req.ValueSats),
+	); err != nil {
+		return nil, fmt.Errorf("user signature validation failed: %w", err)
+	}
+
 	logger.Sugar().Infof(
 		"Creating instant UTXO swap record (transfer id %s, txid %x, vout %d, credit amount %d, secondary credit amount %d, expiry %s, deposit address %s)",
 		transferID,
