@@ -33,6 +33,7 @@ message GossipMessage {
         GossipMessageUpdateWalletSetting update_wallet_setting = 17;
         GossipMessageArchiveStaticDepositAddress archive_static_deposit_address = 18;
         GossipMessageRollbackInstantUtxoSwap rollback_instant_utxo_swap = 19;
+        GossipMessageFinalizeTransferReceiver finalize_transfer_receiver = 20;
     }
 }
 
@@ -68,6 +69,16 @@ message GossipMessageFinalizeTransfer {
     string transfer_id = 1;
     repeated spark_internal.TreeNode internal_nodes = 2;
     google.protobuf.Timestamp completion_timestamp = 3;
+}
+
+// FinalizeTransferReceiver is sent when an individual receiver completes their
+// claim in a MIMO transfer. It carries the receiver's tree node updates and
+// marks that receiver as Completed on non-coordinator SOs.
+message GossipMessageFinalizeTransferReceiver {
+    string transfer_id = 1;
+    bytes receiver_identity_public_key = 2;
+    repeated spark_internal.TreeNode internal_nodes = 3;
+    google.protobuf.Timestamp completion_timestamp = 4;
 }
 
 message GossipMessageFinalizeRefreshTimelock {

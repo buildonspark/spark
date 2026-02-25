@@ -14,7 +14,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/uuids"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -25,6 +27,7 @@ import (
 	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -107,7 +110,7 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 			update := dbNode.Update()
 
 			update.SetRawTx(node.RawTx) // RawTx is required field, can't be nil
-			if dbNode.RawRefundTx != nil {
+			if node.RawRefundTx != nil {
 				update.SetRawRefundTx(node.RawRefundTx)
 			}
 
@@ -156,6 +159,155 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 		}
 	}
 
+	return nil
+}
+
+// FinalizeTransferReceiver processes a per-receiver gossip message for MIMO transfers.
+// It marks the receiver's tree nodes as Available and the receiver as Completed.
+// When all receivers for a transfer are Completed, it marks the transfer itself as Completed.
+func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, req *pbgossip.GossipMessageFinalizeTransferReceiver) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get db: %w", err)
+	}
+
+	transferID, err := uuid.Parse(req.GetTransferId())
+	if err != nil {
+		return fmt.Errorf("failed to parse transfer id: %w", err)
+	}
+
+	transfer, err := h.loadTransferForUpdate(ctx, transferID)
+	if err != nil {
+		return fmt.Errorf("unable to load transfer %s: %w", transferID, err)
+	}
+
+	receiverPubKey, err := keys.ParsePublicKey(req.GetReceiverIdentityPublicKey())
+	if err != nil {
+		return fmt.Errorf("failed to parse receiver identity public key: %w", err)
+	}
+
+	receivers, err := transfer.QueryTransferReceivers().
+		Where(enttransferreceiver.IdentityPubkeyEQ(receiverPubKey)).
+		ForUpdate().
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query receiver for transfer %s: %w", transferID, err)
+	}
+	if len(receivers) != 1 {
+		return fmt.Errorf("expected exactly 1 receiver with pubkey %x for transfer %s, got %d", receiverPubKey.Serialize(), transferID, len(receivers))
+	}
+	receiver := receivers[0]
+
+	receiverLeaves, err := db.TransferLeaf.Query().
+		Where(enttransferleaf.TransferReceiverID(receiver.ID)).
+		QueryLeaf().
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query receiver leaves for transfer %s: %w", transferID, err)
+	}
+	if len(receiverLeaves) != len(req.InternalNodes) {
+		return fmt.Errorf("node count mismatch for receiver in transfer %s: db has %d, gossip has %d",
+			transferID, len(receiverLeaves), len(req.InternalNodes))
+	}
+
+	receiverLeafIDs := make(map[uuid.UUID]struct{})
+	for _, leaf := range receiverLeaves {
+		receiverLeafIDs[leaf.ID] = struct{}{}
+	}
+
+	for _, node := range req.InternalNodes {
+		nodeID, err := uuid.Parse(node.Id)
+		if err != nil {
+			return fmt.Errorf("failed to parse node id %s: %w", node.Id, err)
+		}
+		if _, ok := receiverLeafIDs[nodeID]; !ok {
+			return fmt.Errorf("node %s not in receiver's leaves (or duplicate) for transfer %s", nodeID, transferID)
+		}
+		delete(receiverLeafIDs, nodeID)
+		dbNode, err := db.TreeNode.Get(ctx, nodeID)
+		if err != nil {
+			return fmt.Errorf("failed to get tree node %s: %w", nodeID, err)
+		}
+
+		if dbNode.Status == st.TreeNodeStatusAvailable {
+			// Idempotency: node was already made Available (e.g. by safety net). Verify txs match.
+			rawTxMatch, err := compareTxs(dbNode.RawTx, node.RawTx)
+			if err != nil {
+				return fmt.Errorf("failed to compare raw txs for node %s: %w", nodeID, err)
+			}
+			directRefundTxMatch, err := compareTxs(dbNode.DirectRefundTx, node.DirectRefundTx)
+			if err != nil {
+				return fmt.Errorf("failed to compare direct refund txs for node %s: %w", nodeID, err)
+			}
+			directFromCpfpRefundTxMatch, err := compareTxs(dbNode.DirectFromCpfpRefundTx, node.DirectFromCpfpRefundTx)
+			if err != nil {
+				return fmt.Errorf("failed to compare direct from cpfp refund txs for node %s: %w", nodeID, err)
+			}
+			if !rawTxMatch || !directRefundTxMatch || !directFromCpfpRefundTxMatch {
+				return fmt.Errorf("node txs do not match DB for already-available node %s in transfer %s", nodeID, transferID)
+			}
+
+			// Synchronize any non-nil tx fields.
+			update := dbNode.Update()
+			update.SetRawTx(node.RawTx)
+			if node.RawRefundTx != nil {
+				update.SetRawRefundTx(node.RawRefundTx)
+			}
+			update.SetDirectRefundTx(node.DirectRefundTx)
+			update.SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
+			update.SetStatus(st.TreeNodeStatusAvailable)
+			if _, err = update.Save(ctx); err != nil {
+				return fmt.Errorf("failed to update tree node %s: %w", nodeID, err)
+			}
+		} else {
+			_, err = dbNode.Update().
+				SetRawTx(node.RawTx).
+				SetRawRefundTx(node.RawRefundTx).
+				SetDirectRefundTx(node.DirectRefundTx).
+				SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx).
+				SetStatus(st.TreeNodeStatusAvailable).
+				Save(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to update tree node %s: %w", nodeID, err)
+			}
+		}
+	}
+
+	if receiver.Status == st.TransferReceiverStatusCompleted {
+		if !receiver.CompletionTime.Equal(req.CompletionTimestamp.AsTime()) {
+			return fmt.Errorf("receiver %s already completed at %v, cannot update to %v",
+				receiver.ID, receiver.CompletionTime, req.CompletionTimestamp.AsTime())
+		}
+	} else {
+		_, err = receiver.Update().
+			SetStatus(st.TransferReceiverStatusCompleted).
+			SetCompletionTime(req.CompletionTimestamp.AsTime()).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to mark receiver completed for transfer %s: %w", transferID, err)
+		}
+	}
+
+	// Mark the transfer completed when all of its receivers are now completed.
+	pendingCount, err := transfer.QueryTransferReceivers().
+		Where(enttransferreceiver.StatusNEQ(st.TransferReceiverStatusCompleted)).
+		Count(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to count pending receivers for transfer %s: %w", transferID, err)
+	}
+	if pendingCount == 0 && transfer.Status != st.TransferStatusCompleted {
+		_, err = transfer.Update().
+			SetStatus(st.TransferStatusCompleted).
+			SetCompletionTime(req.CompletionTimestamp.AsTime()).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to mark transfer completed for %s: %w", transferID, err)
+		}
+	}
+
+	logger.With(zap.String("transfer_id", transferID.String())).Sugar().Infof("Finalized receiver %s for transfer", receiver.ID)
 	return nil
 }
 

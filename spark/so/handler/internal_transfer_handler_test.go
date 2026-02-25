@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	sparkProto "github.com/lightsparkdev/spark/proto/spark"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -411,6 +412,54 @@ func TestFinalizeTransfer(t *testing.T) {
 		updatedDone, err := dbCtx.Client.TransferReceiver.Get(ctx, alreadyDoneReceiver.ID)
 		require.NoError(t, err)
 		assert.Equal(t, st.TransferReceiverStatusCompleted, updatedDone.Status)
+	})
+}
+
+func TestFinalizeTransferReceiver(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"regtest": {DepositConfirmationThreshold: 1},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+
+	// Note: the database enforces uniqueness of (transfer_id, identity_pubkey) via
+	// the "transferreceiver_transfer_id_identity_pubkey" constraint, so len > 1 cannot
+	// occur in practice. The code assertion covers len == 0 and provides defense in depth.
+	t.Run("errors when no receiver matches the identity pubkey", func(t *testing.T) {
+		rng := rand.NewChaCha8([32]byte{3})
+		senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		unknownPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+		transfer, err := dbCtx.Client.Transfer.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetStatus(st.TransferStatusReceiverRefundSigned).
+			SetType(st.TransferTypeTransfer).
+			SetSenderIdentityPubkey(senderPrivKey.Public()).
+			SetReceiverIdentityPubkey(receiverPrivKey.Public()).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(24 * time.Hour)).
+			SetCompletionTime(time.Now()).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = dbCtx.Client.TransferReceiver.Create().
+			SetTransfer(transfer).
+			SetIdentityPubkey(receiverPrivKey.Public()).
+			SetStatus(st.TransferReceiverStatusRefundSigned).
+			Save(ctx)
+		require.NoError(t, err)
+
+		handler := NewInternalTransferHandler(config)
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: unknownPrivKey.Public().Serialize(),
+			CompletionTimestamp:       timestamppb.Now(),
+		})
+		require.ErrorContains(t, err, "expected exactly 1")
 	})
 }
 

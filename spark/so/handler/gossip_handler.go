@@ -117,6 +117,9 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	case *pbgossip.GossipMessage_ArchiveStaticDepositAddress:
 		archiveStaticDepositAddress := gossipMessage.GetArchiveStaticDepositAddress()
 		err = h.handleArchiveStaticDepositAddressGossipMessage(ctx, archiveStaticDepositAddress)
+	case *pbgossip.GossipMessage_FinalizeTransferReceiver:
+		finalizeTransferReceiver := gossipMessage.GetFinalizeTransferReceiver()
+		err = h.handleFinalizeTransferReceiverGossipMessage(ctx, finalizeTransferReceiver, forCoordinator)
 	default:
 		err = fmt.Errorf("unsupported gossip message type: %T", gossipMessage.Message)
 	}
@@ -505,4 +508,20 @@ func (h *GossipHandler) handleArchiveStaticDepositAddressGossipMessage(ctx conte
 
 	logger.Sugar().Infof("Successfully archived static deposit address %s from gossip message for identity public key %x", archiveStaticDepositAddress.Address, ownerIDPubKey.Serialize())
 	return nil
+}
+
+func (h *GossipHandler) handleFinalizeTransferReceiverGossipMessage(ctx context.Context, req *pbgossip.GossipMessageFinalizeTransferReceiver, forCoordinator bool) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Info("Handling finalize transfer receiver gossip message")
+
+	if forCoordinator {
+		return nil
+	}
+
+	transferHandler := NewInternalTransferHandler(h.config)
+	err := transferHandler.FinalizeTransferReceiver(ctx, req)
+	if err != nil {
+		logger.Error("Failed to finalize transfer receiver", zap.Error(err))
+	}
+	return err
 }
