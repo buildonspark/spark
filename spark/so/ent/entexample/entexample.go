@@ -7134,6 +7134,7 @@ type UtxoSwapExample struct {
 	UserIdentityPublicKey        *keys.Public
 	CoordinatorIdentityPublicKey *keys.Public
 	RequestedTransferID          *uuid.UUID
+	RequestedSecondaryTransferID *uuid.UUID
 	SpendTxSigningResult         *[]byte
 	ExpiryTime                   *time.Time
 	UtxoValueSats                *uint64
@@ -7215,6 +7216,12 @@ func (us *UtxoSwapExample) SetCoordinatorIdentityPublicKey(v keys.Public) *UtxoS
 // SetRequestedTransferID sets the requested_transfer_id field.
 func (us *UtxoSwapExample) SetRequestedTransferID(v uuid.UUID) *UtxoSwapExample {
 	us.RequestedTransferID = &v
+	return us
+}
+
+// SetRequestedSecondaryTransferID sets the requested_secondary_transfer_id field.
+func (us *UtxoSwapExample) SetRequestedSecondaryTransferID(v uuid.UUID) *UtxoSwapExample {
+	us.RequestedSecondaryTransferID = &v
 	return us
 }
 
@@ -7330,6 +7337,12 @@ func (us *UtxoSwapExample) MustExec(ctx context.Context) *ent.UtxoSwap {
 		// Use default from annotation
 		create.SetRequestedTransferID(uuid.MustParse("019a0ef8-5794-7677-af5f-d3948d691114"))
 	}
+	if us.RequestedSecondaryTransferID != nil {
+		create.SetRequestedSecondaryTransferID(*us.RequestedSecondaryTransferID)
+	} else {
+		// Use default from annotation
+		create.SetRequestedSecondaryTransferID(uuid.MustParse("019a0ef8-5794-7677-af5f-d3948d691114"))
+	}
 	if us.SpendTxSigningResult != nil {
 		create.SetSpendTxSigningResult(*us.SpendTxSigningResult)
 	} else {
@@ -7440,6 +7453,12 @@ func (us *UtxoSwapExample) Exec(ctx context.Context) (*ent.UtxoSwap, error) {
 	} else {
 		// Use default from annotation
 		create.SetRequestedTransferID(uuid.MustParse("019a0ef8-5794-7677-af5f-d3948d691114"))
+	}
+	if us.RequestedSecondaryTransferID != nil {
+		create.SetRequestedSecondaryTransferID(*us.RequestedSecondaryTransferID)
+	} else {
+		// Use default from annotation
+		create.SetRequestedSecondaryTransferID(uuid.MustParse("019a0ef8-5794-7677-af5f-d3948d691114"))
 	}
 	if us.SpendTxSigningResult != nil {
 		create.SetSpendTxSigningResult(*us.SpendTxSigningResult)

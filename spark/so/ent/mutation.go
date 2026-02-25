@@ -32997,6 +32997,7 @@ type UtxoSwapMutation struct {
 	user_identity_public_key        *keys.Public
 	coordinator_identity_public_key *keys.Public
 	requested_transfer_id           *uuid.UUID
+	requested_secondary_transfer_id *uuid.UUID
 	spend_tx_signing_result         *[]byte
 	expiry_time                     *time.Time
 	utxo_value_sats                 *uint64
@@ -33752,6 +33753,55 @@ func (m *UtxoSwapMutation) ResetRequestedTransferID() {
 	delete(m.clearedFields, utxoswap.FieldRequestedTransferID)
 }
 
+// SetRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field.
+func (m *UtxoSwapMutation) SetRequestedSecondaryTransferID(u uuid.UUID) {
+	m.requested_secondary_transfer_id = &u
+}
+
+// RequestedSecondaryTransferID returns the value of the "requested_secondary_transfer_id" field in the mutation.
+func (m *UtxoSwapMutation) RequestedSecondaryTransferID() (r uuid.UUID, exists bool) {
+	v := m.requested_secondary_transfer_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestedSecondaryTransferID returns the old "requested_secondary_transfer_id" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldRequestedSecondaryTransferID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestedSecondaryTransferID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestedSecondaryTransferID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestedSecondaryTransferID: %w", err)
+	}
+	return oldValue.RequestedSecondaryTransferID, nil
+}
+
+// ClearRequestedSecondaryTransferID clears the value of the "requested_secondary_transfer_id" field.
+func (m *UtxoSwapMutation) ClearRequestedSecondaryTransferID() {
+	m.requested_secondary_transfer_id = nil
+	m.clearedFields[utxoswap.FieldRequestedSecondaryTransferID] = struct{}{}
+}
+
+// RequestedSecondaryTransferIDCleared returns if the "requested_secondary_transfer_id" field was cleared in this mutation.
+func (m *UtxoSwapMutation) RequestedSecondaryTransferIDCleared() bool {
+	_, ok := m.clearedFields[utxoswap.FieldRequestedSecondaryTransferID]
+	return ok
+}
+
+// ResetRequestedSecondaryTransferID resets all changes to the "requested_secondary_transfer_id" field.
+func (m *UtxoSwapMutation) ResetRequestedSecondaryTransferID() {
+	m.requested_secondary_transfer_id = nil
+	delete(m.clearedFields, utxoswap.FieldRequestedSecondaryTransferID)
+}
+
 // SetSpendTxSigningResult sets the "spend_tx_signing_result" field.
 func (m *UtxoSwapMutation) SetSpendTxSigningResult(b []byte) {
 	m.spend_tx_signing_result = &b
@@ -34057,7 +34107,7 @@ func (m *UtxoSwapMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UtxoSwapMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 17)
 	if m.create_time != nil {
 		fields = append(fields, utxoswap.FieldCreateTime)
 	}
@@ -34096,6 +34146,9 @@ func (m *UtxoSwapMutation) Fields() []string {
 	}
 	if m.requested_transfer_id != nil {
 		fields = append(fields, utxoswap.FieldRequestedTransferID)
+	}
+	if m.requested_secondary_transfer_id != nil {
+		fields = append(fields, utxoswap.FieldRequestedSecondaryTransferID)
 	}
 	if m.spend_tx_signing_result != nil {
 		fields = append(fields, utxoswap.FieldSpendTxSigningResult)
@@ -34140,6 +34193,8 @@ func (m *UtxoSwapMutation) Field(name string) (ent.Value, bool) {
 		return m.CoordinatorIdentityPublicKey()
 	case utxoswap.FieldRequestedTransferID:
 		return m.RequestedTransferID()
+	case utxoswap.FieldRequestedSecondaryTransferID:
+		return m.RequestedSecondaryTransferID()
 	case utxoswap.FieldSpendTxSigningResult:
 		return m.SpendTxSigningResult()
 	case utxoswap.FieldExpiryTime:
@@ -34181,6 +34236,8 @@ func (m *UtxoSwapMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCoordinatorIdentityPublicKey(ctx)
 	case utxoswap.FieldRequestedTransferID:
 		return m.OldRequestedTransferID(ctx)
+	case utxoswap.FieldRequestedSecondaryTransferID:
+		return m.OldRequestedSecondaryTransferID(ctx)
 	case utxoswap.FieldSpendTxSigningResult:
 		return m.OldSpendTxSigningResult(ctx)
 	case utxoswap.FieldExpiryTime:
@@ -34286,6 +34343,13 @@ func (m *UtxoSwapMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRequestedTransferID(v)
+		return nil
+	case utxoswap.FieldRequestedSecondaryTransferID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestedSecondaryTransferID(v)
 		return nil
 	case utxoswap.FieldSpendTxSigningResult:
 		v, ok := value.([]byte)
@@ -34413,6 +34477,9 @@ func (m *UtxoSwapMutation) ClearedFields() []string {
 	if m.FieldCleared(utxoswap.FieldRequestedTransferID) {
 		fields = append(fields, utxoswap.FieldRequestedTransferID)
 	}
+	if m.FieldCleared(utxoswap.FieldRequestedSecondaryTransferID) {
+		fields = append(fields, utxoswap.FieldRequestedSecondaryTransferID)
+	}
 	if m.FieldCleared(utxoswap.FieldSpendTxSigningResult) {
 		fields = append(fields, utxoswap.FieldSpendTxSigningResult)
 	}
@@ -34456,6 +34523,9 @@ func (m *UtxoSwapMutation) ClearField(name string) error {
 		return nil
 	case utxoswap.FieldRequestedTransferID:
 		m.ClearRequestedTransferID()
+		return nil
+	case utxoswap.FieldRequestedSecondaryTransferID:
+		m.ClearRequestedSecondaryTransferID()
 		return nil
 	case utxoswap.FieldSpendTxSigningResult:
 		m.ClearSpendTxSigningResult()
@@ -34509,6 +34579,9 @@ func (m *UtxoSwapMutation) ResetField(name string) error {
 		return nil
 	case utxoswap.FieldRequestedTransferID:
 		m.ResetRequestedTransferID()
+		return nil
+	case utxoswap.FieldRequestedSecondaryTransferID:
+		m.ResetRequestedSecondaryTransferID()
 		return nil
 	case utxoswap.FieldSpendTxSigningResult:
 		m.ResetSpendTxSigningResult()

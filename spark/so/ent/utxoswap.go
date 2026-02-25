@@ -48,6 +48,8 @@ type UtxoSwap struct {
 	CoordinatorIdentityPublicKey keys.Public `json:"coordinator_identity_public_key,omitempty"`
 	// The transfer ID requested by the user, unique across all operators.
 	RequestedTransferID uuid.UUID `json:"requested_transfer_id,omitempty"`
+	// The transfer id that was requested by the user for the secondary transfer, a unique reference across all operators
+	RequestedSecondaryTransferID uuid.UUID `json:"requested_secondary_transfer_id,omitempty"`
 	// The result of FROST signing the UTXO spend transaction.
 	SpendTxSigningResult []byte `json:"spend_tx_signing_result,omitempty"`
 	// When this swap offer/lock expires (if applicable).
@@ -125,7 +127,7 @@ func (*UtxoSwap) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case utxoswap.FieldCreateTime, utxoswap.FieldUpdateTime, utxoswap.FieldExpiryTime:
 			values[i] = new(sql.NullTime)
-		case utxoswap.FieldID, utxoswap.FieldRequestedTransferID:
+		case utxoswap.FieldID, utxoswap.FieldRequestedTransferID, utxoswap.FieldRequestedSecondaryTransferID:
 			values[i] = new(uuid.UUID)
 		case utxoswap.ForeignKeys[0]: // deposit_address_utxoswaps
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
@@ -234,6 +236,12 @@ func (us *UtxoSwap) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field requested_transfer_id", values[i])
 			} else if value != nil {
 				us.RequestedTransferID = *value
+			}
+		case utxoswap.FieldRequestedSecondaryTransferID:
+			if value, ok := values[i].(*uuid.UUID); !ok {
+				return fmt.Errorf("unexpected type %T for field requested_secondary_transfer_id", values[i])
+			} else if value != nil {
+				us.RequestedSecondaryTransferID = *value
 			}
 		case utxoswap.FieldSpendTxSigningResult:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -373,6 +381,9 @@ func (us *UtxoSwap) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("requested_transfer_id=")
 	builder.WriteString(fmt.Sprintf("%v", us.RequestedTransferID))
+	builder.WriteString(", ")
+	builder.WriteString("requested_secondary_transfer_id=")
+	builder.WriteString(fmt.Sprintf("%v", us.RequestedSecondaryTransferID))
 	builder.WriteString(", ")
 	builder.WriteString("spend_tx_signing_result=")
 	builder.WriteString(fmt.Sprintf("%v", us.SpendTxSigningResult))

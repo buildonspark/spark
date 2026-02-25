@@ -153,6 +153,10 @@ func (UtxoSwap) Fields() []ent.Field {
 			Optional().
 			Comment("The transfer ID requested by the user, unique across all operators.").
 			Annotations(entexample.Default("019a0ef8-5794-7677-af5f-d3948d691114")),
+		field.UUID("requested_secondary_transfer_id", uuid.UUID{}).
+			Optional().
+			Annotations(entexample.Default("019a0ef8-5794-7677-af5f-d3948d691114")).
+			Comment("The transfer id that was requested by the user for the secondary transfer, a unique reference across all operators"),
 		field.Bytes("spend_tx_signing_result").
 			Optional().
 			Comment("The result of FROST signing the UTXO spend transaction."),

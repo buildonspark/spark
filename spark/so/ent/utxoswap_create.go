@@ -170,6 +170,20 @@ func (usc *UtxoSwapCreate) SetNillableRequestedTransferID(u *uuid.UUID) *UtxoSwa
 	return usc
 }
 
+// SetRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field.
+func (usc *UtxoSwapCreate) SetRequestedSecondaryTransferID(u uuid.UUID) *UtxoSwapCreate {
+	usc.mutation.SetRequestedSecondaryTransferID(u)
+	return usc
+}
+
+// SetNillableRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field if the given value is not nil.
+func (usc *UtxoSwapCreate) SetNillableRequestedSecondaryTransferID(u *uuid.UUID) *UtxoSwapCreate {
+	if u != nil {
+		usc.SetRequestedSecondaryTransferID(*u)
+	}
+	return usc
+}
+
 // SetSpendTxSigningResult sets the "spend_tx_signing_result" field.
 func (usc *UtxoSwapCreate) SetSpendTxSigningResult(b []byte) *UtxoSwapCreate {
 	usc.mutation.SetSpendTxSigningResult(b)
@@ -445,6 +459,10 @@ func (usc *UtxoSwapCreate) createSpec() (*UtxoSwap, *sqlgraph.CreateSpec) {
 	if value, ok := usc.mutation.RequestedTransferID(); ok {
 		_spec.SetField(utxoswap.FieldRequestedTransferID, field.TypeUUID, value)
 		_node.RequestedTransferID = value
+	}
+	if value, ok := usc.mutation.RequestedSecondaryTransferID(); ok {
+		_spec.SetField(utxoswap.FieldRequestedSecondaryTransferID, field.TypeUUID, value)
+		_node.RequestedSecondaryTransferID = value
 	}
 	if value, ok := usc.mutation.SpendTxSigningResult(); ok {
 		_spec.SetField(utxoswap.FieldSpendTxSigningResult, field.TypeBytes, value)
@@ -768,6 +786,24 @@ func (u *UtxoSwapUpsert) UpdateRequestedTransferID() *UtxoSwapUpsert {
 // ClearRequestedTransferID clears the value of the "requested_transfer_id" field.
 func (u *UtxoSwapUpsert) ClearRequestedTransferID() *UtxoSwapUpsert {
 	u.SetNull(utxoswap.FieldRequestedTransferID)
+	return u
+}
+
+// SetRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field.
+func (u *UtxoSwapUpsert) SetRequestedSecondaryTransferID(v uuid.UUID) *UtxoSwapUpsert {
+	u.Set(utxoswap.FieldRequestedSecondaryTransferID, v)
+	return u
+}
+
+// UpdateRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field to the value that was provided on create.
+func (u *UtxoSwapUpsert) UpdateRequestedSecondaryTransferID() *UtxoSwapUpsert {
+	u.SetExcluded(utxoswap.FieldRequestedSecondaryTransferID)
+	return u
+}
+
+// ClearRequestedSecondaryTransferID clears the value of the "requested_secondary_transfer_id" field.
+func (u *UtxoSwapUpsert) ClearRequestedSecondaryTransferID() *UtxoSwapUpsert {
+	u.SetNull(utxoswap.FieldRequestedSecondaryTransferID)
 	return u
 }
 
@@ -1118,6 +1154,27 @@ func (u *UtxoSwapUpsertOne) UpdateRequestedTransferID() *UtxoSwapUpsertOne {
 func (u *UtxoSwapUpsertOne) ClearRequestedTransferID() *UtxoSwapUpsertOne {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.ClearRequestedTransferID()
+	})
+}
+
+// SetRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field.
+func (u *UtxoSwapUpsertOne) SetRequestedSecondaryTransferID(v uuid.UUID) *UtxoSwapUpsertOne {
+	return u.Update(func(s *UtxoSwapUpsert) {
+		s.SetRequestedSecondaryTransferID(v)
+	})
+}
+
+// UpdateRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field to the value that was provided on create.
+func (u *UtxoSwapUpsertOne) UpdateRequestedSecondaryTransferID() *UtxoSwapUpsertOne {
+	return u.Update(func(s *UtxoSwapUpsert) {
+		s.UpdateRequestedSecondaryTransferID()
+	})
+}
+
+// ClearRequestedSecondaryTransferID clears the value of the "requested_secondary_transfer_id" field.
+func (u *UtxoSwapUpsertOne) ClearRequestedSecondaryTransferID() *UtxoSwapUpsertOne {
+	return u.Update(func(s *UtxoSwapUpsert) {
+		s.ClearRequestedSecondaryTransferID()
 	})
 }
 
@@ -1644,6 +1701,27 @@ func (u *UtxoSwapUpsertBulk) UpdateRequestedTransferID() *UtxoSwapUpsertBulk {
 func (u *UtxoSwapUpsertBulk) ClearRequestedTransferID() *UtxoSwapUpsertBulk {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.ClearRequestedTransferID()
+	})
+}
+
+// SetRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field.
+func (u *UtxoSwapUpsertBulk) SetRequestedSecondaryTransferID(v uuid.UUID) *UtxoSwapUpsertBulk {
+	return u.Update(func(s *UtxoSwapUpsert) {
+		s.SetRequestedSecondaryTransferID(v)
+	})
+}
+
+// UpdateRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field to the value that was provided on create.
+func (u *UtxoSwapUpsertBulk) UpdateRequestedSecondaryTransferID() *UtxoSwapUpsertBulk {
+	return u.Update(func(s *UtxoSwapUpsert) {
+		s.UpdateRequestedSecondaryTransferID()
+	})
+}
+
+// ClearRequestedSecondaryTransferID clears the value of the "requested_secondary_transfer_id" field.
+func (u *UtxoSwapUpsertBulk) ClearRequestedSecondaryTransferID() *UtxoSwapUpsertBulk {
+	return u.Update(func(s *UtxoSwapUpsert) {
+		s.ClearRequestedSecondaryTransferID()
 	})
 }
 

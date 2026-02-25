@@ -113,6 +113,11 @@ func RequestedTransferID(v uuid.UUID) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldRequestedTransferID, v))
 }
 
+// RequestedSecondaryTransferID applies equality check predicate on the "requested_secondary_transfer_id" field. It's identical to RequestedSecondaryTransferIDEQ.
+func RequestedSecondaryTransferID(v uuid.UUID) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldEQ(FieldRequestedSecondaryTransferID, v))
+}
+
 // SpendTxSigningResult applies equality check predicate on the "spend_tx_signing_result" field. It's identical to SpendTxSigningResultEQ.
 func SpendTxSigningResult(v []byte) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldSpendTxSigningResult, v))
@@ -706,6 +711,56 @@ func RequestedTransferIDIsNil() predicate.UtxoSwap {
 // RequestedTransferIDNotNil applies the NotNil predicate on the "requested_transfer_id" field.
 func RequestedTransferIDNotNil() predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldNotNull(FieldRequestedTransferID))
+}
+
+// RequestedSecondaryTransferIDEQ applies the EQ predicate on the "requested_secondary_transfer_id" field.
+func RequestedSecondaryTransferIDEQ(v uuid.UUID) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldEQ(FieldRequestedSecondaryTransferID, v))
+}
+
+// RequestedSecondaryTransferIDNEQ applies the NEQ predicate on the "requested_secondary_transfer_id" field.
+func RequestedSecondaryTransferIDNEQ(v uuid.UUID) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNEQ(FieldRequestedSecondaryTransferID, v))
+}
+
+// RequestedSecondaryTransferIDIn applies the In predicate on the "requested_secondary_transfer_id" field.
+func RequestedSecondaryTransferIDIn(vs ...uuid.UUID) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldIn(FieldRequestedSecondaryTransferID, vs...))
+}
+
+// RequestedSecondaryTransferIDNotIn applies the NotIn predicate on the "requested_secondary_transfer_id" field.
+func RequestedSecondaryTransferIDNotIn(vs ...uuid.UUID) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNotIn(FieldRequestedSecondaryTransferID, vs...))
+}
+
+// RequestedSecondaryTransferIDGT applies the GT predicate on the "requested_secondary_transfer_id" field.
+func RequestedSecondaryTransferIDGT(v uuid.UUID) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldGT(FieldRequestedSecondaryTransferID, v))
+}
+
+// RequestedSecondaryTransferIDGTE applies the GTE predicate on the "requested_secondary_transfer_id" field.
+func RequestedSecondaryTransferIDGTE(v uuid.UUID) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldGTE(FieldRequestedSecondaryTransferID, v))
+}
+
+// RequestedSecondaryTransferIDLT applies the LT predicate on the "requested_secondary_transfer_id" field.
+func RequestedSecondaryTransferIDLT(v uuid.UUID) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldLT(FieldRequestedSecondaryTransferID, v))
+}
+
+// RequestedSecondaryTransferIDLTE applies the LTE predicate on the "requested_secondary_transfer_id" field.
+func RequestedSecondaryTransferIDLTE(v uuid.UUID) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldLTE(FieldRequestedSecondaryTransferID, v))
+}
+
+// RequestedSecondaryTransferIDIsNil applies the IsNil predicate on the "requested_secondary_transfer_id" field.
+func RequestedSecondaryTransferIDIsNil() predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldIsNull(FieldRequestedSecondaryTransferID))
+}
+
+// RequestedSecondaryTransferIDNotNil applies the NotNil predicate on the "requested_secondary_transfer_id" field.
+func RequestedSecondaryTransferIDNotNil() predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNotNull(FieldRequestedSecondaryTransferID))
 }
 
 // SpendTxSigningResultEQ applies the EQ predicate on the "spend_tx_signing_result" field.

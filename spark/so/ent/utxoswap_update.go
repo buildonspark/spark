@@ -247,6 +247,26 @@ func (usu *UtxoSwapUpdate) ClearRequestedTransferID() *UtxoSwapUpdate {
 	return usu
 }
 
+// SetRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field.
+func (usu *UtxoSwapUpdate) SetRequestedSecondaryTransferID(u uuid.UUID) *UtxoSwapUpdate {
+	usu.mutation.SetRequestedSecondaryTransferID(u)
+	return usu
+}
+
+// SetNillableRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field if the given value is not nil.
+func (usu *UtxoSwapUpdate) SetNillableRequestedSecondaryTransferID(u *uuid.UUID) *UtxoSwapUpdate {
+	if u != nil {
+		usu.SetRequestedSecondaryTransferID(*u)
+	}
+	return usu
+}
+
+// ClearRequestedSecondaryTransferID clears the value of the "requested_secondary_transfer_id" field.
+func (usu *UtxoSwapUpdate) ClearRequestedSecondaryTransferID() *UtxoSwapUpdate {
+	usu.mutation.ClearRequestedSecondaryTransferID()
+	return usu
+}
+
 // SetSpendTxSigningResult sets the "spend_tx_signing_result" field.
 func (usu *UtxoSwapUpdate) SetSpendTxSigningResult(b []byte) *UtxoSwapUpdate {
 	usu.mutation.SetSpendTxSigningResult(b)
@@ -523,6 +543,12 @@ func (usu *UtxoSwapUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if usu.mutation.RequestedTransferIDCleared() {
 		_spec.ClearField(utxoswap.FieldRequestedTransferID, field.TypeUUID)
+	}
+	if value, ok := usu.mutation.RequestedSecondaryTransferID(); ok {
+		_spec.SetField(utxoswap.FieldRequestedSecondaryTransferID, field.TypeUUID, value)
+	}
+	if usu.mutation.RequestedSecondaryTransferIDCleared() {
+		_spec.ClearField(utxoswap.FieldRequestedSecondaryTransferID, field.TypeUUID)
 	}
 	if value, ok := usu.mutation.SpendTxSigningResult(); ok {
 		_spec.SetField(utxoswap.FieldSpendTxSigningResult, field.TypeBytes, value)
@@ -864,6 +890,26 @@ func (usuo *UtxoSwapUpdateOne) ClearRequestedTransferID() *UtxoSwapUpdateOne {
 	return usuo
 }
 
+// SetRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field.
+func (usuo *UtxoSwapUpdateOne) SetRequestedSecondaryTransferID(u uuid.UUID) *UtxoSwapUpdateOne {
+	usuo.mutation.SetRequestedSecondaryTransferID(u)
+	return usuo
+}
+
+// SetNillableRequestedSecondaryTransferID sets the "requested_secondary_transfer_id" field if the given value is not nil.
+func (usuo *UtxoSwapUpdateOne) SetNillableRequestedSecondaryTransferID(u *uuid.UUID) *UtxoSwapUpdateOne {
+	if u != nil {
+		usuo.SetRequestedSecondaryTransferID(*u)
+	}
+	return usuo
+}
+
+// ClearRequestedSecondaryTransferID clears the value of the "requested_secondary_transfer_id" field.
+func (usuo *UtxoSwapUpdateOne) ClearRequestedSecondaryTransferID() *UtxoSwapUpdateOne {
+	usuo.mutation.ClearRequestedSecondaryTransferID()
+	return usuo
+}
+
 // SetSpendTxSigningResult sets the "spend_tx_signing_result" field.
 func (usuo *UtxoSwapUpdateOne) SetSpendTxSigningResult(b []byte) *UtxoSwapUpdateOne {
 	usuo.mutation.SetSpendTxSigningResult(b)
@@ -1170,6 +1216,12 @@ func (usuo *UtxoSwapUpdateOne) sqlSave(ctx context.Context) (_node *UtxoSwap, er
 	}
 	if usuo.mutation.RequestedTransferIDCleared() {
 		_spec.ClearField(utxoswap.FieldRequestedTransferID, field.TypeUUID)
+	}
+	if value, ok := usuo.mutation.RequestedSecondaryTransferID(); ok {
+		_spec.SetField(utxoswap.FieldRequestedSecondaryTransferID, field.TypeUUID, value)
+	}
+	if usuo.mutation.RequestedSecondaryTransferIDCleared() {
+		_spec.ClearField(utxoswap.FieldRequestedSecondaryTransferID, field.TypeUUID)
 	}
 	if value, ok := usuo.mutation.SpendTxSigningResult(); ok {
 		_spec.SetField(utxoswap.FieldSpendTxSigningResult, field.TypeBytes, value)

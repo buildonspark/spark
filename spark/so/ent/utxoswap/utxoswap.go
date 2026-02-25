@@ -44,6 +44,8 @@ const (
 	FieldCoordinatorIdentityPublicKey = "coordinator_identity_public_key"
 	// FieldRequestedTransferID holds the string denoting the requested_transfer_id field in the database.
 	FieldRequestedTransferID = "requested_transfer_id"
+	// FieldRequestedSecondaryTransferID holds the string denoting the requested_secondary_transfer_id field in the database.
+	FieldRequestedSecondaryTransferID = "requested_secondary_transfer_id"
 	// FieldSpendTxSigningResult holds the string denoting the spend_tx_signing_result field in the database.
 	FieldSpendTxSigningResult = "spend_tx_signing_result"
 	// FieldExpiryTime holds the string denoting the expiry_time field in the database.
@@ -97,6 +99,7 @@ var Columns = []string{
 	FieldUserIdentityPublicKey,
 	FieldCoordinatorIdentityPublicKey,
 	FieldRequestedTransferID,
+	FieldRequestedSecondaryTransferID,
 	FieldSpendTxSigningResult,
 	FieldExpiryTime,
 	FieldUtxoValueSats,
@@ -209,6 +212,11 @@ func ByMaxFeeSats(opts ...sql.OrderTermOption) OrderOption {
 // ByRequestedTransferID orders the results by the requested_transfer_id field.
 func ByRequestedTransferID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequestedTransferID, opts...).ToFunc()
+}
+
+// ByRequestedSecondaryTransferID orders the results by the requested_secondary_transfer_id field.
+func ByRequestedSecondaryTransferID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequestedSecondaryTransferID, opts...).ToFunc()
 }
 
 // ByExpiryTime orders the results by the expiry_time field.
