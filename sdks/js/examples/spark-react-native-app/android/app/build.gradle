@@ -44,8 +44,10 @@ react {
     // extraPackagerArgs = []
 
     /* Hermes Commands */
-    //   The hermes compiler command to run. By default it is 'hermesc'
-    // hermesCommand = "$rootDir/my-custom-hermesc/bin/hermesc"
+    //   The hermes compiler command to run. By default is resolved relative to root,
+    //   but in a yarn workspace the hoisted node_modules breaks that lookup.
+    //   Point directly to the hermesc inside the resolved reactNativeDir.
+    hermesCommand = "${reactNativeDir.get().asFile}/sdks/hermesc/%OS-BIN%/hermesc"
     //
     //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]

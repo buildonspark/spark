@@ -1,4 +1,4 @@
-const TIMEOUT = 30 * 1000;
+const TIMEOUT = 60 * 1000;
 
 async function waitForEither(successId, errorId, timeout) {
   const start = Date.now();
@@ -22,7 +22,7 @@ async function waitForEither(successId, errorId, timeout) {
   );
 }
 
-describe('Spark React Native App', () => {
+describe('Spark React Native App (Hermetic)', () => {
   beforeAll(async () => {
     await device.installApp();
 
@@ -36,7 +36,7 @@ describe('Spark React Native App', () => {
 
     await waitFor(element(by.id('open-test-screen-button')))
       .toBeVisible()
-      .withTimeout(TIMEOUT * 6);
+      .withTimeout(TIMEOUT * 3);
 
     // Re-enable synchronization once the app is stable
     await device.enableSynchronization();
@@ -46,13 +46,13 @@ describe('Spark React Native App', () => {
     await device.terminateApp();
   });
 
-  it('should handle wallet operations in sequence', async () => {
+  it('should handle wallet operations against minikube', async () => {
+    // Navigate to test screen
     await waitFor(element(by.id('open-test-screen-button')))
       .toBeVisible()
       .withTimeout(TIMEOUT);
 
     await expect(element(by.id('open-test-screen-button'))).toBeVisible();
-
     await element(by.id('open-test-screen-button')).tap();
 
     await waitFor(element(by.id('connect-wallet-button')))
@@ -60,13 +60,17 @@ describe('Spark React Native App', () => {
       .withTimeout(TIMEOUT);
 
     await expect(element(by.id('connect-wallet-button'))).toBeVisible();
-    await expect(element(by.id('create-invoice-button'))).toBeVisible();
     await expect(element(by.id('test-bindings-button'))).toBeVisible();
 
+    // Disable synchronization during wallet connect - the SDK makes many
+    // sequential network calls that can confuse Detox's idle tracking.
     await device.disableSynchronization();
 
+    // Connect wallet to minikube operators
     await element(by.id('connect-wallet-button')).tap();
 
+    // Wait for either success or error - fail fast on errors instead of
+    // waiting the full timeout blindly.
     const result = await waitForEither(
       'wallet-status',
       'wallet-error',
@@ -82,8 +86,8 @@ describe('Spark React Native App', () => {
 
     await expect(element(by.id('wallet-status'))).toBeVisible();
 
+    // Get balance
     await expect(element(by.id('get-balance-button'))).toBeVisible();
-
     await element(by.id('get-balance-button')).tap();
 
     await waitFor(element(by.id('wallet-balance')))
@@ -92,14 +96,7 @@ describe('Spark React Native App', () => {
 
     await expect(element(by.id('wallet-balance'))).toBeVisible();
 
-    await element(by.id('create-invoice-button')).tap();
-
-    await waitFor(element(by.id('invoice-display')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
-
-    await expect(element(by.id('invoice-display'))).toBeVisible();
-
+    // Test FROST bindings (local crypto, no network)
     await element(by.id('test-bindings-button')).tap();
 
     await waitFor(element(by.id('dummy-tx-display')))
@@ -108,12 +105,15 @@ describe('Spark React Native App', () => {
 
     await expect(element(by.id('dummy-tx-display'))).toBeVisible();
 
+    // Create test token (goes to operators, not SSP)
     await element(by.id('create-test-token-button')).tap();
 
     await waitFor(element(by.id('test-token-tx-id-display')))
       .toBeVisible()
-      .withTimeout(TIMEOUT);
+      .withTimeout(TIMEOUT * 2);
 
     await expect(element(by.id('test-token-tx-id-display'))).toBeVisible();
+
+    // NOTE: createInvoice is skipped - it requires SSP which is not in minikube
   });
 });

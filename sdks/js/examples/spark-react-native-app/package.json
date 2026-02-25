@@ -12,7 +12,12 @@
     "build:ios:debug": "../../node_modules/.bin/detox build --configuration ios.sim.debug",
     "test:ios:debug": "../../node_modules/.bin/detox test --configuration ios.sim.debug",
     "build:ios:release": "../../node_modules/.bin/detox build --configuration ios.sim.release",
-    "test:ios:release": "../../node_modules/.bin/detox test --configuration ios.sim.release"
+    "test:ios:release": "../../node_modules/.bin/detox test --configuration ios.sim.release",
+    "build:android:debug": "../../node_modules/.bin/detox build --configuration android.emu.debug",
+    "build:android:release": "../../node_modules/.bin/detox build --configuration android.emu.release",
+    "test:android:debug": "../../node_modules/.bin/detox test --configuration android.emu.debug",
+    "test:android:release": "../../node_modules/.bin/detox test --configuration android.emu.release",
+    "test:android:hermetic": "../../node_modules/.bin/detox test --configuration android.emu.hermetic e2e/spark-hermetic.test.js"
   },
   "dependencies": {
     "@azure/core-asynciterator-polyfill": "^1.0.2",

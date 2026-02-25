@@ -2,6 +2,8 @@ import { IssuerSparkWallet } from '@buildonspark/issuer-sdk';
 import { getSparkFrost } from '@buildonspark/spark-sdk';
 import { Fragment, useState } from 'react';
 import { CONFIG } from '../config';
+import { HERMETIC_CONFIG } from '../config/hermeticConfig';
+import { SPARK_ENV } from '../config/sparkEnv';
 import {
   Button,
   SafeAreaView,
@@ -25,24 +27,30 @@ function App() {
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [isCreatingTestToken, setIsCreatingTestToken] = useState(false);
   const [testTokenTxId, setTestTokenTxId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const connectWallet = async () => {
     try {
       setIsConnecting(true);
       setIsLoadingBalance(true);
+      setError(null);
       setInvoice(null);
       setDummyTx(null);
       setTestTokenTxId(null);
       const { wallet } = await IssuerSparkWallet.initialize({
-        options: CONFIG,
+        options: SPARK_ENV.isHermeticTest
+          ? { network: 'LOCAL', ...HERMETIC_CONFIG }
+          : CONFIG,
       });
       setWallet(wallet);
       const addr = await wallet.getSparkAddress();
       const { balance: bal } = await wallet.getBalance();
       setSparkAddress(addr);
       setBalance(bal.toString());
-    } catch (error) {
-      console.error('Wallet connection error:', error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Wallet connection error:', message);
+      setError(message);
     } finally {
       setIsConnecting(false);
       setIsLoadingBalance(false);
@@ -150,6 +158,11 @@ function App() {
           disabled={isCreatingTestToken || !wallet}
           testID="create-test-token-button"
         />
+        {error && (
+          <Text style={styles.errorText} testID="wallet-error">
+            {error}
+          </Text>
+        )}
         {wallet && (
           <Text style={styles.successText} testID="wallet-status">
             ✅ Wallet Spark Address:
@@ -207,6 +220,11 @@ function App() {
 const styles = StyleSheet.create({
   container: {
     margin: 24,
+  },
+  errorText: {
+    marginTop: 14,
+    fontSize: 14,
+    color: 'red',
   },
   successText: {
     marginTop: 14,
