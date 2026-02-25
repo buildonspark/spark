@@ -99,7 +99,7 @@ Keep functions focused and reasonably short. If a function is doing too many thi
 
 ## Pull Request Descriptions
 
-PRs are synced to a public mirror. Follow the format in `.github/PULL_REQUEST_TEMPLATE.md`. The `## Public` section is required and CI will fail without it.
+PRs are synced to a public mirror. Follow the format in `.github/PULL_REQUEST_TEMPLATE.md`. The `## Public` section is required and CI will fail without it. When using tools that create PRs without a body (e.g., `gt submit` in non-interactive mode), follow up with `gh pr edit <number> --body "..."` to add the description.
 
 ## Critical Thinking
 

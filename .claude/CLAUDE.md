@@ -543,15 +543,10 @@ mise test-unit-with-postgres  # Full unit tests with postgres
 
 **Proto Generation** (When proto files change):
 ```bash
-make
+mise gen-protos          # Generate Go proto bindings only
+mise gen-protos-with-ts  # Generate Go AND TypeScript proto bindings
 ```
-
-**CRITICAL**: After running `make` to regenerate SO proto bindings, you MUST also regenerate JS SDK proto bindings:
-```bash
-cd sdks/js/packages/spark-sdk/
-mise exec -- yarn generate:proto
-```
-**NOTE**: Must use `mise exec --` to ensure correct protoc version (33.2) is used. See section 13.4 for tool version requirements.
+**NOTE**: Use `mise gen-protos-with-ts` when proto changes affect the JS SDK (most cases). This runs `make all` for Go bindings then `yarn generate:proto` for TypeScript bindings, using the correct protoc version (33.2) automatically.
 
 **Ent Generation** (When schema changes):
 ```bash
@@ -654,9 +649,10 @@ yarn test:integration
 
 **Proto Generation** (When proto files change):
 ```bash
-mise exec -- yarn generate:proto
+# From the repository root:
+mise gen-protos-with-ts  # Generates Go AND TypeScript proto bindings
 ```
-**CRITICAL**: When proto files (`.proto`) are modified in the SO codebase, you MUST regenerate the JS SDK proto bindings. Run this from `sdks/js/packages/spark-sdk/` directory after running `make` in the SO repository. Must use `mise exec --` to ensure correct protoc version (33.2) is used.
+**NOTE**: When proto files (`.proto`) are modified, run `mise gen-protos-with-ts` from the repository root. This handles both Go and TypeScript generation with the correct protoc version (33.2) automatically.
 
 **Example Scripts Verification** (Required if examples modified):
 ```bash
