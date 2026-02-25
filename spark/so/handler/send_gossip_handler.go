@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	"github.com/lightsparkdev/spark/so"
+	sparkdb "github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
@@ -59,7 +60,7 @@ func (h *SendGossipHandler) postSendingGossipMessage(
 				strings.Contains(err.Error(), "unexpected HTTP status code") {
 				return nil, err
 			}
-			if isRetriableSQLStateError(err) {
+			if sparkdb.IsRetriableSQLStateError(err) {
 				logger.Warn("retriable SQL error in gossip handling, should investigate root cause",
 					zap.String("message_id", message.MessageId),
 					zap.Error(err))
@@ -96,7 +97,7 @@ func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, 
 			strings.Contains(err.Error(), "unexpected HTTP status code") {
 			return err
 		}
-		if isRetriableSQLStateError(err) {
+		if sparkdb.IsRetriableSQLStateError(err) {
 			logger.Warn("retriable SQL error sending gossip to participant, should investigate root cause",
 				zap.String("participant", participant),
 				zap.Error(err))
@@ -209,27 +210,4 @@ func (h *SendGossipHandler) SendGossipMessage(ctx context.Context, gossip *ent.G
 		return nil, err
 	}
 	return gossip, nil
-}
-
-// isRetriableSQLStateError returns true for transient database errors that might
-// succeed on retry (connection issues, timeouts, resource exhaustion).
-// Returns false for constraint violations which will always fail on retry.
-func isRetriableSQLStateError(err error) bool {
-	if err == nil {
-		return false
-	}
-	// Constraint violations are never retriable
-	if sqlgraph.IsConstraintError(err) {
-		return false
-	}
-	errStr := err.Error()
-	// Only consider SQLSTATE errors as potentially retriable
-	if !strings.Contains(errStr, "SQLSTATE") {
-		return false
-	}
-	// Class 23 errors (integrity constraint violations) are not retriable
-	if strings.Contains(errStr, "SQLSTATE 23") {
-		return false
-	}
-	return true
 }

@@ -31,6 +31,7 @@ import (
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
+	sparkdb "github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
@@ -2413,7 +2414,7 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 			status.Code(err) == codes.Canceled ||
 			strings.Contains(err.Error(), "context canceled") ||
 			strings.Contains(err.Error(), "unexpected HTTP status code") ||
-			isRetriableSQLStateError(err) {
+			sparkdb.IsRetriableSQLStateError(err) {
 			logger.Sugar().Error("Unable to settle receiver key tweak due to operator unavailability, please try again later", zap.Error(err))
 			return fmt.Errorf("unable to settle receiver key tweak due to operator unavailability: %w, please try again later", err)
 		}
@@ -2575,7 +2576,7 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 
 	transfer, err := h.loadTransferForUpdate(ctx, transferID, sql.WithLockAction(sql.NoWait))
 	if err != nil {
-		if strings.Contains(err.Error(), "SQLSTATE 55P03") {
+		if sparkdb.IsLockNotAvailableError(err) {
 			return nil, sparkerrors.AbortedConcurrentClaimConflict(fmt.Errorf("unable to load transfer %s: %w", transferID, err))
 		}
 		return nil, fmt.Errorf("unable to load transfer %s: %w", transferID, err)
