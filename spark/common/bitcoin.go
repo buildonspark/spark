@@ -310,8 +310,10 @@ func UpdateTxWithSignature(rawTxBytes []byte, vin int, signature []byte) ([]byte
 	return buf.Bytes(), nil
 }
 
-// VerifySignatureSingleInput verifies that a signed transaction's input
-// properly spends the prevOutput provided.
+// VerifySignatureSingleInput verifies a single input's signature for a transaction
+// that only has one input. Use this when the tx has a single input and you have
+// the prev output directly. For multi-input transactions, use VerifySignatureInput
+// or VerifySignatureMultiInput instead, since Taproot sighash commits to all prev outputs.
 func VerifySignatureSingleInput(signedTx *wire.MsgTx, vin int, prevOutput *wire.TxOut) error {
 	if err := ValidateBitcoinTxVersion(signedTx); err != nil {
 		return fmt.Errorf("transaction version validation failed: %w", err)
@@ -334,6 +336,33 @@ func VerifySignatureSingleInput(signedTx *wire.MsgTx, vin int, prevOutput *wire.
 	return nil
 }
 
+// VerifySignatureInput verifies a single input's signature in a multi-input transaction.
+// Unlike VerifySignatureSingleInput, it takes a PrevOutputFetcher with all prev outputs,
+// which is required for correct Taproot sighash computation. Use this when the tx has
+// multiple inputs but only one input's witness needs verification (e.g., refund txs where
+// the user signs input 0 but the connector input is unsigned).
+func VerifySignatureInput(signedTx *wire.MsgTx, vin int, prevOutputFetcher txscript.PrevOutputFetcher) error {
+	if err := ValidateBitcoinTxVersion(signedTx); err != nil {
+		return fmt.Errorf("transaction version validation failed: %w", err)
+	}
+
+	txOut := prevOutputFetcher.FetchPrevOutput(signedTx.TxIn[vin].PreviousOutPoint)
+	if txOut == nil {
+		return fmt.Errorf("previous output not found for input %d (outpoint %s)", vin, signedTx.TxIn[vin].PreviousOutPoint)
+	}
+	hashCache := txscript.NewTxSigHashes(signedTx, prevOutputFetcher)
+	verifyFlags := txscript.StandardVerifyFlags & ^txscript.ScriptVerifyDiscourageUpgradeableWitnessProgram
+	vm, err := txscript.NewEngine(txOut.PkScript, signedTx, vin, verifyFlags,
+		nil, hashCache, txOut.Value, prevOutputFetcher)
+	if err != nil {
+		return err
+	}
+	return vm.Execute()
+}
+
+// VerifySignatureMultiInput verifies all input signatures in a multi-input transaction.
+// Use this when every input in the tx has a valid witness that needs verification
+// (e.g., fully signed coop exit transactions).
 func VerifySignatureMultiInput(signedTx *wire.MsgTx, prevOutputFetcher txscript.PrevOutputFetcher) error {
 	hashCache := txscript.NewTxSigHashes(signedTx, prevOutputFetcher)
 	for vin, txIn := range signedTx.TxIn {

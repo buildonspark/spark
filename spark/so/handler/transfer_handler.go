@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -182,7 +183,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	if err != nil {
 		return nil, fmt.Errorf("invalid transfer id: %w", err)
 	}
-	leafTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.TransferPackage, reqOwnerIdentityPubKey)
+	leafTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.TransferPackage, reqOwnerIdentityPubKey, !transferType.IsSwap())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package for transfer %s: %w", transferID, err)
 	}
@@ -307,7 +308,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			return nil, fmt.Errorf("failed to sign refunds for transfer %s: %w", transferID, err)
 		}
 	} else {
-		cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, err := SignRefundsWithPregeneratedNonce(ctx, h.config, req, leafMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey)
+		cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, err := SignRefundsWithPregeneratedNonce(ctx, h.config, req, leafMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign refunds with pregenerated nonce: %w", err)
 		}
@@ -488,7 +489,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	return &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResults}, nil
 }
 
-func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, transfer *ent.Transfer, cpfpSignatureMap map[string][]byte, directSignatureMap map[string][]byte, directFromCpfpSignatureMap map[string][]byte) error {
+func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, transfer *ent.Transfer, cpfpSignatureMap map[string][]byte, directSignatureMap map[string][]byte, directFromCpfpSignatureMap map[string][]byte, connectorTx ...[]byte) error {
 	transferLeaves, err := transfer.QueryTransferLeaves().WithLeaf().All(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get transfer leaves: %w", err)
@@ -497,6 +498,16 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get db from context: %w", err)
+	}
+
+	// Parse connector tx if provided for multi-input verification (cooperative exit)
+	var rawConnectorTx []byte
+	if len(connectorTx) > 0 {
+		rawConnectorTx = connectorTx[0]
+	}
+	connectorPrevOuts, err := parseConnectorTxOutputs(rawConnectorTx)
+	if err != nil {
+		return fmt.Errorf("unable to parse connector tx: %w", err)
 	}
 
 	// Collect all updates to batch them and avoid N+1 queries
@@ -517,7 +528,20 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 		if err != nil {
 			return fmt.Errorf("unable to get cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
-		err = common.VerifySignatureSingleInput(updatedCpfpRefundTx, 0, nodeTx.TxOut[0])
+		if len(updatedCpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
+			prevOutFetcher := txscript.NewMultiPrevOutFetcher(nil)
+			prevOutFetcher.AddPrevOut(updatedCpfpRefundTx.TxIn[0].PreviousOutPoint, nodeTx.TxOut[0])
+			for _, txIn := range updatedCpfpRefundTx.TxIn[1:] {
+				prevOut, ok := connectorPrevOuts[txIn.PreviousOutPoint]
+				if !ok {
+					return fmt.Errorf("missing connector prevout for cpfp refund tx input %s in leaf %s", txIn.PreviousOutPoint, leaf.Edges.Leaf.ID.String())
+				}
+				prevOutFetcher.AddPrevOut(txIn.PreviousOutPoint, prevOut)
+			}
+			err = common.VerifySignatureInput(updatedCpfpRefundTx, 0, prevOutFetcher)
+		} else {
+			err = common.VerifySignatureSingleInput(updatedCpfpRefundTx, 0, nodeTx.TxOut[0])
+		}
 		if err != nil {
 			return fmt.Errorf("unable to verify leaf cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
@@ -533,7 +557,20 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 			if err != nil {
 				return fmt.Errorf("unable to get direct from cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
-			err = common.VerifySignatureSingleInput(updatedDirectFromCpfpRefundTx, 0, nodeTx.TxOut[0])
+			if len(updatedDirectFromCpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
+				prevOutFetcher := txscript.NewMultiPrevOutFetcher(nil)
+				prevOutFetcher.AddPrevOut(updatedDirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint, nodeTx.TxOut[0])
+				for _, txIn := range updatedDirectFromCpfpRefundTx.TxIn[1:] {
+					prevOut, ok := connectorPrevOuts[txIn.PreviousOutPoint]
+					if !ok {
+						return fmt.Errorf("missing connector prevout for direct-from-cpfp refund tx input %s in leaf %s", txIn.PreviousOutPoint, leaf.Edges.Leaf.ID.String())
+					}
+					prevOutFetcher.AddPrevOut(txIn.PreviousOutPoint, prevOut)
+				}
+				err = common.VerifySignatureInput(updatedDirectFromCpfpRefundTx, 0, prevOutFetcher)
+			} else {
+				err = common.VerifySignatureSingleInput(updatedDirectFromCpfpRefundTx, 0, nodeTx.TxOut[0])
+			}
 			if err != nil {
 				return fmt.Errorf("unable to verify leaf direct from cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
@@ -558,7 +595,20 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 				return fmt.Errorf("unable to get direct refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 
-			err = common.VerifySignatureSingleInput(updatedDirectRefundTx, 0, directNodeTx.TxOut[0])
+			if len(updatedDirectRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
+				prevOutFetcher := txscript.NewMultiPrevOutFetcher(nil)
+				prevOutFetcher.AddPrevOut(updatedDirectRefundTx.TxIn[0].PreviousOutPoint, directNodeTx.TxOut[0])
+				for _, txIn := range updatedDirectRefundTx.TxIn[1:] {
+					prevOut, ok := connectorPrevOuts[txIn.PreviousOutPoint]
+					if !ok {
+						return fmt.Errorf("missing connector prevout for direct refund tx input %s in leaf %s", txIn.PreviousOutPoint, leaf.Edges.Leaf.ID.String())
+					}
+					prevOutFetcher.AddPrevOut(txIn.PreviousOutPoint, prevOut)
+				}
+				err = common.VerifySignatureInput(updatedDirectRefundTx, 0, prevOutFetcher)
+			} else {
+				err = common.VerifySignatureSingleInput(updatedDirectRefundTx, 0, directNodeTx.TxOut[0])
+			}
 			if err != nil {
 				return fmt.Errorf("unable to verify leaf signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
@@ -891,21 +941,9 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 	}
 
 	// Parse connector tx if provided for multi-input sighash calculation (cooperative exit)
-	var connectorPrevOuts map[wire.OutPoint]*wire.TxOut
-	if len(connectorTx) > 0 {
-		parsedConnectorTx, err := common.TxFromRawTxBytes(connectorTx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse connector tx: %w", err)
-		}
-		connectorTxHash := parsedConnectorTx.TxHash()
-		connectorPrevOuts = make(map[wire.OutPoint]*wire.TxOut, len(parsedConnectorTx.TxOut))
-		for i, txOut := range parsedConnectorTx.TxOut {
-			outpoint := wire.OutPoint{
-				Hash:  connectorTxHash,
-				Index: uint32(i),
-			}
-			connectorPrevOuts[outpoint] = txOut
-		}
+	connectorPrevOuts, err := parseConnectorTxOutputs(connectorTx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse connector tx: %w", err)
 	}
 
 	leafJobMap := make(map[uuid.UUID]*ent.TreeNode)
@@ -1178,6 +1216,7 @@ func SignRefundsWithPregeneratedNonce(
 	cpfpAdaptorPubKey keys.Public,
 	directAdaptorPubKey keys.Public,
 	directFromCpfpAdaptorPubKey keys.Public,
+	connectorTx []byte,
 ) (map[string]*helper.SigningResult, map[string]*helper.SigningResult, map[string]*helper.SigningResult, error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.signRefunds")
 	defer span.End()
@@ -1188,6 +1227,12 @@ func SignRefundsWithPregeneratedNonce(
 
 	if requests.TransferPackage == nil {
 		return nil, nil, nil, fmt.Errorf("transfer package is nil")
+	}
+
+	// Parse connector tx if provided for multi-input sighash calculation (cooperative exit)
+	connectorPrevOuts, err := parseConnectorTxOutputs(connectorTx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("unable to parse connector tx: %w", err)
 	}
 
 	var signingJobs []*helper.SigningJobWithPregeneratedNonce
@@ -1208,7 +1253,24 @@ func SignRefundsWithPregeneratedNonce(
 		if len(leafTx.TxOut) == 0 {
 			return nil, nil, nil, fmt.Errorf("vout out of bounds")
 		}
-		refundTxSigHash, err := common.SigHashFromTx(refundTx, 0, leafTx.TxOut[0])
+
+		var refundTxSigHash []byte
+		if len(refundTx.TxIn) > 1 && connectorPrevOuts != nil {
+			leafTxHash := leafTx.TxHash()
+			prevOuts := make(map[wire.OutPoint]*wire.TxOut, 2)
+			prevOuts[wire.OutPoint{Hash: leafTxHash, Index: 0}] = leafTx.TxOut[0]
+
+			connectorOutpoint := refundTx.TxIn[1].PreviousOutPoint
+			connectorTxOut, exists := connectorPrevOuts[connectorOutpoint]
+			if !exists {
+				return nil, nil, nil, fmt.Errorf("cpfp refund tx input 1 does not reference a valid connector output: %v", connectorOutpoint)
+			}
+			prevOuts[connectorOutpoint] = connectorTxOut
+
+			refundTxSigHash, err = common.SigHashFromMultiPrevOutTx(refundTx, 0, prevOuts)
+		} else {
+			refundTxSigHash, err = common.SigHashFromTx(refundTx, 0, leafTx.TxOut[0])
+		}
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to calculate sighash from refund tx: %w", err)
 		}
@@ -1278,7 +1340,23 @@ func SignRefundsWithPregeneratedNonce(
 		if len(directTx.TxOut) == 0 {
 			return nil, nil, nil, fmt.Errorf("vout out of bounds")
 		}
-		directRefundTxSigHash, err := common.SigHashFromTx(directRefundTx, 0, directTx.TxOut[0])
+		var directRefundTxSigHash []byte
+		if len(directRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
+			directTxHash := directTx.TxHash()
+			prevOuts := make(map[wire.OutPoint]*wire.TxOut, 2)
+			prevOuts[wire.OutPoint{Hash: directTxHash, Index: 0}] = directTx.TxOut[0]
+
+			connectorOutpoint := directRefundTx.TxIn[1].PreviousOutPoint
+			connectorTxOut, exists := connectorPrevOuts[connectorOutpoint]
+			if !exists {
+				return nil, nil, nil, fmt.Errorf("direct refund tx input 1 does not reference a valid connector output: %v", connectorOutpoint)
+			}
+			prevOuts[connectorOutpoint] = connectorTxOut
+
+			directRefundTxSigHash, err = common.SigHashFromMultiPrevOutTx(directRefundTx, 0, prevOuts)
+		} else {
+			directRefundTxSigHash, err = common.SigHashFromTx(directRefundTx, 0, directTx.TxOut[0])
+		}
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to calculate sighash from direct refund tx: %w", err)
 		}
@@ -1339,7 +1417,24 @@ func SignRefundsWithPregeneratedNonce(
 		if len(directFromCpfpLeafTx.TxOut) == 0 {
 			return nil, nil, nil, fmt.Errorf("vout out of bounds")
 		}
-		directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, directFromCpfpLeafTx.TxOut[0])
+
+		var directFromCpfpRefundTxSigHash []byte
+		if len(directFromCpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
+			leafTxHash := directFromCpfpLeafTx.TxHash()
+			prevOuts := make(map[wire.OutPoint]*wire.TxOut, 2)
+			prevOuts[wire.OutPoint{Hash: leafTxHash, Index: 0}] = directFromCpfpLeafTx.TxOut[0]
+
+			connectorOutpoint := directFromCpfpRefundTx.TxIn[1].PreviousOutPoint
+			connectorTxOut, exists := connectorPrevOuts[connectorOutpoint]
+			if !exists {
+				return nil, nil, nil, fmt.Errorf("direct-from-cpfp refund tx input 1 does not reference a valid connector output: %v", connectorOutpoint)
+			}
+			prevOuts[connectorOutpoint] = connectorTxOut
+
+			directFromCpfpRefundTxSigHash, err = common.SigHashFromMultiPrevOutTx(directFromCpfpRefundTx, 0, prevOuts)
+		} else {
+			directFromCpfpRefundTxSigHash, err = common.SigHashFromTx(directFromCpfpRefundTx, 0, directFromCpfpLeafTx.TxOut[0])
+		}
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to calculate sighash from direct from cpfp refund tx: %w", err)
 		}
@@ -4121,7 +4216,7 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 // setSoCoordinatorKeyTweaks sets the key tweaks for each transfer leaf based on the validated transfer package.
 func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfer *ent.Transfer, req *pb.TransferPackage, ownerIdentityPubKey keys.Public) error {
 	// Get key tweak map from transfer package
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, transfer.ID, req, ownerIdentityPubKey)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, transfer.ID, req, ownerIdentityPubKey, !transfer.Type.IsSwap())
 	if err != nil {
 		return fmt.Errorf("failed to validate transfer package: %w", err)
 	}

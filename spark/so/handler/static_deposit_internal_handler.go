@@ -193,7 +193,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", transferID, err)
 	}
-	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.Transfer.TransferPackage, reqTransferOwnerIDPubKey); err != nil {
+	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.Transfer.TransferPackage, reqTransferOwnerIDPubKey, false); err != nil {
 		return nil, fmt.Errorf("error validating transfer package: %w", err)
 	}
 

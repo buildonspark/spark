@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -617,4 +618,70 @@ func TestCancelTransferInternal_PreimageSwap(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, st.TransferStatusReturned, updated.Status)
 	})
+}
+
+func TestValidateTransferPackage_DuplicateLeafID(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	h := NewBaseTransferHandler(config)
+	leafID := uuid.New().String()
+
+	pkg := &pbspark.TransferPackage{
+		KeyTweakPackage: map[string][]byte{"so-0": {1, 2, 3}},
+		LeavesToSend: []*pbspark.UserSignedTxSigningJob{
+			{LeafId: leafID, RawTx: []byte{1}},
+			{LeafId: leafID, RawTx: []byte{2}},
+		},
+	}
+
+	_, err := h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), false)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "duplicate leaf id in LeavesToSend")
+}
+
+func TestValidateTransferPackage_OrphanDirectLeaf(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	h := NewBaseTransferHandler(config)
+	leafID := uuid.New().String()
+
+	pkg := &pbspark.TransferPackage{
+		KeyTweakPackage: map[string][]byte{"so-0": {1, 2, 3}},
+		LeavesToSend: []*pbspark.UserSignedTxSigningJob{
+			{LeafId: leafID, RawTx: []byte{1}},
+		},
+		DirectLeavesToSend: []*pbspark.UserSignedTxSigningJob{
+			{LeafId: uuid.New().String(), RawTx: []byte{2}}, // different ID
+		},
+		DirectFromCpfpLeavesToSend: []*pbspark.UserSignedTxSigningJob{
+			{LeafId: leafID, RawTx: []byte{3}},
+		},
+	}
+
+	_, err := h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), false)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "orphan leaf in DirectLeavesToSend")
+}
+
+func TestValidateTransferPackage_MissingDirectFromCpfpLeaves(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	h := NewBaseTransferHandler(config)
+	leafID := uuid.New().String()
+
+	pkg := &pbspark.TransferPackage{
+		KeyTweakPackage: map[string][]byte{"so-0": {1, 2, 3}},
+		LeavesToSend: []*pbspark.UserSignedTxSigningJob{
+			{LeafId: leafID, RawTx: []byte{1}},
+		},
+	}
+
+	// When requireDirectFromCpfpLeaves is true, missing DirectFromCpfpLeavesToSend should fail.
+	_, err := h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), true)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "mismatched number of leaves")
+
+	// When requireDirectFromCpfpLeaves is false (swap), missing DirectFromCpfpLeavesToSend is allowed.
+	// The error should NOT be about mismatched leaves (it may fail later on other validation).
+	_, err = h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), false)
+	if err != nil {
+		require.NotContains(t, err.Error(), "mismatched number of leaves")
+	}
 }

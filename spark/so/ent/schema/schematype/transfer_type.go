@@ -38,6 +38,17 @@ func (TransferType) Values() []string {
 	}
 }
 
+// IsSwap returns true if the transfer type represents a swap operation.
+func (t TransferType) IsSwap() bool {
+	switch t {
+	case TransferTypePreimageSwap, TransferTypeSwap, TransferTypeCounterSwap,
+		TransferTypeUtxoSwap, TransferTypePrimarySwapV3, TransferTypeCounterSwapV3:
+		return true
+	default:
+		return false
+	}
+}
+
 // TransferTypeFromProto converts a proto transfer type string to a TransferType and validates it.
 // Returns an error if the string does not represent a valid TransferType.
 func TransferTypeFromProto(s string) (TransferType, error) {

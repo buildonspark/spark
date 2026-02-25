@@ -930,7 +930,7 @@ func (h *LightningHandler) GetPreimageShare(
 		return nil, fmt.Errorf("unable to parse transfer id: %w", err)
 	}
 	if req.TransferRequest != nil {
-		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, transferID, req.TransferRequest.TransferPackage, ownerIdentityPubKey)
+		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, transferID, req.TransferRequest.TransferPackage, ownerIdentityPubKey, false)
 		if err != nil {
 			return nil, fmt.Errorf("unable to validate transfer package: %w", err)
 		}
@@ -1191,7 +1191,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 }
 
 func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest *pbspark.StartTransferRequest, leafMap map[string]*ent.TreeNode) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
-	cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, err := SignRefundsWithPregeneratedNonce(ctx, h.config, transferRequest, leafMap, keys.Public{}, keys.Public{}, keys.Public{})
+	cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, err := SignRefundsWithPregeneratedNonce(ctx, h.config, transferRequest, leafMap, keys.Public{}, keys.Public{}, keys.Public{}, nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to sign refunds with pregenerated nonce: %w", err)
 	}
@@ -1365,7 +1365,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer id: %w", err))
 	}
 	if req.TransferRequest != nil {
-		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, transferID, req.TransferRequest.TransferPackage, ownerIdentityPubKey)
+		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, transferID, req.TransferRequest.TransferPackage, ownerIdentityPubKey, false)
 		if err != nil {
 			return nil, fmt.Errorf("unable to validate transfer package: %w", err)
 		}

@@ -1154,7 +1154,7 @@ func (h *BaseTransferHandler) loadSingleTransferReceiverForUnsupportedMimoPath(c
 }
 
 // ValidateTransferPackage validates the transfer package, to ensure the key tweaks are valid.
-func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, transferID uuid.UUID, req *pbspark.TransferPackage, senderIdentityPubKey keys.Public) (map[string]*pbspark.SendLeafKeyTweak, error) {
+func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, transferID uuid.UUID, req *pbspark.TransferPackage, senderIdentityPubKey keys.Public, requireDirectFromCpfpLeaves bool) (map[string]*pbspark.SendLeafKeyTweak, error) {
 	// If the transfer package is nil, we don't need to validate it.
 	if req == nil {
 		return nil, nil
@@ -1197,25 +1197,57 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 		return nil, fmt.Errorf("key tweak package too large: %d bytes (max: %d)", totalSize, MaxKeyTweakPackageSize)
 	}
 
-	// Validate leaf IDs in leaves_to_send
+	// Validate leaf IDs and check for duplicates/orphans/mismatches across lists.
+	leavesToSendIDs := make(map[string]struct{}, len(req.LeavesToSend))
 	for _, leaf := range req.LeavesToSend {
-		if err := uuid.Validate(leaf.LeafId); err != nil {
+		parsed, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
 			return nil, fmt.Errorf("unable to parse leaf_id as a uuid %s: %w", leaf.LeafId, err)
 		}
+		leafID := parsed.String()
+		if _, exists := leavesToSendIDs[leafID]; exists {
+			return nil, fmt.Errorf("duplicate leaf id in LeavesToSend: %s", leafID)
+		}
+		leavesToSendIDs[leafID] = struct{}{}
 	}
 
-	// Validate leaf IDs in direct_leaves_to_send
+	directLeafIDs := make(map[string]struct{}, len(req.DirectLeavesToSend))
 	for _, leaf := range req.DirectLeavesToSend {
-		if err := uuid.Validate(leaf.LeafId); err != nil {
+		parsed, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
 			return nil, fmt.Errorf("unable to parse direct_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)
 		}
+		leafID := parsed.String()
+		if _, ok := leavesToSendIDs[leafID]; !ok {
+			return nil, fmt.Errorf("orphan leaf in DirectLeavesToSend with ID %s not found in LeavesToSend", leaf.LeafId)
+		}
+		if _, exists := directLeafIDs[leafID]; exists {
+			return nil, fmt.Errorf("duplicate leaf id in DirectLeavesToSend: %s", leafID)
+		}
+		directLeafIDs[leafID] = struct{}{}
 	}
 
-	// Validate leaf IDs in direct_from_cpfp_leaves_to_send
+	if requireDirectFromCpfpLeaves {
+		if len(req.LeavesToSend) != len(req.DirectFromCpfpLeavesToSend) {
+			return nil, fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(req.LeavesToSend), len(req.DirectFromCpfpLeavesToSend))
+		}
+	} else if len(req.DirectFromCpfpLeavesToSend) > 0 && len(req.LeavesToSend) != len(req.DirectFromCpfpLeavesToSend) {
+		return nil, fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(req.LeavesToSend), len(req.DirectFromCpfpLeavesToSend))
+	}
+	directFromCpfpLeafIDs := make(map[string]struct{}, len(req.DirectFromCpfpLeavesToSend))
 	for _, leaf := range req.DirectFromCpfpLeavesToSend {
-		if err := uuid.Validate(leaf.LeafId); err != nil {
+		parsed, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
 			return nil, fmt.Errorf("unable to parse direct_from_cpfp_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)
 		}
+		leafID := parsed.String()
+		if _, ok := leavesToSendIDs[leafID]; !ok {
+			return nil, fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s not in LeavesToSend", leaf.LeafId)
+		}
+		if _, exists := directFromCpfpLeafIDs[leafID]; exists {
+			return nil, fmt.Errorf("duplicate leaf id in DirectFromCpfpLeavesToSend: %s", leafID)
+		}
+		directFromCpfpLeafIDs[leafID] = struct{}{}
 	}
 
 	// Signature validation - prevent replay/DoS
@@ -1366,11 +1398,7 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 			}
 		}
 
-		if req == nil || req.TransferPackage == nil {
-			return validateTransactionCooperativeExitLeavesToSend(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey, connectorTx)
-		} else {
-			return fmt.Errorf("Invalid cooperative exit validation request, coop exits with transfer package are not supported")
-		}
+		return validateTransactionCooperativeExitLeavesToSend(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey, connectorTx)
 
 	default:
 		return fmt.Errorf("invalid transfer type: %s", transferType)
