@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.6.7
+
+### Patch Changes
+
+- Export readonly types
+
 ## 0.6.6
 
 ### Patch Changes
