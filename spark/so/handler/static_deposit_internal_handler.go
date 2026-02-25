@@ -321,6 +321,13 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 			totalCreditAmount, reqWithSignature.Request.ValueSats))
 	}
 
+	if req.SecondaryCreditAmountSats == 0 && req.RequestedSecondaryTransferId != "" {
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("requested_secondary_transfer_id provided without secondary_credit_amount_sats"))
+	}
+	if req.SecondaryCreditAmountSats > 0 && req.RequestedSecondaryTransferId == "" {
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("secondary_credit_amount_sats provided without requested_secondary_transfer_id"))
+	}
+
 	// Verify CoordinatorPublicKey is correct.
 	messageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeCreated,
@@ -414,6 +421,14 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 
 	if req.SecondaryCreditAmountSats > 0 {
 		utxoSwapCreate = utxoSwapCreate.SetSecondaryCreditAmountSats(uint64(req.SecondaryCreditAmountSats))
+	}
+
+	if req.RequestedSecondaryTransferId != "" {
+		secondaryTransferID, err := uuid.Parse(req.RequestedSecondaryTransferId)
+		if err != nil {
+			return nil, fmt.Errorf("invalid requested_secondary_transfer_id: %w", err)
+		}
+		utxoSwapCreate = utxoSwapCreate.SetRequestedSecondaryTransferID(secondaryTransferID)
 	}
 
 	utxoSwap, err := utxoSwapCreate.Save(ctx)

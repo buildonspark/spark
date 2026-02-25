@@ -4109,6 +4109,8 @@ func (m *ReserveInstantStaticDepositUtxoSwapRequest) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for RequestedSecondaryTransferId
+
 	if len(errors) > 0 {
 		return ReserveInstantStaticDepositUtxoSwapRequestMultiError(errors)
 	}

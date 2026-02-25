@@ -1965,9 +1965,11 @@ type ReserveInstantStaticDepositUtxoSwapRequest struct {
 	// secondary credit amount in satoshis.
 	SecondaryCreditAmountSats int64 `protobuf:"varint,8,opt,name=secondary_credit_amount_sats,json=secondaryCreditAmountSats,proto3" json:"secondary_credit_amount_sats,omitempty"`
 	// expiry time of the swap
-	ExpiryTime    *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=expiry_time,json=expiryTime,proto3" json:"expiry_time,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ExpiryTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=expiry_time,json=expiryTime,proto3" json:"expiry_time,omitempty"`
+	// Optional: requested secondary transfer ID for secondary credit amount.
+	RequestedSecondaryTransferId string `protobuf:"bytes,10,opt,name=requested_secondary_transfer_id,json=requestedSecondaryTransferId,proto3" json:"requested_secondary_transfer_id,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *ReserveInstantStaticDepositUtxoSwapRequest) Reset() {
@@ -2061,6 +2063,13 @@ func (x *ReserveInstantStaticDepositUtxoSwapRequest) GetExpiryTime() *timestampp
 		return x.ExpiryTime
 	}
 	return nil
+}
+
+func (x *ReserveInstantStaticDepositUtxoSwapRequest) GetRequestedSecondaryTransferId() string {
+	if x != nil {
+		return x.RequestedSecondaryTransferId
+	}
+	return ""
 }
 
 type CreateInstantStaticDepositUtxoSwapRequest struct {
@@ -3737,7 +3746,7 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x1bSettleSenderKeyTweakRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x12<\n" +
-	"\x06action\x18\x02 \x01(\x0e2$.spark_internal.SettleKeyTweakActionR\x06action\"\xde\x03\n" +
+	"\x06action\x18\x02 \x01(\x0e2$.spark_internal.SettleKeyTweakActionR\x06action\"\xa5\x04\n" +
 	"*ReserveInstantStaticDepositUtxoSwapRequest\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12#\n" +
 	"\rssp_signature\x18\x02 \x01(\fR\fsspSignature\x12%\n" +
@@ -3749,7 +3758,9 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x12credit_amount_sats\x18\a \x01(\x03R\x10creditAmountSats\x12?\n" +
 	"\x1csecondary_credit_amount_sats\x18\b \x01(\x03R\x19secondaryCreditAmountSats\x12;\n" +
 	"\vexpiry_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"expiryTime\"\xd5\x01\n" +
+	"expiryTime\x12E\n" +
+	"\x1frequested_secondary_transfer_id\x18\n" +
+	" \x01(\tR\x1crequestedSecondaryTransferId\"\xd5\x01\n" +
 	")CreateInstantStaticDepositUtxoSwapRequest\x12T\n" +
 	"\arequest\x18\x01 \x01(\v2:.spark_internal.ReserveInstantStaticDepositUtxoSwapRequestR\arequest\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +

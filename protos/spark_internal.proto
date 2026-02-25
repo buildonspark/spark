@@ -333,6 +333,8 @@ message ReserveInstantStaticDepositUtxoSwapRequest {
     int64 secondary_credit_amount_sats = 8;
     // expiry time of the swap
     google.protobuf.Timestamp expiry_time = 9;
+    // Optional: requested secondary transfer ID for secondary credit amount.
+    string requested_secondary_transfer_id = 10;
 }
 
 message CreateInstantStaticDepositUtxoSwapRequest {
