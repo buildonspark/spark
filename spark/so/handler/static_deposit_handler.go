@@ -200,6 +200,39 @@ func (o *StaticDepositHandler) CreateInstantStaticDepositUtxoSwapForAllOperators
 	return err
 }
 
+func (o *StaticDepositHandler) SaveUtxoForInstantStaticDepositForAllOperators(ctx context.Context, config *so.Config, request *pbinternal.SaveUtxoForInstantStaticDepositRequest) error {
+	ctx, span := tracer.Start(ctx, "StaticDepositHandler.SaveUtxoForInstantStaticDepositForAllOperators")
+	defer span.End()
+
+	logger := logging.GetLoggerFromContext(ctx)
+
+	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (*pbinternal.SaveUtxoForInstantStaticDepositResponse, error) {
+		conn, err := operator.NewOperatorGRPCConnection()
+		if err != nil {
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to connect to operator %s", operator.Identifier)
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		internalResp, err := client.SaveUtxoForInstantStaticDeposit(ctx, request)
+		if err != nil {
+			logger.With(zap.Error(err)).Sugar().Errorf(
+				"Failed to save utxo for instant static deposit with operator %s",
+				operator.Identifier,
+			)
+			return nil, err
+		}
+		return internalResp, err
+	})
+	if err != nil {
+		return err
+	}
+	internalDepositHandler := NewStaticDepositInternalHandler(config)
+	_, err = internalDepositHandler.SaveUtxoForInstantStaticDeposit(ctx, config, request)
+	return err
+}
+
 func (o *StaticDepositHandler) rollbackInstantStaticDepositUtxoSwapUsingGossip(ctx context.Context, config *so.Config, utxo *pb.UTXO, rollbackFromStatus []st.UtxoSwapStatus, rollbackToStatus st.UtxoSwapStatus) {
 	logger := logging.GetLoggerFromContext(ctx)
 

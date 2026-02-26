@@ -19,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/staticdeposit"
 )
@@ -488,6 +489,100 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 	return &pbinternal.CreateInstantStaticDepositUtxoSwapResponse{
 		SwapId: utxoSwap.ID.String(),
 	}, nil
+}
+
+// SaveUtxoForInstantStaticDeposit saves the on-chain UTXO for an instant static deposit swap.
+// This is called on each SO by the coordinator during the claim phase, once the UTXO is confirmed on-chain.
+func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx context.Context, config *so.Config, req *pbinternal.SaveUtxoForInstantStaticDepositRequest) (*pbinternal.SaveUtxoForInstantStaticDepositResponse, error) {
+	ctx, span := tracer.Start(ctx, "StaticDepositInternalHandler.SaveUtxoForInstantStaticDeposit")
+	defer span.End()
+
+	if req.OnChainUtxo == nil {
+		return nil, fmt.Errorf("on_chain_utxo is required")
+	}
+	utxoSwapID, err := uuid.Parse(req.UtxoSwapId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid utxo_swap_id: %w", err)
+	}
+
+	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
+	if err != nil {
+		return nil, err
+	}
+
+	messageHash, err := CreateUtxoSwapStatement(
+		UtxoSwapStatementTypeCreated,
+		hex.EncodeToString(req.OnChainUtxo.Txid),
+		req.OnChainUtxo.Vout,
+		network,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create utxo swap statement: %w", err)
+	}
+	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse coordinator public key: %w", err)
+	}
+
+	coordinatorIsSO := false
+	for _, op := range config.SigningOperatorMap {
+		if op.IdentityPublicKey.Equals(coordinatorPubKey) {
+			coordinatorIsSO = true
+			break
+		}
+	}
+	if !coordinatorIsSO {
+		return nil, fmt.Errorf("coordinator is not a signing operator")
+	}
+
+	if err := common.VerifyECDSASignature(coordinatorPubKey, req.Signature, messageHash); err != nil {
+		return nil, fmt.Errorf("unable to verify coordinator signature for saving utxo: %w", err)
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get db: %w", err)
+	}
+
+	targetUtxo, err := VerifiedTargetUtxoFromRequestWithThreshold(ctx, config, db, network, req.OnChainUtxo, 1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify on-chain utxo: %w", err)
+	}
+	if targetUtxo == nil {
+		return nil, fmt.Errorf("on-chain utxo not found or not confirmed")
+	}
+
+	swap, err := db.UtxoSwap.Get(ctx, utxoSwapID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get utxo swap %s: %w", utxoSwapID, err)
+	}
+
+	if targetUtxo.inner.Amount != swap.UtxoValueSats {
+		return nil, fmt.Errorf("utxo amount %d does not match swap utxo_value_sats %d", targetUtxo.inner.Amount, swap.UtxoValueSats)
+	}
+
+	utxoDepositAddress, err := targetUtxo.inner.QueryDepositAddress().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get deposit address for utxo: %w", err)
+	}
+
+	swapDepositAddress, err := db.DepositAddress.Query().
+		Where(depositaddress.HasUtxoswapsWith(utxoswap.IDEQ(utxoSwapID))).
+		Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get deposit address for swap %s: %w", utxoSwapID, err)
+	}
+
+	if utxoDepositAddress.ID != swapDepositAddress.ID {
+		return nil, fmt.Errorf("utxo deposit address %s does not match swap deposit address %s", utxoDepositAddress.ID, swapDepositAddress.ID)
+	}
+
+	_, err = db.UtxoSwap.UpdateOneID(utxoSwapID).SetUtxo(targetUtxo.inner).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save utxo on swap %s: %w", utxoSwapID, err)
+	}
+
+	return &pbinternal.SaveUtxoForInstantStaticDepositResponse{}, nil
 }
 
 func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context.Context, config *so.Config, reqWithSignature *pbinternal.CreateStaticDepositUtxoRefundRequest) (*pbinternal.CreateStaticDepositUtxoRefundResponse, error) {

@@ -56,6 +56,8 @@ service SparkInternalService {
     rpc create_static_deposit_utxo_refund(CreateStaticDepositUtxoRefundRequest) returns (CreateStaticDepositUtxoRefundResponse) {}
     // Create instant static deposit UTXO swap record across all SOs
     rpc create_instant_static_deposit_utxo_swap(CreateInstantStaticDepositUtxoSwapRequest) returns (CreateInstantStaticDepositUtxoSwapResponse) {}
+    // Save utxo for an instant static deposit across all SOs
+    rpc save_utxo_for_instant_static_deposit(SaveUtxoForInstantStaticDepositRequest) returns (SaveUtxoForInstantStaticDepositResponse) {}
 
     // Internal method to cancel a swap for other SOs if one of them failed to ack it
     rpc rollback_utxo_swap(RollbackUtxoSwapRequest) returns (RollbackUtxoSwapResponse) {}
@@ -346,6 +348,15 @@ message CreateInstantStaticDepositUtxoSwapRequest {
 message CreateInstantStaticDepositUtxoSwapResponse {
     string swap_id = 1;
 }
+
+message SaveUtxoForInstantStaticDepositRequest {
+    spark.UTXO on_chain_utxo = 1;
+    string utxo_swap_id = 2;
+    bytes signature = 3;
+    bytes coordinator_public_key = 4;
+}
+
+message SaveUtxoForInstantStaticDepositResponse {}
 
 message InitiateStaticDepositUtxoSwapRequest {
     spark.UTXO on_chain_utxo = 1;

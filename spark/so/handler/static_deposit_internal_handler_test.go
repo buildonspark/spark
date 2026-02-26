@@ -5,8 +5,15 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so/db"
+	"github.com/lightsparkdev/spark/so/ent"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -112,4 +119,195 @@ func TestCreateArchiveStaticDepositAddressStatement_KnownVector(t *testing.T) {
 
 	require.Equal(t, expectedHash, hash, "hash should match known test vector")
 	t.Logf("Hash verification successful: %x", hash)
+}
+
+func TestSaveUtxoForInstantStaticDeposit_Success(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositInternalHandler(cfg)
+
+	rng := rand.NewChaCha8([32]byte{1})
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, userIdentityPubKey, ownerSigningPubKey)
+	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
+
+	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(utxo.Amount).
+		SetCreditAmountSats(9000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = sessionCtx.Client.DepositAddress.UpdateOneID(depositAddress.ID).AddUtxoswaps(utxoSwap).Save(ctx)
+	require.NoError(t, err)
+
+	messageHash, err := CreateUtxoSwapStatement(
+		UtxoSwapStatementTypeCreated,
+		hex.EncodeToString(utxo.Txid),
+		utxo.Vout,
+		btcnetwork.Regtest,
+	)
+	require.NoError(t, err)
+	signature := ecdsa.Sign(cfg.IdentityPrivateKey.ToBTCEC(), messageHash)
+
+	req := &pbinternal.SaveUtxoForInstantStaticDepositRequest{
+		OnChainUtxo: &pb.UTXO{
+			Network: pb.Network_REGTEST,
+			Txid:    utxo.Txid,
+			Vout:    utxo.Vout,
+		},
+		UtxoSwapId:           utxoSwap.ID.String(),
+		Signature:            signature.Serialize(),
+		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+	}
+
+	resp, err := handler.SaveUtxoForInstantStaticDeposit(ctx, cfg, req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	savedSwap, err := txClient.UtxoSwap.Get(ctx, utxoSwap.ID)
+	require.NoError(t, err)
+	savedUtxo, err := savedSwap.QueryUtxo().Only(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, utxo.ID, savedUtxo.ID)
+}
+
+func TestSaveUtxoForInstantStaticDeposit_ErrorAddressMismatch(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositInternalHandler(cfg)
+
+	rng := rand.NewChaCha8([32]byte{2})
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+
+	keyshareA := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddressA := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshareA, userIdentityPubKey, ownerSigningPubKey)
+	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddressA, 100)
+
+	otherOwnerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	otherOwnerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	keyshareB := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddressB, err := sessionCtx.Client.DepositAddress.Create().
+		SetAddress("bc1ptest_other_deposit_address_for_testing").
+		SetOwnerIdentityPubkey(otherOwnerIdentityPubKey).
+		SetOwnerSigningPubkey(otherOwnerSigningPubKey).
+		SetSigningKeyshare(keyshareB).
+		SetIsStatic(true).
+		Save(ctx)
+	require.NoError(t, err)
+
+	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(utxo.Amount).
+		SetCreditAmountSats(9000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = sessionCtx.Client.DepositAddress.UpdateOneID(depositAddressB.ID).AddUtxoswaps(utxoSwap).Save(ctx)
+	require.NoError(t, err)
+
+	messageHash, err := CreateUtxoSwapStatement(
+		UtxoSwapStatementTypeCreated,
+		hex.EncodeToString(utxo.Txid),
+		utxo.Vout,
+		btcnetwork.Regtest,
+	)
+	require.NoError(t, err)
+	signature := ecdsa.Sign(cfg.IdentityPrivateKey.ToBTCEC(), messageHash)
+
+	req := &pbinternal.SaveUtxoForInstantStaticDepositRequest{
+		OnChainUtxo: &pb.UTXO{
+			Network: pb.Network_REGTEST,
+			Txid:    utxo.Txid,
+			Vout:    utxo.Vout,
+		},
+		UtxoSwapId:           utxoSwap.ID.String(),
+		Signature:            signature.Serialize(),
+		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+	}
+
+	resp, err := handler.SaveUtxoForInstantStaticDeposit(ctx, cfg, req)
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.ErrorContains(t, err, "does not match swap deposit address")
+}
+
+func TestSaveUtxoForInstantStaticDeposit_ErrorAmountMismatch(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositInternalHandler(cfg)
+
+	rng := rand.NewChaCha8([32]byte{3})
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, userIdentityPubKey, ownerSigningPubKey)
+	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
+
+	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(5000).
+		SetCreditAmountSats(4000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = sessionCtx.Client.DepositAddress.UpdateOneID(depositAddress.ID).AddUtxoswaps(utxoSwap).Save(ctx)
+	require.NoError(t, err)
+
+	messageHash, err := CreateUtxoSwapStatement(
+		UtxoSwapStatementTypeCreated,
+		hex.EncodeToString(utxo.Txid),
+		utxo.Vout,
+		btcnetwork.Regtest,
+	)
+	require.NoError(t, err)
+	signature := ecdsa.Sign(cfg.IdentityPrivateKey.ToBTCEC(), messageHash)
+
+	req := &pbinternal.SaveUtxoForInstantStaticDepositRequest{
+		OnChainUtxo: &pb.UTXO{
+			Network: pb.Network_REGTEST,
+			Txid:    utxo.Txid,
+			Vout:    utxo.Vout,
+		},
+		UtxoSwapId:           utxoSwap.ID.String(),
+		Signature:            signature.Serialize(),
+		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+	}
+
+	resp, err := handler.SaveUtxoForInstantStaticDeposit(ctx, cfg, req)
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.ErrorContains(t, err, "does not match swap utxo_value_sats")
 }

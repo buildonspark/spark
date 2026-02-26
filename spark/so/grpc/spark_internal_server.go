@@ -183,6 +183,11 @@ func (s *SparkInternalServer) CreateInstantStaticDepositUtxoSwap(ctx context.Con
 	return depositHandler.CreateInstantStaticDepositUtxoSwap(ctx, s.config, req)
 }
 
+func (s *SparkInternalServer) SaveUtxoForInstantStaticDeposit(ctx context.Context, req *pb.SaveUtxoForInstantStaticDepositRequest) (*pb.SaveUtxoForInstantStaticDepositResponse, error) {
+	depositHandler := handler.NewStaticDepositInternalHandler(s.config)
+	return depositHandler.SaveUtxoForInstantStaticDeposit(ctx, s.config, req)
+}
+
 func (s *SparkInternalServer) CreateStaticDepositUtxoRefund(ctx context.Context, req *pb.CreateStaticDepositUtxoRefundRequest) (*pb.CreateStaticDepositUtxoRefundResponse, error) {
 	depositHandler := handler.NewStaticDepositInternalHandler(s.config)
 	return depositHandler.CreateStaticDepositUtxoRefund(ctx, s.config, req)
