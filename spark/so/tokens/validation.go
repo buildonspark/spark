@@ -73,7 +73,7 @@ func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, 
 		ForUpdate().
 		First(ctx)
 	if ent.IsNotFound(err) {
-		logger.Info(fmt.Sprintf("Token metadata not found - minting not allowed for %s", identifierInfo))
+		logger.Sugar().Infof("Token metadata not found - minting not allowed for %s", identifierInfo)
 		return sparkerrors.NotFoundMissingEntity(fmt.Errorf("minting not allowed because a created token was not found for %s", identifierInfo))
 	}
 	if err != nil {

@@ -334,6 +334,74 @@ func TestTokenMintWithWrongIssuerPublicKeyFails(t *testing.T) {
 	})
 }
 
+func TestTokenMintUsesCorrectIssuerPublicKey(t *testing.T) {
+	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
+		// Use a fresh issuer key (not the static one) to demonstrate that the SO resolves
+		// the issuer public key from the TokenCreate record via the token identifier.
+		issuerPrivKey := keys.GeneratePrivateKey()
+		config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+		config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
+
+		err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+			issuerPrivateKey: issuerPrivKey,
+			name:             "Key Test Token",
+			ticker:           "KTT",
+			maxSupply:        0,
+		})
+		require.NoError(t, err, "failed to create token")
+
+		// Query the token metadata to get the issuer public key as stored in the SO's TokenCreate record.
+		resp, err := wallet.QueryTokenMetadata(t.Context(), config, nil, []keys.Public{issuerPrivKey.Public()})
+		require.NoError(t, err, "failed to query token metadata")
+		require.Len(t, resp.TokenMetadata, 1, "expected exactly one token")
+		require.Equal(t, issuerPrivKey.Public().Serialize(), resp.TokenMetadata[0].IssuerPublicKey,
+			"issuer public key in token metadata should match the key used to create the token")
+
+		tokenIdentifier := resp.TokenMetadata[0].TokenIdentifier
+
+		mintTx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+			TokenIdentityPubKey: issuerPrivKey.Public(),
+			TokenIdentifier:     tokenIdentifier,
+			NumOutputs:          1,
+			OutputAmounts:       []uint64{uint64(testIssueOutput1Amount)},
+		})
+		require.NoError(t, err, "failed to create mint transaction")
+
+		// Mint succeeds because the SO resolves the issuer public key from the TokenCreate record
+		// (via the token identifier) and correctly validates the signature.
+		_, err = broadcastTokenTransaction(t, t.Context(), config, mintTx, []keys.Private{issuerPrivKey})
+		require.NoError(t, err, "mint should succeed when the correct issuer key (resolved from TokenCreate via token identifier) is used")
+	})
+}
+
+func TestTokenMintWithBadSignatureFails(t *testing.T) {
+	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
+		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+		config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
+
+		tokenPrivKey := config.IdentityPrivateKey
+		tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+
+		// Create a mint transaction with the correct issuer public key in MintInput,
+		// matching the TokenCreate record, so the key mismatch check passes.
+		mintTx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+			TokenIdentityPubKey: tokenPrivKey.Public(),
+			TokenIdentifier:     tokenIdentifier,
+			NumOutputs:          1,
+			OutputAmounts:       []uint64{uint64(testIssueOutput1Amount)},
+		})
+		require.NoError(t, err, "failed to create mint transaction")
+
+		// Sign with a completely different key, producing an invalid signature.
+		// The SO resolves the issuer public key from the TokenCreate record and
+		// uses it to verify the signature — which should fail.
+		wrongSigningKey := keys.GeneratePrivateKey()
+		_, err = broadcastTokenTransaction(t, t.Context(), config, mintTx, []keys.Private{wrongSigningKey})
+		require.Error(t, err, "expected mint with bad signature to be rejected")
+		require.ErrorContains(t, err, "failed to validate mint token transaction signature")
+	})
+}
+
 func TestTokenMintAndTransferTokensTooManyOutputsFails(t *testing.T) {
 	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
