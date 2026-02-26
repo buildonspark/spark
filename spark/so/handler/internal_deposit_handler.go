@@ -754,7 +754,11 @@ func (h *InternalDepositHandler) RollbackInstantUtxoSwap(ctx context.Context, co
 	}
 	txOut := onChainTx.TxOut[req.OnChainUtxo.Vout]
 	amount := txOut.Value
-	_, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.PkScript, schemaNetwork.Params())
+	networkParams, err := schemaNetwork.Params()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get network params: %w", err)
+	}
+	_, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.PkScript, networkParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract address from pkscript: %w", err)
 	}
