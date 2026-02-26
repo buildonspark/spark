@@ -1849,15 +1849,12 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		return nil, fmt.Errorf("cannot specify both isPending=true and filter.Statuses")
 	}
 
-	var network btcnetwork.Network
 	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
-		network = btcnetwork.Mainnet
-	} else {
-		n, err := btcnetwork.FromProtoNetwork(filter.GetNetwork())
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
-		}
-		network = n
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("filter.Network must be specified"))
+	}
+	network, err := btcnetwork.FromProtoNetwork(filter.GetNetwork())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
 	}
 	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelQueryTransfers, 0) > 0
 

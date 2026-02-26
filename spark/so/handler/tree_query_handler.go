@@ -159,15 +159,12 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	var network btcnetwork.Network
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
-		network = btcnetwork.Mainnet
-	} else {
-		var err error
-		network, err = btcnetwork.FromProtoNetwork(req.GetNetwork())
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
-		}
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
+	}
+	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
 	}
 
 	identityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
@@ -288,15 +285,12 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 		return nil, err
 	}
 
-	var network btcnetwork.Network
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
-		network = btcnetwork.Mainnet
-	} else {
-		var err error
-		network, err = btcnetwork.FromProtoNetwork(req.GetNetwork())
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
-		}
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
+	}
+	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
 	}
 
 	var unusedDepositAddresses []*pb.DepositAddressQueryResult
@@ -361,15 +355,12 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 		return nil, err
 	}
 
-	var network btcnetwork.Network
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
-		network = btcnetwork.Mainnet
-	} else {
-		var err error
-		network, err = btcnetwork.FromProtoNetwork(req.GetNetwork())
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
-		}
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
+	}
+	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
 	}
 
 	var staticDepositAddresses []*pb.DepositAddressQueryResult

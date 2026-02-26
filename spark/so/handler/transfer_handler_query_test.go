@@ -36,6 +36,7 @@ func TestQueryTransfers_SSP_WithReceiverFilter(t *testing.T) {
 		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
 			ReceiverIdentityPublicKey: receiverIDPubKey.Serialize(),
 		},
+		Network: pb.Network_REGTEST,
 	}
 
 	// Call queryTransfers with isSSP=true, isPending=false
@@ -59,6 +60,7 @@ func TestQueryTransfers_SSP_WithSenderFilter(t *testing.T) {
 		Participant: &pb.TransferFilter_SenderIdentityPublicKey{
 			SenderIdentityPublicKey: senderIDPubKey.Serialize(),
 		},
+		Network: pb.Network_REGTEST,
 	}
 
 	// Call queryTransfers with isSSP=true, isPending=false
@@ -85,6 +87,7 @@ func TestQueryTransfers_NotSSP_RequiresAuthz(t *testing.T) {
 		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
 			ReceiverIdentityPublicKey: receiverIDPubKey.Serialize(),
 		},
+		Network: pb.Network_REGTEST,
 	}
 
 	// Call queryTransfers with isPending=false, isSSP=false
@@ -128,6 +131,7 @@ func TestQueryTransfers_NotSSP_RequiresAuthz_Mismatch(t *testing.T) {
 		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
 			ReceiverIdentityPublicKey: receiverIDPubKey.Serialize(),
 		},
+		Network: pb.Network_REGTEST,
 	}
 
 	// Call queryTransfers with isPending=false, isSSP=false
@@ -172,6 +176,7 @@ func TestQueryTransfers_NotSSP_NoSession(t *testing.T) {
 		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
 			ReceiverIdentityPublicKey: receiverIDPubKey.Serialize(),
 		},
+		Network: pb.Network_REGTEST,
 	}
 
 	// Call queryTransfers with isPending=false, isSSP=false
