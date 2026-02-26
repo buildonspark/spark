@@ -1640,8 +1640,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		return nil, err
 	}
 	var senderPubkey keys.Public
-	transferNetworkStr := transfer.Network.String()
-	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &transferNetworkStr, 0) > 0 {
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
 		senderPubkey, _, err = GetTransferSenderReceiver(transfer)
 		if err != nil {
 			return nil, err
@@ -1860,8 +1859,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		}
 		network = n
 	}
-	networkStr := network.String()
-	useMIMO := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &networkStr, 0) > 0
+	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0
 
 	var transferPredicate []predicate.Transfer
 
@@ -2085,8 +2083,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 }
 
 func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.Client, network btcnetwork.Network, walletIdentityPubkey keys.Public) predicate.Transfer {
-	networkStr := network.String()
-	useMIMO := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &networkStr, 0) > 0
+	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0
 
 	swapQuery := db.Transfer.Query().
 		Where(enttransfer.And(

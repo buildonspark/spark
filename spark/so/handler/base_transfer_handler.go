@@ -366,8 +366,7 @@ func (h *BaseTransferHandler) createTransfer(
 		}
 		// Validate that the parties in the Swap V3 counter transfer are the reverse of the primary transfer to ensure atomic swap correctness
 		var primarySender, primaryReceiver keys.Public
-		primaryNetworkStr := primaryTransfer.Network.String()
-		if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &primaryNetworkStr, 0) > 0 {
+		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
 			primarySender, primaryReceiver, err = GetTransferSenderReceiver(primaryTransfer)
 			if err != nil {
 				return nil, nil, err
@@ -713,8 +712,7 @@ func (h *BaseTransferHandler) LeafAvailableToTransfer(ctx context.Context, leaf 
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf %v is not available to transfer, status: %s", leaf.ID, leaf.Status))
 	}
 	var senderPubkey keys.Public
-	transferNetworkStr := transfer.Network.String()
-	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &transferNetworkStr, 0) > 0 {
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
 		var err error
 		senderPubkey, _, err = GetTransferSenderReceiver(transfer)
 		if err != nil {
@@ -848,8 +846,7 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 		return &pbspark.CancelTransferResponse{}, nil
 	}
 	var senderPubkey keys.Public
-	transferNetworkStr := transfer.Network.String()
-	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobReadMIMODataModelTransferSend, &transferNetworkStr, 0) > 0 {
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
 		var err error
 		senderPubkey, _, err = GetTransferSenderReceiver(transfer)
 		if err != nil {

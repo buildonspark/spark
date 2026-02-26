@@ -441,8 +441,8 @@ func TestQueryTransfers_WithTransferIds_AccessCheck_MIMO(t *testing.T) {
 	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100,
-		fmt.Sprintf("%s@%s", knobs.KnobReadMIMODataModelTransferSend, btcnetwork.Regtest.String()): 100,
+		knobs.KnobPrivacyEnabled:                100,
+		knobs.KnobReadMIMODataModelTransferSend: 100,
 	})
 	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
 
