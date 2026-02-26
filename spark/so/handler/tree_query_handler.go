@@ -254,6 +254,13 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse identity public key: %w", err)
 	}
+	if req.GetNetwork() == pb.Network_UNSPECIFIED {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
+	}
+	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
+	}
 	query := db.DepositAddress.Query().
 		Where(depositaddress.OwnerIdentityPubkey(idPubKey)).
 		// Exclude static deposit addresses, because they always can be used,
@@ -283,14 +290,6 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 	depositAddresses, err := query.All(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	if req.GetNetwork() == pb.Network_UNSPECIFIED {
-		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
-	}
-	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
 	}
 
 	var unusedDepositAddresses []*pb.DepositAddressQueryResult
@@ -340,6 +339,13 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse identity public key: %w", err)
 	}
+	if req.GetNetwork() == pb.Network_UNSPECIFIED {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
+	}
+	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
+	}
 	query := db.DepositAddress.Query().
 		Where(depositaddress.OwnerIdentityPubkey(idPubKey)).
 		Where(depositaddress.IsStatic(true)).
@@ -353,14 +359,6 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 	depositAddresses, err := query.All(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	if req.GetNetwork() == pb.Network_UNSPECIFIED {
-		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
-	}
-	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
 	}
 
 	var staticDepositAddresses []*pb.DepositAddressQueryResult
