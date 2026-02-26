@@ -506,8 +506,11 @@ func handleBlock(
 	start := time.Now()
 	logger.Sugar().Infof("Starting to handle block at height %d", blockHeight)
 
-	networkParams := network.Params()
-	_, err := dbClient.BlockHeight.Update().
+	networkParams, err := network.Params()
+	if err != nil {
+		return err
+	}
+	_, err = dbClient.BlockHeight.Update().
 		SetHeight(blockHeight).
 		Where(blockheight.NetworkEQ(network)).
 		Save(ctx)

@@ -148,19 +148,26 @@ func (n *Network) Scan(src any) error {
 
 // ToBitcoinNetworkIdentifier returns the standardized bitcoin network identifier.
 func (n Network) ToBitcoinNetworkIdentifier() (uint32, error) {
-	return uint32(n.Params().Net), nil
+	params, err := n.Params()
+	if err != nil {
+		return 0, err
+	}
+	return uint32(params.Net), nil
 }
 
-// Params converts a Network into its corresponding chaincfg.Params
-func (n Network) Params() *chaincfg.Params {
+// Params converts a Network into its corresponding chaincfg.Params.
+// Returns an error for Unspecified or unknown network.
+func (n Network) Params() (*chaincfg.Params, error) {
 	switch n {
 	case Mainnet:
-		return &chaincfg.MainNetParams
+		return &chaincfg.MainNetParams, nil
 	case Regtest:
-		return &chaincfg.RegressionNetParams
+		return &chaincfg.RegressionNetParams, nil
 	case Testnet:
-		return &chaincfg.TestNet3Params
+		return &chaincfg.TestNet3Params, nil
+	case Signet:
+		return &chaincfg.SigNetParams, nil
 	default:
-		return &chaincfg.MainNetParams
+		return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("network must be specified (got %s)", n))
 	}
 }

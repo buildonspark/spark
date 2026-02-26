@@ -90,9 +90,13 @@ func CreateLightningHTLCTaprootAddressWithSequence(network btcnetwork.Network, h
 	// Compute the taproot key
 	taprootKey := txscript.ComputeTaprootOutputKey(numsKey.ToBTCEC(), tapRoot[:])
 
+	params, err := network.Params()
+	if err != nil {
+		return nil, err
+	}
 	taprootAddr, err := btcutil.NewAddressTaproot(
 		schnorr.SerializePubKey(taprootKey),
-		network.Params(),
+		params,
 	)
 	if err != nil {
 		return nil, err

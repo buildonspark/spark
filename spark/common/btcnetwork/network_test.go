@@ -172,3 +172,13 @@ func TestFromStringUnknownValue(t *testing.T) {
 	_, err := FromString("invalid_network")
 	require.Error(t, err)
 }
+
+func TestParamsRequiresSpecifiedNetwork(t *testing.T) {
+	_, err := Unspecified.Params()
+	require.Error(t, err)
+}
+
+func TestParamsSignet(t *testing.T) {
+	_, err := Signet.Params()
+	require.NoError(t, err)
+}

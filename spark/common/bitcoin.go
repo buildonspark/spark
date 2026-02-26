@@ -43,12 +43,16 @@ func P2TRScriptFromPubKey(pubKey keys.Public) ([]byte, error) {
 }
 
 func P2TRRawAddressFromPublicKey(pubKey keys.Public, network btcnetwork.Network) (btcutil.Address, error) {
+	params, err := network.Params()
+	if err != nil {
+		return nil, err
+	}
 	// Tweak the internal key with empty merkle root
 	taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey.ToBTCEC())
 	return btcutil.NewAddressTaproot(
 		// Convert a 33 byte public key to a 32 byte x-only public key
 		schnorr.SerializePubKey(taprootKey),
-		network.Params(),
+		params,
 	)
 }
 
@@ -68,7 +72,10 @@ func P2TRAddressFromPkScript(pkScript []byte, network btcnetwork.Network) (*stri
 		return nil, err
 	}
 
-	networkParams := network.Params()
+	networkParams, err := network.Params()
+	if err != nil {
+		return nil, err
+	}
 	if parsedScript.Class() == txscript.WitnessV1TaprootTy {
 		address, err := parsedScript.Address(networkParams)
 		if err != nil {

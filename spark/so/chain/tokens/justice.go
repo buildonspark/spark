@@ -155,8 +155,12 @@ func BroadcastJusticeTransaction(
 		TimelockScript: scriptData.TimelockScript,
 	}
 
+	params, err := network.Params()
+	if err != nil {
+		return nil, nil, fmt.Errorf("network params: %w", err)
+	}
 	pubKeyHash := btcutil.Hash160(soPrivateKey.Public().Serialize())
-	soAddr, err := btcutil.NewAddressWitnessPubKeyHash(pubKeyHash, network.Params())
+	soAddr, err := btcutil.NewAddressWitnessPubKeyHash(pubKeyHash, params)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to compute SO P2WPKH address: %w", err)
 	}
