@@ -19,29 +19,11 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: "Install system dependencies"
-      shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y git clang lld
-
     - name: "Install Protoc"
       uses: arduino/setup-protoc@v3
       with:
         version: "33.2"
         repo-token: ${{ inputs.repo-token }}
-
-    - name: "Setup Rust"
-      uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        cache: false
-        rustflags: ""
-
-    - name: "Setup Rust cache"
-      uses: Swatinem/rust-cache@v2
-      with:
-        workspaces: "signer"
-        save-if: ${{ github.event_name == 'push' }}"
 
     - name: "Setup Node.js and Yarn"
       uses: ./public/actions/setup-node-yarn-install
@@ -78,9 +60,9 @@ runs:
       shell: bash
       working-directory: ${{ inputs.workspace }}
       run: |
-        if ! git diff --quiet; then
+        if ! git diff --quiet -- '${{ inputs.proto-package-dir }}/src/proto'; then
           echo "❌ Proto files are not up to date. Please run 'yarn generate:proto' in ${GITHUB_WORKSPACE}/${{ inputs.proto-package-dir }} and commit the changes."
-          git diff
+          git diff -- '${{ inputs.proto-package-dir }}/src/proto'
           exit 1
         fi
         echo "✅ Proto files are up to date"

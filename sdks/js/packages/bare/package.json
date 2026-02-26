@@ -54,12 +54,14 @@
     "postversion": "yarn build",
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --detectOpenHandles --forceExit",
     "test": "echo \"Skipping for now\"",
+    "test:integration": "bare tests/run-integration-tests.js",
     "types:watch": "tsc-absolute --watch",
     "types": "tsc"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.4",
     "@noble/hashes": "^1.7.0",
+    "bare": "^1.23.3",
     "depcheck": "^1.4.7",
     "madge": "^8.0.0",
     "prettier": "^3.7.4",

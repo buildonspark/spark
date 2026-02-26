@@ -17,13 +17,12 @@
   ],
   "addon": true,
   "scripts": {
-    "build": "./build.sh",
+    "build:native": "./build.sh",
     "test": "bare ./test.js",
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
     "package:checks": "yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
-    "prepublishOnly": "node scripts/ensure-prebuilds-present.js",
-    "postversion": "yarn build"
+    "prepublishOnly": "node scripts/ensure-prebuilds-present.js"
   },
   "installConfig": {
     "hoistingLimits": "dependencies"

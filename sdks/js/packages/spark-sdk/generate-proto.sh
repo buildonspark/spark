@@ -39,6 +39,7 @@ protoc "${ARGS[@]}"
 
 echo "[generate-proto] Embedding descriptors..."
 node scripts/embed-descriptors.mjs
+rm -f src/spark_descriptors.pb
 
 echo "[generate-proto] Formatting generated code..."
 yarn format:fix

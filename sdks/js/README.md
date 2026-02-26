@@ -7,11 +7,13 @@
 The postinstall build process requires a C/C++ compiler. Install clang:
 
 **macOS:**
+
 ```bash
 xcode-select --install
 ```
 
 **Linux (Ubuntu/Debian):**
+
 ```bash
 sudo apt install clang lld
 ```

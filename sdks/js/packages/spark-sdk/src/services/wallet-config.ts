@@ -3,6 +3,7 @@ import {
   SspClientOptions,
 } from "../graphql/client.js";
 import type { SparkWalletEvents } from "../spark-wallet/types.js";
+import { isBare } from "@lightsparkdev/core";
 import { isHermeticTest } from "../tests/isHermeticTest.js";
 import { NetworkType } from "../utils/network.js";
 
@@ -263,9 +264,12 @@ export function getLocalSigningOperators(): Record<string, SigningOperator> {
         ? 3
         : 5;
 
+  const hermeticDomain = isBare
+    ? "spark-web.minikube.local"
+    : "spark.minikube.local";
   const addresses = Array.from({ length: 5 }, (_, i) =>
     isHermeticTest
-      ? `https://${i}.spark.minikube.local`
+      ? `https://${i}.${hermeticDomain}`
       : `https://localhost:${i + 8535}`,
   );
 
