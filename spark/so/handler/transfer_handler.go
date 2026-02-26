@@ -2751,10 +2751,48 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		return nil, err
 	}
 
+	// Determine whether we should use the stored key tweaks (from a previous Phase 1 commit)
+	// rather than the new claim package. When the transfer is already at ReceiverKeyTweakLocked
+	// or later receiver-side states, Phase 1 has already committed the key tweaks on all SOs.
+	// Using a new claim package would cause a mismatch: SOs that already stored the original
+	// tweaks would keep them (due to the len(leaf.KeyTweak) == 0 guard), while the coordinator
+	// would extract different proofs from the new package.
+	useStoredKeyTweaks := false
+	if isMimoReceiveEnabled {
+		switch receiver.Status {
+		case st.TransferReceiverStatusKeyTweakLocked,
+			st.TransferReceiverStatusKeyTweakApplied,
+			st.TransferReceiverStatusRefundSigned:
+			useStoredKeyTweaks = true
+		case st.TransferReceiverStatusSenderInitiated,
+			st.TransferReceiverStatusKeyTweaked,
+			st.TransferReceiverStatusCompleted,
+			st.TransferReceiverStatusCancelled:
+			// Use the new claim package.
+		}
+	} else {
+		switch transfer.Status {
+		case st.TransferStatusReceiverKeyTweakLocked,
+			st.TransferStatusReceiverKeyTweakApplied,
+			st.TransferStatusReceiverRefundSigned:
+			useStoredKeyTweaks = true
+		case st.TransferStatusSenderInitiated,
+			st.TransferStatusSenderInitiatedCoordinator,
+			st.TransferStatusSenderKeyTweakPending,
+			st.TransferStatusApplyingSenderKeyTweak,
+			st.TransferStatusSenderKeyTweaked,
+			st.TransferStatusReceiverKeyTweaked,
+			st.TransferStatusCompleted,
+			st.TransferStatusExpired,
+			st.TransferStatusReturned:
+			// Use the new claim package.
+		}
+	}
+
 	// Decrypt and extract key tweak proofs from the coordinator's portion of the claim package.
 	keyTweakProofs := map[string]*pb.SecretProof{}
 	coordinatorKeyTweaks := claimPackage.KeyTweakPackage[h.config.Identifier]
-	if len(coordinatorKeyTweaks) > 0 {
+	if !useStoredKeyTweaks && len(coordinatorKeyTweaks) > 0 {
 		decryptionPrivateKey := eciesgo.NewPrivateKeyFromBytes(h.config.IdentityPrivateKey.Serialize())
 		decrypted, err := eciesgo.Decrypt(decryptionPrivateKey, coordinatorKeyTweaks)
 		if err != nil {
@@ -2805,7 +2843,16 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 	for _, job := range claimPackage.LeavesToClaim {
 		userPublicKeys[job.LeafId] = job.SigningPublicKey
 	}
-	err = h.settleReceiverKeyTweakWithClaimPackage(ctx, transfer, receiver, keyTweakProofs, userPublicKeys, claimPackage.KeyTweakPackage, claimPackage.UserSignature)
+
+	// When using stored key tweaks, don't forward the new claim package to other SOs.
+	// All SOs should already have the key tweaks stored from the original Phase 1 commit.
+	var encryptedKeyTweakPackage map[string][]byte
+	var claimSignature []byte
+	if !useStoredKeyTweaks {
+		encryptedKeyTweakPackage = claimPackage.KeyTweakPackage
+		claimSignature = claimPackage.UserSignature
+	}
+	err = h.settleReceiverKeyTweakWithClaimPackage(ctx, transfer, receiver, keyTweakProofs, userPublicKeys, encryptedKeyTweakPackage, claimSignature)
 	if err != nil {
 		return nil, fmt.Errorf("unable to settle receiver key tweak: %w", err)
 	}
@@ -3800,6 +3847,11 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 
 	hasClaimPackage := len(req.EncryptedClaimKeyTweakPackage) > 0
 
+	// When the transfer is already at KeyTweakLocked or later, the key tweaks from a previous
+	// Phase 1 are already stored on this SO. We must not accept a new claim package because it
+	// could contain different key tweaks, leading to a mismatch between SOs.
+	alreadyLocked := false
+
 	// Read logic determined by MIMO receive state
 	if isMimoReceiveEnabled {
 		if receiver != nil {
@@ -3808,9 +3860,10 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 				if !hasClaimPackage {
 					return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("receiver %s is at status SenderInitiated but no encrypted_claim_key_tweak_package provided", receiver.ID))
 				}
-			case st.TransferReceiverStatusKeyTweaked,
-				st.TransferReceiverStatusKeyTweakLocked:
+			case st.TransferReceiverStatusKeyTweaked:
 				// do nothing
+			case st.TransferReceiverStatusKeyTweakLocked:
+				alreadyLocked = true
 			case st.TransferReceiverStatusKeyTweakApplied,
 				st.TransferReceiverStatusRefundSigned:
 				// The key tweak is already applied, return early.
@@ -3827,8 +3880,9 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer %s is at status SenderKeyTweaked but no encrypted_claim_key_tweak_package provided", transferID))
 			}
 		case st.TransferStatusReceiverKeyTweaked:
-		case st.TransferStatusReceiverKeyTweakLocked:
 			// do nothing
+		case st.TransferStatusReceiverKeyTweakLocked:
+			alreadyLocked = true
 		case st.TransferStatusReceiverKeyTweakApplied,
 			st.TransferStatusReceiverRefundSigned:
 			// The key tweak is already applied, return early.
@@ -3838,8 +3892,10 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		}
 	}
 
-	// If encrypted claim key tweak package is provided, verify signature, decrypt, and store.
-	if hasClaimPackage {
+	// If encrypted claim key tweak package is provided AND we haven't already locked the key
+	// tweaks from a prior Phase 1 commit, verify signature, decrypt, and store.
+	// When already locked, skip this block entirely — the stored key tweaks must be used.
+	if hasClaimPackage && !alreadyLocked {
 		// Verify receiver signature over the full encrypted key tweak package.
 		signingPayload := common.GetClaimPackageSigningPayload(transferID, req.EncryptedClaimKeyTweakPackage)
 		if err := common.VerifyECDSASignature(*receiverIdentityPublicKey, req.ClaimSignature, signingPayload); err != nil {
