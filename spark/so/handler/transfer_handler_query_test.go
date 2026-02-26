@@ -428,7 +428,7 @@ func TestQueryTransfers_WithTransferIds_MasterKeyAccess(t *testing.T) {
 	assert.Equal(t, transfer.ID.String(), resp.Transfers[0].Id)
 }
 
-// TestQueryTransfers_WithTransferIds_AccessCheck_MIMO verifies that when the MIMO data model knob is on,
+// TestQueryTransfers_WithTransferIds_AccessCheck_MIMO verifies that when the MIMO query-transfers knob is on,
 // queryTransfers uses checkTransferAccessMIMO (sender/receiver from edges) and still filters by viewer access.
 func TestQueryTransfers_WithTransferIds_AccessCheck_MIMO(t *testing.T) {
 	ctx, cfg := createTestContextForTransferQuery(t)
@@ -441,8 +441,8 @@ func TestQueryTransfers_WithTransferIds_AccessCheck_MIMO(t *testing.T) {
 	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                100,
-		knobs.KnobReadMIMODataModelTransferSend: 100,
+		knobs.KnobPrivacyEnabled:                  100,
+		knobs.KnobReadMIMODataModelQueryTransfers: 100,
 	})
 	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
 

@@ -1859,7 +1859,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		}
 		network = n
 	}
-	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0
+	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelQueryTransfers, 0) > 0
 
 	var transferPredicate []predicate.Transfer
 
@@ -2083,7 +2083,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 }
 
 func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.Client, network btcnetwork.Network, walletIdentityPubkey keys.Public) predicate.Transfer {
-	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0
+	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelQueryTransfers, 0) > 0
 
 	swapQuery := db.Transfer.Query().
 		Where(enttransfer.And(
