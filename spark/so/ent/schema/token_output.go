@@ -175,6 +175,8 @@ func (TokenOutput) Indexes() []ent.Index {
 	return []ent.Index{
 		// Optimized for GetOwnedTokenOutputs query
 		index.Fields("owner_public_key", "status", "network"),
+		index.Fields("update_time", "id").
+			StorageKey("token_outputs_update_time_id_idx"),
 		// Optimized for GetTokenTransactions query
 		index.Fields("owner_public_key", "token_identifier", "status").Annotations(tokenTxIncludeAnnotations()),
 		index.Fields("token_identifier", "status").Annotations(tokenTxIncludeAnnotations()),

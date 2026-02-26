@@ -26,6 +26,8 @@ func (SigningKeyshare) Mixin() []ent.Mixin {
 func (SigningKeyshare) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("coordinator_index"),
+		index.Fields("update_time", "id").
+			StorageKey("signing_keyshares_update_time_id_idx"),
 		// Partial index for AVAILABLE and PENDING keys only - optimized for hot path (claiming keys)
 		// and confirming pending keys (marking keys as AVAILABLE).
 		// This is smaller and faster than the composite index for the common case

@@ -555,6 +555,11 @@ var (
 				Columns: []*schema.Column{SigningKeysharesColumns[8]},
 			},
 			{
+				Name:    "signing_keyshares_update_time_id_idx",
+				Unique:  false,
+				Columns: []*schema.Column{SigningKeysharesColumns[2], SigningKeysharesColumns[0]},
+			},
+			{
 				Name:    "idx_signing_keyshares_coordinator_available_or_pending",
 				Unique:  false,
 				Columns: []*schema.Column{SigningKeysharesColumns[8], SigningKeysharesColumns[3]},
@@ -807,6 +812,11 @@ var (
 				Columns: []*schema.Column{TokenOutputsColumns[4], TokenOutputsColumns[3], TokenOutputsColumns[19]},
 			},
 			{
+				Name:    "token_outputs_update_time_id_idx",
+				Unique:  false,
+				Columns: []*schema.Column{TokenOutputsColumns[2], TokenOutputsColumns[0]},
+			},
+			{
 				Name:    "tokenoutput_owner_public_key_token_identifier_status",
 				Unique:  false,
 				Columns: []*schema.Column{TokenOutputsColumns[4], TokenOutputsColumns[20], TokenOutputsColumns[3]},
@@ -896,6 +906,11 @@ var (
 				Name:    "tokenpartialrevocationsecretshare_token_output_token_partial_revocation_secret_shares",
 				Unique:  false,
 				Columns: []*schema.Column{TokenPartialRevocationSecretSharesColumns[5]},
+			},
+			{
+				Name:    "token_partial_revocation_secret_shares_update_time_id_idx",
+				Unique:  false,
+				Columns: []*schema.Column{TokenPartialRevocationSecretSharesColumns[2], TokenPartialRevocationSecretSharesColumns[0]},
 			},
 			{
 				Name:    "tokenpartialrevocationsecretshare_operator_identity_public_key_token_output_token_partial_revocation_secret_shares",
@@ -1195,6 +1210,11 @@ var (
 				Name:    "transferleaf_transfer_leaf_leaf",
 				Unique:  false,
 				Columns: []*schema.Column{TransferLeafsColumns[21]},
+			},
+			{
+				Name:    "transfer_leafs_update_time_id_idx",
+				Unique:  false,
+				Columns: []*schema.Column{TransferLeafsColumns[2], TransferLeafsColumns[0]},
 			},
 			{
 				Name:    "transferleaf_intermediate_refund_txid",

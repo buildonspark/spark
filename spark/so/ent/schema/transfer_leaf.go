@@ -159,6 +159,8 @@ func (TransferLeaf) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Edges("transfer"),
 		index.Edges("leaf"),
+		index.Fields("update_time", "id").
+			StorageKey("transfer_leafs_update_time_id_idx"),
 
 		index.Fields("intermediate_refund_txid").Annotations(
 			entsql.IndexWhere("intermediate_refund_txid is not null"),
