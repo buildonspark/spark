@@ -5,7 +5,6 @@ import { Transaction } from "@scure/btc-signer";
 import { SparkError } from "../../errors/index.js";
 import { TreeNode } from "../../proto/spark.js";
 import { getTxId } from "../../utils/bitcoin.js";
-import { Network } from "../../utils/network.js";
 import {
   constructUnilateralExitFeeBumpPackages,
   hash160,
@@ -90,7 +89,7 @@ describe("unilateral exit", () => {
       { satPerVbyte: 5 },
       LOCAL_MEMPOOL_URL,
       sparkClient,
-      Network.LOCAL,
+      configService.getNetworkProto(),
     );
 
     const txPackages = constructedTx[0]?.txPackages;
@@ -169,7 +168,7 @@ describe("unilateral exit", () => {
       { satPerVbyte: 5 },
       LOCAL_MEMPOOL_URL,
       sparkClient,
-      Network.LOCAL,
+      configService.getNetworkProto(),
     );
 
     const txPackages = constructedTx[0]?.txPackages.slice(0, 1);

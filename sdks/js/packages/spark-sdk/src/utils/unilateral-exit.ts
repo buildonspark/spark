@@ -6,7 +6,7 @@ import { sha256 } from "@noble/hashes/sha2";
 import * as btc from "@scure/btc-signer";
 import * as psbt from "@scure/btc-signer/psbt";
 import type { SparkServiceClient } from "../proto/spark.js";
-import { TreeNode } from "../proto/spark.js";
+import { Network as NetworkProto, TreeNode } from "../proto/spark.js";
 import {
   getTxFromRawTxHex,
   getTxId,
@@ -100,8 +100,11 @@ export async function constructUnilateralExitFeeBumpPackages(
   feeRate: FeeRate,
   electrsUrl: string,
   sparkClient?: SparkServiceClient,
-  network?: any, // Network enum from the proto
+  networkProto?: NetworkProto,
 ): Promise<FeeBumpTxChain[]> {
+  if (networkProto === undefined || networkProto === NetworkProto.UNSPECIFIED) {
+    networkProto = NetworkProto.MAINNET;
+  }
   const result: FeeBumpTxChain[] = [];
 
   // Sort UTXOs by value in descending order and make a copy we can modify
@@ -201,7 +204,7 @@ export async function constructUnilateralExitFeeBumpPackages(
                 },
               },
               includeParents: true,
-              network: network || 0, // Default to mainnet if not provided
+              network: networkProto,
             });
 
             parentNode = response.nodes[currentNode.parentNodeId];
@@ -252,7 +255,7 @@ export async function constructUnilateralExitFeeBumpPackages(
           continue;
         }
         broadcastTxs.set(txid, true);
-        const isBroadcast = await isTxBroadcast(txid, electrsUrl, network);
+        const isBroadcast = await isTxBroadcast(txid, electrsUrl, networkProto);
         if (isBroadcast) {
           // This node has already been broadcast, so we don't need to do so.
           continue;

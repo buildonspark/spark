@@ -2844,9 +2844,6 @@ async function runCLI() {
               (wallet as any).config.getCoordinatorAddress(),
             );
 
-            // Get network from wallet config
-            const network = (wallet as any).config.getNetwork();
-
             // Get electrs URL from wallet config
             const electrsUrl = (wallet as any).config.getElectrsUrl();
 
@@ -2856,7 +2853,7 @@ async function runCLI() {
               { satPerVbyte: feeRate },
               electrsUrl,
               sparkClient,
-              network,
+              (wallet as any).config.getNetworkProto(),
             );
 
             console.log(
@@ -2953,6 +2950,7 @@ async function runCLI() {
                     },
                   },
                   includeParents: true,
+                  network: (wallet as any).config.getNetworkProto(),
                 });
 
                 const node = response.nodes[nodeId];
@@ -3492,7 +3490,7 @@ async function runCLI() {
               { satPerVbyte: feeRate },
               electrsUrl,
               sparkClient,
-              (wallet as any).config.getNetwork(),
+              (wallet as any).config.getNetworkProto(),
             );
 
             // Display results

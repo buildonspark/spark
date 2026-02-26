@@ -3,6 +3,7 @@ import {
   getElectrsUrl,
 } from "../services/wallet-config.js";
 import { BitcoinNetwork } from "../types/index.js";
+import { Network as NetworkProto } from "../proto/spark.js";
 import { getFetch } from "./fetch.js";
 import { Network, getNetworkFromAddress } from "./network.js";
 
@@ -55,12 +56,12 @@ export async function getLatestDepositTxId(
 export async function isTxBroadcast(
   txid: string,
   baseUrl: string,
-  network?: any,
+  networkProto?: NetworkProto,
 ): Promise<boolean> {
   const { fetch, Headers } = getFetch();
   const headers = new Headers();
 
-  if (network === Network.REGTEST) {
+  if (networkProto === NetworkProto.REGTEST) {
     const auth = btoa(
       `${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`,
     );
