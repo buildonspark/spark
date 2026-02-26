@@ -159,15 +159,23 @@ describe.each(TEST_CONFIGS)(
     it("should consolidate outputs for multiple token types using optimizeTokenOutputs", async () => {
       const totalAmountPerToken = 10000n;
       const smallTransferAmount = 10n;
-      const transfersPerToken = 51;
+      const minOutputsThreshold = 10;
+      const transfersPerToken = minOutputsThreshold + 1;
+      const configWithLowerOptimizationThreshold = {
+        ...config,
+        tokenOptimizationOptions: {
+          ...config.tokenOptimizationOptions,
+          minOutputsThreshold,
+        },
+      };
 
       const { wallet: issuerWallet } =
         await IssuerSparkWalletTesting.initialize({
-          options: config,
+          options: configWithLowerOptimizationThreshold,
         });
 
       const { wallet: userWallet } = await SparkWalletTesting.initialize({
-        options: config,
+        options: configWithLowerOptimizationThreshold,
       });
 
       const tokenOne = await issuerWallet.createToken({

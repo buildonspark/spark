@@ -50,6 +50,7 @@ type queryParams struct {
 	issuerPublicKeys       []keys.Public
 	tokenIdentifiers       [][]byte
 	tokenTransactionHashes [][]byte
+	isByFiltersQuery       bool
 	order                  sparkpb.Order
 	limit                  int64
 	offset                 int64
@@ -280,8 +281,8 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(params *queryParams)
 	ownerPubKeys := params.ownerPublicKeys
 	issuerPubKeys := params.issuerPublicKeys
 
-	// Build a single CTE with ALL filters combined
-	// This ensures the same output satisfies all conditions
+	// Build a single output CTE with ALL filters combined.
+	// This ensures the same output satisfies all conditions.
 	var whereConditions []string
 
 	// Handle OutputIds filter
@@ -328,15 +329,54 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(params *queryParams)
 		return "", nil, fmt.Errorf("no valid filters provided for optimized query")
 	}
 
-	// Build the CTE with all conditions combined with AND
+	// Build output CTE with all conditions combined with AND.
 	cteWhere := strings.Join(whereConditions, " AND ")
-	cte := fmt.Sprintf(`filtered_outputs AS (
+	outputsCTE := fmt.Sprintf(`filtered_outputs AS (
 		SELECT
 			tou.token_output_output_created_token_transaction,
 			tou.token_output_output_spent_token_transaction
 		FROM token_outputs tou
 		WHERE %s
 	)`, cteWhere)
+
+	// For by_filters requests, include create transactions that match token metadata filters.
+	// Create transactions have no token_outputs, so they must be matched via token_creates.
+	hasCreateCTE := false
+	var createCTE string
+	if params.isByFiltersQuery && len(params.outputIDs) == 0 {
+		var createWhereConditions []string
+
+		// When spark addresses are provided, they are decoded into owner_public_keys.
+		// For create transactions, both owner and issuer filters map to tc.issuer_public_key.
+		createIssuerKeyBytes := make([][]byte, 0, len(ownerPubKeys)+len(issuerPubKeys))
+		for _, key := range ownerPubKeys {
+			createIssuerKeyBytes = append(createIssuerKeyBytes, key.Serialize())
+		}
+		for _, key := range issuerPubKeys {
+			createIssuerKeyBytes = append(createIssuerKeyBytes, key.Serialize())
+		}
+		if len(createIssuerKeyBytes) > 0 {
+			createWhereConditions = append(createWhereConditions, fmt.Sprintf("tc.issuer_public_key = ANY($%d)", qb.argIndex))
+			qb.args = append(qb.args, pq.Array(createIssuerKeyBytes))
+			qb.argIndex++
+		}
+
+		if len(params.tokenIdentifiers) > 0 {
+			createWhereConditions = append(createWhereConditions, fmt.Sprintf("tc.token_identifier = ANY($%d)", qb.argIndex))
+			qb.args = append(qb.args, pq.Array(params.tokenIdentifiers))
+			qb.argIndex++
+		}
+
+		if len(createWhereConditions) > 0 {
+			hasCreateCTE = true
+			createCTE = fmt.Sprintf(`filtered_creates AS (
+		SELECT
+			tc.id
+		FROM token_creates tc
+		WHERE %s
+	)`, strings.Join(createWhereConditions, " AND "))
+		}
+	}
 
 	// Build transaction hash filter if provided
 	var txHashFilter string
@@ -349,7 +389,11 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(params *queryParams)
 	// Build the final query with CTE
 	var queryBuilder strings.Builder
 	queryBuilder.WriteString("WITH ")
-	queryBuilder.WriteString(cte)
+	queryBuilder.WriteString(outputsCTE)
+	if hasCreateCTE {
+		queryBuilder.WriteString(", ")
+		queryBuilder.WriteString(createCTE)
+	}
 	queryBuilder.WriteString(" SELECT DISTINCT * FROM (")
 
 	// UNION: transactions that created the filtered outputs OR spent the filtered outputs
@@ -360,6 +404,12 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(params *queryParams)
 	queryBuilder.WriteString("SELECT tt.id, tt.create_time FROM token_transactions tt ")
 	queryBuilder.WriteString("JOIN filtered_outputs ON tt.id = filtered_outputs.token_output_output_spent_token_transaction")
 	queryBuilder.WriteString(txHashFilter)
+	if hasCreateCTE {
+		queryBuilder.WriteString(" UNION ALL ")
+		queryBuilder.WriteString("SELECT tt.id, tt.create_time FROM token_transactions tt ")
+		queryBuilder.WriteString("JOIN filtered_creates ON tt.token_transaction_create = filtered_creates.id")
+		queryBuilder.WriteString(txHashFilter)
+	}
 
 	queryBuilder.WriteString(") combined")
 
@@ -579,6 +629,7 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 			ownerPublicKeys:  ownerPubKeys,
 			issuerPublicKeys: issuerPubKeys,
 			tokenIdentifiers: req.GetByFilters().TokenIdentifiers,
+			isByFiltersQuery: true,
 			order:            req.GetOrder(),
 			limit:            limit,
 			offset:           req.Offset,

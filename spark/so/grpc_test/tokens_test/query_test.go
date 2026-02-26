@@ -2,6 +2,7 @@ package tokens_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/big"
 	"testing"
@@ -58,6 +59,34 @@ func getOutputIDOrFail(t *testing.T, outputs []*tokenpb.TokenOutput, outputIndex
 	require.NotNilf(t, output.Id, "expected %s output %d to have id", txLabel, outputIndex)
 	require.NotEmptyf(t, *output.Id, "expected %s output %d id to be non-empty", txLabel, outputIndex)
 	return *output.Id
+}
+
+func requireCreateTransactionAtIndex(t *testing.T, txs []*tokenpb.TokenTransactionWithStatus, index int) {
+	t.Helper()
+	require.Greaterf(t, len(txs), index, "expected transaction at index %d", index)
+	require.NotNilf(t, txs[index].TokenTransaction, "expected transaction at index %d to have payload", index)
+	require.NotNilf(t, txs[index].TokenTransaction.GetCreateInput(), "expected transaction at index %d to be a create transaction", index)
+}
+
+func broadcastTokenTransactionWithPhase2Retry(
+	t *testing.T,
+	ctx context.Context,
+	config *wallet.TestWalletConfig,
+	tokenTransaction *tokenpb.TokenTransaction,
+	ownerPrivateKeys []keys.Private,
+) (*tokenpb.TokenTransaction, error) {
+	t.Helper()
+	if !broadcastTokenTestsUseV3 || !broadcastTokenTestsUsePhase2 {
+		return broadcastTokenTransaction(t, ctx, config, tokenTransaction, ownerPrivateKeys)
+	}
+
+	var finalTx *tokenpb.TokenTransaction
+	var err error
+	require.Eventuallyf(t, func() bool {
+		finalTx, err = broadcastTokenTransaction(t, ctx, config, tokenTransaction, ownerPrivateKeys)
+		return err == nil
+	}, 5*time.Second, 100*time.Millisecond, "failed to broadcast token transaction in phase2 after retries: %v", err)
+	return finalTx, err
 }
 
 // TestTokenMintAndTransferExpectedOutputAndTxRetrieval tests the full flow with a mint and a transfer
@@ -269,7 +298,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	transferTx, userOutput5PrivKey, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash1, issuerPrivKey.Public(), tokenIdentifier)
 	require.NoError(t, err, "failed to create transfer transaction")
 
-	finalTransferTx, err := broadcastTokenTransaction(
+	finalTransferTx, err := broadcastTokenTransactionWithPhase2Retry(
 		t,
 		t.Context(),
 		config,
@@ -1471,11 +1500,12 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 			cursor = result.PageResponse.NextCursor
 		}
 
-		require.Len(t, allTransactions, 5, "should have retrieved all 5 transactions")
+		require.Len(t, allTransactions, len(transactionHashes)+1, "should include create + all mint transactions")
+		requireCreateTransactionAtIndex(t, allTransactions, 0)
 
-		for i, tx := range allTransactions {
-			require.Equal(t, transactionHashes[i], tx.TokenTransactionHash,
-				"transaction %d hash should match", i)
+		for i, expectedHash := range transactionHashes {
+			require.Equal(t, expectedHash, allTransactions[i+1].TokenTransactionHash,
+				"mint transaction %d hash should match", i)
 		}
 	})
 
@@ -1509,14 +1539,15 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 		require.NotNil(t, page2.PageResponse, "page response should not be nil")
 
 		require.Len(t, page1.TokenTransactionsWithStatus, 3)
-		require.Len(t, page2.TokenTransactionsWithStatus, 2)
+		require.Len(t, page2.TokenTransactionsWithStatus, 3)
 
-		require.Equal(t, transactionHashes[0], page1.TokenTransactionsWithStatus[0].TokenTransactionHash)
-		require.Equal(t, transactionHashes[1], page1.TokenTransactionsWithStatus[1].TokenTransactionHash)
-		require.Equal(t, transactionHashes[2], page1.TokenTransactionsWithStatus[2].TokenTransactionHash)
+		requireCreateTransactionAtIndex(t, page1.TokenTransactionsWithStatus, 0)
+		require.Equal(t, transactionHashes[0], page1.TokenTransactionsWithStatus[1].TokenTransactionHash)
+		require.Equal(t, transactionHashes[1], page1.TokenTransactionsWithStatus[2].TokenTransactionHash)
 
-		require.Equal(t, transactionHashes[3], page2.TokenTransactionsWithStatus[0].TokenTransactionHash)
-		require.Equal(t, transactionHashes[4], page2.TokenTransactionsWithStatus[1].TokenTransactionHash)
+		require.Equal(t, transactionHashes[2], page2.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		require.Equal(t, transactionHashes[3], page2.TokenTransactionsWithStatus[1].TokenTransactionHash)
+		require.Equal(t, transactionHashes[4], page2.TokenTransactionsWithStatus[2].TokenTransactionHash)
 	})
 
 	t.Run("cursor pagination backward direction", func(t *testing.T) {
@@ -1532,7 +1563,7 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 			},
 		)
 		require.NoError(t, err, "failed to query all transactions")
-		require.Len(t, allResult.TokenTransactionsWithStatus, 5)
+		require.Len(t, allResult.TokenTransactionsWithStatus, len(transactionHashes)+1)
 
 		// Use the cursor from the 4th transaction to paginate backward
 		page1, err := wallet.QueryTokenTransactions(
@@ -1588,7 +1619,7 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 			},
 		)
 		require.NoError(t, err, "failed to query last page")
-		require.Len(t, lastPage.TokenTransactionsWithStatus, 2, "expected 2 remaining transactions")
+		require.Len(t, lastPage.TokenTransactionsWithStatus, 3, "expected 3 remaining transactions")
 		require.False(t, lastPage.PageResponse.HasNextPage, "last page should not have next page")
 		require.True(t, lastPage.PageResponse.HasPreviousPage, "last page should have previous page")
 	})
@@ -1611,8 +1642,8 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 		require.False(t, result.PageResponse.HasPreviousPage, "first page should not have previous page")
 		require.True(t, result.PageResponse.HasNextPage, "first page should have next page")
 
-		require.Equal(t, transactionHashes[0], result.TokenTransactionsWithStatus[0].TokenTransactionHash)
-		require.Equal(t, transactionHashes[1], result.TokenTransactionsWithStatus[1].TokenTransactionHash)
+		requireCreateTransactionAtIndex(t, result.TokenTransactionsWithStatus, 0)
+		require.Equal(t, transactionHashes[0], result.TokenTransactionsWithStatus[1].TokenTransactionHash)
 	})
 
 	t.Run("cursor pagination with zero page size uses default", func(t *testing.T) {
@@ -1628,8 +1659,8 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 		)
 		require.NoError(t, err, "failed to query with zero page size")
 		require.NotNil(t, result.PageResponse, "page response should not be nil")
-		// Default page size is 50, we only have 5 transactions
-		require.Len(t, result.TokenTransactionsWithStatus, 5)
+		// Default page size is 50, we only have create + 5 mints.
+		require.Len(t, result.TokenTransactionsWithStatus, len(transactionHashes)+1)
 		require.False(t, result.PageResponse.HasNextPage, "should not have next page with default size")
 	})
 
@@ -1680,8 +1711,8 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 		require.NoError(t, err, "failed to query next page with order override")
 		require.NotNil(t, nextPage.PageResponse, "page response should not be nil")
 		require.Len(t, nextPage.TokenTransactionsWithStatus, 2)
-		require.Equal(t, transactionHashes[3], nextPage.TokenTransactionsWithStatus[0].TokenTransactionHash)
-		require.Equal(t, transactionHashes[4], nextPage.TokenTransactionsWithStatus[1].TokenTransactionHash)
+		require.Equal(t, transactionHashes[2], nextPage.TokenTransactionsWithStatus[0].TokenTransactionHash)
+		require.Equal(t, transactionHashes[3], nextPage.TokenTransactionsWithStatus[1].TokenTransactionHash)
 
 		prevPage, err := wallet.QueryTokenTransactions(
 			t.Context(),
@@ -1698,8 +1729,8 @@ func TestQueryTokenTransactionsCursorPagination(t *testing.T) {
 		require.NoError(t, err, "failed to query previous page with order override")
 		require.NotNil(t, prevPage.PageResponse, "page response should not be nil")
 		require.Len(t, prevPage.TokenTransactionsWithStatus, 2)
-		require.Equal(t, transactionHashes[0], prevPage.TokenTransactionsWithStatus[0].TokenTransactionHash)
-		require.Equal(t, transactionHashes[1], prevPage.TokenTransactionsWithStatus[1].TokenTransactionHash)
+		requireCreateTransactionAtIndex(t, prevPage.TokenTransactionsWithStatus, 0)
+		require.Equal(t, transactionHashes[0], prevPage.TokenTransactionsWithStatus[1].TokenTransactionHash)
 	})
 
 	t.Run("cursor pagination with invalid cursor returns error", func(t *testing.T) {
@@ -1791,6 +1822,6 @@ func TestQueryTokenTransactionsCursorPaginationSameCreateTime(t *testing.T) {
 			cursor = result.PageResponse.NextCursor
 		}
 
-		require.Len(t, allTransactions, 5, "should have retrieved all 5 transactions without skips")
+		require.Len(t, allTransactions, len(transactionHashes)+1, "should have retrieved create + all mint transactions without skips")
 	})
 }

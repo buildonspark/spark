@@ -179,7 +179,7 @@ describe.each(TEST_CONFIGS)(
         });
         const transactions = res.tokenTransactionsWithStatus;
         const amount_of_transactions = transactions.length;
-        expect(amount_of_transactions).toEqual(1);
+        expect(amount_of_transactions).toEqual(2);
       }
 
       {
@@ -188,7 +188,7 @@ describe.each(TEST_CONFIGS)(
         });
         const transactions = res.tokenTransactionsWithStatus;
         const amount_of_transactions = transactions.length;
-        expect(amount_of_transactions).toEqual(1);
+        expect(amount_of_transactions).toEqual(2);
       }
 
       await issuerWallet.transferTokens({
@@ -203,7 +203,7 @@ describe.each(TEST_CONFIGS)(
         });
         const transactions = res.tokenTransactionsWithStatus;
         const amount_of_transactions = transactions.length;
-        expect(amount_of_transactions).toEqual(2);
+        expect(amount_of_transactions).toEqual(3);
       }
 
       {
@@ -212,7 +212,7 @@ describe.each(TEST_CONFIGS)(
         });
         const transactions = res.tokenTransactionsWithStatus;
         const amount_of_transactions = transactions.length;
-        expect(amount_of_transactions).toEqual(2);
+        expect(amount_of_transactions).toEqual(3);
       }
 
       for (let index = 0; index < 100; ++index) {
@@ -383,7 +383,7 @@ describe.each(TEST_CONFIGS)(
           page_num += 1;
         }
 
-        expect(hashset_of_all_transactions.size).toEqual(202);
+        expect(hashset_of_all_transactions.size).toEqual(203);
       }
     });
   },

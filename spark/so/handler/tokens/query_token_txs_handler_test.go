@@ -3,6 +3,8 @@ package tokens
 import (
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/stretchr/testify/require"
 )
@@ -169,4 +171,65 @@ func TestValidateQueryTokenTransactionsRequest_FilterLimits(t *testing.T) {
 		err := validateQueryTokenTransactionsRequest(req)
 		require.NoError(t, err)
 	})
+}
+
+func TestBuildOptimizedQuery_ByFiltersIncludesTokenCreateMatches(t *testing.T) {
+	handler := &QueryTokenTransactionsHandler{}
+	params := &queryParams{
+		ownerPublicKeys:  []keys.Public{keys.GeneratePrivateKey().Public()},
+		issuerPublicKeys: []keys.Public{keys.GeneratePrivateKey().Public()},
+		tokenIdentifiers: [][]byte{make([]byte, 32)},
+		isByFiltersQuery: true,
+		limit:            10,
+	}
+
+	query, _, err := handler.buildOptimizedQuery(params)
+	require.NoError(t, err)
+	require.Contains(t, query, "filtered_creates AS")
+	require.Contains(t, query, "JOIN filtered_creates ON tt.token_transaction_create = filtered_creates.id")
+}
+
+func TestBuildOptimizedQuery_LegacyQuerySkipsTokenCreateMatches(t *testing.T) {
+	handler := &QueryTokenTransactionsHandler{}
+	params := &queryParams{
+		ownerPublicKeys:  []keys.Public{keys.GeneratePrivateKey().Public()},
+		issuerPublicKeys: []keys.Public{keys.GeneratePrivateKey().Public()},
+		tokenIdentifiers: [][]byte{make([]byte, 32)},
+		limit:            10,
+	}
+
+	query, _, err := handler.buildOptimizedQuery(params)
+	require.NoError(t, err)
+	require.NotContains(t, query, "filtered_creates AS")
+	require.NotContains(t, query, "JOIN filtered_creates ON tt.token_transaction_create = filtered_creates.id")
+}
+
+func TestBuildOptimizedQuery_ByFiltersOutputIDOnlySkipsTokenCreateMatches(t *testing.T) {
+	handler := &QueryTokenTransactionsHandler{}
+	params := &queryParams{
+		outputIDs:        []string{uuid.NewString()},
+		isByFiltersQuery: true,
+		limit:            10,
+	}
+
+	query, _, err := handler.buildOptimizedQuery(params)
+	require.NoError(t, err)
+	require.NotContains(t, query, "filtered_creates AS")
+	require.NotContains(t, query, "JOIN filtered_creates ON tt.token_transaction_create = filtered_creates.id")
+}
+
+func TestBuildOptimizedQuery_ByFiltersWithOutputIDAndTokenFiltersSkipsTokenCreateMatches(t *testing.T) {
+	handler := &QueryTokenTransactionsHandler{}
+	params := &queryParams{
+		outputIDs:        []string{uuid.NewString()},
+		issuerPublicKeys: []keys.Public{keys.GeneratePrivateKey().Public()},
+		tokenIdentifiers: [][]byte{make([]byte, 32)},
+		isByFiltersQuery: true,
+		limit:            10,
+	}
+
+	query, _, err := handler.buildOptimizedQuery(params)
+	require.NoError(t, err)
+	require.NotContains(t, query, "filtered_creates AS")
+	require.NotContains(t, query, "JOIN filtered_creates ON tt.token_transaction_create = filtered_creates.id")
 }
