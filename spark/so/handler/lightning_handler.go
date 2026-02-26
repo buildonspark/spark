@@ -1948,7 +1948,9 @@ func (h *LightningHandler) QueryPreimage(ctx context.Context, req *pbspark.Query
 		Where(
 			preimagerequest.PaymentHashEQ(req.PaymentHash),
 			preimagerequest.ReceiverIdentityPubkeyEQ(receiverIdentityPubKey),
+			preimagerequest.StatusNEQ(st.PreimageRequestStatusReturned),
 		).
+		Order(ent.Desc(preimagerequest.FieldCreateTime)).
 		WithTransfers().
 		First(ctx)
 	if err != nil {
