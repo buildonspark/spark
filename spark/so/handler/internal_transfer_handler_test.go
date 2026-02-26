@@ -744,6 +744,196 @@ func getTxOutpoint(t *testing.T, txBytes []byte, vout uint32) (wire.OutPoint, []
 	return wire.OutPoint{Hash: tx.TxHash(), Index: vout}, tx.TxOut[vout].PkScript, tx.TxOut[vout].Value
 }
 
+// makeP2TRSpendTxUnsigned creates a v2 transaction spending prevOut with a single
+// output of sendValue/destScript, but with no witness (unsigned).
+func makeP2TRSpendTxUnsigned(prevOut wire.OutPoint, sendValue int64, destScript []byte) ([]byte, error) {
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(wire.NewTxIn(&prevOut, nil, nil))
+	tx.AddTxOut(wire.NewTxOut(sendValue, destScript))
+	var buf bytes.Buffer
+	if err := tx.Serialize(&buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// corruptWitness flips the first byte of the first witness element on input 0,
+// producing a transaction that is structurally valid but carries an invalid signature.
+func corruptWitness(t *testing.T, rawTx []byte) []byte {
+	t.Helper()
+	var tx wire.MsgTx
+	require.NoError(t, tx.Deserialize(bytes.NewReader(rawTx)))
+	require.NotEmpty(t, tx.TxIn)
+	require.NotEmpty(t, tx.TxIn[0].Witness)
+	tx.TxIn[0].Witness[0][0] ^= 0xFF
+	var buf bytes.Buffer
+	require.NoError(t, tx.Serialize(&buf))
+	return buf.Bytes()
+}
+
+func TestCompareTxs(t *testing.T) {
+	t.Parallel()
+
+	key := keys.GeneratePrivateKey()
+	_, outpoint, pkScript, prevAmt, tweakedPriv, err := makeP2TRFundingTx(1000, key)
+	require.NoError(t, err)
+
+	signedTx, err := makeP2TRSpendTx(outpoint, pkScript, prevAmt, tweakedPriv, 900, pkScript)
+	require.NoError(t, err)
+
+	unsignedTx, err := makeP2TRSpendTxUnsigned(outpoint, 900, pkScript)
+	require.NoError(t, err)
+
+	differentOutpointTx, err := makeP2TRSpendTxUnsigned(wire.OutPoint{Hash: chainhash.Hash{2}, Index: 0}, 900, pkScript)
+	require.NoError(t, err)
+
+	differentValueTx, err := makeP2TRSpendTxUnsigned(outpoint, 800, pkScript)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		tx1     []byte
+		tx2     []byte
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "both nil",
+			tx1:  nil, tx2: nil,
+			want: true,
+		},
+		{
+			name: "identical unsigned txs",
+			tx1:  unsignedTx, tx2: unsignedTx,
+			want: true,
+		},
+		{
+			name: "identical signed txs",
+			tx1:  signedTx, tx2: signedTx,
+			want: true,
+		},
+		{
+			name: "different outpoints",
+			tx1:  unsignedTx, tx2: differentOutpointTx,
+			want: false,
+		},
+		{
+			name: "different output values",
+			tx1:  unsignedTx, tx2: differentValueTx,
+			want: false,
+		},
+		{
+			name: "same structure, different witnesses",
+			tx1:  unsignedTx, tx2: signedTx,
+			want: false,
+		},
+		{
+			name: "one nil",
+			tx1:  nil, tx2: signedTx,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := compareTxs(tt.tx1, tt.tx2)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCompareAndVerifyTxs(t *testing.T) {
+	t.Parallel()
+
+	key := keys.GeneratePrivateKey()
+	_, outpoint, pkScript, prevAmt, tweakedPriv, err := makeP2TRFundingTx(1000, key)
+	require.NoError(t, err)
+
+	prevOut := &wire.TxOut{Value: prevAmt, PkScript: pkScript}
+
+	signedTx, err := makeP2TRSpendTx(outpoint, pkScript, prevAmt, tweakedPriv, 900, pkScript)
+	require.NoError(t, err)
+
+	unsignedTx, err := makeP2TRSpendTxUnsigned(outpoint, 900, pkScript)
+	require.NoError(t, err)
+
+	corruptedTx := corruptWitness(t, signedTx)
+
+	tests := []struct {
+		name    string
+		tx1     []byte
+		tx2     []byte
+		prevOut *wire.TxOut
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "both nil",
+			tx1:  nil, tx2: nil,
+			prevOut: nil,
+			want:    true,
+		},
+		{
+			name: "identical signed txs",
+			tx1:  signedTx, tx2: signedTx,
+			prevOut: prevOut,
+			want:    true,
+		},
+		{
+			name: "tx1 unsigned, tx2 has valid sig",
+			tx1:  unsignedTx, tx2: signedTx,
+			prevOut: prevOut,
+			want:    true,
+		},
+		{
+			name: "tx2 has corrupted signature",
+			tx1:  signedTx, tx2: corruptedTx,
+			prevOut: prevOut,
+			wantErr: true,
+		},
+		{
+			name: "tx2 has no witness",
+			tx1:  signedTx, tx2: unsignedTx,
+			prevOut: prevOut,
+			wantErr: true,
+		},
+		{
+			name: "structural mismatch - different outpoint",
+			tx1:  signedTx,
+			tx2: func() []byte {
+				tx, _ := makeP2TRSpendTxUnsigned(wire.OutPoint{Hash: chainhash.Hash{2}, Index: 0}, 900, pkScript)
+				return tx
+			}(),
+			prevOut: prevOut,
+			want:    false,
+		},
+		{
+			name:    "structural mismatch - different value",
+			tx1:     signedTx,
+			tx2:     func() []byte { tx, _ := makeP2TRSpendTxUnsigned(outpoint, 800, pkScript); return tx }(),
+			prevOut: prevOut,
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := compareAndVerifyTxs(tt.tx1, tt.tx2, tt.prevOut)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestUpdateTransferLeavesSignatures(t *testing.T) {
 	t.Parallel()
 

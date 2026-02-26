@@ -88,16 +88,41 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 		}
 
 		if transfer.Status == st.TransferStatusCompleted {
-			// Verify that the transfer details are the same between both nodes
+			// Verify that the transfer details are the same between both nodes.
+			// Node txs (RawTx) are signed once at tree creation and never re-signed;
+			// their witnesses should be byte-identical across gossip deliveries, so
+			// strict compareTxs is appropriate. Refund txs are re-signed on each
+			// transfer and use compareAndVerifyTxs below.
 			rawTxMatch, err := compareTxs(dbNode.RawTx, node.RawTx)
 			if err != nil {
 				return fmt.Errorf("failed to compare raw txs: %w", err)
 			}
-			directRefundTxMatch, err := compareTxs(dbNode.DirectRefundTx, node.DirectRefundTx)
+
+			// Parse prevout txs needed for signature verification on refund txs.
+			cpfpNodeTx, err := common.TxFromRawTxBytes(dbNode.RawTx)
+			if err != nil {
+				return fmt.Errorf("failed to parse cpfp node tx for node %s: %w", nodeID, err)
+			}
+			var directNodeTxOut *wire.TxOut
+			if len(dbNode.DirectTx) > 0 {
+				directNodeTx, err := common.TxFromRawTxBytes(dbNode.DirectTx)
+				if err != nil {
+					return fmt.Errorf("failed to parse direct node tx for node %s: %w", nodeID, err)
+				}
+				if len(directNodeTx.TxOut) == 0 {
+					return fmt.Errorf("direct node tx for node %s has no outputs", nodeID)
+				}
+				directNodeTxOut = directNodeTx.TxOut[0]
+			}
+
+			directRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectRefundTx, node.DirectRefundTx, directNodeTxOut)
 			if err != nil {
 				return fmt.Errorf("failed to compare direct refund txs: %w", err)
 			}
-			directFromCpfpRefundTxMatch, err := compareTxs(dbNode.DirectFromCpfpRefundTx, node.DirectFromCpfpRefundTx)
+			if len(cpfpNodeTx.TxOut) == 0 {
+				return fmt.Errorf("cpfp node tx for node %s has no outputs", nodeID)
+			}
+			directFromCpfpRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectFromCpfpRefundTx, node.DirectFromCpfpRefundTx, cpfpNodeTx.TxOut[0])
 			if err != nil {
 				return fmt.Errorf("failed to compare direct from cpfp refund txs: %w", err)
 			}
@@ -878,59 +903,126 @@ func (h *InternalTransferHandler) GetTransfers(ctx context.Context, req *pbinter
 }
 
 // Deserializes the txs and compares the inputs and outputs.
+// parseTxPair parses and version-validates both raw transactions.
+func parseTxPair(rawTx1, rawTx2 []byte) (*wire.MsgTx, *wire.MsgTx, error) {
+	if rawTx1 == nil || rawTx2 == nil {
+		return nil, nil, fmt.Errorf("one or both transactions are nil")
+	}
+	tx1, err := common.TxFromRawTxBytes(rawTx1)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse tx1: %w", err)
+	}
+	if err := common.ValidateBitcoinTxVersion(tx1); err != nil {
+		return nil, nil, fmt.Errorf("tx1 version validation failed: %w", err)
+	}
+	tx2, err := common.TxFromRawTxBytes(rawTx2)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse tx2: %w", err)
+	}
+	if err := common.ValidateBitcoinTxVersion(tx2); err != nil {
+		return nil, nil, fmt.Errorf("tx2 version validation failed: %w", err)
+	}
+	return tx1, tx2, nil
+}
+
+// compareTxStructure returns true if tx1 and tx2 have identical inputs
+// (outpoint, script, sequence) and outputs (value, pkscript).
+// Witness data is not compared.
+// Assumes inputs have already been length-checked if called after other checks,
+// but performs its own length checks internally.
+func compareTxStructure(tx1, tx2 *wire.MsgTx) bool {
+	if len(tx1.TxIn) != len(tx2.TxIn) {
+		return false
+	}
+	for i, txIn1 := range tx1.TxIn {
+		txIn2 := tx2.TxIn[i]
+		if txIn1.PreviousOutPoint != txIn2.PreviousOutPoint {
+			return false
+		}
+		// SignatureScript is always nil for P2TR inputs; checked here for completeness.
+		if !bytes.Equal(txIn1.SignatureScript, txIn2.SignatureScript) {
+			return false
+		}
+		if txIn1.Sequence != txIn2.Sequence {
+			return false
+		}
+	}
+	if len(tx1.TxOut) != len(tx2.TxOut) {
+		return false
+	}
+	for i, txOut1 := range tx1.TxOut {
+		txOut2 := tx2.TxOut[i]
+		if txOut1.Value != txOut2.Value {
+			return false
+		}
+		if !bytes.Equal(txOut1.PkScript, txOut2.PkScript) {
+			return false
+		}
+	}
+	return true
+}
+
+// witnessesMatch returns true if every input in tx1 and tx2 has byte-identical
+// witness stacks. Assumes tx1 and tx2 have the same number of inputs.
+func witnessesMatch(tx1, tx2 *wire.MsgTx) bool {
+	for i, txIn1 := range tx1.TxIn {
+		txIn2 := tx2.TxIn[i]
+		if len(txIn1.Witness) != len(txIn2.Witness) {
+			return false
+		}
+		for j, item := range txIn1.Witness {
+			if !bytes.Equal(item, txIn2.Witness[j]) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// compareTxs returns true if rawTx1 and rawTx2 are structurally identical,
+// including byte-for-byte equal witness stacks. Returns (false, nil) for any
+// mismatch; returns (false, error) only for parse or version failures.
 func compareTxs(rawTx1, rawTx2 []byte) (bool, error) {
 	if rawTx1 == nil && rawTx2 == nil {
 		return true, nil
 	}
-	tx1, err := common.TxFromRawTxBytes(rawTx1)
+	tx1, tx2, err := parseTxPair(rawTx1, rawTx2)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse tx1: %w", err)
+		return false, err
 	}
-
-	if err := common.ValidateBitcoinTxVersion(tx1); err != nil {
-		return false, fmt.Errorf("tx1 version validation failed: %w", err)
-	}
-
-	tx2, err := common.TxFromRawTxBytes(rawTx2)
-	if err != nil {
-		return false, fmt.Errorf("failed to parse tx2: %w", err)
-	}
-
-	if err := common.ValidateBitcoinTxVersion(tx2); err != nil {
-		return false, fmt.Errorf("tx2 version validation failed: %w", err)
-	}
-
-	if len(tx1.TxIn) != len(tx2.TxIn) {
+	if !compareTxStructure(tx1, tx2) {
 		return false, nil
 	}
+	return witnessesMatch(tx1, tx2), nil
+}
 
-	for i, txIn1 := range tx1.TxIn {
-		txIn2 := tx2.TxIn[i]
-		if txIn1.PreviousOutPoint != txIn2.PreviousOutPoint {
-			return false, nil
-		}
-		if !bytes.Equal(txIn1.SignatureScript, txIn2.SignatureScript) {
-			return false, nil
-		}
-		if txIn1.Sequence != txIn2.Sequence {
-			return false, nil
-		}
+// compareAndVerifyTxs returns true if rawTx1 and rawTx2 are structurally
+// identical and carry valid signatures. If the witness stacks differ,
+// tx2's signature is verified against prevOut — a different but cryptographically
+// valid signature (e.g. from a separate FROST signing session) is accepted.
+// An invalid or missing signature in tx2 is returned as an error.
+// Returns (false, nil) for structural mismatches; (false, error) for parse,
+// version, or signature failures. prevOut must be non-nil when the transactions
+// are non-nil.
+func compareAndVerifyTxs(rawTx1, rawTx2 []byte, prevOut *wire.TxOut) (bool, error) {
+	if rawTx1 == nil && rawTx2 == nil {
+		return true, nil
 	}
-
-	if len(tx1.TxOut) != len(tx2.TxOut) {
+	tx1, tx2, err := parseTxPair(rawTx1, rawTx2)
+	if err != nil {
+		return false, err
+	}
+	if !compareTxStructure(tx1, tx2) {
 		return false, nil
 	}
-
-	for i, txOut1 := range tx1.TxOut {
-		txOut2 := tx2.TxOut[i]
-		if txOut1.Value != txOut2.Value {
-			return false, nil
+	if !witnessesMatch(tx1, tx2) {
+		if prevOut == nil {
+			return false, fmt.Errorf("cannot verify signature: prevOut is nil")
 		}
-		if !bytes.Equal(txOut1.PkScript, txOut2.PkScript) {
-			return false, nil
+		if err := common.VerifySignatureSingleInput(tx2, 0, prevOut); err != nil {
+			return false, fmt.Errorf("incoming tx has invalid or missing signature: %w", err)
 		}
 	}
-
 	return true, nil
 }
 
