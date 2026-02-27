@@ -111,7 +111,10 @@ func StartPostgresServer() (stop func()) {
 		panic(err)
 	}
 	postgresPort = strconv.Itoa(port)
-	tmpDir, err := os.MkdirTemp("/tmp", postgresPort)
+	if err := os.MkdirAll("/tmp/sparktestpg", 0o755); err != nil {
+		panic(fmt.Errorf("failed to create sparktestpg dir: %w", err))
+	}
+	tmpDir, err := os.MkdirTemp("/tmp/sparktestpg", postgresPort)
 	if err != nil {
 		panic(fmt.Errorf("failed to create temp dir: %w", err))
 	}
@@ -128,7 +131,10 @@ func StartPostgresServer() (stop func()) {
 	if err := pg.Start(); err != nil {
 		panic(fmt.Errorf("unable to start postgres DB: %w", err))
 	}
-	return func() { _ = pg.Stop() }
+	return func() {
+		_ = pg.Stop()
+		_ = os.RemoveAll(tmpDir)
+	}
 }
 
 func findFreePort() (port int, err error) {
