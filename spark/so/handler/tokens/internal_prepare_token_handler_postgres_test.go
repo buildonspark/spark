@@ -29,6 +29,50 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
+// TestTryFinalizeCreatedSignedOutput_MintParentFinalizesJIT verifies that an output whose parent
+// creating transaction is a SIGNED mint can be finalized just-in-time via tryFinalizeCreatedSignedOutput.
+// Before the fix, the function filtered with StatusEQ(REVEALED) and HasSpentOutput(), which excluded mint
+// transactions (SIGNED, no spent outputs), leaving the output permanently un-spendable until the cron ran.
+func TestTryFinalizeCreatedSignedOutput_MintParentFinalizesJIT(t *testing.T) {
+	t.Parallel()
+	rng := rand.NewChaCha8([32]byte{})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbtx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	f := entfixtures.New(t, ctx, dbtx).WithRNG(rng)
+
+	cfg := sparktesting.TestConfig(t)
+	network := btcnetwork.Regtest
+
+	// Create a token with a generous max supply.
+	tokenCreate := f.CreateTokenCreate(network, f.RandomBytes(32), big.NewInt(1_000_000))
+
+	// Create a mint transaction in SIGNED state (pre-finalize terminal state for mints).
+	// The output will be in CREATED_SIGNED state because the transaction is SIGNED.
+	mintTx, outputs := f.CreateMintTransaction(tokenCreate, entfixtures.OutputSpecs(big.NewInt(100)), st.TokenTransactionStatusSigned)
+	require.Len(t, outputs, 1)
+	output := outputs[0]
+
+	// Preconditions: transaction is SIGNED, output is CREATED_SIGNED.
+	require.Equal(t, st.TokenTransactionStatusSigned, mintTx.Status)
+	require.Equal(t, st.TokenOutputStatusCreatedSigned, output.Status)
+
+	// Call tryFinalizeCreatedSignedOutput — this is the JIT path exercised during a transfer attempt.
+	err = tryFinalizeCreatedSignedOutput(ctx, cfg, output)
+	require.NoError(t, err)
+
+	// Reload the output and parent transaction to verify final states.
+	updatedOutput, err := dbtx.TokenOutput.Get(ctx, output.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenOutputStatusCreatedFinalized, updatedOutput.Status,
+		"output should be promoted to CREATED_FINALIZED after JIT finalization")
+
+	updatedTx, err := dbtx.TokenTransaction.Get(ctx, mintTx.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusFinalized, updatedTx.Status,
+		"parent mint transaction should be FINALIZED after JIT finalization")
+}
+
 // TestPrepareTokenTransactionInternal_NetworkValidation ensures we correctly validate network matching.
 func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 	testCases := []struct {

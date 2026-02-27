@@ -572,9 +572,13 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 func tryFinalizeCreatedSignedOutput(ctx context.Context, config *so.Config, output *ent.TokenOutput) error {
 	outputCreatedTx, err := output.QueryOutputCreatedTokenTransaction().
 		Where(
-			tokentransaction.StatusEQ(st.TokenTransactionStatusRevealed),
-			tokentransaction.HasSpentOutput(),
+			tokentransaction.StatusIn(
+				st.TokenTransactionStatusRevealed,
+				st.TokenTransactionStatusSigned,
+			),
 		).
+		WithMint().
+		WithCreate().
 		WithPeerSignatures().
 		WithSpentOutput(func(q *ent.TokenOutputQuery) {
 			q.WithOutputCreatedTokenTransaction()
@@ -594,13 +598,17 @@ func tryFinalizeCreatedSignedOutput(ctx context.Context, config *so.Config, outp
 		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get parent transaction: %w", err))
 	}
 
-	signTokenHandler := NewSignTokenHandler(config)
-	err = signTokenHandler.TryFinalizeRevealedTokenTransaction(ctx, outputCreatedTx)
-	if err != nil {
-		return fmt.Errorf("failed to finalize revealed token transaction %s: %w", outputCreatedTx.ID, err)
+	txType := outputCreatedTx.InferTokenTransactionTypeEnt()
+	switch txType {
+	case utils.TokenTransactionTypeTransfer:
+		signTokenHandler := NewSignTokenHandler(config)
+		return signTokenHandler.TryFinalizeRevealedTokenTransaction(ctx, outputCreatedTx)
+	case utils.TokenTransactionTypeMint, utils.TokenTransactionTypeCreate:
+		finalizeHandler := NewInternalFinalizeTokenHandler(config)
+		return finalizeHandler.FinalizeMintOrCreateTransaction(ctx, outputCreatedTx)
+	default:
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unsupported transaction type %s for JIT finalization", txType))
 	}
-
-	return nil
 }
 
 // validateOutputIsSpendable checks if a output is eligible to be spent by verifying:
