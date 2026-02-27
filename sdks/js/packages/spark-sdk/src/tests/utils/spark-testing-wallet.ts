@@ -1,11 +1,9 @@
-import { QueryTransfersResponse, Transfer } from "../../proto/spark.js";
-import { ConfigOptions } from "../../services/wallet-config.js";
-import { SparkSigner } from "../../signer/signer.js";
-import type { SparkWalletProps } from "../../spark-wallet/types.js";
-import { BitcoinFaucet } from "./test-faucet.js";
 import { Transaction } from "@scure/btc-signer";
-import { SparkWallet, NetworkType } from "../../index.node.js";
+import { NetworkType, SparkWallet } from "../../index.node.js";
+import { QueryTransfersResponse, Transfer } from "../../proto/spark.js";
 import type { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
+import { SparkSigner } from "../../signer/signer.js";
+import { BitcoinFaucet } from "./test-faucet.js";
 
 export class SparkWalletTesting extends SparkWallet {
   protected override async setupBackgroundStream() {
@@ -60,6 +58,10 @@ export class SparkWalletTestingIntegration extends SparkWalletTesting {
 
   public getConnectionManager() {
     return this.connectionManager as ConnectionManagerNodeJS;
+  }
+
+  public getSwapService() {
+    return this.swapService;
   }
 
   public getTransferService() {
