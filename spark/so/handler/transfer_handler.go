@@ -2639,6 +2639,26 @@ func (h *TransferHandler) ClaimTransferSignRefundsV2(ctx context.Context, req *p
 	return h.claimTransferSignRefunds(ctx, req, true)
 }
 
+// validateTransferReadyForReceiverClaim checks that the transfer has progressed past
+// sender-side processing and is not in a terminal state. The transfer must be at
+// SENDER_KEY_TWEAKED or later for any receiver to begin claiming.
+func validateTransferReadyForReceiverClaim(transfer *ent.Transfer) error {
+	switch transfer.Status {
+	case st.TransferStatusSenderInitiated,
+		st.TransferStatusSenderInitiatedCoordinator,
+		st.TransferStatusSenderKeyTweakPending,
+		st.TransferStatusApplyingSenderKeyTweak:
+		return sparkerrors.FailedPreconditionInvalidState(
+			fmt.Errorf("transfer %s is not ready for receiver claim, sender-side status: %s",
+				transfer.ID, transfer.Status))
+	case st.TransferStatusExpired, st.TransferStatusReturned:
+		return sparkerrors.FailedPreconditionInvalidState(
+			fmt.Errorf("transfer %s is in terminal state %s", transfer.ID, transfer.Status))
+	default:
+		return nil
+	}
+}
+
 // ClaimTransfer claims a transfer in a single call. It combines key tweak delivery,
 // refund signing, signature aggregation, and finalization.
 func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransferRequest) (*pb.ClaimTransferResponse, error) {
@@ -2687,6 +2707,9 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 
 	// Read model determined by MIMO state
 	if isMimoReceiveEnabled {
+		if err := validateTransferReadyForReceiverClaim(transfer); err != nil {
+			return nil, err
+		}
 		switch receiver.Status {
 		case st.TransferReceiverStatusSenderInitiated:
 		case st.TransferReceiverStatusKeyTweaked:
@@ -3803,6 +3826,9 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 
 	// Read logic determined by MIMO receive state
 	if isMimoReceiveEnabled {
+		if err := validateTransferReadyForReceiverClaim(transfer); err != nil {
+			return err
+		}
 		if receiver.Status == st.TransferReceiverStatusCompleted {
 			// This receiver has already completed their claim, return early.
 			return nil
@@ -4060,6 +4086,18 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 	}
 
 	if isMimoReceiveEnabled {
+		if err := validateTransferReadyForReceiverClaim(transfer); err != nil {
+			if req.Action == pbinternal.SettleKeyTweakAction_COMMIT {
+				return err
+			}
+			// ROLLBACK always proceeds even when the transfer is not ready for receiver claim,
+			// to prevent resource leaks in the two-phase commit protocol.
+			logging.GetLoggerFromContext(ctx).Warn("SettleReceiverKeyTweak ROLLBACK proceeding despite transfer not ready for receiver claim",
+				zap.String("transfer_id", transferID.String()),
+				zap.String("transfer_status", string(transfer.Status)),
+				zap.Error(err),
+			)
+		}
 		switch receiver.Status {
 		case st.TransferReceiverStatusKeyTweakApplied,
 			st.TransferReceiverStatusRefundSigned,

@@ -208,6 +208,10 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 		return fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
 
+	if err := validateTransferReadyForReceiverClaim(transfer); err != nil {
+		return err
+	}
+
 	receiverPubKey, err := keys.ParsePublicKey(req.GetReceiverIdentityPublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to parse receiver identity public key: %w", err)

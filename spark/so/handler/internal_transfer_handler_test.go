@@ -463,6 +463,79 @@ func TestFinalizeTransferReceiver(t *testing.T) {
 	})
 }
 
+func TestFinalizeTransferReceiver_RejectsEarlyTransferStatus(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"regtest": {DepositConfirmationThreshold: 1},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+
+	rng := rand.NewChaCha8([32]byte{44})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	t.Run("rejects SenderInitiated transfer", func(t *testing.T) {
+		transfer, err := dbCtx.Client.Transfer.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetStatus(st.TransferStatusSenderInitiated).
+			SetType(st.TransferTypeTransfer).
+			SetSenderIdentityPubkey(senderPrivKey.Public()).
+			SetReceiverIdentityPubkey(receiverPrivKey.Public()).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(24 * time.Hour)).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = dbCtx.Client.TransferReceiver.Create().
+			SetTransfer(transfer).
+			SetIdentityPubkey(receiverPrivKey.Public()).
+			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			Save(ctx)
+		require.NoError(t, err)
+
+		handler := NewInternalTransferHandler(config)
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiverPrivKey.Public().Serialize(),
+			CompletionTimestamp:       timestamppb.Now(),
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not ready for receiver claim")
+	})
+
+	t.Run("rejects Expired transfer", func(t *testing.T) {
+		transfer, err := dbCtx.Client.Transfer.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetStatus(st.TransferStatusExpired).
+			SetType(st.TransferTypeTransfer).
+			SetSenderIdentityPubkey(senderPrivKey.Public()).
+			SetReceiverIdentityPubkey(receiverPrivKey.Public()).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(24 * time.Hour)).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = dbCtx.Client.TransferReceiver.Create().
+			SetTransfer(transfer).
+			SetIdentityPubkey(receiverPrivKey.Public()).
+			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			Save(ctx)
+		require.NoError(t, err)
+
+		handler := NewInternalTransferHandler(config)
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiverPrivKey.Public().Serialize(),
+			CompletionTimestamp:       timestamppb.Now(),
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "terminal state")
+	})
+}
+
 func TestApplySignatures(t *testing.T) {
 	t.Parallel()
 	ctx, dbCtx := db.NewTestSQLiteContext(t)

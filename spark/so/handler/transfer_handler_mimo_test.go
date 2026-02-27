@@ -130,6 +130,74 @@ func TestClaimTransferMIMO_AlreadyCompleted(t *testing.T) {
 	assert.Contains(t, err.Error(), "already been claimed by this receiver")
 }
 
+func TestClaimTransferMIMO_TransferNotReady(t *testing.T) {
+	sparktesting.RequireGripMock(t)
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	ctx = mimoEnabledContext(ctx)
+
+	rng := rand.NewChaCha8([32]byte{30})
+	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusSenderInitiated)
+
+	_, err := sessionCtx.Client.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverPubKey).
+		SetStatus(st.TransferReceiverStatusSenderInitiated).
+		Save(ctx)
+	require.NoError(t, err)
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	req := &pb.ClaimTransferRequest{
+		TransferId:             transfer.ID.String(),
+		OwnerIdentityPublicKey: receiverPubKey.Serialize(),
+		ClaimPackage: &pb.ClaimPackage{
+			LeavesToClaim:   []*pb.UserSignedTxSigningJob{},
+			KeyTweakPackage: map[string][]byte{"so1": []byte("data")},
+		},
+	}
+	_, err = handler.ClaimTransfer(ctx, req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not ready for receiver claim")
+}
+
+func TestClaimTransferMIMO_TransferExpired(t *testing.T) {
+	sparktesting.RequireGripMock(t)
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	ctx = mimoEnabledContext(ctx)
+
+	rng := rand.NewChaCha8([32]byte{31})
+	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusExpired)
+
+	_, err := sessionCtx.Client.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverPubKey).
+		SetStatus(st.TransferReceiverStatusSenderInitiated).
+		Save(ctx)
+	require.NoError(t, err)
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	req := &pb.ClaimTransferRequest{
+		TransferId:             transfer.ID.String(),
+		OwnerIdentityPublicKey: receiverPubKey.Serialize(),
+		ClaimPackage: &pb.ClaimPackage{
+			LeavesToClaim:   []*pb.UserSignedTxSigningJob{},
+			KeyTweakPackage: map[string][]byte{"so1": []byte("data")},
+		},
+	}
+	_, err = handler.ClaimTransfer(ctx, req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "terminal state")
+}
+
 // TestClaimTransferMIMO_LeafScopedByReceiver verifies that the MIMO path only considers leaves
 // assigned to the specific receiver (via the TransferLeaf→TransferReceiver FK), not all leaves
 // on the transfer. Creates 1 leaf linked to the receiver but submits 2 LeavesToClaim; the
@@ -230,6 +298,77 @@ func TestClaimTransferMIMO_ReceiverNotClaimableStatus(t *testing.T) {
 	_, err = handler.ClaimTransfer(ctx, req)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not in a claimable status")
+}
+
+func TestValidateTransferReadyForReceiverClaim(t *testing.T) {
+	tests := []struct {
+		name      string
+		status    st.TransferStatus
+		wantError bool
+		errSubstr string
+	}{
+		// Pre-SENDER_KEY_TWEAKED: reject
+		{
+			name:      "SenderInitiated",
+			status:    st.TransferStatusSenderInitiated,
+			wantError: true,
+			errSubstr: "not ready for receiver claim",
+		},
+		{
+			name:      "SenderInitiatedCoordinator",
+			status:    st.TransferStatusSenderInitiatedCoordinator,
+			wantError: true,
+			errSubstr: "not ready for receiver claim",
+		},
+		{
+			name:      "SenderKeyTweakPending",
+			status:    st.TransferStatusSenderKeyTweakPending,
+			wantError: true,
+			errSubstr: "not ready for receiver claim",
+		},
+		{
+			name:      "ApplyingSenderKeyTweak",
+			status:    st.TransferStatusApplyingSenderKeyTweak,
+			wantError: true,
+			errSubstr: "not ready for receiver claim",
+		},
+		// Terminal: reject
+		{
+			name:      "Expired",
+			status:    st.TransferStatusExpired,
+			wantError: true,
+			errSubstr: "terminal state",
+		},
+		{
+			name:      "Returned",
+			status:    st.TransferStatusReturned,
+			wantError: true,
+			errSubstr: "terminal state",
+		},
+		// SENDER_KEY_TWEAKED and later: allow
+		{name: "SenderKeyTweaked", status: st.TransferStatusSenderKeyTweaked},
+		{name: "ReceiverKeyTweaked", status: st.TransferStatusReceiverKeyTweaked},
+		{name: "ReceiverKeyTweakLocked", status: st.TransferStatusReceiverKeyTweakLocked},
+		{name: "ReceiverKeyTweakApplied", status: st.TransferStatusReceiverKeyTweakApplied},
+		{name: "ReceiverRefundSigned", status: st.TransferStatusReceiverRefundSigned},
+		{name: "Completed", status: st.TransferStatusCompleted},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			transfer := &ent.Transfer{
+				ID:     uuid.New(),
+				Status: tc.status,
+			}
+			err := validateTransferReadyForReceiverClaim(transfer)
+			if tc.wantError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errSubstr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 // TestClaimTransferTweakKeys_DualWritesReceiverStatus verifies that ClaimTransferTweakKeys
@@ -1300,5 +1439,128 @@ func TestSettleReceiverKeyTweak_RefundSignedReturnsEarly(t *testing.T) {
 		}
 		err = handler.SettleReceiverKeyTweak(enabledCtx, req)
 		assert.NoError(t, err)
+	})
+}
+
+func TestInitiateSettleReceiverKeyTweak_RejectsEarlyTransferStatus(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+
+	rng := rand.NewChaCha8([32]byte{42})
+	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	t.Run("MIMO: rejects SenderInitiated transfer", func(t *testing.T) {
+		enabledCtx := mimoEnabledContext(ctx)
+		transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusSenderInitiated)
+
+		_, err := sessionCtx.Client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverPubKey).
+			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			Save(ctx)
+		require.NoError(t, err)
+
+		req := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
+		}
+		err = handler.InitiateSettleReceiverKeyTweak(enabledCtx, req)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not ready for receiver claim")
+	})
+
+	t.Run("MIMO: rejects Expired transfer", func(t *testing.T) {
+		enabledCtx := mimoEnabledContext(ctx)
+		transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusExpired)
+
+		_, err := sessionCtx.Client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverPubKey).
+			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			Save(ctx)
+		require.NoError(t, err)
+
+		req := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
+		}
+		err = handler.InitiateSettleReceiverKeyTweak(enabledCtx, req)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "terminal state")
+	})
+}
+
+func TestSettleReceiverKeyTweak_RejectsEarlyTransferStatus(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+
+	rng := rand.NewChaCha8([32]byte{43})
+	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	t.Run("MIMO: COMMIT rejects SenderInitiated transfer", func(t *testing.T) {
+		enabledCtx := mimoEnabledContext(ctx)
+		transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusSenderInitiated)
+
+		_, err := sessionCtx.Client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverPubKey).
+			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			Save(ctx)
+		require.NoError(t, err)
+
+		req := &pbinternal.SettleReceiverKeyTweakRequest{
+			TransferId:                transfer.ID.String(),
+			Action:                    pbinternal.SettleKeyTweakAction_COMMIT,
+			ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
+		}
+		err = handler.SettleReceiverKeyTweak(enabledCtx, req)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not ready for receiver claim")
+	})
+
+	t.Run("MIMO: ROLLBACK proceeds despite SenderInitiated transfer", func(t *testing.T) {
+		enabledCtx := mimoEnabledContext(ctx)
+		transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusSenderInitiated)
+
+		_, err := sessionCtx.Client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverPubKey).
+			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			Save(ctx)
+		require.NoError(t, err)
+
+		req := &pbinternal.SettleReceiverKeyTweakRequest{
+			TransferId:                transfer.ID.String(),
+			Action:                    pbinternal.SettleKeyTweakAction_ROLLBACK,
+			ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
+		}
+		err = handler.SettleReceiverKeyTweak(enabledCtx, req)
+		require.NoError(t, err)
+	})
+
+	t.Run("MIMO: ROLLBACK proceeds despite Expired transfer", func(t *testing.T) {
+		enabledCtx := mimoEnabledContext(ctx)
+		transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusExpired)
+
+		_, err := sessionCtx.Client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverPubKey).
+			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			Save(ctx)
+		require.NoError(t, err)
+
+		req := &pbinternal.SettleReceiverKeyTweakRequest{
+			TransferId:                transfer.ID.String(),
+			Action:                    pbinternal.SettleKeyTweakAction_ROLLBACK,
+			ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
+		}
+		err = handler.SettleReceiverKeyTweak(enabledCtx, req)
+		require.NoError(t, err)
 	})
 }
