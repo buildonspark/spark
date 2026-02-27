@@ -2625,6 +2625,38 @@ func isMimoReceiveEnabled(ctx context.Context, receiver *ent.TransferReceiver) b
 	return receiver != nil && knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoTransferMultiReceiverEnabled, 0) > 0
 }
 
+// buildFinalizeGossipMessage constructs the gossip message for transfer finalization.
+// MIMO-enabled transfers use a per-receiver message; legacy transfers use a transfer-level message.
+func buildFinalizeGossipMessage(
+	mimoEnabled bool,
+	transferID uuid.UUID,
+	receiver *ent.TransferReceiver,
+	internalNodes []*pbinternal.TreeNode,
+	completionTimestamp *timestamppb.Timestamp,
+) *pbgossip.GossipMessage {
+	if mimoEnabled {
+		return &pbgossip.GossipMessage{
+			Message: &pbgossip.GossipMessage_FinalizeTransferReceiver{
+				FinalizeTransferReceiver: &pbgossip.GossipMessageFinalizeTransferReceiver{
+					TransferId:                transferID.String(),
+					ReceiverIdentityPublicKey: receiver.IdentityPubkey.Serialize(),
+					InternalNodes:             internalNodes,
+					CompletionTimestamp:       completionTimestamp,
+				},
+			},
+		}
+	}
+	return &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_FinalizeTransfer{
+			FinalizeTransfer: &pbgossip.GossipMessageFinalizeTransfer{
+				TransferId:          transferID.String(),
+				InternalNodes:       internalNodes,
+				CompletionTimestamp: completionTimestamp,
+			},
+		},
+	}
+}
+
 // Create a query to fetch all the leaves for the current transfer; scoped to the receiver if one is provided.
 func getTransferLeavesForReceiverQuery(ctx context.Context, transfer *ent.Transfer, receiver *ent.TransferReceiver) *ent.TransferLeafQuery {
 	transferLeavesQuery := transfer.QueryTransferLeaves()
@@ -3115,15 +3147,9 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 	}
 	sendGossipHandler := NewSendGossipHandler(h.config)
 	completionTimestamp := timestamppb.New(completionTime)
-	_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
-		Message: &pbgossip.GossipMessage_FinalizeTransfer{
-			FinalizeTransfer: &pbgossip.GossipMessageFinalizeTransfer{
-				TransferId:          transferID.String(),
-				InternalNodes:       internalNodes,
-				CompletionTimestamp: completionTimestamp,
-			},
-		},
-	}, participants)
+
+	gossipMsg := buildFinalizeGossipMessage(isMimoReceiveEnabled, transferID, receiver, internalNodes, completionTimestamp)
+	_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, gossipMsg, participants)
 	if err != nil {
 		return nil, fmt.Errorf("unable to send finalize transfer gossip: %w", err)
 	}

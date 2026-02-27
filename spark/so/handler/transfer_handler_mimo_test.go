@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // createTestTransferForMIMO creates an ent.Transfer record with the given sender/receiver
@@ -799,6 +800,41 @@ func TestIsMimoReceiveEnabled(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+// TestBuildFinalizeGossipMessage verifies that buildFinalizeGossipMessage produces the
+// correct gossip message type and populates the expected fields:
+//
+//	mimoEnabled == true  → GossipMessageFinalizeTransferReceiver (with receiver pubkey)
+//	mimoEnabled == false → GossipMessageFinalizeTransfer         (legacy, no receiver pubkey)
+func TestBuildFinalizeGossipMessage(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{42})
+	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiver := &ent.TransferReceiver{IdentityPubkey: receiverPubKey}
+	transferID := uuid.New()
+	nodes := []*pbinternal.TreeNode{{Id: "node-1"}}
+	ts := timestamppb.Now()
+
+	t.Run("MIMO enabled: FinalizeTransferReceiver with receiver pubkey", func(t *testing.T) {
+		msg := buildFinalizeGossipMessage(true, transferID, receiver, nodes, ts)
+		inner := msg.GetFinalizeTransferReceiver()
+		require.NotNil(t, inner, "expected FinalizeTransferReceiver message")
+		assert.Nil(t, msg.GetFinalizeTransfer(), "should not contain legacy FinalizeTransfer")
+		assert.Equal(t, transferID.String(), inner.TransferId)
+		assert.Equal(t, receiverPubKey.Serialize(), inner.ReceiverIdentityPublicKey)
+		assert.Equal(t, nodes, inner.InternalNodes)
+		assert.True(t, proto.Equal(ts, inner.CompletionTimestamp))
+	})
+
+	t.Run("MIMO disabled: legacy FinalizeTransfer", func(t *testing.T) {
+		msg := buildFinalizeGossipMessage(false, transferID, nil, nodes, ts)
+		inner := msg.GetFinalizeTransfer()
+		require.NotNil(t, inner, "expected FinalizeTransfer message")
+		assert.Nil(t, msg.GetFinalizeTransferReceiver(), "should not contain FinalizeTransferReceiver")
+		assert.Equal(t, transferID.String(), inner.TransferId)
+		assert.Equal(t, nodes, inner.InternalNodes)
+		assert.True(t, proto.Equal(ts, inner.CompletionTimestamp))
+	})
 }
 
 func TestVerifyClaimPackageSignature(t *testing.T) {

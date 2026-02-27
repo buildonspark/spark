@@ -463,6 +463,332 @@ func TestFinalizeTransferReceiver(t *testing.T) {
 	})
 }
 
+func TestFinalizeTransferReceiverMultiReceiver(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"regtest": {DepositConfirmationThreshold: 1},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+
+	// Deterministic key generation for reproducibility.
+	rng := rand.NewChaCha8([32]byte{10})
+
+	// Keys.
+	senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiver1IdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiver2IdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingPrivKey1 := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerSigningPrivKey1 := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingPrivKey2 := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerSigningPrivKey2 := keys.MustGeneratePrivateKeyFromRand(rng)
+	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	// Initial tx bytes stored on tree nodes before the transfer.
+	rawTx1 := createTestTxBytes(t, 10_000)
+	rawRefundTx1 := createTestTxBytes(t, 10_001)
+	directRefundTx1 := createTestTxBytes(t, 10_003)
+	directFromCpfpRefundTx1 := createTestTxBytes(t, 10_004)
+
+	rawTx2 := createTestTxBytes(t, 20_000)
+	rawRefundTx2 := createTestTxBytes(t, 20_001)
+	directRefundTx2 := createTestTxBytes(t, 20_003)
+	directFromCpfpRefundTx2 := createTestTxBytes(t, 20_004)
+
+	// Tx bytes delivered via gossip after the coordinator finalizes the claim.
+	// In production, RawTx is unchanged by transfers (the UTXO stays the same;
+	// only FROST key shares are tweaked so the new owner can spend it). The
+	// coordinator's updateNode passes RawTx through as-is for TRANSFER intent
+	// and MarshalInternalProto includes it in the gossip payload. The receiving
+	// SO writes it back unconditionally. We use distinct values here so that
+	// assertions can verify which leaf was written by which gossip message.
+	//
+	// Refund txs DO change in production — they get new aggregated FROST
+	// signatures for the receiver's tweaked key shares.
+	rawTx1Updated := createTestTxBytes(t, 11_000)
+	rawRefundTx1Updated := createTestTxBytes(t, 11_001)
+	directRefundTx1Updated := createTestTxBytes(t, 11_003)
+	directFromCpfpRefundTx1Updated := createTestTxBytes(t, 11_004)
+
+	rawTx2Updated := createTestTxBytes(t, 21_000)
+	rawRefundTx2Updated := createTestTxBytes(t, 21_001)
+	directRefundTx2Updated := createTestTxBytes(t, 21_003)
+	directFromCpfpRefundTx2Updated := createTestTxBytes(t, 21_004)
+
+	// Shared signing keyshare.
+	signingKeyshare, err := dbCtx.Client.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keysharePrivKey).
+		SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+		SetPublicKey(keysharePrivKey.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Two trees — one per leaf.
+	baseTxid1 := st.NewRandomTxIDForTesting(t)
+	tree1, err := dbCtx.Client.Tree.Create().
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Regtest).
+		SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+		SetBaseTxid(baseTxid1).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	baseTxid2 := st.NewRandomTxIDForTesting(t)
+	tree2, err := dbCtx.Client.Tree.Create().
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Regtest).
+		SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+		SetBaseTxid(baseTxid2).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Leaf 1 — will be assigned to receiver 1 via TransferLeaf.
+	leaf1, err := dbCtx.Client.TreeNode.Create().
+		SetStatus(st.TreeNodeStatusTransferLocked).
+		SetTree(tree1).
+		SetNetwork(tree1.Network).
+		SetSigningKeyshare(signingKeyshare).
+		SetValue(5000).
+		SetVerifyingPubkey(verifyingPrivKey1.Public()).
+		SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+		SetOwnerSigningPubkey(ownerSigningPrivKey1.Public()).
+		SetRawTx(rawTx1).
+		SetRawRefundTx(rawRefundTx1).
+		SetDirectRefundTx(directRefundTx1).
+		SetDirectFromCpfpRefundTx(directFromCpfpRefundTx1).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Leaf 2 — will be assigned to receiver 2 via TransferLeaf.
+	leaf2, err := dbCtx.Client.TreeNode.Create().
+		SetStatus(st.TreeNodeStatusTransferLocked).
+		SetTree(tree2).
+		SetNetwork(tree2.Network).
+		SetSigningKeyshare(signingKeyshare).
+		SetValue(3000).
+		SetVerifyingPubkey(verifyingPrivKey2.Public()).
+		SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+		SetOwnerSigningPubkey(ownerSigningPrivKey2.Public()).
+		SetRawTx(rawTx2).
+		SetRawRefundTx(rawRefundTx2).
+		SetDirectRefundTx(directRefundTx2).
+		SetDirectFromCpfpRefundTx(directFromCpfpRefundTx2).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Transfer with two receivers.
+	transfer, err := dbCtx.Client.Transfer.Create().
+		SetNetwork(btcnetwork.Regtest).
+		SetStatus(st.TransferStatusReceiverRefundSigned).
+		SetType(st.TransferTypeTransfer).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiver1IdentityPrivKey.Public()).
+		SetTotalValue(8000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Receiver 1.
+	receiver1, err := dbCtx.Client.TransferReceiver.Create().
+		SetTransfer(transfer).
+		SetIdentityPubkey(receiver1IdentityPrivKey.Public()).
+		SetStatus(st.TransferReceiverStatusRefundSigned).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Receiver 2.
+	receiver2, err := dbCtx.Client.TransferReceiver.Create().
+		SetTransfer(transfer).
+		SetIdentityPubkey(receiver2IdentityPrivKey.Public()).
+		SetStatus(st.TransferReceiverStatusRefundSigned).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// TransferLeaf 1 → leaf1, linked to receiver1.
+	_, err = dbCtx.Client.TransferLeaf.Create().
+		SetTransfer(transfer).
+		SetLeaf(leaf1).
+		SetTransferReceiver(receiver1).
+		SetPreviousRefundTx(createTestTxBytes(t, 30_000)).
+		SetIntermediateRefundTx(createTestTxBytes(t, 30_001)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// TransferLeaf 2 → leaf2, linked to receiver2.
+	_, err = dbCtx.Client.TransferLeaf.Create().
+		SetTransfer(transfer).
+		SetLeaf(leaf2).
+		SetTransferReceiver(receiver2).
+		SetPreviousRefundTx(createTestTxBytes(t, 30_002)).
+		SetIntermediateRefundTx(createTestTxBytes(t, 30_003)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := NewInternalTransferHandler(config)
+
+	// Gossip nodes delivered by coordinator.
+	gossipNode1 := &pbinternal.TreeNode{
+		Id:                     leaf1.ID.String(),
+		RawTx:                  rawTx1Updated,
+		RawRefundTx:            rawRefundTx1Updated,
+		DirectRefundTx:         directRefundTx1Updated,
+		DirectFromCpfpRefundTx: directFromCpfpRefundTx1Updated,
+	}
+	gossipNode2 := &pbinternal.TreeNode{
+		Id:                     leaf2.ID.String(),
+		RawTx:                  rawTx2Updated,
+		RawRefundTx:            rawRefundTx2Updated,
+		DirectRefundTx:         directRefundTx2Updated,
+		DirectFromCpfpRefundTx: directFromCpfpRefundTx2Updated,
+	}
+
+	t.Run("two receivers finalize independently", func(t *testing.T) {
+		ts1 := timestamppb.New(time.Now().Truncate(time.Microsecond))
+
+		// --- Finalize receiver 1 ---
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiver1IdentityPrivKey.Public().Serialize(),
+			InternalNodes:             []*pbinternal.TreeNode{gossipNode1},
+			CompletionTimestamp:       ts1,
+		})
+		require.NoError(t, err)
+
+		// Mid-transaction verification: receiver 1 completed, receiver 2 unchanged, transfer NOT completed.
+		txDB, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+
+		r1, err := txDB.TransferReceiver.Get(ctx, receiver1.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferReceiverStatusCompleted, r1.Status)
+
+		r2, err := txDB.TransferReceiver.Get(ctx, receiver2.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferReceiverStatusRefundSigned, r2.Status, "receiver 2 should be unchanged")
+
+		xfer, err := txDB.Transfer.Get(ctx, transfer.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferStatusReceiverRefundSigned, xfer.Status, "transfer should not be completed yet")
+
+		// Leaf 1 should be Available; leaf 2 should still be TransferLocked.
+		l1, err := txDB.TreeNode.Get(ctx, leaf1.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TreeNodeStatusAvailable, l1.Status)
+		assert.Equal(t, rawTx1Updated, l1.RawTx)
+
+		l2, err := txDB.TreeNode.Get(ctx, leaf2.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TreeNodeStatusTransferLocked, l2.Status, "leaf 2 should be untouched")
+		assert.Equal(t, rawTx2, l2.RawTx, "leaf 2 raw tx should be original")
+
+		// --- Finalize receiver 2 ---
+		ts2 := timestamppb.New(time.Now().Truncate(time.Microsecond))
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiver2IdentityPrivKey.Public().Serialize(),
+			InternalNodes:             []*pbinternal.TreeNode{gossipNode2},
+			CompletionTimestamp:       ts2,
+		})
+		require.NoError(t, err)
+
+		// Commit and verify final state.
+		entTx, err := ent.GetTxFromContext(ctx)
+		require.NoError(t, err)
+		err = entTx.Commit()
+		require.NoError(t, err)
+
+		// Both receivers completed.
+		r1Final, err := dbCtx.Client.TransferReceiver.Get(ctx, receiver1.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferReceiverStatusCompleted, r1Final.Status)
+
+		r2Final, err := dbCtx.Client.TransferReceiver.Get(ctx, receiver2.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferReceiverStatusCompleted, r2Final.Status)
+
+		// Transfer completed.
+		xferFinal, err := dbCtx.Client.Transfer.Get(ctx, transfer.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferStatusCompleted, xferFinal.Status)
+
+		// Both leaves available with updated txs.
+		l1Final, err := dbCtx.Client.TreeNode.Get(ctx, leaf1.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TreeNodeStatusAvailable, l1Final.Status)
+		assert.Equal(t, rawTx1Updated, l1Final.RawTx)
+		assert.Equal(t, rawRefundTx1Updated, l1Final.RawRefundTx)
+		assert.Equal(t, directRefundTx1Updated, l1Final.DirectRefundTx)
+		assert.Equal(t, directFromCpfpRefundTx1Updated, l1Final.DirectFromCpfpRefundTx)
+
+		l2Final, err := dbCtx.Client.TreeNode.Get(ctx, leaf2.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TreeNodeStatusAvailable, l2Final.Status)
+		assert.Equal(t, rawTx2Updated, l2Final.RawTx)
+		assert.Equal(t, rawRefundTx2Updated, l2Final.RawRefundTx)
+		assert.Equal(t, directRefundTx2Updated, l2Final.DirectRefundTx)
+		assert.Equal(t, directFromCpfpRefundTx2Updated, l2Final.DirectFromCpfpRefundTx)
+	})
+
+	t.Run("idempotent replay with same timestamp succeeds", func(t *testing.T) {
+		// receiver1 is already Completed from the previous subtest.
+		// Replaying with the same timestamp and same nodes should succeed.
+		r1, err := dbCtx.Client.TransferReceiver.Get(ctx, receiver1.ID)
+		require.NoError(t, err)
+		ts := timestamppb.New(r1.CompletionTime)
+
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiver1IdentityPrivKey.Public().Serialize(),
+			InternalNodes:             []*pbinternal.TreeNode{gossipNode1},
+			CompletionTimestamp:       ts,
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("replay with different timestamp errors", func(t *testing.T) {
+		// receiver1 is already Completed. A different timestamp should be rejected.
+		differentTs := timestamppb.New(time.Now().Add(1 * time.Hour).Truncate(time.Microsecond))
+
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiver1IdentityPrivKey.Public().Serialize(),
+			InternalNodes:             []*pbinternal.TreeNode{gossipNode1},
+			CompletionTimestamp:       differentTs,
+		})
+		require.ErrorContains(t, err, "already completed at")
+	})
+
+	t.Run("node not belonging to receiver is rejected", func(t *testing.T) {
+		// Send receiver1's gossip message but with receiver2's node.
+		wrongNode := &pbinternal.TreeNode{
+			Id:                     leaf2.ID.String(),
+			RawTx:                  rawTx2Updated,
+			RawRefundTx:            rawRefundTx2Updated,
+			DirectRefundTx:         directRefundTx2Updated,
+			DirectFromCpfpRefundTx: directFromCpfpRefundTx2Updated,
+		}
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiver1IdentityPrivKey.Public().Serialize(),
+			InternalNodes:             []*pbinternal.TreeNode{wrongNode},
+			CompletionTimestamp:       timestamppb.Now(),
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not in receiver's leaves")
+	})
+}
+
 func TestFinalizeTransferReceiver_RejectsEarlyTransferStatus(t *testing.T) {
 	ctx, dbCtx := db.ConnectToTestPostgres(t)
 
