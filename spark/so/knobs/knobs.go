@@ -117,6 +117,7 @@ const (
 	KnobEnhancedTransferReceiveValidation = "spark.so.enhanced_transfer_receive_validation"
 
 	KnobShutdownRenewNode        = "spark.so.shutdown_renew_node"
+	KnobShutdownHodlInvoices     = "spark.so.shutdown_hodl_invoices"
 	KnobDirectRefundTxValidation = "spark.so.direct_refund_tx_validation"
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)

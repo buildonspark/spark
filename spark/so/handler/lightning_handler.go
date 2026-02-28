@@ -1274,6 +1274,11 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 			if !ent.IsNotFound(err) {
 				return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
 			}
+			if knobs.GetKnobsService(ctx).GetValue(knobs.KnobShutdownHodlInvoices, 0) > 0 {
+				return nil, sparkerrors.UnavailableMethodDisabled(
+					fmt.Errorf("hodl invoices are currently disabled"),
+				)
+			}
 		} else if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
 			return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(
 				fmt.Errorf("preimage share owner identity public key mismatch for payment hash: %x", req.PaymentHash),
