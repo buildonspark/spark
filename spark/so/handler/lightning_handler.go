@@ -1209,6 +1209,9 @@ func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbsp
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
 		t := time.Now().Add(LightningPaymentExpiryDuration)
 		expireTimeOverride = &t
+	} else if req.TransferRequest != nil && req.TransferRequest.ExpiryTime != nil && !req.TransferRequest.ExpiryTime.AsTime().IsZero() {
+		t := req.TransferRequest.ExpiryTime.AsTime()
+		expireTimeOverride = &t
 	} else {
 		t := time.Now().Add(LightningReceiveExpiryDuration)
 		expireTimeOverride = &t
@@ -1307,6 +1310,24 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		return nil, err
 	}
 
+	// Receive preimage swap only has expiry time when it is HODL invoice.
+	// Apply the override before validation so that Transfer and TransferRequest
+	// have matching expiry times when checked below.
+	if expireTimeOverride != nil && (req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND || preimageShare == nil) {
+		req.Transfer.ExpiryTime = timestamppb.New(*expireTimeOverride)
+		if req.TransferRequest != nil {
+			req.TransferRequest.ExpiryTime = timestamppb.New(*expireTimeOverride)
+		}
+	}
+
+	// We do not want expiry times for receive preimage swap when it is a non-HODL invoice or else these transfers will be cancelled by the cancel_expired_transfers task.
+	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && preimageShare != nil {
+		req.Transfer.ExpiryTime = nil
+		if req.TransferRequest != nil {
+			req.TransferRequest.ExpiryTime = nil
+		}
+	}
+
 	// TODO: Once SSP has removed the query user refund call, we can replace everything with transfer request and remove this validation.
 	// Currently all validation is done in req.Transfer, so we only need to validate that req.TransferRequest has all the same leaves as req.Transfer.
 	// The transactions will be reconstructed before signing, so we don't need to validate the transactions themselves.
@@ -1348,14 +1369,6 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	for i := range req.Transfer.DirectFromCpfpLeavesToSend {
 		directFromCpfpTransaction := req.Transfer.DirectFromCpfpLeavesToSend[i]
 		directFromCpfpLeafRefundMap[directFromCpfpTransaction.LeafId] = directFromCpfpTransaction.RawTx
-	}
-
-	// Receive preimage swap only has expiry time when it is HODL invoice.
-	if expireTimeOverride != nil && (req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND || preimageShare == nil) {
-		req.Transfer.ExpiryTime = timestamppb.New(*expireTimeOverride)
-		if req.TransferRequest != nil {
-			req.TransferRequest.ExpiryTime = timestamppb.New(*expireTimeOverride)
-		}
 	}
 	// TODO: (LIG-8397) Remove once we can remove transfer
 	expiryTime := req.Transfer.ExpiryTime.AsTime()
