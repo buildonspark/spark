@@ -43,7 +43,7 @@ describe("Lightning Network provider", () => {
         let invoice = await walletStatic.createLightningInvoice({
           amountSats: amountSats,
           memo: "test",
-          expirySeconds: 10,
+          expirySeconds: 100,
         });
 
         expect(invoice).toBeDefined();
@@ -104,7 +104,7 @@ describe("Lightning Network provider", () => {
       const invoice = await bobWallet.createLightningInvoice({
         amountSats: INVOICE_AMOUNT,
         memo: "test",
-        expirySeconds: 10,
+        expirySeconds: 100,
       });
 
       expect(invoice).toBeDefined();
