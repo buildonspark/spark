@@ -878,16 +878,17 @@ func AllStartupTasks() []StartupTaskSpec {
 						return nil
 					}
 					logger := logging.GetLoggerFromContext(ctx)
-					db, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get database: %w", err)
-					}
 
 					const batchSize = 1000
 					totalUpdated := 0
 					var cursor uuid.UUID
 
 					for {
+						db, err := ent.GetDbFromContext(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to get database: %w", err)
+						}
+
 						query := db.TokenTransaction.Query().
 							Where(
 								tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
@@ -947,6 +948,10 @@ func AllStartupTasks() []StartupTaskSpec {
 							}
 							totalUpdated += updated
 							logger.Sugar().Infof("Updated %d v3 mint/create transactions to FINALIZED (total: %d)", updated, totalUpdated)
+						}
+
+						if err := ent.DbCommit(ctx); err != nil {
+							return fmt.Errorf("failed to commit batch: %w", err)
 						}
 
 						if len(transactions) < batchSize {
