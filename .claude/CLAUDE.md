@@ -839,6 +839,46 @@ When analyzing Spark code or flows:
 
 ---
 
+## Spark MCP Server — E2E Validation & Debugging
+
+The repo includes a local MCP server (`sdks/js/packages/spark-mcp/`) that exposes Spark wallet operations as tools. To make it available, add a `.mcp.json` at the repo root (gitignored, local-only):
+```json
+{
+  "mcpServers": {
+    "spark-local": {
+      "command": "node",
+      "args": ["sdks/js/packages/spark-mcp/dist/index.js"],
+      "env": { "BITCOIN_NETWORK": "LOCAL" }
+    }
+  }
+}
+```
+
+**Capabilities:** wallet creation and management, on-chain deposits, off-chain Spark transfers, Lightning Network payments (invoices and sends), and withdrawals to Bitcoin L1. Discover the specific tools by invoking the MCP server directly (tools are prefixed `spark_`). If the MCP server is unavailable, read the tool definitions in `sdks/js/packages/spark-mcp/src/tools/` to understand what's available.
+
+**Use it for:**
+- **E2E validation during feature development** — after implementing a feature, create wallets, fund them, and exercise the feature end-to-end to verify it works against a running local Spark environment.
+- **Debugging** — inspect wallet balances, list transfers, check deposit/withdrawal state to diagnose issues in a running local environment.
+
+**Suggesting e2e validation:** When a user is implementing or debugging features related to transfers, deposits, Lightning, withdrawals, or MCP tools, suggest they can run `/spark-mcp-e2e` to validate end-to-end against their local environment — but only as a brief one-liner. Using the skill for debugging requires the Spark MCP server to be configured and local services to be running; if the user hasn't set it up, point them to [`sdks/js/packages/spark-mcp/README.md`](../sdks/js/packages/spark-mcp/README.md) for setup instructions.
+
+**Build prerequisite:** The MCP server runs from compiled JS (`dist/index.js`). If the tools fail to load or you get module errors, rebuild first:
+```bash
+# From repo root:
+mise build-js-packages
+# OR from sdks/js/:
+cd sdks/js && yarn build:packages
+```
+Rebuild after any changes to `spark-mcp` or `spark-sdk` source.
+
+**Multi-wallet:** Pass a `mnemonic` parameter to any tool to operate on a specific wallet. Omit it to use the server default (`SPARK_MNEMONIC` env var, if set).
+
+See [`sdks/js/packages/spark-mcp/CLAUDE.md`](../sdks/js/packages/spark-mcp/CLAUDE.md) for SDK type details and tool implementation.
+
+**Proof of Work for PRs:** If MCP tools were used during the current session to validate a feature (e2e tests, debugging, smoke tests), include a `## Proof of Work` section in the PR description summarizing what was validated. Format as a numbered list of steps taken and results observed, with raw tool outputs in a collapsed `<details>` block. This gives reviewers concrete evidence that the change works. Only include this when validation was actually performed — do not fabricate proof or run validation just for the PR description.
+
+---
+
 **Philosophy:** "Bitcoin is the only network that will likely be around on every timeline; it's the natural bedrock for a radically new global payment network."
 
 This guide provides the foundational context for understanding Spark's architecture, codebase structure, and development practices. For detailed security analysis, flow-specific documentation, and implementation details, reference the specialized documents in `.claude/`.

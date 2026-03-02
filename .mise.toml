@@ -31,6 +31,7 @@ spark-cli-loadtest = { dir = "{{config_root}}/sdks/js", run = 'yarn install && y
 test-go = { dir = "{{config_root}}/spark", run = 'mise test-unit' }
 test-grpc = { dir = "{{config_root}}/spark", run = 'mise test-grpc' }
 test-grpc-minikube = { dir = "{{config_root}}/spark", run = 'mise test-grpc-minikube' }
+build-js-packages = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages' }
 test-js = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test' }
 test-js-integration = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test:integration' }
 test-js-integration-minikube = { dir = "{{config_root}}/sdks/js", run = 'yarn install && MINIKUBE_IP=$(minikube ip) yarn test:integration' }
