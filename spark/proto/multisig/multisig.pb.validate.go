@@ -175,22 +175,22 @@ var _ interface {
 	ErrorName() string
 } = MultisigConfigValidationError{}
 
-// Validate checks the field values on MultisigSignature with the rules defined
-// in the proto definition for this message. If any rules are violated, the
-// first error encountered is returned, or nil if there are no violations.
-func (m *MultisigSignature) Validate() error {
+// Validate checks the field values on KeyedSignature with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *KeyedSignature) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on MultisigSignature with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// MultisigSignatureMultiError, or nil if none found.
-func (m *MultisigSignature) ValidateAll() error {
+// ValidateAll checks the field values on KeyedSignature with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in KeyedSignatureMultiError,
+// or nil if none found.
+func (m *KeyedSignature) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *MultisigSignature) validate(all bool) error {
+func (m *KeyedSignature) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -198,7 +198,7 @@ func (m *MultisigSignature) validate(all bool) error {
 	var errors []error
 
 	if len(m.GetPublicKey()) != 33 {
-		err := MultisigSignatureValidationError{
+		err := KeyedSignatureValidationError{
 			field:  "PublicKey",
 			reason: "value length must be 33 bytes",
 		}
@@ -209,7 +209,7 @@ func (m *MultisigSignature) validate(all bool) error {
 	}
 
 	if l := len(m.GetSignature()); l < 64 || l > 73 {
-		err := MultisigSignatureValidationError{
+		err := KeyedSignatureValidationError{
 			field:  "Signature",
 			reason: "value length must be between 64 and 73 bytes, inclusive",
 		}
@@ -220,19 +220,19 @@ func (m *MultisigSignature) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return MultisigSignatureMultiError(errors)
+		return KeyedSignatureMultiError(errors)
 	}
 
 	return nil
 }
 
-// MultisigSignatureMultiError is an error wrapping multiple validation errors
-// returned by MultisigSignature.ValidateAll() if the designated constraints
+// KeyedSignatureMultiError is an error wrapping multiple validation errors
+// returned by KeyedSignature.ValidateAll() if the designated constraints
 // aren't met.
-type MultisigSignatureMultiError []error
+type KeyedSignatureMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m MultisigSignatureMultiError) Error() string {
+func (m KeyedSignatureMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -241,11 +241,11 @@ func (m MultisigSignatureMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m MultisigSignatureMultiError) AllErrors() []error { return m }
+func (m KeyedSignatureMultiError) AllErrors() []error { return m }
 
-// MultisigSignatureValidationError is the validation error returned by
-// MultisigSignature.Validate if the designated constraints aren't met.
-type MultisigSignatureValidationError struct {
+// KeyedSignatureValidationError is the validation error returned by
+// KeyedSignature.Validate if the designated constraints aren't met.
+type KeyedSignatureValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -253,24 +253,22 @@ type MultisigSignatureValidationError struct {
 }
 
 // Field function returns field value.
-func (e MultisigSignatureValidationError) Field() string { return e.field }
+func (e KeyedSignatureValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e MultisigSignatureValidationError) Reason() string { return e.reason }
+func (e KeyedSignatureValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e MultisigSignatureValidationError) Cause() error { return e.cause }
+func (e KeyedSignatureValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e MultisigSignatureValidationError) Key() bool { return e.key }
+func (e KeyedSignatureValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e MultisigSignatureValidationError) ErrorName() string {
-	return "MultisigSignatureValidationError"
-}
+func (e KeyedSignatureValidationError) ErrorName() string { return "KeyedSignatureValidationError" }
 
 // Error satisfies the builtin error interface
-func (e MultisigSignatureValidationError) Error() string {
+func (e KeyedSignatureValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -282,14 +280,14 @@ func (e MultisigSignatureValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sMultisigSignature.%s: %s%s",
+		"invalid %sKeyedSignature.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = MultisigSignatureValidationError{}
+var _ error = KeyedSignatureValidationError{}
 
 var _ interface {
 	Field() string
@@ -297,7 +295,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = MultisigSignatureValidationError{}
+} = KeyedSignatureValidationError{}
 
 // Validate checks the field values on MultisigSignatureSet with the rules
 // defined in the proto definition for this message. If any rules are

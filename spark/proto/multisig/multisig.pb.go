@@ -83,7 +83,7 @@ func (x *MultisigConfig) GetPublicKeys() [][]byte {
 	return nil
 }
 
-type MultisigSignature struct {
+type KeyedSignature struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PublicKey     []byte                 `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
 	Signature     []byte                 `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
@@ -91,20 +91,20 @@ type MultisigSignature struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *MultisigSignature) Reset() {
-	*x = MultisigSignature{}
+func (x *KeyedSignature) Reset() {
+	*x = KeyedSignature{}
 	mi := &file_multisig_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *MultisigSignature) String() string {
+func (x *KeyedSignature) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*MultisigSignature) ProtoMessage() {}
+func (*KeyedSignature) ProtoMessage() {}
 
-func (x *MultisigSignature) ProtoReflect() protoreflect.Message {
+func (x *KeyedSignature) ProtoReflect() protoreflect.Message {
 	mi := &file_multisig_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -116,19 +116,19 @@ func (x *MultisigSignature) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use MultisigSignature.ProtoReflect.Descriptor instead.
-func (*MultisigSignature) Descriptor() ([]byte, []int) {
+// Deprecated: Use KeyedSignature.ProtoReflect.Descriptor instead.
+func (*KeyedSignature) Descriptor() ([]byte, []int) {
 	return file_multisig_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *MultisigSignature) GetPublicKey() []byte {
+func (x *KeyedSignature) GetPublicKey() []byte {
 	if x != nil {
 		return x.PublicKey
 	}
 	return nil
 }
 
-func (x *MultisigSignature) GetSignature() []byte {
+func (x *KeyedSignature) GetSignature() []byte {
 	if x != nil {
 		return x.Signature
 	}
@@ -138,7 +138,7 @@ func (x *MultisigSignature) GetSignature() []byte {
 type MultisigSignatureSet struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	MultisigIdentifier []byte                 `protobuf:"bytes,1,opt,name=multisig_identifier,json=multisigIdentifier,proto3" json:"multisig_identifier,omitempty"`
-	Signatures         []*MultisigSignature   `protobuf:"bytes,2,rep,name=signatures,proto3" json:"signatures,omitempty"`
+	Signatures         []*KeyedSignature      `protobuf:"bytes,2,rep,name=signatures,proto3" json:"signatures,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -180,7 +180,7 @@ func (x *MultisigSignatureSet) GetMultisigIdentifier() []byte {
 	return nil
 }
 
-func (x *MultisigSignatureSet) GetSignatures() []*MultisigSignature {
+func (x *MultisigSignatureSet) GetSignatures() []*KeyedSignature {
 	if x != nil {
 		return x.Signatures
 	}
@@ -196,15 +196,15 @@ const file_multisig_proto_rawDesc = "" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12%\n" +
 	"\tthreshold\x18\x02 \x01(\rB\a\xfaB\x04*\x02(\x01R\tthreshold\x12/\n" +
 	"\vpublic_keys\x18\x03 \x03(\fB\x0e\xfaB\v\x92\x01\b\b\x02\"\x04z\x02h!R\n" +
-	"publicKeys\"d\n" +
-	"\x11MultisigSignature\x12&\n" +
+	"publicKeys\"a\n" +
+	"\x0eKeyedSignature\x12&\n" +
 	"\n" +
 	"public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\tpublicKey\x12'\n" +
-	"\tsignature\x18\x02 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\tsignature\"\x8d\x01\n" +
+	"\tsignature\x18\x02 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\tsignature\"\x8a\x01\n" +
 	"\x14MultisigSignatureSet\x128\n" +
-	"\x13multisig_identifier\x18\x01 \x01(\fB\a\xfaB\x04z\x02h R\x12multisigIdentifier\x12;\n" +
+	"\x13multisig_identifier\x18\x01 \x01(\fB\a\xfaB\x04z\x02h R\x12multisigIdentifier\x128\n" +
 	"\n" +
-	"signatures\x18\x02 \x03(\v2\x1b.multisig.MultisigSignatureR\n" +
+	"signatures\x18\x02 \x03(\v2\x18.multisig.KeyedSignatureR\n" +
 	"signaturesB/Z-github.com/lightsparkdev/spark/proto/multisigb\x06proto3"
 
 var (
@@ -222,11 +222,11 @@ func file_multisig_proto_rawDescGZIP() []byte {
 var file_multisig_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_multisig_proto_goTypes = []any{
 	(*MultisigConfig)(nil),       // 0: multisig.MultisigConfig
-	(*MultisigSignature)(nil),    // 1: multisig.MultisigSignature
+	(*KeyedSignature)(nil),       // 1: multisig.KeyedSignature
 	(*MultisigSignatureSet)(nil), // 2: multisig.MultisigSignatureSet
 }
 var file_multisig_proto_depIdxs = []int32{
-	1, // 0: multisig.MultisigSignatureSet.signatures:type_name -> multisig.MultisigSignature
+	1, // 0: multisig.MultisigSignatureSet.signatures:type_name -> multisig.KeyedSignature
 	1, // [1:1] is the sub-list for method output_type
 	1, // [1:1] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name

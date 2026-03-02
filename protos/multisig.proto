@@ -16,7 +16,7 @@ message MultisigConfig {
     }];
 }
 
-message MultisigSignature {
+message KeyedSignature {
     bytes public_key = 1 [(validate.rules).bytes.len = 33];
     bytes signature = 2 [
         (validate.rules).bytes.min_len = 64,
@@ -26,5 +26,5 @@ message MultisigSignature {
 
 message MultisigSignatureSet {
     bytes multisig_identifier = 1 [(validate.rules).bytes.len = 32];
-    repeated MultisigSignature signatures = 2;
+    repeated KeyedSignature signatures = 2;
 }
