@@ -277,4 +277,35 @@ impl FrostService for FrostServer {
             .map_err(Status::internal)
             .map(|_| Response::new(()))
     }
+
+    async fn sign_frost_v2(
+        &self,
+        request: Request<SignFrostRequestV2>,
+    ) -> Result<Response<SignFrostResponse>, Status> {
+        info!("Received frost sign v2 request");
+        let response =
+            spark_frost::signing::sign_frost_v2(request.get_ref()).map_err(Status::internal)?;
+        info!("Returning frost sign v2 response");
+        Ok(Response::new(response))
+    }
+
+    async fn aggregate_frost_v2(
+        &self,
+        request: Request<AggregateFrostRequestV2>,
+    ) -> Result<Response<AggregateFrostResponse>, Status> {
+        tracing::info!("Received frost aggregate v2 request");
+        let response = spark_frost::signing::aggregate_frost_v2(request.get_ref())
+            .map_err(Status::internal)?;
+        Ok(Response::new(response))
+    }
+
+    async fn validate_signature_share_v2(
+        &self,
+        request: Request<ValidateSignatureShareRequestV2>,
+    ) -> Result<Response<()>, Status> {
+        tracing::info!("Received frost validate signature share v2 request");
+        spark_frost::signing::validate_signature_share_v2(request.get_ref())
+            .map_err(Status::internal)
+            .map(|_| Response::new(()))
+    }
 }

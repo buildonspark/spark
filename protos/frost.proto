@@ -17,6 +17,10 @@ service FrostService {
     rpc sign_frost(SignFrostRequest) returns (SignFrostResponse) {}
     rpc aggregate_frost(AggregateFrostRequest) returns (AggregateFrostResponse) {}
     rpc validate_signature_share(ValidateSignatureShareRequest) returns (google.protobuf.Empty) {}
+
+    rpc sign_frost_v2(SignFrostRequestV2) returns (SignFrostResponse) {}
+    rpc aggregate_frost_v2(AggregateFrostRequestV2) returns (AggregateFrostResponse) {}
+    rpc validate_signature_share_v2(ValidateSignatureShareRequestV2) returns (google.protobuf.Empty) {}
 }
 
 message EchoRequest {
@@ -291,4 +295,44 @@ message ValidateSignatureShareRequest {
 
     // The commitments for all participants of the user.
     common.SigningCommitment user_commitments = 8;
+}
+
+message ParticipantGroup {
+    repeated string identifiers = 1;
+}
+
+message FrostSigningJobV2 {
+    string job_id = 1;
+    bytes message = 2;
+    KeyPackage key_package = 3;
+    bytes verifying_key = 4;
+    SigningNonce nonce = 5;
+    map<string, common.SigningCommitment> commitments = 6;
+    repeated ParticipantGroup participant_groups = 7;
+    bytes adaptor_public_key = 8;
+    bool use_tweak = 9;
+}
+
+message SignFrostRequestV2 {
+    repeated FrostSigningJobV2 signing_jobs = 1;
+}
+
+message AggregateFrostRequestV2 {
+    bytes message = 1;
+    map<string, bytes> signature_shares = 2;
+    map<string, bytes> public_shares = 3;
+    bytes verifying_key = 4;
+    map<string, common.SigningCommitment> commitments = 5;
+    repeated ParticipantGroup participant_groups = 6;
+    bytes adaptor_public_key = 7;
+}
+
+message ValidateSignatureShareRequestV2 {
+    string identifier = 1;
+    bytes message = 2;
+    bytes signature_share = 3;
+    bytes public_share = 4;
+    bytes verifying_key = 5;
+    map<string, common.SigningCommitment> commitments = 6;
+    repeated ParticipantGroup participant_groups = 7;
 }

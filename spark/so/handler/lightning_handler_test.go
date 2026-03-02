@@ -115,6 +115,18 @@ func (m *mockFrostServiceClient) ValidateSignatureShare(context.Context, *pbfros
 	return &emptypb.Empty{}, nil
 }
 
+func (m *mockFrostServiceClient) SignFrostV2(context.Context, *pbfrost.SignFrostRequestV2, ...grpc.CallOption) (*pbfrost.SignFrostResponse, error) {
+	return &pbfrost.SignFrostResponse{}, nil
+}
+
+func (m *mockFrostServiceClient) AggregateFrostV2(context.Context, *pbfrost.AggregateFrostRequestV2, ...grpc.CallOption) (*pbfrost.AggregateFrostResponse, error) {
+	return &pbfrost.AggregateFrostResponse{}, nil
+}
+
+func (m *mockFrostServiceClient) ValidateSignatureShareV2(context.Context, *pbfrost.ValidateSignatureShareRequestV2, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
+}
+
 func createSigningJob(leafID string) *pb.UserSignedTxSigningJob {
 	return &pb.UserSignedTxSigningJob{
 		LeafId: leafID,

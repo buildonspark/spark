@@ -2680,3 +2680,874 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ValidateSignatureShareRequestValidationError{}
+
+// Validate checks the field values on ParticipantGroup with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *ParticipantGroup) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ParticipantGroup with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ParticipantGroupMultiError, or nil if none found.
+func (m *ParticipantGroup) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ParticipantGroup) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return ParticipantGroupMultiError(errors)
+	}
+
+	return nil
+}
+
+// ParticipantGroupMultiError is an error wrapping multiple validation errors
+// returned by ParticipantGroup.ValidateAll() if the designated constraints
+// aren't met.
+type ParticipantGroupMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ParticipantGroupMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ParticipantGroupMultiError) AllErrors() []error { return m }
+
+// ParticipantGroupValidationError is the validation error returned by
+// ParticipantGroup.Validate if the designated constraints aren't met.
+type ParticipantGroupValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ParticipantGroupValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ParticipantGroupValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ParticipantGroupValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ParticipantGroupValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ParticipantGroupValidationError) ErrorName() string { return "ParticipantGroupValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ParticipantGroupValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sParticipantGroup.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ParticipantGroupValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ParticipantGroupValidationError{}
+
+// Validate checks the field values on FrostSigningJobV2 with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *FrostSigningJobV2) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on FrostSigningJobV2 with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// FrostSigningJobV2MultiError, or nil if none found.
+func (m *FrostSigningJobV2) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *FrostSigningJobV2) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for JobId
+
+	// no validation rules for Message
+
+	if all {
+		switch v := interface{}(m.GetKeyPackage()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FrostSigningJobV2ValidationError{
+					field:  "KeyPackage",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FrostSigningJobV2ValidationError{
+					field:  "KeyPackage",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetKeyPackage()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FrostSigningJobV2ValidationError{
+				field:  "KeyPackage",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for VerifyingKey
+
+	if all {
+		switch v := interface{}(m.GetNonce()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FrostSigningJobV2ValidationError{
+					field:  "Nonce",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FrostSigningJobV2ValidationError{
+					field:  "Nonce",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNonce()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FrostSigningJobV2ValidationError{
+				field:  "Nonce",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetCommitments()))
+		i := 0
+		for key := range m.GetCommitments() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetCommitments()[key]
+			_ = val
+
+			// no validation rules for Commitments[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, FrostSigningJobV2ValidationError{
+							field:  fmt.Sprintf("Commitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, FrostSigningJobV2ValidationError{
+							field:  fmt.Sprintf("Commitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return FrostSigningJobV2ValidationError{
+						field:  fmt.Sprintf("Commitments[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	for idx, item := range m.GetParticipantGroups() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, FrostSigningJobV2ValidationError{
+						field:  fmt.Sprintf("ParticipantGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, FrostSigningJobV2ValidationError{
+						field:  fmt.Sprintf("ParticipantGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return FrostSigningJobV2ValidationError{
+					field:  fmt.Sprintf("ParticipantGroups[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for AdaptorPublicKey
+
+	// no validation rules for UseTweak
+
+	if len(errors) > 0 {
+		return FrostSigningJobV2MultiError(errors)
+	}
+
+	return nil
+}
+
+// FrostSigningJobV2MultiError is an error wrapping multiple validation errors
+// returned by FrostSigningJobV2.ValidateAll() if the designated constraints
+// aren't met.
+type FrostSigningJobV2MultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m FrostSigningJobV2MultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m FrostSigningJobV2MultiError) AllErrors() []error { return m }
+
+// FrostSigningJobV2ValidationError is the validation error returned by
+// FrostSigningJobV2.Validate if the designated constraints aren't met.
+type FrostSigningJobV2ValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e FrostSigningJobV2ValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e FrostSigningJobV2ValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e FrostSigningJobV2ValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e FrostSigningJobV2ValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e FrostSigningJobV2ValidationError) ErrorName() string {
+	return "FrostSigningJobV2ValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e FrostSigningJobV2ValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sFrostSigningJobV2.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = FrostSigningJobV2ValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = FrostSigningJobV2ValidationError{}
+
+// Validate checks the field values on SignFrostRequestV2 with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SignFrostRequestV2) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SignFrostRequestV2 with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SignFrostRequestV2MultiError, or nil if none found.
+func (m *SignFrostRequestV2) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SignFrostRequestV2) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetSigningJobs() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SignFrostRequestV2ValidationError{
+						field:  fmt.Sprintf("SigningJobs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SignFrostRequestV2ValidationError{
+						field:  fmt.Sprintf("SigningJobs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SignFrostRequestV2ValidationError{
+					field:  fmt.Sprintf("SigningJobs[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return SignFrostRequestV2MultiError(errors)
+	}
+
+	return nil
+}
+
+// SignFrostRequestV2MultiError is an error wrapping multiple validation errors
+// returned by SignFrostRequestV2.ValidateAll() if the designated constraints
+// aren't met.
+type SignFrostRequestV2MultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SignFrostRequestV2MultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SignFrostRequestV2MultiError) AllErrors() []error { return m }
+
+// SignFrostRequestV2ValidationError is the validation error returned by
+// SignFrostRequestV2.Validate if the designated constraints aren't met.
+type SignFrostRequestV2ValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SignFrostRequestV2ValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SignFrostRequestV2ValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SignFrostRequestV2ValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SignFrostRequestV2ValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SignFrostRequestV2ValidationError) ErrorName() string {
+	return "SignFrostRequestV2ValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SignFrostRequestV2ValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSignFrostRequestV2.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SignFrostRequestV2ValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SignFrostRequestV2ValidationError{}
+
+// Validate checks the field values on AggregateFrostRequestV2 with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *AggregateFrostRequestV2) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AggregateFrostRequestV2 with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// AggregateFrostRequestV2MultiError, or nil if none found.
+func (m *AggregateFrostRequestV2) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AggregateFrostRequestV2) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Message
+
+	// no validation rules for SignatureShares
+
+	// no validation rules for PublicShares
+
+	// no validation rules for VerifyingKey
+
+	{
+		sorted_keys := make([]string, len(m.GetCommitments()))
+		i := 0
+		for key := range m.GetCommitments() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetCommitments()[key]
+			_ = val
+
+			// no validation rules for Commitments[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, AggregateFrostRequestV2ValidationError{
+							field:  fmt.Sprintf("Commitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, AggregateFrostRequestV2ValidationError{
+							field:  fmt.Sprintf("Commitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return AggregateFrostRequestV2ValidationError{
+						field:  fmt.Sprintf("Commitments[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	for idx, item := range m.GetParticipantGroups() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, AggregateFrostRequestV2ValidationError{
+						field:  fmt.Sprintf("ParticipantGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, AggregateFrostRequestV2ValidationError{
+						field:  fmt.Sprintf("ParticipantGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return AggregateFrostRequestV2ValidationError{
+					field:  fmt.Sprintf("ParticipantGroups[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for AdaptorPublicKey
+
+	if len(errors) > 0 {
+		return AggregateFrostRequestV2MultiError(errors)
+	}
+
+	return nil
+}
+
+// AggregateFrostRequestV2MultiError is an error wrapping multiple validation
+// errors returned by AggregateFrostRequestV2.ValidateAll() if the designated
+// constraints aren't met.
+type AggregateFrostRequestV2MultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AggregateFrostRequestV2MultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AggregateFrostRequestV2MultiError) AllErrors() []error { return m }
+
+// AggregateFrostRequestV2ValidationError is the validation error returned by
+// AggregateFrostRequestV2.Validate if the designated constraints aren't met.
+type AggregateFrostRequestV2ValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AggregateFrostRequestV2ValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AggregateFrostRequestV2ValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AggregateFrostRequestV2ValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AggregateFrostRequestV2ValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AggregateFrostRequestV2ValidationError) ErrorName() string {
+	return "AggregateFrostRequestV2ValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AggregateFrostRequestV2ValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAggregateFrostRequestV2.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AggregateFrostRequestV2ValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AggregateFrostRequestV2ValidationError{}
+
+// Validate checks the field values on ValidateSignatureShareRequestV2 with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ValidateSignatureShareRequestV2) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ValidateSignatureShareRequestV2 with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// ValidateSignatureShareRequestV2MultiError, or nil if none found.
+func (m *ValidateSignatureShareRequestV2) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ValidateSignatureShareRequestV2) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Identifier
+
+	// no validation rules for Message
+
+	// no validation rules for SignatureShare
+
+	// no validation rules for PublicShare
+
+	// no validation rules for VerifyingKey
+
+	{
+		sorted_keys := make([]string, len(m.GetCommitments()))
+		i := 0
+		for key := range m.GetCommitments() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetCommitments()[key]
+			_ = val
+
+			// no validation rules for Commitments[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, ValidateSignatureShareRequestV2ValidationError{
+							field:  fmt.Sprintf("Commitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, ValidateSignatureShareRequestV2ValidationError{
+							field:  fmt.Sprintf("Commitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return ValidateSignatureShareRequestV2ValidationError{
+						field:  fmt.Sprintf("Commitments[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	for idx, item := range m.GetParticipantGroups() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ValidateSignatureShareRequestV2ValidationError{
+						field:  fmt.Sprintf("ParticipantGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ValidateSignatureShareRequestV2ValidationError{
+						field:  fmt.Sprintf("ParticipantGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ValidateSignatureShareRequestV2ValidationError{
+					field:  fmt.Sprintf("ParticipantGroups[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return ValidateSignatureShareRequestV2MultiError(errors)
+	}
+
+	return nil
+}
+
+// ValidateSignatureShareRequestV2MultiError is an error wrapping multiple
+// validation errors returned by ValidateSignatureShareRequestV2.ValidateAll()
+// if the designated constraints aren't met.
+type ValidateSignatureShareRequestV2MultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ValidateSignatureShareRequestV2MultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ValidateSignatureShareRequestV2MultiError) AllErrors() []error { return m }
+
+// ValidateSignatureShareRequestV2ValidationError is the validation error
+// returned by ValidateSignatureShareRequestV2.Validate if the designated
+// constraints aren't met.
+type ValidateSignatureShareRequestV2ValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ValidateSignatureShareRequestV2ValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ValidateSignatureShareRequestV2ValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ValidateSignatureShareRequestV2ValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ValidateSignatureShareRequestV2ValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ValidateSignatureShareRequestV2ValidationError) ErrorName() string {
+	return "ValidateSignatureShareRequestV2ValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ValidateSignatureShareRequestV2ValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sValidateSignatureShareRequestV2.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ValidateSignatureShareRequestV2ValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ValidateSignatureShareRequestV2ValidationError{}
