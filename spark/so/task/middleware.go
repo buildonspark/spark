@@ -98,6 +98,19 @@ func TimeoutMiddleware() TaskMiddleware {
 	}
 }
 
+func RawDBClientMiddleware(dbClient *ent.Client) TaskMiddleware {
+	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec, knobsService knobs.Knobs) error {
+		if !task.RequiresRawDBClient {
+			return task.Task(ctx, config, knobsService)
+		}
+		rawDB, err := dbClient.RawDB()
+		if err != nil {
+			return fmt.Errorf("failed to get raw database client: %w", err)
+		}
+		return task.Task(InjectRawClient(ctx, rawDB), config, knobsService)
+	}
+}
+
 func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration) TaskMiddleware {
 	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec, knobsService knobs.Knobs) error {
 		sessionCtx, cancel := context.WithCancel(ctx)
@@ -127,7 +140,6 @@ func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration
 				return tx.Commit()
 			}
 		}
-
 		return err
 	}
 }

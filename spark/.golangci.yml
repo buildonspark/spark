@@ -91,6 +91,9 @@ linters:
         - pattern: '\.Tx\.QueryContext$'
           pkg: '^github.com/lightsparkdev/spark/so/ent$'
           msg: 'Use of ent.Tx.QueryContext is forbidden. Use ent query builders unless you know what you are doing!'
+        - pattern: '^GetRawClientFromContext$'
+          pkg: '^github.com/lightsparkdev/spark/so/task$'
+          msg: 'Use of task.GetRawClientFromContext is forbidden by default. Use it only for Postgres operations that cannot run in a transaction (e.g., ... CONCURRENTLY DDL), and add //nolint:forbidigo with a specific justification.'
       analyze-types: true
     nolintlint:
       # Require an explanation of nonzero length after each nolint directive.

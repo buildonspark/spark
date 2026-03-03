@@ -89,6 +89,8 @@ type BaseTaskSpec struct {
 	Timeout *time.Duration
 	// Whether to run the task in the hermetic test environment.
 	RunInTestEnv bool
+	// RequiresRawDBClient indicates whether this task explicitly needs raw *ent.Client access.
+	RequiresRawDBClient bool
 	// If true, the task will not run
 	Disabled bool
 	// Task is the function that is run when the task is scheduled.
@@ -1046,6 +1048,7 @@ func (t *BaseTaskSpec) getTimeout() time.Duration {
 func (t *BaseTaskSpec) RunOnce(ctx context.Context, config *so.Config, dbClient *ent.Client, knobsService knobs.Knobs) error {
 	wrappedTask := t.chainMiddleware(
 		LogMiddleware(),
+		RawDBClientMiddleware(dbClient),
 		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient, knobsService), config.Database.NewTxTimeout),
 		TimeoutMiddleware(),
 		PanicRecoveryMiddleware(),
@@ -1057,6 +1060,7 @@ func (t *BaseTaskSpec) RunOnce(ctx context.Context, config *so.Config, dbClient 
 func (t *ScheduledTaskSpec) Schedule(scheduler gocron.Scheduler, config *so.Config, dbClient *ent.Client, knobsService knobs.Knobs) error {
 	wrappedTask := t.chainMiddleware(
 		LogMiddleware(),
+		RawDBClientMiddleware(dbClient),
 		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient, knobsService), config.Database.NewTxTimeout),
 		TimeoutMiddleware(),
 		PanicRecoveryMiddleware(),
@@ -1074,9 +1078,10 @@ func (t *ScheduledTaskSpec) Schedule(scheduler gocron.Scheduler, config *so.Conf
 // is wrapped with the provided middleware. The original task's fields are preserved.
 func (t *BaseTaskSpec) wrapMiddleware(middleware TaskMiddleware) *BaseTaskSpec {
 	return &BaseTaskSpec{
-		Name:         t.Name,
-		Timeout:      t.Timeout,
-		RunInTestEnv: t.RunInTestEnv,
+		Name:                t.Name,
+		Timeout:             t.Timeout,
+		RunInTestEnv:        t.RunInTestEnv,
+		RequiresRawDBClient: t.RequiresRawDBClient,
 		Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 			return middleware(ctx, config, t, knobsService)
 		},
