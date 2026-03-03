@@ -116,6 +116,7 @@ func (h *SparkInvoiceHandler) querySparkInvoicesByRawInvoice(ctx context.Context
 					transfer.FieldID,
 					transfer.FieldStatus,
 				).
+					WithSparkInvoice().
 					Order(ent.Desc(transfer.FieldCreateTime)).
 					Limit(1)
 			}).
