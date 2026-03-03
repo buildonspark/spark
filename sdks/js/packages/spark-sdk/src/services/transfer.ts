@@ -752,7 +752,7 @@ export class BaseTransferService {
     return nodeSignatures;
   }
 
-  private async prepareSendTransferKeyTweaks(
+  protected async prepareSendTransferKeyTweaks(
     transferID: string,
     receiverIdentityPubkey: Uint8Array,
     leaves: LeafKeyTweak[],

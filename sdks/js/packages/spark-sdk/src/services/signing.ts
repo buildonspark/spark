@@ -6,10 +6,16 @@ import {
   UserSignedTxSigningJob,
 } from "../proto/spark.js";
 import { SigningCommitmentWithOptionalNonce } from "../signer/types.js";
-import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin.js";
+import {
+  getSigHashFromMultiInputTx,
+  getSigHashFromTx,
+  getTxFromRawTxBytes,
+} from "../utils/bitcoin.js";
+import { TransactionInput } from "@scure/btc-signer/psbt";
 import { createRefundTxsForLightning } from "../utils/htlc-transactions.js";
 import { getNetwork } from "../utils/network.js";
 import {
+  createConnectorRefundTxs,
   createCurrentTimelockRefundTxs,
   createDecrementedTimelockRefundTxs,
   getCurrentTimelock,
@@ -341,6 +347,157 @@ export class SigningService {
           directFromCpfpSigningCommitments[i]?.signingNonceCommitments,
         );
         directFromCpfpLeafSigningJobs.push(...signingJobs);
+      }
+    }
+
+    return {
+      cpfpLeafSigningJobs,
+      directLeafSigningJobs,
+      directFromCpfpLeafSigningJobs,
+    };
+  }
+
+  async signRefundsForCoopExit(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    connectorOutputs: TransactionInput[],
+    connectorTx: Uint8Array,
+    cpfpSigningCommitments: RequestedSigningCommitments[],
+    directSigningCommitments: RequestedSigningCommitments[],
+    directFromCpfpSigningCommitments: RequestedSigningCommitments[],
+  ): Promise<{
+    cpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[];
+    directLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[];
+    directFromCpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[];
+  }> {
+    const cpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[] = [];
+    const directLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[] =
+      [];
+    const directFromCpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[] =
+      [];
+
+    const connectorTxParsed = getTxFromRawTxBytes(connectorTx);
+
+    for (let i = 0; i < leaves.length; i++) {
+      const leaf = leaves[i];
+      if (!leaf?.leaf) {
+        throw new SparkValidationError(
+          "Leaf not found in signRefundsForCoopExit",
+          {
+            field: "leaf",
+            value: leaf,
+            expected: "Non-null leaf",
+          },
+        );
+      }
+
+      const connectorOutput = connectorOutputs[i];
+      if (!connectorOutput || connectorOutput.index === undefined) {
+        throw new SparkValidationError("Missing connector output", {
+          field: "connectorOutput",
+          value: connectorOutput,
+          expected: "Valid connector output with index",
+        });
+      }
+
+      const connectorPrevOutput = connectorTxParsed.getOutput(
+        connectorOutput.index,
+      );
+      if (
+        !connectorPrevOutput ||
+        !connectorPrevOutput.script ||
+        connectorPrevOutput.amount === undefined
+      ) {
+        throw new SparkValidationError("Invalid connector transaction output", {
+          field: "connectorPrevOutput",
+          value: connectorPrevOutput,
+          expected: "Valid output with script and amount",
+        });
+      }
+
+      const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
+      const nodeTxOutput = nodeTx.getOutput(0);
+
+      const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
+      const currentSequence = currRefundTx.getInput(0).sequence;
+      if (!currentSequence) {
+        throw new SparkValidationError("Invalid refund transaction", {
+          field: "sequence",
+          value: currRefundTx.getInput(0),
+          expected: "Non-null sequence",
+        });
+      }
+
+      const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
+
+      let directNodeTx: Transaction | undefined;
+      if (leaf.leaf.directTx.length > 0 && !isZeroNode) {
+        directNodeTx = getTxFromRawTxBytes(leaf.leaf.directTx);
+      }
+
+      const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
+        createConnectorRefundTxs({
+          nodeTx,
+          directNodeTx,
+          sequence: currentSequence,
+          connectorOutput,
+          receivingPubkey: receiverIdentityPubkey,
+          network: this.config.getNetwork(),
+        });
+
+      // CPFP refund: sign input 0 with multi-input sighash
+      const cpfpSighash = getSigHashFromMultiInputTx(cpfpRefundTx, 0, [
+        nodeTxOutput,
+        connectorPrevOutput,
+      ]);
+      const cpfpJobs = await this.signRefundsInternal(
+        cpfpRefundTx,
+        cpfpSighash,
+        leaf,
+        cpfpSigningCommitments[i]?.signingNonceCommitments,
+      );
+      cpfpLeafSigningJobs.push(...cpfpJobs);
+
+      // Direct refund (spends direct tx output)
+      if (directRefundTx && !isZeroNode) {
+        if (!directNodeTx) {
+          throw new SparkValidationError(
+            "Direct node transaction undefined while direct refund transaction is defined",
+            {
+              field: "directNodeTx",
+              value: directNodeTx,
+              expected: "Non-null direct node transaction",
+            },
+          );
+        }
+        const directTxOutput = directNodeTx.getOutput(0);
+        const directSighash = getSigHashFromMultiInputTx(directRefundTx, 0, [
+          directTxOutput,
+          connectorPrevOutput,
+        ]);
+        const directJobs = await this.signRefundsInternal(
+          directRefundTx,
+          directSighash,
+          leaf,
+          directSigningCommitments[i]?.signingNonceCommitments,
+        );
+        directLeafSigningJobs.push(...directJobs);
+      }
+
+      // Direct-from-CPFP refund (spends CPFP node tx output)
+      if (directFromCpfpRefundTx) {
+        const directFromCpfpSighash = getSigHashFromMultiInputTx(
+          directFromCpfpRefundTx,
+          0,
+          [nodeTxOutput, connectorPrevOutput],
+        );
+        const directFromCpfpJobs = await this.signRefundsInternal(
+          directFromCpfpRefundTx,
+          directFromCpfpSighash,
+          leaf,
+          directFromCpfpSigningCommitments[i]?.signingNonceCommitments,
+        );
+        directFromCpfpLeafSigningJobs.push(...directFromCpfpJobs);
       }
     }
 
