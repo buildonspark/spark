@@ -26,7 +26,6 @@
       "Bash(git cat-file:*)",
       "Bash(git add:*)",
       "Bash(git checkout:*)",
-      "Bash(git mv:*)",
       "Bash(git worktree:*)",
       "Bash(git --version:*)",
       "Bash(git help:*)",
@@ -57,7 +56,6 @@
       "Bash(git -C * cat-file:*)",
       "Bash(git -C * add:*)",
       "Bash(git -C * checkout:*)",
-      "Bash(git -C * mv:*)",
       "Bash(git -C * worktree:*)",
       "Bash(git -C * check-ignore:*)",
 
@@ -77,7 +75,6 @@
       "Bash(gh workflow list:*)",
       "Bash(gh workflow view:*)",
       "Bash(gh auth status:*)",
-      "Bash(gh api:*)",
 
       "Bash(gt ls:*)",
       "Bash(gt log:*)",
@@ -98,11 +95,8 @@
       "Bash(stat:*)",
       "Bash(diff:*)",
       "Bash(ls:*)",
-      "Bash(find:*)",
       "Bash(tree:*)",
       "Bash(grep:*)",
-      "Bash(rg:*)",
-      "Bash(awk:*)",
 
       "Bash(which:*)",
       "Bash(command -v:*)",
