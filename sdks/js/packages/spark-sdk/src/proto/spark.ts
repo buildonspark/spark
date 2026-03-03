@@ -1328,6 +1328,35 @@ export interface StartTransferResponse {
   signingResults: LeafRefundTxSigningResult[];
 }
 
+export interface SenderTransferPackage {
+  ownerIdentityPublicKey: Uint8Array;
+  transferPackage:
+    | TransferPackage
+    | undefined;
+  /**
+   * The transfer package contains leaves that may be meant for multiple receivers.
+   * This maps leaf_id to receiver_identity_public_key for each leaf.
+   */
+  receiverIdentityPublicKeys: { [key: string]: Uint8Array };
+}
+
+export interface SenderTransferPackage_ReceiverIdentityPublicKeysEntry {
+  key: string;
+  value: Uint8Array;
+}
+
+/**
+ * Request to transfer leaves from multiple senders to multiple receivers
+ * in a single atomic operation.
+ */
+export interface StartTransferV3Request {
+  transferId: string;
+  /** One entry per sender. Leaf IDs must be disjoint across entries. */
+  senderPackages: SenderTransferPackage[];
+  /** Expiry time for the entire transfer */
+  expiryTime: Date | undefined;
+}
+
 /**
  * TransferPackage is a package of leaves to send and key tweaks to send.
  * This is in the improved send transfer flow where the sender can send the transfer in one call to
@@ -1391,6 +1420,12 @@ export interface FinalizeTransferResponse {
   transfer: Transfer | undefined;
 }
 
+/** Per-receiver summary within a Transfer response. */
+export interface TransferReceiver {
+  identityPublicKey: Uint8Array;
+  amountSats: number;
+}
+
 export interface Transfer {
   id: string;
   senderIdentityPublicKey: Uint8Array;
@@ -1404,6 +1439,8 @@ export interface Transfer {
   type: TransferType;
   sparkInvoice: string;
   network: Network;
+  /** For V3 multi-receiver transfers. Empty for single-receiver (V2) transfers. */
+  receivers: TransferReceiver[];
 }
 
 export interface TransferLeaf {
@@ -8310,6 +8347,306 @@ export const StartTransferResponse: MessageFns<StartTransferResponse> = {
   },
 };
 
+function createBaseSenderTransferPackage(): SenderTransferPackage {
+  return { ownerIdentityPublicKey: new Uint8Array(0), transferPackage: undefined, receiverIdentityPublicKeys: {} };
+}
+
+export const SenderTransferPackage: MessageFns<SenderTransferPackage> = {
+  encode(message: SenderTransferPackage, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.ownerIdentityPublicKey);
+    }
+    if (message.transferPackage !== undefined) {
+      TransferPackage.encode(message.transferPackage, writer.uint32(18).fork()).join();
+    }
+    Object.entries(message.receiverIdentityPublicKeys).forEach(([key, value]) => {
+      SenderTransferPackage_ReceiverIdentityPublicKeysEntry.encode({ key: key as any, value }, writer.uint32(26).fork())
+        .join();
+    });
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SenderTransferPackage {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSenderTransferPackage();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.transferPackage = TransferPackage.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          const entry3 = SenderTransferPackage_ReceiverIdentityPublicKeysEntry.decode(reader, reader.uint32());
+          if (entry3.value !== undefined) {
+            message.receiverIdentityPublicKeys[entry3.key] = entry3.value;
+          }
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SenderTransferPackage {
+    return {
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      transferPackage: isSet(object.transferPackage) ? TransferPackage.fromJSON(object.transferPackage) : undefined,
+      receiverIdentityPublicKeys: isObject(object.receiverIdentityPublicKeys)
+        ? Object.entries(object.receiverIdentityPublicKeys).reduce<{ [key: string]: Uint8Array }>(
+          (acc, [key, value]) => {
+            acc[key] = bytesFromBase64(value as string);
+            return acc;
+          },
+          {},
+        )
+        : {},
+    };
+  },
+
+  toJSON(message: SenderTransferPackage): unknown {
+    const obj: any = {};
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.transferPackage !== undefined) {
+      obj.transferPackage = TransferPackage.toJSON(message.transferPackage);
+    }
+    if (message.receiverIdentityPublicKeys) {
+      const entries = Object.entries(message.receiverIdentityPublicKeys);
+      if (entries.length > 0) {
+        obj.receiverIdentityPublicKeys = {};
+        entries.forEach(([k, v]) => {
+          obj.receiverIdentityPublicKeys[k] = base64FromBytes(v);
+        });
+      }
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SenderTransferPackage>): SenderTransferPackage {
+    return SenderTransferPackage.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SenderTransferPackage>): SenderTransferPackage {
+    const message = createBaseSenderTransferPackage();
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.transferPackage = (object.transferPackage !== undefined && object.transferPackage !== null)
+      ? TransferPackage.fromPartial(object.transferPackage)
+      : undefined;
+    message.receiverIdentityPublicKeys = Object.entries(object.receiverIdentityPublicKeys ?? {}).reduce<
+      { [key: string]: Uint8Array }
+    >((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseSenderTransferPackage_ReceiverIdentityPublicKeysEntry(): SenderTransferPackage_ReceiverIdentityPublicKeysEntry {
+  return { key: "", value: new Uint8Array(0) };
+}
+
+export const SenderTransferPackage_ReceiverIdentityPublicKeysEntry: MessageFns<
+  SenderTransferPackage_ReceiverIdentityPublicKeysEntry
+> = {
+  encode(
+    message: SenderTransferPackage_ReceiverIdentityPublicKeysEntry,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value.length !== 0) {
+      writer.uint32(18).bytes(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SenderTransferPackage_ReceiverIdentityPublicKeysEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSenderTransferPackage_ReceiverIdentityPublicKeysEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SenderTransferPackage_ReceiverIdentityPublicKeysEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? bytesFromBase64(object.value) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: SenderTransferPackage_ReceiverIdentityPublicKeysEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value.length !== 0) {
+      obj.value = base64FromBytes(message.value);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<SenderTransferPackage_ReceiverIdentityPublicKeysEntry>,
+  ): SenderTransferPackage_ReceiverIdentityPublicKeysEntry {
+    return SenderTransferPackage_ReceiverIdentityPublicKeysEntry.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<SenderTransferPackage_ReceiverIdentityPublicKeysEntry>,
+  ): SenderTransferPackage_ReceiverIdentityPublicKeysEntry {
+    const message = createBaseSenderTransferPackage_ReceiverIdentityPublicKeysEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseStartTransferV3Request(): StartTransferV3Request {
+  return { transferId: "", senderPackages: [], expiryTime: undefined };
+}
+
+export const StartTransferV3Request: MessageFns<StartTransferV3Request> = {
+  encode(message: StartTransferV3Request, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transferId !== "") {
+      writer.uint32(10).string(message.transferId);
+    }
+    for (const v of message.senderPackages) {
+      SenderTransferPackage.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.expiryTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.expiryTime), writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): StartTransferV3Request {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStartTransferV3Request();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transferId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.senderPackages.push(SenderTransferPackage.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.expiryTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StartTransferV3Request {
+    return {
+      transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
+      senderPackages: globalThis.Array.isArray(object?.senderPackages)
+        ? object.senderPackages.map((e: any) => SenderTransferPackage.fromJSON(e))
+        : [],
+      expiryTime: isSet(object.expiryTime) ? fromJsonTimestamp(object.expiryTime) : undefined,
+    };
+  },
+
+  toJSON(message: StartTransferV3Request): unknown {
+    const obj: any = {};
+    if (message.transferId !== "") {
+      obj.transferId = message.transferId;
+    }
+    if (message.senderPackages?.length) {
+      obj.senderPackages = message.senderPackages.map((e) => SenderTransferPackage.toJSON(e));
+    }
+    if (message.expiryTime !== undefined) {
+      obj.expiryTime = message.expiryTime.toISOString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<StartTransferV3Request>): StartTransferV3Request {
+    return StartTransferV3Request.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<StartTransferV3Request>): StartTransferV3Request {
+    const message = createBaseStartTransferV3Request();
+    message.transferId = object.transferId ?? "";
+    message.senderPackages = object.senderPackages?.map((e) => SenderTransferPackage.fromPartial(e)) || [];
+    message.expiryTime = object.expiryTime ?? undefined;
+    return message;
+  },
+};
+
 function createBaseTransferPackage(): TransferPackage {
   return {
     leavesToSend: [],
@@ -9179,6 +9516,84 @@ export const FinalizeTransferResponse: MessageFns<FinalizeTransferResponse> = {
   },
 };
 
+function createBaseTransferReceiver(): TransferReceiver {
+  return { identityPublicKey: new Uint8Array(0), amountSats: 0 };
+}
+
+export const TransferReceiver: MessageFns<TransferReceiver> = {
+  encode(message: TransferReceiver, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    if (message.amountSats !== 0) {
+      writer.uint32(16).uint64(message.amountSats);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TransferReceiver {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTransferReceiver();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.amountSats = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TransferReceiver {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+      amountSats: isSet(object.amountSats) ? globalThis.Number(object.amountSats) : 0,
+    };
+  },
+
+  toJSON(message: TransferReceiver): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    if (message.amountSats !== 0) {
+      obj.amountSats = Math.round(message.amountSats);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TransferReceiver>): TransferReceiver {
+    return TransferReceiver.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TransferReceiver>): TransferReceiver {
+    const message = createBaseTransferReceiver();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    message.amountSats = object.amountSats ?? 0;
+    return message;
+  },
+};
+
 function createBaseTransfer(): Transfer {
   return {
     id: "",
@@ -9193,6 +9608,7 @@ function createBaseTransfer(): Transfer {
     type: 0,
     sparkInvoice: "",
     network: 0,
+    receivers: [],
   };
 }
 
@@ -9233,6 +9649,9 @@ export const Transfer: MessageFns<Transfer> = {
     }
     if (message.network !== 0) {
       writer.uint32(96).int32(message.network);
+    }
+    for (const v of message.receivers) {
+      TransferReceiver.encode(v!, writer.uint32(106).fork()).join();
     }
     return writer;
   },
@@ -9340,6 +9759,14 @@ export const Transfer: MessageFns<Transfer> = {
           message.network = reader.int32() as any;
           continue;
         }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.receivers.push(TransferReceiver.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -9367,6 +9794,9 @@ export const Transfer: MessageFns<Transfer> = {
       type: isSet(object.type) ? transferTypeFromJSON(object.type) : 0,
       sparkInvoice: isSet(object.sparkInvoice) ? globalThis.String(object.sparkInvoice) : "",
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+      receivers: globalThis.Array.isArray(object?.receivers)
+        ? object.receivers.map((e: any) => TransferReceiver.fromJSON(e))
+        : [],
     };
   },
 
@@ -9408,6 +9838,9 @@ export const Transfer: MessageFns<Transfer> = {
     if (message.network !== 0) {
       obj.network = networkToJSON(message.network);
     }
+    if (message.receivers?.length) {
+      obj.receivers = message.receivers.map((e) => TransferReceiver.toJSON(e));
+    }
     return obj;
   },
 
@@ -9428,6 +9861,7 @@ export const Transfer: MessageFns<Transfer> = {
     message.type = object.type ?? 0;
     message.sparkInvoice = object.sparkInvoice ?? "";
     message.network = object.network ?? 0;
+    message.receivers = object.receivers?.map((e) => TransferReceiver.fromPartial(e)) || [];
     return message;
   },
 };
@@ -20341,6 +20775,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    start_transfer_v3: {
+      name: "start_transfer_v3",
+      requestType: StartTransferV3Request,
+      requestStream: false,
+      responseType: StartTransferResponse,
+      responseStream: false,
+      options: {},
+    },
     claim_transfer: {
       name: "claim_transfer",
       requestType: ClaimTransferRequest,
@@ -20545,6 +20987,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartTransferRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartTransferResponse>>;
+  start_transfer_v3(
+    request: StartTransferV3Request,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<StartTransferResponse>>;
   claim_transfer(
     request: ClaimTransferRequest,
     context: CallContext & CallContextExt,
@@ -20728,6 +21174,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
   ): Promise<StartTransferResponse>;
   start_transfer_v2(
     request: DeepPartial<StartTransferRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<StartTransferResponse>;
+  start_transfer_v3(
+    request: DeepPartial<StartTransferV3Request>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartTransferResponse>;
   claim_transfer(

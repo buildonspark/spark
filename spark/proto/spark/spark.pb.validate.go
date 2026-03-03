@@ -8092,6 +8092,308 @@ var _ interface {
 	ErrorName() string
 } = StartTransferResponseValidationError{}
 
+// Validate checks the field values on SenderTransferPackage with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SenderTransferPackage) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SenderTransferPackage with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SenderTransferPackageMultiError, or nil if none found.
+func (m *SenderTransferPackage) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SenderTransferPackage) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for OwnerIdentityPublicKey
+
+	if all {
+		switch v := interface{}(m.GetTransferPackage()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SenderTransferPackageValidationError{
+					field:  "TransferPackage",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SenderTransferPackageValidationError{
+					field:  "TransferPackage",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTransferPackage()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SenderTransferPackageValidationError{
+				field:  "TransferPackage",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for ReceiverIdentityPublicKeys
+
+	if len(errors) > 0 {
+		return SenderTransferPackageMultiError(errors)
+	}
+
+	return nil
+}
+
+// SenderTransferPackageMultiError is an error wrapping multiple validation
+// errors returned by SenderTransferPackage.ValidateAll() if the designated
+// constraints aren't met.
+type SenderTransferPackageMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SenderTransferPackageMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SenderTransferPackageMultiError) AllErrors() []error { return m }
+
+// SenderTransferPackageValidationError is the validation error returned by
+// SenderTransferPackage.Validate if the designated constraints aren't met.
+type SenderTransferPackageValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SenderTransferPackageValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SenderTransferPackageValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SenderTransferPackageValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SenderTransferPackageValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SenderTransferPackageValidationError) ErrorName() string {
+	return "SenderTransferPackageValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SenderTransferPackageValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSenderTransferPackage.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SenderTransferPackageValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SenderTransferPackageValidationError{}
+
+// Validate checks the field values on StartTransferV3Request with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *StartTransferV3Request) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StartTransferV3Request with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// StartTransferV3RequestMultiError, or nil if none found.
+func (m *StartTransferV3Request) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StartTransferV3Request) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	for idx, item := range m.GetSenderPackages() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StartTransferV3RequestValidationError{
+						field:  fmt.Sprintf("SenderPackages[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StartTransferV3RequestValidationError{
+						field:  fmt.Sprintf("SenderPackages[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StartTransferV3RequestValidationError{
+					field:  fmt.Sprintf("SenderPackages[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if all {
+		switch v := interface{}(m.GetExpiryTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, StartTransferV3RequestValidationError{
+					field:  "ExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, StartTransferV3RequestValidationError{
+					field:  "ExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetExpiryTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return StartTransferV3RequestValidationError{
+				field:  "ExpiryTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return StartTransferV3RequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// StartTransferV3RequestMultiError is an error wrapping multiple validation
+// errors returned by StartTransferV3Request.ValidateAll() if the designated
+// constraints aren't met.
+type StartTransferV3RequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StartTransferV3RequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StartTransferV3RequestMultiError) AllErrors() []error { return m }
+
+// StartTransferV3RequestValidationError is the validation error returned by
+// StartTransferV3Request.Validate if the designated constraints aren't met.
+type StartTransferV3RequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StartTransferV3RequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StartTransferV3RequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StartTransferV3RequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StartTransferV3RequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StartTransferV3RequestValidationError) ErrorName() string {
+	return "StartTransferV3RequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StartTransferV3RequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStartTransferV3Request.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StartTransferV3RequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StartTransferV3RequestValidationError{}
+
 // Validate checks the field values on TransferPackage with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
@@ -8991,6 +9293,110 @@ var _ interface {
 	ErrorName() string
 } = FinalizeTransferResponseValidationError{}
 
+// Validate checks the field values on TransferReceiver with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *TransferReceiver) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TransferReceiver with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// TransferReceiverMultiError, or nil if none found.
+func (m *TransferReceiver) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TransferReceiver) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for IdentityPublicKey
+
+	// no validation rules for AmountSats
+
+	if len(errors) > 0 {
+		return TransferReceiverMultiError(errors)
+	}
+
+	return nil
+}
+
+// TransferReceiverMultiError is an error wrapping multiple validation errors
+// returned by TransferReceiver.ValidateAll() if the designated constraints
+// aren't met.
+type TransferReceiverMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TransferReceiverMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TransferReceiverMultiError) AllErrors() []error { return m }
+
+// TransferReceiverValidationError is the validation error returned by
+// TransferReceiver.Validate if the designated constraints aren't met.
+type TransferReceiverValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TransferReceiverValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TransferReceiverValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TransferReceiverValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TransferReceiverValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TransferReceiverValidationError) ErrorName() string { return "TransferReceiverValidationError" }
+
+// Error satisfies the builtin error interface
+func (e TransferReceiverValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTransferReceiver.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TransferReceiverValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TransferReceiverValidationError{}
+
 // Validate checks the field values on Transfer with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -9149,6 +9555,40 @@ func (m *Transfer) validate(all bool) error {
 	// no validation rules for SparkInvoice
 
 	// no validation rules for Network
+
+	for idx, item := range m.GetReceivers() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TransferValidationError{
+						field:  fmt.Sprintf("Receivers[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TransferValidationError{
+						field:  fmt.Sprintf("Receivers[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TransferValidationError{
+					field:  fmt.Sprintf("Receivers[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
 
 	if len(errors) > 0 {
 		return TransferMultiError(errors)

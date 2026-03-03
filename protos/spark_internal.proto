@@ -41,6 +41,7 @@ service SparkInternalService {
     rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
 
     rpc initiate_transfer(InitiateTransferRequest) returns (google.protobuf.Empty) {}
+    rpc initiate_transfer_v2(InitiateTransferV2Request) returns (google.protobuf.Empty) {}
 
     rpc deliver_sender_key_tweak(DeliverSenderKeyTweakRequest) returns (google.protobuf.Empty) {}
 
@@ -263,6 +264,31 @@ message InitiateTransferRequest {
     // required to be connected so their keys can be tweaked at the same time.
     // For non-SwapV3 flows this field will be an empty string.
     string primary_transfer_id = 14;
+}
+
+// Per-sender data within an InitiateTransferV2Request.
+message InitiateTransferSenderPackage {
+    bytes sender_identity_public_key = 1;
+    spark.TransferPackage transfer_package = 2;
+    // leaf_id → receiver_identity_public_key for each leaf in this sender's package.
+    map<string, bytes> receiver_identity_public_keys = 3;
+    // Finalized CPFP refund signatures (leaf_id → signature).
+    map<string, bytes> refund_signatures = 4;
+    // Finalized direct refund signatures (leaf_id → signature).
+    map<string, bytes> direct_refund_signatures = 5;
+    // Finalized direct-from-CPFP refund signatures (leaf_id → signature).
+    map<string, bytes> direct_from_cpfp_refund_signatures = 6;
+}
+
+// Internal SO-to-SO request to create one Transfer with multiple senders and receivers.
+// Receiving SOs must accept all sender packages atomically (all or nothing).
+message InitiateTransferV2Request {
+    string transfer_id = 1;
+    // One entry per sender. Leaf IDs must be disjoint across entries.
+    repeated InitiateTransferSenderPackage sender_packages = 2;
+    // FROST key-tweak proofs keyed by leaf_id (across all senders).
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 3;
+    google.protobuf.Timestamp expiry_time = 4;
 }
 
 message DeliverSenderKeyTweakRequest {

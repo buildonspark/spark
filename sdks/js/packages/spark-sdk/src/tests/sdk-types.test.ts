@@ -33,6 +33,7 @@ describe("sdk-types mapping functions", () => {
         type: TransferType.TRANSFER,
         sparkInvoice: "spark1testinvoice",
         network: Network.REGTEST,
+        receivers: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, identityPublicKey);
@@ -55,6 +56,7 @@ describe("sdk-types mapping functions", () => {
         type: TransferType.TRANSFER,
         sparkInvoice: "",
         network: Network.REGTEST,
+        receivers: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, identityPublicKey);
@@ -81,6 +83,7 @@ describe("sdk-types mapping functions", () => {
         type: TransferType.TRANSFER,
         sparkInvoice: "spark1invoice123",
         network: Network.MAINNET,
+        receivers: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, identityPublicKey);
@@ -112,6 +115,7 @@ describe("sdk-types mapping functions", () => {
         type: TransferType.TRANSFER,
         sparkInvoice: "",
         network: Network.REGTEST,
+        receivers: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, identityPublicKey);
@@ -134,6 +138,7 @@ describe("sdk-types mapping functions", () => {
         type: TransferType.TRANSFER,
         sparkInvoice: "",
         network: Network.REGTEST,
+        receivers: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, identityPublicKey);

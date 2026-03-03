@@ -40,6 +40,7 @@ const (
 	SparkInternalService_StorePreimageShare_FullMethodName                 = "/spark_internal.SparkInternalService/store_preimage_share"
 	SparkInternalService_PrepareTreeAddress_FullMethodName                 = "/spark_internal.SparkInternalService/prepare_tree_address"
 	SparkInternalService_InitiateTransfer_FullMethodName                   = "/spark_internal.SparkInternalService/initiate_transfer"
+	SparkInternalService_InitiateTransferV2_FullMethodName                 = "/spark_internal.SparkInternalService/initiate_transfer_v2"
 	SparkInternalService_DeliverSenderKeyTweak_FullMethodName              = "/spark_internal.SparkInternalService/deliver_sender_key_tweak"
 	SparkInternalService_InitiateCooperativeExit_FullMethodName            = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
 	SparkInternalService_InitiateSettleReceiverKeyTweak_FullMethodName     = "/spark_internal.SparkInternalService/initiate_settle_receiver_key_tweak"
@@ -87,6 +88,7 @@ type SparkInternalServiceClient interface {
 	StorePreimageShare(ctx context.Context, in *spark.StorePreimageShareV2Request, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
 	InitiateTransfer(ctx context.Context, in *InitiateTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	InitiateTransferV2(ctx context.Context, in *InitiateTransferV2Request, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	DeliverSenderKeyTweak(ctx context.Context, in *DeliverSenderKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateSettleReceiverKeyTweak(ctx context.Context, in *InitiateSettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -321,6 +323,16 @@ func (c *sparkInternalServiceClient) InitiateTransfer(ctx context.Context, in *I
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) InitiateTransferV2(ctx context.Context, in *InitiateTransferV2Request, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_InitiateTransferV2_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkInternalServiceClient) DeliverSenderKeyTweak(ctx context.Context, in *DeliverSenderKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -546,6 +558,7 @@ type SparkInternalServiceServer interface {
 	StorePreimageShare(context.Context, *spark.StorePreimageShareV2Request) (*emptypb.Empty, error)
 	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
 	InitiateTransfer(context.Context, *InitiateTransferRequest) (*emptypb.Empty, error)
+	InitiateTransferV2(context.Context, *InitiateTransferV2Request) (*emptypb.Empty, error)
 	DeliverSenderKeyTweak(context.Context, *DeliverSenderKeyTweakRequest) (*emptypb.Empty, error)
 	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
 	InitiateSettleReceiverKeyTweak(context.Context, *InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
@@ -644,6 +657,9 @@ func (UnimplementedSparkInternalServiceServer) PrepareTreeAddress(context.Contex
 }
 func (UnimplementedSparkInternalServiceServer) InitiateTransfer(context.Context, *InitiateTransferRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method InitiateTransfer not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) InitiateTransferV2(context.Context, *InitiateTransferV2Request) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method InitiateTransferV2 not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) DeliverSenderKeyTweak(context.Context, *DeliverSenderKeyTweakRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeliverSenderKeyTweak not implemented")
@@ -1064,6 +1080,24 @@ func _SparkInternalService_InitiateTransfer_Handler(srv interface{}, ctx context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkInternalServiceServer).InitiateTransfer(ctx, req.(*InitiateTransferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_InitiateTransferV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiateTransferV2Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).InitiateTransferV2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_InitiateTransferV2_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).InitiateTransferV2(ctx, req.(*InitiateTransferV2Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1510,6 +1544,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "initiate_transfer",
 			Handler:    _SparkInternalService_InitiateTransfer_Handler,
+		},
+		{
+			MethodName: "initiate_transfer_v2",
+			Handler:    _SparkInternalService_InitiateTransferV2_Handler,
 		},
 		{
 			MethodName: "deliver_sender_key_tweak",

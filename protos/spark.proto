@@ -77,6 +77,7 @@ service SparkService {
     rpc initiate_preimage_swap_v3(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc start_leaf_swap_v2(StartTransferRequest) returns (StartTransferResponse) {}
     rpc start_transfer_v2(StartTransferRequest) returns (StartTransferResponse) {}
+    rpc start_transfer_v3(StartTransferV3Request) returns (StartTransferResponse) {}
 
     rpc claim_transfer(ClaimTransferRequest) returns (ClaimTransferResponse) {}
 
@@ -710,6 +711,24 @@ message StartTransferResponse {
     repeated LeafRefundTxSigningResult signing_results = 2;
 }
 
+message SenderTransferPackage {
+    bytes owner_identity_public_key = 1;
+    TransferPackage transfer_package = 2;
+    // The transfer package contains leaves that may be meant for multiple receivers.
+    // This maps leaf_id to receiver_identity_public_key for each leaf.
+    map<string, bytes> receiver_identity_public_keys = 3;
+}
+
+// Request to transfer leaves from multiple senders to multiple receivers
+// in a single atomic operation.
+message StartTransferV3Request {
+    string transfer_id = 1;
+    // One entry per sender. Leaf IDs must be disjoint across entries.
+    repeated SenderTransferPackage sender_packages = 2;
+    // Expiry time for the entire transfer
+    google.protobuf.Timestamp expiry_time = 3;
+}
+
 /**
  * TransferPackage is a package of leaves to send and key tweaks to send.
  * This is in the improved send transfer flow where the sender can send the transfer in one call to
@@ -794,6 +813,12 @@ enum Order {
     ASCENDING = 1;
 }
 
+// Per-receiver summary within a Transfer response.
+message TransferReceiver {
+    bytes identity_public_key = 1;
+    uint64 amount_sats = 2;
+}
+
 message Transfer {
     string id = 1;
     bytes sender_identity_public_key = 2;
@@ -807,6 +832,8 @@ message Transfer {
     TransferType type = 10;
     string spark_invoice = 11;
     Network network = 12;
+    // For V3 multi-receiver transfers. Empty for single-receiver (V2) transfers.
+    repeated TransferReceiver receivers = 13;
 }
 
 message TransferLeaf {
@@ -1338,8 +1365,8 @@ enum UtxoSwapStatus {
 
 // Which hash variant to use in cryptographic operations.
 enum HashVariant {
-  HASH_VARIANT_UNSPECIFIED = 0;  // Legacy
-  HASH_VARIANT_V2 = 1;           // Structured hashing
+  HASH_VARIANT_UNSPECIFIED = 0; // Legacy
+  HASH_VARIANT_V2 = 1; // Structured hashing
 }
 
 

@@ -13,6 +13,8 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/handler/signing_handler"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -138,6 +140,11 @@ func (s *SparkInternalServer) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 func (s *SparkInternalServer) InitiateTransfer(ctx context.Context, req *pb.InitiateTransferRequest) (*emptypb.Empty, error) {
 	transferHandler := handler.NewInternalTransferHandler(s.config)
 	return &emptypb.Empty{}, transferHandler.InitiateTransfer(ctx, req)
+}
+
+// InitiateTransferV2 initiates a transfer with multiple receivers.
+func (s *SparkInternalServer) InitiateTransferV2(ctx context.Context, req *pb.InitiateTransferV2Request) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "InitiateTransferV2 not yet implemented")
 }
 
 func (s *SparkInternalServer) DeliverSenderKeyTweak(ctx context.Context, req *pb.DeliverSenderKeyTweakRequest) (*emptypb.Empty, error) {

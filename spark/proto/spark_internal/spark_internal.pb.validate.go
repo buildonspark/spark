@@ -3226,6 +3226,361 @@ var _ interface {
 	ErrorName() string
 } = InitiateTransferRequestValidationError{}
 
+// Validate checks the field values on InitiateTransferSenderPackage with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *InitiateTransferSenderPackage) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiateTransferSenderPackage with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// InitiateTransferSenderPackageMultiError, or nil if none found.
+func (m *InitiateTransferSenderPackage) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateTransferSenderPackage) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for SenderIdentityPublicKey
+
+	if all {
+		switch v := interface{}(m.GetTransferPackage()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiateTransferSenderPackageValidationError{
+					field:  "TransferPackage",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiateTransferSenderPackageValidationError{
+					field:  "TransferPackage",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTransferPackage()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiateTransferSenderPackageValidationError{
+				field:  "TransferPackage",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for ReceiverIdentityPublicKeys
+
+	// no validation rules for RefundSignatures
+
+	// no validation rules for DirectRefundSignatures
+
+	// no validation rules for DirectFromCpfpRefundSignatures
+
+	if len(errors) > 0 {
+		return InitiateTransferSenderPackageMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateTransferSenderPackageMultiError is an error wrapping multiple
+// validation errors returned by InitiateTransferSenderPackage.ValidateAll()
+// if the designated constraints aren't met.
+type InitiateTransferSenderPackageMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateTransferSenderPackageMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateTransferSenderPackageMultiError) AllErrors() []error { return m }
+
+// InitiateTransferSenderPackageValidationError is the validation error
+// returned by InitiateTransferSenderPackage.Validate if the designated
+// constraints aren't met.
+type InitiateTransferSenderPackageValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateTransferSenderPackageValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateTransferSenderPackageValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateTransferSenderPackageValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateTransferSenderPackageValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateTransferSenderPackageValidationError) ErrorName() string {
+	return "InitiateTransferSenderPackageValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateTransferSenderPackageValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateTransferSenderPackage.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateTransferSenderPackageValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateTransferSenderPackageValidationError{}
+
+// Validate checks the field values on InitiateTransferV2Request with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *InitiateTransferV2Request) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiateTransferV2Request with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// InitiateTransferV2RequestMultiError, or nil if none found.
+func (m *InitiateTransferV2Request) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateTransferV2Request) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	for idx, item := range m.GetSenderPackages() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InitiateTransferV2RequestValidationError{
+						field:  fmt.Sprintf("SenderPackages[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InitiateTransferV2RequestValidationError{
+						field:  fmt.Sprintf("SenderPackages[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InitiateTransferV2RequestValidationError{
+					field:  fmt.Sprintf("SenderPackages[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, InitiateTransferV2RequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, InitiateTransferV2RequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return InitiateTransferV2RequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetExpiryTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiateTransferV2RequestValidationError{
+					field:  "ExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiateTransferV2RequestValidationError{
+					field:  "ExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetExpiryTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiateTransferV2RequestValidationError{
+				field:  "ExpiryTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return InitiateTransferV2RequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateTransferV2RequestMultiError is an error wrapping multiple validation
+// errors returned by InitiateTransferV2Request.ValidateAll() if the
+// designated constraints aren't met.
+type InitiateTransferV2RequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateTransferV2RequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateTransferV2RequestMultiError) AllErrors() []error { return m }
+
+// InitiateTransferV2RequestValidationError is the validation error returned by
+// InitiateTransferV2Request.Validate if the designated constraints aren't met.
+type InitiateTransferV2RequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateTransferV2RequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateTransferV2RequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateTransferV2RequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateTransferV2RequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateTransferV2RequestValidationError) ErrorName() string {
+	return "InitiateTransferV2RequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateTransferV2RequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateTransferV2Request.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateTransferV2RequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateTransferV2RequestValidationError{}
+
 // Validate checks the field values on DeliverSenderKeyTweakRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

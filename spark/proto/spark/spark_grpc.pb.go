@@ -52,6 +52,7 @@ const (
 	SparkService_InitiatePreimageSwapV3_FullMethodName              = "/spark.SparkService/initiate_preimage_swap_v3"
 	SparkService_StartLeafSwapV2_FullMethodName                     = "/spark.SparkService/start_leaf_swap_v2"
 	SparkService_StartTransferV2_FullMethodName                     = "/spark.SparkService/start_transfer_v2"
+	SparkService_StartTransferV3_FullMethodName                     = "/spark.SparkService/start_transfer_v3"
 	SparkService_ClaimTransfer_FullMethodName                       = "/spark.SparkService/claim_transfer"
 	SparkService_GetUtxosForAddress_FullMethodName                  = "/spark.SparkService/get_utxos_for_address"
 	SparkService_QuerySparkInvoices_FullMethodName                  = "/spark.SparkService/query_spark_invoices"
@@ -113,6 +114,7 @@ type SparkServiceClient interface {
 	InitiatePreimageSwapV3(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	StartLeafSwapV2(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
 	StartTransferV2(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
+	StartTransferV3(ctx context.Context, in *StartTransferV3Request, opts ...grpc.CallOption) (*StartTransferResponse, error)
 	ClaimTransfer(ctx context.Context, in *ClaimTransferRequest, opts ...grpc.CallOption) (*ClaimTransferResponse, error)
 	GetUtxosForAddress(ctx context.Context, in *GetUtxosForAddressRequest, opts ...grpc.CallOption) (*GetUtxosForAddressResponse, error)
 	QuerySparkInvoices(ctx context.Context, in *QuerySparkInvoicesRequest, opts ...grpc.CallOption) (*QuerySparkInvoicesResponse, error)
@@ -461,6 +463,16 @@ func (c *sparkServiceClient) StartTransferV2(ctx context.Context, in *StartTrans
 	return out, nil
 }
 
+func (c *sparkServiceClient) StartTransferV3(ctx context.Context, in *StartTransferV3Request, opts ...grpc.CallOption) (*StartTransferResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartTransferResponse)
+	err := c.cc.Invoke(ctx, SparkService_StartTransferV3_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkServiceClient) ClaimTransfer(ctx context.Context, in *ClaimTransferRequest, opts ...grpc.CallOption) (*ClaimTransferResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ClaimTransferResponse)
@@ -574,6 +586,7 @@ type SparkServiceServer interface {
 	InitiatePreimageSwapV3(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	StartLeafSwapV2(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
 	StartTransferV2(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
+	StartTransferV3(context.Context, *StartTransferV3Request) (*StartTransferResponse, error)
 	ClaimTransfer(context.Context, *ClaimTransferRequest) (*ClaimTransferResponse, error)
 	GetUtxosForAddress(context.Context, *GetUtxosForAddressRequest) (*GetUtxosForAddressResponse, error)
 	QuerySparkInvoices(context.Context, *QuerySparkInvoicesRequest) (*QuerySparkInvoicesResponse, error)
@@ -688,6 +701,9 @@ func (UnimplementedSparkServiceServer) StartLeafSwapV2(context.Context, *StartTr
 }
 func (UnimplementedSparkServiceServer) StartTransferV2(context.Context, *StartTransferRequest) (*StartTransferResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method StartTransferV2 not implemented")
+}
+func (UnimplementedSparkServiceServer) StartTransferV3(context.Context, *StartTransferV3Request) (*StartTransferResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartTransferV3 not implemented")
 }
 func (UnimplementedSparkServiceServer) ClaimTransfer(context.Context, *ClaimTransferRequest) (*ClaimTransferResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ClaimTransfer not implemented")
@@ -1297,6 +1313,24 @@ func _SparkService_StartTransferV2_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_StartTransferV3_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartTransferV3Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).StartTransferV3(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_StartTransferV3_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).StartTransferV3(ctx, req.(*StartTransferV3Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkService_ClaimTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ClaimTransferRequest)
 	if err := dec(in); err != nil {
@@ -1535,6 +1569,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "start_transfer_v2",
 			Handler:    _SparkService_StartTransferV2_Handler,
+		},
+		{
+			MethodName: "start_transfer_v3",
+			Handler:    _SparkService_StartTransferV3_Handler,
 		},
 		{
 			MethodName: "claim_transfer",
