@@ -101,8 +101,9 @@ export class BitcoinFaucet {
     const minerPubKey = secp256k1.getPublicKey(STATIC_MINING_KEY);
     const address = getP2TRAddressFromPublicKey(minerPubKey, Network.LOCAL);
 
-    // Use scantxoutset to find UTXOs
-    const scanResult = await this.call("scantxoutset", [
+    // Use scantxoutset to find UTXOs. Retry on "Scan already in progress" (-8)
+    // which happens when concurrent test processes hit the same bitcoind.
+    const scanResult = await this.callWithRetry("scantxoutset", [
       "start",
       [`addr(${address})`],
     ]);
@@ -321,6 +322,27 @@ export class BitcoinFaucet {
       startBlock,
       expectedIncrease: numBlocks,
     });
+  }
+
+  private async callWithRetry(
+    method: string,
+    params: any[],
+    { maxAttempts = 5, baseDelayMs = 200, maxDelayMs = 3000 } = {},
+  ) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.call(method, params);
+      } catch (err) {
+        const isRetryable =
+          err instanceof SparkRequestError &&
+          err.message?.includes("Scan already in progress");
+        if (!isRetryable || attempt === maxAttempts) throw err;
+        const delay =
+          Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs) +
+          Math.random() * 100;
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
   }
 
   private async call(method: string, params: any[]) {

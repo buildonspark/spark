@@ -127,7 +127,7 @@ class BitcoinFaucet {
     const minerPubKey = secp256k1.getPublicKey(STATIC_MINING_KEY);
     const address = getP2TRAddressFromPublicKey(minerPubKey, REGTEST_NETWORK);
 
-    const scanResult = await this._call("scantxoutset", [
+    const scanResult = await this._callWithRetry("scantxoutset", [
       "start",
       [`addr(${address})`],
     ]);
@@ -319,6 +319,25 @@ class BitcoinFaucet {
 
   async _getRawTransaction(txid) {
     return await this._call("getrawtransaction", [txid, 2]);
+  }
+
+  async _callWithRetry(
+    method,
+    params,
+    { maxAttempts = 5, baseDelayMs = 200, maxDelayMs = 3000 } = {},
+  ) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this._call(method, params);
+      } catch (err) {
+        const isRetryable = err.message?.includes("Scan already in progress");
+        if (!isRetryable || attempt === maxAttempts) throw err;
+        const delay =
+          Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs) +
+          Math.random() * 100;
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
   }
 
   async _call(method, params) {
