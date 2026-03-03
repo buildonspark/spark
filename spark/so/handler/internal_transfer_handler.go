@@ -89,19 +89,24 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 
 		if transfer.Status == st.TransferStatusCompleted {
 			// Verify that the transfer details are the same between both nodes.
-			// Node txs (RawTx) are signed once at tree creation and never re-signed;
-			// their witnesses should be byte-identical across gossip deliveries, so
-			// strict compareTxs is appropriate. Refund txs are re-signed on each
-			// transfer and use compareAndVerifyTxs below.
+			// RawTx is signed once at tree creation and never re-signed; its
+			// witnesses should be byte-identical across gossip deliveries, so
+			// strict compareTxs is appropriate. Refund txs (RawRefundTx,
+			// DirectRefundTx, DirectFromCpfpRefundTx) are re-signed on each
+			// transfer and use compareAndVerifyTxs to accept different-but-valid
+			// FROST signatures from separate signing sessions.
 			rawTxMatch, err := compareTxs(dbNode.RawTx, node.RawTx)
 			if err != nil {
 				return fmt.Errorf("failed to compare raw txs: %w", err)
 			}
 
 			// Parse prevout txs needed for signature verification on refund txs.
-			cpfpNodeTx, err := common.TxFromRawTxBytes(dbNode.RawTx)
+			nodeRawTx, err := common.TxFromRawTxBytes(dbNode.RawTx)
 			if err != nil {
-				return fmt.Errorf("failed to parse cpfp node tx for node %s: %w", nodeID, err)
+				return fmt.Errorf("failed to parse node raw tx for node %s: %w", nodeID, err)
+			}
+			if len(nodeRawTx.TxOut) == 0 {
+				return fmt.Errorf("node raw tx for node %s has no outputs", nodeID)
 			}
 			var directNodeTxOut *wire.TxOut
 			if len(dbNode.DirectTx) > 0 {
@@ -115,19 +120,20 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 				directNodeTxOut = directNodeTx.TxOut[0]
 			}
 
+			rawRefundTxMatch, err := compareAndVerifyTxs(dbNode.RawRefundTx, node.RawRefundTx, nodeRawTx.TxOut[0])
+			if err != nil {
+				return fmt.Errorf("failed to compare raw refund txs for node %s: %w", nodeID, err)
+			}
 			directRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectRefundTx, node.DirectRefundTx, directNodeTxOut)
 			if err != nil {
 				return fmt.Errorf("failed to compare direct refund txs: %w", err)
 			}
-			if len(cpfpNodeTx.TxOut) == 0 {
-				return fmt.Errorf("cpfp node tx for node %s has no outputs", nodeID)
-			}
-			directFromCpfpRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectFromCpfpRefundTx, node.DirectFromCpfpRefundTx, cpfpNodeTx.TxOut[0])
+			directFromCpfpRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectFromCpfpRefundTx, node.DirectFromCpfpRefundTx, nodeRawTx.TxOut[0])
 			if err != nil {
 				return fmt.Errorf("failed to compare direct from cpfp refund txs: %w", err)
 			}
 
-			if !rawTxMatch || !directRefundTxMatch || !directFromCpfpRefundTxMatch {
+			if !rawTxMatch || !rawRefundTxMatch || !directRefundTxMatch || !directFromCpfpRefundTxMatch {
 				return fmt.Errorf("node is not the same as the one in the DB or maybe refundTX not matching. transfer id: %s. with status: %s. node id: %s", transferID, transfer.Status, nodeID)
 			}
 
@@ -262,19 +268,51 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 
 		if dbNode.Status == st.TreeNodeStatusAvailable {
 			// Idempotency: node was already made Available (e.g. by safety net). Verify txs match.
+			// RawTx is signed once at tree creation and never re-signed; its
+			// witnesses should be byte-identical across gossip deliveries, so
+			// strict compareTxs is appropriate. Refund txs (RawRefundTx,
+			// DirectRefundTx, DirectFromCpfpRefundTx) are re-signed on each
+			// transfer and use compareAndVerifyTxs to accept different-but-valid
+			// FROST signatures from separate signing sessions.
 			rawTxMatch, err := compareTxs(dbNode.RawTx, node.RawTx)
 			if err != nil {
 				return fmt.Errorf("failed to compare raw txs for node %s: %w", nodeID, err)
 			}
-			directRefundTxMatch, err := compareTxs(dbNode.DirectRefundTx, node.DirectRefundTx)
+
+			// Parse prevout txs needed for signature verification on refund txs.
+			nodeRawTx, err := common.TxFromRawTxBytes(dbNode.RawTx)
+			if err != nil {
+				return fmt.Errorf("failed to parse node raw tx for node %s: %w", nodeID, err)
+			}
+			if len(nodeRawTx.TxOut) == 0 {
+				return fmt.Errorf("node raw tx for node %s has no outputs", nodeID)
+			}
+			var directNodeTxOut *wire.TxOut
+			if len(dbNode.DirectTx) > 0 {
+				directNodeTx, err := common.TxFromRawTxBytes(dbNode.DirectTx)
+				if err != nil {
+					return fmt.Errorf("failed to parse direct node tx for node %s: %w", nodeID, err)
+				}
+				if len(directNodeTx.TxOut) == 0 {
+					return fmt.Errorf("direct node tx for node %s has no outputs", nodeID)
+				}
+				directNodeTxOut = directNodeTx.TxOut[0]
+			}
+
+			rawRefundTxMatch, err := compareAndVerifyTxs(dbNode.RawRefundTx, node.RawRefundTx, nodeRawTx.TxOut[0])
+			if err != nil {
+				return fmt.Errorf("failed to compare raw refund txs for node %s: %w", nodeID, err)
+			}
+			directRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectRefundTx, node.DirectRefundTx, directNodeTxOut)
 			if err != nil {
 				return fmt.Errorf("failed to compare direct refund txs for node %s: %w", nodeID, err)
 			}
-			directFromCpfpRefundTxMatch, err := compareTxs(dbNode.DirectFromCpfpRefundTx, node.DirectFromCpfpRefundTx)
+			directFromCpfpRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectFromCpfpRefundTx, node.DirectFromCpfpRefundTx, nodeRawTx.TxOut[0])
 			if err != nil {
 				return fmt.Errorf("failed to compare direct from cpfp refund txs for node %s: %w", nodeID, err)
 			}
-			if !rawTxMatch || !directRefundTxMatch || !directFromCpfpRefundTxMatch {
+
+			if !rawTxMatch || !rawRefundTxMatch || !directRefundTxMatch || !directFromCpfpRefundTxMatch {
 				return fmt.Errorf("node txs do not match DB for already-available node %s in transfer %s", nodeID, transferID)
 			}
 
@@ -305,9 +343,14 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 	}
 
 	if receiver.Status == st.TransferReceiverStatusCompleted {
+		// Idempotency: receiver already completed. Node data was verified above.
 		if !receiver.CompletionTime.Equal(req.CompletionTimestamp.AsTime()) {
-			return fmt.Errorf("receiver %s already completed at %v, cannot update to %v",
-				receiver.ID, receiver.CompletionTime, req.CompletionTimestamp.AsTime())
+			logger.With(
+				zap.String("transfer_id", transferID.String()),
+				zap.String("receiver_id", receiver.ID.String()),
+				zap.Time("existing_completion_time", receiver.CompletionTime),
+				zap.Time("gossip_completion_time", req.CompletionTimestamp.AsTime()),
+			).Warn("receiver already completed with different timestamp, accepting idempotently")
 		}
 	} else {
 		_, err = receiver.Update().

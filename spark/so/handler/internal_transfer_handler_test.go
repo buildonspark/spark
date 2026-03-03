@@ -105,8 +105,6 @@ func TestFinalizeTransfer(t *testing.T) {
 		directRefundTxUpdated := createTestTxBytes(t, 2003)
 		directFromCpfpRefundTxUpdated := createTestTxBytes(t, 2004)
 
-		newRawRefundTx := createTestTxBytes(t, 3001)
-
 		// Create test signing keyshare
 		rng := rand.NewChaCha8([32]byte{})
 		keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -230,27 +228,10 @@ func TestFinalizeTransfer(t *testing.T) {
 		assert.Equal(t, directRefundTxUpdated, updatedLeaf.DirectRefundTx)
 		assert.Equal(t, directFromCpfpRefundTxUpdated, updatedLeaf.DirectFromCpfpRefundTx)
 
-		// Create another copy of the internal node for the request, but with different RawRefundTx
-		internalNode2 := &pbinternal.TreeNode{
-			Id:                     leaf.ID.String(),
-			Value:                  1000,                                  // Must match the original value since it's immutable
-			VerifyingPubkey:        verifyingPrivKey.Public().Serialize(), // Must match the original value since it's immutable
-			OwnerIdentityPubkey:    updatedOwnerIdentityPrivKey.Public().Serialize(),
-			OwnerSigningPubkey:     updatedOwnerSigningPrivKey.Public().Serialize(),
-			RawTx:                  rawTxUpdated,
-			RawRefundTx:            newRawRefundTx,
-			DirectTx:               createTestTxBytes(t, 2002),
-			DirectRefundTx:         directRefundTxUpdated,
-			DirectFromCpfpRefundTx: directFromCpfpRefundTxUpdated,
-			TreeId:                 tree.ID.String(),
-			SigningKeyshareId:      signingKeyshare.ID.String(),
-			Vout:                   1,
-		}
-
-		// Test the FinalizeTransfer method with the new internal node
+		// Idempotent replay: send the same data again (transfer already Completed).
 		err = internalTransferHandler.FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{
 			TransferId: transfer.ID.String(),
-			Nodes:      []*pbinternal.TreeNode{internalNode2},
+			Nodes:      []*pbinternal.TreeNode{internalNode},
 			Timestamp:  timestamppb.New(time.Now()),
 		})
 		require.NoError(t, err)
@@ -261,16 +242,15 @@ func TestFinalizeTransfer(t *testing.T) {
 		err = entTx.Commit()
 		require.NoError(t, err)
 
-		// Verify the transfer status was updated
+		// Verify everything is still correct after replay.
 		updatedTransfer2, err := dbCtx.Client.Transfer.Get(ctx, transfer.ID)
 		require.NoError(t, err)
 		assert.Equal(t, st.TransferStatusCompleted, updatedTransfer2.Status)
 
-		// Verify the leaf node was updated (only certain fields are updated by FinalizeTransfer)
 		updatedLeaf2, err := dbCtx.Client.TreeNode.Get(ctx, leaf.ID)
 		require.NoError(t, err)
 		assert.Equal(t, rawTxUpdated, updatedLeaf2.RawTx)
-		assert.Equal(t, newRawRefundTx, updatedLeaf2.RawRefundTx)
+		assert.Equal(t, rawRefundTxUpdated, updatedLeaf2.RawRefundTx)
 		assert.Equal(t, directTx, updatedLeaf2.DirectTx) // DirectTx is NOT updated by FinalizeTransfer
 		assert.Equal(t, directRefundTxUpdated, updatedLeaf2.DirectRefundTx)
 		assert.Equal(t, directFromCpfpRefundTxUpdated, updatedLeaf2.DirectFromCpfpRefundTx)
@@ -461,6 +441,185 @@ func TestFinalizeTransferReceiver(t *testing.T) {
 		})
 		require.ErrorContains(t, err, "expected exactly 1")
 	})
+
+	t.Run("successful finalize and idempotent replay", func(t *testing.T) {
+		rng := rand.NewChaCha8([32]byte{4})
+
+		rawTx := createTestTxBytes(t, 8000)
+		rawRefundTx := createTestTxBytes(t, 8001)
+		directTx := createTestTxBytes(t, 8002)
+		directRefundTx := createTestTxBytes(t, 8003)
+		directFromCpfpRefundTx := createTestTxBytes(t, 8004)
+
+		rawTxUpdated := createTestTxBytes(t, 9000)
+		rawRefundTxUpdated := createTestTxBytes(t, 9001)
+		directRefundTxUpdated := createTestTxBytes(t, 9003)
+		directFromCpfpRefundTxUpdated := createTestTxBytes(t, 9004)
+
+		keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		verifyingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		ownerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		receiverIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+		signingKeyshare, err := dbCtx.Client.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(keysharePrivKey).
+			SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+			SetPublicKey(keysharePrivKey.Public()).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		baseTxid := st.NewRandomTxIDForTesting(t)
+		tree, err := dbCtx.Client.Tree.Create().
+			SetStatus(st.TreeStatusAvailable).
+			SetNetwork(btcnetwork.Regtest).
+			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+			SetBaseTxid(baseTxid).
+			SetVout(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		leaf, err := dbCtx.Client.TreeNode.Create().
+			SetStatus(st.TreeNodeStatusTransferLocked).
+			SetTree(tree).
+			SetNetwork(tree.Network).
+			SetSigningKeyshare(signingKeyshare).
+			SetValue(8000).
+			SetVerifyingPubkey(verifyingPrivKey.Public()).
+			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+			SetOwnerSigningPubkey(ownerSigningPrivKey.Public()).
+			SetRawTx(rawTx).
+			SetRawRefundTx(rawRefundTx).
+			SetDirectTx(directTx).
+			SetDirectRefundTx(directRefundTx).
+			SetDirectFromCpfpRefundTx(directFromCpfpRefundTx).
+			SetVout(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		transfer, err := dbCtx.Client.Transfer.Create().
+			SetNetwork(tree.Network).
+			SetStatus(st.TransferStatusReceiverRefundSigned).
+			SetType(st.TransferTypeTransfer).
+			SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+			SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+			SetTotalValue(8000).
+			SetExpiryTime(time.Now().Add(24 * time.Hour)).
+			SetCompletionTime(time.Now()).
+			Save(ctx)
+		require.NoError(t, err)
+
+		receiver, err := dbCtx.Client.TransferReceiver.Create().
+			SetTransfer(transfer).
+			SetIdentityPubkey(receiverIdentityPrivKey.Public()).
+			SetStatus(st.TransferReceiverStatusRefundSigned).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = dbCtx.Client.TransferLeaf.Create().
+			SetTransfer(transfer).
+			SetTransferReceiver(receiver).
+			SetLeaf(leaf).
+			SetPreviousRefundTx(createTestTxBytes(t, 10000)).
+			SetIntermediateRefundTx(createTestTxBytes(t, 10001)).
+			Save(ctx)
+		require.NoError(t, err)
+
+		updatedOwnerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		updatedOwnerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+		internalNode := &pbinternal.TreeNode{
+			Id:                     leaf.ID.String(),
+			Value:                  8000,
+			VerifyingPubkey:        verifyingPrivKey.Public().Serialize(),
+			OwnerIdentityPubkey:    updatedOwnerIdentityPrivKey.Public().Serialize(),
+			OwnerSigningPubkey:     updatedOwnerSigningPrivKey.Public().Serialize(),
+			RawTx:                  rawTxUpdated,
+			RawRefundTx:            rawRefundTxUpdated,
+			DirectTx:               createTestTxBytes(t, 10002),
+			DirectRefundTx:         directRefundTxUpdated,
+			DirectFromCpfpRefundTx: directFromCpfpRefundTxUpdated,
+			TreeId:                 tree.ID.String(),
+			SigningKeyshareId:      signingKeyshare.ID.String(),
+			Vout:                   1,
+		}
+
+		completionTime := timestamppb.New(time.Now())
+
+		// --- First call: happy path ---
+		handler := NewInternalTransferHandler(config)
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiverIdentityPrivKey.Public().Serialize(),
+			InternalNodes:             []*pbinternal.TreeNode{internalNode},
+			CompletionTimestamp:       completionTime,
+		})
+		require.NoError(t, err)
+
+		entTx, err := ent.GetTxFromContext(ctx)
+		require.NoError(t, err)
+		err = entTx.Commit()
+		require.NoError(t, err)
+
+		// Verify receiver is completed.
+		updatedReceiver, err := dbCtx.Client.TransferReceiver.Get(ctx, receiver.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferReceiverStatusCompleted, updatedReceiver.Status)
+
+		// Verify transfer is completed (single receiver, so transfer completes too).
+		updatedTransfer, err := dbCtx.Client.Transfer.Get(ctx, transfer.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferStatusCompleted, updatedTransfer.Status)
+
+		// Verify leaf node was updated.
+		updatedLeaf, err := dbCtx.Client.TreeNode.Get(ctx, leaf.ID)
+		require.NoError(t, err)
+		assert.Equal(t, rawTxUpdated, updatedLeaf.RawTx)
+		assert.Equal(t, rawRefundTxUpdated, updatedLeaf.RawRefundTx)
+		assert.Equal(t, directRefundTxUpdated, updatedLeaf.DirectRefundTx)
+		assert.Equal(t, directFromCpfpRefundTxUpdated, updatedLeaf.DirectFromCpfpRefundTx)
+
+		// --- Second call: idempotent replay with same data ---
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiverIdentityPrivKey.Public().Serialize(),
+			InternalNodes:             []*pbinternal.TreeNode{internalNode},
+			CompletionTimestamp:       completionTime,
+		})
+		require.NoError(t, err)
+
+		entTx, err = ent.GetTxFromContext(ctx)
+		require.NoError(t, err)
+		err = entTx.Commit()
+		require.NoError(t, err)
+
+		// Verify leaf data unchanged after replay.
+		updatedLeaf2, err := dbCtx.Client.TreeNode.Get(ctx, leaf.ID)
+		require.NoError(t, err)
+		assert.Equal(t, rawTxUpdated, updatedLeaf2.RawTx)
+		assert.Equal(t, rawRefundTxUpdated, updatedLeaf2.RawRefundTx)
+
+		// Verify transfer/receiver still completed.
+		updatedTransfer2, err := dbCtx.Client.Transfer.Get(ctx, transfer.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferStatusCompleted, updatedTransfer2.Status)
+
+		// --- Third call: idempotent replay with different completion timestamp ---
+		differentTime := timestamppb.New(time.Now().Add(5 * time.Minute))
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiverIdentityPrivKey.Public().Serialize(),
+			InternalNodes:             []*pbinternal.TreeNode{internalNode},
+			CompletionTimestamp:       differentTime,
+		})
+		require.NoError(t, err, "should succeed even with different timestamp")
+	})
+
 }
 
 func TestFinalizeTransferReceiverMultiReceiver(t *testing.T) {
@@ -756,8 +915,7 @@ func TestFinalizeTransferReceiverMultiReceiver(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("replay with different timestamp errors", func(t *testing.T) {
-		// receiver1 is already Completed. A different timestamp should be rejected.
+	t.Run("replay with different timestamp succeeds idempotently", func(t *testing.T) {
 		differentTs := timestamppb.New(time.Now().Add(1 * time.Hour).Truncate(time.Microsecond))
 
 		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
@@ -766,7 +924,7 @@ func TestFinalizeTransferReceiverMultiReceiver(t *testing.T) {
 			InternalNodes:             []*pbinternal.TreeNode{gossipNode1},
 			CompletionTimestamp:       differentTs,
 		})
-		require.ErrorContains(t, err, "already completed at")
+		require.NoError(t, err, "should succeed idempotently even with different timestamp")
 	})
 
 	t.Run("node not belonging to receiver is rejected", func(t *testing.T) {
