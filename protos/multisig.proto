@@ -25,6 +25,6 @@ message KeyedSignature {
 }
 
 message MultisigSignatureSet {
-    bytes multisig_identifier = 1 [(validate.rules).bytes.len = 32];
+    MultisigConfig multisig_config = 1 [(validate.rules).message.required = true];
     repeated KeyedSignature signatures = 2;
 }

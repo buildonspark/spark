@@ -319,15 +319,44 @@ func (m *MultisigSignatureSet) validate(all bool) error {
 
 	var errors []error
 
-	if len(m.GetMultisigIdentifier()) != 32 {
+	if m.GetMultisigConfig() == nil {
 		err := MultisigSignatureSetValidationError{
-			field:  "MultisigIdentifier",
-			reason: "value length must be 32 bytes",
+			field:  "MultisigConfig",
+			reason: "value is required",
 		}
 		if !all {
 			return err
 		}
 		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMultisigConfig()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, MultisigSignatureSetValidationError{
+					field:  "MultisigConfig",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, MultisigSignatureSetValidationError{
+					field:  "MultisigConfig",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMultisigConfig()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return MultisigSignatureSetValidationError{
+				field:  "MultisigConfig",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
 	}
 
 	for idx, item := range m.GetSignatures() {

@@ -136,11 +136,11 @@ func (x *KeyedSignature) GetSignature() []byte {
 }
 
 type MultisigSignatureSet struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	MultisigIdentifier []byte                 `protobuf:"bytes,1,opt,name=multisig_identifier,json=multisigIdentifier,proto3" json:"multisig_identifier,omitempty"`
-	Signatures         []*KeyedSignature      `protobuf:"bytes,2,rep,name=signatures,proto3" json:"signatures,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	MultisigConfig *MultisigConfig        `protobuf:"bytes,1,opt,name=multisig_config,json=multisigConfig,proto3" json:"multisig_config,omitempty"`
+	Signatures     []*KeyedSignature      `protobuf:"bytes,2,rep,name=signatures,proto3" json:"signatures,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *MultisigSignatureSet) Reset() {
@@ -173,9 +173,9 @@ func (*MultisigSignatureSet) Descriptor() ([]byte, []int) {
 	return file_multisig_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *MultisigSignatureSet) GetMultisigIdentifier() []byte {
+func (x *MultisigSignatureSet) GetMultisigConfig() *MultisigConfig {
 	if x != nil {
-		return x.MultisigIdentifier
+		return x.MultisigConfig
 	}
 	return nil
 }
@@ -200,9 +200,9 @@ const file_multisig_proto_rawDesc = "" +
 	"\x0eKeyedSignature\x12&\n" +
 	"\n" +
 	"public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\tpublicKey\x12'\n" +
-	"\tsignature\x18\x02 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\tsignature\"\x8a\x01\n" +
-	"\x14MultisigSignatureSet\x128\n" +
-	"\x13multisig_identifier\x18\x01 \x01(\fB\a\xfaB\x04z\x02h R\x12multisigIdentifier\x128\n" +
+	"\tsignature\x18\x02 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\tsignature\"\x9d\x01\n" +
+	"\x14MultisigSignatureSet\x12K\n" +
+	"\x0fmultisig_config\x18\x01 \x01(\v2\x18.multisig.MultisigConfigB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x0emultisigConfig\x128\n" +
 	"\n" +
 	"signatures\x18\x02 \x03(\v2\x18.multisig.KeyedSignatureR\n" +
 	"signaturesB/Z-github.com/lightsparkdev/spark/proto/multisigb\x06proto3"
@@ -226,12 +226,13 @@ var file_multisig_proto_goTypes = []any{
 	(*MultisigSignatureSet)(nil), // 2: multisig.MultisigSignatureSet
 }
 var file_multisig_proto_depIdxs = []int32{
-	1, // 0: multisig.MultisigSignatureSet.signatures:type_name -> multisig.KeyedSignature
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: multisig.MultisigSignatureSet.multisig_config:type_name -> multisig.MultisigConfig
+	1, // 1: multisig.MultisigSignatureSet.signatures:type_name -> multisig.KeyedSignature
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_multisig_proto_init() }

@@ -8,7 +8,10 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/multisig"
+	pb "github.com/lightsparkdev/spark/proto/multisig"
 	"github.com/lightsparkdev/spark/so/db"
+	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -183,6 +186,59 @@ func TestMultisigMemberCreation_Sequential(t *testing.T) {
 	finalCount, err := config.QueryMembers().Count(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, numMembers, finalCount)
+}
+
+func TestGetOrCreateMultisigConfig_CreatesNewConfig(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+
+	pk1 := keys.GeneratePrivateKey().Public().Serialize()
+	pk2 := keys.GeneratePrivateKey().Public().Serialize()
+	pk3 := keys.GeneratePrivateKey().Public().Serialize()
+
+	protoConfig := multisig.NormalizeMultisigConfig(&pb.MultisigConfig{
+		Version:    0,
+		Threshold:  2,
+		PublicKeys: [][]byte{pk1, pk2, pk3},
+	})
+
+	config, err := ent.GetOrCreateMultisigConfig(ctx, dbCtx.Client, protoConfig)
+	require.NoError(t, err)
+	require.NotNil(t, config)
+	assert.Equal(t, uint32(2), config.NumSignersThreshold)
+	assert.Equal(t, uint32(3), config.NumSignersTotal)
+	assert.Len(t, config.MultisigIdentifier, 32)
+
+	members, err := config.QueryMembers().All(ctx)
+	require.NoError(t, err)
+	assert.Len(t, members, 3)
+}
+
+func TestGetOrCreateMultisigConfig_ReturnsExisting(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+
+	pk1 := keys.GeneratePrivateKey().Public().Serialize()
+	pk2 := keys.GeneratePrivateKey().Public().Serialize()
+
+	protoConfig := multisig.NormalizeMultisigConfig(&pb.MultisigConfig{
+		Version:    0,
+		Threshold:  2,
+		PublicKeys: [][]byte{pk1, pk2},
+	})
+
+	config1, err := ent.GetOrCreateMultisigConfig(ctx, dbCtx.Client, protoConfig)
+	require.NoError(t, err)
+
+	config2, err := ent.GetOrCreateMultisigConfig(ctx, dbCtx.Client, protoConfig)
+	require.NoError(t, err)
+
+	assert.Equal(t, config1.ID, config2.ID)
+}
+
+func TestGetOrCreateMultisigConfig_NilConfig(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+
+	_, err := ent.GetOrCreateMultisigConfig(ctx, dbCtx.Client, nil)
+	require.Error(t, err)
 }
 
 func TestMultisigConfigCreation_ThresholdValidation(t *testing.T) {
