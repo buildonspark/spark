@@ -39,6 +39,10 @@ class TestableLeafManager extends LeafManager {
   ): Promise<TreeNode[]> {
     return (this as any).recoverLeaves(leaves, keyDerivation);
   }
+
+  async checkRenewLeavesPublic(nodes: TreeNode[]): Promise<TreeNode[]> {
+    return (this as any).checkRenewLeaves(nodes);
+  }
 }
 interface MockConfig {
   getCoordinatorAddress?: () => string;
@@ -51,6 +55,9 @@ interface MockTransferService {
   sendTransferWithKeyTweaks?: jest.Mock;
   queryTransfer?: jest.Mock;
   claimTransfer?: jest.Mock;
+  renewNodeTxn?: jest.Mock;
+  renewRefundTxn?: jest.Mock;
+  renewZeroTimelockNodeTxn?: jest.Mock;
 }
 
 interface MockConnectionManager {
@@ -89,6 +96,31 @@ function createMockTreeNode(overrides: Partial<TreeNode> = {}): TreeNode {
     directTx: new Uint8Array(0),
     ...overrides,
   } as TreeNode;
+}
+
+/**
+ * Build a minimal valid raw Bitcoin transaction with a specific input sequence.
+ * The sequence's lower 16 bits are used as the timelock by getCurrentTimelock().
+ */
+function buildRawTx(inputSequence: number): Uint8Array {
+  // Non-segwit: version(4) + inCount(1) + prevTxid(32) + prevVout(4)
+  //   + scriptSigLen(1) + sequence(4) + outCount(1) + value(8)
+  //   + scriptPubKeyLen(1) + scriptPubKey(22) + locktime(4) = 82 bytes
+  const buf = new ArrayBuffer(82);
+  const view = new DataView(buf);
+  const arr = new Uint8Array(buf);
+  view.setUint32(0, 2, true); // version 2
+  arr[4] = 1; // 1 input
+  // prevTxid (32 zero bytes at offset 5) + prevVout (0 at offset 37) already zero
+  // scriptSig length = 0 at offset 41 already zero
+  view.setUint32(42, inputSequence, true); // sequence
+  arr[46] = 1; // 1 output
+  view.setBigUint64(47, BigInt(1000), true); // value
+  arr[55] = 22; // scriptPubKey length
+  arr[56] = 0x00; // OP_0
+  arr[57] = 0x14; // push 20 bytes (P2WPKH)
+  // remaining scriptPubKey + locktime already zero
+  return arr;
 }
 
 describe("LeafManager Test", () => {
@@ -382,6 +414,191 @@ describe("LeafManager Test", () => {
       );
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe("checkRenewLeaves", () => {
+    // Sequence values: getCurrentTimelock(seq) = seq & 0xffff
+    // doesTxnNeedRenewed: timelock < 200
+    // isZeroTimelock: timelock === 0
+    const VALID_SEQ = 500; // timelock 500, no renewal
+    const NEEDS_RENEWAL_SEQ = 100; // timelock 100, needs renewal
+    const ZERO_SEQ = 0; // timelock 0, zero timelock
+
+    function nodeWithSeqs(
+      id: string,
+      nodeSeq: number,
+      refundSeq: number,
+      parentNodeId?: string,
+    ): TreeNode {
+      return createMockTreeNode({
+        id,
+        parentNodeId,
+        nodeTx: buildRawTx(nodeSeq),
+        refundTx: buildRawTx(refundSeq),
+      });
+    }
+
+    it("returns all nodes when none need renewal", async () => {
+      const nodes = [
+        nodeWithSeqs("a", VALID_SEQ, VALID_SEQ),
+        nodeWithSeqs("b", VALID_SEQ, VALID_SEQ),
+      ];
+
+      const leafManager = createTestableLeafManager();
+      const result = await leafManager.checkRenewLeavesPublic(nodes);
+
+      expect(result).toEqual(nodes);
+    });
+
+    it("calls the correct renewal method for each category", async () => {
+      const renewedNode = createMockTreeNode({ id: "renewed-node" });
+      const renewedRefund = createMockTreeNode({ id: "renewed-refund" });
+      const renewedZero = createMockTreeNode({ id: "renewed-zero" });
+
+      // refund needs renewal + node needs renewal → renewNodeTxn
+      const nodeRenewNode = nodeWithSeqs(
+        "n1",
+        NEEDS_RENEWAL_SEQ,
+        NEEDS_RENEWAL_SEQ,
+        "parent-1",
+      );
+      // refund needs renewal + node valid → renewRefundTxn
+      const nodeRenewRefund = nodeWithSeqs(
+        "n2",
+        VALID_SEQ,
+        NEEDS_RENEWAL_SEQ,
+        "parent-2",
+      );
+      // refund needs renewal + node zero timelock → renewZeroTimelockNodeTxn
+      const nodeRenewZero = nodeWithSeqs("n3", ZERO_SEQ, NEEDS_RENEWAL_SEQ);
+      // valid
+      const validNode = nodeWithSeqs("n4", VALID_SEQ, VALID_SEQ);
+
+      const parentNode1 = createMockTreeNode({ id: "parent-1" });
+      const parentNode2 = createMockTreeNode({ id: "parent-2" });
+
+      const queryNodesStub = jest.fn(async () => ({
+        nodes: {
+          n1: nodeRenewNode,
+          n2: nodeRenewRefund,
+          n3: nodeRenewZero,
+          "parent-1": parentNode1,
+          "parent-2": parentNode2,
+        },
+        offset: 0,
+      }));
+      const createSparkClientMock = jest.fn(async () => ({
+        query_nodes: queryNodesStub,
+      }));
+
+      const renewNodeTxnMock = jest.fn(async () => renewedNode);
+      const renewRefundTxnMock = jest.fn(async () => renewedRefund);
+      const renewZeroTimelockNodeTxnMock = jest.fn(async () => renewedZero);
+
+      const leafManager = createTestableLeafManager({
+        config: {
+          getCoordinatorAddress: () => "mock-addr",
+          getNetworkProto: () => 0,
+        } as any,
+        connectionManager: { createSparkClient: createSparkClientMock },
+        transferService: {
+          renewNodeTxn: renewNodeTxnMock,
+          renewRefundTxn: renewRefundTxnMock,
+          renewZeroTimelockNodeTxn: renewZeroTimelockNodeTxnMock,
+        },
+      });
+
+      const result = await leafManager.checkRenewLeavesPublic([
+        nodeRenewNode,
+        nodeRenewRefund,
+        nodeRenewZero,
+        validNode,
+      ]);
+
+      expect(renewNodeTxnMock).toHaveBeenCalledTimes(1);
+      expect(renewNodeTxnMock).toHaveBeenCalledWith(nodeRenewNode, parentNode1);
+      expect(renewRefundTxnMock).toHaveBeenCalledTimes(1);
+      expect(renewRefundTxnMock).toHaveBeenCalledWith(
+        nodeRenewRefund,
+        parentNode2,
+      );
+      expect(renewZeroTimelockNodeTxnMock).toHaveBeenCalledTimes(1);
+      expect(renewZeroTimelockNodeTxnMock).toHaveBeenCalledWith(nodeRenewZero);
+
+      expect(result).toHaveLength(4);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          validNode,
+          renewedNode,
+          renewedRefund,
+          renewedZero,
+        ]),
+      );
+    });
+
+    it("returns valid and successfully renewed nodes when one renewal fails", async () => {
+      const renewedRefund = createMockTreeNode({ id: "renewed-refund" });
+
+      // Will fail renewal
+      const failNode = nodeWithSeqs(
+        "fail",
+        NEEDS_RENEWAL_SEQ,
+        NEEDS_RENEWAL_SEQ,
+        "parent-fail",
+      );
+      // Will succeed renewal
+      const okNode = nodeWithSeqs(
+        "ok",
+        VALID_SEQ,
+        NEEDS_RENEWAL_SEQ,
+        "parent-ok",
+      );
+      // Already valid
+      const validNode = nodeWithSeqs("valid", VALID_SEQ, VALID_SEQ);
+
+      const parentFail = createMockTreeNode({ id: "parent-fail" });
+      const parentOk = createMockTreeNode({ id: "parent-ok" });
+
+      const queryNodesStub = jest.fn(async () => ({
+        nodes: {
+          fail: failNode,
+          ok: okNode,
+          "parent-fail": parentFail,
+          "parent-ok": parentOk,
+        },
+        offset: 0,
+      }));
+
+      const leafManager = createTestableLeafManager({
+        config: {
+          getCoordinatorAddress: () => "mock-addr",
+          getNetworkProto: () => 0,
+        } as any,
+        connectionManager: {
+          createSparkClient: jest.fn(async () => ({
+            query_nodes: queryNodesStub,
+          })),
+        },
+        transferService: {
+          renewNodeTxn: jest.fn(async () => {
+            throw new Error("network failure");
+          }),
+          renewRefundTxn: jest.fn(async () => renewedRefund),
+          renewZeroTimelockNodeTxn: jest.fn(),
+        },
+      });
+
+      const result = await leafManager.checkRenewLeavesPublic([
+        failNode,
+        okNode,
+        validNode,
+      ]);
+
+      expect(result).toHaveLength(2);
+      expect(result).toEqual(
+        expect.arrayContaining([validNode, renewedRefund]),
+      );
     });
   });
 });

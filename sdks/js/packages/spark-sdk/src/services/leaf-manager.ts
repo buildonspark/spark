@@ -1,6 +1,12 @@
 import { equalBytes } from "@noble/curves/utils";
 import { Mutex } from "async-mutex";
-import { SparkValidationError, addPublicKeys } from "../index-shared.js";
+import {
+  SparkValidationError,
+  addPublicKeys,
+  doesTxnNeedRenewed,
+  getTxFromRawTxBytes,
+  isZeroTimelock,
+} from "../index-shared.js";
 import {
   QueryNodesRequest,
   QueryNodesResponse,
@@ -164,12 +170,157 @@ export default class LeafManager {
           path,
         });
         finalLeaves.push(...recovered);
-      } catch {
+      } catch (err) {
         // Recovery failed — skip these leaves rather than losing all valid leaves.
       }
     }
 
     return finalLeaves;
+  }
+  // #endregion
+
+  // #region Leaf Renewal
+  private async checkRenewLeaves(nodes: TreeNode[]): Promise<TreeNode[]> {
+    const nodesToRenewNodeTxn: TreeNode[] = [];
+    const nodesToRenewRefundTxn: TreeNode[] = [];
+    const nodesToRenewZeroTimelockTxn: TreeNode[] = [];
+    const nodeIds: string[] = [];
+    const validNodes: TreeNode[] = [];
+
+    for (const node of nodes) {
+      const nodeTx = getTxFromRawTxBytes(node.nodeTx);
+      const refundTx = getTxFromRawTxBytes(node.refundTx);
+
+      if (!nodeTx.inputsLength) {
+        throw new SparkValidationError("Invalid node transaction", {
+          field: "inputsLength",
+          value: nodeTx.inputsLength,
+          expected: "Non-zero inputs length",
+        });
+      }
+      if (!refundTx.inputsLength) {
+        throw new SparkValidationError("Invalid refund transaction", {
+          field: "inputsLength",
+          value: refundTx.inputsLength,
+          expected: "Non-zero inputs length",
+        });
+      }
+
+      const nodeSequence = nodeTx.getInput(0).sequence;
+      const refundSequence = refundTx.getInput(0).sequence;
+
+      if (nodeSequence === undefined) {
+        throw new SparkValidationError("Invalid node transaction", {
+          field: "sequence",
+          value: nodeTx.getInput(0),
+          expected: "Non-null sequence",
+        });
+      }
+      if (refundSequence === undefined) {
+        throw new SparkValidationError("Invalid refund transaction", {
+          field: "sequence",
+          value: refundTx.getInput(0),
+          expected: "Non-null sequence",
+        });
+      }
+
+      if (doesTxnNeedRenewed(refundSequence)) {
+        if (isZeroTimelock(nodeSequence)) {
+          nodesToRenewZeroTimelockTxn.push(node);
+        } else if (doesTxnNeedRenewed(nodeSequence)) {
+          nodesToRenewNodeTxn.push(node);
+        } else {
+          nodesToRenewRefundTxn.push(node);
+        }
+        nodeIds.push(node.id);
+      } else {
+        validNodes.push(node);
+      }
+    }
+
+    if (
+      nodesToRenewNodeTxn.length === 0 &&
+      nodesToRenewRefundTxn.length === 0 &&
+      nodesToRenewZeroTimelockTxn.length === 0
+    ) {
+      return validNodes;
+    }
+
+    const nodesResp = await this.queryNodes({
+      source: { $case: "nodeIds", nodeIds: { nodeIds } },
+      includeParents: true,
+      network: this.config.getNetworkProto(),
+      statuses: [],
+    });
+
+    const nodesMap = new Map<string, TreeNode>();
+    for (const node of Object.values(nodesResp.nodes)) {
+      nodesMap.set(node.id, node);
+    }
+
+    await Promise.all([
+      ...nodesToRenewNodeTxn.map(async (node) => {
+        try {
+          const parentNode = this.requireParentNode(node, nodesMap);
+          const renewedNode = await this.transferService.renewNodeTxn(
+            node,
+            parentNode,
+          );
+          validNodes.push(renewedNode);
+        } catch (err) {
+          // Skip — don't let one failed renewal discard the rest.
+          console.warn(
+            `[LeafManager] renewNodeTxn failed for node ${node.id}`,
+            err,
+          );
+        }
+      }),
+      ...nodesToRenewRefundTxn.map(async (node) => {
+        try {
+          const parentNode = this.requireParentNode(node, nodesMap);
+          const renewedNode = await this.transferService.renewRefundTxn(
+            node,
+            parentNode,
+          );
+          validNodes.push(renewedNode);
+        } catch (err) {
+          // Skip — don't let one failed renewal discard the rest.
+          console.warn(
+            `[LeafManager] renewRefundTxn failed for node ${node.id}`,
+            err,
+          );
+        }
+      }),
+      ...nodesToRenewZeroTimelockTxn.map(async (node) => {
+        try {
+          const renewedNode =
+            await this.transferService.renewZeroTimelockNodeTxn(node);
+          validNodes.push(renewedNode);
+        } catch (err) {
+          // Skip — don't let one failed renewal discard the rest.
+          console.warn(
+            `[LeafManager] renewZeroTimelockNodeTxn failed for node ${node.id}`,
+            err,
+          );
+        }
+      }),
+    ]);
+
+    return validNodes;
+  }
+
+  private requireParentNode(
+    node: TreeNode,
+    nodesMap: Map<string, TreeNode>,
+  ): TreeNode {
+    if (!node.parentNodeId) {
+      throw new Error(`node ${node.id} has no parent`);
+    }
+    const parentNode = nodesMap.get(node.parentNodeId);
+    if (!parentNode) {
+      throw new Error(`parent node ${node.parentNodeId} not found`);
+    }
+    return parentNode;
   }
   // #endregion
 
