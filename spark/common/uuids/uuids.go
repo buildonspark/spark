@@ -83,3 +83,19 @@ func UUIDv7FromTime(t time.Time) uuid.UUID {
 	// All other bits remain 0 (for minimum boundary)
 	return u
 }
+
+// UUIDRangeForDate returns the UUID range (from, to) for partitioning a single day.
+// The range is [from, to) - inclusive of from, exclusive of to.
+//
+// This is useful for creating date-based partitions on UUIDv7 columns:
+//
+//	from, to := UUIDRangeForDate(date)
+//	CREATE TABLE partition FOR VALUES FROM (from) TO (to)
+func UUIDRangeForDate(t time.Time) (from, to uuid.UUID) {
+	// Truncate to start of day in UTC
+	startOfDay := t.UTC().Truncate(24 * time.Hour)
+
+	from = UUIDv7FromTime(startOfDay)
+	to = UUIDv7FromTime(startOfDay.Add(24 * time.Hour))
+	return from, to
+}

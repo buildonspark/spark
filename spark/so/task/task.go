@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/uuids"
@@ -45,15 +46,17 @@ import (
 )
 
 var (
-	confirmPendingDKGKeysCutoffAge   = 15 * time.Minute
-	defaultTaskTimeout               = 1 * time.Minute
-	dkgTaskTimeout                   = 3 * time.Minute
-	deleteStaleTreeNodesTaskTimeout  = 10 * time.Minute
-	backfillMimoTransfersTaskTimeout = 2 * time.Minute
+	confirmPendingDKGKeysCutoffAge     = 15 * time.Minute
+	defaultTaskTimeout                 = 1 * time.Minute
+	dkgTaskTimeout                     = 3 * time.Minute
+	deleteStaleTreeNodesTaskTimeout    = 10 * time.Minute
+	backfillMimoTransfersTaskTimeout   = 2 * time.Minute
+	purgeSigningNoncePartitionsTimeout = 10 * time.Minute
 
 	meter                       = otel.Meter("gossip")
 	oldestPendingGossipAgeGauge metric.Int64Gauge
 	pendingGossipCountGauge     metric.Int64Gauge
+	signingNoncesPartitioned    atomic.Bool
 )
 
 func init() {
@@ -658,9 +661,32 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 		{
 			ExecutionInterval: 20 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
-				Name:         "purge_signing_nonces",
-				RunInTestEnv: true,
+				Name:                "purge_signing_nonces",
+				RunInTestEnv:        true,
+				RequiresRawDBClient: true,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					if signingNoncesPartitioned.Load() {
+						return nil
+					}
+
+					rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // Partition detection must run on the raw client, outside task transaction wrappers.
+					if err != nil {
+						return fmt.Errorf("failed to get raw db client from context: %w", err)
+					}
+
+					// Skip if table is partitioned (use purge_signing_nonces_partitions instead)
+					isPartitioned, err := ent.IsSigningNoncesPartitioned(ctx, rawDB)
+					if err != nil {
+						return fmt.Errorf("failed to check if signing_nonces is partitioned: %w", err)
+					}
+					if isPartitioned {
+						signingNoncesPartitioned.Store(true)
+					}
+					if signingNoncesPartitioned.Load() {
+						// Table is partitioned, skip this task (purge_signing_nonces_partitions will handle cleanup)
+						return nil
+					}
+
 					db, err := ent.GetDbFromContext(ctx)
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -687,6 +713,39 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						}
 					}
 					return nil
+				},
+			},
+		},
+		{
+			ExecutionInterval: 1 * time.Hour,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:                "purge_signing_nonces_partitions",
+				Timeout:             &purgeSigningNoncePartitionsTimeout,
+				RunInTestEnv:        true,
+				RequiresRawDBClient: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // Partition maintenance uses raw Postgres operations that must not run in a transaction.
+					if err != nil {
+						return fmt.Errorf("failed to get raw db client from context: %w", err)
+					}
+
+					if !signingNoncesPartitioned.Load() {
+						// Skip if table is NOT partitioned (use purge_signing_nonces instead)
+						isPartitioned, err := ent.IsSigningNoncesPartitioned(ctx, rawDB)
+						if err != nil {
+							return fmt.Errorf("failed to check if signing_nonces is partitioned: %w", err)
+						}
+						if !isPartitioned {
+							// Table is not partitioned yet, skip this task (purge_signing_nonces will handle cleanup)
+							return nil
+						}
+						signingNoncesPartitioned.Store(true)
+					}
+
+					t := time.Now()
+					cutoffTime := t.Add(-24 * time.Hour)
+					maxRequestedTime := t.Add(48 * time.Hour)
+					return ent.PurgeAndCreateSigningNoncePartitions(ctx, rawDB, cutoffTime, maxRequestedTime)
 				},
 			},
 		},
