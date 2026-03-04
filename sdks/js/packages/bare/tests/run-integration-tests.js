@@ -6,7 +6,10 @@ const { spawnSync } = require("bare-subprocess");
 const packageDir = path.resolve(__dirname, "..");
 const testsDir = path.join(__dirname, "integration");
 
-const TIMEOUT_MS = 120_000; // 2 minutes per test file
+// bare-subprocess.spawnSync does not support the `timeout` option (it is silently
+// ignored).  Use the Unix `timeout` command instead, which also sends SIGKILL
+// (-k) if the process is still alive 5 s after the initial SIGTERM.
+const TIMEOUT_SECS = 120; // 2 minutes per test file
 
 function run() {
   if (!process.env.MINIKUBE_IP) {
@@ -38,16 +41,26 @@ function run() {
   for (const file of testFiles) {
     const abs = path.join(testsDir, file);
     console.log(`\n=== Running: ${file} ===`);
-    const res = spawnSync("bare", [abs], {
-      stdio: "inherit",
-      cwd: packageDir,
-      env: process.env,
-      timeout: TIMEOUT_MS,
-    });
+    // Wrap with `timeout -k 5s <N>s` so the child is forcefully killed
+    // (SIGKILL) if it does not exit within 5 s of the initial SIGTERM.
+    // Exit code 124 from `timeout` means the command timed out.
+    const res = spawnSync(
+      "timeout",
+      ["-k", "5s", `${TIMEOUT_SECS}s`, "bare", abs],
+      {
+        stdio: "inherit",
+        cwd: packageDir,
+        env: process.env,
+      },
+    );
 
     const code = typeof res.status === "number" ? res.status : 1;
     if (code !== 0) {
-      console.error(`\nFAIL: ${file} (exit code ${code})`);
+      if (code === 124) {
+        console.error(`\nFAIL: ${file} (timed out after ${TIMEOUT_SECS}s)`);
+      } else {
+        console.error(`\nFAIL: ${file} (exit code ${code})`);
+      }
       failed++;
       if (process.env.GITHUB_ACTIONS) {
         process.exit(code);

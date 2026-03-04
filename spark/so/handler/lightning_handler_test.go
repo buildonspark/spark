@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand/v2"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/entexample"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
@@ -124,6 +126,92 @@ func (m *mockFrostServiceClient) AggregateFrostV2(context.Context, *pbfrost.Aggr
 }
 
 func (m *mockFrostServiceClient) ValidateSignatureShareV2(context.Context, *pbfrost.ValidateSignatureShareRequestV2, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
+}
+
+type trackingFrostServiceClientConnection struct {
+	client pbfrost.FrostServiceClient
+}
+
+func (m *trackingFrostServiceClientConnection) StartFrostServiceClient(*LightningHandler) (pbfrost.FrostServiceClient, error) {
+	return m.client, nil
+}
+
+func (m *trackingFrostServiceClientConnection) Close() {
+}
+
+type trackingFrostServiceClient struct {
+	startedCh   chan struct{}
+	releaseCh   <-chan struct{}
+	started     atomic.Int32
+	inFlight    atomic.Int32
+	maxInFlight atomic.Int32
+}
+
+func (m *trackingFrostServiceClient) Echo(context.Context, *pbfrost.EchoRequest, ...grpc.CallOption) (*pbfrost.EchoResponse, error) {
+	return &pbfrost.EchoResponse{}, nil
+}
+
+func (m *trackingFrostServiceClient) DkgRound1(context.Context, *pbfrost.DkgRound1Request, ...grpc.CallOption) (*pbfrost.DkgRound1Response, error) {
+	return &pbfrost.DkgRound1Response{}, nil
+}
+
+func (m *trackingFrostServiceClient) DkgRound2(context.Context, *pbfrost.DkgRound2Request, ...grpc.CallOption) (*pbfrost.DkgRound2Response, error) {
+	return &pbfrost.DkgRound2Response{}, nil
+}
+
+func (m *trackingFrostServiceClient) DkgRound3(context.Context, *pbfrost.DkgRound3Request, ...grpc.CallOption) (*pbfrost.DkgRound3Response, error) {
+	return &pbfrost.DkgRound3Response{}, nil
+}
+
+func (m *trackingFrostServiceClient) FrostNonce(context.Context, *pbfrost.FrostNonceRequest, ...grpc.CallOption) (*pbfrost.FrostNonceResponse, error) {
+	return &pbfrost.FrostNonceResponse{}, nil
+}
+
+func (m *trackingFrostServiceClient) SignFrost(context.Context, *pbfrost.SignFrostRequest, ...grpc.CallOption) (*pbfrost.SignFrostResponse, error) {
+	return &pbfrost.SignFrostResponse{}, nil
+}
+
+func (m *trackingFrostServiceClient) AggregateFrost(context.Context, *pbfrost.AggregateFrostRequest, ...grpc.CallOption) (*pbfrost.AggregateFrostResponse, error) {
+	return &pbfrost.AggregateFrostResponse{}, nil
+}
+
+func (m *trackingFrostServiceClient) ValidateSignatureShare(ctx context.Context, _ *pbfrost.ValidateSignatureShareRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	currentInFlight := m.inFlight.Add(1)
+	for {
+		maxInFlight := m.maxInFlight.Load()
+		if currentInFlight <= maxInFlight {
+			break
+		}
+		if m.maxInFlight.CompareAndSwap(maxInFlight, currentInFlight) {
+			break
+		}
+	}
+	m.started.Add(1)
+	select {
+	case m.startedCh <- struct{}{}:
+	default:
+	}
+
+	select {
+	case <-m.releaseCh:
+		m.inFlight.Add(-1)
+		return &emptypb.Empty{}, nil
+	case <-ctx.Done():
+		m.inFlight.Add(-1)
+		return nil, ctx.Err()
+	}
+}
+
+func (m *trackingFrostServiceClient) SignFrostV2(context.Context, *pbfrost.SignFrostRequestV2, ...grpc.CallOption) (*pbfrost.SignFrostResponse, error) {
+	return &pbfrost.SignFrostResponse{}, nil
+}
+
+func (m *trackingFrostServiceClient) AggregateFrostV2(context.Context, *pbfrost.AggregateFrostRequestV2, ...grpc.CallOption) (*pbfrost.AggregateFrostResponse, error) {
+	return &pbfrost.AggregateFrostResponse{}, nil
+}
+
+func (m *trackingFrostServiceClient) ValidateSignatureShareV2(context.Context, *pbfrost.ValidateSignatureShareRequestV2, ...grpc.CallOption) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, nil
 }
 
@@ -1142,6 +1230,139 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	code, reason := sparkerrors.CodeAndReasonFrom(err)
 	require.Equal(t, codes.InvalidArgument, code)
 	require.Equal(t, "OUT_OF_RANGE", reason)
+}
+
+func TestValidateGetPreimageRequestRespectsFrostValidationConcurrencyLimit(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{3})
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	const parallelLimit int32 = 2
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoMaxParallelFrostValidationsPerRequest: float64(parallelLimit),
+	}))
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	paymentHash := bytes.Repeat([]byte{1}, 32)
+	destinationPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	baseTxid := st.NewRandomTxIDForTesting(t)
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(destinationPubKey).
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Mainnet).
+		SetBaseTxid(baseTxid).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusInUse).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
+		SetPublicShares(map[string]keys.Public{"operator1": destinationPubKey}).
+		SetPublicKey(destinationPubKey).
+		SetMinSigners(2).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	const numTransactions = 6
+	cpfpTransactions := make([]*pb.UserSignedTxSigningJob, 0, numTransactions)
+	outputScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
+	require.NoError(t, err)
+
+	for i := range numTransactions {
+		nodeID := uuid.New()
+		parentTx, refundTx := createParentAndRefundTx(t, outputScript, 1000+int64(i))
+
+		_, err = tx.TreeNode.Create().
+			SetTree(tree).
+			SetNetwork(tree.Network).
+			SetID(nodeID).
+			SetValue(uint64(1000 + i)).
+			SetStatus(st.TreeNodeStatusAvailable).
+			SetVerifyingPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+			SetOwnerIdentityPubkey(destinationPubKey).
+			SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+			SetRawTx(parentTx).
+			SetVout(0).
+			SetSigningKeyshare(keyshare).
+			Save(ctx)
+		require.NoError(t, err)
+
+		cpfpTransactions = append(cpfpTransactions, &pb.UserSignedTxSigningJob{
+			LeafId: nodeID.String(),
+			SigningCommitments: &pb.SigningCommitments{
+				SigningCommitments: map[string]*pbcommon.SigningCommitment{
+					"test": {
+						Hiding:  []byte("test_hiding"),
+						Binding: []byte("test_binding"),
+					},
+				},
+			},
+			SigningNonceCommitment: &pbcommon.SigningCommitment{
+				Hiding:  []byte("test_nonce_hiding"),
+				Binding: []byte("test_nonce_binding"),
+			},
+			UserSignature: []byte("test_signature"),
+			RawTx:         refundTx,
+		})
+	}
+
+	releaseCh := make(chan struct{})
+	startedCh := make(chan struct{}, numTransactions)
+	frostClient := &trackingFrostServiceClient{
+		startedCh: startedCh,
+		releaseCh: releaseCh,
+	}
+	frostConnection := &trackingFrostServiceClientConnection{
+		client: frostClient,
+	}
+
+	validationErrCh := make(chan error, 1)
+	go func() {
+		validationErrCh <- lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
+			ctx,
+			frostConnection,
+			paymentHash,
+			cpfpTransactions,
+			[]*pb.UserSignedTxSigningJob{},
+			[]*pb.UserSignedTxSigningJob{},
+			&pb.InvoiceAmount{ValueSats: 1},
+			destinationPubKey,
+			0,
+			pb.InitiatePreimageSwapRequest_REASON_SEND,
+			false,
+		)
+	}()
+
+	for i := range int(parallelLimit) {
+		select {
+		case <-startedCh:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out waiting for validation #%d to start", i+1)
+		}
+	}
+
+	time.Sleep(150 * time.Millisecond)
+	require.Equal(t, parallelLimit, frostClient.started.Load(), "expected only configured parallel validations to start before release")
+	require.Equal(t, parallelLimit, frostClient.maxInFlight.Load(), "expected max in-flight validations to match configured parallel limit")
+
+	close(releaseCh)
+
+	select {
+	case err := <-validationErrCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for preimage validation to complete")
+	}
+
+	require.Equal(t, int32(numTransactions), frostClient.started.Load())
+	assert.LessOrEqual(t, frostClient.maxInFlight.Load(), parallelLimit)
 }
 
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8043

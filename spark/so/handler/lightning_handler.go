@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	eciesgo "github.com/ecies/go/v2"
@@ -380,6 +381,15 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("too many transactions: %d, maximum allowed: %d", totalTransactions, maxTransactionsPerRequest))
 	}
 
+	const defaultMaxParallelFrostValidationsPerRequest = 16
+	maxParallelFrostValidationsPerRequest := int(knobs.GetKnobsService(ctx).GetValue(
+		knobs.KnobSoMaxParallelFrostValidationsPerRequest,
+		defaultMaxParallelFrostValidationsPerRequest,
+	))
+	if maxParallelFrostValidationsPerRequest <= 0 {
+		maxParallelFrostValidationsPerRequest = defaultMaxParallelFrostValidationsPerRequest
+	}
+
 	// Step 0 Validate that there's no existing preimage request for this payment hash
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -410,8 +420,19 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	}
 	defer frostServiceClientConnection.Close()
 
+	// frostValidationJob holds the data for a single FROST signature validation call.
+	type frostValidationJob struct {
+		request *pbfrost.ValidateSignatureShareRequest
+		wrapErr func(error) error
+	}
+
 	var nodes []*ent.TreeNode
-	// Validate CPFP transaction.
+	jobs := make([]frostValidationJob, 0, len(cpfpTransactions)+len(directTransactions)+len(directFromCpfpTransactions))
+
+	// Phase 1 (serial): DB operations and sighash computation for all transaction types.
+	// DB operations share the same transaction and must remain serial.
+
+	// Collect CPFP validation jobs.
 	for i := range cpfpTransactions {
 		cpfpTransaction := cpfpTransactions[i]
 
@@ -488,21 +509,26 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if err != nil {
 			return fmt.Errorf("unable to get cpfp sighash for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
 		}
-		_, err = client.ValidateSignatureShare(ctx, &pbfrost.ValidateSignatureShareRequest{
-			Message:         cpfpSighash,
-			SignatureShare:  cpfpTransaction.UserSignature,
-			Role:            pbfrost.SigningRole_USER,
-			VerifyingKey:    node.VerifyingPubkey.Serialize(),
-			PublicShare:     node.OwnerSigningPubkey.Serialize(),
-			Commitments:     cpfpTransaction.SigningCommitments.SigningCommitments,
-			UserCommitments: cpfpTransaction.SigningNonceCommitment,
+
+		sighash := cpfpSighash
+		ownerPubKey := node.OwnerSigningPubkey
+		jobs = append(jobs, frostValidationJob{
+			request: &pbfrost.ValidateSignatureShareRequest{
+				Message:         sighash,
+				SignatureShare:  cpfpTransaction.UserSignature,
+				Role:            pbfrost.SigningRole_USER,
+				VerifyingKey:    node.VerifyingPubkey.Serialize(),
+				PublicShare:     ownerPubKey.Serialize(),
+				Commitments:     cpfpTransaction.SigningCommitments.SigningCommitments,
+				UserCommitments: cpfpTransaction.SigningNonceCommitment,
+			},
+			wrapErr: func(err error) error {
+				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(sighash), ownerPubKey))
+			},
 		})
-		if err != nil {
-			return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(cpfpSighash), node.OwnerSigningPubkey))
-		}
 	}
 
-	// Only validate direct and direct-from-cpfp transactions if both are present
+	// Collect direct validation jobs.
 	for i := range directTransactions {
 		directTransaction := directTransactions[i]
 
@@ -562,21 +588,25 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return fmt.Errorf("unable to get direct sighash for directTransaction, tree_node id: %s: %w", nodeID, err)
 		}
 
-		_, err = client.ValidateSignatureShare(ctx, &pbfrost.ValidateSignatureShareRequest{
-			Message:         directSighash,
-			SignatureShare:  directTransaction.UserSignature,
-			Role:            pbfrost.SigningRole_USER,
-			VerifyingKey:    node.VerifyingPubkey.Serialize(),
-			PublicShare:     node.OwnerSigningPubkey.Serialize(),
-			Commitments:     directTransaction.SigningCommitments.SigningCommitments,
-			UserCommitments: directTransaction.SigningNonceCommitment,
+		sighash := directSighash
+		ownerPubKey := node.OwnerSigningPubkey
+		jobs = append(jobs, frostValidationJob{
+			request: &pbfrost.ValidateSignatureShareRequest{
+				Message:         sighash,
+				SignatureShare:  directTransaction.UserSignature,
+				Role:            pbfrost.SigningRole_USER,
+				VerifyingKey:    node.VerifyingPubkey.Serialize(),
+				PublicShare:     ownerPubKey.Serialize(),
+				Commitments:     directTransaction.SigningCommitments.SigningCommitments,
+				UserCommitments: directTransaction.SigningNonceCommitment,
+			},
+			wrapErr: func(err error) error {
+				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(sighash), ownerPubKey))
+			},
 		})
-		if err != nil {
-			return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(directSighash), node.OwnerSigningPubkey))
-		}
 	}
 
-	// Validate direct-from-cpfp transactions
+	// Collect direct-from-cpfp validation jobs.
 	for i := range directFromCpfpTransactions {
 		directFromCpfpTransaction := directFromCpfpTransactions[i]
 		if directFromCpfpTransaction == nil {
@@ -635,18 +665,42 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return fmt.Errorf("unable to get direct from cpfp sighash for directFromCpfpTransaction, tree_node id: %s: %w", nodeID, err)
 		}
 
-		_, err = client.ValidateSignatureShare(ctx, &pbfrost.ValidateSignatureShareRequest{
-			Message:         directFromCpfpSighash,
-			SignatureShare:  directFromCpfpTransaction.UserSignature,
-			Role:            pbfrost.SigningRole_USER,
-			VerifyingKey:    node.VerifyingPubkey.Serialize(),
-			PublicShare:     node.OwnerSigningPubkey.Serialize(),
-			Commitments:     directFromCpfpTransaction.SigningCommitments.SigningCommitments,
-			UserCommitments: directFromCpfpTransaction.SigningNonceCommitment,
+		sighash := directFromCpfpSighash
+		ownerPubKey := node.OwnerSigningPubkey
+		jobs = append(jobs, frostValidationJob{
+			request: &pbfrost.ValidateSignatureShareRequest{
+				Message:         sighash,
+				SignatureShare:  directFromCpfpTransaction.UserSignature,
+				Role:            pbfrost.SigningRole_USER,
+				VerifyingKey:    node.VerifyingPubkey.Serialize(),
+				PublicShare:     ownerPubKey.Serialize(),
+				Commitments:     directFromCpfpTransaction.SigningCommitments.SigningCommitments,
+				UserCommitments: directFromCpfpTransaction.SigningNonceCommitment,
+			},
+			wrapErr: func(err error) error {
+				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct from cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(sighash), ownerPubKey))
+			},
 		})
-		if err != nil {
-			return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct from cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(directFromCpfpSighash), node.OwnerSigningPubkey))
-		}
+	}
+
+	// Phase 2 (parallel): Run all FROST signature validations concurrently.
+	// Each ValidateSignatureShare call is an IPC call to the local Rust signer process;
+	// they are independent and safe to call concurrently.
+	// Limit in-flight calls to avoid per-request burst amplification.
+	g, gCtx := errgroup.WithContext(ctx)
+	g.SetLimit(maxParallelFrostValidationsPerRequest)
+	for i := range jobs {
+		job := jobs[i]
+		g.Go(func() error {
+			_, err := client.ValidateSignatureShare(gCtx, job.request)
+			if err != nil {
+				return job.wrapErr(err)
+			}
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
 	if validateNodeOwnership {
