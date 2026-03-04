@@ -1,0 +1,23 @@
+# Air config for SO hot-reload in dev-cli.
+# Watches Go files, rebuilds the shared binary, restarts all 5 SOs.
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -tags=lightspark -o ${DEV_STATE_DIR:-./tmp}/bin/operator ./bin/operator"
+bin = ""
+full_bin = "if [ -f tmp/.air-initial-done ]; then process-compose process restart so-0 so-1 so-2 so-3 so-4 2>/dev/null || true; else touch tmp/.air-initial-done && echo 'Initial build complete, watching for changes.'; fi"
+include_ext = ["go"]
+exclude_dir = ["proto", "so/ent", "tmp", "vendor"]
+exclude_regex = ["_test\\.go$"]
+delay = 1000
+log = "build-errors.log"
+send_interrupt = false
+kill_delay = 500
+
+[log]
+time = true
+
+[misc]
+clean_on_exit = true

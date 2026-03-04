@@ -4,3 +4,7 @@
 
 # Output from building the SO (i.e. go build ./bin/operator)
 /operator
+
+# Air hot-reload artifacts
+/tmp/
+/build-errors.log
