@@ -84,7 +84,7 @@ describe("ConnectionManager channel cache", () => {
     expect(ch1.close).toHaveBeenCalledTimes(1);
   });
 
-  test("creates distinct channels for stream vs unary and does not close stream on closeConnections", async () => {
+  test("creates distinct channels for stream vs unary and closes both on closeConnections", async () => {
     const config = new WalletConfigService(
       { network: "LOCAL" },
       new DefaultSparkSigner(),
@@ -100,13 +100,9 @@ describe("ConnectionManager channel cache", () => {
     const [unaryCh, streamCh] = mgr.createdChannels;
     expect(mgr.createdIsStream).toEqual([false, true]);
 
-    // closeConnections closes unary clients, not stream
+    // closeConnections closes all client types
     await mgr.closeConnections();
     expect(unaryCh!.close).toHaveBeenCalledTimes(1);
-    expect(streamCh!.close).not.toHaveBeenCalled();
-
-    // Now manually close stream by invoking its optional close (release via channelKey)
-    streamClient.close?.();
     expect(streamCh!.close).toHaveBeenCalledTimes(1);
   });
 
@@ -140,7 +136,7 @@ describe("ConnectionManager channel cache", () => {
     expect(ch.close).toHaveBeenCalledTimes(1);
   });
 
-  test("spark and tokens share unary channel and require both releases", async () => {
+  test("spark and tokens share unary channel and closeConnections releases both", async () => {
     const config = new WalletConfigService(
       { network: "LOCAL" },
       new DefaultSparkSigner(),
@@ -155,16 +151,13 @@ describe("ConnectionManager channel cache", () => {
     expect(mgr.createdChannels).toHaveLength(1);
     const ch = mgr.createdChannels[0]!;
 
-    // Closing only spark clients should not close the channel yet (tokens still holds a ref)
+    // closeConnections releases all client types, closing the shared channel
     await mgr.closeConnections();
-    expect(ch.close).not.toHaveBeenCalled();
-
-    // Now release the tokens client to close the underlying channel
-    tokensClient.close?.();
     expect(ch.close).toHaveBeenCalledTimes(1);
 
-    // Avoid unused variable lint for sparkClient
+    // Avoid unused variable lint
     expect(sparkClient).toBeDefined();
+    expect(tokensClient).toBeDefined();
   });
 
   test("client.close is idempotent and channel closes once", async () => {
@@ -206,7 +199,7 @@ describe("ConnectionManager channel cache", () => {
     expect(ch2!.close).toHaveBeenCalledTimes(1);
   });
 
-  test("deduplicates concurrent stream channel creation; manual close required", async () => {
+  test("deduplicates concurrent stream channel creation; closeConnections releases all", async () => {
     const config = new WalletConfigService(
       { network: "LOCAL" },
       new DefaultSparkSigner(),
@@ -224,14 +217,13 @@ describe("ConnectionManager channel cache", () => {
     expect(mgr.createdIsStream).toEqual([true]);
     const ch = mgr.createdChannels[0]!;
 
-    // closeConnections should not close stream channels - closed via AbortController in SparkWallet
+    // closeConnections closes all client types including stream
     await mgr.closeConnections();
-    expect(ch.close).not.toHaveBeenCalled();
-
-    // Releasing both stream clients should close once
-    s1.close?.();
-    s2.close?.();
     expect(ch.close).toHaveBeenCalledTimes(1);
+
+    // Avoid unused variable lint
+    expect(s1).toBeDefined();
+    expect(s2).toBeDefined();
   });
 
   test("reuses channel across manager instances and releases after both close", async () => {

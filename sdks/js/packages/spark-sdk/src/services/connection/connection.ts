@@ -298,12 +298,18 @@ export abstract class ConnectionManager {
   }
 
   public async closeConnections() {
-    const sparkMap = this.clientsByType.get("spark");
-    if (!sparkMap) return;
-    await Promise.all(
-      Array.from(sparkMap.values()).map((entry) => entry.client.close?.()),
-    );
-    sparkMap.clear();
+    const closePromises: Promise<void>[] = [];
+    for (const [, clientMap] of this.clientsByType) {
+      for (const entry of clientMap.values()) {
+        if (entry.client.close) {
+          closePromises.push(
+            Promise.resolve(entry.client.close()).catch(() => {}),
+          );
+        }
+      }
+      clientMap.clear();
+    }
+    await Promise.all(closePromises);
   }
 
   private getDefinitionForClientType(
