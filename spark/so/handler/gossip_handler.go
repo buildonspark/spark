@@ -188,7 +188,12 @@ func (h *GossipHandler) handleRollbackTransfer(ctx context.Context, req *pbgossi
 	logger.Sugar().Infof("Handling rollback transfer gossip message for transfer %s", transferID)
 
 	baseHandler := NewBaseTransferHandler(h.config)
-	if err := baseHandler.RollbackTransfer(ctx, transferID); err != nil {
+	err = baseHandler.RollbackTransfer(ctx, transferID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			// The transfer is not created, treat it as successful rollback.
+			return nil
+		}
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to rollback transfer %s", transferID)
 	}
 	return err
