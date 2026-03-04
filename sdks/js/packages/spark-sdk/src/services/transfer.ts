@@ -73,6 +73,13 @@ import {
   UserSignedTxSigningJobWithSelfCommitment,
 } from "./signing.js";
 
+export type TransferQueryOptions = {
+  limit: number;
+  offset: number;
+  createdAfter?: Date;
+  createdBefore?: Date;
+};
+
 type TransferPackageCommitmentsOverride = {
   leavesToSend: UserSignedTxSigningJobWithSelfCommitment[];
   directLeavesToSend: UserSignedTxSigningJobWithSelfCommitment[];
@@ -978,6 +985,63 @@ export class TransferService extends BaseTransferService {
     return pendingTransfersResp;
   }
 
+  async queryPrimarySwapTransfers(
+    options: TransferQueryOptions,
+  ): Promise<QueryTransfersResponse> {
+    return await this.queryAllTransfers({
+      ...options,
+      senderOnly: true,
+      types: [TransferType.PRIMARY_SWAP_V3, TransferType.SWAP],
+      statuses: [
+        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
+        TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK,
+        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
+      ],
+    });
+  }
+
+  async queryCounterSwapTransfers(
+    options: TransferQueryOptions,
+  ): Promise<QueryTransfersResponse> {
+    return await this.queryAllTransfers({
+      ...options,
+      types: [TransferType.COUNTER_SWAP_V3, TransferType.COUNTER_SWAP],
+      statuses: [
+        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
+        TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK,
+        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
+        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED,
+        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED,
+        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED,
+        TransferStatus.TRANSFER_STATUS_RECEIVER_REFUND_SIGNED,
+      ],
+    });
+  }
+
+  async queryPendingOutgoingTransfers(
+    options: TransferQueryOptions,
+  ): Promise<QueryTransfersResponse> {
+    return await this.queryAllTransfers({
+      ...options,
+      senderOnly: true,
+      types: [
+        TransferType.COOPERATIVE_EXIT,
+        TransferType.UTXO_SWAP,
+        TransferType.PREIMAGE_SWAP,
+        TransferType.TRANSFER,
+      ],
+      statuses: [
+        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
+        TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK,
+        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
+      ],
+    });
+  }
+
   /**
    * Queries all transfers for the authenticated user with optional time filtering.
    *
@@ -987,12 +1051,19 @@ export class TransferService extends BaseTransferService {
    * @param createdBefore - Optional: Return transfers created strictly before this time (exclusive). Mutually exclusive with createdAfter.
    * @returns Promise containing the query response with transfers
    */
-  async queryAllTransfers(
-    limit: number,
-    offset: number,
-    createdAfter?: Date,
-    createdBefore?: Date,
-  ): Promise<QueryTransfersResponse> {
+  async queryAllTransfers({
+    limit,
+    offset,
+    createdAfter,
+    createdBefore,
+    types,
+    statuses,
+    senderOnly,
+  }: TransferQueryOptions & {
+    types: TransferType[];
+    statuses?: TransferStatus[];
+    senderOnly?: boolean;
+  }): Promise<QueryTransfersResponse> {
     // Validate that only one time filter is provided (mutually exclusive)
     if (createdAfter && createdBefore) {
       throw new Error(
@@ -1004,21 +1075,23 @@ export class TransferService extends BaseTransferService {
       this.config.getCoordinatorAddress(),
     );
 
+    const identityPublicKey = await this.config.signer.getIdentityPublicKey();
+
     // Build filter object
     const filter: any = {
-      participant: {
-        $case: "senderOrReceiverIdentityPublicKey",
-        senderOrReceiverIdentityPublicKey:
-          await this.config.signer.getIdentityPublicKey(),
-      },
+      participant: senderOnly
+        ? {
+            $case: "senderIdentityPublicKey",
+            senderIdentityPublicKey: identityPublicKey,
+          }
+        : {
+            $case: "senderOrReceiverIdentityPublicKey",
+            senderOrReceiverIdentityPublicKey: identityPublicKey,
+          },
       limit,
       offset,
-      types: [
-        TransferType.TRANSFER,
-        TransferType.PREIMAGE_SWAP,
-        TransferType.COOPERATIVE_EXIT,
-        TransferType.UTXO_SWAP,
-      ],
+      types,
+      ...(statuses !== undefined ? { statuses } : {}),
       network: NetworkToProto[this.config.getNetwork()],
     };
 

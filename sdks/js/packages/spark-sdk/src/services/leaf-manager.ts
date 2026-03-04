@@ -1,21 +1,22 @@
 import { equalBytes } from "@noble/curves/utils";
 import { Mutex } from "async-mutex";
-import {
-  SparkValidationError,
-  addPublicKeys,
-  doesTxnNeedRenewed,
-  getTxFromRawTxBytes,
-  isZeroTimelock,
-} from "../index-shared.js";
+import { SparkValidationError } from "../errors/index.js";
 import {
   QueryNodesRequest,
   QueryNodesResponse,
+  TransferType,
   TreeNode,
   TreeNodeStatus,
 } from "../proto/spark.js";
 import { KeyDerivation, KeyDerivationType } from "../signer/types.js";
+import {
+  doesTxnNeedRenewed,
+  getTxFromRawTxBytes,
+  isZeroTimelock,
+} from "../utils/index.js";
+import { addPublicKeys } from "../utils/keys.js";
 import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./index.js";
+import { ConnectionManager } from "./connection/connection.js";
 import SwapService from "./swap.js";
 import { LeafKeyTweak, TransferService } from "./transfer.js";
 
@@ -45,6 +46,44 @@ type LeafRecord = {
   lastUpdated?: number;
 };
 
+const VALID_TRANSITIONS: Record<LeafStatus, LeafStatus[]> = {
+  [LeafStatus.AVAILABLE]: [LeafStatus.LOCAL_LOCKED],
+  [LeafStatus.LOCAL_LOCKED]: [
+    LeafStatus.AVAILABLE,
+    LeafStatus.OUTGOING,
+    LeafStatus.SWAP_PENDING,
+  ],
+  [LeafStatus.OUTGOING]: [LeafStatus.AVAILABLE, LeafStatus.SPENT],
+  [LeafStatus.SWAP_PENDING]: [LeafStatus.AVAILABLE, LeafStatus.SPENT],
+  [LeafStatus.INCOMING]: [LeafStatus.AVAILABLE],
+  [LeafStatus.SPENT]: [],
+};
+
+// Only LOCAL_LOCKED is preserved across sync — it's the only status where the SO
+// hasn't been contacted yet.
+const SYNC_PRESERVED_STATUSES = new Set([LeafStatus.LOCAL_LOCKED]);
+
+// Statuses where a local or remote operation is in progress — addLeaves must not
+// overwrite these, as that would corrupt in-flight state.
+const IN_FLIGHT_STATUSES = new Set([
+  LeafStatus.LOCAL_LOCKED,
+  LeafStatus.OUTGOING,
+  LeafStatus.SWAP_PENDING,
+]);
+const OWNED_STATUSES = new Set([
+  LeafStatus.AVAILABLE,
+  LeafStatus.LOCAL_LOCKED,
+  LeafStatus.OUTGOING,
+  LeafStatus.SWAP_PENDING,
+]);
+
+export type BalanceSnapshot = {
+  available: number;
+  owned: number;
+  incoming: number;
+};
+
+export type OnBalanceUpdate = (balance: BalanceSnapshot) => void;
 export default class LeafManager {
   private leaves: Map<string, LeafRecord> = new Map();
 
@@ -55,9 +94,107 @@ export default class LeafManager {
     private readonly swapService: SwapService,
     private readonly transferService: TransferService,
     private readonly connectionManager: ConnectionManager,
+    private readonly onBalanceUpdate?: OnBalanceUpdate,
   ) {}
 
+  private emitBalanceUpdate(): void {
+    this.onBalanceUpdate?.({
+      available: this.getAvailableBalance(),
+      owned: this.getOwnedBalance(),
+      incoming: this.getIncomingBalance(),
+    });
+  }
+
   // #region Public API
+  public async sync() {
+    const [rawLeaves, swaps, outgoingTransfers, incomingTransfers] =
+      await Promise.all([
+        this.getLeaves(),
+        this.getAllPendingSwaps(),
+        this.getAllPendingOutgoingTransfers(),
+        this.transferService.queryPendingTransfers(),
+      ]);
+
+    const leaves = await this.checkRenewLeaves(rawLeaves);
+
+    await this.leavesMutex.runExclusive(() => {
+      const preserved = new Map<string, LeafRecord>();
+      for (const [id, record] of this.leaves) {
+        if (SYNC_PRESERVED_STATUSES.has(record.status)) {
+          preserved.set(id, record);
+        }
+      }
+
+      this.leaves.clear();
+
+      for (const leaf of leaves) {
+        if (leaf.status === "AVAILABLE") {
+          this.leaves.set(leaf.id, {
+            treeNode: leaf,
+            status: LeafStatus.AVAILABLE,
+            source: { kind: "none" },
+          });
+        }
+      }
+
+      for (const { leaf, transferId } of swaps) {
+        this.leaves.set(leaf.id, {
+          treeNode: leaf,
+          status: LeafStatus.SWAP_PENDING,
+          source: { kind: "swap", swapId: transferId },
+        });
+      }
+
+      for (const { leaf, transferId } of outgoingTransfers) {
+        this.leaves.set(leaf.id, {
+          treeNode: leaf,
+          status: LeafStatus.OUTGOING,
+          source: { kind: "transfer", transferId },
+        });
+      }
+
+      for (const transfer of incomingTransfers.transfers) {
+        // Counter-swaps are the inbound side of a swap we initiated — they're
+        // already accounted for in SWAP_PENDING (owned balance). Including them
+        // as INCOMING would double-count the sats.
+        if (
+          transfer.type === TransferType.COUNTER_SWAP ||
+          transfer.type === TransferType.COUNTER_SWAP_V3
+        ) {
+          continue;
+        }
+        for (const leaf of transfer.leaves) {
+          if (!leaf.leaf) continue;
+          // Don't downgrade OUTGOING/SWAP_PENDING to INCOMING (e.g., self-transfers
+          // appear in both outgoing and incoming queries).
+          const existing = this.leaves.get(leaf.leaf.id);
+          if (
+            existing &&
+            (existing.status === LeafStatus.OUTGOING ||
+              existing.status === LeafStatus.SWAP_PENDING)
+          ) {
+            continue;
+          }
+          this.leaves.set(leaf.leaf.id, {
+            treeNode: leaf.leaf,
+            status: LeafStatus.INCOMING,
+            source: { kind: "transfer", transferId: transfer.id },
+          });
+        }
+      }
+
+      // In-flight local state always wins over server state. If we have a leaf
+      // as LOCAL_LOCKED, the SO hasn't been contacted yet (e.g., a swap is being
+      // initiated). Restoring it unconditionally ensures the leaf stays locked
+      // until the calling code explicitly transitions it.
+      for (const [id, record] of preserved) {
+        this.leaves.set(id, record);
+      }
+
+      this.emitBalanceUpdate();
+    });
+  }
+
   public async getLeaves(isBalanceCheck: boolean = false): Promise<TreeNode[]> {
     const ownerIdentityPubkey = await this.config.signer.getIdentityPublicKey();
     const coordinatorId = this.config.getCoordinatorIdentifier();
@@ -177,6 +314,124 @@ export default class LeafManager {
 
     return finalLeaves;
   }
+
+  public async addLeaves(leaves: TreeNode[]) {
+    await this.leavesMutex.runExclusive(() => {
+      for (const leaf of leaves) {
+        const existing = this.leaves.get(leaf.id);
+        if (existing && IN_FLIGHT_STATUSES.has(existing.status)) continue;
+        this.leaves.set(leaf.id, {
+          treeNode: leaf,
+          status: LeafStatus.AVAILABLE,
+          source: { kind: "none" },
+        });
+      }
+      this.emitBalanceUpdate();
+    });
+  }
+
+  /** Add leaves as INCOMING (unclaimed transfer or unconfirmed deposit).
+   *  Does not overwrite leaves already in the cache with a non-INCOMING status. */
+  public async addIncomingLeaves(leaves: TreeNode[], transferId: string) {
+    await this.leavesMutex.runExclusive(() => {
+      for (const leaf of leaves) {
+        const existing = this.leaves.get(leaf.id);
+        if (existing && existing.status !== LeafStatus.INCOMING) continue;
+        this.leaves.set(leaf.id, {
+          treeNode: leaf,
+          status: LeafStatus.INCOMING,
+          source: { kind: "transfer", transferId },
+        });
+      }
+      this.emitBalanceUpdate();
+    });
+  }
+
+  public async removeLeaves(leafIds: string[]) {
+    await this.leavesMutex.runExclusive(() => {
+      for (const id of leafIds) {
+        this.leaves.delete(id);
+      }
+      this.emitBalanceUpdate();
+    });
+  }
+
+  /** Register newly claimed leaves — renews them and adds to cache.
+   *  Unconditionally sets status to AVAILABLE, bypassing the IN_FLIGHT_STATUSES
+   *  guard in addLeaves, since successfully claimed leaves are definitively ours. */
+  public async registerClaimedLeaves(leaves: TreeNode[]): Promise<TreeNode[]> {
+    const renewed = await this.checkRenewLeaves(leaves);
+    await this.leavesMutex.runExclusive(() => {
+      for (const leaf of renewed) {
+        this.leaves.set(leaf.id, {
+          treeNode: leaf,
+          status: LeafStatus.AVAILABLE,
+          source: { kind: "none" },
+        });
+      }
+      this.emitBalanceUpdate();
+    });
+    return renewed;
+  }
+
+  public getAvailableBalance(): number {
+    let total = 0;
+    for (const record of this.leaves.values()) {
+      if (record.status === LeafStatus.AVAILABLE)
+        total += record.treeNode.value;
+    }
+    return total;
+  }
+
+  public getOwnedBalance(): number {
+    let total = 0;
+    for (const record of this.leaves.values()) {
+      if (OWNED_STATUSES.has(record.status)) total += record.treeNode.value;
+    }
+    return total;
+  }
+
+  public getIncomingBalance(): number {
+    let total = 0;
+    for (const record of this.leaves.values()) {
+      if (record.status === LeafStatus.INCOMING) total += record.treeNode.value;
+    }
+    return total;
+  }
+  // #endregion
+
+  // #region State Management
+  /**
+   * Transition one or more leaves to a new status.
+   *
+   * Resilient by design — this is a local cache, not the source of truth:
+   * - Unknown leaf ids are skipped (next sync() will pick them up).
+   */
+  private transition(
+    leafIds: string[],
+    toStatus: LeafStatus,
+    meta?: { source: LeafSource },
+  ): void {
+    for (const leafId of leafIds) {
+      const leaf = this.leaves.get(leafId);
+      if (!leaf) {
+        continue;
+      }
+
+      const allowed = VALID_TRANSITIONS[leaf.status];
+      if (!allowed.includes(toStatus)) {
+        continue;
+      }
+
+      if (toStatus === LeafStatus.SPENT) {
+        this.leaves.delete(leafId);
+        continue;
+      }
+
+      leaf.status = toStatus;
+      if (meta?.source !== undefined) leaf.source = meta.source;
+    }
+  }
   // #endregion
 
   // #region Leaf Renewal
@@ -188,53 +443,61 @@ export default class LeafManager {
     const validNodes: TreeNode[] = [];
 
     for (const node of nodes) {
-      const nodeTx = getTxFromRawTxBytes(node.nodeTx);
-      const refundTx = getTxFromRawTxBytes(node.refundTx);
+      try {
+        const nodeTx = getTxFromRawTxBytes(node.nodeTx);
+        const refundTx = getTxFromRawTxBytes(node.refundTx);
 
-      if (!nodeTx.inputsLength) {
-        throw new SparkValidationError("Invalid node transaction", {
-          field: "inputsLength",
-          value: nodeTx.inputsLength,
-          expected: "Non-zero inputs length",
-        });
-      }
-      if (!refundTx.inputsLength) {
-        throw new SparkValidationError("Invalid refund transaction", {
-          field: "inputsLength",
-          value: refundTx.inputsLength,
-          expected: "Non-zero inputs length",
-        });
-      }
-
-      const nodeSequence = nodeTx.getInput(0).sequence;
-      const refundSequence = refundTx.getInput(0).sequence;
-
-      if (nodeSequence === undefined) {
-        throw new SparkValidationError("Invalid node transaction", {
-          field: "sequence",
-          value: nodeTx.getInput(0),
-          expected: "Non-null sequence",
-        });
-      }
-      if (refundSequence === undefined) {
-        throw new SparkValidationError("Invalid refund transaction", {
-          field: "sequence",
-          value: refundTx.getInput(0),
-          expected: "Non-null sequence",
-        });
-      }
-
-      if (doesTxnNeedRenewed(refundSequence)) {
-        if (isZeroTimelock(nodeSequence)) {
-          nodesToRenewZeroTimelockTxn.push(node);
-        } else if (doesTxnNeedRenewed(nodeSequence)) {
-          nodesToRenewNodeTxn.push(node);
-        } else {
-          nodesToRenewRefundTxn.push(node);
+        if (!nodeTx.inputsLength) {
+          throw new SparkValidationError("Invalid node transaction", {
+            field: "inputsLength",
+            value: nodeTx.inputsLength,
+            expected: "Non-zero inputs length",
+          });
         }
-        nodeIds.push(node.id);
-      } else {
-        validNodes.push(node);
+        if (!refundTx.inputsLength) {
+          throw new SparkValidationError("Invalid refund transaction", {
+            field: "inputsLength",
+            value: refundTx.inputsLength,
+            expected: "Non-zero inputs length",
+          });
+        }
+
+        const nodeSequence = nodeTx.getInput(0).sequence;
+        const refundSequence = refundTx.getInput(0).sequence;
+
+        if (nodeSequence === undefined) {
+          throw new SparkValidationError("Invalid node transaction", {
+            field: "sequence",
+            value: nodeTx.getInput(0),
+            expected: "Non-null sequence",
+          });
+        }
+        if (refundSequence === undefined) {
+          throw new SparkValidationError("Invalid refund transaction", {
+            field: "sequence",
+            value: refundTx.getInput(0),
+            expected: "Non-null sequence",
+          });
+        }
+
+        if (doesTxnNeedRenewed(refundSequence)) {
+          if (isZeroTimelock(nodeSequence)) {
+            nodesToRenewZeroTimelockTxn.push(node);
+          } else if (doesTxnNeedRenewed(nodeSequence)) {
+            nodesToRenewNodeTxn.push(node);
+          } else {
+            nodesToRenewRefundTxn.push(node);
+          }
+          nodeIds.push(node.id);
+        } else {
+          validNodes.push(node);
+        }
+      } catch (err) {
+        // Skip this node — don't let one malformed leaf abort the entire batch.
+        console.warn(
+          `[LeafManager] checkRenewLeaves validation failed for node ${node.id}`,
+          err,
+        );
       }
     }
 
@@ -356,6 +619,71 @@ export default class LeafManager {
       }
       offset += pageSize;
     }
+  }
+
+  private async getAllPendingSwaps(): Promise<
+    { leaf: TreeNode; transferId: string }[]
+  > {
+    const extractLeaves = (transfer: {
+      id: string;
+      leaves: { leaf: TreeNode | undefined }[];
+    }) =>
+      transfer.leaves.flatMap((leaf) =>
+        leaf.leaf ? [{ leaf: leaf.leaf, transferId: transfer.id }] : [],
+      );
+
+    // A swap has up to 2 transfers: the primary (outgoing) and the counter
+    // (incoming replacement). The primary query filters for pre-SENDER_KEY_TWEAKED
+    // statuses, so once the primary advances to SENDER_KEY_TWEAKED (which atomically
+    // creates the counter swap), it drops out of the primary query. No overlap.
+    const [primarySwaps, counterSwaps] = await Promise.all([
+      this.paginateTransfers(
+        (params) => this.transferService.queryPrimarySwapTransfers(params),
+        extractLeaves,
+      ),
+      this.paginateTransfers(
+        (params) => this.transferService.queryCounterSwapTransfers(params),
+        extractLeaves,
+      ),
+    ]);
+
+    return [...primarySwaps, ...counterSwaps];
+  }
+
+  private async getAllPendingOutgoingTransfers(): Promise<
+    { leaf: TreeNode; transferId: string }[]
+  > {
+    return this.paginateTransfers(
+      (params) => this.transferService.queryPendingOutgoingTransfers(params),
+      (transfer) =>
+        transfer.leaves.flatMap((leaf) =>
+          leaf.leaf ? [{ leaf: leaf.leaf, transferId: transfer.id }] : [],
+        ),
+    );
+  }
+
+  private async paginateTransfers<T extends { id: string }>(
+    query: (params: {
+      limit: number;
+      offset: number;
+    }) => Promise<{ transfers: T[]; offset: number }>,
+    extractLeaves: (transfer: T) => { leaf: TreeNode; transferId: string }[],
+  ): Promise<{ leaf: TreeNode; transferId: string }[]> {
+    const PAGE_SIZE = 100;
+    const results: { leaf: TreeNode; transferId: string }[] = [];
+    let offset = 0;
+    let prevOffset = -1;
+    do {
+      const response = await query({ limit: PAGE_SIZE, offset });
+      for (const transfer of response.transfers) {
+        results.push(...extractLeaves(transfer));
+      }
+      if (response.transfers.length < PAGE_SIZE) break;
+      if (response.offset === prevOffset) break; // no forward progress
+      prevOffset = response.offset;
+      offset = response.offset;
+    } while (offset >= 0);
+    return results;
   }
   // #endregion
 

@@ -4719,12 +4719,18 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       );
     }
 
-    const transfers = await this.transferService.queryAllTransfers(
+    const transfers = await this.transferService.queryAllTransfers({
       limit,
       offset,
       createdAfter,
       createdBefore,
-    );
+      types: [
+        TransferType.COOPERATIVE_EXIT,
+        TransferType.PREIMAGE_SWAP,
+        TransferType.UTXO_SWAP,
+        TransferType.TRANSFER,
+      ],
+    });
 
     return {
       transfers: await this.constructTransfersWithUserRequest(
