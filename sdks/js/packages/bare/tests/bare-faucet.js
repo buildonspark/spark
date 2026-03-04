@@ -14,6 +14,8 @@ const {
   bytesToHex,
   hexToBytes,
 } = require("@noble/curves/abstract/utils", imports);
+const { sha256 } = require("@noble/hashes/sha2", imports);
+const { concatBytes, utf8ToBytes } = require("@noble/hashes/utils", imports);
 const btc = require("@scure/btc-signer", imports);
 const { taprootTweakPrivKey } = require("@scure/btc-signer/utils", imports);
 
@@ -33,6 +35,28 @@ const REFILL_AMOUNT = 10_000_000n;
 const COIN_AMOUNT = 1_000_000n;
 const FEE_AMOUNT = 1000n;
 const TARGET_NUM_COINS = 20;
+const DEFAULT_FAUCET_NAMESPACE = "bare";
+
+function getFaucetNamespace() {
+  const suffix =
+    process.env.SPARK_TEST_FAUCET_NAMESPACE ||
+    (process.env.GITHUB_RUN_ID
+      ? `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT || "1"}`
+      : "local");
+  return `${DEFAULT_FAUCET_NAMESPACE}:${suffix}`;
+}
+
+function derivePrivateKey(baseKey, namespace, role) {
+  let material = concatBytes(baseKey, utf8ToBytes(`|${namespace}|${role}|v1`));
+  for (let i = 0; i < 1024; i++) {
+    const candidate = sha256(material);
+    if (secp256k1.utils.isValidPrivateKey(candidate)) {
+      return candidate;
+    }
+    material = concatBytes(candidate, utf8ToBytes(`|retry:${i}`));
+  }
+  throw new Error("Failed to derive a valid secp256k1 private key");
+}
 
 // Bitcoin utility helpers (inlined from spark-sdk utils/bitcoin.ts)
 
@@ -79,8 +103,11 @@ class BitcoinFaucet {
     this._password = password;
     this._coins = [];
     this._lock = Promise.resolve();
+    const namespace = getFaucetNamespace();
+    this._faucetKey = derivePrivateKey(STATIC_FAUCET_KEY, namespace, "faucet");
+    this._miningKey = derivePrivateKey(STATIC_MINING_KEY, namespace, "miner");
     this._miningAddress = getP2TRAddressFromPublicKey(
-      secp256k1.getPublicKey(STATIC_MINING_KEY),
+      secp256k1.getPublicKey(this._miningKey),
       REGTEST_NETWORK,
     );
   }
@@ -124,7 +151,7 @@ class BitcoinFaucet {
   }
 
   async _refill() {
-    const minerPubKey = secp256k1.getPublicKey(STATIC_MINING_KEY);
+    const minerPubKey = secp256k1.getPublicKey(this._miningKey);
     const address = getP2TRAddressFromPublicKey(minerPubKey, REGTEST_NETWORK);
 
     const scanResult = await this._callWithRetry("scantxoutset", [
@@ -199,7 +226,7 @@ class BitcoinFaucet {
       index: selectedUtxo.vout,
     });
 
-    const faucetPubKey = secp256k1.getPublicKey(STATIC_FAUCET_KEY);
+    const faucetPubKey = secp256k1.getPublicKey(this._faucetKey);
     const script = getP2TRScriptFromPublicKey(faucetPubKey, REGTEST_NETWORK);
     for (let i = 0; i < numCoinsToCreate; i++) {
       splitTx.addOutput({ script, amount: COIN_AMOUNT });
@@ -210,7 +237,7 @@ class BitcoinFaucet {
       COIN_AMOUNT * BigInt(numCoinsToCreate) -
       FEE_AMOUNT;
     const minerScript = getP2TRScriptFromPublicKey(
-      secp256k1.getPublicKey(STATIC_MINING_KEY),
+      secp256k1.getPublicKey(this._miningKey),
       REGTEST_NETWORK,
     );
     if (remainingValue > 0n) {
@@ -220,7 +247,7 @@ class BitcoinFaucet {
     const signedSplitTx = await this.signFaucetCoin(
       splitTx,
       { amount: selectedUtxoAmountSats },
-      STATIC_MINING_KEY,
+      this._miningKey,
     );
 
     await this.broadcastTx(bytesToHex(signedSplitTx.extract()));
@@ -228,7 +255,7 @@ class BitcoinFaucet {
     const splitTxId = signedSplitTx.id;
     for (let i = 0; i < numCoinsToCreate; i++) {
       this._coins.push({
-        key: STATIC_FAUCET_KEY,
+        key: this._faucetKey,
         outpoint: { txid: hexToBytes(splitTxId), index: i },
         txout: signedSplitTx.getOutput(i),
       });
