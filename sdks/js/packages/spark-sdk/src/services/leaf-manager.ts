@@ -20,7 +20,6 @@ import { ConnectionManager } from "./connection/connection.js";
 import SwapService from "./swap.js";
 import { LeafKeyTweak, TransferService } from "./transfer.js";
 
-// TODO: Implement LeafSource, LeafStatus, LeafRecord
 type LeafSource =
   | { kind: "transfer"; transferId: string }
   | { kind: "swap"; swapId: string }
@@ -52,6 +51,7 @@ const VALID_TRANSITIONS: Record<LeafStatus, LeafStatus[]> = {
     LeafStatus.AVAILABLE,
     LeafStatus.OUTGOING,
     LeafStatus.SWAP_PENDING,
+    LeafStatus.SPENT,
   ],
   [LeafStatus.OUTGOING]: [LeafStatus.AVAILABLE, LeafStatus.SPENT],
   [LeafStatus.SWAP_PENDING]: [LeafStatus.AVAILABLE, LeafStatus.SPENT],
@@ -87,6 +87,11 @@ export type OnBalanceUpdate = (balance: BalanceSnapshot) => void;
 export default class LeafManager {
   private leaves: Map<string, LeafRecord> = new Map();
 
+  // Mutex policy: acquire when transitioning AVAILABLE → LOCAL_LOCKED (prevents
+  // double-selection) or when inserting/removing leaves from the map. Read-only
+  // operations (balance getters, selectLeavesReadOnly) and error-path restores
+  // (restoreLocalLockedToAvailable) do not acquire — JS single-threading guarantees
+  // synchronous iterations can't be interleaved.
   private leavesMutex = new Mutex();
 
   constructor(
@@ -315,6 +320,82 @@ export default class LeafManager {
     return finalLeaves;
   }
 
+  public async selectLeavesAndExecute<T extends number[], R>(
+    targetAmounts: [...T],
+    executor: (selectedLeaves: { [K in keyof T]: TreeNode[] }) => Promise<R>,
+  ): Promise<R> {
+    if (targetAmounts.some((amount) => amount <= 0)) {
+      throw new SparkValidationError("Target amount must be positive", {
+        field: "targetAmounts",
+        value: targetAmounts,
+      });
+    }
+
+    const totalTargetAmount = targetAmounts.reduce(
+      (acc, amount) => acc + amount,
+      0,
+    );
+
+    // Fast-path check without mutex — the real selection happens under lock in
+    // selectLeavesWithSwap, which will fail safely if balance changed.
+    const availableBalance = this.getAvailableBalance();
+    if (totalTargetAmount > availableBalance) {
+      throw new SparkValidationError(
+        "Total target amount exceeds available balance",
+        {
+          field: "targetAmounts",
+          value: totalTargetAmount,
+          expected: `less than or equal to ${availableBalance}`,
+        },
+      );
+    }
+
+    const executeWithCleanup = async (): Promise<R> => {
+      const selectedLeaves = await this.selectLeavesWithSwap(targetAmounts);
+      const selectedIds = Object.values(selectedLeaves)
+        .flat()
+        .map((l) => l.id);
+      try {
+        const result = await executor(selectedLeaves);
+        // Executor succeeded — mark any leaves still LOCAL_LOCKED as OUTGOING.
+        // If a stream event already advanced them (OUTGOING/SPENT), this is a
+        // no-op since those transitions aren't in VALID_TRANSITIONS for the
+        // current status.
+        this.transition(selectedIds, LeafStatus.OUTGOING);
+        return result;
+      } catch (error) {
+        // On failure: restore leaves still LOCAL_LOCKED back to AVAILABLE.
+        // If the executor contacted the SO, it should have already advanced
+        // the state (e.g., to OUTGOING/SPENT via handleTransferEvent).
+        // restoreLocalLockedToAvailable only touches LOCAL_LOCKED, so leaves
+        // the executor already advanced are left alone.
+        this.restoreLocalLockedToAvailable(selectedIds);
+        throw error;
+      }
+    };
+
+    try {
+      return await executeWithCleanup();
+    } catch (error) {
+      if (this.isStaleLeafError(error)) {
+        await this.sync();
+        const refreshedBalance = this.getAvailableBalance();
+        if (totalTargetAmount > refreshedBalance) {
+          throw new SparkValidationError(
+            "Total target amount exceeds available balance",
+            {
+              field: "targetAmounts",
+              value: totalTargetAmount,
+              expected: `less than or equal to ${refreshedBalance}`,
+            },
+          );
+        }
+        return await executeWithCleanup();
+      }
+      throw error;
+    }
+  }
+
   public async addLeaves(leaves: TreeNode[]) {
     await this.leavesMutex.runExclusive(() => {
       for (const leaf of leaves) {
@@ -374,6 +455,189 @@ export default class LeafManager {
     return renewed;
   }
 
+  /** Select all available leaves and execute an operation with them. */
+  public async executeWithAllLeaves<R>(
+    executor: (leaves: TreeNode[]) => Promise<R>,
+  ): Promise<R> {
+    // Lock → capture → unlock → execute → update (same pattern as selectLeavesWithSwap)
+    // to avoid holding the mutex during network I/O which could deadlock with
+    // stream event handlers that also acquire the mutex.
+    const { available, lockedIds } = await this.leavesMutex.runExclusive(() => {
+      const available = this.getAvailableLeaves();
+      const lockedIds = available.map((l) => l.id);
+      this.transition(lockedIds, LeafStatus.LOCAL_LOCKED);
+      return { available, lockedIds };
+    });
+
+    try {
+      const result = await executor(available);
+      this.transition(lockedIds, LeafStatus.OUTGOING);
+      return result;
+    } catch (error) {
+      this.restoreLocalLockedToAvailable(lockedIds);
+      throw error;
+    }
+  }
+
+  /** Read-only leaf selection for queries (fee quotes, etc). Does NOT lock leaves. */
+  public selectLeavesReadOnly(targetAmount: number): TreeNode[] {
+    const sorted = [...this.getAvailableLeaves()].sort(
+      (a, b) => b.value - a.value,
+    );
+    const selected: TreeNode[] = [];
+    let amount = 0;
+    for (const leaf of sorted) {
+      if (amount >= targetAmount) break;
+      amount += leaf.value;
+      selected.push(leaf);
+    }
+    return selected;
+  }
+
+  private async selectLeavesWithSwap<T extends number[]>(
+    targetAmounts: [...T],
+  ): Promise<{ [K in keyof T]: TreeNode[] }> {
+    let lockedForSwap: TreeNode[] | undefined;
+
+    // Phase 1: Try exact selection under lock
+    const release = await this.leavesMutex.acquire();
+    try {
+      const [results, found] = this.selectLeaves(targetAmounts);
+      if (found) {
+        const allSelected = Object.values(results).flat();
+        this.transition(
+          allSelected.map((l) => l.id),
+          LeafStatus.LOCAL_LOCKED,
+        );
+        return results;
+      }
+
+      // Phase 2: Need a swap — lock leaves, capture IDs, then release for the network call
+      const totalTargetAmount = targetAmounts.reduce((acc, a) => acc + a, 0);
+      lockedForSwap = this.determineLeavesToSwap(totalTargetAmount);
+      this.transition(
+        lockedForSwap.map((l) => l.id),
+        LeafStatus.LOCAL_LOCKED,
+      );
+    } finally {
+      release();
+    }
+
+    // Phase 3: Execute swap outside lock — use captured leaves, NOT getLeavesByStatus
+    const swapLeafIds = lockedForSwap!.map((l) => l.id);
+    let newLeaves: TreeNode[];
+    try {
+      newLeaves = await this.swapService.requestLeavesSwap({
+        leaves: lockedForSwap!,
+        targetAmounts,
+        onSwapInitiated: async () => {
+          await this.leavesMutex.runExclusive(() => {
+            this.transition(swapLeafIds, LeafStatus.SWAP_PENDING);
+          });
+        },
+      });
+    } catch (error) {
+      // Only restore LOCAL_LOCKED leaves — if onSwapInitiated fired, the leaves
+      // are SWAP_PENDING and the SO has them locked. Those will be reconciled
+      // on the next sync(). LOCAL_LOCKED means the SO was never contacted.
+      this.restoreLocalLockedToAvailable(swapLeafIds);
+      throw error;
+    }
+
+    // Phase 4: Update state and re-select under lock
+    return await this.leavesMutex.runExclusive(() => {
+      this.transition(swapLeafIds, LeafStatus.SPENT);
+      for (const leaf of newLeaves) {
+        this.leaves.set(leaf.id, {
+          treeNode: leaf,
+          status: LeafStatus.AVAILABLE,
+          source: { kind: "none" },
+        });
+      }
+
+      const [newResults, newFound] = this.selectLeaves(targetAmounts);
+      if (!newFound) {
+        // Cache was mutated (old leaves spent, new leaves added) — notify
+        // subscribers even though re-selection failed.
+        this.emitBalanceUpdate();
+        throw new Error(
+          "Failed to select leaves for the target amounts after swap",
+        );
+      }
+      const allSelected = Object.values(newResults).flat();
+      this.transition(
+        allSelected.map((l) => l.id),
+        LeafStatus.LOCAL_LOCKED,
+      );
+      return newResults;
+    });
+  }
+
+  /**
+   * Greedy exact-fit selection. Returns [batches, success].
+   * Must be called while holding the mutex.
+   */
+  private selectLeaves<T extends number[]>(
+    targetAmounts: [...T],
+  ): [{ [K in keyof T]: TreeNode[] }, boolean] {
+    const availableLeaves = this.getAvailableLeaves();
+    const sorted = [...availableLeaves].sort((a, b) => b.value - a.value);
+
+    // Process targets ascending — smaller targets have fewer valid leaf
+    // combinations and should claim leaves first to avoid the greedy
+    // algorithm missing valid exact-fit solutions.
+    const indexed = targetAmounts.map((amount, i) => ({ amount, i }));
+    indexed.sort((a, b) => a.amount - b.amount);
+
+    const usedIds = new Set<string>();
+    const batches: TreeNode[][] = new Array(targetAmounts.length);
+    let totalAmount = 0;
+
+    for (const { amount: targetAmount, i: originalIndex } of indexed) {
+      const nodes: TreeNode[] = [];
+      let amount = 0;
+
+      for (const leaf of sorted) {
+        if (usedIds.has(leaf.id)) continue;
+        if (targetAmount - amount >= leaf.value) {
+          amount += leaf.value;
+          nodes.push(leaf);
+          usedIds.add(leaf.id);
+        }
+      }
+
+      totalAmount += amount;
+      batches[originalIndex] = nodes;
+    }
+
+    const results = {} as { [K in keyof T]: TreeNode[] };
+    for (let i = 0; i < targetAmounts.length; i++) {
+      results[i] = batches[i] ?? [];
+    }
+
+    const totalTargetAmount = targetAmounts.reduce((acc, a) => acc + a, 0);
+    return [results, totalAmount === totalTargetAmount];
+  }
+
+  /** Must be called while holding the mutex. */
+  private determineLeavesToSwap(targetAmount: number): TreeNode[] {
+    const sorted = [...this.getAvailableLeaves()].sort(
+      (a, b) => a.value - b.value,
+    );
+    let amount = 0;
+    const nodes: TreeNode[] = [];
+    for (const leaf of sorted) {
+      if (amount >= targetAmount) break;
+      amount += leaf.value;
+      nodes.push(leaf);
+    }
+    if (amount < targetAmount) {
+      throw new Error("Not enough leaves to swap for the target amount");
+    }
+    return nodes;
+  }
+
+  // #region Balance Getters
   public getAvailableBalance(): number {
     let total = 0;
     for (const record of this.leaves.values()) {
@@ -736,6 +1000,48 @@ export default class LeafManager {
       ) &&
       equalBytes(leaf.nodeTx, opLeaf.nodeTx)
     );
+  }
+
+  /**
+   * Restore leaves that are still LOCAL_LOCKED back to AVAILABLE.
+   * Safe to call after an executor returns — if the SO was successfully contacted,
+   * the status would have already changed to OUTGOING/SWAP_PENDING.
+   */
+  private restoreLocalLockedToAvailable(leafIds: string[]): void {
+    for (const id of leafIds) {
+      const record = this.leaves.get(id);
+      if (record?.status === LeafStatus.LOCAL_LOCKED) {
+        record.status = LeafStatus.AVAILABLE;
+      }
+    }
+  }
+
+  /**
+   * Detects SO errors that indicate our cached leaf state is stale.
+   * This covers: leaf locked by another instance, leaf ownership changed
+   * after a swap by another instance, or leaf otherwise unavailable.
+   */
+  private isStaleLeafError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+    const msg = error.message.toLowerCase();
+    return (
+      msg.includes("not available to transfer") ||
+      msg.includes("not owned by") ||
+      msg.includes("leaf is unavailable") ||
+      msg.includes("leaf is not available")
+    );
+  }
+
+  private getAvailableLeaves(): TreeNode[] {
+    return this.getLeavesByStatus(LeafStatus.AVAILABLE);
+  }
+
+  private getLeavesByStatus(status: LeafStatus): TreeNode[] {
+    const result: TreeNode[] = [];
+    for (const record of this.leaves.values()) {
+      if (record.status === status) result.push(record.treeNode);
+    }
+    return result;
   }
   // #endregion
 }

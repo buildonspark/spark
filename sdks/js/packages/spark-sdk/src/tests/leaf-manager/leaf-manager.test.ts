@@ -62,6 +62,24 @@ class TestableLeafManager extends LeafManager {
   getLeafCount(): number {
     return (this as any).leaves.size;
   }
+
+  selectLeavesPublic(
+    targetAmounts: number[],
+  ): [{ [key: number]: TreeNode[] }, boolean] {
+    return (this as any).selectLeaves(targetAmounts);
+  }
+
+  determineLeavesToSwapPublic(targetAmount: number): TreeNode[] {
+    return (this as any).determineLeavesToSwap(targetAmount);
+  }
+
+  restoreLocalLockedToAvailablePublic(leafIds: string[]): void {
+    (this as any).restoreLocalLockedToAvailable(leafIds);
+  }
+
+  isStaleLeafErrorPublic(error: unknown): boolean {
+    return (this as any).isStaleLeafError(error);
+  }
 }
 interface MockConfig {
   getCoordinatorAddress?: () => string;
@@ -83,12 +101,17 @@ interface MockTransferService {
   queryPendingOutgoingTransfers?: jest.Mock;
 }
 
+interface MockSwapService {
+  requestLeavesSwap?: jest.Mock;
+}
+
 interface MockConnectionManager {
   createSparkClient?: jest.Mock;
 }
 
 function createTestableLeafManager(overrides?: {
   config?: MockConfig;
+  swapService?: MockSwapService;
   transferService?: MockTransferService;
   connectionManager?: MockConnectionManager;
   onBalanceUpdate?: (balance: {
@@ -99,7 +122,7 @@ function createTestableLeafManager(overrides?: {
 }): TestableLeafManager {
   return new TestableLeafManager(
     (overrides?.config ?? {}) as any,
-    {} as any, // swapService — unused in current tests
+    (overrides?.swapService ?? {}) as any,
     (overrides?.transferService ?? {}) as any,
     (overrides?.connectionManager ?? {}) as any,
     overrides?.onBalanceUpdate,
@@ -1296,6 +1319,585 @@ describe("LeafManager Test", () => {
         owned: 1000,
         incoming: 0,
       });
+    });
+  });
+
+  // ── Leaf Selection ───────────────────────────────────────────────────
+
+  describe("selectLeaves (greedy exact-fit)", () => {
+    it("selects a single leaf that exactly matches target", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 500 })]);
+
+      const [results, found] = lm.selectLeavesPublic([500]);
+
+      expect(found).toBe(true);
+      expect(results[0]).toHaveLength(1);
+      expect(results[0]![0]!.id).toBe("a");
+    });
+
+    it("selects multiple leaves to reach exact target", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 300 }),
+        createMockTreeNode({ id: "b", value: 200 }),
+      ]);
+
+      const [results, found] = lm.selectLeavesPublic([500]);
+
+      expect(found).toBe(true);
+      expect(results[0]).toHaveLength(2);
+    });
+
+    it("returns false when exact fit is impossible", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 700 })]);
+
+      const [results, found] = lm.selectLeavesPublic([500]);
+
+      expect(found).toBe(false);
+      expect(results[0]).toHaveLength(0);
+    });
+
+    it("returns false when not enough balance", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 300 })]);
+
+      const [, found] = lm.selectLeavesPublic([500]);
+
+      expect(found).toBe(false);
+    });
+
+    it("returns true with empty results for empty targets", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 500 })]);
+
+      const [, found] = lm.selectLeavesPublic([]);
+
+      expect(found).toBe(true);
+    });
+
+    it("handles multiple target amounts without reusing leaves", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 500 }),
+        createMockTreeNode({ id: "b", value: 300 }),
+        createMockTreeNode({ id: "c", value: 200 }),
+      ]);
+
+      const [results, found] = lm.selectLeavesPublic([500, 300]);
+
+      expect(found).toBe(true);
+      expect(results[0]).toHaveLength(1);
+      expect(results[1]).toHaveLength(1);
+
+      const batch0Ids = results[0]!.map((l: TreeNode) => l.id);
+      const batch1Ids = results[1]!.map((l: TreeNode) => l.id);
+      expect(
+        batch0Ids.filter((id: string) => batch1Ids.includes(id)),
+      ).toHaveLength(0);
+    });
+
+    it("fails when competing batches exhaust available leaves", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 500 }),
+        createMockTreeNode({ id: "b", value: 300 }),
+      ]);
+
+      const [, found] = lm.selectLeavesPublic([500, 500]);
+
+      expect(found).toBe(false);
+    });
+
+    it("prefers larger leaves first (greedy descending)", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "small", value: 100 }),
+        createMockTreeNode({ id: "big", value: 400 }),
+        createMockTreeNode({ id: "medium", value: 200 }),
+      ]);
+
+      const [results, found] = lm.selectLeavesPublic([600]);
+
+      expect(found).toBe(true);
+      const ids = results[0]!.map((l: TreeNode) => l.id);
+      expect(ids).toContain("big");
+      expect(ids).toContain("medium");
+    });
+
+    it("finds exact fit by processing smaller targets first", async () => {
+      const lm = createTestableLeafManager();
+      // [200, 150, 150] with targets [300, 200]:
+      // Naive descending greedy would assign 200 to target-300, fail both.
+      // Ascending order processes target-200 first (gets leaf-200), then
+      // target-300 gets 150+150 = 300. Both satisfied.
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 200 }),
+        createMockTreeNode({ id: "b", value: 150 }),
+        createMockTreeNode({ id: "c", value: 150 }),
+      ]);
+
+      const [results, found] = lm.selectLeavesPublic([300, 200]);
+
+      expect(found).toBe(true);
+      const batch0Total = results[0]!.reduce(
+        (sum: number, l: TreeNode) => sum + l.value,
+        0,
+      );
+      const batch1Total = results[1]!.reduce(
+        (sum: number, l: TreeNode) => sum + l.value,
+        0,
+      );
+      expect(batch0Total).toBe(300);
+      expect(batch1Total).toBe(200);
+    });
+
+    it("only considers AVAILABLE leaves (ignores locked)", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 500 }),
+        createMockTreeNode({ id: "b", value: 500 }),
+      ]);
+      lm.transitionPublic(["a"], "LOCAL_LOCKED");
+
+      const [results, found] = lm.selectLeavesPublic([500]);
+
+      expect(found).toBe(true);
+      expect(results[0]![0]!.id).toBe("b");
+    });
+
+    it("skips leaf when it would overshoot the target", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "big", value: 700 }),
+        createMockTreeNode({ id: "exact", value: 500 }),
+      ]);
+
+      const [results, found] = lm.selectLeavesPublic([500]);
+
+      expect(found).toBe(true);
+      expect(results[0]).toHaveLength(1);
+      expect(results[0]![0]!.id).toBe("exact");
+    });
+
+    it("returns empty cache selection", async () => {
+      const lm = createTestableLeafManager();
+
+      const [results, found] = lm.selectLeavesPublic([100]);
+
+      expect(found).toBe(false);
+      expect(results[0]).toHaveLength(0);
+    });
+  });
+
+  describe("determineLeavesToSwap", () => {
+    it("selects smallest leaves first (ascending)", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "big", value: 1000 }),
+        createMockTreeNode({ id: "small", value: 100 }),
+        createMockTreeNode({ id: "medium", value: 500 }),
+      ]);
+
+      const result = lm.determineLeavesToSwapPublic(600);
+
+      expect(result).toHaveLength(2);
+      const ids = result.map((l) => l.id);
+      expect(ids).toContain("small");
+      expect(ids).toContain("medium");
+    });
+
+    it("throws when not enough leaves to cover target", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 100 })]);
+
+      expect(() => lm.determineLeavesToSwapPublic(500)).toThrow(
+        "Not enough leaves to swap",
+      );
+    });
+
+    it("stops as soon as target is reached", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 200 }),
+        createMockTreeNode({ id: "b", value: 300 }),
+        createMockTreeNode({ id: "c", value: 500 }),
+      ]);
+
+      const result = lm.determineLeavesToSwapPublic(400);
+
+      expect(result).toHaveLength(2);
+    });
+  });
+
+  describe("selectLeavesReadOnly", () => {
+    it("selects largest leaves first without locking", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "small", value: 100 }),
+        createMockTreeNode({ id: "big", value: 500 }),
+        createMockTreeNode({ id: "medium", value: 300 }),
+      ]);
+
+      const result = lm.selectLeavesReadOnly(700);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]!.id).toBe("big");
+      expect(result[1]!.id).toBe("medium");
+      expect(lm.getLeafRecordPublic("big")?.status).toBe("AVAILABLE");
+      expect(lm.getLeafRecordPublic("medium")?.status).toBe("AVAILABLE");
+    });
+
+    it("returns all leaves if target exceeds balance", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 100 }),
+        createMockTreeNode({ id: "b", value: 200 }),
+      ]);
+
+      const result = lm.selectLeavesReadOnly(1000);
+
+      expect(result).toHaveLength(2);
+    });
+
+    it("returns empty for empty cache", () => {
+      const lm = createTestableLeafManager();
+      expect(lm.selectLeavesReadOnly(100)).toHaveLength(0);
+    });
+
+    it("stops early when target is met", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 500 }),
+        createMockTreeNode({ id: "b", value: 300 }),
+        createMockTreeNode({ id: "c", value: 200 }),
+      ]);
+
+      const result = lm.selectLeavesReadOnly(500);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.id).toBe("a");
+    });
+  });
+
+  describe("restoreLocalLockedToAvailable", () => {
+    it("restores LOCAL_LOCKED leaves back to AVAILABLE", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 1000 })]);
+      lm.transitionPublic(["a"], "LOCAL_LOCKED");
+
+      lm.restoreLocalLockedToAvailablePublic(["a"]);
+
+      expect(lm.getLeafRecordPublic("a")?.status).toBe("AVAILABLE");
+    });
+
+    it("does not touch leaves in other statuses", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 500 }),
+        createMockTreeNode({ id: "b", value: 500 }),
+      ]);
+      lm.transitionPublic(["a"], "LOCAL_LOCKED");
+      lm.transitionPublic(["a"], "OUTGOING");
+      lm.transitionPublic(["b"], "LOCAL_LOCKED");
+      lm.transitionPublic(["b"], "SWAP_PENDING");
+
+      lm.restoreLocalLockedToAvailablePublic(["a", "b"]);
+
+      expect(lm.getLeafRecordPublic("a")?.status).toBe("OUTGOING");
+      expect(lm.getLeafRecordPublic("b")?.status).toBe("SWAP_PENDING");
+    });
+
+    it("handles non-existent ids gracefully", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 500 })]);
+      lm.transitionPublic(["a"], "LOCAL_LOCKED");
+
+      lm.restoreLocalLockedToAvailablePublic(["a", "missing"]);
+
+      expect(lm.getLeafRecordPublic("a")?.status).toBe("AVAILABLE");
+    });
+  });
+
+  describe("isStaleLeafError", () => {
+    it.each([
+      "Leaf is not available to transfer",
+      "Leaf is not owned by this user",
+      "leaf is unavailable for operation",
+      "LEAF IS NOT AVAILABLE",
+    ])("returns true for: %s", (msg) => {
+      const lm = createTestableLeafManager();
+      expect(lm.isStaleLeafErrorPublic(new Error(msg))).toBe(true);
+    });
+
+    it("returns false for unrelated errors", () => {
+      const lm = createTestableLeafManager();
+      expect(lm.isStaleLeafErrorPublic(new Error("network timeout"))).toBe(
+        false,
+      );
+    });
+
+    it("returns false for non-Error values", () => {
+      const lm = createTestableLeafManager();
+      expect(lm.isStaleLeafErrorPublic("string error")).toBe(false);
+      expect(lm.isStaleLeafErrorPublic(null)).toBe(false);
+      expect(lm.isStaleLeafErrorPublic(42)).toBe(false);
+    });
+  });
+
+  describe("executeWithAllLeaves", () => {
+    it("locks all available leaves and passes to executor", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 500 }),
+        createMockTreeNode({ id: "b", value: 300 }),
+      ]);
+
+      const result = await lm.executeWithAllLeaves(async (leaves) => {
+        expect(leaves).toHaveLength(2);
+        expect(lm.getLeafRecordPublic("a")?.status).toBe("LOCAL_LOCKED");
+        expect(lm.getLeafRecordPublic("b")?.status).toBe("LOCAL_LOCKED");
+        return "done";
+      });
+
+      expect(result).toBe("done");
+    });
+
+    it("restores leaves on executor failure", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 500 }),
+        createMockTreeNode({ id: "b", value: 300 }),
+      ]);
+
+      await expect(
+        lm.executeWithAllLeaves(async () => {
+          throw new Error("executor failed");
+        }),
+      ).rejects.toThrow("executor failed");
+
+      expect(lm.getLeafRecordPublic("a")?.status).toBe("AVAILABLE");
+      expect(lm.getLeafRecordPublic("b")?.status).toBe("AVAILABLE");
+    });
+
+    it("does not restore leaves executor already advanced", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 500 }),
+        createMockTreeNode({ id: "b", value: 300 }),
+      ]);
+
+      await expect(
+        lm.executeWithAllLeaves(async () => {
+          lm.transitionPublic(["a"], "OUTGOING");
+          throw new Error("partial failure");
+        }),
+      ).rejects.toThrow("partial failure");
+
+      expect(lm.getLeafRecordPublic("a")?.status).toBe("OUTGOING");
+      expect(lm.getLeafRecordPublic("b")?.status).toBe("AVAILABLE");
+    });
+  });
+
+  describe("selectLeavesAndExecute", () => {
+    it("rejects non-positive target amounts", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 1000 })]);
+
+      await expect(
+        lm.selectLeavesAndExecute([0], async () => "ok"),
+      ).rejects.toThrow("Target amount must be positive");
+
+      await expect(
+        lm.selectLeavesAndExecute([-1], async () => "ok"),
+      ).rejects.toThrow("Target amount must be positive");
+    });
+
+    it("rejects when total exceeds available balance", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 500 })]);
+
+      await expect(
+        lm.selectLeavesAndExecute([600], async () => "ok"),
+      ).rejects.toThrow("Total target amount exceeds available balance");
+    });
+
+    it("selects exact-fit leaves and executes without swap", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 300 }),
+        createMockTreeNode({ id: "b", value: 200 }),
+        createMockTreeNode({ id: "c", value: 500 }),
+      ]);
+
+      const result = await lm.selectLeavesAndExecute(
+        [500],
+        async (selected) => {
+          expect(selected[0]).toHaveLength(1);
+          expect(selected[0]![0]!.id).toBe("c");
+          return "executed";
+        },
+      );
+
+      expect(result).toBe("executed");
+    });
+
+    it("restores LOCAL_LOCKED leaves on executor failure", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 500 })]);
+
+      await expect(
+        lm.selectLeavesAndExecute([500], async () => {
+          throw new Error("executor failed");
+        }),
+      ).rejects.toThrow("executor failed");
+
+      expect(lm.getLeafRecordPublic("a")?.status).toBe("AVAILABLE");
+      expect(lm.getAvailableBalance()).toBe(500);
+    });
+
+    it("retries on stale leaf error after sync", async () => {
+      let attempt = 0;
+      const lm = createTestableLeafManager({
+        transferService: {
+          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+        },
+      });
+
+      (lm as any).getLeaves = jest.fn(async () => [
+        createMockTreeNode({ id: "fresh", value: 500, status: "AVAILABLE" }),
+      ]);
+      (lm as any).getAllPendingSwaps = jest.fn(async () => []);
+      (lm as any).getAllPendingOutgoingTransfers = jest.fn(async () => []);
+      (lm as any).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => nodes,
+      );
+
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 500 })]);
+
+      const result = await lm.selectLeavesAndExecute([500], async () => {
+        attempt++;
+        if (attempt === 1) {
+          throw new Error("leaf is not available to transfer");
+        }
+        return "retried-ok";
+      });
+
+      expect(result).toBe("retried-ok");
+      expect(attempt).toBe(2);
+    });
+
+    it("does not retry on non-stale errors", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 500 })]);
+
+      await expect(
+        lm.selectLeavesAndExecute([500], async () => {
+          throw new Error("network timeout");
+        }),
+      ).rejects.toThrow("network timeout");
+    });
+
+    it("triggers swap when exact fit is impossible", async () => {
+      const lm = createTestableLeafManager({
+        swapService: {
+          requestLeavesSwap: jest.fn(async (params: any) => {
+            await params.onSwapInitiated?.();
+            return [
+              createMockTreeNode({ id: "new-500", value: 500 }),
+              createMockTreeNode({ id: "new-200", value: 200 }),
+            ];
+          }),
+        },
+      });
+
+      await lm.addLeaves([createMockTreeNode({ id: "big", value: 700 })]);
+
+      const result = await lm.selectLeavesAndExecute(
+        [500],
+        async (selected) => {
+          expect(selected[0]).toHaveLength(1);
+          expect(selected[0]![0]!.value).toBe(500);
+          return "swapped-ok";
+        },
+      );
+
+      expect(result).toBe("swapped-ok");
+    });
+
+    it("restores LOCAL_LOCKED leaves when swap fails before onSwapInitiated", async () => {
+      const lm = createTestableLeafManager({
+        swapService: {
+          requestLeavesSwap: jest.fn(async () => {
+            throw new Error("swap service down");
+          }),
+        },
+      });
+
+      await lm.addLeaves([createMockTreeNode({ id: "big", value: 700 })]);
+
+      await expect(
+        lm.selectLeavesAndExecute([500], async () => "ok"),
+      ).rejects.toThrow("swap service down");
+
+      expect(lm.getLeafRecordPublic("big")?.status).toBe("AVAILABLE");
+    });
+
+    it("does not restore SWAP_PENDING leaves when swap fails after onSwapInitiated", async () => {
+      const lm = createTestableLeafManager({
+        swapService: {
+          requestLeavesSwap: jest.fn(async (params: any) => {
+            await params.onSwapInitiated?.();
+            throw new Error("swap failed mid-flight");
+          }),
+        },
+      });
+
+      await lm.addLeaves([createMockTreeNode({ id: "big", value: 700 })]);
+
+      await expect(
+        lm.selectLeavesAndExecute([500], async () => "ok"),
+      ).rejects.toThrow("swap failed mid-flight");
+
+      expect(lm.getLeafRecordPublic("big")?.status).toBe("SWAP_PENDING");
+    });
+  });
+
+  describe("selectLeavesAndExecute with multiple targets", () => {
+    it("selects separate batches for each target", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "a", value: 200 }),
+        createMockTreeNode({ id: "b", value: 300 }),
+        createMockTreeNode({ id: "c", value: 500 }),
+      ]);
+
+      const result = await lm.selectLeavesAndExecute(
+        [500, 300],
+        async (selected) => {
+          const batch0Values = selected[0]!.map((l: TreeNode) => l.value);
+          const batch1Values = selected[1]!.map((l: TreeNode) => l.value);
+          expect(batch0Values.reduce((a: number, b: number) => a + b, 0)).toBe(
+            500,
+          );
+          expect(batch1Values.reduce((a: number, b: number) => a + b, 0)).toBe(
+            300,
+          );
+          return "multi-ok";
+        },
+      );
+
+      expect(result).toBe("multi-ok");
+    });
+
+    it("rejects when any individual target is non-positive", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 1000 })]);
+
+      await expect(
+        lm.selectLeavesAndExecute([500, 0], async () => "ok"),
+      ).rejects.toThrow("Target amount must be positive");
     });
   });
 });
