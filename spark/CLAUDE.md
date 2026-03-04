@@ -116,6 +116,10 @@ sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("already completed"))
 
 ### Logging
 ```go
+// Preferred for dynamic runtime values
+logger.Sugar().Infof("just finished %d things for task %s", numberOfThings, taskID)
+
+// Use structured fields only for approved/indexed keys
 logger.Info("transfer completed", zap.String("transfer_id", id))
 ```
 

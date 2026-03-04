@@ -116,8 +116,11 @@ We use [Zap](https://github.com/uber-go/zap) for logging in the SO. Here are som
     - `identity_public_key`: we use this for logging the identity of the public key that is making
       a particular request.
   It should _not_ be used for logging one-off attributes that don't have a clear purpose or common
-  meaning across the codebase, i.e. `count`, `value`, etc. Use unstructured logging for those. If
-  you're unsure, err towards unstructured logging.
+  meaning across the codebase, i.e. `count`, `value`, etc.
+- Default to `logger.Sugar().Infof(...)` for dynamic runtime values.
+- Structured fields are an allowlist, not a general pattern. If a value is not an approved
+  searchable key, log it in the message string, not as a zap field. If you're unsure, err towards
+  unstructured logging.
 - Converting between `zap.Logger` and `zap.SugaredLogger` is easy and cheap. Use `Logger.Sugar()`
   to go from `zap.Logger` to `zap.SugaredLogger`, and `SugaredLogger.Desugar()` to go the other way.
 - Most places in the codebase have a `zap.Logger` injected into the `Context` with common fields
@@ -130,6 +133,14 @@ We use [Zap](https://github.com/uber-go/zap) for logging in the SO. Here are som
     ...
     logger.With(zap.Error(err)).Sugar().Infof("Failed to broadcast node tx for node %s", node.ID)
 
+```
+- Bad:
+```go
+logger.Info("just finished things", zap.Int("numberOfThings", numberOfThings))
+```
+- Good:
+```go
+logger.Sugar().Infof("just finished %d things", numberOfThings)
 ```
 - Be mindful with what you log. Be extremely selective on logs that are logged on every request
   (i.e. logs in middleware). Logs that describe regular execution are discouraged, instead logs
