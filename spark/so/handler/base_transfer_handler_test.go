@@ -620,6 +620,163 @@ func TestCancelTransferInternal_PreimageSwap(t *testing.T) {
 	})
 }
 
+func TestCancelTransferInternal_UpdatesReceiverStatus(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	senderPub := keys.GeneratePrivateKey().Public()
+	receiverPub := keys.GeneratePrivateKey().Public()
+
+	t.Run("cancellation sets receiver to cancelled", func(t *testing.T) {
+		transfer, err := client.Transfer.Create().
+			SetSenderIdentityPubkey(senderPub).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetStatus(st.TransferStatusSenderInitiated).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			SetType(st.TransferTypeTransfer).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		receiver, err := client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverPub).
+			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			Save(ctx)
+		require.NoError(t, err)
+
+		h := NewBaseTransferHandler(config)
+		err = h.CancelTransferInternal(ctx, transfer.ID)
+		require.NoError(t, err)
+
+		updated, err := client.Transfer.Query().Where(enttransfer.ID(transfer.ID)).Only(ctx)
+		require.NoError(t, err)
+		require.Equal(t, st.TransferStatusReturned, updated.Status)
+
+		updatedReceiver, err := client.TransferReceiver.Get(ctx, receiver.ID)
+		require.NoError(t, err)
+		require.Equal(t, st.TransferReceiverStatusCancelled, updatedReceiver.Status)
+	})
+
+	t.Run("cancellation skips already-cancelled receiver", func(t *testing.T) {
+		transfer, err := client.Transfer.Create().
+			SetSenderIdentityPubkey(senderPub).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetStatus(st.TransferStatusSenderInitiated).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			SetType(st.TransferTypeTransfer).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		receiver, err := client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverPub).
+			SetStatus(st.TransferReceiverStatusCancelled).
+			Save(ctx)
+		require.NoError(t, err)
+
+		h := NewBaseTransferHandler(config)
+		err = h.CancelTransferInternal(ctx, transfer.ID)
+		require.NoError(t, err)
+
+		updatedReceiver, err := client.TransferReceiver.Get(ctx, receiver.ID)
+		require.NoError(t, err)
+		require.Equal(t, st.TransferReceiverStatusCancelled, updatedReceiver.Status)
+	})
+
+	t.Run("cancellation works with no receiver", func(t *testing.T) {
+		transfer, err := client.Transfer.Create().
+			SetSenderIdentityPubkey(senderPub).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetStatus(st.TransferStatusSenderInitiated).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			SetType(st.TransferTypeTransfer).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		h := NewBaseTransferHandler(config)
+		err = h.CancelTransferInternal(ctx, transfer.ID)
+		require.NoError(t, err)
+
+		updated, err := client.Transfer.Query().Where(enttransfer.ID(transfer.ID)).Only(ctx)
+		require.NoError(t, err)
+		require.Equal(t, st.TransferStatusReturned, updated.Status)
+	})
+
+	t.Run("cancellation errors on unexpected receiver status", func(t *testing.T) {
+		transfer, err := client.Transfer.Create().
+			SetSenderIdentityPubkey(senderPub).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetStatus(st.TransferStatusSenderInitiated).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			SetType(st.TransferTypeTransfer).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverPub).
+			SetStatus(st.TransferReceiverStatusRefundSigned).
+			Save(ctx)
+		require.NoError(t, err)
+
+		h := NewBaseTransferHandler(config)
+		err = h.CancelTransferInternal(ctx, transfer.ID)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unexpected status")
+	})
+
+	t.Run("cancellation cancels multiple receivers", func(t *testing.T) {
+		receiverPub2 := keys.GeneratePrivateKey().Public()
+
+		transfer, err := client.Transfer.Create().
+			SetSenderIdentityPubkey(senderPub).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetStatus(st.TransferStatusSenderInitiated).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			SetType(st.TransferTypeTransfer).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		receiver1, err := client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverPub).
+			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			Save(ctx)
+		require.NoError(t, err)
+
+		receiver2, err := client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverPub2).
+			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			Save(ctx)
+		require.NoError(t, err)
+
+		h := NewBaseTransferHandler(config)
+		err = h.CancelTransferInternal(ctx, transfer.ID)
+		require.NoError(t, err)
+
+		updatedR1, err := client.TransferReceiver.Get(ctx, receiver1.ID)
+		require.NoError(t, err)
+		require.Equal(t, st.TransferReceiverStatusCancelled, updatedR1.Status)
+
+		updatedR2, err := client.TransferReceiver.Get(ctx, receiver2.ID)
+		require.NoError(t, err)
+		require.Equal(t, st.TransferReceiverStatusCancelled, updatedR2.Status)
+	})
+}
+
 func TestValidateTransferPackage_DuplicateLeafID(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	h := NewBaseTransferHandler(config)

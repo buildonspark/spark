@@ -976,6 +976,26 @@ func (h *BaseTransferHandler) executeCancelTransfer(ctx context.Context, transfe
 		return fmt.Errorf("unable to update transfer status: %w", err)
 	}
 
+	// Receivers can only advance past SenderInitiated once the transfer reaches
+	// SenderKeyTweaked, which is blocked from cancellation above. So receivers
+	// here should only be in SenderInitiated or already Cancelled.
+	receivers, err := transfer.QueryTransferReceivers().All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to query transfer receivers: %w", err)
+	}
+	for _, r := range receivers {
+		switch r.Status {
+		case st.TransferReceiverStatusCancelled:
+			// Already cancelled, nothing to do.
+		case st.TransferReceiverStatusSenderInitiated:
+			if _, err := r.Update().SetStatus(st.TransferReceiverStatusCancelled).Save(ctx); err != nil {
+				return fmt.Errorf("unable to update transfer receiver %s to cancelled: %w", r.ID, err)
+			}
+		default:
+			return fmt.Errorf("transfer receiver %s in unexpected status %s during cancellation", r.ID, r.Status)
+		}
+	}
+
 	err = h.cancelTransferUnlockLeaves(ctx, transfer)
 	if err != nil {
 		return fmt.Errorf("unable to unlock leaves in the transfer: %w", err)

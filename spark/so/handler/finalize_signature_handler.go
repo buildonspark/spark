@@ -350,10 +350,32 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		return nil, fmt.Errorf("missing signatures for transfer %s", transfer.ID.String())
 	}
 
-	updatedTransfer, err := transfer.Update().SetStatus(st.TransferStatusCompleted).SetCompletionTime(time.Now()).Save(ctx)
+	receivers, err := transfer.QueryTransferReceivers().All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query receivers for transfer %s: %w", transfer.ID.String(), err)
+	}
+	if len(receivers) > 1 {
+		return nil, fmt.Errorf("transfer %s has %d receivers; FinalizeNodeSignatures does not support multi-receiver transfers", transfer.ID.String(), len(receivers))
+	}
+
+	completionTime := time.Now()
+	updatedTransfer, err := transfer.Update().SetStatus(st.TransferStatusCompleted).SetCompletionTime(completionTime).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update transfer %s: %w", transfer.ID.String(), err)
 	}
+
+	if len(receivers) == 1 {
+		r := receivers[0]
+		if r.Status != st.TransferReceiverStatusCompleted {
+			if _, err := r.Update().
+				SetStatus(st.TransferReceiverStatusCompleted).
+				SetCompletionTime(completionTime).
+				Save(ctx); err != nil {
+				return nil, fmt.Errorf("failed to update receiver %s to completed: %w", r.ID, err)
+			}
+		}
+	}
+
 	return updatedTransfer, nil
 }
 
