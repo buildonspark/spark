@@ -55,6 +55,7 @@
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --detectOpenHandles --forceExit",
     "test": "echo \"Skipping for now\"",
     "test:integration": "bare tests/run-integration-tests.js",
+    "test:integration:ssp": "bare tests/run-ssp-integration-tests.js",
     "types:watch": "tsc-absolute --watch",
     "types": "tsc"
   },

@@ -3,6 +3,9 @@
   "tasks": {
     "test:integration": {
       "dependsOn": ["build", "^build"]
+    },
+    "test:integration:ssp": {
+      "dependsOn": ["build", "^build"]
     }
   }
 }
