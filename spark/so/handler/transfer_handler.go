@@ -366,9 +366,30 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		}
 	}
 
+	// Send our version of the proof map when syncing the transfer with other SOs
+	// so that they can validate it against the version they decrypt
+	senderKeyTweakProofs := make(map[string]*pb.SecretProof)
+	for _, leaf := range leafTweakMap {
+		senderKeyTweakProofs[leaf.LeafId] = &pb.SecretProof{
+			Proofs: leaf.SecretShareTweak.Proofs,
+		}
+	}
+
 	// This call to other SOs will check the validity of the transfer package. If no error is
 	// returned, it means the transfer package is valid and the transfer is considered sent.
-	err = h.syncTransferInit(ctx, req, transferType, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey, swapV3Package)
+	err = h.syncTransferInit(
+		ctx,
+		req,
+		transferType,
+		senderKeyTweakProofs,
+		finalCpfpSignatureMap,
+		finalDirectSignatureMap,
+		finalDirectFromCpfpSignatureMap,
+		cpfpAdaptorPubKey,
+		directAdaptorPubKey,
+		directFromCpfpAdaptorPubKey,
+		swapV3Package,
+	)
 	if err != nil {
 		syncErr := err
 		logger.With(zap.Error(syncErr)).Sugar().Errorf("Failed to sync transfer init for transfer %s", transferID)
@@ -432,18 +453,11 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 				// If all other SOs have settled the sender key tweaks, we can commit the sender key tweaks.
 				// If there's any error, it means one or more of the SOs are down at the time, we will have a
 				// cron job to retry the key commit.
-				keyTweakProofMap := make(map[string]*pb.SecretProof)
-				for _, leaf := range leafTweakMap {
-					keyTweakProofMap[leaf.LeafId] = &pb.SecretProof{
-						Proofs: leaf.SecretShareTweak.Proofs,
-					}
-				}
-
 				message = &pbgossip.GossipMessage{
 					Message: &pbgossip.GossipMessage_SettleSenderKeyTweak{
 						SettleSenderKeyTweak: &pbgossip.GossipMessageSettleSenderKeyTweak{
 							TransferId:           transfer.ID.String(),
-							SenderKeyTweakProofs: keyTweakProofMap,
+							SenderKeyTweakProofs: senderKeyTweakProofs,
 						},
 					},
 				}
@@ -821,6 +835,7 @@ func (h *TransferHandler) syncTransferInit(
 	ctx context.Context,
 	req *pb.StartTransferRequest,
 	transferType st.TransferType,
+	senderKeyTweakProofs map[string]*pb.SecretProof,
 	cpfpRefundSignatures map[string][]byte,
 	directRefundSignatures map[string][]byte,
 	directFromCpfpRefundSignatures map[string][]byte,
@@ -877,6 +892,7 @@ func (h *TransferHandler) syncTransferInit(
 		ReceiverIdentityPublicKey:      req.ReceiverIdentityPublicKey,
 		ExpiryTime:                     req.ExpiryTime,
 		Leaves:                         leaves,
+		SenderKeyTweakProofs:           senderKeyTweakProofs,
 		Type:                           *transferTypeProto,
 		TransferPackage:                req.TransferPackage,
 		RefundSignatures:               cpfpRefundSignatures,
