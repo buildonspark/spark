@@ -577,6 +577,27 @@ func CompleteUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {
 		if !transferHelper.IsTransferSent(transfer) {
 			return fmt.Errorf("UTXO swap cannot be completed from transfer status %s: transfer is not sent", transfer.Status)
 		}
+
+		secondaryTransfer, needSecondaryUpdate, err := GetSecondaryTransferFromUtxoSwap(ctx, utxoSwap)
+		if err != nil {
+			return fmt.Errorf("unable to get secondary transfer from utxo swap: %w", err)
+		}
+		if secondaryTransfer != nil {
+			if needSecondaryUpdate {
+				_, err := utxoSwap.Update().SetSecondaryTransfer(secondaryTransfer).Save(ctx)
+				if err != nil {
+					return fmt.Errorf("unable to set secondary transfer: %w", err)
+				}
+			}
+
+			if secondaryTransfer.Status == st.TransferStatusExpired || secondaryTransfer.Status == st.TransferStatusReturned {
+				return fmt.Errorf("secondary transfer is expired or returned")
+			}
+
+			if !transferHelper.IsTransferSent(secondaryTransfer) {
+				return fmt.Errorf("UTXO swap cannot be completed from secondary transfer status %s: transfer is not sent", secondaryTransfer.Status)
+			}
+		}
 	}
 	if _, err := utxoSwap.Update().SetStatus(st.UtxoSwapStatusCompleted).Save(ctx); err != nil {
 		return fmt.Errorf("unable to complete utxo swap: %w", err)
@@ -600,6 +621,28 @@ func GetTransferFromUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) (*ent.
 		transfer, err = db.Transfer.Get(ctx, utxoSwap.RequestedTransferID)
 		if err != nil {
 			return nil, false, fmt.Errorf("unable to fetch transfer by requested id=%s: %w", utxoSwap.RequestedTransferID, err)
+		}
+		return transfer, true, nil
+	}
+	return transfer, false, nil
+}
+
+func GetSecondaryTransferFromUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) (*ent.Transfer, bool, error) {
+	if utxoSwap.RequestedSecondaryTransferID == uuid.Nil {
+		return nil, false, nil
+	}
+	transfer, err := utxoSwap.QuerySecondaryTransfer().Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return nil, false, fmt.Errorf("unable to get secondary transfer: %w", err)
+	}
+	if transfer == nil {
+		db, err := ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		}
+		transfer, err = db.Transfer.Get(ctx, utxoSwap.RequestedSecondaryTransferID)
+		if err != nil {
+			return nil, false, fmt.Errorf("unable to fetch secondary transfer by requested id=%s: %w", utxoSwap.RequestedSecondaryTransferID, err)
 		}
 		return transfer, true, nil
 	}
