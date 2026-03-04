@@ -996,8 +996,8 @@ func (h *LightningHandler) GetPreimageShare(
 	}
 	transfer, _, err := transferHandler.createTransfer(
 		ctx,
-		nil,
 		transferID,
+		nil,
 		st.TransferTypePreimageSwap,
 		// TODO: (LIG-8397) Remove once we can remove transfer
 		req.Transfer.ExpiryTime.AsTime(),
@@ -1462,8 +1462,8 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 
 	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
-		nil,
 		transferID,
+		nil,
 		st.TransferTypePreimageSwap,
 		req.Transfer.ExpiryTime.AsTime(),
 		ownerIdentityPubKey,

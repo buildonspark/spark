@@ -125,8 +125,8 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 
 	_, _, err = h.createTransfer(
 		ctx,
-		nil,
 		transferID,
+		nil,
 		st.TransferTypeTransfer,
 		expiry,
 		senderPub,
@@ -229,8 +229,8 @@ func TestCreateTransfer_FailsWithWrongPrevOutpoint(t *testing.T) {
 	h := NewBaseTransferHandler(config)
 	_, _, err = h.createTransfer(
 		ctx,
-		nil,
 		uuid.New(),
+		nil,
 		st.TransferTypeTransfer,
 		time.Now().Add(10*time.Minute),
 		senderPub,
@@ -354,8 +354,8 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedAmount(t *testing.T) {
 
 	_, _, err = h.createTransfer(
 		ctx,
-		nil,
 		transferID,
+		nil,
 		st.TransferTypeCounterSwapV3,
 		expiry,
 		senderPub,
@@ -501,8 +501,8 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedParties(t *testing.T) {
 			// Try to create Swap V3 counter transfer with mismatched parties
 			_, _, err = h.createTransfer(
 				ctx,
-				nil,
 				uuid.New(),
+				nil,
 				st.TransferTypeCounterSwapV3,
 				expiry,
 				tt.senderPubKey,

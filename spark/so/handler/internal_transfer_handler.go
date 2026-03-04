@@ -511,8 +511,8 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 
 	_, _, err = h.createTransfer(
 		ctx,
-		nil,
 		transferID,
+		req.TransferPackage,
 		transferType,
 		req.ExpiryTime.AsTime(),
 		senderIdentityPubKey,
@@ -759,8 +759,8 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 
 	transfer, _, err := h.createTransfer(
 		ctx,
-		nil,
 		transferID,
+		transferReq.TransferPackage,
 		st.TransferTypeCooperativeExit,
 		transferReq.ExpiryTime.AsTime(),
 		senderIDPubKey,

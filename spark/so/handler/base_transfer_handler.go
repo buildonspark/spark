@@ -271,8 +271,8 @@ func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawRefundTx []byte, directRef
 
 func (h *BaseTransferHandler) createTransfer(
 	ctx context.Context,
-	req *pbspark.StartTransferRequest,
 	transferID uuid.UUID,
+	pkg *pbspark.TransferPackage,
 	transferType st.TransferType,
 	expiryTime time.Time,
 	senderIdentityPubKey keys.Public,
@@ -384,7 +384,7 @@ func (h *BaseTransferHandler) createTransfer(
 	}
 
 	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeSwap || transferType == st.TransferTypeCounterSwap || transferType == st.TransferTypePrimarySwapV3 || transferType == st.TransferTypeCounterSwapV3 || transferType == st.TransferTypeCooperativeExit {
-		if err := h.validateAndConstructBitcoinTransactions(ctx, req, transferType, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, connectorTx); err != nil {
+		if err := h.validateAndConstructBitcoinTransactions(ctx, pkg, transferType, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, connectorTx); err != nil {
 			return nil, nil, fmt.Errorf("unable to validate and construct bitcoin transactions: %w, transfer id: %s", err, transferID)
 		}
 	}
@@ -1376,7 +1376,7 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 
 func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 	ctx context.Context,
-	req *pbspark.StartTransferRequest,
+	pkg *pbspark.TransferPackage,
 	transferType st.TransferType,
 	leaves []*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
@@ -1398,10 +1398,10 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 
 	switch transferType {
 	case st.TransferTypeTransfer:
-		if req == nil || req.TransferPackage == nil {
+		if pkg == nil {
 			return validateLegacyLeavesToSend_transfer(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 		}
-		return validateLeaves_transfer(ctx, req, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
+		return validateLeaves_transfer(ctx, pkg, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 
 	case st.TransferTypeSwap, st.TransferTypeCounterSwap, st.TransferTypePrimarySwapV3, st.TransferTypeCounterSwapV3:
 		return validateLeaves_swap(ctx, nodesByID, leafCpfpRefundMap, refundDestPubkey, transferType)
@@ -1672,15 +1672,15 @@ func validateLegacyLeavesToSend_transfer(
 
 func validateLeaves_transfer(
 	ctx context.Context,
-	req *pbspark.StartTransferRequest,
+	pkg *pbspark.TransferPackage,
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
 	leafDirectRefundMap map[string][]byte,
 	leafDirectFromCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
 ) error {
-	leavesToSendByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.LeavesToSend))
-	for _, leaf := range req.TransferPackage.LeavesToSend {
+	leavesToSendByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.LeavesToSend))
+	for _, leaf := range pkg.LeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
 			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
@@ -1692,8 +1692,8 @@ func validateLeaves_transfer(
 		leavesToSendByID[leafID] = leaf
 	}
 
-	directLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.DirectLeavesToSend))
-	for _, leaf := range req.TransferPackage.DirectLeavesToSend {
+	directLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.DirectLeavesToSend))
+	for _, leaf := range pkg.DirectLeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
 			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
@@ -1708,12 +1708,12 @@ func validateLeaves_transfer(
 		directLeavesByID[directLeafID] = leaf
 	}
 
-	if len(req.TransferPackage.LeavesToSend) != len(req.TransferPackage.DirectFromCpfpLeavesToSend) {
-		return fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(req.TransferPackage.LeavesToSend), len(req.TransferPackage.DirectFromCpfpLeavesToSend))
+	if len(pkg.LeavesToSend) != len(pkg.DirectFromCpfpLeavesToSend) {
+		return fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.LeavesToSend), len(pkg.DirectFromCpfpLeavesToSend))
 	}
 
-	directFromCpfpLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(req.TransferPackage.DirectFromCpfpLeavesToSend))
-	for _, leaf := range req.TransferPackage.DirectFromCpfpLeavesToSend {
+	directFromCpfpLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.DirectFromCpfpLeavesToSend))
+	for _, leaf := range pkg.DirectFromCpfpLeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
 			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)

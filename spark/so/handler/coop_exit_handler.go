@@ -100,8 +100,8 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 
 	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
-		nil,
 		transferUUID,
+		nil,
 		st.TransferTypeCooperativeExit,
 		req.Transfer.ExpiryTime.AsTime(),
 		reqTransferOwnerIdentityPubKey,
@@ -234,8 +234,8 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 	// Create transfer with key tweaks
 	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
-		nil,
 		transferID,
+		nil,
 		st.TransferTypeCooperativeExit,
 		req.Transfer.ExpiryTime.AsTime(),
 		reqTransferOwnerIdentityPubKey,

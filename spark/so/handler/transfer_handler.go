@@ -249,8 +249,8 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	}
 	transfer, leafMap, err := h.createTransfer(
 		ctx,
-		nil,
 		transferID,
+		req.GetTransferPackage(),
 		transferType,
 		req.ExpiryTime.AsTime(),
 		reqOwnerIdentityPubKey,
