@@ -21,3 +21,9 @@ Object.defineProperties(globalThis, {
     value: fetch,
   },
 });
+
+/* Initialize SparkFrost WASM bindings for tests */
+import { setSparkFrostOnce } from "../src/spark-bindings/spark-bindings.js";
+import { SparkFrost } from "../src/spark-bindings/spark-bindings.node.js";
+
+setSparkFrostOnce(new SparkFrost());

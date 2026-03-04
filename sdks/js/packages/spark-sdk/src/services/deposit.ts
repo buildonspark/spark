@@ -253,7 +253,11 @@ export class DepositService {
       });
     }
 
-    const { nodeTx: cpfpRootTx } = createRootNodeTx(depositTx, vout);
+    const { nodeTx: cpfpRootTx } = await createRootNodeTx(
+      depositTx,
+      vout,
+      this.config.getNetwork(),
+    );
 
     // Create nonce commitments for root transactions
     const cpfpRootNonceCommitment =
@@ -266,7 +270,7 @@ export class DepositService {
       await this.config.signer.getPublicKeyFromDerivation(keyDerivation);
 
     const { cpfpRefundTx, directFromCpfpRefundTx } =
-      createInitialTimelockRefundTxs({
+      await createInitialTimelockRefundTxs({
         nodeTx: cpfpRootTx,
         receivingPubkey: signingPubKey,
         network: this.config.getNetwork(),
@@ -477,7 +481,7 @@ export class DepositService {
 
     // Refund txs spend root tx output 0 — same as single-input path
     const { cpfpRefundTx, directFromCpfpRefundTx } =
-      createInitialTimelockRefundTxs({
+      await createInitialTimelockRefundTxs({
         nodeTx: cpfpRootTx,
         receivingPubkey: signingPubKey,
         network: this.config.getNetwork(),

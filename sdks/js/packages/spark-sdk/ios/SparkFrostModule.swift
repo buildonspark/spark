@@ -518,6 +518,159 @@ class SparkFrostModule: NSObject, RCTBridgeModule {
         }
     }
 
+    @objc(constructNodeTxPair:resolve:reject:)
+    func rn_constructNodeTxPair(_ params: [String: Any],
+                       resolve: @escaping RCTPromiseResolveBlock,
+                       reject: @escaping RCTPromiseRejectBlock) {
+        do {
+            guard let parentTxArray = params["parentTx"] as? [Any],
+                  let parentTx = arrayToData(parentTxArray) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid parentTx format"])
+            }
+            guard let vout = params["vout"] as? Int else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid vout format"])
+            }
+            guard let address = params["address"] as? String else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid address format"])
+            }
+            guard let sequence = params["sequence"] as? Int else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid sequence format"])
+            }
+            guard let directSequence = params["directSequence"] as? Int else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid directSequence format"])
+            }
+            guard let feeSatsStr = params["feeSats"] as? String,
+                  let feeSats = UInt64(feeSatsStr) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid feeSats format"])
+            }
+
+            let result = try constructNodeTxPair(
+                parentTx: parentTx,
+                vout: UInt32(vout),
+                address: address,
+                sequence: UInt32(sequence),
+                directSequence: UInt32(directSequence),
+                feeSats: feeSats
+            )
+
+            let resultDict: [String: Any] = [
+                "cpfp": ["tx": dataToArray(result.cpfp.tx)],
+                "direct": ["tx": dataToArray(result.direct.tx)]
+            ]
+            resolve(resultDict)
+        } catch {
+            reject("ERROR", error.localizedDescription, error)
+        }
+    }
+
+    @objc(constructRefundTxTrio:resolve:reject:)
+    func rn_constructRefundTxTrio(_ params: [String: Any],
+                       resolve: @escaping RCTPromiseResolveBlock,
+                       reject: @escaping RCTPromiseRejectBlock) {
+        do {
+            guard let cpfpNodeTxArray = params["cpfpNodeTx"] as? [Any],
+                  let cpfpNodeTx = arrayToData(cpfpNodeTxArray) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid cpfpNodeTx format"])
+            }
+
+            var directNodeTx: Data? = nil
+            if let directNodeTxArray = params["directNodeTx"] as? [Any] {
+                directNodeTx = arrayToData(directNodeTxArray)
+            }
+
+            guard let vout = params["vout"] as? Int else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid vout format"])
+            }
+            guard let receivingPubkeyArray = params["receivingPubkey"] as? [Any],
+                  let receivingPubkey = arrayToData(receivingPubkeyArray) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid receivingPubkey format"])
+            }
+            guard let network = params["network"] as? String else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid network format"])
+            }
+            guard let sequence = params["sequence"] as? Int else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid sequence format"])
+            }
+            guard let directSequence = params["directSequence"] as? Int else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid directSequence format"])
+            }
+            guard let feeSatsStr = params["feeSats"] as? String,
+                  let feeSats = UInt64(feeSatsStr) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid feeSats format"])
+            }
+
+            let result = try constructRefundTxTrio(
+                cpfpNodeTx: cpfpNodeTx,
+                directNodeTx: directNodeTx,
+                vout: UInt32(vout),
+                receivingPubkey: receivingPubkey,
+                network: network,
+                sequence: UInt32(sequence),
+                directSequence: UInt32(directSequence),
+                feeSats: feeSats
+            )
+
+            var resultDict: [String: Any] = [
+                "cpfp_refund": ["tx": dataToArray(result.cpfpRefund.tx)],
+                "direct_from_cpfp_refund": ["tx": dataToArray(result.directFromCpfpRefund.tx)]
+            ]
+
+            if let directRefund = result.directRefund {
+                resultDict["direct_refund"] = ["tx": dataToArray(directRefund.tx)]
+            }
+
+            resolve(resultDict)
+        } catch {
+            reject("ERROR", error.localizedDescription, error)
+        }
+    }
+
+    @objc(computeMultiInputSighash:resolve:reject:)
+    func rn_computeMultiInputSighash(_ params: [String: Any],
+                       resolve: @escaping RCTPromiseResolveBlock,
+                       reject: @escaping RCTPromiseRejectBlock) {
+        do {
+            guard let txArray = params["tx"] as? [Any],
+                  let tx = arrayToData(txArray) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid tx format"])
+            }
+            guard let inputIndex = params["inputIndex"] as? Int else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid inputIndex format"])
+            }
+            guard let prevOutScriptsArrays = params["prevOutScripts"] as? [[Any]] else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid prevOutScripts format"])
+            }
+            guard let prevOutValuesArray = params["prevOutValues"] as? [Any] else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid prevOutValues format"])
+            }
+
+            let prevOutScripts: [Data] = try prevOutScriptsArrays.enumerated().map { (i, arr) in
+                guard let data = arrayToData(arr) else {
+                    throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid prevOutScript at index \(i)"])
+                }
+                return data
+            }
+
+            let prevOutValues: [UInt64] = try prevOutValuesArray.enumerated().map { (i, val) in
+                guard let num = val as? NSNumber else {
+                    throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid prevOutValue at index \(i)"])
+                }
+                return num.uint64Value
+            }
+
+            let result = try computeMultiInputSighashUniffi(
+                tx: tx,
+                inputIndex: UInt32(inputIndex),
+                prevOutScripts: prevOutScripts,
+                prevOutValues: prevOutValues
+            )
+
+            resolve(dataToArray(result))
+        } catch {
+            reject("ERROR", error.localizedDescription, error)
+        }
+    }
+
     func constantsToExport() -> [AnyHashable : Any]! {
         return [:]
     }

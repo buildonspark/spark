@@ -157,7 +157,6 @@ export function getSigHashFromTx(
   inputIndex: number,
   prevOutput: TransactionOutput,
 ): Uint8Array {
-  // For Taproot, we use preimageWitnessV1 with SIGHASH_DEFAULT (0x00)
   const prevScript = prevOutput.script;
   if (!prevScript) {
     throw new SparkValidationError("No script found in prevOutput", {

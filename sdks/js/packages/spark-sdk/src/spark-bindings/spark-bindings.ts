@@ -113,6 +113,45 @@ export abstract class SparkFrostBase {
     proofs: Uint8Array[],
   ): Promise<void>;
 
+  abstract constructNodeTxPair(
+    parentTx: Uint8Array,
+    vout: number,
+    address: string,
+    sequence: number,
+    directSequence: number,
+    feeSats: bigint,
+  ):
+    | { cpfp: { tx: Uint8Array }; direct: { tx: Uint8Array } }
+    | Promise<{ cpfp: { tx: Uint8Array }; direct: { tx: Uint8Array } }>;
+
+  abstract constructRefundTxTrio(
+    cpfpNodeTx: Uint8Array,
+    directNodeTx: Uint8Array | null,
+    vout: number,
+    receivingPubkey: Uint8Array,
+    network: string,
+    sequence: number,
+    directSequence: number,
+    feeSats: bigint,
+  ):
+    | {
+        cpfp_refund: { tx: Uint8Array };
+        direct_refund?: { tx: Uint8Array };
+        direct_from_cpfp_refund: { tx: Uint8Array };
+      }
+    | Promise<{
+        cpfp_refund: { tx: Uint8Array };
+        direct_refund?: { tx: Uint8Array };
+        direct_from_cpfp_refund: { tx: Uint8Array };
+      }>;
+
+  abstract computeMultiInputSighash(
+    tx: Uint8Array,
+    inputIndex: number,
+    prevOutScripts: Uint8Array[],
+    prevOutValues: number[],
+  ): Uint8Array | Promise<Uint8Array>;
+
   // These will be moved to bindings in the future
   getPublicKeyBytes(privateKey: Uint8Array): Uint8Array {
     return secp256k1.getPublicKey(privateKey, true);

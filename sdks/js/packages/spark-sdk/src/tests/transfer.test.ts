@@ -41,7 +41,7 @@ describe("transfer", () => {
     );
 
     const { cpfpRefundTx, directFromCpfpRefundTx } =
-      createInitialTimelockRefundTxs({
+      await createInitialTimelockRefundTxs({
         nodeTx,
         receivingPubkey,
         network: Network.MAINNET,
@@ -150,7 +150,7 @@ describe("transfer", () => {
     );
 
     const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-      createInitialTimelockRefundTxs({
+      await createInitialTimelockRefundTxs({
         nodeTx,
         directNodeTx: directTx,
         receivingPubkey,
@@ -308,7 +308,7 @@ describe("transfer", () => {
     );
 
     const { cpfpRefundTx, directFromCpfpRefundTx } =
-      createInitialTimelockRefundTxs({
+      await createInitialTimelockRefundTxs({
         nodeTx,
         directNodeTx: directTx,
         receivingPubkey,

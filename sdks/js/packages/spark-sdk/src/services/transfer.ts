@@ -1288,9 +1288,9 @@ export class TransferService extends BaseTransferService {
         };
 
         const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-          isForClaim
+          await (isForClaim
             ? createCurrentTimelockRefundTxs(refundTxsParams)
-            : createDecrementedTimelockRefundTxs(refundTxsParams);
+            : createDecrementedTimelockRefundTxs(refundTxsParams));
 
         const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
 
@@ -1825,7 +1825,11 @@ export class TransferService extends BaseTransferService {
     const refundTx = getTxFromRawTxBytes(node.refundTx);
 
     const { nodeTx: newNodeTx, directNodeTx: newDirectNodeTx } =
-      createDecrementedTimelockNodeTx(parentTx, nodeTx);
+      await createDecrementedTimelockNodeTx(
+        parentTx,
+        nodeTx,
+        this.config.getNetwork(),
+      );
 
     signingJobs.push({
       signingPublicKey,
@@ -1881,7 +1885,7 @@ export class TransferService extends BaseTransferService {
       cpfpRefundTx: newRefundTx,
       directRefundTx: newDirectRefundTx,
       directFromCpfpRefundTx: newDirectFromCpfpRefundTx,
-    } = createInitialTimelockRefundTxs({
+    } = await createInitialTimelockRefundTxs({
       nodeTx: newNodeTx,
       directNodeTx: newDirectNodeTx,
       receivingPubkey: signingPublicKey,
@@ -1955,7 +1959,7 @@ export class TransferService extends BaseTransferService {
       await this.config.signer.getPublicKeyFromDerivation(keyDerivation);
 
     const { nodeTx: splitNodeTx, directNodeTx: splitNodeDirectTx } =
-      createZeroTimelockNodeTx(parentTx);
+      await createZeroTimelockNodeTx(parentTx, this.config.getNetwork());
 
     signingJobs.push({
       signingPublicKey,
@@ -1996,7 +2000,7 @@ export class TransferService extends BaseTransferService {
     };
 
     const { nodeTx: newNodeTx, directNodeTx: newDirectNodeTx } =
-      createInitialTimelockNodeTx(splitNodeTx);
+      await createInitialTimelockNodeTx(splitNodeTx, this.config.getNetwork());
 
     signingJobs.push({
       signingPublicKey,
@@ -2036,7 +2040,7 @@ export class TransferService extends BaseTransferService {
       cpfpRefundTx: newRefundTx,
       directRefundTx: newDirectRefundTx,
       directFromCpfpRefundTx: newDirectFromCpfpRefundTx,
-    } = createInitialTimelockRefundTxs({
+    } = await createInitialTimelockRefundTxs({
       nodeTx: newNodeTx,
       directNodeTx: newDirectNodeTx,
       receivingPubkey: signingPublicKey,
@@ -2164,7 +2168,7 @@ export class TransferService extends BaseTransferService {
     const nodeTx = getTxFromRawTxBytes(node.nodeTx);
 
     const { nodeTx: newNodeTx, directNodeTx: newDirectNodeTx } =
-      createZeroTimelockNodeTx(nodeTx);
+      await createZeroTimelockNodeTx(nodeTx, this.config.getNetwork());
 
     signingJobs.push({
       signingPublicKey,
@@ -2192,7 +2196,7 @@ export class TransferService extends BaseTransferService {
 
     // direct refund spending direct node tx
     const { cpfpRefundTx, directFromCpfpRefundTx } =
-      createInitialTimelockRefundTxs({
+      await createInitialTimelockRefundTxs({
         nodeTx: newNodeTx,
         directNodeTx: newDirectNodeTx,
         receivingPubkey: signingPublicKey,

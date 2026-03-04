@@ -147,7 +147,7 @@ export class SigningService {
       }
 
       const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-        createDecrementedTimelockRefundTxs({
+        await createDecrementedTimelockRefundTxs({
           nodeTx: nodeTx,
           directNodeTx: directNodeTx,
           sequence: currentSequence,
@@ -287,7 +287,7 @@ export class SigningService {
       }
 
       const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-        createCurrentTimelockRefundTxs({
+        await createCurrentTimelockRefundTxs({
           nodeTx,
           directNodeTx,
           sequence: currentSequence,
@@ -436,7 +436,7 @@ export class SigningService {
       }
 
       const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-        createConnectorRefundTxs({
+        await createConnectorRefundTxs({
           nodeTx,
           directNodeTx,
           sequence: currentSequence,

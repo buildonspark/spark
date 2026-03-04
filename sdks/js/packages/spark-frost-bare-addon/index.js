@@ -9,3 +9,6 @@ exports.aggregateFrost = binding.aggregateFrost;
 exports.splitSecretWithProofs = binding.splitSecretWithProofs;
 exports.recoverSecret = binding.recoverSecret;
 exports.validateShare = binding.validateShare;
+exports.constructNodeTxPair = binding.constructNodeTxPair;
+exports.constructRefundTxTrio = binding.constructRefundTxTrio;
+exports.computeMultiInputSighash = binding.computeMultiInputSighash;

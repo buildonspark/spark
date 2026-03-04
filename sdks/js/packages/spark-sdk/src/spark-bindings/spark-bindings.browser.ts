@@ -1,6 +1,9 @@
 import { bytesToHex } from "@noble/curves/utils";
 import {
   apply_adaptor_to_signature,
+  compute_multi_input_sighash,
+  construct_node_tx_pair,
+  construct_refund_tx_trio,
   create_dummy_tx,
   decrypt_ecies,
   DummyTx,
@@ -236,6 +239,60 @@ class SparkFrostBrowser extends SparkFrostBase {
       hash,
       signature,
       adaptorPrivateKeyBytes,
+    );
+  }
+
+  constructNodeTxPair(
+    parentTx: Uint8Array,
+    vout: number,
+    address: string,
+    sequence: number,
+    directSequence: number,
+    feeSats: bigint,
+  ) {
+    return construct_node_tx_pair(
+      parentTx,
+      vout,
+      address,
+      sequence,
+      directSequence,
+      feeSats,
+    );
+  }
+
+  constructRefundTxTrio(
+    cpfpNodeTx: Uint8Array,
+    directNodeTx: Uint8Array | null,
+    vout: number,
+    receivingPubkey: Uint8Array,
+    network: string,
+    sequence: number,
+    directSequence: number,
+    feeSats: bigint,
+  ) {
+    return construct_refund_tx_trio(
+      cpfpNodeTx,
+      directNodeTx,
+      vout,
+      receivingPubkey,
+      network,
+      sequence,
+      directSequence,
+      feeSats,
+    );
+  }
+
+  computeMultiInputSighash(
+    tx: Uint8Array,
+    inputIndex: number,
+    prevOutScripts: Uint8Array[],
+    prevOutValues: number[],
+  ) {
+    return compute_multi_input_sighash(
+      tx,
+      inputIndex,
+      prevOutScripts,
+      prevOutValues,
     );
   }
 }

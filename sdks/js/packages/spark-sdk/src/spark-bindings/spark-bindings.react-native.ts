@@ -215,6 +215,92 @@ class SparkFrostReactNative extends SparkFrostBase {
     });
   }
 
+  async constructNodeTxPair(
+    parentTx: Uint8Array,
+    vout: number,
+    address: string,
+    sequence: number,
+    directSequence: number,
+    feeSats: bigint,
+  ): Promise<{ cpfp: { tx: Uint8Array }; direct: { tx: Uint8Array } }> {
+    if (!SparkFrostModule) {
+      throw new Error("SparkFrostModule is not available in this environment");
+    }
+    const result = await SparkFrostModule.constructNodeTxPair({
+      parentTx: toNumberArray(parentTx),
+      vout,
+      address,
+      sequence,
+      directSequence,
+      feeSats: feeSats.toString(),
+    });
+    return {
+      cpfp: { tx: toUint8Array(result.cpfp.tx) },
+      direct: { tx: toUint8Array(result.direct.tx) },
+    };
+  }
+
+  async constructRefundTxTrio(
+    cpfpNodeTx: Uint8Array,
+    directNodeTx: Uint8Array | null,
+    vout: number,
+    receivingPubkey: Uint8Array,
+    network: string,
+    sequence: number,
+    directSequence: number,
+    feeSats: bigint,
+  ): Promise<{
+    cpfp_refund: { tx: Uint8Array };
+    direct_refund?: { tx: Uint8Array };
+    direct_from_cpfp_refund: { tx: Uint8Array };
+  }> {
+    if (!SparkFrostModule) {
+      throw new Error("SparkFrostModule is not available in this environment");
+    }
+    const result = await SparkFrostModule.constructRefundTxTrio({
+      cpfpNodeTx: toNumberArray(cpfpNodeTx),
+      directNodeTx: directNodeTx ? toNumberArray(directNodeTx) : null,
+      vout,
+      receivingPubkey: toNumberArray(receivingPubkey),
+      network,
+      sequence,
+      directSequence,
+      feeSats: feeSats.toString(),
+    });
+    const out: {
+      cpfp_refund: { tx: Uint8Array };
+      direct_refund?: { tx: Uint8Array };
+      direct_from_cpfp_refund: { tx: Uint8Array };
+    } = {
+      cpfp_refund: { tx: toUint8Array(result.cpfp_refund.tx) },
+      direct_from_cpfp_refund: {
+        tx: toUint8Array(result.direct_from_cpfp_refund.tx),
+      },
+    };
+    if (result.direct_refund) {
+      out.direct_refund = { tx: toUint8Array(result.direct_refund.tx) };
+    }
+    return out;
+  }
+
+  async computeMultiInputSighash(
+    tx: Uint8Array,
+    inputIndex: number,
+    prevOutScripts: Uint8Array[],
+    prevOutValues: number[],
+  ): Promise<Uint8Array> {
+    if (!SparkFrostModule) {
+      throw new Error("SparkFrostModule is not available in this environment");
+    }
+    const result = await SparkFrostModule.computeMultiInputSighash({
+      tx: toNumberArray(tx),
+      inputIndex,
+      prevOutScripts: prevOutScripts.map(toNumberArray),
+      prevOutValues,
+    });
+    return toUint8Array(result);
+  }
+
   private static async callNativeModule(
     method: string,
     params: any,

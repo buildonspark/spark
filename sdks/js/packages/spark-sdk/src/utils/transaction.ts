@@ -1,8 +1,13 @@
-import { hexToBytes } from "@noble/hashes/utils";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
+import { hexToBytes } from "@noble/curves/utils";
 import { SparkValidationError } from "../errors/types.js";
-import { getP2TRScriptFromPublicKey, getTxId } from "./bitcoin.js";
+import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
+import {
+  getP2TRAddressFromPkScript,
+  getTxFromRawTxBytes,
+  getTxId,
+} from "./bitcoin.js";
 import { Network } from "./network.js";
 
 const INITIAL_TIMELOCK = 2000;
@@ -26,6 +31,20 @@ const ESTIMATED_TX_SIZE = 191;
 const DEFAULT_SATS_PER_VBYTE = 5;
 export const DEFAULT_FEE_SATS = ESTIMATED_TX_SIZE * DEFAULT_SATS_PER_VBYTE;
 
+function networkToString(network: Network): string {
+  switch (network) {
+    case Network.MAINNET:
+      return "mainnet";
+    case Network.TESTNET:
+      return "testnet";
+    case Network.SIGNET:
+      return "signet";
+    case Network.REGTEST:
+    case Network.LOCAL:
+      return "regtest";
+  }
+}
+
 /**
  * Subtracts the default fee from the amount if it's greater than the fee.
  * Returns the original amount if it's less than or equal to the fee.
@@ -37,62 +56,22 @@ export function maybeApplyFee(amount: bigint): bigint {
   return amount;
 }
 
-interface CreateNodeTxInput {
-  sequence: number;
-  txOut: TransactionOutput;
-  parentOutPoint: TransactionInput;
-  applyFee?: boolean;
-  includeAnchor?: boolean;
-}
-// createNodeTx creates a node transaction.
-// This stands in between a split tx and a leaf node tx,
-// and has no timelock.
-function createNodeTx({
-  sequence,
-  txOut,
-  parentOutPoint,
-  applyFee,
-  includeAnchor,
-}: CreateNodeTxInput): Transaction {
-  const nodeTx = new Transaction({
-    version: 3,
-    allowUnknownOutputs: true,
-  });
-  nodeTx.addInput({
-    ...parentOutPoint,
-    sequence,
-  });
-
-  if (applyFee) {
-    nodeTx.addOutput({
-      script: txOut.script,
-      amount: maybeApplyFee(txOut.amount ?? 0n),
-    });
-  } else {
-    nodeTx.addOutput(txOut);
-  }
-
-  if (includeAnchor) {
-    nodeTx.addOutput(getEphemeralAnchorOutput());
-  }
-
-  return nodeTx;
-}
-
-function createNodeTxs({
+async function createNodeTxs({
   parentTx,
   sequence,
   directSequence,
   vout,
+  network,
 }: {
   parentTx: Transaction;
   sequence: number;
   directSequence?: number;
   vout: number;
-}): {
+  network: Network;
+}): Promise<{
   nodeTx: Transaction;
   directNodeTx: Transaction;
-} {
+}> {
   const parentOutput = parentTx.getOutput(vout);
   if (!parentOutput.amount || !parentOutput.script) {
     throw new SparkValidationError("Parent output amount or script not found", {
@@ -100,71 +79,75 @@ function createNodeTxs({
       value: parentOutput,
     });
   }
-  const output = {
-    script: parentOutput.script,
-    amount: parentOutput.amount,
-  };
 
-  const input = {
-    txid: hexToBytes(getTxId(parentTx)!),
-    index: vout,
-  };
+  const address = getP2TRAddressFromPkScript(parentOutput.script, network);
+  const actualDirectSequence =
+    directSequence ?? sequence + DIRECT_TIMELOCK_OFFSET;
 
-  const nodeTx = createNodeTx({
+  const sparkFrost = getSparkFrost();
+  const result = await sparkFrost.constructNodeTxPair(
+    parentTx.toBytes(true),
+    vout,
+    address,
     sequence,
-    txOut: output,
-    parentOutPoint: input,
-    includeAnchor: true,
-  });
+    actualDirectSequence,
+    BigInt(DEFAULT_FEE_SATS),
+  );
 
-  const directNodeTx = createNodeTx({
-    sequence: directSequence ?? sequence + DIRECT_TIMELOCK_OFFSET,
-    txOut: output,
-    parentOutPoint: input,
-    includeAnchor: false,
-    applyFee: true,
-  });
+  const nodeTx = getTxFromRawTxBytes(result.cpfp.tx);
+  const directNodeTx = getTxFromRawTxBytes(result.direct.tx);
 
   return { nodeTx, directNodeTx };
 }
 
-export function createRootNodeTx(
+export async function createRootNodeTx(
   parentTx: Transaction,
   vout: number,
-): {
+  network: Network,
+): Promise<{
   nodeTx: Transaction;
   directNodeTx: Transaction;
-} {
+}> {
   return createNodeTxs({
     parentTx,
     sequence: INITIAL_ROOT_NODE_SEQUENCE,
     vout,
+    network,
   });
 }
 
-export function createZeroTimelockNodeTx(parentTx: Transaction): {
+export async function createZeroTimelockNodeTx(
+  parentTx: Transaction,
+  network: Network,
+): Promise<{
   nodeTx: Transaction;
   directNodeTx: Transaction;
-} {
+}> {
   return createNodeTxs({
     parentTx,
     sequence: INITIAL_ROOT_NODE_SEQUENCE,
     directSequence: DIRECT_TIMELOCK_OFFSET,
     vout: 0,
+    network,
   });
 }
 
-export function createInitialTimelockNodeTx(parentTx: Transaction) {
+export async function createInitialTimelockNodeTx(
+  parentTx: Transaction,
+  network: Network,
+) {
   return createNodeTxs({
     parentTx,
     sequence: INITIAL_SEQUENCE,
     vout: 0,
+    network,
   });
 }
 
-export function createDecrementedTimelockNodeTx(
+export async function createDecrementedTimelockNodeTx(
   parentTx: Transaction,
   currentTx: Transaction,
+  network: Network,
 ) {
   const currentSequence = currentTx.getInput(0).sequence;
   if (!currentSequence) {
@@ -178,12 +161,14 @@ export function createDecrementedTimelockNodeTx(
     parentTx,
     sequence: getNextTransactionSequence(currentSequence).nextSequence,
     vout: 0,
+    network,
   });
 }
 
-export function createTestUnilateralTimelockNodeTx(
+export async function createTestUnilateralTimelockNodeTx(
   parentTx: Transaction,
   nodeTx: Transaction,
+  network: Network,
 ) {
   const sequence = nodeTx.getInput(0).sequence;
   if (!sequence) {
@@ -197,52 +182,8 @@ export function createTestUnilateralTimelockNodeTx(
     parentTx,
     sequence: isBit30Defined | TEST_UNILATERAL_TIMELOCK,
     vout: 0,
+    network,
   });
-}
-interface CreateRefundTxInput {
-  sequence: number;
-  input: TransactionInput;
-  amountSats: bigint;
-  receivingPubkey: Uint8Array;
-  network: Network;
-  shouldCalculateFee: boolean;
-  includeAnchor: boolean;
-}
-function createRefundTx({
-  sequence,
-  input,
-  amountSats,
-  receivingPubkey,
-  network,
-  shouldCalculateFee,
-  includeAnchor,
-}: CreateRefundTxInput): Transaction {
-  const refundTx = new Transaction({
-    version: 3,
-    allowUnknownOutputs: true,
-  });
-  refundTx.addInput({
-    ...input,
-    sequence,
-  });
-
-  const refundPkScript = getP2TRScriptFromPublicKey(receivingPubkey, network);
-
-  let outputAmount = amountSats;
-  if (shouldCalculateFee) {
-    outputAmount = maybeApplyFee(amountSats);
-  }
-
-  refundTx.addOutput({
-    script: refundPkScript,
-    amount: outputAmount,
-  });
-
-  if (includeAnchor) {
-    refundTx.addOutput(getEphemeralAnchorOutput());
-  }
-
-  return refundTx;
 }
 
 export function getNextHTLCTransactionSequence(
@@ -302,15 +243,14 @@ interface RefundTxs {
   directFromCpfpRefundTx?: Transaction;
 }
 
-function createRefundTxs({
+async function createRefundTxs({
   nodeTx,
   directNodeTx,
   receivingPubkey,
   network,
   sequence,
   enforceTimelocks = false,
-}: RefundTxWithSequenceParams): RefundTxs {
-  // When we claim, we should enforce the timelock to be X00 or X50.
+}: RefundTxWithSequenceParams): Promise<RefundTxs> {
   if (enforceTimelocks) {
     let currentTimelock = getCurrentTimelock(sequence);
     const remainder = currentTimelock % TIME_LOCK_INTERVAL;
@@ -320,83 +260,48 @@ function createRefundTxs({
 
     sequence = (currentTimelock & 0xffff) | ((sequence & (1 << 30)) >>> 0);
   }
-  const refundInput: TransactionInput = {
-    txid: hexToBytes(getTxId(nodeTx)!),
-    index: 0,
-  };
 
-  const nodeAmountSats = nodeTx.getOutput(0).amount;
-  if (nodeAmountSats === undefined) {
-    throw new SparkValidationError("Node amount not found", {
-      field: "nodeAmountSats",
-      value: nodeAmountSats,
-    });
-  }
+  const directSequence = sequence + DIRECT_TIMELOCK_OFFSET;
+  const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
 
-  let directRefundTx: Transaction | undefined;
-  if (directNodeTx) {
-    const directRefundInput: TransactionInput = {
-      txid: hexToBytes(getTxId(directNodeTx)),
-      index: 0,
-    };
+  const directNodeTxBytes =
+    directNodeTx && !isZeroNode ? directNodeTx.toBytes(true) : null;
 
-    const directAmountSats = directNodeTx.getOutput(0).amount;
-    if (directAmountSats === undefined) {
-      throw new SparkValidationError("Direct amount not found", {
-        field: "directAmountSats",
-        value: directAmountSats,
-      });
-    }
-
-    const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
-    if (!isZeroNode) {
-      directRefundTx = createRefundTx({
-        sequence: sequence + DIRECT_TIMELOCK_OFFSET,
-        input: directRefundInput,
-        amountSats: directAmountSats,
-        receivingPubkey,
-        network,
-        shouldCalculateFee: true,
-        includeAnchor: false,
-      });
-    }
-  }
-
-  const cpfpRefundTx = createRefundTx({
-    sequence: sequence,
-    input: refundInput,
-    amountSats: nodeAmountSats,
+  const sparkFrost = getSparkFrost();
+  const result = await sparkFrost.constructRefundTxTrio(
+    nodeTx.toBytes(true),
+    directNodeTxBytes,
+    0,
     receivingPubkey,
-    network,
-    shouldCalculateFee: false,
-    includeAnchor: true,
-  });
+    networkToString(network),
+    sequence,
+    directSequence,
+    BigInt(DEFAULT_FEE_SATS),
+  );
 
-  const directFromCpfpRefundTx = createRefundTx({
-    sequence: sequence + DIRECT_TIMELOCK_OFFSET,
-    input: refundInput,
-    amountSats: nodeAmountSats,
-    receivingPubkey,
-    network,
-    shouldCalculateFee: true,
-    includeAnchor: false,
-  });
+  const cpfpRefundTx = getTxFromRawTxBytes(result.cpfp_refund.tx);
+  const directRefundTx = result.direct_refund
+    ? getTxFromRawTxBytes(result.direct_refund.tx)
+    : undefined;
+  const directFromCpfpRefundTx = getTxFromRawTxBytes(
+    result.direct_from_cpfp_refund.tx,
+  );
 
   return { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx };
 }
 
-export function createInitialTimelockRefundTxs(
+export async function createInitialTimelockRefundTxs(
   params: RefundTxParams,
-): RefundTxs {
+): Promise<RefundTxs> {
   return createRefundTxs({
     ...params,
     sequence: INITIAL_SEQUENCE,
   });
 }
 
-export function createDecrementedTimelockRefundTxs(
+export async function createDecrementedTimelockRefundTxs(
   params: RefundTxWithSequenceParams,
-): RefundTxs {
+): Promise<RefundTxs> {
   const nextSequence = getNextTransactionSequence(params.sequence).nextSequence;
 
   return createRefundTxs({
@@ -405,30 +310,30 @@ export function createDecrementedTimelockRefundTxs(
   });
 }
 
-export function createCurrentTimelockRefundTxs(
+export async function createCurrentTimelockRefundTxs(
   params: RefundTxWithSequenceParams,
-): RefundTxs {
+): Promise<RefundTxs> {
   return createRefundTxs({
     ...params,
     enforceTimelocks: true,
   });
 }
 
-export function createTestUnilateralRefundTxs(
+export async function createTestUnilateralRefundTxs(
   params: RefundTxParams,
-): RefundTxs {
+): Promise<RefundTxs> {
   return createRefundTxs({
     ...params,
     sequence: TEST_UNILATERAL_SEQUENCE,
   });
 }
 
-export function createConnectorRefundTxs(
+export async function createConnectorRefundTxs(
   params: RefundTxWithSequenceAndConnectorOutputParams,
-): RefundTxs {
+): Promise<RefundTxs> {
   const { connectorOutput, ...baseParams } = params;
   const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-    createDecrementedTimelockRefundTxs(baseParams);
+    await createDecrementedTimelockRefundTxs(baseParams);
 
   cpfpRefundTx.addInput(connectorOutput);
   if (directRefundTx) {
