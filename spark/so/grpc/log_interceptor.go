@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/peer"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -142,18 +140,8 @@ func NewGRPCClientInfoProvider(xffClientIpPosition int) *GRPCClientInfoProvider 
 }
 
 func (g *GRPCClientInfoProvider) GetClientIP(ctx context.Context) (string, error) {
-	if clientIP, err := middleware.GetClientIpFromHeader(ctx, g.xffClientIpPosition); err == nil {
-		return clientIP, nil
+	if ip := middleware.GetClientIP(ctx, g.xffClientIpPosition); ip != "" {
+		return ip, nil
 	}
-
-	// If we can't get the client IP from the header, just fall back to the peer.
-	if p, ok := peer.FromContext(ctx); ok {
-		if ip, _, err := net.SplitHostPort(p.Addr.String()); err == nil {
-			return ip, nil
-		} else {
-			return p.Addr.String(), nil
-		}
-	}
-
 	return "", errors.InternalObjectMissingField(fmt.Errorf("no client IP found in header or peer context"))
 }

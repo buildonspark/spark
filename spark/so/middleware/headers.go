@@ -3,11 +3,43 @@ package middleware
 import (
 	"context"
 	"errors"
+	"net"
 	"strings"
 
 	"github.com/lightsparkdev/spark/common/logging"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 )
+
+// GetClientIP returns the client IP address from the request context. It first
+// tries the x-forwarded-for header (for production behind an ALB). If XFF is
+// entirely absent (e.g., local dev without ALB), it falls back to the gRPC peer
+// address. If XFF is present but parsing fails (misconfigured position), it does
+// NOT fall back — that's a configuration error that should surface loudly.
+func GetClientIP(ctx context.Context, xffClientIpPosition int) string {
+	if ip, err := GetClientIpFromHeader(ctx, xffClientIpPosition); err == nil && ip != "" {
+		return ip
+	}
+
+	if !hasXForwardedForHeader(ctx) {
+		if p, ok := peer.FromContext(ctx); ok {
+			if ip, _, err := net.SplitHostPort(p.Addr.String()); err == nil {
+				return ip
+			}
+			return p.Addr.String()
+		}
+	}
+
+	return ""
+}
+
+func hasXForwardedForHeader(ctx context.Context) bool {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return false
+	}
+	return len(md.Get("x-forwarded-for")) > 0
+}
 
 func GetClientIpFromHeader(ctx context.Context, xffClientIpPosition int) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
