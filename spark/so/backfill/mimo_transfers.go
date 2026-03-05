@@ -3,8 +3,11 @@ package backfill
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so"
@@ -13,8 +16,23 @@ import (
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
+	"github.com/lightsparkdev/spark/so/ent/transfersender"
 	"go.uber.org/zap"
 )
+
+const initScanBatchSize = 10000
+
+var (
+	backfillMu     sync.Mutex
+	backfillCursor time.Time // zero = uninitialized
+	lastSeenID     uuid.UUID // tiebreaker for keyset pagination in initBackfillCursor
+)
+
+// resetBackfillState resets the cursor state for testing.
+func resetBackfillState() {
+	backfillCursor = time.Time{}
+	lastSeenID = uuid.UUID{}
+}
 
 // BackfillMimoResult holds the results of both backfill operations.
 type BackfillMimoResult struct {
@@ -28,6 +46,11 @@ type BackfillMimoResult struct {
 //  2. Syncs stale TransferReceiver statuses for receivers created before
 //     dual-write status updates were enabled.
 func BackfillMimoTransfers(ctx context.Context, config *so.Config, batchSize int) (BackfillMimoResult, error) {
+	if !backfillMu.TryLock() {
+		return BackfillMimoResult{}, nil
+	}
+	defer backfillMu.Unlock()
+
 	created, err := backfillCreateMimoRecords(ctx, batchSize)
 	if err != nil {
 		return BackfillMimoResult{}, fmt.Errorf("backfill create records: %w", err)
@@ -44,9 +67,89 @@ func BackfillMimoTransfers(ctx context.Context, config *so.Config, batchSize int
 	}, nil
 }
 
+// initBackfillCursor scans forward through transfers ordered by update_time
+// to find the first transfer without a TransferSender record, setting the
+// cursor to its update_time. If all transfers have senders, cursor is set to
+// now (nothing left to backfill).
+//
+// This isn't super efficient, but it's a one-time (per deployment) no-lock scan and
+// works best for this use case to avoid timeouts with expensive full-table anti-join queries.
+func initBackfillCursor(ctx context.Context, db *ent.Client, batchSize int) error {
+	cursor := backfillCursor
+	lastID := lastSeenID
+
+	for {
+		query := db.Transfer.Query().
+			Where(
+				enttransfer.NetworkNEQ(btcnetwork.Unspecified),
+			).
+			Order(enttransfer.ByUpdateTime(sql.OrderAsc()), enttransfer.ByID(sql.OrderAsc())).
+			Limit(batchSize)
+
+		// Keyset pagination: pick up either at a later timestamp, or at
+		// the same timestamp with a higher ID. This avoids skipping
+		// records when multiple transfers share the same update_time
+		// (pure GT on timestamp would jump past all of them).
+		if !cursor.IsZero() {
+			query = query.Where(
+				enttransfer.Or(
+					enttransfer.UpdateTimeGT(cursor),
+					enttransfer.And(
+						enttransfer.UpdateTimeEQ(cursor),
+						enttransfer.IDGT(lastID),
+					),
+				),
+			)
+		}
+
+		transfers, err := query.All(ctx)
+		if err != nil {
+			return fmt.Errorf("init cursor scan: %w", err)
+		}
+
+		if len(transfers) == 0 {
+			// All transfers have been scanned; everything is backfilled.
+			backfillCursor = time.Now()
+			return nil
+		}
+
+		ids := make([]uuid.UUID, len(transfers))
+		for i, t := range transfers {
+			ids[i] = t.ID
+		}
+
+		var existingIDs []uuid.UUID
+		err = db.TransferSender.Query().
+			Where(transfersender.TransferIDIn(ids...)).
+			Select(transfersender.FieldTransferID).
+			Scan(ctx, &existingIDs)
+		if err != nil {
+			return fmt.Errorf("init cursor sender check: %w", err)
+		}
+
+		existingSet := make(map[uuid.UUID]bool, len(existingIDs))
+		for _, id := range existingIDs {
+			existingSet[id] = true
+		}
+
+		for _, t := range transfers {
+			if !existingSet[t.ID] {
+				backfillCursor = t.UpdateTime
+				lastSeenID = t.ID
+				return nil
+			}
+		}
+
+		// Entire batch had senders; advance past it.
+		last := transfers[len(transfers)-1]
+		cursor = last.UpdateTime
+		lastID = last.ID
+	}
+}
+
 // backfillCreateMimoRecords finds Transfers without TransferSender records and
 // creates the corresponding TransferSender, TransferReceiver, and TransferLeaf
-// associations.
+// associations. Uses a cursor to avoid scanning from the beginning of the table.
 func backfillCreateMimoRecords(ctx context.Context, batchSize int) (int, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
@@ -55,14 +158,22 @@ func backfillCreateMimoRecords(ctx context.Context, batchSize int) (int, error) 
 		return 0, fmt.Errorf("failed to get db from context: %w", err)
 	}
 
+	if backfillCursor.IsZero() {
+		if err := initBackfillCursor(ctx, db, initScanBatchSize); err != nil {
+			return 0, fmt.Errorf("failed to init backfill cursor: %w", err)
+		}
+	}
+
+	// The anti-join is acceptable here because the cursor narrows the scan
+	// window and the limit caps the result set.
 	transfers, err := db.Transfer.Query().
 		Where(
+			enttransfer.UpdateTimeGTE(backfillCursor),
 			enttransfer.Not(enttransfer.HasTransferSenders()),
 			enttransfer.NetworkNEQ(btcnetwork.Unspecified),
 		).
-		Order(enttransfer.ByCreateTime(sql.OrderAsc())).
+		Order(enttransfer.ByUpdateTime(sql.OrderAsc())).
 		Limit(batchSize).
-		ForUpdate(sql.WithLockAction(sql.SkipLocked)).
 		All(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query transfers without senders: %w", err)
@@ -113,6 +224,12 @@ func backfillCreateMimoRecords(ctx context.Context, batchSize int) (int, error) 
 		}
 
 		processed++
+	}
+
+	// Advance cursor only when the entire batch succeeded; the anti-join
+	// filters already-processed transfers on the next run regardless.
+	if processed == len(transfers) {
+		backfillCursor = transfers[len(transfers)-1].UpdateTime
 	}
 
 	return processed, nil

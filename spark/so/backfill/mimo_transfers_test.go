@@ -158,6 +158,7 @@ func createTestEntitiesForBackfill(
 
 func TestBackfillMimoTransfers(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
+	resetBackfillState()
 
 	rng := rand.NewChaCha8([32]byte{})
 
@@ -167,6 +168,9 @@ func TestBackfillMimoTransfers(t *testing.T) {
 		assert.Equal(t, 0, result.TransfersCreated)
 		assert.Equal(t, 0, result.ReceiverStatusesUpdated)
 	})
+
+	// Reset cursor so subsequent subtests start fresh.
+	resetBackfillState()
 
 	t.Run("backfills sender initiated transfer", func(t *testing.T) {
 		transfer := createTestEntitiesForBackfill(t, ctx, rng, st.TransferStatusSenderInitiated, nil, 1)
@@ -244,6 +248,7 @@ func TestBackfillMimoTransfers(t *testing.T) {
 	})
 
 	t.Run("respects batch size", func(t *testing.T) {
+		resetBackfillState()
 		createTestEntitiesForBackfill(t, ctx, rng, st.TransferStatusSenderInitiated, nil, 1)
 		createTestEntitiesForBackfill(t, ctx, rng, st.TransferStatusCompleted, nil, 1)
 		createTestEntitiesForBackfill(t, ctx, rng, st.TransferStatusReceiverKeyTweaked, nil, 1)
@@ -258,6 +263,7 @@ func TestBackfillMimoTransfers(t *testing.T) {
 	})
 
 	t.Run("skips transfers with UNSPECIFIED network", func(t *testing.T) {
+		resetBackfillState()
 		client, err := ent.GetDbFromContext(ctx)
 		require.NoError(t, err)
 
@@ -285,8 +291,50 @@ func TestBackfillMimoTransfers(t *testing.T) {
 	})
 }
 
+func TestBackfillMimoTransfers_TryLock(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	resetBackfillState()
+
+	// Hold the mutex to simulate a concurrent run.
+	backfillMu.Lock()
+	defer backfillMu.Unlock()
+
+	result, err := BackfillMimoTransfers(ctx, nil, 1000)
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.TransfersCreated)
+	assert.Equal(t, 0, result.ReceiverStatusesUpdated)
+}
+
+func TestBackfillMimoTransfers_CursorAdvancement(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	resetBackfillState()
+
+	rng := rand.NewChaCha8([32]byte{99})
+
+	// Create three transfers.
+	createTestEntitiesForBackfill(t, ctx, rng, st.TransferStatusSenderInitiated, nil, 1)
+	createTestEntitiesForBackfill(t, ctx, rng, st.TransferStatusCompleted, nil, 1)
+	createTestEntitiesForBackfill(t, ctx, rng, st.TransferStatusReceiverKeyTweaked, nil, 1)
+
+	// Backfill with batch size 2 — should process two transfers.
+	result, err := BackfillMimoTransfers(ctx, nil, 2)
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.TransfersCreated)
+
+	// Cursor should have advanced; second call picks up the remaining transfer.
+	result, err = BackfillMimoTransfers(ctx, nil, 2)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.TransfersCreated)
+
+	// No more transfers to backfill.
+	result, err = BackfillMimoTransfers(ctx, nil, 2)
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.TransfersCreated)
+}
+
 func TestBackfillMimoTransfers_SyncsReceiverStatuses(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
+	resetBackfillState()
 
 	rng := rand.NewChaCha8([32]byte{42})
 
