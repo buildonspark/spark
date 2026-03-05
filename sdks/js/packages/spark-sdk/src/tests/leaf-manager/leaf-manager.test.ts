@@ -2646,4 +2646,154 @@ describe("LeafManager Test", () => {
       expect(lm.getLeafRecordPublic("l1")?.status).toBe("OUTGOING");
     });
   });
+
+  // ── handleDepositEvent ───────────────────────────────────────────────
+
+  describe("handleDepositEvent", () => {
+    it("adds CREATING deposit as INCOMING", async () => {
+      const lm = createTestableLeafManager();
+      const deposit = createMockTreeNode({
+        id: "dep-1",
+        value: 1000,
+        status: "CREATING",
+      });
+
+      await lm.handleDepositEvent(deposit);
+
+      expect(lm.getLeafRecordPublic("dep-1")?.status).toBe("INCOMING");
+      expect(lm.getLeafRecordPublic("dep-1")?.source).toEqual({
+        kind: "deposit",
+        depositId: "dep-1",
+      });
+      expect(lm.getIncomingBalance()).toBe(1000);
+    });
+
+    it("does not overwrite existing leaf with CREATING deposit", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "dep-1", value: 1000 })]);
+
+      await lm.handleDepositEvent(
+        createMockTreeNode({ id: "dep-1", value: 1000, status: "CREATING" }),
+      );
+
+      // Should still be AVAILABLE — not overwritten to INCOMING
+      expect(lm.getLeafRecordPublic("dep-1")?.status).toBe("AVAILABLE");
+    });
+
+    it("adds AVAILABLE deposit as new leaf", async () => {
+      const lm = createTestableLeafManager();
+      const deposit = createMockTreeNode({
+        id: "dep-1",
+        value: 1000,
+        status: "AVAILABLE",
+      });
+
+      await lm.handleDepositEvent(deposit);
+
+      expect(lm.getLeafRecordPublic("dep-1")?.status).toBe("AVAILABLE");
+      expect(lm.getLeafRecordPublic("dep-1")?.source).toEqual({
+        kind: "deposit",
+        depositId: "dep-1",
+      });
+      expect(lm.getAvailableBalance()).toBe(1000);
+    });
+
+    it("transitions existing INCOMING leaf to AVAILABLE on confirmed deposit", async () => {
+      const lm = createTestableLeafManager();
+
+      // First: deposit arrives as CREATING → INCOMING
+      await lm.handleDepositEvent(
+        createMockTreeNode({ id: "dep-1", value: 1000, status: "CREATING" }),
+      );
+      expect(lm.getLeafRecordPublic("dep-1")?.status).toBe("INCOMING");
+
+      // Then: deposit confirms → AVAILABLE
+      await lm.handleDepositEvent(
+        createMockTreeNode({ id: "dep-1", value: 1000, status: "AVAILABLE" }),
+      );
+      expect(lm.getLeafRecordPublic("dep-1")?.status).toBe("AVAILABLE");
+      expect(lm.getAvailableBalance()).toBe(1000);
+      expect(lm.getIncomingBalance()).toBe(0);
+    });
+
+    it("ignores deposits with unhandled statuses", async () => {
+      const lm = createTestableLeafManager();
+
+      await lm.handleDepositEvent(
+        createMockTreeNode({ id: "dep-1", value: 1000, status: "SPENT" }),
+      );
+
+      expect(lm.getLeafRecordPublic("dep-1")).toBeUndefined();
+      expect(lm.getAvailableBalance()).toBe(0);
+    });
+
+    it("does not re-transition already AVAILABLE leaf", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "dep-1", value: 1000 })]);
+
+      // Source before is { kind: "none" } from addLeaves
+      const sourceBefore = lm.getLeafRecordPublic("dep-1")?.source;
+
+      await lm.handleDepositEvent(
+        createMockTreeNode({ id: "dep-1", value: 1000, status: "AVAILABLE" }),
+      );
+
+      // Should still be AVAILABLE, source unchanged (transition is a no-op)
+      expect(lm.getLeafRecordPublic("dep-1")?.status).toBe("AVAILABLE");
+      expect(lm.getLeafRecordPublic("dep-1")?.source).toEqual(sourceBefore);
+    });
+
+    it("emits balance update", async () => {
+      const callback = jest.fn();
+      const lm = createTestableLeafManager({ onBalanceUpdate: callback });
+
+      await lm.handleDepositEvent(
+        createMockTreeNode({ id: "dep-1", value: 500, status: "AVAILABLE" }),
+      );
+
+      expect(callback).toHaveBeenCalledWith({
+        available: 500,
+        owned: 500,
+        incoming: 0,
+      });
+    });
+
+    it("does not overwrite LOCAL_LOCKED leaf on AVAILABLE deposit", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "dep-1", value: 1000 })]);
+      lm.transitionPublic(["dep-1"], "LOCAL_LOCKED");
+
+      await lm.handleDepositEvent(
+        createMockTreeNode({ id: "dep-1", value: 1000, status: "AVAILABLE" }),
+      );
+
+      expect(lm.getLeafRecordPublic("dep-1")?.status).toBe("LOCAL_LOCKED");
+    });
+
+    it("does not overwrite OUTGOING leaf on AVAILABLE deposit", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "dep-1", value: 1000 })]);
+      lm.transitionPublic(["dep-1"], "LOCAL_LOCKED");
+      lm.transitionPublic(["dep-1"], "OUTGOING");
+
+      await lm.handleDepositEvent(
+        createMockTreeNode({ id: "dep-1", value: 1000, status: "AVAILABLE" }),
+      );
+
+      expect(lm.getLeafRecordPublic("dep-1")?.status).toBe("OUTGOING");
+    });
+
+    it("does not overwrite SWAP_PENDING leaf on AVAILABLE deposit", async () => {
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "dep-1", value: 1000 })]);
+      lm.transitionPublic(["dep-1"], "LOCAL_LOCKED");
+      lm.transitionPublic(["dep-1"], "SWAP_PENDING");
+
+      await lm.handleDepositEvent(
+        createMockTreeNode({ id: "dep-1", value: 1000, status: "AVAILABLE" }),
+      );
+
+      expect(lm.getLeafRecordPublic("dep-1")?.status).toBe("SWAP_PENDING");
+    });
+  });
 });

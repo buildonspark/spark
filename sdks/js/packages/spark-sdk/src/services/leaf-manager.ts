@@ -488,6 +488,43 @@ export default class LeafManager {
     }
   }
 
+  public async handleDepositEvent(deposit: TreeNode) {
+    await this.leavesMutex.runExclusive(() => {
+      if (deposit.status === "CREATING") {
+        // Unconfirmed deposit — track as INCOMING so it shows in incoming balance.
+        // Don't overwrite if we already have a more advanced status for this leaf.
+        const existing = this.leaves.get(deposit.id);
+        if (!existing) {
+          this.leaves.set(deposit.id, {
+            treeNode: deposit,
+            status: LeafStatus.INCOMING,
+            source: { kind: "deposit", depositId: deposit.id },
+          });
+          this.emitBalanceUpdate();
+        }
+      } else if (deposit.status === "AVAILABLE") {
+        const existing = this.leaves.get(deposit.id);
+        if (existing) {
+          if (
+            !IN_FLIGHT_STATUSES.has(existing.status) &&
+            existing.status !== LeafStatus.AVAILABLE
+          ) {
+            existing.treeNode = deposit;
+            this.transition([deposit.id], LeafStatus.AVAILABLE);
+            this.emitBalanceUpdate();
+          }
+        } else {
+          this.leaves.set(deposit.id, {
+            treeNode: deposit,
+            status: LeafStatus.AVAILABLE,
+            source: { kind: "deposit", depositId: deposit.id },
+          });
+          this.emitBalanceUpdate();
+        }
+      }
+    });
+  }
+
   public async handleTransferEvent(transfer: Transfer) {
     if (
       !this.identityPublicKey ||
@@ -499,6 +536,7 @@ export default class LeafManager {
       leaf.leaf ? [leaf.leaf.id] : [],
     );
 
+    let changed = false;
     await this.leavesMutex.runExclusive(() => {
       const source: LeafSource = { kind: "transfer", transferId: transfer.id };
       switch (transfer.status) {
@@ -506,9 +544,11 @@ export default class LeafManager {
           this.transition(leafIds, LeafStatus.AVAILABLE, {
             source: { kind: "none" },
           });
+          changed = true;
           break;
         case TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED:
           this.transition(leafIds, LeafStatus.SPENT, { source });
+          changed = true;
           break;
         case TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING:
         case TransferStatus.TRANSFER_STATUS_SENDER_INITIATED:
@@ -522,11 +562,12 @@ export default class LeafManager {
             isSwap ? LeafStatus.SWAP_PENDING : LeafStatus.OUTGOING,
             { source },
           );
+          changed = true;
           break;
         }
       }
     });
-    this.emitBalanceUpdate();
+    if (changed) this.emitBalanceUpdate();
   }
 
   /** Read-only leaf selection for queries (fee quotes, etc). Does NOT lock leaves. */
