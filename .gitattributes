@@ -31,6 +31,9 @@ signer/Cargo.lock linguist-generated=true
 spark/go.sum linguist-generated=true
 tools/vanity-token-generator/go.sum linguist-generated=true
 
+# Claude plans
+.claude/plans/** linguist-generated=true
+
 # Atlas migration checksum
 # spark/so/ent/migrate/migrations/atlas.sum linguist-generated=true
 
