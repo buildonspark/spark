@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
 
@@ -571,13 +573,15 @@ func (r *RateLimiter) buildDimensions(ctx context.Context) ([]rateLimitDimension
 
 	if v, err := GetClientIpFromHeader(ctx, r.config.XffClientIpPosition); err == nil && v != "" {
 		clientIP = v
+	} else if p, ok := peer.FromContext(ctx); ok {
+		// Fall back to peer IP when XFF header is unavailable (e.g., local dev without ALB).
+		if ip, _, err := net.SplitHostPort(p.Addr.String()); err == nil {
+			clientIP = ip
+		} else {
+			clientIP = p.Addr.String()
+		}
 	}
 
-	// Unconditionally reject requests that have no client identifier at all,
-	// regardless of whether rate limits are configured for the method.
-	// Every request through this interceptor must carry an IP or session —
-	// in production the ALB always sets x-forwarded-for and authenticated RPCs have sessions,
-	// so this should not be reachable under normal operation.
 	if identityHex == "" && clientIP == "" {
 		return nil, status.Errorf(codes.Internal, "no client identifier available for rate limiting")
 	}
