@@ -4,6 +4,8 @@ import { SparkValidationError } from "../errors/index.js";
 import {
   QueryNodesRequest,
   QueryNodesResponse,
+  Transfer,
+  TransferStatus,
   TransferType,
   TreeNode,
   TreeNodeStatus,
@@ -95,7 +97,7 @@ export default class LeafManager {
   // (restoreLocalLockedToAvailable) do not acquire — JS single-threading guarantees
   // synchronous iterations can't be interleaved.
   private leavesMutex = new Mutex();
-
+  private identityPublicKey: Uint8Array | undefined;
   constructor(
     private readonly config: WalletConfigService,
     private readonly swapService: SwapService,
@@ -114,6 +116,8 @@ export default class LeafManager {
 
   // #region Public API
   public async sync() {
+    this.identityPublicKey = await this.config.signer.getIdentityPublicKey();
+
     const [rawLeaves, swaps, outgoingTransfers, incomingTransfers] =
       await Promise.all([
         this.getLeaves(),
@@ -482,6 +486,47 @@ export default class LeafManager {
       this.restoreLocalLockedToAvailable(lockedIds);
       throw error;
     }
+  }
+
+  public async handleTransferEvent(transfer: Transfer) {
+    if (
+      !this.identityPublicKey ||
+      !equalBytes(transfer.senderIdentityPublicKey, this.identityPublicKey)
+    ) {
+      return;
+    }
+    const leafIds = transfer.leaves.flatMap((leaf) =>
+      leaf.leaf ? [leaf.leaf.id] : [],
+    );
+
+    await this.leavesMutex.runExclusive(() => {
+      const source: LeafSource = { kind: "transfer", transferId: transfer.id };
+      switch (transfer.status) {
+        case TransferStatus.TRANSFER_STATUS_RETURNED:
+          this.transition(leafIds, LeafStatus.AVAILABLE, {
+            source: { kind: "none" },
+          });
+          break;
+        case TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED:
+          this.transition(leafIds, LeafStatus.SPENT, { source });
+          break;
+        case TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING:
+        case TransferStatus.TRANSFER_STATUS_SENDER_INITIATED:
+        case TransferStatus.TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR:
+        case TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK: {
+          const isSwap =
+            transfer.type === TransferType.PRIMARY_SWAP_V3 ||
+            transfer.type === TransferType.SWAP;
+          this.transition(
+            leafIds,
+            isSwap ? LeafStatus.SWAP_PENDING : LeafStatus.OUTGOING,
+            { source },
+          );
+          break;
+        }
+      }
+    });
+    this.emitBalanceUpdate();
   }
 
   /** Read-only leaf selection for queries (fee quotes, etc). Does NOT lock leaves. */

@@ -3,6 +3,8 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   QueryNodesRequest,
   QueryNodesResponse,
+  Transfer,
+  TransferStatus,
   TransferType,
   TreeNode,
 } from "../../proto/spark.js";
@@ -999,6 +1001,10 @@ describe("LeafManager Test", () => {
   // ── Sync ─────────────────────────────────────────────────────────────
 
   describe("sync", () => {
+    const SYNC_SIGNER = {
+      getIdentityPublicKey: jest.fn(async () => new Uint8Array(33).fill(0x02)),
+    };
+
     function mockSyncDeps(
       lm: TestableLeafManager,
       opts: {
@@ -1040,7 +1046,20 @@ describe("LeafManager Test", () => {
       const outgoingLeaf = createMockTreeNode({ id: "o1", value: 400 });
       const incomingLeaf = createMockTreeNode({ id: "i1", value: 500 });
 
-      const lm = createTestableLeafManager();
+      const lm = createTestableLeafManager({
+        config: { signer: SYNC_SIGNER },
+        transferService: {
+          queryPendingTransfers: jest.fn(async () => ({
+            transfers: [
+              {
+                id: "incoming-t1",
+                type: 0, // not a counter-swap
+                leaves: [{ leaf: incomingLeaf }],
+              },
+            ],
+          })),
+        },
+      });
 
       mockSyncDeps(lm, {
         leaves: [available1, available2],
@@ -1067,6 +1086,7 @@ describe("LeafManager Test", () => {
 
     it("preserves LOCAL_LOCKED leaves across sync", async () => {
       const lm = createTestableLeafManager({
+        config: { signer: SYNC_SIGNER },
         transferService: {
           queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
         },
@@ -1093,6 +1113,7 @@ describe("LeafManager Test", () => {
 
     it("does not preserve OUTGOING or SWAP_PENDING across sync", async () => {
       const lm = createTestableLeafManager({
+        config: { signer: SYNC_SIGNER },
         transferService: {
           queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
         },
@@ -1122,7 +1143,30 @@ describe("LeafManager Test", () => {
       const counterSwapV3Leaf = createMockTreeNode({ id: "cs2", value: 150 });
       const regularLeaf = createMockTreeNode({ id: "r1", value: 200 });
 
-      const lm = createTestableLeafManager();
+      const lm = createTestableLeafManager({
+        config: { signer: SYNC_SIGNER },
+        transferService: {
+          queryPendingTransfers: jest.fn(async () => ({
+            transfers: [
+              {
+                id: "t-counter",
+                type: TransferType.COUNTER_SWAP,
+                leaves: [{ leaf: counterSwapLeaf }],
+              },
+              {
+                id: "t-counter-v3",
+                type: TransferType.COUNTER_SWAP_V3,
+                leaves: [{ leaf: counterSwapV3Leaf }],
+              },
+              {
+                id: "t-regular",
+                type: 0, // not a counter-swap
+                leaves: [{ leaf: regularLeaf }],
+              },
+            ],
+          })),
+        },
+      });
 
       mockSyncDeps(lm, {
         leaves: [],
@@ -1154,6 +1198,7 @@ describe("LeafManager Test", () => {
 
     it("server state overwrites stale cache (except LOCAL_LOCKED)", async () => {
       const lm = createTestableLeafManager({
+        config: { signer: SYNC_SIGNER },
         transferService: {
           queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
         },
@@ -1182,6 +1227,7 @@ describe("LeafManager Test", () => {
     it("emits balance update after sync", async () => {
       const callback = jest.fn();
       const lm = createTestableLeafManager({
+        config: { signer: SYNC_SIGNER },
         transferService: {
           queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
         },
@@ -1774,6 +1820,13 @@ describe("LeafManager Test", () => {
     it("retries on stale leaf error after sync", async () => {
       let attempt = 0;
       const lm = createTestableLeafManager({
+        config: {
+          signer: {
+            getIdentityPublicKey: jest.fn(async () =>
+              new Uint8Array(33).fill(0x02),
+            ),
+          },
+        },
         transferService: {
           queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
         },
@@ -2331,6 +2384,266 @@ describe("LeafManager Test", () => {
       for (const leaf of leaves) {
         expect(lm.getLeafRecordPublic(leaf.id)?.status).toBe("AVAILABLE");
       }
+    });
+  });
+
+  // ── handleTransferEvent ──────────────────────────────────────────────
+
+  describe("handleTransferEvent", () => {
+    const IDENTITY_PUBKEY = new Uint8Array(33).fill(0x02);
+    const OTHER_PUBKEY = new Uint8Array(33).fill(0x03);
+
+    function createMockTransfer(
+      overrides: Partial<Transfer> & { leafIds?: string[] },
+    ): Transfer {
+      const leafIds = overrides.leafIds ?? ["l1"];
+      return {
+        id: "transfer-1",
+        senderIdentityPublicKey: IDENTITY_PUBKEY,
+        receiverIdentityPublicKey: OTHER_PUBKEY,
+        status: TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+        totalValue: 0,
+        expiryTime: undefined,
+        leaves: leafIds.map((id) => ({
+          leaf: createMockTreeNode({ id, value: 500 }),
+          id,
+          previousLeaf: undefined,
+          adaptorSignature: new Uint8Array(),
+          leafKeyTweakNonce: new Uint8Array(),
+        })),
+        createdTime: undefined,
+        updatedTime: undefined,
+        type: TransferType.TRANSFER,
+        sparkInvoice: "",
+        network: 0,
+        receivers: [],
+        ...overrides,
+      } as Transfer;
+    }
+
+    /** Create a LeafManager with identityPublicKey set (as if sync was called). */
+    async function createSyncedLeafManager(
+      overrides?: Parameters<typeof createTestableLeafManager>[0],
+    ) {
+      const lm = createTestableLeafManager({
+        ...overrides,
+        config: {
+          signer: {
+            getIdentityPublicKey: jest.fn(async () => IDENTITY_PUBKEY),
+          },
+          ...overrides?.config,
+        },
+        transferService: {
+          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          ...overrides?.transferService,
+        },
+      });
+
+      // Call sync to set identityPublicKey
+      (lm as any).getLeaves = jest.fn(async () => []);
+      (lm as any).getAllPendingSwaps = jest.fn(async () => []);
+      (lm as any).getAllPendingOutgoingTransfers = jest.fn(async () => []);
+      (lm as any).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => nodes,
+      );
+      await lm.sync();
+
+      return lm;
+    }
+
+    it("transitions LOCAL_LOCKED → OUTGOING on SENDER_INITIATED", async () => {
+      const lm = await createSyncedLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
+      lm.transitionPublic(["l1"], "LOCAL_LOCKED");
+
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          status: TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+        }),
+      );
+
+      expect(lm.getLeafRecordPublic("l1")?.status).toBe("OUTGOING");
+      expect(lm.getLeafRecordPublic("l1")?.source).toEqual({
+        kind: "transfer",
+        transferId: "transfer-1",
+      });
+    });
+
+    it("transitions LOCAL_LOCKED → OUTGOING on SENDER_INITIATED_COORDINATOR", async () => {
+      const lm = await createSyncedLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
+      lm.transitionPublic(["l1"], "LOCAL_LOCKED");
+
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          status: TransferStatus.TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
+        }),
+      );
+
+      expect(lm.getLeafRecordPublic("l1")?.status).toBe("OUTGOING");
+    });
+
+    it("transitions LOCAL_LOCKED → OUTGOING on SENDER_KEY_TWEAK_PENDING", async () => {
+      const lm = await createSyncedLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
+      lm.transitionPublic(["l1"], "LOCAL_LOCKED");
+
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
+        }),
+      );
+
+      expect(lm.getLeafRecordPublic("l1")?.status).toBe("OUTGOING");
+    });
+
+    it("transitions LOCAL_LOCKED → OUTGOING on APPLYING_SENDER_KEY_TWEAK", async () => {
+      const lm = await createSyncedLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
+      lm.transitionPublic(["l1"], "LOCAL_LOCKED");
+
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          status: TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK,
+        }),
+      );
+
+      expect(lm.getLeafRecordPublic("l1")?.status).toBe("OUTGOING");
+    });
+
+    it("transitions LOCAL_LOCKED → SWAP_PENDING on APPLYING_SENDER_KEY_TWEAK for swaps", async () => {
+      const lm = await createSyncedLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
+      lm.transitionPublic(["l1"], "LOCAL_LOCKED");
+
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          status: TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK,
+          type: TransferType.PRIMARY_SWAP_V3,
+        }),
+      );
+
+      expect(lm.getLeafRecordPublic("l1")?.status).toBe("SWAP_PENDING");
+    });
+
+    it("transitions OUTGOING → SPENT on SENDER_KEY_TWEAKED", async () => {
+      const lm = await createSyncedLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
+      lm.transitionPublic(["l1"], "LOCAL_LOCKED");
+      lm.transitionPublic(["l1"], "OUTGOING");
+
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+        }),
+      );
+
+      // SPENT deletes the leaf from cache
+      expect(lm.getLeafRecordPublic("l1")).toBeUndefined();
+      expect(lm.getOwnedBalance()).toBe(0);
+    });
+
+    it("transitions OUTGOING → AVAILABLE on RETURNED", async () => {
+      const lm = await createSyncedLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
+      lm.transitionPublic(["l1"], "LOCAL_LOCKED");
+      lm.transitionPublic(["l1"], "OUTGOING");
+
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          status: TransferStatus.TRANSFER_STATUS_RETURNED,
+        }),
+      );
+
+      expect(lm.getLeafRecordPublic("l1")?.status).toBe("AVAILABLE");
+      expect(lm.getAvailableBalance()).toBe(500);
+    });
+
+    it("ignores events when identityPublicKey is not set", async () => {
+      // Don't call sync — identityPublicKey remains undefined
+      const lm = createTestableLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
+      lm.transitionPublic(["l1"], "LOCAL_LOCKED");
+
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          status: TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+        }),
+      );
+
+      // Should still be LOCAL_LOCKED — event was ignored
+      expect(lm.getLeafRecordPublic("l1")?.status).toBe("LOCAL_LOCKED");
+    });
+
+    it("ignores events where sender is not us", async () => {
+      const lm = await createSyncedLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
+      lm.transitionPublic(["l1"], "LOCAL_LOCKED");
+
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          senderIdentityPublicKey: OTHER_PUBKEY,
+          status: TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+        }),
+      );
+
+      expect(lm.getLeafRecordPublic("l1")?.status).toBe("LOCAL_LOCKED");
+    });
+
+    it("handles multiple leaves in a single transfer", async () => {
+      const lm = await createSyncedLeafManager();
+      await lm.addLeaves([
+        createMockTreeNode({ id: "l1", value: 300 }),
+        createMockTreeNode({ id: "l2", value: 200 }),
+      ]);
+      lm.transitionPublic(["l1", "l2"], "LOCAL_LOCKED");
+
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          leafIds: ["l1", "l2"],
+          status: TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+        }),
+      );
+
+      expect(lm.getLeafRecordPublic("l1")?.status).toBe("OUTGOING");
+      expect(lm.getLeafRecordPublic("l2")?.status).toBe("OUTGOING");
+    });
+
+    it("emits balance update after processing", async () => {
+      const callback = jest.fn();
+      const lm = await createSyncedLeafManager({ onBalanceUpdate: callback });
+      await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
+      lm.transitionPublic(["l1"], "LOCAL_LOCKED");
+      lm.transitionPublic(["l1"], "OUTGOING");
+      callback.mockClear();
+
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+        }),
+      );
+
+      expect(callback).toHaveBeenCalledWith({
+        available: 0,
+        owned: 0,
+        incoming: 0,
+      });
+    });
+
+    it("ignores unhandled transfer statuses", async () => {
+      const lm = await createSyncedLeafManager();
+      await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
+      lm.transitionPublic(["l1"], "LOCAL_LOCKED");
+      lm.transitionPublic(["l1"], "OUTGOING");
+
+      // RECEIVER_KEY_TWEAKED is not handled — should be a no-op for outgoing leaves
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          status: TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED,
+        }),
+      );
+
+      expect(lm.getLeafRecordPublic("l1")?.status).toBe("OUTGOING");
     });
   });
 });
