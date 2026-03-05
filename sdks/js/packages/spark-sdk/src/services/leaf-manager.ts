@@ -15,6 +15,7 @@ import {
   isZeroTimelock,
 } from "../utils/index.js";
 import { addPublicKeys } from "../utils/keys.js";
+import { optimize, shouldOptimize } from "../utils/optimize.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection/connection.js";
 import SwapService from "./swap.js";
@@ -85,6 +86,7 @@ export type BalanceSnapshot = {
 
 export type OnBalanceUpdate = (balance: BalanceSnapshot) => void;
 export default class LeafManager {
+  private optimizationInProgress = false;
   private leaves: Map<string, LeafRecord> = new Map();
 
   // Mutex policy: acquire when transitioning AVAILABLE → LOCAL_LOCKED (prevents
@@ -452,6 +454,9 @@ export default class LeafManager {
       }
       this.emitBalanceUpdate();
     });
+    // Fire-and-forget: don't block the caller waiting for optimization network calls.
+    // autoOptimizeIfNeeded swallows errors internally.
+    this.autoOptimizeIfNeeded();
     return renewed;
   }
 
@@ -665,6 +670,158 @@ export default class LeafManager {
   // #endregion
 
   // #region State Management
+
+  private async autoOptimizeIfNeeded(): Promise<void> {
+    try {
+      if (!this.config.getOptimizationOptions().auto) return;
+      const available = this.getLeavesByStatus(LeafStatus.AVAILABLE);
+      if (
+        !shouldOptimize(
+          available.map((l) => l.value),
+          this.config.getOptimizationOptions().multiplicity ?? 0,
+        )
+      )
+        return;
+
+      for await (const _ of this.optimizeLeaves()) {
+        // run all steps
+      }
+    } catch {
+      // Optimization is best-effort. If it fails (e.g., config error, another
+      // instance already locked the leaf, or SSP is unavailable), the leaves
+      // remain AVAILABLE.
+    }
+  }
+
+  public async *optimizeLeaves(
+    multiplicity: number | undefined = undefined,
+  ): AsyncGenerator<
+    { step: number; total: number; controller: AbortController },
+    void,
+    void
+  > {
+    const multiplicityValue =
+      multiplicity ?? this.config.getOptimizationOptions().multiplicity ?? 0;
+    if (multiplicityValue < 0) {
+      throw new SparkValidationError("Multiplicity cannot be negative");
+    } else if (multiplicityValue > 5) {
+      throw new SparkValidationError("Multiplicity cannot be greater than 5");
+    }
+
+    if (this.optimizationInProgress) return;
+
+    const controller = new AbortController();
+    let ownsFlag = false;
+    let swapBatches: { leavesToSend: TreeNode[]; outLeaves: number[] }[] = [];
+    let outerRelease: (() => void) | undefined =
+      await this.leavesMutex.acquire();
+    try {
+      // Second check under lock — guards against TOCTOU where two callers
+      // both pass the optimistic check before either acquires the mutex.
+      if (this.optimizationInProgress) return;
+      this.optimizationInProgress = true;
+      ownsFlag = true;
+
+      const availableLeaves = this.getAvailableLeaves();
+      const swaps = optimize(
+        availableLeaves.map((leaf) => leaf.value),
+        multiplicityValue,
+      );
+      if (swaps.length === 0) return;
+
+      const valueToNodes = new Map<number, TreeNode[]>();
+      for (const leaf of availableLeaves) {
+        let bucket = valueToNodes.get(leaf.value);
+        if (!bucket) {
+          bucket = [];
+          valueToNodes.set(leaf.value, bucket);
+        }
+        bucket.push(leaf);
+      }
+
+      swapBatches = [];
+      for (const swap of swaps) {
+        const leavesToSend: TreeNode[] = [];
+        for (const leafValue of swap.inLeaves) {
+          const nodes = valueToNodes.get(leafValue);
+          if (nodes && nodes.length > 0) {
+            leavesToSend.push(nodes.shift()!);
+          }
+        }
+        swapBatches.push({ leavesToSend, outLeaves: swap.outLeaves });
+        this.transition(
+          leavesToSend.map((l) => l.id),
+          LeafStatus.LOCAL_LOCKED,
+        );
+      }
+      outerRelease();
+      outerRelease = undefined;
+
+      // Yield step 0 after releasing the mutex so consumers can do async work
+      // (e.g., UI updates that call addLeaves/sync) without deadlocking.
+      yield { step: 0, total: swapBatches.length, controller };
+
+      for (let i = 0; i < swapBatches.length; i++) {
+        const swap = swapBatches[i]!;
+        if (controller.signal.aborted) break;
+
+        const swapLeafIds = swap.leavesToSend.map((l) => l.id);
+        try {
+          const newLeaves = await this.swapService.requestLeavesSwap({
+            leaves: swap.leavesToSend,
+            targetAmounts: swap.outLeaves,
+            onSwapInitiated: async () => {
+              await this.leavesMutex.runExclusive(() => {
+                this.transition(swapLeafIds, LeafStatus.SWAP_PENDING);
+              });
+            },
+          });
+
+          await this.leavesMutex.runExclusive(() => {
+            this.transition(swapLeafIds, LeafStatus.SPENT);
+            for (const leaf of newLeaves) {
+              this.leaves.set(leaf.id, {
+                treeNode: leaf,
+                status: LeafStatus.AVAILABLE,
+                source: { kind: "none" },
+              });
+            }
+            this.emitBalanceUpdate();
+          });
+        } catch (error) {
+          // Only restore LOCAL_LOCKED leaves — SWAP_PENDING means the SO was
+          // contacted and has them locked; sync() will reconcile those.
+          this.restoreLocalLockedToAvailable(swapLeafIds);
+          // Restore all remaining unprocessed batches (always LOCAL_LOCKED)
+          for (let j = i + 1; j < swapBatches.length; j++) {
+            const remainingIds = swapBatches[j]!.leavesToSend.map((l) => l.id);
+            this.restoreLocalLockedToAvailable(remainingIds);
+          }
+          // emitBalanceUpdate deferred to finally block
+          throw error;
+        }
+
+        yield { step: i + 1, total: swapBatches.length, controller };
+      }
+    } finally {
+      if (ownsFlag) {
+        this.optimizationInProgress = false;
+        // Restore any LOCAL_LOCKED leaves that were never processed — covers
+        // abort, consumer break, and early return. restoreLocalLockedToAvailable
+        // is idempotent (no-op for non-LOCAL_LOCKED leaves).
+        if (swapBatches.length > 0) {
+          for (const swap of swapBatches) {
+            this.restoreLocalLockedToAvailable(
+              swap.leavesToSend.map((l) => l.id),
+            );
+          }
+          this.emitBalanceUpdate();
+        }
+      }
+      outerRelease?.();
+    }
+  }
+
   /**
    * Transition one or more leaves to a new status.
    *

@@ -83,6 +83,7 @@ class TestableLeafManager extends LeafManager {
 }
 interface MockConfig {
   getCoordinatorAddress?: () => string;
+  getOptimizationOptions?: () => { auto?: boolean; multiplicity?: number };
   signer?: {
     getIdentityPublicKey: () => Promise<Uint8Array>;
   };
@@ -1264,7 +1265,11 @@ describe("LeafManager Test", () => {
 
   describe("registerClaimedLeaves", () => {
     it("overwrites SWAP_PENDING leaf to AVAILABLE", async () => {
-      const lm = createTestableLeafManager();
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
+        },
+      });
       (lm as any).checkRenewLeaves = jest.fn(
         async (nodes: TreeNode[]) => nodes,
       );
@@ -1282,7 +1287,11 @@ describe("LeafManager Test", () => {
     });
 
     it("overwrites INCOMING leaf to AVAILABLE", async () => {
-      const lm = createTestableLeafManager();
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
+        },
+      });
       (lm as any).checkRenewLeaves = jest.fn(
         async (nodes: TreeNode[]) => nodes,
       );
@@ -1305,7 +1314,12 @@ describe("LeafManager Test", () => {
 
     it("emits balance update with correct values", async () => {
       const callback = jest.fn();
-      const lm = createTestableLeafManager({ onBalanceUpdate: callback });
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
+        },
+        onBalanceUpdate: callback,
+      });
       (lm as any).checkRenewLeaves = jest.fn(
         async (nodes: TreeNode[]) => nodes,
       );
@@ -1898,6 +1912,425 @@ describe("LeafManager Test", () => {
       await expect(
         lm.selectLeavesAndExecute([500, 0], async () => "ok"),
       ).rejects.toThrow("Target amount must be positive");
+    });
+  });
+
+  // ── Optimize Leaves ──────────────────────────────────────────────────
+
+  describe("optimizeLeaves", () => {
+    /** Drain an async generator, collecting yielded values. */
+    async function drainOptimize(
+      gen: AsyncGenerator<
+        { step: number; total: number; controller: AbortController },
+        void,
+        void
+      >,
+    ) {
+      const steps: { step: number; total: number }[] = [];
+      for await (const { step, total } of gen) {
+        steps.push({ step, total });
+      }
+      return steps;
+    }
+
+    it("throws on negative multiplicity", async () => {
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+      });
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 100 })]);
+
+      await expect(drainOptimize(lm.optimizeLeaves(-1))).rejects.toThrow(
+        "Multiplicity cannot be negative",
+      );
+    });
+
+    it("throws on multiplicity > 5", async () => {
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+      });
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 100 })]);
+
+      await expect(drainOptimize(lm.optimizeLeaves(6))).rejects.toThrow(
+        "Multiplicity cannot be greater than 5",
+      );
+    });
+
+    it("returns immediately when no swaps are needed", async () => {
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+      });
+      // A single power-of-two leaf — already optimal
+      await lm.addLeaves([createMockTreeNode({ id: "a", value: 128 })]);
+
+      const steps = await drainOptimize(lm.optimizeLeaves(0));
+
+      expect(steps).toHaveLength(0);
+    });
+
+    it("executes swaps and yields progress", async () => {
+      // 8 x 16-sat leaves → optimize(multiplicity=0) produces one swap → [128]
+      const leaves = Array.from({ length: 8 }, (_, i) =>
+        createMockTreeNode({ id: `l${i}`, value: 16 }),
+      );
+
+      const requestLeavesSwapMock = jest.fn(async (params: any) => {
+        await params.onSwapInitiated?.();
+        return params.targetAmounts.map((v: number, i: number) =>
+          createMockTreeNode({ id: `new-${i}`, value: v }),
+        );
+      });
+
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+        swapService: { requestLeavesSwap: requestLeavesSwapMock },
+      });
+      await lm.addLeaves(leaves);
+
+      const steps = await drainOptimize(lm.optimizeLeaves(0));
+
+      // step 0 is yielded before any swap, then step 1..N after each swap
+      expect(steps.length).toBeGreaterThanOrEqual(1);
+      expect(steps[0]!.step).toBe(0);
+      // Last step should have step === total
+      expect(steps[steps.length - 1]!.step).toBe(
+        steps[steps.length - 1]!.total,
+      );
+      // Swap service should have been called
+      expect(requestLeavesSwapMock).toHaveBeenCalled();
+      // Old leaves should be deleted (SPENT removes from cache), new leaves AVAILABLE
+      for (const leaf of leaves) {
+        expect(lm.getLeafRecordPublic(leaf.id)).toBeUndefined();
+      }
+      expect(lm.getAvailableBalance()).toBeGreaterThan(0);
+    });
+
+    it("locks all swap batches before releasing mutex", async () => {
+      // 8 x 16 → optimize produces a single swap batch
+      const leaves = Array.from({ length: 8 }, (_, i) =>
+        createMockTreeNode({ id: `l${i}`, value: 16 }),
+      );
+
+      const requestLeavesSwapMock = jest.fn(async (params: any) => {
+        await params.onSwapInitiated?.();
+        return [createMockTreeNode({ id: "new-0", value: 128 })];
+      });
+
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+        swapService: { requestLeavesSwap: requestLeavesSwapMock },
+      });
+      await lm.addLeaves(leaves);
+
+      // When requestLeavesSwap is called, all leaves should already be locked
+      requestLeavesSwapMock.mockImplementation(async (params: any) => {
+        // All original leaves should be LOCAL_LOCKED or SWAP_PENDING at this point
+        for (const leaf of leaves) {
+          const record = lm.getLeafRecordPublic(leaf.id);
+          expect(["LOCAL_LOCKED", "SWAP_PENDING"]).toContain(record?.status);
+        }
+        await params.onSwapInitiated?.();
+        return [createMockTreeNode({ id: "new-0", value: 128 })];
+      });
+
+      await drainOptimize(lm.optimizeLeaves(0));
+    });
+
+    it("restores LOCAL_LOCKED leaves and remaining batches on swap failure", async () => {
+      // Use multiplicity=0: 8 x 16 = 128 → single swap [128]
+      const leaves = Array.from({ length: 8 }, (_, i) =>
+        createMockTreeNode({ id: `l${i}`, value: 16 }),
+      );
+
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+        swapService: {
+          requestLeavesSwap: jest.fn(async () => {
+            // Fail before onSwapInitiated
+            throw new Error("swap down");
+          }),
+        },
+      });
+      await lm.addLeaves(leaves);
+
+      await expect(drainOptimize(lm.optimizeLeaves(0))).rejects.toThrow(
+        "swap down",
+      );
+
+      // All leaves should be restored to AVAILABLE
+      for (const leaf of leaves) {
+        expect(lm.getLeafRecordPublic(leaf.id)?.status).toBe("AVAILABLE");
+      }
+    });
+
+    it("preserves SWAP_PENDING on failure after onSwapInitiated", async () => {
+      const leaves = Array.from({ length: 8 }, (_, i) =>
+        createMockTreeNode({ id: `l${i}`, value: 16 }),
+      );
+
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+        swapService: {
+          requestLeavesSwap: jest.fn(async (params: any) => {
+            await params.onSwapInitiated?.();
+            throw new Error("swap failed after initiation");
+          }),
+        },
+      });
+      await lm.addLeaves(leaves);
+
+      await expect(drainOptimize(lm.optimizeLeaves(0))).rejects.toThrow(
+        "swap failed after initiation",
+      );
+
+      // Leaves advanced to SWAP_PENDING should stay there
+      for (const leaf of leaves) {
+        expect(lm.getLeafRecordPublic(leaf.id)?.status).toBe("SWAP_PENDING");
+      }
+    });
+
+    it("abort controller stops processing and restores unprocessed batches", async () => {
+      // Use multiplicity=1 with a [64] leaf to produce a swap with multiple output leaves
+      // so we can verify the abort behavior.
+      // Actually, let's use a simpler setup: 2 leaves that require 2 separate swaps
+      // by using multiplicity=1 with leaves [8, 64].
+      // optimize([8, 64], 1) → [Swap([64], [2, 2, 4, 8, 16, 32])]
+      // That's a single swap, which won't test abort well.
+      // Let's instead test abort at the generator level directly.
+
+      let swapCallCount = 0;
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+        swapService: {
+          requestLeavesSwap: jest.fn(async (params: any) => {
+            swapCallCount++;
+            await params.onSwapInitiated?.();
+            return [
+              createMockTreeNode({ id: `result-${swapCallCount}`, value: 128 }),
+            ];
+          }),
+        },
+      });
+
+      // maximizeUnilateralExit with maxLeavesPerSwap=2 would produce multiple batches
+      // but we can't control maxLeavesPerSwap. Instead, test that abort on step 0
+      // prevents all swaps from executing.
+      const leaves = Array.from({ length: 8 }, (_, i) =>
+        createMockTreeNode({ id: `l${i}`, value: 16 }),
+      );
+      await lm.addLeaves(leaves);
+
+      const gen = lm.optimizeLeaves(0);
+      const first = await gen.next();
+      expect(first.done).toBe(false);
+      // Abort after step 0 (before any swap executes)
+      first.value!.controller.abort();
+
+      // Drain remaining yields
+      const steps: number[] = [];
+      for await (const { step } of gen) {
+        steps.push(step);
+      }
+
+      // All leaves should be restored to AVAILABLE (abort before swap)
+      for (const leaf of leaves) {
+        const record = lm.getLeafRecordPublic(leaf.id);
+        expect(record?.status).toBe("AVAILABLE");
+      }
+    });
+
+    it("prevents concurrent optimization (reentrancy guard)", async () => {
+      const leaves = Array.from({ length: 8 }, (_, i) =>
+        createMockTreeNode({ id: `l${i}`, value: 16 }),
+      );
+
+      let resolveSwap: ((v: TreeNode[]) => void) | undefined;
+      const requestLeavesSwapMock = jest.fn(
+        (params: any) =>
+          new Promise<TreeNode[]>(async (resolve) => {
+            await params.onSwapInitiated?.();
+            resolveSwap = resolve;
+          }),
+      );
+
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+        swapService: { requestLeavesSwap: requestLeavesSwapMock },
+      });
+      await lm.addLeaves(leaves);
+
+      // Start first optimization (will block on swap)
+      const gen1Promise = drainOptimize(lm.optimizeLeaves(0));
+
+      // Yield to let gen1 start (it will block in the swap)
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Second optimization should be a no-op (reentrancy guard)
+      const gen2Steps = await drainOptimize(lm.optimizeLeaves(0));
+      expect(gen2Steps).toHaveLength(0);
+
+      // Resolve the first swap
+      resolveSwap!([createMockTreeNode({ id: "new-0", value: 128 })]);
+      await gen1Promise;
+    });
+
+    it("clears optimizationInProgress flag even on error", async () => {
+      const swapMock: jest.Mock = jest.fn(async () => {
+        throw new Error("fail");
+      });
+
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+        swapService: { requestLeavesSwap: swapMock },
+      });
+      const leaves = Array.from({ length: 8 }, (_, i) =>
+        createMockTreeNode({ id: `l${i}`, value: 16 }),
+      );
+      await lm.addLeaves(leaves);
+
+      await expect(drainOptimize(lm.optimizeLeaves(0))).rejects.toThrow("fail");
+
+      // Replace mock with one that succeeds — verify reentrancy guard is cleared
+      swapMock.mockImplementation(async (params: any) => {
+        await params.onSwapInitiated?.();
+        return params.targetAmounts.map((v: number, i: number) =>
+          createMockTreeNode({ id: `retry-${i}`, value: v }),
+        );
+      });
+
+      // Second call should succeed (flag was cleared in finally block)
+      const gen2Steps = await drainOptimize(lm.optimizeLeaves(0));
+      expect(gen2Steps.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("autoOptimizeIfNeeded", () => {
+    it("triggers optimization when auto=true and shouldOptimize returns true", async () => {
+      const requestLeavesSwapMock = jest.fn(async (params: any) => {
+        await params.onSwapInitiated?.();
+        return params.targetAmounts.map((v: number, i: number) =>
+          createMockTreeNode({ id: `opt-${i}`, value: v }),
+        );
+      });
+
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ auto: true, multiplicity: 0 }),
+          getCoordinatorAddress: () => "mock-addr",
+          getNetworkProto: () => 0,
+        } as any,
+        swapService: { requestLeavesSwap: requestLeavesSwapMock },
+      });
+
+      // checkRenewLeaves is called by registerClaimedLeaves — mock it
+      (lm as any).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => nodes,
+      );
+
+      // 8 x 16 triggers shouldOptimize for multiplicity=0
+      const leaves = Array.from({ length: 8 }, (_, i) =>
+        createMockTreeNode({ id: `l${i}`, value: 16 }),
+      );
+      await lm.registerClaimedLeaves(leaves);
+
+      // autoOptimizeIfNeeded is fire-and-forget — yield to let it complete
+      await new Promise((r) => setTimeout(r, 100));
+
+      expect(requestLeavesSwapMock).toHaveBeenCalled();
+    });
+
+    it("does not trigger when auto=false", async () => {
+      const requestLeavesSwapMock = jest.fn(async () => []);
+
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
+        },
+        swapService: { requestLeavesSwap: requestLeavesSwapMock },
+      });
+      (lm as any).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => nodes,
+      );
+
+      const leaves = Array.from({ length: 8 }, (_, i) =>
+        createMockTreeNode({ id: `l${i}`, value: 16 }),
+      );
+      await lm.registerClaimedLeaves(leaves);
+
+      expect(requestLeavesSwapMock).not.toHaveBeenCalled();
+    });
+
+    it("does not trigger when leaves are already optimal", async () => {
+      const requestLeavesSwapMock = jest.fn(async () => []);
+
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ auto: true, multiplicity: 0 }),
+        },
+        swapService: { requestLeavesSwap: requestLeavesSwapMock },
+      });
+      (lm as any).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => nodes,
+      );
+
+      // Single power-of-two leaf — shouldOptimize returns false
+      await lm.registerClaimedLeaves([
+        createMockTreeNode({ id: "a", value: 128 }),
+      ]);
+
+      expect(requestLeavesSwapMock).not.toHaveBeenCalled();
+    });
+
+    it("swallows optimization errors silently", async () => {
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ auto: true, multiplicity: 0 }),
+        },
+        swapService: {
+          requestLeavesSwap: jest.fn(async () => {
+            throw new Error("swap service unavailable");
+          }),
+        },
+      });
+      (lm as any).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => nodes,
+      );
+
+      const leaves = Array.from({ length: 8 }, (_, i) =>
+        createMockTreeNode({ id: `l${i}`, value: 16 }),
+      );
+
+      // Should not throw despite swap failure
+      const result = await lm.registerClaimedLeaves(leaves);
+
+      // autoOptimizeIfNeeded is fire-and-forget — yield to let it run
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(result).toHaveLength(8);
+
+      // Leaves should be restored to AVAILABLE (not stuck in LOCAL_LOCKED)
+      for (const leaf of leaves) {
+        expect(lm.getLeafRecordPublic(leaf.id)?.status).toBe("AVAILABLE");
+      }
     });
   });
 });
