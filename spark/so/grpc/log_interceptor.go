@@ -155,5 +155,5 @@ func (g *GRPCClientInfoProvider) GetClientIP(ctx context.Context) (string, error
 		}
 	}
 
-	return "", errors.InvalidArgumentMissingField(fmt.Errorf("no client IP found in header or peer context"))
+	return "", errors.InternalObjectMissingField(fmt.Errorf("no client IP found in header or peer context"))
 }

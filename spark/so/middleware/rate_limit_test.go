@@ -907,7 +907,7 @@ func TestRateLimiter(t *testing.T) {
 		assert.Equal(t, "ok", resp)
 	})
 
-	t.Run("x-real-ip ignored", func(t *testing.T) {
+	t.Run("x-real-ip rejected as invalid identifier", func(t *testing.T) {
 		config := &RateLimiterConfig{}
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
 		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))

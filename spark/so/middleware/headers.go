@@ -12,6 +12,10 @@ import (
 func GetClientIpFromHeader(ctx context.Context, xffClientIpPosition int) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
+		logging.GetLoggerFromContext(ctx).Sugar().Errorf(
+			"no gRPC incoming metadata found, xffClientIpPosition=%d",
+			xffClientIpPosition,
+		)
 		return "", errors.New("no metadata found")
 	}
 
