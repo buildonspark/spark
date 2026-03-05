@@ -6,13 +6,15 @@
     {{ template "header" . }}
 {{- end }}
 
+{{- $pkg := base $.Config.Package }}
+
 import (
     "context"
     "encoding/base64"
     "fmt"
     "testing"
 
-    "github.com/lightsparkdev/spark/so/ent"
+    "{{ $.Config.Package }}"
 )
 
 {{ range $n := $.Nodes }}
@@ -21,7 +23,7 @@ import (
 
 // {{ $example }} is a test fixture builder for {{ $n.Name }}.
 type {{ $example }} struct {
-    client *ent.Client
+    client *{{ $pkg }}.Client
     t      *testing.T
 
     // Fields - use pointers to distinguish between "not set" and "set to zero value"
@@ -34,15 +36,15 @@ type {{ $example }} struct {
     // Edges - if set, use the provided entity; if nil, create a default one
     {{- range $e := $n.Edges }}
     {{- if $e.Unique }}
-    {{ $e.StructField }} *ent.{{ $e.Type.Name }}
+    {{ $e.StructField }} *{{ $pkg }}.{{ $e.Type.Name }}
     {{- else }}
-    {{ $e.StructField }} []*ent.{{ $e.Type.Name }}
+    {{ $e.StructField }} []*{{ $pkg }}.{{ $e.Type.Name }}
     {{- end }}
     {{- end }}
 }
 
 // New{{ $example }} creates a new {{ $example }} for testing.
-func New{{ $example }}(t *testing.T, client *ent.Client) *{{ $example }} {
+func New{{ $example }}(t *testing.T, client *{{ $pkg }}.Client) *{{ $example }} {
     return &{{ $example }}{
         client: client,
         t:      t,
@@ -62,19 +64,19 @@ func ({{ $receiver }} *{{ $example }}) Set{{ $f.StructField }}(v {{ $f.Type }}) 
 {{- range $e := $n.Edges }}
 {{- if $e.Unique }}
 // Set{{ $e.StructField }} sets the {{ $e.Name }} edge.
-func ({{ $receiver }} *{{ $example }}) Set{{ $e.StructField }}(v *ent.{{ $e.Type.Name }}) *{{ $example }} {
+func ({{ $receiver }} *{{ $example }}) Set{{ $e.StructField }}(v *{{ $pkg }}.{{ $e.Type.Name }}) *{{ $example }} {
     {{ $receiver }}.{{ $e.StructField }} = v
     return {{ $receiver }}
 }
 {{- else }}
 // Add{{ singular $e.StructField }} adds a {{ $e.Type.Name }} to the {{ $e.Name }} edge.
-func ({{ $receiver }} *{{ $example }}) Add{{ singular $e.StructField }}(v *ent.{{ $e.Type.Name }}) *{{ $example }} {
+func ({{ $receiver }} *{{ $example }}) Add{{ singular $e.StructField }}(v *{{ $pkg }}.{{ $e.Type.Name }}) *{{ $example }} {
     {{ $receiver }}.{{ $e.StructField }} = append({{ $receiver }}.{{ $e.StructField }}, v)
     return {{ $receiver }}
 }
 
 // Set{{ $e.StructField }} sets the {{ $e.Name }} edge.
-func ({{ $receiver }} *{{ $example }}) Set{{ $e.StructField }}(v []*ent.{{ $e.Type.Name }}) *{{ $example }} {
+func ({{ $receiver }} *{{ $example }}) Set{{ $e.StructField }}(v []*{{ $pkg }}.{{ $e.Type.Name }}) *{{ $example }} {
     {{ $receiver }}.{{ $e.StructField }} = v
     return {{ $receiver }}
 }
@@ -83,7 +85,7 @@ func ({{ $receiver }} *{{ $example }}) Set{{ $e.StructField }}(v []*ent.{{ $e.Ty
 
 // MustExec builds and saves the {{ $n.Name }} entity to the database.
 // It panics if the save fails.
-func ({{ $receiver }} *{{ $example }}) MustExec(ctx context.Context) *ent.{{ $n.Name }} {
+func ({{ $receiver }} *{{ $example }}) MustExec(ctx context.Context) *{{ $pkg }}.{{ $n.Name }} {
     create := {{ $receiver }}.client.{{ $n.Name }}.Create()
 
     // Set fields
@@ -160,7 +162,7 @@ func ({{ $receiver }} *{{ $example }}) MustExec(ctx context.Context) *ent.{{ $n.
 
 // Exec builds and saves the {{ $n.Name }} entity to the database.
 // It returns an error if the save fails.
-func ({{ $receiver }} *{{ $example }}) Exec(ctx context.Context) (*ent.{{ $n.Name }}, error) {
+func ({{ $receiver }} *{{ $example }}) Exec(ctx context.Context) (*{{ $pkg }}.{{ $n.Name }}, error) {
     create := {{ $receiver }}.client.{{ $n.Name }}.Create()
 
     // Set fields

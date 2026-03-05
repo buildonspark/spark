@@ -614,28 +614,37 @@ reset_databases() {
         # Terminate all relevant connections first
         for i in $(seq 0 $max_count); do
             db="sparkoperator_$i"
+            ephemeraldb="spark_ephemeral_$i"
             psql postgres -c "
             SELECT pg_terminate_backend(pid)
             FROM pg_stat_activity
-            WHERE datname = '$db'
+            WHERE (datname = '$db' OR datname = '$ephemeraldb')
             AND pid <> pg_backend_pid();" > /dev/null 2>&1
         done
 
         # Drop and recreate
         for i in $(seq 0 $max_count); do
             db="sparkoperator_$i"
-            echo "Resetting $db..."
+            ephemeraldb="spark_ephemeral_$i"
+            echo "Resetting $db and $ephemeraldb..."
             dropdb --if-exists "$db" > /dev/null 2>&1
+            dropdb --if-exists "$ephemeraldb" > /dev/null 2>&1
             createdb "$db" > /dev/null 2>&1
+            createdb "$ephemeraldb" > /dev/null 2>&1
         done
     else
         echo "Soft reset: creating databases only if they don't exist (0 to $max_count)..."
 
         for i in $(seq 0 $max_count); do
             db="sparkoperator_$i"
+            ephemeraldb="spark_ephemeral_$i"
             if ! psql -lqt | cut -d \| -f 1 | grep -qw "$db"; then
                 echo "Creating $db as it doesn't exist..."
                 createdb "$db" > /dev/null 2>&1
+            fi
+            if ! psql -lqt | cut -d \| -f 1 | grep -qw "$ephemeraldb"; then
+                echo "Creating $ephemeraldb as it doesn't exist..."
+                createdb "$ephemeraldb" > /dev/null 2>&1
             fi
         done
     fi
@@ -643,7 +652,9 @@ reset_databases() {
     cd spark
     for i in $(seq 0 $max_count); do
         db="sparkoperator_$i"
+        ephemeraldb="spark_ephemeral_$i"
         atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/$db?sslmode=disable"
+        atlas migrate apply --dir "file://so/entephemeral/migrate/migrations" --url "postgresql://127.0.0.1:5432/$ephemeraldb?sslmode=disable"
     done
     cd -
 

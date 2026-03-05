@@ -124,6 +124,7 @@ COPY --from=builder-go /go/bin/dlv /usr/local/bin/dlv
 COPY --from=builder-go /bin/grpc_health_probe /usr/local/bin/grpc_health_probe
 COPY --from=builder-rust /signer/target/*/release/spark-frost-signer /usr/local/bin/spark-frost-signer
 COPY spark/so/ent/migrate/migrations /opt/spark/migrations
+COPY spark/so/entephemeral/migrate/migrations /opt/spark/ephemeral_migrations
 
 RUN if [ "$DEBUG" = "0" ]; then rm -f /usr/local/bin/dlv; fi
 

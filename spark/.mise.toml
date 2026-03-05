@@ -69,3 +69,11 @@ run = "atlas migrate hash --dir 'file://migrate/migrations'"
 [tasks.atlas-diff]
 dir = "so/ent"
 run = "atlas migrate diff \"$@\" --env local"
+
+[tasks.atlas-ephemeral-hash]
+dir = "so/entephemeral"
+run = "atlas migrate hash --dir 'file://migrate/migrations'"
+
+[tasks.atlas-ephemeral-diff]
+dir = "so/entephemeral"
+run = "atlas migrate diff \"$@\" --env local"
