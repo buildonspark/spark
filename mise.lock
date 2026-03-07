@@ -61,13 +61,13 @@ backend = "aqua:jqlang/jq"
 "platforms.windows-x64" = { checksum = "sha256:23cb60a1354eed6bcc8d9b9735e8c7b388cd1fdcb75726b93bc299ef22dd9334", url = "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-windows-amd64.exe"}
 
 [[tools.lefthook]]
-version = "2.0.12"
+version = "2.1.1"
 backend = "aqua:evilmartians/lefthook"
-"platforms.linux-arm64" = { checksum = "sha256:4405c0c936c2209202107b4f78a7fe7451f0b4c35ed41ba874901c89fc9d6466", url = "https://github.com/evilmartians/lefthook/releases/download/v2.0.12/lefthook_2.0.12_Linux_aarch64.gz"}
-"platforms.linux-x64" = { checksum = "sha256:6faaf1bdfcb3f654fc236b76872aeb6d8258cf0a2a5793ddafeac7ed8527bd14", url = "https://github.com/evilmartians/lefthook/releases/download/v2.0.12/lefthook_2.0.12_Linux_x86_64.gz"}
-"platforms.macos-arm64" = { checksum = "sha256:9aa9461773162ddbd2aa64750d521d3381bcc1f4f78a012c4f05e7b20f1cb1ce", url = "https://github.com/evilmartians/lefthook/releases/download/v2.0.12/lefthook_2.0.12_MacOS_arm64.gz"}
-"platforms.macos-x64" = { checksum = "sha256:8c62194853bf74aacdb6a13f16b74b384c97cb8a0d11a7f29ca1e1e40ea506e8", url = "https://github.com/evilmartians/lefthook/releases/download/v2.0.12/lefthook_2.0.12_MacOS_x86_64.gz"}
-"platforms.windows-x64" = { checksum = "sha256:e5e002b6551694fedaf0e90d0464ae734dcf8f07f1fa79d036ee0421a0768729", url = "https://github.com/evilmartians/lefthook/releases/download/v2.0.12/lefthook_2.0.12_Windows_x86_64.gz"}
+"platforms.linux-arm64" = { checksum = "sha256:46907f78fa64de6d47e4f4c6b80f9ad246a09c67262c00ba5a32c74217d7f5ea", url = "https://github.com/evilmartians/lefthook/releases/download/v2.1.1/lefthook_2.1.1_Linux_aarch64.gz"}
+"platforms.linux-x64" = { checksum = "sha256:5d29942bb5954c59d67d8c37184411034e576ed2829e22b0a6d88bba934e4fbb", url = "https://github.com/evilmartians/lefthook/releases/download/v2.1.1/lefthook_2.1.1_Linux_x86_64.gz"}
+"platforms.macos-arm64" = { checksum = "sha256:efe16a83824d2fc0f95719102045263b0f6d61d3c998442a12763c285f8b49bc", url = "https://github.com/evilmartians/lefthook/releases/download/v2.1.1/lefthook_2.1.1_MacOS_arm64.gz"}
+"platforms.macos-x64" = { checksum = "sha256:a73e790b9e7b7bc13810cb9f7d7945462f899165c25d14f39bc31d9a70427638", url = "https://github.com/evilmartians/lefthook/releases/download/v2.1.1/lefthook_2.1.1_MacOS_x86_64.gz"}
+"platforms.windows-x64" = { checksum = "sha256:ac26892266ce98066c469d2db7feafe067009b9cff85786dae7605cf3be0db50", url = "https://github.com/evilmartians/lefthook/releases/download/v2.1.1/lefthook_2.1.1_Windows_x86_64.gz"}
 
 [[tools.node]]
 version = "20.19.0"
@@ -117,3 +117,12 @@ backend = "aqua:bufbuild/protoc-gen-validate"
 [[tools.rust]]
 version = "1.92.0"
 backend = "core:rust"
+
+[[tools.tilt]]
+version = "0.36.0"
+backend = "aqua:tilt-dev/tilt"
+"platforms.linux-arm64" = { checksum = "sha256:1fb79ec7609c9d430c29c66d9d1c12c2a58aaf2314bf42d7372105f8ab2eb4ce", url = "https://github.com/tilt-dev/tilt/releases/download/v0.36.0/tilt.0.36.0.linux.arm64.tar.gz"}
+"platforms.linux-x64" = { checksum = "sha256:9ce610083efc76ffa518ec9b001ddb1711b652adce3333f57ffff6be50ad9719", url = "https://github.com/tilt-dev/tilt/releases/download/v0.36.0/tilt.0.36.0.linux.x86_64.tar.gz"}
+"platforms.macos-arm64" = { checksum = "sha256:2e7c99c07d9a06ba8b76bc758c8808f263e12356ea88bba7438f61832e9963df", url = "https://github.com/tilt-dev/tilt/releases/download/v0.36.0/tilt.0.36.0.mac.arm64.tar.gz"}
+"platforms.macos-x64" = { checksum = "sha256:07639c3ec1a22301ce2b4b96f9786074a53ae56714c2fb1940611d60a04d7bc9", url = "https://github.com/tilt-dev/tilt/releases/download/v0.36.0/tilt.0.36.0.mac.x86_64.tar.gz"}
+"platforms.windows-x64" = { checksum = "sha256:d16d482119886c19d65c3f61f3588198f85696d30c08efdf19c4e17624b941ea", url = "https://github.com/tilt-dev/tilt/releases/download/v0.36.0/tilt.0.36.0.windows.x86_64.zip"}
