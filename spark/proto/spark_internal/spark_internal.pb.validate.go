@@ -5158,6 +5158,10 @@ func (m *InitiateStaticDepositUtxoSwapRequest) validate(all bool) error {
 
 	// no validation rules for HashVariant
 
+	if m.ConfirmationThreshold != nil {
+		// no validation rules for ConfirmationThreshold
+	}
+
 	if len(errors) > 0 {
 		return InitiateStaticDepositUtxoSwapRequestMultiError(errors)
 	}

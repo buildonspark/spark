@@ -102,13 +102,13 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test verification
-		verifiedUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: txidStringBytes, Vout: vout})
+		verifiedUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: txidStringBytes, Vout: vout}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, utxo.ID, verifiedUtxo.inner.ID)
 		assert.Equal(t, utxo.BlockHeight, verifiedUtxo.inner.BlockHeight)
 
 		// Test verification in mainnet (should fail)
-		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Mainnet, &pb.UTXO{Txid: txidStringBytes, Vout: vout})
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Mainnet, &pb.UTXO{Txid: txidStringBytes, Vout: vout}, nil)
 		require.ErrorContains(t, err, "utxo not found")
 	})
 
@@ -155,7 +155,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test verification with not yet mined utxo
-		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: testTxid2StringBytes, Vout: 1})
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: testTxid2StringBytes, Vout: 1}, nil)
 		require.Error(t, err)
 		grpcError, ok := status.FromError(err)
 		require.True(t, ok)
@@ -176,7 +176,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test verification
-		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: testTxid2StringBytes, Vout: 1})
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: testTxid2StringBytes, Vout: 1}, nil)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "deposit tx doesn't have enough confirmations")
 	})
@@ -195,7 +195,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		for i := range tooLongTxid {
 			tooLongTxid[i] = byte(i)
 		}
-		_, err := VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: tooLongTxid, Vout: 0})
+		_, err := VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: tooLongTxid, Vout: 0}, nil)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "invalid txid length: expected 32 bytes, got 33 bytes")
 		// Test with invalid txid (too short - less than 32 bytes)
@@ -203,18 +203,244 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		for i := range tooShortTxid {
 			tooShortTxid[i] = byte(i)
 		}
-		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: tooShortTxid, Vout: 0})
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: tooShortTxid, Vout: 0}, nil)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "invalid txid length: expected 32 bytes, got 16 bytes")
 		// Test with empty txid
 		emptyTxid := []byte{}
-		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: emptyTxid, Vout: 0})
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: emptyTxid, Vout: 0}, nil)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "invalid txid length: expected 32 bytes, got 0 bytes")
 		// Test with nil reqUtxo
-		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, nil)
+		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, nil, nil)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "requested UTXO is nil")
+	})
+
+	t.Run("threshold_1_with_1_conf_succeeds", func(t *testing.T) {
+		testSecretKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		testPublicKey := testSecretKey.Public()
+		signingKeyshare, err := tx.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(testSecretKey).
+			SetPublicShares(map[string]keys.Public{"test": testPublicKey}).
+			SetPublicKey(testPublicKey).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		testIdentityKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		testSigningKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		depositAddress, err := tx.DepositAddress.Create().
+			SetAddress("test_address_threshold_1_pass").
+			SetOwnerIdentityPubkey(testIdentityKey.Public()).
+			SetOwnerSigningPubkey(testSigningKey.Public()).
+			SetSigningKeyshare(signingKeyshare).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		testTxid, err := chainhash.NewHash(chainhash.DoubleHashB([]byte("threshold_1_pass")))
+		require.NoError(t, err)
+		txidBytes, err := hex.DecodeString(testTxid.String())
+		require.NoError(t, err)
+
+		// 1 confirmation: blockHeight(100) - utxoBlockHeight(100) + 1 = 1
+		_, err = tx.Utxo.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetTxid(txidBytes).
+			SetVout(0).
+			SetBlockHeight(int64(blockHeight)).
+			SetAmount(1000).
+			SetPkScript([]byte("test_script")).
+			SetDepositAddress(depositAddress).
+			Save(ctx)
+		require.NoError(t, err)
+
+		result, err := VerifiedTargetUtxoFromRequestWithThreshold(ctx, tx, btcnetwork.Regtest, &pb.UTXO{Txid: txidBytes, Vout: 0}, 1)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("threshold_1_with_0_conf_returns_nil", func(t *testing.T) {
+		testSecretKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		testPublicKey := testSecretKey.Public()
+		signingKeyshare, err := tx.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(testSecretKey).
+			SetPublicShares(map[string]keys.Public{"test": testPublicKey}).
+			SetPublicKey(testPublicKey).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		testIdentityKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		testSigningKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		depositAddress, err := tx.DepositAddress.Create().
+			SetAddress("test_address_threshold_1_fail").
+			SetOwnerIdentityPubkey(testIdentityKey.Public()).
+			SetOwnerSigningPubkey(testSigningKey.Public()).
+			SetSigningKeyshare(signingKeyshare).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		testTxid, err := chainhash.NewHash(chainhash.DoubleHashB([]byte("threshold_1_fail")))
+		require.NoError(t, err)
+		txidBytes, err := hex.DecodeString(testTxid.String())
+		require.NoError(t, err)
+
+		// 0 confirmations: blockHeight(100) - utxoBlockHeight(101) + 1 = 0
+		_, err = tx.Utxo.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetTxid(txidBytes).
+			SetVout(0).
+			SetBlockHeight(int64(blockHeight + 1)).
+			SetAmount(1000).
+			SetPkScript([]byte("test_script")).
+			SetDepositAddress(depositAddress).
+			Save(ctx)
+		require.NoError(t, err)
+
+		result, err := VerifiedTargetUtxoFromRequestWithThreshold(ctx, tx, btcnetwork.Regtest, &pb.UTXO{Txid: txidBytes, Vout: 0}, 1)
+		require.NoError(t, err)
+		assert.Nil(t, result)
+	})
+
+	t.Run("threshold_3_with_3_conf_succeeds", func(t *testing.T) {
+		testSecretKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		testPublicKey := testSecretKey.Public()
+		signingKeyshare, err := tx.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(testSecretKey).
+			SetPublicShares(map[string]keys.Public{"test": testPublicKey}).
+			SetPublicKey(testPublicKey).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		testIdentityKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		testSigningKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		depositAddress, err := tx.DepositAddress.Create().
+			SetAddress("test_address_threshold_3_pass").
+			SetOwnerIdentityPubkey(testIdentityKey.Public()).
+			SetOwnerSigningPubkey(testSigningKey.Public()).
+			SetSigningKeyshare(signingKeyshare).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		testTxid, err := chainhash.NewHash(chainhash.DoubleHashB([]byte("threshold_3_pass")))
+		require.NoError(t, err)
+		txidBytes, err := hex.DecodeString(testTxid.String())
+		require.NoError(t, err)
+
+		// 3 confirmations: blockHeight(100) - utxoBlockHeight(98) + 1 = 3
+		_, err = tx.Utxo.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetTxid(txidBytes).
+			SetVout(0).
+			SetBlockHeight(int64(blockHeight - 2)).
+			SetAmount(1000).
+			SetPkScript([]byte("test_script")).
+			SetDepositAddress(depositAddress).
+			Save(ctx)
+		require.NoError(t, err)
+
+		result, err := VerifiedTargetUtxoFromRequestWithThreshold(ctx, tx, btcnetwork.Regtest, &pb.UTXO{Txid: txidBytes, Vout: 0}, 3)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("threshold_3_with_2_conf_returns_nil", func(t *testing.T) {
+		testSecretKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		testPublicKey := testSecretKey.Public()
+		signingKeyshare, err := tx.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(testSecretKey).
+			SetPublicShares(map[string]keys.Public{"test": testPublicKey}).
+			SetPublicKey(testPublicKey).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		testIdentityKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		testSigningKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		depositAddress, err := tx.DepositAddress.Create().
+			SetAddress("test_address_threshold_3_fail").
+			SetOwnerIdentityPubkey(testIdentityKey.Public()).
+			SetOwnerSigningPubkey(testSigningKey.Public()).
+			SetSigningKeyshare(signingKeyshare).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		testTxid, err := chainhash.NewHash(chainhash.DoubleHashB([]byte("threshold_3_fail")))
+		require.NoError(t, err)
+		txidBytes, err := hex.DecodeString(testTxid.String())
+		require.NoError(t, err)
+
+		// 2 confirmations: blockHeight(100) - utxoBlockHeight(99) + 1 = 2, needs 3
+		_, err = tx.Utxo.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetTxid(txidBytes).
+			SetVout(0).
+			SetBlockHeight(int64(blockHeight - 1)).
+			SetAmount(1000).
+			SetPkScript([]byte("test_script")).
+			SetDepositAddress(depositAddress).
+			Save(ctx)
+		require.NoError(t, err)
+
+		result, err := VerifiedTargetUtxoFromRequestWithThreshold(ctx, tx, btcnetwork.Regtest, &pb.UTXO{Txid: txidBytes, Vout: 0}, 3)
+		require.NoError(t, err)
+		assert.Nil(t, result)
+	})
+}
+
+func TestResolveConfirmationThreshold(t *testing.T) {
+	t.Run("uses_request_value", func(t *testing.T) {
+		requested := uint32(1)
+		config := &so.Config{
+			BitcoindConfigs: map[string]so.BitcoindConfig{
+				"regtest": {DepositConfirmationThreshold: 3},
+			},
+		}
+		result := resolveConfirmationThreshold(&requested, config, btcnetwork.Regtest)
+		assert.Equal(t, uint32(1), result)
+	})
+
+	t.Run("falls_back_to_config", func(t *testing.T) {
+		config := &so.Config{
+			BitcoindConfigs: map[string]so.BitcoindConfig{
+				"regtest": {DepositConfirmationThreshold: 5},
+			},
+		}
+		result := resolveConfirmationThreshold(nil, config, btcnetwork.Regtest)
+		assert.Equal(t, uint32(5), result)
+	})
+
+	t.Run("falls_back_to_default", func(t *testing.T) {
+		config := &so.Config{
+			BitcoindConfigs: map[string]so.BitcoindConfig{},
+		}
+		result := resolveConfirmationThreshold(nil, config, btcnetwork.Regtest)
+		assert.Equal(t, uint32(DefaultDepositConfirmationThreshold), result)
+	})
+
+	t.Run("ignores_zero", func(t *testing.T) {
+		requested := uint32(0)
+		config := &so.Config{
+			BitcoindConfigs: map[string]so.BitcoindConfig{
+				"regtest": {DepositConfirmationThreshold: 5},
+			},
+		}
+		result := resolveConfirmationThreshold(&requested, config, btcnetwork.Regtest)
+		assert.Equal(t, uint32(5), result)
 	})
 }
 

@@ -287,7 +287,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 	}
 	// Validate the on-chain UTXO
 
-	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, userIDPubKey); err != nil {
 				return nil, fmt.Errorf("utxo swap is already completed by another user")
 			}
-			spendTxSigningResult, depositAddressQueryResult, err := GetSpendTxSigningResult(ctx, config, req.OnChainUtxo, req.RefundTxSigningJob)
+			spendTxSigningResult, depositAddressQueryResult, err := GetSpendTxSigningResult(ctx, config, req.OnChainUtxo, req.RefundTxSigningJob, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get spend tx signing result: %w", err)
 			}
@@ -348,7 +348,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 	// **********************************************************************************************
 	// Signing the spend transactions.
 	// **********************************************************************************************
-	spendTxSigningResult, depositAddressQueryResult, err := GetSpendTxSigningResult(ctx, config, req.OnChainUtxo, req.RefundTxSigningJob)
+	spendTxSigningResult, depositAddressQueryResult, err := GetSpendTxSigningResult(ctx, config, req.OnChainUtxo, req.RefundTxSigningJob, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get spend tx signing result: %w", err)
 	}

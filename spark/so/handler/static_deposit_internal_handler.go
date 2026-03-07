@@ -131,7 +131,11 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, err
 	}
 	// Validate the on-chain UTXO
-	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo)
+	if req.ConfirmationThreshold != nil && *req.ConfirmationThreshold == 0 {
+		return nil, fmt.Errorf("confirmation_threshold must be at least 1")
+	}
+	threshold := resolveConfirmationThreshold(req.ConfirmationThreshold, config, schemaNetwork)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo, &threshold)
 	if err != nil {
 		return nil, err
 	}
@@ -549,7 +553,7 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 		return nil, fmt.Errorf("failed to get db: %w", err)
 	}
 
-	targetUtxo, err := VerifiedTargetUtxoFromRequestWithThreshold(ctx, config, db, network, req.OnChainUtxo, 1)
+	targetUtxo, err := VerifiedTargetUtxoFromRequestWithThreshold(ctx, db, network, req.OnChainUtxo, 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify on-chain utxo: %w", err)
 	}
@@ -647,7 +651,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, err
 	}
 	// Validate the on-chain UTXO
-	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo, nil)
 	if err != nil {
 		return nil, err
 	}

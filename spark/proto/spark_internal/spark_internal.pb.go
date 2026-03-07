@@ -2455,9 +2455,11 @@ type InitiateStaticDepositUtxoSwapRequest struct {
 	// Transaction constructed by the SSP spending the UTXO to an address it owns.
 	SpendTxSigningJob *spark.SigningJob `protobuf:"bytes,5,opt,name=spend_tx_signing_job,json=spendTxSigningJob,proto3" json:"spend_tx_signing_job,omitempty"`
 	// Optional: which hash variant was used to create user_signature.
-	HashVariant   spark.HashVariant `protobuf:"varint,6,opt,name=hash_variant,json=hashVariant,proto3,enum=spark.HashVariant" json:"hash_variant,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	HashVariant spark.HashVariant `protobuf:"varint,6,opt,name=hash_variant,json=hashVariant,proto3,enum=spark.HashVariant" json:"hash_variant,omitempty"`
+	// Optional: minimum confirmations required. Defaults to 3 if unset/0. Min 1.
+	ConfirmationThreshold *uint32 `protobuf:"varint,7,opt,name=confirmation_threshold,json=confirmationThreshold,proto3,oneof" json:"confirmation_threshold,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *InitiateStaticDepositUtxoSwapRequest) Reset() {
@@ -2530,6 +2532,13 @@ func (x *InitiateStaticDepositUtxoSwapRequest) GetHashVariant() spark.HashVarian
 		return x.HashVariant
 	}
 	return spark.HashVariant(0)
+}
+
+func (x *InitiateStaticDepositUtxoSwapRequest) GetConfirmationThreshold() uint32 {
+	if x != nil && x.ConfirmationThreshold != nil {
+		return *x.ConfirmationThreshold
+	}
+	return 0
 }
 
 type CreateStaticDepositUtxoSwapRequest struct {
@@ -4067,14 +4076,16 @@ const file_spark_internal_proto_rawDesc = "" +
 	"utxoSwapId\x12\x1c\n" +
 	"\tsignature\x18\x03 \x01(\fR\tsignature\x124\n" +
 	"\x16coordinator_public_key\x18\x04 \x01(\fR\x14coordinatorPublicKey\")\n" +
-	"'SaveUtxoForInstantStaticDepositResponse\"\xd7\x02\n" +
+	"'SaveUtxoForInstantStaticDepositResponse\"\xae\x03\n" +
 	"$InitiateStaticDepositUtxoSwapRequest\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12#\n" +
 	"\rssp_signature\x18\x02 \x01(\fR\fsspSignature\x12%\n" +
 	"\x0euser_signature\x18\x03 \x01(\fR\ruserSignature\x127\n" +
 	"\btransfer\x18\x04 \x01(\v2\x1b.spark.StartTransferRequestR\btransfer\x12B\n" +
 	"\x14spend_tx_signing_job\x18\x05 \x01(\v2\x11.spark.SigningJobR\x11spendTxSigningJob\x125\n" +
-	"\fhash_variant\x18\x06 \x01(\x0e2\x12.spark.HashVariantR\vhashVariant\"\xc8\x01\n" +
+	"\fhash_variant\x18\x06 \x01(\x0e2\x12.spark.HashVariantR\vhashVariant\x12:\n" +
+	"\x16confirmation_threshold\x18\a \x01(\rH\x00R\x15confirmationThreshold\x88\x01\x01B\x19\n" +
+	"\x17_confirmation_threshold\"\xc8\x01\n" +
 	"\"CreateStaticDepositUtxoSwapRequest\x12N\n" +
 	"\arequest\x18\x01 \x01(\v24.spark_internal.InitiateStaticDepositUtxoSwapRequestR\arequest\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +
@@ -4489,6 +4500,7 @@ func file_spark_internal_proto_init() {
 	}
 	file_spark_internal_proto_msgTypes[1].OneofWrappers = []any{}
 	file_spark_internal_proto_msgTypes[15].OneofWrappers = []any{}
+	file_spark_internal_proto_msgTypes[36].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

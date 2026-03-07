@@ -1320,7 +1320,7 @@ func (u *VerifiedTargetUtxo) Vout() uint32 {
 }
 
 // Verifies that an UTXO is confirmed on the blockchain and has sufficient confirmations.
-func VerifiedTargetUtxoFromRequest(ctx context.Context, config *so.Config, db *ent.Client, network btcnetwork.Network, reqUtxo *pb.UTXO) (*VerifiedTargetUtxo, error) {
+func VerifiedTargetUtxoFromRequest(ctx context.Context, config *so.Config, db *ent.Client, network btcnetwork.Network, reqUtxo *pb.UTXO, confirmationThreshold *uint32) (*VerifiedTargetUtxo, error) {
 	if reqUtxo == nil {
 		return nil, fmt.Errorf("requested UTXO is nil")
 	}
@@ -1353,9 +1353,14 @@ func VerifiedTargetUtxoFromRequest(ctx context.Context, config *so.Config, db *e
 		return nil, fmt.Errorf("failed to get target utxo: %w", err)
 	}
 
-	threshold := DefaultDepositConfirmationThreshold
-	if bitcoinConfig, ok := config.BitcoindConfigs[strings.ToLower(network.String())]; ok {
-		threshold = bitcoinConfig.DepositConfirmationThreshold
+	var threshold uint
+	if confirmationThreshold != nil {
+		threshold = uint(*confirmationThreshold)
+	} else {
+		threshold = DefaultDepositConfirmationThreshold
+		if bitcoinConfig, ok := config.BitcoindConfigs[strings.ToLower(network.String())]; ok {
+			threshold = bitcoinConfig.DepositConfirmationThreshold
+		}
 	}
 	if blockHeight.Height-targetUtxo.BlockHeight+1 < int64(threshold) {
 		return nil, errors.FailedPreconditionInsufficientConfirmations(fmt.Errorf("deposit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", targetUtxo.BlockHeight, blockHeight.Height))
@@ -1363,10 +1368,23 @@ func VerifiedTargetUtxoFromRequest(ctx context.Context, config *so.Config, db *e
 	return &VerifiedTargetUtxo{inner: targetUtxo, txid: *reqUtxoTxid}, nil
 }
 
+// resolveConfirmationThreshold returns the effective confirmation threshold.
+// Uses the request-provided value if >= 1, otherwise falls back to the
+// SO config value, otherwise falls back to DefaultDepositConfirmationThreshold (3).
+func resolveConfirmationThreshold(requested *uint32, config *so.Config, network btcnetwork.Network) uint32 {
+	if requested != nil && *requested >= 1 {
+		return *requested
+	}
+	if bitcoinConfig, ok := config.BitcoindConfigs[strings.ToLower(network.String())]; ok {
+		return uint32(bitcoinConfig.DepositConfirmationThreshold)
+	}
+	return uint32(DefaultDepositConfirmationThreshold)
+}
+
 // VerifiedTargetUtxoFromRequestWithThreshold verifies a UTXO with an optional confirmation threshold override.
 // If the UTXO doesn't meet the confirmation requirement, returns (nil, nil) instead of an error.
 // This allows callers to handle unconfirmed UTXOs gracefully.
-func VerifiedTargetUtxoFromRequestWithThreshold(ctx context.Context, config *so.Config, db *ent.Client, network btcnetwork.Network, reqUtxo *pb.UTXO, threshold uint32) (*VerifiedTargetUtxo, error) {
+func VerifiedTargetUtxoFromRequestWithThreshold(ctx context.Context, db *ent.Client, network btcnetwork.Network, reqUtxo *pb.UTXO, threshold uint32) (*VerifiedTargetUtxo, error) {
 	if reqUtxo == nil {
 		return nil, fmt.Errorf("requested UTXO is nil")
 	}
@@ -1493,7 +1511,7 @@ func GetTxSigningInfo(ctx context.Context, targetUtxo *ent.Utxo, spendTxRaw []by
 	return spendTxSigHash, total, nil
 }
 
-func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UTXO, spendTxSigningJob *pb.SigningJob) (*pb.SigningResult, *pb.DepositAddressQueryResult, error) {
+func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UTXO, spendTxSigningJob *pb.SigningJob, confirmationThreshold *uint32) (*pb.SigningResult, *pb.DepositAddressQueryResult, error) {
 	if spendTxSigningJob == nil || spendTxSigningJob.SigningNonceCommitment == nil || spendTxSigningJob.RawTx == nil {
 		return nil, nil, fmt.Errorf("spend tx signing job is not valid")
 	}
@@ -1506,7 +1524,7 @@ func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UT
 		return nil, nil, fmt.Errorf("failed to get schema network: %w", err)
 	}
 
-	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, network, utxo)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, network, utxo, confirmationThreshold)
 	if err != nil {
 		return nil, nil, err
 	}

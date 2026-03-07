@@ -398,6 +398,8 @@ message InitiateStaticDepositUtxoSwapRequest {
     spark.SigningJob spend_tx_signing_job = 5;
     // Optional: which hash variant was used to create user_signature.
     spark.HashVariant hash_variant = 6;
+    // Optional: minimum confirmations required. Defaults to 3 if unset/0. Min 1.
+    optional uint32 confirmation_threshold = 7;
 }
 
 message CreateStaticDepositUtxoSwapRequest {
