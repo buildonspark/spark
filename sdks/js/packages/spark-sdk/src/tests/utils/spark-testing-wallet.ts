@@ -68,6 +68,10 @@ export class SparkWalletTestingIntegration extends SparkWalletTesting {
     return this.transferService;
   }
 
+  public getLeafManager() {
+    return this.leafManager;
+  }
+
   public getDepositService() {
     return this.depositService;
   }

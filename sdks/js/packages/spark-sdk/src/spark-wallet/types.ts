@@ -191,6 +191,7 @@ export type HandlePublicMethodErrorParams = {
 
 export const SparkWalletEvent = {
   All: "*",
+  BalanceUpdate: "balance:update",
   TransferClaimed: "transfer:claimed",
   DepositConfirmed: "deposit:confirmed",
   StreamConnected: "stream:connected",
@@ -203,6 +204,12 @@ export type SparkWalletEventType =
 
 export interface SparkWalletEvents {
   [SparkWalletEvent.All]: (eventName: string, ...args: unknown[]) => void;
+  /** Emitted whenever the balance changes (deposits, transfers, swaps, claims). */
+  [SparkWalletEvent.BalanceUpdate]: (balance: {
+    available: bigint;
+    owned: bigint;
+    incoming: bigint;
+  }) => void;
   /** Emitted when an incoming transfer is successfully claimed. Includes the transfer ID and new total balance. */
   [SparkWalletEvent.TransferClaimed]: (
     transferId: string,

@@ -141,9 +141,9 @@ describe("SSP coop exit integration", () => {
       }),
     ).rejects.toMatchObject({
       name: SparkValidationError.name,
-      message: expect.stringContaining("No owned leaves found"),
+      message: expect.stringContaining("exceeds available balance"),
       context: expect.objectContaining({
-        field: "leaves",
+        field: "targetAmounts",
       }),
     });
   }, 600000);

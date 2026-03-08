@@ -718,7 +718,7 @@ async function runCLI() {
   initwallet [mnemonic | seed]                                        - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
   setprivacyenabled <true|false>                                      - Set the privacy enabled setting for the wallet
   getwalletsettings                                                   - Get the wallet's settings
-  getbalance                                                          - Get the wallet's balance
+  getbalance                                                          - Get the wallet's balance (available, pending, incoming)
   getdepositaddress                                                   - Get an address to deposit funds from L1 to Spark
   getstaticdepositaddress                                             - Get a static address to deposit funds from L1 to Spark
   identity                                                            - Get the wallet's identity public key
@@ -1178,7 +1178,13 @@ async function runCLI() {
             break;
           }
           const balanceInfo = await wallet.getBalance();
-          console.log("Sats Balance: " + balanceInfo.balance);
+          const { satsBalance } = balanceInfo;
+          console.log("Sats Balance:");
+          console.log("  Available: " + satsBalance.available);
+          console.log("  Owned:     " + satsBalance.owned);
+          if (satsBalance.incoming > 0n) {
+            console.log("  Incoming:  " + satsBalance.incoming);
+          }
           if (balanceInfo.tokenBalances && balanceInfo.tokenBalances.size > 0) {
             console.log(
               "\nToken Balances: [<tokenIdentifier> (<issuerPublicKey>)]",

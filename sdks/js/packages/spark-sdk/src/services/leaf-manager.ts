@@ -42,14 +42,19 @@ type LeafRecord = {
   treeNode: TreeNode;
   status: LeafStatus;
   source: LeafSource;
-
-  lockId?: string;
-  lockExpiresAt?: number;
-  lastUpdated?: number;
 };
 
 const VALID_TRANSITIONS: Record<LeafStatus, LeafStatus[]> = {
-  [LeafStatus.AVAILABLE]: [LeafStatus.LOCAL_LOCKED],
+  // AVAILABLE → OUTGOING/SWAP_PENDING/SPENT: concurrent wallet case only —
+  // another instance sent a transfer or swap using this leaf, we receive the
+  // stream event while the leaf is still AVAILABLE in our cache (we never
+  // locked it locally).
+  [LeafStatus.AVAILABLE]: [
+    LeafStatus.LOCAL_LOCKED,
+    LeafStatus.OUTGOING,
+    LeafStatus.SWAP_PENDING,
+    LeafStatus.SPENT,
+  ],
   [LeafStatus.LOCAL_LOCKED]: [
     LeafStatus.AVAILABLE,
     LeafStatus.OUTGOING,
@@ -89,6 +94,7 @@ export type BalanceSnapshot = {
 export type OnBalanceUpdate = (balance: BalanceSnapshot) => void;
 export default class LeafManager {
   private optimizationInProgress = false;
+  private hasSynced = false;
   private leaves: Map<string, LeafRecord> = new Map();
 
   // Mutex policy: acquire when transitioning AVAILABLE → LOCAL_LOCKED (prevents
@@ -98,12 +104,14 @@ export default class LeafManager {
   // synchronous iterations can't be interleaved.
   private leavesMutex = new Mutex();
   private identityPublicKey: Uint8Array | undefined;
+
   constructor(
     private readonly config: WalletConfigService,
     private readonly swapService: SwapService,
     private readonly transferService: TransferService,
     private readonly connectionManager: ConnectionManager,
     private readonly onBalanceUpdate?: OnBalanceUpdate,
+    private readonly onAutoOptimize?: () => Promise<void>,
   ) {}
 
   private emitBalanceUpdate(): void {
@@ -114,7 +122,16 @@ export default class LeafManager {
     });
   }
 
-  // #region Public API
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
+
+  /** Must be called before stream events are processed. Sets the identity
+   *  public key used by handleTransferEvent to filter sender events. */
+  public async initialize() {
+    this.identityPublicKey = await this.config.signer.getIdentityPublicKey();
+  }
+
   public async sync() {
     this.identityPublicKey = await this.config.signer.getIdentityPublicKey();
 
@@ -202,8 +219,11 @@ export default class LeafManager {
         this.leaves.set(id, record);
       }
 
-      this.emitBalanceUpdate();
+      this.hasSynced = true;
     });
+
+    this.autoOptimizeIfNeeded();
+    this.emitBalanceUpdate();
   }
 
   public async getLeaves(isBalanceCheck: boolean = false): Promise<TreeNode[]> {
@@ -361,13 +381,49 @@ export default class LeafManager {
       const selectedIds = Object.values(selectedLeaves)
         .flat()
         .map((l) => l.id);
+
+      // Renew any leaves whose timelocks are close to expiry before handing
+      // them to the executor. This avoids an avoidable round-trip from the
+      // stale-leaf retry path when a leaf expires between sync() calls.
+      const allFlat = Object.values(selectedLeaves).flat();
+      const renewed = await this.checkRenewLeaves(allFlat);
+      if (renewed.length < allFlat.length) {
+        const renewedIds = new Set(renewed.map((l) => l.id));
+        const dropped = allFlat.filter((l) => !renewedIds.has(l.id));
+        console.warn(
+          `[LeafManager] ${dropped.length} leaf(es) dropped during renewal — will cause stale-leaf retry`,
+          dropped.map((l) => l.id),
+        );
+      }
+      if (renewed.length > 0) {
+        const renewedMap = new Map(renewed.map((l) => [l.id, l]));
+        for (const key of Object.keys(selectedLeaves)) {
+          const batch = (selectedLeaves as Record<string, TreeNode[]>)[key]!;
+          for (let i = 0; i < batch.length; i++) {
+            const fresh = renewedMap.get(batch[i]!.id);
+            if (fresh) {
+              batch[i] = fresh;
+              // Keep cache consistent with what the executor receives
+              const record = this.leaves.get(fresh.id);
+              if (record) record.treeNode = fresh;
+            }
+          }
+        }
+      }
+
       try {
         const result = await executor(selectedLeaves);
-        // Executor succeeded — mark any leaves still LOCAL_LOCKED as OUTGOING.
-        // If a stream event already advanced them (OUTGOING/SPENT), this is a
-        // no-op since those transitions aren't in VALID_TRANSITIONS for the
-        // current status.
-        this.transition(selectedIds, LeafStatus.OUTGOING);
+        // Executor succeeded — mark leaves still LOCAL_LOCKED as OUTGOING.
+        // Only transition LOCAL_LOCKED leaves — leaves that have already been
+        // advanced (OUTGOING/SPENT via handleTransferEvent) or re-claimed
+        // (AVAILABLE via registerClaimedLeaves, e.g., self-transfers) must not
+        // be touched.
+        for (const id of selectedIds) {
+          const record = this.leaves.get(id);
+          if (record?.status === LeafStatus.LOCAL_LOCKED) {
+            record.status = LeafStatus.OUTGOING;
+          }
+        }
         return result;
       } catch (error) {
         // On failure: restore leaves still LOCAL_LOCKED back to AVAILABLE.
@@ -403,23 +459,32 @@ export default class LeafManager {
   }
 
   public async addLeaves(leaves: TreeNode[]) {
+    let changed = false;
     await this.leavesMutex.runExclusive(() => {
       for (const leaf of leaves) {
         const existing = this.leaves.get(leaf.id);
         if (existing && IN_FLIGHT_STATUSES.has(existing.status)) continue;
+        // Skip if already AVAILABLE with same value — no change to emit
+        if (
+          existing?.status === LeafStatus.AVAILABLE &&
+          existing.treeNode.value === leaf.value
+        )
+          continue;
         this.leaves.set(leaf.id, {
           treeNode: leaf,
           status: LeafStatus.AVAILABLE,
           source: { kind: "none" },
         });
+        changed = true;
       }
-      this.emitBalanceUpdate();
     });
+    if (changed) this.emitBalanceUpdate();
   }
 
   /** Add leaves as INCOMING (unclaimed transfer or unconfirmed deposit).
    *  Does not overwrite leaves already in the cache with a non-INCOMING status. */
   public async addIncomingLeaves(leaves: TreeNode[], transferId: string) {
+    let changed = false;
     await this.leavesMutex.runExclusive(() => {
       for (const leaf of leaves) {
         const existing = this.leaves.get(leaf.id);
@@ -429,37 +494,65 @@ export default class LeafManager {
           status: LeafStatus.INCOMING,
           source: { kind: "transfer", transferId },
         });
+        changed = true;
       }
-      this.emitBalanceUpdate();
     });
+    if (changed) this.emitBalanceUpdate();
+  }
+
+  /** Remove stale AVAILABLE leaves not in the fresh coordinator set.
+   *  Only evicts leaves with source "none" — freshly claimed leaves
+   *  (source "transfer") are preserved since they may not yet appear
+   *  in the coordinator response. */
+  public async evictStaleAvailable(freshIds: Set<string>) {
+    let changed = false;
+    await this.leavesMutex.runExclusive(() => {
+      for (const [id, record] of this.leaves) {
+        if (
+          record.status === LeafStatus.AVAILABLE &&
+          record.source.kind === "none" &&
+          !freshIds.has(id)
+        ) {
+          this.leaves.delete(id);
+          changed = true;
+        }
+      }
+    });
+    if (changed) this.emitBalanceUpdate();
   }
 
   public async removeLeaves(leafIds: string[]) {
+    let changed = false;
     await this.leavesMutex.runExclusive(() => {
       for (const id of leafIds) {
-        this.leaves.delete(id);
+        if (this.leaves.delete(id)) changed = true;
       }
-      this.emitBalanceUpdate();
     });
+    if (changed) this.emitBalanceUpdate();
   }
 
   /** Register newly claimed leaves — renews them and adds to cache.
    *  Unconditionally sets status to AVAILABLE, bypassing the IN_FLIGHT_STATUSES
    *  guard in addLeaves, since successfully claimed leaves are definitively ours. */
-  public async registerClaimedLeaves(leaves: TreeNode[]): Promise<TreeNode[]> {
+  public async registerClaimedLeaves(
+    leaves: TreeNode[],
+    transferId?: string,
+  ): Promise<TreeNode[]> {
     const renewed = await this.checkRenewLeaves(leaves);
     await this.leavesMutex.runExclusive(() => {
       for (const leaf of renewed) {
         this.leaves.set(leaf.id, {
           treeNode: leaf,
           status: LeafStatus.AVAILABLE,
-          source: { kind: "none" },
+          // Tag with the transfer ID so handleTransferEvent can detect stale
+          // stream events for self-transfers that reuse the same leaf ID.
+          source: transferId
+            ? { kind: "transfer", transferId }
+            : { kind: "none" },
         });
       }
-      this.emitBalanceUpdate();
     });
-    // Fire-and-forget: don't block the caller waiting for optimization network calls.
-    // autoOptimizeIfNeeded swallows errors internally.
+    this.emitBalanceUpdate();
     this.autoOptimizeIfNeeded();
     return renewed;
   }
@@ -478,21 +571,55 @@ export default class LeafManager {
       return { available, lockedIds };
     });
 
+    // Renew leaves with expiring timelocks before passing to the executor.
+    const renewed = await this.checkRenewLeaves(available);
+    const renewedIds = new Set(renewed.map((l) => l.id));
+    if (renewed.length < available.length) {
+      // Restore dropped leaves to AVAILABLE — they were never passed to the
+      // executor so they must not be marked OUTGOING on success.
+      const droppedIds = available
+        .filter((l) => !renewedIds.has(l.id))
+        .map((l) => l.id);
+      console.warn(
+        `[LeafManager] ${droppedIds.length} leaf(es) dropped during renewal`,
+        droppedIds,
+      );
+      this.restoreLocalLockedToAvailable(droppedIds);
+    }
+    // Update cache with renewed tree nodes
+    for (const leaf of renewed) {
+      const record = this.leaves.get(leaf.id);
+      if (record) record.treeNode = leaf;
+    }
+
     try {
-      const result = await executor(available);
-      this.transition(lockedIds, LeafStatus.OUTGOING);
+      const result = await executor(renewed);
+      // Only transition leaves that were actually passed to the executor
+      for (const id of lockedIds) {
+        if (!renewedIds.has(id)) continue;
+        const record = this.leaves.get(id);
+        if (record?.status === LeafStatus.LOCAL_LOCKED) {
+          record.status = LeafStatus.OUTGOING;
+        }
+      }
       return result;
     } catch (error) {
-      this.restoreLocalLockedToAvailable(lockedIds);
+      // Only restore leaves that were actually passed to the executor.
+      // Dropped leaves were already restored before the executor ran.
+      const renewedLockedIds = lockedIds.filter((id) => renewedIds.has(id));
+      this.restoreLocalLockedToAvailable(renewedLockedIds);
       throw error;
     }
   }
 
-  public async handleDepositEvent(deposit: TreeNode) {
+  /** Returns true if the deposit was added/updated in the cache. */
+  public async handleDepositEvent(deposit: TreeNode): Promise<boolean> {
+    let needsVerification = false;
+    let added = false;
+
+    let changed = false;
     await this.leavesMutex.runExclusive(() => {
       if (deposit.status === "CREATING") {
-        // Unconfirmed deposit — track as INCOMING so it shows in incoming balance.
-        // Don't overwrite if we already have a more advanced status for this leaf.
         const existing = this.leaves.get(deposit.id);
         if (!existing) {
           this.leaves.set(deposit.id, {
@@ -500,7 +627,8 @@ export default class LeafManager {
             status: LeafStatus.INCOMING,
             source: { kind: "deposit", depositId: deposit.id },
           });
-          this.emitBalanceUpdate();
+          changed = true;
+          added = true;
         }
       } else if (deposit.status === "AVAILABLE") {
         const existing = this.leaves.get(deposit.id);
@@ -511,18 +639,70 @@ export default class LeafManager {
           ) {
             existing.treeNode = deposit;
             this.transition([deposit.id], LeafStatus.AVAILABLE);
-            this.emitBalanceUpdate();
+            changed = true;
+            added = true;
           }
-        } else {
+          // Already AVAILABLE or IN_FLIGHT — no change, don't signal as added
+        } else if (!this.hasSynced) {
           this.leaves.set(deposit.id, {
             treeNode: deposit,
             status: LeafStatus.AVAILABLE,
             source: { kind: "deposit", depositId: deposit.id },
           });
-          this.emitBalanceUpdate();
+          changed = true;
+          added = true;
+        } else {
+          needsVerification = true;
         }
       }
     });
+    if (changed) this.emitBalanceUpdate();
+
+    if (needsVerification) {
+      added = await this.verifyAndAddLeaf(deposit.id);
+    }
+
+    return added;
+  }
+
+  /** Query the coordinator for a specific leaf and add it if it's AVAILABLE
+   *  and owned by us. Used to validate stream events for unknown leaves.
+   *  Returns true if the leaf was verified and added. */
+  private async verifyAndAddLeaf(leafId: string): Promise<boolean> {
+    try {
+      const response = await this.queryNodes({
+        source: { $case: "nodeIds", nodeIds: { nodeIds: [leafId] } },
+        includeParents: false,
+        network: this.config.getNetworkProto(),
+        statuses: [],
+      });
+
+      const node = response.nodes[leafId];
+      if (!node || node.status !== "AVAILABLE") return false;
+
+      let wasAdded = false;
+      await this.leavesMutex.runExclusive(() => {
+        const existing = this.leaves.get(leafId);
+        // Already AVAILABLE — treat as successfully verified (may have been
+        // added by a concurrent sync()), so DepositConfirmed still fires.
+        if (existing?.status === LeafStatus.AVAILABLE) {
+          wasAdded = true;
+          return;
+        }
+        if (existing) return; // in-flight — don't overwrite
+
+        this.leaves.set(leafId, {
+          treeNode: node,
+          status: LeafStatus.AVAILABLE,
+          source: { kind: "deposit", depositId: leafId },
+        });
+        wasAdded = true;
+      });
+      if (wasAdded) this.emitBalanceUpdate();
+      return wasAdded;
+    } catch {
+      return false;
+    }
   }
 
   public async handleTransferEvent(transfer: Transfer) {
@@ -539,15 +719,30 @@ export default class LeafManager {
     let changed = false;
     await this.leavesMutex.runExclusive(() => {
       const source: LeafSource = { kind: "transfer", transferId: transfer.id };
+
+      // Skip leaves that were already reclaimed for this transfer (self-transfer).
+      // These are AVAILABLE with source matching this transfer ID — stale stream
+      // events must not re-transition them to OUTGOING/SPENT.
+      const activeLeafIds = leafIds.filter((id) => {
+        const record = this.leaves.get(id);
+        if (!record) return true; // not in cache — let transition handle it
+        if (record.status !== LeafStatus.AVAILABLE) return true; // in-flight — proceed
+        // AVAILABLE leaf: skip if its source is this same transfer (reclaimed)
+        return !(
+          record.source.kind === "transfer" &&
+          record.source.transferId === transfer.id
+        );
+      });
+
       switch (transfer.status) {
         case TransferStatus.TRANSFER_STATUS_RETURNED:
-          this.transition(leafIds, LeafStatus.AVAILABLE, {
+          this.transition(activeLeafIds, LeafStatus.AVAILABLE, {
             source: { kind: "none" },
           });
           changed = true;
           break;
         case TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED:
-          this.transition(leafIds, LeafStatus.SPENT, { source });
+          this.transition(activeLeafIds, LeafStatus.SPENT, { source });
           changed = true;
           break;
         case TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING:
@@ -558,7 +753,7 @@ export default class LeafManager {
             transfer.type === TransferType.PRIMARY_SWAP_V3 ||
             transfer.type === TransferType.SWAP;
           this.transition(
-            leafIds,
+            activeLeafIds,
             isSwap ? LeafStatus.SWAP_PENDING : LeafStatus.OUTGOING,
             { source },
           );
@@ -568,6 +763,43 @@ export default class LeafManager {
       }
     });
     if (changed) this.emitBalanceUpdate();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Balance
+  // ---------------------------------------------------------------------------
+
+  public getAvailableBalance(): number {
+    let total = 0;
+    for (const record of this.leaves.values()) {
+      if (record.status === LeafStatus.AVAILABLE)
+        total += record.treeNode.value;
+    }
+    return total;
+  }
+
+  public getOwnedBalance(): number {
+    let total = 0;
+    for (const record of this.leaves.values()) {
+      if (OWNED_STATUSES.has(record.status)) total += record.treeNode.value;
+    }
+    return total;
+  }
+
+  public getIncomingBalance(): number {
+    let total = 0;
+    for (const record of this.leaves.values()) {
+      if (record.status === LeafStatus.INCOMING) total += record.treeNode.value;
+    }
+    return total;
+  }
+
+  private getAvailableLeaves(): TreeNode[] {
+    return this.getLeavesByStatus(LeafStatus.AVAILABLE);
+  }
+
+  public isOptimizing(): boolean {
+    return this.optimizationInProgress;
   }
 
   /** Read-only leaf selection for queries (fee quotes, etc). Does NOT lock leaves. */
@@ -584,6 +816,10 @@ export default class LeafManager {
     }
     return selected;
   }
+
+  // ---------------------------------------------------------------------------
+  // Leaf Selection
+  // ---------------------------------------------------------------------------
 
   private async selectLeavesWithSwap<T extends number[]>(
     targetAmounts: [...T],
@@ -728,34 +964,9 @@ export default class LeafManager {
     return nodes;
   }
 
-  // #region Balance Getters
-  public getAvailableBalance(): number {
-    let total = 0;
-    for (const record of this.leaves.values()) {
-      if (record.status === LeafStatus.AVAILABLE)
-        total += record.treeNode.value;
-    }
-    return total;
-  }
-
-  public getOwnedBalance(): number {
-    let total = 0;
-    for (const record of this.leaves.values()) {
-      if (OWNED_STATUSES.has(record.status)) total += record.treeNode.value;
-    }
-    return total;
-  }
-
-  public getIncomingBalance(): number {
-    let total = 0;
-    for (const record of this.leaves.values()) {
-      if (record.status === LeafStatus.INCOMING) total += record.treeNode.value;
-    }
-    return total;
-  }
-  // #endregion
-
-  // #region State Management
+  // ---------------------------------------------------------------------------
+  // Optimization
+  // ---------------------------------------------------------------------------
 
   private async autoOptimizeIfNeeded(): Promise<void> {
     try {
@@ -769,9 +980,8 @@ export default class LeafManager {
       )
         return;
 
-      for await (const _ of this.optimizeLeaves()) {
-        // run all steps
-      }
+      if (!this.onAutoOptimize) return;
+      await this.onAutoOptimize();
     } catch {
       // Optimization is best-effort. If it fails (e.g., config error, another
       // instance already locked the leaf, or SSP is unavailable), the leaves
@@ -908,6 +1118,10 @@ export default class LeafManager {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // State Machine
+  // ---------------------------------------------------------------------------
+
   /**
    * Transition one or more leaves to a new status.
    *
@@ -939,9 +1153,11 @@ export default class LeafManager {
       if (meta?.source !== undefined) leaf.source = meta.source;
     }
   }
-  // #endregion
 
-  // #region Leaf Renewal
+  // ---------------------------------------------------------------------------
+  // Leaf Renewal
+  // ---------------------------------------------------------------------------
+
   private async checkRenewLeaves(nodes: TreeNode[]): Promise<TreeNode[]> {
     const nodesToRenewNodeTxn: TreeNode[] = [];
     const nodesToRenewRefundTxn: TreeNode[] = [];
@@ -1092,9 +1308,11 @@ export default class LeafManager {
     }
     return parentNode;
   }
-  // #endregion
 
-  // #region Network Queries
+  // ---------------------------------------------------------------------------
+  // Network Queries
+  // ---------------------------------------------------------------------------
+
   private async queryNodes(
     baseRequest: Omit<QueryNodesRequest, "limit" | "offset">,
     sparkClientAddress?: string,
@@ -1192,9 +1410,11 @@ export default class LeafManager {
     } while (offset >= 0);
     return results;
   }
-  // #endregion
 
-  // #region Recovery
+  // ---------------------------------------------------------------------------
+  // Recovery
+  // ---------------------------------------------------------------------------
+
   private async recoverLeaves(
     leaves: TreeNode[],
     keyDerivation: KeyDerivation,
@@ -1217,9 +1437,11 @@ export default class LeafManager {
       ? await this.transferService.claimTransfer(pendingTransfer)
       : [];
   }
-  // #endregion
 
-  // #region Filtering & Validation
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
   private verifyKey(
     pubkey1: Uint8Array,
     pubkey2: Uint8Array,
@@ -1249,14 +1471,21 @@ export default class LeafManager {
    * Restore leaves that are still LOCAL_LOCKED back to AVAILABLE.
    * Safe to call after an executor returns — if the SO was successfully contacted,
    * the status would have already changed to OUTGOING/SWAP_PENDING.
+   *
+   * Public so that batch-send callers can release leaves for failed jobs
+   * before the executor returns (preventing the post-executor transition
+   * from incorrectly marking them OUTGOING).
    */
-  private restoreLocalLockedToAvailable(leafIds: string[]): void {
+  public restoreLocalLockedToAvailable(leafIds: string[]): void {
+    let changed = false;
     for (const id of leafIds) {
       const record = this.leaves.get(id);
       if (record?.status === LeafStatus.LOCAL_LOCKED) {
         record.status = LeafStatus.AVAILABLE;
+        changed = true;
       }
     }
+    if (changed) this.emitBalanceUpdate();
   }
 
   /**
@@ -1275,10 +1504,6 @@ export default class LeafManager {
     );
   }
 
-  private getAvailableLeaves(): TreeNode[] {
-    return this.getLeavesByStatus(LeafStatus.AVAILABLE);
-  }
-
   private getLeavesByStatus(status: LeafStatus): TreeNode[] {
     const result: TreeNode[] = [];
     for (const record of this.leaves.values()) {
@@ -1286,5 +1511,4 @@ export default class LeafManager {
     }
     return result;
   }
-  // #endregion
 }
