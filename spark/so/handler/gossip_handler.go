@@ -456,6 +456,7 @@ func (h *GossipHandler) handleUpdateWalletSettingGossipMessage(ctx context.Conte
 	ownerIdentityPubKey, err := keys.ParsePublicKey(updateWalletSetting.GetOwnerIdentityPublicKey())
 	if err != nil {
 		logger.Error("Failed to parse owner identity public key", zap.Error(err))
+		return fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
 	logger.Sugar().Infof("Handling wallet setting update gossip message for identity public key %s", ownerIdentityPubKey)
 
