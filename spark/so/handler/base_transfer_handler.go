@@ -692,24 +692,44 @@ func (h *BaseTransferHandler) validateSwapV3Leaves(
 func (h *BaseTransferHandler) LeafAvailableToTransfer(ctx context.Context, leaf *ent.TreeNode, transfer *ent.Transfer) error {
 	if leaf.Status != st.TreeNodeStatusAvailable {
 		if leaf.Status == st.TreeNodeStatusTransferLocked {
-			transferLeaves, err := transfer.QueryTransferLeaves().
+			db, err := ent.GetDbFromContext(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to get db from context: %w", err)
+			}
+			transferLeaves, err := db.TransferLeaf.Query().
 				Where(enttransferleaf.HasLeafWith(treenode.IDEQ(leaf.ID))).
 				WithTransfer().
 				All(ctx)
 			if err != nil {
 				return fmt.Errorf("unable to find transfer leaf for leaf %v: %w", leaf.ID, err)
 			}
+			cancelledExpiredLock := false
 			now := time.Now()
 			for _, transferLeaf := range transferLeaves {
-				if transferLeaf.Edges.Transfer.Status == st.TransferStatusSenderInitiated && transferLeaf.Edges.Transfer.ExpiryTime.Before(now) {
-					err := h.CancelTransferInternal(ctx, transfer.ID)
+				expiredTransfer := transferLeaf.Edges.Transfer
+				if expiredTransfer == nil {
+					continue
+				}
+				if expiredTransfer.Status == st.TransferStatusSenderInitiated && expiredTransfer.ExpiryTime.Before(now) {
+					err := h.CancelTransferInternal(ctx, expiredTransfer.ID)
 					if err != nil {
 						return fmt.Errorf("unable to cancel transfer: %w", err)
 					}
+					cancelledExpiredLock = true
 				}
 			}
+			// If the expired transfer was successfully cancelled, the leaf is now unlocked
+			// within the current transaction. Fall through to the ownership check so the
+			// new transfer can proceed atomically in the same transaction. This avoids
+			// rolling back the cancellation: running it in a separate transaction would
+			// deadlock because the current transaction already holds a FOR UPDATE lock on
+			// the leaf's TreeNode row (acquired in loadLeavesWithLock).
+			if !cancelledExpiredLock {
+				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf %v is not available to transfer, status: %s", leaf.ID, leaf.Status))
+			}
+		} else {
+			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf %v is not available to transfer, status: %s", leaf.ID, leaf.Status))
 		}
-		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf %v is not available to transfer, status: %s", leaf.ID, leaf.Status))
 	}
 	var senderPubkey keys.Public
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
