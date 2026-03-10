@@ -229,7 +229,7 @@ func (h *TransferHandler) startTransferInternal(
 	directFromCpfpAdaptorPubKey keys.Public,
 	requireDirectTx bool,
 	swapV3Package *SwapV3Package,
-) (*pb.StartTransferResponse, error) {
+) (resp *pb.StartTransferResponse, retErr error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	ctx, span := tracer.Start(ctx, "TransferHandler.startTransferInternal", trace.WithAttributes(
@@ -291,6 +291,20 @@ func (h *TransferHandler) startTransferInternal(
 		return nil, err
 	}
 
+	// Rollback PendingSendTransfer on any failure between here and the success
+	// point. cancelGossip is set to true before syncTransferInit so that a
+	// sync failure also cancels the gossip messages sent to other SOs.
+	needsRollback := true
+	cancelGossip := false
+	defer func() {
+		if !needsRollback || retErr == nil {
+			return
+		}
+		if rbErr := h.rollbackTransferInit(ctx, transferID, cancelGossip); rbErr != nil {
+			retErr = fmt.Errorf("rollback failed: %w while processing transfer %s: %w", rbErr, transferID, retErr)
+		}
+	}()
+
 	role := TransferRoleCoordinator
 	var primaryTransferId uuid.UUID
 	tweakKeys := true
@@ -324,11 +338,7 @@ func (h *TransferHandler) startTransferInternal(
 		nil,
 	)
 	if err != nil {
-		originalErr := err
-		if rbErr := h.rollbackTransferInit(ctx, transferID, false /* cancelGossip */); rbErr != nil {
-			return nil, fmt.Errorf("rollback failed: %w while creating transfer: %w", rbErr, originalErr)
-		}
-		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", transferID, originalErr)
+		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", transferID, err)
 	}
 
 	// If the SSP matched the user's primary transfer with a counter transfer, lock it from cancellation.
@@ -381,6 +391,7 @@ func (h *TransferHandler) startTransferInternal(
 
 	// This call to other SOs will check the validity of the transfer package. If no error is
 	// returned, it means the transfer package is valid and the transfer is considered sent.
+	cancelGossip = true
 	err = h.syncTransferInit(
 		ctx,
 		req,
@@ -395,15 +406,12 @@ func (h *TransferHandler) startTransferInternal(
 		swapV3Package,
 	)
 	if err != nil {
-		syncErr := err
-		logger.With(zap.Error(syncErr)).Sugar().Errorf("Failed to sync transfer init for transfer %s", transferID)
-		if rbErr := h.rollbackTransferInit(ctx, transferID, true /* cancelGossip */); rbErr != nil {
-			return nil, fmt.Errorf("rollback failed: %w while syncing transfer %s: %w", rbErr, transferID, syncErr)
-		}
-		return nil, fmt.Errorf("failed to sync transfer init for transfer %s: %w", transferID, syncErr)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to sync transfer init for transfer %s", transferID)
+		return nil, fmt.Errorf("failed to sync transfer init for transfer %s: %w", transferID, err)
 	}
 
 	// After this point, the transfer send is considered successful.
+	needsRollback = false
 
 	if req.TransferPackage != nil {
 		entTx, err := ent.GetTxFromContext(ctx)

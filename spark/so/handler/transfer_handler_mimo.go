@@ -28,7 +28,7 @@ import (
 func (h *TransferHandler) startTransferV3Internal(
 	ctx context.Context,
 	req *pb.StartTransferV3Request,
-) (*pb.StartTransferResponse, error) {
+) (resp *pb.StartTransferResponse, retErr error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	ctx, span := tracer.Start(ctx, "TransferHandler.startTransferV3Internal")
@@ -105,6 +105,20 @@ func (h *TransferHandler) startTransferV3Internal(
 		return nil, err
 	}
 
+	// Rollback PendingSendTransfer on any failure between here and the success
+	// point. cancelGossip is set to true before syncTransferV3Init so that a
+	// sync failure also cancels the gossip messages sent to other SOs.
+	needsRollback := true
+	cancelGossip := false
+	defer func() {
+		if !needsRollback || retErr == nil {
+			return
+		}
+		if rbErr := h.rollbackTransferInit(ctx, transferID, cancelGossip); rbErr != nil {
+			retErr = fmt.Errorf("rollback failed: %w while processing transfer %s: %w", rbErr, transferID, retErr)
+		}
+	}()
+
 	// Create transfer with multiple receivers.
 	transfer, leafMap, err := h.createTransferV3(
 		ctx,
@@ -122,11 +136,7 @@ func (h *TransferHandler) startTransferV3Internal(
 		true, /* requireDirectTx */
 	)
 	if err != nil {
-		originalErr := err
-		if rbErr := h.rollbackTransferInit(ctx, transferID, false /* cancelGossip */); rbErr != nil {
-			return nil, fmt.Errorf("rollback failed: %w while creating transfer: %w", rbErr, originalErr)
-		}
-		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", transferID, originalErr)
+		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", transferID, err)
 	}
 
 	refundSignatures, err := h.signAggregateAndUpdateRefunds(
@@ -151,6 +161,7 @@ func (h *TransferHandler) startTransferV3Internal(
 		}
 	}
 
+	cancelGossip = true
 	err = h.syncTransferV3Init(
 		ctx,
 		req,
@@ -161,15 +172,12 @@ func (h *TransferHandler) startTransferV3Internal(
 		refundSignatures.finalDfcSignatureMap,
 	)
 	if err != nil {
-		syncErr := err
-		logger.With(zap.Error(syncErr)).Sugar().Errorf("Failed to sync transfer V3 init for transfer %s", transferID)
-		if rbErr := h.rollbackTransferInit(ctx, transferID, true /* cancelGossip */); rbErr != nil {
-			return nil, fmt.Errorf("rollback failed: %w while syncing transfer V3 %s: %w", rbErr, transferID, syncErr)
-		}
-		return nil, fmt.Errorf("failed to sync transfer V3 init for transfer %s: %w", transferID, syncErr)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to sync transfer V3 init for transfer %s", transferID)
+		return nil, fmt.Errorf("failed to sync transfer V3 init for transfer %s: %w", transferID, err)
 	}
 
 	// After this point, the transfer send is considered successful.
+	needsRollback = false
 
 	// Commit and settle key tweaks.
 	entTx, err := ent.GetTxFromContext(ctx)
