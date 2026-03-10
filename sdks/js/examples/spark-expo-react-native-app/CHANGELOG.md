@@ -1,5 +1,13 @@
 # my-app
 
+## 1.0.45
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.7.0
+  - @buildonspark/issuer-sdk@0.1.18
+
 ## 1.0.44
 
 ### Patch Changes
