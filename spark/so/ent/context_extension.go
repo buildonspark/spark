@@ -40,8 +40,7 @@ type Session interface {
 	Notify(context.Context, Notification) error
 }
 
-// ClientTxProvider is a TxProvider that uses an underlying ent.Client to create new transactions. This always
-// returns a new transaction.
+// ClientTxProvider is a TxProvider that uses an underlying ent.Client to create new transactions.
 type ClientTxProvider struct {
 	dbClient *Client
 }
@@ -58,12 +57,8 @@ func (e *ClientTxProvider) GetOrBeginTx(ctx context.Context) (*Tx, error) {
 	return tx, nil
 }
 
-func (e *ClientTxProvider) GetClient(ctx context.Context) (*Client, error) {
-	tx, err := e.GetOrBeginTx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return tx.Client(), nil
+func (e *ClientTxProvider) GetClient(_ context.Context) (*Client, error) {
+	return e.dbClient, nil
 }
 
 // Inject the transaction provider into the context. This should ONLY be called from the start of
