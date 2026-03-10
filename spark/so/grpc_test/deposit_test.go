@@ -1636,6 +1636,74 @@ func TestFinalizeDepositTreeCreationMultiUtxoWrongInputOrder(t *testing.T) {
 	assert.Contains(t, err.Error(), "multi-input root tx does not match expected construction")
 }
 
+// TestFinalizeDepositTreeCreationMultiUtxoRejectsUnconfirmedPrimary verifies that
+// the multi-UTXO finalization path rejects an unconfirmed primary UTXO even when
+// depositAddress.AvailabilityConfirmedAt is set from a different confirmed UTXO.
+// This is a regression test for SPARK-481.
+func TestFinalizeDepositTreeCreationMultiUtxoRejectsUnconfirmedPrimary(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	privKey := keys.GeneratePrivateKey()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), nil, false)
+	require.NoError(t, err)
+
+	client := sparktesting.GetBitcoinClient()
+
+	// Step 1: Fund and confirm a small UTXO to the deposit address.
+	// This will cause the chain watcher to set depositAddress.AvailabilityConfirmedAt.
+	coin1, err := faucet.Fund()
+	require.NoError(t, err)
+	depositTx1, err := sparktesting.CreateTestDepositTransaction(coin1.OutPoint, depositResp.DepositAddress.Address, 10_000)
+	require.NoError(t, err)
+	signedDepositTx1, err := sparktesting.SignFaucetCoin(depositTx1, coin1.TxOut, coin1.Key)
+	require.NoError(t, err)
+	_, err = client.SendRawTransaction(signedDepositTx1, true)
+	require.NoError(t, err)
+
+	// Mine blocks so the chain watcher confirms the small UTXO and sets
+	// depositAddress.AvailabilityConfirmedAt.
+	randomKey := keys.GeneratePrivateKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
+	require.NoError(t, err)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
+	require.NoError(t, err)
+
+	time.Sleep(3 * time.Second)
+
+	// Step 2: Broadcast a large UTXO to the same address but do NOT mine it.
+	// It will be in the mempool only — not confirmed and not in the Utxo table.
+	coin2, err := faucet.Fund()
+	require.NoError(t, err)
+	depositTx2, err := sparktesting.CreateTestDepositTransaction(coin2.OutPoint, depositResp.DepositAddress.Address, 90_000)
+	require.NoError(t, err)
+	signedDepositTx2, err := sparktesting.SignFaucetCoin(depositTx2, coin2.TxOut, coin2.Key)
+	require.NoError(t, err)
+	_, err = client.SendRawTransaction(signedDepositTx2, true)
+	require.NoError(t, err)
+	// Intentionally NOT mining — depositTx2 stays unconfirmed.
+
+	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	require.NoError(t, err)
+
+	// Step 3: Attempt multi-UTXO finalization with the unconfirmed large UTXO as primary.
+	// Before the fix for SPARK-481 this would succeed because
+	// depositAddress.AvailabilityConfirmedAt was already set by depositTx1.
+	utxos := []wallet.DepositUTXO{
+		{Tx: depositTx2, Vout: 0}, // primary: unconfirmed large UTXO
+		{Tx: depositTx1, Vout: 0}, // additional: confirmed small UTXO
+	}
+	_, err = wallet.CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(ctx, config, privKey, verifyingKey, utxos)
+	require.Error(t, err, "should reject multi-UTXO finalization when primary UTXO is unconfirmed")
+	assert.Contains(t, err.Error(), "primary utxo not found on-chain")
+}
+
 func signingJobFromTx(t *testing.T, publicKey keys.Public, tx *wire.MsgTx) *pb.SigningJob {
 	var txBuf bytes.Buffer
 	require.NoError(t, tx.Serialize(&txBuf))

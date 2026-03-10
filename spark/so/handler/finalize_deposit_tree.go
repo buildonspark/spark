@@ -275,35 +275,54 @@ func loadAndValidateDepositAddress(
 		return
 	}
 
-	// For multi-UTXO deposits, all UTXOs (primary + additional) must be confirmed on-chain
+	// For multi-UTXO deposits, all UTXOs (primary + additional) must be confirmed on-chain.
+	// Each UTXO is verified individually against the Utxo table rather than relying on
+	// depositAddress.AvailabilityConfirmedAt, which only indicates that some UTXO to that
+	// address was confirmed — not necessarily the primary UTXO in this request.
 	if len(additionalUtxos) > 0 {
-		if depositAddress.AvailabilityConfirmedAt.IsZero() {
-			err = fmt.Errorf("primary utxo must be confirmed for multi-utxo deposits")
-			return
+		// Build list of all UTXOs to verify: primary first, then additional
+		type utxoToVerify struct {
+			label string
+			txID  string
+			vout  uint32
 		}
+		allUtxos := make([]utxoToVerify, 0, 1+len(additionalUtxos))
+		allUtxos = append(allUtxos, utxoToVerify{
+			label: "primary",
+			txID:  onChainTx.TxID(),
+			vout:  req.OnChainUtxo.Vout,
+		})
 		for i, add := range additionalUtxos {
+			allUtxos = append(allUtxos, utxoToVerify{
+				label: fmt.Sprintf("additional utxo %d", i),
+				txID:  add.onChainTx.TxID(),
+				vout:  add.vout,
+			})
+		}
+
+		for _, u := range allUtxos {
 			var txidBytes []byte
-			txidBytes, err = hex.DecodeString(add.onChainTx.TxID())
+			txidBytes, err = hex.DecodeString(u.txID)
 			if err != nil {
-				err = fmt.Errorf("failed to encode additional utxo %d txid: %w", i, err)
+				err = fmt.Errorf("failed to encode %s txid: %w", u.label, err)
 				return
 			}
 			var utxoEntity *ent.Utxo
 			utxoEntity, err = db.Utxo.Query().
 				Where(entutxo.NetworkEQ(network)).
 				Where(entutxo.Txid(txidBytes)).
-				Where(entutxo.Vout(add.vout)).
+				Where(entutxo.Vout(u.vout)).
 				Only(ctx)
 			if err != nil {
 				if ent.IsNotFound(err) {
-					err = fmt.Errorf("additional utxo %d not found on-chain", i)
+					err = fmt.Errorf("%s utxo not found on-chain", u.label)
 					return
 				}
-				err = fmt.Errorf("failed to query additional utxo %d: %w", i, err)
+				err = fmt.Errorf("failed to query %s utxo: %w", u.label, err)
 				return
 			}
 			if utxoEntity.AvailabilityConfirmedAt == nil {
-				err = fmt.Errorf("additional utxo %d is not yet confirmed", i)
+				err = fmt.Errorf("%s utxo is not yet confirmed", u.label)
 				return
 			}
 		}
