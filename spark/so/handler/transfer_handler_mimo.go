@@ -98,7 +98,6 @@ func (h *TransferHandler) startTransferV3Internal(
 		}
 	}
 
-	// Load refund maps from TransferPackage.
 	leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap := loadLeafRefundMapsFromTransferPackage(senderPkg.TransferPackage)
 
 	// Mutual exclusivity

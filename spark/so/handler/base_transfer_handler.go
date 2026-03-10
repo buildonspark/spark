@@ -2167,6 +2167,37 @@ func validateTransactionCooperativeExitLeavesToSend(
 	return nil
 }
 
+// verifySenderKeyTweakProofsMatch checks that the coordinator's plaintext proofs match
+// the proofs each SO independently decrypted from the transfer package.
+// Used before the transfer is persisted.
+func verifySenderKeyTweakProofsMatch(keyTweakMap map[string]*pbspark.SendLeafKeyTweak, senderKeyTweakProofs map[string]*pbspark.SecretProof) error {
+	if keyTweakMap == nil || senderKeyTweakProofs == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("key tweak map and sender key tweak proofs must not be nil"))
+	}
+	if len(keyTweakMap) != len(senderKeyTweakProofs) {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof count mismatch: expected %d, got %d", len(keyTweakMap), len(senderKeyTweakProofs)))
+	}
+
+	for leafID, leafTweak := range keyTweakMap {
+		if leafTweak.SecretShareTweak == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("secret share tweak missing for leaf %s", leafID))
+		}
+		proof, ok := senderKeyTweakProofs[leafID]
+		if !ok {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof missing for leaf %s", leafID))
+		}
+		if proof == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("sender key tweak proof value is nil for leaf %s", leafID))
+		}
+		if !slices.EqualFunc(proof.Proofs, leafTweak.SecretShareTweak.Proofs, bytes.Equal) {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof mismatch for leaf %s", leafID))
+		}
+	}
+	return nil
+}
+
+// validateKeyTweakProofs checks that the provided proofs match the proofs stored in
+// the database on the transfer's leaves. Used after the transfer has already been persisted.
 func (h *BaseTransferHandler) validateKeyTweakProofs(ctx context.Context, transfer *ent.Transfer, senderKeyTweakProofs map[string]*pbspark.SecretProof) error {
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {

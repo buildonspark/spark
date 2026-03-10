@@ -842,3 +842,78 @@ func TestValidateTransferPackage_MissingDirectFromCpfpLeaves(t *testing.T) {
 		require.NotContains(t, err.Error(), "mismatched number of leaves")
 	}
 }
+
+func TestVerifySenderKeyTweakProofsMatch_Match(t *testing.T) {
+	leafID := uuid.New().String()
+	proofs := [][]byte{{1, 2, 3}, {4, 5, 6}}
+
+	keyTweakMap := map[string]*pbspark.SendLeafKeyTweak{
+		leafID: {
+			LeafId:           leafID,
+			SecretShareTweak: &pbspark.SecretShare{Proofs: proofs},
+		},
+	}
+	senderProofs := map[string]*pbspark.SecretProof{
+		leafID: {Proofs: proofs},
+	}
+
+	err := verifySenderKeyTweakProofsMatch(keyTweakMap, senderProofs)
+	require.NoError(t, err)
+}
+
+func TestVerifySenderKeyTweakProofsMatch_NilInputs(t *testing.T) {
+	err := verifySenderKeyTweakProofsMatch(nil, map[string]*pbspark.SecretProof{})
+	require.ErrorContains(t, err, "must not be nil")
+
+	err = verifySenderKeyTweakProofsMatch(map[string]*pbspark.SendLeafKeyTweak{}, nil)
+	require.ErrorContains(t, err, "must not be nil")
+}
+
+func TestVerifySenderKeyTweakProofsMatch_CountMismatch(t *testing.T) {
+	leafID := uuid.New().String()
+
+	keyTweakMap := map[string]*pbspark.SendLeafKeyTweak{
+		leafID: {
+			LeafId:           leafID,
+			SecretShareTweak: &pbspark.SecretShare{Proofs: [][]byte{{1}}},
+		},
+	}
+
+	err := verifySenderKeyTweakProofsMatch(keyTweakMap, map[string]*pbspark.SecretProof{})
+	require.ErrorContains(t, err, "sender key tweak proof count mismatch")
+}
+
+func TestVerifySenderKeyTweakProofsMatch_MissingProof(t *testing.T) {
+	leafID1 := uuid.New().String()
+	leafID2 := uuid.New().String()
+
+	keyTweakMap := map[string]*pbspark.SendLeafKeyTweak{
+		leafID1: {
+			LeafId:           leafID1,
+			SecretShareTweak: &pbspark.SecretShare{Proofs: [][]byte{{1}}},
+		},
+	}
+	senderProofs := map[string]*pbspark.SecretProof{
+		leafID2: {Proofs: [][]byte{{1}}},
+	}
+
+	err := verifySenderKeyTweakProofsMatch(keyTweakMap, senderProofs)
+	require.ErrorContains(t, err, "sender key tweak proof missing for leaf")
+}
+
+func TestVerifySenderKeyTweakProofsMatch_Mismatch(t *testing.T) {
+	leafID := uuid.New().String()
+
+	keyTweakMap := map[string]*pbspark.SendLeafKeyTweak{
+		leafID: {
+			LeafId:           leafID,
+			SecretShareTweak: &pbspark.SecretShare{Proofs: [][]byte{{1, 2, 3}}},
+		},
+	}
+	senderProofs := map[string]*pbspark.SecretProof{
+		leafID: {Proofs: [][]byte{{9, 9, 9}}},
+	}
+
+	err := verifySenderKeyTweakProofsMatch(keyTweakMap, senderProofs)
+	require.ErrorContains(t, err, "sender key tweak proof mismatch for leaf")
+}

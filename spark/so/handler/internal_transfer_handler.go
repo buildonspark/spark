@@ -404,9 +404,21 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	if err != nil {
 		return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver identity public key: %w", err))
 	}
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.TransferPackage, senderIdentityPubKey, !transferType.IsSwap())
-	if err != nil {
-		return err
+
+	// Validate the transfer package and the decrypted key tweak proofs if the package is present
+	var keyTweakMap map[string]*pb.SendLeafKeyTweak
+	if req.TransferPackage != nil {
+		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, req.TransferPackage, senderIdentityPubKey, !transferType.IsSwap())
+		if err != nil {
+			return err
+		}
+		if keyTweakMap == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer package produced no key tweaks for transfer %s", transferID))
+		}
+
+		if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.SenderKeyTweakProofs); err != nil {
+			return err
+		}
 	}
 
 	if len(req.SparkInvoice) > 0 {
@@ -545,13 +557,18 @@ func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *p
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
 
-	// Validate transfer package.
+	// Validate required transfer package and decrypted key tweaks
 	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, senderPkg.TransferPackage, senderIdentityPubKey, true)
 	if err != nil {
 		return err
 	}
+	if keyTweakMap == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer package produced no key tweaks for transfer %s", transferID))
+	}
+	if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.SenderKeyTweakProofs); err != nil {
+		return err
+	}
 
-	// Load refund maps from TransferPackage.
 	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadLeafRefundMapsFromTransferPackage(senderPkg.TransferPackage)
 
 	// Apply refund signatures to transactions and verify.
