@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -16,6 +20,54 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
 	}
+	return t.marshalWithLeaves(ctx, leaves)
+}
+
+// MarshalProtoForReceiver converts a Transfer to a protobuf Transfer,
+// optionally filtering leaves to only those assigned to a specific receiver.
+// When receiverPubkey is nil, behaves identically to MarshalProto.
+// The Transfer's TransferReceivers edge must be pre-loaded (WithTransferReceivers)
+// when receiverPubkey is non-nil.
+func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey *keys.Public) (*pb.Transfer, error) {
+	var leaves []*TransferLeaf
+	var err error
+	if receiverPubkey != nil {
+		if t.Edges.TransferReceivers == nil {
+			logging.GetLoggerFromContext(ctx).Sugar().Warnf(
+				"MarshalProtoForReceiver called with receiverPubkey but TransferReceivers edge not pre-loaded for transfer %s", t.ID)
+		}
+		receiverID, found := t.findReceiverID(*receiverPubkey)
+		if found {
+			leaves, err = t.QueryTransferLeaves().
+				Where(transferleaf.TransferReceiverIDEQ(receiverID)).
+				All(ctx)
+		} else {
+			// Receiver not found — fall through to returning all leaves.
+			// This happens for sender queries or legacy single-receiver transfers.
+			leaves, err = t.QueryTransferLeaves().All(ctx)
+		}
+	} else {
+		leaves, err = t.QueryTransferLeaves().All(ctx)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
+	}
+
+	return t.marshalWithLeaves(ctx, leaves)
+}
+
+// findReceiverID looks up the TransferReceiver ID for a given identity pubkey.
+// Requires TransferReceivers edge to be pre-loaded.
+func (t *Transfer) findReceiverID(pubkey keys.Public) (uuid.UUID, bool) {
+	for _, r := range t.Edges.TransferReceivers {
+		if r.IdentityPubkey.Equals(pubkey) {
+			return r.ID, true
+		}
+	}
+	return uuid.UUID{}, false
+}
+
+func (t *Transfer) marshalWithLeaves(ctx context.Context, leaves []*TransferLeaf) (*pb.Transfer, error) {
 	var leavesProto []*pb.TransferLeaf
 	for _, leaf := range leaves {
 		leafProto, err := leaf.MarshalProto(ctx)

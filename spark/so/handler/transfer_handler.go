@@ -2147,7 +2147,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			}
 		}
 
-		transferProto, err := transfer.MarshalProto(ctx)
+		var receiverFilter *keys.Public
+		if useMIMO && walletIdentityPubkey != nil {
+			receiverFilter = walletIdentityPubkey
+		}
+		transferProto, err := transfer.MarshalProtoForReceiver(ctx, receiverFilter)
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 		}
