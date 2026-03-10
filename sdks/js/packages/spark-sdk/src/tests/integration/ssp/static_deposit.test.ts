@@ -109,6 +109,78 @@ describe("SSP static deposit address integration", () => {
       expect(transfers.transfers.length).toBe(3);
     }, 60000);
 
+    it("should return a valid transfer ID that can be looked up via SSP", async () => {
+      const faucet = BitcoinFaucet.getInstance();
+      const { wallet: userWallet } =
+        await SparkWalletTestingWithStream.initialize({
+          options: {
+            network: "LOCAL",
+          },
+        });
+
+      const depositAddress = await userWallet.getStaticDepositAddress();
+      expect(depositAddress).toBeDefined();
+
+      const signedTx = await faucet.sendToAddress(
+        depositAddress,
+        DEPOSIT_AMOUNT,
+      );
+      await faucet.mineBlocks(6);
+
+      const transactionId = signedTx.id;
+      let vout: number | undefined;
+      for (let i = 0; i < signedTx.outputsLength; i++) {
+        const output = signedTx.getOutput(i);
+        if (output.amount === DEPOSIT_AMOUNT) {
+          vout = i;
+          break;
+        }
+      }
+
+      const quote = await userWallet.getClaimStaticDepositQuote(
+        transactionId,
+        vout!,
+      );
+      const quoteAmount = quote!.creditAmountSats;
+      const sspSignature = quote!.signature;
+
+      // Claim the deposit and capture the returned transfer ID
+      const claimResult = await retryUntilSuccess(
+        async () =>
+          await userWallet.claimStaticDeposit({
+            transactionId,
+            creditAmountSats: quoteAmount,
+            sspSignature,
+            outputIndex: vout!,
+          }),
+      );
+
+      // The transfer ID must be defined — this is the Spark transfer ID
+      // that clients use to track the deposit claim.
+      // Regression: PR #24467 broke this by returning the SSP internal
+      // transfer_id instead of transfer.external_spark_id.
+      expect(claimResult).toBeDefined();
+      expect(claimResult!.transferId).toBeDefined();
+      expect(claimResult!.transferId.length).toBeGreaterThan(0);
+
+      await waitForClaim({ wallet: userWallet });
+
+      // Look up the transfer by the returned ID via the SSP.
+      // If the wrong ID was returned, this lookup will fail.
+      const transfer = await userWallet.getTransferFromSsp(
+        claimResult!.transferId,
+      );
+      expect(transfer).toBeDefined();
+      expect(transfer!.userRequest).toBeDefined();
+      expect((transfer!.userRequest as any).typename).toBe(
+        "ClaimStaticDeposit",
+      );
+
+      // Sanity check: balance matches the quoted amount
+      const { balance } = await userWallet.getBalance();
+      expect(balance).toBe(BigInt(quoteAmount));
+    }, 60000);
+
     it("should create a refund transaction", async () => {
       const faucet = BitcoinFaucet.getInstance();
 
