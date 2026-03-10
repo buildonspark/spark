@@ -119,6 +119,25 @@ describe("SparkReadonlyClient input validation", () => {
     });
   });
 
+  describe("getUtxosForDepositAddresses", () => {
+    it("rejects empty depositAddresses array", async () => {
+      await expect(
+        client.getUtxosForDepositAddresses({
+          depositAddresses: [],
+        }),
+      ).rejects.toThrow(SparkValidationError);
+    });
+
+    it("rejects direction = PREVIOUS", async () => {
+      await expect(
+        client.getUtxosForDepositAddresses({
+          depositAddresses: ["bcrt1qfakeaddress"],
+          direction: "PREVIOUS",
+        }),
+      ).rejects.toThrow(SparkValidationError);
+    });
+  });
+
   // ── getSparkInvoices ───────────────────────────────────────
 
   describe("getSparkInvoices", () => {

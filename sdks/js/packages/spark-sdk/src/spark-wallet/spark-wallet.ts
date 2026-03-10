@@ -47,6 +47,7 @@ import {
 import {
   ConnectedEvent,
   DepositAddressQueryResult,
+  Direction,
   Network as NetworkProto,
   networkToJSON,
   PreimageRequestRole,
@@ -66,6 +67,7 @@ import {
   QueryTokenTransactionsResponse,
 } from "../proto/spark_token.js";
 import type { DecodedInvoice } from "../services/bolt11-spark.js";
+import type { GetUtxosForAddressesParams } from "../spark-readonly-client/types.js";
 import {
   decodeInvoice,
   getNetworkFromInvoice,
@@ -1240,6 +1242,98 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         error,
       });
     }
+  }
+
+  /**
+   * Returns confirmed UTXOs for a batch of static Spark deposit addresses.
+   *
+   * @param params - Batch UTXO query params.
+   */
+  public async getUtxosForDepositAddresses(
+    params: GetUtxosForAddressesParams,
+  ): Promise<{
+    utxos: { address: string; txid: string; vout: number }[];
+    pageResponse: {
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+      nextCursor: string;
+      previousCursor: string;
+    };
+  }> {
+    const {
+      depositAddresses,
+      pageSize = 50,
+      cursor = "",
+      direction = "NEXT",
+      excludeClaimed = false,
+    } = params;
+
+    if (depositAddresses.length === 0) {
+      throw new SparkValidationError("Deposit addresses cannot be empty", {
+        field: "depositAddresses",
+      });
+    }
+
+    if (!Number.isInteger(pageSize) || pageSize <= 0) {
+      throw new SparkValidationError("Page size must be a positive integer", {
+        field: "pageSize",
+        pageSize,
+      });
+    }
+    if (direction === "PREVIOUS") {
+      throw new SparkValidationError(
+        "Backward pagination is not currently supported for getUtxosForDepositAddresses",
+        { field: "direction" },
+      );
+    }
+
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    let response: Awaited<
+      ReturnType<typeof sparkClient.get_utxos_for_addresses>
+    >;
+    try {
+      response = await sparkClient.get_utxos_for_addresses({
+        addresses: depositAddresses,
+        network: NetworkToProto[this.config.getNetwork()],
+        excludeClaimed,
+        page: {
+          pageSize,
+          cursor,
+          direction: Direction.NEXT,
+        },
+      });
+    } catch (error) {
+      throw new SparkRequestError("Failed to get UTXOs for deposit addresses", {
+        operation: "get_utxos_for_addresses",
+        error,
+      });
+    }
+
+    return {
+      utxos:
+        response.utxos.map((addressedUtxo) => {
+          if (!addressedUtxo.utxo) {
+            throw new SparkRequestError("Malformed UTXO response payload", {
+              operation: "get_utxos_for_addresses",
+              addressedUtxo,
+            });
+          }
+          return {
+            address: addressedUtxo.address,
+            txid: bytesToHex(addressedUtxo.utxo.txid),
+            vout: addressedUtxo.utxo.vout,
+          };
+        }) ?? [],
+      pageResponse: {
+        hasNextPage: response.page?.hasNextPage ?? false,
+        hasPreviousPage: response.page?.hasPreviousPage ?? false,
+        nextCursor: response.page?.nextCursor ?? "",
+        previousCursor: response.page?.previousCursor ?? "",
+      },
+    };
   }
 
   /**
@@ -5303,6 +5397,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "getUnusedDepositAddresses",
   "getUserRequests",
   "getUtxosForDepositAddress",
+  "getUtxosForDepositAddresses",
   "getWalletSettings",
   "getWithdrawalFeeQuote",
   "isOptimizationInProgress",

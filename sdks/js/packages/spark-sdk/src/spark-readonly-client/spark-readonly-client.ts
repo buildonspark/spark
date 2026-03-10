@@ -54,6 +54,7 @@ import type {
   QueryTransfersParams,
   QueryDepositAddressesParams,
   GetUtxosParams,
+  GetUtxosForAddressesParams,
   QuerySparkInvoicesParams,
   QueryTokenTransactionsParams,
 } from "./types.js";
@@ -61,6 +62,7 @@ export type {
   QueryTransfersParams,
   QueryDepositAddressesParams,
   GetUtxosParams,
+  GetUtxosForAddressesParams,
   QuerySparkInvoicesParams,
   QueryTokenTransactionsParams,
 } from "./types.js";
@@ -503,6 +505,80 @@ export abstract class SparkReadonlyClient {
         error,
       });
     }
+  }
+
+  /** Queries paginated confirmed UTXOs for a batch of static deposit addresses. */
+  public async getUtxosForDepositAddresses(
+    params: GetUtxosForAddressesParams,
+  ): Promise<{
+    utxos: { address: string; txid: string; vout: number }[];
+    pageResponse: {
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+      nextCursor: string;
+      previousCursor: string;
+    };
+  }> {
+    const {
+      depositAddresses,
+      pageSize = 50,
+      cursor = "",
+      direction = "NEXT",
+      excludeClaimed = false,
+    } = params;
+    this.assertNonEmptyArray(depositAddresses, "depositAddresses");
+    this.assertPositiveInteger(pageSize, "pageSize");
+    if (direction === "PREVIOUS") {
+      throw new SparkValidationError(
+        "Backward pagination is not currently supported for getUtxosForDepositAddresses",
+        { field: "direction" },
+      );
+    }
+
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    let result: Awaited<ReturnType<typeof sparkClient.get_utxos_for_addresses>>;
+    try {
+      result = await sparkClient.get_utxos_for_addresses({
+        addresses: depositAddresses,
+        network: this.config.getNetworkProto(),
+        excludeClaimed,
+        page: {
+          pageSize,
+          cursor,
+          direction: Direction.NEXT,
+        },
+      });
+    } catch (error) {
+      throw new SparkRequestError("Failed to get UTXOs for deposit addresses", {
+        operation: "get_utxos_for_addresses",
+        error,
+      });
+    }
+
+    return {
+      utxos: result.utxos.map((addressedUtxo) => {
+        if (!addressedUtxo.utxo) {
+          throw new SparkRequestError("Malformed UTXO response payload", {
+            operation: "get_utxos_for_addresses",
+            addressedUtxo,
+          });
+        }
+        return {
+          address: addressedUtxo.address,
+          txid: bytesToHex(addressedUtxo.utxo.txid),
+          vout: addressedUtxo.utxo.vout,
+        };
+      }),
+      pageResponse: {
+        hasNextPage: result.page?.hasNextPage ?? false,
+        hasPreviousPage: result.page?.hasPreviousPage ?? false,
+        nextCursor: result.page?.nextCursor ?? "",
+        previousCursor: result.page?.previousCursor ?? "",
+      },
+    };
   }
 
   // ── Spark Invoices ──────────────────────────────────────────────

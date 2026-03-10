@@ -46,6 +46,9 @@ import (
 )
 
 const DefaultDepositConfirmationThreshold = uint(3)
+const DefaultGetUtxosForAddressesPageSize = 50
+const MaxGetUtxosForAddressesPageSize = 100
+const MaxGetUtxosForAddressesCount = 100
 
 // DefaultMaxUnusedDepositAddresses is the default maximum number of unused non-static deposit
 // addresses a user can have per network. This prevents DoS attacks where users repeatedly
@@ -1650,6 +1653,193 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 	}
 
 	return &pb.GetUtxosForAddressResponse{Utxos: utxosResult}, nil
+}
+
+func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUtxosForAddressesRequest) (*pb.GetUtxosForAddressesResponse, error) {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+
+	if len(req.GetAddresses()) == 0 {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("addresses is required"))
+	}
+
+	uniqueAddresses := make([]string, 0, len(req.GetAddresses()))
+	seenAddresses := make(map[string]struct{}, len(req.GetAddresses()))
+	for _, address := range req.GetAddresses() {
+		if _, exists := seenAddresses[address]; exists {
+			continue
+		}
+		seenAddresses[address] = struct{}{}
+		uniqueAddresses = append(uniqueAddresses, address)
+	}
+	if len(uniqueAddresses) > MaxGetUtxosForAddressesCount {
+		return nil, errors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many addresses in request: got %d, max %d", len(uniqueAddresses), MaxGetUtxosForAddressesCount),
+		)
+	}
+
+	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get schema network: %w", err)
+	}
+
+	for _, address := range uniqueAddresses {
+		if !utils.IsBitcoinAddressForNetwork(address, network) {
+			return nil, errors.InvalidArgumentMalformedField(
+				fmt.Errorf("deposit address %s is not aligned with the requested network", address),
+			)
+		}
+	}
+
+	currentBlockHeight, err := db.BlockHeight.Query().Where(blockheight.NetworkEQ(network)).Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current block height: %w", err)
+	}
+
+	threshold := DefaultDepositConfirmationThreshold
+	if bitcoinConfig, ok := o.config.BitcoindConfigs[strings.ToLower(network.String())]; ok {
+		threshold = bitcoinConfig.DepositConfirmationThreshold
+	}
+
+	limit := DefaultGetUtxosForAddressesPageSize
+	if page := req.GetPage(); page != nil {
+		if page.GetPageSize() > 0 {
+			limit = int(page.GetPageSize())
+		} else if page.GetUnsafePageSize() > 0 {
+			limit = int(page.GetUnsafePageSize())
+		}
+		if page.GetDirection() == pb.Direction_PREVIOUS {
+			return nil, errors.InvalidArgumentMalformedField(
+				fmt.Errorf("backward pagination with 'previous' direction is not currently supported"),
+			)
+		}
+	}
+	if limit > MaxGetUtxosForAddressesPageSize {
+		return nil, errors.InvalidArgumentOutOfRange(
+			fmt.Errorf("requested page size exceeds max supported size: got %d, max %d", limit, MaxGetUtxosForAddressesPageSize),
+		)
+	}
+
+	var (
+		cursorProvided  bool
+		cursorBlock     int64
+		cursorTxidBytes []byte
+		cursorVout      uint32
+		cursorID        uuid.UUID
+	)
+	if page := req.GetPage(); page != nil && page.GetCursor() != "" {
+		cursorPayload, txidBytes, utxoID, err := decodeGetUtxosForAddressesCursor(page.GetCursor())
+		if err != nil {
+			return nil, err
+		}
+		cursorProvided = true
+		cursorBlock = cursorPayload.BlockHeight
+		cursorTxidBytes = txidBytes
+		cursorVout = cursorPayload.Vout
+		cursorID = utxoID
+	}
+
+	query := db.Utxo.Query().
+		Where(
+			entutxo.NetworkEQ(network),
+			entutxo.BlockHeightLTE(currentBlockHeight.Height-int64(threshold)),
+			entutxo.HasDepositAddressWith(
+				depositaddress.AddressIn(uniqueAddresses...),
+				depositaddress.IsStatic(true),
+			),
+		).WithDepositAddress().
+		Order(
+			entutxo.ByBlockHeight(sql.OrderDesc()),
+			func(s *sql.Selector) {
+				s.OrderBy(sql.Asc(s.C(entutxo.FieldTxid)))
+			},
+			entutxo.ByVout(),
+			entutxo.ByID(),
+		)
+
+	if req.GetExcludeClaimed() {
+		query = query.Where(func(s *sql.Selector) {
+			subquery := sql.Select(utxoswap.UtxoColumn).
+				From(sql.Table(utxoswap.Table)).
+				Where(sql.NEQ(utxoswap.FieldStatus, string(st.UtxoSwapStatusCancelled)))
+			s.Where(sql.NotIn(s.C(entutxo.FieldID), subquery))
+		})
+	}
+
+	if cursorProvided {
+		query = query.Where(func(s *sql.Selector) {
+			s.Where(
+				sql.Or(
+					sql.LT(s.C(entutxo.FieldBlockHeight), cursorBlock),
+					sql.And(
+						sql.EQ(s.C(entutxo.FieldBlockHeight), cursorBlock),
+						sql.GT(s.C(entutxo.FieldTxid), cursorTxidBytes),
+					),
+					sql.And(
+						sql.EQ(s.C(entutxo.FieldBlockHeight), cursorBlock),
+						sql.EQ(s.C(entutxo.FieldTxid), cursorTxidBytes),
+						sql.GT(s.C(entutxo.FieldVout), cursorVout),
+					),
+					sql.And(
+						sql.EQ(s.C(entutxo.FieldBlockHeight), cursorBlock),
+						sql.EQ(s.C(entutxo.FieldTxid), cursorTxidBytes),
+						sql.EQ(s.C(entutxo.FieldVout), cursorVout),
+						sql.GT(s.C(entutxo.FieldID), cursorID),
+					),
+				),
+			)
+		})
+	}
+
+	utxos, err := query.Limit(limit + 1).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get utxos: %w", err)
+	}
+
+	hasNextPage := len(utxos) > limit
+	if hasNextPage {
+		utxos = utxos[:limit]
+	}
+
+	utxosResult := make([]*pb.AddressedUtxo, 0, len(utxos))
+	for _, utxo := range utxos {
+		if utxo.Edges.DepositAddress == nil {
+			return nil, fmt.Errorf("utxo %s is missing deposit address edge", utxo.ID)
+		}
+		utxosResult = append(utxosResult, &pb.AddressedUtxo{
+			Address: utxo.Edges.DepositAddress.Address,
+			Utxo: &pb.UTXO{
+				Txid:    utxo.Txid,
+				Vout:    utxo.Vout,
+				Network: req.Network,
+			},
+		})
+	}
+
+	pageResponse := &pb.PageResponse{
+		HasNextPage:     hasNextPage,
+		HasPreviousPage: cursorProvided,
+	}
+	if len(utxos) > 0 {
+		previousCursor, err := encodeGetUtxosForAddressesCursor(utxos[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode previous cursor: %w", err)
+		}
+		pageResponse.PreviousCursor = previousCursor
+
+		nextCursor, err := encodeGetUtxosForAddressesCursor(utxos[len(utxos)-1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode next cursor: %w", err)
+		}
+		pageResponse.NextCursor = nextCursor
+	}
+
+	return &pb.GetUtxosForAddressesResponse{
+		Utxos: utxosResult,
+		Page:  pageResponse,
+	}, nil
 }
 
 // validateBitcoinTransactions validates Bitcoin transactions in a deposit flow.

@@ -1432,6 +1432,193 @@ func TestGetUtxosFromAddress(t *testing.T) {
 	})
 }
 
+func TestGetUtxosForAddresses(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	rng := rand.NewChaCha8([32]byte{9})
+
+	_, err = tx.BlockHeight.Create().
+		SetNetwork(btcnetwork.Regtest).
+		SetHeight(200).
+		Save(ctx)
+	require.NoError(t, err)
+
+	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingKeyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secretShare).
+		SetPublicShares(map[string]keys.Public{"test": secretShare.Public()}).
+		SetPublicKey(secretShare.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	newAddress := func(address string, isStatic bool) *ent.DepositAddress {
+		identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		depositAddress, createErr := tx.DepositAddress.Create().
+			SetAddress(address).
+			SetOwnerIdentityPubkey(identityPubKey).
+			SetOwnerSigningPubkey(signingPubKey).
+			SetSigningKeyshare(signingKeyshare).
+			SetIsStatic(isStatic).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, createErr)
+		return depositAddress
+	}
+
+	staticAddress1 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abc"
+	staticAddress2 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abd"
+	nonStaticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abe"
+
+	depositAddress1 := newAddress(staticAddress1, true)
+	depositAddress2 := newAddress(staticAddress2, true)
+	depositAddress3 := newAddress(nonStaticAddress, false)
+
+	createUtxo := func(addr *ent.DepositAddress, txid string, vout uint32, blockHeight int64) *ent.Utxo {
+		utxo, createErr := tx.Utxo.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetTxid([]byte(txid)).
+			SetVout(vout).
+			SetBlockHeight(blockHeight).
+			SetAmount(1000).
+			SetPkScript([]byte("script")).
+			SetDepositAddress(addr).
+			Save(ctx)
+		require.NoError(t, createErr)
+		return utxo
+	}
+
+	utxo1 := createUtxo(depositAddress1, "batch_txid_1", 0, 100)
+	utxo2 := createUtxo(depositAddress1, "batch_txid_2", 1, 101)
+	_ = createUtxo(depositAddress2, "batch_txid_3", 2, 102)
+	_ = createUtxo(depositAddress3, "batch_txid_non_static", 3, 103)
+
+	_, err = tx.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
+		SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetUtxo(utxo2).
+		SetUtxoValueSats(utxo2.Amount).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := NewDepositHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+
+	t.Run("paginates with cursor and filters to static addresses only", func(t *testing.T) {
+		req := &pb.GetUtxosForAddressesRequest{
+			Addresses: []string{staticAddress1, staticAddress2, nonStaticAddress, staticAddress1},
+			Network:   pb.Network_REGTEST,
+			Page: &pb.PageRequest{
+				PageSize: 2,
+			},
+		}
+
+		response, getErr := handler.GetUtxosForAddresses(ctx, req)
+		require.NoError(t, getErr)
+		require.Len(t, response.Utxos, 2)
+		require.True(t, response.Page.HasNextPage)
+		require.NotEmpty(t, response.Page.NextCursor)
+
+		txidsPage1 := make(map[string]bool)
+		addressesPage1 := make(map[string]bool)
+		for _, utxo := range response.Utxos {
+			require.NotNil(t, utxo.Utxo)
+			txidsPage1[hex.EncodeToString(utxo.Utxo.Txid)] = true
+			addressesPage1[utxo.Address] = true
+		}
+		require.NotContains(t, txidsPage1, hex.EncodeToString([]byte("batch_txid_non_static")))
+		require.NotContains(t, addressesPage1, nonStaticAddress)
+
+		req.Page.Cursor = response.Page.NextCursor
+		responsePage2, getErr := handler.GetUtxosForAddresses(ctx, req)
+		require.NoError(t, getErr)
+		require.Len(t, responsePage2.Utxos, 1)
+		require.False(t, responsePage2.Page.HasNextPage)
+		require.True(t, responsePage2.Page.HasPreviousPage)
+	})
+
+	t.Run("exclude_claimed filters out utxos with active swaps", func(t *testing.T) {
+		req := &pb.GetUtxosForAddressesRequest{
+			Addresses:      []string{staticAddress1, staticAddress2},
+			Network:        pb.Network_REGTEST,
+			ExcludeClaimed: true,
+			Page: &pb.PageRequest{
+				PageSize: 10,
+			},
+		}
+
+		response, getErr := handler.GetUtxosForAddresses(ctx, req)
+		require.NoError(t, getErr)
+		require.Len(t, response.Utxos, 2)
+
+		txids := make(map[string]bool)
+		for _, utxo := range response.Utxos {
+			require.NotNil(t, utxo.Utxo)
+			txids[hex.EncodeToString(utxo.Utxo.Txid)] = true
+		}
+		require.Contains(t, txids, hex.EncodeToString(utxo1.Txid))
+		require.NotContains(t, txids, hex.EncodeToString(utxo2.Txid))
+	})
+
+	t.Run("invalid requests are rejected", func(t *testing.T) {
+		_, getErr := handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: nil,
+			Network:   pb.Network_REGTEST,
+		})
+		require.ErrorContains(t, getErr, "addresses is required")
+
+		_, getErr = handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: []string{staticAddress1},
+			Network:   pb.Network_REGTEST,
+			Page: &pb.PageRequest{
+				Direction: pb.Direction_PREVIOUS,
+			},
+		})
+		require.ErrorContains(t, getErr, "backward pagination")
+
+		_, getErr = handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: []string{staticAddress1},
+			Network:   pb.Network_REGTEST,
+			Page: &pb.PageRequest{
+				Cursor: "not-a-cursor",
+			},
+		})
+		require.ErrorContains(t, getErr, "invalid cursor")
+
+		tooManyAddresses := make([]string, MaxGetUtxosForAddressesCount+1)
+		for i := range tooManyAddresses {
+			tooManyAddresses[i] = fmt.Sprintf("address_%d", i)
+		}
+		_, getErr = handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: tooManyAddresses,
+			Network:   pb.Network_REGTEST,
+		})
+		require.ErrorContains(t, getErr, "too many addresses")
+
+		_, getErr = handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: []string{staticAddress1},
+			Network:   pb.Network_REGTEST,
+			Page: &pb.PageRequest{
+				PageSize: MaxGetUtxosForAddressesPageSize + 1,
+			},
+		})
+		require.ErrorContains(t, getErr, "requested page size exceeds max supported size")
+
+		_, getErr = handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: []string{staticAddress1},
+			Network:   pb.Network_REGTEST,
+			Page: &pb.PageRequest{
+				UnsafePageSize: int32(MaxGetUtxosForAddressesPageSize + 1),
+			},
+		})
+		require.ErrorContains(t, getErr, "requested page size exceeds max supported size")
+	})
+}
+
 func TestVerifyRootTransactionSuccess(t *testing.T) {
 	onChainTx := wire.NewMsgTx(3)
 	onChainTx.AddTxOut(wire.NewTxOut(1000, []byte("test_script")))

@@ -22,6 +22,14 @@ export type GetUtxosParams = {
   excludeClaimed?: boolean;
 };
 
+export type GetUtxosForAddressesParams = {
+  depositAddresses: string[];
+  pageSize?: number;
+  cursor?: string;
+  direction?: "NEXT" | "PREVIOUS";
+  excludeClaimed?: boolean;
+};
+
 export type QuerySparkInvoicesParams = {
   invoices: string[];
   limit?: number;

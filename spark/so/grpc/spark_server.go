@@ -325,6 +325,11 @@ func (s *SparkServer) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxosFo
 	return depositHandler.GetUtxosForAddress(ctx, req)
 }
 
+func (s *SparkServer) GetUtxosForAddresses(ctx context.Context, req *pb.GetUtxosForAddressesRequest) (*pb.GetUtxosForAddressesResponse, error) {
+	depositHandler := handler.NewDepositHandler(s.config)
+	return depositHandler.GetUtxosForAddresses(ctx, req)
+}
+
 func (s *SparkServer) QuerySparkInvoices(ctx context.Context, req *pb.QuerySparkInvoicesRequest) (*pb.QuerySparkInvoicesResponse, error) {
 	invoiceHandler := handler.NewSparkInvoiceHandler(s.config)
 	return invoiceHandler.QuerySparkInvoices(ctx, req)

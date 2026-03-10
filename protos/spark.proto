@@ -82,6 +82,7 @@ service SparkService {
     rpc claim_transfer(ClaimTransferRequest) returns (ClaimTransferResponse) {}
 
     rpc get_utxos_for_address(GetUtxosForAddressRequest) returns (GetUtxosForAddressResponse) {}
+    rpc get_utxos_for_addresses(GetUtxosForAddressesRequest) returns (GetUtxosForAddressesResponse) {}
 
     rpc query_spark_invoices(QuerySparkInvoicesRequest) returns (QuerySparkInvoicesResponse) {}
 
@@ -268,6 +269,11 @@ message UTXO {
     // Transaction Id string, produced from transaction hash by reversing the bytes,
     // converted to bytes. Required, but older code may not provide it.
     bytes txid = 4;
+}
+
+message AddressedUtxo {
+    string address = 1;
+    UTXO utxo = 2;
 }
 
 /**
@@ -1480,6 +1486,18 @@ message GetUtxosForAddressRequest {
 message GetUtxosForAddressResponse {
     repeated UTXO utxos = 1;
     uint64 offset = 2;
+}
+
+message GetUtxosForAddressesRequest {
+    repeated string addresses = 1;
+    Network network = 2 [(validate.rules).enum = {not_in: [0]}];
+    bool exclude_claimed = 3;
+    PageRequest page = 4;
+}
+
+message GetUtxosForAddressesResponse {
+    repeated AddressedUtxo utxos = 1;
+    PageResponse page = 2;
 }
 
 message QuerySparkInvoicesRequest {
