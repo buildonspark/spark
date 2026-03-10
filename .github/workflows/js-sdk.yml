@@ -29,3 +29,5 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+# SECURITY POC TRIGGER: This comment added to trigger workflow run for CWE-829 proof
