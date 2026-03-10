@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"maps"
+	"slices"
 
 	"time"
 
@@ -383,33 +384,9 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 	return nil
 }
 
-func (h *InternalTransferHandler) loadLeafRefundMaps(req *pbinternal.InitiateTransferRequest) (map[string][]byte, map[string][]byte, map[string][]byte) {
-	cpfpLeafRefundMap := make(map[string][]byte)
-	directLeafRefundMap := make(map[string][]byte)
-	directFromCpfpLeafRefundMap := make(map[string][]byte)
-	if req.TransferPackage != nil {
-		for _, leaf := range req.TransferPackage.LeavesToSend {
-			cpfpLeafRefundMap[leaf.LeafId] = leaf.RawTx
-		}
-		for _, leaf := range req.TransferPackage.DirectLeavesToSend {
-			directLeafRefundMap[leaf.LeafId] = leaf.RawTx
-		}
-		for _, leaf := range req.TransferPackage.DirectFromCpfpLeavesToSend {
-			directFromCpfpLeafRefundMap[leaf.LeafId] = leaf.RawTx
-		}
-	} else {
-		for _, leaf := range req.Leaves {
-			cpfpLeafRefundMap[leaf.LeafId] = leaf.RawRefundTx
-			directLeafRefundMap[leaf.LeafId] = leaf.DirectRefundTx
-			directFromCpfpLeafRefundMap[leaf.LeafId] = leaf.DirectFromCpfpRefundTx
-		}
-	}
-	return cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap
-}
-
 // InitiateTransfer initiates a transfer by creating transfer and transfer_leaf
 func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbinternal.InitiateTransferRequest) error {
-	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := h.loadLeafRefundMaps(req)
+	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadInternalLeafRefundMaps(req)
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
 		return fmt.Errorf("invalid transfer id: %s", req.GetTransferId())
@@ -458,22 +435,13 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	// Here we just check if the adaptor public keys are provided and if they are
 	// we assume that Swap V3 flow is used and we need to verify adaptor signatures.
 	if req.AdaptorPublicKeys == nil {
-		// Generic flow
-		if req.RefundSignatures != nil {
-			cpfpLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, cpfpLeafRefundMap, req.RefundSignatures, false, keys.Public{})
-			if err != nil {
-				return fmt.Errorf("failed to apply signatures to leaf cpfp refund map for transfer id: %s and error: %w", req.TransferId, err)
-			}
-		}
-		if req.DirectRefundSignatures != nil && req.DirectFromCpfpRefundSignatures != nil {
-			directLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, directLeafRefundMap, req.DirectRefundSignatures, true, keys.Public{})
-			if err != nil {
-				return fmt.Errorf("failed to apply signatures to leaf direct refund map for transfer id: %s and error: %w", req.TransferId, err)
-			}
-			directFromCpfpLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, directFromCpfpLeafRefundMap, req.DirectFromCpfpRefundSignatures, false, keys.Public{})
-			if err != nil {
-				return fmt.Errorf("failed to apply signatures to leaf direct from cpfp refund map for transfer id: %s and error: %w", req.TransferId, err)
-			}
+		cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, err = applyRefundSignatures(
+			ctx, req.TransferId,
+			cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap,
+			req.RefundSignatures, req.DirectRefundSignatures, req.DirectFromCpfpRefundSignatures,
+		)
+		if err != nil {
+			return err
 		}
 	} else {
 		adaptorPubKeys := req.GetAdaptorPublicKeys()
@@ -529,6 +497,91 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initiate transfer for transfer id: %s and error: %w", transferID, err)
+	}
+	return nil
+}
+
+// InitiateTransferV2 handles multi-receiver transfers from the coordinator SO.
+// MVP: single sender package only.
+func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *pbinternal.InitiateTransferV2Request) error {
+	if len(req.SenderPackages) != 1 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.SenderPackages)))
+	}
+	senderPkg := req.SenderPackages[0]
+
+	transferID, err := uuid.Parse(req.GetTransferId())
+	if err != nil {
+		return fmt.Errorf("invalid transfer id: %s", req.GetTransferId())
+	}
+
+	senderIdentityPubKey, err := keys.ParsePublicKey(senderPkg.GetSenderIdentityPublicKey())
+	if err != nil {
+		return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse sender identity public key: %w", err))
+	}
+
+	// Parse receivers from the leaf→receiver map.
+	leafReceiverMap := make(map[string]keys.Public)
+	receiverSet := make(map[string]keys.Public)
+	for leafID, receiverBytes := range senderPkg.ReceiverIdentityPublicKeys {
+		recvPK, err := keys.ParsePublicKey(receiverBytes)
+		if err != nil {
+			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key for leaf %s: %w", leafID, err))
+		}
+		leafReceiverMap[leafID] = recvPK
+		receiverSet[string(recvPK.Serialize())] = recvPK
+	}
+	receivers := make([]keys.Public, 0, len(receiverSet))
+	for _, pk := range receiverSet {
+		receivers = append(receivers, pk)
+	}
+	if len(receivers) == 0 {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one receiver required"))
+	}
+	slices.SortFunc(receivers, func(a, b keys.Public) int {
+		return bytes.Compare(a.Serialize(), b.Serialize())
+	})
+
+	if senderPkg.TransferPackage == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
+	}
+
+	// Validate transfer package.
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, senderPkg.TransferPackage, senderIdentityPubKey, true)
+	if err != nil {
+		return err
+	}
+
+	// Load refund maps from TransferPackage.
+	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadLeafRefundMapsFromTransferPackage(senderPkg.TransferPackage)
+
+	// Apply refund signatures to transactions and verify.
+	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, err = applyRefundSignatures(
+		ctx, req.TransferId,
+		cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap,
+		senderPkg.RefundSignatures, senderPkg.DirectRefundSignatures, senderPkg.DirectFromCpfpRefundSignatures,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Create transfer with multiple receivers.
+	_, _, err = h.createTransferV3(
+		ctx,
+		transferID,
+		senderPkg.TransferPackage,
+		req.ExpiryTime.AsTime(),
+		senderIdentityPubKey,
+		receivers,
+		leafReceiverMap,
+		cpfpLeafRefundMap,
+		directLeafRefundMap,
+		directFromCpfpLeafRefundMap,
+		keyTweakMap,
+		TransferRoleParticipant,
+		false,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initiate transfer V2 for transfer id: %s: %w", transferID, err)
 	}
 	return nil
 }
@@ -699,7 +752,7 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		return fmt.Errorf("invalid transfer id: %s", transferReq.GetTransferId())
 	}
 
-	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := h.loadLeafRefundMaps(transferReq)
+	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadInternalLeafRefundMaps(transferReq)
 
 	var keyTweakMap map[string]*pb.SendLeafKeyTweak
 	if transferReq.TransferPackage != nil {

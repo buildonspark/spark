@@ -1245,11 +1245,11 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 }
 
 func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest *pbspark.StartTransferRequest, leafMap map[string]*ent.TreeNode) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
-	cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, err := SignRefundsWithPregeneratedNonce(ctx, h.config, transferRequest, leafMap, keys.Public{}, keys.Public{}, keys.Public{}, nil)
+	cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, err := SignRefundsWithPregeneratedNonce(ctx, h.config, transferRequest.GetTransferId(), transferRequest.TransferPackage, leafMap, keys.Public{}, keys.Public{}, keys.Public{}, nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to sign refunds with pregenerated nonce: %w", err)
 	}
-	return AggregateSignatures(ctx, h.config, transferRequest, keys.Public{}, keys.Public{}, keys.Public{}, cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, leafMap)
+	return AggregateSignatures(ctx, h.config, transferRequest.GetTransferId(), transferRequest.TransferPackage, keys.Public{}, keys.Public{}, keys.Public{}, cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, leafMap)
 }
 
 // InitiatePreimageSwapV3 initiates a preimage swap for the given payment hash.

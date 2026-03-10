@@ -12,8 +12,6 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/handler"
 	events "github.com/lightsparkdev/spark/so/stream"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -91,9 +89,10 @@ func (s *SparkServer) StartTransferV2(ctx context.Context, req *pb.StartTransfer
 	return transferHander.StartTransferV2(ctx, req)
 }
 
-// StartTransferV3 initiates a transfer from one sender to multiple receivers.
+// StartTransferV3 initiates a MIMO transfer from one sender to multiple receivers.
 func (s *SparkServer) StartTransferV3(ctx context.Context, req *pb.StartTransferV3Request) (*pb.StartTransferResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "StartTransferV3 not yet implemented")
+	transferHandler := handler.NewTransferHandler(s.config)
+	return transferHandler.StartTransferV3(ctx, req)
 }
 
 // FinalizeTransfer completes a transfer from sender.

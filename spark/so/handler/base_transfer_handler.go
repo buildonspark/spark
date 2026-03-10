@@ -30,6 +30,7 @@ import (
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -89,6 +90,94 @@ func NewBaseTransferHandler(config *so.Config) BaseTransferHandler {
 	return BaseTransferHandler{
 		config: config,
 	}
+}
+
+// loadLeafRefundMapsFromTransferPackage extracts CPFP, direct, and direct-from-CPFP
+// refund maps from a TransferPackage. Returns three maps keyed by leaf ID.
+func loadLeafRefundMapsFromTransferPackage(pkg *pbspark.TransferPackage) (cpfp, direct, directFromCpfp map[string][]byte) {
+	cpfp = make(map[string][]byte)
+	for _, leaf := range pkg.LeavesToSend {
+		cpfp[leaf.LeafId] = leaf.RawTx
+	}
+	direct = make(map[string][]byte)
+	for _, leaf := range pkg.DirectLeavesToSend {
+		direct[leaf.LeafId] = leaf.RawTx
+	}
+	directFromCpfp = make(map[string][]byte)
+	for _, leaf := range pkg.DirectFromCpfpLeavesToSend {
+		directFromCpfp[leaf.LeafId] = leaf.RawTx
+	}
+	return cpfp, direct, directFromCpfp
+}
+
+// loadLeafRefundMaps extracts refund maps from a StartTransferRequest,
+// delegating to loadLeafRefundMapsFromTransferPackage when a TransferPackage
+// is present and falling back to the legacy LeavesToSend field otherwise.
+func loadLeafRefundMaps(req *pbspark.StartTransferRequest) (cpfp, direct, directFromCpfp map[string][]byte) {
+	if req.TransferPackage != nil {
+		return loadLeafRefundMapsFromTransferPackage(req.TransferPackage)
+	}
+	cpfp = make(map[string][]byte)
+	direct = make(map[string][]byte)
+	directFromCpfp = make(map[string][]byte)
+	for _, leaf := range req.LeavesToSend {
+		cpfp[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx
+		if leaf.DirectRefundTxSigningJob != nil {
+			direct[leaf.LeafId] = leaf.DirectRefundTxSigningJob.RawTx
+		}
+		if leaf.DirectFromCpfpRefundTxSigningJob != nil {
+			directFromCpfp[leaf.LeafId] = leaf.DirectFromCpfpRefundTxSigningJob.RawTx
+		}
+	}
+	return cpfp, direct, directFromCpfp
+}
+
+// loadInternalLeafRefundMaps extracts refund maps from an InitiateTransferRequest,
+// delegating to loadLeafRefundMapsFromTransferPackage when a TransferPackage
+// is present and falling back to the legacy Leaves field otherwise.
+func loadInternalLeafRefundMaps(req *pbinternal.InitiateTransferRequest) (cpfp, direct, directFromCpfp map[string][]byte) {
+	if req.TransferPackage != nil {
+		return loadLeafRefundMapsFromTransferPackage(req.TransferPackage)
+	}
+	cpfp = make(map[string][]byte)
+	direct = make(map[string][]byte)
+	directFromCpfp = make(map[string][]byte)
+	for _, leaf := range req.Leaves {
+		cpfp[leaf.LeafId] = leaf.RawRefundTx
+		direct[leaf.LeafId] = leaf.DirectRefundTx
+		directFromCpfp[leaf.LeafId] = leaf.DirectFromCpfpRefundTx
+	}
+	return cpfp, direct, directFromCpfp
+}
+
+// applyRefundSignatures applies sender-provided refund signatures to the three
+// refund maps (CPFP, direct, direct-from-CPFP) using zero adaptor keys.
+// Any nil signature map is skipped; direct and direct-from-CPFP signatures are
+// applied together only when both are present.
+func applyRefundSignatures(
+	ctx context.Context,
+	transferID string,
+	cpfpMap, directMap, directFromCpfpMap map[string][]byte,
+	cpfpSigs, directSigs, directFromCpfpSigs map[string][]byte,
+) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
+	var err error
+	if cpfpSigs != nil {
+		cpfpMap, err = applySignaturesToTransactionsAndVerify(ctx, cpfpMap, cpfpSigs, false, keys.Public{})
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to apply signatures to leaf cpfp refund map for transfer id: %s: %w", transferID, err)
+		}
+	}
+	if directSigs != nil && directFromCpfpSigs != nil {
+		directMap, err = applySignaturesToTransactionsAndVerify(ctx, directMap, directSigs, true, keys.Public{})
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to apply signatures to leaf direct refund map for transfer id: %s: %w", transferID, err)
+		}
+		directFromCpfpMap, err = applySignaturesToTransactionsAndVerify(ctx, directFromCpfpMap, directFromCpfpSigs, false, keys.Public{})
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to apply signatures to leaf direct from cpfp refund map for transfer id: %s: %w", transferID, err)
+		}
+	}
+	return cpfpMap, directMap, directFromCpfpMap, nil
 }
 
 func validateLeafRefundTxOutput(refundTx *wire.MsgTx, receiverIdentityPubKey keys.Public) error {
@@ -465,6 +554,177 @@ func (h *BaseTransferHandler) createTransfer(
 	return transfer, leafMap, nil
 }
 
+// createTransferV3 creates a transfer with one sender and multiple receivers.
+// Each leaf is associated with a specific receiver via leafReceiverMap.
+// Validation is done per-receiver group since refund outputs must pay to the correct receiver.
+func (h *BaseTransferHandler) createTransferV3(
+	ctx context.Context,
+	transferID uuid.UUID,
+	pkg *pbspark.TransferPackage,
+	expiryTime time.Time,
+	senderIdentityPubKey keys.Public,
+	receivers []keys.Public,
+	leafReceiverMap map[string]keys.Public,
+	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
+	leafTweakMap map[string]*pbspark.SendLeafKeyTweak,
+	role TransferRole,
+	requireDirectTx bool,
+) (*ent.Transfer, map[string]*ent.TreeNode, error) {
+	transferType := st.TransferTypeTransfer
+
+	if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
+		return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid expiry_time %v", expiryTime))
+	}
+
+	var transferStatus st.TransferStatus
+	if role == TransferRoleCoordinator {
+		transferStatus = st.TransferStatusSenderInitiatedCoordinator
+	} else {
+		transferStatus = st.TransferStatusSenderKeyTweakPending
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to get database transaction: %w", err)
+	}
+
+	leaves, network, err := loadLeavesWithLock(ctx, db, leafCpfpRefundMap)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to load leaves: %w", err)
+	}
+
+	// Group leaves by receiver for per-receiver claiming.
+	type receiverGroup struct {
+		receiverPubKey keys.Public
+		leaves         []*ent.TreeNode
+		cpfpMap        map[string][]byte
+		directMap      map[string][]byte
+		directCpfpMap  map[string][]byte
+	}
+	groupsByReceiver := make(map[string]*receiverGroup)
+	for _, leaf := range leaves {
+		recvPK, ok := leafReceiverMap[leaf.ID.String()]
+		if !ok {
+			return nil, nil, fmt.Errorf("leaf %s not found in leaf-receiver map", leaf.ID)
+		}
+		recvKey := string(recvPK.Serialize())
+		group, ok := groupsByReceiver[recvKey]
+		if !ok {
+			group = &receiverGroup{
+				receiverPubKey: recvPK,
+				cpfpMap:        make(map[string][]byte),
+				directMap:      make(map[string][]byte),
+				directCpfpMap:  make(map[string][]byte),
+			}
+			groupsByReceiver[recvKey] = group
+		}
+		group.leaves = append(group.leaves, leaf)
+		leafID := leaf.ID.String()
+		if v, ok := leafCpfpRefundMap[leafID]; ok {
+			group.cpfpMap[leafID] = v
+		}
+		if v, ok := leafDirectRefundMap[leafID]; ok {
+			group.directMap[leafID] = v
+		}
+		if v, ok := leafDirectFromCpfpRefundMap[leafID]; ok {
+			group.directCpfpMap[leafID] = v
+		}
+	}
+
+	// Validate bitcoin transactions per-receiver group (refund outputs must pay to the correct receiver).
+	for _, g := range groupsByReceiver {
+		if err := h.validateAndConstructBitcoinTransactions(ctx, pkg, transferType, g.leaves, g.cpfpMap, g.directMap, g.directCpfpMap, g.receiverPubKey, nil); err != nil {
+			return nil, nil, fmt.Errorf("unable to validate bitcoin transactions for receiver %s: %w", g.receiverPubKey, err)
+		}
+	}
+
+	// Use the first receiver as the "primary" receiver for the deprecated Transfer.ReceiverIdentityPubkey field.
+	primaryReceiver := receivers[0]
+
+	transferCreate := db.Transfer.Create().
+		SetID(transferID).
+		SetSenderIdentityPubkey(senderIdentityPubKey).
+		SetReceiverIdentityPubkey(primaryReceiver).
+		SetStatus(transferStatus).
+		SetTotalValue(0).
+		SetExpiryTime(expiryTime).
+		SetType(transferType).
+		SetNetwork(network)
+
+	transfer, err := transferCreate.Save(ctx)
+	if err != nil {
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return nil, nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer already exists: %w", err))
+		}
+		return nil, nil, fmt.Errorf("unable to create transfer: %w", err)
+	}
+
+	transferSender, err := db.TransferSender.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(senderIdentityPubKey).
+		Save(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create transfer sender: %w", err)
+	}
+
+	// Create one TransferReceiver per receiver, then create transfer leaves for each group.
+	for _, g := range groupsByReceiver {
+		transferReceiver, err := db.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(g.receiverPubKey).
+			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			Save(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to create transfer receiver: %w", err)
+		}
+
+		err = createTransferLeaves(ctx, db, transfer, transferSender, transferReceiver, g.leaves, g.cpfpMap, g.directMap, g.directCpfpMap, leafTweakMap)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to create transfer leaves for receiver %s: %w", g.receiverPubKey, err)
+		}
+	}
+
+	transfer, err = db.Transfer.Query().
+		Where(enttransfer.ID(transfer.ID)).
+		WithTransferSenders().
+		WithTransferReceivers().
+		Only(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to load transfer with edges: %w", err)
+	}
+
+	if len(leafCpfpRefundMap) == 0 {
+		return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("must provide at least one leaf for transfer"))
+	}
+
+	// Validate transfer leaves per-receiver group.
+	for _, g := range groupsByReceiver {
+		err = h.validateTransferLeaves(ctx, transfer, g.leaves, g.cpfpMap, g.directMap, g.directCpfpMap, g.receiverPubKey, requireDirectTx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to validate transfer leaves for receiver %s: %w", g.receiverPubKey, err)
+		}
+	}
+
+	err = setTotalTransferValue(ctx, db, transfer, leaves)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to update transfer total value: %w", err)
+	}
+
+	leaves, err = lockLeaves(ctx, db, leaves)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to lock leaves: %w", err)
+	}
+
+	leafMap := make(map[string]*ent.TreeNode)
+	for _, leaf := range leaves {
+		leafMap[leaf.ID.String()] = leaf
+	}
+
+	return transfer, leafMap, nil
+}
+
 func createAndLockSparkInvoice(ctx context.Context, sparkInvoice string) (uuid.UUID, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -635,6 +895,8 @@ func (h *BaseTransferHandler) validateUtxoSwapLeaves(
 	return nil
 }
 
+// validateTransferLeaves checks that each leaf exists in the refund map,
+// has a valid refund tx, and is available to transfer.
 func (h *BaseTransferHandler) validateTransferLeaves(
 	ctx context.Context,
 	transfer *ent.Transfer,
@@ -1191,13 +1453,19 @@ func (h *BaseTransferHandler) loadSingleTransferReceiverForUnsupportedMimoPath(c
 }
 
 // ValidateTransferPackage validates the transfer package, to ensure the key tweaks are valid.
-func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, transferID uuid.UUID, req *pbspark.TransferPackage, senderIdentityPubKey keys.Public, requireDirectFromCpfpLeaves bool) (map[string]*pbspark.SendLeafKeyTweak, error) {
+func (h *BaseTransferHandler) ValidateTransferPackage(
+	ctx context.Context,
+	transferID uuid.UUID,
+	pkg *pbspark.TransferPackage,
+	senderIdentityPubKey keys.Public,
+	requireDirectFromCpfpLeaves bool,
+) (map[string]*pbspark.SendLeafKeyTweak, error) {
 	// If the transfer package is nil, we don't need to validate it.
-	if req == nil {
+	if pkg == nil {
 		return nil, nil
 	}
 
-	if len(req.KeyTweakPackage) == 0 {
+	if len(pkg.KeyTweakPackage) == 0 {
 		return nil, fmt.Errorf("key tweak package is empty")
 	}
 	// Get the transfer limit from knobs if available
@@ -1213,21 +1481,21 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 	}
 
 	// Input size and count validation - prevent resource exhaustion
-	if len(req.LeavesToSend) > transferLimit {
-		return nil, fmt.Errorf("too many leaves to send: %d (max: %d)", len(req.LeavesToSend), transferLimit)
+	if len(pkg.LeavesToSend) > transferLimit {
+		return nil, fmt.Errorf("too many leaves to send: %d (max: %d)", len(pkg.LeavesToSend), transferLimit)
 	}
 
-	if len(req.DirectLeavesToSend) > transferLimit {
-		return nil, fmt.Errorf("too many direct leaves to send: %d (max: %d)", len(req.DirectLeavesToSend), transferLimit)
+	if len(pkg.DirectLeavesToSend) > transferLimit {
+		return nil, fmt.Errorf("too many direct leaves to send: %d (max: %d)", len(pkg.DirectLeavesToSend), transferLimit)
 	}
 
-	if len(req.DirectFromCpfpLeavesToSend) > transferLimit {
-		return nil, fmt.Errorf("too many direct from cpfp leaves to send: %d (max: %d)", len(req.DirectFromCpfpLeavesToSend), transferLimit)
+	if len(pkg.DirectFromCpfpLeavesToSend) > transferLimit {
+		return nil, fmt.Errorf("too many direct from cpfp leaves to send: %d (max: %d)", len(pkg.DirectFromCpfpLeavesToSend), transferLimit)
 	}
 
 	// Validate key tweak package size
 	totalSize := 0
-	for _, ciphertext := range req.KeyTweakPackage {
+	for _, ciphertext := range pkg.KeyTweakPackage {
 		totalSize += len(ciphertext)
 	}
 	if totalSize > MaxKeyTweakPackageSize {
@@ -1235,8 +1503,8 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 	}
 
 	// Validate leaf IDs and check for duplicates/orphans/mismatches across lists.
-	leavesToSendIDs := make(map[string]struct{}, len(req.LeavesToSend))
-	for _, leaf := range req.LeavesToSend {
+	leavesToSendIDs := make(map[string]struct{}, len(pkg.LeavesToSend))
+	for _, leaf := range pkg.LeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse leaf_id as a uuid %s: %w", leaf.LeafId, err)
@@ -1248,8 +1516,8 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 		leavesToSendIDs[leafID] = struct{}{}
 	}
 
-	directLeafIDs := make(map[string]struct{}, len(req.DirectLeavesToSend))
-	for _, leaf := range req.DirectLeavesToSend {
+	directLeafIDs := make(map[string]struct{}, len(pkg.DirectLeavesToSend))
+	for _, leaf := range pkg.DirectLeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse direct_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)
@@ -1265,14 +1533,14 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 	}
 
 	if requireDirectFromCpfpLeaves {
-		if len(req.LeavesToSend) != len(req.DirectFromCpfpLeavesToSend) {
-			return nil, fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(req.LeavesToSend), len(req.DirectFromCpfpLeavesToSend))
+		if len(pkg.LeavesToSend) != len(pkg.DirectFromCpfpLeavesToSend) {
+			return nil, fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.LeavesToSend), len(pkg.DirectFromCpfpLeavesToSend))
 		}
-	} else if len(req.DirectFromCpfpLeavesToSend) > 0 && len(req.LeavesToSend) != len(req.DirectFromCpfpLeavesToSend) {
-		return nil, fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(req.LeavesToSend), len(req.DirectFromCpfpLeavesToSend))
+	} else if len(pkg.DirectFromCpfpLeavesToSend) > 0 && len(pkg.LeavesToSend) != len(pkg.DirectFromCpfpLeavesToSend) {
+		return nil, fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.LeavesToSend), len(pkg.DirectFromCpfpLeavesToSend))
 	}
-	directFromCpfpLeafIDs := make(map[string]struct{}, len(req.DirectFromCpfpLeavesToSend))
-	for _, leaf := range req.DirectFromCpfpLeavesToSend {
+	directFromCpfpLeafIDs := make(map[string]struct{}, len(pkg.DirectFromCpfpLeavesToSend))
+	for _, leaf := range pkg.DirectFromCpfpLeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse direct_from_cpfp_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)
@@ -1288,16 +1556,16 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 	}
 
 	// Signature validation - prevent replay/DoS
-	if len(req.UserSignature) == 0 {
+	if len(pkg.UserSignature) == 0 {
 		return nil, fmt.Errorf("user signature cannot be empty")
 	}
 
-	if len(req.UserSignature) > MaxSignatureSize {
-		return nil, fmt.Errorf("user signature too large: %d bytes (max: %d)", len(req.UserSignature), MaxSignatureSize)
+	if len(pkg.UserSignature) > MaxSignatureSize {
+		return nil, fmt.Errorf("user signature too large: %d bytes (max: %d)", len(pkg.UserSignature), MaxSignatureSize)
 	}
 
 	// Decrypt the key tweaks
-	leafTweaksCipherText := req.KeyTweakPackage[h.config.Identifier]
+	leafTweaksCipherText := pkg.KeyTweakPackage[h.config.Identifier]
 	if leafTweaksCipherText == nil {
 		return nil, fmt.Errorf("no key tweaks found for SO %s", h.config.Identifier)
 	}
@@ -1363,9 +1631,9 @@ func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, trans
 
 		leafTweaksMap[leafTweak.LeafId] = leafTweak
 	}
-	payloadToVerify := common.GetTransferPackageSigningPayload(transferID, req)
+	payloadToVerify := common.GetTransferPackageSigningPayload(transferID, pkg)
 
-	if err := common.VerifyECDSASignature(senderIdentityPubKey, req.UserSignature, payloadToVerify); err != nil {
+	if err := common.VerifyECDSASignature(senderIdentityPubKey, pkg.UserSignature, payloadToVerify); err != nil {
 		return nil, fmt.Errorf("unable to verify user signature: %w", err)
 	}
 

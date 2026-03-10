@@ -247,31 +247,6 @@ func withKnob(ctx context.Context, enabled bool) context.Context {
 	return knobs.InjectKnobsService(ctx, k)
 }
 
-func loadLeafRefundMaps(req *pb.StartTransferRequest) (map[string][]byte, map[string][]byte, map[string][]byte) {
-	cpfpLeafRefundMap := make(map[string][]byte)
-	directLeafRefundMap := make(map[string][]byte)
-	directFromCpfpLeafRefundMap := make(map[string][]byte)
-
-	if req.TransferPackage != nil {
-		for _, leaf := range req.TransferPackage.LeavesToSend {
-			cpfpLeafRefundMap[leaf.LeafId] = leaf.RawTx
-		}
-		for _, leaf := range req.TransferPackage.DirectLeavesToSend {
-			directLeafRefundMap[leaf.LeafId] = leaf.RawTx
-		}
-		for _, leaf := range req.TransferPackage.DirectFromCpfpLeavesToSend {
-			directFromCpfpLeafRefundMap[leaf.LeafId] = leaf.RawTx
-		}
-	} else {
-		for _, leaf := range req.LeavesToSend {
-			cpfpLeafRefundMap[leaf.LeafId] = leaf.GetRefundTxSigningJob().GetRawTx()
-			directLeafRefundMap[leaf.LeafId] = leaf.GetDirectRefundTxSigningJob().GetRawTx()
-			directFromCpfpLeafRefundMap[leaf.LeafId] = leaf.GetDirectFromCpfpRefundTxSigningJob().GetRawTx()
-		}
-	}
-	return cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap
-}
-
 func validateAndConstructBitcoinTransactionsForTest(t *testing.T, ctx context.Context, h *BaseTransferHandler, req *pb.StartTransferRequest, transferType st.TransferType) error {
 	t.Helper()
 

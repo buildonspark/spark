@@ -210,25 +210,16 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 		return nil, fmt.Errorf("connector_tx is required for cooperative exit")
 	}
 
-	leafCpfpRefundMap := transferHandler.loadCpfpLeafRefundMap(req.Transfer)
-	leafDirectRefundMap := transferHandler.loadDirectLeafRefundMap(req.Transfer)
-	leafDirectFromCpfpRefundMap := transferHandler.loadDirectFromCpfpLeafRefundMap(req.Transfer)
+	leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap := loadLeafRefundMaps(req.Transfer)
 
 	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer receiver identity public key: %w", err)
 	}
 
-	// Create pending send transfer
-	entTx, err := ent.GetTxFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get database transaction: %w", err)
-	}
-	if _, err = ent.CreateOrResetPendingSendTransfer(ctx, transferID); err != nil {
-		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
-	}
-	if err := entTx.Commit(); err != nil {
-		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
+	// Mutual exclusivity
+	if err := createPendingSendTransferAndCommit(ctx, transferID); err != nil {
+		return nil, err
 	}
 
 	// Create transfer with key tweaks
@@ -252,24 +243,8 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 	)
 	if err != nil {
 		originalErr := err
-		rollbackTx, rollbackErr := ent.GetTxFromContext(ctx)
-		if rollbackErr != nil {
-			return nil, fmt.Errorf("unable to get database transaction: %w while creating transfer: %w", rollbackErr, originalErr)
-		}
-		if rollbackErr = rollbackTx.Rollback(); rollbackErr != nil {
-			return nil, fmt.Errorf("unable to rollback database transaction: %w while creating transfer: %w", rollbackErr, originalErr)
-		}
-		rollbackTx, rollbackErr = ent.GetTxFromContext(ctx)
-		if rollbackErr != nil {
-			return nil, fmt.Errorf("unable to get database transaction: %w while creating transfer: %w", rollbackErr, originalErr)
-		}
-		dbClient := rollbackTx.Client()
-		_, rollbackErr = dbClient.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transferID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
-		if rollbackErr != nil {
-			return nil, fmt.Errorf("unable to update pending send transfer: %w while creating transfer: %w", rollbackErr, originalErr)
-		}
-		if rollbackErr = rollbackTx.Commit(); rollbackErr != nil {
-			return nil, fmt.Errorf("unable to commit database transaction: %w while creating transfer: %w", rollbackErr, originalErr)
+		if rbErr := transferHandler.rollbackTransferInit(ctx, transferID, false /* cancelGossip */); rbErr != nil {
+			return nil, fmt.Errorf("rollback failed: %w while creating transfer: %w", rbErr, originalErr)
 		}
 		return nil, fmt.Errorf("failed to create transfer for coop exit %s: %w", transferID, originalErr)
 	}
@@ -300,71 +275,23 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 		return nil, fmt.Errorf("failed to create cooperative exit for exit id %s exit txid %s: %w", req.ExitId, exitTxid.String(), err)
 	}
 
-	// Sign refunds with pregenerated nonces and aggregate
-	cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, err := SignRefundsWithPregeneratedNonce(
-		ctx, h.config, req.Transfer, leafMap,
-		keys.Public{}, keys.Public{}, keys.Public{},
-		req.GetConnectorTx(),
+	// Sign refunds with pregenerated nonces, aggregate, and update leaves.
+	refundSignatures, err := transferHandler.signAggregateAndUpdateRefunds(
+		ctx, transfer, req.Transfer.GetTransferId(), req.Transfer.TransferPackage, leafMap,
+		keys.Public{}, keys.Public{}, keys.Public{}, req.GetConnectorTx(),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign refunds with pregenerated nonce for coop exit %s: %w", transferID, err)
-	}
-
-	finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap, err := AggregateSignatures(
-		ctx, h.config, req.Transfer,
-		keys.Public{}, keys.Public{}, keys.Public{},
-		cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, leafMap,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to aggregate signatures for coop exit %s: %w", transferID, err)
-	}
-
-	// Store aggregated signatures on transfer leaves
-	if len(finalDirectSignatureMap) > 0 || len(finalDirectFromCpfpSignatureMap) > 0 {
-		err = transferHandler.UpdateTransferLeavesSignatures(ctx, transfer, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap, req.GetConnectorTx())
-		if err != nil {
-			return nil, fmt.Errorf("failed to update transfer leaves signatures for coop exit %s: %w", transferID, err)
-		}
-	} else {
-		err = transferHandler.UpdateTransferLeavesSignaturesForRefundTxOnly(ctx, transfer, finalCpfpSignatureMap, keys.Public{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to update CPFP transfer leaves signatures for coop exit %s: %w", transferID, err)
-		}
+		return nil, fmt.Errorf("coop exit %s: %w", transferID, err)
 	}
 
 	// Sync with other operators
-	err = transferHandler.syncCoopExitInit(ctx, req, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap)
+	err = transferHandler.syncCoopExitInit(ctx, req, refundSignatures.finalCpfpSignatureMap, refundSignatures.finalDirectSignatureMap, refundSignatures.finalDfcSignatureMap)
 	if err != nil {
 		syncErr := err
 		logger.With(zap.Error(syncErr)).Sugar().Errorf("Failed to sync coop exit init for transfer %s", transferID)
-
-		syncRollbackTx, syncRollbackErr := ent.GetTxFromContext(ctx)
-		if syncRollbackErr != nil {
-			return nil, fmt.Errorf("unable to get database transaction: %w", syncRollbackErr)
+		if rbErr := transferHandler.rollbackTransferInit(ctx, transferID, true /* cancelGossip */); rbErr != nil {
+			return nil, fmt.Errorf("rollback failed: %w while syncing coop exit %s: %w", rbErr, transferID, syncErr)
 		}
-		syncRollbackErr = syncRollbackTx.Rollback()
-		if syncRollbackErr != nil {
-			return nil, fmt.Errorf("unable to rollback database transaction: %w", syncRollbackErr)
-		}
-
-		syncRollbackTx, syncRollbackErr = ent.GetTxFromContext(ctx)
-		if syncRollbackErr != nil {
-			return nil, fmt.Errorf("unable to get database transaction: %w", syncRollbackErr)
-		}
-		dbClient := syncRollbackTx.Client()
-		_, syncRollbackErr = dbClient.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
-		if syncRollbackErr != nil {
-			return nil, fmt.Errorf("unable to update pending send transfer: %w", syncRollbackErr)
-		}
-		cancelErr := transferHandler.CreateCancelTransferGossipMessage(ctx, transferID)
-		if cancelErr != nil {
-			logger.With(zap.Error(cancelErr)).Sugar().Errorf("Failed to create cancel transfer gossip message for coop exit %s", transferID)
-		}
-		syncRollbackErr = syncRollbackTx.Commit()
-		if syncRollbackErr != nil {
-			return nil, fmt.Errorf("unable to commit database transaction: %w", syncRollbackErr)
-		}
-
 		return nil, fmt.Errorf("failed to sync coop exit init for transfer %s: %w", transferID, syncErr)
 	}
 
@@ -379,7 +306,7 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 	}
 
 	// Commit and update pending send transfer to finished
-	entTx, err = ent.GetTxFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}

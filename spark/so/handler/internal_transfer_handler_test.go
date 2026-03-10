@@ -1025,24 +1025,6 @@ func TestApplySignatures(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
 
-	config := &so.Config{
-		BitcoindConfigs: map[string]so.BitcoindConfig{
-			"regtest": {
-				DepositConfirmationThreshold: 1,
-			},
-		},
-		SigningOperatorMap: map[string]*so.SigningOperator{
-			"test-operator": {
-				ID:                        0,
-				Identifier:                "test-operator",
-				AddressRpc:                "localhost:8080",
-				AddressDkg:                "localhost:8081",
-				OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
-			},
-		},
-		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
-	}
-
 	key := keys.GeneratePrivateKey()
 	rawTx, outpoint, pkScript, prevAmt, tweakedPriv, err := makeP2TRFundingTx(1000, key)
 	require.NoError(t, err)
@@ -1125,8 +1107,6 @@ func TestApplySignatures(t *testing.T) {
 		SetIntermediateRefundTx(createTestTxBytes(t, 2001)).
 		Save(ctx)
 	require.NoError(t, err)
-
-	handler := NewInternalTransferHandler(config)
 
 	// sign the P2TR output
 	signature := getTxOutputSignature(t, directTx, directRefundTx, tweakedPriv)
@@ -1254,7 +1234,7 @@ func TestApplySignatures(t *testing.T) {
 				DirectRefundTx: tt.directRefundTx,
 			}}
 
-			_, map2, _ := handler.loadLeafRefundMaps(req)
+			_, map2, _ := loadInternalLeafRefundMaps(req)
 			_, err = applySignaturesToTransactionsAndVerify(ctx, map2, req.DirectRefundSignatures, true, tt.adaptorPublicKey)
 
 			if tt.expectedError != "" {

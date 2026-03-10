@@ -69,50 +69,66 @@ func NewTransferHandler(config *so.Config) *TransferHandler {
 	return &TransferHandler{BaseTransferHandler: NewBaseTransferHandler(config), config: config}
 }
 
-func (h *TransferHandler) loadCpfpLeafRefundMap(req *pb.StartTransferRequest) map[string][]byte {
-	leafRefundMap := make(map[string][]byte)
-	if req.TransferPackage != nil {
-		for _, leaf := range req.TransferPackage.LeavesToSend {
-			leafRefundMap[leaf.LeafId] = leaf.RawTx
-		}
-	} else {
-		for _, leaf := range req.LeavesToSend {
-			leafRefundMap[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx
-		}
+// createPendingSendTransferAndCommit creates (or resets) a PendingSendTransfer
+// record for the given transfer and commits the current database transaction.
+func createPendingSendTransferAndCommit(ctx context.Context, transferID uuid.UUID) error {
+	entTx, err := ent.GetTxFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get database transaction: %w", err)
 	}
-	return leafRefundMap
+	if _, err = ent.CreateOrResetPendingSendTransfer(ctx, transferID); err != nil {
+		return fmt.Errorf("unable to create pending send transfer: %w", err)
+	}
+	if err := entTx.Commit(); err != nil {
+		return fmt.Errorf("unable to commit database transaction: %w", err)
+	}
+	return nil
 }
 
-func (h *TransferHandler) loadDirectLeafRefundMap(req *pb.StartTransferRequest) map[string][]byte {
-	leafRefundMap := make(map[string][]byte)
-	if req.TransferPackage != nil {
-		for _, leaf := range req.TransferPackage.DirectLeavesToSend {
-			leafRefundMap[leaf.LeafId] = leaf.RawTx
-		}
-	} else {
-		for _, leaf := range req.LeavesToSend {
-			if leaf.DirectRefundTxSigningJob != nil {
-				leafRefundMap[leaf.LeafId] = leaf.DirectRefundTxSigningJob.RawTx
+// buildSigningResultProtos marshals per-leaf signing result maps into the proto
+// response format used by StartTransfer and StartTransferV3.
+func buildSigningResultProtos(
+	leafMap map[string]*ent.TreeNode,
+	cpfpSigningResultMap map[string]*helper.SigningResult,
+	directSigningResultMap map[string]*helper.SigningResult,
+	directFromCpfpSigningResultMap map[string]*helper.SigningResult,
+) ([]*pb.LeafRefundTxSigningResult, error) {
+	var results []*pb.LeafRefundTxSigningResult
+	for leafID := range leafMap {
+		var cpfpProto *pb.SigningResult
+		var directProto *pb.SigningResult
+		var directFromCpfpProto *pb.SigningResult
+		if res, ok := cpfpSigningResultMap[leafID]; ok {
+			cpfRes, err := res.MarshalProto()
+			if err != nil {
+				return nil, fmt.Errorf("unable to marshal cpfp signing result: %w", err)
+			}
+			cpfpProto = cpfRes
+			if res, ok := directSigningResultMap[leafID]; ok && len(directSigningResultMap) > 0 {
+				dirRes, err := res.MarshalProto()
+				if err != nil {
+					return nil, fmt.Errorf("unable to marshal direct signing result: %w", err)
+				}
+				directProto = dirRes
+			}
+			if res, ok := directFromCpfpSigningResultMap[leafID]; ok && len(directFromCpfpSigningResultMap) > 0 {
+				dirFromCpfpRes, err := res.MarshalProto()
+				if err != nil {
+					return nil, fmt.Errorf("unable to marshal direct from cpfp signing result: %w", err)
+				}
+				directFromCpfpProto = dirFromCpfpRes
 			}
 		}
-	}
-	return leafRefundMap
-}
 
-func (h *TransferHandler) loadDirectFromCpfpLeafRefundMap(req *pb.StartTransferRequest) map[string][]byte {
-	leafRefundMap := make(map[string][]byte)
-	if req.TransferPackage != nil {
-		for _, leaf := range req.TransferPackage.DirectFromCpfpLeavesToSend {
-			leafRefundMap[leaf.LeafId] = leaf.RawTx
-		}
-	} else {
-		for _, leaf := range req.LeavesToSend {
-			if leaf.DirectFromCpfpRefundTxSigningJob != nil {
-				leafRefundMap[leaf.LeafId] = leaf.DirectFromCpfpRefundTxSigningJob.RawTx
-			}
-		}
+		results = append(results, &pb.LeafRefundTxSigningResult{
+			LeafId:                              leafID,
+			RefundTxSigningResult:               cpfpProto,
+			DirectRefundTxSigningResult:         directProto,
+			DirectFromCpfpRefundTxSigningResult: directFromCpfpProto,
+			VerifyingKey:                        leafMap[leafID].VerifyingPubkey.Serialize(),
+		})
 	}
-	return leafRefundMap
+	return results, nil
 }
 
 type TransferAdaptorPublicKeys struct {
@@ -130,6 +146,47 @@ func (h *TransferHandler) StartCounterTransferInternal(ctx context.Context, req 
 // If this package is provided then the handler should execute SwapV3 logic.
 type SwapV3Package struct {
 	primaryTransferId uuid.UUID
+}
+
+// rollbackTransferInit rolls back the current DB transaction, marks the
+// PendingSendTransfer as finished, and optionally sends a cancel-transfer
+// gossip message. Use cancelGossip=true when the transfer was already synced
+// to other SOs (so they need to know it's cancelled); use false when
+// createTransfer itself failed (nothing was synced yet).
+func (h *TransferHandler) rollbackTransferInit(ctx context.Context, transferID uuid.UUID, cancelGossip bool) error {
+	rollbackTx, err := ent.GetTxFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get database transaction: %w", err)
+	}
+	if err := rollbackTx.Rollback(); err != nil {
+		return fmt.Errorf("unable to rollback database transaction: %w", err)
+	}
+
+	cleanupTx, err := ent.GetTxFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get database transaction for cleanup: %w", err)
+	}
+	dbClient := cleanupTx.Client()
+	_, err = dbClient.PendingSendTransfer.Update().
+		Where(pendingsendtransfer.TransferID(transferID)).
+		SetStatus(st.PendingSendTransferStatusFinished).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update pending send transfer: %w", err)
+	}
+
+	if cancelGossip {
+		if cancelErr := h.CreateCancelTransferGossipMessage(ctx, transferID); cancelErr != nil {
+			logging.GetLoggerFromContext(ctx).With(zap.Error(cancelErr)).Sugar().Errorf(
+				"Failed to create cancel transfer gossip message for transfer %s", transferID,
+			)
+		}
+	}
+
+	if err := cleanupTx.Commit(); err != nil {
+		return fmt.Errorf("unable to commit cleanup transaction: %w", err)
+	}
+	return nil
 }
 
 // startTransferInternal initiates a transfer between two parties by validating the transfer request,
@@ -163,7 +220,16 @@ type SwapV3Package struct {
 //
 // The method ensures atomicity by rolling back changes if any step fails, and marks the transfer
 // as successful only after all service operators have validated the transfer package.
-func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.StartTransferRequest, transferType st.TransferType, cpfpAdaptorPubKey keys.Public, directAdaptorPubKey keys.Public, directFromCpfpAdaptorPubKey keys.Public, requireDirectTx bool, swapV3Package *SwapV3Package) (*pb.StartTransferResponse, error) {
+func (h *TransferHandler) startTransferInternal(
+	ctx context.Context,
+	req *pb.StartTransferRequest,
+	transferType st.TransferType,
+	cpfpAdaptorPubKey keys.Public,
+	directAdaptorPubKey keys.Public,
+	directFromCpfpAdaptorPubKey keys.Public,
+	requireDirectTx bool,
+	swapV3Package *SwapV3Package,
+) (*pb.StartTransferResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	ctx, span := tracer.Start(ctx, "TransferHandler.startTransferInternal", trace.WithAttributes(
@@ -201,9 +267,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		}
 	}
 
-	leafCpfpRefundMap := h.loadCpfpLeafRefundMap(req)
-	leafDirectRefundMap := h.loadDirectLeafRefundMap(req)
-	leafDirectFromCpfpRefundMap := h.loadDirectFromCpfpLeafRefundMap(req)
+	leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap := loadLeafRefundMaps(req)
 
 	receiverIdentityPubKey, err := keys.ParsePublicKey(req.GetReceiverIdentityPublicKey())
 	if err != nil {
@@ -222,15 +286,9 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		}
 	}
 
-	entTx, err := ent.GetTxFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get database transaction: %w", err)
-	}
-	if _, err = ent.CreateOrResetPendingSendTransfer(ctx, transferID); err != nil {
-		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
-	}
-	if err := entTx.Commit(); err != nil {
-		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
+	// Mutual exclusivity
+	if err := createPendingSendTransferAndCommit(ctx, transferID); err != nil {
+		return nil, err
 	}
 
 	role := TransferRoleCoordinator
@@ -267,24 +325,8 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	)
 	if err != nil {
 		originalErr := err
-		entTx, err := ent.GetTxFromContext(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get database transaction: %w while creating transfer: %w", err, originalErr)
-		}
-		if err := entTx.Rollback(); err != nil {
-			return nil, fmt.Errorf("unable to rollback database transaction: %w while creating transfer: %w", err, originalErr)
-		}
-		entTx, err = ent.GetTxFromContext(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get database transaction: %w while creating transfer: %w", err, originalErr)
-		}
-		dbClient := entTx.Client()
-		_, err = dbClient.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transferID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update pending send transfer: %w while creating transfer: %w", err, originalErr)
-		}
-		if err = entTx.Commit(); err != nil {
-			return nil, fmt.Errorf("unable to commit database transaction: %w while creating transfer: %w", err, originalErr)
+		if rbErr := h.rollbackTransferInit(ctx, transferID, false /* cancelGossip */); rbErr != nil {
+			return nil, fmt.Errorf("rollback failed: %w while creating transfer: %w", rbErr, originalErr)
 		}
 		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", transferID, originalErr)
 	}
@@ -298,71 +340,33 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		}
 	}
 
-	var signingResults []*pb.LeafRefundTxSigningResult
+	var signingResultProtos []*pb.LeafRefundTxSigningResult
 	var finalCpfpSignatureMap map[string][]byte
 	var finalDirectSignatureMap map[string][]byte
 	var finalDirectFromCpfpSignatureMap map[string][]byte
 	if req.TransferPackage == nil {
-		signingResults, err = signRefunds(ctx, h.config, req, leafMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey, nil)
+		signingResultProtos, err = signRefunds(ctx, h.config, req, leafMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign refunds for transfer %s: %w", transferID, err)
 		}
 	} else {
-		cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, err := SignRefundsWithPregeneratedNonce(ctx, h.config, req, leafMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey, nil)
+		refundSignatures, err := h.signAggregateAndUpdateRefunds(
+			ctx, transfer, req.GetTransferId(), req.TransferPackage, leafMap,
+			cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey, nil,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to sign refunds with pregenerated nonce: %w", err)
-		}
-		finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap, err = AggregateSignatures(ctx, h.config, req, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey, cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, leafMap)
-		if err != nil {
-			return nil, fmt.Errorf("failed to aggregate signatures: %w", err)
+			return nil, err
 		}
 
-		// Update the leaves with the final signatures for refunds
-		if len(finalDirectSignatureMap) > 0 || len(finalDirectFromCpfpSignatureMap) > 0 {
-			err = h.UpdateTransferLeavesSignatures(ctx, transfer, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap)
-			if err != nil {
-				return nil, fmt.Errorf("failed to update transfer leaves signatures: %w", err)
-			}
-		} else {
-			err = h.UpdateTransferLeavesSignaturesForRefundTxOnly(ctx, transfer, finalCpfpSignatureMap, cpfpAdaptorPubKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to update CPFP transfer leaves signatures: %w", err)
-			}
-		}
-		// Build the proto signing results including both CPFP and direct refund signatures.
-		for leafID := range leafMap {
-			var cpfpProto *pb.SigningResult
-			var directProto *pb.SigningResult
-			var directFromCpfpProto *pb.SigningResult
-			if res, ok := cpfpSigningResultMap[leafID]; ok {
-				cpfRes, err := res.MarshalProto()
-				if err != nil {
-					return nil, fmt.Errorf("unable to marshal cpfp signing result: %w", err)
-				}
-				cpfpProto = cpfRes
-				if res, ok := directSigningResultMap[leafID]; ok && len(directSigningResultMap) > 0 {
-					dirRes, err := res.MarshalProto()
-					if err != nil {
-						return nil, fmt.Errorf("unable to marshal direct signing result: %w", err)
-					}
-					directProto = dirRes
-				}
-				if res, ok := directFromCpfpSigningResultMap[leafID]; ok && len(directFromCpfpSigningResultMap) > 0 {
-					dirFromCpfpRes, err := res.MarshalProto()
-					if err != nil {
-						return nil, fmt.Errorf("unable to marshal direct from cpfp signing result: %w", err)
-					}
-					directFromCpfpProto = dirFromCpfpRes
-				}
-			}
-
-			signingResults = append(signingResults, &pb.LeafRefundTxSigningResult{
-				LeafId:                              leafID,
-				RefundTxSigningResult:               cpfpProto,
-				DirectRefundTxSigningResult:         directProto,
-				DirectFromCpfpRefundTxSigningResult: directFromCpfpProto,
-				VerifyingKey:                        leafMap[leafID].VerifyingPubkey.Serialize(),
-			})
+		finalCpfpSignatureMap = refundSignatures.finalCpfpSignatureMap
+		finalDirectSignatureMap = refundSignatures.finalDirectSignatureMap
+		finalDirectFromCpfpSignatureMap = refundSignatures.finalDfcSignatureMap
+		signingResultProtos, err = buildSigningResultProtos(
+			leafMap, refundSignatures.cpfpSigningResultMap,
+			refundSignatures.directSigningResultMap, refundSignatures.directFromCpfpSigningResultMap,
+		)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -393,34 +397,9 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	if err != nil {
 		syncErr := err
 		logger.With(zap.Error(syncErr)).Sugar().Errorf("Failed to sync transfer init for transfer %s", transferID)
-
-		entTx, err := ent.GetTxFromContext(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get database transaction: %w", err)
+		if rbErr := h.rollbackTransferInit(ctx, transferID, true /* cancelGossip */); rbErr != nil {
+			return nil, fmt.Errorf("rollback failed: %w while syncing transfer %s: %w", rbErr, transferID, syncErr)
 		}
-		err = entTx.Rollback()
-		if err != nil {
-			return nil, fmt.Errorf("unable to rollback database transaction: %w", err)
-		}
-
-		entTx, err = ent.GetTxFromContext(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get database transaction: %w", err)
-		}
-		dbClient := entTx.Client()
-		_, err = dbClient.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
-		}
-		cancelErr := h.CreateCancelTransferGossipMessage(ctx, transferID)
-		if cancelErr != nil {
-			logger.With(zap.Error(cancelErr)).Sugar().Errorf("Failed to create cancel transfer gossip message for transfer %s", transferID)
-		}
-		err = entTx.Commit()
-		if err != nil {
-			return nil, fmt.Errorf("unable to commit database transaction: %w", err)
-		}
-
 		return nil, fmt.Errorf("failed to sync transfer init for transfer %s: %w", transferID, syncErr)
 	}
 
@@ -437,47 +416,33 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		// Only false for Swap V3 flow when initiating a primary transfer for a swap.
 		// Swap V3 postpones key tweaking for the primary transfer, until a counter transfer is submitted.
 		if tweakKeys {
-			var message *pbgossip.GossipMessage
 			// Swap V3 requires both primary and counter transfer tweaks settled at the same time,
 			// so there is a special handler for this case.
 			// primaryTransferId is only passed in for swap v3.
 			if transferType == st.TransferTypeCounterSwapV3 && primaryTransferId != uuid.Nil {
-				message = &pbgossip.GossipMessage{
+				message := &pbgossip.GossipMessage{
 					Message: &pbgossip.GossipMessage_SettleSwapKeyTweak{
 						SettleSwapKeyTweak: &pbgossip.GossipMessageSettleSwapKeyTweak{
 							CounterTransferId: transfer.ID.String(),
 						},
 					},
 				}
-			} else {
-				// If all other SOs have settled the sender key tweaks, we can commit the sender key tweaks.
-				// If there's any error, it means one or more of the SOs are down at the time, we will have a
-				// cron job to retry the key commit.
-				message = &pbgossip.GossipMessage{
-					Message: &pbgossip.GossipMessage_SettleSenderKeyTweak{
-						SettleSenderKeyTweak: &pbgossip.GossipMessageSettleSenderKeyTweak{
-							TransferId:           transfer.ID.String(),
-							SenderKeyTweakProofs: senderKeyTweakProofs,
-						},
-					},
+				sendGossipHandler := NewSendGossipHandler(h.config)
+				selection := helper.OperatorSelection{
+					Option: helper.OperatorSelectionOptionExcludeSelf,
 				}
-			}
-
-			sendGossipHandler := NewSendGossipHandler(h.config)
-			selection := helper.OperatorSelection{
-				Option: helper.OperatorSelectionOptionExcludeSelf,
-			}
-			participants, err := selection.OperatorIdentifierList(h.config)
-			if err != nil {
-				return nil, fmt.Errorf("unable to get operator list: %w", err)
-			}
-			_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, message, participants)
-			if err != nil {
-				logger.With(zap.Error(err)).Sugar().Errorf(
-					"Failed to create and send gossip message to settle sender key tweak for transfer %s",
-					transferID,
-				)
-				return nil, fmt.Errorf("failed to create and send gossip message to settle sender key tweak: %w", err)
+				participants, err := selection.OperatorIdentifierList(h.config)
+				if err != nil {
+					return nil, fmt.Errorf("unable to get operator list: %w", err)
+				}
+				_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, message, participants)
+				if err != nil {
+					return nil, fmt.Errorf("failed to settle swap key tweak for transfer %s: %w", transferID, err)
+				}
+			} else {
+				if err := h.syncSettleSenderKeyTweaks(ctx, transfer.ID.String(), senderKeyTweakProofs); err != nil {
+					return nil, err
+				}
 			}
 		}
 		transfer, err = h.loadTransferForUpdate(ctx, transferID)
@@ -500,7 +465,100 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		logger.With(zap.Error(err)).Sugar().Errorf("Unable to marshal transfer %s", transfer.ID)
 	}
 
-	return &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResults}, nil
+	return &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResultProtos}, nil
+}
+
+// syncSettleSenderKeyTweaks builds a SettleSenderKeyTweak gossip message
+// from the given tweak proof map and broadcasts it to all other operators.
+func (h *TransferHandler) syncSettleSenderKeyTweaks(
+	ctx context.Context,
+	transferID string,
+	keyTweakProofMap map[string]*pb.SecretProof,
+) error {
+	message := &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_SettleSenderKeyTweak{
+			SettleSenderKeyTweak: &pbgossip.GossipMessageSettleSenderKeyTweak{
+				TransferId:           transferID,
+				SenderKeyTweakProofs: keyTweakProofMap,
+			},
+		},
+	}
+
+	sendGossipHandler := NewSendGossipHandler(h.config)
+	selection := helper.OperatorSelection{
+		Option: helper.OperatorSelectionOptionExcludeSelf,
+	}
+	participants, err := selection.OperatorIdentifierList(h.config)
+	if err != nil {
+		return fmt.Errorf("unable to get operator list: %w", err)
+	}
+	_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, message, participants)
+	if err != nil {
+		return fmt.Errorf("failed to settle sender key tweaks for transfer %s: %w", transferID, err)
+	}
+	return nil
+}
+
+// refundSigningOutput holds the results of the sign-aggregate-update pipeline.
+type refundSigningOutput struct {
+	cpfpSigningResultMap           map[string]*helper.SigningResult
+	directSigningResultMap         map[string]*helper.SigningResult
+	directFromCpfpSigningResultMap map[string]*helper.SigningResult
+	finalCpfpSignatureMap          map[string][]byte
+	finalDirectSignatureMap        map[string][]byte
+	finalDfcSignatureMap           map[string][]byte // direct-from-cpfp
+}
+
+// signAggregateAndUpdateRefunds runs the 3-step pipeline: sign refunds with
+// pregenerated nonces, aggregate the partial signatures, and update the
+// transfer leaves with the final signatures. connectorTx is passed through to
+// both SignRefundsWithPregeneratedNonce and UpdateTransferLeavesSignatures (used
+// by cooperative exits).
+func (h *TransferHandler) signAggregateAndUpdateRefunds(
+	ctx context.Context,
+	transfer *ent.Transfer,
+	transferID string,
+	transferPackage *pb.TransferPackage,
+	leafMap map[string]*ent.TreeNode,
+	cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey keys.Public,
+	connectorTx []byte,
+) (*refundSigningOutput, error) {
+	cpfpResults, directResults, directFromCpfpResults, err := SignRefundsWithPregeneratedNonce(
+		ctx, h.config, transferID, transferPackage, leafMap,
+		cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey,
+		connectorTx,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign refunds with pregenerated nonce: %w", err)
+	}
+
+	finalCpfpSigMap, finalDirectSigMap, finalDirectFromCpfpSigMap, err := AggregateSignatures(
+		ctx, h.config, transferID, transferPackage,
+		cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey,
+		cpfpResults, directResults, directFromCpfpResults, leafMap,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate signatures: %w", err)
+	}
+
+	if len(finalDirectSigMap) > 0 || len(finalDirectFromCpfpSigMap) > 0 {
+		if err := h.UpdateTransferLeavesSignatures(ctx, transfer, finalCpfpSigMap, finalDirectSigMap, finalDirectFromCpfpSigMap, connectorTx); err != nil {
+			return nil, fmt.Errorf("failed to update transfer leaves signatures: %w", err)
+		}
+	} else {
+		if err := h.UpdateTransferLeavesSignaturesForRefundTxOnly(ctx, transfer, finalCpfpSigMap, cpfpAdaptorPubKey); err != nil {
+			return nil, fmt.Errorf("failed to update CPFP transfer leaves signatures: %w", err)
+		}
+	}
+
+	return &refundSigningOutput{
+		cpfpSigningResultMap:           cpfpResults,
+		directSigningResultMap:         directResults,
+		directFromCpfpSigningResultMap: directFromCpfpResults,
+		finalCpfpSignatureMap:          finalCpfpSigMap,
+		finalDirectSignatureMap:        finalDirectSigMap,
+		finalDfcSignatureMap:           finalDirectFromCpfpSigMap,
+	}, nil
 }
 
 func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, transfer *ent.Transfer, cpfpSignatureMap map[string][]byte, directSignatureMap map[string][]byte, directFromCpfpSignatureMap map[string][]byte, connectorTx ...[]byte) error {
@@ -754,6 +812,10 @@ func (h *TransferHandler) StartTransfer(ctx context.Context, req *pb.StartTransf
 
 func (h *TransferHandler) StartTransferV2(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
 	return h.startTransferInternal(ctx, req, st.TransferTypeTransfer, keys.Public{}, keys.Public{}, keys.Public{}, true, nil)
+}
+
+func (h *TransferHandler) StartTransferV3(ctx context.Context, req *pb.StartTransferV3Request) (*pb.StartTransferResponse, error) {
+	return h.startTransferV3Internal(ctx, req)
 }
 
 func (h *TransferHandler) StartLeafSwap(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
@@ -1227,7 +1289,8 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 func SignRefundsWithPregeneratedNonce(
 	ctx context.Context,
 	config *so.Config,
-	requests *pb.StartTransferRequest,
+	transferID string,
+	pkg *pb.TransferPackage,
 	leafMap map[string]*ent.TreeNode,
 	cpfpAdaptorPubKey keys.Public,
 	directAdaptorPubKey keys.Public,
@@ -1241,7 +1304,7 @@ func SignRefundsWithPregeneratedNonce(
 	jobIsDirectRefund := make(map[uuid.UUID]bool)
 	jobIsDirectFromCpfpRefund := make(map[uuid.UUID]bool)
 
-	if requests.TransferPackage == nil {
+	if pkg == nil {
 		return nil, nil, nil, fmt.Errorf("transfer package is nil")
 	}
 
@@ -1252,7 +1315,7 @@ func SignRefundsWithPregeneratedNonce(
 	}
 
 	var signingJobs []*helper.SigningJobWithPregeneratedNonce
-	for _, req := range requests.TransferPackage.LeavesToSend {
+	for _, req := range pkg.LeavesToSend {
 		leaf, exists := leafMap[req.LeafId]
 		if !exists {
 			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", req.LeafId)
@@ -1339,7 +1402,7 @@ func SignRefundsWithPregeneratedNonce(
 	}
 
 	// Create signing jobs for DIRECT refund txs.
-	for _, req := range requests.TransferPackage.DirectLeavesToSend {
+	for _, req := range pkg.DirectLeavesToSend {
 		leaf, exists := leafMap[req.LeafId]
 		if !exists {
 			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", req.LeafId)
@@ -1417,7 +1480,7 @@ func SignRefundsWithPregeneratedNonce(
 		leafJobMap[directJobID] = leaf
 	}
 	// Create signing jobs for DIRECT FROM CPFP refund txs.
-	for _, req := range requests.TransferPackage.DirectFromCpfpLeavesToSend {
+	for _, req := range pkg.DirectFromCpfpLeavesToSend {
 		leaf, exists := leafMap[req.LeafId]
 		if !exists {
 			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", req.LeafId)
@@ -1532,7 +1595,8 @@ func SignRefundsWithPregeneratedNonce(
 func AggregateSignatures(
 	ctx context.Context,
 	config *so.Config,
-	req *pb.StartTransferRequest,
+	transferID string,
+	pkg *pb.TransferPackage,
 	cpfpAdaptorPubKey keys.Public,
 	directAdaptorPubKey keys.Public,
 	directFromCpfpAdaptorPubKey keys.Public,
@@ -1550,9 +1614,9 @@ func AggregateSignatures(
 	}
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
-	cpfpUserSignedRefunds := req.TransferPackage.LeavesToSend
-	directUserSignedRefunds := req.TransferPackage.DirectLeavesToSend
-	directFromCpfpUserSignedRefunds := req.TransferPackage.DirectFromCpfpLeavesToSend
+	cpfpUserSignedRefunds := pkg.LeavesToSend
+	directUserSignedRefunds := pkg.DirectLeavesToSend
+	directFromCpfpUserSignedRefunds := pkg.DirectFromCpfpLeavesToSend
 
 	cpfpUserRefundMap := make(map[string]*pb.UserSignedTxSigningJob)
 	directUserRefundMap := make(map[string]*pb.UserSignedTxSigningJob)
