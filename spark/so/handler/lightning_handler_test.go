@@ -685,12 +685,82 @@ func TestValidatePreimage_InvalidPreimage_Errors(t *testing.T) {
 				IdentityPublicKey: tt.identityPubKey.Serialize(),
 			}
 
-			transfer, err := lightningHandler.ValidatePreimage(ctx, req)
+			preimageRequest, transfer, err := lightningHandler.ValidatePreimage(ctx, req)
 
 			require.ErrorContains(t, err, tt.expectedErrMsg)
+			assert.Nil(t, preimageRequest)
 			assert.Nil(t, transfer)
 		})
 	}
+}
+
+func TestStorePreimage(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{1})
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	senderPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	preimage := bytes.Repeat([]byte{0xab}, 32)
+
+	t.Run("updates status from WaitingForPreimage to PreimageShared", func(t *testing.T) {
+		transfer, err := dbTx.Transfer.Create().
+			SetSenderIdentityPubkey(senderPub).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetStatus(st.TransferStatusSenderKeyTweakPending).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			SetType(st.TransferTypePreimageSwap).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		preimageRequest, err := dbTx.PreimageRequest.Create().
+			SetPaymentHash(bytes.Repeat([]byte{0x01}, 32)).
+			SetStatus(st.PreimageRequestStatusWaitingForPreimage).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetTransfers(transfer).
+			Save(ctx)
+		require.NoError(t, err)
+
+		updated, err := lightningHandler.StorePreimage(ctx, preimageRequest, preimage)
+		require.NoError(t, err)
+		assert.Equal(t, st.PreimageRequestStatusPreimageShared, updated.Status)
+		assert.Equal(t, preimage, updated.Preimage)
+	})
+
+	t.Run("no-ops when already PreimageShared", func(t *testing.T) {
+		existingPreimage := bytes.Repeat([]byte{0xcd}, 32)
+		transfer, err := dbTx.Transfer.Create().
+			SetSenderIdentityPubkey(senderPub).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetStatus(st.TransferStatusSenderKeyTweakPending).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			SetType(st.TransferTypePreimageSwap).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		preimageRequest, err := dbTx.PreimageRequest.Create().
+			SetPaymentHash(bytes.Repeat([]byte{0x02}, 32)).
+			SetStatus(st.PreimageRequestStatusPreimageShared).
+			SetPreimage(existingPreimage).
+			SetReceiverIdentityPubkey(receiverPub).
+			SetTransfers(transfer).
+			Save(ctx)
+		require.NoError(t, err)
+
+		updated, err := lightningHandler.StorePreimage(ctx, preimageRequest, preimage)
+		require.NoError(t, err)
+		assert.Equal(t, st.PreimageRequestStatusPreimageShared, updated.Status)
+		assert.Equal(t, existingPreimage, updated.Preimage)
+	})
 }
 
 // Note: validateNodeOwnership and validateHasSession are private methods,

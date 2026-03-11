@@ -1918,31 +1918,30 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlc
 	}, nil
 }
 
-func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (*ent.Transfer, error) {
+func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (*ent.PreimageRequest, *ent.Transfer, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	// Validate input parameters
 	if len(req.PaymentHash) != 32 {
-		return nil, fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(req.PaymentHash))
+		return nil, nil, fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(req.PaymentHash))
 	}
 	if len(req.Preimage) != 32 {
-		return nil, fmt.Errorf("invalid preimage length: %d bytes, expected 32 bytes", len(req.Preimage))
+		return nil, nil, fmt.Errorf("invalid preimage length: %d bytes, expected 32 bytes", len(req.Preimage))
 	}
 	if len(req.IdentityPublicKey) != 33 {
-		return nil, fmt.Errorf("invalid identity public key length: %d bytes, expected 33 bytes", len(req.IdentityPublicKey))
+		return nil, nil, fmt.Errorf("invalid identity public key length: %d bytes, expected 33 bytes", len(req.IdentityPublicKey))
 	}
 
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return nil, nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 	reqIdentityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, nil, fmt.Errorf("invalid identity public key: %w", err)
 	}
 	calculatedPaymentHash := sha256.Sum256(req.Preimage)
 	if !bytes.Equal(calculatedPaymentHash[:], req.PaymentHash) {
-		return nil, fmt.Errorf("invalid preimage")
+		return nil, nil, fmt.Errorf("invalid preimage")
 	}
 
 	preimageRequest, err := tx.PreimageRequest.Query().Where(
@@ -1956,24 +1955,28 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.Pr
 			req.IdentityPublicKey,
 			req.PaymentHash,
 		)
-		return nil, fmt.Errorf("ProvidePreimage: unable to get preimage request: %w", err)
-	}
-
-	if preimageRequest.Status == st.PreimageRequestStatusWaitingForPreimage {
-		preimageRequest, err = preimageRequest.Update().
-			SetStatus(st.PreimageRequestStatusPreimageShared).
-			SetPreimage(req.Preimage).
-			Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update preimage request status: %w", err)
-		}
+		return nil, nil, fmt.Errorf("ProvidePreimage: unable to get preimage request: %w", err)
 	}
 
 	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer: %w", err)
+		return nil, nil, fmt.Errorf("unable to get transfer: %w", err)
 	}
-	return transfer, nil
+	return preimageRequest, transfer, nil
+}
+
+func (h *LightningHandler) StorePreimage(ctx context.Context, preimageRequest *ent.PreimageRequest, preimage []byte) (*ent.PreimageRequest, error) {
+	if preimageRequest.Status == st.PreimageRequestStatusWaitingForPreimage {
+		updated, err := preimageRequest.Update().
+			SetStatus(st.PreimageRequestStatusPreimageShared).
+			SetPreimage(preimage).
+			Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update preimage request status: %w", err)
+		}
+		return updated, nil
+	}
+	return preimageRequest, nil
 }
 
 func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pbinternal.ProvidePreimageRequest) (*ent.Transfer, error) {
@@ -1982,7 +1985,7 @@ func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pb
 		Preimage:          req.Preimage,
 		IdentityPublicKey: req.IdentityPublicKey,
 	}
-	transfer, err := h.ValidatePreimage(ctx, providePreimageRequest)
+	preimageRequest, transfer, err := h.ValidatePreimage(ctx, providePreimageRequest)
 	if err != nil {
 		return nil, fmt.Errorf("unable to validate preimage: %w", err)
 	}
@@ -1992,6 +1995,12 @@ func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pb
 	if err != nil {
 		return nil, fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
+
+	_, err = h.StorePreimage(ctx, preimageRequest, req.Preimage)
+	if err != nil {
+		return nil, fmt.Errorf("unable to store preimage: %w", err)
+	}
+
 	return transfer, nil
 }
 
@@ -2067,10 +2076,16 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, identityPubKey); err != nil {
 		return nil, err
 	}
-	transfer, err := h.ValidatePreimage(ctx, req)
+	preimageRequest, transfer, err := h.ValidatePreimage(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("unable to provide preimage: %w", err)
 	}
+
+	_, err = h.StorePreimage(ctx, preimageRequest, req.Preimage)
+	if err != nil {
+		return nil, fmt.Errorf("unable to store preimage: %w", err)
+	}
+
 	if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
 		transferProto, err := transfer.MarshalProto(ctx)
 		if err != nil {
