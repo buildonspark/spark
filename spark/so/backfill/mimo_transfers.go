@@ -23,15 +23,17 @@ import (
 const initScanBatchSize = 10000
 
 var (
-	backfillMu     sync.Mutex
-	backfillCursor time.Time // zero = uninitialized
-	lastSeenID     uuid.UUID // tiebreaker for keyset pagination in initBackfillCursor
+	backfillMu          sync.Mutex
+	backfillCursor      time.Time // zero = uninitialized
+	lastSeenID          uuid.UUID // tiebreaker for keyset pagination in initBackfillCursor
+	backfillInitialized bool
 )
 
 // resetBackfillState resets the cursor state for testing.
 func resetBackfillState() {
 	backfillCursor = time.Time{}
 	lastSeenID = uuid.UUID{}
+	backfillInitialized = false
 }
 
 // BackfillMimoResult holds the results of both backfill operations.
@@ -75,9 +77,6 @@ func BackfillMimoTransfers(ctx context.Context, config *so.Config, batchSize int
 // This isn't super efficient, but it's a one-time (per deployment) no-lock scan and
 // works best for this use case to avoid timeouts with expensive full-table anti-join queries.
 func initBackfillCursor(ctx context.Context, db *ent.Client, batchSize int) error {
-	cursor := backfillCursor
-	lastID := lastSeenID
-
 	for {
 		query := db.Transfer.Query().
 			Where(
@@ -90,13 +89,13 @@ func initBackfillCursor(ctx context.Context, db *ent.Client, batchSize int) erro
 		// the same timestamp with a higher ID. This avoids skipping
 		// records when multiple transfers share the same update_time
 		// (pure GT on timestamp would jump past all of them).
-		if !cursor.IsZero() {
+		if !backfillCursor.IsZero() {
 			query = query.Where(
 				enttransfer.Or(
-					enttransfer.UpdateTimeGT(cursor),
+					enttransfer.UpdateTimeGT(backfillCursor),
 					enttransfer.And(
-						enttransfer.UpdateTimeEQ(cursor),
-						enttransfer.IDGT(lastID),
+						enttransfer.UpdateTimeEQ(backfillCursor),
+						enttransfer.IDGT(lastSeenID),
 					),
 				),
 			)
@@ -110,6 +109,7 @@ func initBackfillCursor(ctx context.Context, db *ent.Client, batchSize int) erro
 		if len(transfers) == 0 {
 			// All transfers have been scanned; everything is backfilled.
 			backfillCursor = time.Now()
+			backfillInitialized = true
 			return nil
 		}
 
@@ -136,14 +136,22 @@ func initBackfillCursor(ctx context.Context, db *ent.Client, batchSize int) erro
 			if !existingSet[t.ID] {
 				backfillCursor = t.UpdateTime
 				lastSeenID = t.ID
+				backfillInitialized = true
 				return nil
 			}
 		}
 
+		if len(transfers) < batchSize {
+			// Reached end of table with no gaps — backfill is complete.
+			backfillCursor = time.Now()
+			backfillInitialized = true
+			return nil
+		}
+
 		// Entire batch had senders; advance past it.
 		last := transfers[len(transfers)-1]
-		cursor = last.UpdateTime
-		lastID = last.ID
+		backfillCursor = last.UpdateTime
+		lastSeenID = last.ID
 	}
 }
 
@@ -158,7 +166,7 @@ func backfillCreateMimoRecords(ctx context.Context, batchSize int) (int, error) 
 		return 0, fmt.Errorf("failed to get db from context: %w", err)
 	}
 
-	if backfillCursor.IsZero() {
+	if !backfillInitialized {
 		if err := initBackfillCursor(ctx, db, initScanBatchSize); err != nil {
 			return 0, fmt.Errorf("failed to init backfill cursor: %w", err)
 		}
