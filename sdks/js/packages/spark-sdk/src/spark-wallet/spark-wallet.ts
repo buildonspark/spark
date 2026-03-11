@@ -3923,15 +3923,20 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       amountSats,
     );
 
-    if (
-      !feeEstimate ||
-      feeEstimate.feeEstimate.originalUnit !== CurrencyUnit.Millisatoshi
-    ) {
+    if (!feeEstimate) {
       throw new Error("Failed to get lightning send fee estimate");
     }
 
-    const satsFeeEstimate = feeEstimate.feeEstimate.originalValue / 1000;
-    return Math.ceil(satsFeeEstimate);
+    switch (feeEstimate.feeEstimate.originalUnit) {
+      case CurrencyUnit.Satoshi:
+        return feeEstimate.feeEstimate.originalValue;
+      case CurrencyUnit.Millisatoshi:
+        return Math.ceil(feeEstimate.feeEstimate.originalValue / 1000);
+      default:
+        throw new Error(
+          `Unsupported fee estimate unit: ${feeEstimate.feeEstimate.originalUnit}`,
+        );
+    }
   }
 
   // ***** Cooperative Exit Flow *****
