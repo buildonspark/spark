@@ -9,13 +9,6 @@ const testsDir = path.join(__dirname, "integration", "ssp");
 const TIMEOUT_MS = 120_000; // 2 minutes per test file
 
 function run() {
-  if (!process.env.MINIKUBE_IP) {
-    console.error(
-      "MINIKUBE_IP not set. SSP integration tests require hermetic environment with SSP deployed.",
-    );
-    process.exit(1);
-  }
-
   if (!fs.existsSync(testsDir)) {
     console.error(`SSP tests directory not found: ${testsDir}`);
     process.exit(1);

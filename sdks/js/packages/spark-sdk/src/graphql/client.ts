@@ -162,6 +162,14 @@ export default class SspClient {
 
     const retryFetch = createRetryFetch(fetch as typeof globalThis.fetch);
 
+    const authAwareFetch: typeof globalThis.fetch = async (input, init) => {
+      const response = await retryFetch(input, init);
+      if (response.status === 401) {
+        throw new Error("Request unauthorized");
+      }
+      return response;
+    };
+
     this.requester = new Requester(
       new NodeKeyCache(DefaultCrypto),
       options.schemaEndpoint || `graphql/spark/2025-03-19`,
@@ -170,7 +178,7 @@ export default class SspClient {
       options.baseUrl,
       DefaultCrypto,
       undefined,
-      retryFetch,
+      authAwareFetch,
     );
   }
 
