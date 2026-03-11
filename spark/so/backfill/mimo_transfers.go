@@ -40,6 +40,8 @@ func resetBackfillState() {
 type BackfillMimoResult struct {
 	TransfersCreated        int
 	ReceiverStatusesUpdated int
+	ReceiverMismatches      int
+	BackfillCursor          time.Time
 }
 
 // BackfillMimoTransfers runs two backfill operations:
@@ -58,6 +60,13 @@ func BackfillMimoTransfers(ctx context.Context, config *so.Config, batchSize int
 		return BackfillMimoResult{}, fmt.Errorf("backfill create records: %w", err)
 	}
 
+	mismatches, err := monitorReceiverStatusMismatches(ctx, batchSize)
+	if err != nil {
+		logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "monitor_receiver_status_mismatches"), zap.Error(err)).
+			Sugar().Errorf("failed to monitor receiver status mismatches (non-fatal)")
+		mismatches = 0
+	}
+
 	updated, err := backfillSyncReceiverStatuses(ctx, batchSize)
 	if err != nil {
 		return BackfillMimoResult{}, fmt.Errorf("backfill sync receiver statuses: %w", err)
@@ -66,7 +75,57 @@ func BackfillMimoTransfers(ctx context.Context, config *so.Config, batchSize int
 	return BackfillMimoResult{
 		TransfersCreated:        created,
 		ReceiverStatusesUpdated: updated,
+		ReceiverMismatches:      mismatches,
+		BackfillCursor:          backfillCursor,
 	}, nil
+}
+
+// monitorReceiverStatusMismatches checks recently-updated Transfers for
+// TransferReceivers whose status doesn't match the expected mapped status.
+// This detects dual-write failures across ALL states, not just terminal ones.
+//
+// Uses the Transfer.update_time index to efficiently find recent transfers,
+// then eager-loads their receivers for comparison.
+func monitorReceiverStatusMismatches(ctx context.Context, batchSize int) (int, error) {
+	logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "monitor_receiver_status_mismatches"))
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get db from context: %w", err)
+	}
+
+	now := time.Now()
+	transfers, err := db.Transfer.Query().
+		Where(
+			enttransfer.UpdateTimeGTE(now.Add(-30*time.Second)),
+			enttransfer.HasTransferReceivers(),
+		).
+		WithTransferReceivers().
+		Limit(batchSize).
+		All(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query recent transfers: %w", err)
+	}
+
+	mismatches := 0
+	for _, t := range transfers {
+		expectedStatus := MapTransferToReceiverStatus(t.Status)
+		for _, r := range t.Edges.TransferReceivers {
+			if r.Status != expectedStatus {
+				mismatches++
+				logger.With(
+					zap.String("transfer_id", t.ID.String()),
+				).Sugar().Warnf("receiver %s status mismatch: receiver=%s, expected=%s (transfer=%s)",
+					r.ID, r.Status, expectedStatus, t.Status)
+			}
+		}
+	}
+
+	if mismatches > 0 {
+		logger.Sugar().Warnf("found %d receiver status mismatches across %d recent transfers", mismatches, len(transfers))
+	}
+
+	return mismatches, nil
 }
 
 // initBackfillCursor scans forward through transfers ordered by update_time

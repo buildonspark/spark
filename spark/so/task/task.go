@@ -946,9 +946,10 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					if err != nil {
 						return err
 					}
-					if result.TransfersCreated > 0 || result.ReceiverStatusesUpdated > 0 {
-						logger := logging.GetLoggerFromContext(ctx)
-						logger.Info(fmt.Sprintf("backfill_mimo_transfers: created %d transfer records, updated %d receiver statuses", result.TransfersCreated, result.ReceiverStatusesUpdated))
+					if !result.BackfillCursor.IsZero() {
+						logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "backfill_mimo_transfers"))
+						logger.Sugar().Infof("created %d transfer records, updated %d receiver statuses, found %d receiver mismatches, cursor at %s (unix: %d)",
+							result.TransfersCreated, result.ReceiverStatusesUpdated, result.ReceiverMismatches, result.BackfillCursor.Format(time.RFC3339), result.BackfillCursor.Unix())
 					}
 					return nil
 				},
