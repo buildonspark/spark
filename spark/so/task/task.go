@@ -804,47 +804,79 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				Name:         "monitor_pending_send_transfers",
 				RunInTestEnv: true,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
+					logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "monitor_pending_send_transfers"))
 					tx, err := ent.GetDbFromContext(ctx)
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
+					now := time.Now()
 					pendingSendTransfers, err := tx.PendingSendTransfer.Query().Where(
 						pendingsendtransfer.StatusEQ(st.PendingSendTransferStatusPending),
-						pendingsendtransfer.UpdateTimeLT(time.Now().Add(-4*time.Minute)),
+						pendingsendtransfer.UpdateTimeLT(now.Add(-4*time.Minute)),
 					).Limit(100).ForUpdate(sql.WithLockAction(sql.SkipLocked)).All(ctx)
 					if err != nil {
 						return err
 					}
+					if len(pendingSendTransfers) == 0 {
+						return nil
+					}
+
+					logger.Sugar().Warnf("found %d stuck pending send transfers (limit=%d, may_have_more=%v)",
+						len(pendingSendTransfers), 100, len(pendingSendTransfers) == 100)
+					cancelledCount := 0
+					finishedCount := 0
+					errorCount := 0
 					for _, pendingSendTransfer := range pendingSendTransfers {
-						logger.Sugar().Infof("Pending send transfer %s is still pending", pendingSendTransfer.ID)
+						transferLogger := logger.With(
+							zap.String("transfer_id", pendingSendTransfer.TransferID.String()),
+							zap.String("pending_send_transfer_id", pendingSendTransfer.ID.String()),
+						)
+						stuckDuration := now.Sub(pendingSendTransfer.UpdateTime)
+						transferLogger.Sugar().Warnf("stuck for %s (since %s)",
+							stuckDuration.Round(time.Second), pendingSendTransfer.UpdateTime.Format(time.RFC3339))
 						transferEnt, err := tx.Transfer.Query().Where(transfer.IDEQ(pendingSendTransfer.TransferID)).Only(ctx)
 						if err != nil && !ent.IsNotFound(err) {
-							logger.Sugar().Errorw("failed to get transfer", zap.Error(err))
+							transferLogger.With(zap.Error(err)).Sugar().Errorf("failed to get transfer")
+							errorCount++
 							continue
 						}
-						shouldCancel := ent.IsNotFound(err) || transferEnt.Status == st.TransferStatusReturned
+
+						transferNotFound := ent.IsNotFound(err)
+						shouldCancel := transferNotFound || transferEnt.Status == st.TransferStatusReturned
 						if shouldCancel {
-							logger.Sugar().Infof("Cancelling transfer %s", pendingSendTransfer.TransferID)
+							if transferNotFound {
+								transferLogger.Sugar().Warnf("cancelling (transfer entity not found)")
+							} else {
+								transferLogger.Sugar().Warnf("cancelling (transfer status: %s)", transferEnt.Status)
+							}
 							transferHandler := handler.NewTransferHandler(config)
 							err := transferHandler.CreateCancelTransferGossipMessage(ctx, pendingSendTransfer.TransferID)
 							if err != nil {
-								logger.Sugar().Errorw("failed to cancel transfer", zap.Error(err))
+								transferLogger.With(zap.Error(err)).Sugar().Errorf("failed to cancel transfer")
+								errorCount++
 							} else {
-								logger.Sugar().Infof("Successfully cancelled transfer %s", pendingSendTransfer.TransferID)
 								_, err = pendingSendTransfer.Update().SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
 								if err != nil {
-									logger.Sugar().Errorw("failed to update pending send transfer", zap.Error(err))
+									transferLogger.With(zap.Error(err)).Sugar().Errorf("failed to update pending send transfer")
+									errorCount++
+								} else {
+									cancelledCount++
 								}
 							}
 						} else {
-							logger.Sugar().Infof("Transfer %s is not ready to be cancelled", pendingSendTransfer.TransferID)
+							transferLogger.Sugar().Warnf("marking as finished without cancel (transfer status: %s)", transferEnt.Status)
 							_, err = pendingSendTransfer.Update().SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
 							if err != nil {
-								logger.Sugar().Errorw("failed to update pending send transfer", zap.Error(err))
+								transferLogger.With(zap.Error(err)).Sugar().Errorf("failed to update pending send transfer")
+								errorCount++
+							} else {
+								finishedCount++
 							}
 						}
 					}
+
+					logger.Sugar().Warnf("processed %d stuck transfers (cancelled: %d, finished: %d, errors: %d)",
+						len(pendingSendTransfers), cancelledCount, finishedCount, errorCount)
 					return nil
 				},
 			},
