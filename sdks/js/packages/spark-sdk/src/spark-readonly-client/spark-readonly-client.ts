@@ -507,11 +507,16 @@ export abstract class SparkReadonlyClient {
     }
   }
 
-  /** Queries paginated confirmed UTXOs for a batch of static deposit addresses. */
+  /** Queries paginated static deposit UTXOs for a batch of deposit addresses. */
   public async getUtxosForDepositAddresses(
     params: GetUtxosForAddressesParams,
   ): Promise<{
-    utxos: { address: string; txid: string; vout: number }[];
+    utxos: {
+      address: string;
+      txid: string;
+      vout: number;
+      isConfirmed: boolean;
+    }[];
     pageResponse: {
       hasNextPage: boolean;
       hasPreviousPage: boolean;
@@ -525,6 +530,7 @@ export abstract class SparkReadonlyClient {
       cursor = "",
       direction = "NEXT",
       excludeClaimed = false,
+      includePending = false,
     } = params;
     this.assertNonEmptyArray(depositAddresses, "depositAddresses");
     this.assertPositiveInteger(pageSize, "pageSize");
@@ -545,6 +551,7 @@ export abstract class SparkReadonlyClient {
         addresses: depositAddresses,
         network: this.config.getNetworkProto(),
         excludeClaimed,
+        includePending,
         page: {
           pageSize,
           cursor,
@@ -570,6 +577,7 @@ export abstract class SparkReadonlyClient {
           address: addressedUtxo.address,
           txid: bytesToHex(addressedUtxo.utxo.txid),
           vout: addressedUtxo.utxo.vout,
+          isConfirmed: addressedUtxo.isConfirmed,
         };
       }),
       pageResponse: {

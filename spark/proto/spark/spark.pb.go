@@ -1760,6 +1760,7 @@ type AddressedUtxo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Address       string                 `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
 	Utxo          *UTXO                  `protobuf:"bytes,2,opt,name=utxo,proto3" json:"utxo,omitempty"`
+	IsConfirmed   bool                   `protobuf:"varint,3,opt,name=is_confirmed,json=isConfirmed,proto3" json:"is_confirmed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1806,6 +1807,13 @@ func (x *AddressedUtxo) GetUtxo() *UTXO {
 		return x.Utxo
 	}
 	return nil
+}
+
+func (x *AddressedUtxo) GetIsConfirmed() bool {
+	if x != nil {
+		return x.IsConfirmed
+	}
+	return false
 }
 
 // *
@@ -10446,6 +10454,7 @@ type GetUtxosForAddressesRequest struct {
 	Network        Network                `protobuf:"varint,2,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
 	ExcludeClaimed bool                   `protobuf:"varint,3,opt,name=exclude_claimed,json=excludeClaimed,proto3" json:"exclude_claimed,omitempty"`
 	Page           *PageRequest           `protobuf:"bytes,4,opt,name=page,proto3" json:"page,omitempty"`
+	IncludePending bool                   `protobuf:"varint,5,opt,name=include_pending,json=includePending,proto3" json:"include_pending,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -10506,6 +10515,13 @@ func (x *GetUtxosForAddressesRequest) GetPage() *PageRequest {
 		return x.Page
 	}
 	return nil
+}
+
+func (x *GetUtxosForAddressesRequest) GetIncludePending() bool {
+	if x != nil {
+		return x.IncludePending
+	}
+	return false
 }
 
 type GetUtxosForAddressesResponse struct {
@@ -11382,10 +11398,11 @@ const file_spark_proto_rawDesc = "" +
 	"\x06raw_tx\x18\x01 \x01(\fR\x05rawTx\x12\x12\n" +
 	"\x04vout\x18\x02 \x01(\rR\x04vout\x122\n" +
 	"\anetwork\x18\x03 \x01(\x0e2\x0e.spark.NetworkB\b\xfaB\x05\x82\x01\x02 \x00R\anetwork\x12\x12\n" +
-	"\x04txid\x18\x04 \x01(\fR\x04txid\"J\n" +
+	"\x04txid\x18\x04 \x01(\fR\x04txid\"m\n" +
 	"\rAddressedUtxo\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x1f\n" +
-	"\x04utxo\x18\x02 \x01(\v2\v.spark.UTXOR\x04utxo\"9\n" +
+	"\x04utxo\x18\x02 \x01(\v2\v.spark.UTXOR\x04utxo\x12!\n" +
+	"\fis_confirmed\x18\x03 \x01(\bR\visConfirmed\"9\n" +
 	"\n" +
 	"NodeOutput\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
@@ -12071,12 +12088,13 @@ const file_spark_proto_rawDesc = "" +
 	"\x0fexclude_claimed\x18\x05 \x01(\bR\x0eexcludeClaimed\"W\n" +
 	"\x1aGetUtxosForAddressResponse\x12!\n" +
 	"\x05utxos\x18\x01 \x03(\v2\v.spark.UTXOR\x05utxos\x12\x16\n" +
-	"\x06offset\x18\x02 \x01(\x04R\x06offset\"\xc0\x01\n" +
+	"\x06offset\x18\x02 \x01(\x04R\x06offset\"\xe9\x01\n" +
 	"\x1bGetUtxosForAddressesRequest\x12\x1c\n" +
 	"\taddresses\x18\x01 \x03(\tR\taddresses\x122\n" +
 	"\anetwork\x18\x02 \x01(\x0e2\x0e.spark.NetworkB\b\xfaB\x05\x82\x01\x02 \x00R\anetwork\x12'\n" +
 	"\x0fexclude_claimed\x18\x03 \x01(\bR\x0eexcludeClaimed\x12&\n" +
-	"\x04page\x18\x04 \x01(\v2\x12.spark.PageRequestR\x04page\"s\n" +
+	"\x04page\x18\x04 \x01(\v2\x12.spark.PageRequestR\x04page\x12'\n" +
+	"\x0finclude_pending\x18\x05 \x01(\bR\x0eincludePending\"s\n" +
 	"\x1cGetUtxosForAddressesResponse\x12*\n" +
 	"\x05utxos\x18\x01 \x03(\v2\x14.spark.AddressedUtxoR\x05utxos\x12'\n" +
 	"\x04page\x18\x02 \x01(\v2\x13.spark.PageResponseR\x04page\"c\n" +

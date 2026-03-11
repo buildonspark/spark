@@ -274,6 +274,7 @@ message UTXO {
 message AddressedUtxo {
     string address = 1;
     UTXO utxo = 2;
+    bool is_confirmed = 3;
 }
 
 /**
@@ -1493,6 +1494,7 @@ message GetUtxosForAddressesRequest {
     Network network = 2 [(validate.rules).enum = {not_in: [0]}];
     bool exclude_claimed = 3;
     PageRequest page = 4;
+    bool include_pending = 5;
 }
 
 message GetUtxosForAddressesResponse {

@@ -1702,6 +1702,8 @@ func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUt
 	if bitcoinConfig, ok := o.config.BitcoindConfigs[strings.ToLower(network.String())]; ok {
 		threshold = bitcoinConfig.DepositConfirmationThreshold
 	}
+	confirmedCutoffBlockHeight := currentBlockHeight.Height - int64(threshold) + 1
+	maxPendingBlockHeight := currentBlockHeight.Height
 
 	limit := DefaultGetUtxosForAddressesPageSize
 	if page := req.GetPage(); page != nil {
@@ -1744,7 +1746,6 @@ func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUt
 	query := db.Utxo.Query().
 		Where(
 			entutxo.NetworkEQ(network),
-			entutxo.BlockHeightLTE(currentBlockHeight.Height-int64(threshold)),
 			entutxo.HasDepositAddressWith(
 				depositaddress.AddressIn(uniqueAddresses...),
 				depositaddress.IsStatic(true),
@@ -1758,6 +1759,12 @@ func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUt
 			entutxo.ByVout(),
 			entutxo.ByID(),
 		)
+
+	if req.GetIncludePending() {
+		query = query.Where(entutxo.BlockHeightLTE(maxPendingBlockHeight))
+	} else {
+		query = query.Where(entutxo.BlockHeightLTE(confirmedCutoffBlockHeight))
+	}
 
 	if req.GetExcludeClaimed() {
 		query = query.Where(func(s *sql.Selector) {
@@ -1809,7 +1816,8 @@ func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUt
 			return nil, fmt.Errorf("utxo %s is missing deposit address edge", utxo.ID)
 		}
 		utxosResult = append(utxosResult, &pb.AddressedUtxo{
-			Address: utxo.Edges.DepositAddress.Address,
+			Address:     utxo.Edges.DepositAddress.Address,
+			IsConfirmed: utxo.BlockHeight <= confirmedCutoffBlockHeight,
 			Utxo: &pb.UTXO{
 				Txid:    utxo.Txid,
 				Vout:    utxo.Vout,

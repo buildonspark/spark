@@ -1245,14 +1245,19 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
-   * Returns confirmed UTXOs for a batch of static Spark deposit addresses.
+   * Returns static deposit UTXOs for a batch of Spark deposit addresses.
    *
    * @param params - Batch UTXO query params.
    */
   public async getUtxosForDepositAddresses(
     params: GetUtxosForAddressesParams,
   ): Promise<{
-    utxos: { address: string; txid: string; vout: number }[];
+    utxos: {
+      address: string;
+      txid: string;
+      vout: number;
+      isConfirmed: boolean;
+    }[];
     pageResponse: {
       hasNextPage: boolean;
       hasPreviousPage: boolean;
@@ -1266,6 +1271,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       cursor = "",
       direction = "NEXT",
       excludeClaimed = false,
+      includePending = false,
     } = params;
 
     if (depositAddresses.length === 0) {
@@ -1299,6 +1305,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         addresses: depositAddresses,
         network: NetworkToProto[this.config.getNetwork()],
         excludeClaimed,
+        includePending,
         page: {
           pageSize,
           cursor,
@@ -1325,6 +1332,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             address: addressedUtxo.address,
             txid: bytesToHex(addressedUtxo.utxo.txid),
             vout: addressedUtxo.utxo.vout,
+            isConfirmed: addressedUtxo.isConfirmed,
           };
         }) ?? [],
       pageResponse: {

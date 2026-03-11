@@ -802,6 +802,7 @@ export interface UTXO {
 export interface AddressedUtxo {
   address: string;
   utxo: UTXO | undefined;
+  isConfirmed: boolean;
 }
 
 /**
@@ -2182,6 +2183,7 @@ export interface GetUtxosForAddressesRequest {
   network: Network;
   excludeClaimed: boolean;
   page: PageRequest | undefined;
+  includePending: boolean;
 }
 
 export interface GetUtxosForAddressesResponse {
@@ -3809,7 +3811,7 @@ export const UTXO: MessageFns<UTXO> = {
 };
 
 function createBaseAddressedUtxo(): AddressedUtxo {
-  return { address: "", utxo: undefined };
+  return { address: "", utxo: undefined, isConfirmed: false };
 }
 
 export const AddressedUtxo: MessageFns<AddressedUtxo> = {
@@ -3819,6 +3821,9 @@ export const AddressedUtxo: MessageFns<AddressedUtxo> = {
     }
     if (message.utxo !== undefined) {
       UTXO.encode(message.utxo, writer.uint32(18).fork()).join();
+    }
+    if (message.isConfirmed !== false) {
+      writer.uint32(24).bool(message.isConfirmed);
     }
     return writer;
   },
@@ -3846,6 +3851,14 @@ export const AddressedUtxo: MessageFns<AddressedUtxo> = {
           message.utxo = UTXO.decode(reader, reader.uint32());
           continue;
         }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.isConfirmed = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3859,6 +3872,7 @@ export const AddressedUtxo: MessageFns<AddressedUtxo> = {
     return {
       address: isSet(object.address) ? globalThis.String(object.address) : "",
       utxo: isSet(object.utxo) ? UTXO.fromJSON(object.utxo) : undefined,
+      isConfirmed: isSet(object.isConfirmed) ? globalThis.Boolean(object.isConfirmed) : false,
     };
   },
 
@@ -3870,6 +3884,9 @@ export const AddressedUtxo: MessageFns<AddressedUtxo> = {
     if (message.utxo !== undefined) {
       obj.utxo = UTXO.toJSON(message.utxo);
     }
+    if (message.isConfirmed !== false) {
+      obj.isConfirmed = message.isConfirmed;
+    }
     return obj;
   },
 
@@ -3880,6 +3897,7 @@ export const AddressedUtxo: MessageFns<AddressedUtxo> = {
     const message = createBaseAddressedUtxo();
     message.address = object.address ?? "";
     message.utxo = (object.utxo !== undefined && object.utxo !== null) ? UTXO.fromPartial(object.utxo) : undefined;
+    message.isConfirmed = object.isConfirmed ?? false;
     return message;
   },
 };
@@ -19507,7 +19525,7 @@ export const GetUtxosForAddressResponse: MessageFns<GetUtxosForAddressResponse> 
 };
 
 function createBaseGetUtxosForAddressesRequest(): GetUtxosForAddressesRequest {
-  return { addresses: [], network: 0, excludeClaimed: false, page: undefined };
+  return { addresses: [], network: 0, excludeClaimed: false, page: undefined, includePending: false };
 }
 
 export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest> = {
@@ -19523,6 +19541,9 @@ export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest
     }
     if (message.page !== undefined) {
       PageRequest.encode(message.page, writer.uint32(34).fork()).join();
+    }
+    if (message.includePending !== false) {
+      writer.uint32(40).bool(message.includePending);
     }
     return writer;
   },
@@ -19566,6 +19587,14 @@ export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest
           message.page = PageRequest.decode(reader, reader.uint32());
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.includePending = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -19583,6 +19612,7 @@ export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
       excludeClaimed: isSet(object.excludeClaimed) ? globalThis.Boolean(object.excludeClaimed) : false,
       page: isSet(object.page) ? PageRequest.fromJSON(object.page) : undefined,
+      includePending: isSet(object.includePending) ? globalThis.Boolean(object.includePending) : false,
     };
   },
 
@@ -19600,6 +19630,9 @@ export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest
     if (message.page !== undefined) {
       obj.page = PageRequest.toJSON(message.page);
     }
+    if (message.includePending !== false) {
+      obj.includePending = message.includePending;
+    }
     return obj;
   },
 
@@ -19614,6 +19647,7 @@ export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest
     message.page = (object.page !== undefined && object.page !== null)
       ? PageRequest.fromPartial(object.page)
       : undefined;
+    message.includePending = object.includePending ?? false;
     return message;
   },
 };

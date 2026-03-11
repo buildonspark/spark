@@ -28,6 +28,7 @@ export type GetUtxosForAddressesParams = {
   cursor?: string;
   direction?: "NEXT" | "PREVIOUS";
   excludeClaimed?: boolean;
+  includePending?: boolean;
 };
 
 export type QuerySparkInvoicesParams = {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"math/rand/v2"
@@ -1433,189 +1434,373 @@ func TestGetUtxosFromAddress(t *testing.T) {
 }
 
 func TestGetUtxosForAddresses(t *testing.T) {
-	ctx, _ := db.NewTestSQLiteContext(t)
-	tx, err := ent.GetDbFromContext(ctx)
-	require.NoError(t, err)
-	rng := rand.NewChaCha8([32]byte{9})
-
-	_, err = tx.BlockHeight.Create().
-		SetNetwork(btcnetwork.Regtest).
-		SetHeight(200).
-		Save(ctx)
-	require.NoError(t, err)
-
-	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
-	signingKeyshare, err := tx.SigningKeyshare.Create().
-		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(secretShare).
-		SetPublicShares(map[string]keys.Public{"test": secretShare.Public()}).
-		SetPublicKey(secretShare.Public()).
-		SetMinSigners(2).
-		SetCoordinatorIndex(0).
-		Save(ctx)
-	require.NoError(t, err)
-
-	newAddress := func(address string, isStatic bool) *ent.DepositAddress {
-		identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-		signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-		depositAddress, createErr := tx.DepositAddress.Create().
-			SetAddress(address).
-			SetOwnerIdentityPubkey(identityPubKey).
-			SetOwnerSigningPubkey(signingPubKey).
-			SetSigningKeyshare(signingKeyshare).
-			SetIsStatic(isStatic).
-			SetNetwork(btcnetwork.Regtest).
-			Save(ctx)
-		require.NoError(t, createErr)
-		return depositAddress
+	type testEnv struct {
+		ctx                    context.Context
+		handler                *DepositHandler
+		staticAddress1         string
+		staticAddress2         string
+		staticAddress3         string
+		nonStaticAddress       string
+		confirmedUtxo          *ent.Utxo
+		claimedConfirmedUtxo   *ent.Utxo
+		cancelledSwapUtxo      *ent.Utxo
+		pendingUtxo            *ent.Utxo
+		pendingClaimedUtxo     *ent.Utxo
+		thresholdConfirmedUtxo *ent.Utxo
+		oneConfUtxo            *ent.Utxo
 	}
 
-	staticAddress1 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abc"
-	staticAddress2 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abd"
-	nonStaticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abe"
+	newTestEnv := func(t *testing.T) *testEnv {
+		t.Helper()
 
-	depositAddress1 := newAddress(staticAddress1, true)
-	depositAddress2 := newAddress(staticAddress2, true)
-	depositAddress3 := newAddress(nonStaticAddress, false)
+		ctx, _ := db.NewTestSQLiteContext(t)
+		tx, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
 
-	createUtxo := func(addr *ent.DepositAddress, txid string, vout uint32, blockHeight int64) *ent.Utxo {
-		utxo, createErr := tx.Utxo.Create().
+		rng := rand.NewChaCha8([32]byte{9})
+
+		_, err = tx.BlockHeight.Create().
 			SetNetwork(btcnetwork.Regtest).
-			SetTxid([]byte(txid)).
-			SetVout(vout).
-			SetBlockHeight(blockHeight).
-			SetAmount(1000).
-			SetPkScript([]byte("script")).
-			SetDepositAddress(addr).
+			SetHeight(200).
 			Save(ctx)
-		require.NoError(t, createErr)
-		return utxo
+		require.NoError(t, err)
+
+		secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+		signingKeyshare, err := tx.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(secretShare).
+			SetPublicShares(map[string]keys.Public{"test": secretShare.Public()}).
+			SetPublicKey(secretShare.Public()).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		newAddress := func(address string, isStatic bool) *ent.DepositAddress {
+			identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			depositAddress, createErr := tx.DepositAddress.Create().
+				SetAddress(address).
+				SetOwnerIdentityPubkey(identityPubKey).
+				SetOwnerSigningPubkey(signingPubKey).
+				SetSigningKeyshare(signingKeyshare).
+				SetIsStatic(isStatic).
+				SetNetwork(btcnetwork.Regtest).
+				Save(ctx)
+			require.NoError(t, createErr)
+			return depositAddress
+		}
+
+		staticAddress1 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abc"
+		staticAddress2 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abd"
+		staticAddress3 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abf"
+		nonStaticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abe"
+
+		depositAddress1 := newAddress(staticAddress1, true)
+		depositAddress2 := newAddress(staticAddress2, true)
+		_ = newAddress(staticAddress3, true)
+		nonStaticDepositAddress := newAddress(nonStaticAddress, false)
+
+		createUtxo := func(addr *ent.DepositAddress, txid string, vout uint32, blockHeight int64) *ent.Utxo {
+			utxo, createErr := tx.Utxo.Create().
+				SetNetwork(btcnetwork.Regtest).
+				SetTxid([]byte(txid)).
+				SetVout(vout).
+				SetBlockHeight(blockHeight).
+				SetAmount(1000).
+				SetPkScript([]byte("script")).
+				SetDepositAddress(addr).
+				Save(ctx)
+			require.NoError(t, createErr)
+			return utxo
+		}
+
+		createSwap := func(utxo *ent.Utxo, status st.UtxoSwapStatus) {
+			_, createErr := tx.UtxoSwap.Create().
+				SetStatus(status).
+				SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
+				SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+				SetUtxo(utxo).
+				SetUtxoValueSats(utxo.Amount).
+				Save(ctx)
+			require.NoError(t, createErr)
+		}
+
+		confirmedUtxo := createUtxo(depositAddress1, "confirmed_txid_1", 0, 100)
+		claimedConfirmedUtxo := createUtxo(depositAddress1, "claimed_confirmed_txid", 1, 101)
+		cancelledSwapUtxo := createUtxo(depositAddress2, "cancelled_swap_txid", 2, 102)
+		pendingUtxo := createUtxo(depositAddress2, "pending_txid", 3, 199)
+		pendingClaimedUtxo := createUtxo(depositAddress1, "pending_claimed_txid", 4, 200)
+		thresholdConfirmedUtxo := createUtxo(depositAddress2, "threshold_confirmed_txid", 5, 198)
+		oneConfUtxo := createUtxo(depositAddress2, "one_conf_txid", 6, 200)
+		_ = createUtxo(nonStaticDepositAddress, "non_static_txid", 7, 103)
+
+		createSwap(claimedConfirmedUtxo, st.UtxoSwapStatusCreated)
+		createSwap(cancelledSwapUtxo, st.UtxoSwapStatusCancelled)
+		createSwap(pendingClaimedUtxo, st.UtxoSwapStatusCreated)
+
+		handler := NewDepositHandler(&so.Config{
+			BitcoindConfigs: map[string]so.BitcoindConfig{
+				"regtest": {
+					DepositConfirmationThreshold: 3,
+				},
+			},
+			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+		})
+
+		return &testEnv{
+			ctx:                    ctx,
+			handler:                handler,
+			staticAddress1:         staticAddress1,
+			staticAddress2:         staticAddress2,
+			staticAddress3:         staticAddress3,
+			nonStaticAddress:       nonStaticAddress,
+			confirmedUtxo:          confirmedUtxo,
+			claimedConfirmedUtxo:   claimedConfirmedUtxo,
+			cancelledSwapUtxo:      cancelledSwapUtxo,
+			pendingUtxo:            pendingUtxo,
+			pendingClaimedUtxo:     pendingClaimedUtxo,
+			thresholdConfirmedUtxo: thresholdConfirmedUtxo,
+			oneConfUtxo:            oneConfUtxo,
+		}
 	}
 
-	utxo1 := createUtxo(depositAddress1, "batch_txid_1", 0, 100)
-	utxo2 := createUtxo(depositAddress1, "batch_txid_2", 1, 101)
-	_ = createUtxo(depositAddress2, "batch_txid_3", 2, 102)
-	_ = createUtxo(depositAddress3, "batch_txid_non_static", 3, 103)
-
-	_, err = tx.UtxoSwap.Create().
-		SetStatus(st.UtxoSwapStatusCreated).
-		SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
-		SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
-		SetUtxo(utxo2).
-		SetUtxoValueSats(utxo2.Amount).
-		Save(ctx)
-	require.NoError(t, err)
-
-	handler := NewDepositHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
-
-	t.Run("paginates with cursor and filters to static addresses only", func(t *testing.T) {
+	t.Run("default behavior returns only confirmed static utxos", func(t *testing.T) {
+		env := newTestEnv(t)
 		req := &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{staticAddress1, staticAddress2, nonStaticAddress, staticAddress1},
+			Addresses: []string{env.staticAddress1, env.staticAddress2, env.nonStaticAddress, env.staticAddress1},
 			Network:   pb.Network_REGTEST,
 			Page: &pb.PageRequest{
 				PageSize: 2,
 			},
 		}
 
-		response, getErr := handler.GetUtxosForAddresses(ctx, req)
-		require.NoError(t, getErr)
-		require.Len(t, response.Utxos, 2)
-		require.True(t, response.Page.HasNextPage)
-		require.NotEmpty(t, response.Page.NextCursor)
+		page1, err := env.handler.GetUtxosForAddresses(env.ctx, req)
+		require.NoError(t, err)
+		require.Len(t, page1.Utxos, 2)
+		require.True(t, page1.Page.HasNextPage)
+		require.False(t, page1.Page.HasPreviousPage)
 
-		txidsPage1 := make(map[string]bool)
-		addressesPage1 := make(map[string]bool)
-		for _, utxo := range response.Utxos {
+		req.Page.Cursor = page1.Page.NextCursor
+		page2, err := env.handler.GetUtxosForAddresses(env.ctx, req)
+		require.NoError(t, err)
+		require.Len(t, page2.Utxos, 2)
+		require.False(t, page2.Page.HasNextPage)
+		require.True(t, page2.Page.HasPreviousPage)
+
+		allResults := append(page1.Utxos, page2.Utxos...)
+		require.Len(t, allResults, 4)
+
+		gotTxids := make([]string, 0, len(allResults))
+		gotAddresses := make(map[string]bool, len(allResults))
+		for _, utxo := range allResults {
 			require.NotNil(t, utxo.Utxo)
-			txidsPage1[hex.EncodeToString(utxo.Utxo.Txid)] = true
-			addressesPage1[utxo.Address] = true
+			require.True(t, utxo.IsConfirmed)
+			gotTxids = append(gotTxids, string(utxo.Utxo.Txid))
+			gotAddresses[utxo.Address] = true
 		}
-		require.NotContains(t, txidsPage1, hex.EncodeToString([]byte("batch_txid_non_static")))
-		require.NotContains(t, addressesPage1, nonStaticAddress)
 
-		req.Page.Cursor = response.Page.NextCursor
-		responsePage2, getErr := handler.GetUtxosForAddresses(ctx, req)
-		require.NoError(t, getErr)
-		require.Len(t, responsePage2.Utxos, 1)
-		require.False(t, responsePage2.Page.HasNextPage)
-		require.True(t, responsePage2.Page.HasPreviousPage)
+		require.Equal(t, []string{
+			string(env.thresholdConfirmedUtxo.Txid),
+			string(env.cancelledSwapUtxo.Txid),
+			string(env.claimedConfirmedUtxo.Txid),
+			string(env.confirmedUtxo.Txid),
+		}, gotTxids)
+		require.NotContains(t, gotAddresses, env.nonStaticAddress)
+		require.NotContains(t, gotTxids, string(env.pendingUtxo.Txid))
+		require.NotContains(t, gotTxids, string(env.pendingClaimedUtxo.Txid))
+		require.NotContains(t, gotTxids, string(env.oneConfUtxo.Txid))
 	})
 
-	t.Run("exclude_claimed filters out utxos with active swaps", func(t *testing.T) {
-		req := &pb.GetUtxosForAddressesRequest{
-			Addresses:      []string{staticAddress1, staticAddress2},
+	t.Run("include_pending returns mixed utxos and marks confirmed status", func(t *testing.T) {
+		env := newTestEnv(t)
+		response, err := env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses:      []string{env.staticAddress1, env.staticAddress2},
 			Network:        pb.Network_REGTEST,
-			ExcludeClaimed: true,
+			IncludePending: true,
 			Page: &pb.PageRequest{
 				PageSize: 10,
 			},
+		})
+		require.NoError(t, err)
+		require.Len(t, response.Utxos, 7)
+
+		type gotUtxo struct {
+			txid        string
+			isConfirmed bool
 		}
 
-		response, getErr := handler.GetUtxosForAddresses(ctx, req)
-		require.NoError(t, getErr)
-		require.Len(t, response.Utxos, 2)
-
-		txids := make(map[string]bool)
+		got := make([]gotUtxo, 0, len(response.Utxos))
 		for _, utxo := range response.Utxos {
 			require.NotNil(t, utxo.Utxo)
-			txids[hex.EncodeToString(utxo.Utxo.Txid)] = true
+			got = append(got, gotUtxo{
+				txid:        string(utxo.Utxo.Txid),
+				isConfirmed: utxo.IsConfirmed,
+			})
 		}
-		require.Contains(t, txids, hex.EncodeToString(utxo1.Txid))
-		require.NotContains(t, txids, hex.EncodeToString(utxo2.Txid))
+
+		require.Equal(t, []gotUtxo{
+			{txid: string(env.oneConfUtxo.Txid), isConfirmed: false},
+			{txid: string(env.pendingClaimedUtxo.Txid), isConfirmed: false},
+			{txid: string(env.pendingUtxo.Txid), isConfirmed: false},
+			{txid: string(env.thresholdConfirmedUtxo.Txid), isConfirmed: true},
+			{txid: string(env.cancelledSwapUtxo.Txid), isConfirmed: true},
+			{txid: string(env.claimedConfirmedUtxo.Txid), isConfirmed: true},
+			{txid: string(env.confirmedUtxo.Txid), isConfirmed: true},
+		}, got)
+	})
+
+	t.Run("include_pending paginates deterministically across mixed results", func(t *testing.T) {
+		env := newTestEnv(t)
+		req := &pb.GetUtxosForAddressesRequest{
+			Addresses:      []string{env.staticAddress1, env.staticAddress2},
+			Network:        pb.Network_REGTEST,
+			IncludePending: true,
+			Page: &pb.PageRequest{
+				PageSize: 2,
+			},
+		}
+
+		var got []string
+		seen := make(map[string]bool)
+		pageNumber := 0
+		for {
+			pageNumber++
+			response, err := env.handler.GetUtxosForAddresses(env.ctx, req)
+			require.NoError(t, err)
+			require.NotNil(t, response.Page)
+			if pageNumber == 1 {
+				require.False(t, response.Page.HasPreviousPage)
+			} else {
+				require.True(t, response.Page.HasPreviousPage)
+			}
+
+			for _, utxo := range response.Utxos {
+				require.NotNil(t, utxo.Utxo)
+				txid := string(utxo.Utxo.Txid)
+				require.False(t, seen[txid], "duplicate txid %s returned across pages", txid)
+				seen[txid] = true
+				got = append(got, txid)
+			}
+
+			if !response.Page.HasNextPage {
+				break
+			}
+			req.Page.Cursor = response.Page.NextCursor
+		}
+
+		require.Equal(t, []string{
+			string(env.oneConfUtxo.Txid),
+			string(env.pendingClaimedUtxo.Txid),
+			string(env.pendingUtxo.Txid),
+			string(env.thresholdConfirmedUtxo.Txid),
+			string(env.cancelledSwapUtxo.Txid),
+			string(env.claimedConfirmedUtxo.Txid),
+			string(env.confirmedUtxo.Txid),
+		}, got)
+	})
+
+	t.Run("exclude_claimed applies to both pending and confirmed utxos", func(t *testing.T) {
+		env := newTestEnv(t)
+		response, err := env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses:      []string{env.staticAddress1, env.staticAddress2},
+			Network:        pb.Network_REGTEST,
+			ExcludeClaimed: true,
+			IncludePending: true,
+			Page: &pb.PageRequest{
+				PageSize: 10,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, response.Utxos, 5)
+
+		require.Equal(t, []struct {
+			txid        string
+			isConfirmed bool
+		}{
+			{txid: string(env.oneConfUtxo.Txid), isConfirmed: false},
+			{txid: string(env.pendingUtxo.Txid), isConfirmed: false},
+			{txid: string(env.thresholdConfirmedUtxo.Txid), isConfirmed: true},
+			{txid: string(env.cancelledSwapUtxo.Txid), isConfirmed: true},
+			{txid: string(env.confirmedUtxo.Txid), isConfirmed: true},
+		}, []struct {
+			txid        string
+			isConfirmed bool
+		}{
+			{txid: string(response.Utxos[0].Utxo.Txid), isConfirmed: response.Utxos[0].IsConfirmed},
+			{txid: string(response.Utxos[1].Utxo.Txid), isConfirmed: response.Utxos[1].IsConfirmed},
+			{txid: string(response.Utxos[2].Utxo.Txid), isConfirmed: response.Utxos[2].IsConfirmed},
+			{txid: string(response.Utxos[3].Utxo.Txid), isConfirmed: response.Utxos[3].IsConfirmed},
+			{txid: string(response.Utxos[4].Utxo.Txid), isConfirmed: response.Utxos[4].IsConfirmed},
+		})
 	})
 
 	t.Run("invalid requests are rejected", func(t *testing.T) {
-		_, getErr := handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
+		env := newTestEnv(t)
+
+		_, err := env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
 			Addresses: nil,
 			Network:   pb.Network_REGTEST,
 		})
-		require.ErrorContains(t, getErr, "addresses is required")
+		require.ErrorContains(t, err, "addresses is required")
 
-		_, getErr = handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{staticAddress1},
+		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: []string{env.staticAddress1},
 			Network:   pb.Network_REGTEST,
 			Page: &pb.PageRequest{
 				Direction: pb.Direction_PREVIOUS,
 			},
 		})
-		require.ErrorContains(t, getErr, "backward pagination")
+		require.ErrorContains(t, err, "backward pagination")
 
-		_, getErr = handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{staticAddress1},
+		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: []string{env.staticAddress1},
 			Network:   pb.Network_REGTEST,
 			Page: &pb.PageRequest{
 				Cursor: "not-a-cursor",
 			},
 		})
-		require.ErrorContains(t, getErr, "invalid cursor")
+		require.ErrorContains(t, err, "invalid cursor")
+
+		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: []string{"zz-invalid-address"},
+			Network:   pb.Network_REGTEST,
+		})
+		require.ErrorContains(t, err, "not aligned with the requested network")
+
+		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: []string{"bc1qmainnetaddress"},
+			Network:   pb.Network_REGTEST,
+		})
+		require.ErrorContains(t, err, "not aligned with the requested network")
 
 		tooManyAddresses := make([]string, MaxGetUtxosForAddressesCount+1)
 		for i := range tooManyAddresses {
 			tooManyAddresses[i] = fmt.Sprintf("address_%d", i)
 		}
-		_, getErr = handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
+		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
 			Addresses: tooManyAddresses,
 			Network:   pb.Network_REGTEST,
 		})
-		require.ErrorContains(t, getErr, "too many addresses")
+		require.ErrorContains(t, err, "too many addresses")
 
-		_, getErr = handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{staticAddress1},
+		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: []string{env.staticAddress1},
 			Network:   pb.Network_REGTEST,
 			Page: &pb.PageRequest{
 				PageSize: MaxGetUtxosForAddressesPageSize + 1,
 			},
 		})
-		require.ErrorContains(t, getErr, "requested page size exceeds max supported size")
+		require.ErrorContains(t, err, "requested page size exceeds max supported size")
 
-		_, getErr = handler.GetUtxosForAddresses(ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{staticAddress1},
+		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
+			Addresses: []string{env.staticAddress1},
 			Network:   pb.Network_REGTEST,
 			Page: &pb.PageRequest{
 				UnsafePageSize: int32(MaxGetUtxosForAddressesPageSize + 1),
 			},
 		})
-		require.ErrorContains(t, getErr, "requested page size exceeds max supported size")
+		require.ErrorContains(t, err, "requested page size exceeds max supported size")
 	})
 }
 

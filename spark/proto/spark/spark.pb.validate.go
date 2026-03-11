@@ -2275,6 +2275,8 @@ func (m *AddressedUtxo) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for IsConfirmed
+
 	if len(errors) > 0 {
 		return AddressedUtxoMultiError(errors)
 	}
@@ -22184,6 +22186,8 @@ func (m *GetUtxosForAddressesRequest) validate(all bool) error {
 			}
 		}
 	}
+
+	// no validation rules for IncludePending
 
 	if len(errors) > 0 {
 		return GetUtxosForAddressesRequestMultiError(errors)
