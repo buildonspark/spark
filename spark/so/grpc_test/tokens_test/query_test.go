@@ -1850,7 +1850,6 @@ func TestQueryTokenOutputsBackwardPaginationRejected(t *testing.T) {
 		ownerPubKey, err := keys.ParsePublicKey(finalMintTx.TokenOutputs[0].OwnerPublicKey)
 		require.NoError(t, err)
 
-		// First query to get a valid cursor
 		ownerConfig := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 		sparkConn, err := ownerConfig.NewCoordinatorGRPCConnection()
 		require.NoError(t, err)
@@ -1862,31 +1861,12 @@ func TestQueryTokenOutputsBackwardPaginationRejected(t *testing.T) {
 
 		tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
 
-		// Query with forward pagination to get a cursor
-		forwardResp, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
-			OwnerPublicKeys: [][]byte{ownerPubKey.Serialize()},
-			Network:         config.ProtoNetwork(),
-			PageRequest: &sparkpb.PageRequest{
-				PageSize:  10,
-				Direction: sparkpb.Direction_NEXT,
-			},
-		})
-		require.NoError(t, err, "forward pagination should succeed")
-		require.NotEmpty(t, forwardResp.OutputsWithPreviousTransactionData, "should have at least one output")
-
-		cursor := forwardResp.PageResponse.GetNextCursor()
-		if cursor == "" {
-			cursor = forwardResp.PageResponse.GetPreviousCursor()
-		}
-		require.NotEmpty(t, cursor, "should have a cursor from forward query")
-
-		// Now attempt backward pagination — should be rejected
+		// Attempt backward pagination — should be rejected regardless of cursor
 		_, err = tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
 			OwnerPublicKeys: [][]byte{ownerPubKey.Serialize()},
 			Network:         config.ProtoNetwork(),
 			PageRequest: &sparkpb.PageRequest{
 				PageSize:  10,
-				Cursor:    cursor,
 				Direction: sparkpb.Direction_PREVIOUS,
 			},
 		})
@@ -1963,7 +1943,7 @@ func TestQueryTokenOutputsFilterCountLimits(t *testing.T) {
 	})
 }
 
-func TestQueryTokenOutputsByTokenIdentifierFilter(t *testing.T) {
+func TestQueryTokenOutputsByTokenIdentifierOnly(t *testing.T) {
 	RunWithBroadcastLabel(t, func(t *testing.T) {
 		// Create two tokens with the same owner so we can filter by token identifier
 		ownerPrivKey := keys.GeneratePrivateKey()
@@ -2059,11 +2039,18 @@ func TestQueryTokenOutputsByTokenIdentifierFilter(t *testing.T) {
 		require.NoError(t, err, "query with owner + both identifiers should succeed")
 		require.Len(t, resp.OutputsWithPreviousTransactionData, 2, "should find both outputs")
 
+		// Query with token identifier only — no owner or issuer keys
+		resp, err = tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+			TokenIdentifiers: [][]byte{tokenIdA},
+			Network:          ownerConfig.ProtoNetwork(),
+		})
+		require.NoError(t, err, "query with token identifier only should succeed")
+		require.Len(t, resp.OutputsWithPreviousTransactionData, 1, "should find token A output")
+
 		// Query with non-existent token identifier should return empty
 		nonExistentID := make([]byte, 32)
 		nonExistentID[0] = 0xFF
 		resp, err = tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
-			OwnerPublicKeys:  [][]byte{ownerPrivKey.Public().Serialize()},
 			TokenIdentifiers: [][]byte{nonExistentID},
 			Network:          ownerConfig.ProtoNetwork(),
 		})
