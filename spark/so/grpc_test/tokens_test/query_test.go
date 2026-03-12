@@ -1839,9 +1839,12 @@ func TestQueryTokenOutputsBackwardPaginationRejected(t *testing.T) {
 
 		tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
 
-		// Backward pagination rejection fires before any data lookup
+		// Include a dummy owner key to pass the "must specify filter" validation,
+		// then verify that backward pagination is rejected.
+		dummyKey := keys.GeneratePrivateKey()
 		_, err = tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
-			Network: config.ProtoNetwork(),
+			OwnerPublicKeys: [][]byte{dummyKey.Public().Serialize()},
+			Network:         config.ProtoNetwork(),
 			PageRequest: &sparkpb.PageRequest{
 				PageSize:  10,
 				Direction: sparkpb.Direction_PREVIOUS,
