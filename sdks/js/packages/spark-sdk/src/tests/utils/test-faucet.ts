@@ -549,6 +549,67 @@ export class BitcoinFaucet {
     return signedTx;
   }
 
+  private async buildAndBroadcastTx(
+    coin: FaucetCoin,
+    address: string,
+    amount: bigint,
+    feeAmount: bigint = FEE_AMOUNT,
+  ): Promise<Transaction> {
+    const tx = new Transaction();
+    tx.addInput({ ...coin.outpoint, sequence: 0xfffffffd });
+
+    const availableAmount = COIN_AMOUNT - feeAmount;
+
+    const destinationAddress = Address(getNetwork(Network.LOCAL)).decode(
+      address,
+    );
+    const destinationScript = OutScript.encode(destinationAddress);
+    tx.addOutput({
+      script: destinationScript,
+      amount: amount,
+    });
+
+    const changeAmount = availableAmount - amount;
+    if (changeAmount > 0) {
+      const changeKey = secp256k1.utils.randomPrivateKey();
+      const changePubKey = secp256k1.getPublicKey(changeKey);
+      const changeScript = getP2TRScriptFromPublicKey(
+        changePubKey,
+        Network.LOCAL,
+      );
+      tx.addOutput({
+        script: changeScript,
+        amount: changeAmount,
+      });
+    }
+
+    const signedTx = await this.signFaucetCoin(tx, coin.txout, coin.key);
+    const txHex = bytesToHex(signedTx.extract());
+    await this.broadcastTx(txHex);
+
+    return signedTx;
+  }
+
+  async sendToAddressRbf(
+    address: string,
+    amount: bigint,
+  ): Promise<{ tx: Transaction; coin: FaucetCoin }> {
+    const coin = await this.fund();
+    if (!coin) {
+      throw new Error("No coins available");
+    }
+    const tx = await this.buildAndBroadcastTx(coin, address, amount);
+    return { tx, coin };
+  }
+
+  async replaceTransaction(
+    coin: FaucetCoin,
+    address: string,
+    amount: bigint,
+  ): Promise<Transaction> {
+    return this.buildAndBroadcastTx(coin, address, amount, FEE_AMOUNT * 2n);
+  }
+
   async getRawTransaction(txid: string) {
     return await this.call("getrawtransaction", [txid, 2]);
   }
