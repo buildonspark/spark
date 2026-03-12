@@ -1825,3 +1825,316 @@ func TestQueryTokenTransactionsCursorPaginationSameCreateTime(t *testing.T) {
 		require.Len(t, allTransactions, len(transactionHashes)+1, "should have retrieved create + all mint transactions without skips")
 	})
 }
+
+func TestQueryTokenOutputsBackwardPaginationRejected(t *testing.T) {
+	RunWithBroadcastLabel(t, func(t *testing.T) {
+		issuerPrivKey := keys.GeneratePrivateKey()
+		config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+		err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+			issuerPrivateKey: issuerPrivKey,
+			name:             "Backward Page Token",
+			ticker:           "BPT",
+			maxSupply:        0,
+		})
+		require.NoError(t, err, "failed to create native spark token")
+
+		tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
+
+		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
+		require.NoError(t, err, "failed to create mint transaction")
+
+		finalMintTx, err := broadcastTokenTransaction(t, t.Context(), config, mintTx, []keys.Private{issuerPrivKey})
+		require.NoError(t, err, "failed to broadcast mint transaction")
+
+		ownerPubKey, err := keys.ParsePublicKey(finalMintTx.TokenOutputs[0].OwnerPublicKey)
+		require.NoError(t, err)
+
+		// First query to get a valid cursor
+		ownerConfig := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+		sparkConn, err := ownerConfig.NewCoordinatorGRPCConnection()
+		require.NoError(t, err)
+		defer sparkConn.Close()
+
+		authToken, err := wallet.AuthenticateWithConnection(t.Context(), ownerConfig, sparkConn)
+		require.NoError(t, err)
+		authCtx := wallet.ContextWithToken(t.Context(), authToken)
+
+		tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
+
+		// Query with forward pagination to get a cursor
+		forwardResp, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+			OwnerPublicKeys: [][]byte{ownerPubKey.Serialize()},
+			Network:         config.ProtoNetwork(),
+			PageRequest: &sparkpb.PageRequest{
+				PageSize:  10,
+				Direction: sparkpb.Direction_NEXT,
+			},
+		})
+		require.NoError(t, err, "forward pagination should succeed")
+		require.NotEmpty(t, forwardResp.OutputsWithPreviousTransactionData, "should have at least one output")
+
+		cursor := forwardResp.PageResponse.GetNextCursor()
+		if cursor == "" {
+			cursor = forwardResp.PageResponse.GetPreviousCursor()
+		}
+		require.NotEmpty(t, cursor, "should have a cursor from forward query")
+
+		// Now attempt backward pagination — should be rejected
+		_, err = tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+			OwnerPublicKeys: [][]byte{ownerPubKey.Serialize()},
+			Network:         config.ProtoNetwork(),
+			PageRequest: &sparkpb.PageRequest{
+				PageSize:  10,
+				Cursor:    cursor,
+				Direction: sparkpb.Direction_PREVIOUS,
+			},
+		})
+		require.Error(t, err, "backward pagination should be rejected")
+		require.Contains(t, err.Error(), "not currently supported", "error should indicate backward pagination is unsupported")
+	})
+}
+
+func TestQueryTokenOutputsFilterCountLimits(t *testing.T) {
+	RunWithBroadcastLabel(t, func(t *testing.T) {
+		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+
+		sparkConn, err := config.NewCoordinatorGRPCConnection()
+		require.NoError(t, err)
+		defer sparkConn.Close()
+
+		authToken, err := wallet.AuthenticateWithConnection(t.Context(), config, sparkConn)
+		require.NoError(t, err)
+		authCtx := wallet.ContextWithToken(t.Context(), authToken)
+
+		tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
+
+		// Generate 501 fake public keys (33 bytes each)
+		tooManyKeys := make([][]byte, 501)
+		for i := range tooManyKeys {
+			privKey := keys.GeneratePrivateKey()
+			tooManyKeys[i] = privKey.Public().Serialize()
+		}
+
+		// Generate 501 fake token identifiers (32 bytes each)
+		tooManyIdentifiers := make([][]byte, 501)
+		for i := range tooManyIdentifiers {
+			tooManyIdentifiers[i] = make([]byte, 32)
+			tooManyIdentifiers[i][0] = byte(i >> 8)
+			tooManyIdentifiers[i][1] = byte(i)
+		}
+
+		t.Run("too many owner public keys", func(t *testing.T) {
+			_, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+				OwnerPublicKeys: tooManyKeys,
+				Network:         config.ProtoNetwork(),
+			})
+			require.Error(t, err, "should reject >500 owner public keys")
+			require.Contains(t, err.Error(), "500", "error should reference the limit")
+		})
+
+		t.Run("too many issuer public keys", func(t *testing.T) {
+			_, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+				OwnerPublicKeys:  [][]byte{tooManyKeys[0]},
+				IssuerPublicKeys: tooManyKeys,
+				Network:          config.ProtoNetwork(),
+			})
+			require.Error(t, err, "should reject >500 issuer public keys")
+			require.Contains(t, err.Error(), "500", "error should reference the limit")
+		})
+
+		t.Run("too many token identifiers", func(t *testing.T) {
+			_, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+				OwnerPublicKeys:  [][]byte{tooManyKeys[0]},
+				TokenIdentifiers: tooManyIdentifiers,
+				Network:          config.ProtoNetwork(),
+			})
+			require.Error(t, err, "should reject >500 token identifiers")
+			require.Contains(t, err.Error(), "500", "error should reference the limit")
+		})
+
+		t.Run("exactly 500 owner public keys succeeds", func(t *testing.T) {
+			_, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+				OwnerPublicKeys: tooManyKeys[:500],
+				Network:         config.ProtoNetwork(),
+			})
+			require.NoError(t, err, "should accept exactly 500 owner public keys")
+		})
+	})
+}
+
+func TestQueryTokenOutputsByTokenIdentifierFilter(t *testing.T) {
+	RunWithBroadcastLabel(t, func(t *testing.T) {
+		// Create two tokens with the same owner so we can filter by token identifier
+		ownerPrivKey := keys.GeneratePrivateKey()
+
+		issuer1 := keys.GeneratePrivateKey()
+		config1 := wallet.NewTestWalletConfigWithIdentityKey(t, issuer1)
+		err := testCreateNativeSparkTokenWithParams(t, config1, sparkTokenCreationTestParams{
+			issuerPrivateKey: issuer1,
+			name:             "TokenID Filter A",
+			ticker:           "TFA",
+			maxSupply:        0,
+		})
+		require.NoError(t, err, "failed to create token A")
+		tokenIdA := queryTokenIdentifierOrFail(t, config1, issuer1.Public())
+
+		issuer2 := keys.GeneratePrivateKey()
+		config2 := wallet.NewTestWalletConfigWithIdentityKey(t, issuer2)
+		err = testCreateNativeSparkTokenWithParams(t, config2, sparkTokenCreationTestParams{
+			issuerPrivateKey: issuer2,
+			name:             "TokenID Filter B",
+			ticker:           "TFB",
+			maxSupply:        0,
+		})
+		require.NoError(t, err, "failed to create token B")
+		tokenIdB := queryTokenIdentifierOrFail(t, config2, issuer2.Public())
+
+		// Mint token A to the shared owner
+		mintTxA, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config1, tokenTransactionParams{
+			TokenIdentityPubKey: issuer1.Public(),
+			TokenIdentifier:     tokenIdA,
+			NumOutputs:          1,
+			OutputAmounts:       []uint64{100},
+			SameOwner:           true,
+		})
+		require.NoError(t, err)
+		// Override the output owner to our shared owner
+		mintTxA.TokenOutputs[0].OwnerPublicKey = ownerPrivKey.Public().Serialize()
+		_, err = broadcastTokenTransaction(t, t.Context(), config1, mintTxA, []keys.Private{issuer1})
+		require.NoError(t, err, "failed to broadcast mint A")
+
+		// Mint token B to the shared owner
+		mintTxB, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config2, tokenTransactionParams{
+			TokenIdentityPubKey: issuer2.Public(),
+			TokenIdentifier:     tokenIdB,
+			NumOutputs:          1,
+			OutputAmounts:       []uint64{200},
+			SameOwner:           true,
+		})
+		require.NoError(t, err)
+		mintTxB.TokenOutputs[0].OwnerPublicKey = ownerPrivKey.Public().Serialize()
+		_, err = broadcastTokenTransaction(t, t.Context(), config2, mintTxB, []keys.Private{issuer2})
+		require.NoError(t, err, "failed to broadcast mint B")
+
+		// Query with owner + token_identifier A filter — should return only token A outputs
+		ownerConfig := wallet.NewTestWalletConfigWithIdentityKey(t, ownerPrivKey)
+		sparkConn, err := ownerConfig.NewCoordinatorGRPCConnection()
+		require.NoError(t, err)
+		defer sparkConn.Close()
+
+		authToken, err := wallet.AuthenticateWithConnection(t.Context(), ownerConfig, sparkConn)
+		require.NoError(t, err)
+		authCtx := wallet.ContextWithToken(t.Context(), authToken)
+
+		tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
+
+		resp, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+			OwnerPublicKeys:  [][]byte{ownerPrivKey.Public().Serialize()},
+			TokenIdentifiers: [][]byte{tokenIdA},
+			Network:          ownerConfig.ProtoNetwork(),
+		})
+		require.NoError(t, err, "query with owner + token identifier A should succeed")
+		require.Len(t, resp.OutputsWithPreviousTransactionData, 1, "should find only token A output")
+		amount := bytesToBigInt(resp.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
+		require.Equal(t, uint64ToBigInt(100), amount, "token A output should have amount 100")
+
+		// Query with owner + token_identifier B filter — should return only token B outputs
+		resp, err = tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+			OwnerPublicKeys:  [][]byte{ownerPrivKey.Public().Serialize()},
+			TokenIdentifiers: [][]byte{tokenIdB},
+			Network:          ownerConfig.ProtoNetwork(),
+		})
+		require.NoError(t, err, "query with owner + token identifier B should succeed")
+		require.Len(t, resp.OutputsWithPreviousTransactionData, 1, "should find only token B output")
+		amount = bytesToBigInt(resp.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
+		require.Equal(t, uint64ToBigInt(200), amount, "token B output should have amount 200")
+
+		// Query with owner + both identifiers — should return both
+		resp, err = tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+			OwnerPublicKeys:  [][]byte{ownerPrivKey.Public().Serialize()},
+			TokenIdentifiers: [][]byte{tokenIdA, tokenIdB},
+			Network:          ownerConfig.ProtoNetwork(),
+		})
+		require.NoError(t, err, "query with owner + both identifiers should succeed")
+		require.Len(t, resp.OutputsWithPreviousTransactionData, 2, "should find both outputs")
+
+		// Query with non-existent token identifier should return empty
+		nonExistentID := make([]byte, 32)
+		nonExistentID[0] = 0xFF
+		resp, err = tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+			OwnerPublicKeys:  [][]byte{ownerPrivKey.Public().Serialize()},
+			TokenIdentifiers: [][]byte{nonExistentID},
+			Network:          ownerConfig.ProtoNetwork(),
+		})
+		require.NoError(t, err, "query with non-existent token identifier should succeed")
+		require.Empty(t, resp.OutputsWithPreviousTransactionData, "should return no outputs for non-existent token")
+	})
+}
+
+func TestQueryTokenTransactionsConfirmationMetadata(t *testing.T) {
+	RunWithBroadcastLabel(t, func(t *testing.T) {
+		setup, err := setupNativeTokenWithMint(
+			t,
+			"Confirm Meta Token",
+			"CMT",
+			0,
+			[]uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
+			false,
+		)
+		require.NoError(t, err, "failed to setup token with mint")
+
+		// Get the output IDs from the mint transaction
+		mintOutputs := getTransactionOutputsOrFail(t, setup.Config, setup.MintTxHash)
+		require.Len(t, mintOutputs, 2, "mint should have 2 outputs")
+
+		mintOutput0ID := getOutputIDOrFail(t, mintOutputs, 0, "mint")
+		mintOutput1ID := getOutputIDOrFail(t, mintOutputs, 1, "mint")
+
+		// Transfer to a new owner, spending both mint outputs
+		transferTx, _, err := createTestTokenTransferTransactionTokenPb(
+			t, setup.Config, setup.MintTxHash, setup.IssuerPrivateKey.Public(), setup.TokenIdentifier,
+		)
+		require.NoError(t, err, "failed to create transfer transaction")
+
+		finalTransferTx, err := broadcastTokenTransaction(
+			t, t.Context(), setup.Config, transferTx, setup.OutputOwners,
+		)
+		require.NoError(t, err, "failed to broadcast transfer transaction")
+
+		transferTxHash, err := utils.HashTokenTransaction(finalTransferTx, false)
+		require.NoError(t, err, "failed to hash transfer transaction")
+
+		// Query the transfer transaction and verify confirmation_metadata
+		resp, err := wallet.QueryTokenTransactions(
+			t.Context(),
+			setup.Config,
+			wallet.QueryTokenTransactionsParams{
+				TransactionHashes: [][]byte{transferTxHash},
+				Limit:             1,
+			},
+		)
+		require.NoError(t, err, "failed to query transfer transaction")
+		require.Len(t, resp.TokenTransactionsWithStatus, 1, "should find the transfer transaction")
+
+		txWithStatus := resp.TokenTransactionsWithStatus[0]
+		require.Equal(t, tokenpb.TokenTransactionStatus_TOKEN_TRANSACTION_FINALIZED,
+			txWithStatus.Status, "transfer should be finalized")
+
+		// Verify confirmation_metadata contains spent output metadata
+		require.NotNil(t, txWithStatus.ConfirmationMetadata, "confirmation_metadata should be populated for finalized transfer")
+		spentMeta := txWithStatus.ConfirmationMetadata.SpentTokenOutputsMetadata
+		require.Len(t, spentMeta, 2, "should have metadata for both spent outputs")
+
+		// Collect the output IDs from the confirmation metadata
+		spentOutputIDs := make(map[string]bool)
+		for _, meta := range spentMeta {
+			require.NotEmpty(t, meta.OutputId, "spent output metadata should have output ID")
+			spentOutputIDs[meta.OutputId] = true
+			require.NotEmpty(t, meta.RevocationSecret, "spent output metadata should have revocation secret")
+		}
+
+		require.True(t, spentOutputIDs[mintOutput0ID], "should contain mint output 0 ID in spent metadata")
+		require.True(t, spentOutputIDs[mintOutput1ID], "should contain mint output 1 ID in spent metadata")
+	})
+}

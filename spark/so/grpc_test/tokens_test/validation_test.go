@@ -758,3 +758,187 @@ func TestBroadcastTokenTransactionV3ValidationRules(t *testing.T) {
 		}
 	}
 }
+
+func TestBroadcastTokenTransactionV3ExecuteBeforeValidation(t *testing.T) {
+	if !broadcastTokenTestsUseV3 {
+		t.Skip("execute_before is only validated in V3 broadcast")
+	}
+	if !broadcastTokenTestsUsePhase2 {
+		t.Skip("execute_before is only validated in V3 Phase2")
+	}
+
+	testCases := []struct {
+		name                  string
+		setExecuteBefore      func(partial *tokenpb.PartialTokenTransaction)
+		expectError           bool
+		expectedErrorContains string
+	}{
+		{
+			name: "valid_execute_before_within_window",
+			setExecuteBefore: func(partial *tokenpb.PartialTokenTransaction) {
+				clientTs := partial.TokenTransactionMetadata.GetClientCreatedTimestamp().AsTime()
+				validTime := clientTs.Add(5 * time.Minute)
+				validTime = utils.ToMicrosecondPrecision(validTime)
+				partial.ExecuteBefore = timestamppb.New(validTime)
+			},
+			expectError: false,
+		},
+		{
+			name: "execute_before_in_the_past_rejected",
+			setExecuteBefore: func(partial *tokenpb.PartialTokenTransaction) {
+				pastTime := time.Now().Add(-1 * time.Hour)
+				pastTime = utils.ToMicrosecondPrecision(pastTime)
+				partial.ExecuteBefore = timestamppb.New(pastTime)
+			},
+			expectError:           true,
+			expectedErrorContains: "must be after client_created_timestamp",
+		},
+		{
+			name: "execute_before_beyond_max_window_rejected",
+			setExecuteBefore: func(partial *tokenpb.PartialTokenTransaction) {
+				clientTs := partial.TokenTransactionMetadata.GetClientCreatedTimestamp().AsTime()
+				// TokenMaxExecuteBeforeWindow is 14 days; set to 15 days
+				tooFar := clientTs.Add(15 * 24 * time.Hour)
+				tooFar = utils.ToMicrosecondPrecision(tooFar)
+				partial.ExecuteBefore = timestamppb.New(tooFar)
+			},
+			expectError:           true,
+			expectedErrorContains: "exceeds max window",
+		},
+		{
+			name: "execute_before_at_client_created_timestamp_rejected",
+			setExecuteBefore: func(partial *tokenpb.PartialTokenTransaction) {
+				clientTs := partial.TokenTransactionMetadata.GetClientCreatedTimestamp().AsTime()
+				partial.ExecuteBefore = timestamppb.New(clientTs)
+			},
+			expectError:           true,
+			expectedErrorContains: "must be after client_created_timestamp",
+		},
+		{
+			name: "execute_before_before_client_created_timestamp_rejected",
+			setExecuteBefore: func(partial *tokenpb.PartialTokenTransaction) {
+				clientTs := partial.TokenTransactionMetadata.GetClientCreatedTimestamp().AsTime()
+				beforeClient := utils.ToMicrosecondPrecision(clientTs.Add(-1 * time.Second))
+				partial.ExecuteBefore = timestamppb.New(beforeClient)
+			},
+			expectError:           true,
+			expectedErrorContains: "must be after client_created_timestamp",
+		},
+		{
+			name: "execute_before_with_sub_microsecond_precision_rejected",
+			setExecuteBefore: func(partial *tokenpb.PartialTokenTransaction) {
+				clientTs := partial.TokenTransactionMetadata.GetClientCreatedTimestamp().AsTime()
+				nanoTime := clientTs.Add(5 * time.Minute).Add(123 * time.Nanosecond)
+				if nanoTime.Nanosecond()%1000 == 0 {
+					nanoTime = nanoTime.Add(1 * time.Nanosecond)
+				}
+				partial.ExecuteBefore = timestamppb.New(nanoTime)
+			},
+			expectError:           true,
+			expectedErrorContains: "sub-microsecond precision",
+		},
+	}
+
+	for _, tc := range testCases {
+		for _, sigTC := range signatureTypeTestCases {
+			testName := tc.name + "_" + sigTC.name + "_[" + currentBroadcastRunLabel() + "]"
+			t.Run(testName, func(t *testing.T) {
+				issuerPrivKey := keys.GeneratePrivateKey()
+				config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+				config.UseTokenTransactionSchnorrSignatures = sigTC.useSchnorrSignatures
+
+				err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+					issuerPrivateKey: issuerPrivKey,
+					name:             "ExecBefore Token",
+					ticker:           "EBT",
+					maxSupply:        0,
+				})
+				require.NoError(t, err, "failed to create native spark token")
+
+				tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
+				issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
+				require.NoError(t, err, "failed to create test token issuance transaction")
+
+				finalIssueTokenTransaction, err := broadcastTokenTransaction(
+					t, t.Context(), config, issueTokenTransaction, []keys.Private{issuerPrivKey},
+				)
+				require.NoError(t, err, "failed to broadcast issuance token transaction")
+
+				finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
+				require.NoError(t, err, "failed to hash final issuance token transaction")
+
+				withdrawBond := uint64(withdrawalBondSatsInConfig)
+				withdrawLock := uint64(withdrawalRelativeBlockLocktimeInConfig)
+				transferTokenTransaction := &tokenpb.TokenTransaction{
+					Version:                         3,
+					Network:                         config.ProtoNetwork(),
+					SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
+					ValidityDurationSeconds:         proto.Uint64(180),
+					ClientCreatedTimestamp:          timestamppb.New(utils.ToMicrosecondPrecision(time.Now().UTC())),
+					TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+						TransferInput: &tokenpb.TokenTransferInput{
+							OutputsToSpend: []*tokenpb.TokenOutputToSpend{
+								{
+									PrevTokenTransactionHash: finalIssueTokenTransactionHash,
+									PrevTokenTransactionVout: 0,
+								},
+								{
+									PrevTokenTransactionHash: finalIssueTokenTransactionHash,
+									PrevTokenTransactionVout: 1,
+								},
+							},
+						},
+					},
+					TokenOutputs: []*tokenpb.TokenOutput{
+						{
+							OwnerPublicKey:                userOutput1PrivKey.Public().Serialize(),
+							TokenIdentifier:               tokenIdentifier,
+							TokenAmount:                   int64ToUint128Bytes(0, testTransferOutput1Amount),
+							WithdrawBondSats:              &withdrawBond,
+							WithdrawRelativeBlockLocktime: &withdrawLock,
+						},
+					},
+				}
+				normalizeV3TokenTransaction(transferTokenTransaction)
+
+				partialTx, err := protoconverter.ConvertV2TxShapeToPartial(transferTokenTransaction)
+				require.NoError(t, err, "failed to convert to partial")
+
+				normalizeV3PartialTokenTransaction(partialTx)
+
+				// Sign using the V2 shape hash BEFORE setting execute_before on the partial.
+				// The server converts Partial → V2 → Partial for signature verification,
+				// which strips execute_before, so signatures must be over the V2 shape hash.
+				v2Hash, err := utils.HashTokenTransaction(transferTokenTransaction, true)
+				require.NoError(t, err, "failed to hash V2 shape for signing")
+
+				tc.setExecuteBefore(partialTx)
+
+				ownerSignatures := make([]*tokenpb.SignatureWithIndex, 0)
+				for i, privKey := range []keys.Private{userOutput1PrivKey, userOutput2PrivKey} {
+					sig, err := wallet.SignHashSlice(config, privKey, v2Hash)
+					require.NoError(t, err, "failed to sign")
+					ownerSignatures = append(ownerSignatures, &tokenpb.SignatureWithIndex{
+						InputIndex: uint32(i),
+						Signature:  sig,
+					})
+				}
+
+				req := &tokenpb.BroadcastTransactionRequest{
+					IdentityPublicKey:               config.IdentityPublicKey().Serialize(),
+					PartialTokenTransaction:         partialTx,
+					TokenTransactionOwnerSignatures: ownerSignatures,
+				}
+
+				_, err = wallet.BroadcastTokenTransactionV3Request(t.Context(), config, req)
+
+				if tc.expectError {
+					require.Error(t, err, "expected transaction to be rejected")
+					require.Contains(t, err.Error(), tc.expectedErrorContains)
+				} else {
+					require.NoError(t, err, "expected transaction to succeed")
+				}
+			})
+		}
+	}
+}
