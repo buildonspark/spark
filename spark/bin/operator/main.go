@@ -280,7 +280,9 @@ func main() {
 		args.Threshold,
 		args.SignerAddress,
 		args.DatabasePath,
+		"", // EphemeralDatabasePath — wired in PR 4
 		args.AWS,
+		false, // EphemeralIsRDS — wired in PR 4
 		args.AuthzEnforced,
 		args.SupportedNetworksList(),
 		args.ServerCertPath,
