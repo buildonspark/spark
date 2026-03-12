@@ -4,7 +4,7 @@
 Identified gaps in the existing token transaction integration test suite at `spark/so/grpc_test/tokens_test/`. The tests run across TTV2, TTV3 Phase1, and TTV3 Phase2 modes. Several handler validation paths, query behaviors, and authorization checks have no corresponding integration tests.
 
 ## Approach
-Add new tests to two existing test files (`validation_test.go`, `query_test.go`) and create one new file (`freeze_auth_test.go`) for freeze authorization. Tests follow existing patterns: use `runSignatureTypeTestCases`, table-driven where applicable, and `setupNativeTokenWithMint` for setup.
+Add new tests to one existing test file (`query_test.go`) and create one new file (`freeze_auth_test.go`) for freeze authorization. Tests follow existing patterns: use `runSignatureTypeTestCases`, table-driven where applicable, and `setupNativeTokenWithMint` for setup.
 
 ## Changes
 
