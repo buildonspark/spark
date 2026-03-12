@@ -784,6 +784,19 @@ func TestBroadcastTokenTransactionV3ExecuteBeforeValidation(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name: "execute_before_expired_rejected",
+			setExecuteBefore: func(partial *tokenpb.PartialTokenTransaction) {
+				// Set client_created_timestamp to 10 seconds ago so execute_before
+				// can be after it but still in the past (expired).
+				pastClient := utils.ToMicrosecondPrecision(time.Now().Add(-10 * time.Second))
+				partial.TokenTransactionMetadata.ClientCreatedTimestamp = timestamppb.New(pastClient)
+				expiredTime := utils.ToMicrosecondPrecision(pastClient.Add(1 * time.Second))
+				partial.ExecuteBefore = timestamppb.New(expiredTime)
+			},
+			expectError:           true,
+			expectedErrorContains: "has already passed",
+		},
+		{
 			name: "execute_before_beyond_max_window_rejected",
 			setExecuteBefore: func(partial *tokenpb.PartialTokenTransaction) {
 				clientTs := partial.TokenTransactionMetadata.GetClientCreatedTimestamp().AsTime()
