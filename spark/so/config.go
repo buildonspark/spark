@@ -135,7 +135,11 @@ type Config struct {
 
 // DatabaseDriver returns the database driver based on the database path.
 func (c *Config) DatabaseDriver() string {
-	normalizedPath := strings.ToLower(c.DatabasePath)
+	return databaseDriverFromPath(c.DatabasePath)
+}
+
+func databaseDriverFromPath(databasePath string) string {
+	normalizedPath := strings.ToLower(databasePath)
 	if strings.HasPrefix(normalizedPath, "postgres://") || strings.HasPrefix(normalizedPath, "postgresql://") {
 		return "postgres"
 	}
@@ -519,7 +523,11 @@ func getDatabaseLockTimeoutMs(k knobs.Knobs) uint64 {
 }
 
 func NewDBConnector(ctx context.Context, soConfig *Config, knobsService knobs.Knobs) (*DBConnector, error) {
-	uri, err := url.Parse(soConfig.DatabasePath)
+	return newDBConnector(ctx, soConfig.DatabasePath, soConfig.IsRDS, knobsService)
+}
+
+func newDBConnector(ctx context.Context, databasePath string, isRDS bool, knobsService knobs.Knobs) (*DBConnector, error) {
+	uri, err := url.Parse(databasePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database path: %w", err)
 	}
@@ -530,20 +538,20 @@ func NewDBConnector(ctx context.Context, soConfig *Config, knobsService knobs.Kn
 	)
 
 	var tokenProvider *cachedRDSTokenProvider
-	if soConfig.IsRDS {
+	if isRDS {
 		tokenProvider = newCachedRDSTokenProvider(uri)
 	}
 
 	connector := &DBConnector{
 		uri:              uri,
-		isRDS:            soConfig.IsRDS,
+		isRDS:            isRDS,
 		driver:           otelWrappedDriver,
 		rdsTokenProvider: tokenProvider,
 	}
 
 	// Only create pool for PostgreSQL
-	if strings.HasPrefix(soConfig.DatabasePath, "postgres") {
-		conf, err := pgxpool.ParseConfig(soConfig.DatabasePath)
+	if databaseDriverFromPath(databasePath) == "postgres" {
+		conf, err := pgxpool.ParseConfig(databasePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse pool config: %w", err)
 		}
@@ -568,7 +576,7 @@ func NewDBConnector(ctx context.Context, soConfig *Config, knobsService knobs.Kn
 			defaultPoolMaxConnLifetimeJitter,
 		)
 
-		if soConfig.IsRDS {
+		if isRDS {
 			conf.BeforeConnect = func(ctx context.Context, cfg *pgx.ConnConfig) error {
 				token, err := tokenProvider.Token(ctx)
 				if err != nil {

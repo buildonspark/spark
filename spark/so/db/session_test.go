@@ -253,6 +253,18 @@ func TestTxProviderWithTimeout_Timeout(t *testing.T) {
 	require.ErrorIs(t, err, ErrTxBeginTimeout)
 }
 
+func TestTxProviderWithTimeout_GetClientUsesTxTimeout(t *testing.T) {
+	t.Parallel()
+	timeout := 200 * time.Millisecond
+	provider := NewTxProviderWithTimeout(&NeverTxProvider{}, timeout)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+
+	_, err := provider.GetClient(ctx)
+	require.ErrorIs(t, err, ErrTxBeginTimeout)
+}
+
 func TestTxProviderWithTimeout_SlowProvider(t *testing.T) {
 	t.Parallel()
 	dbClient := NewTestSQLiteClient(t)
