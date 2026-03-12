@@ -1828,43 +1828,20 @@ func TestQueryTokenTransactionsCursorPaginationSameCreateTime(t *testing.T) {
 
 func TestQueryTokenOutputsBackwardPaginationRejected(t *testing.T) {
 	RunWithBroadcastLabel(t, func(t *testing.T) {
-		issuerPrivKey := keys.GeneratePrivateKey()
-		config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
-
-		err := testCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
-			issuerPrivateKey: issuerPrivKey,
-			name:             "Backward Page Token",
-			ticker:           "BPT",
-			maxSupply:        0,
-		})
-		require.NoError(t, err, "failed to create native spark token")
-
-		tokenIdentifier := queryTokenIdentifierOrFail(t, config, issuerPrivKey.Public())
-
-		mintTx, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public(), tokenIdentifier)
-		require.NoError(t, err, "failed to create mint transaction")
-
-		finalMintTx, err := broadcastTokenTransaction(t, t.Context(), config, mintTx, []keys.Private{issuerPrivKey})
-		require.NoError(t, err, "failed to broadcast mint transaction")
-
-		ownerPubKey, err := keys.ParsePublicKey(finalMintTx.TokenOutputs[0].OwnerPublicKey)
-		require.NoError(t, err)
-
-		ownerConfig := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
-		sparkConn, err := ownerConfig.NewCoordinatorGRPCConnection()
+		config := wallet.NewTestWalletConfigWithIdentityKey(t, keys.GeneratePrivateKey())
+		sparkConn, err := config.NewCoordinatorGRPCConnection()
 		require.NoError(t, err)
 		defer sparkConn.Close()
 
-		authToken, err := wallet.AuthenticateWithConnection(t.Context(), ownerConfig, sparkConn)
+		authToken, err := wallet.AuthenticateWithConnection(t.Context(), config, sparkConn)
 		require.NoError(t, err)
 		authCtx := wallet.ContextWithToken(t.Context(), authToken)
 
 		tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
 
-		// Attempt backward pagination — should be rejected regardless of cursor
+		// Backward pagination rejection fires before any data lookup
 		_, err = tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
-			OwnerPublicKeys: [][]byte{ownerPubKey.Serialize()},
-			Network:         config.ProtoNetwork(),
+			Network: config.ProtoNetwork(),
 			PageRequest: &sparkpb.PageRequest{
 				PageSize:  10,
 				Direction: sparkpb.Direction_PREVIOUS,
@@ -1937,6 +1914,22 @@ func TestQueryTokenOutputsFilterCountLimits(t *testing.T) {
 				Network:         config.ProtoNetwork(),
 			})
 			require.NoError(t, err, "should accept exactly 500 owner public keys")
+		})
+
+		t.Run("exactly 500 issuer public keys succeeds", func(t *testing.T) {
+			_, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+				IssuerPublicKeys: tooManyKeys[:500],
+				Network:          config.ProtoNetwork(),
+			})
+			require.NoError(t, err, "should accept exactly 500 issuer public keys")
+		})
+
+		t.Run("exactly 500 token identifiers succeeds", func(t *testing.T) {
+			_, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+				TokenIdentifiers: tooManyIdentifiers[:500],
+				Network:          config.ProtoNetwork(),
+			})
+			require.NoError(t, err, "should accept exactly 500 token identifiers")
 		})
 	})
 }
