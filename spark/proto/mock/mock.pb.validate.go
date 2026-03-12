@@ -559,3 +559,111 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = QueryPreimageShareResponseValidationError{}
+
+// Validate checks the field values on ModifyNodeTimelockRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ModifyNodeTimelockRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ModifyNodeTimelockRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ModifyNodeTimelockRequestMultiError, or nil if none found.
+func (m *ModifyNodeTimelockRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ModifyNodeTimelockRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for NodeId
+
+	// no validation rules for NodeTimelock
+
+	// no validation rules for RefundTimelock
+
+	if len(errors) > 0 {
+		return ModifyNodeTimelockRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ModifyNodeTimelockRequestMultiError is an error wrapping multiple validation
+// errors returned by ModifyNodeTimelockRequest.ValidateAll() if the
+// designated constraints aren't met.
+type ModifyNodeTimelockRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ModifyNodeTimelockRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ModifyNodeTimelockRequestMultiError) AllErrors() []error { return m }
+
+// ModifyNodeTimelockRequestValidationError is the validation error returned by
+// ModifyNodeTimelockRequest.Validate if the designated constraints aren't met.
+type ModifyNodeTimelockRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ModifyNodeTimelockRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ModifyNodeTimelockRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ModifyNodeTimelockRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ModifyNodeTimelockRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ModifyNodeTimelockRequestValidationError) ErrorName() string {
+	return "ModifyNodeTimelockRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ModifyNodeTimelockRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sModifyNodeTimelockRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ModifyNodeTimelockRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ModifyNodeTimelockRequestValidationError{}

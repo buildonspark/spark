@@ -267,6 +267,66 @@ func (x *QueryPreimageShareResponse) GetInvoiceString() string {
 	return ""
 }
 
+type ModifyNodeTimelockRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	NodeId         string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NodeTimelock   uint32                 `protobuf:"varint,2,opt,name=node_timelock,json=nodeTimelock,proto3" json:"node_timelock,omitempty"`
+	RefundTimelock uint32                 `protobuf:"varint,3,opt,name=refund_timelock,json=refundTimelock,proto3" json:"refund_timelock,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ModifyNodeTimelockRequest) Reset() {
+	*x = ModifyNodeTimelockRequest{}
+	mi := &file_mock_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModifyNodeTimelockRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModifyNodeTimelockRequest) ProtoMessage() {}
+
+func (x *ModifyNodeTimelockRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mock_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModifyNodeTimelockRequest.ProtoReflect.Descriptor instead.
+func (*ModifyNodeTimelockRequest) Descriptor() ([]byte, []int) {
+	return file_mock_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ModifyNodeTimelockRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *ModifyNodeTimelockRequest) GetNodeTimelock() uint32 {
+	if x != nil {
+		return x.NodeTimelock
+	}
+	return 0
+}
+
+func (x *ModifyNodeTimelockRequest) GetRefundTimelock() uint32 {
+	if x != nil {
+		return x.RefundTimelock
+	}
+	return 0
+}
+
 var File_mock_proto protoreflect.FileDescriptor
 
 const file_mock_proto_rawDesc = "" +
@@ -285,12 +345,17 @@ const file_mock_proto_rawDesc = "" +
 	"\x1aQueryPreimageShareResponse\x12%\n" +
 	"\x0epreimage_share\x18\x01 \x01(\fR\rpreimageShare\x12\x1c\n" +
 	"\tthreshold\x18\x02 \x01(\x05R\tthreshold\x12%\n" +
-	"\x0einvoice_string\x18\x03 \x01(\tR\rinvoiceString2\xd7\x02\n" +
+	"\x0einvoice_string\x18\x03 \x01(\tR\rinvoiceString\"\x82\x01\n" +
+	"\x19ModifyNodeTimelockRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12#\n" +
+	"\rnode_timelock\x18\x02 \x01(\rR\fnodeTimelock\x12'\n" +
+	"\x0frefund_timelock\x18\x03 \x01(\rR\x0erefundTimelock2\xaa\x03\n" +
 	"\vMockService\x12V\n" +
 	"\x17clean_up_preimage_share\x12!.mock.CleanUpPreimageShareRequest\x1a\x16.google.protobuf.Empty\"\x00\x12O\n" +
 	"\x13update_nodes_status\x12\x1e.mock.UpdateNodesStatusRequest\x1a\x16.google.protobuf.Empty\"\x00\x12B\n" +
 	"\ftrigger_task\x12\x18.mock.TriggerTaskRequest\x1a\x16.google.protobuf.Empty\"\x00\x12[\n" +
-	"\x14query_preimage_share\x12\x1f.mock.QueryPreimageShareRequest\x1a .mock.QueryPreimageShareResponse\"\x00B+Z)github.com/lightsparkdev/spark/proto/mockb\x06proto3"
+	"\x14query_preimage_share\x12\x1f.mock.QueryPreimageShareRequest\x1a .mock.QueryPreimageShareResponse\"\x00\x12Q\n" +
+	"\x14modify_node_timelock\x12\x1f.mock.ModifyNodeTimelockRequest\x1a\x16.google.protobuf.Empty\"\x00B+Z)github.com/lightsparkdev/spark/proto/mockb\x06proto3"
 
 var (
 	file_mock_proto_rawDescOnce sync.Once
@@ -304,26 +369,29 @@ func file_mock_proto_rawDescGZIP() []byte {
 	return file_mock_proto_rawDescData
 }
 
-var file_mock_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_mock_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_mock_proto_goTypes = []any{
 	(*CleanUpPreimageShareRequest)(nil), // 0: mock.CleanUpPreimageShareRequest
 	(*UpdateNodesStatusRequest)(nil),    // 1: mock.UpdateNodesStatusRequest
 	(*TriggerTaskRequest)(nil),          // 2: mock.TriggerTaskRequest
 	(*QueryPreimageShareRequest)(nil),   // 3: mock.QueryPreimageShareRequest
 	(*QueryPreimageShareResponse)(nil),  // 4: mock.QueryPreimageShareResponse
-	(*emptypb.Empty)(nil),               // 5: google.protobuf.Empty
+	(*ModifyNodeTimelockRequest)(nil),   // 5: mock.ModifyNodeTimelockRequest
+	(*emptypb.Empty)(nil),               // 6: google.protobuf.Empty
 }
 var file_mock_proto_depIdxs = []int32{
 	0, // 0: mock.MockService.clean_up_preimage_share:input_type -> mock.CleanUpPreimageShareRequest
 	1, // 1: mock.MockService.update_nodes_status:input_type -> mock.UpdateNodesStatusRequest
 	2, // 2: mock.MockService.trigger_task:input_type -> mock.TriggerTaskRequest
 	3, // 3: mock.MockService.query_preimage_share:input_type -> mock.QueryPreimageShareRequest
-	5, // 4: mock.MockService.clean_up_preimage_share:output_type -> google.protobuf.Empty
-	5, // 5: mock.MockService.update_nodes_status:output_type -> google.protobuf.Empty
-	5, // 6: mock.MockService.trigger_task:output_type -> google.protobuf.Empty
-	4, // 7: mock.MockService.query_preimage_share:output_type -> mock.QueryPreimageShareResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
+	5, // 4: mock.MockService.modify_node_timelock:input_type -> mock.ModifyNodeTimelockRequest
+	6, // 5: mock.MockService.clean_up_preimage_share:output_type -> google.protobuf.Empty
+	6, // 6: mock.MockService.update_nodes_status:output_type -> google.protobuf.Empty
+	6, // 7: mock.MockService.trigger_task:output_type -> google.protobuf.Empty
+	4, // 8: mock.MockService.query_preimage_share:output_type -> mock.QueryPreimageShareResponse
+	6, // 9: mock.MockService.modify_node_timelock:output_type -> google.protobuf.Empty
+	5, // [5:10] is the sub-list for method output_type
+	0, // [0:5] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -340,7 +408,7 @@ func file_mock_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mock_proto_rawDesc), len(file_mock_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

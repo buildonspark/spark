@@ -24,6 +24,7 @@ const (
 	MockService_UpdateNodesStatus_FullMethodName    = "/mock.MockService/update_nodes_status"
 	MockService_TriggerTask_FullMethodName          = "/mock.MockService/trigger_task"
 	MockService_QueryPreimageShare_FullMethodName   = "/mock.MockService/query_preimage_share"
+	MockService_ModifyNodeTimelock_FullMethodName   = "/mock.MockService/modify_node_timelock"
 )
 
 // MockServiceClient is the client API for MockService service.
@@ -35,6 +36,7 @@ type MockServiceClient interface {
 	// Triggers the execution of a scheduled task immediately by name. Used by hermetic tests
 	TriggerTask(ctx context.Context, in *TriggerTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	QueryPreimageShare(ctx context.Context, in *QueryPreimageShareRequest, opts ...grpc.CallOption) (*QueryPreimageShareResponse, error)
+	ModifyNodeTimelock(ctx context.Context, in *ModifyNodeTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type mockServiceClient struct {
@@ -85,6 +87,16 @@ func (c *mockServiceClient) QueryPreimageShare(ctx context.Context, in *QueryPre
 	return out, nil
 }
 
+func (c *mockServiceClient) ModifyNodeTimelock(ctx context.Context, in *ModifyNodeTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, MockService_ModifyNodeTimelock_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MockServiceServer is the server API for MockService service.
 // All implementations must embed UnimplementedMockServiceServer
 // for forward compatibility.
@@ -94,6 +106,7 @@ type MockServiceServer interface {
 	// Triggers the execution of a scheduled task immediately by name. Used by hermetic tests
 	TriggerTask(context.Context, *TriggerTaskRequest) (*emptypb.Empty, error)
 	QueryPreimageShare(context.Context, *QueryPreimageShareRequest) (*QueryPreimageShareResponse, error)
+	ModifyNodeTimelock(context.Context, *ModifyNodeTimelockRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedMockServiceServer()
 }
 
@@ -115,6 +128,9 @@ func (UnimplementedMockServiceServer) TriggerTask(context.Context, *TriggerTaskR
 }
 func (UnimplementedMockServiceServer) QueryPreimageShare(context.Context, *QueryPreimageShareRequest) (*QueryPreimageShareResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryPreimageShare not implemented")
+}
+func (UnimplementedMockServiceServer) ModifyNodeTimelock(context.Context, *ModifyNodeTimelockRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ModifyNodeTimelock not implemented")
 }
 func (UnimplementedMockServiceServer) mustEmbedUnimplementedMockServiceServer() {}
 func (UnimplementedMockServiceServer) testEmbeddedByValue()                     {}
@@ -209,6 +225,24 @@ func _MockService_QueryPreimageShare_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MockService_ModifyNodeTimelock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ModifyNodeTimelockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MockServiceServer).ModifyNodeTimelock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MockService_ModifyNodeTimelock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MockServiceServer).ModifyNodeTimelock(ctx, req.(*ModifyNodeTimelockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MockService_ServiceDesc is the grpc.ServiceDesc for MockService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -231,6 +265,10 @@ var MockService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "query_preimage_share",
 			Handler:    _MockService_QueryPreimageShare_Handler,
+		},
+		{
+			MethodName: "modify_node_timelock",
+			Handler:    _MockService_ModifyNodeTimelock_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/uuids"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -131,4 +133,66 @@ func (o *MockServer) QueryPreimageShare(ctx context.Context, req *pbmock.QueryPr
 		Threshold:     share.Threshold,
 		InvoiceString: share.InvoiceString,
 	}, nil
+}
+
+func (o *MockServer) ModifyNodeTimelock(ctx context.Context, req *pbmock.ModifyNodeTimelockRequest) (*emptypb.Empty, error) {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeUUID, err := uuid.Parse(req.GetNodeId())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse node id: %w", err)
+	}
+
+	node, err := db.TreeNode.Get(ctx, nodeUUID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get node: %w", err)
+	}
+
+	updatedNodeTx, err := modifyTxSequence(node.RawTx, req.NodeTimelock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to modify node tx sequence: %w", err)
+	}
+
+	updatedRefundTx, err := modifyTxSequence(node.RawRefundTx, req.RefundTimelock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to modify refund tx sequence: %w", err)
+	}
+
+	_, err = db.TreeNode.UpdateOneID(nodeUUID).
+		SetRawTx(updatedNodeTx).
+		SetRawRefundTx(updatedRefundTx).
+		Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update node: %w", err)
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
+// modifyTxSequence parses a serialized transaction, modifies the first input's
+// sequence to encode the desired timelock (preserving existing upper bits),
+// and re-serializes it.
+func modifyTxSequence(rawTx []byte, timelock uint32) ([]byte, error) {
+	tx, err := common.TxFromRawTxBytes(rawTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse transaction: %w", err)
+	}
+	if len(tx.TxIn) == 0 {
+		return nil, fmt.Errorf("transaction has no inputs")
+	}
+	if len(tx.TxIn) != 1 {
+		return nil, fmt.Errorf("expected single-input transaction, got %d inputs", len(tx.TxIn))
+	}
+
+	oldSequence := tx.TxIn[0].Sequence
+	tx.TxIn[0].Sequence = (oldSequence & 0xFFFF0000) | (timelock & 0xFFFF)
+
+	serialized, err := common.SerializeTx(tx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize modified transaction: %w", err)
+	}
+	return serialized, nil
 }

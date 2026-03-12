@@ -11,6 +11,7 @@ service MockService {
     // Triggers the execution of a scheduled task immediately by name. Used by hermetic tests
     rpc trigger_task(TriggerTaskRequest) returns (google.protobuf.Empty) {}
     rpc query_preimage_share(QueryPreimageShareRequest) returns (QueryPreimageShareResponse) {}
+    rpc modify_node_timelock(ModifyNodeTimelockRequest) returns (google.protobuf.Empty) {}
 }
 
 message CleanUpPreimageShareRequest {
@@ -35,4 +36,10 @@ message QueryPreimageShareResponse {
     bytes preimage_share = 1;
     int32 threshold = 2;
     string invoice_string = 3;
+}
+
+message ModifyNodeTimelockRequest {
+    string node_id = 1;
+    uint32 node_timelock = 2;
+    uint32 refund_timelock = 3;
 }
