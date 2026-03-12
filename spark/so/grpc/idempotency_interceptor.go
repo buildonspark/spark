@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
 	"google.golang.org/grpc"
@@ -16,14 +17,18 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-const IdempotencyKeyHeader = "x-idempotency-key"
-
 func IdempotencyInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		key := extractIdempotencyKey(ctx)
 
 		if key == "" {
 			// Non-idempotent request
+			return handler(ctx, req)
+		}
+
+		// Skip idempotency for read-only sessions — they don't support
+		// transactions and read-only endpoints are safe to retry.
+		if ent.IsReadOnlySession(ctx) {
 			return handler(ctx, req)
 		}
 
@@ -55,7 +60,7 @@ func extractIdempotencyKey(ctx context.Context) string {
 	if !ok {
 		return ""
 	}
-	if values := md.Get(IdempotencyKeyHeader); len(values) > 0 {
+	if values := md.Get(common.IdempotencyKeyHeader); len(values) > 0 {
 		return values[0]
 	}
 	return ""

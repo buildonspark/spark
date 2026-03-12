@@ -76,6 +76,20 @@ func GetDbFromContext(ctx context.Context) (*Client, error) {
 	return nil, fmt.Errorf("no transaction provider found in context")
 }
 
+// ReadOnly is a marker interface implemented by sessions that do not support
+// transactions. Used to skip transaction-dependent middleware (e.g. idempotency
+// interceptor) without attempting and failing to begin a transaction.
+type ReadOnly interface {
+	IsReadOnly()
+}
+
+// IsReadOnlySession returns true if the session in the context is read-only
+// (i.e. does not support transactions).
+func IsReadOnlySession(ctx context.Context) bool {
+	_, ok := ctx.Value(dbSessionKey).(ReadOnly)
+	return ok
+}
+
 // GetTxFromContext returns the underlying database transaction from the context.
 // This should only be used where explicit transaction commit/rollback is needed.
 func GetTxFromContext(ctx context.Context) (*Tx, error) {

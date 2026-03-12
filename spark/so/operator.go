@@ -78,6 +78,7 @@ func (o *operatorConnectionFactorySecure) NewGRPCConnection(address string, retr
 		),
 		grpc.WithInitialWindowSize(1 << 20),      // 1 MB
 		grpc.WithInitialConnWindowSize(16 << 20), // 16 MB
+		grpc.WithChainUnaryInterceptor(common.IdempotencyKeyClientInterceptor()),
 	}
 	return common.NewGRPCConnectionWithOptions(address, o.operator.CertPath, retryPolicy, clientTimeoutConfig, extraOpts...)
 }

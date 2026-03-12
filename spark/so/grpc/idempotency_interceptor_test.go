@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
@@ -223,6 +224,26 @@ func TestIdempotencyInterceptor_SameKeyDifferentMethods(t *testing.T) {
 	assert.EqualExportedValues(t, structResp1, structResp3)
 }
 
+func TestIdempotencyInterceptor_SkipsReadOnlySession(t *testing.T) {
+	// Create a context with a read-only session
+	dbClient := db.NewTestSQLiteClient(t)
+	readOnlySession := db.NewReadOnlySession(t.Context(), dbClient)
+	ctx := ent.Inject(t.Context(), readOnlySession)
+
+	handlerCalled := false
+	handler := func(ctx context.Context, req any) (any, error) {
+		handlerCalled = true
+		return &structpb.Struct{}, nil
+	}
+
+	// Even with an idempotency key, the interceptor should skip idempotency
+	// processing and call the handler directly for read-only sessions.
+	resp, err := callInterceptor(t, ctx, "some-idempotency-key", "some_method", handler)
+	require.NoError(t, err)
+	assert.True(t, handlerCalled, "handler should be called directly for read-only sessions")
+	assert.NotNil(t, resp)
+}
+
 func TestExtractIdempotencyKey(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -232,7 +253,7 @@ func TestExtractIdempotencyKey(t *testing.T) {
 		{
 			name: "with idempotency key",
 			setupCtx: func() context.Context {
-				md := metadata.Pairs(IdempotencyKeyHeader, "test-key-123")
+				md := metadata.Pairs(common.IdempotencyKeyHeader, "test-key-123")
 				return metadata.NewIncomingContext(t.Context(), md)
 			},
 			expectedKey: "test-key-123",
@@ -247,7 +268,7 @@ func TestExtractIdempotencyKey(t *testing.T) {
 		{
 			name: "with empty key",
 			setupCtx: func() context.Context {
-				md := metadata.Pairs(IdempotencyKeyHeader, "")
+				md := metadata.Pairs(common.IdempotencyKeyHeader, "")
 				return metadata.NewIncomingContext(t.Context(), md)
 			},
 			expectedKey: "",
@@ -272,7 +293,7 @@ func TestExtractIdempotencyKey(t *testing.T) {
 }
 
 func callInterceptor(_ *testing.T, ctx context.Context, key string, methodName string, handler grpc.UnaryHandler) (any, error) {
-	md := metadata.Pairs(IdempotencyKeyHeader, key)
+	md := metadata.Pairs(common.IdempotencyKeyHeader, key)
 	ctx = metadata.NewIncomingContext(ctx, md)
 
 	info := &grpc.UnaryServerInfo{FullMethod: methodName}

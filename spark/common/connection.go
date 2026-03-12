@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	sogrpc "github.com/lightsparkdev/spark/common/grpc"
 	"github.com/lightsparkdev/spark/common/logging"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 // RetryPolicyConfig represents configuration for gRPC retry policy
@@ -78,6 +80,24 @@ func loggingUnaryClientInterceptor(
 		logger.Error("gRPC client request failed", zap.Error(err))
 	}
 	return err
+}
+
+// IdempotencyKeyHeader is the gRPC metadata key used for idempotency.
+// Referenced by both the client interceptor (here) and the server-side
+// IdempotencyInterceptor in so/grpc.
+const IdempotencyKeyHeader = "x-idempotency-key"
+
+// IdempotencyKeyClientInterceptor returns a gRPC client interceptor that
+// attaches a unique UUID as the x-idempotency-key metadata header on each call.
+// gRPC transport-level retries preserve the metadata, so the same key is reused
+// on retry, allowing the server-side IdempotencyInterceptor to return cached
+// responses instead of re-executing the handler.
+func IdempotencyKeyClientInterceptor() grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		key := uuid.New().String()
+		ctx = metadata.AppendToOutgoingContext(ctx, IdempotencyKeyHeader, key)
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
 }
 
 func BasicClientOptions(address string, retryPolicy *RetryPolicyConfig, clientTimeoutConfig *ClientTimeoutConfig) []grpc.DialOption {

@@ -257,6 +257,9 @@ func NewReadOnlySession(ctx context.Context, dbClient *ent.Client, opts ...Sessi
 	}
 }
 
+// IsReadOnly implements the ent.ReadOnly marker interface.
+func (r *ReadOnlySession) IsReadOnly() {}
+
 // GetOrBeginTx always returns an error for read-only sessions.
 func (r *ReadOnlySession) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 	return nil, fmt.Errorf("read-only session does not support explicit transactions")
