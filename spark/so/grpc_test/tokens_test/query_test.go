@@ -1866,11 +1866,23 @@ func TestQueryTokenOutputsFilterCountLimits(t *testing.T) {
 
 		tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
 
-		// Generate 501 fake public keys (33 bytes each)
+		// Generate 501 random 33-byte blobs for count-rejection tests.
+		// The handler rejects based on count alone before parsing keys.
 		tooManyKeys := make([][]byte, 501)
 		for i := range tooManyKeys {
+			b := make([]byte, 33)
+			b[0] = 0x02
+			b[1] = byte(i >> 8)
+			b[2] = byte(i)
+			tooManyKeys[i] = b
+		}
+
+		// Generate 500 real EC keys for boundary-success tests where
+		// the handler parses keys after the count check passes.
+		validKeys := make([][]byte, 500)
+		for i := range validKeys {
 			privKey := keys.GeneratePrivateKey()
-			tooManyKeys[i] = privKey.Public().Serialize()
+			validKeys[i] = privKey.Public().Serialize()
 		}
 
 		// Generate 501 fake token identifiers (32 bytes each)
@@ -1910,7 +1922,7 @@ func TestQueryTokenOutputsFilterCountLimits(t *testing.T) {
 
 		t.Run("exactly 500 owner public keys succeeds", func(t *testing.T) {
 			_, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
-				OwnerPublicKeys: tooManyKeys[:500],
+				OwnerPublicKeys: validKeys,
 				Network:         config.ProtoNetwork(),
 			})
 			require.NoError(t, err, "should accept exactly 500 owner public keys")
@@ -1918,7 +1930,7 @@ func TestQueryTokenOutputsFilterCountLimits(t *testing.T) {
 
 		t.Run("exactly 500 issuer public keys succeeds", func(t *testing.T) {
 			_, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
-				IssuerPublicKeys: tooManyKeys[:500],
+				IssuerPublicKeys: validKeys,
 				Network:          config.ProtoNetwork(),
 			})
 			require.NoError(t, err, "should accept exactly 500 issuer public keys")
