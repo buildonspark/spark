@@ -1,6 +1,46 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { numberToBytesBE } from "@noble/curves/utils";
+import { hexToBytes, numberToBytesBE } from "@noble/curves/utils";
 import { SparkValidationError } from "../errors/index.js";
+
+export function parseCompressedPublicKeyHex(
+  publicKeyHex: string,
+  field = "publicKey",
+): Uint8Array {
+  let publicKey: Uint8Array;
+  try {
+    publicKey = hexToBytes(publicKeyHex);
+  } catch (error) {
+    throw new SparkValidationError(
+      "Public key must be a valid hex-encoded compressed secp256k1 public key",
+      {
+        field,
+        error,
+      },
+    );
+  }
+
+  if (publicKey.length !== 33) {
+    throw new SparkValidationError("Public key must be 33 bytes", {
+      field,
+      value: publicKey.length,
+      expected: 33,
+    });
+  }
+
+  try {
+    secp256k1.Point.fromHex(publicKey);
+  } catch (error) {
+    throw new SparkValidationError(
+      "Public key must be a valid compressed secp256k1 public key",
+      {
+        field,
+        error,
+      },
+    );
+  }
+
+  return publicKey;
+}
 
 export function addPublicKeys(a: Uint8Array, b: Uint8Array): Uint8Array {
   if (a.length !== 33 || b.length !== 33) {

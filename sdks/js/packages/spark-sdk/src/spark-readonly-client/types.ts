@@ -22,13 +22,20 @@ export type GetUtxosParams = {
   excludeClaimed?: boolean;
 };
 
-export type GetUtxosForAddressesParams = {
-  depositAddresses: string[];
+export type GetUtxosForIdentityParams = {
+  identityPublicKey: string;
   pageSize?: number;
   cursor?: string;
   direction?: "NEXT" | "PREVIOUS";
   excludeClaimed?: boolean;
   includePending?: boolean;
+};
+
+export type WalletGetUtxosForIdentityParams = Omit<
+  GetUtxosForIdentityParams,
+  "identityPublicKey"
+> & {
+  identityPublicKey?: string;
 };
 
 export type QuerySparkInvoicesParams = {

@@ -22123,30 +22123,41 @@ var _ interface {
 	ErrorName() string
 } = GetUtxosForAddressResponseValidationError{}
 
-// Validate checks the field values on GetUtxosForAddressesRequest with the
+// Validate checks the field values on GetUtxosForIdentityRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *GetUtxosForAddressesRequest) Validate() error {
+func (m *GetUtxosForIdentityRequest) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on GetUtxosForAddressesRequest with the
+// ValidateAll checks the field values on GetUtxosForIdentityRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// GetUtxosForAddressesRequestMultiError, or nil if none found.
-func (m *GetUtxosForAddressesRequest) ValidateAll() error {
+// GetUtxosForIdentityRequestMultiError, or nil if none found.
+func (m *GetUtxosForIdentityRequest) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *GetUtxosForAddressesRequest) validate(all bool) error {
+func (m *GetUtxosForIdentityRequest) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	if _, ok := _GetUtxosForAddressesRequest_Network_NotInLookup[m.GetNetwork()]; ok {
-		err := GetUtxosForAddressesRequestValidationError{
+	if len(m.GetIdentityPublicKey()) != 33 {
+		err := GetUtxosForIdentityRequestValidationError{
+			field:  "IdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := _GetUtxosForIdentityRequest_Network_NotInLookup[m.GetNetwork()]; ok {
+		err := GetUtxosForIdentityRequestValidationError{
 			field:  "Network",
 			reason: "value must not be in list [UNSPECIFIED]",
 		}
@@ -22162,7 +22173,7 @@ func (m *GetUtxosForAddressesRequest) validate(all bool) error {
 		switch v := interface{}(m.GetPage()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, GetUtxosForAddressesRequestValidationError{
+				errors = append(errors, GetUtxosForIdentityRequestValidationError{
 					field:  "Page",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -22170,7 +22181,7 @@ func (m *GetUtxosForAddressesRequest) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, GetUtxosForAddressesRequestValidationError{
+				errors = append(errors, GetUtxosForIdentityRequestValidationError{
 					field:  "Page",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -22179,7 +22190,7 @@ func (m *GetUtxosForAddressesRequest) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetPage()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return GetUtxosForAddressesRequestValidationError{
+			return GetUtxosForIdentityRequestValidationError{
 				field:  "Page",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -22190,19 +22201,19 @@ func (m *GetUtxosForAddressesRequest) validate(all bool) error {
 	// no validation rules for IncludePending
 
 	if len(errors) > 0 {
-		return GetUtxosForAddressesRequestMultiError(errors)
+		return GetUtxosForIdentityRequestMultiError(errors)
 	}
 
 	return nil
 }
 
-// GetUtxosForAddressesRequestMultiError is an error wrapping multiple
-// validation errors returned by GetUtxosForAddressesRequest.ValidateAll() if
+// GetUtxosForIdentityRequestMultiError is an error wrapping multiple
+// validation errors returned by GetUtxosForIdentityRequest.ValidateAll() if
 // the designated constraints aren't met.
-type GetUtxosForAddressesRequestMultiError []error
+type GetUtxosForIdentityRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m GetUtxosForAddressesRequestMultiError) Error() string {
+func (m GetUtxosForIdentityRequestMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -22211,12 +22222,11 @@ func (m GetUtxosForAddressesRequestMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m GetUtxosForAddressesRequestMultiError) AllErrors() []error { return m }
+func (m GetUtxosForIdentityRequestMultiError) AllErrors() []error { return m }
 
-// GetUtxosForAddressesRequestValidationError is the validation error returned
-// by GetUtxosForAddressesRequest.Validate if the designated constraints
-// aren't met.
-type GetUtxosForAddressesRequestValidationError struct {
+// GetUtxosForIdentityRequestValidationError is the validation error returned
+// by GetUtxosForIdentityRequest.Validate if the designated constraints aren't met.
+type GetUtxosForIdentityRequestValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -22224,24 +22234,24 @@ type GetUtxosForAddressesRequestValidationError struct {
 }
 
 // Field function returns field value.
-func (e GetUtxosForAddressesRequestValidationError) Field() string { return e.field }
+func (e GetUtxosForIdentityRequestValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e GetUtxosForAddressesRequestValidationError) Reason() string { return e.reason }
+func (e GetUtxosForIdentityRequestValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e GetUtxosForAddressesRequestValidationError) Cause() error { return e.cause }
+func (e GetUtxosForIdentityRequestValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e GetUtxosForAddressesRequestValidationError) Key() bool { return e.key }
+func (e GetUtxosForIdentityRequestValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e GetUtxosForAddressesRequestValidationError) ErrorName() string {
-	return "GetUtxosForAddressesRequestValidationError"
+func (e GetUtxosForIdentityRequestValidationError) ErrorName() string {
+	return "GetUtxosForIdentityRequestValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e GetUtxosForAddressesRequestValidationError) Error() string {
+func (e GetUtxosForIdentityRequestValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -22253,14 +22263,14 @@ func (e GetUtxosForAddressesRequestValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGetUtxosForAddressesRequest.%s: %s%s",
+		"invalid %sGetUtxosForIdentityRequest.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = GetUtxosForAddressesRequestValidationError{}
+var _ error = GetUtxosForIdentityRequestValidationError{}
 
 var _ interface {
 	Field() string
@@ -22268,28 +22278,28 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = GetUtxosForAddressesRequestValidationError{}
+} = GetUtxosForIdentityRequestValidationError{}
 
-var _GetUtxosForAddressesRequest_Network_NotInLookup = map[Network]struct{}{
+var _GetUtxosForIdentityRequest_Network_NotInLookup = map[Network]struct{}{
 	0: {},
 }
 
-// Validate checks the field values on GetUtxosForAddressesResponse with the
+// Validate checks the field values on GetUtxosForIdentityResponse with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *GetUtxosForAddressesResponse) Validate() error {
+func (m *GetUtxosForIdentityResponse) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on GetUtxosForAddressesResponse with the
+// ValidateAll checks the field values on GetUtxosForIdentityResponse with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// GetUtxosForAddressesResponseMultiError, or nil if none found.
-func (m *GetUtxosForAddressesResponse) ValidateAll() error {
+// GetUtxosForIdentityResponseMultiError, or nil if none found.
+func (m *GetUtxosForIdentityResponse) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *GetUtxosForAddressesResponse) validate(all bool) error {
+func (m *GetUtxosForIdentityResponse) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -22303,7 +22313,7 @@ func (m *GetUtxosForAddressesResponse) validate(all bool) error {
 			switch v := interface{}(item).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, GetUtxosForAddressesResponseValidationError{
+					errors = append(errors, GetUtxosForIdentityResponseValidationError{
 						field:  fmt.Sprintf("Utxos[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -22311,7 +22321,7 @@ func (m *GetUtxosForAddressesResponse) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, GetUtxosForAddressesResponseValidationError{
+					errors = append(errors, GetUtxosForIdentityResponseValidationError{
 						field:  fmt.Sprintf("Utxos[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -22320,7 +22330,7 @@ func (m *GetUtxosForAddressesResponse) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return GetUtxosForAddressesResponseValidationError{
+				return GetUtxosForIdentityResponseValidationError{
 					field:  fmt.Sprintf("Utxos[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -22334,7 +22344,7 @@ func (m *GetUtxosForAddressesResponse) validate(all bool) error {
 		switch v := interface{}(m.GetPage()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, GetUtxosForAddressesResponseValidationError{
+				errors = append(errors, GetUtxosForIdentityResponseValidationError{
 					field:  "Page",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -22342,7 +22352,7 @@ func (m *GetUtxosForAddressesResponse) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, GetUtxosForAddressesResponseValidationError{
+				errors = append(errors, GetUtxosForIdentityResponseValidationError{
 					field:  "Page",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -22351,7 +22361,7 @@ func (m *GetUtxosForAddressesResponse) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetPage()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return GetUtxosForAddressesResponseValidationError{
+			return GetUtxosForIdentityResponseValidationError{
 				field:  "Page",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -22360,19 +22370,19 @@ func (m *GetUtxosForAddressesResponse) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return GetUtxosForAddressesResponseMultiError(errors)
+		return GetUtxosForIdentityResponseMultiError(errors)
 	}
 
 	return nil
 }
 
-// GetUtxosForAddressesResponseMultiError is an error wrapping multiple
-// validation errors returned by GetUtxosForAddressesResponse.ValidateAll() if
+// GetUtxosForIdentityResponseMultiError is an error wrapping multiple
+// validation errors returned by GetUtxosForIdentityResponse.ValidateAll() if
 // the designated constraints aren't met.
-type GetUtxosForAddressesResponseMultiError []error
+type GetUtxosForIdentityResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m GetUtxosForAddressesResponseMultiError) Error() string {
+func (m GetUtxosForIdentityResponseMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -22381,12 +22391,12 @@ func (m GetUtxosForAddressesResponseMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m GetUtxosForAddressesResponseMultiError) AllErrors() []error { return m }
+func (m GetUtxosForIdentityResponseMultiError) AllErrors() []error { return m }
 
-// GetUtxosForAddressesResponseValidationError is the validation error returned
-// by GetUtxosForAddressesResponse.Validate if the designated constraints
+// GetUtxosForIdentityResponseValidationError is the validation error returned
+// by GetUtxosForIdentityResponse.Validate if the designated constraints
 // aren't met.
-type GetUtxosForAddressesResponseValidationError struct {
+type GetUtxosForIdentityResponseValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -22394,24 +22404,24 @@ type GetUtxosForAddressesResponseValidationError struct {
 }
 
 // Field function returns field value.
-func (e GetUtxosForAddressesResponseValidationError) Field() string { return e.field }
+func (e GetUtxosForIdentityResponseValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e GetUtxosForAddressesResponseValidationError) Reason() string { return e.reason }
+func (e GetUtxosForIdentityResponseValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e GetUtxosForAddressesResponseValidationError) Cause() error { return e.cause }
+func (e GetUtxosForIdentityResponseValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e GetUtxosForAddressesResponseValidationError) Key() bool { return e.key }
+func (e GetUtxosForIdentityResponseValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e GetUtxosForAddressesResponseValidationError) ErrorName() string {
-	return "GetUtxosForAddressesResponseValidationError"
+func (e GetUtxosForIdentityResponseValidationError) ErrorName() string {
+	return "GetUtxosForIdentityResponseValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e GetUtxosForAddressesResponseValidationError) Error() string {
+func (e GetUtxosForIdentityResponseValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -22423,14 +22433,14 @@ func (e GetUtxosForAddressesResponseValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGetUtxosForAddressesResponse.%s: %s%s",
+		"invalid %sGetUtxosForIdentityResponse.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = GetUtxosForAddressesResponseValidationError{}
+var _ error = GetUtxosForIdentityResponseValidationError{}
 
 var _ interface {
 	Field() string
@@ -22438,7 +22448,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = GetUtxosForAddressesResponseValidationError{}
+} = GetUtxosForIdentityResponseValidationError{}
 
 // Validate checks the field values on QuerySparkInvoicesRequest with the rules
 // defined in the proto definition for this message. If any rules are

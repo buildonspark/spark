@@ -67,7 +67,7 @@ import {
   QueryTokenTransactionsResponse,
 } from "../proto/spark_token.js";
 import type { DecodedInvoice } from "../services/bolt11-spark.js";
-import type { GetUtxosForAddressesParams } from "../spark-readonly-client/types.js";
+import type { WalletGetUtxosForIdentityParams } from "../spark-readonly-client/types.js";
 import {
   decodeInvoice,
   getNetworkFromInvoice,
@@ -136,6 +136,7 @@ import {
   NetworkToProto,
   NetworkType,
 } from "../utils/network.js";
+import { parseCompressedPublicKeyHex } from "../utils/keys.js";
 import {
   Bech32mTokenIdentifier,
   decodeBech32mTokenIdentifier,
@@ -1245,12 +1246,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
-   * Returns static deposit UTXOs for a batch of Spark deposit addresses.
+   * Returns static deposit UTXOs for an identity.
    *
-   * @param params - Batch UTXO query params.
+   * @param params - Identity UTXO query params.
    */
-  public async getUtxosForDepositAddresses(
-    params: GetUtxosForAddressesParams,
+  public async getUtxosForIdentity(
+    params: WalletGetUtxosForIdentityParams = {},
   ): Promise<{
     utxos: {
       address: string;
@@ -1266,19 +1267,16 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     };
   }> {
     const {
-      depositAddresses,
+      identityPublicKey,
       pageSize = 50,
       cursor = "",
       direction = "NEXT",
       excludeClaimed = false,
       includePending = false,
     } = params;
-
-    if (depositAddresses.length === 0) {
-      throw new SparkValidationError("Deposit addresses cannot be empty", {
-        field: "depositAddresses",
-      });
-    }
+    const resolvedIdentityPublicKey =
+      identityPublicKey ??
+      bytesToHex(await this.config.signer.getIdentityPublicKey());
 
     if (!Number.isInteger(pageSize) || pageSize <= 0) {
       throw new SparkValidationError("Page size must be a positive integer", {
@@ -1288,21 +1286,25 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
     if (direction === "PREVIOUS") {
       throw new SparkValidationError(
-        "Backward pagination is not currently supported for getUtxosForDepositAddresses",
+        "Backward pagination is not currently supported for getUtxosForIdentity",
         { field: "direction" },
       );
     }
+    const identityPublicKeyBytes = parseCompressedPublicKeyHex(
+      resolvedIdentityPublicKey,
+      "identityPublicKey",
+    );
 
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
 
     let response: Awaited<
-      ReturnType<typeof sparkClient.get_utxos_for_addresses>
+      ReturnType<typeof sparkClient.get_utxos_for_identity>
     >;
     try {
-      response = await sparkClient.get_utxos_for_addresses({
-        addresses: depositAddresses,
+      response = await sparkClient.get_utxos_for_identity({
+        identityPublicKey: identityPublicKeyBytes,
         network: NetworkToProto[this.config.getNetwork()],
         excludeClaimed,
         includePending,
@@ -1313,8 +1315,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         },
       });
     } catch (error) {
-      throw new SparkRequestError("Failed to get UTXOs for deposit addresses", {
-        operation: "get_utxos_for_addresses",
+      throw new SparkRequestError("Failed to get UTXOs for identity", {
+        operation: "get_utxos_for_identity",
         error,
       });
     }
@@ -1324,7 +1326,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         response.utxos.map((addressedUtxo) => {
           if (!addressedUtxo.utxo) {
             throw new SparkRequestError("Malformed UTXO response payload", {
-              operation: "get_utxos_for_addresses",
+              operation: "get_utxos_for_identity",
               addressedUtxo,
             });
           }
@@ -5410,7 +5412,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "getUnusedDepositAddresses",
   "getUserRequests",
   "getUtxosForDepositAddress",
-  "getUtxosForDepositAddresses",
+  "getUtxosForIdentity",
   "getWalletSettings",
   "getWithdrawalFeeQuote",
   "isOptimizationInProgress",

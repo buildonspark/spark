@@ -10448,31 +10448,31 @@ func (x *GetUtxosForAddressResponse) GetOffset() uint64 {
 	return 0
 }
 
-type GetUtxosForAddressesRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Addresses      []string               `protobuf:"bytes,1,rep,name=addresses,proto3" json:"addresses,omitempty"`
-	Network        Network                `protobuf:"varint,2,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
-	ExcludeClaimed bool                   `protobuf:"varint,3,opt,name=exclude_claimed,json=excludeClaimed,proto3" json:"exclude_claimed,omitempty"`
-	Page           *PageRequest           `protobuf:"bytes,4,opt,name=page,proto3" json:"page,omitempty"`
-	IncludePending bool                   `protobuf:"varint,5,opt,name=include_pending,json=includePending,proto3" json:"include_pending,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+type GetUtxosForIdentityRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	IdentityPublicKey []byte                 `protobuf:"bytes,1,opt,name=identity_public_key,json=identityPublicKey,proto3" json:"identity_public_key,omitempty"`
+	Network           Network                `protobuf:"varint,2,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
+	ExcludeClaimed    bool                   `protobuf:"varint,3,opt,name=exclude_claimed,json=excludeClaimed,proto3" json:"exclude_claimed,omitempty"`
+	Page              *PageRequest           `protobuf:"bytes,4,opt,name=page,proto3" json:"page,omitempty"`
+	IncludePending    bool                   `protobuf:"varint,5,opt,name=include_pending,json=includePending,proto3" json:"include_pending,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
-func (x *GetUtxosForAddressesRequest) Reset() {
-	*x = GetUtxosForAddressesRequest{}
+func (x *GetUtxosForIdentityRequest) Reset() {
+	*x = GetUtxosForIdentityRequest{}
 	mi := &file_spark_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetUtxosForAddressesRequest) String() string {
+func (x *GetUtxosForIdentityRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetUtxosForAddressesRequest) ProtoMessage() {}
+func (*GetUtxosForIdentityRequest) ProtoMessage() {}
 
-func (x *GetUtxosForAddressesRequest) ProtoReflect() protoreflect.Message {
+func (x *GetUtxosForIdentityRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_spark_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -10484,47 +10484,47 @@ func (x *GetUtxosForAddressesRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetUtxosForAddressesRequest.ProtoReflect.Descriptor instead.
-func (*GetUtxosForAddressesRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetUtxosForIdentityRequest.ProtoReflect.Descriptor instead.
+func (*GetUtxosForIdentityRequest) Descriptor() ([]byte, []int) {
 	return file_spark_proto_rawDescGZIP(), []int{142}
 }
 
-func (x *GetUtxosForAddressesRequest) GetAddresses() []string {
+func (x *GetUtxosForIdentityRequest) GetIdentityPublicKey() []byte {
 	if x != nil {
-		return x.Addresses
+		return x.IdentityPublicKey
 	}
 	return nil
 }
 
-func (x *GetUtxosForAddressesRequest) GetNetwork() Network {
+func (x *GetUtxosForIdentityRequest) GetNetwork() Network {
 	if x != nil {
 		return x.Network
 	}
 	return Network_UNSPECIFIED
 }
 
-func (x *GetUtxosForAddressesRequest) GetExcludeClaimed() bool {
+func (x *GetUtxosForIdentityRequest) GetExcludeClaimed() bool {
 	if x != nil {
 		return x.ExcludeClaimed
 	}
 	return false
 }
 
-func (x *GetUtxosForAddressesRequest) GetPage() *PageRequest {
+func (x *GetUtxosForIdentityRequest) GetPage() *PageRequest {
 	if x != nil {
 		return x.Page
 	}
 	return nil
 }
 
-func (x *GetUtxosForAddressesRequest) GetIncludePending() bool {
+func (x *GetUtxosForIdentityRequest) GetIncludePending() bool {
 	if x != nil {
 		return x.IncludePending
 	}
 	return false
 }
 
-type GetUtxosForAddressesResponse struct {
+type GetUtxosForIdentityResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Utxos         []*AddressedUtxo       `protobuf:"bytes,1,rep,name=utxos,proto3" json:"utxos,omitempty"`
 	Page          *PageResponse          `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
@@ -10532,20 +10532,20 @@ type GetUtxosForAddressesResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetUtxosForAddressesResponse) Reset() {
-	*x = GetUtxosForAddressesResponse{}
+func (x *GetUtxosForIdentityResponse) Reset() {
+	*x = GetUtxosForIdentityResponse{}
 	mi := &file_spark_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetUtxosForAddressesResponse) String() string {
+func (x *GetUtxosForIdentityResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetUtxosForAddressesResponse) ProtoMessage() {}
+func (*GetUtxosForIdentityResponse) ProtoMessage() {}
 
-func (x *GetUtxosForAddressesResponse) ProtoReflect() protoreflect.Message {
+func (x *GetUtxosForIdentityResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_spark_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -10557,19 +10557,19 @@ func (x *GetUtxosForAddressesResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetUtxosForAddressesResponse.ProtoReflect.Descriptor instead.
-func (*GetUtxosForAddressesResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetUtxosForIdentityResponse.ProtoReflect.Descriptor instead.
+func (*GetUtxosForIdentityResponse) Descriptor() ([]byte, []int) {
 	return file_spark_proto_rawDescGZIP(), []int{143}
 }
 
-func (x *GetUtxosForAddressesResponse) GetUtxos() []*AddressedUtxo {
+func (x *GetUtxosForIdentityResponse) GetUtxos() []*AddressedUtxo {
 	if x != nil {
 		return x.Utxos
 	}
 	return nil
 }
 
-func (x *GetUtxosForAddressesResponse) GetPage() *PageResponse {
+func (x *GetUtxosForIdentityResponse) GetPage() *PageResponse {
 	if x != nil {
 		return x.Page
 	}
@@ -12088,14 +12088,14 @@ const file_spark_proto_rawDesc = "" +
 	"\x0fexclude_claimed\x18\x05 \x01(\bR\x0eexcludeClaimed\"W\n" +
 	"\x1aGetUtxosForAddressResponse\x12!\n" +
 	"\x05utxos\x18\x01 \x03(\v2\v.spark.UTXOR\x05utxos\x12\x16\n" +
-	"\x06offset\x18\x02 \x01(\x04R\x06offset\"\xe9\x01\n" +
-	"\x1bGetUtxosForAddressesRequest\x12\x1c\n" +
-	"\taddresses\x18\x01 \x03(\tR\taddresses\x122\n" +
+	"\x06offset\x18\x02 \x01(\x04R\x06offset\"\x83\x02\n" +
+	"\x1aGetUtxosForIdentityRequest\x127\n" +
+	"\x13identity_public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\x11identityPublicKey\x122\n" +
 	"\anetwork\x18\x02 \x01(\x0e2\x0e.spark.NetworkB\b\xfaB\x05\x82\x01\x02 \x00R\anetwork\x12'\n" +
 	"\x0fexclude_claimed\x18\x03 \x01(\bR\x0eexcludeClaimed\x12&\n" +
 	"\x04page\x18\x04 \x01(\v2\x12.spark.PageRequestR\x04page\x12'\n" +
-	"\x0finclude_pending\x18\x05 \x01(\bR\x0eincludePending\"s\n" +
-	"\x1cGetUtxosForAddressesResponse\x12*\n" +
+	"\x0finclude_pending\x18\x05 \x01(\bR\x0eincludePending\"r\n" +
+	"\x1bGetUtxosForIdentityResponse\x12*\n" +
 	"\x05utxos\x18\x01 \x03(\v2\x14.spark.AddressedUtxoR\x05utxos\x12'\n" +
 	"\x04page\x18\x02 \x01(\v2\x13.spark.PageResponseR\x04page\"c\n" +
 	"\x19QuerySparkInvoicesRequest\x12\x14\n" +
@@ -12219,7 +12219,7 @@ const file_spark_proto_rawDesc = "" +
 	"\x1fTREE_NODE_STATUS_AGGREGATE_LOCK\x10\b\x12\x1b\n" +
 	"\x17TREE_NODE_STATUS_EXITED\x10\t\x12!\n" +
 	"\x1dTREE_NODE_STATUS_RENEW_LOCKED\x10\n" +
-	"2\xeb\x1e\n" +
+	"2\xe8\x1e\n" +
 	"\fSparkService\x12i\n" +
 	"\x18generate_deposit_address\x12$.spark.GenerateDepositAddressRequest\x1a%.spark.GenerateDepositAddressResponse\"\x00\x12|\n" +
 	"\x1fgenerate_static_deposit_address\x12*.spark.GenerateStaticDepositAddressRequest\x1a+.spark.GenerateStaticDepositAddressResponse\"\x00\x12v\n" +
@@ -12257,8 +12257,8 @@ const file_spark_proto_rawDesc = "" +
 	"\x11start_transfer_v2\x12\x1b.spark.StartTransferRequest\x1a\x1c.spark.StartTransferResponse\"\x00\x12R\n" +
 	"\x11start_transfer_v3\x12\x1d.spark.StartTransferV3Request\x1a\x1c.spark.StartTransferResponse\"\x00\x12M\n" +
 	"\x0eclaim_transfer\x12\x1b.spark.ClaimTransferRequest\x1a\x1c.spark.ClaimTransferResponse\"\x00\x12^\n" +
-	"\x15get_utxos_for_address\x12 .spark.GetUtxosForAddressRequest\x1a!.spark.GetUtxosForAddressResponse\"\x00\x12d\n" +
-	"\x17get_utxos_for_addresses\x12\".spark.GetUtxosForAddressesRequest\x1a#.spark.GetUtxosForAddressesResponse\"\x00\x12]\n" +
+	"\x15get_utxos_for_address\x12 .spark.GetUtxosForAddressRequest\x1a!.spark.GetUtxosForAddressResponse\"\x00\x12a\n" +
+	"\x16get_utxos_for_identity\x12!.spark.GetUtxosForIdentityRequest\x1a\".spark.GetUtxosForIdentityResponse\"\x00\x12]\n" +
 	"\x14query_spark_invoices\x12 .spark.QuerySparkInvoicesRequest\x1a!.spark.QuerySparkInvoicesResponse\"\x00\x12y\n" +
 	"\x1einitiate_swap_primary_transfer\x12).spark.InitiateSwapPrimaryTransferRequest\x1a*.spark.InitiateSwapPrimaryTransferResponse\"\x00\x12`\n" +
 	"\x15update_wallet_setting\x12!.spark.UpdateWalletSettingRequest\x1a\".spark.UpdateWalletSettingResponse\"\x00\x12]\n" +
@@ -12434,8 +12434,8 @@ var file_spark_proto_goTypes = []any{
 	(*QueryNodesByValueResponse)(nil),                  // 152: spark.QueryNodesByValueResponse
 	(*GetUtxosForAddressRequest)(nil),                  // 153: spark.GetUtxosForAddressRequest
 	(*GetUtxosForAddressResponse)(nil),                 // 154: spark.GetUtxosForAddressResponse
-	(*GetUtxosForAddressesRequest)(nil),                // 155: spark.GetUtxosForAddressesRequest
-	(*GetUtxosForAddressesResponse)(nil),               // 156: spark.GetUtxosForAddressesResponse
+	(*GetUtxosForIdentityRequest)(nil),                 // 155: spark.GetUtxosForIdentityRequest
+	(*GetUtxosForIdentityResponse)(nil),                // 156: spark.GetUtxosForIdentityResponse
 	(*QuerySparkInvoicesRequest)(nil),                  // 157: spark.QuerySparkInvoicesRequest
 	(*QuerySparkInvoicesResponse)(nil),                 // 158: spark.QuerySparkInvoicesResponse
 	(*InvoiceResponse)(nil),                            // 159: spark.InvoiceResponse
@@ -12729,10 +12729,10 @@ var file_spark_proto_depIdxs = []int32{
 	187, // 253: spark.QueryNodesByValueResponse.nodes:type_name -> spark.QueryNodesByValueResponse.NodesEntry
 	0,   // 254: spark.GetUtxosForAddressRequest.network:type_name -> spark.Network
 	28,  // 255: spark.GetUtxosForAddressResponse.utxos:type_name -> spark.UTXO
-	0,   // 256: spark.GetUtxosForAddressesRequest.network:type_name -> spark.Network
-	18,  // 257: spark.GetUtxosForAddressesRequest.page:type_name -> spark.PageRequest
-	29,  // 258: spark.GetUtxosForAddressesResponse.utxos:type_name -> spark.AddressedUtxo
-	19,  // 259: spark.GetUtxosForAddressesResponse.page:type_name -> spark.PageResponse
+	0,   // 256: spark.GetUtxosForIdentityRequest.network:type_name -> spark.Network
+	18,  // 257: spark.GetUtxosForIdentityRequest.page:type_name -> spark.PageRequest
+	29,  // 258: spark.GetUtxosForIdentityResponse.utxos:type_name -> spark.AddressedUtxo
+	19,  // 259: spark.GetUtxosForIdentityResponse.page:type_name -> spark.PageResponse
 	159, // 260: spark.QuerySparkInvoicesResponse.invoice_statuses:type_name -> spark.InvoiceResponse
 	10,  // 261: spark.InvoiceResponse.status:type_name -> spark.InvoiceStatus
 	160, // 262: spark.InvoiceResponse.sats_transfer:type_name -> spark.SatsTransfer
@@ -12784,7 +12784,7 @@ var file_spark_proto_depIdxs = []int32{
 	63,  // 308: spark.SparkService.start_transfer_v3:input_type -> spark.StartTransferV3Request
 	78,  // 309: spark.SparkService.claim_transfer:input_type -> spark.ClaimTransferRequest
 	153, // 310: spark.SparkService.get_utxos_for_address:input_type -> spark.GetUtxosForAddressRequest
-	155, // 311: spark.SparkService.get_utxos_for_addresses:input_type -> spark.GetUtxosForAddressesRequest
+	155, // 311: spark.SparkService.get_utxos_for_identity:input_type -> spark.GetUtxosForIdentityRequest
 	157, // 312: spark.SparkService.query_spark_invoices:input_type -> spark.QuerySparkInvoicesRequest
 	162, // 313: spark.SparkService.initiate_swap_primary_transfer:input_type -> spark.InitiateSwapPrimaryTransferRequest
 	166, // 314: spark.SparkService.update_wallet_setting:input_type -> spark.UpdateWalletSettingRequest
@@ -12824,7 +12824,7 @@ var file_spark_proto_depIdxs = []int32{
 	61,  // 348: spark.SparkService.start_transfer_v3:output_type -> spark.StartTransferResponse
 	79,  // 349: spark.SparkService.claim_transfer:output_type -> spark.ClaimTransferResponse
 	154, // 350: spark.SparkService.get_utxos_for_address:output_type -> spark.GetUtxosForAddressResponse
-	156, // 351: spark.SparkService.get_utxos_for_addresses:output_type -> spark.GetUtxosForAddressesResponse
+	156, // 351: spark.SparkService.get_utxos_for_identity:output_type -> spark.GetUtxosForIdentityResponse
 	158, // 352: spark.SparkService.query_spark_invoices:output_type -> spark.QuerySparkInvoicesResponse
 	163, // 353: spark.SparkService.initiate_swap_primary_transfer:output_type -> spark.InitiateSwapPrimaryTransferResponse
 	167, // 354: spark.SparkService.update_wallet_setting:output_type -> spark.UpdateWalletSettingResponse

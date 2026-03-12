@@ -12,9 +12,9 @@ import (
 	"github.com/lightsparkdev/spark/so/errors"
 )
 
-const getUtxosForAddressesCursorVersion = 1
+const getUtxosForIdentityCursorVersion = 1
 
-type getUtxosForAddressesCursor struct {
+type getUtxosForIdentityCursor struct {
 	Version     int    `json:"v"`
 	BlockHeight int64  `json:"bh"`
 	Txid        string `json:"tx"`
@@ -22,7 +22,7 @@ type getUtxosForAddressesCursor struct {
 	ID          string `json:"id"`
 }
 
-func decodeGetUtxosForAddressesCursor(cursor string) (*getUtxosForAddressesCursor, []byte, uuid.UUID, error) {
+func decodeGetUtxosForIdentityCursor(cursor string) (*getUtxosForIdentityCursor, []byte, uuid.UUID, error) {
 	cursorBytes, err := base64.RawURLEncoding.DecodeString(cursor)
 	if err != nil {
 		cursorBytes, err = base64.URLEncoding.DecodeString(cursor)
@@ -31,14 +31,14 @@ func decodeGetUtxosForAddressesCursor(cursor string) (*getUtxosForAddressesCurso
 		}
 	}
 
-	var payload getUtxosForAddressesCursor
+	var payload getUtxosForIdentityCursor
 	if err := json.Unmarshal(cursorBytes, &payload); err != nil {
 		return nil, nil, uuid.Nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid cursor payload: %w", err))
 	}
 
-	if payload.Version != getUtxosForAddressesCursorVersion {
+	if payload.Version != getUtxosForIdentityCursorVersion {
 		return nil, nil, uuid.Nil, errors.InvalidArgumentMalformedField(
-			fmt.Errorf("unsupported cursor version: got %d, expected %d", payload.Version, getUtxosForAddressesCursorVersion),
+			fmt.Errorf("unsupported cursor version: got %d, expected %d", payload.Version, getUtxosForIdentityCursorVersion),
 		)
 	}
 
@@ -55,9 +55,9 @@ func decodeGetUtxosForAddressesCursor(cursor string) (*getUtxosForAddressesCurso
 	return &payload, txidBytes, utxoID, nil
 }
 
-func encodeGetUtxosForAddressesCursor(utxo *ent.Utxo) (string, error) {
-	cursorPayload := getUtxosForAddressesCursor{
-		Version:     getUtxosForAddressesCursorVersion,
+func encodeGetUtxosForIdentityCursor(utxo *ent.Utxo) (string, error) {
+	cursorPayload := getUtxosForIdentityCursor{
+		Version:     getUtxosForIdentityCursorVersion,
 		BlockHeight: utxo.BlockHeight,
 		Txid:        hex.EncodeToString(utxo.Txid),
 		Vout:        utxo.Vout,

@@ -46,9 +46,8 @@ import (
 )
 
 const DefaultDepositConfirmationThreshold = uint(3)
-const DefaultGetUtxosForAddressesPageSize = 50
-const MaxGetUtxosForAddressesPageSize = 100
-const MaxGetUtxosForAddressesCount = 100
+const DefaultGetUtxosForIdentityPageSize = 50
+const MaxGetUtxosForIdentityPageSize = 100
 
 // DefaultMaxUnusedDepositAddresses is the default maximum number of unused non-static deposit
 // addresses a user can have per network. This prevents DoS attacks where users repeatedly
@@ -1656,29 +1655,14 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 	return &pb.GetUtxosForAddressResponse{Utxos: utxosResult}, nil
 }
 
-func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUtxosForAddressesRequest) (*pb.GetUtxosForAddressesResponse, error) {
+func (o *DepositHandler) GetUtxosForIdentity(ctx context.Context, req *pb.GetUtxosForIdentityRequest) (*pb.GetUtxosForIdentityResponse, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	if len(req.GetAddresses()) == 0 {
-		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("addresses is required"))
-	}
-
-	uniqueAddresses := make([]string, 0, len(req.GetAddresses()))
-	seenAddresses := make(map[string]struct{}, len(req.GetAddresses()))
-	for _, address := range req.GetAddresses() {
-		if _, exists := seenAddresses[address]; exists {
-			continue
-		}
-		seenAddresses[address] = struct{}{}
-		uniqueAddresses = append(uniqueAddresses, address)
-	}
-	if len(uniqueAddresses) > MaxGetUtxosForAddressesCount {
-		return nil, errors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many addresses in request: got %d, max %d", len(uniqueAddresses), MaxGetUtxosForAddressesCount),
-		)
+	if len(req.GetIdentityPublicKey()) == 0 {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("identity_public_key is required"))
 	}
 
 	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
@@ -1686,12 +1670,22 @@ func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUt
 		return nil, fmt.Errorf("failed to get schema network: %w", err)
 	}
 
-	for _, address := range uniqueAddresses {
-		if !utils.IsBitcoinAddressForNetwork(address, network) {
-			return nil, errors.InvalidArgumentMalformedField(
-				fmt.Errorf("deposit address %s is not aligned with the requested network", address),
-			)
-		}
+	identityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, errors.InvalidArgumentMalformedField(
+			fmt.Errorf("invalid identity public key: %w", err),
+		)
+	}
+
+	hasReadAccess, err := NewWalletSettingHandler(o.config).HasReadAccessToWallet(ctx, identityPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if viewer has read access to wallet %s: %w", identityPubKey.String(), err)
+	}
+	if !hasReadAccess {
+		return &pb.GetUtxosForIdentityResponse{
+			Utxos: []*pb.AddressedUtxo{},
+			Page:  &pb.PageResponse{},
+		}, nil
 	}
 
 	currentBlockHeight, err := db.BlockHeight.Query().Where(blockheight.NetworkEQ(network)).Only(ctx)
@@ -1706,7 +1700,7 @@ func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUt
 	confirmedCutoffBlockHeight := currentBlockHeight.Height - int64(threshold) + 1
 	maxPendingBlockHeight := currentBlockHeight.Height
 
-	limit := DefaultGetUtxosForAddressesPageSize
+	limit := DefaultGetUtxosForIdentityPageSize
 	if page := req.GetPage(); page != nil {
 		if page.GetPageSize() > 0 {
 			limit = int(page.GetPageSize())
@@ -1719,9 +1713,9 @@ func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUt
 			)
 		}
 	}
-	if limit > MaxGetUtxosForAddressesPageSize {
+	if limit > MaxGetUtxosForIdentityPageSize {
 		return nil, errors.InvalidArgumentOutOfRange(
-			fmt.Errorf("requested page size exceeds max supported size: got %d, max %d", limit, MaxGetUtxosForAddressesPageSize),
+			fmt.Errorf("requested page size exceeds max supported size: got %d, max %d", limit, MaxGetUtxosForIdentityPageSize),
 		)
 	}
 
@@ -1733,7 +1727,7 @@ func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUt
 		cursorID        uuid.UUID
 	)
 	if page := req.GetPage(); page != nil && page.GetCursor() != "" {
-		cursorPayload, txidBytes, utxoID, err := decodeGetUtxosForAddressesCursor(page.GetCursor())
+		cursorPayload, txidBytes, utxoID, err := decodeGetUtxosForIdentityCursor(page.GetCursor())
 		if err != nil {
 			return nil, err
 		}
@@ -1748,7 +1742,7 @@ func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUt
 		Where(
 			entutxo.NetworkEQ(network),
 			entutxo.HasDepositAddressWith(
-				depositaddress.AddressIn(uniqueAddresses...),
+				depositaddress.OwnerIdentityPubkey(identityPubKey),
 				depositaddress.IsStatic(true),
 			),
 		).WithDepositAddress().
@@ -1832,20 +1826,20 @@ func (o *DepositHandler) GetUtxosForAddresses(ctx context.Context, req *pb.GetUt
 		HasPreviousPage: cursorProvided,
 	}
 	if len(utxos) > 0 {
-		previousCursor, err := encodeGetUtxosForAddressesCursor(utxos[0])
+		previousCursor, err := encodeGetUtxosForIdentityCursor(utxos[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode previous cursor: %w", err)
 		}
 		pageResponse.PreviousCursor = previousCursor
 
-		nextCursor, err := encodeGetUtxosForAddressesCursor(utxos[len(utxos)-1])
+		nextCursor, err := encodeGetUtxosForIdentityCursor(utxos[len(utxos)-1])
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode next cursor: %w", err)
 		}
 		pageResponse.NextCursor = nextCursor
 	}
 
-	return &pb.GetUtxosForAddressesResponse{
+	return &pb.GetUtxosForIdentityResponse{
 		Utxos: utxosResult,
 		Page:  pageResponse,
 	}, nil

@@ -2178,15 +2178,15 @@ export interface GetUtxosForAddressResponse {
   offset: number;
 }
 
-export interface GetUtxosForAddressesRequest {
-  addresses: string[];
+export interface GetUtxosForIdentityRequest {
+  identityPublicKey: Uint8Array;
   network: Network;
   excludeClaimed: boolean;
   page: PageRequest | undefined;
   includePending: boolean;
 }
 
-export interface GetUtxosForAddressesResponse {
+export interface GetUtxosForIdentityResponse {
   utxos: AddressedUtxo[];
   page: PageResponse | undefined;
 }
@@ -19524,14 +19524,20 @@ export const GetUtxosForAddressResponse: MessageFns<GetUtxosForAddressResponse> 
   },
 };
 
-function createBaseGetUtxosForAddressesRequest(): GetUtxosForAddressesRequest {
-  return { addresses: [], network: 0, excludeClaimed: false, page: undefined, includePending: false };
+function createBaseGetUtxosForIdentityRequest(): GetUtxosForIdentityRequest {
+  return {
+    identityPublicKey: new Uint8Array(0),
+    network: 0,
+    excludeClaimed: false,
+    page: undefined,
+    includePending: false,
+  };
 }
 
-export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest> = {
-  encode(message: GetUtxosForAddressesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.addresses) {
-      writer.uint32(10).string(v!);
+export const GetUtxosForIdentityRequest: MessageFns<GetUtxosForIdentityRequest> = {
+  encode(message: GetUtxosForIdentityRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.identityPublicKey);
     }
     if (message.network !== 0) {
       writer.uint32(16).int32(message.network);
@@ -19548,10 +19554,10 @@ export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): GetUtxosForAddressesRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): GetUtxosForIdentityRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseGetUtxosForAddressesRequest();
+    const message = createBaseGetUtxosForIdentityRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -19560,7 +19566,7 @@ export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest
             break;
           }
 
-          message.addresses.push(reader.string());
+          message.identityPublicKey = reader.bytes();
           continue;
         }
         case 2: {
@@ -19604,11 +19610,11 @@ export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest
     return message;
   },
 
-  fromJSON(object: any): GetUtxosForAddressesRequest {
+  fromJSON(object: any): GetUtxosForIdentityRequest {
     return {
-      addresses: globalThis.Array.isArray(object?.addresses)
-        ? object.addresses.map((e: any) => globalThis.String(e))
-        : [],
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
       excludeClaimed: isSet(object.excludeClaimed) ? globalThis.Boolean(object.excludeClaimed) : false,
       page: isSet(object.page) ? PageRequest.fromJSON(object.page) : undefined,
@@ -19616,10 +19622,10 @@ export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest
     };
   },
 
-  toJSON(message: GetUtxosForAddressesRequest): unknown {
+  toJSON(message: GetUtxosForIdentityRequest): unknown {
     const obj: any = {};
-    if (message.addresses?.length) {
-      obj.addresses = message.addresses;
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
     }
     if (message.network !== 0) {
       obj.network = networkToJSON(message.network);
@@ -19636,12 +19642,12 @@ export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest
     return obj;
   },
 
-  create(base?: DeepPartial<GetUtxosForAddressesRequest>): GetUtxosForAddressesRequest {
-    return GetUtxosForAddressesRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<GetUtxosForIdentityRequest>): GetUtxosForIdentityRequest {
+    return GetUtxosForIdentityRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<GetUtxosForAddressesRequest>): GetUtxosForAddressesRequest {
-    const message = createBaseGetUtxosForAddressesRequest();
-    message.addresses = object.addresses?.map((e) => e) || [];
+  fromPartial(object: DeepPartial<GetUtxosForIdentityRequest>): GetUtxosForIdentityRequest {
+    const message = createBaseGetUtxosForIdentityRequest();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     message.network = object.network ?? 0;
     message.excludeClaimed = object.excludeClaimed ?? false;
     message.page = (object.page !== undefined && object.page !== null)
@@ -19652,12 +19658,12 @@ export const GetUtxosForAddressesRequest: MessageFns<GetUtxosForAddressesRequest
   },
 };
 
-function createBaseGetUtxosForAddressesResponse(): GetUtxosForAddressesResponse {
+function createBaseGetUtxosForIdentityResponse(): GetUtxosForIdentityResponse {
   return { utxos: [], page: undefined };
 }
 
-export const GetUtxosForAddressesResponse: MessageFns<GetUtxosForAddressesResponse> = {
-  encode(message: GetUtxosForAddressesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const GetUtxosForIdentityResponse: MessageFns<GetUtxosForIdentityResponse> = {
+  encode(message: GetUtxosForIdentityResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.utxos) {
       AddressedUtxo.encode(v!, writer.uint32(10).fork()).join();
     }
@@ -19667,10 +19673,10 @@ export const GetUtxosForAddressesResponse: MessageFns<GetUtxosForAddressesRespon
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): GetUtxosForAddressesResponse {
+  decode(input: BinaryReader | Uint8Array, length?: number): GetUtxosForIdentityResponse {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseGetUtxosForAddressesResponse();
+    const message = createBaseGetUtxosForIdentityResponse();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -19699,14 +19705,14 @@ export const GetUtxosForAddressesResponse: MessageFns<GetUtxosForAddressesRespon
     return message;
   },
 
-  fromJSON(object: any): GetUtxosForAddressesResponse {
+  fromJSON(object: any): GetUtxosForIdentityResponse {
     return {
       utxos: globalThis.Array.isArray(object?.utxos) ? object.utxos.map((e: any) => AddressedUtxo.fromJSON(e)) : [],
       page: isSet(object.page) ? PageResponse.fromJSON(object.page) : undefined,
     };
   },
 
-  toJSON(message: GetUtxosForAddressesResponse): unknown {
+  toJSON(message: GetUtxosForIdentityResponse): unknown {
     const obj: any = {};
     if (message.utxos?.length) {
       obj.utxos = message.utxos.map((e) => AddressedUtxo.toJSON(e));
@@ -19717,11 +19723,11 @@ export const GetUtxosForAddressesResponse: MessageFns<GetUtxosForAddressesRespon
     return obj;
   },
 
-  create(base?: DeepPartial<GetUtxosForAddressesResponse>): GetUtxosForAddressesResponse {
-    return GetUtxosForAddressesResponse.fromPartial(base ?? {});
+  create(base?: DeepPartial<GetUtxosForIdentityResponse>): GetUtxosForIdentityResponse {
+    return GetUtxosForIdentityResponse.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<GetUtxosForAddressesResponse>): GetUtxosForAddressesResponse {
-    const message = createBaseGetUtxosForAddressesResponse();
+  fromPartial(object: DeepPartial<GetUtxosForIdentityResponse>): GetUtxosForIdentityResponse {
+    const message = createBaseGetUtxosForIdentityResponse();
     message.utxos = object.utxos?.map((e) => AddressedUtxo.fromPartial(e)) || [];
     message.page = (object.page !== undefined && object.page !== null)
       ? PageResponse.fromPartial(object.page)
@@ -21116,11 +21122,11 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    get_utxos_for_addresses: {
-      name: "get_utxos_for_addresses",
-      requestType: GetUtxosForAddressesRequest,
+    get_utxos_for_identity: {
+      name: "get_utxos_for_identity",
+      requestType: GetUtxosForIdentityRequest,
       requestStream: false,
-      responseType: GetUtxosForAddressesResponse,
+      responseType: GetUtxosForIdentityResponse,
       responseStream: false,
       options: {},
     },
@@ -21324,10 +21330,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: GetUtxosForAddressRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<GetUtxosForAddressResponse>>;
-  get_utxos_for_addresses(
-    request: GetUtxosForAddressesRequest,
+  get_utxos_for_identity(
+    request: GetUtxosForIdentityRequest,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<GetUtxosForAddressesResponse>>;
+  ): Promise<DeepPartial<GetUtxosForIdentityResponse>>;
   query_spark_invoices(
     request: QuerySparkInvoicesRequest,
     context: CallContext & CallContextExt,
@@ -21517,10 +21523,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<GetUtxosForAddressRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<GetUtxosForAddressResponse>;
-  get_utxos_for_addresses(
-    request: DeepPartial<GetUtxosForAddressesRequest>,
+  get_utxos_for_identity(
+    request: DeepPartial<GetUtxosForIdentityRequest>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<GetUtxosForAddressesResponse>;
+  ): Promise<GetUtxosForIdentityResponse>;
   query_spark_invoices(
     request: DeepPartial<QuerySparkInvoicesRequest>,
     options?: CallOptions & CallOptionsExt,

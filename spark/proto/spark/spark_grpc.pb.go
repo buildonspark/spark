@@ -55,7 +55,7 @@ const (
 	SparkService_StartTransferV3_FullMethodName                     = "/spark.SparkService/start_transfer_v3"
 	SparkService_ClaimTransfer_FullMethodName                       = "/spark.SparkService/claim_transfer"
 	SparkService_GetUtxosForAddress_FullMethodName                  = "/spark.SparkService/get_utxos_for_address"
-	SparkService_GetUtxosForAddresses_FullMethodName                = "/spark.SparkService/get_utxos_for_addresses"
+	SparkService_GetUtxosForIdentity_FullMethodName                 = "/spark.SparkService/get_utxos_for_identity"
 	SparkService_QuerySparkInvoices_FullMethodName                  = "/spark.SparkService/query_spark_invoices"
 	SparkService_InitiateSwapPrimaryTransfer_FullMethodName         = "/spark.SparkService/initiate_swap_primary_transfer"
 	SparkService_UpdateWalletSetting_FullMethodName                 = "/spark.SparkService/update_wallet_setting"
@@ -118,7 +118,7 @@ type SparkServiceClient interface {
 	StartTransferV3(ctx context.Context, in *StartTransferV3Request, opts ...grpc.CallOption) (*StartTransferResponse, error)
 	ClaimTransfer(ctx context.Context, in *ClaimTransferRequest, opts ...grpc.CallOption) (*ClaimTransferResponse, error)
 	GetUtxosForAddress(ctx context.Context, in *GetUtxosForAddressRequest, opts ...grpc.CallOption) (*GetUtxosForAddressResponse, error)
-	GetUtxosForAddresses(ctx context.Context, in *GetUtxosForAddressesRequest, opts ...grpc.CallOption) (*GetUtxosForAddressesResponse, error)
+	GetUtxosForIdentity(ctx context.Context, in *GetUtxosForIdentityRequest, opts ...grpc.CallOption) (*GetUtxosForIdentityResponse, error)
 	QuerySparkInvoices(ctx context.Context, in *QuerySparkInvoicesRequest, opts ...grpc.CallOption) (*QuerySparkInvoicesResponse, error)
 	// Inititiates a primary transfer in a Swap V3 protocol. The sender submits the
 	// transfer package, but the SOs will not tweak the keys at this stage of the flow.
@@ -495,10 +495,10 @@ func (c *sparkServiceClient) GetUtxosForAddress(ctx context.Context, in *GetUtxo
 	return out, nil
 }
 
-func (c *sparkServiceClient) GetUtxosForAddresses(ctx context.Context, in *GetUtxosForAddressesRequest, opts ...grpc.CallOption) (*GetUtxosForAddressesResponse, error) {
+func (c *sparkServiceClient) GetUtxosForIdentity(ctx context.Context, in *GetUtxosForIdentityRequest, opts ...grpc.CallOption) (*GetUtxosForIdentityResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetUtxosForAddressesResponse)
-	err := c.cc.Invoke(ctx, SparkService_GetUtxosForAddresses_FullMethodName, in, out, cOpts...)
+	out := new(GetUtxosForIdentityResponse)
+	err := c.cc.Invoke(ctx, SparkService_GetUtxosForIdentity_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -601,7 +601,7 @@ type SparkServiceServer interface {
 	StartTransferV3(context.Context, *StartTransferV3Request) (*StartTransferResponse, error)
 	ClaimTransfer(context.Context, *ClaimTransferRequest) (*ClaimTransferResponse, error)
 	GetUtxosForAddress(context.Context, *GetUtxosForAddressRequest) (*GetUtxosForAddressResponse, error)
-	GetUtxosForAddresses(context.Context, *GetUtxosForAddressesRequest) (*GetUtxosForAddressesResponse, error)
+	GetUtxosForIdentity(context.Context, *GetUtxosForIdentityRequest) (*GetUtxosForIdentityResponse, error)
 	QuerySparkInvoices(context.Context, *QuerySparkInvoicesRequest) (*QuerySparkInvoicesResponse, error)
 	// Inititiates a primary transfer in a Swap V3 protocol. The sender submits the
 	// transfer package, but the SOs will not tweak the keys at this stage of the flow.
@@ -724,8 +724,8 @@ func (UnimplementedSparkServiceServer) ClaimTransfer(context.Context, *ClaimTran
 func (UnimplementedSparkServiceServer) GetUtxosForAddress(context.Context, *GetUtxosForAddressRequest) (*GetUtxosForAddressResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUtxosForAddress not implemented")
 }
-func (UnimplementedSparkServiceServer) GetUtxosForAddresses(context.Context, *GetUtxosForAddressesRequest) (*GetUtxosForAddressesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetUtxosForAddresses not implemented")
+func (UnimplementedSparkServiceServer) GetUtxosForIdentity(context.Context, *GetUtxosForIdentityRequest) (*GetUtxosForIdentityResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUtxosForIdentity not implemented")
 }
 func (UnimplementedSparkServiceServer) QuerySparkInvoices(context.Context, *QuerySparkInvoicesRequest) (*QuerySparkInvoicesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QuerySparkInvoices not implemented")
@@ -1383,20 +1383,20 @@ func _SparkService_GetUtxosForAddress_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_GetUtxosForAddresses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetUtxosForAddressesRequest)
+func _SparkService_GetUtxosForIdentity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUtxosForIdentityRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkServiceServer).GetUtxosForAddresses(ctx, in)
+		return srv.(SparkServiceServer).GetUtxosForIdentity(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkService_GetUtxosForAddresses_FullMethodName,
+		FullMethod: SparkService_GetUtxosForIdentity_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).GetUtxosForAddresses(ctx, req.(*GetUtxosForAddressesRequest))
+		return srv.(SparkServiceServer).GetUtxosForIdentity(ctx, req.(*GetUtxosForIdentityRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1617,8 +1617,8 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_GetUtxosForAddress_Handler,
 		},
 		{
-			MethodName: "get_utxos_for_addresses",
-			Handler:    _SparkService_GetUtxosForAddresses_Handler,
+			MethodName: "get_utxos_for_identity",
+			Handler:    _SparkService_GetUtxosForIdentity_Handler,
 		},
 		{
 			MethodName: "query_spark_invoices",

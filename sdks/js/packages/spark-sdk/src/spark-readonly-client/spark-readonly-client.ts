@@ -36,6 +36,7 @@ import {
   ConnectionManager,
   WalletConfigService,
 } from "../services/index.js";
+import { parseCompressedPublicKeyHex } from "../utils/keys.js";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ import type {
   QueryTransfersParams,
   QueryDepositAddressesParams,
   GetUtxosParams,
-  GetUtxosForAddressesParams,
+  GetUtxosForIdentityParams,
   QuerySparkInvoicesParams,
   QueryTokenTransactionsParams,
 } from "./types.js";
@@ -62,7 +63,7 @@ export type {
   QueryTransfersParams,
   QueryDepositAddressesParams,
   GetUtxosParams,
-  GetUtxosForAddressesParams,
+  GetUtxosForIdentityParams,
   QuerySparkInvoicesParams,
   QueryTokenTransactionsParams,
 } from "./types.js";
@@ -507,10 +508,8 @@ export abstract class SparkReadonlyClient {
     }
   }
 
-  /** Queries paginated static deposit UTXOs for a batch of deposit addresses. */
-  public async getUtxosForDepositAddresses(
-    params: GetUtxosForAddressesParams,
-  ): Promise<{
+  /** Queries paginated static deposit UTXOs for an identity. */
+  public async getUtxosForIdentity(params: GetUtxosForIdentityParams): Promise<{
     utxos: {
       address: string;
       txid: string;
@@ -525,30 +524,38 @@ export abstract class SparkReadonlyClient {
     };
   }> {
     const {
-      depositAddresses,
+      identityPublicKey,
       pageSize = 50,
       cursor = "",
       direction = "NEXT",
       excludeClaimed = false,
       includePending = false,
     } = params;
-    this.assertNonEmptyArray(depositAddresses, "depositAddresses");
+    if (!identityPublicKey) {
+      throw new SparkValidationError("Identity public key cannot be empty", {
+        field: "identityPublicKey",
+      });
+    }
     this.assertPositiveInteger(pageSize, "pageSize");
     if (direction === "PREVIOUS") {
       throw new SparkValidationError(
-        "Backward pagination is not currently supported for getUtxosForDepositAddresses",
+        "Backward pagination is not currently supported for getUtxosForIdentity",
         { field: "direction" },
       );
     }
+    const identityPublicKeyBytes = parseCompressedPublicKeyHex(
+      identityPublicKey,
+      "identityPublicKey",
+    );
 
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
 
-    let result: Awaited<ReturnType<typeof sparkClient.get_utxos_for_addresses>>;
+    let result: Awaited<ReturnType<typeof sparkClient.get_utxos_for_identity>>;
     try {
-      result = await sparkClient.get_utxos_for_addresses({
-        addresses: depositAddresses,
+      result = await sparkClient.get_utxos_for_identity({
+        identityPublicKey: identityPublicKeyBytes,
         network: this.config.getNetworkProto(),
         excludeClaimed,
         includePending,
@@ -559,8 +566,8 @@ export abstract class SparkReadonlyClient {
         },
       });
     } catch (error) {
-      throw new SparkRequestError("Failed to get UTXOs for deposit addresses", {
-        operation: "get_utxos_for_addresses",
+      throw new SparkRequestError("Failed to get UTXOs for identity", {
+        operation: "get_utxos_for_identity",
         error,
       });
     }
@@ -569,7 +576,7 @@ export abstract class SparkReadonlyClient {
       utxos: result.utxos.map((addressedUtxo) => {
         if (!addressedUtxo.utxo) {
           throw new SparkRequestError("Malformed UTXO response payload", {
-            operation: "get_utxos_for_addresses",
+            operation: "get_utxos_for_identity",
             addressedUtxo,
           });
         }

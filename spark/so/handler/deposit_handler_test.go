@@ -14,9 +14,11 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
@@ -1433,14 +1435,18 @@ func TestGetUtxosFromAddress(t *testing.T) {
 	})
 }
 
-func TestGetUtxosForAddresses(t *testing.T) {
+func TestGetUtxosForIdentity(t *testing.T) {
 	type testEnv struct {
 		ctx                    context.Context
 		handler                *DepositHandler
+		ownerIdentityPubKey    keys.Public
+		otherIdentityPubKey    keys.Public
+		masterIdentityPubKey   keys.Public
 		staticAddress1         string
 		staticAddress2         string
 		staticAddress3         string
 		nonStaticAddress       string
+		otherIdentityAddress   string
 		confirmedUtxo          *ent.Utxo
 		claimedConfirmedUtxo   *ent.Utxo
 		cancelledSwapUtxo      *ent.Utxo
@@ -1448,6 +1454,7 @@ func TestGetUtxosForAddresses(t *testing.T) {
 		pendingClaimedUtxo     *ent.Utxo
 		thresholdConfirmedUtxo *ent.Utxo
 		oneConfUtxo            *ent.Utxo
+		otherIdentityUtxo      *ent.Utxo
 	}
 
 	newTestEnv := func(t *testing.T) *testEnv {
@@ -1458,6 +1465,9 @@ func TestGetUtxosForAddresses(t *testing.T) {
 		require.NoError(t, err)
 
 		rng := rand.NewChaCha8([32]byte{9})
+		ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		otherIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		masterIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 		_, err = tx.BlockHeight.Create().
 			SetNetwork(btcnetwork.Regtest).
@@ -1476,15 +1486,15 @@ func TestGetUtxosForAddresses(t *testing.T) {
 			Save(ctx)
 		require.NoError(t, err)
 
-		newAddress := func(address string, isStatic bool) *ent.DepositAddress {
-			identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		newAddress := func(address string, ownerIdentityPubKey keys.Public, isStatic bool, isDefault bool) *ent.DepositAddress {
 			signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 			depositAddress, createErr := tx.DepositAddress.Create().
 				SetAddress(address).
-				SetOwnerIdentityPubkey(identityPubKey).
+				SetOwnerIdentityPubkey(ownerIdentityPubKey).
 				SetOwnerSigningPubkey(signingPubKey).
 				SetSigningKeyshare(signingKeyshare).
 				SetIsStatic(isStatic).
+				SetIsDefault(isDefault).
 				SetNetwork(btcnetwork.Regtest).
 				Save(ctx)
 			require.NoError(t, createErr)
@@ -1495,11 +1505,13 @@ func TestGetUtxosForAddresses(t *testing.T) {
 		staticAddress2 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abd"
 		staticAddress3 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abf"
 		nonStaticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abe"
+		otherIdentityAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdq9z6abg"
 
-		depositAddress1 := newAddress(staticAddress1, true)
-		depositAddress2 := newAddress(staticAddress2, true)
-		_ = newAddress(staticAddress3, true)
-		nonStaticDepositAddress := newAddress(nonStaticAddress, false)
+		depositAddress1 := newAddress(staticAddress1, ownerIdentityPubKey, true, true)
+		depositAddress2 := newAddress(staticAddress2, ownerIdentityPubKey, true, false)
+		depositAddress3 := newAddress(staticAddress3, ownerIdentityPubKey, true, false)
+		nonStaticDepositAddress := newAddress(nonStaticAddress, ownerIdentityPubKey, false, false)
+		otherIdentityDepositAddress := newAddress(otherIdentityAddress, otherIdentityPubKey, true, true)
 
 		createUtxo := func(addr *ent.DepositAddress, txid string, vout uint32, blockHeight int64) *ent.Utxo {
 			utxo, createErr := tx.Utxo.Create().
@@ -1531,9 +1543,10 @@ func TestGetUtxosForAddresses(t *testing.T) {
 		cancelledSwapUtxo := createUtxo(depositAddress2, "cancelled_swap_txid", 2, 102)
 		pendingUtxo := createUtxo(depositAddress2, "pending_txid", 3, 199)
 		pendingClaimedUtxo := createUtxo(depositAddress1, "pending_claimed_txid", 4, 200)
-		thresholdConfirmedUtxo := createUtxo(depositAddress2, "threshold_confirmed_txid", 5, 198)
+		thresholdConfirmedUtxo := createUtxo(depositAddress3, "threshold_confirmed_txid", 5, 198)
 		oneConfUtxo := createUtxo(depositAddress2, "one_conf_txid", 6, 200)
 		_ = createUtxo(nonStaticDepositAddress, "non_static_txid", 7, 103)
+		otherIdentityUtxo := createUtxo(otherIdentityDepositAddress, "other_identity_txid", 8, 150)
 
 		createSwap(claimedConfirmedUtxo, st.UtxoSwapStatusCreated)
 		createSwap(cancelledSwapUtxo, st.UtxoSwapStatusCancelled)
@@ -1551,10 +1564,14 @@ func TestGetUtxosForAddresses(t *testing.T) {
 		return &testEnv{
 			ctx:                    ctx,
 			handler:                handler,
+			ownerIdentityPubKey:    ownerIdentityPubKey,
+			otherIdentityPubKey:    otherIdentityPubKey,
+			masterIdentityPubKey:   masterIdentityPubKey,
 			staticAddress1:         staticAddress1,
 			staticAddress2:         staticAddress2,
 			staticAddress3:         staticAddress3,
 			nonStaticAddress:       nonStaticAddress,
+			otherIdentityAddress:   otherIdentityAddress,
 			confirmedUtxo:          confirmedUtxo,
 			claimedConfirmedUtxo:   claimedConfirmedUtxo,
 			cancelledSwapUtxo:      cancelledSwapUtxo,
@@ -1562,27 +1579,48 @@ func TestGetUtxosForAddresses(t *testing.T) {
 			pendingClaimedUtxo:     pendingClaimedUtxo,
 			thresholdConfirmedUtxo: thresholdConfirmedUtxo,
 			oneConfUtxo:            oneConfUtxo,
+			otherIdentityUtxo:      otherIdentityUtxo,
 		}
 	}
 
-	t.Run("default behavior returns only confirmed static utxos", func(t *testing.T) {
+	enablePrivacy := func(t *testing.T, env *testEnv, includeMaster bool) context.Context {
+		t.Helper()
+
+		tx, err := ent.GetDbFromContext(env.ctx)
+		require.NoError(t, err)
+
+		create := tx.WalletSetting.Create().
+			SetOwnerIdentityPublicKey(env.ownerIdentityPubKey).
+			SetPrivateEnabled(true)
+		if includeMaster {
+			create = create.SetMasterIdentityPublicKey(env.masterIdentityPubKey)
+		}
+		_, err = create.Save(env.ctx)
+		require.NoError(t, err)
+
+		return knobs.InjectKnobsService(env.ctx, knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobPrivacyEnabled: 100,
+		}))
+	}
+
+	t.Run("default behavior returns only confirmed static utxos for the identity", func(t *testing.T) {
 		env := newTestEnv(t)
-		req := &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{env.staticAddress1, env.staticAddress2, env.nonStaticAddress, env.staticAddress1},
-			Network:   pb.Network_REGTEST,
+		req := &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
 			Page: &pb.PageRequest{
 				PageSize: 2,
 			},
 		}
 
-		page1, err := env.handler.GetUtxosForAddresses(env.ctx, req)
+		page1, err := env.handler.GetUtxosForIdentity(env.ctx, req)
 		require.NoError(t, err)
 		require.Len(t, page1.Utxos, 2)
 		require.True(t, page1.Page.HasNextPage)
 		require.False(t, page1.Page.HasPreviousPage)
 
 		req.Page.Cursor = page1.Page.NextCursor
-		page2, err := env.handler.GetUtxosForAddresses(env.ctx, req)
+		page2, err := env.handler.GetUtxosForIdentity(env.ctx, req)
 		require.NoError(t, err)
 		require.Len(t, page2.Utxos, 2)
 		require.False(t, page2.Page.HasNextPage)
@@ -1607,17 +1645,19 @@ func TestGetUtxosForAddresses(t *testing.T) {
 			string(env.confirmedUtxo.Txid),
 		}, gotTxids)
 		require.NotContains(t, gotAddresses, env.nonStaticAddress)
+		require.NotContains(t, gotAddresses, env.otherIdentityAddress)
 		require.NotContains(t, gotTxids, string(env.pendingUtxo.Txid))
 		require.NotContains(t, gotTxids, string(env.pendingClaimedUtxo.Txid))
 		require.NotContains(t, gotTxids, string(env.oneConfUtxo.Txid))
+		require.NotContains(t, gotTxids, string(env.otherIdentityUtxo.Txid))
 	})
 
 	t.Run("include_pending returns mixed utxos and marks confirmed status", func(t *testing.T) {
 		env := newTestEnv(t)
-		response, err := env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses:      []string{env.staticAddress1, env.staticAddress2},
-			Network:        pb.Network_REGTEST,
-			IncludePending: true,
+		response, err := env.handler.GetUtxosForIdentity(env.ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
+			IncludePending:    true,
 			Page: &pb.PageRequest{
 				PageSize: 10,
 			},
@@ -1652,10 +1692,10 @@ func TestGetUtxosForAddresses(t *testing.T) {
 
 	t.Run("include_pending paginates deterministically across mixed results", func(t *testing.T) {
 		env := newTestEnv(t)
-		req := &pb.GetUtxosForAddressesRequest{
-			Addresses:      []string{env.staticAddress1, env.staticAddress2},
-			Network:        pb.Network_REGTEST,
-			IncludePending: true,
+		req := &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
+			IncludePending:    true,
 			Page: &pb.PageRequest{
 				PageSize: 2,
 			},
@@ -1666,7 +1706,7 @@ func TestGetUtxosForAddresses(t *testing.T) {
 		pageNumber := 0
 		for {
 			pageNumber++
-			response, err := env.handler.GetUtxosForAddresses(env.ctx, req)
+			response, err := env.handler.GetUtxosForIdentity(env.ctx, req)
 			require.NoError(t, err)
 			require.NotNil(t, response.Page)
 			if pageNumber == 1 {
@@ -1702,11 +1742,11 @@ func TestGetUtxosForAddresses(t *testing.T) {
 
 	t.Run("exclude_claimed applies to both pending and confirmed utxos", func(t *testing.T) {
 		env := newTestEnv(t)
-		response, err := env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses:      []string{env.staticAddress1, env.staticAddress2},
-			Network:        pb.Network_REGTEST,
-			ExcludeClaimed: true,
-			IncludePending: true,
+		response, err := env.handler.GetUtxosForIdentity(env.ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
+			ExcludeClaimed:    true,
+			IncludePending:    true,
 			Page: &pb.PageRequest{
 				PageSize: 10,
 			},
@@ -1735,69 +1775,145 @@ func TestGetUtxosForAddresses(t *testing.T) {
 		})
 	})
 
+	t.Run("privacy enabled returns empty results without access", func(t *testing.T) {
+		env := newTestEnv(t)
+		ctx := enablePrivacy(t, env, false)
+
+		response, err := env.handler.GetUtxosForIdentity(ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
+			Page: &pb.PageRequest{
+				PageSize: 10,
+			},
+		})
+		require.NoError(t, err)
+		require.Empty(t, response.Utxos)
+		require.NotNil(t, response.Page)
+		require.False(t, response.Page.HasNextPage)
+		require.False(t, response.Page.HasPreviousPage)
+	})
+
+	t.Run("privacy disabled allows authenticated access", func(t *testing.T) {
+		env := newTestEnv(t)
+		ctx := authn.InjectSessionForTests(env.ctx, hex.EncodeToString(env.otherIdentityPubKey.Serialize()), 9999999999)
+
+		response, err := env.handler.GetUtxosForIdentity(ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
+			Page: &pb.PageRequest{
+				PageSize: 10,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, response.Utxos, 4)
+		require.Equal(t, []string{
+			string(env.thresholdConfirmedUtxo.Txid),
+			string(env.cancelledSwapUtxo.Txid),
+			string(env.claimedConfirmedUtxo.Txid),
+			string(env.confirmedUtxo.Txid),
+		}, []string{
+			string(response.Utxos[0].Utxo.Txid),
+			string(response.Utxos[1].Utxo.Txid),
+			string(response.Utxos[2].Utxo.Txid),
+			string(response.Utxos[3].Utxo.Txid),
+		})
+	})
+
+	t.Run("privacy enabled allows the owner", func(t *testing.T) {
+		env := newTestEnv(t)
+		ctx := enablePrivacy(t, env, false)
+		ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(env.ownerIdentityPubKey.Serialize()), 9999999999)
+
+		response, err := env.handler.GetUtxosForIdentity(ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
+			Page: &pb.PageRequest{
+				PageSize: 10,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, response.Utxos, 4)
+	})
+
+	t.Run("privacy enabled allows the wallet master", func(t *testing.T) {
+		env := newTestEnv(t)
+		ctx := enablePrivacy(t, env, true)
+		ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(env.masterIdentityPubKey.Serialize()), 9999999999)
+
+		response, err := env.handler.GetUtxosForIdentity(ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
+			Page: &pb.PageRequest{
+				PageSize: 10,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, response.Utxos, 4)
+	})
+
+	t.Run("privacy enabled returns empty results for a different identity", func(t *testing.T) {
+		env := newTestEnv(t)
+		ctx := enablePrivacy(t, env, true)
+		ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(env.otherIdentityPubKey.Serialize()), 9999999999)
+
+		response, err := env.handler.GetUtxosForIdentity(ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
+			Page: &pb.PageRequest{
+				PageSize: 10,
+			},
+		})
+		require.NoError(t, err)
+		require.Empty(t, response.Utxos)
+	})
+
 	t.Run("invalid requests are rejected", func(t *testing.T) {
 		env := newTestEnv(t)
 
-		_, err := env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: nil,
-			Network:   pb.Network_REGTEST,
+		_, err := env.handler.GetUtxosForIdentity(env.ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: nil,
+			Network:           pb.Network_REGTEST,
 		})
-		require.ErrorContains(t, err, "addresses is required")
+		require.ErrorContains(t, err, "identity_public_key is required")
 
-		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{env.staticAddress1},
-			Network:   pb.Network_REGTEST,
+		_, err = env.handler.GetUtxosForIdentity(env.ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
 			Page: &pb.PageRequest{
 				Direction: pb.Direction_PREVIOUS,
 			},
 		})
 		require.ErrorContains(t, err, "backward pagination")
 
-		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{env.staticAddress1},
-			Network:   pb.Network_REGTEST,
+		_, err = env.handler.GetUtxosForIdentity(env.ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
 			Page: &pb.PageRequest{
 				Cursor: "not-a-cursor",
 			},
 		})
 		require.ErrorContains(t, err, "invalid cursor")
 
-		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{"zz-invalid-address"},
-			Network:   pb.Network_REGTEST,
+		_, err = env.handler.GetUtxosForIdentity(env.ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: []byte("not-a-pubkey"),
+			Network:           pb.Network_REGTEST,
 		})
-		require.ErrorContains(t, err, "not aligned with the requested network")
+		require.ErrorContains(t, err, "invalid identity public key")
 
-		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{"bc1qmainnetaddress"},
-			Network:   pb.Network_REGTEST,
-		})
-		require.ErrorContains(t, err, "not aligned with the requested network")
-
-		tooManyAddresses := make([]string, MaxGetUtxosForAddressesCount+1)
-		for i := range tooManyAddresses {
-			tooManyAddresses[i] = fmt.Sprintf("address_%d", i)
-		}
-		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: tooManyAddresses,
-			Network:   pb.Network_REGTEST,
-		})
-		require.ErrorContains(t, err, "too many addresses")
-
-		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{env.staticAddress1},
-			Network:   pb.Network_REGTEST,
+		_, err = env.handler.GetUtxosForIdentity(env.ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
 			Page: &pb.PageRequest{
-				PageSize: MaxGetUtxosForAddressesPageSize + 1,
+				PageSize: MaxGetUtxosForIdentityPageSize + 1,
 			},
 		})
 		require.ErrorContains(t, err, "requested page size exceeds max supported size")
 
-		_, err = env.handler.GetUtxosForAddresses(env.ctx, &pb.GetUtxosForAddressesRequest{
-			Addresses: []string{env.staticAddress1},
-			Network:   pb.Network_REGTEST,
+		_, err = env.handler.GetUtxosForIdentity(env.ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
 			Page: &pb.PageRequest{
-				UnsafePageSize: int32(MaxGetUtxosForAddressesPageSize + 1),
+				UnsafePageSize: int32(MaxGetUtxosForIdentityPageSize + 1),
 			},
 		})
 		require.ErrorContains(t, err, "requested page size exceeds max supported size")

@@ -43,7 +43,7 @@ func baseUnauthenticatedMethods() map[string]struct{} {
 		"/spark.SparkService/get_signing_operator_list":           {},
 		"/spark.SparkService/query_spark_invoices":                {},
 		"/spark.SparkService/get_utxos_for_address":               {},
-		"/spark.SparkService/get_utxos_for_addresses":             {},
+		"/spark.SparkService/get_utxos_for_identity":              {},
 		"/spark_token.SparkTokenService/query_token_metadata":     {},
 		"/spark_token.SparkTokenService/query_token_outputs":      {},
 		"/spark_token.SparkTokenService/query_token_transactions": {},

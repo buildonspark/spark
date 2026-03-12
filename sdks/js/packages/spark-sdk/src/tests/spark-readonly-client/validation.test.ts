@@ -19,6 +19,7 @@ import { bytesToHex } from "@noble/curves/utils";
 const dummyPubkey = bytesToHex(
   secp256k1.getPublicKey(secp256k1.utils.randomPrivateKey(), true),
 );
+const TEST_IDENTITY_PUBKEY = dummyPubkey;
 const VALID_SPARK_ADDRESS = sparkAddressFromPubkey(dummyPubkey);
 
 describe("SparkReadonlyClient input validation", () => {
@@ -119,19 +120,41 @@ describe("SparkReadonlyClient input validation", () => {
     });
   });
 
-  describe("getUtxosForDepositAddresses", () => {
-    it("rejects empty depositAddresses array", async () => {
+  describe("getUtxosForIdentity", () => {
+    it("rejects missing identityPublicKey", async () => {
+      await expect(client.getUtxosForIdentity({} as never)).rejects.toThrow(
+        SparkValidationError,
+      );
+    });
+
+    it("rejects non-hex identityPublicKey", async () => {
       await expect(
-        client.getUtxosForDepositAddresses({
-          depositAddresses: [],
+        client.getUtxosForIdentity({
+          identityPublicKey: "not-hex",
+        }),
+      ).rejects.toThrow(SparkValidationError);
+    });
+
+    it("rejects wrong-length identityPublicKey", async () => {
+      await expect(
+        client.getUtxosForIdentity({
+          identityPublicKey: "02abcd",
+        }),
+      ).rejects.toThrow(SparkValidationError);
+    });
+
+    it("rejects invalid compressed public keys", async () => {
+      await expect(
+        client.getUtxosForIdentity({
+          identityPublicKey: "00".repeat(33),
         }),
       ).rejects.toThrow(SparkValidationError);
     });
 
     it("rejects direction = PREVIOUS", async () => {
       await expect(
-        client.getUtxosForDepositAddresses({
-          depositAddresses: ["bcrt1qfakeaddress"],
+        client.getUtxosForIdentity({
+          identityPublicKey: TEST_IDENTITY_PUBKEY,
           direction: "PREVIOUS",
         }),
       ).rejects.toThrow(SparkValidationError);
