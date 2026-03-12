@@ -35,6 +35,9 @@ const (
 	// SigningCommitmentBatchSize is the batch size for the signing commitments.
 	SigningCommitmentBatchSize = 1000
 
+	// RenewTimelockThreshold is the maximum timelock value at which a leaf becomes eligible for renewal.
+	RenewTimelockThreshold uint32 = 300
+
 	// DirectTimelockOffset is added to direct transactions to add a buffer before broadcasting.
 	DirectTimelockOffset uint32 = 50
 )

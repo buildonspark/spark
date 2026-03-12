@@ -146,7 +146,10 @@ func (o *MockServer) ModifyNodeTimelock(ctx context.Context, req *pbmock.ModifyN
 		return nil, fmt.Errorf("unable to parse node id: %w", err)
 	}
 
-	node, err := db.TreeNode.Get(ctx, nodeUUID)
+	node, err := db.TreeNode.Query().
+		Where(treenode.IDEQ(nodeUUID)).
+		ForUpdate().
+		Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get node: %w", err)
 	}
