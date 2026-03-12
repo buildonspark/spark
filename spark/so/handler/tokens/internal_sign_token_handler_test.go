@@ -198,7 +198,10 @@ func TestExchangeRevocationSecretsShares_TransferTransaction(t *testing.T) {
 					OperatorIdentityPublicKey: []byte("operator1_pubkey"),
 					Shares: []*sparktokeninternal.RevocationSecretShare{
 						{
-							InputTtxoId: uuid.New().String(),
+							InputTtxoRef: &tokenpb.TokenOutputToSpend{
+								PrevTokenTransactionHash: testHashTransfer[:],
+								PrevTokenTransactionVout: 0,
+							},
 							SecretShare: []byte("secret1"),
 						},
 					},

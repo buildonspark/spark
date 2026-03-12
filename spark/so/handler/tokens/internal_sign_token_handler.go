@@ -525,9 +525,7 @@ func (h *InternalSignTokenHandler) getSecretSharesNotInInput(ctx context.Context
 		outputsWithKeyShares = outputs
 	}
 
-	// Response format should match request format
-	useHashVoutFormat := len(inputOperatorShareMap.ByHashVout) > 0
-	operatorShares, err := h.buildOperatorPubkeyToRevocationSecretShareMap(outputsWithKeyShares, useHashVoutFormat)
+	operatorShares, err := h.buildOperatorPubkeyToRevocationSecretShareMap(outputsWithKeyShares)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build operator pubkey to revocation secret share map: %w", err)
 	}
@@ -791,21 +789,17 @@ func (h *InternalSignTokenHandler) getPartialRevocationSecretShares(
 	return sharesByOutput, nil
 }
 
-func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap(tokenOutputs []*ent.TokenOutput, useHashVoutFormat bool) (operatorSharesMap, error) {
+func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap(tokenOutputs []*ent.TokenOutput) (operatorSharesMap, error) {
 	operatorShares := make(operatorSharesMap)
 	for _, to := range tokenOutputs {
 		if share := to.Edges.RevocationKeyshare; share != nil {
 			operatorIdentityPubkey := h.config.IdentityPublicKey()
 			revShare := &pbtkinternal.RevocationSecretShare{
 				SecretShare: share.SecretShare.Serialize(),
-			}
-			if useHashVoutFormat {
-				revShare.InputTtxoRef = &tokenpb.TokenOutputToSpend{
+				InputTtxoRef: &tokenpb.TokenOutputToSpend{
 					PrevTokenTransactionHash: to.CreatedTransactionFinalizedHash,
 					PrevTokenTransactionVout: uint32(to.CreatedTransactionOutputVout),
-				}
-			} else {
-				revShare.InputTtxoId = to.ID.String()
+				},
 			}
 			operatorShares[operatorIdentityPubkey] = append(operatorShares[operatorIdentityPubkey], revShare)
 		}
@@ -813,14 +807,10 @@ func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap
 			idPubKey := partialShare.OperatorIdentityPublicKey
 			revShare := &pbtkinternal.RevocationSecretShare{
 				SecretShare: partialShare.SecretShare.Serialize(),
-			}
-			if useHashVoutFormat {
-				revShare.InputTtxoRef = &tokenpb.TokenOutputToSpend{
+				InputTtxoRef: &tokenpb.TokenOutputToSpend{
 					PrevTokenTransactionHash: to.CreatedTransactionFinalizedHash,
 					PrevTokenTransactionVout: uint32(to.CreatedTransactionOutputVout),
-				}
-			} else {
-				revShare.InputTtxoId = to.ID.String()
+				},
 			}
 			operatorShares[idPubKey] = append(operatorShares[idPubKey], revShare)
 		}
