@@ -881,6 +881,15 @@ func CreateUtxoSwapStatement(statementType UtxoSwapStatementType, transactionID 
 	return hasher.Sum(nil), nil
 }
 
+// CreateLinkUtxoSwapTransferStatement creates a signable hash for linking a transfer to a utxo swap.
+// Writing to a sha256 never returns an error, so the error return is for signature consistency with CreateUtxoSwapStatement.
+func CreateLinkUtxoSwapTransferStatement(transferID string) ([]byte, error) {
+	hasher := sha256.New()
+	_, _ = hasher.Write([]byte(UtxoSwapStatementTypeLinkTransfer.String()))
+	_, _ = hasher.Write([]byte(transferID))
+	return hasher.Sum(nil), nil
+}
+
 func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *so.Config, req *pbinternal.UtxoSwapCompletedRequest) (*pbinternal.UtxoSwapCompletedResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)

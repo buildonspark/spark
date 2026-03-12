@@ -59,6 +59,8 @@ service SparkInternalService {
     rpc create_instant_static_deposit_utxo_swap(CreateInstantStaticDepositUtxoSwapRequest) returns (CreateInstantStaticDepositUtxoSwapResponse) {}
     // Save utxo for an instant static deposit across all SOs
     rpc save_utxo_for_instant_static_deposit(SaveUtxoForInstantStaticDepositRequest) returns (SaveUtxoForInstantStaticDepositResponse) {}
+    // Link transfer edge to utxo swap on non-coordinator SOs (used by instant static deposits)
+    rpc link_utxo_swap_transfer(LinkUtxoSwapTransferRequest) returns (LinkUtxoSwapTransferResponse) {}
 
     // Internal method to cancel a swap for other SOs if one of them failed to ack it
     rpc rollback_utxo_swap(RollbackUtxoSwapRequest) returns (RollbackUtxoSwapResponse) {}
@@ -450,6 +452,14 @@ message UtxoSwapCompletedRequest {
 
 message UtxoSwapCompletedResponse {
 }
+
+message LinkUtxoSwapTransferRequest {
+    string transfer_id = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+}
+
+message LinkUtxoSwapTransferResponse {}
 
 message QueryLeafSigningPubkeysRequest {
     repeated string leaf_ids = 1;

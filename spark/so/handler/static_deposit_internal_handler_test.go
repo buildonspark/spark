@@ -4,8 +4,10 @@ import (
 	"encoding/hex"
 	"math/rand/v2"
 	"testing"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -310,4 +312,248 @@ func TestSaveUtxoForInstantStaticDeposit_ErrorAmountMismatch(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, resp)
 	assert.ErrorContains(t, err, "does not match swap utxo_value_sats")
+}
+
+func TestLinkUtxoSwapTransfer_LinksTransferEdge(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositInternalHandler(cfg)
+
+	rng := rand.NewChaCha8([32]byte{10})
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	transferID := uuid.New()
+	transfer, err := txClient.Transfer.Create().
+		SetID(transferID).
+		SetSenderIdentityPubkey(sspIdentityPubKey).
+		SetReceiverIdentityPubkey(receiverIdentityPubKey).
+		SetStatus(st.TransferStatusSenderKeyTweaked).
+		SetType(st.TransferTypeUtxoSwap).
+		SetNetwork(btcnetwork.Regtest).
+		SetTotalValue(10000).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	utxoSwap, err := txClient.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(10000).
+		SetCreditAmountSats(9000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(transferID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Verify edge is NOT linked yet
+	linkedTransfer, err := utxoSwap.QueryTransfer().Only(ctx)
+	assert.True(t, ent.IsNotFound(err))
+	assert.Nil(t, linkedTransfer)
+
+	messageHash, err := CreateLinkUtxoSwapTransferStatement(transferID.String())
+	require.NoError(t, err)
+	signature := ecdsa.Sign(cfg.IdentityPrivateKey.ToBTCEC(), messageHash)
+
+	req := &pbinternal.LinkUtxoSwapTransferRequest{
+		TransferId:           transferID.String(),
+		Signature:            signature.Serialize(),
+		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+	}
+
+	resp, err := handler.LinkUtxoSwapTransfer(ctx, cfg, req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	// Verify edge IS now linked - re-query from DB
+	savedSwap, err := txClient.UtxoSwap.Get(ctx, utxoSwap.ID)
+	require.NoError(t, err)
+	linkedTransfer, err = savedSwap.QueryTransfer().Only(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, transfer.ID, linkedTransfer.ID)
+}
+
+func TestLinkUtxoSwapTransfer_InvalidSignature(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositInternalHandler(cfg)
+
+	rng := rand.NewChaCha8([32]byte{11})
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	transferID := uuid.New()
+
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	_, err = txClient.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(10000).
+		SetCreditAmountSats(9000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(transferID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Sign with a different key (not the coordinator)
+	wrongKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	messageHash, err := CreateLinkUtxoSwapTransferStatement(transferID.String())
+	require.NoError(t, err)
+	signature := ecdsa.Sign(wrongKey.ToBTCEC(), messageHash)
+
+	req := &pbinternal.LinkUtxoSwapTransferRequest{
+		TransferId:           transferID.String(),
+		Signature:            signature.Serialize(),
+		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+	}
+
+	resp, err := handler.LinkUtxoSwapTransfer(ctx, cfg, req)
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.ErrorContains(t, err, "unable to verify coordinator signature")
+}
+
+func TestLinkUtxoSwapTransfer_AlreadyLinked(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositInternalHandler(cfg)
+
+	rng := rand.NewChaCha8([32]byte{12})
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	transferID := uuid.New()
+	transfer, err := txClient.Transfer.Create().
+		SetID(transferID).
+		SetSenderIdentityPubkey(sspIdentityPubKey).
+		SetReceiverIdentityPubkey(receiverIdentityPubKey).
+		SetStatus(st.TransferStatusSenderKeyTweaked).
+		SetType(st.TransferTypeUtxoSwap).
+		SetNetwork(btcnetwork.Regtest).
+		SetTotalValue(10000).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	utxoSwap, err := txClient.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(10000).
+		SetCreditAmountSats(9000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(transferID).
+		SetTransfer(transfer).
+		Save(ctx)
+	require.NoError(t, err)
+
+	messageHash, err := CreateLinkUtxoSwapTransferStatement(transferID.String())
+	require.NoError(t, err)
+	signature := ecdsa.Sign(cfg.IdentityPrivateKey.ToBTCEC(), messageHash)
+
+	req := &pbinternal.LinkUtxoSwapTransferRequest{
+		TransferId:           transferID.String(),
+		Signature:            signature.Serialize(),
+		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+	}
+
+	// Should succeed idempotently
+	resp, err := handler.LinkUtxoSwapTransfer(ctx, cfg, req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	// Edge should still be linked
+	savedSwap, err := txClient.UtxoSwap.Get(ctx, utxoSwap.ID)
+	require.NoError(t, err)
+	linkedTransfer, err := savedSwap.QueryTransfer().Only(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, transfer.ID, linkedTransfer.ID)
+}
+
+func TestLinkUtxoSwapTransfer_SwapNotFound(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositInternalHandler(cfg)
+
+	transferID := uuid.New()
+	messageHash, err := CreateLinkUtxoSwapTransferStatement(transferID.String())
+	require.NoError(t, err)
+	signature := ecdsa.Sign(cfg.IdentityPrivateKey.ToBTCEC(), messageHash)
+
+	req := &pbinternal.LinkUtxoSwapTransferRequest{
+		TransferId:           transferID.String(),
+		Signature:            signature.Serialize(),
+		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+	}
+
+	resp, err := handler.LinkUtxoSwapTransfer(ctx, cfg, req)
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.ErrorContains(t, err, "unable to find utxo swap for transfer")
+}
+
+func TestLinkUtxoSwapTransfer_NonSOCoordinator(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositInternalHandler(cfg)
+
+	rng := rand.NewChaCha8([32]byte{13})
+	nonSOKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	transferID := uuid.New()
+	_, err = txClient.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(10000).
+		SetCreditAmountSats(9000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(nonSOKey.Public()).
+		SetRequestedTransferID(transferID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	messageHash, err := CreateLinkUtxoSwapTransferStatement(transferID.String())
+	require.NoError(t, err)
+	signature := ecdsa.Sign(nonSOKey.ToBTCEC(), messageHash)
+
+	req := &pbinternal.LinkUtxoSwapTransferRequest{
+		TransferId:           transferID.String(),
+		Signature:            signature.Serialize(),
+		CoordinatorPublicKey: nonSOKey.Public().Serialize(),
+	}
+
+	resp, err := handler.LinkUtxoSwapTransfer(ctx, cfg, req)
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.ErrorContains(t, err, "coordinator is not a signing operator")
 }

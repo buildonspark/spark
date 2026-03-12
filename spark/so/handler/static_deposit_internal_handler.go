@@ -805,3 +805,68 @@ func (h *StaticDepositInternalHandler) ArchiveStaticDepositAddress(ctx context.C
 
 	return nil
 }
+
+// LinkUtxoSwapTransfer links the transfer edge to a utxo swap on a non-coordinator SO.
+// Called by the coordinator after initiateUtxoSwapTransfer during instant static deposit reservation.
+func (h *StaticDepositInternalHandler) LinkUtxoSwapTransfer(ctx context.Context, config *so.Config, req *pbinternal.LinkUtxoSwapTransferRequest) (*pbinternal.LinkUtxoSwapTransferResponse, error) {
+	ctx, span := tracer.Start(ctx, "StaticDepositInternalHandler.LinkUtxoSwapTransfer")
+	defer span.End()
+
+	logger := logging.GetLoggerFromContext(ctx)
+
+	transferID, err := uuid.Parse(req.TransferId)
+	if err != nil {
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
+	}
+
+	messageHash, err := CreateLinkUtxoSwapTransferStatement(req.TransferId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create link transfer statement: %w", err)
+	}
+	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse coordinator public key: %w", err)
+	}
+
+	coordinatorIsSO := false
+	for _, op := range config.SigningOperatorMap {
+		if op.IdentityPublicKey.Equals(coordinatorPubKey) {
+			coordinatorIsSO = true
+			break
+		}
+	}
+	if !coordinatorIsSO {
+		return nil, fmt.Errorf("coordinator is not a signing operator")
+	}
+
+	if err := common.VerifyECDSASignature(coordinatorPubKey, req.Signature, messageHash); err != nil {
+		return nil, fmt.Errorf("unable to verify coordinator signature: %w", err)
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get db: %w", err)
+	}
+
+	utxoSwapRecord, err := db.UtxoSwap.Query().
+		Where(utxoswap.RequestedTransferIDEQ(transferID)).
+		Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
+		ForUpdate().
+		Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find utxo swap for transfer %s: %w", req.TransferId, err)
+	}
+
+	transfer, needUpdate, err := GetTransferFromUtxoSwap(ctx, utxoSwapRecord)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get transfer from utxo swap: %w", err)
+	}
+	if needUpdate {
+		if _, err := utxoSwapRecord.Update().SetTransfer(transfer).Save(ctx); err != nil {
+			return nil, fmt.Errorf("unable to link transfer to utxo swap: %w", err)
+		}
+	}
+
+	logger.Sugar().Infof("Linked transfer %s to utxo swap %s", req.TransferId, utxoSwapRecord.ID)
+	return &pbinternal.LinkUtxoSwapTransferResponse{}, nil
+}

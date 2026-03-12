@@ -1298,10 +1298,11 @@ const (
 	UtxoSwapStatementTypeCreated UtxoSwapStatementType = iota
 	UtxoSwapStatementTypeRollback
 	UtxoSwapStatementTypeCompleted
+	UtxoSwapStatementTypeLinkTransfer
 )
 
 func (s UtxoSwapStatementType) String() string {
-	return [...]string{"Created", "Rollback", "Completed"}[s]
+	return [...]string{"Created", "Rollback", "Completed", "LinkTransfer"}[s]
 }
 
 // Holds an UTXO that was verified by the validating function as confirmed on

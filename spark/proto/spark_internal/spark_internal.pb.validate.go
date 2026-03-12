@@ -6449,6 +6449,218 @@ var _ interface {
 	ErrorName() string
 } = UtxoSwapCompletedResponseValidationError{}
 
+// Validate checks the field values on LinkUtxoSwapTransferRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *LinkUtxoSwapTransferRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on LinkUtxoSwapTransferRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// LinkUtxoSwapTransferRequestMultiError, or nil if none found.
+func (m *LinkUtxoSwapTransferRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *LinkUtxoSwapTransferRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	// no validation rules for Signature
+
+	// no validation rules for CoordinatorPublicKey
+
+	if len(errors) > 0 {
+		return LinkUtxoSwapTransferRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// LinkUtxoSwapTransferRequestMultiError is an error wrapping multiple
+// validation errors returned by LinkUtxoSwapTransferRequest.ValidateAll() if
+// the designated constraints aren't met.
+type LinkUtxoSwapTransferRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m LinkUtxoSwapTransferRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m LinkUtxoSwapTransferRequestMultiError) AllErrors() []error { return m }
+
+// LinkUtxoSwapTransferRequestValidationError is the validation error returned
+// by LinkUtxoSwapTransferRequest.Validate if the designated constraints
+// aren't met.
+type LinkUtxoSwapTransferRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e LinkUtxoSwapTransferRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e LinkUtxoSwapTransferRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e LinkUtxoSwapTransferRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e LinkUtxoSwapTransferRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e LinkUtxoSwapTransferRequestValidationError) ErrorName() string {
+	return "LinkUtxoSwapTransferRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e LinkUtxoSwapTransferRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sLinkUtxoSwapTransferRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = LinkUtxoSwapTransferRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = LinkUtxoSwapTransferRequestValidationError{}
+
+// Validate checks the field values on LinkUtxoSwapTransferResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *LinkUtxoSwapTransferResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on LinkUtxoSwapTransferResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// LinkUtxoSwapTransferResponseMultiError, or nil if none found.
+func (m *LinkUtxoSwapTransferResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *LinkUtxoSwapTransferResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return LinkUtxoSwapTransferResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// LinkUtxoSwapTransferResponseMultiError is an error wrapping multiple
+// validation errors returned by LinkUtxoSwapTransferResponse.ValidateAll() if
+// the designated constraints aren't met.
+type LinkUtxoSwapTransferResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m LinkUtxoSwapTransferResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m LinkUtxoSwapTransferResponseMultiError) AllErrors() []error { return m }
+
+// LinkUtxoSwapTransferResponseValidationError is the validation error returned
+// by LinkUtxoSwapTransferResponse.Validate if the designated constraints
+// aren't met.
+type LinkUtxoSwapTransferResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e LinkUtxoSwapTransferResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e LinkUtxoSwapTransferResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e LinkUtxoSwapTransferResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e LinkUtxoSwapTransferResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e LinkUtxoSwapTransferResponseValidationError) ErrorName() string {
+	return "LinkUtxoSwapTransferResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e LinkUtxoSwapTransferResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sLinkUtxoSwapTransferResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = LinkUtxoSwapTransferResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = LinkUtxoSwapTransferResponseValidationError{}
+
 // Validate checks the field values on QueryLeafSigningPubkeysRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

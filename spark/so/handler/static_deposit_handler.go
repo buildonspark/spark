@@ -233,6 +233,33 @@ func (o *StaticDepositHandler) SaveUtxoForInstantStaticDepositForAllOperators(ct
 	return err
 }
 
+// LinkUtxoSwapTransferForOtherOperators links the transfer edge to a utxo swap on non-coordinator SOs.
+// The coordinator already linked the edge in initiateUtxoSwapTransfer (ssp_request_handler.go:1484-1492).
+func (o *StaticDepositHandler) LinkUtxoSwapTransferForOtherOperators(ctx context.Context, config *so.Config, request *pbinternal.LinkUtxoSwapTransferRequest) error {
+	ctx, span := tracer.Start(ctx, "StaticDepositHandler.LinkUtxoSwapTransferForOtherOperators")
+	defer span.End()
+
+	logger := logging.GetLoggerFromContext(ctx)
+
+	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (*pbinternal.LinkUtxoSwapTransferResponse, error) {
+		conn, err := operator.NewOperatorGRPCConnection()
+		if err != nil {
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to connect to operator %s", operator.Identifier)
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		internalResp, err := client.LinkUtxoSwapTransfer(ctx, request)
+		if err != nil {
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to link utxo swap transfer with operator %s", operator.Identifier)
+			return nil, err
+		}
+		return internalResp, err
+	})
+	return err
+}
+
 func (o *StaticDepositHandler) rollbackInstantStaticDepositUtxoSwapUsingGossip(ctx context.Context, config *so.Config, utxo *pb.UTXO, rollbackFromStatus []st.UtxoSwapStatus, rollbackToStatus st.UtxoSwapStatus) {
 	logger := logging.GetLoggerFromContext(ctx)
 

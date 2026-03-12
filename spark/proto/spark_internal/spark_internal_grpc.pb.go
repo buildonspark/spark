@@ -50,6 +50,7 @@ const (
 	SparkInternalService_CreateStaticDepositUtxoRefund_FullMethodName      = "/spark_internal.SparkInternalService/create_static_deposit_utxo_refund"
 	SparkInternalService_CreateInstantStaticDepositUtxoSwap_FullMethodName = "/spark_internal.SparkInternalService/create_instant_static_deposit_utxo_swap"
 	SparkInternalService_SaveUtxoForInstantStaticDeposit_FullMethodName    = "/spark_internal.SparkInternalService/save_utxo_for_instant_static_deposit"
+	SparkInternalService_LinkUtxoSwapTransfer_FullMethodName               = "/spark_internal.SparkInternalService/link_utxo_swap_transfer"
 	SparkInternalService_RollbackUtxoSwap_FullMethodName                   = "/spark_internal.SparkInternalService/rollback_utxo_swap"
 	SparkInternalService_RollbackInstantUtxoSwap_FullMethodName            = "/spark_internal.SparkInternalService/rollback_instant_utxo_swap"
 	SparkInternalService_UtxoSwapCompleted_FullMethodName                  = "/spark_internal.SparkInternalService/utxo_swap_completed"
@@ -102,6 +103,8 @@ type SparkInternalServiceClient interface {
 	CreateInstantStaticDepositUtxoSwap(ctx context.Context, in *CreateInstantStaticDepositUtxoSwapRequest, opts ...grpc.CallOption) (*CreateInstantStaticDepositUtxoSwapResponse, error)
 	// Save utxo for an instant static deposit across all SOs
 	SaveUtxoForInstantStaticDeposit(ctx context.Context, in *SaveUtxoForInstantStaticDepositRequest, opts ...grpc.CallOption) (*SaveUtxoForInstantStaticDepositResponse, error)
+	// Link transfer edge to utxo swap on non-coordinator SOs (used by instant static deposits)
+	LinkUtxoSwapTransfer(ctx context.Context, in *LinkUtxoSwapTransferRequest, opts ...grpc.CallOption) (*LinkUtxoSwapTransferResponse, error)
 	// Internal method to cancel a swap for other SOs if one of them failed to ack it
 	RollbackUtxoSwap(ctx context.Context, in *RollbackUtxoSwapRequest, opts ...grpc.CallOption) (*RollbackUtxoSwapResponse, error)
 	// Internal method to cancel an instant UTXO swap for other SOs if one of them failed to ack it
@@ -423,6 +426,16 @@ func (c *sparkInternalServiceClient) SaveUtxoForInstantStaticDeposit(ctx context
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) LinkUtxoSwapTransfer(ctx context.Context, in *LinkUtxoSwapTransferRequest, opts ...grpc.CallOption) (*LinkUtxoSwapTransferResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LinkUtxoSwapTransferResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_LinkUtxoSwapTransfer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkInternalServiceClient) RollbackUtxoSwap(ctx context.Context, in *RollbackUtxoSwapRequest, opts ...grpc.CallOption) (*RollbackUtxoSwapResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RollbackUtxoSwapResponse)
@@ -572,6 +585,8 @@ type SparkInternalServiceServer interface {
 	CreateInstantStaticDepositUtxoSwap(context.Context, *CreateInstantStaticDepositUtxoSwapRequest) (*CreateInstantStaticDepositUtxoSwapResponse, error)
 	// Save utxo for an instant static deposit across all SOs
 	SaveUtxoForInstantStaticDeposit(context.Context, *SaveUtxoForInstantStaticDepositRequest) (*SaveUtxoForInstantStaticDepositResponse, error)
+	// Link transfer edge to utxo swap on non-coordinator SOs (used by instant static deposits)
+	LinkUtxoSwapTransfer(context.Context, *LinkUtxoSwapTransferRequest) (*LinkUtxoSwapTransferResponse, error)
 	// Internal method to cancel a swap for other SOs if one of them failed to ack it
 	RollbackUtxoSwap(context.Context, *RollbackUtxoSwapRequest) (*RollbackUtxoSwapResponse, error)
 	// Internal method to cancel an instant UTXO swap for other SOs if one of them failed to ack it
@@ -687,6 +702,9 @@ func (UnimplementedSparkInternalServiceServer) CreateInstantStaticDepositUtxoSwa
 }
 func (UnimplementedSparkInternalServiceServer) SaveUtxoForInstantStaticDeposit(context.Context, *SaveUtxoForInstantStaticDepositRequest) (*SaveUtxoForInstantStaticDepositResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SaveUtxoForInstantStaticDeposit not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) LinkUtxoSwapTransfer(context.Context, *LinkUtxoSwapTransferRequest) (*LinkUtxoSwapTransferResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LinkUtxoSwapTransfer not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) RollbackUtxoSwap(context.Context, *RollbackUtxoSwapRequest) (*RollbackUtxoSwapResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RollbackUtxoSwap not implemented")
@@ -1264,6 +1282,24 @@ func _SparkInternalService_SaveUtxoForInstantStaticDeposit_Handler(srv interface
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_LinkUtxoSwapTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LinkUtxoSwapTransferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).LinkUtxoSwapTransfer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_LinkUtxoSwapTransfer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).LinkUtxoSwapTransfer(ctx, req.(*LinkUtxoSwapTransferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkInternalService_RollbackUtxoSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RollbackUtxoSwapRequest)
 	if err := dec(in); err != nil {
@@ -1584,6 +1620,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "save_utxo_for_instant_static_deposit",
 			Handler:    _SparkInternalService_SaveUtxoForInstantStaticDeposit_Handler,
+		},
+		{
+			MethodName: "link_utxo_swap_transfer",
+			Handler:    _SparkInternalService_LinkUtxoSwapTransfer_Handler,
 		},
 		{
 			MethodName: "rollback_utxo_swap",
