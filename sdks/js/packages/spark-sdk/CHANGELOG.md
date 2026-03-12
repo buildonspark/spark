@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.7.1
+
+### Patch Changes
+
+- Improve getLightningSendFeeEstimate unit handling
+
 ## 0.7.0
 
 ### Minor Changes
