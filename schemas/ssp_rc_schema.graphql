@@ -534,6 +534,15 @@ enum CurrencyUnit {
 """Date with time (isoformat)"""
 scalar DateTime
 
+input DeleteSparkWalletWebhookInput {
+  """The ID of the webhook to delete."""
+  webhook_id: ID!
+}
+
+type DeleteSparkWalletWebhookOutput {
+  success: Boolean!
+}
+
 """
 This interface is used by all the entities in the Lightspark system. It defines a few core fields that are available everywhere. Any object that implements this interface can be queried using the `entity` query and its ID.
 """
@@ -759,6 +768,11 @@ enum LightningSendRequestStatus {
   REQUEST_VALIDATED @deprecated(reason: "Use CREATED instead")
 }
 
+type ListSparkWalletWebhooksOutput {
+  """The registered webhooks for this wallet user."""
+  webhooks: [SparkWalletWebhookEntry!]!
+}
+
 """The `Long` scalar type represents a 64 bit integer."""
 scalar Long
 
@@ -819,6 +833,14 @@ type Mutation {
   Start the process to request releasing seed. SSP will send an OTP code to the phone number.
   """
   start_seed_release(input: StartSeedReleaseInput!): Void
+
+  """Delete a webhook for the authenticated Spark wallet user."""
+  delete_wallet_webhook(input: DeleteSparkWalletWebhookInput!): DeleteSparkWalletWebhookOutput!
+
+  """
+  Register a webhook URL for the authenticated Spark wallet user. Up to 5 webhooks are allowed; the oldest is evicted if the limit is reached.
+  """
+  register_wallet_webhook(input: RegisterSparkWalletWebhookInput!): RegisterSparkWalletWebhookOutput!
 
   """Verify a signed SSP authentication challenge."""
   verify_challenge(input: VerifyChallengeInput!): VerifyChallengeOutput!
@@ -890,10 +912,29 @@ type Query {
 
   """Query transfers of a given list of transfer spark ids."""
   transfers(transfer_spark_ids: [UUID!]!): [Transfer!]!
+
+  """List all registered webhooks for the authenticated Spark wallet user."""
+  wallet_webhooks: ListSparkWalletWebhooksOutput!
 }
 
 type QuoteStaticDepositOutput {
   quote: StaticDepositQuote!
+}
+
+input RegisterSparkWalletWebhookInput {
+  """The webhook endpoint URL."""
+  url: String!
+
+  """The HMAC-SHA256 signing secret. Must be at least 16 characters."""
+  secret: String!
+
+  """The event types this webhook should receive."""
+  event_types: [SparkWalletWebhookEventType!]!
+}
+
+type RegisterSparkWalletWebhookOutput {
+  """The ID of the newly registered webhook."""
+  webhook_id: ID!
 }
 
 input RequestCoopExitInput {
@@ -1126,6 +1167,25 @@ type SparkWalletUserToUserRequestsConnection implements Connection {
 
   """The Spark User Requests for the current page of this connection."""
   entities: [UserRequest!]!
+}
+
+type SparkWalletWebhookEntry {
+  """The webhook ID."""
+  webhook_id: ID!
+
+  """The webhook endpoint URL."""
+  url: String!
+
+  """The event types this webhook is subscribed to."""
+  event_types: [SparkWalletWebhookEventType!]!
+}
+
+"""Event types supported by Spark wallet webhooks."""
+enum SparkWalletWebhookEventType {
+  SPARK_LIGHTNING_RECEIVE_FINISHED
+  SPARK_LIGHTNING_SEND_FINISHED
+  SPARK_COOP_EXIT_FINISHED
+  SPARK_STATIC_DEPOSIT_FINISHED
 }
 
 input StartSeedReleaseInput {
