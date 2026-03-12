@@ -128,6 +128,13 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		return nil, err
 	}
 
+	if _, ok := req.Source.(*pb.QueryNodesRequest_NodeIds); ok && !isSSP {
+		nodes, err = filterNodesByWalletAccess(ctx, h.config, nodes)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	protoNodeMap := make(map[string]*pb.TreeNode)
 	for _, node := range nodes {
 		protoNodeMap[node.ID.String()], err = node.MarshalSparkProto(ctx)
@@ -244,6 +251,28 @@ func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, n
 	return getAncestorChain(ctx, db, parent, nodeMap, isSSP)
 }
 
+func filterNodesByWalletAccess(ctx context.Context, config *so.Config, nodes []*ent.TreeNode) ([]*ent.TreeNode, error) {
+	walletSettingHandler := NewWalletSettingHandler(config)
+	accessCache := make(map[string]bool)
+	filtered := nodes[:0]
+	for _, node := range nodes {
+		ownerKey := node.OwnerIdentityPubkey.String()
+		hasAccess, cached := accessCache[ownerKey]
+		if !cached {
+			var err error
+			hasAccess, err = walletSettingHandler.HasReadAccessToWallet(ctx, node.OwnerIdentityPubkey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check wallet access for node %s: %w", node.ID, err)
+			}
+			accessCache[ownerKey] = hasAccess
+		}
+		if hasAccess {
+			filtered = append(filtered, node)
+		}
+	}
+	return filtered, nil
+}
+
 func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req *pb.QueryUnusedDepositAddressesRequest) (*pb.QueryUnusedDepositAddressesResponse, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -254,6 +283,18 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse identity public key: %w", err)
 	}
+
+	hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, idPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if privacy is enabled for owner: %w", err)
+	}
+	if !hasReadAccess {
+		return &pb.QueryUnusedDepositAddressesResponse{
+			DepositAddresses: nil,
+			Offset:           -1,
+		}, nil
+	}
+
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
 	}
@@ -339,6 +380,15 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse identity public key: %w", err)
 	}
+
+	hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, idPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if privacy is enabled for owner: %w", err)
+	}
+	if !hasReadAccess {
+		return &pb.QueryStaticDepositAddressesResponse{DepositAddresses: nil}, nil
+	}
+
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
 	}
