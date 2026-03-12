@@ -1967,7 +1967,6 @@ func TestQueryTokenOutputsByTokenIdentifierOnly(t *testing.T) {
 			TokenIdentifier:     tokenIdA,
 			NumOutputs:          1,
 			OutputAmounts:       []uint64{100},
-			SameOwner:           true,
 		})
 		require.NoError(t, err)
 		// Override the output owner to our shared owner
@@ -1981,7 +1980,6 @@ func TestQueryTokenOutputsByTokenIdentifierOnly(t *testing.T) {
 			TokenIdentifier:     tokenIdB,
 			NumOutputs:          1,
 			OutputAmounts:       []uint64{200},
-			SameOwner:           true,
 		})
 		require.NoError(t, err)
 		mintTxB.TokenOutputs[0].OwnerPublicKey = ownerPrivKey.Public().Serialize()
