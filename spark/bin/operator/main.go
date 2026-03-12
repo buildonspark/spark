@@ -834,6 +834,15 @@ func main() {
 	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownRelease()
 
+	// We wrap the gRPC server for grpc-web, which proxies HTTP/WebSocket connections into gRPC calls.
+	// If grpcServer.GracefulStop() is called while the HTTP server is still accepting
+	// connections, grpc-web can receive new requests against a draining gRPC server and
+	// panic, crashing the process. Shutting down the HTTP server first drains and closes
+	// all HTTP and WebSocket connections (including those proxied by grpc-web), so that by
+	// the time we call GracefulStop the gRPC server only needs to wait for in-flight RPCs
+	// that arrived through the native gRPC port.
+	//
+	// See: https://github.com/grpc/grpc-go/issues/1384
 	logger.Info("Stopping HTTP server...")
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("HTTP server failed to shutdown gracefully", zap.Error(err))
