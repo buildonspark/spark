@@ -8,14 +8,8 @@ Add new tests to two existing test files (`validation_test.go`, `query_test.go`)
 
 ## Changes
 
-### 1. `spark/so/grpc_test/tokens_test/validation_test.go`
-- **What**: Add `TestBroadcastTokenTransactionV3ExecuteBeforeValidation` — V3-only table-driven test covering:
-  - Valid `execute_before` within window succeeds
-  - `execute_before` in the past is rejected
-  - `execute_before` beyond `TokenMaxExecuteBeforeWindow` is rejected
-  - `execute_before` before `client_created_timestamp` is rejected
-  - `execute_before` with sub-microsecond precision is rejected
-- **Why**: The `execute_before` field on `PartialTokenTransaction` is validated in `broadcastTokenTransactionPhase2` but has zero integration test coverage.
+### ~~1. `spark/so/grpc_test/tokens_test/validation_test.go`~~ (Removed)
+- **Removed**: `TestBroadcastTokenTransactionV3ExecuteBeforeValidation` was removed per reviewer feedback — the `execute_before` functionality is not yet launched.
 
 ### 2. `spark/so/grpc_test/tokens_test/query_test.go`
 - **What**: Add three new test functions:
@@ -30,7 +24,6 @@ Add new tests to two existing test files (`validation_test.go`, `query_test.go`)
 - **Why**: The `authz.EnforceSessionIdentityPublicKeyMatches` check in `freeze_token_handler.go` has no integration test.
 
 ## Verification
-- [ ] `mise test-grpc` or `go test ./so/grpc_test/tokens_test/... -run TestBroadcastTokenTransactionV3ExecuteBeforeValidation`
 - [ ] `go test ./so/grpc_test/tokens_test/... -run TestQueryTokenOutputsBackwardPaginationRejected`
 - [ ] `go test ./so/grpc_test/tokens_test/... -run TestQueryTokenOutputsFilterCountLimits`
 - [ ] `go test ./so/grpc_test/tokens_test/... -run TestQueryTokenOutputsByTokenIdentifierOnly`
@@ -40,4 +33,3 @@ Add new tests to two existing test files (`validation_test.go`, `query_test.go`)
 
 ## Risks
 - Integration tests require a running local environment (minikube). Tests will be validated against the environment.
-- `execute_before` tests only run in V3 Phase2 mode since that's the only code path that validates the field.
