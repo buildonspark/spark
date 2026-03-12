@@ -1915,7 +1915,6 @@ func TestQueryTokenOutputsFilterCountLimits(t *testing.T) {
 
 		t.Run("too many issuer public keys", func(t *testing.T) {
 			_, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
-				OwnerPublicKeys:  [][]byte{tooManyKeys[0]},
 				IssuerPublicKeys: tooManyKeys,
 				Network:          config.ProtoNetwork(),
 			})
@@ -1925,7 +1924,6 @@ func TestQueryTokenOutputsFilterCountLimits(t *testing.T) {
 
 		t.Run("too many token identifiers", func(t *testing.T) {
 			_, err := tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
-				OwnerPublicKeys:  [][]byte{tooManyKeys[0]},
 				TokenIdentifiers: tooManyIdentifiers,
 				Network:          config.ProtoNetwork(),
 			})
@@ -2039,13 +2037,24 @@ func TestQueryTokenOutputsByTokenIdentifierOnly(t *testing.T) {
 		require.NoError(t, err, "query with owner + both identifiers should succeed")
 		require.Len(t, resp.OutputsWithPreviousTransactionData, 2, "should find both outputs")
 
-		// Query with token identifier only — no owner or issuer keys
-		resp, err = tokenClient.QueryTokenOutputs(authCtx, &tokenpb.QueryTokenOutputsRequest{
+		// Query with token identifier only — authenticate as an unrelated third party
+		// to prove the server doesn't implicitly filter by session identity
+		thirdPartyKey := keys.GeneratePrivateKey()
+		thirdPartyConfig := wallet.NewTestWalletConfigWithIdentityKey(t, thirdPartyKey)
+		thirdPartyConn, err := thirdPartyConfig.NewCoordinatorGRPCConnection()
+		require.NoError(t, err)
+		defer thirdPartyConn.Close()
+		thirdPartyAuthToken, err := wallet.AuthenticateWithConnection(t.Context(), thirdPartyConfig, thirdPartyConn)
+		require.NoError(t, err)
+		thirdPartyCtx := wallet.ContextWithToken(t.Context(), thirdPartyAuthToken)
+
+		thirdPartyTokenClient := tokenpb.NewSparkTokenServiceClient(thirdPartyConn)
+		resp, err = thirdPartyTokenClient.QueryTokenOutputs(thirdPartyCtx, &tokenpb.QueryTokenOutputsRequest{
 			TokenIdentifiers: [][]byte{tokenIdA},
 			Network:          ownerConfig.ProtoNetwork(),
 		})
-		require.NoError(t, err, "query with token identifier only should succeed")
-		require.Len(t, resp.OutputsWithPreviousTransactionData, 1, "should find token A output")
+		require.NoError(t, err, "query with token identifier only should succeed for any authenticated user")
+		require.Len(t, resp.OutputsWithPreviousTransactionData, 1, "should find token A output regardless of who is authenticated")
 
 		// Query with non-existent token identifier should return empty
 		nonExistentID := make([]byte, 32)
