@@ -116,13 +116,15 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 	query := db.TokenOutput.
 		Query().
 		Where(
-			tokenoutput.OwnerPublicKeyIn(params.OwnerPublicKeys...),
 			ownedStatusPredicate,
 			tokenoutput.Not(tokenoutput.HasWithdrawal()),
 		).
 		Where(tokenoutput.NetworkEQ(params.Network)).
 		WithOutputSpentTokenTransaction()
 
+	if len(params.OwnerPublicKeys) > 0 {
+		query = query.Where(tokenoutput.OwnerPublicKeyIn(params.OwnerPublicKeys...))
+	}
 	if len(params.IssuerPublicKeys) > 0 {
 		query = query.Where(tokenoutput.TokenPublicKeyIn(params.IssuerPublicKeys...))
 	}
