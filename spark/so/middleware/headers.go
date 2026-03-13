@@ -67,7 +67,7 @@ func GetClientIpFromHeader(ctx context.Context, xffClientIpPosition int) (string
 	}
 
 	if len(xff) == 0 {
-		logging.GetLoggerFromContext(ctx).Sugar().Errorf(
+		logging.GetLoggerFromContext(ctx).Sugar().Debugf(
 			"x-forwarded-for header missing entirely, xffClientIpPosition=%d",
 			xffClientIpPosition,
 		)
