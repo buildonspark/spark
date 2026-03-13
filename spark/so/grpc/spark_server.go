@@ -6,7 +6,6 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 
-	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/errors"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -294,10 +293,6 @@ func (s *SparkServer) SubscribeToEvents(req *pb.SubscribeToEventsRequest, st pb.
 	idPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
 	if err != nil {
 		return fmt.Errorf("invalid identity public key: %w", err)
-	}
-
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(st.Context(), s.config, idPubKey); err != nil {
-		return err
 	}
 
 	return s.eventsRouter.SubscribeToEvents(idPubKey, st)
