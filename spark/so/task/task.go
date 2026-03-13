@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 	"go.uber.org/zap"
 
+	entdialect "entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/google/uuid"
@@ -948,10 +949,30 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 					if !result.BackfillCursor.IsZero() {
 						logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "backfill_mimo_transfers"))
-						logger.Sugar().Infof("created %d transfer records, updated %d receiver statuses, found %d receiver mismatches, cursor at %s (unix: %d)",
-							result.TransfersCreated, result.ReceiverStatusesUpdated, result.ReceiverMismatches, result.BackfillCursor.Format(time.RFC3339), result.BackfillCursor.Unix())
+						logger.Sugar().Infof("created %d transfer records, updated %d receiver statuses, cursor at %s (unix: %d)",
+							result.TransfersCreated, result.ReceiverStatusesUpdated, result.BackfillCursor.Format(time.RFC3339), result.BackfillCursor.Unix())
 					}
 					return nil
+				},
+			},
+		},
+		{
+			ExecutionInterval: 30 * time.Second,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:                "monitor_receiver_status_mismatches",
+				RunInTestEnv:        true,
+				Disabled:            false,
+				RequiresRawDBClient: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // Monitor needs its own REPEATABLE READ transaction, which cannot nest inside the task middleware's transaction.
+					if err != nil {
+						return fmt.Errorf("failed to get raw db client: %w", err)
+					}
+					drv := sql.OpenDB(entdialect.Postgres, rawDB)
+					client := ent.NewClient(ent.Driver(drv))
+
+					_, err = backfill.MonitorReceiverStatusMismatches(ctx, client, 1000)
+					return err
 				},
 			},
 		},

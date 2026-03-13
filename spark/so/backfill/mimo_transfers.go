@@ -2,6 +2,7 @@ package backfill
 
 import (
 	"context"
+	stdsql "database/sql"
 	"fmt"
 	"sync"
 	"time"
@@ -24,7 +25,7 @@ const initScanBatchSize = 10000
 
 var (
 	backfillMu          sync.Mutex
-	backfillCursor      time.Time // zero = uninitialized
+	backfillCursor      = time.Date(2025, time.November, 15, 0, 0, 0, 0, time.UTC)
 	lastSeenID          uuid.UUID // tiebreaker for keyset pagination in initBackfillCursor
 	backfillInitialized bool
 )
@@ -40,7 +41,6 @@ func resetBackfillState() {
 type BackfillMimoResult struct {
 	TransfersCreated        int
 	ReceiverStatusesUpdated int
-	ReceiverMismatches      int
 	BackfillCursor          time.Time
 }
 
@@ -60,13 +60,6 @@ func BackfillMimoTransfers(ctx context.Context, config *so.Config, batchSize int
 		return BackfillMimoResult{}, fmt.Errorf("backfill create records: %w", err)
 	}
 
-	mismatches, err := monitorReceiverStatusMismatches(ctx, batchSize)
-	if err != nil {
-		logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "monitor_receiver_status_mismatches"), zap.Error(err)).
-			Sugar().Errorf("failed to monitor receiver status mismatches (non-fatal)")
-		mismatches = 0
-	}
-
 	updated, err := backfillSyncReceiverStatuses(ctx, batchSize)
 	if err != nil {
 		return BackfillMimoResult{}, fmt.Errorf("backfill sync receiver statuses: %w", err)
@@ -75,27 +68,36 @@ func BackfillMimoTransfers(ctx context.Context, config *so.Config, batchSize int
 	return BackfillMimoResult{
 		TransfersCreated:        created,
 		ReceiverStatusesUpdated: updated,
-		ReceiverMismatches:      mismatches,
 		BackfillCursor:          backfillCursor,
 	}, nil
 }
 
-// monitorReceiverStatusMismatches checks recently-updated Transfers for
+// MonitorReceiverStatusMismatches checks recently-updated Transfers for
 // TransferReceivers whose status doesn't match the expected mapped status.
 // This detects dual-write failures across ALL states, not just terminal ones.
 //
-// Uses the Transfer.update_time index to efficiently find recent transfers,
-// then eager-loads their receivers for comparison.
-func monitorReceiverStatusMismatches(ctx context.Context, batchSize int) (int, error) {
+// Uses REPEATABLE READ isolation so that the Transfer query and the eager-loaded
+// TransferReceivers query see the same database snapshot, eliminating false
+// positives from concurrent commits between the two reads.
+//
+// Accepts a raw (non-tx-backed) *ent.Client because the task middleware's
+// DatabaseMiddleware wraps every task in a transaction, and BeginTx cannot
+// nest inside an existing transaction. The caller constructs a fresh ent client
+// from the raw *sql.DB provided by RequiresRawDBClient.
+func MonitorReceiverStatusMismatches(ctx context.Context, db *ent.Client, batchSize int) (int, error) {
 	logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "monitor_receiver_status_mismatches"))
 
-	db, err := ent.GetDbFromContext(ctx)
+	tx, err := db.BeginTx(ctx, &stdsql.TxOptions{
+		ReadOnly:  true,
+		Isolation: stdsql.LevelRepeatableRead,
+	})
 	if err != nil {
-		return 0, fmt.Errorf("failed to get db from context: %w", err)
+		return 0, fmt.Errorf("failed to begin read-only tx: %w", err)
 	}
+	defer func() { _ = tx.Rollback() }()
 
 	now := time.Now()
-	transfers, err := db.Transfer.Query().
+	transfers, err := tx.Transfer.Query().
 		Where(
 			enttransfer.UpdateTimeGTE(now.Add(-30*time.Second)),
 			enttransfer.HasTransferReceivers(),
