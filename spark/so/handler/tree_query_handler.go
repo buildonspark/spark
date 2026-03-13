@@ -381,14 +381,6 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 		return nil, fmt.Errorf("unable to parse identity public key: %w", err)
 	}
 
-	hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, idPubKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check if privacy is enabled for owner: %w", err)
-	}
-	if !hasReadAccess {
-		return &pb.QueryStaticDepositAddressesResponse{DepositAddresses: nil}, nil
-	}
-
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
 	}
