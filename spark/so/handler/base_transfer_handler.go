@@ -1107,6 +1107,71 @@ func lockLeaves(ctx context.Context, db *ent.Client, leaves []*ent.TreeNode) ([]
 	return updatedLeaves, nil
 }
 
+func createNodeSwapTransfer(
+	ctx context.Context,
+	db *ent.Client,
+	transferID uuid.UUID,
+	senderPubKey keys.Public,
+	receiverPubKey keys.Public,
+	node *ent.TreeNode,
+	network btcnetwork.Network,
+) (*ent.Transfer, error) {
+	transfer, err := db.Transfer.Create().
+		SetID(transferID).
+		SetSenderIdentityPubkey(senderPubKey).
+		SetReceiverIdentityPubkey(receiverPubKey).
+		SetStatus(st.TransferStatusSenderInitiated).
+		SetTotalValue(node.Value).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		SetType(st.TransferTypeSwap).
+		SetNetwork(network).
+		Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create transfer: %w", err)
+	}
+
+	transferSender, err := db.TransferSender.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(senderPubKey).
+		Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create transfer sender: %w", err)
+	}
+
+	transferReceiver, err := db.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverPubKey).
+		SetStatus(st.TransferReceiverStatusSenderInitiated).
+		Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create transfer receiver: %w", err)
+	}
+
+	transferLeafCreate := db.TransferLeaf.Create().
+		SetTransfer(transfer).
+		SetLeaf(node).
+		SetTransferSender(transferSender).
+		SetTransferReceiver(transferReceiver).
+		SetPreviousRefundTx(node.RawRefundTx).
+		SetIntermediateRefundTx(node.RawRefundTx)
+	if len(node.DirectRefundTx) > 0 {
+		transferLeafCreate = transferLeafCreate.
+			SetPreviousDirectRefundTx(node.DirectRefundTx).
+			SetIntermediateDirectRefundTx(node.DirectRefundTx)
+	}
+	_, err = transferLeafCreate.Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create transfer leaf: %w", err)
+	}
+
+	_, err = lockLeaves(ctx, db, []*ent.TreeNode{node})
+	if err != nil {
+		return nil, fmt.Errorf("unable to lock leaf: %w", err)
+	}
+
+	return transfer, nil
+}
+
 // If open this function in spark.proto, need to take TransferStatusSenderKeyTweakPending out from the allowed status list for TransferTypePreimageSwap.
 func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.CancelTransferRequest) (*pbspark.CancelTransferResponse, error) {
 	reqSenderIDPubKey, err := keys.ParsePublicKey(req.SenderIdentityPublicKey)

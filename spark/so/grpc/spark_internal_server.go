@@ -260,3 +260,8 @@ func (s *SparkInternalServer) SyncNode(ctx context.Context, req *pb.SyncNodeRequ
 	h := handler.NewSyncNodeHandler(s.config)
 	return &emptypb.Empty{}, h.SyncTreeNodes(ctx, req)
 }
+
+func (s *SparkInternalServer) InitiateNodeSwapTransfer(ctx context.Context, req *pb.InitiateNodeSwapTransferRequest) (*emptypb.Empty, error) {
+	transferHandler := handler.NewInternalTransferHandler(s.config)
+	return &emptypb.Empty{}, transferHandler.InitiateNodeSwapTransfer(ctx, req)
+}
