@@ -1116,13 +1116,15 @@ func createNodeSwapTransfer(
 	node *ent.TreeNode,
 	network btcnetwork.Network,
 ) (*ent.Transfer, error) {
+	now := time.Now()
 	transfer, err := db.Transfer.Create().
 		SetID(transferID).
 		SetSenderIdentityPubkey(senderPubKey).
 		SetReceiverIdentityPubkey(receiverPubKey).
-		SetStatus(st.TransferStatusSenderInitiated).
+		SetStatus(st.TransferStatusCompleted).
 		SetTotalValue(node.Value).
-		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		SetExpiryTime(now.Add(24 * time.Hour)).
+		SetCompletionTime(now).
 		SetType(st.TransferTypeSwap).
 		SetNetwork(network).
 		Save(ctx)
@@ -1141,7 +1143,7 @@ func createNodeSwapTransfer(
 	transferReceiver, err := db.TransferReceiver.Create().
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
-		SetStatus(st.TransferReceiverStatusSenderInitiated).
+		SetStatus(st.TransferReceiverStatusCompleted).
 		Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer receiver: %w", err)
@@ -1164,9 +1166,12 @@ func createNodeSwapTransfer(
 		return nil, fmt.Errorf("unable to create transfer leaf: %w", err)
 	}
 
-	_, err = lockLeaves(ctx, db, []*ent.TreeNode{node})
+	_, err = node.Update().
+		SetOwnerIdentityPubkey(receiverPubKey).
+		SetStatus(st.TreeNodeStatusAvailable).
+		Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to lock leaf: %w", err)
+		return nil, fmt.Errorf("unable to update node owner: %w", err)
 	}
 
 	return transfer, nil
