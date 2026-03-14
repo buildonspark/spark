@@ -430,7 +430,6 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		network,
 		totalAmount,
 		uint64(req.SecondaryCreditAmountSats),
-		req.ExpiryTime.AsTime(),
 		req.DestinationAddress,
 		uint64(req.ValueSats),
 	); err != nil {
