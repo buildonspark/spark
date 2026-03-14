@@ -1,5 +1,9 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import { handleGetBalance, handleGetSparkAddress } from "../../tools/wallet.js";
+import {
+  handleGetBalance,
+  handleGetSparkAddress,
+  handleDisconnectWallet,
+} from "../../tools/wallet.js";
 import type { SparkWallet } from "@buildonspark/spark-sdk";
 
 const getBalanceMock = jest.fn<() => Promise<{ balance: bigint }>>();
@@ -59,5 +63,57 @@ describe("handleGetSparkAddress", () => {
     const result = await handleGetSparkAddress(undefined, mockResolve);
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("disconnected");
+  });
+});
+
+describe("handleDisconnectWallet", () => {
+  it("reports wallet disconnected when eviction succeeds", async () => {
+    const mockEvict = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const result = await handleDisconnectWallet(
+      "some mnemonic",
+      undefined,
+      mockEvict,
+    );
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0]?.text).toContain("Wallet disconnected");
+    expect(mockEvict).toHaveBeenCalledWith("some mnemonic", undefined);
+  });
+
+  it("reports no cached wallet when eviction returns false", async () => {
+    const mockEvict = jest
+      .fn<() => Promise<boolean>>()
+      .mockResolvedValue(false);
+    const result = await handleDisconnectWallet(
+      "some mnemonic",
+      undefined,
+      mockEvict,
+    );
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0]?.text).toContain("No cached wallet");
+  });
+
+  it("returns raw output when requested", async () => {
+    const mockEvict = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const result = await handleDisconnectWallet(
+      "some mnemonic",
+      undefined,
+      mockEvict,
+      "raw",
+    );
+    const parsed = JSON.parse(result.content[0]!.text);
+    expect(parsed.evicted).toBe(true);
+  });
+
+  it("returns error on failure", async () => {
+    const mockEvict = jest
+      .fn<() => Promise<boolean>>()
+      .mockRejectedValue(new Error("cleanup failed"));
+    const result = await handleDisconnectWallet(
+      "some mnemonic",
+      undefined,
+      mockEvict,
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("cleanup failed");
   });
 });

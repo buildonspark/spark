@@ -87,6 +87,7 @@ export interface WalletTransfer {
   transferDirection: keyof typeof TransferDirection;
   userRequest: Omit<UserRequestType, "transfer"> | undefined;
   sparkInvoice: string | undefined;
+  receivers?: Array<{ identityPublicKey: string; amountSats: number }>;
 }
 
 export interface WalletTransferLeaf {
@@ -131,5 +132,12 @@ export function mapTransferToWalletTransfer(
         : TransferDirection.OUTGOING,
     userRequest: userRequest,
     sparkInvoice: proto.sparkInvoice || undefined,
+    receivers:
+      proto.receivers.length > 0
+        ? proto.receivers.map((r) => ({
+            identityPublicKey: bytesToHex(r.identityPublicKey),
+            amountSats: r.amountSats,
+          }))
+        : undefined,
   };
 }

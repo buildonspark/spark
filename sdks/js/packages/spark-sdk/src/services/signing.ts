@@ -91,9 +91,10 @@ export class SigningService {
     return leafSigningJobs;
   }
 
-  async signRefunds(
+  private async signRefundsCore(
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
+    createRefundTxs: typeof createDecrementedTimelockRefundTxs,
     cpfpSigningCommitments: RequestedSigningCommitments[],
     directSigningCommitments: RequestedSigningCommitments[],
     directFromCpfpSigningCommitments: RequestedSigningCommitments[],
@@ -112,15 +113,16 @@ export class SigningService {
     for (let i = 0; i < leaves.length; i++) {
       const leaf = leaves[i];
       if (!leaf?.leaf) {
-        throw new SparkValidationError("Leaf not found in signRefunds", {
+        throw new SparkValidationError("Leaf not found in signRefundsCore", {
           field: "leaf",
           value: leaf,
           expected: "Non-null leaf",
         });
       }
 
+      const receivingPubkey =
+        leaf.receiverIdentityPublicKey ?? receiverIdentityPubkey;
       const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
-
       const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
 
       const amountSats = currRefundTx.getOutput(0).amount;
@@ -147,11 +149,11 @@ export class SigningService {
       }
 
       const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-        await createDecrementedTimelockRefundTxs({
-          nodeTx: nodeTx,
-          directNodeTx: directNodeTx,
+        await createRefundTxs({
+          nodeTx,
+          directNodeTx,
           sequence: currentSequence,
-          receivingPubkey: receiverIdentityPubkey,
+          receivingPubkey,
           network: this.config.getNetwork(),
         });
 
@@ -167,7 +169,6 @@ export class SigningService {
         cpfpSigningCommitments[i]?.signingNonceCommitments,
         adaptorPubKey,
       );
-
       cpfpLeafSigningJobs.push(...signingJobs);
 
       const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
@@ -221,9 +222,32 @@ export class SigningService {
     };
   }
 
+  async signRefunds(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    cpfpSigningCommitments: RequestedSigningCommitments[],
+    directSigningCommitments: RequestedSigningCommitments[],
+    directFromCpfpSigningCommitments: RequestedSigningCommitments[],
+    adaptorPubKey?: Uint8Array,
+  ): Promise<{
+    cpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[];
+    directLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[];
+    directFromCpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[];
+  }> {
+    return this.signRefundsCore(
+      leaves,
+      receiverIdentityPubkey,
+      createDecrementedTimelockRefundTxs,
+      cpfpSigningCommitments,
+      directSigningCommitments,
+      directFromCpfpSigningCommitments,
+      adaptorPubKey,
+    );
+  }
+
   async signRefundsForClaim(
     leaves: LeafKeyTweak[],
-    receivingPubkeys: Map<string, Uint8Array>,
+    receiverIdentityPubkey: Uint8Array,
     cpfpSigningCommitments: RequestedSigningCommitments[],
     directSigningCommitments: RequestedSigningCommitments[],
     directFromCpfpSigningCommitments: RequestedSigningCommitments[],
@@ -232,129 +256,14 @@ export class SigningService {
     directLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[];
     directFromCpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[];
   }> {
-    const cpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[] = [];
-    const directLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[] =
-      [];
-    const directFromCpfpLeafSigningJobs: UserSignedTxSigningJobWithSelfCommitment[] =
-      [];
-
-    for (let i = 0; i < leaves.length; i++) {
-      const leaf = leaves[i];
-      if (!leaf?.leaf) {
-        throw new SparkValidationError(
-          "Leaf not found in signRefundsForClaim",
-          {
-            field: "leaf",
-            value: leaf,
-            expected: "Non-null leaf",
-          },
-        );
-      }
-
-      const receivingPubkey = receivingPubkeys.get(leaf.leaf.id);
-      if (!receivingPubkey) {
-        throw new SparkValidationError("Receiving pubkey not found for leaf", {
-          field: "receivingPubkey",
-          value: leaf.leaf.id,
-          expected: "Non-null receiving pubkey",
-        });
-      }
-
-      const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
-      const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
-
-      const amountSats = currRefundTx.getOutput(0).amount;
-      if (amountSats === undefined) {
-        throw new SparkValidationError("Invalid refund transaction", {
-          field: "amount",
-          value: currRefundTx.getOutput(0),
-          expected: "Non-null amount",
-        });
-      }
-
-      let directNodeTx: Transaction | undefined;
-      if (leaf.leaf.directTx.length > 0) {
-        directNodeTx = getTxFromRawTxBytes(leaf.leaf.directTx);
-      }
-
-      const currentSequence = currRefundTx.getInput(0).sequence;
-      if (currentSequence == null) {
-        throw new SparkValidationError("Invalid refund transaction", {
-          field: "sequence",
-          value: currRefundTx.getInput(0),
-          expected: "Non-null sequence",
-        });
-      }
-
-      const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-        await createCurrentTimelockRefundTxs({
-          nodeTx,
-          directNodeTx,
-          sequence: currentSequence,
-          receivingPubkey,
-          network: this.config.getNetwork(),
-        });
-
-      const refundSighash = getSigHashFromTx(
-        cpfpRefundTx,
-        0,
-        nodeTx.getOutput(0),
-      );
-      const signingJobs = await this.signRefundsInternal(
-        cpfpRefundTx,
-        refundSighash,
-        leaf,
-        cpfpSigningCommitments[i]?.signingNonceCommitments,
-      );
-      cpfpLeafSigningJobs.push(...signingJobs);
-
-      const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
-      if (directRefundTx && !isZeroNode) {
-        if (!directNodeTx) {
-          throw new SparkValidationError(
-            "Direct node transaction undefined while direct refund transaction is defined",
-            {
-              field: "directNodeTx",
-              value: directNodeTx,
-              expected: "Non-null direct node transaction",
-            },
-          );
-        }
-        const refundSighash = getSigHashFromTx(
-          directRefundTx,
-          0,
-          directNodeTx.getOutput(0),
-        );
-        const signingJobs = await this.signRefundsInternal(
-          directRefundTx,
-          refundSighash,
-          leaf,
-          directSigningCommitments[i]?.signingNonceCommitments,
-        );
-        directLeafSigningJobs.push(...signingJobs);
-      }
-
-      if (directFromCpfpRefundTx) {
-        const refundSighash = getSigHashFromTx(
-          directFromCpfpRefundTx,
-          0,
-          nodeTx.getOutput(0),
-        );
-        const signingJobs = await this.signRefundsInternal(
-          directFromCpfpRefundTx,
-          refundSighash,
-          leaf,
-          directFromCpfpSigningCommitments[i]?.signingNonceCommitments,
-        );
-        directFromCpfpLeafSigningJobs.push(...signingJobs);
-      }
-    }
-
-    return {
-      cpfpLeafSigningJobs,
-      directLeafSigningJobs,
-      directFromCpfpLeafSigningJobs,
-    };
+    return this.signRefundsCore(
+      leaves,
+      receiverIdentityPubkey,
+      createCurrentTimelockRefundTxs,
+      cpfpSigningCommitments,
+      directSigningCommitments,
+      directFromCpfpSigningCommitments,
+    );
   }
 
   async signRefundsForCoopExit(

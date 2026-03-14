@@ -3,10 +3,15 @@ import { z } from "zod";
 import { outputParam, type OutputMode } from "../utils.js";
 import { resolveWallet, createFreshWallet } from "../wallet.js";
 import type { ServerConfig } from "../config.js";
-import { handleGetBalance, handleGetSparkAddress } from "./wallet.js";
+import {
+  handleGetBalance,
+  handleGetSparkAddress,
+  handleDisconnectWallet,
+} from "./wallet.js";
 import { handleGetDepositAddress, handleClaimDeposit } from "./deposits.js";
 import {
   handleSendTransfer,
+  handleSendMultiTransfer,
   handleGetTransfer,
   handleListTransfers,
 } from "./transfers.js";
@@ -109,6 +114,32 @@ export function registerAllTools(
       network?: string;
       output?: OutputMode;
     }) => handleGetSparkAddress(mnemonic, makeResolve(network), output),
+  );
+  server.tool(
+    "spark_disconnect_wallet",
+    "Disconnect a cached wallet, stopping its background stream and closing connections. " +
+      "After disconnecting, the wallet will NOT auto-claim incoming transfers until the next tool call re-initializes it. " +
+      "Useful in testing to ensure a wallet has not claimed transfers.",
+    {
+      mnemonic: mnemonicParam,
+      network: networkParam,
+      output: outputParam,
+    },
+    ({
+      mnemonic,
+      network,
+      output,
+    }: {
+      mnemonic?: string;
+      network?: string;
+      output?: OutputMode;
+    }) =>
+      handleDisconnectWallet(
+        mnemonic,
+        network as "LOCAL" | "REGTEST" | "MAINNET" | undefined,
+        undefined,
+        output,
+      ),
   );
 
   // Deposit tools
@@ -278,6 +309,47 @@ export function registerAllTools(
       ),
   );
   server.tool(
+    "spark_send_multi_transfer",
+    "Send sats to multiple Spark addresses in a single atomic transfer",
+    {
+      receivers: z
+        .array(
+          z.object({
+            receiverSparkAddress: z
+              .string()
+              .describe("The recipient's Spark address"),
+            amountSats: z
+              .number()
+              .int()
+              .positive()
+              .describe("Amount to send to this receiver in satoshis"),
+          }),
+        )
+        .min(1)
+        .describe("Receivers with their Spark addresses and amounts"),
+      mnemonic: mnemonicParam,
+      network: networkParam,
+      output: outputParam,
+    },
+    ({
+      receivers,
+      mnemonic,
+      network,
+      output,
+    }: {
+      receivers: Array<{ receiverSparkAddress: string; amountSats: number }>;
+      mnemonic?: string;
+      network?: string;
+      output?: OutputMode;
+    }) =>
+      handleSendMultiTransfer(
+        receivers,
+        mnemonic,
+        makeResolve(network),
+        output,
+      ),
+  );
+  server.tool(
     "spark_get_transfer",
     "Get the status and details of a specific transfer by ID",
     {
@@ -316,7 +388,6 @@ export function registerAllTools(
       output?: OutputMode;
     }) => handleListTransfers(mnemonic, makeResolve(network), output),
   );
-
   // Lightning tools
   server.tool(
     "spark_create_invoice",

@@ -29,6 +29,7 @@ async function main(): Promise<void> {
     "Deposit workflow tips:",
     "- Deposit addresses are SINGLE-USE. After funding and claiming a deposit, call spark_get_deposit_address again for the next deposit.",
     "- spark_claim_deposit waits for the balance to settle before returning, so funds are immediately spendable.",
+    "- Incoming Spark transfers are claimed automatically when the wallet connects. Just call spark_get_balance on the receiving wallet after sending from another wallet.",
     ...(config.defaultNetwork === "LOCAL"
       ? [
           "- spark_deposit and spark_fund_address are available for automated funding via local Bitcoin RPC.",

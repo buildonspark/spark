@@ -387,13 +387,11 @@ export function isZeroTimelock(currSequence: number) {
   return getCurrentTimelock(currSequence) === 0;
 }
 
-// A transaction's timelock should never go below 100 blocks following a
-// transfer or renewal operation, as this risks interfering with watchtowers
+// Refresh if current timelock is less than 200 blocks, to prevent it from
+// going below 100 blocks following a transfer or renewal, which risks
+// interfering with watchtowers.
 export function doesTxnNeedRenewed(currSequence: number) {
   const currentTimelock = getCurrentTimelock(currSequence);
-  // Refresh if current timelock is less than 200 blocks.
-  // This is to prevent the timelock from going below 100 blocks following a
-
   return currentTimelock < 200;
 }
 

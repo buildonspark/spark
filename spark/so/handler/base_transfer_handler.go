@@ -996,7 +996,7 @@ func (h *BaseTransferHandler) LeafAvailableToTransfer(ctx context.Context, leaf 
 	var senderPubkey keys.Public
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
 		var err error
-		senderPubkey, _, err = GetTransferSenderReceiver(transfer)
+		senderPubkey, err = GetTransferSender(transfer)
 		if err != nil {
 			return err
 		}
@@ -1195,7 +1195,7 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 	var senderPubkey keys.Public
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
 		var err error
-		senderPubkey, _, err = GetTransferSenderReceiver(transfer)
+		senderPubkey, err = GetTransferSender(transfer)
 		if err != nil {
 			return nil, err
 		}

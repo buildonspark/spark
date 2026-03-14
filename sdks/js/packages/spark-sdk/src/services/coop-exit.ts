@@ -67,9 +67,6 @@ export class CoopExitService extends BaseTransferService {
       transferId,
       receiverPubKey,
       leaves,
-      new Map<string, Uint8Array>(),
-      new Map<string, Uint8Array>(),
-      new Map<string, Uint8Array>(),
     );
 
     // 2. Get SO signing commitments (3 per leaf: cpfp, direct, directFromCpfp)

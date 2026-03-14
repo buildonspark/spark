@@ -233,6 +233,15 @@ export interface SparkWalletEvents {
   ) => void;
 }
 
+export type TransferReceiver = {
+  receiverSparkAddress: string;
+  amountSats: number;
+};
+
+export type TransferV2Params = {
+  receivers: TransferReceiver[];
+};
+
 export type CreateHTLCParams = {
   receiverSparkAddress: string;
   amountSats: number;

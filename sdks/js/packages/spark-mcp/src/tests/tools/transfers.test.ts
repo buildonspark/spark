@@ -1,6 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import {
   handleSendTransfer,
+  handleSendMultiTransfer,
   handleGetTransfer,
   handleListTransfers,
 } from "../../tools/transfers.js";
@@ -29,6 +30,12 @@ const transferMock =
       amountSats: number;
     }) => Promise<WalletTransfer>
   >();
+const transferV2Mock =
+  jest.fn<
+    (p: {
+      receivers: Array<{ receiverSparkAddress: string; amountSats: number }>;
+    }) => Promise<WalletTransfer>
+  >();
 const getTransferMock =
   jest.fn<(id: string) => Promise<WalletTransfer | undefined>>();
 const getTransfersMock =
@@ -38,10 +45,10 @@ const getTransfersMock =
       offset?: number,
     ) => Promise<{ transfers: WalletTransfer[]; offset: number }>
   >();
-
 const mockWallet = {
   getBalance: getBalanceMock,
   transfer: transferMock,
+  transferV2: transferV2Mock,
   getTransfer: getTransferMock,
   getTransfers: getTransfersMock,
 };
@@ -108,6 +115,50 @@ describe("handleSendTransfer", () => {
     );
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("insufficient funds");
+  });
+});
+
+describe("handleSendMultiTransfer", () => {
+  const receivers = [
+    { receiverSparkAddress: "sparkl1abc", amountSats: 500 },
+    { receiverSparkAddress: "sparkl1def", amountSats: 300 },
+  ];
+
+  it("returns transfer id and receiver count", async () => {
+    getBalanceMock.mockResolvedValue({ balance: 5000n });
+    transferV2Mock.mockResolvedValue(sampleTransfer);
+    const result = await handleSendMultiTransfer(
+      receivers,
+      undefined,
+      mockResolve,
+    );
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0]?.text).toContain("txn-123");
+    expect(result.content[0]?.text).toContain("2");
+  });
+
+  it("returns insufficient balance error when total exceeds balance", async () => {
+    getBalanceMock.mockResolvedValue({ balance: 500n });
+    const result = await handleSendMultiTransfer(
+      receivers,
+      undefined,
+      mockResolve,
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("Insufficient balance");
+    expect(transferV2Mock).not.toHaveBeenCalled();
+  });
+
+  it("returns error on transfer failure", async () => {
+    getBalanceMock.mockResolvedValue({ balance: 5000n });
+    transferV2Mock.mockRejectedValue(new Error("network timeout"));
+    const result = await handleSendMultiTransfer(
+      receivers,
+      undefined,
+      mockResolve,
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("network timeout");
   });
 });
 

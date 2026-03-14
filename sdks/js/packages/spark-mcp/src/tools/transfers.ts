@@ -107,6 +107,70 @@ export async function handleSendTransfer(
   }
 }
 
+export async function handleSendMultiTransfer(
+  receivers: Array<{ receiverSparkAddress: string; amountSats: number }>,
+  mnemonic?: string,
+  resolve: ResolveFn = resolveWallet,
+  output: OutputMode = "normal",
+): Promise<ToolResult> {
+  try {
+    const wallet = await resolve(mnemonic);
+
+    const totalAmount = receivers.reduce((sum, r) => sum + r.amountSats, 0);
+    const { balance } = await wallet.getBalance();
+    if (balance < BigInt(totalAmount)) {
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              `Insufficient balance: wallet has ${formatSats(balance)} but transfer requires ${formatSats(BigInt(totalAmount))}. ` +
+              `If you recently claimed a deposit, the balance may still be settling — wait a few seconds and retry.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const transfer = await wallet.transferV2({ receivers });
+
+    if (output === "raw") return rawResult(transfer);
+    if (output === "verbose") {
+      const receiverLines = receivers
+        .map(
+          (r) =>
+            `  ${r.receiverSparkAddress}: ${formatSats(BigInt(r.amountSats))}`,
+        )
+        .join("\n");
+      return {
+        content: [
+          {
+            type: "text",
+            text: `${formatTransferVerbose(transfer as WalletTransfer)}\nReceivers:\n${receiverLines}`,
+          },
+        ],
+      };
+    }
+
+    const receiverSummary = receivers
+      .map((r) => `${r.amountSats} sats`)
+      .join(" + ");
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Multi-transfer sent.\nTransfer ID: ${transfer.id}\nStatus: ${transfer.status}\nReceivers: ${receivers.length} (${receiverSummary})`,
+        },
+      ],
+    };
+  } catch (err) {
+    return {
+      content: [{ type: "text", text: `Error: ${errorMessage(err)}` }],
+      isError: true,
+    };
+  }
+}
+
 export async function handleGetTransfer(
   id: string,
   mnemonic?: string,

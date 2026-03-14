@@ -1729,7 +1729,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	}
 	var senderPubkey keys.Public
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
-		senderPubkey, _, err = GetTransferSenderReceiver(transfer)
+		senderPubkey, err = GetTransferSender(transfer)
 		if err != nil {
 			return nil, err
 		}

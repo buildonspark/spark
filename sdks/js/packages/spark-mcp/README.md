@@ -162,11 +162,12 @@ Funding tools (`spark_fund_address`, `spark_deposit`) only work on the `LOCAL` n
 
 ### Wallet
 
-| Tool                      | Description                                             |
-| ------------------------- | ------------------------------------------------------- |
-| `spark_create_wallet`     | Generate a new wallet. Returns mnemonic + Spark address |
-| `spark_get_balance`       | Get current balance in satoshis                         |
-| `spark_get_spark_address` | Get the wallet's Spark address for receiving transfers  |
+| Tool                      | Description                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `spark_create_wallet`     | Generate a new wallet. Returns mnemonic + Spark address                                               |
+| `spark_get_balance`       | Get current balance in satoshis                                                                       |
+| `spark_get_spark_address` | Get the wallet's Spark address for receiving transfers                                                |
+| `spark_disconnect_wallet` | Disconnect a cached wallet, stopping background streams. Prevents auto-claim until the next tool call |
 
 ### Deposits (Bitcoin L1 → Spark)
 
@@ -181,11 +182,12 @@ Funding tools (`spark_fund_address`, `spark_deposit`) only work on the `LOCAL` n
 
 ### Transfers (off-chain, Spark → Spark)
 
-| Tool                   | Description                                       |
-| ---------------------- | ------------------------------------------------- |
-| `spark_send_transfer`  | Send sats to a Spark address (instant, off-chain) |
-| `spark_get_transfer`   | Get the status of a transfer by ID                |
-| `spark_list_transfers` | List the 10 most recent transfers                 |
+| Tool                        | Description                                                       |
+| --------------------------- | ----------------------------------------------------------------- |
+| `spark_send_transfer`       | Send sats to a Spark address (instant, off-chain)                 |
+| `spark_send_multi_transfer` | Send sats to multiple Spark addresses in a single atomic transfer |
+| `spark_get_transfer`        | Get the status of a transfer by ID                                |
+| `spark_list_transfers`      | List the 10 most recent transfers                                 |
 
 ### Lightning
 

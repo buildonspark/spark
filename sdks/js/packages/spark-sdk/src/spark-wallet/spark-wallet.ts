@@ -153,6 +153,7 @@ import type {
   HandlePublicMethodErrorParams,
   InitWalletResponse,
   InvalidInvoice,
+  TransferV2Params,
   PayLightningInvoiceParams,
   SparkWalletEvents,
   SparkWalletEventType,
@@ -2395,6 +2396,101 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     if (!outcome) throw new Error("no transfer created");
     if (!outcome.ok) throw outcome.error;
     return outcome.transfer;
+  }
+
+  /**
+   * Sends sats to multiple Spark addresses in a single atomic V3 transfer.
+   *
+   * @param {TransferV2Params} params - Receivers with their Spark addresses and amounts
+   * @returns {Promise<WalletTransfer>} The completed transfer
+   */
+  public async transferV2({
+    receivers,
+  }: TransferV2Params): Promise<WalletTransfer> {
+    if (receivers.length === 0) {
+      throw new SparkValidationError(
+        "transferV2 requires at least 1 receiver",
+        {
+          field: "receivers",
+          value: receivers.length,
+          expected: ">= 1",
+        },
+      );
+    }
+
+    const decodedReceivers: Array<{
+      identityPublicKey: Uint8Array;
+      amountSats: number;
+    }> = [];
+
+    for (const receiver of receivers) {
+      if (!receiver.receiverSparkAddress) {
+        throw new SparkValidationError(
+          "Receiver Spark address cannot be empty",
+          { field: "receiverSparkAddress" },
+        );
+      }
+      if (
+        !Number.isSafeInteger(receiver.amountSats) ||
+        receiver.amountSats <= 0
+      ) {
+        throw new SparkValidationError(
+          "Amount must be a positive safe integer",
+          {
+            field: "amountSats",
+            value: receiver.amountSats,
+          },
+        );
+      }
+
+      const addressData = decodeSparkAddress(
+        receiver.receiverSparkAddress,
+        this.config.getNetworkType(),
+      );
+      if (addressData.sparkInvoiceFields) {
+        throw new SparkValidationError(
+          "Spark invoices are not currently supported in multi-receiver transfers. Use plain Spark addresses.",
+          {
+            field: "receiverSparkAddress",
+            value: receiver.receiverSparkAddress,
+          },
+        );
+      }
+
+      decodedReceivers.push({
+        identityPublicKey: hexToBytes(addressData.identityPublicKey),
+        amountSats: receiver.amountSats,
+      });
+    }
+
+    const amountSatsArray = decodedReceivers.map((r) => r.amountSats);
+
+    return await this.leafManager.selectLeavesAndExecute(
+      amountSatsArray,
+      async (selected) => {
+        const allLeafKeyTweaks: LeafKeyTweak[] = [];
+
+        for (let i = 0; i < decodedReceivers.length; i++) {
+          const receiver = decodedReceivers[i]!;
+          const leaves = selected[i] as TreeNode[];
+          const leafKeyTweaks: LeafKeyTweak[] = leaves.map((leaf) => ({
+            ...this.toSendTweak(leaf),
+            receiverIdentityPublicKey: receiver.identityPublicKey,
+          }));
+          allLeafKeyTweaks.push(...leafKeyTweaks);
+        }
+
+        const transfer =
+          await this.transferService.sendTransferV3(allLeafKeyTweaks);
+
+        await this.leafManager.handleTransferEvent(transfer);
+
+        return mapTransferToWalletTransfer(
+          transfer,
+          bytesToHex(await this.config.signer.getIdentityPublicKey()),
+        );
+      },
+    );
   }
 
   /**
@@ -5430,6 +5526,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "signMessageWithIdentityKey",
   "signTransaction",
   "transfer",
+  "transferV2",
   "transferTokens",
   "validateMessageWithIdentityKey",
   "withdraw",

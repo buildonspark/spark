@@ -1,4 +1,5 @@
-import { resolveWallet } from "../wallet.js";
+import { resolveWallet, evictWallet } from "../wallet.js";
+import type { BitcoinNetwork } from "../config.js";
 import {
   formatSats,
   errorMessage,
@@ -42,6 +43,49 @@ export async function handleGetSparkAddress(
     const addr = await wallet.getSparkAddress();
     if (output === "raw") return rawResult({ sparkAddress: addr });
     return { content: [{ type: "text", text: `Spark address: ${addr}` }] };
+  } catch (err) {
+    return {
+      content: [{ type: "text", text: `Error: ${errorMessage(err)}` }],
+      isError: true,
+    };
+  }
+}
+
+type EvictFn = (
+  mnemonic?: string,
+  networkOverride?: BitcoinNetwork,
+) => Promise<boolean>;
+
+export async function handleDisconnectWallet(
+  mnemonic?: string,
+  networkOverride?: BitcoinNetwork,
+  evict: EvictFn = evictWallet,
+  output: OutputMode = "normal",
+): Promise<ToolResult> {
+  try {
+    const evicted = await evict(mnemonic, networkOverride);
+
+    if (output === "raw") return rawResult({ evicted });
+
+    if (!evicted) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "No cached wallet found for this mnemonic/network. Nothing to disconnect.",
+          },
+        ],
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: "Wallet disconnected. Background stream stopped and connections closed. The next call will create a fresh instance.",
+        },
+      ],
+    };
   } catch (err) {
     return {
       content: [{ type: "text", text: `Error: ${errorMessage(err)}` }],
