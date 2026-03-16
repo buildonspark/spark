@@ -195,9 +195,11 @@ message InvoiceAttachment {
 }
 
 message SignatureWithIndex {
-    // This is a Schnorr or ECDSA DER signature which can be between 64 and 73
-    // bytes.
+    // Deprecated: use authority_signatures oneof instead.
+    // When populated, this is a Schnorr or ECDSA DER signature (64-73 bytes).
+    // May be empty when authority_signatures is set.
     bytes signature = 1 [
+        (validate.rules).bytes.ignore_empty = true,
         (validate.rules).bytes.min_len = 64,
         (validate.rules).bytes.max_len = 73
     ];

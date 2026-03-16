@@ -2438,15 +2438,19 @@ func (m *SignatureWithIndex) validate(all bool) error {
 
 	var errors []error
 
-	if l := len(m.GetSignature()); l < 64 || l > 73 {
-		err := SignatureWithIndexValidationError{
-			field:  "Signature",
-			reason: "value length must be between 64 and 73 bytes, inclusive",
+	if len(m.GetSignature()) > 0 {
+
+		if l := len(m.GetSignature()); l < 64 || l > 73 {
+			err := SignatureWithIndexValidationError{
+				field:  "Signature",
+				reason: "value length must be between 64 and 73 bytes, inclusive",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
 		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
+
 	}
 
 	// no validation rules for InputIndex

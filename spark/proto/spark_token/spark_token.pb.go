@@ -1302,8 +1302,9 @@ func (x *InvoiceAttachment) GetSparkInvoice() string {
 
 type SignatureWithIndex struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// This is a Schnorr or ECDSA DER signature which can be between 64 and 73
-	// bytes.
+	// Deprecated: use authority_signatures oneof instead.
+	// When populated, this is a Schnorr or ECDSA DER signature (64-73 bytes).
+	// May be empty when authority_signatures is set.
 	Signature []byte `protobuf:"bytes,1,opt,name=signature,proto3" json:"signature,omitempty"`
 	// The index of the TTXO associated with this signature.
 	InputIndex    uint32 `protobuf:"varint,2,opt,name=input_index,json=inputIndex,proto3" json:"input_index,omitempty"`
@@ -3167,9 +3168,9 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x13final_token_outputs\x18\x06 \x03(\v2\x1d.spark_token.FinalTokenOutputR\x11finalTokenOutputsB\x0e\n" +
 	"\ftoken_inputs\"8\n" +
 	"\x11InvoiceAttachment\x12#\n" +
-	"\rspark_invoice\x18\x01 \x01(\tR\fsparkInvoice\"^\n" +
-	"\x12SignatureWithIndex\x12'\n" +
-	"\tsignature\x18\x01 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\tsignature\x12\x1f\n" +
+	"\rspark_invoice\x18\x01 \x01(\tR\fsparkInvoice\"`\n" +
+	"\x12SignatureWithIndex\x12)\n" +
+	"\tsignature\x18\x01 \x01(\fB\v\xfaB\bz\x06\x10@\x18Ip\x01R\tsignature\x12\x1f\n" +
 	"\vinput_index\x18\x02 \x01(\rR\n" +
 	"inputIndex\"\xb4\x01\n" +
 	"\x1eInputTtxoSignaturesPerOperator\x12H\n" +
