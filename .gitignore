@@ -47,8 +47,9 @@ _data/
 *.code-workspace
 
 # Claude Code settings
-.claude/settings.local.json
 .claude/CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/
 
 # Claude Code thoughts/plans
 /thoughts/
