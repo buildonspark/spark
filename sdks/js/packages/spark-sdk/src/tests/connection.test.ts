@@ -485,6 +485,130 @@ describe("ConnectionManager middleware", () => {
     expect(mgr.verifyChallengeCalls).toBe(1);
   });
 
+  /**
+   * Regression test for the auth retry refcount bug.
+   *
+   * Before the fix, authenticate() created the authn gRPC client once
+   * (acquireChannel +1 refCount) but called close() on every retry
+   * iteration (releaseChannel -1 each time). After enough connection
+   * errors the shared unary channel's refCount hit 0 and the channel
+   * was permanently closed.
+   *
+   * The fix moves close() into a single finally block so it's called
+   * exactly once regardless of how many retries occur.
+   */
+  test("auth retries with connection errors do not drain the shared channel refcount", async () => {
+    let getChallengeAttempts = 0;
+
+    class AuthRetryTestConnectionManager extends ConnectionManagerNodeJS {
+      public createdChannels: FakeChannel[] = [];
+      private readonly fixedNow = new Date();
+      public getCurrentServerTime(): Date {
+        return this.fixedNow;
+      }
+
+      protected async createChannelWithTLS(
+        _address: string,
+        _isStreamClientType: boolean = false,
+      ): Promise<Channel> {
+        const ch = new FakeChannel();
+        this.createdChannels.push(ch);
+        return ch as unknown as Channel;
+      }
+
+      protected async createGrpcClient<T>(
+        _definition: AnyServiceDef,
+        channel: Channel,
+        _withRetries: boolean,
+        _middleware?: ClientMiddleware<RetryOptions, {}>,
+        channelKey?: string,
+      ): Promise<T & { close?: () => void }> {
+        const close =
+          channelKey != null
+            ? () => AuthRetryTestConnectionManager.releaseChannel(channelKey)
+            : (channel.close.bind(channel) as () => void);
+
+        const self = this;
+        const fakeClient = {
+          async get_challenge({ publicKey }: { publicKey: Uint8Array }) {
+            getChallengeAttempts += 1;
+            // Fail with a connection error on the first 3 attempts,
+            // then succeed on attempt 4.
+            if (getChallengeAttempts <= 3) {
+              throw new Error("UNAVAILABLE: read ETIMEDOUT");
+            }
+            return {
+              protectedChallenge: {
+                version: 1,
+                challenge: {
+                  version: 1,
+                  timestamp: 1,
+                  nonce: new Uint8Array([1]),
+                  publicKey,
+                },
+                serverHmac: new Uint8Array([2]),
+              },
+            };
+          },
+          async verify_challenge() {
+            return {
+              sessionToken: "recovered-token",
+              expirationTimestamp:
+                Math.floor(self.fixedNow.getTime() / 1000) + 3600,
+            };
+          },
+          close,
+        } as unknown as T & { close?: () => void };
+
+        return fakeClient;
+      }
+    }
+
+    const signer = new DefaultSparkSigner();
+    await signer.createSparkWalletFromSeed(new Uint8Array(32));
+    const config = new WalletConfigService({ network: "LOCAL" }, signer);
+    const mgr = new AuthRetryTestConnectionManager(config);
+    const address = "https://refcount-bug.spark.local";
+
+    // Create a spark client — this triggers initial auth (which creates
+    // and closes a temporary authn channel) then creates the spark client's
+    // channel. After this, the unary channel has refCount = 1.
+    await mgr.createSparkClient(address);
+    const channelsAfterInit = mgr.createdChannels.length;
+    const sparkChannel = mgr.createdChannels[channelsAfterInit - 1]!;
+
+    // Invalidate the cached auth token so the next authenticate() call
+    // goes through the full get_challenge / verify_challenge flow.
+    (AuthRetryTestConnectionManager as any).authTokenCache.clear();
+
+    // Trigger re-authentication. This acquires the EXISTING unary channel
+    // (refCount goes to 2), then get_challenge fails 3 times with
+    // connection errors before succeeding on attempt 4.
+    //
+    // With the fix: close() is called once in the finally block (refCount → 1).
+    // Without the fix: close() was called on each retry (refCount → -2),
+    //   destroying the channel after the second close.
+    // The first authenticate() (inside createSparkClient) already consumed
+    // attempts 1-4 of the mock. Reset so the re-auth exercises the retry path fresh.
+    getChallengeAttempts = 0;
+    const token = await (mgr as any).authenticate(address);
+
+    expect(token).toBeDefined();
+    expect(getChallengeAttempts).toBe(4); // 3 failures + 1 success
+
+    // The shared spark channel must still be alive — close should NOT
+    // have been called (refCount should be 1, not 0).
+    expect(sparkChannel.close).not.toHaveBeenCalled();
+
+    // No new channels should have been created during re-auth
+    // (the authn client reused the existing unary channel).
+    expect(mgr.createdChannels).toHaveLength(channelsAfterInit);
+
+    await mgr.closeConnections();
+    // NOW close should be called exactly once (refCount drops to 0)
+    expect(sparkChannel.close).toHaveBeenCalledTimes(1);
+  });
+
   test("per-address auth scoping: same signer, two addresses => two auth flows", async () => {
     const signer = new DefaultSparkSigner();
     await signer.createSparkWalletFromSeed(new Uint8Array(32));

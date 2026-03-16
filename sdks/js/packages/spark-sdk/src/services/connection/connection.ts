@@ -418,78 +418,78 @@ export abstract class ConnectionManager {
         const sparkAuthnClient =
           await this.createSparkAuthnGrpcConnection(address);
 
-        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-          try {
-            const challengeResp = await sparkAuthnClient.get_challenge({
-              publicKey: identityPublicKey,
-            });
-            const protectedChallenge = challengeResp.protectedChallenge;
-            const challenge = protectedChallenge?.challenge;
-
-            if (!challenge) {
-              throw new SparkAuthenticationError("Invalid challenge response", {
-                endpoint: "get_challenge",
-                reason: "Missing challenge in response",
+        try {
+          for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            try {
+              const challengeResp = await sparkAuthnClient.get_challenge({
+                publicKey: identityPublicKey,
               });
-            }
+              const protectedChallenge = challengeResp.protectedChallenge;
+              const challenge = protectedChallenge?.challenge;
 
-            const challengeBytes = Challenge.encode(challenge).finish();
-            const hash = sha256(challengeBytes);
-
-            const derSignatureBytes =
-              await this.config.signer.signMessageWithIdentityKey(hash);
-
-            const verifyResp = await sparkAuthnClient.verify_challenge({
-              protectedChallenge,
-              signature: derSignatureBytes,
-              publicKey: identityPublicKey,
-            });
-
-            if (sparkAuthnClient.close) {
-              sparkAuthnClient.close();
-            }
-            return {
-              token: verifyResp.sessionToken,
-              expiresAtSec: verifyResp.expirationTimestamp,
-            };
-          } catch (error: unknown) {
-            if (isError(error)) {
-              if (sparkAuthnClient.close) {
-                sparkAuthnClient.close();
+              if (!challenge) {
+                throw new SparkAuthenticationError(
+                  "Invalid challenge response",
+                  {
+                    endpoint: "get_challenge",
+                    reason: "Missing challenge in response",
+                  },
+                );
               }
 
-              if (isExpiredChallengeError(error, attempt)) {
-                lastError = error;
-                continue;
-              }
+              const challengeBytes = Challenge.encode(challenge).finish();
+              const hash = sha256(challengeBytes);
 
-              if (isConnectionError(error, attempt)) {
-                lastError = error;
-                await new Promise((resolve) => setTimeout(resolve, 250));
-                continue;
-              }
+              const derSignatureBytes =
+                await this.config.signer.signMessageWithIdentityKey(hash);
 
-              throw new SparkAuthenticationError("Authentication failed", {
-                endpoint: "authenticate",
-                reason: error.message,
-                error,
+              const verifyResp = await sparkAuthnClient.verify_challenge({
+                protectedChallenge,
+                signature: derSignatureBytes,
+                publicKey: identityPublicKey,
               });
-            } else {
-              lastError = new Error(
-                `Unknown error during authentication: ${String(error)}`,
-              );
+
+              return {
+                token: verifyResp.sessionToken,
+                expiresAtSec: verifyResp.expirationTimestamp,
+              };
+            } catch (error: unknown) {
+              if (isError(error)) {
+                if (isExpiredChallengeError(error, attempt)) {
+                  lastError = error;
+                  continue;
+                }
+
+                if (isConnectionError(error, attempt)) {
+                  lastError = error;
+                  await new Promise((resolve) => setTimeout(resolve, 250));
+                  continue;
+                }
+
+                throw new SparkAuthenticationError("Authentication failed", {
+                  endpoint: "authenticate",
+                  reason: error.message,
+                  error,
+                });
+              } else {
+                lastError = new Error(
+                  `Unknown error during authentication: ${String(error)}`,
+                );
+              }
             }
           }
-        }
 
-        throw new SparkAuthenticationError(
-          "Authentication failed after retrying expired challenges",
-          {
-            endpoint: "authenticate",
-            reason: lastError?.message ?? "Unknown error",
-            error: lastError,
-          },
-        );
+          throw new SparkAuthenticationError(
+            "Authentication failed after retrying expired challenges",
+            {
+              endpoint: "authenticate",
+              reason: lastError?.message ?? "Unknown error",
+              error: lastError,
+            },
+          );
+        } finally {
+          sparkAuthnClient.close?.();
+        }
       },
     );
   }
