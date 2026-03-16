@@ -62,7 +62,6 @@ const (
 	SparkInternalService_GetTransfers_FullMethodName                       = "/spark_internal.SparkInternalService/get_transfers"
 	SparkInternalService_GenerateStaticDepositAddressProofs_FullMethodName = "/spark_internal.SparkInternalService/generate_static_deposit_address_proofs"
 	SparkInternalService_SyncNode_FullMethodName                           = "/spark_internal.SparkInternalService/sync_node"
-	SparkInternalService_InitiateNodeSwapTransfer_FullMethodName           = "/spark_internal.SparkInternalService/initiate_node_swap_transfer"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -125,9 +124,6 @@ type SparkInternalServiceClient interface {
 	// This method fixes bad leaves by querying a designated "good" SO for its
 	// leaves, and copying it over to this SO's DB.
 	SyncNode(ctx context.Context, in *SyncNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// Creates a swap transfer record for a node without touching keyshares.
-	// Used by the coordinator to sync transfer creation across SOs.
-	InitiateNodeSwapTransfer(ctx context.Context, in *InitiateNodeSwapTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -550,16 +546,6 @@ func (c *sparkInternalServiceClient) SyncNode(ctx context.Context, in *SyncNodeR
 	return out, nil
 }
 
-func (c *sparkInternalServiceClient) InitiateNodeSwapTransfer(ctx context.Context, in *InitiateNodeSwapTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkInternalService_InitiateNodeSwapTransfer_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -620,9 +606,6 @@ type SparkInternalServiceServer interface {
 	// This method fixes bad leaves by querying a designated "good" SO for its
 	// leaves, and copying it over to this SO's DB.
 	SyncNode(context.Context, *SyncNodeRequest) (*emptypb.Empty, error)
-	// Creates a swap transfer record for a node without touching keyshares.
-	// Used by the coordinator to sync transfer creation across SOs.
-	InitiateNodeSwapTransfer(context.Context, *InitiateNodeSwapTransferRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -755,9 +738,6 @@ func (UnimplementedSparkInternalServiceServer) GenerateStaticDepositAddressProof
 }
 func (UnimplementedSparkInternalServiceServer) SyncNode(context.Context, *SyncNodeRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncNode not implemented")
-}
-func (UnimplementedSparkInternalServiceServer) InitiateNodeSwapTransfer(context.Context, *InitiateNodeSwapTransferRequest) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "method InitiateNodeSwapTransfer not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -1518,24 +1498,6 @@ func _SparkInternalService_SyncNode_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkInternalService_InitiateNodeSwapTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(InitiateNodeSwapTransferRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).InitiateNodeSwapTransfer(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkInternalService_InitiateNodeSwapTransfer_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).InitiateNodeSwapTransfer(ctx, req.(*InitiateNodeSwapTransferRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1706,10 +1668,6 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "sync_node",
 			Handler:    _SparkInternalService_SyncNode_Handler,
-		},
-		{
-			MethodName: "initiate_node_swap_transfer",
-			Handler:    _SparkInternalService_InitiateNodeSwapTransfer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

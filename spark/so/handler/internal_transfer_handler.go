@@ -1215,58 +1215,6 @@ func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverPubli
 	return nil
 }
 
-func (h *InternalTransferHandler) InitiateNodeSwapTransfer(ctx context.Context, req *pbinternal.InitiateNodeSwapTransferRequest) error {
-	senderPubKey, err := keys.ParsePublicKey(req.SenderIdentityPublicKey)
-	if err != nil {
-		return fmt.Errorf("invalid sender_identity_public_key: %w", err)
-	}
-
-	receiverPubKey, err := keys.ParsePublicKey(req.ReceiverIdentityPublicKey)
-	if err != nil {
-		return fmt.Errorf("invalid receiver_identity_public_key: %w", err)
-	}
-
-	transferID, err := uuid.Parse(req.TransferId)
-	if err != nil {
-		return fmt.Errorf("invalid transfer_id: %w", err)
-	}
-
-	nodeID, err := uuid.Parse(req.NodeId)
-	if err != nil {
-		return fmt.Errorf("invalid node_id: %w", err)
-	}
-
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get db from context: %w", err)
-	}
-
-	node, err := db.TreeNode.Query().
-		Where(treenode.IDEQ(nodeID)).
-		WithTree().
-		ForUpdate().
-		Only(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to query node %s: %w", nodeID, err)
-	}
-
-	if node.Status != st.TreeNodeStatusAvailable {
-		return fmt.Errorf("node %s is not available, status: %s", nodeID, node.Status)
-	}
-
-	tree := node.Edges.Tree
-	if tree == nil {
-		return fmt.Errorf("node %s has no tree edge", nodeID)
-	}
-
-	_, err = createNodeSwapTransfer(ctx, db, transferID, senderPubKey, receiverPubKey, node, tree.Network)
-	if err != nil {
-		return fmt.Errorf("failed to create node swap transfer: %w", err)
-	}
-
-	return nil
-}
-
 func dedupUUIDs(in []uuid.UUID) []uuid.UUID {
 	m := make(map[uuid.UUID]struct{}, len(in))
 	out := make([]uuid.UUID, 0, len(in))

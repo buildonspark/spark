@@ -86,10 +86,6 @@ service SparkInternalService {
     // This method fixes bad leaves by querying a designated "good" SO for its
     // leaves, and copying it over to this SO's DB.
     rpc sync_node(SyncNodeRequest) returns (google.protobuf.Empty) {}
-
-    // Creates a swap transfer record for a node without touching keyshares.
-    // Used by the coordinator to sync transfer creation across SOs.
-    rpc initiate_node_swap_transfer(InitiateNodeSwapTransferRequest) returns (google.protobuf.Empty) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -538,11 +534,4 @@ message GenerateStaticDepositAddressProofsResponse {
 message SyncNodeRequest {
     repeated string node_ids = 1;
     string operator_id = 2;
-}
-
-message InitiateNodeSwapTransferRequest {
-    string transfer_id = 1;
-    bytes sender_identity_public_key = 2;
-    bytes receiver_identity_public_key = 3;
-    string node_id = 4;
 }
