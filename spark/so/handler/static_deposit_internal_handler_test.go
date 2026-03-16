@@ -139,6 +139,7 @@ func TestSaveUtxoForInstantStaticDeposit_Success(t *testing.T) {
 	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, userIdentityPubKey, ownerSigningPubKey)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
+	transferID := uuid.New()
 	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCreated).
 		SetRequestType(st.UtxoSwapRequestTypeInstant).
@@ -148,6 +149,7 @@ func TestSaveUtxoForInstantStaticDeposit_Success(t *testing.T) {
 		SetSspIdentityPublicKey(sspIdentityPubKey).
 		SetUserIdentityPublicKey(userIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(transferID).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -172,6 +174,7 @@ func TestSaveUtxoForInstantStaticDeposit_Success(t *testing.T) {
 		UtxoSwapId:           utxoSwap.ID.String(),
 		Signature:            signature.Serialize(),
 		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+		TransferId:           transferID.String(),
 	}
 
 	resp, err := handler.SaveUtxoForInstantStaticDeposit(ctx, cfg, req)
@@ -216,6 +219,7 @@ func TestSaveUtxoForInstantStaticDeposit_ErrorAddressMismatch(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
+	transferID := uuid.New()
 	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCreated).
 		SetRequestType(st.UtxoSwapRequestTypeInstant).
@@ -225,6 +229,7 @@ func TestSaveUtxoForInstantStaticDeposit_ErrorAddressMismatch(t *testing.T) {
 		SetSspIdentityPublicKey(sspIdentityPubKey).
 		SetUserIdentityPublicKey(userIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(transferID).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -249,6 +254,7 @@ func TestSaveUtxoForInstantStaticDeposit_ErrorAddressMismatch(t *testing.T) {
 		UtxoSwapId:           utxoSwap.ID.String(),
 		Signature:            signature.Serialize(),
 		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+		TransferId:           transferID.String(),
 	}
 
 	resp, err := handler.SaveUtxoForInstantStaticDeposit(ctx, cfg, req)
@@ -273,6 +279,7 @@ func TestSaveUtxoForInstantStaticDeposit_ErrorAmountMismatch(t *testing.T) {
 	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, userIdentityPubKey, ownerSigningPubKey)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
+	transferID := uuid.New()
 	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCreated).
 		SetRequestType(st.UtxoSwapRequestTypeInstant).
@@ -282,6 +289,7 @@ func TestSaveUtxoForInstantStaticDeposit_ErrorAmountMismatch(t *testing.T) {
 		SetSspIdentityPublicKey(sspIdentityPubKey).
 		SetUserIdentityPublicKey(userIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(transferID).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -306,6 +314,7 @@ func TestSaveUtxoForInstantStaticDeposit_ErrorAmountMismatch(t *testing.T) {
 		UtxoSwapId:           utxoSwap.ID.String(),
 		Signature:            signature.Serialize(),
 		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+		TransferId:           transferID.String(),
 	}
 
 	resp, err := handler.SaveUtxoForInstantStaticDeposit(ctx, cfg, req)

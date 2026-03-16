@@ -4854,6 +4854,8 @@ func (m *SaveUtxoForInstantStaticDepositRequest) validate(all bool) error {
 
 	// no validation rules for CoordinatorPublicKey
 
+	// no validation rules for TransferId
+
 	if len(errors) > 0 {
 		return SaveUtxoForInstantStaticDepositRequestMultiError(errors)
 	}

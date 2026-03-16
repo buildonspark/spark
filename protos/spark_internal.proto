@@ -382,6 +382,7 @@ message SaveUtxoForInstantStaticDepositRequest {
     string utxo_swap_id = 2;
     bytes signature = 3;
     bytes coordinator_public_key = 4;
+    string transfer_id = 5;
 }
 
 message SaveUtxoForInstantStaticDepositResponse {}

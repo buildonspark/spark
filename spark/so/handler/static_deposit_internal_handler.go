@@ -508,9 +508,9 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 	if req.OnChainUtxo == nil {
 		return nil, fmt.Errorf("on_chain_utxo is required")
 	}
-	utxoSwapID, err := uuid.Parse(req.UtxoSwapId)
+	transferID, err := uuid.Parse(req.TransferId)
 	if err != nil {
-		return nil, fmt.Errorf("invalid utxo_swap_id: %w", err)
+		return nil, fmt.Errorf("invalid transfer_id: %w", err)
 	}
 
 	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
@@ -560,9 +560,13 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 		return nil, fmt.Errorf("on-chain utxo not found or not confirmed")
 	}
 
-	swap, err := db.UtxoSwap.Get(ctx, utxoSwapID)
+	swap, err := db.UtxoSwap.Query().
+		Where(utxoswap.RequestedTransferIDEQ(transferID)).
+		Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
+		ForUpdate().
+		Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get utxo swap %s: %w", utxoSwapID, err)
+		return nil, fmt.Errorf("failed to get utxo swap for transfer %s: %w", transferID, err)
 	}
 
 	if targetUtxo.inner.Amount != swap.UtxoValueSats {
@@ -575,19 +579,19 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 	}
 
 	swapDepositAddress, err := db.DepositAddress.Query().
-		Where(depositaddress.HasUtxoswapsWith(utxoswap.IDEQ(utxoSwapID))).
+		Where(depositaddress.HasUtxoswapsWith(utxoswap.IDEQ(swap.ID))).
 		Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get deposit address for swap %s: %w", utxoSwapID, err)
+		return nil, fmt.Errorf("failed to get deposit address for swap %s: %w", swap.ID, err)
 	}
 
 	if utxoDepositAddress.ID != swapDepositAddress.ID {
 		return nil, fmt.Errorf("utxo deposit address %s does not match swap deposit address %s", utxoDepositAddress.ID, swapDepositAddress.ID)
 	}
 
-	_, err = db.UtxoSwap.UpdateOneID(utxoSwapID).SetUtxo(targetUtxo.inner).Save(ctx)
+	_, err = db.UtxoSwap.UpdateOneID(swap.ID).SetUtxo(targetUtxo.inner).Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to save utxo on swap %s: %w", utxoSwapID, err)
+		return nil, fmt.Errorf("failed to save utxo on swap %s: %w", swap.ID, err)
 	}
 
 	return &pbinternal.SaveUtxoForInstantStaticDepositResponse{}, nil

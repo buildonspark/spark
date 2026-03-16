@@ -2343,6 +2343,7 @@ type SaveUtxoForInstantStaticDepositRequest struct {
 	UtxoSwapId           string                 `protobuf:"bytes,2,opt,name=utxo_swap_id,json=utxoSwapId,proto3" json:"utxo_swap_id,omitempty"`
 	Signature            []byte                 `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
 	CoordinatorPublicKey []byte                 `protobuf:"bytes,4,opt,name=coordinator_public_key,json=coordinatorPublicKey,proto3" json:"coordinator_public_key,omitempty"`
+	TransferId           string                 `protobuf:"bytes,5,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -2403,6 +2404,13 @@ func (x *SaveUtxoForInstantStaticDepositRequest) GetCoordinatorPublicKey() []byt
 		return x.CoordinatorPublicKey
 	}
 	return nil
+}
+
+func (x *SaveUtxoForInstantStaticDepositRequest) GetTransferId() string {
+	if x != nil {
+		return x.TransferId
+	}
+	return ""
 }
 
 type SaveUtxoForInstantStaticDepositResponse struct {
@@ -4165,13 +4173,15 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +
 	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\"E\n" +
 	"*CreateInstantStaticDepositUtxoSwapResponse\x12\x17\n" +
-	"\aswap_id\x18\x01 \x01(\tR\x06swapId\"\xcf\x01\n" +
+	"\aswap_id\x18\x01 \x01(\tR\x06swapId\"\xf0\x01\n" +
 	"&SaveUtxoForInstantStaticDepositRequest\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12 \n" +
 	"\futxo_swap_id\x18\x02 \x01(\tR\n" +
 	"utxoSwapId\x12\x1c\n" +
 	"\tsignature\x18\x03 \x01(\fR\tsignature\x124\n" +
-	"\x16coordinator_public_key\x18\x04 \x01(\fR\x14coordinatorPublicKey\")\n" +
+	"\x16coordinator_public_key\x18\x04 \x01(\fR\x14coordinatorPublicKey\x12\x1f\n" +
+	"\vtransfer_id\x18\x05 \x01(\tR\n" +
+	"transferId\")\n" +
 	"'SaveUtxoForInstantStaticDepositResponse\"\xae\x03\n" +
 	"$InitiateStaticDepositUtxoSwapRequest\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12#\n" +
