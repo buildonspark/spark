@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/logging"
@@ -90,7 +89,6 @@ func (f *DefaultSessionFactory) NewSession(ctx context.Context, opts ...SessionO
 		dbClient:  f.dbClient,
 		provider:  provider,
 		currentTx: nil,
-		mu:        sync.Mutex{},
 	}
 }
 
@@ -98,6 +96,10 @@ func (f *DefaultSessionFactory) NewSession(ctx context.Context, opts ...SessionO
 // wraps a TxProvider for creating an initial transaction, and stores that transaction for
 // subsequent requests until the transaction is committed or rolled back. Once the transaction
 // is finished, it is cleared so a new one can begin the next time `GetOrBeginTx` is called.
+//
+// Session is not safe for concurrent use. The underlying database connection does not support
+// concurrent queries, and all methods must be called from a single goroutine, unless the caller
+// can guarantee thread safety.
 type Session struct {
 	// ctx is the context for this session. It is used to for creating new transactions within the
 	// session to ensure that the session can clean those transactions up even if the context in which
@@ -109,8 +111,6 @@ type Session struct {
 	knobs knobs.Knobs
 	// TxProvider is used to create a new transaction when needed.
 	provider ent.TxProvider
-	// Mutex for ensuring thread-safe access to `currentTx`.
-	mu sync.Mutex
 	// The current transaction being tracked by this session if a transaction has been started. When
 	// the tracked transaction is committed or rolled back successfully, this field is set back to nil.
 	currentTx *ent.Tx
@@ -125,9 +125,6 @@ type Session struct {
 // Furthermore, it inserts commit and rollback hooks that will clear the current transaction
 // should the transaction be finished by the caller.
 func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.currentTx == nil {
 		logger := logging.GetLoggerFromContext(ctx)
 
@@ -147,9 +144,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 
 		tx.OnCommit(func(fn ent.Committer) ent.Committer {
 			return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
-				s.mu.Lock()
-				defer s.mu.Unlock()
-
 				if !s.currentIsDirty && s.knobs.RolloutRandom(knobs.KnobDatabaseOnlyCommitDirty, 0) {
 					// Assume we will clear the state when we do a rollback. We should maybe just rollback but
 					// this is the least disruptive for now.
@@ -185,9 +179,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 		})
 		tx.OnRollback(func(fn ent.Rollbacker) ent.Rollbacker {
 			return ent.RollbackFunc(func(ctx context.Context, tx *ent.Tx) error {
-				s.mu.Lock()
-				defer s.mu.Unlock()
-
 				err := fn.Rollback(ctx, tx)
 				if err != nil && !errors.Is(err, sql.ErrTxDone) {
 					logger.Error("Failed to rollback transaction", zap.Error(err))
@@ -204,9 +195,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 }
 
 func (s *Session) MarkTxDirty(ctx context.Context) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.currentTx != nil {
 		s.currentIsDirty = true
 	}
@@ -215,8 +203,6 @@ func (s *Session) MarkTxDirty(ctx context.Context) {
 // GetTxIfExists retrieves the current transaction if it exists, without starting a new one. If
 // no current transaction exists, then returns nil.
 func (s *Session) GetTxIfExists() *ent.Tx {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	return s.currentTx
 }
 
@@ -232,9 +218,6 @@ func (s *Session) GetClient(ctx context.Context) (*ent.Client, error) {
 }
 
 func (s *Session) Notify(ctx context.Context, n ent.Notification) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.currentNotifications == nil {
 		return fmt.Errorf("no active transaction to buffer notification")
 	}

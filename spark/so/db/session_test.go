@@ -233,6 +233,23 @@ func TestSession_GetOrBeginTxRollbackAfterCancelledSessionContext(t *testing.T) 
 	require.Nil(t, currentTx, "Expected no current transaction to exist after session context cancellation")
 }
 
+func TestSession_GetOrBeginTxReturnsNewTxAfterCommit(t *testing.T) {
+	dbClient := NewTestSQLiteClient(t)
+	defer dbClient.Close()
+
+	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+
+	tx1, err := session.GetOrBeginTx(t.Context())
+	require.NoError(t, err, "Expected to retrieve a transaction")
+
+	err = tx1.Commit()
+	require.NoError(t, err, "Expected to commit the transaction successfully")
+
+	tx2, err := session.GetOrBeginTx(t.Context())
+	require.NoError(t, err, "Expected to retrieve a new transaction after commit")
+	require.NotEqual(t, tx1, tx2, "Expected a new transaction after the previous one was committed")
+}
+
 func TestTxProviderWithTimeout_Success(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
