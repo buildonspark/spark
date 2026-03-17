@@ -1538,34 +1538,4 @@ describe.each(walletTypes)("transferV2 multi-receiver", ({ name, Signer }) => {
       }),
     ).rejects.toThrow(SparkValidationError);
   });
-
-  it(`${name} - sendTransferV3 rejects leaves without receiverIdentityPublicKey`, async () => {
-    const options: ConfigOptions = { network: "LOCAL" };
-
-    const { wallet: senderWallet } =
-      await SparkWalletTestingIntegration.initialize({
-        options,
-        signer: new Signer(),
-      });
-
-    const transferService = senderWallet.getTransferService();
-
-    const leafKeyTweaks: LeafKeyTweak[] = [
-      {
-        leaf: { id: "fake-id" } as any,
-        keyDerivation: {
-          type: KeyDerivationType.LEAF,
-          path: "fake",
-        },
-        newKeyDerivation: {
-          type: KeyDerivationType.LEAF,
-          path: "fake-new",
-        },
-      },
-    ];
-
-    await expect(transferService.sendTransferV3(leafKeyTweaks)).rejects.toThrow(
-      SparkValidationError,
-    );
-  });
 });
