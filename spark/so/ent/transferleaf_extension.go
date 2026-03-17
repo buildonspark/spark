@@ -14,6 +14,10 @@ func (t *TransferLeaf) MarshalProto(ctx context.Context) (*pb.TransferLeaf, erro
 	if err != nil {
 		return nil, fmt.Errorf("unable to query leaf for transfer leaf %s: %w", t.ID, err)
 	}
+	return t.marshalTransferLeafProto(ctx, leaf)
+}
+
+func (t *TransferLeaf) marshalTransferLeafProto(ctx context.Context, leaf *TreeNode) (*pb.TransferLeaf, error) {
 	leafProto, err := leaf.MarshalSparkProto(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal leaf %s: %w", leaf.ID, err)

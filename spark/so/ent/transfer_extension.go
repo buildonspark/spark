@@ -15,8 +15,11 @@ import (
 
 // MarshalProto converts a Transfer to a spark protobuf Transfer.
 // To marshal the spark invoice, the edge must be pre-loaded via Transfer.WithSparkInvoice().
+// To populate the Receivers field, the edge must also be pre-loaded via Transfer.WithTransferReceivers().
 func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
-	leaves, err := t.QueryTransferLeaves().All(ctx)
+	leaves, err := t.QueryTransferLeaves().WithLeaf(func(q *TreeNodeQuery) {
+		q.WithTree().WithSigningKeyshare().WithParent()
+	}).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
 	}
@@ -29,6 +32,9 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 // The Transfer's TransferReceivers edge must be pre-loaded (WithTransferReceivers)
 // when receiverPubkey is non-nil.
 func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey *keys.Public) (*pb.Transfer, error) {
+	withLeaf := func(q *TreeNodeQuery) {
+		q.WithTree().WithSigningKeyshare().WithParent()
+	}
 	var leaves []*TransferLeaf
 	var err error
 	if receiverPubkey != nil {
@@ -39,15 +45,16 @@ func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey *
 		receiverID, found := t.findReceiverID(*receiverPubkey)
 		if found {
 			leaves, err = t.QueryTransferLeaves().
+				WithLeaf(withLeaf).
 				Where(transferleaf.TransferReceiverIDEQ(receiverID)).
 				All(ctx)
 		} else {
 			// Receiver not found — fall through to returning all leaves.
 			// This happens for sender queries or legacy single-receiver transfers.
-			leaves, err = t.QueryTransferLeaves().All(ctx)
+			leaves, err = t.QueryTransferLeaves().WithLeaf(withLeaf).All(ctx)
 		}
 	} else {
-		leaves, err = t.QueryTransferLeaves().All(ctx)
+		leaves, err = t.QueryTransferLeaves().WithLeaf(withLeaf).All(ctx)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
@@ -70,11 +77,34 @@ func (t *Transfer) findReceiverID(pubkey keys.Public) (uuid.UUID, bool) {
 func (t *Transfer) marshalWithLeaves(ctx context.Context, leaves []*TransferLeaf) (*pb.Transfer, error) {
 	var leavesProto []*pb.TransferLeaf
 	for _, leaf := range leaves {
-		leafProto, err := leaf.MarshalProto(ctx)
+		treeNode := leaf.Edges.Leaf
+		if treeNode == nil {
+			return nil, fmt.Errorf("tree node not pre-loaded for transfer leaf %s", leaf.ID)
+		}
+		leafProto, err := leaf.marshalTransferLeafProto(ctx, treeNode)
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal transfer leaf %s: %w", leaf.ID, err)
 		}
 		leavesProto = append(leavesProto, leafProto)
+	}
+
+	var receivers []*pb.TransferReceiver
+	if len(t.Edges.TransferReceivers) > 0 {
+		amountByReceiver := make(map[uuid.UUID]uint64, len(t.Edges.TransferReceivers))
+		for _, leaf := range leaves {
+			if leaf.TransferReceiverID != nil {
+				amountByReceiver[*leaf.TransferReceiverID] += leaf.Edges.Leaf.Value
+			}
+		}
+		for _, r := range t.Edges.TransferReceivers {
+			if _, ok := amountByReceiver[r.ID]; !ok {
+				continue
+			}
+			receivers = append(receivers, &pb.TransferReceiver{
+				IdentityPublicKey: r.IdentityPubkey.Serialize(),
+				AmountSats:        amountByReceiver[r.ID],
+			})
+		}
 	}
 
 	status, err := t.getProtoStatus()
@@ -106,6 +136,7 @@ func (t *Transfer) marshalWithLeaves(ctx context.Context, leaves []*TransferLeaf
 		Type:                      *transferType,
 		SparkInvoice:              invoice,
 		Network:                   network,
+		Receivers:                 receivers,
 	}, nil
 }
 

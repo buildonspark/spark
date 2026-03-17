@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/hex"
 	"math/rand/v2"
 	"testing"
 
@@ -64,31 +65,51 @@ func TestMarshalProtoForReceiver(t *testing.T) {
 		proto, err := transfer.MarshalProtoForReceiver(ctx, nil)
 		require.NoError(t, err)
 		assert.Len(t, proto.Leaves, 2)
+		require.Len(t, proto.Receivers, 2)
+		receiverAmounts := make(map[string]uint64)
+		for _, r := range proto.Receivers {
+			receiverAmounts[hex.EncodeToString(r.IdentityPublicKey)] = r.AmountSats
+		}
+		assert.Equal(t, uint64(1000), receiverAmounts[receiverAPub.String()])
+		assert.Equal(t, uint64(1000), receiverAmounts[receiverBPub.String()])
 	})
 
-	t.Run("receiver A pubkey returns only A leaves", func(t *testing.T) {
+	t.Run("receiver A pubkey returns only A leaves and only A in Receivers", func(t *testing.T) {
 		proto, err := transfer.MarshalProtoForReceiver(ctx, &receiverAPub)
 		require.NoError(t, err)
 		require.Len(t, proto.Leaves, 1)
 		assert.Equal(t, leafNodeA.ID.String(), proto.Leaves[0].Leaf.Id)
+		require.Len(t, proto.Receivers, 1)
+		assert.Equal(t, receiverAPub.Serialize(), proto.Receivers[0].IdentityPublicKey)
+		assert.Equal(t, uint64(1000), proto.Receivers[0].AmountSats)
 	})
 
-	t.Run("receiver B pubkey returns only B leaves", func(t *testing.T) {
+	t.Run("receiver B pubkey returns only B leaves and only B in Receivers", func(t *testing.T) {
 		proto, err := transfer.MarshalProtoForReceiver(ctx, &receiverBPub)
 		require.NoError(t, err)
 		require.Len(t, proto.Leaves, 1)
 		assert.Equal(t, leafNodeB.ID.String(), proto.Leaves[0].Leaf.Id)
+		require.Len(t, proto.Receivers, 1)
+		assert.Equal(t, receiverBPub.Serialize(), proto.Receivers[0].IdentityPublicKey)
+		assert.Equal(t, uint64(1000), proto.Receivers[0].AmountSats)
 	})
 
 	t.Run("unrelated pubkey returns all leaves", func(t *testing.T) {
 		proto, err := transfer.MarshalProtoForReceiver(ctx, &unrelatedPub)
 		require.NoError(t, err)
 		assert.Len(t, proto.Leaves, 2)
+		assert.Len(t, proto.Receivers, 2)
 	})
 
-	t.Run("MarshalProto still returns all leaves", func(t *testing.T) {
-		proto, err := transfer.MarshalProto(ctx)
+	t.Run("MarshalProto without pre-loaded receivers has empty Receivers", func(t *testing.T) {
+		plainTransfer, err := client.Transfer.Query().
+			Where(enttransfer.ID(transfer.ID)).
+			WithSparkInvoice().
+			Only(ctx)
+		require.NoError(t, err)
+		proto, err := plainTransfer.MarshalProto(ctx)
 		require.NoError(t, err)
 		assert.Len(t, proto.Leaves, 2)
+		assert.Empty(t, proto.Receivers)
 	})
 }
