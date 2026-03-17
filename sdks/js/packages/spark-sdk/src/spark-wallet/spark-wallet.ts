@@ -2473,10 +2473,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         for (let i = 0; i < decodedReceivers.length; i++) {
           const receiver = decodedReceivers[i]!;
           const leaves = selected[i] as TreeNode[];
-          const leafKeyTweaks: LeafKeyTweak[] = leaves.map((leaf) => ({
-            ...this.toSendTweak(leaf),
-            receiverIdentityPublicKey: receiver.identityPublicKey,
-          }));
+          const leafKeyTweaks: LeafKeyTweak[] = leaves.map((leaf) =>
+            this.toSendTweak(leaf, receiver.identityPublicKey),
+          );
           allLeafKeyTweaks.push(...leafKeyTweaks);
         }
 
@@ -2534,7 +2533,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             const { receiverIdentityPubkey, sparkInvoice } = param;
             const leaves = selected[i] as TreeNode[];
             const leafKeyTweaks: LeafKeyTweak[] = leaves.map((leaf) =>
-              this.toSendTweak(leaf),
+              this.toSendTweak(leaf, receiverIdentityPubkey),
             );
             return {
               leafKeyTweaks,
@@ -2554,7 +2553,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
               const transfer =
                 await this.transferService.sendTransferWithKeyTweaks(
                   job.leafKeyTweaks,
-                  job.receiverIdentityPubkey,
                   job.sparkInvoice,
                 );
 
@@ -2607,11 +2605,15 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     );
   }
 
-  private toSendTweak(node: TreeNode): LeafKeyTweak {
+  private toSendTweak(
+    node: TreeNode,
+    receiverIdentityPublicKey: Uint8Array,
+  ): LeafKeyTweak {
     return {
       leaf: node,
       keyDerivation: { type: KeyDerivationType.LEAF, path: node.id },
       newKeyDerivation: { type: KeyDerivationType.RANDOM },
+      receiverIdentityPublicKey,
     };
   }
 
@@ -3299,25 +3301,26 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         async (selected) => {
           const leaves = selected[0];
 
-          const leavesToSend: LeafKeyTweak[] = await Promise.all(
-            leaves.map(async (leaf) => ({
-              leaf,
-              keyDerivation: {
-                type: KeyDerivationType.LEAF,
-                path: leaf.id,
-              },
-              newKeyDerivation: {
-                type: KeyDerivationType.RANDOM,
-              },
-            })),
+          const sspIdentityPubkey = hexToBytes(
+            this.config.getSspIdentityPublicKey(),
           );
+          const leavesToSend: LeafKeyTweak[] = leaves.map((leaf) => ({
+            leaf,
+            keyDerivation: {
+              type: KeyDerivationType.LEAF,
+              path: leaf.id,
+            },
+            newKeyDerivation: {
+              type: KeyDerivationType.RANDOM,
+            },
+            receiverIdentityPublicKey: sspIdentityPubkey,
+          }));
 
           const transferID = uuidv7();
 
           const startTransferRequest =
             await this.transferService.prepareTransferForLightning(
               leavesToSend,
-              hexToBytes(this.config.getSspIdentityPublicKey()),
               hexToBytes(paymentHash),
               expiryTime,
               transferID,
@@ -3394,19 +3397,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       async (selected) => {
         const leaves = selected[0];
 
-        const leavesToSend: LeafKeyTweak[] = await Promise.all(
-          leaves.map(async (leaf) => ({
-            leaf,
-            keyDerivation: {
-              type: KeyDerivationType.LEAF,
-              path: leaf.id,
-            },
-            newKeyDerivation: {
-              type: KeyDerivationType.RANDOM,
-            },
-          })),
-        );
-
         const transferID = uuidv7();
 
         if (!preimage) {
@@ -3421,10 +3411,22 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           this.config.getNetworkType(),
         ).identityPublicKey;
 
+        const receiverPubkeyBytes = hexToBytes(receiverIdentityPubkey);
+        const leavesToSend: LeafKeyTweak[] = leaves.map((leaf) => ({
+          leaf,
+          keyDerivation: {
+            type: KeyDerivationType.LEAF,
+            path: leaf.id,
+          },
+          newKeyDerivation: {
+            type: KeyDerivationType.RANDOM,
+          },
+          receiverIdentityPublicKey: receiverPubkeyBytes,
+        }));
+
         const startTransferRequest =
           await this.transferService.prepareTransferForLightning(
             leavesToSend,
-            hexToBytes(receiverIdentityPubkey),
             paymentHash,
             expiryTime,
             transferID,
@@ -4158,18 +4160,21 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       leavesToSendToSsp: TreeNode[],
       leavesToSendToSE: TreeNode[],
     ) => {
-      const leafKeyTweaks: LeafKeyTweak[] = await Promise.all(
-        [...leavesToSendToSE, ...leavesToSendToSsp].map(async (leaf) => ({
-          leaf,
-          keyDerivation: {
-            type: KeyDerivationType.LEAF,
-            path: leaf.id,
-          },
-          newKeyDerivation: {
-            type: KeyDerivationType.RANDOM,
-          },
-        })),
-      );
+      const sspPubKey = hexToBytes(this.config.getSspIdentityPublicKey());
+      const leafKeyTweaks: LeafKeyTweak[] = [
+        ...leavesToSendToSE,
+        ...leavesToSendToSsp,
+      ].map((leaf) => ({
+        leaf,
+        keyDerivation: {
+          type: KeyDerivationType.LEAF,
+          path: leaf.id,
+        },
+        newKeyDerivation: {
+          type: KeyDerivationType.RANDOM,
+        },
+        receiverIdentityPublicKey: sspPubKey,
+      }));
 
       const transferId = uuidv7();
 

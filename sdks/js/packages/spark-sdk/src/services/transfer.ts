@@ -96,7 +96,7 @@ export type LeafKeyTweak = {
   leaf: TreeNode;
   keyDerivation: KeyDerivation;
   newKeyDerivation: KeyDerivation;
-  receiverIdentityPublicKey?: Uint8Array;
+  receiverIdentityPublicKey: Uint8Array;
 };
 
 export type ClaimLeafData = {
@@ -176,7 +176,6 @@ export class BaseTransferService {
   ): Promise<Transfer> {
     const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
       transfer.id,
-      transfer.receiverIdentityPublicKey,
       leaves,
       cpfpRefundSignatureMap,
       directRefundSignatureMap,
@@ -199,7 +198,6 @@ export class BaseTransferService {
       transfer.id,
       keyTweakInputMap,
       leaves,
-      transfer.receiverIdentityPublicKey,
     );
 
     const sparkClient = await this.connectionManager.createSparkClient(
@@ -221,14 +219,16 @@ export class BaseTransferService {
 
   async prepareTransferForLightning(
     leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
     paymentHash: Uint8Array,
     expiryTime: Date,
     transferID: string,
   ): Promise<StartTransferRequest> {
+    if (leaves.length === 0) {
+      throw new SparkValidationError("leaves must not be empty");
+    }
+
     const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
       transferID,
-      receiverIdentityPubkey,
       leaves,
     );
 
@@ -236,14 +236,13 @@ export class BaseTransferService {
       transferID,
       keyTweakInputMap,
       leaves,
-      receiverIdentityPubkey,
       paymentHash,
     );
 
     return {
       transferId: transferID,
       ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
-      receiverIdentityPublicKey: receiverIdentityPubkey,
+      receiverIdentityPublicKey: leaves[0]!.receiverIdentityPublicKey,
       transferPackage,
       sparkInvoice: "",
       leavesToSend: [],
@@ -253,14 +252,16 @@ export class BaseTransferService {
 
   async sendTransferWithKeyTweaks(
     leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
     sparkInvoice?: SparkAddressFormat,
   ): Promise<Transfer> {
+    if (leaves.length === 0) {
+      throw new SparkValidationError("leaves must not be empty");
+    }
+
     const transferID = uuidv7();
 
     const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
       transferID,
-      receiverIdentityPubkey,
       leaves,
     );
 
@@ -268,7 +269,6 @@ export class BaseTransferService {
       transferID,
       keyTweakInputMap,
       leaves,
-      receiverIdentityPubkey,
     );
 
     const sparkClient = await this.connectionManager.createSparkClient(
@@ -281,7 +281,7 @@ export class BaseTransferService {
       response = await sparkClient.start_transfer_v2({
         transferId: transferID,
         ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
-        receiverIdentityPublicKey: receiverIdentityPubkey,
+        receiverIdentityPublicKey: leaves[0]!.receiverIdentityPublicKey,
         transferPackage,
         sparkInvoice,
       });
@@ -299,19 +299,19 @@ export class BaseTransferService {
     return response.transfer;
   }
 
-  async sendSwapTransfer(
-    leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
-  ): Promise<{
+  async sendSwapTransfer(leaves: LeafKeyTweak[]): Promise<{
     swapTransfer: InitiateSwapPrimaryTransferResponse;
     adaptorPubkey: Uint8Array;
     adaptorAddedSignatureMap: Map<string, Uint8Array>;
   }> {
+    if (leaves.length === 0) {
+      throw new SparkValidationError("leaves must not be empty");
+    }
+
     const transferID = uuidv7();
 
     const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
       transferID,
-      receiverIdentityPubkey,
       leaves,
     );
 
@@ -321,7 +321,6 @@ export class BaseTransferService {
       transferID,
       keyTweakInputMap,
       leaves,
-      receiverIdentityPubkey,
       adaptorPubkey,
     );
 
@@ -337,7 +336,7 @@ export class BaseTransferService {
           transferId: transferID,
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
-          receiverIdentityPublicKey: receiverIdentityPubkey,
+          receiverIdentityPublicKey: leaves[0]!.receiverIdentityPublicKey,
           transferPackage,
         },
         adaptorPublicKeys: {
@@ -405,7 +404,6 @@ export class BaseTransferService {
     transferID: string,
     keyTweakInputMap: Map<string, SendLeafKeyTweak[]>,
     leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
     adaptorPubKey?: Uint8Array,
   ): Promise<TransferPackageWithSelfCommitments> {
     const sparkClient = await this.connectionManager.createSparkClient(
@@ -427,7 +425,6 @@ export class BaseTransferService {
       directFromCpfpLeafSigningJobs,
     } = await this.signingService.signRefunds(
       leaves,
-      receiverIdentityPubkey,
       signingCommitments.signingCommitments.slice(0, leaves.length),
       signingCommitments.signingCommitments.slice(
         leaves.length,
@@ -489,7 +486,6 @@ export class BaseTransferService {
     transferID: string,
     keyTweakInputMap: Map<string, SendLeafKeyTweak[]>,
     leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
     paymentHash: Uint8Array,
   ): Promise<TransferPackage> {
     const sparkClient = await this.connectionManager.createSparkClient(
@@ -512,7 +508,6 @@ export class BaseTransferService {
       directFromCpfpLeafSigningJobs,
     } = await this.signingService.signRefundsForLightning(
       leaves,
-      receiverIdentityPubkey,
       signingCommitments.signingCommitments.slice(0, leaves.length),
       signingCommitments.signingCommitments.slice(
         leaves.length,
@@ -753,7 +748,6 @@ export class BaseTransferService {
 
   protected async prepareSendTransferKeyTweaks(
     transferID: string,
-    receiverIdentityPubkey: Uint8Array,
     leaves: LeafKeyTweak[],
     cpfpRefundSignatureMap: Map<string, Uint8Array> = new Map(),
     directRefundSignatureMap: Map<string, Uint8Array> = new Map(),
@@ -766,7 +760,7 @@ export class BaseTransferService {
         return await this.prepareSingleSendTransferKeyTweak(
           transferID,
           leaf,
-          leaf.receiverIdentityPublicKey ?? receiverIdentityPubkey,
+          leaf.receiverIdentityPublicKey,
           cpfpRefundSignatureMap.get(leaf.leaf.id),
           directRefundSignatureMap.get(leaf.leaf.id),
           directFromCpfpRefundSignatureMap.get(leaf.leaf.id),
@@ -871,31 +865,10 @@ export class BaseTransferService {
    * must have receiverIdentityPublicKey set.
    */
   async sendTransferV3(leaves: LeafKeyTweak[]): Promise<Transfer> {
-    // Validate: every leaf must have receiverIdentityPublicKey set.
-    const hasReceiverPubkey = leaves.filter(
-      (l) => l.receiverIdentityPublicKey != null,
-    );
-    if (hasReceiverPubkey.length !== leaves.length) {
-      throw new SparkValidationError(
-        "All leaves must have receiverIdentityPublicKey set for V3 transfers",
-        {
-          field: "receiverIdentityPublicKey",
-          value: `${hasReceiverPubkey.length}/${leaves.length} leaves have it set`,
-          expected: "All leaves",
-        },
-      );
-    }
-
     const transferID = uuidv7();
-
-    // Legacy support: The first leaf's pubkey is passed as the default receiverIdentityPubkey
-    // to downstream functions, but each leaf's receiverIdentityPublicKey takes
-    // precedence inside prepareSendTransferKeyTweaks and signRefunds.
-    const defaultReceiverPubkey = leaves[0]!.receiverIdentityPublicKey!;
 
     const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
       transferID,
-      defaultReceiverPubkey,
       leaves,
     );
 
@@ -903,13 +876,11 @@ export class BaseTransferService {
       transferID,
       keyTweakInputMap,
       leaves,
-      defaultReceiverPubkey,
     );
 
     const receiverIdentityPublicKeys: { [key: string]: Uint8Array } = {};
     for (const leaf of leaves) {
-      receiverIdentityPublicKeys[leaf.leaf.id] =
-        leaf.receiverIdentityPublicKey!;
+      receiverIdentityPublicKeys[leaf.leaf.id] = leaf.receiverIdentityPublicKey;
     }
 
     const sparkClient = await this.connectionManager.createSparkClient(
@@ -970,6 +941,7 @@ export class TransferService extends BaseTransferService {
 
   async claimTransferCore(transfer: Transfer): Promise<TreeNode[]> {
     const leafPubKeyMap = await this.verifyPendingTransfer(transfer);
+    const selfIdentityPubkey = await this.config.signer.getIdentityPublicKey();
 
     let leaves: LeafKeyTweak[] = [];
 
@@ -992,6 +964,7 @@ export class TransferService extends BaseTransferService {
               type: KeyDerivationType.LEAF,
               path: leaf.leaf.id,
             },
+            receiverIdentityPublicKey: selfIdentityPubkey,
           });
         }
       }
@@ -1243,7 +1216,6 @@ export class TransferService extends BaseTransferService {
 
   async sendTransferSignRefund(
     leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
     expiryTime: Date,
   ): Promise<{
     transfer: Transfer;
@@ -1258,11 +1230,7 @@ export class TransferService extends BaseTransferService {
       directSignatureMap,
       directFromCpfpSignatureMap,
       leafDataMap,
-    } = await this.sendTransferSignRefundInternal(
-      leaves,
-      receiverIdentityPubkey,
-      expiryTime,
-    );
+    } = await this.sendTransferSignRefundInternal(leaves, expiryTime);
 
     return {
       transfer,
@@ -1275,7 +1243,6 @@ export class TransferService extends BaseTransferService {
 
   async sendTransferSignRefundInternal(
     leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
     expiryTime: Date,
   ): Promise<{
     transfer: Transfer;
@@ -1285,6 +1252,10 @@ export class TransferService extends BaseTransferService {
     leafDataMap: Map<string, LeafRefundSigningData>;
     signingResults: LeafRefundTxSigningResult[];
   }> {
+    if (leaves.length === 0) {
+      throw new SparkValidationError("leaves must not be empty");
+    }
+
     const transferId = uuidv7();
     const leafDataMap = new Map<string, LeafRefundSigningData>();
     await Promise.all(
@@ -1315,7 +1286,7 @@ export class TransferService extends BaseTransferService {
 
         leafDataMap.set(leaf.leaf.id, {
           keyDerivation: leaf.keyDerivation,
-          receivingPubkey: receiverIdentityPubkey,
+          receivingPubkey: leaf.receiverIdentityPublicKey,
           signingNonceCommitment,
           directSigningNonceCommitment,
           tx,
@@ -1344,7 +1315,7 @@ export class TransferService extends BaseTransferService {
         transferId,
         leavesToSend: signingJobs,
         ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
-        receiverIdentityPublicKey: receiverIdentityPubkey,
+        receiverIdentityPublicKey: leaves[0]!.receiverIdentityPublicKey,
         expiryTime: expiryTime,
       });
     } catch (error) {
@@ -1594,15 +1565,12 @@ export class TransferService extends BaseTransferService {
     );
 
     // 5. Sign refunds using current timelock (not decremented).
-    // Each leaf carries its own receiverIdentityPublicKey; the first leaf's
-    // pubkey is passed as the fallback but won't be used.
     const {
       cpfpLeafSigningJobs,
       directLeafSigningJobs,
       directFromCpfpLeafSigningJobs,
     } = await this.signingService.signRefundsForClaim(
       claimLeaves,
-      claimLeaves[0]!.receiverIdentityPublicKey!,
       signingCommitments.signingCommitments.slice(0, leaves.length),
       signingCommitments.signingCommitments.slice(
         leaves.length,

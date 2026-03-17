@@ -153,6 +153,7 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
         path: leafId,
       },
       newKeyDerivation: newLeafDerivationPath,
+      receiverIdentityPublicKey: hexToBytes(sspPubkey),
     };
 
     const transferId = uuidv7();

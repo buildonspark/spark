@@ -1419,16 +1419,16 @@ export default class LeafManager {
     leaves: TreeNode[],
     keyDerivation: KeyDerivation,
   ): Promise<TreeNode[]> {
+    const selfIdentityPubkey = await this.config.signer.getIdentityPublicKey();
     const leafKeyTweaks: LeafKeyTweak[] = leaves.map((leaf) => ({
       leaf,
       keyDerivation,
       newKeyDerivation: { type: KeyDerivationType.RANDOM },
+      receiverIdentityPublicKey: selfIdentityPubkey,
     }));
 
-    const transfer = await this.transferService.sendTransferWithKeyTweaks(
-      leafKeyTweaks,
-      await this.config.signer.getIdentityPublicKey(),
-    );
+    const transfer =
+      await this.transferService.sendTransferWithKeyTweaks(leafKeyTweaks);
 
     const pendingTransfer = await this.transferService.queryTransfer(
       transfer.id,

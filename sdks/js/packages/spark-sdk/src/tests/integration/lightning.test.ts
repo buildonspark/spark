@@ -3,6 +3,7 @@ import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { equalBytes } from "@scure/btc-signer/utils";
 import { uuidv7 } from "uuidv7";
+import type { LeafKeyTweak } from "../../services/transfer.js";
 import { KeyDerivationType } from "../../signer/types.js";
 import {
   BitcoinNetwork,
@@ -195,7 +196,7 @@ describe.each(walletTypes)(
         path: uuidv7(),
       } as const;
 
-      const leaves = [
+      const leaves: LeafKeyTweak[] = [
         {
           leaf: nodeToSend,
           keyDerivation: {
@@ -203,6 +204,7 @@ describe.each(walletTypes)(
             path: leafId,
           } as const,
           newKeyDerivation: newDerivationPath,
+          receiverIdentityPublicKey: userIdentityPublicKey,
         },
       ];
 
@@ -320,7 +322,7 @@ describe.each(walletTypes)(
         type: KeyDerivationType.LEAF,
         path: uuidv7(),
       } as const;
-      const leaves = [
+      const leaves: LeafKeyTweak[] = [
         {
           leaf: nodeToSend,
           keyDerivation: {
@@ -328,13 +330,13 @@ describe.each(walletTypes)(
             path: leafId,
           } as const,
           newKeyDerivation,
+          receiverIdentityPublicKey: userIdentityPublicKey,
         },
       ];
 
       const startTransferRequest =
         await sspTransferService.prepareTransferForLightning(
           leaves,
-          userIdentityPublicKey,
           paymentHash,
           expiryTime,
           transferID,
@@ -416,7 +418,7 @@ describe.each(walletTypes)(
         path: uuidv7(),
       } as const;
 
-      const leaves = [
+      const leaves: LeafKeyTweak[] = [
         {
           leaf: nodeToSend,
           keyDerivation: {
@@ -424,13 +426,13 @@ describe.each(walletTypes)(
             path: leafId,
           } as const,
           newKeyDerivation,
+          receiverIdentityPublicKey: sspIdentityPublicKey,
         },
       ];
 
       const startTransferRequest =
         await transferService.prepareTransferForLightning(
           leaves,
-          sspIdentityPublicKey,
           paymentHash,
           expiryTime,
           transferID,

@@ -119,6 +119,7 @@ export default class SwapService {
   ): Promise<TreeNode[]> {
     this.validateSwapInputs(leaves, targetAmounts);
 
+    const sspIdentityPubkey = hexToBytes(this.config.getSspIdentityPublicKey());
     const leafKeyTweaks: LeafKeyTweak[] = leaves.map((leaf) => ({
       leaf,
       keyDerivation: {
@@ -128,13 +129,11 @@ export default class SwapService {
       newKeyDerivation: {
         type: KeyDerivationType.RANDOM,
       },
+      receiverIdentityPublicKey: sspIdentityPubkey,
     }));
 
     const { swapTransfer, adaptorPubkey, adaptorAddedSignatureMap } =
-      await this.transferService.sendSwapTransfer(
-        leafKeyTweaks,
-        hexToBytes(this.config.getSspIdentityPublicKey()),
-      );
+      await this.transferService.sendSwapTransfer(leafKeyTweaks);
 
     await onSwapInitiated?.(leaves.map((leaf) => leaf.id));
 

@@ -236,7 +236,6 @@ export class LightningService {
       directFromCpfpLeafSigningJobs,
     } = await this.signingService.signRefunds(
       leaves,
-      receiverIdentityPubkey,
       signingCommitments.signingCommitments.slice(0, leaves.length),
       signingCommitments.signingCommitments.slice(
         leaves.length,

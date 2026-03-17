@@ -65,7 +65,6 @@ export class CoopExitService extends BaseTransferService {
     // 1. Prepare key tweaks (empty signature maps since SO hasn't signed yet)
     const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
       transferId,
-      receiverPubKey,
       leaves,
     );
 
@@ -87,7 +86,6 @@ export class CoopExitService extends BaseTransferService {
       directFromCpfpLeafSigningJobs,
     } = await this.signingService.signRefundsForCoopExit(
       leaves,
-      receiverPubKey,
       connectorOutputs,
       connectorTx,
       signingCommitments.signingCommitments.slice(0, leaves.length),

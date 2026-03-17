@@ -66,13 +66,11 @@ describe.each(walletTypes)(
           path: leafId,
         },
         newKeyDerivation: newLeafDerivationPath,
+        receiverIdentityPublicKey: hexToBytes(receiverPubkey),
       };
 
       const senderTransfer =
-        await senderTransferService.sendTransferWithKeyTweaks(
-          [transferNode],
-          hexToBytes(receiverPubkey),
-        );
+        await senderTransferService.sendTransferWithKeyTweaks([transferNode]);
 
       const pendingTransfer = await receiverWallet.queryPendingTransfers();
 
@@ -142,15 +140,13 @@ describe.each(walletTypes)(
           path: leafId,
         },
         newKeyDerivation: newLeafDerivationPath,
+        receiverIdentityPublicKey: hexToBytes(receiverPubkey),
       };
 
       const leavesToTransfer = [transferNode];
 
       const senderTransfer =
-        await senderTransferService.sendTransferWithKeyTweaks(
-          leavesToTransfer,
-          hexToBytes(receiverPubkey),
-        );
+        await senderTransferService.sendTransferWithKeyTweaks(leavesToTransfer);
 
       // Receiver queries pending transfer
       const pendingTransfer = await receiverWallet.queryPendingTransfers();
@@ -194,6 +190,7 @@ describe.each(walletTypes)(
             type: KeyDerivationType.LEAF,
             path: leaf.leaf!.id,
           },
+          receiverIdentityPublicKey: hexToBytes(receiverPubkey),
         }),
       );
 
@@ -279,13 +276,11 @@ describe.each(walletTypes)(
           path: leafId,
         },
         newKeyDerivation: newLeafDerivationPath,
+        receiverIdentityPublicKey: hexToBytes(receiverPubkey),
       };
 
       const senderTransfer =
-        await senderTransferService.sendTransferWithKeyTweaks(
-          [transferNode],
-          hexToBytes(receiverPubkey),
-        );
+        await senderTransferService.sendTransferWithKeyTweaks([transferNode]);
 
       // Create a new wallet instance from same mnemonic to simulate recovery
       const { wallet: receiverWalletRecovered } =
@@ -538,13 +533,11 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
         path: leafId,
       },
       newKeyDerivation: newLeafDerivationPath,
+      receiverIdentityPublicKey: hexToBytes(receiverPubkey),
     };
 
     const senderTransfer =
-      await senderTransferService.sendTransferWithKeyTweaks(
-        [transferNode],
-        hexToBytes(receiverPubkey),
-      );
+      await senderTransferService.sendTransferWithKeyTweaks([transferNode]);
 
     const pendingTransfer = await receiverWallet.queryPendingTransfers();
 
@@ -604,12 +597,10 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
         path: leafId,
       },
       newKeyDerivation: newLeafDerivationPath,
+      receiverIdentityPublicKey: hexToBytes(receiverPubkey),
     };
     const senderTransfer =
-      await senderTransferService.sendTransferWithKeyTweaks(
-        [transferNode],
-        hexToBytes(receiverPubkey),
-      );
+      await senderTransferService.sendTransferWithKeyTweaks([transferNode]);
     const receiverTransfer = await senderTransferService.queryTransfer(
       senderTransfer.id,
     );
@@ -831,6 +822,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     expect(pendingTransfers.transfers.length).toBe(1);
     const transfer = pendingTransfers.transfers[0]!;
 
+    const sdk2Pubkey = await sdk2.getIdentityPublicKey();
     const leaves: LeafKeyTweak[] = transfer.leaves.map((leaf) => ({
       leaf: {
         ...leaf.leaf!,
@@ -846,6 +838,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
         type: KeyDerivationType.LEAF,
         path: leaf.leaf!.id,
       },
+      receiverIdentityPublicKey: hexToBytes(sdk2Pubkey),
     }));
 
     await receiverTransferService.claimTransferTweakKeys(transfer, leaves);
@@ -1045,6 +1038,7 @@ describe.each(walletTypes)(
       const pendingTransfers = await sdk2.queryPendingTransfers();
       expect(pendingTransfers.transfers.length).toBe(3);
 
+      const sdk2Pubkey = hexToBytes(await sdk2.getIdentityPublicKey());
       for (const transfer of pendingTransfers.transfers) {
         const leaves: LeafKeyTweak[] = transfer.leaves.map((leaf) => ({
           leaf: {
@@ -1061,6 +1055,7 @@ describe.each(walletTypes)(
             type: KeyDerivationType.LEAF,
             path: leaf.leaf!.id,
           },
+          receiverIdentityPublicKey: sdk2Pubkey,
         }));
         await receiverTransferService.claimTransferTweakKeys(transfer, leaves);
         const beforeClaimBalance = await sdk2.getBalance();

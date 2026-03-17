@@ -93,7 +93,6 @@ export class SigningService {
 
   private async signRefundsCore(
     leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
     createRefundTxs: typeof createDecrementedTimelockRefundTxs,
     cpfpSigningCommitments: RequestedSigningCommitments[],
     directSigningCommitments: RequestedSigningCommitments[],
@@ -120,8 +119,7 @@ export class SigningService {
         });
       }
 
-      const receivingPubkey =
-        leaf.receiverIdentityPublicKey ?? receiverIdentityPubkey;
+      const receivingPubkey = leaf.receiverIdentityPublicKey;
       const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
       const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
 
@@ -224,7 +222,6 @@ export class SigningService {
 
   async signRefunds(
     leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
     cpfpSigningCommitments: RequestedSigningCommitments[],
     directSigningCommitments: RequestedSigningCommitments[],
     directFromCpfpSigningCommitments: RequestedSigningCommitments[],
@@ -236,7 +233,6 @@ export class SigningService {
   }> {
     return this.signRefundsCore(
       leaves,
-      receiverIdentityPubkey,
       createDecrementedTimelockRefundTxs,
       cpfpSigningCommitments,
       directSigningCommitments,
@@ -247,7 +243,6 @@ export class SigningService {
 
   async signRefundsForClaim(
     leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
     cpfpSigningCommitments: RequestedSigningCommitments[],
     directSigningCommitments: RequestedSigningCommitments[],
     directFromCpfpSigningCommitments: RequestedSigningCommitments[],
@@ -258,7 +253,6 @@ export class SigningService {
   }> {
     return this.signRefundsCore(
       leaves,
-      receiverIdentityPubkey,
       createCurrentTimelockRefundTxs,
       cpfpSigningCommitments,
       directSigningCommitments,
@@ -268,7 +262,6 @@ export class SigningService {
 
   async signRefundsForCoopExit(
     leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
     connectorOutputs: TransactionInput[],
     connectorTx: Uint8Array,
     cpfpSigningCommitments: RequestedSigningCommitments[],
@@ -350,7 +343,7 @@ export class SigningService {
           directNodeTx,
           sequence: currentSequence,
           connectorOutput,
-          receivingPubkey: receiverIdentityPubkey,
+          receivingPubkey: leaf.receiverIdentityPublicKey,
           network: this.config.getNetwork(),
         });
 
@@ -419,7 +412,6 @@ export class SigningService {
 
   async signRefundsForLightning(
     leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
     cpfpSigningCommitments: RequestedSigningCommitments[],
     directSigningCommitments: RequestedSigningCommitments[],
     directFromCpfpSigningCommitments: RequestedSigningCommitments[],
@@ -485,7 +477,7 @@ export class SigningService {
           sequence: nextSequence,
           directSequence: nextDirectSequence,
           hash,
-          hashLockDestinationPubkey: receiverIdentityPubkey,
+          hashLockDestinationPubkey: leaf.receiverIdentityPublicKey,
           sequenceLockDestinationPubkey: identityPublicKey,
         });
 
