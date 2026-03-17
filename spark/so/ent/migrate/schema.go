@@ -1671,6 +1671,14 @@ var (
 					Where: "status != 'CANCELLED'",
 				},
 			},
+			{
+				Name:    "utxoswap_utxo_value_sats_deposit_address_utxoswaps",
+				Unique:  true,
+				Columns: []*schema.Column{UtxoSwapsColumns[17], UtxoSwapsColumns[18]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status NOT IN ('CANCELLED', 'COMPLETED')",
+				},
+			},
 		},
 	}
 	// WalletSettingsColumns holds the columns for the "wallet_settings" table.

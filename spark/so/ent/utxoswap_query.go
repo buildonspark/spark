@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
@@ -29,6 +30,7 @@ type UtxoSwapQuery struct {
 	withUtxo              *UtxoQuery
 	withTransfer          *TransferQuery
 	withSecondaryTransfer *TransferQuery
+	withDepositAddress    *DepositAddressQuery
 	withFKs               bool
 	modifiers             []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -126,6 +128,28 @@ func (usq *UtxoSwapQuery) QuerySecondaryTransfer() *TransferQuery {
 			sqlgraph.From(utxoswap.Table, utxoswap.FieldID, selector),
 			sqlgraph.To(transfer.Table, transfer.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, utxoswap.SecondaryTransferTable, utxoswap.SecondaryTransferColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(usq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryDepositAddress chains the current query on the "deposit_address" edge.
+func (usq *UtxoSwapQuery) QueryDepositAddress() *DepositAddressQuery {
+	query := (&DepositAddressClient{config: usq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := usq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := usq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(utxoswap.Table, utxoswap.FieldID, selector),
+			sqlgraph.To(depositaddress.Table, depositaddress.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, utxoswap.DepositAddressTable, utxoswap.DepositAddressColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(usq.driver.Dialect(), step)
 		return fromU, nil
@@ -328,6 +352,7 @@ func (usq *UtxoSwapQuery) Clone() *UtxoSwapQuery {
 		withUtxo:              usq.withUtxo.Clone(),
 		withTransfer:          usq.withTransfer.Clone(),
 		withSecondaryTransfer: usq.withSecondaryTransfer.Clone(),
+		withDepositAddress:    usq.withDepositAddress.Clone(),
 		// clone intermediate query.
 		sql:       usq.sql.Clone(),
 		path:      usq.path,
@@ -365,6 +390,17 @@ func (usq *UtxoSwapQuery) WithSecondaryTransfer(opts ...func(*TransferQuery)) *U
 		opt(query)
 	}
 	usq.withSecondaryTransfer = query
+	return usq
+}
+
+// WithDepositAddress tells the query-builder to eager-load the nodes that are connected to
+// the "deposit_address" edge. The optional arguments are used to configure the query builder of the edge.
+func (usq *UtxoSwapQuery) WithDepositAddress(opts ...func(*DepositAddressQuery)) *UtxoSwapQuery {
+	query := (&DepositAddressClient{config: usq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	usq.withDepositAddress = query
 	return usq
 }
 
@@ -447,13 +483,14 @@ func (usq *UtxoSwapQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Ut
 		nodes       = []*UtxoSwap{}
 		withFKs     = usq.withFKs
 		_spec       = usq.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [4]bool{
 			usq.withUtxo != nil,
 			usq.withTransfer != nil,
 			usq.withSecondaryTransfer != nil,
+			usq.withDepositAddress != nil,
 		}
 	)
-	if usq.withUtxo != nil || usq.withTransfer != nil || usq.withSecondaryTransfer != nil {
+	if usq.withUtxo != nil || usq.withTransfer != nil || usq.withSecondaryTransfer != nil || usq.withDepositAddress != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -495,6 +532,12 @@ func (usq *UtxoSwapQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Ut
 	if query := usq.withSecondaryTransfer; query != nil {
 		if err := usq.loadSecondaryTransfer(ctx, query, nodes, nil,
 			func(n *UtxoSwap, e *Transfer) { n.Edges.SecondaryTransfer = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := usq.withDepositAddress; query != nil {
+		if err := usq.loadDepositAddress(ctx, query, nodes, nil,
+			func(n *UtxoSwap, e *DepositAddress) { n.Edges.DepositAddress = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -590,6 +633,38 @@ func (usq *UtxoSwapQuery) loadSecondaryTransfer(ctx context.Context, query *Tran
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "utxo_swap_secondary_transfer" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (usq *UtxoSwapQuery) loadDepositAddress(ctx context.Context, query *DepositAddressQuery, nodes []*UtxoSwap, init func(*UtxoSwap), assign func(*UtxoSwap, *DepositAddress)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*UtxoSwap)
+	for i := range nodes {
+		if nodes[i].deposit_address_utxoswaps == nil {
+			continue
+		}
+		fk := *nodes[i].deposit_address_utxoswaps
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(depositaddress.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "deposit_address_utxoswaps" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)

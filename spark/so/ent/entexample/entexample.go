@@ -7143,6 +7143,7 @@ type UtxoSwapExample struct {
 	Utxo              *ent.Utxo
 	Transfer          *ent.Transfer
 	SecondaryTransfer *ent.Transfer
+	DepositAddress    *ent.DepositAddress
 }
 
 // NewUtxoSwapExample creates a new UtxoSwapExample for testing.
@@ -7261,6 +7262,12 @@ func (us *UtxoSwapExample) SetSecondaryTransfer(v *ent.Transfer) *UtxoSwapExampl
 	return us
 }
 
+// SetDepositAddress sets the deposit_address edge.
+func (us *UtxoSwapExample) SetDepositAddress(v *ent.DepositAddress) *UtxoSwapExample {
+	us.DepositAddress = v
+	return us
+}
+
 // MustExec builds and saves the UtxoSwap entity to the database.
 // It panics if the save fails.
 func (us *UtxoSwapExample) MustExec(ctx context.Context) *ent.UtxoSwap {
@@ -7367,6 +7374,9 @@ func (us *UtxoSwapExample) MustExec(ctx context.Context) *ent.UtxoSwap {
 	}
 	if us.SecondaryTransfer != nil {
 		create.SetSecondaryTransfer(us.SecondaryTransfer)
+	}
+	if us.DepositAddress != nil {
+		create.SetDepositAddress(us.DepositAddress)
 	}
 
 	entity, err := create.Save(ctx)
@@ -7484,6 +7494,9 @@ func (us *UtxoSwapExample) Exec(ctx context.Context) (*ent.UtxoSwap, error) {
 	}
 	if us.SecondaryTransfer != nil {
 		create.SetSecondaryTransfer(us.SecondaryTransfer)
+	}
+	if us.DepositAddress != nil {
+		create.SetDepositAddress(us.DepositAddress)
 	}
 
 	return create.Save(ctx)

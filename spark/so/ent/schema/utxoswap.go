@@ -32,6 +32,14 @@ func (UtxoSwap) Mixin() []ent.Mixin {
 func (UtxoSwap) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Edges("utxo").Unique().Annotations(entsql.IndexWhere("status != 'CANCELLED'")),
+		// Prevents concurrent active swaps for the same deposit address and value.
+		// Uses (deposit_address, utxo_value_sats) instead of (txid, vout) because instant
+		// deposits are 0-conf and subject to RBF, making txid unstable.
+		// Excludes COMPLETED (unlike the utxo edge index above) because a completed swap
+		// means the deposit was processed — a new deposit of the same amount should be allowed.
+		// Also gates the refund path intentionally.
+		index.Edges("deposit_address").Fields("utxo_value_sats").Unique().
+			Annotations(entsql.IndexWhere("status NOT IN ('CANCELLED', 'COMPLETED')")),
 	}
 }
 
@@ -180,5 +188,6 @@ func (UtxoSwap) Edges() []ent.Edge {
 		edge.To("secondary_transfer", Transfer.Type).
 			Unique().
 			Comment("Secondary transfer for instant static deposit with multiple payments."),
+		edge.From("deposit_address", DepositAddress.Type).Ref("utxoswaps").Unique(),
 	}
 }

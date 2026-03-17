@@ -28,6 +28,17 @@ type StaticDepositInternalHandler struct {
 	config *so.Config
 }
 
+func addUtxoSwapToDepositAddress(ctx context.Context, db *ent.Client, depositAddressID uuid.UUID, utxoSwap *ent.UtxoSwap) error {
+	_, err := db.DepositAddress.UpdateOneID(depositAddressID).AddUtxoswaps(utxoSwap).Save(ctx)
+	if err != nil {
+		if sqlgraph.IsUniqueConstraintError(err) {
+			return errors.AlreadyExistsDuplicateOperation(fmt.Errorf("active utxo swap already exists for this deposit address and value: %w", err))
+		}
+		return fmt.Errorf("unable to add utxo swap to deposit address: %w", err)
+	}
+	return nil
+}
+
 func NewStaticDepositInternalHandler(config *so.Config) *StaticDepositInternalHandler {
 	return &StaticDepositInternalHandler{config: config}
 }
@@ -266,9 +277,8 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("unable to store utxo swap: %w", err)
 	}
 	// Add the utxo swap to the deposit address
-	_, err = db.DepositAddress.UpdateOneID(depositAddress.ID).AddUtxoswaps(utxoSwap).Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to add utxo swap to deposit address: %w", err)
+	if err = addUtxoSwapToDepositAddress(ctx, db, depositAddress.ID, utxoSwap); err != nil {
+		return nil, err
 	}
 
 	return &pbinternal.CreateStaticDepositUtxoSwapResponse{UtxoDepositAddress: depositAddress.Address}, nil
@@ -489,9 +499,8 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 	logger.Sugar().Infof("Created instant utxo swap %s for %x:%d", utxoSwap.ID, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 
 	// Add the utxo swap to the deposit address
-	_, err = db.DepositAddress.UpdateOneID(depositAddress.ID).AddUtxoswaps(utxoSwap).Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to add utxo swap to deposit address: %w", err)
+	if err = addUtxoSwapToDepositAddress(ctx, db, depositAddress.ID, utxoSwap); err != nil {
+		return nil, err
 	}
 
 	return &pbinternal.CreateInstantStaticDepositUtxoSwapResponse{
@@ -722,9 +731,8 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, fmt.Errorf("unable to store utxo swap: %w", err)
 	}
 
-	_, err = db.DepositAddress.UpdateOneID(depositAddress.ID).AddUtxoswaps(utxoSwap).Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to add utxo swap to deposit address: %w", err)
+	if err = addUtxoSwapToDepositAddress(ctx, db, depositAddress.ID, utxoSwap); err != nil {
+		return nil, err
 	}
 
 	return &pbinternal.CreateStaticDepositUtxoRefundResponse{UtxoDepositAddress: depositAddress.Address}, nil

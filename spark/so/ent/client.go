@@ -6628,6 +6628,22 @@ func (c *UtxoSwapClient) QuerySecondaryTransfer(us *UtxoSwap) *TransferQuery {
 	return query
 }
 
+// QueryDepositAddress queries the deposit_address edge of a UtxoSwap.
+func (c *UtxoSwapClient) QueryDepositAddress(us *UtxoSwap) *DepositAddressQuery {
+	query := (&DepositAddressClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := us.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(utxoswap.Table, utxoswap.FieldID, id),
+			sqlgraph.To(depositaddress.Table, depositaddress.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, utxoswap.DepositAddressTable, utxoswap.DepositAddressColumn),
+		)
+		fromV = sqlgraph.Neighbors(us.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *UtxoSwapClient) Hooks() []Hook {
 	hooks := c.hooks.UtxoSwap

@@ -33009,6 +33009,8 @@ type UtxoSwapMutation struct {
 	clearedtransfer                 bool
 	secondary_transfer              *uuid.UUID
 	clearedsecondary_transfer       bool
+	deposit_address                 *uuid.UUID
+	cleareddeposit_address          bool
 	done                            bool
 	oldValue                        func(context.Context) (*UtxoSwap, error)
 	predicates                      []predicate.UtxoSwap
@@ -34073,6 +34075,45 @@ func (m *UtxoSwapMutation) ResetSecondaryTransfer() {
 	m.clearedsecondary_transfer = false
 }
 
+// SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by id.
+func (m *UtxoSwapMutation) SetDepositAddressID(id uuid.UUID) {
+	m.deposit_address = &id
+}
+
+// ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
+func (m *UtxoSwapMutation) ClearDepositAddress() {
+	m.cleareddeposit_address = true
+}
+
+// DepositAddressCleared reports if the "deposit_address" edge to the DepositAddress entity was cleared.
+func (m *UtxoSwapMutation) DepositAddressCleared() bool {
+	return m.cleareddeposit_address
+}
+
+// DepositAddressID returns the "deposit_address" edge ID in the mutation.
+func (m *UtxoSwapMutation) DepositAddressID() (id uuid.UUID, exists bool) {
+	if m.deposit_address != nil {
+		return *m.deposit_address, true
+	}
+	return
+}
+
+// DepositAddressIDs returns the "deposit_address" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// DepositAddressID instead. It exists only for internal usage by the builders.
+func (m *UtxoSwapMutation) DepositAddressIDs() (ids []uuid.UUID) {
+	if id := m.deposit_address; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetDepositAddress resets all changes to the "deposit_address" edge.
+func (m *UtxoSwapMutation) ResetDepositAddress() {
+	m.deposit_address = nil
+	m.cleareddeposit_address = false
+}
+
 // Where appends a list predicates to the UtxoSwapMutation builder.
 func (m *UtxoSwapMutation) Where(ps ...predicate.UtxoSwap) {
 	m.predicates = append(m.predicates, ps...)
@@ -34598,7 +34639,7 @@ func (m *UtxoSwapMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UtxoSwapMutation) AddedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.utxo != nil {
 		edges = append(edges, utxoswap.EdgeUtxo)
 	}
@@ -34607,6 +34648,9 @@ func (m *UtxoSwapMutation) AddedEdges() []string {
 	}
 	if m.secondary_transfer != nil {
 		edges = append(edges, utxoswap.EdgeSecondaryTransfer)
+	}
+	if m.deposit_address != nil {
+		edges = append(edges, utxoswap.EdgeDepositAddress)
 	}
 	return edges
 }
@@ -34627,13 +34671,17 @@ func (m *UtxoSwapMutation) AddedIDs(name string) []ent.Value {
 		if id := m.secondary_transfer; id != nil {
 			return []ent.Value{*id}
 		}
+	case utxoswap.EdgeDepositAddress:
+		if id := m.deposit_address; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UtxoSwapMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	return edges
 }
 
@@ -34645,7 +34693,7 @@ func (m *UtxoSwapMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UtxoSwapMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.clearedutxo {
 		edges = append(edges, utxoswap.EdgeUtxo)
 	}
@@ -34654,6 +34702,9 @@ func (m *UtxoSwapMutation) ClearedEdges() []string {
 	}
 	if m.clearedsecondary_transfer {
 		edges = append(edges, utxoswap.EdgeSecondaryTransfer)
+	}
+	if m.cleareddeposit_address {
+		edges = append(edges, utxoswap.EdgeDepositAddress)
 	}
 	return edges
 }
@@ -34668,6 +34719,8 @@ func (m *UtxoSwapMutation) EdgeCleared(name string) bool {
 		return m.clearedtransfer
 	case utxoswap.EdgeSecondaryTransfer:
 		return m.clearedsecondary_transfer
+	case utxoswap.EdgeDepositAddress:
+		return m.cleareddeposit_address
 	}
 	return false
 }
@@ -34685,6 +34738,9 @@ func (m *UtxoSwapMutation) ClearEdge(name string) error {
 	case utxoswap.EdgeSecondaryTransfer:
 		m.ClearSecondaryTransfer()
 		return nil
+	case utxoswap.EdgeDepositAddress:
+		m.ClearDepositAddress()
+		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap unique edge %s", name)
 }
@@ -34701,6 +34757,9 @@ func (m *UtxoSwapMutation) ResetEdge(name string) error {
 		return nil
 	case utxoswap.EdgeSecondaryTransfer:
 		m.ResetSecondaryTransfer()
+		return nil
+	case utxoswap.EdgeDepositAddress:
+		m.ResetDepositAddress()
 		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap edge %s", name)

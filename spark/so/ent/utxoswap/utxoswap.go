@@ -58,6 +58,8 @@ const (
 	EdgeTransfer = "transfer"
 	// EdgeSecondaryTransfer holds the string denoting the secondary_transfer edge name in mutations.
 	EdgeSecondaryTransfer = "secondary_transfer"
+	// EdgeDepositAddress holds the string denoting the deposit_address edge name in mutations.
+	EdgeDepositAddress = "deposit_address"
 	// Table holds the table name of the utxoswap in the database.
 	Table = "utxo_swaps"
 	// UtxoTable is the table that holds the utxo relation/edge.
@@ -81,6 +83,13 @@ const (
 	SecondaryTransferInverseTable = "transfers"
 	// SecondaryTransferColumn is the table column denoting the secondary_transfer relation/edge.
 	SecondaryTransferColumn = "utxo_swap_secondary_transfer"
+	// DepositAddressTable is the table that holds the deposit_address relation/edge.
+	DepositAddressTable = "utxo_swaps"
+	// DepositAddressInverseTable is the table name for the DepositAddress entity.
+	// It exists in this package in order to avoid circular dependency with the "depositaddress" package.
+	DepositAddressInverseTable = "deposit_addresses"
+	// DepositAddressColumn is the table column denoting the deposit_address relation/edge.
+	DepositAddressColumn = "deposit_address_utxoswaps"
 )
 
 // Columns holds all SQL columns for utxoswap fields.
@@ -249,6 +258,13 @@ func BySecondaryTransferField(field string, opts ...sql.OrderTermOption) OrderOp
 		sqlgraph.OrderByNeighborTerms(s, newSecondaryTransferStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByDepositAddressField orders the results by deposit_address field.
+func ByDepositAddressField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newDepositAddressStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newUtxoStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -268,5 +284,12 @@ func newSecondaryTransferStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(SecondaryTransferInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, SecondaryTransferTable, SecondaryTransferColumn),
+	)
+}
+func newDepositAddressStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(DepositAddressInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, DepositAddressTable, DepositAddressColumn),
 	)
 }

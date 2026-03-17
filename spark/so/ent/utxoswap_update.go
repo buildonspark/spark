@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
@@ -377,6 +378,25 @@ func (usu *UtxoSwapUpdate) SetSecondaryTransfer(t *Transfer) *UtxoSwapUpdate {
 	return usu.SetSecondaryTransferID(t.ID)
 }
 
+// SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID.
+func (usu *UtxoSwapUpdate) SetDepositAddressID(id uuid.UUID) *UtxoSwapUpdate {
+	usu.mutation.SetDepositAddressID(id)
+	return usu
+}
+
+// SetNillableDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID if the given value is not nil.
+func (usu *UtxoSwapUpdate) SetNillableDepositAddressID(id *uuid.UUID) *UtxoSwapUpdate {
+	if id != nil {
+		usu = usu.SetDepositAddressID(*id)
+	}
+	return usu
+}
+
+// SetDepositAddress sets the "deposit_address" edge to the DepositAddress entity.
+func (usu *UtxoSwapUpdate) SetDepositAddress(d *DepositAddress) *UtxoSwapUpdate {
+	return usu.SetDepositAddressID(d.ID)
+}
+
 // Mutation returns the UtxoSwapMutation object of the builder.
 func (usu *UtxoSwapUpdate) Mutation() *UtxoSwapMutation {
 	return usu.mutation
@@ -397,6 +417,12 @@ func (usu *UtxoSwapUpdate) ClearTransfer() *UtxoSwapUpdate {
 // ClearSecondaryTransfer clears the "secondary_transfer" edge to the Transfer entity.
 func (usu *UtxoSwapUpdate) ClearSecondaryTransfer() *UtxoSwapUpdate {
 	usu.mutation.ClearSecondaryTransfer()
+	return usu
+}
+
+// ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
+func (usu *UtxoSwapUpdate) ClearDepositAddress() *UtxoSwapUpdate {
+	usu.mutation.ClearDepositAddress()
 	return usu
 }
 
@@ -648,6 +674,35 @@ func (usu *UtxoSwapUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if usu.mutation.DepositAddressCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   utxoswap.DepositAddressTable,
+			Columns: []string{utxoswap.DepositAddressColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := usu.mutation.DepositAddressIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   utxoswap.DepositAddressTable,
+			Columns: []string{utxoswap.DepositAddressColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
@@ -1020,6 +1075,25 @@ func (usuo *UtxoSwapUpdateOne) SetSecondaryTransfer(t *Transfer) *UtxoSwapUpdate
 	return usuo.SetSecondaryTransferID(t.ID)
 }
 
+// SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID.
+func (usuo *UtxoSwapUpdateOne) SetDepositAddressID(id uuid.UUID) *UtxoSwapUpdateOne {
+	usuo.mutation.SetDepositAddressID(id)
+	return usuo
+}
+
+// SetNillableDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID if the given value is not nil.
+func (usuo *UtxoSwapUpdateOne) SetNillableDepositAddressID(id *uuid.UUID) *UtxoSwapUpdateOne {
+	if id != nil {
+		usuo = usuo.SetDepositAddressID(*id)
+	}
+	return usuo
+}
+
+// SetDepositAddress sets the "deposit_address" edge to the DepositAddress entity.
+func (usuo *UtxoSwapUpdateOne) SetDepositAddress(d *DepositAddress) *UtxoSwapUpdateOne {
+	return usuo.SetDepositAddressID(d.ID)
+}
+
 // Mutation returns the UtxoSwapMutation object of the builder.
 func (usuo *UtxoSwapUpdateOne) Mutation() *UtxoSwapMutation {
 	return usuo.mutation
@@ -1040,6 +1114,12 @@ func (usuo *UtxoSwapUpdateOne) ClearTransfer() *UtxoSwapUpdateOne {
 // ClearSecondaryTransfer clears the "secondary_transfer" edge to the Transfer entity.
 func (usuo *UtxoSwapUpdateOne) ClearSecondaryTransfer() *UtxoSwapUpdateOne {
 	usuo.mutation.ClearSecondaryTransfer()
+	return usuo
+}
+
+// ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
+func (usuo *UtxoSwapUpdateOne) ClearDepositAddress() *UtxoSwapUpdateOne {
+	usuo.mutation.ClearDepositAddress()
 	return usuo
 }
 
@@ -1321,6 +1401,35 @@ func (usuo *UtxoSwapUpdateOne) sqlSave(ctx context.Context) (_node *UtxoSwap, er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if usuo.mutation.DepositAddressCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   utxoswap.DepositAddressTable,
+			Columns: []string{utxoswap.DepositAddressColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := usuo.mutation.DepositAddressIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   utxoswap.DepositAddressTable,
+			Columns: []string{utxoswap.DepositAddressColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

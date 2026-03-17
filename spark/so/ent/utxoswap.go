@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
@@ -74,9 +75,11 @@ type UtxoSwapEdges struct {
 	Transfer *Transfer `json:"transfer,omitempty"`
 	// Secondary transfer for instant static deposit with multiple payments.
 	SecondaryTransfer *Transfer `json:"secondary_transfer,omitempty"`
+	// DepositAddress holds the value of the deposit_address edge.
+	DepositAddress *DepositAddress `json:"deposit_address,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
 }
 
 // UtxoOrErr returns the Utxo value or an error if the edge
@@ -110,6 +113,17 @@ func (e UtxoSwapEdges) SecondaryTransferOrErr() (*Transfer, error) {
 		return nil, &NotFoundError{label: transfer.Label}
 	}
 	return nil, &NotLoadedError{edge: "secondary_transfer"}
+}
+
+// DepositAddressOrErr returns the DepositAddress value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e UtxoSwapEdges) DepositAddressOrErr() (*DepositAddress, error) {
+	if e.DepositAddress != nil {
+		return e.DepositAddress, nil
+	} else if e.loadedTypes[3] {
+		return nil, &NotFoundError{label: depositaddress.Label}
+	}
+	return nil, &NotLoadedError{edge: "deposit_address"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -316,6 +330,11 @@ func (us *UtxoSwap) QueryTransfer() *TransferQuery {
 // QuerySecondaryTransfer queries the "secondary_transfer" edge of the UtxoSwap entity.
 func (us *UtxoSwap) QuerySecondaryTransfer() *TransferQuery {
 	return NewUtxoSwapClient(us.config).QuerySecondaryTransfer(us)
+}
+
+// QueryDepositAddress queries the "deposit_address" edge of the UtxoSwap entity.
+func (us *UtxoSwap) QueryDepositAddress() *DepositAddressQuery {
+	return NewUtxoSwapClient(us.config).QueryDepositAddress(us)
 }
 
 // Update returns a builder for updating this UtxoSwap.

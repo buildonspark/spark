@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
@@ -281,6 +282,25 @@ func (usc *UtxoSwapCreate) SetSecondaryTransfer(t *Transfer) *UtxoSwapCreate {
 	return usc.SetSecondaryTransferID(t.ID)
 }
 
+// SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID.
+func (usc *UtxoSwapCreate) SetDepositAddressID(id uuid.UUID) *UtxoSwapCreate {
+	usc.mutation.SetDepositAddressID(id)
+	return usc
+}
+
+// SetNillableDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID if the given value is not nil.
+func (usc *UtxoSwapCreate) SetNillableDepositAddressID(id *uuid.UUID) *UtxoSwapCreate {
+	if id != nil {
+		usc = usc.SetDepositAddressID(*id)
+	}
+	return usc
+}
+
+// SetDepositAddress sets the "deposit_address" edge to the DepositAddress entity.
+func (usc *UtxoSwapCreate) SetDepositAddress(d *DepositAddress) *UtxoSwapCreate {
+	return usc.SetDepositAddressID(d.ID)
+}
+
 // Mutation returns the UtxoSwapMutation object of the builder.
 func (usc *UtxoSwapCreate) Mutation() *UtxoSwapMutation {
 	return usc.mutation
@@ -525,6 +545,23 @@ func (usc *UtxoSwapCreate) createSpec() (*UtxoSwap, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.utxo_swap_secondary_transfer = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := usc.mutation.DepositAddressIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   utxoswap.DepositAddressTable,
+			Columns: []string{utxoswap.DepositAddressColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.deposit_address_utxoswaps = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

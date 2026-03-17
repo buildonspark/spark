@@ -1,4 +1,4 @@
-h1:o0yO74fEFeXYU0ICHJdg/p2FN8BoYCkhhoGGDYTOOZY=
+h1:M62L1/W8FXjV4myOduWXJsrpPpZM94K6uR6NYIB8evs=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -130,3 +130,4 @@ h1:o0yO74fEFeXYU0ICHJdg/p2FN8BoYCkhhoGGDYTOOZY=
 20260217002001_add_multisig_config.sql h1:N2LQ/Sero+icXb+b+K9N7yyNcvgcO9Mh6O6Rhk3H9Lo=
 20260224193220_add_requested_secondary_transfer_id.sql h1:vtE6t5i8+3EJ7TVXwp/qUhOToQgK/p8xKYNaQHdhJSU=
 20260225010855_update_time_indexes.sql h1:B1xfAG4P/o7q6Z6GAbqGwmlPNKQefURDRnEAaAOWXBc=
+20260317200548_add_utxoswap_deposit_address_value_unique_index.sql h1:CJ/3ECS7qHeQBxvrqdoCzet9VRWgctuum4wMcQr9wHc=
