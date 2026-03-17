@@ -34,6 +34,7 @@ message GossipMessage {
         GossipMessageArchiveStaticDepositAddress archive_static_deposit_address = 18;
         GossipMessageRollbackInstantUtxoSwap rollback_instant_utxo_swap = 19;
         GossipMessageFinalizeTransferReceiver finalize_transfer_receiver = 20;
+        GossipMessageFinalizeTreeNode finalize_tree_node = 21;
     }
 }
 
@@ -161,4 +162,8 @@ message GossipMessageArchiveStaticDepositAddress {
     string address = 3;  // Specific address to archive
     bytes signature = 4;  // Coordinator's signature over the operation
     bytes coordinator_public_key = 5;  // Identity public key of the SO that initiated the rotation
+}
+
+message GossipMessageFinalizeTreeNode {
+    repeated spark_internal.TreeNode nodes = 1;
 }

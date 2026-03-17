@@ -120,6 +120,8 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	case *pbgossip.GossipMessage_FinalizeTransferReceiver:
 		finalizeTransferReceiver := gossipMessage.GetFinalizeTransferReceiver()
 		err = h.handleFinalizeTransferReceiverGossipMessage(ctx, finalizeTransferReceiver, forCoordinator)
+	case *pbgossip.GossipMessage_FinalizeTreeNode:
+		err = h.handleFinalizeTreeNodeGossipMessage(ctx, gossipMessage.GetFinalizeTreeNode(), forCoordinator)
 	default:
 		err = fmt.Errorf("unsupported gossip message type: %T", gossipMessage.Message)
 	}
@@ -530,4 +532,77 @@ func (h *GossipHandler) handleFinalizeTransferReceiverGossipMessage(ctx context.
 		logger.Error("Failed to finalize transfer receiver", zap.Error(err))
 	}
 	return err
+}
+
+func (h *GossipHandler) handleFinalizeTreeNodeGossipMessage(
+	ctx context.Context,
+	msg *pbgossip.GossipMessageFinalizeTreeNode,
+	forCoordinator bool,
+) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Info("Handling finalize re-sign subtree gossip message")
+
+	if forCoordinator {
+		return nil
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get db from context: %w", err)
+	}
+
+	// Collect all node IDs and lock them before updating.
+	nodeIDs := make([]uuid.UUID, 0, len(msg.Nodes))
+	for _, node := range msg.Nodes {
+		nodeID, err := uuid.Parse(node.Id)
+		if err != nil {
+			return fmt.Errorf("invalid node id in gossip: %w", err)
+		}
+		nodeIDs = append(nodeIDs, nodeID)
+	}
+	_, err = db.TreeNode.Query().
+		Where(treenode.IDIn(nodeIDs...)).
+		ForUpdate().
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to lock nodes for gossip update: %w", err)
+	}
+
+	for _, node := range msg.Nodes {
+		nodeID, _ := uuid.Parse(node.Id)
+
+		update := db.TreeNode.UpdateOneID(nodeID).
+			SetRawTx(node.RawTx)
+
+		// A leaf node has refund txs; only leaf nodes get status set to AVAILABLE.
+		isLeaf := len(node.RawRefundTx) > 0
+		if isLeaf {
+			update.SetRawRefundTx(node.RawRefundTx).
+				SetStatus(st.TreeNodeStatusAvailable)
+		} else {
+			update.ClearRawRefundTx()
+		}
+		if len(node.DirectTx) > 0 {
+			update.SetDirectTx(node.DirectTx)
+		} else {
+			update.ClearDirectTx()
+		}
+		if len(node.DirectRefundTx) > 0 {
+			update.SetDirectRefundTx(node.DirectRefundTx)
+		} else {
+			update.ClearDirectRefundTx()
+		}
+		if len(node.DirectFromCpfpRefundTx) > 0 {
+			update.SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
+		} else {
+			update.ClearDirectFromCpfpRefundTx()
+		}
+
+		_, err = update.Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update node %s from gossip: %w", node.Id, err)
+		}
+	}
+
+	return nil
 }
