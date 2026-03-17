@@ -45,12 +45,8 @@ func TestTransfer(t *testing.T) {
 	}
 	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
-	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
-	require.NoError(t, err, "failed to authenticate sender")
-	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
-
 	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
-		senderCtx,
+		t.Context(),
 		senderConfig,
 		leavesToTransfer,
 		receiverPrivKey.Public(),
@@ -108,12 +104,8 @@ func TestClaimTransfer(t *testing.T) {
 	}
 	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
-	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
-	require.NoError(t, err, "failed to authenticate sender")
-	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
-
 	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
-		senderCtx,
+		t.Context(),
 		senderConfig,
 		leavesToTransfer,
 		receiverPrivKey.Public(),
@@ -150,7 +142,7 @@ func TestClaimTransfer(t *testing.T) {
 	require.Equal(t, claimingNode.Leaf.Id, claimedTransfer.Leaves[0].Leaf.Id)
 }
 
-func TestMimoClaimTransferSingleReceiver(t *testing.T) {
+func TestV2MimoClaimTransferSingleReceiver(t *testing.T) {
 	senderConfig := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -166,12 +158,8 @@ func TestMimoClaimTransferSingleReceiver(t *testing.T) {
 	}
 	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
-	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
-	require.NoError(t, err, "failed to authenticate sender")
-	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
-
 	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
-		senderCtx,
+		t.Context(),
 		senderConfig,
 		leavesToTransfer,
 		receiverPrivKey.Public(),
@@ -222,6 +210,495 @@ func TestMimoClaimTransferSingleReceiver(t *testing.T) {
 	require.Equal(t, st.TransferReceiverStatusCompleted, receiver.Status)
 }
 
+func TestV3ClaimTransferSingleReceiver(t *testing.T) {
+	senderConfig := wallet.NewTestWalletConfig(t)
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	receiverPrivKey := keys.GeneratePrivateKey()
+
+	leavesToTransfer := []wallet.LeafKeyTweak{{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}}
+	leafReceiverMap := map[string]keys.Public{
+		rootNode.Id: receiverPrivKey.Public(),
+	}
+
+	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
+		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send V3 transfer")
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+
+	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err)
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+
+	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err)
+	require.Len(t, pendingTransfer.Transfers, 1)
+	require.Equal(t, senderTransfer.Id, pendingTransfer.Transfers[0].Id)
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pendingTransfer.Transfers[0])
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+
+	finalLeafPrivKey := keys.GeneratePrivateKey()
+	claimLeaves := []wallet.LeafKeyTweak{{
+		Leaf:              pendingTransfer.Transfers[0].Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey,
+		NewSigningPrivKey: finalLeafPrivKey,
+	}}
+	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, pendingTransfer.Transfers[0], receiverConfig, claimLeaves)
+	require.NoError(t, err, "failed to ClaimTransferV2")
+
+	// With a single receiver, the transfer should be COMPLETED immediately.
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimedTransfer.Status)
+	require.Len(t, claimedTransfer.Leaves, 1)
+	require.Equal(t, rootNode.Id, claimedTransfer.Leaves[0].Leaf.Id)
+
+	// Verify the TransferReceiver status in the coordinator DB.
+	transferUUID, err := uuid.Parse(claimedTransfer.Id)
+	require.NoError(t, err)
+	entClient := db.NewPostgresEntClientForIntegrationTest(t, receiverConfig.CoordinatorDatabaseURI)
+	defer entClient.Close()
+	receiver, err := entClient.TransferReceiver.Query().
+		Where(
+			transferreceiver.TransferIDEQ(transferUUID),
+			transferreceiver.IdentityPubkeyEQ(receiverPrivKey.Public()),
+		).Only(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, st.TransferReceiverStatusCompleted, receiver.Status)
+}
+
+func TestV3TransferMultiReceiver(t *testing.T) {
+
+	senderConfig := wallet.NewTestWalletConfig(t)
+
+	// Create 2 leaves for 2 receivers
+	leafPrivKey1 := keys.GeneratePrivateKey()
+	rootNode1, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey1, amountSatsToSend)
+	require.NoError(t, err, "failed to create tree 1")
+
+	leafPrivKey2 := keys.GeneratePrivateKey()
+	rootNode2, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey2, amountSatsToSend)
+	require.NoError(t, err, "failed to create tree 2")
+
+	newLeafPrivKey1 := keys.GeneratePrivateKey()
+	newLeafPrivKey2 := keys.GeneratePrivateKey()
+	receiver1PrivKey := keys.GeneratePrivateKey()
+	receiver2PrivKey := keys.GeneratePrivateKey()
+
+	leavesToTransfer := []wallet.LeafKeyTweak{
+		{Leaf: rootNode1, SigningPrivKey: leafPrivKey1, NewSigningPrivKey: newLeafPrivKey1},
+		{Leaf: rootNode2, SigningPrivKey: leafPrivKey2, NewSigningPrivKey: newLeafPrivKey2},
+	}
+	leafReceiverMap := map[string]keys.Public{
+		rootNode1.Id: receiver1PrivKey.Public(),
+		rootNode2.Id: receiver2PrivKey.Public(),
+	}
+
+	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
+		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send V3 transfer")
+
+	// After StartTransferV3 the transfer must be SENDER_KEY_TWEAKED.
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status,
+		"transfer should be SENDER_KEY_TWEAKED immediately after StartTransferV3")
+
+	entClient := db.NewPostgresEntClientForIntegrationTest(t, senderConfig.CoordinatorDatabaseURI)
+	defer entClient.Close()
+	transferUUID, err := uuid.Parse(senderTransfer.Id)
+	require.NoError(t, err)
+
+	// --- Receiver 1 claims ---
+	receiver1Config := wallet.NewTestWalletConfigWithIdentityKey(t, receiver1PrivKey)
+	receiver1Token, err := wallet.AuthenticateWithServer(t.Context(), receiver1Config)
+	require.NoError(t, err)
+	receiver1Ctx := wallet.ContextWithToken(t.Context(), receiver1Token)
+
+	pending1, err := wallet.QueryPendingTransfers(receiver1Ctx, receiver1Config)
+	require.NoError(t, err)
+	require.Len(t, pending1.Transfers, 1)
+	require.Equal(t, senderTransfer.Id, pending1.Transfers[0].Id)
+
+	leafPrivKeyMap1, err := wallet.VerifyPendingTransfer(t.Context(), receiver1Config, pending1.Transfers[0])
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode1.Id: newLeafPrivKey1}, leafPrivKeyMap1)
+
+	require.Len(t, pending1.Transfers[0].Leaves, 1)
+	finalLeafPrivKey1 := keys.GeneratePrivateKey()
+	claimLeaves1 := []wallet.LeafKeyTweak{{
+		Leaf:              pending1.Transfers[0].Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey1,
+		NewSigningPrivKey: finalLeafPrivKey1,
+	}}
+	claimed1, err := wallet.ClaimTransferV2(receiver1Ctx, pending1.Transfers[0], receiver1Config, claimLeaves1)
+	require.NoError(t, err)
+
+	// After receiver 1 (of 2) claims, transfer must NOT be COMPLETED yet.
+	require.NotEqual(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed1.Status,
+		"transfer must not be COMPLETED until all receivers claim")
+
+	// Verify per-receiver DB state: receiver 1 completed, receiver 2 not yet.
+	r1, err := entClient.TransferReceiver.Query().
+		Where(
+			transferreceiver.TransferIDEQ(transferUUID),
+			transferreceiver.IdentityPubkeyEQ(receiver1PrivKey.Public()),
+		).Only(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, st.TransferReceiverStatusCompleted, r1.Status,
+		"receiver 1 should be COMPLETED after claiming")
+
+	r2Before, err := entClient.TransferReceiver.Query().
+		Where(
+			transferreceiver.TransferIDEQ(transferUUID),
+			transferreceiver.IdentityPubkeyEQ(receiver2PrivKey.Public()),
+		).Only(t.Context())
+	require.NoError(t, err)
+	require.NotEqual(t, st.TransferReceiverStatusCompleted, r2Before.Status,
+		"receiver 2 should NOT be COMPLETED before claiming")
+
+	// --- Receiver 2 claims ---
+	receiver2Config := wallet.NewTestWalletConfigWithIdentityKey(t, receiver2PrivKey)
+	receiver2Token, err := wallet.AuthenticateWithServer(t.Context(), receiver2Config)
+	require.NoError(t, err)
+	receiver2Ctx := wallet.ContextWithToken(t.Context(), receiver2Token)
+
+	pending2, err := wallet.QueryPendingTransfers(receiver2Ctx, receiver2Config)
+	require.NoError(t, err)
+	require.Len(t, pending2.Transfers, 1)
+	require.Equal(t, senderTransfer.Id, pending2.Transfers[0].Id)
+
+	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.Transfers[0])
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode2.Id: newLeafPrivKey2}, leafPrivKeyMap2)
+
+	require.Len(t, pending2.Transfers[0].Leaves, 1)
+	finalLeafPrivKey2 := keys.GeneratePrivateKey()
+	claimLeaves2 := []wallet.LeafKeyTweak{{
+		Leaf:              pending2.Transfers[0].Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey2,
+		NewSigningPrivKey: finalLeafPrivKey2,
+	}}
+	claimed2, err := wallet.ClaimTransferV2(receiver2Ctx, pending2.Transfers[0], receiver2Config, claimLeaves2)
+	require.NoError(t, err)
+
+	// After both receivers claim the transfer is COMPLETED.
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed2.Status,
+		"transfer should be COMPLETED after all receivers claim")
+
+	// Verify receiver 2's DB record is also COMPLETED after their claim.
+	r2After, err := entClient.TransferReceiver.Query().
+		Where(
+			transferreceiver.TransferIDEQ(transferUUID),
+			transferreceiver.IdentityPubkeyEQ(receiver2PrivKey.Public()),
+		).Only(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, st.TransferReceiverStatusCompleted, r2After.Status,
+		"receiver 2 should be COMPLETED after claiming")
+
+	// --- Verify final DB state ---
+	receivers, err := entClient.TransferReceiver.Query().
+		Where(transferreceiver.TransferIDEQ(transferUUID)).
+		All(t.Context())
+	require.NoError(t, err)
+	require.Len(t, receivers, 2)
+	for _, r := range receivers {
+		require.Equal(t, st.TransferReceiverStatusCompleted, r.Status)
+	}
+}
+
+func TestV3TransferMultiReceiverReverseClaimOrder(t *testing.T) {
+	senderConfig := wallet.NewTestWalletConfig(t)
+
+	leafPrivKey1 := keys.GeneratePrivateKey()
+	rootNode1, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey1, amountSatsToSend)
+	require.NoError(t, err, "failed to create tree 1")
+
+	leafPrivKey2 := keys.GeneratePrivateKey()
+	rootNode2, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey2, amountSatsToSend)
+	require.NoError(t, err, "failed to create tree 2")
+
+	newLeafPrivKey1 := keys.GeneratePrivateKey()
+	newLeafPrivKey2 := keys.GeneratePrivateKey()
+	receiver1PrivKey := keys.GeneratePrivateKey()
+	receiver2PrivKey := keys.GeneratePrivateKey()
+
+	leavesToTransfer := []wallet.LeafKeyTweak{
+		{Leaf: rootNode1, SigningPrivKey: leafPrivKey1, NewSigningPrivKey: newLeafPrivKey1},
+		{Leaf: rootNode2, SigningPrivKey: leafPrivKey2, NewSigningPrivKey: newLeafPrivKey2},
+	}
+	leafReceiverMap := map[string]keys.Public{
+		rootNode1.Id: receiver1PrivKey.Public(),
+		rootNode2.Id: receiver2PrivKey.Public(),
+	}
+
+	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
+		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send V3 transfer")
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+
+	entClient := db.NewPostgresEntClientForIntegrationTest(t, senderConfig.CoordinatorDatabaseURI)
+	defer entClient.Close()
+	transferUUID, err := uuid.Parse(senderTransfer.Id)
+	require.NoError(t, err)
+
+	// --- Receiver 2 claims FIRST ---
+	receiver2Config := wallet.NewTestWalletConfigWithIdentityKey(t, receiver2PrivKey)
+	receiver2Token, err := wallet.AuthenticateWithServer(t.Context(), receiver2Config)
+	require.NoError(t, err)
+	receiver2Ctx := wallet.ContextWithToken(t.Context(), receiver2Token)
+
+	pending2, err := wallet.QueryPendingTransfers(receiver2Ctx, receiver2Config)
+	require.NoError(t, err)
+	require.Len(t, pending2.Transfers, 1)
+	require.Equal(t, senderTransfer.Id, pending2.Transfers[0].Id)
+
+	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.Transfers[0])
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode2.Id: newLeafPrivKey2}, leafPrivKeyMap2)
+
+	require.Len(t, pending2.Transfers[0].Leaves, 1)
+	claimLeaves2 := []wallet.LeafKeyTweak{{
+		Leaf:              pending2.Transfers[0].Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey2,
+		NewSigningPrivKey: keys.GeneratePrivateKey(),
+	}}
+	claimed2, err := wallet.ClaimTransferV2(receiver2Ctx, pending2.Transfers[0], receiver2Config, claimLeaves2)
+	require.NoError(t, err)
+
+	require.NotEqual(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed2.Status,
+		"transfer must not be COMPLETED until all receivers claim")
+
+	// Verify DB: receiver 2 completed, receiver 1 not yet
+	r2, err := entClient.TransferReceiver.Query().
+		Where(
+			transferreceiver.TransferIDEQ(transferUUID),
+			transferreceiver.IdentityPubkeyEQ(receiver2PrivKey.Public()),
+		).Only(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, st.TransferReceiverStatusCompleted, r2.Status,
+		"receiver 2 should be COMPLETED after claiming first")
+
+	r1Before, err := entClient.TransferReceiver.Query().
+		Where(
+			transferreceiver.TransferIDEQ(transferUUID),
+			transferreceiver.IdentityPubkeyEQ(receiver1PrivKey.Public()),
+		).Only(t.Context())
+	require.NoError(t, err)
+	require.NotEqual(t, st.TransferReceiverStatusCompleted, r1Before.Status,
+		"receiver 1 should NOT be COMPLETED before claiming")
+
+	// --- Receiver 1 claims SECOND ---
+	receiver1Config := wallet.NewTestWalletConfigWithIdentityKey(t, receiver1PrivKey)
+	receiver1Token, err := wallet.AuthenticateWithServer(t.Context(), receiver1Config)
+	require.NoError(t, err)
+	receiver1Ctx := wallet.ContextWithToken(t.Context(), receiver1Token)
+
+	pending1, err := wallet.QueryPendingTransfers(receiver1Ctx, receiver1Config)
+	require.NoError(t, err)
+	require.Len(t, pending1.Transfers, 1)
+	require.Equal(t, senderTransfer.Id, pending1.Transfers[0].Id)
+
+	leafPrivKeyMap1, err := wallet.VerifyPendingTransfer(t.Context(), receiver1Config, pending1.Transfers[0])
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode1.Id: newLeafPrivKey1}, leafPrivKeyMap1)
+
+	require.Len(t, pending1.Transfers[0].Leaves, 1)
+	claimLeaves1 := []wallet.LeafKeyTweak{{
+		Leaf:              pending1.Transfers[0].Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey1,
+		NewSigningPrivKey: keys.GeneratePrivateKey(),
+	}}
+	claimed1, err := wallet.ClaimTransferV2(receiver1Ctx, pending1.Transfers[0], receiver1Config, claimLeaves1)
+	require.NoError(t, err)
+
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed1.Status,
+		"transfer should be COMPLETED after all receivers claim")
+
+	// Verify receiver 1's DB record is COMPLETED after claiming second.
+	r1After, err := entClient.TransferReceiver.Query().
+		Where(
+			transferreceiver.TransferIDEQ(transferUUID),
+			transferreceiver.IdentityPubkeyEQ(receiver1PrivKey.Public()),
+		).Only(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, st.TransferReceiverStatusCompleted, r1After.Status,
+		"receiver 1 should be COMPLETED after claiming second")
+
+	// Verify final DB state
+	receivers, err := entClient.TransferReceiver.Query().
+		Where(transferreceiver.TransferIDEQ(transferUUID)).
+		All(t.Context())
+	require.NoError(t, err)
+	require.Len(t, receivers, 2)
+	for _, r := range receivers {
+		require.Equal(t, st.TransferReceiverStatusCompleted, r.Status)
+	}
+}
+
+func TestV3TransferMultiLeafPerReceiver(t *testing.T) {
+
+	senderConfig := wallet.NewTestWalletConfig(t)
+
+	// Create 3 leaves for 2 receivers
+	leafPrivKey1 := keys.GeneratePrivateKey()
+	rootNode1, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey1, amountSatsToSend)
+	require.NoError(t, err, "failed to create tree 1")
+
+	leafPrivKey2 := keys.GeneratePrivateKey()
+	rootNode2, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey2, amountSatsToSend)
+	require.NoError(t, err, "failed to create tree 2")
+
+	leafPrivKey3 := keys.GeneratePrivateKey()
+	rootNode3, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey3, amountSatsToSend)
+	require.NoError(t, err, "failed to create tree 3")
+
+	newLeafPrivKey1 := keys.GeneratePrivateKey()
+	newLeafPrivKey2 := keys.GeneratePrivateKey()
+	newLeafPrivKey3 := keys.GeneratePrivateKey()
+	receiver1PrivKey := keys.GeneratePrivateKey()
+	receiver2PrivKey := keys.GeneratePrivateKey()
+
+	leavesToTransfer := []wallet.LeafKeyTweak{
+		{Leaf: rootNode1, SigningPrivKey: leafPrivKey1, NewSigningPrivKey: newLeafPrivKey1},
+		{Leaf: rootNode2, SigningPrivKey: leafPrivKey2, NewSigningPrivKey: newLeafPrivKey2},
+		{Leaf: rootNode3, SigningPrivKey: leafPrivKey3, NewSigningPrivKey: newLeafPrivKey3},
+	}
+	// Receiver 1 gets leaves 1+2, receiver 2 gets leaf 3
+	leafReceiverMap := map[string]keys.Public{
+		rootNode1.Id: receiver1PrivKey.Public(),
+		rootNode2.Id: receiver1PrivKey.Public(),
+		rootNode3.Id: receiver2PrivKey.Public(),
+	}
+
+	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
+		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send V3 transfer")
+
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status,
+		"transfer should be SENDER_KEY_TWEAKED immediately after StartTransferV3")
+
+	entClient := db.NewPostgresEntClientForIntegrationTest(t, senderConfig.CoordinatorDatabaseURI)
+	defer entClient.Close()
+	transferUUID, err := uuid.Parse(senderTransfer.Id)
+	require.NoError(t, err)
+
+	// --- Receiver 1 claims (2 leaves) ---
+	receiver1Config := wallet.NewTestWalletConfigWithIdentityKey(t, receiver1PrivKey)
+	receiver1Token, err := wallet.AuthenticateWithServer(t.Context(), receiver1Config)
+	require.NoError(t, err)
+	receiver1Ctx := wallet.ContextWithToken(t.Context(), receiver1Token)
+
+	pending1, err := wallet.QueryPendingTransfers(receiver1Ctx, receiver1Config)
+	require.NoError(t, err)
+	require.Len(t, pending1.Transfers, 1)
+	require.Equal(t, senderTransfer.Id, pending1.Transfers[0].Id)
+	require.Len(t, pending1.Transfers[0].Leaves, 2)
+
+	leafPrivKeyMap1, err := wallet.VerifyPendingTransfer(t.Context(), receiver1Config, pending1.Transfers[0])
+	require.NoError(t, err)
+	require.Len(t, leafPrivKeyMap1, 2)
+
+	claimLeaves1 := make([]wallet.LeafKeyTweak, 0, 2)
+	for _, transferLeaf := range pending1.Transfers[0].Leaves {
+		signingKey, ok := leafPrivKeyMap1[transferLeaf.Leaf.Id]
+		require.True(t, ok, "missing private key for leaf %s", transferLeaf.Leaf.Id)
+		claimLeaves1 = append(claimLeaves1, wallet.LeafKeyTweak{
+			Leaf:              transferLeaf.Leaf,
+			SigningPrivKey:    signingKey,
+			NewSigningPrivKey: keys.GeneratePrivateKey(),
+		})
+	}
+	claimed1, err := wallet.ClaimTransferV2(receiver1Ctx, pending1.Transfers[0], receiver1Config, claimLeaves1)
+	require.NoError(t, err)
+
+	// After receiver 1 (of 2) claims, transfer must NOT be COMPLETED yet.
+	require.NotEqual(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed1.Status,
+		"transfer must not be COMPLETED until all receivers claim")
+
+	// Verify per-receiver DB state after first claim.
+	r1, err := entClient.TransferReceiver.Query().
+		Where(
+			transferreceiver.TransferIDEQ(transferUUID),
+			transferreceiver.IdentityPubkeyEQ(receiver1PrivKey.Public()),
+		).Only(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, st.TransferReceiverStatusCompleted, r1.Status,
+		"receiver 1 should be COMPLETED after claiming")
+
+	r2Before, err := entClient.TransferReceiver.Query().
+		Where(
+			transferreceiver.TransferIDEQ(transferUUID),
+			transferreceiver.IdentityPubkeyEQ(receiver2PrivKey.Public()),
+		).Only(t.Context())
+	require.NoError(t, err)
+	require.NotEqual(t, st.TransferReceiverStatusCompleted, r2Before.Status,
+		"receiver 2 should NOT be COMPLETED before claiming")
+
+	// --- Receiver 2 claims (1 leaf) ---
+	receiver2Config := wallet.NewTestWalletConfigWithIdentityKey(t, receiver2PrivKey)
+	receiver2Token, err := wallet.AuthenticateWithServer(t.Context(), receiver2Config)
+	require.NoError(t, err)
+	receiver2Ctx := wallet.ContextWithToken(t.Context(), receiver2Token)
+
+	pending2, err := wallet.QueryPendingTransfers(receiver2Ctx, receiver2Config)
+	require.NoError(t, err)
+	require.Len(t, pending2.Transfers, 1)
+	require.Equal(t, senderTransfer.Id, pending2.Transfers[0].Id)
+	require.Len(t, pending2.Transfers[0].Leaves, 1)
+
+	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.Transfers[0])
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode3.Id: newLeafPrivKey3}, leafPrivKeyMap2)
+
+	finalLeafPrivKey2 := keys.GeneratePrivateKey()
+	claimLeaves2 := []wallet.LeafKeyTweak{{
+		Leaf:              pending2.Transfers[0].Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey3,
+		NewSigningPrivKey: finalLeafPrivKey2,
+	}}
+	claimed2, err := wallet.ClaimTransferV2(receiver2Ctx, pending2.Transfers[0], receiver2Config, claimLeaves2)
+	require.NoError(t, err)
+
+	// After both receivers claim the transfer is COMPLETED.
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed2.Status,
+		"transfer should be COMPLETED after all receivers claim")
+
+	// Verify receiver 2's DB record is COMPLETED after claiming second.
+	r2After, err := entClient.TransferReceiver.Query().
+		Where(
+			transferreceiver.TransferIDEQ(transferUUID),
+			transferreceiver.IdentityPubkeyEQ(receiver2PrivKey.Public()),
+		).Only(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, st.TransferReceiverStatusCompleted, r2After.Status,
+		"receiver 2 should be COMPLETED after claiming second")
+
+	// --- Verify final DB state ---
+	receivers, err := entClient.TransferReceiver.Query().
+		Where(transferreceiver.TransferIDEQ(transferUUID)).
+		All(t.Context())
+	require.NoError(t, err)
+	require.Len(t, receivers, 2)
+	for _, r := range receivers {
+		require.Equal(t, st.TransferReceiverStatusCompleted, r.Status)
+	}
+}
+
 func TestQueryPendingTransferByNetwork(t *testing.T) {
 	senderConfig := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
@@ -239,12 +716,8 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 	}
 	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
-	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
-	require.NoError(t, err, "failed to authenticate sender")
-	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
-
 	_, err = wallet.SendTransferWithKeyTweaks(
-		senderCtx,
+		t.Context(),
 		senderConfig,
 		leavesToTransfer,
 		receiverPrivKey.Public(),
@@ -293,12 +766,8 @@ func TestTransferInterrupt(t *testing.T) {
 	}
 	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
-	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
-	require.NoError(t, err, "failed to authenticate sender")
-	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
-
 	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
-		senderCtx,
+		t.Context(),
 		senderConfig,
 		leavesToTransfer,
 		receiverPrivKey.Public(),
@@ -1419,12 +1888,8 @@ func sendTransferWithInvoice(
 	}
 	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
-	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
-	require.NoError(t, err, "failed to authenticate sender")
-	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
-
 	senderTransfer, err = wallet.SendTransferWithKeyTweaksAndInvoice(
-		senderCtx,
+		t.Context(),
 		senderConfig,
 		leavesToTransfer,
 		receiverPrivKey.Public(),

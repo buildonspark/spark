@@ -8,10 +8,14 @@ import type { SparkWallet } from "@buildonspark/spark-sdk";
 
 const getBalanceMock = jest.fn<() => Promise<{ balance: bigint }>>();
 const getSparkAddressMock = jest.fn<() => Promise<string>>();
+const claimPendingTransfersMock = jest
+  .fn<() => Promise<unknown[]>>()
+  .mockResolvedValue([]);
 
 const mockWallet = {
   getBalance: getBalanceMock,
   getSparkAddress: getSparkAddressMock,
+  claimPendingTransfers: claimPendingTransfersMock,
 };
 
 const mockResolve = jest

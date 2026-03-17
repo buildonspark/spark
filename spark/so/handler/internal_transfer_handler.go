@@ -553,11 +553,10 @@ func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *p
 		return bytes.Compare(a.Serialize(), b.Serialize())
 	})
 
+	// Validate required transfer package and decrypted key tweaks
 	if senderPkg.TransferPackage == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
-
-	// Validate required transfer package and decrypted key tweaks
 	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, senderPkg.TransferPackage, senderIdentityPubKey, true)
 	if err != nil {
 		return err

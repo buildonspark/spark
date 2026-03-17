@@ -134,7 +134,7 @@ describe("handleSendMultiTransfer", () => {
     );
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("txn-123");
-    expect(result.content[0]?.text).toContain("2");
+    expect(result.content[0]?.text).toContain("Receivers: 2");
   });
 
   it("returns insufficient balance error when total exceeds balance", async () => {
@@ -159,6 +159,38 @@ describe("handleSendMultiTransfer", () => {
     );
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("network timeout");
+  });
+
+  it("returns raw JSON when output is raw", async () => {
+    getBalanceMock.mockResolvedValue({ balance: 5000n });
+    transferV2Mock.mockResolvedValue(sampleTransfer);
+    const result = await handleSendMultiTransfer(
+      receivers,
+      undefined,
+      mockResolve,
+      "raw",
+    );
+    expect(result.isError).toBeFalsy();
+    const parsed = JSON.parse(result.content[0]!.text);
+    expect(parsed.id).toBe("txn-123");
+    expect(parsed.status).toBe("COMPLETED");
+  });
+
+  it("returns verbose output with receiver breakdown", async () => {
+    getBalanceMock.mockResolvedValue({ balance: 5000n });
+    transferV2Mock.mockResolvedValue(sampleTransfer);
+    const result = await handleSendMultiTransfer(
+      receivers,
+      undefined,
+      mockResolve,
+      "verbose",
+    );
+    expect(result.isError).toBeFalsy();
+    const text = result.content[0]!.text;
+    expect(text).toContain("Direction: OUTGOING");
+    expect(text).toContain("Receivers:");
+    expect(text).toContain("sparkl1abc: 500 sats");
+    expect(text).toContain("sparkl1def: 300 sats");
   });
 });
 

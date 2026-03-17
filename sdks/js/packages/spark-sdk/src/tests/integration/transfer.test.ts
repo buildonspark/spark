@@ -4,6 +4,7 @@ import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { uuidv7 } from "uuidv7";
 import { SparkError } from "../../errors/index.js";
+import { SparkValidationError } from "../../errors/types.js";
 import { InvoiceStatus, TransferStatus } from "../../proto/spark.js";
 import type { LeafKeyTweak } from "../../services/transfer.js";
 import {
@@ -1241,3 +1242,335 @@ describe.each(walletTypes)(
     });
   },
 );
+
+describe.each(walletTypes)("transferV2 multi-receiver", ({ name, Signer }) => {
+  jest.setTimeout(120_000);
+
+  it(`${name} - transferV2 with 2 receivers`, async () => {
+    const faucet = BitcoinFaucet.getInstance();
+    const options: ConfigOptions = { network: "LOCAL" };
+
+    // Create sender and fund with 2 deposits (1000 sats each)
+    const { wallet: senderWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    const depositAddr1 = await senderWallet.getSingleUseDepositAddress();
+    const signedTx1 = await faucet.sendToAddress(depositAddr1, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+    await senderWallet.claimDeposit(signedTx1.id);
+
+    const depositAddr2 = await senderWallet.getSingleUseDepositAddress();
+    const signedTx2 = await faucet.sendToAddress(depositAddr2, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+    await senderWallet.claimDeposit(signedTx2.id);
+
+    const senderBalance = await senderWallet.getBalance();
+    expect(senderBalance.balance).toBe(2_000n);
+
+    // Create 2 receiver wallets
+    const { wallet: receiver1 } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+    const { wallet: receiver2 } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    const sparkAddr1 = await receiver1.getSparkAddress();
+    const sparkAddr2 = await receiver2.getSparkAddress();
+
+    // Send multi-receiver transfer
+    const transfer = await senderWallet.transferV2({
+      receivers: [
+        { receiverSparkAddress: sparkAddr1, amountSats: 1000 },
+        { receiverSparkAddress: sparkAddr2, amountSats: 1000 },
+      ],
+    });
+    expect(transfer.id).toBeDefined();
+
+    // After send, transfer should be SENDER_KEY_TWEAKED.
+    // Requires MIMO knobs enabled on SOs.
+    expect(transfer.status).toBe("TRANSFER_STATUS_SENDER_KEY_TWEAKED");
+
+    // Verify sender balance is 0
+    const senderBalanceAfter = await senderWallet.getBalance();
+    expect(senderBalanceAfter.balance).toBe(0n);
+
+    // Receiver 1 claims
+    const pending1 = await receiver1.queryPendingTransfers();
+    expect(pending1.transfers.length).toBe(1);
+    expect(pending1.transfers[0]!.status).toBe(
+      TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+    );
+    const r1TransferService = receiver1.getTransferService();
+    await r1TransferService.claimTransfer(pending1.transfers[0]!);
+    const balance1 = await receiver1.getBalance();
+    expect(balance1.balance).toBe(1_000n);
+
+    // After receiver 1 claims, receiver 2 should still see the transfer as
+    // pending (not COMPLETED) because receiver 2 hasn't claimed yet.
+    const pending2 = await receiver2.queryPendingTransfers();
+    expect(pending2.transfers.length).toBe(1);
+    expect(pending2.transfers[0]!.status).not.toBe(
+      TransferStatus.TRANSFER_STATUS_COMPLETED,
+    );
+
+    // Receiver 2 claims
+    const r2TransferService = receiver2.getTransferService();
+    await r2TransferService.claimTransfer(pending2.transfers[0]!);
+    const balance2 = await receiver2.getBalance();
+    expect(balance2.balance).toBe(1_000n);
+
+    // After both receivers claim, the transfer should be completed (no longer pending).
+    const final1 = await receiver1.queryPendingTransfers();
+    expect(final1.transfers.length).toBe(0);
+    const final2 = await receiver2.queryPendingTransfers();
+    expect(final2.transfers.length).toBe(0);
+  });
+
+  it(`${name} - transferV2 with single receiver`, async () => {
+    const faucet = BitcoinFaucet.getInstance();
+    const options: ConfigOptions = { network: "LOCAL" };
+
+    const { wallet: senderWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    const depositAddr = await senderWallet.getSingleUseDepositAddress();
+    const signedTx = await faucet.sendToAddress(depositAddr, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+    await senderWallet.claimDeposit(signedTx.id);
+
+    const { wallet: receiverWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+    const receiverAddr = await receiverWallet.getSparkAddress();
+
+    const transfer = await senderWallet.transferV2({
+      receivers: [{ receiverSparkAddress: receiverAddr, amountSats: 1000 }],
+    });
+    expect(transfer.id).toBeDefined();
+
+    const senderBalanceAfter = await senderWallet.getBalance();
+    expect(senderBalanceAfter.balance).toBe(0n);
+
+    const pending = await receiverWallet.queryPendingTransfers();
+    expect(pending.transfers.length).toBe(1);
+    const transferService = receiverWallet.getTransferService();
+    await transferService.claimTransfer(pending.transfers[0]!);
+    const receiverBalance = await receiverWallet.getBalance();
+    expect(receiverBalance.balance).toBe(1_000n);
+  });
+
+  it(`${name} - transferV2 receivers claim in reverse order`, async () => {
+    const faucet = BitcoinFaucet.getInstance();
+    const options: ConfigOptions = { network: "LOCAL" };
+
+    const { wallet: senderWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    // Fund sender with 2 leaves
+    const depositAddr1 = await senderWallet.getSingleUseDepositAddress();
+    const signedTx1 = await faucet.sendToAddress(depositAddr1, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+    await senderWallet.claimDeposit(signedTx1.id);
+
+    const depositAddr2 = await senderWallet.getSingleUseDepositAddress();
+    const signedTx2 = await faucet.sendToAddress(depositAddr2, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+    await senderWallet.claimDeposit(signedTx2.id);
+
+    const { wallet: receiver1 } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+    const { wallet: receiver2 } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    await senderWallet.transferV2({
+      receivers: [
+        {
+          receiverSparkAddress: await receiver1.getSparkAddress(),
+          amountSats: 1000,
+        },
+        {
+          receiverSparkAddress: await receiver2.getSparkAddress(),
+          amountSats: 1000,
+        },
+      ],
+    });
+
+    // Receiver 2 claims FIRST
+    const pending2 = await receiver2.queryPendingTransfers();
+    expect(pending2.transfers.length).toBe(1);
+    expect(pending2.transfers[0]!.status).toBe(
+      TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+    );
+    const r2Service = receiver2.getTransferService();
+    await r2Service.claimTransfer(pending2.transfers[0]!);
+    expect((await receiver2.getBalance()).balance).toBe(1_000n);
+
+    // After receiver 2 claims, transfer is still pending (not COMPLETED) for receiver 1.
+    const pending1 = await receiver1.queryPendingTransfers();
+    expect(pending1.transfers.length).toBe(1);
+    expect(pending1.transfers[0]!.status).not.toBe(
+      TransferStatus.TRANSFER_STATUS_COMPLETED,
+    );
+
+    // Receiver 1 claims SECOND — should still work
+    const r1Service = receiver1.getTransferService();
+    await r1Service.claimTransfer(pending1.transfers[0]!);
+    expect((await receiver1.getBalance()).balance).toBe(1_000n);
+
+    // Sender fully drained
+    expect((await senderWallet.getBalance()).balance).toBe(0n);
+
+    // After both receivers claim, the transfer should be completed (no longer pending).
+    const finalPending1 = await receiver1.queryPendingTransfers();
+    expect(finalPending1.transfers.length).toBe(0);
+    const finalPending2 = await receiver2.queryPendingTransfers();
+    expect(finalPending2.transfers.length).toBe(0);
+  });
+
+  it(`${name} - transferV2 with duplicate receiver addresses`, async () => {
+    const faucet = BitcoinFaucet.getInstance();
+    const options: ConfigOptions = { network: "LOCAL" };
+
+    const { wallet: senderWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    // Fund sender with 2 deposits that match the target amounts exactly
+    // (avoids needing a leaves swap, which requires SSP — not available in hermetic tests)
+    const depositAddr1 = await senderWallet.getSingleUseDepositAddress();
+    const signedTx1 = await faucet.sendToAddress(depositAddr1, 500n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+    await senderWallet.claimDeposit(signedTx1.id);
+
+    const depositAddr2 = await senderWallet.getSingleUseDepositAddress();
+    const signedTx2 = await faucet.sendToAddress(depositAddr2, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+    await senderWallet.claimDeposit(signedTx2.id);
+
+    const senderBalance = await senderWallet.getBalance();
+    expect(senderBalance.balance).toBe(1_500n);
+
+    // Create ONE receiver wallet
+    const { wallet: receiverWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+    const sparkAddr = await receiverWallet.getSparkAddress();
+
+    // Send to the same address twice with different amounts
+    const transfer = await senderWallet.transferV2({
+      receivers: [
+        { receiverSparkAddress: sparkAddr, amountSats: 500 },
+        { receiverSparkAddress: sparkAddr, amountSats: 1_000 },
+      ],
+    });
+    expect(transfer.id).toBeDefined();
+
+    // Verify sender balance is 0
+    const senderBalanceAfter = await senderWallet.getBalance();
+    expect(senderBalanceAfter.balance).toBe(0n);
+
+    // Receiver claims
+    const pending = await receiverWallet.queryPendingTransfers();
+    expect(pending.transfers.length).toBe(1);
+    const transferService = receiverWallet.getTransferService();
+    await transferService.claimTransfer(pending.transfers[0]!);
+    const receiverBalance = await receiverWallet.getBalance();
+    expect(receiverBalance.balance).toBe(1_500n);
+  });
+
+  it(`${name} - transferV2 with empty receivers rejects`, async () => {
+    const options: ConfigOptions = { network: "LOCAL" };
+
+    const { wallet: senderWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    await expect(senderWallet.transferV2({ receivers: [] })).rejects.toThrow(
+      SparkValidationError,
+    );
+  });
+
+  it(`${name} - transferV2 rejects spark invoice as receiver address`, async () => {
+    const options: ConfigOptions = { network: "LOCAL" };
+
+    const { wallet: receiverWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    const invoiceAddress = await receiverWallet.createSatsInvoice({
+      amount: 1000,
+    });
+
+    const { wallet: senderWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    await expect(
+      senderWallet.transferV2({
+        receivers: [{ receiverSparkAddress: invoiceAddress, amountSats: 1000 }],
+      }),
+    ).rejects.toThrow(SparkValidationError);
+  });
+
+  it(`${name} - sendTransferV3 rejects leaves without receiverIdentityPublicKey`, async () => {
+    const options: ConfigOptions = { network: "LOCAL" };
+
+    const { wallet: senderWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    const transferService = senderWallet.getTransferService();
+
+    const leafKeyTweaks: LeafKeyTweak[] = [
+      {
+        leaf: { id: "fake-id" } as any,
+        keyDerivation: {
+          type: KeyDerivationType.LEAF,
+          path: "fake",
+        },
+        newKeyDerivation: {
+          type: KeyDerivationType.LEAF,
+          path: "fake-new",
+        },
+      },
+    ];
+
+    await expect(transferService.sendTransferV3(leafKeyTweaks)).rejects.toThrow(
+      SparkValidationError,
+    );
+  });
+});
