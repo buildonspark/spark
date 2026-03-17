@@ -166,7 +166,6 @@ func TestBackfillMimoTransfers(t *testing.T) {
 		result, err := BackfillMimoTransfers(ctx, nil, 1000)
 		require.NoError(t, err)
 		assert.Equal(t, 0, result.TransfersCreated)
-		assert.Equal(t, 0, result.ReceiverStatusesUpdated)
 	})
 
 	// Reset cursor so subsequent subtests start fresh.
@@ -302,7 +301,6 @@ func TestBackfillMimoTransfers_TryLock(t *testing.T) {
 	result, err := BackfillMimoTransfers(ctx, nil, 1000)
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.TransfersCreated)
-	assert.Equal(t, 0, result.ReceiverStatusesUpdated)
 }
 
 func TestBackfillMimoTransfers_CursorAdvancement(t *testing.T) {
@@ -330,85 +328,4 @@ func TestBackfillMimoTransfers_CursorAdvancement(t *testing.T) {
 	result, err = BackfillMimoTransfers(ctx, nil, 2)
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.TransfersCreated)
-}
-
-func TestBackfillMimoTransfers_SyncsReceiverStatuses(t *testing.T) {
-	ctx, _ := db.ConnectToTestPostgres(t)
-	resetBackfillState()
-
-	rng := rand.NewChaCha8([32]byte{42})
-
-	t.Run("updates stale receiver status to match terminal transfer", func(t *testing.T) {
-		// Create a transfer at SenderInitiated so the backfill creates the
-		// receiver with SenderInitiated status.
-		transfer := createTestEntitiesForBackfill(t, ctx, rng, st.TransferStatusSenderInitiated, nil, 1)
-
-		result, err := BackfillMimoTransfers(ctx, nil, 1000)
-		require.NoError(t, err)
-		assert.Equal(t, 1, result.TransfersCreated)
-		assert.Equal(t, 0, result.ReceiverStatusesUpdated)
-
-		dbClient, err := ent.GetDbFromContext(ctx)
-		require.NoError(t, err)
-
-		// Simulate the gap: advance the Transfer to a terminal status without
-		// updating the receiver (mimicking the period before dual-write was enabled).
-		_, err = transfer.Update().
-			SetStatus(st.TransferStatusExpired).
-			Save(ctx)
-		require.NoError(t, err)
-
-		// Run again — the receiver status sync should catch the mismatch.
-		result, err = BackfillMimoTransfers(ctx, nil, 1000)
-		require.NoError(t, err)
-		assert.Equal(t, 0, result.TransfersCreated)
-		assert.Equal(t, 1, result.ReceiverStatusesUpdated)
-
-		receivers, err := dbClient.TransferReceiver.Query().
-			Where(transferreceiver.TransferIDEQ(transfer.ID)).All(ctx)
-		require.NoError(t, err)
-		require.Len(t, receivers, 1)
-		assert.Equal(t, st.TransferReceiverStatusCancelled, receivers[0].Status)
-	})
-
-	t.Run("sets completion time when syncing to completed", func(t *testing.T) {
-		transfer := createTestEntitiesForBackfill(t, ctx, rng, st.TransferStatusSenderInitiated, nil, 1)
-
-		result, err := BackfillMimoTransfers(ctx, nil, 1000)
-		require.NoError(t, err)
-		assert.Equal(t, 1, result.TransfersCreated)
-
-		completionTime := time.Now().Add(-30 * time.Minute)
-		_, err = transfer.Update().
-			SetStatus(st.TransferStatusCompleted).
-			SetCompletionTime(completionTime).
-			Save(ctx)
-		require.NoError(t, err)
-
-		result, err = BackfillMimoTransfers(ctx, nil, 1000)
-		require.NoError(t, err)
-		assert.Equal(t, 1, result.ReceiverStatusesUpdated)
-
-		dbClient, err := ent.GetDbFromContext(ctx)
-		require.NoError(t, err)
-
-		receivers, err := dbClient.TransferReceiver.Query().
-			Where(transferreceiver.TransferIDEQ(transfer.ID)).All(ctx)
-		require.NoError(t, err)
-		require.Len(t, receivers, 1)
-		assert.Equal(t, st.TransferReceiverStatusCompleted, receivers[0].Status)
-		assert.False(t, receivers[0].CompletionTime.IsZero())
-	})
-
-	t.Run("skips receivers already in sync", func(t *testing.T) {
-		// All previously synced receivers are now in terminal states (Completed/KeyTweaked).
-		// Creating a fresh transfer already at Completed so receiver is created correctly.
-		completionTime := time.Now()
-		createTestEntitiesForBackfill(t, ctx, rng, st.TransferStatusCompleted, &completionTime, 1)
-
-		result, err := BackfillMimoTransfers(ctx, nil, 1000)
-		require.NoError(t, err)
-		assert.Equal(t, 1, result.TransfersCreated)
-		assert.Equal(t, 0, result.ReceiverStatusesUpdated)
-	})
 }

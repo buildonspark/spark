@@ -51,7 +51,7 @@ var (
 	defaultTaskTimeout                 = 1 * time.Minute
 	dkgTaskTimeout                     = 3 * time.Minute
 	deleteStaleTreeNodesTaskTimeout    = 10 * time.Minute
-	backfillMimoTransfersTaskTimeout   = 2 * time.Minute
+	backfillMimoTransfersTaskTimeout   = 10 * time.Minute
 	purgeSigningNoncePartitionsTimeout = 10 * time.Minute
 
 	meter                       = otel.Meter("gossip")
@@ -949,8 +949,8 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 					if !result.BackfillCursor.IsZero() {
 						logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "backfill_mimo_transfers"))
-						logger.Sugar().Infof("created %d transfer records, updated %d receiver statuses, cursor at %s (unix: %d)",
-							result.TransfersCreated, result.ReceiverStatusesUpdated, result.BackfillCursor.Format(time.RFC3339), result.BackfillCursor.Unix())
+						logger.Sugar().Infof("created %d transfer records, cursor at %s (unix: %d)",
+							result.TransfersCreated, result.BackfillCursor.Format(time.RFC3339), result.BackfillCursor.Unix())
 					}
 					return nil
 				},

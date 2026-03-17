@@ -16,7 +16,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
-	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/lightsparkdev/spark/so/ent/transfersender"
 	"go.uber.org/zap"
 )
@@ -25,7 +24,7 @@ const initScanBatchSize = 10000
 
 var (
 	backfillMu          sync.Mutex
-	backfillCursor      = time.Date(2025, time.November, 15, 0, 0, 0, 0, time.UTC)
+	backfillCursor      = time.Date(2025, time.November, 18, 22, 0, 0, 0, time.UTC)
 	lastSeenID          uuid.UUID // tiebreaker for keyset pagination in initBackfillCursor
 	backfillInitialized bool
 )
@@ -37,11 +36,10 @@ func resetBackfillState() {
 	backfillInitialized = false
 }
 
-// BackfillMimoResult holds the results of both backfill operations.
+// BackfillMimoResult holds the results of the backfill operation.
 type BackfillMimoResult struct {
-	TransfersCreated        int
-	ReceiverStatusesUpdated int
-	BackfillCursor          time.Time
+	TransfersCreated int
+	BackfillCursor   time.Time
 }
 
 // BackfillMimoTransfers runs two backfill operations:
@@ -60,15 +58,9 @@ func BackfillMimoTransfers(ctx context.Context, config *so.Config, batchSize int
 		return BackfillMimoResult{}, fmt.Errorf("backfill create records: %w", err)
 	}
 
-	updated, err := backfillSyncReceiverStatuses(ctx, batchSize)
-	if err != nil {
-		return BackfillMimoResult{}, fmt.Errorf("backfill sync receiver statuses: %w", err)
-	}
-
 	return BackfillMimoResult{
-		TransfersCreated:        created,
-		ReceiverStatusesUpdated: updated,
-		BackfillCursor:          backfillCursor,
+		TransfersCreated: created,
+		BackfillCursor:   backfillCursor,
 	}, nil
 }
 
@@ -302,76 +294,6 @@ func backfillCreateMimoRecords(ctx context.Context, batchSize int) (int, error) 
 	}
 
 	return processed, nil
-}
-
-// backfillSyncReceiverStatuses finds TransferReceiver records whose status is out
-// of sync with their Transfer and updates them. This covers the gap between when
-// TransferReceiver records started being created and when dual-write status updates
-// were enabled.
-//
-// To avoid fetching the same in-progress records repeatedly, we only target
-// receivers whose Transfer has reached a terminal state (Completed/Expired/Returned)
-// while the receiver itself has not yet been updated to the corresponding terminal
-// status (Completed/Cancelled).
-func backfillSyncReceiverStatuses(ctx context.Context, batchSize int) (int, error) {
-	logger := logging.GetLoggerFromContext(ctx)
-
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get db from context: %w", err)
-	}
-
-	receivers, err := db.TransferReceiver.Query().
-		Where(
-			transferreceiver.StatusNotIn(
-				st.TransferReceiverStatusCompleted,
-				st.TransferReceiverStatusCancelled,
-			),
-			transferreceiver.HasTransferWith(
-				enttransfer.StatusIn(
-					st.TransferStatusCompleted,
-					st.TransferStatusExpired,
-					st.TransferStatusReturned,
-				),
-			),
-		).
-		WithTransfer().
-		Limit(batchSize).
-		ForUpdate(sql.WithLockAction(sql.SkipLocked)).
-		All(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("failed to query receivers with stale terminal status: %w", err)
-	}
-
-	if len(receivers) == 0 {
-		return 0, nil
-	}
-
-	updated := 0
-	for _, r := range receivers {
-		transfer := r.Edges.Transfer
-		if transfer == nil {
-			continue
-		}
-
-		expectedStatus := MapTransferToReceiverStatus(transfer.Status)
-
-		updateOp := r.Update().SetStatus(expectedStatus)
-		if expectedStatus == st.TransferReceiverStatusCompleted && transfer.CompletionTime != nil {
-			updateOp = updateOp.SetNillableCompletionTime(transfer.CompletionTime)
-		}
-
-		_, err = updateOp.Save(ctx)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("backfill_mimo_receiver_statuses: failed to update receiver %s for transfer %s, skipping", r.ID, transfer.ID), zap.Error(err))
-			continue
-		}
-
-		logger.Info(fmt.Sprintf("backfill_mimo_receiver_statuses: updated receiver %s status %s -> %s for transfer %s", r.ID, r.Status, expectedStatus, transfer.ID))
-		updated++
-	}
-
-	return updated, nil
 }
 
 // MapTransferToReceiverStatus maps a Transfer status to the corresponding TransferReceiver status.
