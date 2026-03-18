@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -17,6 +18,8 @@ import (
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/utils"
 )
+
+var ancestorChainRootSkipCutoff = time.Date(2026, time.March, 17, 0, 0, 0, 0, time.UTC)
 
 // TreeQueryHandler handles queries related to tree nodes.
 type TreeQueryHandler struct {
@@ -223,8 +226,8 @@ func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, n
 		}
 	}
 
-	// skip root node to temporarily disable unilateral exit.
-	if !isSSP {
+	// Legacy mainnet nodes created before the rollout cutoff should not expose the root ancestor to non-SSP callers.
+	if !isSSP && node.CreateTime.Before(ancestorChainRootSkipCutoff) {
 		// Check if parent's parent exists; prefer eager-loaded value
 		if parent.Edges.Parent == nil {
 			if _, err := parent.QueryParent().Only(ctx); err != nil {

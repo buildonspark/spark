@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"math/rand/v2"
 	"testing"
+	"time"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -324,6 +325,161 @@ func TestQueryNodes_StatusField(t *testing.T) {
 		t.Logf("Status %s should be found when querying by node IDs", expectedStatusString)
 		require.True(t, allStatusesFound[expectedStatusString],
 			"Status %s should be found when querying by node IDs", expectedStatusString)
+	}
+}
+
+func createAncestorChainTestNodes(t *testing.T, createTime time.Time) (context.Context, *ent.TreeNode, *ent.TreeNode, *ent.TreeNode) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	rng := rand.NewChaCha8([32]byte{})
+
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	signingKeyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secretShare).
+		SetPublicShares(map[string]keys.Public{"test": secretShare.Public()}).
+		SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetNetwork(btcnetwork.Mainnet).
+		SetStatus(st.TreeStatusAvailable).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	rawTx := createOldBitcoinTxBytes(t, verifyingPubKey)
+	refundTx := createOldBitcoinTxBytes(t, signingPubKey)
+
+	root, err := tx.TreeNode.Create().
+		SetCreateTime(createTime).
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetOwnerSigningPubkey(signingPubKey).
+		SetValue(300000).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetSigningKeyshare(signingKeyshare).
+		SetRawTx(rawTx).
+		SetRawRefundTx(refundTx).
+		SetDirectTx(rawTx).
+		SetDirectRefundTx(refundTx).
+		SetDirectFromCpfpRefundTx(refundTx).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	parent, err := tx.TreeNode.Create().
+		SetCreateTime(createTime).
+		SetTree(tree).
+		SetParent(root).
+		SetNetwork(tree.Network).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetOwnerSigningPubkey(signingPubKey).
+		SetValue(200000).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetSigningKeyshare(signingKeyshare).
+		SetRawTx(rawTx).
+		SetRawRefundTx(refundTx).
+		SetDirectTx(rawTx).
+		SetDirectRefundTx(refundTx).
+		SetDirectFromCpfpRefundTx(refundTx).
+		SetVout(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	leaf, err := tx.TreeNode.Create().
+		SetCreateTime(createTime).
+		SetTree(tree).
+		SetParent(parent).
+		SetNetwork(tree.Network).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetOwnerSigningPubkey(signingPubKey).
+		SetValue(100000).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetSigningKeyshare(signingKeyshare).
+		SetRawTx(rawTx).
+		SetRawRefundTx(refundTx).
+		SetDirectTx(rawTx).
+		SetDirectRefundTx(refundTx).
+		SetDirectFromCpfpRefundTx(refundTx).
+		SetVout(2).
+		Save(ctx)
+	require.NoError(t, err)
+
+	return ctx, root, parent, leaf
+}
+
+func TestGetAncestorChain_RootInclusion(t *testing.T) {
+	testCases := []struct {
+		name              string
+		createTime        time.Time
+		isSSP             bool
+		expectRootInChain bool
+	}{
+		{
+			name:              "legacy mainnet non-SSP skips root",
+			createTime:        ancestorChainRootSkipCutoff.Add(-time.Minute),
+			isSSP:             false,
+			expectRootInChain: false,
+		},
+		{
+			name:              "legacy mainnet SSP includes root",
+			createTime:        ancestorChainRootSkipCutoff.Add(-time.Minute),
+			isSSP:             true,
+			expectRootInChain: true,
+		},
+		{
+			name:              "post-cutoff mainnet non-SSP includes root",
+			createTime:        ancestorChainRootSkipCutoff,
+			isSSP:             false,
+			expectRootInChain: true,
+		},
+		{
+			name:              "post-cutoff mainnet SSP includes root",
+			createTime:        ancestorChainRootSkipCutoff,
+			isSSP:             true,
+			expectRootInChain: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, root, parent, leaf := createAncestorChainTestNodes(t, tc.createTime)
+			dbClient, err := ent.GetDbFromContext(ctx)
+			require.NoError(t, err)
+
+			nodeMap := make(map[string]*pb.TreeNode)
+			protoLeaf, err := leaf.MarshalSparkProto(ctx)
+			require.NoError(t, err)
+			nodeMap[leaf.ID.String()] = protoLeaf
+
+			err = getAncestorChain(ctx, dbClient, leaf, nodeMap, tc.isSSP)
+			require.NoError(t, err)
+			require.Contains(t, nodeMap, leaf.ID.String())
+			require.Contains(t, nodeMap, parent.ID.String())
+
+			if tc.expectRootInChain {
+				require.Len(t, nodeMap, 3)
+				require.Contains(t, nodeMap, root.ID.String())
+			} else {
+				require.Len(t, nodeMap, 2)
+				require.NotContains(t, nodeMap, root.ID.String())
+			}
+		})
 	}
 }
 
