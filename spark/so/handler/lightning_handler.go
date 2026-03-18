@@ -1286,7 +1286,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pbspar
 }
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
-func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, requireDirectTx bool, expireTimeOverride *time.Time) (*pbspark.InitiatePreimageSwapResponse, error) {
+func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, requireDirectTx bool, expireTimeOverride *time.Time) (resp *pbspark.InitiatePreimageSwapResponse, retErr error) {
 	if req.Transfer == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
 	}
@@ -1460,6 +1460,19 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
 	}
 
+	// Rollback PendingSendTransfer on any failure between here and the success
+	// point. cancelGossip is set to true before syncing to other SOs.
+	needsRollback := true
+	cancelGossip := false
+	defer func() {
+		if !needsRollback || retErr == nil {
+			return
+		}
+		if rbErr := transferHandler.rollbackTransferInit(ctx, transferID, cancelGossip); rbErr != nil {
+			retErr = fmt.Errorf("rollback failed: %w while processing preimage swap for payment hash %x: %w", rbErr, req.PaymentHash, retErr)
+		}
+	}()
+
 	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
 		transferID,
@@ -1517,6 +1530,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		return nil, fmt.Errorf("unable to store user signed transactions for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
+	cancelGossip = true
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	result, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
@@ -1538,37 +1552,25 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		return response.PreimageShare, nil
 	})
 	if err != nil {
-		dbErr := ent.DbRollback(ctx)
-		if dbErr != nil {
-			logger.Error("Unable to rollback transaction after operator failed to initiate preimage swap", zap.Error(dbErr))
-		}
-		// At least one operator failed to initiate preimage swap, cancel the transfer.
-		baseHandler := NewBaseTransferHandler(h.config)
-		cancelErr := baseHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID)
-		if cancelErr != nil {
-			logger.Error("InitiatePreimageSwap: unable to cancel own send transfer", zap.Error(cancelErr))
-		}
-		commitErr := ent.DbCommit(ctx)
-		if commitErr != nil {
-			logger.Error("Unable to commit transaction after canceling transfer", zap.Error(commitErr))
-		}
 		return nil, fmt.Errorf("unable to execute task with all operators: %w", err)
 	}
+
+	// After this point, the preimage swap sync is considered successful.
+	needsRollback = false
 
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
-	if req.TransferRequest != nil {
-		tx, err := ent.GetDbFromContext(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get database context: %w", err)
-		}
-		_, err = tx.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
-		}
+	// Mark PendingSendTransfer finished on success.
+	tx, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get database context: %w", err)
+	}
+	_, err = tx.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
 	}
 
 	// For HODL invoices in lightning receive flow without preimageShare, return transfer without preimage

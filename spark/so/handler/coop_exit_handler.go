@@ -45,7 +45,7 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 	return h.cooperativeExit(ctx, req, true)
 }
 
-func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest, requireDirectTx bool) (*pb.CooperativeExitResponse, error) {
+func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest, requireDirectTx bool) (resp *pb.CooperativeExitResponse, retErr error) {
 	reqTransferOwnerIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer owner identity public key: %w", err)
@@ -97,6 +97,19 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 	if err != nil {
 		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
 	}
+
+	// Rollback PendingSendTransfer on any failure between here and the success
+	// point. cancelGossip is set to true before syncing to other SOs.
+	needsRollback := true
+	cancelGossip := false
+	defer func() {
+		if !needsRollback || retErr == nil {
+			return
+		}
+		if rbErr := transferHandler.rollbackTransferInit(ctx, transferUUID, cancelGossip); rbErr != nil {
+			retErr = fmt.Errorf("rollback failed: %w while processing coop exit %s: %w", rbErr, transferUUID, retErr)
+		}
+	}()
 
 	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
@@ -165,15 +178,23 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		return nil, fmt.Errorf("failed to sign refund transactions for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
 	}
 
+	cancelGossip = true
 	err = transferHandler.syncCoopExitInit(ctx, req, nil, nil, nil)
 	if err != nil {
-
-		cancelErr := transferHandler.CreateCancelTransferGossipMessage(ctx, transferUUID)
-		if cancelErr != nil {
-			return nil, fmt.Errorf("failed to create cancel transfer gossip message for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
-		}
-
 		return nil, fmt.Errorf("failed to sync transfer init for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
+	}
+
+	// After this point, the coop exit sync is considered successful.
+	needsRollback = false
+
+	// Mark PendingSendTransfer finished on success.
+	db, err = ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get database context: %w", err)
+	}
+	_, err = db.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transferUUID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
 	}
 
 	response := &pb.CooperativeExitResponse{
