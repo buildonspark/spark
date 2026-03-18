@@ -267,10 +267,10 @@ export function getLocalSigningOperators(): Record<string, SigningOperator> {
   const hermeticDomain = isBare
     ? "spark-web.minikube.local"
     : "spark.minikube.local";
-  const addresses = Array.from({ length: 5 }, (_, i) =>
+  const addresses = Array.from({ length: numOperators }, (_, i) =>
     isHermeticTest
       ? `https://${i}.${hermeticDomain}`
-      : `https://localhost:${i + 8535}`,
+      : `https://localhost:${8535 + i}`,
   );
 
   const pubkeys = [
@@ -281,47 +281,19 @@ export function getLocalSigningOperators(): Record<string, SigningOperator> {
     "02c05c88cc8fc181b1ba30006df6a4b0597de6490e24514fbdd0266d2b9cd3d0ba",
   ];
 
-  const allOperators = {
-    "0000000000000000000000000000000000000000000000000000000000000001": {
-      id: 0,
-      identifier:
-        "0000000000000000000000000000000000000000000000000000000000000001",
-      address: addresses[0]!,
-      identityPublicKey: pubkeys[0]!,
-    },
-    "0000000000000000000000000000000000000000000000000000000000000002": {
-      id: 1,
-      identifier:
-        "0000000000000000000000000000000000000000000000000000000000000002",
-      address: addresses[1]!,
-      identityPublicKey: pubkeys[1]!,
-    },
-    "0000000000000000000000000000000000000000000000000000000000000003": {
-      id: 2,
-      identifier:
-        "0000000000000000000000000000000000000000000000000000000000000003",
-      address: addresses[2]!,
-      identityPublicKey: pubkeys[2]!,
-    },
-    "0000000000000000000000000000000000000000000000000000000000000004": {
-      id: 3,
-      identifier:
-        "0000000000000000000000000000000000000000000000000000000000000004",
-      address: addresses[3]!,
-      identityPublicKey: pubkeys[3]!,
-    },
-    "0000000000000000000000000000000000000000000000000000000000000005": {
-      id: 4,
-      identifier:
-        "0000000000000000000000000000000000000000000000000000000000000005",
-      address: addresses[4]!,
-      identityPublicKey: pubkeys[4]!,
-    },
-  };
+  const operators: Record<string, SigningOperator> = {};
+  for (let i = 0; i < numOperators; i++) {
+    // 64-char hex identifier: "000...0001", "000...0002", etc.
+    const identifier = `000000000000000000000000000000000000000000000000000000000000000${i + 1}`;
+    operators[identifier] = {
+      id: i,
+      identifier,
+      address: addresses[i]!,
+      identityPublicKey: pubkeys[i]!,
+    };
+  }
 
-  return Object.fromEntries(
-    Object.entries(allOperators).slice(0, numOperators),
-  );
+  return operators;
 }
 
 export function getLocalSigningThreshold(): number {
