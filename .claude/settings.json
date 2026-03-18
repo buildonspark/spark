@@ -207,15 +207,6 @@
             "command": "if [ -f \"$(git rev-parse --git-common-dir 2>/dev/null)/.graphite_repo_config\" ]; then echo 'GRAPHITE REPO: Use gt for all branch and PR operations. Load the ls-claude:graphite skill for workflow details.'; fi"
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/rename-plan.sh",
-            "timeout": 10
-          }
-        ]
       }
     ]
   }
