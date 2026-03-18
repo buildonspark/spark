@@ -320,6 +320,47 @@ type CoopExitRequest implements UserRequest & Entity {
   transfer: Transfer
 }
 
+input CreateClaimInstantStaticDepositInput {
+  """The ID of the static deposit quote to claim."""
+  static_deposit_quote_id: ID!
+
+  """
+  The user's private key share for the static deposit address. This key share is used in combination with Spark operator key shares to create the final signature for the spend transaction.
+  """
+  static_deposit_address_private_key_share: String!
+
+  """
+  The user's signature authorizing the static deposit claim. This is a hex-encoded ECDSA signature that proves the user's authorization to claim the deposit. The signature should be created by signing a message containing the claim details (transaction ID, output index, network, and credit amount) with the user's identity private key. This signature is used to authenticate the claim request and prevent unauthorized access to the deposit funds.
+  """
+  signature: String!
+}
+
+type CreateClaimInstantStaticDepositOutput {
+  """The ID of the created claim"""
+  claim_id: UUID!
+}
+
+input CreateInstantStaticDepositQuoteInput {
+  """The transaction id of the deposit."""
+  transaction_id: String!
+
+  """The output index of the deposit."""
+  output_index: Int!
+
+  """The bitcoin network of the deposit."""
+  network: BitcoinNetwork!
+}
+
+type CreateInstantStaticDepositQuoteOutput {
+  """The static deposit quote with pricing information."""
+  quote: StaticDepositQuote!
+
+  """
+  The fulfillment plans indicating when funds will be available based on confirmation probability.
+  """
+  fulfillment_plans: [StaticDepositPlan!]!
+}
+
 """This object represents the value and unit for an amount of currency."""
 type CurrencyAmount {
   """The original numeric value for this CurrencyAmount."""
@@ -469,6 +510,15 @@ enum CurrencyUnit {
 
 """Date with time (isoformat)"""
 scalar DateTime
+
+input DeleteSparkWalletWebhookInput {
+  """The ID of the webhook to delete."""
+  webhook_id: ID!
+}
+
+type DeleteSparkWalletWebhookOutput {
+  success: Boolean!
+}
 
 """
 This interface is used by all the entities in the Lightspark system. It defines a few core fields that are available everywhere. Any object that implements this interface can be queried using the `entity` query and its ID.
@@ -695,12 +745,25 @@ enum LightningSendRequestStatus {
   REQUEST_VALIDATED @deprecated(reason: "Use CREATED instead")
 }
 
+type ListSparkWalletWebhooksOutput {
+  """The registered webhooks for this wallet user."""
+  webhooks: [SparkWalletWebhookEntry!]!
+}
+
 """The `Long` scalar type represents a 64 bit integer."""
 scalar Long
 
 type Mutation {
   """For spark users to claim static deposits."""
   claim_static_deposit(input: ClaimStaticDepositInput!): ClaimStaticDepositOutput!
+
+  """Create an instant claim for a static deposit using a quote."""
+  create_claim_instant_static_deposit(input: CreateClaimInstantStaticDepositInput!): CreateClaimInstantStaticDepositOutput!
+
+  """
+  Create an instant static deposit quote from this SSP to claim a deposit to a static deposit address.
+  """
+  create_instant_static_deposit_quote(input: CreateInstantStaticDepositQuoteInput!): CreateInstantStaticDepositQuoteOutput!
 
   """This API will broadcast the coop exit transaction."""
   complete_coop_exit(input: CompleteCoopExitInput!): CompleteCoopExitOutput!
@@ -711,8 +774,16 @@ type Mutation {
   """For spark users to complete a stuck leaves swap."""
   complete_stuck_leaves_swap(input: CompleteStuckLeavesSwapInput!): CompleteStuckLeavesSwapOutput!
 
+  """Delete a webhook for the authenticated Spark wallet user."""
+  delete_wallet_webhook(input: DeleteSparkWalletWebhookInput!): DeleteSparkWalletWebhookOutput!
+
   """Get a new SSP authentication challenge."""
   get_challenge(input: GetChallengeInput!): GetChallengeOutput!
+
+  """
+  Register a webhook URL for the authenticated Spark wallet user. Up to 5 webhooks are allowed; the oldest is evicted if the limit is reached.
+  """
+  register_wallet_webhook(input: RegisterSparkWalletWebhookInput!): RegisterSparkWalletWebhookOutput!
 
   """For spark users to initiate coop exit."""
   request_coop_exit(input: RequestCoopExitInput!): RequestCoopExitOutput!
@@ -791,6 +862,25 @@ type Query {
 
   """Query transfers of a given list of transfer spark ids."""
   transfers(transfer_spark_ids: [UUID!]!): [Transfer!]!
+
+  """List all registered webhooks for the authenticated Spark wallet user."""
+  wallet_webhooks: ListSparkWalletWebhooksOutput!
+}
+
+input RegisterSparkWalletWebhookInput {
+  """The webhook endpoint URL."""
+  url: String!
+
+  """The HMAC-SHA256 signing secret. Must be at least 16 characters."""
+  secret: String!
+
+  """The event types this webhook should receive."""
+  event_types: [SparkWalletWebhookEventType!]!
+}
+
+type RegisterSparkWalletWebhookOutput {
+  """The ID of the newly registered webhook."""
+  webhook_id: ID!
 }
 
 input RequestCoopExitInput {
@@ -1023,6 +1113,92 @@ type SparkWalletUserToUserRequestsConnection implements Connection {
 
   """The Spark User Requests for the current page of this connection."""
   entities: [UserRequest!]!
+}
+
+type SparkWalletWebhookEntry {
+  """The webhook ID."""
+  webhook_id: ID!
+
+  """The webhook endpoint URL."""
+  url: String!
+
+  """The event types this webhook is subscribed to."""
+  event_types: [SparkWalletWebhookEventType!]!
+}
+
+"""Event types supported by Spark wallet webhooks."""
+enum SparkWalletWebhookEventType {
+  SPARK_LIGHTNING_RECEIVE_FINISHED
+  SPARK_LIGHTNING_SEND_FINISHED
+  SPARK_COOP_EXIT_FINISHED
+  SPARK_STATIC_DEPOSIT_FINISHED
+}
+
+type StaticDepositPlan implements Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+
+  """The amount to be fulfilled with this plan."""
+  amount: CurrencyAmount!
+
+  """The number of confirmations required before fulfilling this plan."""
+  confirmations: Int!
+
+  """The current status of this fulfillment plan."""
+  status: StaticDepositPlanStatus!
+
+  """The id of the outbound transfer associated with this plan."""
+  transfer_spark_id: UUID
+}
+
+enum StaticDepositPlanStatus {
+  """Initial status when the plan is created."""
+  CREATED
+
+  """The plan has started, state is unknown."""
+  PENDING
+
+  """The plan has been completed successfully."""
+  COMPLETED
+}
+
+type StaticDepositQuote implements Entity {
+  """
+  The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
+  """
+  id: ID!
+
+  """The date and time when the entity was first created."""
+  created_at: DateTime!
+
+  """The date and time when the entity was last updated."""
+  updated_at: DateTime!
+
+  """The network of the deposit."""
+  network: BitcoinNetwork!
+
+  """The transaction id of the deposit."""
+  transaction_id: String!
+
+  """The output index of the deposit."""
+  output_index: Int!
+
+  """The amount originally requested to be deposited."""
+  deposit_amount: CurrencyAmount!
+
+  """The amount of credit to be added to the user's balance."""
+  credit_amount: CurrencyAmount!
+
+  """The quote signature from SSP."""
+  quote_signature: String!
 }
 
 input StaticDepositQuoteInput {
