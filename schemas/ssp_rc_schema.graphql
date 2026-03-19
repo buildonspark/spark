@@ -506,8 +506,29 @@ enum CurrencyUnit {
   """United Arab Emirates Dirham."""
   AED
 
+  """Bangladeshi Taka."""
+  BDT
+
+  """Colombian Peso."""
+  COP
+
+  """Egyptian Pound."""
+  EGP
+
+  """Ghanaian Cedi."""
+  GHS
+
   """Guatemalan Quetzal."""
   GTQ
+
+  """Haitian Gourde."""
+  HTG
+
+  """Jamaican Dollar."""
+  JMD
+
+  """Pakistani Rupee."""
+  PKR
 
   """Tether"""
   USDT
@@ -1065,6 +1086,8 @@ enum SparkCoopExitRequestStatus {
   INITIATED
   COMPLETE_REQUEST_RECEIVED
   INBOUND_TRANSFER_CHECKED
+  TX_BROADCASTING_SCHEDULED
+  TX_BROADCASTING_FAILED
   TX_BROADCASTED
   ON_CHAIN_TX_CONFIRMED
   INBOUND_TRANSFER_CLAIMING_FAILED
