@@ -188,6 +188,16 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 	// After this point, the coop exit sync is considered successful.
 	needsRollback = false
 
+	// Commit the current transaction to persist the transfer data, ensuring
+	// consistency with non-coordinator SOs.
+	entTx, err = ent.GetTxFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get database transaction: %w", err)
+	}
+	if err = entTx.Commit(); err != nil {
+		return nil, fmt.Errorf("unable to commit transfer data after successful sync: %w", err)
+	}
+
 	// Mark PendingSendTransfer finished on success.
 	db, err = ent.GetDbFromContext(ctx)
 	if err != nil {

@@ -1558,6 +1558,24 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	// After this point, the preimage swap sync is considered successful.
 	needsRollback = false
 
+	// Commit the current transaction to persist the transfer data, ensuring
+	// consistency with non-coordinator SOs.
+	entTx, err = ent.GetTxFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get database transaction: %w", err)
+	}
+	if err = entTx.Commit(); err != nil {
+		return nil, fmt.Errorf("unable to commit transfer data after successful sync: %w", err)
+	}
+
+	// Reload transfer from the new transaction since the previous one was committed.
+	transferID = transfer.ID
+	baseHandler := NewBaseTransferHandler(h.config)
+	transfer, err = baseHandler.loadTransferForUpdate(ctx, transferID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to reload transfer %s: %w", transferID, err)
+	}
+
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
@@ -1614,7 +1632,6 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 			logger.Error("Unable to rollback transaction after recovered preimage did not match payment hash", zap.Error(dbErr))
 		}
 
-		baseHandler := NewBaseTransferHandler(h.config)
 		if err := baseHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID); err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to cancel own send transfer %s (payment_hash: %x)",
 				transfer.ID,
@@ -1636,7 +1653,6 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 			return nil, fmt.Errorf("unable to settle sender key tweaks for transfer %s: %w", transfer.ID, err)
 		}
 
-		baseHandler := NewBaseTransferHandler(h.config)
 		transfer, err = baseHandler.commitSenderKeyTweaks(ctx, transfer)
 		if err != nil {
 			return nil, fmt.Errorf("unable to commit sender key tweaks for transfer %s: %w", transfer.ID, err)
@@ -1648,7 +1664,13 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		}
 	}
 
-	err = preimageRequest.Update().SetPreimage(secretBytes).SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
+	// Use context-based update since preimageRequest's internal client is from
+	// the committed transaction.
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get database context for preimage update: %w", err)
+	}
+	_, err = db.PreimageRequest.UpdateOneID(preimageRequest.ID).SetPreimage(secretBytes).SetStatus(st.PreimageRequestStatusPreimageShared).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
