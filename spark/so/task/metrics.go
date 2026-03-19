@@ -61,7 +61,7 @@ func (t *Monitor) RecordJobTiming(startTime, endTime time.Time, _ uuid.UUID, nam
 
 func (t *Monitor) RecordJobTimingWithStatus(startTime, endTime time.Time, id uuid.UUID, name string, tags []string, status gocron.JobStatus, err error) {
 	jobStatus := string(status)
-	if err != nil && errors.Is(err, errTaskPanic) {
+	if err != nil {
 		switch {
 		case errors.Is(err, errTaskPanic):
 			jobStatus = "panic"
