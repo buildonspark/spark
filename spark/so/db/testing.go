@@ -19,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/enttest"
+	"github.com/lightsparkdev/spark/so/entephemeral"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
@@ -35,6 +36,19 @@ type TestSessionFactory struct {
 }
 
 func (t *TestSessionFactory) NewSession(_ context.Context, _ ...SessionOption) ent.Session {
+	return t.Session
+}
+
+// TestEphemeralSessionFactory is an EphemeralSessionFactory for tests.
+type TestEphemeralSessionFactory struct {
+	Session entephemeral.Session
+}
+
+func (t *TestEphemeralSessionFactory) NewSession(_ context.Context, _ ...SessionOption) entephemeral.Session {
+	return t.Session
+}
+
+func (t *TestEphemeralSessionFactory) NewReadOnlySession(_ context.Context, _ ...SessionOption) entephemeral.Session {
 	return t.Session
 }
 

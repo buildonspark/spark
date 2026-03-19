@@ -33,6 +33,9 @@ type Session interface {
 	// GetTxIfExists returns the current transaction if one exists, without starting a new one.
 	// Returns nil if no transaction is currently active.
 	GetTxIfExists() *Tx
+	// CommitAttemptedAndFailed reports whether a commit was attempted and failed.
+	// Middlewares use this to distinguish a failed commit from a handler that never committed.
+	CommitAttemptedAndFailed() bool
 }
 
 // ClientTxProvider is a TxProvider that uses an underlying ent.Client to create new transactions.
