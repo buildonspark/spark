@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 )
@@ -170,7 +171,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 	networkString := leafMap[req.Transfer.LeavesToSend[0].LeafId].Network.String()
 
 	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobRequireConnectorTxValidation, &networkString, 0) > 0 && len(req.GetConnectorTx()) == 0 {
-		return nil, fmt.Errorf("connector tx required for cooperative exit validation. Please upgrade to the latest SDK version")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector tx required for cooperative exit validation. Please upgrade to the latest SDK version"))
 	}
 
 	signingResults, err := signRefunds(ctx, h.config, req.Transfer, leafMap, keys.Public{}, keys.Public{}, keys.Public{}, req.GetConnectorTx())
@@ -228,7 +229,7 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 	}
 
 	if len(req.GetConnectorTx()) == 0 {
-		return nil, fmt.Errorf("connector_tx is required for cooperative exit")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector_tx is required for cooperative exit. Please upgrade to the latest SDK version"))
 	}
 
 	leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap := loadLeafRefundMaps(req.Transfer)
