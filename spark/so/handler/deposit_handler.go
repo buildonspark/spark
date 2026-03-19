@@ -1591,7 +1591,7 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 			req.Limit = 100
 		}
 		query := depositAddress.QueryUtxo().
-			Where(entutxo.BlockHeightLTE(currentBlockHeight.Height - int64(threshold))).
+			Where(entutxo.BlockHeightLTE(currentBlockHeight.Height - int64(threshold) + 1)).
 			Offset(int(req.Offset)).
 			Limit(int(req.Limit)).
 			Order(entutxo.ByBlockHeight(sql.OrderDesc()))

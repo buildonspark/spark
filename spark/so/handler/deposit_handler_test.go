@@ -1145,7 +1145,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetNetwork(btcnetwork.Regtest).
 			SetTxid([]byte("test_txid_recent")).
 			SetVout(0).
-			SetBlockHeight(198). // Current height is 200, so only 2 confirmations
+			SetBlockHeight(199). // Current height is 200, so only 2 confirmations (blocks 199, 200)
 			SetAmount(1000).
 			SetPkScript([]byte("test_script_recent")).
 			SetDepositAddress(depositAddress).
@@ -1162,6 +1162,48 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		response, err := handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
 		require.Empty(t, response.Utxos) // Should not return UTXO with insufficient confirmations
+	})
+
+	t.Run("static deposit address with exactly enough confirmations", func(t *testing.T) {
+		// Create static deposit address
+		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6eb"
+		rng := rand.NewChaCha8([32]byte{8})
+		testIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		testSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		depositAddress, err := tx.DepositAddress.Create().
+			SetAddress(staticAddress).
+			SetOwnerIdentityPubkey(testIdentityPubKey).
+			SetOwnerSigningPubkey(testSigningPubKey).
+			SetSigningKeyshare(signingKeyshare).
+			SetIsStatic(true).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		// Create UTXO at exactly the confirmation threshold.
+		// Default threshold is 3. Current height is 200, block height 198
+		// means 3 confirmations (blocks 198, 199, 200) — should be returned.
+		_, err = tx.Utxo.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetTxid([]byte("test_txid_threshold")).
+			SetVout(0).
+			SetBlockHeight(198).
+			SetAmount(1000).
+			SetPkScript([]byte("test_script_threshold")).
+			SetDepositAddress(depositAddress).
+			Save(ctx)
+		require.NoError(t, err)
+
+		req := &pb.GetUtxosForAddressRequest{
+			Address: staticAddress,
+			Network: pb.Network_REGTEST,
+			Offset:  0,
+			Limit:   10,
+		}
+
+		response, err := handler.GetUtxosForAddress(ctx, req)
+		require.NoError(t, err)
+		require.Len(t, response.Utxos, 1)
 	})
 
 	t.Run("network validation error", func(t *testing.T) {
