@@ -472,3 +472,172 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = MultisigSignatureSetValidationError{}
+
+// Validate checks the field values on SigningAuthority with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *SigningAuthority) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SigningAuthority with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SigningAuthorityMultiError, or nil if none found.
+func (m *SigningAuthority) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SigningAuthority) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch v := m.Authority.(type) {
+	case *SigningAuthority_PublicKey:
+		if v == nil {
+			err := SigningAuthorityValidationError{
+				field:  "Authority",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if len(m.GetPublicKey()) != 33 {
+			err := SigningAuthorityValidationError{
+				field:  "PublicKey",
+				reason: "value length must be 33 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	case *SigningAuthority_Multisig:
+		if v == nil {
+			err := SigningAuthorityValidationError{
+				field:  "Authority",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetMultisig()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SigningAuthorityValidationError{
+						field:  "Multisig",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SigningAuthorityValidationError{
+						field:  "Multisig",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetMultisig()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SigningAuthorityValidationError{
+					field:  "Multisig",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return SigningAuthorityMultiError(errors)
+	}
+
+	return nil
+}
+
+// SigningAuthorityMultiError is an error wrapping multiple validation errors
+// returned by SigningAuthority.ValidateAll() if the designated constraints
+// aren't met.
+type SigningAuthorityMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SigningAuthorityMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SigningAuthorityMultiError) AllErrors() []error { return m }
+
+// SigningAuthorityValidationError is the validation error returned by
+// SigningAuthority.Validate if the designated constraints aren't met.
+type SigningAuthorityValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SigningAuthorityValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SigningAuthorityValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SigningAuthorityValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SigningAuthorityValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SigningAuthorityValidationError) ErrorName() string { return "SigningAuthorityValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SigningAuthorityValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSigningAuthority.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SigningAuthorityValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SigningAuthorityValidationError{}

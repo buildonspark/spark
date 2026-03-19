@@ -2438,12 +2438,14 @@ func (m *SignatureWithIndex) validate(all bool) error {
 
 	var errors []error
 
-	if len(m.GetSignature()) > 0 {
+	// no validation rules for InputIndex
 
-		if l := len(m.GetSignature()); l < 64 || l > 73 {
+	switch v := m.AuthoritySignatures.(type) {
+	case *SignatureWithIndex_SingleSignature:
+		if v == nil {
 			err := SignatureWithIndexValidationError{
-				field:  "Signature",
-				reason: "value length must be between 64 and 73 bytes, inclusive",
+				field:  "AuthoritySignatures",
+				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
 				return err
@@ -2451,9 +2453,98 @@ func (m *SignatureWithIndex) validate(all bool) error {
 			errors = append(errors, err)
 		}
 
+		if all {
+			switch v := interface{}(m.GetSingleSignature()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SignatureWithIndexValidationError{
+						field:  "SingleSignature",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SignatureWithIndexValidationError{
+						field:  "SingleSignature",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSingleSignature()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SignatureWithIndexValidationError{
+					field:  "SingleSignature",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *SignatureWithIndex_MultisigSignatures:
+		if v == nil {
+			err := SignatureWithIndexValidationError{
+				field:  "AuthoritySignatures",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetMultisigSignatures()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SignatureWithIndexValidationError{
+						field:  "MultisigSignatures",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SignatureWithIndexValidationError{
+						field:  "MultisigSignatures",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetMultisigSignatures()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SignatureWithIndexValidationError{
+					field:  "MultisigSignatures",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
 	}
 
-	// no validation rules for InputIndex
+	if m.Signature != nil {
+
+		if len(m.GetSignature()) > 0 {
+
+			if l := len(m.GetSignature()); l < 64 || l > 73 {
+				err := SignatureWithIndexValidationError{
+					field:  "Signature",
+					reason: "value length must be between 64 and 73 bytes, inclusive",
+				}
+				if !all {
+					return err
+				}
+				errors = append(errors, err)
+			}
+
+		}
+
+	}
 
 	if len(errors) > 0 {
 		return SignatureWithIndexMultiError(errors)

@@ -8,6 +8,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import type { CallContext, CallOptions } from "nice-grpc-common";
 import { Timestamp } from "./google/protobuf/timestamp.js";
+import { KeyedSignature, MultisigSignatureSet } from "./multisig.js";
 import {
   Network,
   networkFromJSON,
@@ -387,14 +388,17 @@ export interface InvoiceAttachment {
 }
 
 export interface SignatureWithIndex {
-  /**
-   * Deprecated: use authority_signatures oneof instead.
-   * When populated, this is a Schnorr or ECDSA DER signature (64-73 bytes).
-   * May be empty when authority_signatures is set.
-   */
-  signature: Uint8Array;
+  /** Deprecated: use authority_signatures instead. */
+  signature?:
+    | Uint8Array
+    | undefined;
   /** The index of the TTXO associated with this signature. */
   inputIndex: number;
+  /** Supports single-key or multisig signatures. */
+  authoritySignatures?: { $case: "singleSignature"; singleSignature: KeyedSignature } | {
+    $case: "multisigSignatures";
+    multisigSignatures: MultisigSignatureSet;
+  } | undefined;
 }
 
 /**
@@ -2319,16 +2323,24 @@ export const InvoiceAttachment: MessageFns<InvoiceAttachment> = {
 };
 
 function createBaseSignatureWithIndex(): SignatureWithIndex {
-  return { signature: new Uint8Array(0), inputIndex: 0 };
+  return { signature: undefined, inputIndex: 0, authoritySignatures: undefined };
 }
 
 export const SignatureWithIndex: MessageFns<SignatureWithIndex> = {
   encode(message: SignatureWithIndex, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.signature.length !== 0) {
+    if (message.signature !== undefined) {
       writer.uint32(10).bytes(message.signature);
     }
     if (message.inputIndex !== 0) {
       writer.uint32(16).uint32(message.inputIndex);
+    }
+    switch (message.authoritySignatures?.$case) {
+      case "singleSignature":
+        KeyedSignature.encode(message.authoritySignatures.singleSignature, writer.uint32(26).fork()).join();
+        break;
+      case "multisigSignatures":
+        MultisigSignatureSet.encode(message.authoritySignatures.multisigSignatures, writer.uint32(34).fork()).join();
+        break;
     }
     return writer;
   },
@@ -2356,6 +2368,28 @@ export const SignatureWithIndex: MessageFns<SignatureWithIndex> = {
           message.inputIndex = reader.uint32();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.authoritySignatures = {
+            $case: "singleSignature",
+            singleSignature: KeyedSignature.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.authoritySignatures = {
+            $case: "multisigSignatures",
+            multisigSignatures: MultisigSignatureSet.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2367,18 +2401,28 @@ export const SignatureWithIndex: MessageFns<SignatureWithIndex> = {
 
   fromJSON(object: any): SignatureWithIndex {
     return {
-      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
+      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : undefined,
       inputIndex: isSet(object.inputIndex) ? globalThis.Number(object.inputIndex) : 0,
+      authoritySignatures: isSet(object.singleSignature)
+        ? { $case: "singleSignature", singleSignature: KeyedSignature.fromJSON(object.singleSignature) }
+        : isSet(object.multisigSignatures)
+        ? { $case: "multisigSignatures", multisigSignatures: MultisigSignatureSet.fromJSON(object.multisigSignatures) }
+        : undefined,
     };
   },
 
   toJSON(message: SignatureWithIndex): unknown {
     const obj: any = {};
-    if (message.signature.length !== 0) {
+    if (message.signature !== undefined) {
       obj.signature = base64FromBytes(message.signature);
     }
     if (message.inputIndex !== 0) {
       obj.inputIndex = Math.round(message.inputIndex);
+    }
+    if (message.authoritySignatures?.$case === "singleSignature") {
+      obj.singleSignature = KeyedSignature.toJSON(message.authoritySignatures.singleSignature);
+    } else if (message.authoritySignatures?.$case === "multisigSignatures") {
+      obj.multisigSignatures = MultisigSignatureSet.toJSON(message.authoritySignatures.multisigSignatures);
     }
     return obj;
   },
@@ -2388,8 +2432,34 @@ export const SignatureWithIndex: MessageFns<SignatureWithIndex> = {
   },
   fromPartial(object: DeepPartial<SignatureWithIndex>): SignatureWithIndex {
     const message = createBaseSignatureWithIndex();
-    message.signature = object.signature ?? new Uint8Array(0);
+    message.signature = object.signature ?? undefined;
     message.inputIndex = object.inputIndex ?? 0;
+    switch (object.authoritySignatures?.$case) {
+      case "singleSignature": {
+        if (
+          object.authoritySignatures?.singleSignature !== undefined &&
+          object.authoritySignatures?.singleSignature !== null
+        ) {
+          message.authoritySignatures = {
+            $case: "singleSignature",
+            singleSignature: KeyedSignature.fromPartial(object.authoritySignatures.singleSignature),
+          };
+        }
+        break;
+      }
+      case "multisigSignatures": {
+        if (
+          object.authoritySignatures?.multisigSignatures !== undefined &&
+          object.authoritySignatures?.multisigSignatures !== null
+        ) {
+          message.authoritySignatures = {
+            $case: "multisigSignatures",
+            multisigSignatures: MultisigSignatureSet.fromPartial(object.authoritySignatures.multisigSignatures),
+          };
+        }
+        break;
+      }
+    }
     return message;
   },
 };

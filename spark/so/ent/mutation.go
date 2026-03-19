@@ -17948,9 +17948,22 @@ func (m *TokenMintMutation) OldIssuerSignature(ctx context.Context) (v []byte, e
 	return oldValue.IssuerSignature, nil
 }
 
+// ClearIssuerSignature clears the value of the "issuer_signature" field.
+func (m *TokenMintMutation) ClearIssuerSignature() {
+	m.issuer_signature = nil
+	m.clearedFields[tokenmint.FieldIssuerSignature] = struct{}{}
+}
+
+// IssuerSignatureCleared returns if the "issuer_signature" field was cleared in this mutation.
+func (m *TokenMintMutation) IssuerSignatureCleared() bool {
+	_, ok := m.clearedFields[tokenmint.FieldIssuerSignature]
+	return ok
+}
+
 // ResetIssuerSignature resets all changes to the "issuer_signature" field.
 func (m *TokenMintMutation) ResetIssuerSignature() {
 	m.issuer_signature = nil
+	delete(m.clearedFields, tokenmint.FieldIssuerSignature)
 }
 
 // SetOperatorSpecificIssuerSignature sets the "operator_specific_issuer_signature" field.
@@ -18309,6 +18322,9 @@ func (m *TokenMintMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *TokenMintMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(tokenmint.FieldIssuerSignature) {
+		fields = append(fields, tokenmint.FieldIssuerSignature)
+	}
 	if m.FieldCleared(tokenmint.FieldOperatorSpecificIssuerSignature) {
 		fields = append(fields, tokenmint.FieldOperatorSpecificIssuerSignature)
 	}
@@ -18329,6 +18345,9 @@ func (m *TokenMintMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *TokenMintMutation) ClearField(name string) error {
 	switch name {
+	case tokenmint.FieldIssuerSignature:
+		m.ClearIssuerSignature()
+		return nil
 	case tokenmint.FieldOperatorSpecificIssuerSignature:
 		m.ClearOperatorSpecificIssuerSignature()
 		return nil

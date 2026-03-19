@@ -93,6 +93,9 @@ const (
 	// are in finalized/spent states and update them to FINALIZED status.
 	KnobBackfillCreateMintFinalizedStatusEnabled = "spark.so.tokens.backfill_create_mint_finalized_status_enabled"
 	KnobCoordinatedFreezeEnabled                 = "spark.so.tokens.coordinated_freeze_enabled"
+	// When enabled (> 0), allows multisig issuer signatures for issuer operations (mint, freeze).
+	// Gated until the roles system provides proper authority management.
+	KnobMultisigIssuerEnabled = "spark.so.tokens.multisig_issuer_enabled"
 
 	// Tokens - Killswitches
 	// When enabled (> 0), enforces owner signature validation for token withdrawals.

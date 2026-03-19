@@ -26,6 +26,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/protoconverter"
+	"github.com/lightsparkdev/spark/so/tokens/signature"
 	"github.com/lightsparkdev/spark/so/utils"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -162,7 +163,7 @@ func createTransactionEntities(
 		}
 		tokenCreateEnt, err := db.TokenCreate.Create().
 			SetIssuerPublicKey(issuerPubKey).
-			SetIssuerSignature(signaturesWithIndex[0].Signature).
+			SetIssuerSignature(signature.GetEffectiveSingleSignature(signaturesWithIndex[0])).
 			SetTokenName(createInput.GetTokenName()).
 			SetTokenTicker(createInput.GetTokenTicker()).
 			SetDecimals(uint8(createInput.GetDecimals())).
@@ -201,7 +202,7 @@ func createTransactionEntities(
 		}
 		tokenMintEnt, err := db.TokenMint.Create().
 			SetIssuerPublicKey(issuerPubKey).
-			SetIssuerSignature(signaturesWithIndex[0].Signature).
+			SetIssuerSignature(signature.GetEffectiveSingleSignature(signaturesWithIndex[0])).
 			// TODO CNT-376: remove timestamp field from MintInput and use TokenTransaction.ClientCreatedTimestamp instead
 			SetWalletProvidedTimestamp(uint64(tokenTransaction.ClientCreatedTimestamp.AsTime().UnixMilli())).
 			SetTokenIdentifier(tokenTransaction.GetMintInput().GetTokenIdentifier()).
@@ -483,7 +484,7 @@ func fetchSignatureForOutputToSpend(
 func fetchSignatureForInput(signaturesWithIndex []*tokenpb.SignatureWithIndex, inputIndex uint32) ([]byte, error) {
 	for _, s := range signaturesWithIndex {
 		if s.InputIndex == inputIndex {
-			return s.Signature, nil
+			return signature.GetEffectiveSingleSignature(s), nil
 		}
 	}
 	return nil, fmt.Errorf("no signature found for input index %d", inputIndex)

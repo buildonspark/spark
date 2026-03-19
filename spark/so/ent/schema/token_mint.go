@@ -33,7 +33,7 @@ func (TokenMint) Fields() []ent.Field {
 			Comment("Wallet-provided timestamp for this mint operation.").
 			Annotations(entexample.Default(1761323419265)),
 		field.Bytes("issuer_signature").
-			NotEmpty().
+			Optional().
 			Immutable().
 			Comment("The issuer's signature authorizing this mint.").
 			Annotations(entexample.Default(

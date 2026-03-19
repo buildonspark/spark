@@ -187,6 +187,88 @@ func (x *MultisigSignatureSet) GetSignatures() []*KeyedSignature {
 	return nil
 }
 
+type SigningAuthority struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Authority:
+	//
+	//	*SigningAuthority_PublicKey
+	//	*SigningAuthority_Multisig
+	Authority     isSigningAuthority_Authority `protobuf_oneof:"authority"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SigningAuthority) Reset() {
+	*x = SigningAuthority{}
+	mi := &file_multisig_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SigningAuthority) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SigningAuthority) ProtoMessage() {}
+
+func (x *SigningAuthority) ProtoReflect() protoreflect.Message {
+	mi := &file_multisig_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SigningAuthority.ProtoReflect.Descriptor instead.
+func (*SigningAuthority) Descriptor() ([]byte, []int) {
+	return file_multisig_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SigningAuthority) GetAuthority() isSigningAuthority_Authority {
+	if x != nil {
+		return x.Authority
+	}
+	return nil
+}
+
+func (x *SigningAuthority) GetPublicKey() []byte {
+	if x != nil {
+		if x, ok := x.Authority.(*SigningAuthority_PublicKey); ok {
+			return x.PublicKey
+		}
+	}
+	return nil
+}
+
+func (x *SigningAuthority) GetMultisig() *MultisigConfig {
+	if x != nil {
+		if x, ok := x.Authority.(*SigningAuthority_Multisig); ok {
+			return x.Multisig
+		}
+	}
+	return nil
+}
+
+type isSigningAuthority_Authority interface {
+	isSigningAuthority_Authority()
+}
+
+type SigningAuthority_PublicKey struct {
+	PublicKey []byte `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3,oneof"`
+}
+
+type SigningAuthority_Multisig struct {
+	Multisig *MultisigConfig `protobuf:"bytes,2,opt,name=multisig,proto3,oneof"`
+}
+
+func (*SigningAuthority_PublicKey) isSigningAuthority_Authority() {}
+
+func (*SigningAuthority_Multisig) isSigningAuthority_Authority() {}
+
 var File_multisig_proto protoreflect.FileDescriptor
 
 const file_multisig_proto_rawDesc = "" +
@@ -205,7 +287,12 @@ const file_multisig_proto_rawDesc = "" +
 	"\x0fmultisig_config\x18\x01 \x01(\v2\x18.multisig.MultisigConfigB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x0emultisigConfig\x128\n" +
 	"\n" +
 	"signatures\x18\x02 \x03(\v2\x18.multisig.KeyedSignatureR\n" +
-	"signaturesB/Z-github.com/lightsparkdev/spark/proto/multisigb\x06proto3"
+	"signatures\"\x81\x01\n" +
+	"\x10SigningAuthority\x12(\n" +
+	"\n" +
+	"public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!H\x00R\tpublicKey\x126\n" +
+	"\bmultisig\x18\x02 \x01(\v2\x18.multisig.MultisigConfigH\x00R\bmultisigB\v\n" +
+	"\tauthorityB/Z-github.com/lightsparkdev/spark/proto/multisigb\x06proto3"
 
 var (
 	file_multisig_proto_rawDescOnce sync.Once
@@ -219,20 +306,22 @@ func file_multisig_proto_rawDescGZIP() []byte {
 	return file_multisig_proto_rawDescData
 }
 
-var file_multisig_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_multisig_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_multisig_proto_goTypes = []any{
 	(*MultisigConfig)(nil),       // 0: multisig.MultisigConfig
 	(*KeyedSignature)(nil),       // 1: multisig.KeyedSignature
 	(*MultisigSignatureSet)(nil), // 2: multisig.MultisigSignatureSet
+	(*SigningAuthority)(nil),     // 3: multisig.SigningAuthority
 }
 var file_multisig_proto_depIdxs = []int32{
 	0, // 0: multisig.MultisigSignatureSet.multisig_config:type_name -> multisig.MultisigConfig
 	1, // 1: multisig.MultisigSignatureSet.signatures:type_name -> multisig.KeyedSignature
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // 2: multisig.SigningAuthority.multisig:type_name -> multisig.MultisigConfig
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_multisig_proto_init() }
@@ -240,13 +329,17 @@ func file_multisig_proto_init() {
 	if File_multisig_proto != nil {
 		return
 	}
+	file_multisig_proto_msgTypes[3].OneofWrappers = []any{
+		(*SigningAuthority_PublicKey)(nil),
+		(*SigningAuthority_Multisig)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_multisig_proto_rawDesc), len(file_multisig_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

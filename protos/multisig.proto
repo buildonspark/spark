@@ -28,3 +28,10 @@ message MultisigSignatureSet {
     MultisigConfig multisig_config = 1 [(validate.rules).message.required = true];
     repeated KeyedSignature signatures = 2;
 }
+
+message SigningAuthority {
+    oneof authority {
+        bytes public_key = 1 [(validate.rules).bytes.len = 33];
+        MultisigConfig multisig = 2;
+    }
+}

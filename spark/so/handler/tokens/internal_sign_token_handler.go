@@ -34,6 +34,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/tokens"
+	"github.com/lightsparkdev/spark/so/tokens/signature"
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
@@ -76,6 +77,11 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 
 	// V3+ does NOT require operator-specific owner signatures. The initial user signature on 'Start' is sufficient.
 	if tokenTransaction.Version < st.TokenTransactionVersionV3 {
+		for _, sig := range ownerSignatures {
+			if signature.GetEffectiveSingleSignature(sig) == nil {
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("multisig signatures are not supported for token transactions with version < V3"))
+			}
+		}
 		if err := validateOperatorSpecificOwnerSignatures(ctx, h.config.IdentityPublicKey(), ownerSignatures, tokenTransaction, finalTokenTransactionHash); err != nil {
 			return nil, err
 		}
@@ -87,7 +93,7 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 	ownerSignatureMap := make(map[int][]byte, len(ownerSignatures))
 	for _, sig := range ownerSignatures {
 		inputIndex := int(sig.InputIndex)
-		ownerSignatureMap[inputIndex] = sig.Signature
+		ownerSignatureMap[inputIndex] = signature.GetEffectiveSingleSignature(sig)
 	}
 	ownerSignaturesArr := make([][]byte, len(ownerSignatureMap))
 	for i := 0; i < len(ownerSignatureMap); i++ {

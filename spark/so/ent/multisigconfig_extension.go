@@ -1,8 +1,10 @@
 package ent
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/multisig"
@@ -75,4 +77,23 @@ func GetOrCreateMultisigConfig(ctx context.Context, client *Client, protoConfig 
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to re-fetch multisig config after creation: %w", err))
 	}
 	return result, nil
+}
+
+// ToProtoConfig converts the Ent MultisigConfig entity to a proto MultisigConfig.
+// The Members edge must be loaded before calling this method.
+// Keys are sorted lexicographically to match the canonical ordering
+// expected by ValidateAndComputeMultisigIdentifier.
+func (mc *MultisigConfig) ToProtoConfig() *pb.MultisigConfig {
+	publicKeys := make([][]byte, len(mc.Edges.Members))
+	for i, member := range mc.Edges.Members {
+		publicKeys[i] = member.PublicKey.Serialize()
+	}
+	sort.Slice(publicKeys, func(i, j int) bool {
+		return bytes.Compare(publicKeys[i], publicKeys[j]) < 0
+	})
+	return &pb.MultisigConfig{
+		Version:    0,
+		Threshold:  mc.NumSignersThreshold,
+		PublicKeys: publicKeys,
+	}
 }

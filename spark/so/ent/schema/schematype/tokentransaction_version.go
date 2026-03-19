@@ -17,6 +17,9 @@ const (
 	// 3) splits partial and final token transactions into different proto messages
 	// 4) explicitly stores validity duration seconds instead of expiry time.
 	TokenTransactionVersionV3
+	// TokenTransactionVersionV4 is the version of the token transaction that
+	// adds support for multisig issuer signatures.
+	TokenTransactionVersionV4
 )
 
 // ValidValues returns the valid version values
@@ -26,10 +29,11 @@ func (TokenTransactionVersion) ValidValues() []TokenTransactionVersion {
 		TokenTransactionVersionV1,
 		TokenTransactionVersionV2,
 		TokenTransactionVersionV3,
+		TokenTransactionVersionV4,
 	}
 }
 
 // IsValid checks if the version is valid
 func (v TokenTransactionVersion) IsValid() bool {
-	return v == TokenTransactionVersionV0 || v == TokenTransactionVersionV1 || v == TokenTransactionVersionV2 || v == TokenTransactionVersionV3
+	return v == TokenTransactionVersionV0 || v == TokenTransactionVersionV1 || v == TokenTransactionVersionV2 || v == TokenTransactionVersionV3 || v == TokenTransactionVersionV4
 }

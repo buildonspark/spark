@@ -292,6 +292,16 @@ func IssuerSignatureLTE(v []byte) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldLTE(FieldIssuerSignature, v))
 }
 
+// IssuerSignatureIsNil applies the IsNil predicate on the "issuer_signature" field.
+func IssuerSignatureIsNil() predicate.TokenMint {
+	return predicate.TokenMint(sql.FieldIsNull(FieldIssuerSignature))
+}
+
+// IssuerSignatureNotNil applies the NotNil predicate on the "issuer_signature" field.
+func IssuerSignatureNotNil() predicate.TokenMint {
+	return predicate.TokenMint(sql.FieldNotNull(FieldIssuerSignature))
+}
+
 // OperatorSpecificIssuerSignatureEQ applies the EQ predicate on the "operator_specific_issuer_signature" field.
 func OperatorSpecificIssuerSignatureEQ(v []byte) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldEQ(FieldOperatorSpecificIssuerSignature, v))

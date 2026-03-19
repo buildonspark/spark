@@ -724,7 +724,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "issuer_public_key", Type: field.TypeBytes},
 		{Name: "wallet_provided_timestamp", Type: field.TypeUint64},
-		{Name: "issuer_signature", Type: field.TypeBytes},
+		{Name: "issuer_signature", Type: field.TypeBytes, Nullable: true},
 		{Name: "operator_specific_issuer_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
 		{Name: "token_identifier", Type: field.TypeBytes, Nullable: true},
 	}

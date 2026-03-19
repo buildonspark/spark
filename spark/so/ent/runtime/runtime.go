@@ -628,10 +628,6 @@ func init() {
 	tokenmint.DefaultUpdateTime = tokenmintDescUpdateTime.Default.(func() time.Time)
 	// tokenmint.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tokenmint.UpdateDefaultUpdateTime = tokenmintDescUpdateTime.UpdateDefault.(func() time.Time)
-	// tokenmintDescIssuerSignature is the schema descriptor for issuer_signature field.
-	tokenmintDescIssuerSignature := tokenmintFields[2].Descriptor()
-	// tokenmint.IssuerSignatureValidator is a validator for the "issuer_signature" field. It is called by the builders before save.
-	tokenmint.IssuerSignatureValidator = tokenmintDescIssuerSignature.Validators[0].(func([]byte) error)
 	// tokenmintDescID is the schema descriptor for id field.
 	tokenmintDescID := tokenmintMixinFields0[0].Descriptor()
 	// tokenmint.DefaultID holds the default value on creation for the id field.

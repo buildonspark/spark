@@ -144,6 +144,9 @@ func (tmu *TokenMintUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tmu.mutation.UpdateTime(); ok {
 		_spec.SetField(tokenmint.FieldUpdateTime, field.TypeTime, value)
 	}
+	if tmu.mutation.IssuerSignatureCleared() {
+		_spec.ClearField(tokenmint.FieldIssuerSignature, field.TypeBytes)
+	}
 	if value, ok := tmu.mutation.OperatorSpecificIssuerSignature(); ok {
 		_spec.SetField(tokenmint.FieldOperatorSpecificIssuerSignature, field.TypeBytes, value)
 	}
@@ -362,6 +365,9 @@ func (tmuo *TokenMintUpdateOne) sqlSave(ctx context.Context) (_node *TokenMint, 
 	}
 	if value, ok := tmuo.mutation.UpdateTime(); ok {
 		_spec.SetField(tokenmint.FieldUpdateTime, field.TypeTime, value)
+	}
+	if tmuo.mutation.IssuerSignatureCleared() {
+		_spec.ClearField(tokenmint.FieldIssuerSignature, field.TypeBytes)
 	}
 	if value, ok := tmuo.mutation.OperatorSpecificIssuerSignature(); ok {
 		_spec.SetField(tokenmint.FieldOperatorSpecificIssuerSignature, field.TypeBytes, value)

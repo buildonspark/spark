@@ -7,15 +7,18 @@ import (
 
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	multisigpb "github.com/lightsparkdev/spark/proto/multisig"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	sparktokeninternal "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/entfixtures"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
@@ -222,4 +225,55 @@ func TestExchangeRevocationSecretsShares_TransferTransaction(t *testing.T) {
 
 		require.ErrorContains(t, err, "unable to parse request operator identity public key")
 	})
+}
+
+func TestSignAndPersistTokenTransaction_RejectsMultisigForPreV3(t *testing.T) {
+	setup := setUpInternalSignTokenTestHandler(t)
+	defer setup.cleanup()
+
+	tokenCreate := setup.fixtures.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
+	testHash := hash32(0xE1)
+
+	// Create a pre-V3 create transaction (default version is V0).
+	setup.client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(testHash).
+		SetFinalizedTokenTransactionHash(testHash).
+		SetStatus(st.TokenTransactionStatusStarted).
+		SetCreateID(tokenCreate.ID).
+		SaveX(setup.ctx)
+
+	// Re-query with edges loaded so validateTokenTransactionForSigning can inspect them.
+	tokenTx, err := setup.client.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(testHash)).
+		WithCreate().
+		WithCreatedOutput().
+		WithSpentOutput().
+		WithMint().
+		Only(setup.ctx)
+	require.NoError(t, err)
+	assert.Less(t, tokenTx.Version, st.TokenTransactionVersionV3)
+
+	multisigSig := &tokenpb.SignatureWithIndex{
+		InputIndex: 0,
+		AuthoritySignatures: &tokenpb.SignatureWithIndex_MultisigSignatures{
+			MultisigSignatures: &multisigpb.MultisigSignatureSet{
+				MultisigConfig: &multisigpb.MultisigConfig{
+					Version:    0,
+					Threshold:  1,
+					PublicKeys: [][]byte{keys.GeneratePrivateKey().Public().Serialize()},
+				},
+			},
+		},
+	}
+
+	_, err = setup.handler.SignAndPersistTokenTransaction(
+		setup.ctx,
+		tokenTx,
+		nil,
+		testHash,
+		[]*tokenpb.SignatureWithIndex{multisigSig},
+	)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multisig signatures are not supported for token transactions with version < V3")
 }

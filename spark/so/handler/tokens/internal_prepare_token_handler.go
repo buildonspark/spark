@@ -34,6 +34,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/tokens/signature"
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
@@ -138,7 +140,7 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 		if err != nil {
 			return nil, err
 		}
-		if err = validateIssuerSignature(finalTokenTx, tokenTransactionSignatures, createPubKey); err != nil {
+		if err := validateCreateSignature(finalTokenTx, tokenTransactionSignatures, createPubKey); err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to validate create token transaction signature", finalTokenTx, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("failed to validate create token transaction signature: %w", err)))
 		}
 		if err = validateTokenIdentifierNotAlreadyCreated(ctx, finalTokenTx); err != nil {
@@ -147,50 +149,43 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 	case utils.TokenTransactionTypeMint:
 		mintTokenIdentifier := finalTokenTx.GetMintInput().GetTokenIdentifier()
 		if len(mintTokenIdentifier) == 0 {
+			return nil, tokens.FormatErrorWithTransactionProto("missing token identifier", finalTokenTx,
+				sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token_identifier is required on MintInput")))
+		}
+
+		tokenMetadataSlice, err := ent.GetTokenMetadataForTokenTransaction(ctx, finalTokenTx)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(tokenMetadataSlice) == 0 {
 			return nil, tokens.FormatErrorWithTransactionProto(
-				"missing token identifier",
+				"token not found",
 				finalTokenTx,
-				sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token_identifier is required on MintInput")),
+				sparkerrors.NotFoundMissingEntity(fmt.Errorf("cannot mint on non-existent token")),
 			)
 		}
+		tokenMetadata := tokenMetadataSlice[0]
 
-		tokenCreateEnt, err := ent.GetTokenCreateByIdentifier(ctx, mintTokenIdentifier)
-		if err != nil {
-			if ent.IsNotFound(err) {
-				return nil, tokens.FormatErrorWithTransactionProto(
-					"token not found",
-					finalTokenTx,
-					sparkerrors.NotFoundMissingEntity(fmt.Errorf("cannot mint on non-existent token")),
-				)
-			}
-			return nil, tokens.FormatErrorWithTransactionProto("failed to get token create", finalTokenTx, sparkerrors.InternalDatabaseReadError(err))
-		}
-
-		tokenMetadata, err := tokenCreateEnt.ToTokenMetadata()
-		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("failed to convert token metadata", finalTokenTx, sparkerrors.InternalDataInconsistency(err))
-		}
-
-		// Validate that MintInput.issuer_public_key matches the TokenCreate record.
-		// This field is included in the transaction hash, so a mismatch would allow
-		// creating semantically identical transactions with different hashes.
+		// Cross-check: client-supplied issuer key must match the DB-derived key (for hash integrity)
 		mintPubKey, err := keys.ParsePublicKey(finalTokenTx.GetMintInput().GetIssuerPublicKey())
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("failed to parse issuer public key", finalTokenTx, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse issuer public key: %w", err)))
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse issuer public key: %w", err))
 		}
 		if !mintPubKey.Equals(tokenMetadata.IssuerPublicKey) {
 			return nil, tokens.FormatErrorWithTransactionProto(
 				"issuer key mismatch",
 				finalTokenTx,
 				sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf(
-					"MintInput issuer_public_key %x does not match token creator %x",
+					"mint issuer public key %x does not match token creator %x",
 					mintPubKey.Serialize(),
 					tokenMetadata.IssuerPublicKey.Serialize(),
 				)),
 			)
 		}
 
-		if err := validateIssuerSignature(finalTokenTx, tokenTransactionSignatures, tokenMetadata.IssuerPublicKey); err != nil {
+		// Use DB-derived key for signature validation, not the client-supplied key
+		if err := validateIssuerSignature(ctx, finalTokenTx, tokenTransactionSignatures, tokenMetadata.IssuerPublicKey); err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to validate mint token transaction signature", finalTokenTx, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("failed to validate mint token transaction signature: %w", err)))
 		}
 
@@ -209,6 +204,11 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 		err = tokens.ValidateMintDoesNotExceedMaxSupply(ctx, finalTokenTx)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("max supply error", finalTokenTx, err)
+		}
+
+		tokenCreateEnt, err := ent.GetTokenCreateByIdentifier(ctx, mintTokenIdentifier)
+		if err != nil {
+			return nil, tokens.FormatErrorWithTransactionProto("failed to get token create for global pause check", finalTokenTx, sparkerrors.InternalDatabaseReadError(err))
 		}
 		if err := validateTokenNotGloballyPaused(ctx, tokenCreateEnt.ID); err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("global pause check", finalTokenTx, err)
@@ -303,12 +303,12 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 // and verifies that the number of signatures matches the expected count based on transaction type
 func validateOperatorSpecificOwnerSignatures(ctx context.Context, operatorIdentityPublicKey keys.Public, ownerSignatures []*tokenpb.SignatureWithIndex, tokenTransaction *ent.TokenTransaction, finalTokenTransactionHash []byte) error {
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
-		return validateTransferOwnerSignatures(operatorIdentityPublicKey, ownerSignatures, tokenTransaction, finalTokenTransactionHash)
+		return validateTransferOwnerSignatures(ctx, operatorIdentityPublicKey, ownerSignatures, tokenTransaction, finalTokenTransactionHash)
 	}
 	return validateIssuerOwnerSignatures(ctx, operatorIdentityPublicKey, ownerSignatures, tokenTransaction, finalTokenTransactionHash)
 }
 
-func validateTransferOwnerSignatures(operatorIdentityPublicKey keys.Public, ownerSignatures []*tokenpb.SignatureWithIndex, tokenTransaction *ent.TokenTransaction, finalTokenTransactionHash []byte) error {
+func validateTransferOwnerSignatures(ctx context.Context, operatorIdentityPublicKey keys.Public, ownerSignatures []*tokenpb.SignatureWithIndex, tokenTransaction *ent.TokenTransaction, finalTokenTransactionHash []byte) error {
 	if len(ownerSignatures) != len(tokenTransaction.Edges.SpentOutput) {
 		return tokens.FormatErrorWithTransactionEnt(
 			"invalid number of signatures for transfer",
@@ -356,7 +356,7 @@ func validateTransferOwnerSignatures(operatorIdentityPublicKey keys.Public, owne
 
 	for i, sig := range signaturesByIndex {
 		output := spentOutputs[i]
-		if err := utils.ValidateOwnershipSignature(sig.Signature, payloadHash, output.OwnerPublicKey); err != nil {
+		if err := ValidateOwnershipSignatureFromAuthority(ctx, sig, payloadHash, output.OwnerPublicKey); err != nil {
 			return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOwnerSignature, tokenTransaction, err)
 		}
 	}
@@ -365,8 +365,7 @@ func validateTransferOwnerSignatures(operatorIdentityPublicKey keys.Public, owne
 }
 
 // validateIssuerOwnerSignatures validates V2 owner signatures for mint and create transactions.
-// In the coordinated flow, issuer signs an operator-specific payload (finalTxHash + operatorIdentity).
-// For mints, the issuer public key is looked up from the TokenCreate record via TokenIdentifier.
+// The issuer signs an operator-specific payload (finalTxHash + operatorIdentity).
 func validateIssuerOwnerSignatures(ctx context.Context, operatorIdentityPublicKey keys.Public, ownerSignatures []*tokenpb.SignatureWithIndex, tokenTransaction *ent.TokenTransaction, finalTokenTransactionHash []byte) error {
 	if len(ownerSignatures) != 1 {
 		return tokens.FormatErrorWithTransactionEnt(
@@ -376,11 +375,13 @@ func validateIssuerOwnerSignatures(ctx context.Context, operatorIdentityPublicKe
 
 	var issuerPublicKey keys.Public
 	if tokenTransaction.Edges.Mint != nil {
-		issuerPubKey, err := ent.GetIssuerPublicKeyByTokenIdentifier(ctx, tokenTransaction.Edges.Mint.TokenIdentifier)
+		tokenCreate, err := ent.GetTokenCreateByIdentifier(ctx, tokenTransaction.Edges.Mint.TokenIdentifier)
 		if err != nil {
-			return tokens.FormatErrorWithTransactionEnt("failed to get issuer public key", tokenTransaction, err)
+			return tokens.FormatErrorWithTransactionEnt(
+				"failed to look up token create for mint",
+				tokenTransaction, sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to get token create by identifier: %w", err)))
 		}
-		issuerPublicKey = issuerPubKey
+		issuerPublicKey = tokenCreate.IssuerPublicKey
 	} else if tokenTransaction.Edges.Create != nil {
 		issuerPublicKey = tokenTransaction.Edges.Create.IssuerPublicKey
 	} else {
@@ -391,12 +392,14 @@ func validateIssuerOwnerSignatures(ctx context.Context, operatorIdentityPublicKe
 
 	sig := ownerSignatures[0]
 
+	// Compute the operator-specific payload hash
 	payloadHash, err := utils.HashOperatorSpecificPayload(finalTokenTransactionHash, operatorIdentityPublicKey)
 	if err != nil {
 		return tokens.FormatErrorWithTransactionEnt("failed to hash operator-specific payload", tokenTransaction, err)
 	}
 
-	if err := utils.ValidateOwnershipSignature(sig.Signature, payloadHash, issuerPublicKey); err != nil {
+	// Validate the issuer signature against the payload hash
+	if err := ValidateOwnershipSignatureFromAuthority(ctx, sig, payloadHash, issuerPublicKey); err != nil {
 		return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidIssuerSignature, tokenTransaction, err)
 	}
 
@@ -408,7 +411,36 @@ type potentiallySpendableOutput struct {
 	Err    error
 }
 
+// validateCreateSignature validates the issuer signature for a Create token
+// transaction. Unlike Mint, Create does not support multisig -- the
+// issuer_public_key in the CreateInput is the sole signing authority.
+func validateCreateSignature(
+	tokenTransaction *tokenpb.TokenTransaction,
+	signaturesWithIndex []*tokenpb.SignatureWithIndex,
+	issuerPublicKey keys.Public,
+) error {
+	partialHash, err := utils.HashTokenTransaction(tokenTransaction, true)
+	if err != nil {
+		return tokens.FormatErrorWithTransactionProto("failed to hash token transaction", tokenTransaction, err)
+	}
+
+	sig := signaturesWithIndex[0]
+	if err = validateDeprecatedSignatureConsistency(sig); err != nil {
+		return tokens.FormatErrorWithTransactionProto("deprecated signature field inconsistency", tokenTransaction, err)
+	}
+	singleSig := signature.GetEffectiveSingleSignature(sig)
+	if singleSig == nil {
+		return tokens.FormatErrorWithTransactionProto(
+			"multisig is not supported for token creation",
+			tokenTransaction,
+			sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("multisig is not supported for token creation; issuer_public_key in the create input is the sole authority")),
+		)
+	}
+	return utils.ValidateOwnershipSignature(singleSig, partialHash, issuerPublicKey)
+}
+
 func validateIssuerSignature(
+	ctx context.Context,
 	tokenTransaction *tokenpb.TokenTransaction,
 	signaturesWithIndex []*tokenpb.SignatureWithIndex,
 	issuerPublicKey keys.Public,
@@ -418,7 +450,29 @@ func validateIssuerSignature(
 	if err != nil {
 		return tokens.FormatErrorWithTransactionProto("failed to hash token transaction", tokenTransaction, err)
 	}
-	if err = utils.ValidateOwnershipSignature(signaturesWithIndex[0].Signature, partialTokenTransactionHash, issuerPublicKey); err != nil {
+
+	sig := signaturesWithIndex[0]
+
+	// Gate multisig behind V4 version and knob before general validation.
+	if _, ok := sig.AuthoritySignatures.(*tokenpb.SignatureWithIndex_MultisigSignatures); ok {
+		if st.TokenTransactionVersion(tokenTransaction.Version) < st.TokenTransactionVersionV4 {
+			return tokens.FormatErrorWithTransactionProto(
+				"multisig signatures require token transaction version V4 or later",
+				tokenTransaction,
+				sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("multisig issuer signatures are not supported for token transactions with version < V4")),
+			)
+		}
+		knobService := knobs.GetKnobsService(ctx)
+		if knobService == nil || !knobService.RolloutRandom(knobs.KnobMultisigIssuerEnabled, 0) {
+			return tokens.FormatErrorWithTransactionProto(
+				"multisig minting is not enabled",
+				tokenTransaction,
+				sparkerrors.UnimplementedMethodDisabled(fmt.Errorf("multisig issuer signatures are not enabled")),
+			)
+		}
+	}
+
+	if err = ValidateOwnershipSignatureFromAuthority(ctx, sig, partialTokenTransactionHash, issuerPublicKey); err != nil {
 		return tokens.FormatErrorWithTransactionProto("invalid issuer signature", tokenTransaction, err)
 	}
 	return nil
@@ -554,7 +608,7 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 		if outputEnt == nil {
 			return sparkerrors.NotFoundMissingEntity(fmt.Errorf("could not find output entity for output to spend at index %d", i))
 		}
-		if err := utils.ValidateOwnershipSignature(ownershipSignature.Signature, partialTokenTransactionHash, outputEnt.OwnerPublicKey); err != nil {
+		if err := ValidateOwnershipSignatureFromAuthority(ctx, ownershipSignature, partialTokenTransactionHash, outputEnt.OwnerPublicKey); err != nil {
 			return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("invalid ownership signature for output %d: %w", i, err))
 		}
 		if err := validateOutputIsSpendable(ctx, i, outputEnt, tokenTransaction, v0DefaultTransactionExpiryDuration); err != nil {

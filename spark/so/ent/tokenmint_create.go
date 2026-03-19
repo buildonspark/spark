@@ -176,14 +176,6 @@ func (tmc *TokenMintCreate) check() error {
 	if _, ok := tmc.mutation.WalletProvidedTimestamp(); !ok {
 		return &ValidationError{Name: "wallet_provided_timestamp", err: errors.New(`ent: missing required field "TokenMint.wallet_provided_timestamp"`)}
 	}
-	if _, ok := tmc.mutation.IssuerSignature(); !ok {
-		return &ValidationError{Name: "issuer_signature", err: errors.New(`ent: missing required field "TokenMint.issuer_signature"`)}
-	}
-	if v, ok := tmc.mutation.IssuerSignature(); ok {
-		if err := tokenmint.IssuerSignatureValidator(v); err != nil {
-			return &ValidationError{Name: "issuer_signature", err: fmt.Errorf(`ent: validator failed for field "TokenMint.issuer_signature": %w`, err)}
-		}
-	}
 	return nil
 }
 

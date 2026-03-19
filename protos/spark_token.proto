@@ -3,6 +3,7 @@ syntax = "proto3";
 package spark_token;
 
 import "google/protobuf/timestamp.proto";
+import "multisig.proto";
 import "spark.proto";
 import "validate/validate.proto";
 
@@ -195,16 +196,19 @@ message InvoiceAttachment {
 }
 
 message SignatureWithIndex {
-    // Deprecated: use authority_signatures oneof instead.
-    // When populated, this is a Schnorr or ECDSA DER signature (64-73 bytes).
-    // May be empty when authority_signatures is set.
-    bytes signature = 1 [
+    // Deprecated: use authority_signatures instead.
+    optional bytes signature = 1 [
         (validate.rules).bytes.ignore_empty = true,
         (validate.rules).bytes.min_len = 64,
         (validate.rules).bytes.max_len = 73
     ];
     // The index of the TTXO associated with this signature.
     uint32 input_index = 2;
+    // Supports single-key or multisig signatures.
+    oneof authority_signatures {
+        multisig.KeyedSignature single_signature = 3;
+        multisig.MultisigSignatureSet multisig_signatures = 4;
+    }
 }
 
 // A group of signatures for the input TTXOs binding them to the final token

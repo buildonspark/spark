@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/protohash"
 
+	multisigpb "github.com/lightsparkdev/spark/proto/multisig"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
@@ -87,6 +88,12 @@ func StartTokenTransaction(
 		sigWithIndex := &tokenpb.SignatureWithIndex{
 			InputIndex: uint32(i),
 			Signature:  sig,
+			AuthoritySignatures: &tokenpb.SignatureWithIndex_SingleSignature{
+				SingleSignature: &multisigpb.KeyedSignature{
+					PublicKey: privKey.Public().Serialize(),
+					Signature: sig,
+				},
+			},
 		}
 		signaturesByIndex[uint32(i)] = sigWithIndex
 	}
@@ -420,6 +427,12 @@ func convertTokenTransactionToV3Request(
 		ownerSignatures = append(ownerSignatures, &tokenpb.SignatureWithIndex{
 			InputIndex: uint32(i),
 			Signature:  sig,
+			AuthoritySignatures: &tokenpb.SignatureWithIndex_SingleSignature{
+				SingleSignature: &multisigpb.KeyedSignature{
+					PublicKey: privKey.Public().Serialize(),
+					Signature: sig,
+				},
+			},
 		})
 	}
 
@@ -612,6 +625,12 @@ func CreateOperatorSpecificSignatures(
 			ttxoSignatures = append(ttxoSignatures, &tokenpb.SignatureWithIndex{
 				InputIndex: uint32(i),
 				Signature:  sig,
+				AuthoritySignatures: &tokenpb.SignatureWithIndex_SingleSignature{
+					SingleSignature: &multisigpb.KeyedSignature{
+						PublicKey: privKey.Public().Serialize(),
+						Signature: sig,
+					},
+				},
 			})
 		}
 
