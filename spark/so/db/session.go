@@ -17,6 +17,7 @@ import (
 
 var (
 	ErrTxBeginTimeout               = soerrors.UnavailableDatabaseTimeout(fmt.Errorf("the service is currently unavailable, please try again later"))
+	errFailedToCreateTx             = errors.New("failed to create database transaction")
 	DefaultNewTxTimeout             = 15 * time.Second
 	DefaultNotificationFlushTimeout = 5 * time.Second
 )
@@ -289,76 +290,14 @@ func (t *TxProviderWithTimeout) GetClient(ctx context.Context) (*ent.Client, err
 }
 
 func (t *TxProviderWithTimeout) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
-	if t.timeout <= 0 {
-		// If the timeout is zero or negative, assume there is no timeout and we should call
-		// `GetOrBeginTx` normally.
-		return t.wrapped.GetOrBeginTx(ctx)
-	}
-
-	type result struct {
-		tx  *ent.Tx
-		err error
-	}
-
-	resultChan := make(chan result)
-
-	logger := logging.GetLoggerFromContext(ctx)
-
-	timeoutCtx, cancel := context.WithTimeout(ctx, t.timeout)
-	defer cancel()
-
-	// We can't pass timeoutCtx directly into `NewTx`, because the context we pass into `NewTx` isn't
-	// just for starting the transaction. It's also used for the lifetime of the transaction. So throw
-	// this into a goroutine so that we can run a select on:
-	//
-	// 		1. A connection being acquired and a transaction being started successfully.
-	//		2. An error occuring while staring the transaction.
-	//		3. Neither (1) nor (2) happening within the timeout period.
-	//
-	// If (3) happens, this function will return an error AND the caller needs to cancel the context in
-	// order to stop the transaction process.
-	go func() {
-		defer close(resultChan)
-
-		tx, err := t.wrapped.GetOrBeginTx(ctx)
-		if err != nil {
-			select {
-			case resultChan <- result{tx: nil, err: err}:
-			case <-timeoutCtx.Done():
-				logger.Warn("Failed to start transaction within timeout", zap.Error(err))
-				return
-			}
-		}
-
-		select {
-		case resultChan <- result{tx: tx, err: nil}:
-		case <-timeoutCtx.Done():
-			// If the timeout context is done, there are no receivers for the transaction, so we need to
-			// rollback the transaction so that we aren't just leaving it idle.
-			// Only rollback if tx is not nil (it could be nil if GetOrBeginTx failed)
-			if tx == nil {
-				logger.Warn("Wanted to rollback transaction after timeout, but tx is nil")
-			} else {
-				err := tx.Rollback()
-				if err != nil {
-					logger.Warn("Failed to rollback transaction after timeout", zap.Error(err))
-				}
-			}
-			return
-		}
-	}()
-
-	select {
-	case res, ok := <-resultChan:
-		if ok {
-			return res.tx, res.err
-		}
-	case <-timeoutCtx.Done():
-	}
-
-	if timeoutCtx.Err() == context.DeadlineExceeded {
-		return nil, ErrTxBeginTimeout
-	}
-
-	return nil, fmt.Errorf("failed to create database transaction %w", timeoutCtx.Err())
+	return getOrBeginTxWithTimeout(ctx, txBeginTimeoutConfig[*ent.Tx]{
+		timeout:    t.timeout,
+		txTypeName: "spark db transaction",
+		begin:      t.wrapped.GetOrBeginTx,
+		rollback: func(tx *ent.Tx) error {
+			return tx.Rollback()
+		},
+		timeoutErr:      ErrTxBeginTimeout,
+		beginFailureErr: soerrors.InternalDatabaseTransactionLifecycleError(errFailedToCreateTx),
+	})
 }

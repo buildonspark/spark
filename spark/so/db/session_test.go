@@ -261,12 +261,86 @@ func TestTxProviderWithTimeout_Success(t *testing.T) {
 	require.NoError(t, err, "Expected to retrieve a transaction within the timeout")
 }
 
+// contextSpyProvider wraps a TxProvider and captures the context passed to GetOrBeginTx.
+// This lets tests inspect beginCtx — the child context that getOrBeginTxWithTimeout creates
+// and passes to the underlying Begin call.
+type contextSpyProvider struct {
+	wrapped     ent.TxProvider
+	capturedCtx context.Context
+}
+
+func (p *contextSpyProvider) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
+	p.capturedCtx = ctx
+	return p.wrapped.GetOrBeginTx(ctx)
+}
+
+func (p *contextSpyProvider) GetClient(ctx context.Context) (*ent.Client, error) {
+	return p.wrapped.GetClient(ctx)
+}
+
+// TestTxProviderWithTimeout_BeginCtxSurvivesCommit verifies that beginCtx — the context
+// stored by pgx/stdlib in wrapTx.ctx for all connection operations — is NOT cancelled by
+// the commit hook. Cancelling it early interacts with database/sql's awaitDone goroutine
+// under discardConn=true semantics, causing connection churn.
+//
+// This test would have failed with the original #5640 onTxStarted implementation that
+// called defer cancel() from the commit hook.
+func TestTxProviderWithTimeout_BeginCtxSurvivesCommit(t *testing.T) {
+	t.Parallel()
+	dbClient := NewTestSQLiteClient(t)
+	defer dbClient.Close()
+
+	spy := &contextSpyProvider{wrapped: ent.NewEntClientTxProvider(dbClient)}
+	provider := NewTxProviderWithTimeout(spy, 5*time.Second)
+
+	tx, err := provider.GetOrBeginTx(t.Context())
+	require.NoError(t, err)
+	require.NotNil(t, spy.capturedCtx, "begin must have been called")
+	require.NoError(t, spy.capturedCtx.Err(), "beginCtx should be active before commit")
+
+	require.NoError(t, tx.Commit())
+
+	require.NoError(t, spy.capturedCtx.Err(), "beginCtx must not be cancelled by the commit hook")
+}
+
+// TestTxProviderWithTimeout_BeginCtxSurvivesRollback is the rollback counterpart of
+// TestTxProviderWithTimeout_BeginCtxSurvivesCommit.
+func TestTxProviderWithTimeout_BeginCtxSurvivesRollback(t *testing.T) {
+	t.Parallel()
+	dbClient := NewTestSQLiteClient(t)
+	defer dbClient.Close()
+
+	spy := &contextSpyProvider{wrapped: ent.NewEntClientTxProvider(dbClient)}
+	provider := NewTxProviderWithTimeout(spy, 5*time.Second)
+
+	tx, err := provider.GetOrBeginTx(t.Context())
+	require.NoError(t, err)
+	require.NotNil(t, spy.capturedCtx)
+	require.NoError(t, spy.capturedCtx.Err(), "beginCtx should be active before rollback")
+
+	require.NoError(t, tx.Rollback())
+
+	require.NoError(t, spy.capturedCtx.Err(), "beginCtx must not be cancelled by the rollback hook")
+}
+
 func TestTxProviderWithTimeout_Timeout(t *testing.T) {
 	t.Parallel()
 	timeout := 200 * time.Millisecond
 	provider := NewTxProviderWithTimeout(&NeverTxProvider{}, timeout)
 
 	_, err := provider.GetOrBeginTx(t.Context())
+	require.ErrorIs(t, err, ErrTxBeginTimeout)
+}
+
+func TestTxProviderWithTimeout_GetClientUsesTxTimeout(t *testing.T) {
+	t.Parallel()
+	timeout := 200 * time.Millisecond
+	provider := NewTxProviderWithTimeout(&NeverTxProvider{}, timeout)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+
+	_, err := provider.GetClient(ctx)
 	require.ErrorIs(t, err, ErrTxBeginTimeout)
 }
 
