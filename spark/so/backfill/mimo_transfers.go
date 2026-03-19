@@ -24,7 +24,7 @@ const initScanBatchSize = 10000
 
 var (
 	backfillMu          sync.Mutex
-	backfillCursor      = time.Date(2025, time.November, 18, 22, 0, 0, 0, time.UTC)
+	backfillCursor      = time.Date(2025, time.November, 20, 5, 0, 0, 0, time.UTC)
 	lastSeenID          uuid.UUID // tiebreaker for keyset pagination in initBackfillCursor
 	backfillInitialized bool
 )
