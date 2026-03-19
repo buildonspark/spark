@@ -29,6 +29,9 @@ spark-cli-mainnet = { dir = "{{config_root}}/sdks/js", run = 'yarn install && ya
 spark-cli-dev = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:dev' }
 spark-cli-dev-mainnet = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:dev:mainnet' }
 spark-cli-loadtest = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:loadtest' }
+lint = { depends = ["lint-go", "lint-js"], description = "Run all linters (Go + JS)" }
+lint-go = { dir = "{{config_root}}/spark", run = 'mise lint', description = "Run Go linters (golangci-lint + entfieldlint)" }
+lint-js = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn lint', description = "Run JS/TS linters (eslint via turbo)" }
 test-go = { dir = "{{config_root}}/spark", run = 'mise test-unit' }
 test-grpc = { dir = "{{config_root}}/spark", run = 'mise test-grpc' }
 test-grpc-minikube = { dir = "{{config_root}}/spark", run = 'mise test-grpc-minikube' }
