@@ -260,9 +260,7 @@ export function getLocalSigningOperators(): Record<string, SigningOperator> {
     typeof process !== "undefined" &&
     process.env.NUM_SPARK_OPERATORS !== undefined
       ? parseInt(process.env.NUM_SPARK_OPERATORS, 10)
-      : isHermeticTest
-        ? 3
-        : 5;
+      : 3;
 
   const hermeticDomain = isBare
     ? "spark-web.minikube.local"
