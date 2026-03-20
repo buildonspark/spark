@@ -9,6 +9,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/helper"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // TwoPCEngine orchestrates consensus using two-phase commit.
@@ -23,7 +24,7 @@ type TwoPCEngine struct {
 	gossip GossipSender
 
 	mu       sync.RWMutex
-	handlers map[string]FlowHandler
+	handlers map[pbgossip.ConsensusOperationType]FlowHandler
 }
 
 // NewTwoPCEngine creates a TwoPCEngine backed by synchronous operator
@@ -32,14 +33,14 @@ func NewTwoPCEngine(config *so.Config, gossip GossipSender) *TwoPCEngine {
 	return &TwoPCEngine{
 		config:   config,
 		gossip:   gossip,
-		handlers: make(map[string]FlowHandler),
+		handlers: make(map[pbgossip.ConsensusOperationType]FlowHandler),
 	}
 }
 
 // Register adds a FlowHandler for the given operation type.
 // Called at server startup for each domain flow.
 // Returns an error if a handler is already registered for the given opType.
-func (e *TwoPCEngine) Register(opType string, handler FlowHandler) error {
+func (e *TwoPCEngine) Register(opType pbgossip.ConsensusOperationType, handler FlowHandler) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if _, exists := e.handlers[opType]; exists {
@@ -53,11 +54,11 @@ func (e *TwoPCEngine) Register(opType string, handler FlowHandler) error {
 // based on operation type and phase.
 //   - PhasePrepare: called from the RPC handler on each participant during synchronous fan-out.
 //   - PhaseCommit / PhaseRollback: called from the gossip handler on each participant upon
-//     receipt of a consensus gossip message.
+//     receipt of a ConsensusCommit or ConsensusRollback gossip message.
 //
 // Only PhasePrepare returns non-nil bytes; PhaseCommit and PhaseRollback
 // always return nil bytes.
-func (e *TwoPCEngine) Dispatch(ctx context.Context, opType string, phase OperationPhase, op proto.Message) ([]byte, error) {
+func (e *TwoPCEngine) Dispatch(ctx context.Context, opType pbgossip.ConsensusOperationType, phase OperationPhase, op proto.Message) ([]byte, error) {
 	e.mu.RLock()
 	h, ok := e.handlers[opType]
 	e.mu.RUnlock()
@@ -82,21 +83,42 @@ func (e *TwoPCEngine) Prepare(ctx context.Context, task func(ctx context.Context
 	return helper.ExecuteTaskWithAllOperators(ctx, e.config, selection, task)
 }
 
-// Commit sends a gossip message to all participants for durable async delivery.
-// The gossip record is committed to DB before network delivery so background
-// retry can pick it up if delivery fails.
-//
-// Currently identical to Rollback — both delegate to gossip. These will diverge
-// when ConsensusCommit/ConsensusRollback gossip types are added and the engine
-// builds the wrapper message internally.
-func (e *TwoPCEngine) Commit(ctx context.Context, msg *pbgossip.GossipMessage, participants []string) error {
-	_, err := e.gossip.CreateCommitAndSendGossipMessage(ctx, msg, participants)
+// Commit builds a GossipMessageConsensusCommit gossip message and sends it to
+// all participants for durable async delivery. The gossip record is committed
+// to DB before network delivery so background retry can pick it up.
+func (e *TwoPCEngine) Commit(ctx context.Context, opType pbgossip.ConsensusOperationType, op proto.Message, participants []string) error {
+	anyOp, err := anypb.New(op)
+	if err != nil {
+		return fmt.Errorf("failed to marshal operation to Any: %w", err)
+	}
+	msg := &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_ConsensusCommit{
+			ConsensusCommit: &pbgossip.GossipMessageConsensusCommit{
+				OpType:    opType,
+				Operation: anyOp,
+			},
+		},
+	}
+	_, err = e.gossip.CreateCommitAndSendGossipMessage(ctx, msg, participants)
 	return err
 }
 
-// Rollback sends a gossip message to all participants for durable async delivery.
-// See Commit for why these are currently identical.
-func (e *TwoPCEngine) Rollback(ctx context.Context, msg *pbgossip.GossipMessage, participants []string) error {
-	_, err := e.gossip.CreateCommitAndSendGossipMessage(ctx, msg, participants)
+// Rollback builds a GossipMessageConsensusRollback gossip message and sends it
+// to all participants for durable async delivery. Uses the same durable delivery
+// as Commit to ensure rollback is retried on failure.
+func (e *TwoPCEngine) Rollback(ctx context.Context, opType pbgossip.ConsensusOperationType, op proto.Message, participants []string) error {
+	anyOp, err := anypb.New(op)
+	if err != nil {
+		return fmt.Errorf("failed to marshal operation to Any: %w", err)
+	}
+	msg := &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_ConsensusRollback{
+			ConsensusRollback: &pbgossip.GossipMessageConsensusRollback{
+				OpType:    opType,
+				Operation: anyOp,
+			},
+		},
+	}
+	_, err = e.gossip.CreateCommitAndSendGossipMessage(ctx, msg, participants)
 	return err
 }

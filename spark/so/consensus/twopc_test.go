@@ -12,6 +12,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// testOpType is a placeholder enum value for tests. The real enum values
+// will be added as domain flows are migrated.
+const testOpType = pbgossip.ConsensusOperationType(999)
+
 // mockFlowHandler records calls for testing.
 type mockFlowHandler struct {
 	prepareCalled  bool
@@ -67,7 +71,7 @@ func newTestEngine() (*TwoPCEngine, *mockGossipSender) {
 	return NewTwoPCEngine(nil, gs), gs
 }
 
-func mustRegister(t *testing.T, engine *TwoPCEngine, opType string, handler FlowHandler) {
+func mustRegister(t *testing.T, engine *TwoPCEngine, opType pbgossip.ConsensusOperationType, handler FlowHandler) {
 	t.Helper()
 	require.NoError(t, engine.Register(opType, handler))
 }
@@ -77,10 +81,10 @@ func mustRegister(t *testing.T, engine *TwoPCEngine, opType string, handler Flow
 func TestDispatch_Prepare(t *testing.T) {
 	engine, _ := newTestEngine()
 	h := &mockFlowHandler{prepareResult: []byte("sig-share")}
-	mustRegister(t, engine, "renew", h)
+	mustRegister(t, engine, testOpType, h)
 
 	op := &pbgossip.GossipMessage{MessageId: "op-1"}
-	result, err := engine.Dispatch(t.Context(), "renew", PhasePrepare, op)
+	result, err := engine.Dispatch(t.Context(), testOpType, PhasePrepare, op)
 
 	require.NoError(t, err)
 	assert.True(t, h.prepareCalled)
@@ -91,10 +95,10 @@ func TestDispatch_Prepare(t *testing.T) {
 func TestDispatch_Commit(t *testing.T) {
 	engine, _ := newTestEngine()
 	h := &mockFlowHandler{}
-	mustRegister(t, engine, "renew", h)
+	mustRegister(t, engine, testOpType, h)
 
 	op := &pbgossip.GossipMessage{MessageId: "op-1"}
-	result, err := engine.Dispatch(t.Context(), "renew", PhaseCommit, op)
+	result, err := engine.Dispatch(t.Context(), testOpType, PhaseCommit, op)
 
 	require.NoError(t, err)
 	assert.True(t, h.commitCalled)
@@ -105,10 +109,10 @@ func TestDispatch_Commit(t *testing.T) {
 func TestDispatch_Rollback(t *testing.T) {
 	engine, _ := newTestEngine()
 	h := &mockFlowHandler{}
-	mustRegister(t, engine, "renew", h)
+	mustRegister(t, engine, testOpType, h)
 
 	op := &pbgossip.GossipMessage{MessageId: "op-1"}
-	result, err := engine.Dispatch(t.Context(), "renew", PhaseRollback, op)
+	result, err := engine.Dispatch(t.Context(), testOpType, PhaseRollback, op)
 
 	require.NoError(t, err)
 	assert.True(t, h.rollbackCalled)
@@ -119,18 +123,18 @@ func TestDispatch_Rollback(t *testing.T) {
 func TestDispatch_UnregisteredOpType(t *testing.T) {
 	engine, _ := newTestEngine()
 
-	_, err := engine.Dispatch(t.Context(), "unknown", PhasePrepare, &pbgossip.GossipMessage{})
+	_, err := engine.Dispatch(t.Context(), testOpType, PhasePrepare, &pbgossip.GossipMessage{})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `no handler registered for operation type "unknown"`)
+	assert.Contains(t, err.Error(), "no handler registered for operation type")
 }
 
 func TestDispatch_UnknownPhase(t *testing.T) {
 	engine, _ := newTestEngine()
 	h := &mockFlowHandler{}
-	mustRegister(t, engine, "renew", h)
+	mustRegister(t, engine, testOpType, h)
 
-	_, err := engine.Dispatch(t.Context(), "renew", OperationPhase(99), &pbgossip.GossipMessage{})
+	_, err := engine.Dispatch(t.Context(), testOpType, OperationPhase(99), &pbgossip.GossipMessage{})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown operation phase 99")
@@ -139,9 +143,9 @@ func TestDispatch_UnknownPhase(t *testing.T) {
 func TestDispatch_PropagatesPrepareError(t *testing.T) {
 	engine, _ := newTestEngine()
 	h := &mockFlowHandler{prepareErr: fmt.Errorf("validation failed")}
-	mustRegister(t, engine, "renew", h)
+	mustRegister(t, engine, testOpType, h)
 
-	_, err := engine.Dispatch(t.Context(), "renew", PhasePrepare, &pbgossip.GossipMessage{})
+	_, err := engine.Dispatch(t.Context(), testOpType, PhasePrepare, &pbgossip.GossipMessage{})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "validation failed")
@@ -150,9 +154,9 @@ func TestDispatch_PropagatesPrepareError(t *testing.T) {
 func TestDispatch_PropagatesCommitError(t *testing.T) {
 	engine, _ := newTestEngine()
 	h := &mockFlowHandler{commitErr: fmt.Errorf("commit failed")}
-	mustRegister(t, engine, "renew", h)
+	mustRegister(t, engine, testOpType, h)
 
-	_, err := engine.Dispatch(t.Context(), "renew", PhaseCommit, &pbgossip.GossipMessage{})
+	_, err := engine.Dispatch(t.Context(), testOpType, PhaseCommit, &pbgossip.GossipMessage{})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "commit failed")
@@ -161,9 +165,9 @@ func TestDispatch_PropagatesCommitError(t *testing.T) {
 func TestDispatch_PropagatesRollbackError(t *testing.T) {
 	engine, _ := newTestEngine()
 	h := &mockFlowHandler{rollbackErr: fmt.Errorf("rollback failed")}
-	mustRegister(t, engine, "renew", h)
+	mustRegister(t, engine, testOpType, h)
 
-	_, err := engine.Dispatch(t.Context(), "renew", PhaseRollback, &pbgossip.GossipMessage{})
+	_, err := engine.Dispatch(t.Context(), testOpType, PhaseRollback, &pbgossip.GossipMessage{})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "rollback failed")
@@ -171,56 +175,71 @@ func TestDispatch_PropagatesRollbackError(t *testing.T) {
 
 func TestRegister_ErrorsOnDuplicate(t *testing.T) {
 	engine, _ := newTestEngine()
-	require.NoError(t, engine.Register("renew", &mockFlowHandler{}))
+	require.NoError(t, engine.Register(testOpType, &mockFlowHandler{}))
 
-	err := engine.Register("renew", &mockFlowHandler{})
+	err := engine.Register(testOpType, &mockFlowHandler{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `handler already registered for operation type "renew"`)
+	assert.Contains(t, err.Error(), "handler already registered for operation type")
 }
 
-// --- Commit/Rollback tests (gossip delegation) ---
+// --- Commit/Rollback tests (gossip message construction + delegation) ---
 
-func TestCommit_DelegatesToGossipSender(t *testing.T) {
+func TestCommit_BuildsConsensusCommitGossip(t *testing.T) {
 	engine, gs := newTestEngine()
-	msg := &pbgossip.GossipMessage{MessageId: "op-1"}
 	participants := []string{"op1", "op2"}
+	op := &pbgossip.GossipMessage{MessageId: "commit-payload"}
 
-	err := engine.Commit(t.Context(), msg, participants)
+	err := engine.Commit(t.Context(), testOpType, op, participants)
 
 	require.NoError(t, err)
 	require.Len(t, gs.calls, 1)
-	assert.Equal(t, msg, gs.calls[0].msg)
 	assert.Equal(t, participants, gs.calls[0].participants)
+
+	commit := gs.calls[0].msg.GetConsensusCommit()
+	require.NotNil(t, commit)
+	assert.Equal(t, testOpType, commit.OpType)
+
+	// Verify the Any contains the original message.
+	roundTripped, err := commit.Operation.UnmarshalNew()
+	require.NoError(t, err)
+	assert.True(t, proto.Equal(op, roundTripped))
 }
 
 func TestCommit_PropagatesGossipError(t *testing.T) {
 	engine, gs := newTestEngine()
 	gs.err = fmt.Errorf("gossip failed")
 
-	err := engine.Commit(t.Context(), &pbgossip.GossipMessage{}, []string{"op1"})
+	err := engine.Commit(t.Context(), testOpType, &pbgossip.GossipMessage{}, []string{"op1"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "gossip failed")
 }
 
-func TestRollback_DelegatesToGossipSender(t *testing.T) {
+func TestRollback_BuildsConsensusRollbackGossip(t *testing.T) {
 	engine, gs := newTestEngine()
-	msg := &pbgossip.GossipMessage{MessageId: "op-1"}
 	participants := []string{"op1"}
+	op := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
 
-	err := engine.Rollback(t.Context(), msg, participants)
+	err := engine.Rollback(t.Context(), testOpType, op, participants)
 
 	require.NoError(t, err)
 	require.Len(t, gs.calls, 1)
-	assert.Equal(t, msg, gs.calls[0].msg)
 	assert.Equal(t, participants, gs.calls[0].participants)
+
+	rollback := gs.calls[0].msg.GetConsensusRollback()
+	require.NotNil(t, rollback)
+	assert.Equal(t, testOpType, rollback.OpType)
+
+	roundTripped, err := rollback.Operation.UnmarshalNew()
+	require.NoError(t, err)
+	assert.True(t, proto.Equal(op, roundTripped))
 }
 
 func TestRollback_PropagatesGossipError(t *testing.T) {
 	engine, gs := newTestEngine()
 	gs.err = fmt.Errorf("rollback gossip failed")
 
-	err := engine.Rollback(t.Context(), &pbgossip.GossipMessage{}, []string{"op1"})
+	err := engine.Rollback(t.Context(), testOpType, &pbgossip.GossipMessage{}, []string{"op1"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "rollback gossip failed")

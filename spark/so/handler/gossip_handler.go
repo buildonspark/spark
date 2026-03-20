@@ -15,6 +15,7 @@ import (
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -27,6 +28,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 var gossipMessageHandledTotal metric.Int64Counter
@@ -46,6 +48,17 @@ func init() {
 		}
 	}
 	gossipMessageHandledTotal = counter
+}
+
+// consensusEngine is the package-level TwoPCEngine used to dispatch incoming
+// ConsensusCommit/ConsensusRollback gossip messages. Set once at startup via
+// SetConsensusEngine before any gossip messages are processed.
+var consensusEngine *consensus.TwoPCEngine
+
+// SetConsensusEngine sets the package-level consensus engine for gossip dispatch.
+// Must be called during server initialization before gossip messages are processed.
+func SetConsensusEngine(engine *consensus.TwoPCEngine) {
+	consensusEngine = engine
 }
 
 type GossipHandler struct {
@@ -122,6 +135,22 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 		err = h.handleFinalizeTransferReceiverGossipMessage(ctx, finalizeTransferReceiver, forCoordinator)
 	case *pbgossip.GossipMessage_FinalizeTreeNode:
 		err = h.handleFinalizeTreeNodeGossipMessage(ctx, gossipMessage.GetFinalizeTreeNode(), forCoordinator)
+	case *pbgossip.GossipMessage_ConsensusCommit:
+		if !forCoordinator {
+			commit := gossipMessage.GetConsensusCommit()
+			var op proto.Message
+			if op, err = commit.Operation.UnmarshalNew(); err == nil {
+				_, err = consensusEngine.Dispatch(ctx, commit.OpType, consensus.PhaseCommit, op)
+			}
+		}
+	case *pbgossip.GossipMessage_ConsensusRollback:
+		if !forCoordinator {
+			rollback := gossipMessage.GetConsensusRollback()
+			var op proto.Message
+			if op, err = rollback.Operation.UnmarshalNew(); err == nil {
+				_, err = consensusEngine.Dispatch(ctx, rollback.OpType, consensus.PhaseRollback, op)
+			}
+		}
 	default:
 		err = fmt.Errorf("unsupported gossip message type: %T", gossipMessage.Message)
 	}

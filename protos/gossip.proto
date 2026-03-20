@@ -7,6 +7,7 @@ import "spark.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
 import "spark_internal.proto";
+import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
 
 service GossipService {
@@ -35,6 +36,8 @@ message GossipMessage {
         GossipMessageRollbackInstantUtxoSwap rollback_instant_utxo_swap = 19;
         GossipMessageFinalizeTransferReceiver finalize_transfer_receiver = 20;
         GossipMessageFinalizeTreeNode finalize_tree_node = 21;
+        GossipMessageConsensusCommit consensus_commit = 22;
+        GossipMessageConsensusRollback consensus_rollback = 23;
     }
 }
 
@@ -166,4 +169,28 @@ message GossipMessageArchiveStaticDepositAddress {
 
 message GossipMessageFinalizeTreeNode {
     repeated spark_internal.TreeNode nodes = 1;
+}
+
+// ConsensusOperationType identifies the domain flow for consensus operations.
+// Each value maps to a registered FlowHandler in the TwoPCEngine.
+enum ConsensusOperationType {
+    CONSENSUS_OPERATION_TYPE_UNSPECIFIED = 0;
+}
+
+// GossipMessageConsensusCommit delivers the commit phase of a consensus operation.
+// The op_type identifies the registered FlowHandler, and operation carries
+// the serialized domain-specific proto payload for FlowHandler.Commit.
+message GossipMessageConsensusCommit {
+    ConsensusOperationType op_type = 1;
+    // Domain-specific proto message passed to FlowHandler.Commit.
+    google.protobuf.Any operation = 2;
+}
+
+// GossipMessageConsensusRollback delivers the rollback phase of a consensus operation.
+// The op_type identifies the registered FlowHandler, and operation carries
+// the domain-specific proto payload for FlowHandler.Rollback.
+message GossipMessageConsensusRollback {
+    ConsensusOperationType op_type = 1;
+    // Domain-specific proto message passed to FlowHandler.Rollback.
+    google.protobuf.Any operation = 2;
 }

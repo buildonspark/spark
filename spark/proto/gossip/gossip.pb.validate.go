@@ -843,6 +843,88 @@ func (m *GossipMessage) validate(all bool) error {
 			}
 		}
 
+	case *GossipMessage_ConsensusCommit:
+		if v == nil {
+			err := GossipMessageValidationError{
+				field:  "Message",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetConsensusCommit()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "ConsensusCommit",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "ConsensusCommit",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetConsensusCommit()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GossipMessageValidationError{
+					field:  "ConsensusCommit",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *GossipMessage_ConsensusRollback:
+		if v == nil {
+			err := GossipMessageValidationError{
+				field:  "Message",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetConsensusRollback()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "ConsensusRollback",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "ConsensusRollback",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetConsensusRollback()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GossipMessageValidationError{
+					field:  "ConsensusRollback",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -3431,3 +3513,271 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GossipMessageFinalizeTreeNodeValidationError{}
+
+// Validate checks the field values on GossipMessageConsensusCommit with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GossipMessageConsensusCommit) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GossipMessageConsensusCommit with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GossipMessageConsensusCommitMultiError, or nil if none found.
+func (m *GossipMessageConsensusCommit) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GossipMessageConsensusCommit) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for OpType
+
+	if all {
+		switch v := interface{}(m.GetOperation()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GossipMessageConsensusCommitValidationError{
+					field:  "Operation",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GossipMessageConsensusCommitValidationError{
+					field:  "Operation",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOperation()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GossipMessageConsensusCommitValidationError{
+				field:  "Operation",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return GossipMessageConsensusCommitMultiError(errors)
+	}
+
+	return nil
+}
+
+// GossipMessageConsensusCommitMultiError is an error wrapping multiple
+// validation errors returned by GossipMessageConsensusCommit.ValidateAll() if
+// the designated constraints aren't met.
+type GossipMessageConsensusCommitMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GossipMessageConsensusCommitMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GossipMessageConsensusCommitMultiError) AllErrors() []error { return m }
+
+// GossipMessageConsensusCommitValidationError is the validation error returned
+// by GossipMessageConsensusCommit.Validate if the designated constraints
+// aren't met.
+type GossipMessageConsensusCommitValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GossipMessageConsensusCommitValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GossipMessageConsensusCommitValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GossipMessageConsensusCommitValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GossipMessageConsensusCommitValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GossipMessageConsensusCommitValidationError) ErrorName() string {
+	return "GossipMessageConsensusCommitValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GossipMessageConsensusCommitValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGossipMessageConsensusCommit.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GossipMessageConsensusCommitValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GossipMessageConsensusCommitValidationError{}
+
+// Validate checks the field values on GossipMessageConsensusRollback with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GossipMessageConsensusRollback) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GossipMessageConsensusRollback with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// GossipMessageConsensusRollbackMultiError, or nil if none found.
+func (m *GossipMessageConsensusRollback) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GossipMessageConsensusRollback) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for OpType
+
+	if all {
+		switch v := interface{}(m.GetOperation()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GossipMessageConsensusRollbackValidationError{
+					field:  "Operation",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GossipMessageConsensusRollbackValidationError{
+					field:  "Operation",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOperation()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GossipMessageConsensusRollbackValidationError{
+				field:  "Operation",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return GossipMessageConsensusRollbackMultiError(errors)
+	}
+
+	return nil
+}
+
+// GossipMessageConsensusRollbackMultiError is an error wrapping multiple
+// validation errors returned by GossipMessageConsensusRollback.ValidateAll()
+// if the designated constraints aren't met.
+type GossipMessageConsensusRollbackMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GossipMessageConsensusRollbackMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GossipMessageConsensusRollbackMultiError) AllErrors() []error { return m }
+
+// GossipMessageConsensusRollbackValidationError is the validation error
+// returned by GossipMessageConsensusRollback.Validate if the designated
+// constraints aren't met.
+type GossipMessageConsensusRollbackValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GossipMessageConsensusRollbackValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GossipMessageConsensusRollbackValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GossipMessageConsensusRollbackValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GossipMessageConsensusRollbackValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GossipMessageConsensusRollbackValidationError) ErrorName() string {
+	return "GossipMessageConsensusRollbackValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GossipMessageConsensusRollbackValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGossipMessageConsensusRollback.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GossipMessageConsensusRollbackValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GossipMessageConsensusRollbackValidationError{}
