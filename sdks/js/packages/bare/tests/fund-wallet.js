@@ -10,6 +10,9 @@ const { BitcoinFaucet } = require("./bare-faucet.js");
 
 async function fundWallet(wallet, amount = 100000n) {
   const faucet = BitcoinFaucet.getInstance();
+
+  const { balance: balanceBefore } = await wallet.getBalance();
+
   const depositAddress = await wallet.getSingleUseDepositAddress();
   if (!depositAddress) {
     throw new Error("Failed to get single-use deposit address");
@@ -20,10 +23,17 @@ async function fundWallet(wallet, amount = 100000n) {
 
   await retryUntilSuccess(() => wallet.claimDeposit(signedTx.id));
 
-  // Allow time for claim to process
-  await new Promise((r) => setTimeout(r, 3000));
+  // Poll until the balance reflects the new deposit instead of using a fixed sleep.
+  const { balance } = await retryUntilSuccess(async () => {
+    const result = await wallet.getBalance();
+    if (result.balance <= balanceBefore) {
+      throw new Error(
+        `Balance not yet updated (current: ${result.balance}, before: ${balanceBefore})`,
+      );
+    }
+    return result;
+  });
 
-  const { balance } = await wallet.getBalance();
   return balance;
 }
 
