@@ -372,6 +372,9 @@ input CreateInstantStaticDepositQuoteInput {
 
   """The bitcoin network of the deposit."""
   network: BitcoinNetwork!
+
+  """Optional partner identifier for scoring service."""
+  partner_id: String = null
 }
 
 type CreateInstantStaticDepositQuoteOutput {
