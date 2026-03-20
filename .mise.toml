@@ -57,6 +57,31 @@ run = """kubectl --context dev -n bitcoin exec -it regtest-miner-bitcoind-0 -- \
     sendtoaddress {{arg(name="addr")}} {{arg(name="amount", default="0.0001")}}
     """
 
+[tasks.money-dev-rbf]
+description = "Send RBF-signaled regtest BTC on dev to <address> [amount (default=0.0001)]"
+usage = '''
+arg "<addr>" "the l1 address to send to"
+arg "<amount>" "amount to send in btc" default="0.0001"
+'''
+run = """kubectl --context dev -n bitcoin exec -it regtest-miner-bitcoind-0 -- \
+  bitcoin-cli \
+    -conf=/etc/bitcoin/bitcoin.conf \
+    -datadir=/data \
+    sendtoaddress {{arg(name="addr")}} {{arg(name="amount", default="0.0001")}} "" "" false true
+    """
+
+[tasks.bumpfee-dev]
+description = "RBF bump fee on a transaction in dev (must have been sent with RBF signaling)"
+usage = '''
+arg "<txid>" "transaction id to bump"
+'''
+run = """kubectl --context dev -n bitcoin exec -it regtest-miner-bitcoind-0 -- \
+  bitcoin-cli \
+    -conf=/etc/bitcoin/bitcoin.conf \
+    -datadir=/data \
+    bumpfee {{arg(name="txid")}}
+    """
+
 [tasks.bcli-mk]
 description = "Run arbitrary bitcoin-cli commands against regtest in minikube"
 run = """
