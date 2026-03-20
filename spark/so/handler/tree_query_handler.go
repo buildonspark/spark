@@ -245,23 +245,10 @@ func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, n
 		}
 	}
 
-	// Skip if already present — a directly-queried node should not be
-	// overwritten by the ancestor chain (which strips owner keys).
-	if _, alreadyQueried := nodeMap[parent.ID.String()]; !alreadyQueried {
-		protoNode, err := parent.MarshalSparkProto(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to marshal node %s: %w", parent.ID.String(), err)
-		}
-
-		// Ancestor nodes (branch/split intermediaries) should not expose owner
-		// identity information. Without this, a requester who can see a child node
-		// could learn the owner identity of a parent node in a different wallet.
-		if !isSSP {
-			protoNode.OwnerIdentityPublicKey = nil
-			protoNode.OwnerSigningPublicKey = nil
-		}
-
-		nodeMap[parent.ID.String()] = protoNode
+	// Parent exists, continue search
+	nodeMap[parent.ID.String()], err = parent.MarshalSparkProto(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to marshal node %s: %w", parent.ID.String(), err)
 	}
 
 	return getAncestorChain(ctx, db, parent, nodeMap, isSSP)
