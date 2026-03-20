@@ -242,7 +242,7 @@ class SparkFrostBrowser extends SparkFrostBase {
     );
   }
 
-  constructNodeTxPair(
+  async constructNodeTxPair(
     parentTx: Uint8Array,
     vout: number,
     address: string,
@@ -250,6 +250,7 @@ class SparkFrostBrowser extends SparkFrostBase {
     directSequence: number,
     feeSats: bigint,
   ) {
+    await this.init();
     return construct_node_tx_pair(
       parentTx,
       vout,
@@ -260,7 +261,7 @@ class SparkFrostBrowser extends SparkFrostBase {
     );
   }
 
-  constructRefundTxTrio(
+  async constructRefundTxTrio(
     cpfpNodeTx: Uint8Array,
     directNodeTx: Uint8Array | null,
     vout: number,
@@ -270,6 +271,7 @@ class SparkFrostBrowser extends SparkFrostBase {
     directSequence: number,
     feeSats: bigint,
   ) {
+    await this.init();
     return construct_refund_tx_trio(
       cpfpNodeTx,
       directNodeTx,
@@ -282,12 +284,13 @@ class SparkFrostBrowser extends SparkFrostBase {
     );
   }
 
-  computeMultiInputSighash(
+  async computeMultiInputSighash(
     tx: Uint8Array,
     inputIndex: number,
     prevOutScripts: Uint8Array[],
     prevOutValues: number[],
   ) {
+    await this.init();
     return compute_multi_input_sighash(
       tx,
       inputIndex,
