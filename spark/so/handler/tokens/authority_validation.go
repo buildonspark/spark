@@ -13,17 +13,15 @@ import (
 )
 
 // validateDeprecatedSignatureConsistency checks that the deprecated signature
-// field is consistent with the authority_signatures oneof when both are populated.
-// During migration, the deprecated field may coexist with single_signature for
-// backward compatibility with older SOs. Multisig always requires the oneof exclusively.
+// field is not set when the authority_signatures oneof is populated.
 func validateDeprecatedSignatureConsistency(sig *tokenpb.SignatureWithIndex) error {
 	if len(sig.Signature) == 0 {
 		return nil
 	}
 	switch sig.AuthoritySignatures.(type) {
-	case *tokenpb.SignatureWithIndex_MultisigSignatures:
+	case *tokenpb.SignatureWithIndex_MultisigSignatures, *tokenpb.SignatureWithIndex_SingleSignature:
 		return sparkerrors.InvalidArgumentMalformedField(
-			fmt.Errorf("deprecated signature field must not be set when multisig authority_signatures oneof is populated"))
+			fmt.Errorf("deprecated signature field must not be set when authority_signatures oneof is populated"))
 	}
 	return nil
 }

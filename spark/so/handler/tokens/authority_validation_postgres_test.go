@@ -280,6 +280,44 @@ func TestValidateOwnershipSignatureFromAuthority_NoSignatureAtAll(t *testing.T) 
 	assert.Contains(t, err.Error(), "no signature provided")
 }
 
+func TestValidateOwnershipSignatureFromAuthority_MultisigNilSignatureSet(t *testing.T) {
+	ctx := t.Context()
+
+	privKey := keys.GeneratePrivateKey()
+	hash := make([]byte, 32)
+	hash[0] = 0xAB
+
+	sigWithIndex := &tokenpb.SignatureWithIndex{
+		InputIndex: 0,
+		AuthoritySignatures: &tokenpb.SignatureWithIndex_MultisigSignatures{
+			MultisigSignatures: nil,
+		},
+	}
+
+	err := ValidateOwnershipSignatureFromAuthority(ctx, sigWithIndex, hash, privKey.Public())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multisig signature set cannot be nil")
+}
+
+func TestValidateOwnershipSignatureFromAuthority_MultisigNilConfig(t *testing.T) {
+	ctx := t.Context()
+
+	privKey := keys.GeneratePrivateKey()
+	hash := make([]byte, 32)
+	hash[0] = 0xAB
+
+	sigWithIndex := &tokenpb.SignatureWithIndex{
+		InputIndex: 0,
+		AuthoritySignatures: &tokenpb.SignatureWithIndex_MultisigSignatures{
+			MultisigSignatures: &multisigpb.MultisigSignatureSet{},
+		},
+	}
+
+	err := ValidateOwnershipSignatureFromAuthority(ctx, sigWithIndex, hash, privKey.Public())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multisig signature set must contain multisig config")
+}
+
 func TestValidateOwnershipSignatureFromAuthority_RejectsMultisigWithDeprecatedField(t *testing.T) {
 	ctx := t.Context()
 

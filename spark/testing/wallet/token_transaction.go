@@ -87,7 +87,6 @@ func StartTokenTransaction(
 		}
 		sigWithIndex := &tokenpb.SignatureWithIndex{
 			InputIndex: uint32(i),
-			Signature:  sig,
 			AuthoritySignatures: &tokenpb.SignatureWithIndex_SingleSignature{
 				SingleSignature: &multisigpb.KeyedSignature{
 					PublicKey: privKey.Public().Serialize(),
@@ -426,7 +425,6 @@ func convertTokenTransactionToV3Request(
 		}
 		ownerSignatures = append(ownerSignatures, &tokenpb.SignatureWithIndex{
 			InputIndex: uint32(i),
-			Signature:  sig,
 			AuthoritySignatures: &tokenpb.SignatureWithIndex_SingleSignature{
 				SingleSignature: &multisigpb.KeyedSignature{
 					PublicKey: privKey.Public().Serialize(),
@@ -624,7 +622,6 @@ func CreateOperatorSpecificSignatures(
 
 			ttxoSignatures = append(ttxoSignatures, &tokenpb.SignatureWithIndex{
 				InputIndex: uint32(i),
-				Signature:  sig,
 				AuthoritySignatures: &tokenpb.SignatureWithIndex_SingleSignature{
 					SingleSignature: &multisigpb.KeyedSignature{
 						PublicKey: privKey.Public().Serialize(),
