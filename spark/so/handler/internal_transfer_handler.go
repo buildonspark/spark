@@ -641,15 +641,17 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 		if err != nil {
 			return err
 		}
-		if leafTweak, ok := keyTweakMap[leaf.ID.String()]; ok {
-			leafTweakBinary, err := proto.Marshal(leafTweak)
-			if err != nil {
-				return fmt.Errorf("unable to marshal leaf tweak for leaf %s: %w", leaf.ID, err)
-			}
-			_, err = transferLeaf.Update().SetKeyTweak(leafTweakBinary).SetSignature(leafTweak.Signature).SetSecretCipher(leafTweak.SecretCipher).Save(ctx)
-			if err != nil {
-				return fmt.Errorf("unable to update transfer leaf %s for leaf %s: %w", transferLeaf.ID, leaf.ID, err)
-			}
+		leafTweak, ok := keyTweakMap[leaf.ID.String()]
+		if !ok {
+			return fmt.Errorf("key tweak not found for leaf %s in transfer %s", leaf.ID, transferID)
+		}
+		leafTweakBinary, err := proto.Marshal(leafTweak)
+		if err != nil {
+			return fmt.Errorf("unable to marshal leaf tweak for leaf %s: %w", leaf.ID, err)
+		}
+		_, err = transferLeaf.Update().SetKeyTweak(leafTweakBinary).SetSignature(leafTweak.Signature).SetSecretCipher(leafTweak.SecretCipher).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update transfer leaf %s for leaf %s: %w", transferLeaf.ID, leaf.ID, err)
 		}
 	}
 	_, err = transfer.Update().SetStatus(st.TransferStatusSenderKeyTweakPending).Save(ctx)
