@@ -737,7 +737,9 @@ func init() {
 	tokentransactionpeersignature.DefaultID = tokentransactionpeersignatureDescID.Default.(func() uuid.UUID)
 	transferMixin := schema.Transfer{}.Mixin()
 	transferMixinHooks1 := transferMixin[1].Hooks()
+	transferHooks := schema.Transfer{}.Hooks()
 	transfer.Hooks[0] = transferMixinHooks1[0]
+	transfer.Hooks[1] = transferHooks[0]
 	transferMixinFields0 := transferMixin[0].Fields()
 	_ = transferMixinFields0
 	transferFields := schema.Transfer{}.Fields()

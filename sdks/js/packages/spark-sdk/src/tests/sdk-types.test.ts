@@ -145,6 +145,58 @@ describe("sdk-types mapping functions", () => {
 
       expect(result.transferDirection).toBe("OUTGOING");
     });
+
+    it("should set transferDirection to INCOMING for secondary MIMO receiver via receivers array", () => {
+      const secondaryReceiverHex = "04abcd";
+      const proto: Transfer = {
+        id: "transfer-1",
+        senderIdentityPublicKey: hexToBytes("02abcd"),
+        receiverIdentityPublicKey: hexToBytes("03ef12"),
+        status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+        totalValue: 1000,
+        expiryTime: undefined,
+        leaves: [],
+        createdTime: undefined,
+        updatedTime: undefined,
+        type: TransferType.TRANSFER,
+        sparkInvoice: "",
+        network: Network.REGTEST,
+        receivers: [
+          { identityPublicKey: hexToBytes("03ef12"), amountSats: 600 },
+          { identityPublicKey: hexToBytes("04abcd"), amountSats: 400 },
+        ],
+      };
+
+      const result = mapTransferToWalletTransfer(proto, secondaryReceiverHex);
+
+      expect(result.transferDirection).toBe("INCOMING");
+    });
+
+    it("should set transferDirection to OUTGOING for unrelated key even with receivers array", () => {
+      const unrelatedHex = "05ffff";
+      const proto: Transfer = {
+        id: "transfer-1",
+        senderIdentityPublicKey: hexToBytes("02abcd"),
+        receiverIdentityPublicKey: hexToBytes("03ef12"),
+        status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+        totalValue: 1000,
+        expiryTime: undefined,
+        leaves: [],
+        createdTime: undefined,
+        updatedTime: undefined,
+        type: TransferType.TRANSFER,
+        sparkInvoice: "",
+        network: Network.REGTEST,
+        receivers: [
+          { identityPublicKey: hexToBytes("03ef12"), amountSats: 600 },
+          { identityPublicKey: hexToBytes("04abcd"), amountSats: 400 },
+        ],
+      };
+
+      const result = mapTransferToWalletTransfer(proto, unrelatedHex);
+
+      expect(result.transferDirection).toBe("OUTGOING");
+    });
   });
 
   describe("mapTransferLeafToWalletTransferLeaf", () => {

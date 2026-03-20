@@ -231,14 +231,11 @@ func (s *EventRouter) processTransferNotification(ctx context.Context, event pro
 		}
 		status := schematype.TransferStatus(statusStr)
 
-		senderPubkey, ok := event.Fields["sender_identity_pubkey"].(string)
-		if !ok {
-			return nil
-		}
-		receiverPubkey, ok := event.Fields["receiver_identity_pubkey"].(string)
-		if !ok {
-			return nil
-		}
+		// These fields may be absent in fan-out events that target only one
+		// side (e.g. MIMO receiver fan-out omits sender_identity_pubkey).
+		// Treat a missing field as empty so it simply won't match.
+		senderPubkey, senderOk := event.Fields["sender_identity_pubkey"].(string)
+		receiverPubkey, receiverOk := event.Fields["receiver_identity_pubkey"].(string)
 		subscriptionPubkey := identityPublicKey.String()
 
 		var notifications []*pb.SubscribeToEventsResponse
@@ -248,19 +245,19 @@ func (s *EventRouter) processTransferNotification(ctx context.Context, event pro
 			schematype.TransferStatusSenderInitiatedCoordinator,
 			schematype.TransferStatusSenderKeyTweakPending,
 			schematype.TransferStatusReturned:
-			if senderPubkey == subscriptionPubkey {
-				if notification := s.buildTransferEvent(ctx, event.ID, true); notification != nil {
+			if senderOk && senderPubkey == subscriptionPubkey {
+				if notification := s.buildTransferEvent(ctx, event.ID, true, nil); notification != nil {
 					notifications = append(notifications, notification)
 				}
 			}
 		case schematype.TransferStatusSenderKeyTweaked:
-			if senderPubkey == subscriptionPubkey {
-				if notification := s.buildTransferEvent(ctx, event.ID, true); notification != nil {
+			if senderOk && senderPubkey == subscriptionPubkey {
+				if notification := s.buildTransferEvent(ctx, event.ID, true, nil); notification != nil {
 					notifications = append(notifications, notification)
 				}
 			}
-			if receiverPubkey == subscriptionPubkey {
-				if notification := s.buildTransferEvent(ctx, event.ID, false); notification != nil {
+			if receiverOk && receiverPubkey == subscriptionPubkey {
+				if notification := s.buildTransferEvent(ctx, event.ID, false, &identityPublicKey); notification != nil {
 					notifications = append(notifications, notification)
 				}
 			}
@@ -272,14 +269,19 @@ func (s *EventRouter) processTransferNotification(ctx context.Context, event pro
 	return []*pb.SubscribeToEventsResponse{}
 }
 
-func (s *EventRouter) buildTransferEvent(ctx context.Context, transferID uuid.UUID, isSender bool) *pb.SubscribeToEventsResponse {
-	transferEnt, err := s.dbClient.Transfer.Query().Where(transfer.ID(transferID)).Only(ctx)
+func (s *EventRouter) buildTransferEvent(ctx context.Context, transferID uuid.UUID, isSender bool, receiverPubkey *keys.Public) *pb.SubscribeToEventsResponse {
+	transferEnt, err := s.dbClient.Transfer.Query().
+		Where(transfer.ID(transferID)).
+		WithTransferReceivers().
+		Only(ctx)
 	if err != nil {
+		s.logger.With(zap.Error(err)).Sugar().Warnf("failed to query transfer %s for stream event", transferID)
 		return nil
 	}
 
-	transferProto, err := transferEnt.MarshalProto(ctx)
+	transferProto, err := transferEnt.MarshalProtoForReceiver(ctx, receiverPubkey)
 	if err != nil {
+		s.logger.With(zap.Error(err)).Sugar().Warnf("failed to marshal transfer %s for stream event", transferID)
 		return nil
 	}
 

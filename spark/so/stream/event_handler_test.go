@@ -773,3 +773,203 @@ func TestEventRouter_TransferNotifications(t *testing.T) {
 		}
 	}
 }
+
+func TestEventRouter_MIMOFanOutNotifications(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	router := NewEventRouter(dbClient, dbEvents, logger, &so.Config{})
+	rng := rand.NewChaCha8([32]byte{1}) // Different seed from other tests
+
+	senderKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	primaryReceiverKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	secondaryReceiverKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	nonReceiverKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Subscribe all streams.
+	senderStreamCtx, senderCancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer senderCancel()
+	senderStream := &mockStream{ctx: senderStreamCtx}
+
+	primaryStreamCtx, primaryCancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer primaryCancel()
+	primaryStream := &mockStream{ctx: primaryStreamCtx}
+
+	secondaryStreamCtx, secondaryCancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer secondaryCancel()
+	secondaryStream := &mockStream{ctx: secondaryStreamCtx}
+
+	nonReceiverStreamCtx, nonReceiverCancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer nonReceiverCancel()
+	nonReceiverStream := &mockStream{ctx: nonReceiverStreamCtx}
+
+	errCh := make(chan error, 4)
+	go func() { errCh <- router.SubscribeToEvents(senderKey, senderStream) }()
+	go func() { errCh <- router.SubscribeToEvents(primaryReceiverKey, primaryStream) }()
+	go func() { errCh <- router.SubscribeToEvents(secondaryReceiverKey, secondaryStream) }()
+	go func() { errCh <- router.SubscribeToEvents(nonReceiverKey, nonReceiverStream) }()
+
+	time.Sleep(200 * time.Millisecond)
+
+	sessionFactory := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs())
+
+	getReceiverStatuses := func(stream *mockStream) []pb.TransferStatus {
+		stream.mu.Lock()
+		defer stream.mu.Unlock()
+		var result []pb.TransferStatus
+		for _, msg := range stream.messages {
+			if msg.GetReceiverTransfer() != nil {
+				result = append(result, msg.GetReceiverTransfer().GetTransfer().GetStatus())
+			}
+		}
+		return result
+	}
+
+	getSenderStatuses := func(stream *mockStream) []pb.TransferStatus {
+		stream.mu.Lock()
+		defer stream.mu.Unlock()
+		var result []pb.TransferStatus
+		for _, msg := range stream.messages {
+			if msg.GetSenderTransfer() != nil {
+				result = append(result, msg.GetSenderTransfer().GetTransfer().GetStatus())
+			}
+		}
+		return result
+	}
+
+	// Step 1: Create the transfer at SenderInitiated.
+	expiry := time.Now().Add(5 * time.Minute)
+	session := sessionFactory.NewSession(t.Context())
+	mutationCtx := ent.InjectNotifier(ent.Inject(t.Context(), session), session)
+	tx, err := session.GetOrBeginTx(mutationCtx)
+	require.NoError(t, err)
+
+	transfer, err := tx.Transfer.Create().
+		SetNetwork(btcnetwork.Regtest).
+		SetSenderIdentityPubkey(senderKey).
+		SetReceiverIdentityPubkey(primaryReceiverKey).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeTransfer).
+		SetExpiryTime(expiry).
+		SetTotalValue(100).
+		Save(mutationCtx)
+	require.NoError(t, err)
+	ent.MarkTxDirty(mutationCtx)
+	require.NoError(t, tx.Commit())
+
+	// Wait for sender to receive the SenderInitiated event before proceeding.
+	require.Eventually(t, func() bool {
+		return slices.Contains(getSenderStatuses(senderStream), pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED)
+	}, 5*time.Second, 50*time.Millisecond, "expected sender to get SenderInitiated")
+
+	// Step 2: Create TransferReceiver entries (primary + secondary).
+	// These must exist before the status update so the fan-out hook can query them.
+	_, err = dbClient.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(primaryReceiverKey).
+		SetStatus(schematype.TransferReceiverStatusSenderInitiated).
+		Save(t.Context())
+	require.NoError(t, err)
+
+	_, err = dbClient.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(secondaryReceiverKey).
+		SetStatus(schematype.TransferReceiverStatusSenderInitiated).
+		Save(t.Context())
+	require.NoError(t, err)
+
+	// Step 3: Update transfer to SenderKeyTweaked. This triggers the fan-out hook
+	// which emits additional events for each secondary receiver.
+	session2 := sessionFactory.NewSession(t.Context())
+	mutationCtx2 := ent.InjectNotifier(ent.Inject(t.Context(), session2), session2)
+	tx2, err := session2.GetOrBeginTx(mutationCtx2)
+	require.NoError(t, err)
+
+	_, err = tx2.Transfer.UpdateOneID(transfer.ID).
+		SetStatus(schematype.TransferStatusSenderKeyTweaked).
+		Save(mutationCtx2)
+	require.NoError(t, err)
+	ent.MarkTxDirty(mutationCtx2)
+	require.NoError(t, tx2.Commit())
+
+	// Wait for the secondary receiver to get the event — this is the core assertion.
+	require.Eventually(t, func() bool {
+		return slices.Contains(
+			getReceiverStatuses(secondaryStream),
+			pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+		)
+	}, 5*time.Second, 50*time.Millisecond, "secondary receiver should get SenderKeyTweaked via fan-out")
+
+	// Also wait for primary receiver.
+	require.Eventually(t, func() bool {
+		return slices.Contains(
+			getReceiverStatuses(primaryStream),
+			pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+		)
+	}, 5*time.Second, 50*time.Millisecond, "primary receiver should get SenderKeyTweaked")
+
+	// Allow extra time for any straggling events.
+	time.Sleep(300 * time.Millisecond)
+
+	t.Run("secondary receiver gets SenderKeyTweaked", func(t *testing.T) {
+		require.Equal(t, []pb.TransferStatus{
+			pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+		}, getReceiverStatuses(secondaryStream))
+	})
+
+	t.Run("primary receiver gets exactly one SenderKeyTweaked (no double-notify)", func(t *testing.T) {
+		require.Equal(t, []pb.TransferStatus{
+			pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+		}, getReceiverStatuses(primaryStream))
+	})
+
+	t.Run("sender gets exactly both statuses (no duplicate from fan-out)", func(t *testing.T) {
+		require.ElementsMatch(t, []pb.TransferStatus{
+			pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED,
+			pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+		}, getSenderStatuses(senderStream))
+	})
+
+	t.Run("non-receiver gets nothing", func(t *testing.T) {
+		require.Empty(t, getSenderStatuses(nonReceiverStream))
+		require.Empty(t, getReceiverStatuses(nonReceiverStream))
+	})
+
+	// Step 4: Advance to Completed — secondary receiver should NOT get a
+	// fan-out event because the hook only fires for SenderKeyTweaked.
+	session3 := sessionFactory.NewSession(t.Context())
+	mutationCtx3 := ent.InjectNotifier(ent.Inject(t.Context(), session3), session3)
+	tx3, err := session3.GetOrBeginTx(mutationCtx3)
+	require.NoError(t, err)
+
+	_, err = tx3.Transfer.UpdateOneID(transfer.ID).
+		SetStatus(schematype.TransferStatusCompleted).
+		Save(mutationCtx3)
+	require.NoError(t, err)
+	ent.MarkTxDirty(mutationCtx3)
+	require.NoError(t, tx3.Commit())
+
+	// Give time for any spurious events to arrive.
+	time.Sleep(300 * time.Millisecond)
+
+	t.Run("secondary receiver does NOT get Completed (fan-out only for SenderKeyTweaked)", func(t *testing.T) {
+		require.Equal(t, []pb.TransferStatus{
+			pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+		}, getReceiverStatuses(secondaryStream), "secondary receiver should only have SenderKeyTweaked, not Completed")
+	})
+
+	// Cleanup
+	senderCancel()
+	primaryCancel()
+	secondaryCancel()
+	nonReceiverCancel()
+	for range 4 {
+		select {
+		case err := <-errCh:
+			require.NoError(t, err)
+		case <-time.After(time.Second):
+			t.Fatal("router did not exit after cancel")
+		}
+	}
+}

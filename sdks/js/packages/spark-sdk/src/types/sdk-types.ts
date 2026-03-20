@@ -126,10 +126,20 @@ export function mapTransferToWalletTransfer(
     createdTime: proto.createdTime ? new Date(proto.createdTime) : undefined,
     updatedTime: proto.updatedTime ? new Date(proto.updatedTime) : undefined,
     type: TransferType[proto.type] as keyof typeof TransferType,
-    transferDirection:
-      receiverIdentityPublicKey === identityPublicKey
-        ? TransferDirection.INCOMING
-        : TransferDirection.OUTGOING,
+    transferDirection: (() => {
+      if (receiverIdentityPublicKey === identityPublicKey) {
+        return TransferDirection.INCOMING;
+      }
+      if (
+        proto.receivers.length > 0 &&
+        proto.receivers.some(
+          (r) => bytesToHex(r.identityPublicKey) === identityPublicKey,
+        )
+      ) {
+        return TransferDirection.INCOMING;
+      }
+      return TransferDirection.OUTGOING;
+    })(),
     userRequest: userRequest,
     sparkInvoice: proto.sparkInvoice || undefined,
     receivers:

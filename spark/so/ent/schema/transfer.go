@@ -75,6 +75,13 @@ func (Transfer) Fields() []ent.Field {
 	}
 }
 
+// Hooks are the hooks for the transfer table.
+func (Transfer) Hooks() []ent.Hook {
+	return []ent.Hook{
+		mimoReceiverFanOutHook(),
+	}
+}
+
 // Edges are the edges for the tree nodes table.
 func (Transfer) Edges() []ent.Edge {
 	return []ent.Edge{
