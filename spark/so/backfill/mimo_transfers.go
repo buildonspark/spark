@@ -3,11 +3,15 @@ package backfill
 import (
 	"context"
 	stdsql "database/sql"
+	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -22,11 +26,16 @@ import (
 
 const initScanBatchSize = 10000
 
+// hardcodedCursorFallback is used when memcached has no cursor.
+// Both DKG pods have verified all transfers before this point have senders.
+var hardcodedCursorFallback = time.Date(2025, time.November, 20, 18, 0, 0, 0, time.UTC)
+
 var (
 	backfillMu          sync.Mutex
-	backfillCursor      = time.Date(2025, time.November, 20, 5, 0, 0, 0, time.UTC)
+	backfillCursor      = hardcodedCursorFallback
 	lastSeenID          uuid.UUID // tiebreaker for keyset pagination in initBackfillCursor
 	backfillInitialized bool
+	mcClient            *memcache.Client // lazily initialized
 )
 
 // resetBackfillState resets the cursor state for testing.
@@ -34,6 +43,84 @@ func resetBackfillState() {
 	backfillCursor = time.Time{}
 	lastSeenID = uuid.UUID{}
 	backfillInitialized = false
+	mcClient = nil
+}
+
+func cursorCacheKey(operatorIndex uint64) string {
+	return fmt.Sprintf("backfill_mimo_cursor:%d", operatorIndex)
+}
+
+// getMemcacheClient lazily initializes a memcache client from config.CacheURI.
+func getMemcacheClient(config *so.Config) *memcache.Client {
+	if mcClient != nil {
+		return mcClient
+	}
+	uri := strings.TrimSpace(config.CacheURI)
+	uri = strings.TrimPrefix(uri, "memcaches://")
+	uri = strings.TrimPrefix(uri, "memcache://")
+	if uri == "" {
+		return nil
+	}
+	servers := strings.Split(uri, ",")
+	mcClient = memcache.New(servers...)
+	return mcClient
+}
+
+// loadCursorFromCache attempts to restore cursor state from memcached.
+// Returns true if a cached cursor was found and applied.
+func loadCursorFromCache(config *so.Config, logger *zap.Logger) bool {
+	mc := getMemcacheClient(config)
+	if mc == nil {
+		return false
+	}
+	item, err := mc.Get(cursorCacheKey(config.Index))
+	if err != nil {
+		if !errors.Is(err, memcache.ErrCacheMiss) {
+			logger.Sugar().Warnf("failed to load backfill cursor from cache: %v", err)
+		}
+		return false
+	}
+	// Format: "<unix_seconds>:<uuid>"
+	raw := string(item.Value)
+	parts := strings.SplitN(raw, ":", 2)
+	if len(parts) != 2 {
+		logger.Sugar().Warnf("malformed backfill cursor cache value: %q", raw)
+		return false
+	}
+	unix, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		logger.Sugar().Warnf("malformed backfill cursor cache timestamp: %v", err)
+		return false
+	}
+	id, err := uuid.Parse(parts[1])
+	if err != nil {
+		logger.Sugar().Warnf("malformed backfill cursor cache UUID: %v", err)
+		return false
+	}
+	cached := time.Unix(unix, 0)
+	if cached.After(backfillCursor) {
+		backfillCursor = cached
+		lastSeenID = id
+		logger.Sugar().Infof("backfill cursor restored from cache: %s (unix: %d)", cached.Format(time.RFC3339), unix)
+		return true
+	}
+	return false
+}
+
+// saveCursorToCache persists the current cursor state to memcached.
+func saveCursorToCache(config *so.Config, logger *zap.Logger) {
+	mc := getMemcacheClient(config)
+	if mc == nil {
+		return
+	}
+	val := fmt.Sprintf("%d:%s", backfillCursor.Unix(), lastSeenID.String())
+	if err := mc.Set(&memcache.Item{
+		Key:   cursorCacheKey(config.Index),
+		Value: []byte(val),
+		// No expiration — persist until memcached restarts or evicts.
+	}); err != nil {
+		logger.Sugar().Warnf("failed to save backfill cursor to cache: %v", err)
+	}
 }
 
 // BackfillMimoResult holds the results of the backfill operation.
@@ -53,9 +140,17 @@ func BackfillMimoTransfers(ctx context.Context, config *so.Config, batchSize int
 	}
 	defer backfillMu.Unlock()
 
+	if !backfillInitialized && config != nil {
+		loadCursorFromCache(config, logging.GetLoggerFromContext(ctx))
+	}
+
 	created, err := backfillCreateMimoRecords(ctx, batchSize)
 	if err != nil {
 		return BackfillMimoResult{}, fmt.Errorf("backfill create records: %w", err)
+	}
+
+	if config != nil {
+		saveCursorToCache(config, logging.GetLoggerFromContext(ctx))
 	}
 
 	return BackfillMimoResult{
@@ -290,7 +385,9 @@ func backfillCreateMimoRecords(ctx context.Context, batchSize int) (int, error) 
 	// Advance cursor only when the entire batch succeeded; the anti-join
 	// filters already-processed transfers on the next run regardless.
 	if processed == len(transfers) {
-		backfillCursor = transfers[len(transfers)-1].UpdateTime
+		last := transfers[len(transfers)-1]
+		backfillCursor = last.UpdateTime
+		lastSeenID = last.ID
 	}
 
 	return processed, nil
