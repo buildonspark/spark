@@ -32,6 +32,12 @@ export type { default as Entity } from "./Entity.js";
 export { default as ExitSpeed } from "./ExitSpeed.js";
 export type { default as GetChallengeInput } from "./GetChallengeInput.js";
 export type { default as GetChallengeOutput } from "./GetChallengeOutput.js";
+export type { default as InstantStaticDepositClaimOutput } from "./InstantStaticDepositClaimOutput.js";
+export type { default as InstantStaticDepositPlan } from "./InstantStaticDepositPlan.js";
+export type {
+  default as InstantStaticDepositQuoteOutput,
+  StaticDepositQuote,
+} from "./InstantStaticDepositQuoteOutput.js";
 export type { default as Invoice } from "./Invoice.js";
 export type { default as Leaf } from "./Leaf.js";
 export type { default as LeavesSwapFeeEstimateInput } from "./LeavesSwapFeeEstimateInput.js";

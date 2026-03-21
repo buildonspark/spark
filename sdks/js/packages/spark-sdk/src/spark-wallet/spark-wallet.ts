@@ -36,12 +36,15 @@ import {
   CoopExitFeeQuote,
   CoopExitRequest,
   ExitSpeed,
+  InstantStaticDepositPlan,
+  InstantStaticDepositQuoteOutput,
   LeavesSwapFeeEstimateOutput,
   LightningReceiveRequest,
   LightningSendFeeEstimateInput,
   LightningSendRequest,
   RequestCoopExitInput,
   SparkWalletUserToUserRequestsConnection,
+  StaticDepositQuote,
   StaticDepositQuoteOutput,
 } from "../graphql/objects/index.js";
 import {
@@ -129,6 +132,7 @@ import {
   createReceiverSpendTx,
   createSenderSpendTx,
 } from "../utils/htlc-transactions.js";
+import { newHasher } from "../utils/hashstructure.js";
 import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import {
   getNetwork,
@@ -1525,6 +1529,170 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     return response;
+  }
+
+  /**
+   * Gets an instant static deposit quote from the SSP. This returns a quote with
+   * pricing info and fulfillment plans indicating when funds will be available
+   * based on confirmation probability.
+   *
+   * @experimental This API is experimental and may change or be removed without notice.
+   *
+   * @param {string} transactionId - The transaction ID of the deposit
+   * @param {number} [outputIndex] - The output index (auto-detected if omitted)
+   * @returns {Promise<InstantStaticDepositQuoteOutput>} The quote and fulfillment plans
+   */
+  public async experimental_GetInstantStaticDepositQuote(
+    transactionId: string,
+    outputIndex?: number,
+    partnerId?: string,
+  ): Promise<InstantStaticDepositQuoteOutput> {
+    const sspClient = this.getSspClient();
+
+    if (outputIndex === undefined) {
+      outputIndex = await this.getDepositTransactionVout({
+        txid: transactionId,
+      });
+    }
+
+    let network = this.config.getSspNetwork();
+    if (network === BitcoinNetwork.FUTURE_VALUE) {
+      network = BitcoinNetwork.REGTEST;
+    }
+
+    const result = await sspClient.getInstantStaticDepositQuote({
+      transactionId,
+      outputIndex,
+      network,
+      partnerId,
+    });
+
+    if (!result) {
+      throw new SparkRequestError(
+        "Failed to get instant static deposit quote",
+        {
+          transactionId,
+          outputIndex,
+        },
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * Claims an instant static deposit using a quote from {@link experimental_GetInstantStaticDepositQuote}.
+   * Supports both 0-conf (instant tagged hash signature) and 1-conf (regular static deposit
+   * signature) paths based on the fulfillment plan's confirmation requirement.
+   *
+   * @experimental This API is experimental and may change or be removed without notice.
+   *
+   * @param {Object} params - Claim parameters
+   * @param {StaticDepositQuote} params.quote - The quote from experimental_GetInstantStaticDepositQuote
+   * @param {InstantStaticDepositPlan} params.plan - The fulfillment plan to claim
+   * @param {string} params.transactionId - The deposit transaction ID
+   * @param {number} params.outputIndex - The deposit output index
+   * @returns {Promise<{ claimId: string }>} The claim ID
+   */
+  public async experimental_ClaimInstantStaticDeposit({
+    quote,
+    plan,
+    transactionId,
+    outputIndex,
+  }: {
+    quote: StaticDepositQuote;
+    plan: InstantStaticDepositPlan;
+    transactionId: string;
+    outputIndex: number;
+  }): Promise<{ claimId: string }> {
+    const sspClient = this.getSspClient();
+
+    const depositSecretKeyBytes =
+      await this.config.signer.getStaticDepositSecretKey(0);
+    const depositSecretKey = bytesToHex(depositSecretKeyBytes);
+
+    let network = this.config.getSspNetwork();
+    if (network === BitcoinNetwork.FUTURE_VALUE) {
+      network = BitcoinNetwork.REGTEST;
+    }
+    const networkName = network.toLowerCase();
+
+    const creditAmountSats = quote.creditAmount.originalValue;
+    const depositAmountSats = quote.depositAmount.originalValue;
+    const quoteSignature = quote.quoteSignature;
+
+    let messageHash: Uint8Array;
+    if (plan.confirmations >= 1) {
+      // 1-conf path: use regular static deposit signature (legacy hash format)
+      const payload = await this.getStaticDepositSigningPayload(
+        transactionId,
+        outputIndex,
+        networkName,
+        UtxoSwapRequestType.Fixed,
+        creditAmountSats,
+        quoteSignature,
+      );
+      messageHash = sha256(payload);
+    } else {
+      // 0-conf path: use instant deposit tagged hash
+      const staticDepositAddress = await this.getStaticDepositAddress();
+      messageHash = this.createInstantDepositUserStatement({
+        network: networkName,
+        creditAmountSats,
+        secondaryCreditAmountSats: 0,
+        destinationAddress: staticDepositAddress,
+        satsValue: depositAmountSats,
+        sspSignature: hexToBytes(quoteSignature),
+      });
+    }
+
+    const signatureBytes =
+      await this.config.signer.signMessageWithIdentityKey(messageHash);
+    const signature = bytesToHex(signatureBytes);
+
+    const result = await sspClient.claimInstantStaticDeposit({
+      quoteId: quote.id,
+      depositSecretKey,
+      signature,
+    });
+
+    if (!result) {
+      throw new SparkRequestError("Failed to claim instant static deposit", {
+        quoteId: quote.id,
+      });
+    }
+
+    return { claimId: result.claimId };
+  }
+
+  /**
+   * Creates the tagged hash for authorizing an instant static deposit claim.
+   * Must match the GO CreateInstantUserStatement in internal_deposit_handler.go.
+   */
+  private createInstantDepositUserStatement({
+    network,
+    creditAmountSats,
+    secondaryCreditAmountSats,
+    destinationAddress,
+    satsValue,
+    sspSignature,
+  }: {
+    network: string;
+    creditAmountSats: number;
+    secondaryCreditAmountSats: number;
+    destinationAddress: string;
+    satsValue: number;
+    sspSignature: Uint8Array;
+  }): Uint8Array {
+    return newHasher(["spark", "claim_instant_static_deposit"])
+      .addString(network)
+      .addUint8(3) // requestType = Instant
+      .addUint64(BigInt(creditAmountSats))
+      .addUint64(BigInt(secondaryCreditAmountSats))
+      .addString(destinationAddress)
+      .addUint64(BigInt(satsValue))
+      .addBytes(sspSignature)
+      .hash();
   }
 
   /**
@@ -5481,6 +5649,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "claimMultiUtxoDeposit",
   "claimStaticDeposit",
   "claimStaticDepositWithMaxFee",
+  "experimental_ClaimInstantStaticDeposit",
   "cleanupConnections",
   "createHTLC",
   "getHTLCPreimage",
@@ -5497,6 +5666,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "getCachedBalance",
   "getClaimStaticDepositQuote",
   "getCoopExitRequest",
+  "experimental_GetInstantStaticDepositQuote",
   "getIdentityPublicKey",
   "getLeaves",
   "getLightningReceiveRequest",

@@ -15,6 +15,7 @@ import {
 import { SparkSigner } from "../signer/signer.js";
 import { UserRequestType } from "../types/sdk-types.js";
 import { getFetch } from "../utils/fetch.js";
+import { ClaimInstantStaticDeposit } from "./mutations/ClaimInstantStaticDeposit.js";
 import { ClaimStaticDeposit } from "./mutations/ClaimStaticDeposit.js";
 import { CompleteCoopExit } from "./mutations/CompleteCoopExit.js";
 import { GetChallenge } from "./mutations/GetChallenge.js";
@@ -24,6 +25,12 @@ import { RequestLightningSend } from "./mutations/RequestLightningSend.js";
 import { RequestSwapLeaves } from "./mutations/RequestSwapLeaves.js";
 import { VerifyChallenge } from "./mutations/VerifyChallenge.js";
 import { ClaimStaticDepositFromJson } from "./objects/ClaimStaticDeposit.js";
+import InstantStaticDepositClaimOutput, {
+  InstantStaticDepositClaimOutputFromJson,
+} from "./objects/InstantStaticDepositClaimOutput.js";
+import InstantStaticDepositQuoteOutput, {
+  InstantStaticDepositQuoteOutputFromJson,
+} from "./objects/InstantStaticDepositQuoteOutput.js";
 import ClaimStaticDepositOutput, {
   ClaimStaticDepositOutputFromJson,
 } from "./objects/ClaimStaticDepositOutput.js";
@@ -76,6 +83,7 @@ import VerifyChallengeOutput, {
 } from "./objects/VerifyChallengeOutput.js";
 import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate.js";
 import { FetchCurrentUserToUserRequestsConnection } from "./queries/FetchCurrentUserToUserRequestsConnection.js";
+import { GetInstantStaticDepositQuote } from "./mutations/GetInstantStaticDepositQuote.js";
 import { GetClaimDepositQuote } from "./queries/GetClaimDepositQuote.js";
 import { GetCoopExitFeeQuote } from "./queries/GetCoopExitFeeQuote.js";
 import { LeavesSwapFeeEstimate } from "./queries/LeavesSwapFeeEstimate.js";
@@ -513,6 +521,56 @@ export default class SspClient {
       },
       constructObject: (response: { claim_static_deposit: any }) => {
         return ClaimStaticDepositOutputFromJson(response.claim_static_deposit);
+      },
+    });
+  }
+
+  async getInstantStaticDepositQuote({
+    transactionId,
+    outputIndex,
+    network,
+    partnerId,
+  }: StaticDepositQuoteInput): Promise<InstantStaticDepositQuoteOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: GetInstantStaticDepositQuote,
+      variables: {
+        transaction_id: transactionId,
+        output_index: outputIndex,
+        network: network,
+        partner_id: partnerId,
+      },
+      constructObject: (response: {
+        create_instant_static_deposit_quote: any;
+      }) => {
+        return InstantStaticDepositQuoteOutputFromJson(
+          response.create_instant_static_deposit_quote,
+        );
+      },
+    });
+  }
+
+  async claimInstantStaticDeposit({
+    quoteId,
+    depositSecretKey,
+    signature,
+  }: {
+    quoteId: string;
+    depositSecretKey: string;
+    signature: string;
+  }): Promise<InstantStaticDepositClaimOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: ClaimInstantStaticDeposit,
+      variables: {
+        static_deposit_quote_id: quoteId,
+        static_deposit_address_private_key_share: depositSecretKey,
+        signature: signature,
+      },
+      constructObject: (response: {
+        create_claim_instant_static_deposit: any;
+      }) => {
+        return InstantStaticDepositClaimOutputFromJson(
+          response.create_claim_instant_static_deposit,
+        );
       },
     });
   }

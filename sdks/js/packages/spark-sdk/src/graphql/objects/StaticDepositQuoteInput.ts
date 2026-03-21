@@ -17,7 +17,8 @@ outputIndex: number;
     /** The bitcoin network of the deposit. **/
 network: BitcoinNetwork;
 
-
+    /** The partner id for the deposit. **/
+partnerId?: string;
 
 
 }

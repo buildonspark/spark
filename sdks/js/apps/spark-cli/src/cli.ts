@@ -207,6 +207,8 @@ const commands = [
   "refundstaticdepositlegacy",
   "refundandbroadcaststaticdeposit",
   "claimstaticdepositwithmaxfee",
+  "instantstaticdepositquote",
+  "claiminstantstaticdeposit",
   "getutxosfordepositaddress",
   "createsparkinvoice",
   "createinvoice",
@@ -730,6 +732,8 @@ async function runCLI() {
   claimstaticdepositquote <txid> [outputIndex]                        - Get a quote for claiming a static deposit
   claimstaticdeposit <txid> <creditAmountSats> <sspSignature> [outputIndex] - Claim a static deposits
   claimstaticdepositwithmaxfee <txid> <maxFee> [outputIndex]          - Claim a static deposit with a max fee
+  instantstaticdepositquote <txid> [outputIndex] [partnerId]         - Get an instant static deposit quote
+  claiminstantstaticdeposit <quoteJson> [planIndex] [txid] [outputIndex]  - Claim an instant static deposit (paste JSON from instantstaticdepositquote, override txid/vout for RBF)
   getutxosfordepositaddress <depositAddress> <excludeClaimed(true|false)> - Get all UTXOs for a deposit address
   refundstaticdepositlegacy <depositTransactionId> <destinationAddress> <fee> [outputIndex] - Refund a static deposit legacy
   refundstaticdeposit <depositTransactionId> <destinationAddress> <satsPerVbyteFee> [outputIndex] - Refund a static deposit
@@ -1295,6 +1299,59 @@ async function runCLI() {
               });
 
             console.log(claimDepositWithMaxFee);
+          }
+          break;
+        case "instantstaticdepositquote":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+
+          {
+            const txid = args[0];
+            const outputIdx =
+              args[1] !== undefined ? parseInt(args[1]) : undefined;
+            const partnerId = args[2];
+            const instantQuote =
+              await wallet.experimental_GetInstantStaticDepositQuote(
+                txid,
+                outputIdx,
+                partnerId,
+              );
+            console.log(JSON.stringify(instantQuote, null, 2));
+          }
+          break;
+        case "claiminstantstaticdeposit":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+
+          {
+            const quoteData = JSON.parse(args[0]);
+            const planIdx = args[1] !== undefined ? parseInt(args[1]) : 0;
+
+            if (planIdx < 0 || planIdx >= quoteData.fulfillmentPlans.length) {
+              console.log(
+                `Error: planIndex ${planIdx} out of range (0-${quoteData.fulfillmentPlans.length - 1})`,
+              );
+              break;
+            }
+
+            // Allow overriding txid/outputIndex for RBF scenarios
+            const txid = args[2] || quoteData.quote.transactionId;
+            const outputIdx =
+              args[3] !== undefined
+                ? parseInt(args[3])
+                : quoteData.quote.outputIndex;
+
+            const result = await wallet.experimental_ClaimInstantStaticDeposit({
+              quote: quoteData.quote,
+              plan: quoteData.fulfillmentPlans[planIdx],
+              transactionId: txid,
+              outputIndex: outputIdx,
+            });
+            console.log(result);
           }
           break;
         case "getutxosfordepositaddress":
