@@ -6,7 +6,12 @@ import { sha256 } from "@noble/hashes/sha2";
 import * as btc from "@scure/btc-signer";
 import * as psbt from "@scure/btc-signer/psbt";
 import type { SparkServiceClient } from "../proto/spark.js";
-import { Network as NetworkProto, TreeNode } from "../proto/spark.js";
+import {
+  Network as NetworkProto,
+  TreeNode,
+  TreeNodeStatus,
+  treeNodeStatusToJSON,
+} from "../proto/spark.js";
 import {
   getTxFromRawTxHex,
   getTxId,
@@ -62,6 +67,86 @@ export interface BroadcastResult {
   txids?: string[];
   error?: string;
   broadcastedPackages?: number;
+}
+
+const TREE_NODE_STATUS_PREFIX = "TREE_NODE_STATUS_";
+
+function getTreeNodeStatusString(status: TreeNodeStatus): string {
+  const statusName = treeNodeStatusToJSON(status);
+  if (!statusName.startsWith(TREE_NODE_STATUS_PREFIX)) {
+    throw new Error(`Unexpected tree node status: ${statusName}`);
+  }
+  return statusName.slice(TREE_NODE_STATUS_PREFIX.length);
+}
+
+const EXIT_CHAIN_STATUSES = new Set([
+  getTreeNodeStatusString(TreeNodeStatus.TREE_NODE_STATUS_AVAILABLE),
+  getTreeNodeStatusString(TreeNodeStatus.TREE_NODE_STATUS_SPLITTED),
+  getTreeNodeStatusString(TreeNodeStatus.TREE_NODE_STATUS_ON_CHAIN),
+]);
+
+export async function buildUnilateralExitChain(
+  node: TreeNode,
+  nodeMap: Map<string, TreeNode>,
+  sparkClient?: SparkServiceClient,
+  networkProto: NetworkProto = NetworkProto.MAINNET,
+): Promise<TreeNode[]> {
+  const chain: TreeNode[] = [];
+  let currentNode = node;
+
+  while (currentNode) {
+    // Only proceed with nodes that can still contribute to an exit chain.
+    // ON_CHAIN is included here because the server marks a node ON_CHAIN when
+    // either its raw tx or its direct tx confirms.
+    if (!EXIT_CHAIN_STATUSES.has(currentNode.status)) {
+      break;
+    }
+    chain.unshift(currentNode);
+
+    if (!currentNode.parentNodeId) {
+      break;
+    }
+
+    let parentNode = nodeMap.get(currentNode.parentNodeId);
+
+    if (!parentNode && sparkClient) {
+      try {
+        const response = await sparkClient.query_nodes({
+          source: {
+            $case: "nodeIds",
+            nodeIds: {
+              nodeIds: [currentNode.parentNodeId],
+            },
+          },
+          includeParents: true,
+          network: networkProto,
+        });
+
+        for (const returnedNode of Object.values(response.nodes)) {
+          nodeMap.set(returnedNode.id, returnedNode);
+        }
+
+        parentNode = nodeMap.get(currentNode.parentNodeId);
+        if (!parentNode) {
+          throw new Error(
+            `Parent node ${currentNode.parentNodeId} not returned by query_nodes. Exit chain is incomplete.`,
+          );
+        }
+      } catch (error) {
+        throw new Error(
+          `Failed to query parent node ${currentNode.parentNodeId}: ${error}`,
+        );
+      }
+    }
+
+    if (parentNode) {
+      currentNode = parentNode;
+      continue;
+    }
+    break;
+  }
+
+  return chain;
 }
 
 export function isEphemeralAnchorOutput(
@@ -174,72 +259,16 @@ export async function constructUnilateralExitFeeBumpPackages(
     const txPackages: FeeBumpTxPackage[] = [];
     let previousFeeBumpTx: string | undefined;
 
-    // Build the chain from this node to the root
+    // Build the chain from this node to the root.
     // TODO(aakselrod): check whether
     // - two leaves are hanging off the same tree
     // - any ancestor nodes are already broadcast/confirmed
-    const chain: TreeNode[] = [];
-    let currentNode = node;
-
-    // Walk up the chain to find the root, querying for each parent
-    while (currentNode) {
-      // Only proceed with nodes that are available for exit
-      if (currentNode.status !== "AVAILABLE") {
-        break;
-      }
-      chain.unshift(currentNode);
-
-      if (currentNode.parentNodeId) {
-        // Check if we already have the parent in our map (from previous queries)
-        let parentNode = nodeMap.get(currentNode.parentNodeId);
-
-        if (!parentNode && sparkClient) {
-          // Query for the parent node
-          try {
-            const response = await sparkClient.query_nodes({
-              source: {
-                $case: "nodeIds",
-                nodeIds: {
-                  nodeIds: [currentNode.parentNodeId],
-                },
-              },
-              includeParents: true,
-              network: networkProto,
-            });
-
-            parentNode = response.nodes[currentNode.parentNodeId];
-
-            if (parentNode) {
-              // Add to our map for future use
-              nodeMap.set(currentNode.parentNodeId, parentNode);
-            }
-          } catch (error) {
-            console.warn(
-              `Failed to query parent node ${currentNode.parentNodeId}: ${error}`,
-            );
-            break;
-          }
-        }
-
-        if (parentNode) {
-          currentNode = parentNode;
-        } else {
-          if (!sparkClient) {
-            console.warn(
-              `Parent node ${currentNode.parentNodeId} not found. Provide a sparkClient to fetch missing parents.`,
-            );
-          } else {
-            console.warn(
-              `Parent node ${currentNode.parentNodeId} not found in database. Chain may be incomplete.`,
-            );
-          }
-          break;
-        }
-      } else {
-        // We've reached the root
-        break;
-      }
-    }
+    const chain = await buildUnilateralExitChain(
+      node,
+      nodeMap,
+      sparkClient,
+      networkProto,
+    );
 
     // Now walk down the chain from root to leaf to build fee bump packages
     for (const chainNode of chain) {

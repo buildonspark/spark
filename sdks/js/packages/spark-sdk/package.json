@@ -118,6 +118,7 @@
     "test": "yarn test-cmd src/tests/*.test.ts",
     "test:integration": "yarn test-cmd src/tests/integration/*.test.ts",
     "test:integration:ssp": "yarn test-cmd src/tests/integration/ssp/*.test.ts",
+    "test:integration:ssp:unilateral": "yarn test-cmd src/tests/integration/ssp/unilateral/*.test.ts",
     "types:watch": "tsc-absolute --watch",
     "types": "tsc",
     "patch-wasm": "node ./wasm/patch-wasm-browser.mjs && node ./wasm/patch-wasm-nodejs.mjs",
