@@ -622,6 +622,13 @@ func main() {
 	// Interceptors wrap RPC handlers so we can apply cross‑cutting concerns in one place
 	// and in a defined order. We install separate chains for unary (request/response)
 	// and streaming RPCs.
+	dbSessionInterceptor := sparkgrpc.DatabaseSessionMiddleware(
+		dbClient,
+		db.NewDefaultSessionFactory(dbClient, knobsService),
+		nil, // EphemeralSessionFactory — wired in PR 4
+		config.Database.NewTxTimeout,
+	)
+
 	serverOpts = append(serverOpts,
 		grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(
 			sparkgrpc.TimestampHeaderInterceptor(),
@@ -651,11 +658,7 @@ func main() {
 					return handler(ctx, req)
 				}
 			}(),
-			sparkgrpc.DatabaseSessionMiddleware(
-				dbClient,
-				db.NewDefaultSessionFactory(dbClient, knobsService),
-				config.Database.NewTxTimeout,
-			),
+			dbSessionInterceptor,
 			// Idempotency must be after the DB session so we can store idempotency keys
 			sparkgrpc.IdempotencyInterceptor(),
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
@@ -726,7 +729,7 @@ func main() {
 		logger.Fatal("Failed to register all gRPC servers", zap.Error(err))
 	}
 
-	healthServer := sparkgrpc.NewHealthServer(errCtx, dbClient)
+	healthServer := sparkgrpc.NewHealthServer(errCtx, dbClient, nil)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 
 	// Web compatibility layer
