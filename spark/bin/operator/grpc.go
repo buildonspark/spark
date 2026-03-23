@@ -34,7 +34,7 @@ func RegisterGrpcServers(
 	eventsRouter *events.EventRouter,
 ) error {
 	if args.RunningLocally {
-		mockServer := sparkgrpc.NewMockServer(config, dbClient)
+		mockServer := sparkgrpc.NewMockServer(config, dbClient, nil)
 		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
 	}
 

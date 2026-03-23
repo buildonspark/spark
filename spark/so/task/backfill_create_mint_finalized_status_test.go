@@ -173,7 +173,7 @@ func TestBackfillCreateMintFinalizedStatus(t *testing.T) {
 				knobs.KnobBackfillCreateMintFinalizedStatusEnabled: 100,
 			})
 
-			err = backfillTask.RunOnce(ctx, cfg, client, knobsService)
+			err = backfillTask.RunOnce(ctx, cfg, client, nil, knobsService)
 			require.NoError(t, err)
 
 			// Verify the transaction status
@@ -206,7 +206,7 @@ func TestBackfillCreateMintFinalizedStatus_KnobDisabled(t *testing.T) {
 		knobs.KnobBackfillCreateMintFinalizedStatusEnabled: 0,
 	})
 
-	err = backfillTask.RunOnce(ctx, cfg, client, knobsService)
+	err = backfillTask.RunOnce(ctx, cfg, client, nil, knobsService)
 	require.NoError(t, err)
 
 	// Transaction should remain SIGNED

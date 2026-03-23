@@ -27,15 +27,22 @@ type TxProvider interface {
 	GetClient(context.Context) (*Client, error)
 }
 
+// Session is not safe for concurrent use. Although a Session can be retrieved from a context
+// (which is accessible from any goroutine), all methods must be called from a single goroutine.
 type Session interface {
 	TxProvider
 	MarkTxDirty(context.Context)
 	// GetTxIfExists returns the current transaction if one exists, without starting a new one.
 	// Returns nil if no transaction is currently active.
 	GetTxIfExists() *Tx
-	// CommitAttemptedAndFailed reports whether a commit was attempted and failed.
-	// Middlewares use this to distinguish a failed commit from a handler that never committed.
-	CommitAttemptedAndFailed() bool
+	// CommitError returns the error from an in-handler DbCommit attempt that failed, or nil if
+	// no commit was attempted or it succeeded. This allows middlewares to detect and propagate
+	// masked commit failures even when GetTxIfExists returns nil.
+	CommitError() error
+	// TxWasStarted reports whether GetOrBeginTx was ever called successfully on this session.
+	// This distinguishes a session that committed in-handler (txWasStarted=true, GetTxIfExists=nil)
+	// from one that was injected but never used (txWasStarted=false, GetTxIfExists=nil).
+	TxWasStarted() bool
 }
 
 // ClientTxProvider is a TxProvider that uses an underlying ent.Client to create new transactions.
@@ -95,6 +102,15 @@ func MarkTxDirty(ctx context.Context) {
 
 // DbCommit commits the active transaction if one exists.
 // If no transaction is active, it is a no-op.
+//
+// Warning: callers must always propagate errors from DbCommit. Two divergence
+// scenarios exist:
+//   - If DbCommit succeeds but the handler returns a non-nil error, the ephemeral
+//     TX is already committed while the middleware rolls back the main TX.
+//   - If DbCommit fails, currentTx is kept set so a deferred rollback can still
+//     fire. The error is also recorded on the session so middlewares can detect
+//     the masked failure via CommitError() and return an error even when the
+//     handler returns nil.
 func DbCommit(ctx context.Context) error {
 	session, ok := ctx.Value(dbSessionKey).(Session)
 	if !ok {
@@ -115,6 +131,11 @@ func DbCommit(ctx context.Context) error {
 
 // DbRollback rolls back the active transaction if one exists.
 // If no transaction is active, it is a no-op.
+//
+// Warning: if a handler calls DbRollback and then returns nil, the ephemeral
+// transaction is already rolled back and currentTx is nil, so the middleware
+// will skip both its rollback and commit paths — silently discarding any
+// ephemeral writes without error.
 func DbRollback(ctx context.Context) error {
 	session, ok := ctx.Value(dbSessionKey).(Session)
 	if !ok {

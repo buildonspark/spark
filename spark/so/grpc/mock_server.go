@@ -6,9 +6,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/uuids"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/entephemeral"
 	"github.com/lightsparkdev/spark/so/knobs"
 
 	"github.com/lightsparkdev/spark/so/task"
@@ -28,12 +30,13 @@ import (
 type MockServer struct {
 	config *so.Config
 	pbmock.UnimplementedMockServiceServer
-	rootClient *ent.Client
+	rootClient          *ent.Client
+	ephemeralRootClient *entephemeral.Client
 }
 
 // NewMockServer creates a new MockServer.
-func NewMockServer(config *so.Config, rootClient *ent.Client) *MockServer {
-	return &MockServer{config: config, rootClient: rootClient}
+func NewMockServer(config *so.Config, rootClient *ent.Client, ephemeralRootClient *entephemeral.Client) *MockServer {
+	return &MockServer{config: config, rootClient: rootClient, ephemeralRootClient: ephemeralRootClient}
 }
 
 // CleanUpPreimageShare cleans up the preimage share for the given payment hash.
@@ -107,8 +110,12 @@ func (o *MockServer) TriggerTask(ctx context.Context, req *pbmock.TriggerTaskReq
 	}
 	// Use the operator's root *ent.Client instead of the transactional one because RunOnce expects *ent.Client.
 	dbClient := o.rootClient
+	ephemeralDBClient := o.ephemeralRootClient
+	if ephemeralDBClient == nil {
+		logging.GetLoggerFromContext(ctx).Sugar().Warnf("Mock TriggerTask running without ephemeral DB client for task %s", taskName)
+	}
 	// Use the knobs service from context (injected by gRPC interceptor) to respect test-configured knob values
-	if err := selected.RunOnce(ctx, o.config, dbClient, knobs.GetKnobsService(ctx)); err != nil {
+	if err := selected.RunOnce(ctx, o.config, dbClient, ephemeralDBClient, knobs.GetKnobsService(ctx)); err != nil {
 		return nil, status.Errorf(codes.Internal, "task %s failed: %v", taskName, err)
 	}
 

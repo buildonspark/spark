@@ -11,10 +11,12 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/entephemeral"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 )
 
@@ -91,8 +93,11 @@ func TimeoutMiddleware() TaskMiddleware {
 				logger.Warn("Task timed out!")
 				return err
 			}
-
-			logger.Warn("Context done before task completion! Are we shutting down?", zap.Error(err))
+			if err != nil {
+				logger.With(zap.Error(err)).Warn("Context done before task completion! Are we shutting down?")
+			} else {
+				logger.Warn("Context done before task completion! Are we shutting down?")
+			}
 			return err
 		}
 	}
@@ -111,8 +116,17 @@ func RawDBClientMiddleware(dbClient *ent.Client) TaskMiddleware {
 	}
 }
 
-func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration) TaskMiddleware {
+// DatabaseMiddleware manages per-task main and ephemeral DB sessions.
+// On successful task execution, ephemeral commits are attempted before main commits.
+// If ephemeral commit fails, this middleware returns an error even when the task function
+// returned success to avoid acknowledging completion without durable ephemeral state.
+//
+// Task functions must be idempotent: if the ephemeral commit fails after task execution, the
+// error returned to the caller may trigger a retry that re-executes the task with all its
+// side effects.
+func DatabaseMiddleware(factory db.SessionFactory, ephemeralFactory db.EphemeralSessionFactory, beginTxTimeout *time.Duration) TaskMiddleware {
 	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec, knobsService knobs.Knobs) error {
+		logger := logging.GetLoggerFromContext(ctx)
 		sessionCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
@@ -122,24 +136,86 @@ func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration
 			}),
 		}
 
+		// EphemeralSessionFactory only uses txBeginTimeout; metric attributes are not emitted.
+		var ephemeralOpts []db.SessionOption
 		if beginTxTimeout != nil {
 			opts = append(opts, db.WithTxBeginTimeout(*beginTxTimeout))
+			ephemeralOpts = append(ephemeralOpts, db.WithTxBeginTimeout(*beginTxTimeout))
 		}
 
 		session := factory.NewSession(sessionCtx, opts...)
+		var ephemeralSession entephemeral.Session
+		if ephemeralFactory != nil {
+			ephemeralSession = ephemeralFactory.NewSession(sessionCtx, ephemeralOpts...)
+		}
 
 		ctx = ent.Inject(ctx, session)
 		ctx = ent.InjectNotifier(ctx, session)
+		if ephemeralSession != nil {
+			ctx = entephemeral.Inject(ctx, ephemeralSession)
+		}
+
+		// Pre-register cleanup so rollbacks are guaranteed to fire even if the task panics.
+		// txDone is set after all commits succeed; until then, the defer rolls back any
+		// live transactions (Rollback is a no-op if already committed or rolled back).
+		var txDone bool
+		defer func() {
+			if !txDone {
+				if tx := session.GetTxIfExists(); tx != nil {
+					if rollbackErr := tx.Rollback(); rollbackErr != nil {
+						logger.With(zap.Error(rollbackErr)).Warn("Failed to rollback main task transaction")
+					}
+				}
+				if ephemeralSession != nil {
+					if etx := ephemeralSession.GetTxIfExists(); etx != nil {
+						if rollbackErr := etx.Rollback(); rollbackErr != nil {
+							logger.With(zap.Error(rollbackErr)).Warn("Failed to rollback ephemeral task transaction")
+						}
+					}
+				}
+			}
+		}()
 
 		err := task.Task(ctx, config, knobsService)
 
-		if tx := session.GetTxIfExists(); tx != nil {
-			defer func() { _ = tx.Rollback() }() // Safe to call, will be a no-op if already committed or rolled back.
-
-			if err == nil {
-				return tx.Commit()
+		if err == nil {
+			// Detect in-handler DbCommit failures that were swallowed by the task.
+			// When DbCommit fails in-handler, commitErr is set but currentTx is kept alive
+			// for deferred rollback. Without this check, the middleware would re-attempt
+			// Commit() on an already-failed transaction. Skip the commit entirely and
+			// surface the earlier failure.
+			ephemeralCommitted := false
+			if ephemeralSession != nil {
+				if commitErr := ephemeralSession.CommitError(); commitErr != nil {
+					return fmt.Errorf("ephemeral transaction commit failed in task: %w", commitErr)
+				}
+				if ephemeralTx := ephemeralSession.GetTxIfExists(); ephemeralTx != nil {
+					if commitErr := ephemeralTx.Commit(); commitErr != nil {
+						return fmt.Errorf("failed to commit task ephemeral transaction: %w", commitErr)
+					}
+					ephemeralCommitted = true
+				} else {
+					// GetTxIfExists returns nil after an in-handler commit. Only treat this as a
+					// committed ephemeral TX if GetOrBeginTx was actually called; otherwise the
+					// session was injected but never used and there is nothing to track.
+					ephemeralCommitted = ephemeralSession.TxWasStarted()
+				}
 			}
+			if tx := session.GetTxIfExists(); tx != nil {
+				if commitErr := tx.Commit(); commitErr != nil {
+					if ephemeralCommitted {
+						logger.With(zap.Error(commitErr)).Error("Main task transaction commit failed after ephemeral transaction commit")
+						ephemeralDivergenceCounter().Add(ctx, 1, metric.WithAttributes(nameKey.String(task.Name)))
+					}
+					return fmt.Errorf("failed to commit task transaction: %w", commitErr)
+				}
+			}
+			// txDone signals "the full success path completed", not "a TX was committed".
+			// It is set unconditionally here because either no TX was active (no-op) or
+			// all commits succeeded. The deferred cleanup skips rollbacks when txDone is true.
+			txDone = true
 		}
+
 		return err
 	}
 }

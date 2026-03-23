@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
@@ -11,12 +12,31 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 )
 
 const (
 	nameKey   = attribute.Key("task.name")
 	resultKey = attribute.Key("task.result")
 )
+
+// ephemeralDivergenceCounter counts tasks where the ephemeral transaction committed
+// successfully but the subsequent main transaction commit failed. This divergence
+// means the ephemeral DB has durable state the main DB does not, and persists until
+// a successful retry reconciles the two.
+var ephemeralDivergenceCounter = sync.OnceValue(func() metric.Int64Counter {
+	c, err := otel.Meter("gocron").Int64Counter(
+		"gocron.task_ephemeral_divergence_total",
+		metric.WithDescription("Number of tasks where the ephemeral transaction committed but the main transaction commit failed, creating a DB divergence"),
+	)
+	if err != nil {
+		otel.Handle(err)
+	}
+	if c == nil {
+		return noop.Int64Counter{}
+	}
+	return c
+})
 
 type Monitor struct {
 	taskCount    metric.Int64Counter

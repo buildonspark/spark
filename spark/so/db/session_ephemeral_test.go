@@ -99,8 +99,8 @@ func TestEphemeralSession_GetTxIfExistsReturnsSameTxAfterFailedCommit(t *testing
 
 	// currentTx must be preserved so that middleware can still issue a rollback via DbRollback.
 	require.Equal(t, tx, session.GetTxIfExists())
-	// CommitAttemptedAndFailed lets middleware distinguish a failed commit from a handler that never committed.
-	require.True(t, session.CommitAttemptedAndFailed())
+	// CommitError lets middleware distinguish a failed commit from a handler that never committed.
+	require.ErrorContains(t, session.CommitError(), "forced commit failure")
 	// The original tx reference must still be rollback-able.
 	require.NoError(t, tx.Rollback())
 }

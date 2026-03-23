@@ -38,6 +38,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
+	"github.com/lightsparkdev/spark/so/entephemeral"
 	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/handler/tokens"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -1158,11 +1159,20 @@ func (t *BaseTaskSpec) getTimeout() time.Duration {
 	return defaultTaskTimeout
 }
 
-func (t *BaseTaskSpec) RunOnce(ctx context.Context, config *so.Config, dbClient *ent.Client, knobsService knobs.Knobs) error {
+func (t *BaseTaskSpec) RunOnce(ctx context.Context, config *so.Config, dbClient *ent.Client, ephemeralDBClient *entephemeral.Client, knobsService knobs.Knobs) error {
+	var ephemeralFactory db.EphemeralSessionFactory
+	if ephemeralDBClient != nil {
+		ephemeralFactory = db.NewDefaultEphemeralSessionFactory(ephemeralDBClient)
+	}
+
 	wrappedTask := t.chainMiddleware(
 		LogMiddleware(),
 		RawDBClientMiddleware(dbClient),
-		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient, knobsService), config.Database.NewTxTimeout),
+		DatabaseMiddleware(
+			db.NewDefaultSessionFactory(dbClient, knobsService),
+			ephemeralFactory,
+			config.Database.NewTxTimeout,
+		),
 		TimeoutMiddleware(),
 		PanicRecoveryMiddleware(),
 	)
@@ -1170,11 +1180,20 @@ func (t *BaseTaskSpec) RunOnce(ctx context.Context, config *so.Config, dbClient 
 	return wrappedTask.Task(ctx, config, knobsService)
 }
 
-func (t *ScheduledTaskSpec) Schedule(scheduler gocron.Scheduler, config *so.Config, dbClient *ent.Client, knobsService knobs.Knobs) error {
+func (t *ScheduledTaskSpec) Schedule(scheduler gocron.Scheduler, config *so.Config, dbClient *ent.Client, ephemeralDBClient *entephemeral.Client, knobsService knobs.Knobs) error {
+	var ephemeralFactory db.EphemeralSessionFactory
+	if ephemeralDBClient != nil {
+		ephemeralFactory = db.NewDefaultEphemeralSessionFactory(ephemeralDBClient)
+	}
+
 	wrappedTask := t.chainMiddleware(
 		LogMiddleware(),
 		RawDBClientMiddleware(dbClient),
-		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient, knobsService), config.Database.NewTxTimeout),
+		DatabaseMiddleware(
+			db.NewDefaultSessionFactory(dbClient, knobsService),
+			ephemeralFactory,
+			config.Database.NewTxTimeout,
+		),
 		TimeoutMiddleware(),
 		PanicRecoveryMiddleware(),
 	)
@@ -1233,7 +1252,7 @@ func (t *BaseTaskSpec) chainMiddleware(
 
 // RunStartupTasks runs startup tasks with optional retry logic.
 // Any task with a non-nil RetryInterval will be retried in the background on failure.
-func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, runningLocally bool, knobsService knobs.Knobs) error {
+func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, ephemeralDB *entephemeral.Client, runningLocally bool, knobsService knobs.Knobs) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Info("Running startup tasks...")
 
@@ -1244,7 +1263,7 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, run
 					retryInterval := *task.RetryInterval
 
 					for {
-						err := task.RunOnce(ctx, config, db, knobsService)
+						err := task.RunOnce(ctx, config, db, ephemeralDB, knobsService)
 						if err == nil {
 							break
 						}
@@ -1259,7 +1278,7 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, run
 				}(task)
 			} else {
 				// This is already logged in `LogMiddleware`, so no need to also log it here.
-				_ = task.RunOnce(ctx, config, db, knobsService)
+				_ = task.RunOnce(ctx, config, db, ephemeralDB, knobsService)
 			}
 		}
 	}

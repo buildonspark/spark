@@ -10,6 +10,8 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/entephemeral"
+	entephemeraltest "github.com/lightsparkdev/spark/so/entephemeral/enttest"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
@@ -158,7 +160,7 @@ func TestDatabaseMiddleware_TestCommitWhenTaskSuccessful(t *testing.T) {
 	go func() {
 		defer close(errChan)
 
-		taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil))
+		taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil, nil))
 		err = taskWithDb.Task(t.Context(), config, knobs.NewEmptyFixedKnobs())
 
 		select {
@@ -229,7 +231,7 @@ func TestDatabaseMiddleware_TestRollbackWhenTaskUnsuccessful(t *testing.T) {
 	go func() {
 		defer close(errChan)
 
-		taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil))
+		taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil, nil))
 		err = taskWithDb.Task(t.Context(), config, knobs.NewFixedKnobs(map[string]float64{}))
 		if err != nil {
 			errChan <- err
@@ -275,12 +277,282 @@ func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
 		},
 	}
 
-	taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil))
+	taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil, nil))
 
 	err := taskWithDb.Task(t.Context(), config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err, "Expected task to commit transaction successfully")
 
 	require.Nil(t, dbSession.GetTxIfExists(), "Expected no current transaction after task completed.")
+}
+
+func TestDatabaseMiddleware_EphemeralCommitFailureSkipsMainCommit(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	mainClient := db.NewTestSQLiteClient(t)
+	mainSession := db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+
+	ephemeralClient := entephemeraltest.Open(t, "sqlite3", fmt.Sprintf("file:%s?mode=memory&_fk=1", t.Name()))
+	defer func() {
+		require.NoError(t, ephemeralClient.Close())
+	}()
+	ephemeralSession := db.NewDefaultEphemeralSessionFactory(ephemeralClient).NewSession(t.Context())
+
+	mainCommitCalled := make(chan struct{}, 1)
+	mainRollbackCalled := make(chan struct{}, 1)
+	ephemeralCommitErr := errors.New("ephemeral commit failed")
+
+	task := BaseTaskSpec{
+		Name:    "Test",
+		Timeout: nil,
+		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
+			mainTx, err := ent.GetTxFromContext(ctx)
+			require.NoError(t, err)
+
+			ephemeralTx, err := entephemeral.GetTxFromContext(ctx)
+			require.NoError(t, err)
+
+			mainTx.OnCommit(func(fn ent.Committer) ent.Committer {
+				return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
+					mainCommitCalled <- struct{}{}
+					return fn.Commit(ctx, tx)
+				})
+			})
+
+			mainTx.OnRollback(func(fn ent.Rollbacker) ent.Rollbacker {
+				return ent.RollbackFunc(func(ctx context.Context, tx *ent.Tx) error {
+					mainRollbackCalled <- struct{}{}
+					return fn.Rollback(ctx, tx)
+				})
+			})
+
+			ephemeralTx.OnCommit(func(fn entephemeral.Committer) entephemeral.Committer {
+				return entephemeral.CommitFunc(func(context.Context, *entephemeral.Tx) error {
+					return ephemeralCommitErr
+				})
+			})
+
+			return nil
+		},
+	}
+
+	taskWithDb := task.wrapMiddleware(DatabaseMiddleware(
+		&db.TestSessionFactory{Session: mainSession},
+		&db.TestEphemeralSessionFactory{Session: ephemeralSession},
+		nil,
+	))
+
+	err := taskWithDb.Task(t.Context(), config, knobs.NewEmptyFixedKnobs())
+	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to commit task ephemeral transaction")
+	require.ErrorContains(t, err, ephemeralCommitErr.Error())
+
+	select {
+	case <-mainCommitCalled:
+		t.Fatal("main transaction commit should not be attempted after ephemeral commit failure")
+	default:
+	}
+
+	select {
+	case <-mainRollbackCalled:
+	default:
+		t.Fatal("main transaction should have been rolled back after ephemeral commit failure")
+	}
+}
+
+func TestDatabaseMiddleware_DetectsInHandlerDbCommitFailure(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	mainClient := db.NewTestSQLiteClient(t)
+	mainSession := db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+
+	ephemeralClient := entephemeraltest.Open(t, "sqlite3", fmt.Sprintf("file:%s?mode=memory&_fk=1", t.Name()))
+	defer func() {
+		require.NoError(t, ephemeralClient.Close())
+	}()
+	ephemeralSession := db.NewDefaultEphemeralSessionFactory(ephemeralClient).NewSession(t.Context())
+
+	ephemeralCommitErr := errors.New("ephemeral commit failed")
+
+	task := BaseTaskSpec{
+		Name:    "Test",
+		Timeout: nil,
+		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
+			ephemeralTx, err := entephemeral.GetTxFromContext(ctx)
+			require.NoError(t, err)
+
+			ephemeralTx.OnCommit(func(fn entephemeral.Committer) entephemeral.Committer {
+				return entephemeral.CommitFunc(func(context.Context, *entephemeral.Tx) error {
+					return ephemeralCommitErr
+				})
+			})
+
+			// Explicitly commit in-handler and swallow the error.
+			_ = entephemeral.DbCommit(ctx)
+			return nil
+		},
+	}
+
+	taskWithDb := task.wrapMiddleware(DatabaseMiddleware(
+		&db.TestSessionFactory{Session: mainSession},
+		&db.TestEphemeralSessionFactory{Session: ephemeralSession},
+		nil,
+	))
+
+	err := taskWithDb.Task(t.Context(), config, knobs.NewEmptyFixedKnobs())
+	require.Error(t, err)
+	require.ErrorContains(t, err, "ephemeral transaction commit failed in task")
+	require.ErrorIs(t, err, ephemeralCommitErr)
+}
+
+func TestDatabaseMiddleware_RollbacksEphemeralWhenTaskFails(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	mainClient := db.NewTestSQLiteClient(t)
+	mainSession := db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+
+	ephemeralClient := entephemeraltest.Open(t, "sqlite3", fmt.Sprintf("file:%s?mode=memory&_fk=1", t.Name()))
+	defer func() {
+		require.NoError(t, ephemeralClient.Close())
+	}()
+	ephemeralSession := db.NewDefaultEphemeralSessionFactory(ephemeralClient).NewSession(t.Context())
+
+	taskErr := errors.New("task failed")
+	rollbackCalled := make(chan struct{}, 1)
+
+	task := BaseTaskSpec{
+		Name:    "Test",
+		Timeout: nil,
+		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
+			ephemeralTx, err := entephemeral.GetTxFromContext(ctx)
+			require.NoError(t, err)
+
+			ephemeralTx.OnRollback(func(fn entephemeral.Rollbacker) entephemeral.Rollbacker {
+				return entephemeral.RollbackFunc(func(ctx context.Context, tx *entephemeral.Tx) error {
+					rollbackCalled <- struct{}{}
+					return fn.Rollback(ctx, tx)
+				})
+			})
+
+			return taskErr
+		},
+	}
+
+	taskWithDb := task.wrapMiddleware(DatabaseMiddleware(
+		&db.TestSessionFactory{Session: mainSession},
+		&db.TestEphemeralSessionFactory{Session: ephemeralSession},
+		nil,
+	))
+
+	err := taskWithDb.Task(t.Context(), config, knobs.NewEmptyFixedKnobs())
+	require.ErrorIs(t, err, taskErr)
+
+	select {
+	case <-rollbackCalled:
+	default:
+		t.Fatal("expected ephemeral transaction to be rolled back when task fails")
+	}
+}
+
+func TestDatabaseMiddleware_CommitsEphemeralBeforeMain(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	mainClient := db.NewTestSQLiteClient(t)
+	mainSession := db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+
+	ephemeralClient := entephemeraltest.Open(t, "sqlite3", fmt.Sprintf("file:%s?mode=memory&_fk=1", t.Name()))
+	defer func() {
+		require.NoError(t, ephemeralClient.Close())
+	}()
+	ephemeralSession := db.NewDefaultEphemeralSessionFactory(ephemeralClient).NewSession(t.Context())
+
+	mainCommitErr := errors.New("main commit failed")
+	commitOrder := make([]string, 0, 2)
+
+	task := BaseTaskSpec{
+		Name:    "Test",
+		Timeout: nil,
+		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
+			mainTx, err := ent.GetTxFromContext(ctx)
+			require.NoError(t, err)
+
+			ephemeralTx, err := entephemeral.GetTxFromContext(ctx)
+			require.NoError(t, err)
+
+			ephemeralTx.OnCommit(func(fn entephemeral.Committer) entephemeral.Committer {
+				return entephemeral.CommitFunc(func(ctx context.Context, tx *entephemeral.Tx) error {
+					commitOrder = append(commitOrder, "ephemeral")
+					return fn.Commit(ctx, tx)
+				})
+			})
+
+			mainTx.OnCommit(func(fn ent.Committer) ent.Committer {
+				return ent.CommitFunc(func(context.Context, *ent.Tx) error {
+					commitOrder = append(commitOrder, "main")
+					return mainCommitErr
+				})
+			})
+
+			return nil
+		},
+	}
+
+	taskWithDb := task.wrapMiddleware(DatabaseMiddleware(
+		&db.TestSessionFactory{Session: mainSession},
+		&db.TestEphemeralSessionFactory{Session: ephemeralSession},
+		nil,
+	))
+
+	err := taskWithDb.Task(t.Context(), config, knobs.NewEmptyFixedKnobs())
+	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to commit task transaction")
+	require.ErrorContains(t, err, mainCommitErr.Error())
+	require.Equal(t, []string{"ephemeral", "main"}, commitOrder)
+}
+
+func TestDatabaseMiddleware_NoDivergenceWhenEphemeralTxNeverStarted(t *testing.T) {
+	// Regression: a task that uses the ephemeral session for reads only (never calls
+	// GetOrBeginTx) should NOT be counted as a divergence when the main commit fails,
+	// because no ephemeral writes ever occurred.
+	config := sparktesting.TestConfig(t)
+	mainClient := db.NewTestSQLiteClient(t)
+	mainSession := db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+
+	ephemeralClient := entephemeraltest.Open(t, "sqlite3", fmt.Sprintf("file:%s?mode=memory&_fk=1", t.Name()))
+	defer func() {
+		require.NoError(t, ephemeralClient.Close())
+	}()
+	ephemeralSession := db.NewDefaultEphemeralSessionFactory(ephemeralClient).NewSession(t.Context())
+
+	mainCommitErr := errors.New("main commit failed")
+
+	task := BaseTaskSpec{
+		Name:    "Test",
+		Timeout: nil,
+		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
+			mainTx, err := ent.GetTxFromContext(ctx)
+			require.NoError(t, err)
+
+			// Deliberately do NOT call entephemeral.GetTxFromContext — simulates a task
+			// that only reads from the ephemeral DB via GetClient, never starting a TX.
+
+			mainTx.OnCommit(func(fn ent.Committer) ent.Committer {
+				return ent.CommitFunc(func(context.Context, *ent.Tx) error {
+					return mainCommitErr
+				})
+			})
+
+			return nil
+		},
+	}
+
+	taskWithDb := task.wrapMiddleware(DatabaseMiddleware(
+		&db.TestSessionFactory{Session: mainSession},
+		&db.TestEphemeralSessionFactory{Session: ephemeralSession},
+		nil,
+	))
+
+	err := taskWithDb.Task(t.Context(), config, knobs.NewEmptyFixedKnobs())
+	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to commit task transaction")
+	// The ephemeral session was never used, so TxWasStarted must be false —
+	// confirming no spurious divergence would be recorded.
+	require.False(t, ephemeralSession.TxWasStarted())
 }
 
 func TestPanicRecoveryInterceptor_TestNoPanic(t *testing.T) {

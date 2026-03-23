@@ -57,9 +57,13 @@ type EphemeralSession struct {
 	provider entephemeral.TxProvider
 	// currentTx is the live transaction, or nil if none has been started.
 	currentTx *entephemeral.Tx
-	// commitFailed is set when an in-handler DbCommit attempt fails. It allows middlewares to
-	// detect the failure even after currentTx has been cleared.
-	commitFailed bool
+	// commitErr records the error from an in-handler DbCommit attempt that failed. It allows
+	// middlewares to detect and propagate the failure even after currentTx has been cleared.
+	commitErr error
+	// txWasStarted is set to true the first time GetOrBeginTx successfully begins a transaction.
+	// It remains true even after the transaction is committed or rolled back, distinguishing
+	// "session used" from "session injected but never accessed".
+	txWasStarted bool
 }
 
 // GetOrBeginTx retrieves the current transaction if one exists, or begins a new one.
@@ -83,7 +87,7 @@ func (s *EphemeralSession) GetOrBeginTx(ctx context.Context) (*entephemeral.Tx, 
 			err := fn.Commit(ctx, tx)
 			if err != nil {
 				logging.GetLoggerFromContext(ctx).Error("Failed to commit ephemeral transaction", zap.Error(err))
-				s.commitFailed = true
+				s.commitErr = err
 				// Leave currentTx set so that a deferred DbRollback (e.g. from middleware)
 				// can still issue a rollback via GetTxIfExists.
 				return err
@@ -99,12 +103,13 @@ func (s *EphemeralSession) GetOrBeginTx(ctx context.Context) (*entephemeral.Tx, 
 				logging.GetLoggerFromContext(ctx).Error("Failed to rollback ephemeral transaction", zap.Error(err))
 			}
 			s.currentTx = nil
-			s.commitFailed = false
+			s.commitErr = nil
 			return err
 		})
 	})
 
 	s.currentTx = tx
+	s.txWasStarted = true
 	return tx, nil
 }
 
@@ -126,8 +131,12 @@ func (s *EphemeralSession) GetTxIfExists() *entephemeral.Tx {
 	return s.currentTx
 }
 
-func (s *EphemeralSession) CommitAttemptedAndFailed() bool {
-	return s.commitFailed
+func (s *EphemeralSession) CommitError() error {
+	return s.commitErr
+}
+
+func (s *EphemeralSession) TxWasStarted() bool {
+	return s.txWasStarted
 }
 
 // ReadOnlyEphemeralSession is a lightweight session for read-only ephemeral DB access.
@@ -151,7 +160,9 @@ func (r *ReadOnlyEphemeralSession) MarkTxDirty(context.Context) {}
 
 func (r *ReadOnlyEphemeralSession) GetTxIfExists() *entephemeral.Tx { return nil }
 
-func (r *ReadOnlyEphemeralSession) CommitAttemptedAndFailed() bool { return false }
+func (r *ReadOnlyEphemeralSession) CommitError() error { return nil }
+
+func (r *ReadOnlyEphemeralSession) TxWasStarted() bool { return false }
 
 // EphemeralTxProviderWithTimeout wraps an entephemeral.TxProvider with timeout behavior.
 type EphemeralTxProviderWithTimeout struct {

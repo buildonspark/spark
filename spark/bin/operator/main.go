@@ -515,7 +515,7 @@ func main() {
 			// Don't run the task if the task specifies it should not be run in
 			// test environments and RunningLocally is set (eg. we are in a test environment)
 			if (!args.RunningLocally || scheduled.RunInTestEnv) && !scheduled.Disabled {
-				err := scheduled.Schedule(scheduler, config, dbClient, knobsService)
+				err := scheduled.Schedule(scheduler, config, dbClient, nil, knobsService)
 				if err != nil {
 					logger.Fatal("Failed to create job", zap.Error(err))
 				}
@@ -533,7 +533,7 @@ func main() {
 			// are done before returning.
 			startupCtx = logging.Inject(startupCtx, logger.With(zap.String("component", "startup")))
 
-			return task.RunStartupTasks(startupCtx, config, dbClient, args.RunningLocally, knobsService)
+			return task.RunStartupTasks(startupCtx, config, dbClient, nil, args.RunningLocally, knobsService)
 		})
 	}
 
