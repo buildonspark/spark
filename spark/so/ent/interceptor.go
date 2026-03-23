@@ -71,8 +71,10 @@ func init() {
 	}
 }
 
-// DatabaseStatsInterceptor tracks query (read) operations and their duration
-func DatabaseStatsInterceptor(threshold time.Duration) ent.Interceptor {
+// DatabaseStatsInterceptor tracks query (read) operations and their duration.
+// dbName is included as a "database" attribute on all metrics to distinguish
+// the main DB from the ephemeral DB.
+func DatabaseStatsInterceptor(dbName string) ent.Interceptor {
 	return ent.InterceptFunc(func(next ent.Querier) ent.Querier {
 		return ent.QuerierFunc(func(ctx context.Context, query ent.Query) (ent.Value, error) {
 			start := time.Now()
@@ -84,6 +86,7 @@ func DatabaseStatsInterceptor(threshold time.Duration) ent.Interceptor {
 
 			// Track read operation metrics (queries only, not mutations)
 			attrs := []attribute.KeyValue{
+				attribute.String("database", dbName),
 				attribute.String("table", tableName),
 				attribute.Bool("error", err != nil),
 			}
@@ -97,9 +100,10 @@ func DatabaseStatsInterceptor(threshold time.Duration) ent.Interceptor {
 	})
 }
 
-// DatabaseOperationsHook tracks mutation operations (insert, update, delete)
-// This should be registered as a global hook on the Ent client.
-func DatabaseOperationsHook() ent.Hook {
+// DatabaseOperationsHook tracks mutation operations (insert, update, delete).
+// dbName is included as a "database" attribute on all metrics to distinguish
+// the main DB from the ephemeral DB.
+func DatabaseOperationsHook(dbName string) ent.Hook {
 	return func(next ent.Mutator) ent.Mutator {
 		return ent.MutateFunc(func(ctx context.Context, mutation ent.Mutation) (ent.Value, error) {
 			start := time.Now()
@@ -109,6 +113,7 @@ func DatabaseOperationsHook() ent.Hook {
 			// Track mutation metrics
 			tableName := extractTableName(mutation.Type())
 			attrs := []attribute.KeyValue{
+				attribute.String("database", dbName),
 				attribute.String("table", tableName),
 				attribute.Bool("error", err != nil),
 			}

@@ -554,6 +554,17 @@ func newDBConnector(ctx context.Context, databasePath string, isRDS bool, knobsS
 		return nil, fmt.Errorf("failed to parse database path: %w", err)
 	}
 
+	// For SQLite, inject _busy_timeout into the DSN so it applies to every connection
+	// in the pool (PRAGMA busy_timeout is per-connection and cannot be set on a
+	// separate throwaway connection).
+	if databaseDriverFromPath(databasePath) != "postgres" {
+		q := uri.Query()
+		if q.Get("_busy_timeout") == "" {
+			q.Set("_busy_timeout", "5000")
+			uri.RawQuery = q.Encode()
+		}
+	}
+
 	otelWrappedDriver := otelsql.WrapDriver(stdlib.GetDefaultDriver(),
 		otelsql.WithAttributes(semconv.DBSystemPostgreSQL),
 		otelsql.WithSpanOptions(OtelSQLSpanOptions),

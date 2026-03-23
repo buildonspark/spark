@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so/authninternal"
 	"github.com/lightsparkdev/spark/so/dkg"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/entephemeral"
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
 	events "github.com/lightsparkdev/spark/so/stream"
 	"go.uber.org/zap"
@@ -29,12 +30,13 @@ func RegisterGrpcServers(
 	config *so.Config,
 	logger *zap.Logger,
 	dbClient *ent.Client,
+	ephemeralDBClient *entephemeral.Client,
 	frostClient *grpc.ClientConn,
 	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier,
 	eventsRouter *events.EventRouter,
 ) error {
 	if args.RunningLocally {
-		mockServer := sparkgrpc.NewMockServer(config, dbClient, nil)
+		mockServer := sparkgrpc.NewMockServer(config, dbClient, ephemeralDBClient)
 		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
 	}
 

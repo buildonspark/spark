@@ -41,6 +41,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	_ "github.com/lightsparkdev/spark/so/ent/runtime"
+	"github.com/lightsparkdev/spark/so/entephemeral"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
@@ -79,6 +80,7 @@ type args struct {
 	HttpPort                   uint64
 	GrpcPort                   uint64
 	DatabasePath               string
+	EphemeralDatabasePath      string
 	RunningLocally             bool
 	ChallengeTimeout           time.Duration
 	SessionDuration            time.Duration
@@ -87,6 +89,7 @@ type args struct {
 	DisableChainwatcher        bool
 	SupportedNetworks          string
 	AWS                        bool
+	EphemeralAWS               bool
 	ServerCertPath             string
 	ServerKeyPath              string
 	RunDirectory               string
@@ -132,6 +135,7 @@ func loadArgs() (*args, error) {
 	flag.Uint64Var(&args.HttpPort, "http-port", 0, "HTTP port (grpc-web + metrics)")
 	flag.Uint64Var(&args.GrpcPort, "grpc-port", 0, "Native gRPC port (if 0 or same as http-port, uses ServeHTTP multiplexing)")
 	flag.StringVar(&args.DatabasePath, "database", "", "Path to database file")
+	flag.StringVar(&args.EphemeralDatabasePath, "ephemeral-database", "", "Path to ephemeral database file")
 	flag.BoolVar(&args.RunningLocally, "local", false, "Running locally")
 	flag.DurationVar(&args.ChallengeTimeout, "challenge-timeout", time.Minute, "Challenge timeout")
 	flag.DurationVar(&args.SessionDuration, "session-duration", time.Minute*15, "Session duration")
@@ -140,6 +144,7 @@ func loadArgs() (*args, error) {
 	flag.BoolVar(&args.DisableChainwatcher, "disable-chainwatcher", false, "Disable Chainwatcher")
 	flag.StringVar(&args.SupportedNetworks, "supported-networks", "", "Supported networks")
 	flag.BoolVar(&args.AWS, "aws", false, "Use AWS RDS")
+	flag.BoolVar(&args.EphemeralAWS, "ephemeral-aws", false, "Use AWS RDS for the ephemeral database (defaults to the value of --aws if not explicitly set)")
 	flag.StringVar(&args.ServerCertPath, "server-cert", "", "Path to server certificate")
 	flag.StringVar(&args.ServerKeyPath, "server-key", "", "Path to server key")
 	flag.StringVar(&args.RunDirectory, "run-dir", "", "Run directory for resolving relative paths")
@@ -148,6 +153,16 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.PyroscopeServer, "pyroscope-server", "", "The address of the Pyroscope server to connect to. Leave blank to skip Pyroscope monitoring.")
 
 	flag.Parse()
+
+	var ephemeralAWSFlagSet bool
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "ephemeral-aws" {
+			ephemeralAWSFlagSet = true
+		}
+	})
+	if !ephemeralAWSFlagSet {
+		args.EphemeralAWS = args.AWS
+	}
 
 	if args.IdentityPrivateKeyFilePath == "" {
 		return nil, errors.New("identity private key file path is required")
@@ -280,9 +295,9 @@ func main() {
 		args.Threshold,
 		args.SignerAddress,
 		args.DatabasePath,
-		"", // EphemeralDatabasePath — wired in PR 4
+		args.EphemeralDatabasePath,
 		args.AWS,
-		false, // EphemeralIsRDS — wired in PR 4
+		args.EphemeralAWS,
 		args.AuthzEnforced,
 		args.SupportedNetworksList(),
 		args.ServerCertPath,
@@ -348,6 +363,17 @@ func main() {
 		logger.Fatal("Failed to create db connector", zap.Error(err))
 	}
 	defer connector.Close()
+	ephemeralEnabled := config.EphemeralDatabasePath != ""
+	var ephemeralConnector *so.DBConnector
+	if ephemeralEnabled {
+		ephemeralConnector, err = so.NewEphemeralDBConnector(context.Background(), config, knobsService)
+		if err != nil {
+			logger.Fatal("Failed to create ephemeral db connector", zap.Error(err))
+		}
+		defer ephemeralConnector.Close()
+	} else {
+		logger.Info("Ephemeral DB disabled because no URI was configured")
+	}
 
 	for _, op := range config.SigningOperatorMap {
 		op.SetTimeoutProvider(knobs.NewKnobsTimeoutProvider(knobsService, config.GRPC.ClientTimeout))
@@ -374,63 +400,94 @@ func main() {
 		knobs.NewKnobsTimeoutProvider(knobsService, config.GRPC.ClientTimeout))
 
 	var sqlDb entsql.ExecQuerier
+	var ephemeralDb entsql.ExecQuerier
 	if dbDriver == "postgres" {
 		sqlDb = stdlib.OpenDBFromPool(connector.Pool())
+		if ephemeralEnabled {
+			if ephemeralConnector.Pool() == nil {
+				logger.Fatal(
+					"Ephemeral DB pool is not initialized. Check ephemeral DB configuration",
+					zap.String("ephemeral_database_path", config.EphemeralDatabasePath),
+				)
+			}
+			ephemeralDb = stdlib.OpenDBFromPool(ephemeralConnector.Pool())
+		}
 	} else {
 		sqlDb = otelsql.OpenDB(connector, otelsql.WithSpanOptions(so.OtelSQLSpanOptions))
+		if ephemeralEnabled {
+			ephemeralDb = otelsql.OpenDB(ephemeralConnector, otelsql.WithSpanOptions(so.OtelSQLSpanOptions))
+		}
 	}
 
 	dialectDriver := entsql.NewDriver(dbDriver, entsql.Conn{ExecQuerier: sqlDb})
 
 	var dbClient *ent.Client
+	var ephemeralDbClient *entephemeral.Client
+	var ephemeralDialectDriver *entsql.Driver
+	if ephemeralEnabled {
+		ephemeralDialectDriver = entsql.NewDriver(dbDriver, entsql.Conn{ExecQuerier: ephemeralDb})
+	}
 	if args.EntDebug {
 		dbClient = ent.NewClient(ent.Driver(dialectDriver), ent.Debug())
+		if ephemeralEnabled {
+			ephemeralDbClient = entephemeral.NewClient(entephemeral.Driver(ephemeralDialectDriver), entephemeral.Debug())
+		}
 	} else {
 		dbClient = ent.NewClient(ent.Driver(dialectDriver))
+		if ephemeralEnabled {
+			ephemeralDbClient = entephemeral.NewClient(entephemeral.Driver(ephemeralDialectDriver))
+		}
 	}
 
 	// Add interceptor for query stats and read operation metrics
-	dbClient.Intercept(ent.DatabaseStatsInterceptor(10 * time.Second))
+	dbClient.Intercept(ent.DatabaseStatsInterceptor("main"))
+	if ephemeralDbClient != nil {
+		ephemeralDbClient.Intercept(ent.DatabaseStatsInterceptor("ephemeral"))
+	}
 
 	// Add hook for mutation operation metrics (insert, update, delete)
-	dbClient.Use(ent.DatabaseOperationsHook())
+	dbClient.Use(ent.DatabaseOperationsHook("main"))
+	if ephemeralDbClient != nil {
+		ephemeralDbClient.Use(ent.DatabaseOperationsHook("ephemeral"))
+	}
 
 	// Add hook to track whether a transaction is dirty
-	dbClient.Use(func(next ent.Mutator) ent.Mutator {
-		return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-			v, err := next.Mutate(ctx, m)
-			if err != nil {
-				return v, err
-			}
-
-			mx, ok := m.(interface {
-				Tx() (*ent.Tx, error)
-			})
-			if !ok {
-				return v, err
-			}
-
-			if tx, _ := mx.Tx(); tx != nil {
-				ent.MarkTxDirty(ctx)
-			}
-
-			return v, err
-		})
-	})
+	dbClient.Use(txIsDirtyHook)
+	if ephemeralDbClient != nil {
+		ephemeralDbClient.Use(txIsDirtyEphemeralHook)
+	}
 
 	defer func() {
 		_ = dbClient.Close()
+		if ephemeralDbClient != nil {
+			_ = ephemeralDbClient.Close()
+		}
 	}()
 
 	if dbDriver == "sqlite3" {
-		sqliteDb, _ := sql.Open("sqlite3", config.DatabasePath)
-		if _, err := sqliteDb.ExecContext(errCtx, "PRAGMA journal_mode=WAL;"); err != nil {
-			logger.Fatal("Failed to set journal_mode", zap.Error(err))
+		applySQLitePragmas := func(dbPath string, dbName string) {
+			sqliteDb, err := sql.Open("sqlite3", dbPath)
+			if err != nil {
+				logger.With(zap.Error(err)).Sugar().Fatalf("Failed to open sqlite database for PRAGMA initialization (%s)", dbName)
+			}
+			if sqliteDb != nil {
+				defer func() { _ = sqliteDb.Close() }()
+			}
+
+			// journal_mode=WAL is a file-level setting that persists across connections,
+			// so setting it once here is sufficient.
+			if _, err := sqliteDb.ExecContext(errCtx, "PRAGMA journal_mode=WAL;"); err != nil {
+				logger.With(zap.Error(err)).Sugar().Fatalf("Failed to set journal_mode for %s sqlite database", dbName)
+			}
+
+			// busy_timeout is a per-connection setting; it is applied via _busy_timeout=5000
+			// in the SQLite DSN inside newDBConnector so it takes effect on every pool connection.
 		}
-		if _, err := sqliteDb.ExecContext(errCtx, "PRAGMA busy_timeout=5000;"); err != nil {
-			logger.Fatal("Failed to set busy_timeout", zap.Error(err))
+
+		applySQLitePragmas(config.DatabasePath, "main")
+		if ephemeralEnabled {
+			applySQLitePragmas(config.EphemeralDatabasePath, "ephemeral")
 		}
-		_ = sqliteDb.Close()
 	}
 
 	dbEvents, err := db.NewDBEvents(errCtx, dbClient, logger.With(zap.String("component", "dbevents")))
@@ -515,7 +572,7 @@ func main() {
 			// Don't run the task if the task specifies it should not be run in
 			// test environments and RunningLocally is set (eg. we are in a test environment)
 			if (!args.RunningLocally || scheduled.RunInTestEnv) && !scheduled.Disabled {
-				err := scheduled.Schedule(scheduler, config, dbClient, nil, knobsService)
+				err := scheduled.Schedule(scheduler, config, dbClient, ephemeralDbClient, knobsService)
 				if err != nil {
 					logger.Fatal("Failed to create job", zap.Error(err))
 				}
@@ -533,7 +590,7 @@ func main() {
 			// are done before returning.
 			startupCtx = logging.Inject(startupCtx, logger.With(zap.String("component", "startup")))
 
-			return task.RunStartupTasks(startupCtx, config, dbClient, nil, args.RunningLocally, knobsService)
+			return task.RunStartupTasks(startupCtx, config, dbClient, ephemeralDbClient, args.RunningLocally, knobsService)
 		})
 	}
 
@@ -575,6 +632,11 @@ func main() {
 	var tableLogger *logging.TableLogger
 	if args.LogRequestStats && args.LogJSON {
 		tableLogger = logging.NewTableLogger(clientInfoProvider)
+	}
+
+	var ephemeralSessionFactory db.EphemeralSessionFactory
+	if ephemeralDbClient != nil {
+		ephemeralSessionFactory = db.NewDefaultEphemeralSessionFactory(ephemeralDbClient)
 	}
 
 	serverOpts := []grpc.ServerOption{
@@ -622,10 +684,10 @@ func main() {
 	// Interceptors wrap RPC handlers so we can apply cross‑cutting concerns in one place
 	// and in a defined order. We install separate chains for unary (request/response)
 	// and streaming RPCs.
-	dbSessionInterceptor := sparkgrpc.DatabaseSessionMiddleware(
+	dbSessionMiddleware := sparkgrpc.DatabaseSessionMiddleware(
 		dbClient,
 		db.NewDefaultSessionFactory(dbClient, knobsService),
-		nil, // EphemeralSessionFactory — wired in PR 4
+		ephemeralSessionFactory,
 		config.Database.NewTxTimeout,
 	)
 
@@ -658,7 +720,7 @@ func main() {
 					return handler(ctx, req)
 				}
 			}(),
-			dbSessionInterceptor,
+			dbSessionMiddleware,
 			// Idempotency must be after the DB session so we can store idempotency keys
 			sparkgrpc.IdempotencyInterceptor(),
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
@@ -721,6 +783,7 @@ func main() {
 		config,
 		logger,
 		dbClient,
+		ephemeralDbClient,
 		frostConnection,
 		sessionTokenCreatorVerifier,
 		eventsRouter,
@@ -729,7 +792,7 @@ func main() {
 		logger.Fatal("Failed to register all gRPC servers", zap.Error(err))
 	}
 
-	healthServer := sparkgrpc.NewHealthServer(errCtx, dbClient, nil)
+	healthServer := sparkgrpc.NewHealthServer(errCtx, dbClient, ephemeralDbClient)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 
 	// Web compatibility layer
@@ -975,4 +1038,48 @@ func operatorPoolConfigFromKnobs(knobsService knobs.Knobs, operatorID string) so
 		UsersPerConnectionCap: getInt(knobs.KnobGrpcClientPoolUsersPerConnectionCap, defaults.UsersPerConnectionCap),
 		ScaleConcurrency:      getInt(knobs.KnobGrpcClientPoolScaleConcurrency, defaults.ScaleConcurrency),
 	}
+}
+
+func txIsDirtyHook(next ent.Mutator) ent.Mutator {
+	return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+		v, err := next.Mutate(ctx, m)
+		if err != nil {
+			return v, err
+		}
+
+		mx, ok := m.(interface {
+			Tx() (*ent.Tx, error)
+		})
+		if !ok {
+			return v, err
+		}
+
+		if tx, _ := mx.Tx(); tx != nil {
+			ent.MarkTxDirty(ctx)
+		}
+
+		return v, err
+	})
+}
+
+func txIsDirtyEphemeralHook(next entephemeral.Mutator) entephemeral.Mutator {
+	return entephemeral.MutateFunc(func(ctx context.Context, m entephemeral.Mutation) (entephemeral.Value, error) {
+		v, err := next.Mutate(ctx, m)
+		if err != nil {
+			return v, err
+		}
+
+		mx, ok := m.(interface {
+			Tx() (*entephemeral.Tx, error)
+		})
+		if !ok {
+			return v, err
+		}
+
+		if tx, _ := mx.Tx(); tx != nil {
+			entephemeral.MarkTxDirty(ctx)
+		}
+
+		return v, err
+	})
 }
