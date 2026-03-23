@@ -1038,13 +1038,14 @@ func createTransferLeaves(
 			SetIntermediateDirectFromCpfpRefundTx(intermediateDirectFromCpfpRefundTx)
 		if leafTweakMap != nil {
 			leafTweak, ok := leafTweakMap[leaf.ID.String()]
-			if ok {
-				leafTweakBinary, err := proto.Marshal(leafTweak)
-				if err != nil {
-					return fmt.Errorf("unable to marshal leaf tweak: %w", err)
-				}
-				mutator = mutator.SetKeyTweak(leafTweakBinary)
+			if !ok {
+				return fmt.Errorf("key tweak not found for leaf %s in transfer %s", leaf.ID, transfer.ID)
 			}
+			leafTweakBinary, err := proto.Marshal(leafTweak)
+			if err != nil {
+				return fmt.Errorf("unable to marshal leaf tweak: %w", err)
+			}
+			mutator = mutator.SetKeyTweak(leafTweakBinary)
 		}
 		mutators = append(mutators, mutator)
 	}
