@@ -1632,6 +1632,19 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 
 		leafTweaksMap[leafTweak.LeafId] = leafTweak
 	}
+
+	// The refund transactions and key tweak package must cover exactly the same set of leaves.
+	if len(leafTweaksMap) != len(leavesToSendIDs) {
+		return nil, fmt.Errorf("key tweak count mismatch in transfer %s: refund transactions have %d leaves, key tweak package has %d entries",
+			transferID, len(leavesToSendIDs), len(leafTweaksMap))
+	}
+	for leafID := range leavesToSendIDs {
+		if _, ok := leafTweaksMap[leafID]; !ok {
+			return nil, fmt.Errorf("key tweak missing for leaf %s in transfer %s",
+				leafID, transferID)
+		}
+	}
+
 	payloadToVerify := common.GetTransferPackageSigningPayload(transferID, pkg)
 
 	if err := common.VerifyECDSASignature(senderIdentityPubKey, pkg.UserSignature, payloadToVerify); err != nil {
@@ -2257,6 +2270,14 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 	}
 	logger.Sugar().Infof("Beginning to tweak keys for transfer %s", transfer.ID)
 	for _, leaf := range transferLeaves {
+		if len(leaf.KeyTweak) == 0 {
+			treeNode, _ := leaf.QueryLeaf().Only(ctx)
+			leafID := leaf.ID.String()
+			if treeNode != nil {
+				leafID = treeNode.ID.String()
+			}
+			return nil, fmt.Errorf("transfer leaf has no key tweak stored for leaf %s in transfer %s", leafID, transfer.ID)
+		}
 		keyTweak := &pbspark.SendLeafKeyTweak{}
 		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
 		if err != nil {
