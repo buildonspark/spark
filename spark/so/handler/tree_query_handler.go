@@ -279,17 +279,17 @@ func filterNodesByWalletAccess(ctx context.Context, config *so.Config, nodes []*
 func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req *pb.QueryUnusedDepositAddressesRequest) (*pb.QueryUnusedDepositAddressesResponse, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return nil, errors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get or create current tx for request: %w", err))
 	}
 
 	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse identity public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse identity public key: %w", err))
 	}
 
 	hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, idPubKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check if privacy is enabled for owner: %w", err)
+		return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to check if privacy is enabled for owner: %w", err))
 	}
 	if !hasReadAccess {
 		return &pb.QueryUnusedDepositAddressesResponse{
@@ -303,7 +303,7 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 	}
 	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to common network: %w", err))
 	}
 	query := db.DepositAddress.Query().
 		Where(depositaddress.OwnerIdentityPubkey(idPubKey)).
@@ -315,7 +315,7 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 
 	// Validate offset and limit
 	if req.Limit < 0 || req.Offset < 0 {
-		return nil, fmt.Errorf("expect non-negative offset and limit")
+		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("expect non-negative offset and limit"))
 	}
 
 	usePagination := req.Limit > 0 || req.Offset > 0
@@ -333,7 +333,7 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 
 	depositAddresses, err := query.All(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to query deposit addresses: %w", err))
 	}
 
 	var unusedDepositAddresses []*pb.DepositAddressQueryResult
