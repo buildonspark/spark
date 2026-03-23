@@ -911,7 +911,7 @@ func setUpPyroscope(args *args, logger *zap.Logger) (shutDown func()) {
 	pyroLogger := logger.With(zap.String("component", "profiling"))
 	if len(args.PyroscopeServer) == 0 {
 		pyroLogger.Info("No Pyroscope server specified; skipping")
-		return
+		return func() {}
 	}
 
 	pyroLogger.Info("Connecting to Pyroscope server", zap.String("server", args.PyroscopeServer))
