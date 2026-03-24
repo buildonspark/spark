@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,7 +18,14 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/utils"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+// errNonRetryableBroadcast is a sentinel error returned when a peer SO permanently
+// rejects a transaction (FailedPrecondition, InvalidArgument, NotFound). The caller
+// uses this to log accurately without counting it as a task failure.
+var errNonRetryableBroadcast = errors.New("non-retryable broadcast error")
 
 // RetryIncompleteSignatureBroadcasts finds SIGNED transactions where this SO is coordinator,
 // has no/insufficient peer signatures, and re-attempts the broadcast fanout.
@@ -38,10 +46,18 @@ func RetryIncompleteSignatureBroadcasts(ctx context.Context, config *so.Config) 
 
 	broadcastHandler := NewBroadcastTokenHandler(config)
 	var errs []error
+	skipped := 0
 
 	// Process each transaction one at a time to minimize lock duration
 	for _, id := range ids {
 		if err := retryTokenTransactionBroadcast(ctx, config, broadcastHandler, id); err != nil {
+			if errors.Is(err, errNonRetryableBroadcast) {
+				// Transaction was permanently rejected by a peer — not a task failure.
+				// It will be re-queried on subsequent runs (up to ~10 times over the
+				// 5-minute TokenMaxValidityDuration window) until it expires.
+				skipped++
+				continue
+			}
 			logger.Error("Failed to retry token transaction broadcast",
 				zap.String("token_transaction_id", id.String()),
 				zap.Error(err))
@@ -53,7 +69,7 @@ func RetryIncompleteSignatureBroadcasts(ctx context.Context, config *so.Config) 
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("failed to retry %d/%d transactions", len(errs), len(ids))
+		return fmt.Errorf("failed to retry %d/%d transactions (%d skipped as non-retryable)", len(errs), len(ids)-skipped, skipped)
 	}
 	return nil
 }
@@ -202,5 +218,30 @@ func retryTokenTransactionBroadcast(
 
 	// Call FanoutBroadcastAndFinalize which is idempotent
 	_, err = broadcastHandler.FanoutBroadcastAndFinalize(ctx, tokenTx, legacyTokenTx, keyshareIDs, signatures)
+	if err != nil && isNonRetryableBroadcastError(err) {
+		logging.GetLoggerFromContext(ctx).Warn(
+			fmt.Sprintf("retry broadcast: skipping transaction %s due to non-retryable peer rejection (will expire naturally)", id),
+			zap.Error(err))
+		return errNonRetryableBroadcast
+	}
 	return err
+}
+
+// isNonRetryableBroadcastError returns true if the error indicates a permanent
+// rejection by a peer SO that will never succeed on retry. These include:
+//   - FailedPrecondition: transaction data is invalid/stale (e.g., hash mismatch
+//     because underlying outputs were modified by another transfer)
+//   - InvalidArgument: malformed transaction data
+//   - NotFound: referenced outputs no longer exist
+//
+// Transient errors (Unavailable, Internal, DeadlineExceeded) are retryable and
+// should still surface as task failures.
+func isNonRetryableBroadcastError(err error) bool {
+	code := status.Code(err)
+	switch code {
+	case codes.FailedPrecondition, codes.InvalidArgument, codes.NotFound:
+		return true
+	default:
+		return false
+	}
 }
