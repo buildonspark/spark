@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"maps"
+	"runtime/debug"
 	"slices"
 	"strings"
 	"time"
@@ -32,6 +34,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	entutxo "github.com/lightsparkdev/spark/so/ent/utxo"
+	"github.com/lightsparkdev/spark/so/entephemeral"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/tree"
@@ -42,6 +45,11 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 	"google.golang.org/protobuf/proto"
 )
+
+// errEphemeralMainDBDiverged is returned when the ephemeral DB commits but the
+// main DB commit fails, leaving the two stores in an irreconcilable state.
+// WatchChain treats this as fatal and stops processing further blocks.
+var errEphemeralMainDBDiverged = errors.New("ephemeral and main DB state diverged")
 
 var (
 	meter = otel.Meter("chain_watcher")
@@ -54,6 +62,62 @@ var (
 	// tweakKeysForCoopExitFunc is a function variable that can be mocked in tests
 	tweakKeysForCoopExitFunc = tweakKeysForCoopExit
 )
+
+// txBackedSession adapts an existing transaction to ent.Session so code paths
+// that rely on ent.GetDbFromContext can run inside chain watcher block handling.
+type txBackedSession struct {
+	tx *ent.Tx
+}
+
+func (s *txBackedSession) GetOrBeginTx(context.Context) (*ent.Tx, error) {
+	if s.tx == nil {
+		return nil, fmt.Errorf("no transaction available")
+	}
+	return s.tx, nil
+}
+
+func (s *txBackedSession) GetClient(ctx context.Context) (*ent.Client, error) {
+	tx, err := s.GetOrBeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tx.Client(), nil
+}
+
+func (s *txBackedSession) MarkTxDirty(context.Context) {}
+
+func (s *txBackedSession) GetTxIfExists() *ent.Tx { return s.tx }
+
+func (s *txBackedSession) Notify(context.Context, ent.Notification) error { return nil }
+
+// txBackedEphemeralSession intentionally omits Notify: entephemeral.Session
+// has no notification interface, unlike ent.Session.
+type txBackedEphemeralSession struct {
+	tx *entephemeral.Tx
+}
+
+func (s *txBackedEphemeralSession) GetOrBeginTx(context.Context) (*entephemeral.Tx, error) {
+	if s.tx == nil {
+		return nil, fmt.Errorf("no ephemeral transaction available")
+	}
+	return s.tx, nil
+}
+
+func (s *txBackedEphemeralSession) GetClient(ctx context.Context) (*entephemeral.Client, error) {
+	tx, err := s.GetOrBeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tx.Client(), nil
+}
+
+func (s *txBackedEphemeralSession) MarkTxDirty(context.Context) {}
+
+func (s *txBackedEphemeralSession) GetTxIfExists() *entephemeral.Tx { return s.tx }
+
+func (s *txBackedEphemeralSession) CommitError() error { return nil }
+
+func (s *txBackedEphemeralSession) TxWasStarted() bool { return s.tx != nil }
 
 const (
 	nonStaticDefaultConfirmationThreshold = 3
@@ -185,20 +249,12 @@ func scanChainUpdates(
 	ctx context.Context,
 	config *so.Config,
 	dbClient *ent.Client,
+	ephemeralDBClient *entephemeral.Client,
 	bitcoinClient *rpcclient.Client,
 	network btcnetwork.Network,
 	bitcoindConfig so.BitcoindConfig,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	defer func() {
-		if r := recover(); r != nil {
-			logger.Error("Panic recovered in scanChainUpdates",
-				zap.Any("panic", r),
-				zap.Stack("stack"),
-			)
-		}
-	}()
-
 	latestBlockHeight, err := bitcoinClient.GetBlockCount()
 	if err != nil {
 		return fmt.Errorf("failed to get block count: %w", err)
@@ -241,19 +297,24 @@ func scanChainUpdates(
 	// that were confirmed in any of the blocks we're about to connect
 	oldBlockHeight := dbBlockHeight.Height
 
-	// Connect new blocks first
+	// Panics from connectBlocks are intentionally not recovered here.
+	// A divergence panic (errEphemeralMainDBDiverged) must be fatal: the operator
+	// cannot safely continue with split-brain DB state. Any other panic indicates
+	// a code bug (nil-ptr, out-of-range, etc.) and is also treated as fatal rather
+	// than silently skipping blocks, which would mask the underlying issue.
 	err = connectBlocks(
 		ctx,
 		config,
 		dbClient,
+		ephemeralDBClient,
 		bitcoinClient,
 		difference.Connected,
 		network,
 	)
-	logger.Sugar().Infof("Connected %d blocks", len(difference.Connected))
 	if err != nil {
 		return fmt.Errorf("failed to connect blocks: %w", err)
 	}
+	logger.Sugar().Infof("Connected %d blocks", len(difference.Connected))
 
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMultipleConfirmationForNonStaticDeposit, 0) > 0 {
 		// After connecting blocks, process deposit availability
@@ -305,6 +366,7 @@ func WatchChain(
 	ctx context.Context,
 	config *so.Config,
 	dbClient *ent.Client,
+	ephemeralDBClient *entephemeral.Client,
 	bitcoindConfig so.BitcoindConfig,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
@@ -319,8 +381,11 @@ func WatchChain(
 		return err
 	}
 
-	err = scanChainUpdates(ctx, config, dbClient, bitcoinClient, network, bitcoindConfig)
+	err = scanChainUpdates(ctx, config, dbClient, ephemeralDBClient, bitcoinClient, network, bitcoindConfig)
 	if err != nil {
+		if errors.Is(err, errEphemeralMainDBDiverged) {
+			return err
+		}
 		logger.Error("failed to scan chain updates", zap.Error(err))
 	}
 
@@ -357,8 +422,11 @@ func WatchChain(
 		// we need to query bitcoind for the height anyway. We just
 		// treat it as a notification that a new block appeared.
 
-		err = scanChainUpdates(ctx, config, dbClient, bitcoinClient, network, bitcoindConfig)
+		err = scanChainUpdates(ctx, config, dbClient, ephemeralDBClient, bitcoinClient, network, bitcoindConfig)
 		if err != nil {
+			if errors.Is(err, errEphemeralMainDBDiverged) {
+				return err
+			}
 			logger.Error("Failed to scan chain updates", zap.Error(err))
 		}
 	}
@@ -369,17 +437,44 @@ func disconnectBlocks(_ context.Context, _ *ent.Client, _ []Tip, _ btcnetwork.Ne
 	return nil
 }
 
+// connectBlocks processes each chain tip in order, committing both the ephemeral
+// and main transactions per block.
 func connectBlocks(
 	ctx context.Context,
 	config *so.Config,
 	dbClient *ent.Client,
+	ephemeralDBClient *entephemeral.Client,
 	bitcoinClient *rpcclient.Client,
 	chainTips []Tip,
 	network btcnetwork.Network,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
+	// Divergence guard: if a panic occurs after ephemeralTx.Commit() but before
+	// dbTx.Commit(), re-panic with the sentinel so WatchChain exits rather than
+	// continuing on a split-brain state. This must live inside connectBlocks
+	// (rather than the caller) so that the local ephemeralCommittedOnLastBlock
+	// variable is accessible during stack unwinding.
+	ephemeralCommittedOnLastBlock := false
+	lastProcessedHeight := int64(0)
+	defer func() {
+		if r := recover(); r != nil {
+			// debug.Stack() is called after recover(), so the stack reflects the deferred
+			// frame — not the original panic site. The panic value r still identifies what
+			// panicked; locate the exact line by searching for the preceding crash in logs.
+			logger.Sugar().Errorf("panic in connectBlocks at height %d (ephemeralCommitted=%v): %v\n%s", lastProcessedHeight, ephemeralCommittedOnLastBlock, r, debug.Stack())
+			if ephemeralCommittedOnLastBlock {
+				panic(errEphemeralMainDBDiverged)
+			}
+			panic(r)
+		}
+	}()
+
 	for _, chainTip := range chainTips {
+		ephemeralCommittedOnLastBlock = false
+		lastProcessedHeight = chainTip.Height
+		blockCtx := ctx
+
 		blockHash, err := bitcoinClient.GetBlockHash(chainTip.Height)
 		if err != nil {
 			return err
@@ -398,14 +493,28 @@ func connectBlocks(
 		}
 
 		notifier := ent.NewBufferedNotifier(dbClient)
-		ctx = ent.InjectNotifier(ctx, &notifier)
+		blockCtx = ent.InjectNotifier(blockCtx, &notifier)
 
-		dbTx, err := dbClient.Tx(ctx)
+		dbTx, err := dbClient.Tx(blockCtx)
 		if err != nil {
 			return err
 		}
+		var ephemeralTx *entephemeral.Tx
+		if ephemeralDBClient != nil {
+			ephemeralTx, err = ephemeralDBClient.Tx(blockCtx)
+			if err != nil {
+				if dbRollbackErr := dbTx.Rollback(); dbRollbackErr != nil {
+					return errors.Join(err, fmt.Errorf("failed to rollback main transaction after ephemeral transaction begin failure: %w", dbRollbackErr))
+				}
+				return err
+			}
+		}
+		blockCtx = ent.Inject(blockCtx, &txBackedSession{tx: dbTx})
+		if ephemeralTx != nil {
+			blockCtx = entephemeral.Inject(blockCtx, &txBackedEphemeralSession{tx: ephemeralTx})
+		}
 		err = handleBlock(
-			ctx,
+			blockCtx,
 			config,
 			dbTx.Client(),
 			bitcoinClient,
@@ -416,25 +525,75 @@ func connectBlocks(
 		)
 		if err != nil {
 			logger.Error("Failed to handle block", zap.Error(err))
-			rollbackErr := dbTx.Rollback()
+			var rollbackErr error
+			if ephemeralTx != nil {
+				if ephemeralRollbackErr := ephemeralTx.Rollback(); ephemeralRollbackErr != nil {
+					rollbackErr = errors.Join(
+						rollbackErr,
+						fmt.Errorf("failed to rollback ephemeral transaction: %w", ephemeralRollbackErr),
+					)
+				}
+			}
+			if dbRollbackErr := dbTx.Rollback(); dbRollbackErr != nil {
+				rollbackErr = errors.Join(
+					rollbackErr,
+					fmt.Errorf("failed to rollback main transaction: %w", dbRollbackErr),
+				)
+			}
 			if rollbackErr != nil {
-				return rollbackErr
+				return errors.Join(err, rollbackErr)
 			}
 			return err
 		}
+		// Two-phase commit: ephemeral DB is committed first, then the main DB.
+		// This ordering is intentional: if the ephemeral commit fails we can still
+		// roll back the main transaction atomically. However, if the ephemeral commit
+		// succeeds and the main commit subsequently fails, the two stores will diverge
+		// with no automatic recovery path. This is a known architectural trade-off;
+		// the operator must be restarted and the divergence resolved manually.
+		if ephemeralTx != nil {
+			err = ephemeralTx.Commit()
+			if err != nil {
+				if rollbackErr := dbTx.Rollback(); rollbackErr != nil {
+					return errors.Join(err, fmt.Errorf("failed to rollback main transaction after ephemeral commit failure: %w", rollbackErr))
+				}
+				return err
+			}
+			ephemeralCommittedOnLastBlock = true
+		}
 		err = dbTx.Commit()
 		if err != nil {
+			if ephemeralCommittedOnLastBlock {
+				logger.With(zap.Error(err)).Sugar().Errorf(
+					"Main database commit failed after ephemeral commit at block height %d (hash %s); ephemeral and main DB state have diverged",
+					chainTip.Height,
+					chainTip.Hash.String(),
+				)
+				return errors.Join(
+					err,
+					fmt.Errorf(
+						"ephemeral and main DB state have diverged after main database commit failure at block height %d (hash %s)",
+						chainTip.Height,
+						chainTip.Hash.String(),
+					),
+					errEphemeralMainDBDiverged,
+				)
+			}
 			return err
 		}
 
-		err = notifier.Flush(ctx)
+		// Both commits succeeded; reset so a panic on a subsequent block in this
+		// batch is not misidentified as a divergence from the current block.
+		ephemeralCommittedOnLastBlock = false
+
+		err = notifier.Flush(blockCtx)
 		if err != nil {
 			logger.Error("Failed to flush notifier", zap.Error(err))
 		}
 
 		// Record current block height
 		if blockHeightGauge != nil {
-			blockHeightGauge.Record(ctx, chainTip.Height, metric.WithAttributes(
+			blockHeightGauge.Record(blockCtx, chainTip.Height, metric.WithAttributes(
 				attribute.String("network", network.String()),
 			))
 		}

@@ -528,7 +528,7 @@ func main() {
 				chainCtx = logging.Inject(chainCtx, chainLogger)
 				chainCtx = knobs.InjectKnobsService(chainCtx, knobsService)
 
-				if err := chain.WatchChain(chainCtx, config, dbClient, bitcoindConfig); err != nil {
+				if err := chain.WatchChain(chainCtx, config, dbClient, ephemeralDbClient, bitcoindConfig); err != nil {
 					logger.Error("Error in chain watcher", zap.Error(err))
 					return err
 				}
