@@ -1998,6 +1998,100 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	require.NoError(t, err, "Expected success when TransferIds are specified")
 }
 
+// TestV3MimoReceiverCannotClaimOtherReceiversLeaves verifies that in a
+// multi-receiver MIMO transfer, receiver 1 cannot claim leaves that were
+// assigned to receiver 2. The SO must scope leaves per-receiver and reject
+// a claim where the leaf count doesn't match the receiver's assignment.
+func TestV3MimoReceiverCannotClaimOtherReceiversLeaves(t *testing.T) {
+	senderConfig := wallet.NewTestWalletConfig(t)
+
+	// Create 2 leaves — one per receiver.
+	leafPrivKey1 := keys.GeneratePrivateKey()
+	rootNode1, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey1, amountSatsToSend)
+	require.NoError(t, err, "failed to create tree 1")
+
+	leafPrivKey2 := keys.GeneratePrivateKey()
+	rootNode2, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey2, amountSatsToSend)
+	require.NoError(t, err, "failed to create tree 2")
+
+	newLeafPrivKey1 := keys.GeneratePrivateKey()
+	newLeafPrivKey2 := keys.GeneratePrivateKey()
+	receiver1PrivKey := keys.GeneratePrivateKey()
+	receiver2PrivKey := keys.GeneratePrivateKey()
+
+	leavesToTransfer := []wallet.LeafKeyTweak{
+		{Leaf: rootNode1, SigningPrivKey: leafPrivKey1, NewSigningPrivKey: newLeafPrivKey1},
+		{Leaf: rootNode2, SigningPrivKey: leafPrivKey2, NewSigningPrivKey: newLeafPrivKey2},
+	}
+	leafReceiverMap := map[string]keys.Public{
+		rootNode1.Id: receiver1PrivKey.Public(),
+		rootNode2.Id: receiver2PrivKey.Public(),
+	}
+
+	// Send the MIMO transfer.
+	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
+		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send V3 transfer")
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+
+	// Authenticate receiver 1.
+	receiver1Config := wallet.NewTestWalletConfigWithIdentityKey(t, receiver1PrivKey)
+	receiver1Token, err := wallet.AuthenticateWithServer(t.Context(), receiver1Config)
+	require.NoError(t, err)
+	receiver1Ctx := wallet.ContextWithToken(t.Context(), receiver1Token)
+
+	// Receiver 1 queries their pending transfer — should see only their leaf.
+	pending1, err := wallet.QueryPendingTransfers(receiver1Ctx, receiver1Config)
+	require.NoError(t, err)
+	require.Len(t, pending1.Transfers, 1)
+	require.Len(t, pending1.Transfers[0].Leaves, 1, "receiver 1 should only see 1 leaf")
+	require.Equal(t, rootNode1.Id, pending1.Transfers[0].Leaves[0].Leaf.Id,
+		"receiver 1 should see leaf 1, not leaf 2")
+
+	// Authenticate receiver 2 and get their pending transfer (with leaf 2).
+	receiver2Config := wallet.NewTestWalletConfigWithIdentityKey(t, receiver2PrivKey)
+	receiver2Token, err := wallet.AuthenticateWithServer(t.Context(), receiver2Config)
+	require.NoError(t, err)
+	receiver2Ctx := wallet.ContextWithToken(t.Context(), receiver2Token)
+
+	pending2, err := wallet.QueryPendingTransfers(receiver2Ctx, receiver2Config)
+	require.NoError(t, err)
+	require.Len(t, pending2.Transfers, 1)
+	require.Len(t, pending2.Transfers[0].Leaves, 1, "receiver 2 should only see 1 leaf")
+	require.Equal(t, rootNode2.Id, pending2.Transfers[0].Leaves[0].Leaf.Id,
+		"receiver 2 should see leaf 2, not leaf 1")
+
+	// ATTACK: Receiver 1 tries to claim using receiver 2's leaf.
+	// Even if the attacker somehow obtained receiver 2's intermediate signing
+	// key, the SO should reject the claim because the leaf is not assigned to
+	// receiver 1 in the TransferReceiver scoping.
+	attackLeafPrivKey := keys.GeneratePrivateKey()
+	attackLeaves := []wallet.LeafKeyTweak{{
+		Leaf:              pending2.Transfers[0].Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey2,
+		NewSigningPrivKey: attackLeafPrivKey,
+	}}
+
+	_, err = wallet.ClaimTransferV2(receiver1Ctx, pending2.Transfers[0], receiver1Config, attackLeaves)
+	require.Error(t, err, "receiver 1 should not be able to claim receiver 2's leaves")
+
+	// Verify receiver 2 can still claim their own leaf (not stolen).
+	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.Transfers[0])
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode2.Id: newLeafPrivKey2}, leafPrivKeyMap2)
+
+	finalLeafPrivKey2 := keys.GeneratePrivateKey()
+	claimLeaves2 := []wallet.LeafKeyTweak{{
+		Leaf:              pending2.Transfers[0].Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey2,
+		NewSigningPrivKey: finalLeafPrivKey2,
+	}}
+	_, err = wallet.ClaimTransferV2(receiver2Ctx, pending2.Transfers[0], receiver2Config, claimLeaves2)
+	require.NoError(t, err, "receiver 2 should still be able to claim their own leaf after the failed attack")
+}
+
 func deterministicSeedFromTestName(testName string) [32]byte {
 	return sha256.Sum256([]byte(testName))
 }
