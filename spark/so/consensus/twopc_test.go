@@ -49,49 +49,63 @@ func newTestEngineWithConfig() (*TwoPCEngine, *mockGossipSender, *so.Config) {
 	return NewTwoPCEngine(config, gs), gs, config
 }
 
-// simpleFlowHandler is a FlowHandler without PostPrepare — commit uses op directly.
-type simpleFlowHandler struct{}
-
-func (h *simpleFlowHandler) Prepare(_ context.Context, _ proto.Message) ([]byte, error) {
-	return nil, nil
+// simpleFlow is a CoordinatorFlow where commit and rollback use the same static payload.
+type simpleFlow struct {
+	prepareResult []byte
+	prepareErr    error
+	payload       proto.Message
 }
 
-func (h *simpleFlowHandler) Commit(_ context.Context, _ proto.Message) error {
-	return nil
+func (f *simpleFlow) PrepareTask(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
+	return f.prepareResult, f.prepareErr
 }
 
-func (h *simpleFlowHandler) Rollback(_ context.Context, _ proto.Message) error {
-	return nil
+func (f *simpleFlow) BuildCommitPayload(_ context.Context, _ map[string][]byte) (proto.Message, error) {
+	return f.payload, nil
 }
 
-// aggregatingFlowHandler implements PostPrepare to build the commit message from results.
-type aggregatingFlowHandler struct {
-	simpleFlowHandler
-	postPrepareResult proto.Message
-	postPrepareErr    error
+func (f *simpleFlow) RollbackPayload() proto.Message {
+	return f.payload
 }
 
-func (h *aggregatingFlowHandler) PostPrepare(_ context.Context, _ map[string][]byte) (proto.Message, error) {
-	return h.postPrepareResult, h.postPrepareErr
+var _ CoordinatorFlow = (*simpleFlow)(nil)
+
+// aggregatingFlow is a CoordinatorFlow where BuildCommitPayload produces a
+// different message from the prepare results.
+type aggregatingFlow struct {
+	prepareResult []byte
+	rollbackOp    proto.Message
+	commitResult  proto.Message
+	commitErr     error
 }
 
-var _ PostPrepare = (*aggregatingFlowHandler)(nil)
+func (f *aggregatingFlow) PrepareTask(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
+	return f.prepareResult, nil
+}
 
-// --- Execute tests (simple flow, no PostPrepare) ---
+func (f *aggregatingFlow) BuildCommitPayload(_ context.Context, _ map[string][]byte) (proto.Message, error) {
+	return f.commitResult, f.commitErr
+}
 
-func TestExecute_PrepareSucceeds_SendsCommitWithOp(t *testing.T) {
+func (f *aggregatingFlow) RollbackPayload() proto.Message {
+	return f.rollbackOp
+}
+
+var _ CoordinatorFlow = (*aggregatingFlow)(nil)
+
+// --- Execute tests (simple flow) ---
+
+func TestExecute_PrepareSucceeds_SendsCommitWithPayload(t *testing.T) {
 	engine, gs, config := newTestEngineWithConfig()
 	op := &pbgossip.GossipMessage{MessageId: "op"}
 	selection, err := helper.NewPreSelectedOperatorSelection(config, []string{"op-self"})
 	require.NoError(t, err)
 
-	err = engine.Execute(t.Context(), testOpType, op,
-		func(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
-			return []byte("sig-share"), nil
-		},
-		selection, &simpleFlowHandler{})
+	result, err := engine.Execute(t.Context(), testOpType, selection,
+		&simpleFlow{prepareResult: []byte("sig-share"), payload: op})
 
 	require.NoError(t, err)
+	assert.True(t, proto.Equal(op, result))
 	require.Len(t, gs.calls, 1)
 
 	commit := gs.calls[0].msg.GetConsensusCommit()
@@ -107,14 +121,12 @@ func TestExecute_PrepareFails_SendsRollback(t *testing.T) {
 	selection, err := helper.NewPreSelectedOperatorSelection(config, []string{"op-self"})
 	require.NoError(t, err)
 
-	err = engine.Execute(t.Context(), testOpType, op,
-		func(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
-			return nil, fmt.Errorf("validation failed")
-		},
-		selection, &simpleFlowHandler{})
+	result, err := engine.Execute(t.Context(), testOpType, selection,
+		&simpleFlow{prepareErr: fmt.Errorf("validation failed"), payload: op})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "prepare failed")
+	assert.Nil(t, result)
 	require.Len(t, gs.calls, 1)
 	assert.NotNil(t, gs.calls[0].msg.GetConsensusRollback())
 }
@@ -126,36 +138,34 @@ func TestExecute_CommitGossipFails_NoRollback(t *testing.T) {
 	selection, err := helper.NewPreSelectedOperatorSelection(config, []string{"op-self"})
 	require.NoError(t, err)
 
-	err = engine.Execute(t.Context(), testOpType, op,
-		func(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
-			return []byte("sig-share"), nil
-		},
-		selection, &simpleFlowHandler{})
+	result, err := engine.Execute(t.Context(), testOpType, selection,
+		&simpleFlow{prepareResult: []byte("sig-share"), payload: op})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "commit gossip failed")
+	assert.Nil(t, result)
 	require.Len(t, gs.calls, 1)
 	assert.NotNil(t, gs.calls[0].msg.GetConsensusCommit())
 }
 
-// --- Execute tests (with PostPrepare) ---
+// --- Execute tests (aggregating flow) ---
 
-func TestExecute_PostPrepare_CommitUsesAggregatedMessage(t *testing.T) {
+func TestExecute_BuildCommitPayload_CommitUsesAggregatedMessage(t *testing.T) {
 	engine, gs, config := newTestEngineWithConfig()
 	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback"}
 	commitOp := &pbgossip.GossipMessage{MessageId: "aggregated-commit"}
 	selection, err := helper.NewPreSelectedOperatorSelection(config, []string{"op-self"})
 	require.NoError(t, err)
 
-	handler := &aggregatingFlowHandler{postPrepareResult: commitOp}
-
-	err = engine.Execute(t.Context(), testOpType, rollbackOp,
-		func(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
-			return []byte("sig-share"), nil
-		},
-		selection, handler)
+	result, err := engine.Execute(t.Context(), testOpType, selection,
+		&aggregatingFlow{
+			prepareResult: []byte("sig-share"),
+			rollbackOp:    rollbackOp,
+			commitResult:  commitOp,
+		})
 
 	require.NoError(t, err)
+	assert.True(t, proto.Equal(commitOp, result))
 	require.Len(t, gs.calls, 1)
 
 	commit := gs.calls[0].msg.GetConsensusCommit()
@@ -165,22 +175,22 @@ func TestExecute_PostPrepare_CommitUsesAggregatedMessage(t *testing.T) {
 	assert.True(t, proto.Equal(commitOp, roundTripped))
 }
 
-func TestExecute_PostPrepareFails_SendsRollback(t *testing.T) {
+func TestExecute_BuildCommitPayloadFails_SendsRollback(t *testing.T) {
 	engine, gs, config := newTestEngineWithConfig()
 	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback"}
 	selection, err := helper.NewPreSelectedOperatorSelection(config, []string{"op-self"})
 	require.NoError(t, err)
 
-	handler := &aggregatingFlowHandler{postPrepareErr: fmt.Errorf("aggregation failed")}
-
-	err = engine.Execute(t.Context(), testOpType, rollbackOp,
-		func(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
-			return []byte("sig-share"), nil
-		},
-		selection, handler)
+	result, err := engine.Execute(t.Context(), testOpType, selection,
+		&aggregatingFlow{
+			prepareResult: []byte("sig-share"),
+			rollbackOp:    rollbackOp,
+			commitErr:     fmt.Errorf("aggregation failed"),
+		})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "post-prepare failed")
+	assert.Contains(t, err.Error(), "build-commit failed")
+	assert.Nil(t, result)
 	require.Len(t, gs.calls, 1)
 
 	rollback := gs.calls[0].msg.GetConsensusRollback()

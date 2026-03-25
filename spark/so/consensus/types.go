@@ -4,6 +4,7 @@ import (
 	"context"
 
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"google.golang.org/protobuf/proto"
 )
@@ -32,14 +33,22 @@ type FlowHandler interface {
 	Rollback(ctx context.Context, op proto.Message) error
 }
 
-// PostPrepare is optionally implemented by a FlowHandler to process prepare
-// results on the coordinator before commit. For example, a renew flow uses
-// this to aggregate FROST signature shares into finalized transactions.
-//
-// The returned proto.Message becomes the commit gossip payload. If PostPrepare
-// fails, the engine sends a rollback instead.
-type PostPrepare interface {
-	PostPrepare(ctx context.Context, results map[string][]byte) (commitOp proto.Message, err error)
+// CoordinatorFlow defines the coordinator-side behavior for a consensus operation.
+// Each consensus flow (renew, transfer, coop exit, etc.) implements this interface.
+// The engine fans out PrepareTask to all participants, then sends a commit or
+// rollback gossip message.
+type CoordinatorFlow interface {
+	// PrepareTask is fanned out to all selected operators during the prepare phase.
+	PrepareTask(ctx context.Context, operator *so.SigningOperator) ([]byte, error)
+
+	// BuildCommitPayload produces the commit gossip payload from prepare results.
+	// For aggregating flows (e.g., FROST signing), this aggregates signature shares
+	// into a finalized transaction. For simple flows, this ignores results and
+	// returns a static message.
+	BuildCommitPayload(ctx context.Context, results map[string][]byte) (proto.Message, error)
+
+	// RollbackPayload returns the gossip payload sent on rollback.
+	RollbackPayload() proto.Message
 }
 
 // GossipSender abstracts gossip message creation and delivery.

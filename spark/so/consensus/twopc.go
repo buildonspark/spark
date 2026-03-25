@@ -15,10 +15,9 @@ import (
 
 // TwoPCEngine orchestrates consensus using two-phase commit.
 //
-// The coordinator calls Execute with a prepareTask closure to run the full lifecycle:
-//  1. Prepare: synchronous fan-out via ExecuteTaskWithAllOperators
-//  2. PostPrepare (optional): coordinator-only processing of prepare results
-//     (e.g., aggregate FROST signatures into finalized transactions)
+// The coordinator calls Execute with a CoordinatorFlow to run the full lifecycle:
+//  1. Prepare: synchronous fan-out of flow.PrepareTask via ExecuteTaskWithAllOperators
+//  2. BuildCommitPayload: coordinator builds commit payload from prepare results
 //  3. Commit or Rollback: durable async delivery via gossip
 //
 // On the receiving side, incoming ConsensusCommit/ConsensusRollback gossip
@@ -40,59 +39,55 @@ func NewTwoPCEngine(config *so.Config, gossip GossipSender) *TwoPCEngine {
 
 // Execute runs the full two-phase commit lifecycle for a consensus operation.
 //
-// It fans out prepareTask to all selected operators. If the handler implements
-// PostPrepare, the coordinator processes the prepare results (e.g., aggregates
-// signature shares) and the returned message becomes the commit payload.
-// Otherwise, op is used as the commit payload directly.
-//
-// If any step fails, a rollback gossip is sent with op.
+// It fans out flow.PrepareTask to all selected operators, then calls
+// flow.BuildCommitPayload to produce the commit gossip payload from prepare
+// results. If any step fails, a rollback gossip is sent with
+// flow.RollbackPayload().
 //
 // If commit gossip fails after a successful prepare, Execute does not attempt
 // a rollback. The gossip system persists the record to DB before network
 // delivery, so the background retry task will eventually deliver it. Sending a
 // competing rollback would create two conflicting gossip records.
+//
+// On success, returns the commit payload so the coordinator can use it to build
+// its RPC response.
 func (e *TwoPCEngine) Execute(
 	ctx context.Context,
 	opType pbgossip.ConsensusOperationType,
-	op proto.Message,
-	prepareTask func(ctx context.Context, operator *so.SigningOperator) ([]byte, error),
 	selection *helper.OperatorSelection,
-	handler FlowHandler,
-) error {
+	flow CoordinatorFlow,
+) (proto.Message, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	participants, err := selection.OperatorIdentifierList(e.config)
 	if err != nil {
-		return fmt.Errorf("failed to resolve participants: %w", err)
+		return nil, fmt.Errorf("failed to resolve participants: %w", err)
 	}
 
-	results, err := helper.ExecuteTaskWithAllOperators(ctx, e.config, selection, prepareTask)
+	results, err := helper.ExecuteTaskWithAllOperators(ctx, e.config, selection, flow.PrepareTask)
 	if err != nil {
-		if rollbackErr := e.rollback(ctx, opType, op, participants); rollbackErr != nil {
+		if rollbackErr := e.rollback(ctx, opType, flow.RollbackPayload(), participants); rollbackErr != nil {
 			logger.With(zap.Error(rollbackErr)).Sugar().Errorf(
 				"failed to send consensus rollback gossip for op type %d", opType)
 		}
-		return fmt.Errorf("prepare failed: %w", err)
+		return nil, fmt.Errorf("prepare failed: %w", err)
 	}
 
-	commitOp := op
-	if pp, ok := handler.(PostPrepare); ok {
-		commitOp, err = pp.PostPrepare(ctx, results)
-		if err != nil {
-			if rollbackErr := e.rollback(ctx, opType, op, participants); rollbackErr != nil {
-				logger.With(zap.Error(rollbackErr)).Sugar().Errorf(
-					"failed to send consensus rollback gossip for op type %d", opType)
-			}
-			return fmt.Errorf("post-prepare failed: %w", err)
+	commitOp, err := flow.BuildCommitPayload(ctx, results)
+	if err != nil {
+		if rollbackErr := e.rollback(ctx, opType, flow.RollbackPayload(), participants); rollbackErr != nil {
+			logger.With(zap.Error(rollbackErr)).Sugar().Errorf(
+				"failed to send consensus rollback gossip for op type %d", opType)
 		}
+		return nil, fmt.Errorf("build-commit failed: %w", err)
 	}
 
 	if err := e.commit(ctx, opType, commitOp, participants); err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf(
 			"failed to send consensus commit gossip for op type %d", opType)
-		return fmt.Errorf("commit gossip failed: %w", err)
+		return nil, fmt.Errorf("commit gossip failed: %w", err)
 	}
-	return nil
+	return commitOp, nil
 }
 
 // commit builds a ConsensusCommit gossip message and sends it to all
