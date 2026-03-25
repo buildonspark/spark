@@ -174,21 +174,8 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 		}
 	}
 
-	receivers, err := transfer.QueryTransferReceivers().
-		Where(enttransferreceiver.StatusNEQ(st.TransferReceiverStatusCompleted)).
-		ForUpdate().
-		All(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to query receivers for transfer %s: %w", transferID, err)
-	}
-	for _, r := range receivers {
-		_, err = r.Update().
-			SetStatus(st.TransferReceiverStatusCompleted).
-			SetCompletionTime(req.Timestamp.AsTime()).
-			Save(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to mark receiver %s completed for transfer %s: %w", r.ID, transferID, err)
-		}
+	if err := syncReceiversToTerminalStatus(ctx, transfer.ID, st.TransferStatusCompleted, req.Timestamp.AsTime()); err != nil {
+		return fmt.Errorf("failed to sync receiver statuses for transfer %s: %w", transferID, err)
 	}
 
 	return nil

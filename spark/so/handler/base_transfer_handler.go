@@ -1225,6 +1225,53 @@ func (h *BaseTransferHandler) CreateRollbackTransferGossipMessage(ctx context.Co
 	return nil
 }
 
+// syncReceiversToTerminalStatus updates all TransferReceivers for a transfer to
+// match the expected status for the transfer's terminal state.
+//
+// For RETURNED/EXPIRED: receivers are set to CANCELLED.
+// For COMPLETED: receivers are set to COMPLETED with the given completionTime.
+//
+// Receivers already in the expected status are skipped (idempotent).
+func syncReceiversToTerminalStatus(ctx context.Context, transferID uuid.UUID, transferStatus st.TransferStatus, completionTime time.Time) error {
+	var expectedStatus st.TransferReceiverStatus
+	switch transferStatus {
+	case st.TransferStatusReturned, st.TransferStatusExpired:
+		expectedStatus = st.TransferReceiverStatusCancelled
+	case st.TransferStatusCompleted:
+		expectedStatus = st.TransferReceiverStatusCompleted
+	default:
+		return fmt.Errorf("syncReceiversToTerminalStatus called with non-terminal transfer status %s", transferStatus)
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get db for receiver sync: %w", err)
+	}
+
+	receivers, err := db.TransferReceiver.Query().
+		Where(
+			enttransferreceiver.TransferID(transferID),
+			enttransferreceiver.StatusNEQ(expectedStatus),
+		).
+		ForUpdate().
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query receivers for transfer %s: %w", transferID, err)
+	}
+
+	for _, r := range receivers {
+		update := r.Update().SetStatus(expectedStatus)
+		if expectedStatus == st.TransferReceiverStatusCompleted {
+			update = update.SetCompletionTime(completionTime)
+		}
+		if _, err := update.Save(ctx); err != nil {
+			return fmt.Errorf("failed to update receiver %s to %s: %w", r.ID, expectedStatus, err)
+		}
+	}
+
+	return nil
+}
+
 func (h *BaseTransferHandler) CancelTransferInternal(ctx context.Context, transferID uuid.UUID) error {
 	transfer, err := h.loadTransferForUpdate(ctx, transferID)
 	if err != nil {

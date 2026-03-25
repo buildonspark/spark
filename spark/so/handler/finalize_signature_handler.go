@@ -350,12 +350,12 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		return nil, fmt.Errorf("missing signatures for transfer %s", transfer.ID.String())
 	}
 
-	receivers, err := transfer.QueryTransferReceivers().All(ctx)
+	receiverCount, err := transfer.QueryTransferReceivers().Count(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query receivers for transfer %s: %w", transfer.ID.String(), err)
+		return nil, fmt.Errorf("failed to count receivers for transfer %s: %w", transfer.ID.String(), err)
 	}
-	if len(receivers) > 1 {
-		return nil, fmt.Errorf("transfer %s has %d receivers; FinalizeNodeSignatures does not support multi-receiver transfers", transfer.ID.String(), len(receivers))
+	if receiverCount > 1 {
+		return nil, fmt.Errorf("transfer %s has %d receivers; FinalizeNodeSignatures does not support multi-receiver transfers", transfer.ID.String(), receiverCount)
 	}
 
 	completionTime := time.Now()
@@ -364,16 +364,8 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		return nil, fmt.Errorf("failed to update transfer %s: %w", transfer.ID.String(), err)
 	}
 
-	if len(receivers) == 1 {
-		r := receivers[0]
-		if r.Status != st.TransferReceiverStatusCompleted {
-			if _, err := r.Update().
-				SetStatus(st.TransferReceiverStatusCompleted).
-				SetCompletionTime(completionTime).
-				Save(ctx); err != nil {
-				return nil, fmt.Errorf("failed to update receiver %s to completed: %w", r.ID, err)
-			}
-		}
+	if err := syncReceiversToTerminalStatus(ctx, transfer.ID, st.TransferStatusCompleted, completionTime); err != nil {
+		return nil, fmt.Errorf("failed to sync receiver statuses for transfer %s: %w", transfer.ID.String(), err)
 	}
 
 	return updatedTransfer, nil
