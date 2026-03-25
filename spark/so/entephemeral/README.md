@@ -41,6 +41,34 @@ Versioning is used to coordinate updates across two independent databases:
 
 This avoids in-place mutation races and provides deterministic lookup of the secret for a specific main-db version.
 
+## Secret Version APIs
+
+`signingkeysharesecret_extension.go` provides explicit helpers for versioned secret lifecycle:
+
+- `GetSigningKeyshareSecretVersion(id, version)` fetches an exact version.
+- `GetLatestSigningKeyshareSecretVersionForUpdate(id)` reads the latest version with row locking.
+- `AddSigningKeyshareSecretVersion(id, secret)` allocates the next version (`latest + 1`, or `0` if missing).
+- `CreateSigningKeyshareSecretVersion(id, version, secret)` inserts an explicit version.
+- `DeleteSigningKeyshareSecretVersion(id, version)` removes a specific version.
+
+Behavioral notes:
+
+- `GetSigningKeyshareSecretVersion` and `DeleteSigningKeyshareSecretVersion` return `ErrNoSecretVersion` when the requested version is absent.
+- `GetLatestSigningKeyshareSecretVersionForUpdate` returns `(nil, nil)` when no version exists yet (signaling "start from version 0").
+- Duplicate `(signing_keyshare_id, version)` inserts fail via the unique index.
+- Version overflow (`int32` max) is rejected explicitly.
+
+## Advisory Locking for Version Writes
+
+To serialize concurrent version allocation per `signing_keyshare_id`, writes take a transaction-scoped Postgres advisory lock:
+
+- Lock primitive: `pg_advisory_xact_lock(classid, objid)`
+- Key derivation: UUID -> FNV-64a hash -> split into stable `(classid, objid)` int32 pair
+
+The UUID hashing step is deliberate: using FNV-64a over the full UUID avoids collision/pathological contention patterns from simpler folding strategies.
+
+This lock is required by mutation flows (`Add*`, `Create*`, and latest-for-update path). These paths are Postgres-only; they return an error on non-Postgres dialects.
+
 ## Transaction and Commit Semantics
 
 Cross-database transactions are not atomic. This follows a Saga-style pattern (with compensating actions and explicit divergence handling), not a distributed 2PC transaction:
