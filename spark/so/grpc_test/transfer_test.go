@@ -1998,6 +1998,45 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	require.NoError(t, err, "Expected success when TransferIds are specified")
 }
 
+// TestV3MimoEmptyTransferRejected verifies that the SO rejects a
+// StartTransferV3 request with no leaves and no receivers.
+func TestV3MimoEmptyTransferRejected(t *testing.T) {
+	senderConfig := wallet.NewTestWalletConfig(t)
+
+	sparkConn, err := senderConfig.NewCoordinatorGRPCConnection()
+	require.NoError(t, err)
+	defer sparkConn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), senderConfig, sparkConn)
+	require.NoError(t, err)
+	authCtx := wallet.ContextWithToken(t.Context(), token)
+
+	client := sparkpb.NewSparkServiceClient(sparkConn)
+	transferID, err := uuid.NewV7()
+	require.NoError(t, err)
+
+	// Empty sender package: no transfer package, no receiver map.
+	_, err = client.StartTransferV3(authCtx, &sparkpb.StartTransferV3Request{
+		TransferId: transferID.String(),
+		SenderPackages: []*sparkpb.SenderTransferPackage{{
+			OwnerIdentityPublicKey:     senderConfig.IdentityPublicKey().Serialize(),
+			TransferPackage:            nil,
+			ReceiverIdentityPublicKeys: map[string][]byte{},
+		}},
+	})
+	require.Error(t, err, "empty MIMO transfer with no leaves/receivers should be rejected")
+
+	// Also test with no sender packages at all.
+	transferID2, err := uuid.NewV7()
+	require.NoError(t, err)
+
+	_, err = client.StartTransferV3(authCtx, &sparkpb.StartTransferV3Request{
+		TransferId:     transferID2.String(),
+		SenderPackages: []*sparkpb.SenderTransferPackage{},
+	})
+	require.Error(t, err, "MIMO transfer with zero sender packages should be rejected")
+}
+
 // TestV3MimoReceiverCannotClaimOtherReceiversLeaves verifies that in a
 // multi-receiver MIMO transfer, receiver 1 cannot claim leaves that were
 // assigned to receiver 2. The SO must scope leaves per-receiver and reject
