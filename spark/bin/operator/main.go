@@ -346,6 +346,10 @@ func main() {
 		} else {
 			valuesProvider = provider
 		}
+	} else if args.RunningLocally && len(config.Knobs.StaticValues) > 0 {
+		// Fallback for bare-process deployments (dev-cli, run-everything.sh):
+		// use static values from the YAML config
+		valuesProvider = knobs.NewStaticValuesProvider(config.Knobs.StaticValues)
 	}
 
 	// Knobs service is always defined, no need to check for nil.

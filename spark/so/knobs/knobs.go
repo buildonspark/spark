@@ -151,6 +151,9 @@ const (
 type Config struct {
 	Enabled   *bool   `yaml:"enabled"`
 	Namespace *string `yaml:"namespace"`
+	// StaticValues provides default knob values for local development
+	// over Kubernetes-based knob providers.
+	StaticValues map[string]float64 `yaml:"static_values"`
 }
 
 func (c *Config) IsEnabled() bool {

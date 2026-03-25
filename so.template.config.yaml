@@ -55,3 +55,45 @@ tracing:
     per_span_sampling_rates: {}
     allow_list: []
     block_list: []
+knobs:
+  static_values:
+    # Database
+    spark.database.only_commit_dirty: 100
+    spark.database.pool.min_conns: 4
+    # Deposit/transfer validation
+    spark.so.enable_deposit_flow_validation@REGTEST: 100
+    spark.so.enhanced_transfer_receive_validation@REGTEST: 100
+    spark.so.enhanced_bitcoin_tx_validation@REGTEST: 100
+    spark.so.require_direct_from_cpfp_refund@REGTEST: 100
+    spark.so.direct_refund_tx_validation@REGTEST: 100
+    spark.so.require_multiple_conf_for_non_static_deposit: 1
+    spark.so.max_unused_deposit_addresses: 64
+    spark.so.enforce_no_direct_transactions_from_deposit_tx@REGTEST: 100
+    spark.so.disable_v2_txs@REGTEST: 100
+    spark.so.require_connector_tx_validation@REGTEST: 100
+    spark.so.filter_ssp_counter_swap_as_transfer@REGTEST: 100
+    # Chain watcher
+    spark.so.watch_chain.tweak_keys_for_coop_exit_delay.enabled: 1
+    # Instant static deposit
+    spark.so.enable_instant_static_deposit@REGTEST: 100
+    spark.so.max_pending_instant_static_deposit_amount: 1000000
+    # Lightning
+    spark.so.shutdown_hodl_invoices: 0
+    # MIMO
+    spark.so.mimo_transfer_multi_receiver_enabled: 1
+    spark.so.read_mimo_data_model_query_transfers: 1
+    spark.so.read_mimo_data_model_transfer_send: 1
+    # Tokens
+    spark.so.tokens.allow_extra_metadata_on_mainnet: 0
+    spark.so.tokens.backfill_create_mint_finalized_status_enabled: 0
+    spark.so.tokens.coordinated_freeze_enabled: 0
+    spark.so.tokens.enable_justice_transactions: 1
+    spark.so.tokens.enforce_withdrawal_signature_validation: 0
+    spark.so.tokens.multisig_issuer_enabled: 0
+    spark.so.tokens.token_transaction_v3_enabled: 100
+    spark.so.tokens.token_transaction_v3_phase2_enabled: 100
+    spark.so.tokens.token_transaction_v3_phase2_retry_enabled: 100
+    # Read-only sessions
+    spark.so.ro_session@/spark.SparkService/query_nodes: 100
+    spark.so.ro_session@/spark.SparkService/query_pending_transfers: 100
+    spark.so.ro_session@/spark_token.SparkTokenService/query_token_outputs: 100
