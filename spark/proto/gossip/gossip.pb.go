@@ -28,7 +28,7 @@ const (
 )
 
 // ConsensusOperationType identifies the domain flow for consensus operations.
-// Each value maps to a registered FlowHandler in the TwoPCEngine.
+// Each value corresponds to a case in the gossip handler's dispatch switch.
 type ConsensusOperationType int32
 
 const (
@@ -1544,12 +1544,12 @@ func (x *GossipMessageFinalizeTreeNode) GetNodes() []*spark_internal.TreeNode {
 }
 
 // GossipMessageConsensusCommit delivers the commit phase of a consensus operation.
-// The op_type identifies the registered FlowHandler, and operation carries
-// the serialized domain-specific proto payload for FlowHandler.Commit.
+// The op_type identifies the domain flow, and operation carries the serialized
+// domain-specific proto payload for the flow's commit logic.
 type GossipMessageConsensusCommit struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	OpType ConsensusOperationType `protobuf:"varint,1,opt,name=op_type,json=opType,proto3,enum=gossip.ConsensusOperationType" json:"op_type,omitempty"`
-	// Domain-specific proto message passed to FlowHandler.Commit.
+	// Domain-specific proto message for the commit phase.
 	Operation     *anypb.Any `protobuf:"bytes,2,opt,name=operation,proto3" json:"operation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1600,12 +1600,12 @@ func (x *GossipMessageConsensusCommit) GetOperation() *anypb.Any {
 }
 
 // GossipMessageConsensusRollback delivers the rollback phase of a consensus operation.
-// The op_type identifies the registered FlowHandler, and operation carries
-// the domain-specific proto payload for FlowHandler.Rollback.
+// The op_type identifies the domain flow, and operation carries the serialized
+// domain-specific proto payload for the flow's rollback logic.
 type GossipMessageConsensusRollback struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	OpType ConsensusOperationType `protobuf:"varint,1,opt,name=op_type,json=opType,proto3,enum=gossip.ConsensusOperationType" json:"op_type,omitempty"`
-	// Domain-specific proto message passed to FlowHandler.Rollback.
+	// Domain-specific proto message for the rollback phase.
 	Operation     *anypb.Any `protobuf:"bytes,2,opt,name=operation,proto3" json:"operation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

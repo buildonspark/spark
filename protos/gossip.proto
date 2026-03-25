@@ -172,25 +172,25 @@ message GossipMessageFinalizeTreeNode {
 }
 
 // ConsensusOperationType identifies the domain flow for consensus operations.
-// Each value maps to a registered FlowHandler in the TwoPCEngine.
+// Each value corresponds to a case in the gossip handler's dispatch switch.
 enum ConsensusOperationType {
     CONSENSUS_OPERATION_TYPE_UNSPECIFIED = 0;
 }
 
 // GossipMessageConsensusCommit delivers the commit phase of a consensus operation.
-// The op_type identifies the registered FlowHandler, and operation carries
-// the serialized domain-specific proto payload for FlowHandler.Commit.
+// The op_type identifies the domain flow, and operation carries the serialized
+// domain-specific proto payload for the flow's commit logic.
 message GossipMessageConsensusCommit {
     ConsensusOperationType op_type = 1;
-    // Domain-specific proto message passed to FlowHandler.Commit.
+    // Domain-specific proto message for the commit phase.
     google.protobuf.Any operation = 2;
 }
 
 // GossipMessageConsensusRollback delivers the rollback phase of a consensus operation.
-// The op_type identifies the registered FlowHandler, and operation carries
-// the domain-specific proto payload for FlowHandler.Rollback.
+// The op_type identifies the domain flow, and operation carries the serialized
+// domain-specific proto payload for the flow's rollback logic.
 message GossipMessageConsensusRollback {
     ConsensusOperationType op_type = 1;
-    // Domain-specific proto message passed to FlowHandler.Rollback.
+    // Domain-specific proto message for the rollback phase.
     google.protobuf.Any operation = 2;
 }

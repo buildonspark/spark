@@ -6,47 +6,15 @@ import (
 	"testing"
 
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
 
-// testOpType is a placeholder enum value for tests. The real enum values
-// will be added as domain flows are migrated.
 const testOpType = pbgossip.ConsensusOperationType(999)
-
-// mockFlowHandler records calls for testing.
-type mockFlowHandler struct {
-	prepareCalled  bool
-	commitCalled   bool
-	rollbackCalled bool
-	lastOp         proto.Message
-	prepareResult  []byte
-	prepareErr     error
-	commitErr      error
-	rollbackErr    error
-}
-
-func (m *mockFlowHandler) Prepare(_ context.Context, op proto.Message) ([]byte, error) {
-	m.prepareCalled = true
-	m.lastOp = op
-	return m.prepareResult, m.prepareErr
-}
-
-func (m *mockFlowHandler) Commit(_ context.Context, op proto.Message) error {
-	m.commitCalled = true
-	m.lastOp = op
-	return m.commitErr
-}
-
-func (m *mockFlowHandler) Rollback(_ context.Context, op proto.Message) error {
-	m.rollbackCalled = true
-	m.lastOp = op
-	return m.rollbackErr
-}
-
-var _ FlowHandler = (*mockFlowHandler)(nil)
 
 // mockGossipSender records gossip calls for testing.
 type mockGossipSender struct {
@@ -66,181 +34,158 @@ func (m *mockGossipSender) CreateCommitAndSendGossipMessage(_ context.Context, m
 
 var _ GossipSender = (*mockGossipSender)(nil)
 
-func newTestEngine() (*TwoPCEngine, *mockGossipSender) {
+func testConfig() *so.Config {
+	return &so.Config{
+		Identifier: "op-self",
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"op-self": {Identifier: "op-self"},
+		},
+	}
+}
+
+func newTestEngineWithConfig() (*TwoPCEngine, *mockGossipSender, *so.Config) {
 	gs := &mockGossipSender{}
-	return NewTwoPCEngine(nil, gs), gs
+	config := testConfig()
+	return NewTwoPCEngine(config, gs), gs, config
 }
 
-func mustRegister(t *testing.T, engine *TwoPCEngine, opType pbgossip.ConsensusOperationType, handler FlowHandler) {
-	t.Helper()
-	require.NoError(t, engine.Register(opType, handler))
+// simpleFlowHandler is a FlowHandler without PostPrepare — commit uses op directly.
+type simpleFlowHandler struct{}
+
+func (h *simpleFlowHandler) Prepare(_ context.Context, _ proto.Message) ([]byte, error) {
+	return nil, nil
 }
 
-// --- Dispatch tests (local FlowHandler routing) ---
+func (h *simpleFlowHandler) Commit(_ context.Context, _ proto.Message) error {
+	return nil
+}
 
-func TestDispatch_Prepare(t *testing.T) {
-	engine, _ := newTestEngine()
-	h := &mockFlowHandler{prepareResult: []byte("sig-share")}
-	mustRegister(t, engine, testOpType, h)
+func (h *simpleFlowHandler) Rollback(_ context.Context, _ proto.Message) error {
+	return nil
+}
 
-	op := &pbgossip.GossipMessage{MessageId: "op-1"}
-	result, err := engine.Dispatch(t.Context(), testOpType, PhasePrepare, op)
+// aggregatingFlowHandler implements PostPrepare to build the commit message from results.
+type aggregatingFlowHandler struct {
+	simpleFlowHandler
+	postPrepareResult proto.Message
+	postPrepareErr    error
+}
 
+func (h *aggregatingFlowHandler) PostPrepare(_ context.Context, _ map[string][]byte) (proto.Message, error) {
+	return h.postPrepareResult, h.postPrepareErr
+}
+
+var _ PostPrepare = (*aggregatingFlowHandler)(nil)
+
+// --- Execute tests (simple flow, no PostPrepare) ---
+
+func TestExecute_PrepareSucceeds_SendsCommitWithOp(t *testing.T) {
+	engine, gs, config := newTestEngineWithConfig()
+	op := &pbgossip.GossipMessage{MessageId: "op"}
+	selection, err := helper.NewPreSelectedOperatorSelection(config, []string{"op-self"})
 	require.NoError(t, err)
-	assert.True(t, h.prepareCalled)
-	assert.Equal(t, op, h.lastOp)
-	assert.Equal(t, []byte("sig-share"), result)
-}
 
-func TestDispatch_Commit(t *testing.T) {
-	engine, _ := newTestEngine()
-	h := &mockFlowHandler{}
-	mustRegister(t, engine, testOpType, h)
-
-	op := &pbgossip.GossipMessage{MessageId: "op-1"}
-	result, err := engine.Dispatch(t.Context(), testOpType, PhaseCommit, op)
-
-	require.NoError(t, err)
-	assert.True(t, h.commitCalled)
-	assert.Equal(t, op, h.lastOp)
-	assert.Nil(t, result)
-}
-
-func TestDispatch_Rollback(t *testing.T) {
-	engine, _ := newTestEngine()
-	h := &mockFlowHandler{}
-	mustRegister(t, engine, testOpType, h)
-
-	op := &pbgossip.GossipMessage{MessageId: "op-1"}
-	result, err := engine.Dispatch(t.Context(), testOpType, PhaseRollback, op)
-
-	require.NoError(t, err)
-	assert.True(t, h.rollbackCalled)
-	assert.Equal(t, op, h.lastOp)
-	assert.Nil(t, result)
-}
-
-func TestDispatch_UnregisteredOpType(t *testing.T) {
-	engine, _ := newTestEngine()
-
-	_, err := engine.Dispatch(t.Context(), testOpType, PhasePrepare, &pbgossip.GossipMessage{})
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no handler registered for operation type")
-}
-
-func TestDispatch_UnknownPhase(t *testing.T) {
-	engine, _ := newTestEngine()
-	h := &mockFlowHandler{}
-	mustRegister(t, engine, testOpType, h)
-
-	_, err := engine.Dispatch(t.Context(), testOpType, OperationPhase(99), &pbgossip.GossipMessage{})
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown operation phase 99")
-}
-
-func TestDispatch_PropagatesPrepareError(t *testing.T) {
-	engine, _ := newTestEngine()
-	h := &mockFlowHandler{prepareErr: fmt.Errorf("validation failed")}
-	mustRegister(t, engine, testOpType, h)
-
-	_, err := engine.Dispatch(t.Context(), testOpType, PhasePrepare, &pbgossip.GossipMessage{})
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "validation failed")
-}
-
-func TestDispatch_PropagatesCommitError(t *testing.T) {
-	engine, _ := newTestEngine()
-	h := &mockFlowHandler{commitErr: fmt.Errorf("commit failed")}
-	mustRegister(t, engine, testOpType, h)
-
-	_, err := engine.Dispatch(t.Context(), testOpType, PhaseCommit, &pbgossip.GossipMessage{})
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "commit failed")
-}
-
-func TestDispatch_PropagatesRollbackError(t *testing.T) {
-	engine, _ := newTestEngine()
-	h := &mockFlowHandler{rollbackErr: fmt.Errorf("rollback failed")}
-	mustRegister(t, engine, testOpType, h)
-
-	_, err := engine.Dispatch(t.Context(), testOpType, PhaseRollback, &pbgossip.GossipMessage{})
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "rollback failed")
-}
-
-func TestRegister_ErrorsOnDuplicate(t *testing.T) {
-	engine, _ := newTestEngine()
-	require.NoError(t, engine.Register(testOpType, &mockFlowHandler{}))
-
-	err := engine.Register(testOpType, &mockFlowHandler{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "handler already registered for operation type")
-}
-
-// --- Commit/Rollback tests (gossip message construction + delegation) ---
-
-func TestCommit_BuildsConsensusCommitGossip(t *testing.T) {
-	engine, gs := newTestEngine()
-	participants := []string{"op1", "op2"}
-	op := &pbgossip.GossipMessage{MessageId: "commit-payload"}
-
-	err := engine.Commit(t.Context(), testOpType, op, participants)
+	err = engine.Execute(t.Context(), testOpType, op,
+		func(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
+			return []byte("sig-share"), nil
+		},
+		selection, &simpleFlowHandler{})
 
 	require.NoError(t, err)
 	require.Len(t, gs.calls, 1)
-	assert.Equal(t, participants, gs.calls[0].participants)
 
 	commit := gs.calls[0].msg.GetConsensusCommit()
 	require.NotNil(t, commit)
-	assert.Equal(t, testOpType, commit.OpType)
-
-	// Verify the Any contains the original message.
 	roundTripped, err := commit.Operation.UnmarshalNew()
 	require.NoError(t, err)
 	assert.True(t, proto.Equal(op, roundTripped))
 }
 
-func TestCommit_PropagatesGossipError(t *testing.T) {
-	engine, gs := newTestEngine()
-	gs.err = fmt.Errorf("gossip failed")
+func TestExecute_PrepareFails_SendsRollback(t *testing.T) {
+	engine, gs, config := newTestEngineWithConfig()
+	op := &pbgossip.GossipMessage{MessageId: "op"}
+	selection, err := helper.NewPreSelectedOperatorSelection(config, []string{"op-self"})
+	require.NoError(t, err)
 
-	err := engine.Commit(t.Context(), testOpType, &pbgossip.GossipMessage{}, []string{"op1"})
+	err = engine.Execute(t.Context(), testOpType, op,
+		func(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
+			return nil, fmt.Errorf("validation failed")
+		},
+		selection, &simpleFlowHandler{})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "gossip failed")
+	assert.Contains(t, err.Error(), "prepare failed")
+	require.Len(t, gs.calls, 1)
+	assert.NotNil(t, gs.calls[0].msg.GetConsensusRollback())
 }
 
-func TestRollback_BuildsConsensusRollbackGossip(t *testing.T) {
-	engine, gs := newTestEngine()
-	participants := []string{"op1"}
-	op := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
+func TestExecute_CommitGossipFails_NoRollback(t *testing.T) {
+	engine, gs, config := newTestEngineWithConfig()
+	gs.err = fmt.Errorf("gossip unavailable")
+	op := &pbgossip.GossipMessage{MessageId: "op"}
+	selection, err := helper.NewPreSelectedOperatorSelection(config, []string{"op-self"})
+	require.NoError(t, err)
 
-	err := engine.Rollback(t.Context(), testOpType, op, participants)
+	err = engine.Execute(t.Context(), testOpType, op,
+		func(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
+			return []byte("sig-share"), nil
+		},
+		selection, &simpleFlowHandler{})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "commit gossip failed")
+	require.Len(t, gs.calls, 1)
+	assert.NotNil(t, gs.calls[0].msg.GetConsensusCommit())
+}
+
+// --- Execute tests (with PostPrepare) ---
+
+func TestExecute_PostPrepare_CommitUsesAggregatedMessage(t *testing.T) {
+	engine, gs, config := newTestEngineWithConfig()
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback"}
+	commitOp := &pbgossip.GossipMessage{MessageId: "aggregated-commit"}
+	selection, err := helper.NewPreSelectedOperatorSelection(config, []string{"op-self"})
+	require.NoError(t, err)
+
+	handler := &aggregatingFlowHandler{postPrepareResult: commitOp}
+
+	err = engine.Execute(t.Context(), testOpType, rollbackOp,
+		func(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
+			return []byte("sig-share"), nil
+		},
+		selection, handler)
 
 	require.NoError(t, err)
 	require.Len(t, gs.calls, 1)
-	assert.Equal(t, participants, gs.calls[0].participants)
+
+	commit := gs.calls[0].msg.GetConsensusCommit()
+	require.NotNil(t, commit)
+	roundTripped, err := commit.Operation.UnmarshalNew()
+	require.NoError(t, err)
+	assert.True(t, proto.Equal(commitOp, roundTripped))
+}
+
+func TestExecute_PostPrepareFails_SendsRollback(t *testing.T) {
+	engine, gs, config := newTestEngineWithConfig()
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback"}
+	selection, err := helper.NewPreSelectedOperatorSelection(config, []string{"op-self"})
+	require.NoError(t, err)
+
+	handler := &aggregatingFlowHandler{postPrepareErr: fmt.Errorf("aggregation failed")}
+
+	err = engine.Execute(t.Context(), testOpType, rollbackOp,
+		func(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
+			return []byte("sig-share"), nil
+		},
+		selection, handler)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "post-prepare failed")
+	require.Len(t, gs.calls, 1)
 
 	rollback := gs.calls[0].msg.GetConsensusRollback()
 	require.NotNil(t, rollback)
-	assert.Equal(t, testOpType, rollback.OpType)
-
 	roundTripped, err := rollback.Operation.UnmarshalNew()
 	require.NoError(t, err)
-	assert.True(t, proto.Equal(op, roundTripped))
-}
-
-func TestRollback_PropagatesGossipError(t *testing.T) {
-	engine, gs := newTestEngine()
-	gs.err = fmt.Errorf("rollback gossip failed")
-
-	err := engine.Rollback(t.Context(), testOpType, &pbgossip.GossipMessage{}, []string{"op1"})
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "rollback gossip failed")
+	assert.True(t, proto.Equal(rollbackOp, roundTripped))
 }

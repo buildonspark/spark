@@ -15,7 +15,6 @@ import (
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
-	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -48,17 +47,6 @@ func init() {
 		}
 	}
 	gossipMessageHandledTotal = counter
-}
-
-// consensusEngine is the package-level TwoPCEngine used to dispatch incoming
-// ConsensusCommit/ConsensusRollback gossip messages. Set once at startup via
-// SetConsensusEngine before any gossip messages are processed.
-var consensusEngine *consensus.TwoPCEngine
-
-// SetConsensusEngine sets the package-level consensus engine for gossip dispatch.
-// Must be called during server initialization before gossip messages are processed.
-func SetConsensusEngine(engine *consensus.TwoPCEngine) {
-	consensusEngine = engine
 }
 
 type GossipHandler struct {
@@ -140,7 +128,7 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 			commit := gossipMessage.GetConsensusCommit()
 			var op proto.Message
 			if op, err = commit.Operation.UnmarshalNew(); err == nil {
-				_, err = consensusEngine.Dispatch(ctx, commit.OpType, consensus.PhaseCommit, op)
+				err = dispatchConsensusCommit(ctx, h.config, commit.OpType, op)
 			}
 		}
 	case *pbgossip.GossipMessage_ConsensusRollback:
@@ -148,7 +136,7 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 			rollback := gossipMessage.GetConsensusRollback()
 			var op proto.Message
 			if op, err = rollback.Operation.UnmarshalNew(); err == nil {
-				_, err = consensusEngine.Dispatch(ctx, rollback.OpType, consensus.PhaseRollback, op)
+				err = dispatchConsensusRollback(ctx, h.config, rollback.OpType, op)
 			}
 		}
 	default:
@@ -634,4 +622,26 @@ func (h *GossipHandler) handleFinalizeTreeNodeGossipMessage(
 	}
 
 	return nil
+}
+
+// dispatchConsensusCommit routes an incoming ConsensusCommit gossip message to
+// the appropriate FlowHandler.Commit based on operation type. New consensus
+// flows add a case here.
+func dispatchConsensusCommit(_ context.Context, _ *so.Config, opType pbgossip.ConsensusOperationType, _ proto.Message) error {
+	switch opType {
+	// TODO: Add cases here as domain flows are migrated to the consensus engine.
+	default:
+		return fmt.Errorf("unknown consensus operation type for commit: %d", opType)
+	}
+}
+
+// dispatchConsensusRollback routes an incoming ConsensusRollback gossip message
+// to the appropriate FlowHandler.Rollback based on operation type. New consensus
+// flows add a case here.
+func dispatchConsensusRollback(_ context.Context, _ *so.Config, opType pbgossip.ConsensusOperationType, _ proto.Message) error {
+	switch opType {
+	// TODO: Add cases here as domain flows are migrated to the consensus engine.
+	default:
+		return fmt.Errorf("unknown consensus operation type for rollback: %d", opType)
+	}
 }
