@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 	"go.uber.org/zap"
 
+	stdsql "database/sql"
 	entdialect "entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-co-op/gocron/v2"
@@ -21,7 +22,7 @@ import (
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
-	"github.com/lightsparkdev/spark/so/backfill"
+
 	"github.com/lightsparkdev/spark/so/db"
 	sodkg "github.com/lightsparkdev/spark/so/dkg"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -52,7 +53,6 @@ var (
 	defaultTaskTimeout                 = 1 * time.Minute
 	dkgTaskTimeout                     = 3 * time.Minute
 	deleteStaleTreeNodesTaskTimeout    = 10 * time.Minute
-	backfillMimoTransfersTaskTimeout   = 10 * time.Minute
 	purgeSigningNoncePartitionsTimeout = 10 * time.Minute
 
 	meter                       = otel.Meter("gossip")
@@ -939,27 +939,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 		{
 			ExecutionInterval: 30 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
-				Name:         "backfill_mimo_transfers",
-				RunInTestEnv: true,
-				Disabled:     false,
-				Timeout:      &backfillMimoTransfersTaskTimeout,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					result, err := backfill.BackfillMimoTransfers(ctx, config, 1000)
-					if err != nil {
-						return err
-					}
-					if !result.BackfillCursor.IsZero() {
-						logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "backfill_mimo_transfers"))
-						logger.Sugar().Infof("created %d transfer records, cursor at %s (unix: %d)",
-							result.TransfersCreated, result.BackfillCursor.Format(time.RFC3339), result.BackfillCursor.Unix())
-					}
-					return nil
-				},
-			},
-		},
-		{
-			ExecutionInterval: 30 * time.Second,
-			BaseTaskSpec: BaseTaskSpec{
 				Name:                "monitor_receiver_status_mismatches",
 				RunInTestEnv:        true,
 				Disabled:            false,
@@ -972,8 +951,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					drv := sql.OpenDB(entdialect.Postgres, rawDB)
 					client := ent.NewClient(ent.Driver(drv))
 
-					_, err = backfill.MonitorReceiverStatusMismatches(ctx, client, 1000)
-					return err
+					return monitorReceiverStatusMismatches(ctx, client, 1000)
 				},
 			},
 		},
@@ -1284,4 +1262,78 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, eph
 	}
 	logger.Info("All startup tasks completed")
 	return nil
+}
+
+// monitorReceiverStatusMismatches checks recently-updated Transfers for
+// TransferReceivers whose status doesn't match the expected mapped status.
+// Uses REPEATABLE READ isolation to eliminate false positives from concurrent commits.
+func monitorReceiverStatusMismatches(ctx context.Context, db *ent.Client, batchSize int) error {
+	logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "monitor_receiver_status_mismatches"))
+
+	tx, err := db.BeginTx(ctx, &stdsql.TxOptions{
+		ReadOnly:  true,
+		Isolation: stdsql.LevelRepeatableRead,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to begin read-only tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	now := time.Now()
+	transfers, err := tx.Transfer.Query().
+		Where(
+			transfer.UpdateTimeGTE(now.Add(-30*time.Second)),
+			transfer.HasTransferReceivers(),
+		).
+		WithTransferReceivers().
+		Limit(batchSize).
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query recent transfers: %w", err)
+	}
+
+	mismatches := 0
+	for _, t := range transfers {
+		expectedStatus := mapTransferToReceiverStatus(t.Status)
+		for _, r := range t.Edges.TransferReceivers {
+			if r.Status != expectedStatus {
+				mismatches++
+				logger.With(
+					zap.String("transfer_id", t.ID.String()),
+				).Sugar().Warnf("receiver %s status mismatch: receiver=%s, expected=%s (transfer=%s)",
+					r.ID, r.Status, expectedStatus, t.Status)
+			}
+		}
+	}
+
+	if mismatches > 0 {
+		logger.Sugar().Warnf("found %d receiver status mismatches across %d recent transfers", mismatches, len(transfers))
+	}
+
+	return nil
+}
+
+func mapTransferToReceiverStatus(s st.TransferStatus) st.TransferReceiverStatus {
+	switch s {
+	case st.TransferStatusSenderInitiated,
+		st.TransferStatusSenderInitiatedCoordinator,
+		st.TransferStatusSenderKeyTweakPending,
+		st.TransferStatusApplyingSenderKeyTweak,
+		st.TransferStatusSenderKeyTweaked:
+		return st.TransferReceiverStatusSenderInitiated
+	case st.TransferStatusReceiverKeyTweaked:
+		return st.TransferReceiverStatusKeyTweaked
+	case st.TransferStatusReceiverKeyTweakLocked:
+		return st.TransferReceiverStatusKeyTweakLocked
+	case st.TransferStatusReceiverKeyTweakApplied:
+		return st.TransferReceiverStatusKeyTweakApplied
+	case st.TransferStatusReceiverRefundSigned:
+		return st.TransferReceiverStatusRefundSigned
+	case st.TransferStatusCompleted:
+		return st.TransferReceiverStatusCompleted
+	case st.TransferStatusExpired, st.TransferStatusReturned:
+		return st.TransferReceiverStatusCancelled
+	default:
+		return st.TransferReceiverStatusSenderInitiated
+	}
 }
