@@ -3222,11 +3222,17 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 	if err != nil {
 		return nil, fmt.Errorf("unable to get db for marshal: %w", err)
 	}
-	freshTransfer, err := marshalDb.Transfer.Get(ctx, transfer.ID)
+	freshTransferQuery := marshalDb.Transfer.Query().Where(enttransfer.ID(transfer.ID))
+	var receiverFilter *keys.Public
+	if isMimoReceiveEnabled {
+		freshTransferQuery = freshTransferQuery.WithTransferReceivers()
+		receiverFilter = &reqOwnerIDPubKey
+	}
+	freshTransfer, err := freshTransferQuery.Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to reload transfer for marshal: %w", err)
 	}
-	transferProto, err := freshTransfer.MarshalProto(ctx)
+	transferProto, err := freshTransfer.MarshalProtoForReceiver(ctx, receiverFilter)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 	}

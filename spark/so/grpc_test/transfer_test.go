@@ -478,6 +478,10 @@ func TestV3TransferMultiReceiverReverseClaimOrder(t *testing.T) {
 	claimed2, err := wallet.ClaimTransferV2(receiver2Ctx, pending2.Transfers[0], receiver2Config, claimLeaves2)
 	require.NoError(t, err)
 
+	require.Len(t, claimed2.Leaves, 1, "claim response should only contain receiver 2's leaf")
+	require.Equal(t, rootNode2.Id, claimed2.Leaves[0].Leaf.Id,
+		"claim response leaf should be receiver 2's leaf")
+
 	require.NotEqual(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed2.Status,
 		"transfer must not be COMPLETED until all receivers claim")
 
@@ -523,6 +527,10 @@ func TestV3TransferMultiReceiverReverseClaimOrder(t *testing.T) {
 	}}
 	claimed1, err := wallet.ClaimTransferV2(receiver1Ctx, pending1.Transfers[0], receiver1Config, claimLeaves1)
 	require.NoError(t, err)
+
+	require.Len(t, claimed1.Leaves, 1, "claim response should only contain receiver 1's leaf")
+	require.Equal(t, rootNode1.Id, claimed1.Leaves[0].Leaf.Id,
+		"claim response leaf should be receiver 1's leaf")
 
 	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed1.Status,
 		"transfer should be COMPLETED after all receivers claim")
