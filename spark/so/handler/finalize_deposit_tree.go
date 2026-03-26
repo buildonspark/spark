@@ -328,6 +328,18 @@ func loadAndValidateDepositAddress(
 		}
 	}
 
+	// For single-input deposits, verify the primary UTXO matches the confirmed
+	// on-chain deposit. Without this check, an attacker could supply fabricated
+	// raw tx bytes paying to a valid deposit address with an inflated value,
+	// and the server would create a tree backed by a UTXO that doesn't exist.
+	if len(additionalUtxos) == 0 && depositAddress.ConfirmationTxid != "" {
+		onChainTxid := onChainTx.TxHash().String()
+		if onChainTxid != depositAddress.ConfirmationTxid {
+			err = fmt.Errorf("primary utxo txid %s does not match confirmed deposit txid %s", onChainTxid, depositAddress.ConfirmationTxid)
+			return
+		}
+	}
+
 	if len(additionalUtxos) == 0 {
 		// Single-input: full validation of root tx, refund txs, and direct txs
 		combinedPublicKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)

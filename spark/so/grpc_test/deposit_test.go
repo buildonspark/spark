@@ -1704,6 +1704,63 @@ func TestFinalizeDepositTreeCreationMultiUtxoRejectsUnconfirmedPrimary(t *testin
 	assert.Contains(t, err.Error(), "primary utxo not found on-chain")
 }
 
+// TestFinalizeDepositTreeCreation_RejectsFabricatedUtxo verifies that the server
+// rejects a FinalizeDepositTreeCreation request when the primary UTXO does not
+// match the confirmed on-chain deposit. Without this check, an attacker could
+// supply fabricated raw tx bytes with an inflated value and mint unbacked funds.
+func TestFinalizeDepositTreeCreation_RejectsFabricatedUtxo(t *testing.T) {
+	bitcoinClient := sparktesting.GetBitcoinClient()
+
+	// Step 1: Generate a deposit address.
+	config := wallet.NewTestWalletConfig(t)
+	token, err := wallet.AuthenticateWithServer(t.Context(), config)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	signingPrivKey := keys.GeneratePrivateKey()
+	leafID := uuid.NewString()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, signingPrivKey.Public(), &leafID, false)
+	require.NoError(t, err)
+	depositAddress := depositResp.DepositAddress.Address
+
+	// Step 2: Send a small legitimate deposit and mine it.
+	coin, err := faucet.Fund()
+	require.NoError(t, err)
+
+	legitimateAmount := int64(10_000)
+	legitimateDepositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositAddress, legitimateAmount)
+	require.NoError(t, err)
+
+	signedLegitTx, err := sparktesting.SignFaucetCoin(legitimateDepositTx, coin.TxOut, coin.Key)
+	require.NoError(t, err)
+	_, err = bitcoinClient.SendRawTransaction(signedLegitTx, true)
+	require.NoError(t, err)
+
+	mineAddress, err := common.P2TRRawAddressFromPublicKey(keys.GeneratePrivateKey().Public(), btcnetwork.Regtest)
+	require.NoError(t, err)
+	_, err = bitcoinClient.GenerateToAddress(3, mineAddress, nil)
+	require.NoError(t, err)
+
+	// Wait for chain watcher to confirm the deposit.
+	time.Sleep(2 * time.Second)
+
+	// Step 3: Create a fabricated tx (never broadcast) with inflated value.
+	fakeOutPoint := &wire.OutPoint{Hash: [32]byte{0xDE, 0xAD, 0xBE, 0xEF}, Index: 0}
+	fabricatedAmount := int64(900_000)
+	fabricatedDepositTx, err := sparktesting.CreateTestDepositTransaction(fakeOutPoint, depositAddress, fabricatedAmount)
+	require.NoError(t, err)
+
+	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	require.NoError(t, err)
+
+	// Step 4: FinalizeDepositTreeCreation should reject the fabricated tx.
+	_, err = wallet.CreateTreeRootWithFinalizeDepositTreeCreation(
+		ctx, config, signingPrivKey, verifyingKey, fabricatedDepositTx, 0,
+	)
+	require.Error(t, err, "should reject fabricated tx that doesn't match confirmed deposit")
+	assert.Contains(t, err.Error(), "does not match confirmed deposit txid")
+}
+
 func signingJobFromTx(t *testing.T, publicKey keys.Public, tx *wire.MsgTx) *pb.SigningJob {
 	var txBuf bytes.Buffer
 	require.NoError(t, tx.Serialize(&txBuf))
