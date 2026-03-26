@@ -915,35 +915,42 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 
 	logger.Sugar().Infof("Marking UTXO swap for %x:%d as COMPLETED", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 
-	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get schema network: %w", err)
-	}
-	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo, nil)
-	if err != nil {
-		return nil, err
-	}
-
+	// Look up the swap type to determine the correct confirmation threshold.
+	// Instant deposits require threshold=1; regular deposits use the default (3 or config).
 	utxoSwap, err := db.UtxoSwap.Query().
-		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.inner.ID))).
-		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
-		// The identity public key of the coordinator that created the utxo swap.
-		// It's been verified above.
-		Where(utxoswap.CoordinatorIdentityPublicKeyEQ(coordinatorPubKey)).
+		Where(
+			utxoswap.HasUtxoWith(
+				utxo.Txid(req.OnChainUtxo.Txid),
+				utxo.Vout(req.OnChainUtxo.Vout),
+				utxo.NetworkEQ(network),
+			),
+			utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted),
+			utxoswap.CoordinatorIdentityPublicKeyEQ(coordinatorPubKey),
+		).
 		Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get utxo swap for utxo %s: %w", targetUtxo.inner.ID, err)
+		return nil, fmt.Errorf("unable to get utxo swap for %x:%d: %w", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, err)
 	}
 
-	if utxoSwap != nil && utxoSwap.Status == st.UtxoSwapStatusCompleted {
+	if utxoSwap.Status == st.UtxoSwapStatusCompleted {
 		return &pbinternal.UtxoSwapCompletedResponse{}, nil
+	}
+
+	var confirmationThreshold *uint32
+	if utxoSwap.RequestType == st.UtxoSwapRequestTypeInstant {
+		threshold := uint32(1)
+		confirmationThreshold = &threshold
+	}
+	_, err = VerifiedTargetUtxoFromRequest(ctx, config, db, network, req.OnChainUtxo, confirmationThreshold)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := CompleteUtxoSwap(ctx, utxoSwap); err != nil {
 		return nil, fmt.Errorf("unable to complete utxo swap: %w", err)
 	}
 
-	logger.Sugar().Infof("UTXO swap %s for %s:%d marked as COMPLETED", utxoSwap.ID, targetUtxo.Hash().String(), targetUtxo.Vout())
+	logger.Sugar().Infof("UTXO swap %s for %x:%d marked as COMPLETED", utxoSwap.ID, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 	return &pbinternal.UtxoSwapCompletedResponse{}, nil
 }
 

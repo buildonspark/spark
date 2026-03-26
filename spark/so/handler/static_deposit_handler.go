@@ -217,8 +217,8 @@ func (o *StaticDepositHandler) SaveUtxoForInstantStaticDepositForAllOperators(ct
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		internalResp, err := client.SaveUtxoForInstantStaticDeposit(ctx, request)
 		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf(
-				"Failed to save utxo for instant static deposit with operator %s",
+			logger.With(zap.Error(err)).Sugar().Warnf(
+				"Failed to save utxo for instant static deposit with operator %s (will retry via SSP)",
 				operator.Identifier,
 			)
 			return nil, err
