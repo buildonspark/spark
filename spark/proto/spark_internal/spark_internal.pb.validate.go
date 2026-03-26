@@ -8315,3 +8315,267 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = SyncNodeRequestValidationError{}
+
+// Validate checks the field values on ConsensusPrepareRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ConsensusPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ConsensusPrepareRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ConsensusPrepareRequestMultiError, or nil if none found.
+func (m *ConsensusPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ConsensusPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for OpType
+
+	if all {
+		switch v := interface{}(m.GetOperation()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ConsensusPrepareRequestValidationError{
+					field:  "Operation",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ConsensusPrepareRequestValidationError{
+					field:  "Operation",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOperation()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ConsensusPrepareRequestValidationError{
+				field:  "Operation",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return ConsensusPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ConsensusPrepareRequestMultiError is an error wrapping multiple validation
+// errors returned by ConsensusPrepareRequest.ValidateAll() if the designated
+// constraints aren't met.
+type ConsensusPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ConsensusPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ConsensusPrepareRequestMultiError) AllErrors() []error { return m }
+
+// ConsensusPrepareRequestValidationError is the validation error returned by
+// ConsensusPrepareRequest.Validate if the designated constraints aren't met.
+type ConsensusPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ConsensusPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ConsensusPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ConsensusPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ConsensusPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ConsensusPrepareRequestValidationError) ErrorName() string {
+	return "ConsensusPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ConsensusPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sConsensusPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ConsensusPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ConsensusPrepareRequestValidationError{}
+
+// Validate checks the field values on ConsensusPrepareResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ConsensusPrepareResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ConsensusPrepareResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ConsensusPrepareResponseMultiError, or nil if none found.
+func (m *ConsensusPrepareResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ConsensusPrepareResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetResult()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ConsensusPrepareResponseValidationError{
+					field:  "Result",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ConsensusPrepareResponseValidationError{
+					field:  "Result",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetResult()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ConsensusPrepareResponseValidationError{
+				field:  "Result",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return ConsensusPrepareResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// ConsensusPrepareResponseMultiError is an error wrapping multiple validation
+// errors returned by ConsensusPrepareResponse.ValidateAll() if the designated
+// constraints aren't met.
+type ConsensusPrepareResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ConsensusPrepareResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ConsensusPrepareResponseMultiError) AllErrors() []error { return m }
+
+// ConsensusPrepareResponseValidationError is the validation error returned by
+// ConsensusPrepareResponse.Validate if the designated constraints aren't met.
+type ConsensusPrepareResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ConsensusPrepareResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ConsensusPrepareResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ConsensusPrepareResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ConsensusPrepareResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ConsensusPrepareResponseValidationError) ErrorName() string {
+	return "ConsensusPrepareResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ConsensusPrepareResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sConsensusPrepareResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ConsensusPrepareResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ConsensusPrepareResponseValidationError{}

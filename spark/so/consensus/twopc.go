@@ -39,9 +39,13 @@ func NewTwoPCEngine(config *so.Config, gossip GossipSender) *TwoPCEngine {
 
 // Execute runs the full two-phase commit lifecycle for a consensus operation.
 //
-// It fans out flow.PrepareTask to all selected operators, then calls
-// flow.BuildCommitPayload to produce the commit gossip payload from prepare
-// results. If any step fails, a rollback gossip is sent with
+// Prepare is fanned out to all selected operators:
+//   - Remote operators: via flow.PrepareTask (typically ConsensusPrepare gRPC)
+//   - Self (coordinator): via flow.Prepare locally to avoid gRPC deadlocks
+//     when the caller holds DB locks
+//
+// After all prepares succeed, flow.BuildCommitPayload produces the commit
+// gossip payload. If any step fails, a rollback gossip is sent with
 // flow.RollbackPayload().
 //
 // If commit gossip fails after a successful prepare, Execute does not attempt
@@ -64,7 +68,27 @@ func (e *TwoPCEngine) Execute(
 		return nil, fmt.Errorf("failed to resolve participants: %w", err)
 	}
 
-	results, err := helper.ExecuteTaskWithAllOperators(ctx, e.config, selection, flow.PrepareTask)
+	// Wrap prepareTask: remote operators use flow.PrepareTask (gRPC),
+	// self uses flow.Prepare locally to avoid deadlock.
+	// Both return proto.Message which is marshaled into *anypb.Any for the results map.
+	prepareTask := func(ctx context.Context, operator *so.SigningOperator) (*anypb.Any, error) {
+		var result proto.Message
+		var err error
+		if operator.Identifier == e.config.Identifier {
+			result, err = flow.Prepare(ctx, flow.PrepareOp())
+		} else {
+			result, err = flow.PrepareTask(ctx, operator)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if result == nil {
+			return nil, nil
+		}
+		return anypb.New(result)
+	}
+
+	results, err := helper.ExecuteTaskWithAllOperators(ctx, e.config, selection, prepareTask)
 	if err != nil {
 		if rollbackErr := e.rollback(ctx, opType, flow.RollbackPayload(), participants); rollbackErr != nil {
 			logger.With(zap.Error(rollbackErr)).Sugar().Errorf(

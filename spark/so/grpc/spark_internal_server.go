@@ -260,3 +260,12 @@ func (s *SparkInternalServer) SyncNode(ctx context.Context, req *pb.SyncNodeRequ
 	h := handler.NewSyncNodeHandler(s.config)
 	return &emptypb.Empty{}, h.SyncTreeNodes(ctx, req)
 }
+
+func (s *SparkInternalServer) ConsensusPrepare(ctx context.Context, req *pb.ConsensusPrepareRequest) (*pb.ConsensusPrepareResponse, error) {
+	ch := handler.NewConsensusHandler(s.config)
+	result, err := ch.DispatchPrepare(ctx, pbgossip.ConsensusOperationType(req.OpType), req.Operation)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.ConsensusPrepareResponse{Result: result}, nil
+}

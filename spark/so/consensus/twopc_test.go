@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const testOpType = pbgossip.ConsensusOperationType(999)
@@ -51,16 +52,25 @@ func newTestEngineWithConfig() (*TwoPCEngine, *mockGossipSender, *so.Config) {
 
 // simpleFlow is a CoordinatorFlow where commit and rollback use the same static payload.
 type simpleFlow struct {
-	prepareResult []byte
-	prepareErr    error
-	payload       proto.Message
+	prepareErr error
+	payload    proto.Message
 }
 
-func (f *simpleFlow) PrepareTask(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
-	return f.prepareResult, f.prepareErr
+func (f *simpleFlow) Prepare(_ context.Context, _ proto.Message) (proto.Message, error) {
+	return nil, f.prepareErr
 }
 
-func (f *simpleFlow) BuildCommitPayload(_ context.Context, _ map[string][]byte) (proto.Message, error) {
+func (f *simpleFlow) Commit(_ context.Context, _ proto.Message) error { return nil }
+
+func (f *simpleFlow) Rollback(_ context.Context, _ proto.Message) error { return nil }
+
+func (f *simpleFlow) PrepareOp() proto.Message { return f.payload }
+
+func (f *simpleFlow) PrepareTask(_ context.Context, _ *so.SigningOperator) (proto.Message, error) {
+	return nil, f.prepareErr
+}
+
+func (f *simpleFlow) BuildCommitPayload(_ context.Context, _ map[string]*anypb.Any) (proto.Message, error) {
 	return f.payload, nil
 }
 
@@ -73,17 +83,26 @@ var _ CoordinatorFlow = (*simpleFlow)(nil)
 // aggregatingFlow is a CoordinatorFlow where BuildCommitPayload produces a
 // different message from the prepare results.
 type aggregatingFlow struct {
-	prepareResult []byte
-	rollbackOp    proto.Message
-	commitResult  proto.Message
-	commitErr     error
+	rollbackOp   proto.Message
+	commitResult proto.Message
+	commitErr    error
 }
 
-func (f *aggregatingFlow) PrepareTask(_ context.Context, _ *so.SigningOperator) ([]byte, error) {
-	return f.prepareResult, nil
+func (f *aggregatingFlow) Prepare(_ context.Context, _ proto.Message) (proto.Message, error) {
+	return nil, nil
 }
 
-func (f *aggregatingFlow) BuildCommitPayload(_ context.Context, _ map[string][]byte) (proto.Message, error) {
+func (f *aggregatingFlow) Commit(_ context.Context, _ proto.Message) error { return nil }
+
+func (f *aggregatingFlow) Rollback(_ context.Context, _ proto.Message) error { return nil }
+
+func (f *aggregatingFlow) PrepareOp() proto.Message { return f.rollbackOp }
+
+func (f *aggregatingFlow) PrepareTask(_ context.Context, _ *so.SigningOperator) (proto.Message, error) {
+	return nil, nil
+}
+
+func (f *aggregatingFlow) BuildCommitPayload(_ context.Context, _ map[string]*anypb.Any) (proto.Message, error) {
 	return f.commitResult, f.commitErr
 }
 
@@ -102,7 +121,7 @@ func TestExecute_PrepareSucceeds_SendsCommitWithPayload(t *testing.T) {
 	require.NoError(t, err)
 
 	result, err := engine.Execute(t.Context(), testOpType, selection,
-		&simpleFlow{prepareResult: []byte("sig-share"), payload: op})
+		&simpleFlow{payload: op})
 
 	require.NoError(t, err)
 	assert.True(t, proto.Equal(op, result))
@@ -139,7 +158,7 @@ func TestExecute_CommitGossipFails_NoRollback(t *testing.T) {
 	require.NoError(t, err)
 
 	result, err := engine.Execute(t.Context(), testOpType, selection,
-		&simpleFlow{prepareResult: []byte("sig-share"), payload: op})
+		&simpleFlow{payload: op})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "commit gossip failed")
@@ -159,9 +178,8 @@ func TestExecute_BuildCommitPayload_CommitUsesAggregatedMessage(t *testing.T) {
 
 	result, err := engine.Execute(t.Context(), testOpType, selection,
 		&aggregatingFlow{
-			prepareResult: []byte("sig-share"),
-			rollbackOp:    rollbackOp,
-			commitResult:  commitOp,
+			rollbackOp:   rollbackOp,
+			commitResult: commitOp,
 		})
 
 	require.NoError(t, err)
@@ -183,9 +201,8 @@ func TestExecute_BuildCommitPayloadFails_SendsRollback(t *testing.T) {
 
 	result, err := engine.Execute(t.Context(), testOpType, selection,
 		&aggregatingFlow{
-			prepareResult: []byte("sig-share"),
-			rollbackOp:    rollbackOp,
-			commitErr:     fmt.Errorf("aggregation failed"),
+			rollbackOp: rollbackOp,
+			commitErr:  fmt.Errorf("aggregation failed"),
 		})
 
 	require.Error(t, err)

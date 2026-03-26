@@ -62,6 +62,7 @@ const (
 	SparkInternalService_GetTransfers_FullMethodName                       = "/spark_internal.SparkInternalService/get_transfers"
 	SparkInternalService_GenerateStaticDepositAddressProofs_FullMethodName = "/spark_internal.SparkInternalService/generate_static_deposit_address_proofs"
 	SparkInternalService_SyncNode_FullMethodName                           = "/spark_internal.SparkInternalService/sync_node"
+	SparkInternalService_ConsensusPrepare_FullMethodName                   = "/spark_internal.SparkInternalService/consensus_prepare"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -124,6 +125,10 @@ type SparkInternalServiceClient interface {
 	// This method fixes bad leaves by querying a designated "good" SO for its
 	// leaves, and copying it over to this SO's DB.
 	SyncNode(ctx context.Context, in *SyncNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ConsensusPrepare is the generic prepare RPC for the 2PC consensus engine.
+	// The coordinator fans this out to all participants during Execute.
+	// Each participant dispatches to the appropriate FlowHandler.Prepare based on op_type.
+	ConsensusPrepare(ctx context.Context, in *ConsensusPrepareRequest, opts ...grpc.CallOption) (*ConsensusPrepareResponse, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -546,6 +551,16 @@ func (c *sparkInternalServiceClient) SyncNode(ctx context.Context, in *SyncNodeR
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) ConsensusPrepare(ctx context.Context, in *ConsensusPrepareRequest, opts ...grpc.CallOption) (*ConsensusPrepareResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConsensusPrepareResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_ConsensusPrepare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -606,6 +621,10 @@ type SparkInternalServiceServer interface {
 	// This method fixes bad leaves by querying a designated "good" SO for its
 	// leaves, and copying it over to this SO's DB.
 	SyncNode(context.Context, *SyncNodeRequest) (*emptypb.Empty, error)
+	// ConsensusPrepare is the generic prepare RPC for the 2PC consensus engine.
+	// The coordinator fans this out to all participants during Execute.
+	// Each participant dispatches to the appropriate FlowHandler.Prepare based on op_type.
+	ConsensusPrepare(context.Context, *ConsensusPrepareRequest) (*ConsensusPrepareResponse, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -738,6 +757,9 @@ func (UnimplementedSparkInternalServiceServer) GenerateStaticDepositAddressProof
 }
 func (UnimplementedSparkInternalServiceServer) SyncNode(context.Context, *SyncNodeRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncNode not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) ConsensusPrepare(context.Context, *ConsensusPrepareRequest) (*ConsensusPrepareResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConsensusPrepare not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -1498,6 +1520,24 @@ func _SparkInternalService_SyncNode_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_ConsensusPrepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConsensusPrepareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).ConsensusPrepare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_ConsensusPrepare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).ConsensusPrepare(ctx, req.(*ConsensusPrepareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1668,6 +1708,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "sync_node",
 			Handler:    _SparkInternalService_SyncNode_Handler,
+		},
+		{
+			MethodName: "consensus_prepare",
+			Handler:    _SparkInternalService_ConsensusPrepare_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

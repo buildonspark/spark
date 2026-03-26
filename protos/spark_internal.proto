@@ -3,6 +3,7 @@ syntax = "proto3";
 package spark_internal;
 
 import "common.proto";
+import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "spark.proto";
@@ -86,6 +87,11 @@ service SparkInternalService {
     // This method fixes bad leaves by querying a designated "good" SO for its
     // leaves, and copying it over to this SO's DB.
     rpc sync_node(SyncNodeRequest) returns (google.protobuf.Empty) {}
+
+    // ConsensusPrepare is the generic prepare RPC for the 2PC consensus engine.
+    // The coordinator fans this out to all participants during Execute.
+    // Each participant dispatches to the appropriate FlowHandler.Prepare based on op_type.
+    rpc consensus_prepare(ConsensusPrepareRequest) returns (ConsensusPrepareResponse) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -535,4 +541,17 @@ message GenerateStaticDepositAddressProofsResponse {
 message SyncNodeRequest {
     repeated string node_ids = 1;
     string operator_id = 2;
+}
+
+message ConsensusPrepareRequest {
+    // Corresponds to gossip.ConsensusOperationType. Defined as int32 to avoid
+    // a circular proto import (gossip.proto already imports spark_internal.proto).
+    int32 op_type = 1;
+    // Domain-specific proto message passed to FlowHandler.Prepare.
+    google.protobuf.Any operation = 2;
+}
+
+message ConsensusPrepareResponse {
+    // Domain-specific result from FlowHandler.Prepare (e.g., signature shares).
+    google.protobuf.Any result = 1;
 }
