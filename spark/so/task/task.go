@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	stdsql "database/sql"
+
 	entdialect "entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-co-op/gocron/v2"
@@ -618,6 +619,70 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 								h := handler.NewInternalDepositHandler(config)
 								if err := h.CompleteSwapForAllOperators(ctx, config, completedUtxoSwapRequest); err != nil {
 									logger.Warn("Failed to mark a utxo swap as completed in all operators, cron task to retry", zap.Error(err))
+								}
+							}
+						}
+					}
+					return nil
+				},
+			},
+		},
+		{
+			ExecutionInterval: 1 * time.Minute,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "complete_instant_utxo_swap",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					logger := logging.GetLoggerFromContext(ctx)
+					tx, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+					}
+
+					query := tx.UtxoSwap.Query().
+						Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
+						Where(utxoswap.CoordinatorIdentityPublicKeyEQ(config.IdentityPublicKey())).
+						Where(utxoswap.CreateTimeLT(time.Now().Add(-2 * time.Minute))).
+						Where(utxoswap.RequestTypeEQ(st.UtxoSwapRequestTypeInstant)).
+						Where(utxoswap.HasUtxo()).
+						WithUtxo().
+						WithTransfer().
+						Order(utxoswap.ByCreateTime(sql.OrderAsc())).
+						Limit(100)
+
+					utxoSwaps, err := query.All(ctx)
+					if err != nil {
+						return err
+					}
+
+					h := handler.NewInternalDepositHandler(config)
+					for _, utxoSwap := range utxoSwaps {
+						dbTransfer := utxoSwap.Edges.Transfer
+						if dbTransfer == nil {
+							logger.Sugar().Debugf("No transfer found for instant utxo swap %s", utxoSwap.ID)
+							continue
+						}
+
+						if transferHelper.IsTransferSent(dbTransfer) {
+							logger.Sugar().Infof("Completing orphaned instant utxo swap %s", utxoSwap.ID)
+
+							utxo := utxoSwap.Edges.Utxo
+							protoNetwork, err := utxo.Network.MarshalProto()
+							if err != nil {
+								return fmt.Errorf("unable to get proto network: %w", err)
+							}
+							protoUtxo := &pbspark.UTXO{
+								Txid:    utxo.Txid,
+								Vout:    utxo.Vout,
+								Network: protoNetwork,
+							}
+
+							completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo)
+							if err != nil {
+								logger.Warn("Failed to create complete swap request for instant utxo swap", zap.Error(err))
+							} else {
+								if err := h.CompleteSwapForAllOperators(ctx, config, completedUtxoSwapRequest); err != nil {
+									logger.Warn("Failed to complete instant utxo swap in all operators, will retry", zap.Error(err))
 								}
 							}
 						}
