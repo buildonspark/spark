@@ -26,7 +26,7 @@ module.exports = {
       binaryPath:
         'ios/build/Build/Products/Release-iphonesimulator/SparkReactNativeApp.app',
       build:
-        'xcodebuild -workspace ios/SparkReactNativeApp.xcworkspace -scheme SparkReactNativeApp -configuration Release -sdk iphonesimulator -derivedDataPath ios/build',
+        'xcodebuild -workspace ios/SparkReactNativeApp.xcworkspace -scheme SparkReactNativeApp -configuration Release -sdk iphonesimulator -derivedDataPath ios/build -arch arm64 ONLY_ACTIVE_ARCH=YES -jobs $(sysctl -n hw.ncpu) -quiet',
     },
     'android.debug': {
       type: 'android.apk',
