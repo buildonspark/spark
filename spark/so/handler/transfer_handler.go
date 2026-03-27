@@ -2147,11 +2147,12 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			}
 		}
 
-		var receiverFilter *keys.Public
-		if useMIMO && walletIdentityPubkey != nil {
-			receiverFilter = walletIdentityPubkey
+		var transferProto *pb.Transfer
+		if useMIMO && walletIdentityPubkey != nil && transfer.HasReceiver(*walletIdentityPubkey) {
+			transferProto, err = transfer.MarshalProtoForReceiver(ctx, *walletIdentityPubkey)
+		} else {
+			transferProto, err = transfer.MarshalProto(ctx)
 		}
-		transferProto, err := transfer.MarshalProtoForReceiver(ctx, receiverFilter)
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 		}
@@ -3223,16 +3224,19 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		return nil, fmt.Errorf("unable to get db for marshal: %w", err)
 	}
 	freshTransferQuery := marshalDb.Transfer.Query().Where(enttransfer.ID(transfer.ID))
-	var receiverFilter *keys.Public
 	if isMimoReceiveEnabled {
 		freshTransferQuery = freshTransferQuery.WithTransferReceivers()
-		receiverFilter = &reqOwnerIDPubKey
 	}
 	freshTransfer, err := freshTransferQuery.Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to reload transfer for marshal: %w", err)
 	}
-	transferProto, err := freshTransfer.MarshalProtoForReceiver(ctx, receiverFilter)
+	var transferProto *pb.Transfer
+	if isMimoReceiveEnabled {
+		transferProto, err = freshTransfer.MarshalProtoForReceiver(ctx, reqOwnerIDPubKey)
+	} else {
+		transferProto, err = freshTransfer.MarshalProto(ctx)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 	}

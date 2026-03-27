@@ -279,7 +279,12 @@ func (s *EventRouter) buildTransferEvent(ctx context.Context, transferID uuid.UU
 		return nil
 	}
 
-	transferProto, err := transferEnt.MarshalProtoForReceiver(ctx, receiverPubkey)
+	var transferProto *pb.Transfer
+	if receiverPubkey != nil && transferEnt.HasReceiver(*receiverPubkey) {
+		transferProto, err = transferEnt.MarshalProtoForReceiver(ctx, *receiverPubkey)
+	} else {
+		transferProto, err = transferEnt.MarshalProto(ctx)
+	}
 	if err != nil {
 		s.logger.With(zap.Error(err)).Sugar().Warnf("failed to marshal transfer %s for stream event", transferID)
 		return nil

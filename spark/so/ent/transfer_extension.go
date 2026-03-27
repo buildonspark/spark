@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
-	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
@@ -27,40 +26,34 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 }
 
 // MarshalProtoForReceiver converts a Transfer to a protobuf Transfer,
-// optionally filtering leaves to only those assigned to a specific receiver.
-// When receiverPubkey is nil, behaves identically to MarshalProto.
-// The Transfer's TransferReceivers edge must be pre-loaded (WithTransferReceivers)
-// when receiverPubkey is non-nil.
-func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey *keys.Public) (*pb.Transfer, error) {
-	withLeaf := func(q *TreeNodeQuery) {
-		q.WithTree().WithSigningKeyshare().WithParent()
+// filtering leaves to only those assigned to the given receiver.
+// The Transfer's TransferReceivers edge must be pre-loaded (WithTransferReceivers).
+// Returns an error if the receiver is not found in this transfer.
+func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey keys.Public) (*pb.Transfer, error) {
+	if t.Edges.TransferReceivers == nil {
+		return nil, fmt.Errorf("TransferReceivers edge not pre-loaded for transfer %s", t.ID)
 	}
-	var leaves []*TransferLeaf
-	var err error
-	if receiverPubkey != nil {
-		if t.Edges.TransferReceivers == nil {
-			logging.GetLoggerFromContext(ctx).Sugar().Warnf(
-				"MarshalProtoForReceiver called with receiverPubkey but TransferReceivers edge not pre-loaded for transfer %s", t.ID)
-		}
-		receiverID, found := t.findReceiverID(*receiverPubkey)
-		if found {
-			leaves, err = t.QueryTransferLeaves().
-				WithLeaf(withLeaf).
-				Where(transferleaf.TransferReceiverIDEQ(receiverID)).
-				All(ctx)
-		} else {
-			// Receiver not found — fall through to returning all leaves.
-			// This happens for sender queries or legacy single-receiver transfers.
-			leaves, err = t.QueryTransferLeaves().WithLeaf(withLeaf).All(ctx)
-		}
-	} else {
-		leaves, err = t.QueryTransferLeaves().WithLeaf(withLeaf).All(ctx)
+	receiverID, found := t.findReceiverID(receiverPubkey)
+	if !found {
+		return nil, fmt.Errorf("receiver %s not found in transfer %s", receiverPubkey, t.ID)
 	}
+	leaves, err := t.QueryTransferLeaves().
+		WithLeaf(func(q *TreeNodeQuery) {
+			q.WithTree().WithSigningKeyshare().WithParent()
+		}).
+		Where(transferleaf.TransferReceiverIDEQ(receiverID)).
+		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
 	}
-
 	return t.marshalWithLeaves(ctx, leaves)
+}
+
+// HasReceiver reports whether the given pubkey matches a TransferReceiver on this transfer.
+// Requires the TransferReceivers edge to be pre-loaded.
+func (t *Transfer) HasReceiver(pubkey keys.Public) bool {
+	_, found := t.findReceiverID(pubkey)
+	return found
 }
 
 // findReceiverID looks up the TransferReceiver ID for a given identity pubkey.
