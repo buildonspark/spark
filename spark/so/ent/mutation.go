@@ -4561,19 +4561,20 @@ func (m *GossipMutation) ResetEdge(name string) error {
 // IdempotencyKeyMutation represents an operation that mutates the IdempotencyKey nodes in the graph.
 type IdempotencyKeyMutation struct {
 	config
-	op              Op
-	typ             string
-	id              *uuid.UUID
-	create_time     *time.Time
-	update_time     *time.Time
-	idempotency_key *string
-	method_name     *string
-	response        *json.RawMessage
-	appendresponse  json.RawMessage
-	clearedFields   map[string]struct{}
-	done            bool
-	oldValue        func(context.Context) (*IdempotencyKey, error)
-	predicates      []predicate.IdempotencyKey
+	op                  Op
+	typ                 string
+	id                  *uuid.UUID
+	create_time         *time.Time
+	update_time         *time.Time
+	idempotency_key     *string
+	method_name         *string
+	identity_public_key *[]byte
+	response            *json.RawMessage
+	appendresponse      json.RawMessage
+	clearedFields       map[string]struct{}
+	done                bool
+	oldValue            func(context.Context) (*IdempotencyKey, error)
+	predicates          []predicate.IdempotencyKey
 }
 
 var _ ent.Mutation = (*IdempotencyKeyMutation)(nil)
@@ -4824,6 +4825,42 @@ func (m *IdempotencyKeyMutation) ResetMethodName() {
 	m.method_name = nil
 }
 
+// SetIdentityPublicKey sets the "identity_public_key" field.
+func (m *IdempotencyKeyMutation) SetIdentityPublicKey(b []byte) {
+	m.identity_public_key = &b
+}
+
+// IdentityPublicKey returns the value of the "identity_public_key" field in the mutation.
+func (m *IdempotencyKeyMutation) IdentityPublicKey() (r []byte, exists bool) {
+	v := m.identity_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIdentityPublicKey returns the old "identity_public_key" field's value of the IdempotencyKey entity.
+// If the IdempotencyKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *IdempotencyKeyMutation) OldIdentityPublicKey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIdentityPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIdentityPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIdentityPublicKey: %w", err)
+	}
+	return oldValue.IdentityPublicKey, nil
+}
+
+// ResetIdentityPublicKey resets all changes to the "identity_public_key" field.
+func (m *IdempotencyKeyMutation) ResetIdentityPublicKey() {
+	m.identity_public_key = nil
+}
+
 // SetResponse sets the "response" field.
 func (m *IdempotencyKeyMutation) SetResponse(jm json.RawMessage) {
 	m.response = &jm
@@ -4923,7 +4960,7 @@ func (m *IdempotencyKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *IdempotencyKeyMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.create_time != nil {
 		fields = append(fields, idempotencykey.FieldCreateTime)
 	}
@@ -4935,6 +4972,9 @@ func (m *IdempotencyKeyMutation) Fields() []string {
 	}
 	if m.method_name != nil {
 		fields = append(fields, idempotencykey.FieldMethodName)
+	}
+	if m.identity_public_key != nil {
+		fields = append(fields, idempotencykey.FieldIdentityPublicKey)
 	}
 	if m.response != nil {
 		fields = append(fields, idempotencykey.FieldResponse)
@@ -4955,6 +4995,8 @@ func (m *IdempotencyKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.IdempotencyKey()
 	case idempotencykey.FieldMethodName:
 		return m.MethodName()
+	case idempotencykey.FieldIdentityPublicKey:
+		return m.IdentityPublicKey()
 	case idempotencykey.FieldResponse:
 		return m.Response()
 	}
@@ -4974,6 +5016,8 @@ func (m *IdempotencyKeyMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldIdempotencyKey(ctx)
 	case idempotencykey.FieldMethodName:
 		return m.OldMethodName(ctx)
+	case idempotencykey.FieldIdentityPublicKey:
+		return m.OldIdentityPublicKey(ctx)
 	case idempotencykey.FieldResponse:
 		return m.OldResponse(ctx)
 	}
@@ -5012,6 +5056,13 @@ func (m *IdempotencyKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMethodName(v)
+		return nil
+	case idempotencykey.FieldIdentityPublicKey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIdentityPublicKey(v)
 		return nil
 	case idempotencykey.FieldResponse:
 		v, ok := value.(json.RawMessage)
@@ -5089,6 +5140,9 @@ func (m *IdempotencyKeyMutation) ResetField(name string) error {
 		return nil
 	case idempotencykey.FieldMethodName:
 		m.ResetMethodName()
+		return nil
+	case idempotencykey.FieldIdentityPublicKey:
+		m.ResetIdentityPublicKey()
 		return nil
 	case idempotencykey.FieldResponse:
 		m.ResetResponse()

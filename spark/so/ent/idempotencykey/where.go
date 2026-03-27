@@ -75,6 +75,11 @@ func MethodName(v string) predicate.IdempotencyKey {
 	return predicate.IdempotencyKey(sql.FieldEQ(FieldMethodName, v))
 }
 
+// IdentityPublicKey applies equality check predicate on the "identity_public_key" field. It's identical to IdentityPublicKeyEQ.
+func IdentityPublicKey(v []byte) predicate.IdempotencyKey {
+	return predicate.IdempotencyKey(sql.FieldEQ(FieldIdentityPublicKey, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.IdempotencyKey {
 	return predicate.IdempotencyKey(sql.FieldEQ(FieldCreateTime, v))
@@ -283,6 +288,46 @@ func MethodNameEqualFold(v string) predicate.IdempotencyKey {
 // MethodNameContainsFold applies the ContainsFold predicate on the "method_name" field.
 func MethodNameContainsFold(v string) predicate.IdempotencyKey {
 	return predicate.IdempotencyKey(sql.FieldContainsFold(FieldMethodName, v))
+}
+
+// IdentityPublicKeyEQ applies the EQ predicate on the "identity_public_key" field.
+func IdentityPublicKeyEQ(v []byte) predicate.IdempotencyKey {
+	return predicate.IdempotencyKey(sql.FieldEQ(FieldIdentityPublicKey, v))
+}
+
+// IdentityPublicKeyNEQ applies the NEQ predicate on the "identity_public_key" field.
+func IdentityPublicKeyNEQ(v []byte) predicate.IdempotencyKey {
+	return predicate.IdempotencyKey(sql.FieldNEQ(FieldIdentityPublicKey, v))
+}
+
+// IdentityPublicKeyIn applies the In predicate on the "identity_public_key" field.
+func IdentityPublicKeyIn(vs ...[]byte) predicate.IdempotencyKey {
+	return predicate.IdempotencyKey(sql.FieldIn(FieldIdentityPublicKey, vs...))
+}
+
+// IdentityPublicKeyNotIn applies the NotIn predicate on the "identity_public_key" field.
+func IdentityPublicKeyNotIn(vs ...[]byte) predicate.IdempotencyKey {
+	return predicate.IdempotencyKey(sql.FieldNotIn(FieldIdentityPublicKey, vs...))
+}
+
+// IdentityPublicKeyGT applies the GT predicate on the "identity_public_key" field.
+func IdentityPublicKeyGT(v []byte) predicate.IdempotencyKey {
+	return predicate.IdempotencyKey(sql.FieldGT(FieldIdentityPublicKey, v))
+}
+
+// IdentityPublicKeyGTE applies the GTE predicate on the "identity_public_key" field.
+func IdentityPublicKeyGTE(v []byte) predicate.IdempotencyKey {
+	return predicate.IdempotencyKey(sql.FieldGTE(FieldIdentityPublicKey, v))
+}
+
+// IdentityPublicKeyLT applies the LT predicate on the "identity_public_key" field.
+func IdentityPublicKeyLT(v []byte) predicate.IdempotencyKey {
+	return predicate.IdempotencyKey(sql.FieldLT(FieldIdentityPublicKey, v))
+}
+
+// IdentityPublicKeyLTE applies the LTE predicate on the "identity_public_key" field.
+func IdentityPublicKeyLTE(v []byte) predicate.IdempotencyKey {
+	return predicate.IdempotencyKey(sql.FieldLTE(FieldIdentityPublicKey, v))
 }
 
 // ResponseIsNil applies the IsNil predicate on the "response" field.

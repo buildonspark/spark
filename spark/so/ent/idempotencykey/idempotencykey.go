@@ -22,6 +22,8 @@ const (
 	FieldIdempotencyKey = "idempotency_key"
 	// FieldMethodName holds the string denoting the method_name field in the database.
 	FieldMethodName = "method_name"
+	// FieldIdentityPublicKey holds the string denoting the identity_public_key field in the database.
+	FieldIdentityPublicKey = "identity_public_key"
 	// FieldResponse holds the string denoting the response field in the database.
 	FieldResponse = "response"
 	// Table holds the table name of the idempotencykey in the database.
@@ -35,6 +37,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldIdempotencyKey,
 	FieldMethodName,
+	FieldIdentityPublicKey,
 	FieldResponse,
 }
 
@@ -59,6 +62,8 @@ var (
 	IdempotencyKeyValidator func(string) error
 	// MethodNameValidator is a validator for the "method_name" field. It is called by the builders before save.
 	MethodNameValidator func(string) error
+	// DefaultIdentityPublicKey holds the default value on creation for the "identity_public_key" field.
+	DefaultIdentityPublicKey []byte
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )

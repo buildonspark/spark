@@ -27,6 +27,8 @@ type IdempotencyKey struct {
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
 	// Method name used for the API call.
 	MethodName string `json:"method_name,omitempty"`
+	// Compressed public key of the authenticated user who created this idempotency record. Empty for internal SO-to-SO calls.
+	IdentityPublicKey []byte `json:"identity_public_key,omitempty"`
 	// JSON-Marshalled proto response to return for subsequent requests with the same idempotency key. A NULL value indicates we're not done processing the request.
 	Response     json.RawMessage `json:"response,omitempty"`
 	selectValues sql.SelectValues
@@ -37,7 +39,7 @@ func (*IdempotencyKey) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case idempotencykey.FieldResponse:
+		case idempotencykey.FieldIdentityPublicKey, idempotencykey.FieldResponse:
 			values[i] = new([]byte)
 		case idempotencykey.FieldIdempotencyKey, idempotencykey.FieldMethodName:
 			values[i] = new(sql.NullString)
@@ -89,6 +91,12 @@ func (ik *IdempotencyKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field method_name", values[i])
 			} else if value.Valid {
 				ik.MethodName = value.String
+			}
+		case idempotencykey.FieldIdentityPublicKey:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field identity_public_key", values[i])
+			} else if value != nil {
+				ik.IdentityPublicKey = *value
 			}
 		case idempotencykey.FieldResponse:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -145,6 +153,9 @@ func (ik *IdempotencyKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("method_name=")
 	builder.WriteString(ik.MethodName)
+	builder.WriteString(", ")
+	builder.WriteString("identity_public_key=")
+	builder.WriteString(fmt.Sprintf("%v", ik.IdentityPublicKey))
 	builder.WriteString(", ")
 	builder.WriteString("response=")
 	builder.WriteString(fmt.Sprintf("%v", ik.Response))

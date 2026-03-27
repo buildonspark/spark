@@ -219,6 +219,10 @@ func init() {
 	idempotencykeyDescMethodName := idempotencykeyFields[1].Descriptor()
 	// idempotencykey.MethodNameValidator is a validator for the "method_name" field. It is called by the builders before save.
 	idempotencykey.MethodNameValidator = idempotencykeyDescMethodName.Validators[0].(func(string) error)
+	// idempotencykeyDescIdentityPublicKey is the schema descriptor for identity_public_key field.
+	idempotencykeyDescIdentityPublicKey := idempotencykeyFields[2].Descriptor()
+	// idempotencykey.DefaultIdentityPublicKey holds the default value on creation for the identity_public_key field.
+	idempotencykey.DefaultIdentityPublicKey = idempotencykeyDescIdentityPublicKey.Default.([]byte)
 	// idempotencykeyDescID is the schema descriptor for id field.
 	idempotencykeyDescID := idempotencykeyMixinFields0[0].Descriptor()
 	// idempotencykey.DefaultID holds the default value on creation for the id field.

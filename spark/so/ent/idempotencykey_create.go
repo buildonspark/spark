@@ -65,6 +65,12 @@ func (ikc *IdempotencyKeyCreate) SetMethodName(s string) *IdempotencyKeyCreate {
 	return ikc
 }
 
+// SetIdentityPublicKey sets the "identity_public_key" field.
+func (ikc *IdempotencyKeyCreate) SetIdentityPublicKey(b []byte) *IdempotencyKeyCreate {
+	ikc.mutation.SetIdentityPublicKey(b)
+	return ikc
+}
+
 // SetResponse sets the "response" field.
 func (ikc *IdempotencyKeyCreate) SetResponse(jm json.RawMessage) *IdempotencyKeyCreate {
 	ikc.mutation.SetResponse(jm)
@@ -128,6 +134,10 @@ func (ikc *IdempotencyKeyCreate) defaults() {
 		v := idempotencykey.DefaultUpdateTime()
 		ikc.mutation.SetUpdateTime(v)
 	}
+	if _, ok := ikc.mutation.IdentityPublicKey(); !ok {
+		v := idempotencykey.DefaultIdentityPublicKey
+		ikc.mutation.SetIdentityPublicKey(v)
+	}
 	if _, ok := ikc.mutation.ID(); !ok {
 		v := idempotencykey.DefaultID()
 		ikc.mutation.SetID(v)
@@ -156,6 +166,12 @@ func (ikc *IdempotencyKeyCreate) check() error {
 	if v, ok := ikc.mutation.MethodName(); ok {
 		if err := idempotencykey.MethodNameValidator(v); err != nil {
 			return &ValidationError{Name: "method_name", err: fmt.Errorf(`ent: validator failed for field "IdempotencyKey.method_name": %w`, err)}
+		}
+	}
+	switch ikc.driver.Dialect() {
+	case dialect.MySQL, dialect.SQLite:
+		if _, ok := ikc.mutation.IdentityPublicKey(); !ok {
+			return &ValidationError{Name: "identity_public_key", err: errors.New(`ent: missing required field "IdempotencyKey.identity_public_key"`)}
 		}
 	}
 	return nil
@@ -209,6 +225,10 @@ func (ikc *IdempotencyKeyCreate) createSpec() (*IdempotencyKey, *sqlgraph.Create
 	if value, ok := ikc.mutation.MethodName(); ok {
 		_spec.SetField(idempotencykey.FieldMethodName, field.TypeString, value)
 		_node.MethodName = value
+	}
+	if value, ok := ikc.mutation.IdentityPublicKey(); ok {
+		_spec.SetField(idempotencykey.FieldIdentityPublicKey, field.TypeBytes, value)
+		_node.IdentityPublicKey = value
 	}
 	if value, ok := ikc.mutation.Response(); ok {
 		_spec.SetField(idempotencykey.FieldResponse, field.TypeJSON, value)
@@ -321,6 +341,9 @@ func (u *IdempotencyKeyUpsertOne) UpdateNewValues() *IdempotencyKeyUpsertOne {
 		}
 		if _, exists := u.create.mutation.MethodName(); exists {
 			s.SetIgnore(idempotencykey.FieldMethodName)
+		}
+		if _, exists := u.create.mutation.IdentityPublicKey(); exists {
+			s.SetIgnore(idempotencykey.FieldIdentityPublicKey)
 		}
 	}))
 	return u
@@ -579,6 +602,9 @@ func (u *IdempotencyKeyUpsertBulk) UpdateNewValues() *IdempotencyKeyUpsertBulk {
 			}
 			if _, exists := b.mutation.MethodName(); exists {
 				s.SetIgnore(idempotencykey.FieldMethodName)
+			}
+			if _, exists := b.mutation.IdentityPublicKey(); exists {
+				s.SetIgnore(idempotencykey.FieldIdentityPublicKey)
 			}
 		}
 	}))

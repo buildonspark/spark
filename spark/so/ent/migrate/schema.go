@@ -206,6 +206,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "idempotency_key", Type: field.TypeString},
 		{Name: "method_name", Type: field.TypeString},
+		{Name: "identity_public_key", Type: field.TypeBytes, Default: map[string]schema.Expr{"postgres": "''::bytea", "sqlite3": "X''"}},
 		{Name: "response", Type: field.TypeJSON, Nullable: true},
 	}
 	// IdempotencyKeysTable holds the schema information for the "idempotency_keys" table.
@@ -215,9 +216,9 @@ var (
 		PrimaryKey: []*schema.Column{IdempotencyKeysColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "idempotency_keys_idempotency_key_method_name",
+				Name:    "idempotency_keys_key_method_identity",
 				Unique:  true,
-				Columns: []*schema.Column{IdempotencyKeysColumns[3], IdempotencyKeysColumns[4]},
+				Columns: []*schema.Column{IdempotencyKeysColumns[3], IdempotencyKeysColumns[4], IdempotencyKeysColumns[5]},
 			},
 			{
 				Name:    "idempotency_keys_create_time",
