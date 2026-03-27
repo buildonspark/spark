@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
@@ -292,9 +293,136 @@ func TestExtractIdempotencyKey(t *testing.T) {
 	}
 }
 
+func TestIdempotencyInterceptor_DifferentIdentitiesSeparateCaches(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	idempotencyKey := "cross-user-key"
+	methodName := "my_method"
+	identityA := "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+	identityB := "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+
+	// User A caches a response
+	handlerA := func(ctx context.Context, req any) (any, error) {
+		return structpb.NewStruct(map[string]any{"user": "A"})
+	}
+	respA, err := callInterceptorWithIdentity(t, ctx, idempotencyKey, methodName, identityA, handlerA)
+	require.NoError(t, err)
+
+	// User B with same key should NOT get User A's response
+	handlerBCalled := false
+	handlerB := func(ctx context.Context, req any) (any, error) {
+		handlerBCalled = true
+		return structpb.NewStruct(map[string]any{"user": "B"})
+	}
+	respB, err := callInterceptorWithIdentity(t, ctx, idempotencyKey, methodName, identityB, handlerB)
+	require.NoError(t, err)
+	assert.True(t, handlerBCalled, "handler should be called for different identity")
+
+	structA, ok := respA.(*structpb.Struct)
+	require.True(t, ok)
+	structB, ok := respB.(*structpb.Struct)
+	require.True(t, ok)
+	assert.Equal(t, "A", structA.Fields["user"].GetStringValue())
+	assert.Equal(t, "B", structB.Fields["user"].GetStringValue())
+}
+
+func TestIdempotencyInterceptor_SameIdentityCacheHit(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	idempotencyKey := "same-user-key"
+	methodName := "my_method"
+	identity := "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+
+	handler := func(ctx context.Context, req any) (any, error) {
+		return structpb.NewStruct(map[string]any{"user": "A"})
+	}
+	_, err := callInterceptorWithIdentity(t, ctx, idempotencyKey, methodName, identity, handler)
+	require.NoError(t, err)
+
+	// Same identity, same key — should be a cache hit
+	handlerCalled := false
+	handler2 := func(ctx context.Context, req any) (any, error) {
+		handlerCalled = true
+		return nil, fmt.Errorf("should not be called")
+	}
+	resp2, err := callInterceptorWithIdentity(t, ctx, idempotencyKey, methodName, identity, handler2)
+	require.NoError(t, err)
+	assert.False(t, handlerCalled, "handler should not be called on cache hit for same identity")
+
+	structResp, ok := resp2.(*structpb.Struct)
+	require.True(t, ok)
+	assert.Equal(t, "A", structResp.Fields["user"].GetStringValue())
+}
+
+func TestIdempotencyInterceptor_NoIdentitySharesCache(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	idempotencyKey := "internal-key"
+	methodName := "my_method"
+
+	handler := func(ctx context.Context, req any) (any, error) {
+		return structpb.NewStruct(map[string]any{"internal": "response"})
+	}
+	_, err := callInterceptor(t, ctx, idempotencyKey, methodName, handler)
+	require.NoError(t, err)
+
+	// Second internal call (no identity) — should be cache hit
+	handlerCalled := false
+	handler2 := func(ctx context.Context, req any) (any, error) {
+		handlerCalled = true
+		return nil, fmt.Errorf("should not be called")
+	}
+	resp2, err := callInterceptor(t, ctx, idempotencyKey, methodName, handler2)
+	require.NoError(t, err)
+	assert.False(t, handlerCalled, "internal calls with same key should share cache")
+	assert.NotNil(t, resp2)
+}
+
+func TestIdempotencyInterceptor_IdentityDoesNotMatchNoIdentity(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	idempotencyKey := "mixed-key"
+	methodName := "my_method"
+	identity := "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+
+	// Internal call (no identity) caches a response
+	handler := func(ctx context.Context, req any) (any, error) {
+		return structpb.NewStruct(map[string]any{"from": "internal"})
+	}
+	_, err := callInterceptor(t, ctx, idempotencyKey, methodName, handler)
+	require.NoError(t, err)
+
+	// Authenticated call with same key should NOT get the internal response
+	handlerCalled := false
+	handler2 := func(ctx context.Context, req any) (any, error) {
+		handlerCalled = true
+		return structpb.NewStruct(map[string]any{"from": "user"})
+	}
+	resp2, err := callInterceptorWithIdentity(t, ctx, idempotencyKey, methodName, identity, handler2)
+	require.NoError(t, err)
+	assert.True(t, handlerCalled, "authenticated call should not match unauthenticated cache entry")
+
+	structResp, ok := resp2.(*structpb.Struct)
+	require.True(t, ok)
+	assert.Equal(t, "user", structResp.Fields["from"].GetStringValue())
+}
+
 func callInterceptor(_ *testing.T, ctx context.Context, key string, methodName string, handler grpc.UnaryHandler) (any, error) {
 	md := metadata.Pairs(common.IdempotencyKeyHeader, key)
 	ctx = metadata.NewIncomingContext(ctx, md)
+
+	info := &grpc.UnaryServerInfo{FullMethod: methodName}
+	interceptor := IdempotencyInterceptor()
+
+	return interceptor(ctx, nil, info, handler)
+}
+
+func callInterceptorWithIdentity(_ *testing.T, ctx context.Context, key string, methodName string, identityHex string, handler grpc.UnaryHandler) (any, error) {
+	md := metadata.Pairs(common.IdempotencyKeyHeader, key)
+	ctx = metadata.NewIncomingContext(ctx, md)
+	if identityHex != "" {
+		ctx = authn.InjectSessionForTests(ctx, identityHex, 9999999999)
+	}
 
 	info := &grpc.UnaryServerInfo{FullMethod: methodName}
 	interceptor := IdempotencyInterceptor()
