@@ -1513,6 +1513,72 @@ describe.each(walletTypes)("transferV2 multi-receiver", ({ name, Signer }) => {
     );
   });
 
+  it(`${name} - transferV2 with self as one of the receivers auto-claims`, async () => {
+    const faucet = BitcoinFaucet.getInstance();
+    const options: ConfigOptions = { network: "LOCAL" };
+
+    const { wallet: senderWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    // Fund sender with 2 deposits. Each target amount equals a full deposit
+    // so leaf selection assigns one deposit's leaves per receiver without
+    // needing a swap via SSP (unavailable in hermetic CI).
+    const depositAddr1 = await senderWallet.getSingleUseDepositAddress();
+    const signedTx1 = await faucet.sendToAddress(depositAddr1, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+    await senderWallet.claimDeposit(signedTx1.id);
+
+    const depositAddr2 = await senderWallet.getSingleUseDepositAddress();
+    const signedTx2 = await faucet.sendToAddress(depositAddr2, 1_000n);
+    await faucet.mineBlocksAndWaitForMiningToComplete(3);
+    await senderWallet.claimDeposit(signedTx2.id);
+
+    const senderBalance = await senderWallet.getBalance();
+    expect(senderBalance.balance).toBe(2_000n);
+
+    // Create a separate receiver
+    const { wallet: otherReceiver } =
+      await SparkWalletTestingIntegration.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+    const selfAddr = await senderWallet.getSparkAddress();
+    const otherAddr = await otherReceiver.getSparkAddress();
+
+    // Send to self AND another receiver in one V2 transfer.
+    // Before the fix, the self-bound portion would not auto-claim because
+    // the stream handler skips claim when sender == primary receiver.
+    const transfer = await senderWallet.transferV2({
+      receivers: [
+        { receiverSparkAddress: selfAddr, amountSats: 1000 },
+        { receiverSparkAddress: otherAddr, amountSats: 1000 },
+      ],
+    });
+    expect(transfer.id).toBeDefined();
+
+    // Both 1000-sat leaves transferred; self-receiver leaf claimed inline.
+    const senderBalanceAfter = await senderWallet.getBalance();
+    expect(senderBalanceAfter.balance).toBe(1_000n);
+
+    // Other receiver claims their portion
+    const pending = await otherReceiver.queryPendingTransfers();
+    expect(pending.transfers.length).toBe(1);
+    const otherTransferService = otherReceiver.getTransferService();
+    await otherTransferService.claimTransfer(pending.transfers[0]!);
+    const otherBalance = await otherReceiver.getBalance();
+    expect(otherBalance.balance).toBe(1_000n);
+
+    // No pending transfers remain for either party
+    const senderPending = await senderWallet.queryPendingTransfers();
+    expect(senderPending.transfers.length).toBe(0);
+    const otherPending = await otherReceiver.queryPendingTransfers();
+    expect(otherPending.transfers.length).toBe(0);
+  });
+
   it(`${name} - transferV2 rejects spark invoice as receiver address`, async () => {
     const options: ConfigOptions = { network: "LOCAL" };
 

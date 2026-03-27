@@ -2650,11 +2650,28 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         const transfer =
           await this.transferService.sendTransferV3(allLeafKeyTweaks);
 
-        await this.leafManager.handleTransferEvent(transfer);
+        const signerIdentityPublicKey =
+          await this.config.signer.getIdentityPublicKey();
+
+        // When the sender is also a receiver, claim inline — the stream
+        // handler may skip auto-claim depending on primary receiver order.
+        // claimTransfer handles ALREADY_EXISTS races gracefully.
+        const hasSelfReceiver = decodedReceivers.some((r) =>
+          equalBytes(r.identityPublicKey, signerIdentityPublicKey),
+        );
+
+        if (hasSelfReceiver) {
+          const pending = await this.transferService.queryTransfer(transfer.id);
+          if (pending) {
+            await this.claimTransfer({ transfer: pending });
+          }
+        } else {
+          await this.leafManager.handleTransferEvent(transfer);
+        }
 
         return mapTransferToWalletTransfer(
           transfer,
-          bytesToHex(await this.config.signer.getIdentityPublicKey()),
+          bytesToHex(signerIdentityPublicKey),
         );
       },
     );
