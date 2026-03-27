@@ -221,6 +221,7 @@ const commands = [
   "createhtlcsenderspendtx",
   "createhtlcreceiverspendtx",
   "sendtransfer",
+  "sendtransferv2",
   "withdraw",
   "withdrawalfee",
   "lightningsendfee",
@@ -732,7 +733,7 @@ async function runCLI() {
   claimstaticdepositquote <txid> [outputIndex]                        - Get a quote for claiming a static deposit
   claimstaticdeposit <txid> <creditAmountSats> <sspSignature> [outputIndex] - Claim a static deposits
   claimstaticdepositwithmaxfee <txid> <maxFee> [outputIndex]          - Claim a static deposit with a max fee
-  instantstaticdepositquote <txid> [outputIndex] [partnerId]         - Get an instant static deposit quote
+  instantstaticdepositquote <txid> [outputIndex] [partnerId]          - Get an instant static deposit quote
   claiminstantstaticdeposit <quoteJson> [planIndex] [txid] [outputIndex]  - Claim an instant static deposit (paste JSON from instantstaticdepositquote, override txid/vout for RBF)
   getutxosfordepositaddress <depositAddress> <excludeClaimed(true|false)> - Get all UTXOs for a deposit address
   refundstaticdepositlegacy <depositTransactionId> <destinationAddress> <fee> [outputIndex] - Refund a static deposit legacy
@@ -750,6 +751,7 @@ async function runCLI() {
   createhtlcsenderspendtx <htlcTx> <sequence> <hash> <hashLockDestinationPubkey> <sequenceLockDestinationPubkey> <satsPerVbyteFee> - Create a sender spend transaction for a HTLC
   createhtlcreceiverspendtx <htlcTx> <hash> <hashLockDestinationPubkey> <sequenceLockDestinationPubkey> <preimage> <satsPerVbyteFee> - Create a receiver spend transaction for a HTLC
   sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
+  sendtransferv2 <address1:amount1> [address2:amount2] ...            - Send sats to one or more Spark addresses in a single atomic transfer
   withdraw <amount> <onchainAddress> <exitSpeed(FAST|MEDIUM|SLOW)> [deductFeeFromWithdrawalAmount(true|false)] - Withdraw funds to an L1 address
   withdrawalfee <amount> <withdrawalAddress>                          - Get a fee estimate for a withdrawal (cooperative exit)
   lightningsendfee <invoice>                                          - Get a fee estimate for a lightning send
@@ -766,7 +768,7 @@ async function runCLI() {
   leafidtohex <leafId1> [leafId2] [leafId3] ...                       - Convert leaf ID to hex string for unilateral exit
   getleaves                                                           - Get all leaves owned by the wallet
   fulfillsparkinvoice <invoice1[:amount1]> <invoice2[:amount2]> ...   - Fulfill one or more Spark token invoices (append :amount if invoice has no preset amount)
-  querysparkinvoices <invoice1> <invoice2> ...                          - Query Spark token invoices raw invoice strings
+  querysparkinvoices <invoice1> <invoice2> ...                        - Query Spark token invoices raw invoice strings
   getuserrequests [--first <number>] [--after <cursor>] [--types <types>] [--statuses <statuses>] [--networks <networks>] - Get user requests for the wallet
 
   💡 Simplified Unilateral Exit Flow:
@@ -787,7 +789,7 @@ async function runCLI() {
   getissuertokenmetadata                                              - Get the issuer's token metadata
   getissuertokenidentifier                                            - Get the issuer's token identifier
   getissuertokenpublickey                                             - Get the issuer's token public key
-  minttokens <amount> <tokenIdentifier>                                - Mint new tokens. If the token was created with 2 decimals, minttokens 1 would transfer 0.01 tokens.
+  minttokens <amount> <tokenIdentifier>                               - Mint new tokens. If the token was created with 2 decimals, minttokens 1 would transfer 0.01 tokens.
   burntokens <amount> <tokenIdentifier>                               - Burn tokens. If the token was created with 2 decimals, burntokens 1 would burn 0.01 tokens.
   freezetokens <sparkAddress> <tokenIdentifier>                       - Freeze tokens for a specific address
   unfreezetokens <sparkAddress> <tokenIdentifier>                     - Unfreeze tokens for a specific address
@@ -1666,6 +1668,82 @@ async function runCLI() {
           });
           console.log(transfer);
           break;
+        case "sendtransferv2": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          if (args.length < 1) {
+            console.log(
+              "Usage: sendtransferv2 <address1:amount1> [address2:amount2] ...",
+            );
+            break;
+          }
+
+          const v2Receivers: Array<{
+            receiverSparkAddress: string;
+            amountSats: number;
+          }> = [];
+          let v2ParseError = false;
+
+          for (let i = 0; i < args.length; i++) {
+            const lastColon = args[i].lastIndexOf(":");
+            if (lastColon === -1) {
+              console.log(
+                `Invalid format for argument ${i + 1}: ${args[i]}. Expected format: address:amount`,
+              );
+              v2ParseError = true;
+              break;
+            }
+
+            const addr = args[i].substring(0, lastColon);
+            const amt = parseInt(args[i].substring(lastColon + 1), 10);
+
+            if (!addr) {
+              console.log(`Empty address in argument ${i + 1}: ${args[i]}`);
+              v2ParseError = true;
+              break;
+            }
+            if (isNaN(amt) || amt <= 0) {
+              console.log(
+                `Invalid amount in argument ${i + 1}: ${args[i]}. Must be a positive integer.`,
+              );
+              v2ParseError = true;
+              break;
+            }
+
+            v2Receivers.push({
+              receiverSparkAddress: addr,
+              amountSats: amt,
+            });
+          }
+
+          if (v2ParseError || v2Receivers.length === 0) {
+            break;
+          }
+
+          const v2Total = v2Receivers.reduce((sum, r) => sum + r.amountSats, 0);
+          console.log(
+            `Sending to ${v2Receivers.length} receiver(s), total: ${v2Total} sats`,
+          );
+          for (const r of v2Receivers) {
+            console.log(`  ${r.receiverSparkAddress}: ${r.amountSats} sats`);
+          }
+
+          try {
+            const v2Transfer = await wallet.transferV2({
+              receivers: v2Receivers,
+            });
+            console.log("Transfer result:", v2Transfer);
+          } catch (error) {
+            let errorMsg = "Unknown error";
+            if (error instanceof Error) {
+              errorMsg = error.message;
+            }
+            console.error(`Failed to send transfer: ${errorMsg}`);
+          }
+          break;
+        }
         case "transfertokens":
           if (!wallet) {
             console.log("Please initialize a wallet first");
