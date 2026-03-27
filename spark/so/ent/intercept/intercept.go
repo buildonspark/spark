@@ -21,6 +21,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/lightsparkdev/spark/so/ent/multisigmember"
+	"github.com/lightsparkdev/spark/so/ent/partner"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -454,6 +455,33 @@ func (f TraverseMultisigMember) Traverse(ctx context.Context, q ent.Query) error
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.MultisigMemberQuery", q)
+}
+
+// The PartnerFunc type is an adapter to allow the use of ordinary function as a Querier.
+type PartnerFunc func(context.Context, *ent.PartnerQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f PartnerFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.PartnerQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.PartnerQuery", q)
+}
+
+// The TraversePartner type is an adapter to allow the use of ordinary function as Traverser.
+type TraversePartner func(context.Context, *ent.PartnerQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraversePartner) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraversePartner) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PartnerQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.PartnerQuery", q)
 }
 
 // The PaymentIntentFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1160,6 +1188,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.MultisigConfigQuery, predicate.MultisigConfig, multisigconfig.OrderOption]{typ: ent.TypeMultisigConfig, tq: q}, nil
 	case *ent.MultisigMemberQuery:
 		return &query[*ent.MultisigMemberQuery, predicate.MultisigMember, multisigmember.OrderOption]{typ: ent.TypeMultisigMember, tq: q}, nil
+	case *ent.PartnerQuery:
+		return &query[*ent.PartnerQuery, predicate.Partner, partner.OrderOption]{typ: ent.TypePartner, tq: q}, nil
 	case *ent.PaymentIntentQuery:
 		return &query[*ent.PaymentIntentQuery, predicate.PaymentIntent, paymentintent.OrderOption]{typ: ent.TypePaymentIntent, tq: q}, nil
 	case *ent.PendingSendTransferQuery:

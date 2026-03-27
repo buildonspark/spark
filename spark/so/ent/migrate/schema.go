@@ -392,6 +392,21 @@ var (
 			},
 		},
 	}
+	// PartnersColumns holds the columns for the "partners" table.
+	PartnersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "partner_id", Type: field.TypeString, Unique: true, Size: 255},
+		{Name: "partner_name", Type: field.TypeString, Size: 255},
+		{Name: "jwt_public_key", Type: field.TypeBytes, Unique: true},
+	}
+	// PartnersTable holds the schema information for the "partners" table.
+	PartnersTable = &schema.Table{
+		Name:       "partners",
+		Columns:    PartnersColumns,
+		PrimaryKey: []*schema.Column{PartnersColumns[0]},
+	}
 	// PaymentIntentsColumns holds the columns for the "payment_intents" table.
 	PaymentIntentsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1774,6 +1789,7 @@ var (
 		L1withdrawalTransactionsTable,
 		MultisigConfigsTable,
 		MultisigMembersTable,
+		PartnersTable,
 		PaymentIntentsTable,
 		PendingSendTransfersTable,
 		PreimageRequestsTable,

@@ -29,6 +29,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/lightsparkdev/spark/so/ent/multisigmember"
+	"github.com/lightsparkdev/spark/so/ent/partner"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -89,6 +90,8 @@ type Client struct {
 	MultisigConfig *MultisigConfigClient
 	// MultisigMember is the client for interacting with the MultisigMember builders.
 	MultisigMember *MultisigMemberClient
+	// Partner is the client for interacting with the Partner builders.
+	Partner *PartnerClient
 	// PaymentIntent is the client for interacting with the PaymentIntent builders.
 	PaymentIntent *PaymentIntentClient
 	// PendingSendTransfer is the client for interacting with the PendingSendTransfer builders.
@@ -163,6 +166,7 @@ func (c *Client) init() {
 	c.L1WithdrawalTransaction = NewL1WithdrawalTransactionClient(c.config)
 	c.MultisigConfig = NewMultisigConfigClient(c.config)
 	c.MultisigMember = NewMultisigMemberClient(c.config)
+	c.Partner = NewPartnerClient(c.config)
 	c.PaymentIntent = NewPaymentIntentClient(c.config)
 	c.PendingSendTransfer = NewPendingSendTransferClient(c.config)
 	c.PreimageRequest = NewPreimageRequestClient(c.config)
@@ -293,6 +297,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		L1WithdrawalTransaction:           NewL1WithdrawalTransactionClient(cfg),
 		MultisigConfig:                    NewMultisigConfigClient(cfg),
 		MultisigMember:                    NewMultisigMemberClient(cfg),
+		Partner:                           NewPartnerClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
 		PendingSendTransfer:               NewPendingSendTransferClient(cfg),
 		PreimageRequest:                   NewPreimageRequestClient(cfg),
@@ -350,6 +355,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		L1WithdrawalTransaction:           NewL1WithdrawalTransactionClient(cfg),
 		MultisigConfig:                    NewMultisigConfigClient(cfg),
 		MultisigMember:                    NewMultisigMemberClient(cfg),
+		Partner:                           NewPartnerClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
 		PendingSendTransfer:               NewPendingSendTransferClient(cfg),
 		PreimageRequest:                   NewPreimageRequestClient(cfg),
@@ -407,12 +413,13 @@ func (c *Client) Use(hooks ...Hook) {
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
 		c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
 		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
-		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.PaymentIntent,
-		c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare, c.SigningCommitment,
-		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenCreate,
-		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
-		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
-		c.TransferLeaf, c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
+		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
+		c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare,
+		c.SigningCommitment, c.SigningKeyshare, c.SigningNonce, c.SparkInvoice,
+		c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
+		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
+		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf,
+		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
 		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
 	} {
 		n.Use(hooks...)
@@ -426,12 +433,13 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
 		c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
 		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
-		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.PaymentIntent,
-		c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare, c.SigningCommitment,
-		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenCreate,
-		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
-		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
-		c.TransferLeaf, c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
+		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
+		c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare,
+		c.SigningCommitment, c.SigningKeyshare, c.SigningNonce, c.SparkInvoice,
+		c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
+		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
+		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf,
+		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
 		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
 	} {
 		n.Intercept(interceptors...)
@@ -467,6 +475,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.MultisigConfig.mutate(ctx, m)
 	case *MultisigMemberMutation:
 		return c.MultisigMember.mutate(ctx, m)
+	case *PartnerMutation:
+		return c.Partner.mutate(ctx, m)
 	case *PaymentIntentMutation:
 		return c.PaymentIntent.mutate(ctx, m)
 	case *PendingSendTransferMutation:
@@ -2491,6 +2501,139 @@ func (c *MultisigMemberClient) mutate(ctx context.Context, m *MultisigMemberMuta
 		return (&MultisigMemberDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown MultisigMember mutation op: %q", m.Op())
+	}
+}
+
+// PartnerClient is a client for the Partner schema.
+type PartnerClient struct {
+	config
+}
+
+// NewPartnerClient returns a client for the Partner from the given config.
+func NewPartnerClient(c config) *PartnerClient {
+	return &PartnerClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `partner.Hooks(f(g(h())))`.
+func (c *PartnerClient) Use(hooks ...Hook) {
+	c.hooks.Partner = append(c.hooks.Partner, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `partner.Intercept(f(g(h())))`.
+func (c *PartnerClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Partner = append(c.inters.Partner, interceptors...)
+}
+
+// Create returns a builder for creating a Partner entity.
+func (c *PartnerClient) Create() *PartnerCreate {
+	mutation := newPartnerMutation(c.config, OpCreate)
+	return &PartnerCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Partner entities.
+func (c *PartnerClient) CreateBulk(builders ...*PartnerCreate) *PartnerCreateBulk {
+	return &PartnerCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PartnerClient) MapCreateBulk(slice any, setFunc func(*PartnerCreate, int)) *PartnerCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PartnerCreateBulk{err: fmt.Errorf("calling to PartnerClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PartnerCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PartnerCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Partner.
+func (c *PartnerClient) Update() *PartnerUpdate {
+	mutation := newPartnerMutation(c.config, OpUpdate)
+	return &PartnerUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PartnerClient) UpdateOne(pa *Partner) *PartnerUpdateOne {
+	mutation := newPartnerMutation(c.config, OpUpdateOne, withPartner(pa))
+	return &PartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PartnerClient) UpdateOneID(id uuid.UUID) *PartnerUpdateOne {
+	mutation := newPartnerMutation(c.config, OpUpdateOne, withPartnerID(id))
+	return &PartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Partner.
+func (c *PartnerClient) Delete() *PartnerDelete {
+	mutation := newPartnerMutation(c.config, OpDelete)
+	return &PartnerDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PartnerClient) DeleteOne(pa *Partner) *PartnerDeleteOne {
+	return c.DeleteOneID(pa.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PartnerClient) DeleteOneID(id uuid.UUID) *PartnerDeleteOne {
+	builder := c.Delete().Where(partner.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PartnerDeleteOne{builder}
+}
+
+// Query returns a query builder for Partner.
+func (c *PartnerClient) Query() *PartnerQuery {
+	return &PartnerQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePartner},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Partner entity by its id.
+func (c *PartnerClient) Get(ctx context.Context, id uuid.UUID) (*Partner, error) {
+	return c.Query().Where(partner.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PartnerClient) GetX(ctx context.Context, id uuid.UUID) *Partner {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PartnerClient) Hooks() []Hook {
+	return c.hooks.Partner
+}
+
+// Interceptors returns the client interceptors.
+func (c *PartnerClient) Interceptors() []Interceptor {
+	return c.inters.Partner
+}
+
+func (c *PartnerClient) mutate(ctx context.Context, m *PartnerMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PartnerCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PartnerUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PartnerDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Partner mutation op: %q", m.Op())
 	}
 }
 
@@ -6809,7 +6952,7 @@ type (
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
 		Gossip, IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
 		L1TokenOutputWithdrawal, L1WithdrawalTransaction, MultisigConfig,
-		MultisigMember, PaymentIntent, PendingSendTransfer, PreimageRequest,
+		MultisigMember, Partner, PaymentIntent, PendingSendTransfer, PreimageRequest,
 		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
 		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,
@@ -6821,7 +6964,7 @@ type (
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
 		Gossip, IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
 		L1TokenOutputWithdrawal, L1WithdrawalTransaction, MultisigConfig,
-		MultisigMember, PaymentIntent, PendingSendTransfer, PreimageRequest,
+		MultisigMember, Partner, PaymentIntent, PendingSendTransfer, PreimageRequest,
 		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
 		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,

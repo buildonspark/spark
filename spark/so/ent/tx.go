@@ -40,6 +40,8 @@ type Tx struct {
 	MultisigConfig *MultisigConfigClient
 	// MultisigMember is the client for interacting with the MultisigMember builders.
 	MultisigMember *MultisigMemberClient
+	// Partner is the client for interacting with the Partner builders.
+	Partner *PartnerClient
 	// PaymentIntent is the client for interacting with the PaymentIntent builders.
 	PaymentIntent *PaymentIntentClient
 	// PendingSendTransfer is the client for interacting with the PendingSendTransfer builders.
@@ -234,6 +236,7 @@ func (tx *Tx) init() {
 	tx.L1WithdrawalTransaction = NewL1WithdrawalTransactionClient(tx.config)
 	tx.MultisigConfig = NewMultisigConfigClient(tx.config)
 	tx.MultisigMember = NewMultisigMemberClient(tx.config)
+	tx.Partner = NewPartnerClient(tx.config)
 	tx.PaymentIntent = NewPaymentIntentClient(tx.config)
 	tx.PendingSendTransfer = NewPendingSendTransferClient(tx.config)
 	tx.PreimageRequest = NewPreimageRequestClient(tx.config)

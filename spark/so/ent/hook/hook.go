@@ -165,6 +165,18 @@ func (f MultisigMemberFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MultisigMemberMutation", m)
 }
 
+// The PartnerFunc type is an adapter to allow the use of ordinary
+// function as Partner mutator.
+type PartnerFunc func(context.Context, *ent.PartnerMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PartnerFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PartnerMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PartnerMutation", m)
+}
+
 // The PaymentIntentFunc type is an adapter to allow the use of ordinary
 // function as PaymentIntent mutator.
 type PaymentIntentFunc func(context.Context, *ent.PaymentIntentMutation) (ent.Value, error)

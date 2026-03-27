@@ -1925,6 +1925,111 @@ func (mm *MultisigMemberExample) Exec(ctx context.Context) (*ent.MultisigMember,
 	return create.Save(ctx)
 }
 
+// PartnerExample is a test fixture builder for Partner.
+type PartnerExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	PartnerID    *string
+	PartnerName  *string
+	JwtPublicKey *keys.JwtPubKey
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+}
+
+// NewPartnerExample creates a new PartnerExample for testing.
+func NewPartnerExample(t *testing.T, client *ent.Client) *PartnerExample {
+	return &PartnerExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetPartnerID sets the partner_id field.
+func (pa *PartnerExample) SetPartnerID(v string) *PartnerExample {
+	pa.PartnerID = &v
+	return pa
+}
+
+// SetPartnerName sets the partner_name field.
+func (pa *PartnerExample) SetPartnerName(v string) *PartnerExample {
+	pa.PartnerName = &v
+	return pa
+}
+
+// SetJwtPublicKey sets the jwt_public_key field.
+func (pa *PartnerExample) SetJwtPublicKey(v keys.JwtPubKey) *PartnerExample {
+	pa.JwtPublicKey = &v
+	return pa
+}
+
+// MustExec builds and saves the Partner entity to the database.
+// It panics if the save fails.
+func (pa *PartnerExample) MustExec(ctx context.Context) *ent.Partner {
+	create := pa.client.Partner.Create()
+
+	// Set fields
+	if pa.PartnerID != nil {
+		create.SetPartnerID(*pa.PartnerID)
+	} else {
+		// Use default from annotation
+		create.SetPartnerID("partner-a")
+	}
+	if pa.PartnerName != nil {
+		create.SetPartnerName(*pa.PartnerName)
+	} else {
+		// Use default from annotation
+		create.SetPartnerName("Partner A")
+	}
+	if pa.JwtPublicKey != nil {
+		create.SetJwtPublicKey(*pa.JwtPublicKey)
+	} else {
+		// Use default from annotation
+		create.SetJwtPublicKey(keys.MustParseJwtPubKeyHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+	}
+
+	// Handle edges
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		pa.t.Helper()
+		pa.t.Fatalf("failed to create Partner: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the Partner entity to the database.
+// It returns an error if the save fails.
+func (pa *PartnerExample) Exec(ctx context.Context) (*ent.Partner, error) {
+	create := pa.client.Partner.Create()
+
+	// Set fields
+	if pa.PartnerID != nil {
+		create.SetPartnerID(*pa.PartnerID)
+	} else {
+		// Use default from annotation
+		create.SetPartnerID("partner-a")
+	}
+	if pa.PartnerName != nil {
+		create.SetPartnerName(*pa.PartnerName)
+	} else {
+		// Use default from annotation
+		create.SetPartnerName("Partner A")
+	}
+	if pa.JwtPublicKey != nil {
+		create.SetJwtPublicKey(*pa.JwtPublicKey)
+	} else {
+		// Use default from annotation
+		create.SetJwtPublicKey(keys.MustParseJwtPubKeyHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+	}
+
+	// Handle edges
+
+	return create.Save(ctx)
+}
+
 // PaymentIntentExample is a test fixture builder for PaymentIntent.
 type PaymentIntentExample struct {
 	client *ent.Client

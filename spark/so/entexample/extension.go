@@ -34,6 +34,12 @@ var typeRegistry = map[string]func(any) (string, error){
 		}
 		return "", fmt.Errorf("invalid value %#v (type %T) for keys.Private", v, v)
 	},
+	"keys.JwtPubKey": func(v any) (string, error) {
+		if s, ok := v.(string); ok {
+			return fmt.Sprintf(`keys.MustParseJwtPubKeyHex(%q)`, s), nil
+		}
+		return "", fmt.Errorf("invalid value %#v (type %T) for keys.JwtPubKey", v, v)
+	},
 	"frost.SigningCommitment": func(v any) (string, error) {
 		if s, ok := v.(string); ok {
 			return fmt.Sprintf(`frost.MustParseSigningCommitment(%q)`, s), nil

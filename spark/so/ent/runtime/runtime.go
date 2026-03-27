@@ -19,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/lightsparkdev/spark/so/ent/multisigmember"
+	"github.com/lightsparkdev/spark/so/ent/partner"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -375,6 +376,61 @@ func init() {
 	multisigmemberDescID := multisigmemberMixinFields0[0].Descriptor()
 	// multisigmember.DefaultID holds the default value on creation for the id field.
 	multisigmember.DefaultID = multisigmemberDescID.Default.(func() uuid.UUID)
+	partnerMixin := schema.Partner{}.Mixin()
+	partnerMixinFields0 := partnerMixin[0].Fields()
+	_ = partnerMixinFields0
+	partnerFields := schema.Partner{}.Fields()
+	_ = partnerFields
+	// partnerDescCreateTime is the schema descriptor for create_time field.
+	partnerDescCreateTime := partnerMixinFields0[1].Descriptor()
+	// partner.DefaultCreateTime holds the default value on creation for the create_time field.
+	partner.DefaultCreateTime = partnerDescCreateTime.Default.(func() time.Time)
+	// partnerDescUpdateTime is the schema descriptor for update_time field.
+	partnerDescUpdateTime := partnerMixinFields0[2].Descriptor()
+	// partner.DefaultUpdateTime holds the default value on creation for the update_time field.
+	partner.DefaultUpdateTime = partnerDescUpdateTime.Default.(func() time.Time)
+	// partner.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	partner.UpdateDefaultUpdateTime = partnerDescUpdateTime.UpdateDefault.(func() time.Time)
+	// partnerDescPartnerID is the schema descriptor for partner_id field.
+	partnerDescPartnerID := partnerFields[0].Descriptor()
+	// partner.PartnerIDValidator is a validator for the "partner_id" field. It is called by the builders before save.
+	partner.PartnerIDValidator = func() func(string) error {
+		validators := partnerDescPartnerID.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(partner_id string) error {
+			for _, fn := range fns {
+				if err := fn(partner_id); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// partnerDescPartnerName is the schema descriptor for partner_name field.
+	partnerDescPartnerName := partnerFields[1].Descriptor()
+	// partner.PartnerNameValidator is a validator for the "partner_name" field. It is called by the builders before save.
+	partner.PartnerNameValidator = func() func(string) error {
+		validators := partnerDescPartnerName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(partner_name string) error {
+			for _, fn := range fns {
+				if err := fn(partner_name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// partnerDescID is the schema descriptor for id field.
+	partnerDescID := partnerMixinFields0[0].Descriptor()
+	// partner.DefaultID holds the default value on creation for the id field.
+	partner.DefaultID = partnerDescID.Default.(func() uuid.UUID)
 	paymentintentMixin := schema.PaymentIntent{}.Mixin()
 	paymentintentHooks := schema.PaymentIntent{}.Hooks()
 	paymentintent.Hooks[0] = paymentintentHooks[0]
