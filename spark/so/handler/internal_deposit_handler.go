@@ -83,19 +83,28 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse owner signing public key: %w", err)
 	}
-	_, err = db.DepositAddress.Create().
-		SetSigningKeyshareID(keyshareID).
-		SetOwnerIdentityPubkey(ownerIDPubKey).
-		SetOwnerSigningPubkey(ownerSigningPubKey).
-		SetNetwork(network).
-		SetAddress(req.Address).
-		SetIsStatic(req.GetIsStatic()).
-		Save(ctx)
+
+	if req.GetIsStatic() {
+		// Always handle conflicts gracefully on operators. The coordinator
+		// controls user-facing error semantics via its own knob check;
+		// operators only receive this call after the coordinator succeeded.
+		_, err = saveStaticDepositAddress(ctx, db, keyshareID, ownerIDPubKey, ownerSigningPubKey, network, req.Address, true)
+
+	} else {
+		_, err = db.DepositAddress.Create().
+			SetSigningKeyshareID(keyshareID).
+			SetOwnerIdentityPubkey(ownerIDPubKey).
+			SetOwnerSigningPubkey(ownerSigningPubKey).
+			SetNetwork(network).
+			SetAddress(req.Address).
+			SetIsStatic(req.GetIsStatic()).
+			Save(ctx)
+	}
+
 	if err != nil {
 		logger.Error("Failed to link keyshare to deposit address", zap.Error(err))
 		return nil, err
 	}
-
 	logger.Sugar().Infof("Marked keyshare %s for deposit address", req.KeyshareId)
 
 	signingKey := h.config.IdentityPrivateKey

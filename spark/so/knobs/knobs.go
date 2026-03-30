@@ -142,6 +142,11 @@ const (
 	// by identity public key and tracks per-receiver claim status.
 	KnobMimoTransferMultiReceiverEnabled = "spark.so.mimo_transfer_multi_receiver_enabled"
 
+	// When enabled, a concurrent static deposit address creation that hits the
+	// unique constraint on (network, identity_pubkey, is_static, is_default) will
+	// gracefully create a non-default address instead of failing.
+	KnobGracefulConcurrentStaticDeposit = "spark.so.graceful_concurrent_static_deposit"
+
 	// Enable instant static deposit flow.
 	KnobEnableInstantStaticDeposit = "spark.so.enable_instant_static_deposit"
 	// Total number of sats that can be pending in the instant static deposit flow
