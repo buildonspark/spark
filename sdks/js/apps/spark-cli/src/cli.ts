@@ -41,6 +41,7 @@ import {
   ExitSpeed,
   SparkUserRequestStatus,
   SparkUserRequestType,
+  SparkWalletWebhookEventType,
 } from "@buildonspark/spark-sdk/types";
 import { LoggingLevel } from "@lightsparkdev/core";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
@@ -259,6 +260,9 @@ const commands = [
   "testonly_generateutxostring",
   "generatecpfptx",
 
+  "registerwebhook",
+  "deletewebhook",
+  "listwebhooks",
   "fulfillsparkinvoice",
   "querysparkinvoices",
   "validateinvoicesig",
@@ -861,6 +865,63 @@ async function runCLI() {
           const walletSettings = await wallet.getWalletSettings();
           console.log(walletSettings);
           break;
+        case "registerwebhook": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          // Usage: registerwebhook <secret> <url> [event_type1,event_type2,...]
+          // If no event types specified, subscribes to all Spark wallet webhook event types.
+          if (args.length < 2) {
+            console.log("Usage: registerwebhook <secret> <url> [event_types]");
+            console.log(
+              "  event_types: comma-separated list of event types (optional, defaults to all)",
+            );
+            console.log(
+              "  Available types: " +
+                Object.values(SparkWalletWebhookEventType).join(", "),
+            );
+            break;
+          }
+          const [webhookSecret, webhookUrl, eventTypesArg] = args;
+          const eventTypes = eventTypesArg
+            ? eventTypesArg
+                .split(",")
+                .map((t) => t.trim() as SparkWalletWebhookEventType)
+            : Object.values(SparkWalletWebhookEventType);
+          const result = await wallet.registerSparkWalletWebhook({
+            secret: webhookSecret,
+            url: webhookUrl,
+            event_types: eventTypes,
+          });
+          console.log("Webhook registered:", result);
+          break;
+        }
+        case "deletewebhook": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          if (args.length < 1) {
+            console.log("Usage: deletewebhook <webhook_id>");
+            break;
+          }
+          const [webhookId] = args;
+          const deleteResult = await wallet.deleteSparkWalletWebhook({
+            webhook_id: webhookId,
+          });
+          console.log("Webhook deleted:", deleteResult);
+          break;
+        }
+        case "listwebhooks": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          const listResult = await wallet.listSparkWalletWebhooks();
+          console.log("Webhooks:", JSON.stringify(listResult, null, 2));
+          break;
+        }
         case "nontrustydeposit":
           if (process.env.NODE_ENV !== "development" || network !== "REGTEST") {
             console.log(

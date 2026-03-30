@@ -18,12 +18,15 @@ import { getFetch } from "../utils/fetch.js";
 import { ClaimInstantStaticDeposit } from "./mutations/ClaimInstantStaticDeposit.js";
 import { ClaimStaticDeposit } from "./mutations/ClaimStaticDeposit.js";
 import { CompleteCoopExit } from "./mutations/CompleteCoopExit.js";
+import { DeleteSparkWalletWebhook } from "./mutations/DeleteSparkWalletWebhook.js";
 import { GetChallenge } from "./mutations/GetChallenge.js";
+import { RegisterSparkWalletWebhook } from "./mutations/RegisterSparkWalletWebhook.js";
 import { RequestCoopExit } from "./mutations/RequestCoopExit.js";
 import { RequestLightningReceive } from "./mutations/RequestLightningReceive.js";
 import { RequestLightningSend } from "./mutations/RequestLightningSend.js";
 import { RequestSwapLeaves } from "./mutations/RequestSwapLeaves.js";
 import { VerifyChallenge } from "./mutations/VerifyChallenge.js";
+import { ListSparkWalletWebhooks } from "./queries/ListSparkWalletWebhooks.js";
 import { ClaimStaticDepositFromJson } from "./objects/ClaimStaticDeposit.js";
 import InstantStaticDepositClaimOutput, {
   InstantStaticDepositClaimOutputFromJson,
@@ -70,6 +73,20 @@ import LightningSendFeeEstimateOutput, {
   LightningSendFeeEstimateOutputFromJson,
 } from "./objects/LightningSendFeeEstimateOutput.js";
 import { LightningSendRequestFromJson } from "./objects/LightningSendRequest.js";
+import DeleteSparkWalletWebhookInput from "./objects/DeleteSparkWalletWebhookInput.js";
+import {
+  DeleteSparkWalletWebhookOutputFromJson,
+  type default as DeleteSparkWalletWebhookOutput,
+} from "./objects/DeleteSparkWalletWebhookOutput.js";
+import {
+  ListSparkWalletWebhooksOutputFromJson,
+  type default as ListSparkWalletWebhooksOutput,
+} from "./objects/ListSparkWalletWebhooksOutput.js";
+import RegisterSparkWalletWebhookInput from "./objects/RegisterSparkWalletWebhookInput.js";
+import {
+  RegisterSparkWalletWebhookOutputFromJson,
+  type default as RegisterSparkWalletWebhookOutput,
+} from "./objects/RegisterSparkWalletWebhookOutput.js";
 import SparkWalletUserToUserRequestsConnection, {
   SparkWalletUserToUserRequestsConnectionFromJson,
 } from "./objects/SparkWalletUserToUserRequestsConnection.js";
@@ -762,6 +779,53 @@ export default class SspClient {
         return SparkWalletUserToUserRequestsConnectionFromJson(
           response.current_user?.user_requests,
         );
+      },
+    });
+  }
+  async registerSparkWalletWebhook(
+    input: RegisterSparkWalletWebhookInput,
+  ): Promise<RegisterSparkWalletWebhookOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: RegisterSparkWalletWebhook,
+      variables: {
+        input: {
+          secret: input.secret,
+          url: input.url,
+          event_types: input.event_types,
+        },
+      },
+      constructObject: (response: { register_wallet_webhook: any }) => {
+        return RegisterSparkWalletWebhookOutputFromJson(
+          response.register_wallet_webhook,
+        );
+      },
+    });
+  }
+
+  async deleteSparkWalletWebhook(
+    input: DeleteSparkWalletWebhookInput,
+  ): Promise<DeleteSparkWalletWebhookOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: DeleteSparkWalletWebhook,
+      variables: {
+        input: {
+          webhook_id: input.webhook_id,
+        },
+      },
+      constructObject: (response: { delete_wallet_webhook: any }) => {
+        return DeleteSparkWalletWebhookOutputFromJson(
+          response.delete_wallet_webhook,
+        );
+      },
+    });
+  }
+
+  async listSparkWalletWebhooks(): Promise<ListSparkWalletWebhooksOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: ListSparkWalletWebhooks,
+      variables: {},
+      constructObject: (response: { wallet_webhooks: any }) => {
+        return ListSparkWalletWebhooksOutputFromJson(response.wallet_webhooks);
       },
     });
   }

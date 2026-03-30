@@ -46,6 +46,11 @@ import {
   SparkWalletUserToUserRequestsConnection,
   StaticDepositQuote,
   StaticDepositQuoteOutput,
+  type DeleteSparkWalletWebhookInput,
+  type DeleteSparkWalletWebhookOutput,
+  type ListSparkWalletWebhooksOutput,
+  type RegisterSparkWalletWebhookInput,
+  type RegisterSparkWalletWebhookOutput,
 } from "../graphql/objects/index.js";
 import {
   ConnectedEvent,
@@ -70,7 +75,6 @@ import {
   QueryTokenTransactionsResponse,
 } from "../proto/spark_token.js";
 import type { DecodedInvoice } from "../services/bolt11-spark.js";
-import type { WalletGetUtxosForIdentityParams } from "../spark-readonly-client/types.js";
 import {
   decodeInvoice,
   getNetworkFromInvoice,
@@ -97,6 +101,7 @@ import {
 } from "../services/wallet-config.js";
 import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
 import { KeyDerivation, KeyDerivationType } from "../signer/types.js";
+import type { WalletGetUtxosForIdentityParams } from "../spark-readonly-client/types.js";
 import { BitcoinFaucet } from "../tests/utils/test-faucet.js";
 import { Interval } from "../types/index.js";
 import {
@@ -128,19 +133,19 @@ import {
   getTxId,
 } from "../utils/bitcoin.js";
 import { getFetch } from "../utils/fetch.js";
+import { newHasher } from "../utils/hashstructure.js";
 import {
   createReceiverSpendTx,
   createSenderSpendTx,
 } from "../utils/htlc-transactions.js";
-import { newHasher } from "../utils/hashstructure.js";
 import { HashSparkInvoice } from "../utils/invoice-hashing.js";
+import { parseCompressedPublicKeyHex } from "../utils/keys.js";
 import {
   getNetwork,
   Network,
   NetworkToProto,
   NetworkType,
 } from "../utils/network.js";
-import { parseCompressedPublicKeyHex } from "../utils/keys.js";
 import {
   Bech32mTokenIdentifier,
   decodeBech32mTokenIdentifier,
@@ -157,7 +162,6 @@ import type {
   HandlePublicMethodErrorParams,
   InitWalletResponse,
   InvalidInvoice,
-  TransferV2Params,
   PayLightningInvoiceParams,
   SparkWalletEvents,
   SparkWalletEventType,
@@ -167,6 +171,7 @@ import type {
   TokenMetadataMap,
   TokenOutputsMap,
   TransferParams,
+  TransferV2Params,
   TransferWithInvoiceOutcome,
   TransferWithInvoiceParams,
   UserTokenMetadata,
@@ -5483,6 +5488,25 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return walletSetting;
   }
 
+  public async registerSparkWalletWebhook(
+    input: RegisterSparkWalletWebhookInput,
+  ): Promise<RegisterSparkWalletWebhookOutput | null> {
+    const sspClient = this.getSspClient();
+    return await sspClient.registerSparkWalletWebhook(input);
+  }
+
+  public async deleteSparkWalletWebhook(
+    input: DeleteSparkWalletWebhookInput,
+  ): Promise<DeleteSparkWalletWebhookOutput | null> {
+    const sspClient = this.getSspClient();
+    return await sspClient.deleteSparkWalletWebhook(input);
+  }
+
+  public async listSparkWalletWebhooks(): Promise<ListSparkWalletWebhooksOutput | null> {
+    const sspClient = this.getSspClient();
+    return await sspClient.listSparkWalletWebhooks();
+  }
+
   public async isOptimizationInProgress() {
     return this.leafManager.isOptimizing();
   }
@@ -5720,6 +5744,9 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "transfer",
   "transferV2",
   "transferTokens",
+  "registerSparkWalletWebhook",
+  "deleteSparkWalletWebhook",
+  "listSparkWalletWebhooks",
   "validateMessageWithIdentityKey",
   "withdraw",
 ] as const satisfies readonly WrappableSparkWalletMethod[];
