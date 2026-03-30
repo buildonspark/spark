@@ -187,13 +187,13 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 	setup.client.TokenPartialRevocationSecretShare.Create().
 		SetTokenOutput(tokenOutputInDb).
 		SetOperatorIdentityPublicKey(bobOperatorPubKey).
-		SetSecretShare(bobSigningKeyshare.SecretShare).
+		SetSecretShare(*bobSigningKeyshare.SecretShare).
 		SaveX(setup.ctx)
 
 	setup.client.TokenPartialRevocationSecretShare.Create().
 		SetTokenOutput(tokenOutputInDb).
 		SetOperatorIdentityPublicKey(carolOperatorPubKey).
-		SetSecretShare(carolSigningKeyshare.SecretShare).
+		SetSecretShare(*carolSigningKeyshare.SecretShare).
 		SaveX(setup.ctx)
 
 	t.Run("returns empty map when input share map is empty", func(t *testing.T) {
@@ -214,7 +214,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 					TokenOutputID:             tokenOutputInDb.ID,
 					OperatorIdentityPublicKey: aliceOperatorPubKey,
 				}: {
-					SecretShare:               aliceSigningKeyshare.SecretShare,
+					SecretShare:               *aliceSigningKeyshare.SecretShare,
 					OperatorIdentityPublicKey: aliceOperatorPubKey,
 				},
 			},
@@ -235,7 +235,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 					TokenOutputID:             tokenOutputInDb.ID,
 					OperatorIdentityPublicKey: bobOperatorPubKey,
 				}: {
-					SecretShare:               bobSigningKeyshare.SecretShare,
+					SecretShare:               *bobSigningKeyshare.SecretShare,
 					OperatorIdentityPublicKey: bobOperatorPubKey,
 				},
 			},
@@ -261,7 +261,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 					PrevVout:                  uint32(tokenOutputInDb.CreatedTransactionOutputVout),
 					OperatorIdentityPublicKey: aliceOperatorPubKey,
 				}: {
-					SecretShare:               aliceSigningKeyshare.SecretShare,
+					SecretShare:               *aliceSigningKeyshare.SecretShare,
 					OperatorIdentityPublicKey: aliceOperatorPubKey,
 				},
 			},

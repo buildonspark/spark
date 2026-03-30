@@ -526,6 +526,9 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 
 	for _, outputWithKeyShare := range outputsWithKeyShares {
 		if keyshare := outputWithKeyShare.Edges.RevocationKeyshare; keyshare != nil {
+			if keyshare.SecretShare == nil {
+				return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("revocation keyshare %s has no secret share", keyshare.ID))
+			}
 			if operatorShares, exists := sharesToReturnMap[h.config.IdentityPublicKey()]; exists {
 				share := &tokeninternalpb.RevocationSecretShare{
 					SecretShare: keyshare.SecretShare.Serialize(),

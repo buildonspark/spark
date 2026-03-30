@@ -24,6 +24,8 @@ const (
 	FieldStatus = "status"
 	// FieldSecretShare holds the string denoting the secret_share field in the database.
 	FieldSecretShare = "secret_share"
+	// FieldSecretVersion holds the string denoting the secret_version field in the database.
+	FieldSecretVersion = "secret_version"
 	// FieldPublicShares holds the string denoting the public_shares field in the database.
 	FieldPublicShares = "public_shares"
 	// FieldPublicKey holds the string denoting the public_key field in the database.
@@ -43,6 +45,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldStatus,
 	FieldSecretShare,
+	FieldSecretVersion,
 	FieldPublicShares,
 	FieldPublicKey,
 	FieldMinSigners,
@@ -101,6 +104,11 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// BySecretVersion orders the results by the secret_version field.
+func BySecretVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSecretVersion, opts...).ToFunc()
 }
 
 // ByMinSigners orders the results by the min_signers field.

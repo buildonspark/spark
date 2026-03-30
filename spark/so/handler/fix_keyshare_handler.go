@@ -79,6 +79,9 @@ func (h *FixKeyshareHandler) parseRequest(ctx context.Context, badKeyshareId str
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bad keyshare: %w", err)
 	}
+	if badKeyshare.SecretShare == nil {
+		return nil, fmt.Errorf("bad keyshare %s has nil secret share", badKeyshare.ID)
+	}
 
 	args := FixKeyshareArgs{
 		badKeyshare:   badKeyshare,
@@ -243,6 +246,10 @@ func (h FixKeyshareHandler) createSender(args FixKeyshareArgs) (*secretsharing.I
 	}
 
 	sb := args.badKeyshare.SecretShare
+	if sb == nil {
+		// parseRequest enforces this already; keep as a defensive invariant check for direct callers.
+		return nil, fmt.Errorf("bad keyshare %s has nil secret share", args.badKeyshare.ID)
+	}
 	ownSecretShare, err := curve.ParseScalar(sb.Serialize())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse own secret share: %w", err)

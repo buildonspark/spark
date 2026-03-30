@@ -799,6 +799,9 @@ func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap
 	operatorShares := make(operatorSharesMap)
 	for _, to := range tokenOutputs {
 		if share := to.Edges.RevocationKeyshare; share != nil {
+			if share.SecretShare == nil {
+				return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("revocation keyshare %s has no secret share", share.ID))
+			}
 			operatorIdentityPubkey := h.config.IdentityPublicKey()
 			revShare := &pbtkinternal.RevocationSecretShare{
 				SecretShare: share.SecretShare.Serialize(),
@@ -1059,7 +1062,7 @@ func (h *InternalSignTokenHandler) canRecoverAndFinalizeTransaction(tokenTransac
 			return false, tokens.FormatErrorWithTransactionEnt(
 				"missing revocation key-share on output", tokenTransaction, sparkerrors.InternalDatabaseMissingEdge(nil))
 		}
-		if spentOutput.Edges.RevocationKeyshare.SecretShare.IsZero() {
+		if spentOutput.Edges.RevocationKeyshare.SecretShare == nil {
 			return false, tokens.FormatErrorWithTransactionEnt(
 				"nil revocation secret share on output", tokenTransaction, sparkerrors.InternalObjectMissingField(nil))
 		}
@@ -1088,7 +1091,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 		if output.Edges.RevocationKeyshare == nil {
 			return nil, nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("missing revocation key-share edge on output"))
 		}
-		if output.Edges.RevocationKeyshare.SecretShare.IsZero() {
+		if output.Edges.RevocationKeyshare.SecretShare == nil {
 			return nil, nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("nil revocation secret share on output"))
 		}
 		outputToSpendRevocationCommitments = append(outputToSpendRevocationCommitments, commitment)

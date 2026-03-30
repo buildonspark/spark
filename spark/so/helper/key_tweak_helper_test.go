@@ -105,7 +105,8 @@ func TestTweakLeafKey(t *testing.T) {
 	// Verify that the keyshare was properly updated with the tweak values
 	// The new secret share should be the sum of the original and tweak
 	expectedNewSecretShare := keysharePriv.Add(tweakPriv)
-	assert.Equal(t, expectedNewSecretShare, updatedKeyshare.SecretShare)
+	assert.NotNil(t, updatedKeyshare.SecretShare)
+	assert.Equal(t, expectedNewSecretShare, *updatedKeyshare.SecretShare)
 
 	// The new public key should be the sum of the original and tweak public key
 	expectedNewPublicKey := keysharePub.Add(tweakPub)

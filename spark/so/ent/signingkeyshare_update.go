@@ -65,6 +65,39 @@ func (sku *SigningKeyshareUpdate) SetNillableSecretShare(k *keys.Private) *Signi
 	return sku
 }
 
+// ClearSecretShare clears the value of the "secret_share" field.
+func (sku *SigningKeyshareUpdate) ClearSecretShare() *SigningKeyshareUpdate {
+	sku.mutation.ClearSecretShare()
+	return sku
+}
+
+// SetSecretVersion sets the "secret_version" field.
+func (sku *SigningKeyshareUpdate) SetSecretVersion(i int32) *SigningKeyshareUpdate {
+	sku.mutation.ResetSecretVersion()
+	sku.mutation.SetSecretVersion(i)
+	return sku
+}
+
+// SetNillableSecretVersion sets the "secret_version" field if the given value is not nil.
+func (sku *SigningKeyshareUpdate) SetNillableSecretVersion(i *int32) *SigningKeyshareUpdate {
+	if i != nil {
+		sku.SetSecretVersion(*i)
+	}
+	return sku
+}
+
+// AddSecretVersion adds i to the "secret_version" field.
+func (sku *SigningKeyshareUpdate) AddSecretVersion(i int32) *SigningKeyshareUpdate {
+	sku.mutation.AddSecretVersion(i)
+	return sku
+}
+
+// ClearSecretVersion clears the value of the "secret_version" field.
+func (sku *SigningKeyshareUpdate) ClearSecretVersion() *SigningKeyshareUpdate {
+	sku.mutation.ClearSecretVersion()
+	return sku
+}
+
 // SetPublicShares sets the "public_shares" field.
 func (sku *SigningKeyshareUpdate) SetPublicShares(m map[string]keys.Public) *SigningKeyshareUpdate {
 	sku.mutation.SetPublicShares(m)
@@ -205,6 +238,18 @@ func (sku *SigningKeyshareUpdate) sqlSave(ctx context.Context) (n int, err error
 	if value, ok := sku.mutation.SecretShare(); ok {
 		_spec.SetField(signingkeyshare.FieldSecretShare, field.TypeBytes, value)
 	}
+	if sku.mutation.SecretShareCleared() {
+		_spec.ClearField(signingkeyshare.FieldSecretShare, field.TypeBytes)
+	}
+	if value, ok := sku.mutation.SecretVersion(); ok {
+		_spec.SetField(signingkeyshare.FieldSecretVersion, field.TypeInt32, value)
+	}
+	if value, ok := sku.mutation.AddedSecretVersion(); ok {
+		_spec.AddField(signingkeyshare.FieldSecretVersion, field.TypeInt32, value)
+	}
+	if sku.mutation.SecretVersionCleared() {
+		_spec.ClearField(signingkeyshare.FieldSecretVersion, field.TypeInt32)
+	}
 	if value, ok := sku.mutation.PublicShares(); ok {
 		_spec.SetField(signingkeyshare.FieldPublicShares, field.TypeJSON, value)
 	}
@@ -276,6 +321,39 @@ func (skuo *SigningKeyshareUpdateOne) SetNillableSecretShare(k *keys.Private) *S
 	if k != nil {
 		skuo.SetSecretShare(*k)
 	}
+	return skuo
+}
+
+// ClearSecretShare clears the value of the "secret_share" field.
+func (skuo *SigningKeyshareUpdateOne) ClearSecretShare() *SigningKeyshareUpdateOne {
+	skuo.mutation.ClearSecretShare()
+	return skuo
+}
+
+// SetSecretVersion sets the "secret_version" field.
+func (skuo *SigningKeyshareUpdateOne) SetSecretVersion(i int32) *SigningKeyshareUpdateOne {
+	skuo.mutation.ResetSecretVersion()
+	skuo.mutation.SetSecretVersion(i)
+	return skuo
+}
+
+// SetNillableSecretVersion sets the "secret_version" field if the given value is not nil.
+func (skuo *SigningKeyshareUpdateOne) SetNillableSecretVersion(i *int32) *SigningKeyshareUpdateOne {
+	if i != nil {
+		skuo.SetSecretVersion(*i)
+	}
+	return skuo
+}
+
+// AddSecretVersion adds i to the "secret_version" field.
+func (skuo *SigningKeyshareUpdateOne) AddSecretVersion(i int32) *SigningKeyshareUpdateOne {
+	skuo.mutation.AddSecretVersion(i)
+	return skuo
+}
+
+// ClearSecretVersion clears the value of the "secret_version" field.
+func (skuo *SigningKeyshareUpdateOne) ClearSecretVersion() *SigningKeyshareUpdateOne {
+	skuo.mutation.ClearSecretVersion()
 	return skuo
 }
 
@@ -448,6 +526,18 @@ func (skuo *SigningKeyshareUpdateOne) sqlSave(ctx context.Context) (_node *Signi
 	}
 	if value, ok := skuo.mutation.SecretShare(); ok {
 		_spec.SetField(signingkeyshare.FieldSecretShare, field.TypeBytes, value)
+	}
+	if skuo.mutation.SecretShareCleared() {
+		_spec.ClearField(signingkeyshare.FieldSecretShare, field.TypeBytes)
+	}
+	if value, ok := skuo.mutation.SecretVersion(); ok {
+		_spec.SetField(signingkeyshare.FieldSecretVersion, field.TypeInt32, value)
+	}
+	if value, ok := skuo.mutation.AddedSecretVersion(); ok {
+		_spec.AddField(signingkeyshare.FieldSecretVersion, field.TypeInt32, value)
+	}
+	if skuo.mutation.SecretVersionCleared() {
+		_spec.ClearField(signingkeyshare.FieldSecretVersion, field.TypeInt32)
 	}
 	if value, ok := skuo.mutation.PublicShares(); ok {
 		_spec.SetField(signingkeyshare.FieldPublicShares, field.TypeJSON, value)
