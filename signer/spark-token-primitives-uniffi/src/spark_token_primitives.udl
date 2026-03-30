@@ -1,0 +1,58 @@
+namespace spark_token_primitives {
+    [Throws=SparkTokenPrimitivesError]
+    PartialTransferBuildResult construct_partial_transfer_transaction(TransferBuildRequest request);
+
+    [Throws=SparkTokenPrimitivesError]
+    bytes hash_partial_token_transaction(bytes partial_token_transaction_bytes);
+
+    [Throws=SparkTokenPrimitivesError]
+    bytes build_broadcast_transaction_request(BroadcastBuildRequest request);
+};
+
+[Error]
+enum SparkTokenPrimitivesError {
+    "Spark",
+};
+
+dictionary SelectedTokenOutput {
+    bytes previous_transaction_hash;
+    u32 previous_transaction_vout;
+    bytes owner_public_key;
+    bytes token_identifier;
+    bytes token_amount;
+};
+
+dictionary ReceiverTokenOutput {
+    string receiver_spark_address;
+    bytes? token_identifier;
+    bytes? token_amount;
+};
+
+dictionary TransferBuildRequest {
+    bytes identity_public_key;
+    sequence<SelectedTokenOutput> selected_outputs;
+    sequence<ReceiverTokenOutput> receiver_outputs;
+    sequence<bytes> operator_identity_public_keys;
+    u32 network;
+    u64 validity_duration_seconds;
+    i64 client_created_timestamp_unix_micros;
+    u64 withdraw_bond_sats;
+    u64 withdraw_relative_block_locktime;
+};
+
+dictionary PartialTransferBuildResult {
+    bytes partial_token_transaction_bytes;
+    bytes partial_token_transaction_hash;
+};
+
+dictionary SignatureWithIndexInput {
+    u32 input_index;
+    bytes public_key;
+    bytes signature;
+};
+
+dictionary BroadcastBuildRequest {
+    bytes identity_public_key;
+    bytes partial_token_transaction_bytes;
+    sequence<SignatureWithIndexInput> owner_signatures;
+};

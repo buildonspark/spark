@@ -2,12 +2,18 @@
 resolver = "2"
 members = [
     "spark-frost",
-    "spark-frost-signer", "spark-frost-uniffi",
+    "spark-frost-signer",
+    "spark-frost-uniffi",
+    "spark-token-primitives",
+    "spark-token-primitives-uniffi",
     # "spark-frost-uniffi",
 ]
 
 [workspace.dependencies]
+bech32 = "0.11.0"
 prost = "0.13.3"
+prost-build = "0.13.3"
+prost-types = "0.13.3"
 tonic = "0.12.3"
 tokio = { version = "1.41.0", features = ["macros", "rt-multi-thread", "signal"] }
 tokio-stream = "0.1.16"
@@ -15,11 +21,14 @@ frost-secp256k1-tr = { git = "https://github.com/lightsparkdev/frost", branch = 
 frost-core = { git = "https://github.com/lightsparkdev/frost", branch = "nested-signing" }
 rand = "0.8.5"
 serde = "1.0.214"
+sha2 = "0.10.8"
 hex = "0.4.3"
 clap = { version = "4.5.20", features = ["derive"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tonic-build = "0.12.3"
+thiserror = "1.0.69"
+uniffi = "0.28.3"
 uuid = { version = "1.1.2", features = ["v4", "js"] }
 ecies = { "version" = "0.2.7", default-features = false, features = ["pure"]}
 rayon = "1.10.0"

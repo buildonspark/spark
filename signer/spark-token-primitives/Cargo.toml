@@ -1,0 +1,18 @@
+[package]
+name = "spark-token-primitives"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bech32 = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[build-dependencies]
+prost-build = { workspace = true }
+
+[lib]
+name = "spark_token_primitives"
+doctest = false

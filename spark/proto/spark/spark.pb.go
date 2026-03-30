@@ -10983,7 +10983,7 @@ func (x *InitiateSwapPrimaryTransferResponse) GetSigningResults() []*LeafRefundT
 }
 
 // Adaptor public key is derived from the secret `t` using formula:
-// ```
+// ```text
 // T = t * G
 // ```
 type AdaptorPublicKeyPackage struct {

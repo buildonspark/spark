@@ -68,3 +68,6 @@ tilt/tilt_config.json
 
 # Lefthook local overrides
 lefthook-local.yml
+
+signer/spark-token-primitives-uniffi/spark-token-primitives-python/spark_token_primitives_python.egg-info/
+signer/spark-token-primitives-uniffi/spark-token-primitives-python/src/spark_token_primitives/__pycache__/

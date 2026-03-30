@@ -1,0 +1,22 @@
+[package]
+name = "spark-token-primitives-uniffi"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spark_token_primitives = { package = "spark-token-primitives", path = "../spark-token-primitives" }
+uniffi = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[features]
+default = ["uniffi/cli"]
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+name = "spark_token_primitives"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"

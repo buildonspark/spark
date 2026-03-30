@@ -2495,6 +2495,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "spark-token-primitives"
+version = "0.1.0"
+dependencies = [
+ "bech32",
+ "prost 0.13.5",
+ "prost-build 0.13.5",
+ "prost-types 0.13.5",
+ "sha2",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "spark-token-primitives-uniffi"
+version = "0.1.0"
+dependencies = [
+ "spark-token-primitives",
+ "uniffi",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
