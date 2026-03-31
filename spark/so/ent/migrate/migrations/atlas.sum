@@ -1,4 +1,4 @@
-h1:+xBkwlYNIQaZu3wwjGeaCWrEcIj3SYOd8khmsNdf3Zc=
+h1:4tKkMzfSiVGBGxzbPeCyyXWMWNJS1oioIRlmwA1AFnI=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -135,3 +135,4 @@ h1:+xBkwlYNIQaZu3wwjGeaCWrEcIj3SYOd8khmsNdf3Zc=
 20260326220136_add_identity_to_idempotency_keys.sql h1:BVonkDOwYfBl/iR0UoRqKMIqdcjB7aigJ0Ash8YSmgI=
 20260327223914_add_partner_table.sql h1:YAAShaR97vTTV1SCf+U7DNmTaPs+ATnv2OGFvYupv2Y=
 20260330000000_add_signing_keyshare_secret_version.sql h1:5WBb8NS/XX1OYMb+jpyVCT/iGCv2KXBzdqzQN8jfFIo=
+20260331175515_readd_old_idempotency_index.sql h1:/qe2ULZQPoJil8mRki51FQf9A5IuIIoaVqztamxPTaE=

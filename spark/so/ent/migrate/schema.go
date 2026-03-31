@@ -216,6 +216,11 @@ var (
 		PrimaryKey: []*schema.Column{IdempotencyKeysColumns[0]},
 		Indexes: []*schema.Index{
 			{
+				Name:    "idempotency_keys_idempotency_key_method_name",
+				Unique:  true,
+				Columns: []*schema.Column{IdempotencyKeysColumns[3], IdempotencyKeysColumns[4]},
+			},
+			{
 				Name:    "idempotency_keys_key_method_identity",
 				Unique:  true,
 				Columns: []*schema.Column{IdempotencyKeysColumns[3], IdempotencyKeysColumns[4], IdempotencyKeysColumns[5]},
