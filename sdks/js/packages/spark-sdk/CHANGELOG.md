@@ -1,5 +1,15 @@
 # @buildonspark/spark-sdk
 
+## 0.7.2
+
+### Patch Changes
+
+- - Add experimental instant static deposit (0-conf) flow for claiming static deposits before on-chain confirmation
+  - Add webhook management — register, delete, and list webhooks for wallet events via `registerWebhook()`, `deleteWebhook()`, and `listWebhooks()`
+  - Retry fetch on network errors in SSP client for improved reliability on mobile and intermittent connections
+  - Initialize WASM in transaction construction calls for browser environments
+  - Make `receiverIdentityPublicKey` required on `LeafKeyTweak` — structural refactor that removes parameter threading across internal functions
+
 ## 0.7.1
 
 ### Patch Changes
