@@ -2006,6 +2006,202 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 	require.NoError(t, err, "Expected success when TransferIds are specified")
 }
 
+// TestQueryAllTransfersMIMO verifies that QueryAllTransfers works correctly
+// when the MIMO data model knob is enabled, specifically that the
+// SenderOrReceiverIdentityPublicKey filter returns the right transfers
+// by querying through TransferSender/TransferReceiver records.
+func TestQueryAllTransfersMIMO(t *testing.T) {
+	senderConfig := wallet.NewTestWalletConfig(t)
+	receiverPrivKey := keys.GeneratePrivateKey()
+	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
+
+	// Create a leaf and send a V3 transfer (creates TransferSender/TransferReceiver records).
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
+	require.NoError(t, err)
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
+		t.Context(), senderConfig,
+		[]wallet.LeafKeyTweak{{Leaf: rootNode, SigningPrivKey: leafPrivKey, NewSigningPrivKey: newLeafPrivKey}},
+		map[string]keys.Public{rootNode.Id: receiverPrivKey.Public()},
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+
+	// Enable the MIMO query path.
+	kc, err := sparktesting.NewKnobController(t)
+	require.NoError(t, err)
+	err = kc.SetKnob(t, knobs.KnobReadMIMODataModelQueryTransfers, 100)
+	require.NoError(t, err)
+
+	network, err := senderConfig.Network.ToProtoNetwork()
+	require.NoError(t, err)
+
+	// Query as sender using SenderOrReceiverIdentityPublicKey.
+	senderToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
+	require.NoError(t, err)
+	senderCtx := wallet.ContextWithToken(t.Context(), senderToken)
+	senderConn, err := senderConfig.NewCoordinatorGRPCConnection()
+	require.NoError(t, err)
+	defer senderConn.Close()
+	senderClient := sparkpb.NewSparkServiceClient(senderConn)
+
+	resp, err := senderClient.QueryAllTransfers(senderCtx, &sparkpb.TransferFilter{
+		Participant: &sparkpb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+			SenderOrReceiverIdentityPublicKey: senderConfig.IdentityPublicKey().Serialize(),
+		},
+		Network: network,
+		Limit:   50,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, resp.Transfers, "sender should see the transfer via MIMO query path")
+
+	var found bool
+	for _, tr := range resp.Transfers {
+		if tr.Id == senderTransfer.Id {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "sender's transfer should appear in results")
+
+	// Query as receiver using SenderOrReceiverIdentityPublicKey.
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err)
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+	receiverConn, err := receiverConfig.NewCoordinatorGRPCConnection()
+	require.NoError(t, err)
+	defer receiverConn.Close()
+	receiverClient := sparkpb.NewSparkServiceClient(receiverConn)
+
+	resp, err = receiverClient.QueryAllTransfers(receiverCtx, &sparkpb.TransferFilter{
+		Participant: &sparkpb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+			SenderOrReceiverIdentityPublicKey: receiverConfig.IdentityPublicKey().Serialize(),
+		},
+		Network: network,
+		Limit:   50,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, resp.Transfers, "receiver should see the transfer via MIMO query path")
+
+	found = false
+	for _, tr := range resp.Transfers {
+		if tr.Id == senderTransfer.Id {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "receiver's transfer should appear in results")
+
+	// Query with an unrelated pubkey — should return no transfers.
+	unrelatedPrivKey := keys.GeneratePrivateKey()
+	unrelatedConfig := wallet.NewTestWalletConfigWithIdentityKey(t, unrelatedPrivKey)
+	unrelatedToken, err := wallet.AuthenticateWithServer(t.Context(), unrelatedConfig)
+	require.NoError(t, err)
+	unrelatedCtx := wallet.ContextWithToken(t.Context(), unrelatedToken)
+	unrelatedConn, err := unrelatedConfig.NewCoordinatorGRPCConnection()
+	require.NoError(t, err)
+	defer unrelatedConn.Close()
+	unrelatedClient := sparkpb.NewSparkServiceClient(unrelatedConn)
+
+	resp, err = unrelatedClient.QueryAllTransfers(unrelatedCtx, &sparkpb.TransferFilter{
+		Participant: &sparkpb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+			SenderOrReceiverIdentityPublicKey: unrelatedConfig.IdentityPublicKey().Serialize(),
+		},
+		Network: network,
+		Limit:   50,
+	})
+	require.NoError(t, err)
+	require.Empty(t, resp.Transfers, "unrelated pubkey should see no transfers")
+}
+
+// TestQueryPendingTransfersMIMO verifies that QueryPendingTransfers with
+// SenderOrReceiverIdentityPublicKey correctly applies role-based status
+// filtering when the MIMO knob is enabled. The sender should only see
+// transfers in sender-pending statuses (not receiver-pending), and vice versa.
+func TestQueryPendingTransfersMIMO(t *testing.T) {
+	senderConfig := wallet.NewTestWalletConfig(t)
+	receiverPrivKey := keys.GeneratePrivateKey()
+	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
+
+	// Create and send a V3 transfer. After SendTransferV3, the transfer is at
+	// SENDER_KEY_TWEAKED — which is a receiver-pending status, NOT a sender-pending status.
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
+	require.NoError(t, err)
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
+		t.Context(), senderConfig,
+		[]wallet.LeafKeyTweak{{Leaf: rootNode, SigningPrivKey: leafPrivKey, NewSigningPrivKey: newLeafPrivKey}},
+		map[string]keys.Public{rootNode.Id: receiverPrivKey.Public()},
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+
+	// Enable the MIMO query path.
+	kc, err := sparktesting.NewKnobController(t)
+	require.NoError(t, err)
+	err = kc.SetKnob(t, knobs.KnobReadMIMODataModelQueryTransfers, 100)
+	require.NoError(t, err)
+
+	network, err := senderConfig.Network.ToProtoNetwork()
+	require.NoError(t, err)
+
+	// Sender queries pending transfers. SENDER_KEY_TWEAKED is a receiver-pending
+	// status, so the sender should NOT see this transfer as pending.
+	senderToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
+	require.NoError(t, err)
+	senderCtx := wallet.ContextWithToken(t.Context(), senderToken)
+	senderConn, err := senderConfig.NewCoordinatorGRPCConnection()
+	require.NoError(t, err)
+	defer senderConn.Close()
+	senderClient := sparkpb.NewSparkServiceClient(senderConn)
+
+	pendingResp, err := senderClient.QueryPendingTransfers(senderCtx, &sparkpb.TransferFilter{
+		Participant: &sparkpb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+			SenderOrReceiverIdentityPublicKey: senderConfig.IdentityPublicKey().Serialize(),
+		},
+		Network: network,
+	})
+	require.NoError(t, err)
+
+	for _, tr := range pendingResp.Transfers {
+		require.NotEqual(t, senderTransfer.Id, tr.Id,
+			"sender should NOT see SENDER_KEY_TWEAKED transfer as pending (it's a receiver-pending status)")
+	}
+
+	// Receiver queries pending transfers. SENDER_KEY_TWEAKED IS a receiver-pending
+	// status, so the receiver SHOULD see this transfer.
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err)
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+	receiverConn, err := receiverConfig.NewCoordinatorGRPCConnection()
+	require.NoError(t, err)
+	defer receiverConn.Close()
+	receiverClient := sparkpb.NewSparkServiceClient(receiverConn)
+
+	pendingResp, err = receiverClient.QueryPendingTransfers(receiverCtx, &sparkpb.TransferFilter{
+		Participant: &sparkpb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+			SenderOrReceiverIdentityPublicKey: receiverConfig.IdentityPublicKey().Serialize(),
+		},
+		Network: network,
+	})
+	require.NoError(t, err)
+
+	var found bool
+	for _, tr := range pendingResp.Transfers {
+		if tr.Id == senderTransfer.Id {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "receiver should see SENDER_KEY_TWEAKED transfer as pending")
+}
+
 // TestV3MimoEmptyTransferRejected verifies that the SO rejects a
 // StartTransferV3 request with no leaves and no receivers.
 func TestV3MimoEmptyTransferRejected(t *testing.T) {

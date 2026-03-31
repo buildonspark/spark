@@ -1968,7 +1968,20 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
 		}
 		if useMIMO {
-			transferPredicate = append(transferPredicate, enttransfer.HasTransferReceiversWith(enttransferreceiver.IdentityPubkeyEQ(receiverIDPubKey)))
+			transferIDs, err := db.TransferReceiver.Query().
+				Where(enttransferreceiver.IdentityPubkeyEQ(receiverIDPubKey)).
+				QueryTransfer().
+				Unique(false).
+				Order(ent.Desc(enttransfer.FieldCreateTime)).
+				Limit(maxMIMOTransferIDs).
+				IDs(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to query receiver transfer IDs: %w", err)
+			}
+			if len(transferIDs) == 0 {
+				return &pb.QueryTransfersResponse{Offset: -1}, nil
+			}
+			transferPredicate = append(transferPredicate, enttransfer.IDIn(transferIDs...))
 		} else {
 			transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(receiverIDPubKey))
 		}
@@ -1982,7 +1995,20 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			return nil, fmt.Errorf("invalid sender identity public key: %w", err)
 		}
 		if useMIMO {
-			transferPredicate = append(transferPredicate, enttransfer.HasTransferSendersWith(enttransfersender.IdentityPubkeyEQ(senderIDPubKey)))
+			transferIDs, err := db.TransferSender.Query().
+				Where(enttransfersender.IdentityPubkeyEQ(senderIDPubKey)).
+				QueryTransfer().
+				Unique(false).
+				Order(ent.Desc(enttransfer.FieldCreateTime)).
+				Limit(maxMIMOTransferIDs).
+				IDs(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to query sender transfer IDs: %w", err)
+			}
+			if len(transferIDs) == 0 {
+				return &pb.QueryTransfersResponse{Offset: -1}, nil
+			}
+			transferPredicate = append(transferPredicate, enttransfer.IDIn(transferIDs...))
 		} else {
 			transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(senderIDPubKey))
 		}
@@ -1998,21 +2024,89 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if err != nil {
 			return nil, fmt.Errorf("invalid sender or receiver identity public key: %w", err)
 		}
-		var receiverMatchesIdentity, senderMatchesIdentity predicate.Transfer
 		if useMIMO {
-			receiverMatchesIdentity = enttransfer.HasTransferReceiversWith(enttransferreceiver.IdentityPubkeyEQ(identityPubKey))
-			senderMatchesIdentity = enttransfer.HasTransferSendersWith(enttransfersender.IdentityPubkeyEQ(identityPubKey))
+			// For MIMO, query TransferSender/TransferReceiver directly to get
+			// transfer IDs. This avoids the slow OR + EXISTS pattern that causes
+			// full table scans when querying from the transfers table.
+			receiverTransferIDs, err := db.TransferReceiver.Query().
+				Where(enttransferreceiver.IdentityPubkeyEQ(identityPubKey)).
+				QueryTransfer().
+				Unique(false).
+				Order(ent.Desc(enttransfer.FieldCreateTime)).
+				Limit(maxMIMOTransferIDs).
+				IDs(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to query receiver transfer IDs: %w", err)
+			}
+			senderTransferIDs, err := db.TransferSender.Query().
+				Where(enttransfersender.IdentityPubkeyEQ(identityPubKey)).
+				QueryTransfer().
+				Unique(false).
+				Order(ent.Desc(enttransfer.FieldCreateTime)).
+				Limit(maxMIMOTransferIDs).
+				IDs(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to query sender transfer IDs: %w", err)
+			}
+
+			if len(receiverTransferIDs) == 0 && len(senderTransferIDs) == 0 {
+				return &pb.QueryTransfersResponse{Offset: -1}, nil
+			}
+
+			if isPending {
+				// Keep IDs separate to preserve role-based status filtering.
+				// Guard each arm against empty ID slices — a wallet may have
+				// only sent or only received transfers.
+				var pendingParts []predicate.Transfer
+				if len(receiverTransferIDs) > 0 {
+					pendingParts = append(pendingParts, enttransfer.And(
+						enttransfer.IDIn(receiverTransferIDs...),
+						enttransfer.StatusIn(receiverPendingStatuses...),
+					))
+				}
+				if len(senderTransferIDs) > 0 {
+					pendingParts = append(pendingParts, enttransfer.And(
+						enttransfer.IDIn(senderTransferIDs...),
+						enttransfer.StatusIn(senderPendingStatuses...),
+						enttransfer.ExpiryTimeLT(time.Now()),
+					))
+				}
+				if len(pendingParts) == 0 {
+					return &pb.QueryTransfersResponse{Offset: -1}, nil
+				}
+				transferPredicate = append(transferPredicate, enttransfer.Or(pendingParts...))
+			} else {
+				// Deduplicate transfer IDs for the non-pending path.
+				seen := make(map[uuid.UUID]struct{}, len(receiverTransferIDs)+len(senderTransferIDs))
+				allIDs := make([]uuid.UUID, 0, len(receiverTransferIDs)+len(senderTransferIDs))
+				for _, id := range receiverTransferIDs {
+					if _, ok := seen[id]; !ok {
+						seen[id] = struct{}{}
+						allIDs = append(allIDs, id)
+					}
+				}
+				for _, id := range senderTransferIDs {
+					if _, ok := seen[id]; !ok {
+						seen[id] = struct{}{}
+						allIDs = append(allIDs, id)
+					}
+				}
+				if len(allIDs) > maxMIMOTransferIDs {
+					allIDs = allIDs[:maxMIMOTransferIDs]
+				}
+				transferPredicate = append(transferPredicate, enttransfer.IDIn(allIDs...))
+			}
 		} else {
-			receiverMatchesIdentity = enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey)
-			senderMatchesIdentity = enttransfer.SenderIdentityPubkeyEQ(identityPubKey)
-		}
-		if isPending {
-			transferPredicate = append(transferPredicate, enttransfer.Or(
-				enttransfer.And(receiverMatchesIdentity, enttransfer.StatusIn(receiverPendingStatuses...)),
-				enttransfer.And(senderMatchesIdentity, enttransfer.StatusIn(senderPendingStatuses...), enttransfer.ExpiryTimeLT(time.Now())),
-			))
-		} else {
-			transferPredicate = append(transferPredicate, enttransfer.Or(receiverMatchesIdentity, senderMatchesIdentity))
+			receiverMatchesIdentity := enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey)
+			senderMatchesIdentity := enttransfer.SenderIdentityPubkeyEQ(identityPubKey)
+			if isPending {
+				transferPredicate = append(transferPredicate, enttransfer.Or(
+					enttransfer.And(receiverMatchesIdentity, enttransfer.StatusIn(receiverPendingStatuses...)),
+					enttransfer.And(senderMatchesIdentity, enttransfer.StatusIn(senderPendingStatuses...), enttransfer.ExpiryTimeLT(time.Now())),
+				))
+			} else {
+				transferPredicate = append(transferPredicate, enttransfer.Or(receiverMatchesIdentity, senderMatchesIdentity))
+			}
 		}
 		walletIdentityPubkey = &identityPubKey
 	default:
@@ -2229,6 +2323,12 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.Tran
 }
 
 const CoopExitConfirmationThreshold = 6
+
+// maxMIMOTransferIDs caps the number of transfer IDs fetched from
+// TransferSender/TransferReceiver to stay within PostgreSQL's bind
+// parameter limit (65,535). With other predicates also consuming
+// parameters, 50,000 provides safe headroom.
+const maxMIMOTransferIDs = 50_000
 
 func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Client, transfer *ent.Transfer) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.checkCoopExitTxBroadcasted")
