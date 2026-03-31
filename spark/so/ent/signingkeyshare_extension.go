@@ -136,7 +136,16 @@ func getUnusedSigningKeysharesTx(ctx context.Context, client *Client, cfg *so.Co
 		SET status = 'IN_USE', update_time = NOW()
 		FROM selected_ids
 		WHERE signing_keyshares.id = selected_ids.id
-		RETURNING signing_keyshares.*
+		RETURNING
+			signing_keyshares.id,
+			signing_keyshares.create_time,
+			signing_keyshares.update_time,
+			signing_keyshares.status,
+			signing_keyshares.secret_share,
+			signing_keyshares.public_shares,
+			signing_keyshares.public_key,
+			signing_keyshares.min_signers,
+			signing_keyshares.coordinator_index
 	`, []any{cfg.Index, keyshareCount}...)
 	if err != nil {
 		return nil, err
@@ -183,7 +192,16 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UU
 		SET status = 'IN_USE', update_time = NOW()
 		WHERE signing_keyshares.status = 'AVAILABLE'
 		AND signing_keyshares.id = ANY($1)
-		RETURNING signing_keyshares.*
+		RETURNING
+			signing_keyshares.id,
+			signing_keyshares.create_time,
+			signing_keyshares.update_time,
+			signing_keyshares.status,
+			signing_keyshares.secret_share,
+			signing_keyshares.public_shares,
+			signing_keyshares.public_key,
+			signing_keyshares.min_signers,
+			signing_keyshares.coordinator_index
 	`, []any{pq.Array(ids)}...)
 	if err != nil {
 		return nil, err

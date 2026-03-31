@@ -34,6 +34,21 @@ For tables managed by Ent/Atlas:
 5. **Test on staging** database
 6. **Deploy** - Atlas automatically applies on startup
 
+#### Raw SQL Result Shape Safety
+
+When writing raw SQL against Ent-managed tables, avoid `SELECT *` and `RETURNING *`.
+Prefer an explicit column list instead.
+
+With PostgreSQL prepared statement caching, additive schema changes such as `ALTER TABLE ...
+ADD COLUMN ...` can change the result shape of `*` queries on existing connections and cause:
+
+```text
+ERROR: cached plan must not change result type (SQLSTATE 0A000)
+```
+
+Using explicit column lists makes these queries more stable across migrations and avoids
+silently changing which fields are loaded into Ent models.
+
 ### External Table Workflow (Manual Management)
 
 Some tables require manual management due to advanced features that Ent/Atlas cannot handle:
