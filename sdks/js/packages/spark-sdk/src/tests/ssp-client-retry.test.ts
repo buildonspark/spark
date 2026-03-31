@@ -1,36 +1,9 @@
 import { describe, expect, it, jest } from "@jest/globals";
+import { createRetryFetch } from "../graphql/client.js";
 
-// Re-create the retry logic here for testing (since it's not exported)
-const RETRYABLE_STATUS_CODES = new Set([502, 503, 504]);
+type FetchFn = typeof globalThis.fetch;
 
-type FetchFn = (
-  input: RequestInfo | URL,
-  init?: RequestInit,
-) => Promise<Response>;
-
-function createRetryFetch(
-  baseFetch: FetchFn,
-  maxRetries: number = 5,
-  baseDelayMs: number = 1000,
-): FetchFn {
-  return async (input, init) => {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      const response = await baseFetch(input, init);
-
-      if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < maxRetries) {
-        const delay = Math.min(baseDelayMs * Math.pow(2, attempt), 10000);
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
-
-      return response;
-    }
-
-    throw new Error("Retry loop exited unexpectedly");
-  };
-}
-
-describe("SspClient retry fetch", () => {
+describe("createRetryFetch", () => {
   beforeEach(() => {
     jest.useFakeTimers();
   });
@@ -44,7 +17,7 @@ describe("SspClient retry fetch", () => {
       .fn<FetchFn>()
       .mockResolvedValue(new Response("ok", { status: 200 }));
 
-    const retryFetch = createRetryFetch(mockFetch, 3, 100);
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
     const response = await retryFetch("https://example.com", {});
 
     expect(response.status).toBe(200);
@@ -57,7 +30,7 @@ describe("SspClient retry fetch", () => {
       .mockResolvedValueOnce(new Response("bad gateway", { status: 502 }))
       .mockResolvedValueOnce(new Response("ok", { status: 200 }));
 
-    const retryFetch = createRetryFetch(mockFetch, 3, 100);
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
 
     const promise = retryFetch("https://example.com", {});
     await jest.runAllTimersAsync();
@@ -75,7 +48,7 @@ describe("SspClient retry fetch", () => {
       )
       .mockResolvedValueOnce(new Response("ok", { status: 200 }));
 
-    const retryFetch = createRetryFetch(mockFetch, 3, 100);
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
 
     const promise = retryFetch("https://example.com", {});
     await jest.runAllTimersAsync();
@@ -91,7 +64,7 @@ describe("SspClient retry fetch", () => {
       .mockResolvedValueOnce(new Response("gateway timeout", { status: 504 }))
       .mockResolvedValueOnce(new Response("ok", { status: 200 }));
 
-    const retryFetch = createRetryFetch(mockFetch, 3, 100);
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
 
     const promise = retryFetch("https://example.com", {});
     await jest.runAllTimersAsync();
@@ -106,7 +79,7 @@ describe("SspClient retry fetch", () => {
       .fn<FetchFn>()
       .mockResolvedValue(new Response("bad gateway", { status: 502 }));
 
-    const retryFetch = createRetryFetch(mockFetch, 3, 100);
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
 
     const promise = retryFetch("https://example.com", {});
     await jest.runAllTimersAsync();
@@ -122,7 +95,7 @@ describe("SspClient retry fetch", () => {
       .fn<FetchFn>()
       .mockResolvedValue(new Response("bad request", { status: 400 }));
 
-    const retryFetch = createRetryFetch(mockFetch, 3, 100);
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
     const response = await retryFetch("https://example.com", {});
 
     expect(response.status).toBe(400);
@@ -134,7 +107,7 @@ describe("SspClient retry fetch", () => {
       .fn<FetchFn>()
       .mockResolvedValue(new Response("internal error", { status: 500 }));
 
-    const retryFetch = createRetryFetch(mockFetch, 3, 100);
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
     const response = await retryFetch("https://example.com", {});
 
     expect(response.status).toBe(500);
@@ -149,7 +122,7 @@ describe("SspClient retry fetch", () => {
       .mockResolvedValueOnce(new Response("", { status: 502 }))
       .mockResolvedValueOnce(new Response("ok", { status: 200 }));
 
-    const retryFetch = createRetryFetch(mockFetch, 3, 100);
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
 
     const promise = retryFetch("https://example.com", {});
     await jest.runAllTimersAsync();
@@ -157,5 +130,101 @@ describe("SspClient retry fetch", () => {
 
     expect(response.status).toBe(200);
     expect(mockFetch).toHaveBeenCalledTimes(4);
+  });
+
+  // --- Network error (thrown fetch) tests ---
+
+  it("should retry on thrown network error and succeed", async () => {
+    const mockFetch = jest
+      .fn<FetchFn>()
+      .mockRejectedValueOnce(new Error("ECONNRESET"))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
+
+    const promise = retryFetch("https://example.com", {});
+    await jest.runAllTimersAsync();
+    const response = await promise;
+
+    expect(response.status).toBe(200);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("should rethrow after max retries on network errors", async () => {
+    jest.useRealTimers();
+    const networkError = new Error("ECONNREFUSED");
+    const mockFetch = jest.fn<FetchFn>().mockRejectedValue(networkError);
+
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 2, 1);
+
+    await expect(retryFetch("https://example.com", {})).rejects.toThrow(
+      "ECONNREFUSED",
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(3); // 1 initial + 2 retries
+  });
+
+  it("should retry mixed network errors and HTTP errors", async () => {
+    const mockFetch = jest
+      .fn<FetchFn>()
+      .mockRejectedValueOnce(new Error("ECONNRESET"))
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
+
+    const promise = retryFetch("https://example.com", {});
+    await jest.runAllTimersAsync();
+    const response = await promise;
+
+    expect(response.status).toBe(200);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  // --- AbortError / TimeoutError tests ---
+
+  it("should not retry on AbortError", async () => {
+    const abortError = Object.assign(new Error("The operation was aborted"), {
+      name: "AbortError",
+    });
+    const mockFetch = jest.fn<FetchFn>().mockRejectedValue(abortError);
+
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
+
+    await expect(retryFetch("https://example.com", {})).rejects.toThrow(
+      "The operation was aborted",
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("should not retry AbortError even with retries remaining", async () => {
+    jest.useRealTimers();
+    const abortError = Object.assign(new Error("signal is aborted"), {
+      name: "AbortError",
+    });
+    const mockFetch = jest
+      .fn<FetchFn>()
+      .mockResolvedValueOnce(new Response("", { status: 502 }))
+      .mockRejectedValueOnce(abortError);
+
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 1);
+
+    await expect(retryFetch("https://example.com", {})).rejects.toThrow(
+      "signal is aborted",
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("should not retry on TimeoutError", async () => {
+    const timeoutError = Object.assign(new Error("The operation timed out"), {
+      name: "TimeoutError",
+    });
+    const mockFetch = jest.fn<FetchFn>().mockRejectedValue(timeoutError);
+
+    const retryFetch = createRetryFetch(mockFetch as FetchFn, 3, 100);
+
+    await expect(retryFetch("https://example.com", {})).rejects.toThrow(
+      "The operation timed out",
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

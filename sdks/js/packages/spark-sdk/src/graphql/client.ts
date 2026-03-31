@@ -121,14 +121,43 @@ const RETRYABLE_STATUS_CODES = new Set([
   504, // Gateway Timeout
 ]);
 
-function createRetryFetch(
+/** @internal Exported for testing only. */
+export function createRetryFetch(
   baseFetch: typeof globalThis.fetch,
   maxRetries: number = 5,
   baseDelayMs: number = 1000,
 ): typeof globalThis.fetch {
   return async (input, init) => {
+    let lastError: unknown;
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      const response = await baseFetch(input, init);
+      let response: Response;
+      try {
+        response = await baseFetch(input, init);
+      } catch (error) {
+        // Abort/timeout errors should fail immediately — retrying would
+        // exceed caller deadlines or replay after intentional cancellation.
+        if (
+          isError(error) &&
+          (error.name === "AbortError" || error.name === "TimeoutError")
+        ) {
+          throw error;
+        }
+        // Network errors (ECONNRESET, DNS failure) can occur after the server
+        // committed a mutation but before the response arrived. SSP mutations
+        // are protected from retry side effects via idempotency keys, unique
+        // constraints, or state machine checks.
+        if (attempt < maxRetries) {
+          lastError = error;
+          const delay = Math.min(baseDelayMs * Math.pow(2, attempt), 10000);
+          console.warn(
+            `[SspClient] fetch error (attempt ${attempt + 1}/${maxRetries + 1}): ${error instanceof Error ? error.message : error}, retrying in ${delay}ms`,
+          );
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        throw error;
+      }
 
       if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < maxRetries) {
         const delay = Math.min(baseDelayMs * Math.pow(2, attempt), 10000);
@@ -142,8 +171,7 @@ function createRetryFetch(
       return response;
     }
 
-    // This shouldn't be reached, but TypeScript needs it
-    throw new Error("Retry loop exited unexpectedly");
+    throw lastError ?? new Error("Retry loop exited unexpectedly");
   };
 }
 
