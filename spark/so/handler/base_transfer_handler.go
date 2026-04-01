@@ -2305,11 +2305,11 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 	}
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Checking commitSenderKeyTweaks for transfer %s (status: %s)", transfer.ID, transfer.Status)
-	if transfer.Status == st.TransferStatusSenderKeyTweaked {
-		return transfer, nil
+	if transfer.Status == st.TransferStatusSenderInitiated {
+		return nil, fmt.Errorf("transfer %s does not have key tweaks to commit", transfer.ID)
 	}
 	if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator && transfer.Status != st.TransferStatusApplyingSenderKeyTweak {
-		return nil, fmt.Errorf("transfer %s is not in sender key tweak pending, sender initiated coordinator, or applying sender key tweak status", transfer.ID)
+		return transfer, nil
 	}
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
