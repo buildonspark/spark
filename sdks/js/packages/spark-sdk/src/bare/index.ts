@@ -44,6 +44,7 @@ export {
   type SparkSigner,
 } from "../signer/signer.js";
 export { type IKeyPackage } from "../spark-bindings/types.js";
+export { SparkReadonlyClientBare as SparkReadonlyClient } from "../spark-readonly-client/spark-readonly-client.bare.js";
 export { SparkFrostBase } from "../spark-bindings/spark-bindings.js";
 export {
   type SignFrostParams,
