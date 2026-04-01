@@ -130,7 +130,7 @@ func createIdempotencyRecord(ctx context.Context, key string, methodName string,
 		SetIdempotencyKey(key).
 		SetMethodName(methodName).
 		SetIdentityPublicKey(identity).
-		OnConflictColumns("idempotency_key", "method_name").
+		OnConflictColumns("idempotency_key", "method_name", "identity_public_key").
 		DoNothing().
 		Exec(ctx)
 
