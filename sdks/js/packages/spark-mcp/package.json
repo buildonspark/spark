@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-mcp",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "MCP server for Spark Bitcoin/Lightning wallet operations",
   "license": "Apache-2.0",
   "type": "module",

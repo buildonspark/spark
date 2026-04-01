@@ -1,5 +1,11 @@
 # @buildonspark/spark-frost-bare-addon
 
+## 0.0.10
+
+### Patch Changes
+
+- Add constructNodeTxPair, constructRefundTxTrio, computeMultiInputSighash
+
 ## 0.0.9
 
 ### Patch Changes

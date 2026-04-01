@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-frost-bare-addon",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Example Bare addon",
   "license": "Apache-2.0",
   "homepage": "https://github.com/buildonspark/spark",
@@ -13,6 +13,7 @@
     "binding.c",
     "binding.js",
     "CMakeLists.txt",
+    "CHANGELOG.md",
     "prebuilds"
   ],
   "addon": true,

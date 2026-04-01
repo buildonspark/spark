@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.7.3
+
+### Patch Changes
+
+- - Export `SparkReadonlyClient` from the bare entrypoint
+
 ## 0.7.2
 
 ### Patch Changes
