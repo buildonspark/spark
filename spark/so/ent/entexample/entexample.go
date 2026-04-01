@@ -2683,7 +2683,6 @@ type SigningKeyshareExample struct {
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	Status           *schematype.SigningKeyshareStatus
 	SecretShare      *keys.Private
-	SecretVersion    *int32
 	PublicShares     *map[string]keys.Public
 	PublicKey        *keys.Public
 	MinSigners       *int32
@@ -2709,12 +2708,6 @@ func (sk *SigningKeyshareExample) SetStatus(v schematype.SigningKeyshareStatus) 
 // SetSecretShare sets the secret_share field.
 func (sk *SigningKeyshareExample) SetSecretShare(v keys.Private) *SigningKeyshareExample {
 	sk.SecretShare = &v
-	return sk
-}
-
-// SetSecretVersion sets the secret_version field.
-func (sk *SigningKeyshareExample) SetSecretVersion(v int32) *SigningKeyshareExample {
-	sk.SecretVersion = &v
 	return sk
 }
 
@@ -2759,12 +2752,6 @@ func (sk *SigningKeyshareExample) MustExec(ctx context.Context) *ent.SigningKeys
 	} else {
 		// Use default from annotation
 		create.SetSecretShare(keys.MustParsePrivateKeyHex("adeab186b64a2239f15640cb43d7c57c35376f5e1c42f574671880a34a4a80ad"))
-	}
-	if sk.SecretVersion != nil {
-		create.SetSecretVersion(*sk.SecretVersion)
-	} else {
-		// Use default from annotation
-		create.SetSecretVersion(int32(0))
 	}
 	if sk.PublicShares != nil {
 		create.SetPublicShares(*sk.PublicShares)
@@ -2819,12 +2806,6 @@ func (sk *SigningKeyshareExample) Exec(ctx context.Context) (*ent.SigningKeyshar
 	} else {
 		// Use default from annotation
 		create.SetSecretShare(keys.MustParsePrivateKeyHex("adeab186b64a2239f15640cb43d7c57c35376f5e1c42f574671880a34a4a80ad"))
-	}
-	if sk.SecretVersion != nil {
-		create.SetSecretVersion(*sk.SecretVersion)
-	} else {
-		// Use default from annotation
-		create.SetSecretVersion(int32(0))
 	}
 	if sk.PublicShares != nil {
 		create.SetPublicShares(*sk.PublicShares)

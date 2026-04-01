@@ -366,30 +366,12 @@ func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, erro
 	firstSecret := *keyshares[0].SecretShare
 	sum.SecretShare = &firstSecret
 
-	if keyshares[0].SecretVersion != nil {
-		v := *keyshares[0].SecretVersion
-		sum.SecretVersion = &v
-	}
-
 	sum.PublicShares = make(map[string]keys.Public, len(keyshares[0].PublicShares))
 	maps.Copy(sum.PublicShares, keyshares[0].PublicShares)
 
 	for _, keyshare := range keyshares[1:] {
 		if keyshare.SecretShare == nil {
 			return nil, fmt.Errorf("signing keyshare %s has no secret share", keyshare.ID)
-		}
-		versionsMatch := (keyshare.SecretVersion == nil && sum.SecretVersion == nil) ||
-			(keyshare.SecretVersion != nil && sum.SecretVersion != nil && *keyshare.SecretVersion == *sum.SecretVersion)
-		if !versionsMatch {
-			expectedVersion := "<nil>"
-			if sum.SecretVersion != nil {
-				expectedVersion = fmt.Sprintf("%d", *sum.SecretVersion)
-			}
-			gotVersion := "<nil>"
-			if keyshare.SecretVersion != nil {
-				gotVersion = fmt.Sprintf("%d", *keyshare.SecretVersion)
-			}
-			return nil, fmt.Errorf("signing keyshare version mismatch: expected %s, got %s for keyshare %s", expectedVersion, gotVersion, keyshare.ID)
 		}
 		newSecret := sum.SecretShare.Add(*keyshare.SecretShare)
 		sum.SecretShare = &newSecret
@@ -449,7 +431,6 @@ func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *Signing
 	lastKey, err := db.SigningKeyshare.Create().
 		SetID(id).
 		SetSecretShare(lastSecretShare).
-		SetNillableSecretVersion(sumKeyshare.SecretVersion).
 		SetPublicShares(publicShares).
 		SetPublicKey(verifyingKey).
 		SetStatus(st.KeyshareStatusInUse).
@@ -480,16 +461,11 @@ func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningK
 	if sumKeyshare.SecretShare == nil {
 		return nil, fmt.Errorf("summed keyshare has no secret share")
 	}
-	updateQuery := db.SigningKeyshare.UpdateOneID(updateKeyshareID).
+	updateKeyshare, err := db.SigningKeyshare.UpdateOneID(updateKeyshareID).
 		SetSecretShare(*sumKeyshare.SecretShare).
 		SetPublicKey(sumKeyshare.PublicKey).
-		SetPublicShares(sumKeyshare.PublicShares)
-	if sumKeyshare.SecretVersion == nil {
-		updateQuery = updateQuery.ClearSecretVersion()
-	} else {
-		updateQuery = updateQuery.SetSecretVersion(*sumKeyshare.SecretVersion)
-	}
-	updateKeyshare, err := updateQuery.Save(ctx)
+		SetPublicShares(sumKeyshare.PublicShares).
+		Save(ctx)
 	if err != nil {
 		return nil, err
 	}

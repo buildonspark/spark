@@ -4,7 +4,6 @@ import (
 	"maps"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/stretchr/testify/require"
 )
@@ -49,48 +48,4 @@ func TestSumOfSigningKeyshares_DoesNotMutateInputs(t *testing.T) {
 	sum.PublicShares["01"] = sum.PublicShares["01"].Add(keys.GeneratePrivateKey().Public())
 	require.True(t, first.PublicShares["01"].Equals(originalFirstPublicShares["01"]))
 	require.False(t, sum.PublicShares["01"].Equals(sumShareBefore))
-}
-
-func TestSumOfSigningKeyshares_SecretVersionComparison(t *testing.T) {
-	makeKeyshare := func(v *int32) *SigningKeyshare {
-		priv := keys.GeneratePrivateKey()
-		pub := priv.Public()
-		return &SigningKeyshare{
-			ID:            uuid.New(),
-			SecretShare:   &priv,
-			SecretVersion: v,
-			PublicShares:  map[string]keys.Public{"op": pub},
-			PublicKey:     pub,
-		}
-	}
-
-	v0a, v0b, v1 := int32(0), int32(0), int32(1)
-
-	tests := []struct {
-		name    string
-		v1      *int32
-		v2      *int32
-		wantErr bool
-		errSub  string
-	}{
-		{"same value different pointers", &v0a, &v0b, false, ""},
-		{"one nil one non-nil", nil, &v1, true, "version mismatch"},
-		{"both non-nil different values", &v0a, &v1, true, "version mismatch"},
-		{"both nil", nil, nil, false, ""},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := sumOfSigningKeyshares([]*SigningKeyshare{
-				makeKeyshare(tc.v1),
-				makeKeyshare(tc.v2),
-			})
-			if (err != nil) != tc.wantErr {
-				t.Fatalf("err = %v, wantErr = %v", err, tc.wantErr)
-			}
-			if tc.errSub != "" {
-				require.ErrorContains(t, err, tc.errSub)
-			}
-		})
-	}
 }

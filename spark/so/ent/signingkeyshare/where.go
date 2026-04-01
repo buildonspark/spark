@@ -72,11 +72,6 @@ func SecretShare(v keys.Private) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldEQ(FieldSecretShare, v))
 }
 
-// SecretVersion applies equality check predicate on the "secret_version" field. It's identical to SecretVersionEQ.
-func SecretVersion(v int32) predicate.SigningKeyshare {
-	return predicate.SigningKeyshare(sql.FieldEQ(FieldSecretVersion, v))
-}
-
 // PublicKey applies equality check predicate on the "public_key" field. It's identical to PublicKeyEQ.
 func PublicKey(v keys.Public) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldEQ(FieldPublicKey, v))
@@ -250,56 +245,6 @@ func SecretShareIsNil() predicate.SigningKeyshare {
 // SecretShareNotNil applies the NotNil predicate on the "secret_share" field.
 func SecretShareNotNil() predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldNotNull(FieldSecretShare))
-}
-
-// SecretVersionEQ applies the EQ predicate on the "secret_version" field.
-func SecretVersionEQ(v int32) predicate.SigningKeyshare {
-	return predicate.SigningKeyshare(sql.FieldEQ(FieldSecretVersion, v))
-}
-
-// SecretVersionNEQ applies the NEQ predicate on the "secret_version" field.
-func SecretVersionNEQ(v int32) predicate.SigningKeyshare {
-	return predicate.SigningKeyshare(sql.FieldNEQ(FieldSecretVersion, v))
-}
-
-// SecretVersionIn applies the In predicate on the "secret_version" field.
-func SecretVersionIn(vs ...int32) predicate.SigningKeyshare {
-	return predicate.SigningKeyshare(sql.FieldIn(FieldSecretVersion, vs...))
-}
-
-// SecretVersionNotIn applies the NotIn predicate on the "secret_version" field.
-func SecretVersionNotIn(vs ...int32) predicate.SigningKeyshare {
-	return predicate.SigningKeyshare(sql.FieldNotIn(FieldSecretVersion, vs...))
-}
-
-// SecretVersionGT applies the GT predicate on the "secret_version" field.
-func SecretVersionGT(v int32) predicate.SigningKeyshare {
-	return predicate.SigningKeyshare(sql.FieldGT(FieldSecretVersion, v))
-}
-
-// SecretVersionGTE applies the GTE predicate on the "secret_version" field.
-func SecretVersionGTE(v int32) predicate.SigningKeyshare {
-	return predicate.SigningKeyshare(sql.FieldGTE(FieldSecretVersion, v))
-}
-
-// SecretVersionLT applies the LT predicate on the "secret_version" field.
-func SecretVersionLT(v int32) predicate.SigningKeyshare {
-	return predicate.SigningKeyshare(sql.FieldLT(FieldSecretVersion, v))
-}
-
-// SecretVersionLTE applies the LTE predicate on the "secret_version" field.
-func SecretVersionLTE(v int32) predicate.SigningKeyshare {
-	return predicate.SigningKeyshare(sql.FieldLTE(FieldSecretVersion, v))
-}
-
-// SecretVersionIsNil applies the IsNil predicate on the "secret_version" field.
-func SecretVersionIsNil() predicate.SigningKeyshare {
-	return predicate.SigningKeyshare(sql.FieldIsNull(FieldSecretVersion))
-}
-
-// SecretVersionNotNil applies the NotNil predicate on the "secret_version" field.
-func SecretVersionNotNil() predicate.SigningKeyshare {
-	return predicate.SigningKeyshare(sql.FieldNotNull(FieldSecretVersion))
 }
 
 // PublicKeyEQ applies the EQ predicate on the "public_key" field.
