@@ -23,6 +23,18 @@ import { WalletConfigService } from "../config.js";
 import { getMonotonicTime } from "../time-sync.js";
 import { AuthMode, ConnectionManager } from "./connection.js";
 
+// The default @grpc/grpc-js message size limit is 4 MB. Wallets with many
+// leaves can exceed this — e.g. start_transfer_v2 responses have been observed
+// at ~5 MB. Bump to 20 MB to provide headroom. This only affects Node.js;
+// browser and Bare runtimes use fetch-based transports with no client-side
+// message size limit.
+const MAX_MESSAGE_SIZE = 20 * 1024 * 1024; // 20 MB
+
+const CHANNEL_OPTIONS = {
+  "grpc.max_receive_message_length": MAX_MESSAGE_SIZE,
+  "grpc.max_send_message_length": MAX_MESSAGE_SIZE,
+};
+
 export class ConnectionManagerNodeJS extends ConnectionManager {
   private certPath: string | null = null;
 
@@ -62,7 +74,11 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
       if (this.certPath) {
         try {
           const cert = fs.readFileSync(this.certPath);
-          return createChannel(address, ChannelCredentials.createSsl(cert));
+          return createChannel(
+            address,
+            ChannelCredentials.createSsl(cert),
+            CHANNEL_OPTIONS,
+          );
         } catch (error) {
           console.error("Error reading certificate:", error);
           return createChannel(
@@ -70,6 +86,7 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
             ChannelCredentials.createSsl(null, null, null, {
               rejectUnauthorized: false,
             }),
+            CHANNEL_OPTIONS,
           );
         }
       } else {
@@ -78,6 +95,7 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
           ChannelCredentials.createSsl(null, null, null, {
             rejectUnauthorized: false,
           }),
+          CHANNEL_OPTIONS,
         );
         return ch;
       }
