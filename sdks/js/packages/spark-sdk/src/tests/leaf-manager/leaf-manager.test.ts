@@ -737,6 +737,60 @@ describe("LeafManager", () => {
       expect(lm.getAvailableBalance()).toBe(100);
     });
 
+    it("transitions back to AVAILABLE on EXPIRED", async () => {
+      const lm = createLeafManagerWithIdentity();
+      const leaf = createMockTreeNode({ id: "leaf-1", value: 100 });
+      await lm.addLeaves([leaf]);
+
+      // Move to OUTGOING
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          senderIdentityPublicKey: identityKey,
+          status: TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+          leaves: [createMockTransferLeaf(leaf)],
+        }),
+      );
+
+      // Expire
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          senderIdentityPublicKey: identityKey,
+          status: TransferStatus.TRANSFER_STATUS_EXPIRED,
+          leaves: [createMockTransferLeaf(leaf)],
+        }),
+      );
+
+      expect(lm.getLeafStatus("leaf-1")).toBe("AVAILABLE");
+      expect(lm.getAvailableBalance()).toBe(100);
+    });
+
+    it("ignores UNRECOGNIZED status", async () => {
+      const lm = createLeafManagerWithIdentity();
+      const leaf = createMockTreeNode({ id: "leaf-1", value: 100 });
+      await lm.addLeaves([leaf]);
+
+      // Move to OUTGOING
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          senderIdentityPublicKey: identityKey,
+          status: TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+          leaves: [createMockTransferLeaf(leaf)],
+        }),
+      );
+
+      // UNRECOGNIZED should be a no-op
+      await lm.handleTransferEvent(
+        createMockTransfer({
+          senderIdentityPublicKey: identityKey,
+          status: TransferStatus.UNRECOGNIZED,
+          leaves: [createMockTransferLeaf(leaf)],
+        }),
+      );
+
+      expect(lm.getLeafStatus("leaf-1")).toBe("OUTGOING");
+      expect(lm.getOwnedBalance()).toBe(100);
+    });
+
     it("sets transfer source on transition", async () => {
       const lm = createLeafManagerWithIdentity();
       const leaf = createMockTreeNode({ id: "leaf-1", value: 100 });
@@ -4947,20 +5001,21 @@ describe("LeafManager", () => {
       });
     });
 
-    it("ignores unhandled transfer statuses", async () => {
+    it("transitions to SPENT for terminal statuses like RECEIVER_KEY_TWEAKED", async () => {
       const lm = await createSyncedLeafManager();
       await lm.addLeaves([createMockTreeNode({ id: "l1", value: 500 })]);
       lm.transitionPublic(["l1"], "LOCAL_LOCKED");
       lm.transitionPublic(["l1"], "OUTGOING");
 
-      // RECEIVER_KEY_TWEAKED is not handled — should be a no-op for outgoing leaves
+      // RECEIVER_KEY_TWEAKED means the transfer completed — leaf is spent and removed
       await lm.handleTransferEvent(
         createMockTransfer({
           status: TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED,
         }),
       );
 
-      expect(lm.getLeafRecordPublic("l1")?.status).toBe("OUTGOING");
+      expect(lm.getLeafRecordPublic("l1")).toBeUndefined();
+      expect(lm.getOwnedBalance()).toBe(0);
     });
   });
 

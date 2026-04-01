@@ -736,13 +736,10 @@ export default class LeafManager {
 
       switch (transfer.status) {
         case TransferStatus.TRANSFER_STATUS_RETURNED:
+        case TransferStatus.TRANSFER_STATUS_EXPIRED:
           this.transition(activeLeafIds, LeafStatus.AVAILABLE, {
             source: { kind: "none" },
           });
-          changed = true;
-          break;
-        case TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED:
-          this.transition(activeLeafIds, LeafStatus.SPENT, { source });
           changed = true;
           break;
         case TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING:
@@ -760,6 +757,12 @@ export default class LeafManager {
           changed = true;
           break;
         }
+        default:
+          if (transfer.status !== TransferStatus.UNRECOGNIZED) {
+            this.transition(activeLeafIds, LeafStatus.SPENT, { source });
+            changed = true;
+          }
+          break;
       }
     });
     if (changed) this.emitBalanceUpdate();
