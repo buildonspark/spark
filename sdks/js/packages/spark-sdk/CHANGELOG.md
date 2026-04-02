@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.7.4
+
+### Patch Changes
+
+- Increase max grpc message size for node environments
+- Add default catch for leaf state transitions
+
 ## 0.7.3
 
 ### Patch Changes
