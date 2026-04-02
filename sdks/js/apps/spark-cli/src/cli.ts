@@ -625,6 +625,9 @@ const CLI_VERSION: string = process.env.SPARK_CLI_VERSION ?? "dev";
 function parseCliArgs(): {
   network: NetworkType;
   configFile: string | undefined;
+  mnemonic: string | undefined;
+  seed: string | undefined;
+  execCommands: string[];
 } {
   const argv = process.argv.slice(2);
 
@@ -639,6 +642,9 @@ function parseCliArgs(): {
 Options:
   --network <network>  Network to connect to (mainnet, regtest, local) [default: regtest]
   --config <path>      Path to a JSON config file
+  --exec <command>     Execute a command non-interactively and exit (can be repeated)
+  --mnemonic <words>   12-word BIP39 mnemonic (auto-initializes wallet; also settable in config JSON)
+  --seed <hex>         Hex seed (auto-initializes wallet; also settable in config JSON)
   -v, --version        Print version
   -h, --help           Show this help message
 
@@ -674,13 +680,48 @@ Environment variables:
   else if (rawNetwork === "LOCAL") network = "LOCAL";
   else network = "REGTEST";
 
+  // Parse --exec flags (can appear multiple times for sequential commands)
+  const execCommands: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--exec" && i + 1 < argv.length) {
+      execCommands.push(argv[i + 1]);
+      i++; // skip the value
+    }
+  }
+
+  // Parse --mnemonic flag
+  let mnemonicArg: string | undefined;
+  const mnemonicIdx = argv.indexOf("--mnemonic");
+  if (mnemonicIdx !== -1 && mnemonicIdx + 1 < argv.length) {
+    mnemonicArg = argv[mnemonicIdx + 1];
+  }
+
+  // Parse --seed flag
+  let seedArg: string | undefined;
+  const seedIdx = argv.indexOf("--seed");
+  if (seedIdx !== -1 && seedIdx + 1 < argv.length) {
+    seedArg = argv[seedIdx + 1];
+  }
+
   const configFile = configArg ?? process.env.CONFIG_FILE;
 
-  return { network, configFile };
+  return {
+    network,
+    configFile,
+    mnemonic: mnemonicArg,
+    seed: seedArg,
+    execCommands,
+  };
 }
 
 async function runCLI() {
-  const { network, configFile } = parseCliArgs();
+  const {
+    network,
+    configFile,
+    mnemonic: cliMnemonic,
+    seed: cliSeed,
+    execCommands,
+  } = parseCliArgs();
   let config: ConfigOptions = {};
   if (configFile) {
     try {
@@ -711,6 +752,35 @@ async function runCLI() {
   let wallet: IssuerSparkWallet | undefined;
   let coopExitFeeQuote: CoopExitFeeQuote | undefined;
   let readonlyClient: SparkReadonlyClient | undefined;
+
+  const isExecMode = execCommands.length > 0;
+
+  // Auto-initialize wallet from --mnemonic, --seed, or config JSON "mnemonic"/"seed" field
+  if (cliMnemonic && cliSeed) {
+    console.error("Error: --mnemonic and --seed are mutually exclusive");
+    process.exit(1);
+  }
+  const configData = config as Record<string, unknown>;
+  const autoMnemonicOrSeed =
+    cliMnemonic ?? cliSeed ?? configData["mnemonic"] ?? configData["seed"];
+  if (typeof autoMnemonicOrSeed === "string" && autoMnemonicOrSeed.length > 0) {
+    try {
+      const { wallet: newWallet } = await IssuerSparkWallet.initialize({
+        mnemonicOrSeed: autoMnemonicOrSeed,
+        options: { ...config, network },
+      });
+      wallet = newWallet;
+      console.log("Auto-initialized wallet");
+      console.log("Network:", network);
+    } catch (err) {
+      console.error("Failed to auto-initialize wallet:", err);
+      if (isExecMode) process.exit(1);
+    }
+  } else if (isExecMode) {
+    console.warn(
+      "Warning: no --mnemonic or --seed provided; commands requiring a wallet will fail",
+    );
+  }
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -819,15 +889,34 @@ async function runCLI() {
   help                                                                - Show this help message
   exit/quit                                                           - Exit the program
 `;
-  console.log(helpMessage);
-  console.log(
-    "\x1b[41m%s\x1b[0m",
-    "⚠️  WARNING: This is an example CLI implementation and is not intended for production use. Use at your own risk. The official package is available at https://www.npmjs.com/package/@buildonspark/spark-sdk  ⚠️",
-  );
+  if (!isExecMode) {
+    console.log(helpMessage);
+    console.log(
+      "\x1b[41m%s\x1b[0m",
+      "⚠️  WARNING: This is an example CLI implementation and is not intended for production use. Use at your own risk. The official package is available at https://www.npmjs.com/package/@buildonspark/spark-sdk  ⚠️",
+    );
+  }
+
+  // Non-interactive mode: run --exec commands sequentially and exit
+  let execIndex = 0;
+
   while (true) {
-    const command = await new Promise<string>((resolve) => {
-      rl.question("> ", resolve);
-    });
+    let command: string;
+    if (isExecMode) {
+      if (execIndex >= execCommands.length) {
+        rl.close();
+        if (wallet) {
+          await wallet.cleanupConnections();
+        }
+        break;
+      }
+      command = execCommands[execIndex++];
+      console.log(`---exec:${command.split(" ")[0]}---`);
+    } else {
+      command = await new Promise<string>((resolve) => {
+        rl.question("> ", resolve);
+      });
+    }
 
     const [firstWord, ...args] = command.split(" ");
     const lowerCommand = firstWord.toLowerCase();
@@ -1159,7 +1248,7 @@ async function runCLI() {
           break;
         case "initwallet":
           if (wallet) {
-            wallet.cleanupConnections();
+            await wallet.cleanupConnections();
           }
           let mnemonicOrSeed;
           let accountNumber;
@@ -3865,6 +3954,7 @@ async function runCLI() {
       }
     } catch (error) {
       console.error("Error:", error);
+      if (isExecMode) process.exit(1);
     }
   }
 }
