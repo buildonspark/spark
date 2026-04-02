@@ -4068,31 +4068,6 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		}
 	}
 
-	// Check if the transfer leaves already contain the current key tweaks and return early if so
-	userPubKeys, err := keys.ParsePublicKeyMap(req.GetUserPublicKeys())
-	if err != nil {
-		return err
-	}
-	applied, err := h.checkIfKeyTweakApplied(ctx, transfer, receiver, userPubKeys)
-	if err != nil {
-		return fmt.Errorf("unable to check if key tweak is applied: %w", err)
-	}
-	if applied {
-		// MIMO - Dual write status changes
-		_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakApplied).Save(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
-		}
-		if receiver != nil {
-			_, err = receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweakApplied).Save(ctx)
-			if err != nil {
-				return fmt.Errorf("unable to update transfer receiver status %s: %w", transfer.ID, err)
-			}
-		}
-
-		return nil
-	}
-
 	hasClaimPackage := len(req.EncryptedClaimKeyTweakPackage) > 0
 
 	// When the transfer is already at KeyTweakLocked or later, the key tweaks from a previous
@@ -4254,32 +4229,6 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	}
 
 	return nil
-}
-
-func (h *TransferHandler) checkIfKeyTweakApplied(ctx context.Context, transfer *ent.Transfer, receiver *ent.TransferReceiver, userPublicKeys map[string]keys.Public) (bool, error) {
-	leaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).QueryLeaf().WithSigningKeyshare().All(ctx)
-	if err != nil {
-		return false, fmt.Errorf("unable to get leaves from transfer %v: %w", transfer.ID, err)
-	}
-
-	var tweaked, tweakedSet bool
-	for _, leaf := range leaves {
-		userPublicKey, ok := userPublicKeys[leaf.ID.String()]
-		if !ok {
-			return false, fmt.Errorf("user public key for leaf %v not found", leaf.ID)
-		}
-		sparkPublicKey := leaf.Edges.SigningKeyshare.PublicKey
-		combinedPublicKey := sparkPublicKey.Add(userPublicKey)
-
-		localTweaked := combinedPublicKey.Equals(leaf.VerifyingPubkey)
-		if !tweakedSet {
-			tweaked = localTweaked
-			tweakedSet = true
-		} else if tweaked != localTweaked {
-			return false, fmt.Errorf("inconsistent key tweak status for transfer %v", transfer.ID)
-		}
-	}
-	return tweaked, nil
 }
 
 func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbinternal.SettleReceiverKeyTweakRequest) error {
