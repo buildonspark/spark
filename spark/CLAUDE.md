@@ -37,7 +37,6 @@ mise format       # or: golangci-lint fmt
 ```bash
 ./run-everything.sh                    # Local dev with tmux
 ./scripts/local-test.sh                # Hermetic testing with minikube
-./scripts/build-to-minikube.sh         # Build image for minikube
 ```
 
 ## Architecture
