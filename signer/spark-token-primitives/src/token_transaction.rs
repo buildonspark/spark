@@ -924,7 +924,11 @@ mod tests {
         spark::{self, SparkAddress, SparkInvoiceFields, TokensPayment},
         spark_token::partial_token_transaction,
     };
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
     use bech32::{Bech32m, Hrp};
+    use serde::Deserialize;
+    use std::{fs, path::PathBuf};
+    use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
     fn sample_key(fill: u8) -> Vec<u8> {
         vec![fill; 33]
@@ -1267,47 +1271,266 @@ mod tests {
         assert!(error.to_string().contains("token_identifier mismatch"));
     }
 
-    #[test]
-    fn hash_partial_token_transaction_matches_known_transfer_case() {
-        let partial = PartialTokenTransaction {
-            version: 3,
-            token_transaction_metadata: Some(TokenTransactionMetadata {
-                spark_operator_identity_public_keys: vec![sample_key(0x03)],
-                network: Network::Regtest as i32,
-                client_created_timestamp: Some(Timestamp {
-                    seconds: 0,
-                    nanos: 100_000_000,
+    #[derive(Debug, Deserialize)]
+    struct PartialHashCaseFile {
+        #[serde(rename = "testCases")]
+        test_cases: Vec<PartialHashCase>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PartialHashCase {
+        name: String,
+        #[serde(rename = "expectedHash")]
+        expected_hash: String,
+        #[serde(rename = "partialTokenTransaction")]
+        partial_token_transaction: PartialTokenTransactionJson,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PartialTokenTransactionJson {
+        version: u32,
+        #[serde(rename = "tokenTransactionMetadata")]
+        token_transaction_metadata: Option<TokenTransactionMetadataJson>,
+        #[serde(rename = "mintInput")]
+        mint_input: Option<TokenMintInputJson>,
+        #[serde(rename = "transferInput")]
+        transfer_input: Option<TokenTransferInputJson>,
+        #[serde(rename = "createInput")]
+        create_input: Option<TokenCreateInputJson>,
+        #[serde(rename = "partialTokenOutputs", default)]
+        partial_token_outputs: Vec<PartialTokenOutputJson>,
+        #[serde(rename = "executeBefore")]
+        execute_before: Option<String>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct TokenTransactionMetadataJson {
+        #[serde(rename = "sparkOperatorIdentityPublicKeys", default)]
+        spark_operator_identity_public_keys: Vec<String>,
+        network: String,
+        #[serde(rename = "clientCreatedTimestamp")]
+        client_created_timestamp: Option<String>,
+        #[serde(rename = "validityDurationSeconds")]
+        validity_duration_seconds: Option<String>,
+        #[serde(rename = "invoiceAttachments", default)]
+        invoice_attachments: Vec<InvoiceAttachmentJson>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct InvoiceAttachmentJson {
+        #[serde(rename = "sparkInvoice")]
+        spark_invoice: String,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct TokenMintInputJson {
+        #[serde(rename = "issuerPublicKey")]
+        issuer_public_key: String,
+        #[serde(rename = "tokenIdentifier")]
+        token_identifier: Option<String>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct TokenTransferInputJson {
+        #[serde(rename = "outputsToSpend", default)]
+        outputs_to_spend: Vec<TokenOutputToSpendJson>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct TokenOutputToSpendJson {
+        #[serde(rename = "prevTokenTransactionHash")]
+        prev_token_transaction_hash: String,
+        #[serde(rename = "prevTokenTransactionVout")]
+        prev_token_transaction_vout: u32,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct TokenCreateInputJson {
+        #[serde(rename = "issuerPublicKey")]
+        issuer_public_key: String,
+        #[serde(rename = "tokenName")]
+        token_name: String,
+        #[serde(rename = "tokenTicker")]
+        token_ticker: String,
+        decimals: u32,
+        #[serde(rename = "maxSupply")]
+        max_supply: String,
+        #[serde(rename = "isFreezable")]
+        is_freezable: bool,
+        #[serde(rename = "creationEntityPublicKey")]
+        creation_entity_public_key: Option<String>,
+        #[serde(rename = "extraMetadata")]
+        extra_metadata: Option<String>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PartialTokenOutputJson {
+        #[serde(rename = "ownerPublicKey")]
+        owner_public_key: String,
+        #[serde(rename = "withdrawBondSats")]
+        withdraw_bond_sats: Option<String>,
+        #[serde(rename = "withdrawRelativeBlockLocktime")]
+        withdraw_relative_block_locktime: Option<String>,
+        #[serde(rename = "tokenIdentifier")]
+        token_identifier: String,
+        #[serde(rename = "tokenAmount")]
+        token_amount: String,
+    }
+
+    fn decode_base64(value: &str) -> Vec<u8> {
+        STANDARD.decode(value).unwrap()
+    }
+
+    fn parse_u64_string(value: Option<&str>) -> u64 {
+        value
+            .map(|value| value.parse().unwrap())
+            .unwrap_or_default()
+    }
+
+    fn parse_timestamp(value: &str) -> Timestamp {
+        let timestamp = OffsetDateTime::parse(value, &Rfc3339)
+            .unwrap_or_else(|err| panic!("invalid RFC3339 timestamp {value}: {err}"));
+        Timestamp {
+            seconds: timestamp.unix_timestamp(),
+            nanos: timestamp.nanosecond() as i32,
+        }
+    }
+
+    fn parse_network(value: &str) -> i32 {
+        match value {
+            "REGTEST" => Network::Regtest as i32,
+            "TESTNET" => Network::Testnet as i32,
+            "SIGNET" => Network::Signet as i32,
+            "MAINNET" => Network::Mainnet as i32,
+            other => panic!("unsupported network {other}"),
+        }
+    }
+
+    fn build_partial_transaction(json: PartialTokenTransactionJson) -> PartialTokenTransaction {
+        let token_inputs = match (json.mint_input, json.transfer_input, json.create_input) {
+            (Some(mint_input), None, None) => Some(
+                partial_token_transaction::TokenInputs::MintInput(spark_token::TokenMintInput {
+                    issuer_public_key: decode_base64(&mint_input.issuer_public_key),
+                    token_identifier: mint_input
+                        .token_identifier
+                        .map(|token_identifier| decode_base64(&token_identifier)),
                 }),
-                validity_duration_seconds: 60,
-                invoice_attachments: Vec::new(),
-            }),
-            token_inputs: Some(partial_token_transaction::TokenInputs::TransferInput(
-                TokenTransferInput {
-                    outputs_to_spend: vec![TokenOutputToSpend {
-                        prev_token_transaction_hash: vec![
-                            0xad, 0x35, 0xb6, 0x48, 0xad, 0x5e, 0xe5, 0x82, 0x56, 0x6f, 0x62, 0xfb,
-                            0x9f, 0xf1, 0x7f, 0x5a, 0x9b, 0x35, 0x34, 0x1c, 0x6e, 0xa0, 0x52, 0x8e,
-                            0x8b, 0xe3, 0xfe, 0x73, 0x98, 0x6c, 0x84, 0x94,
-                        ],
-                        prev_token_transaction_vout: 0,
-                    }],
-                },
-            )),
-            partial_token_outputs: vec![PartialTokenOutput {
-                owner_public_key: sample_key(0x02),
-                withdraw_bond_sats: 10_000,
-                withdraw_relative_block_locktime: 100,
-                token_identifier: vec![0x07; 32],
-                token_amount: encode_u128_be(1000),
-            }],
-            execute_before: None,
+            ),
+            (None, Some(transfer_input), None) => Some(
+                partial_token_transaction::TokenInputs::TransferInput(TokenTransferInput {
+                    outputs_to_spend: transfer_input
+                        .outputs_to_spend
+                        .into_iter()
+                        .map(|output| TokenOutputToSpend {
+                            prev_token_transaction_hash: decode_base64(
+                                &output.prev_token_transaction_hash,
+                            ),
+                            prev_token_transaction_vout: output.prev_token_transaction_vout,
+                        })
+                        .collect(),
+                }),
+            ),
+            (None, None, Some(create_input)) => {
+                Some(partial_token_transaction::TokenInputs::CreateInput(
+                    spark_token::TokenCreateInput {
+                        issuer_public_key: decode_base64(&create_input.issuer_public_key),
+                        token_name: create_input.token_name,
+                        token_ticker: create_input.token_ticker,
+                        decimals: create_input.decimals,
+                        max_supply: decode_base64(&create_input.max_supply),
+                        is_freezable: create_input.is_freezable,
+                        creation_entity_public_key: create_input
+                            .creation_entity_public_key
+                            .map(|public_key| decode_base64(&public_key)),
+                        extra_metadata: create_input
+                            .extra_metadata
+                            .map(|extra_metadata| decode_base64(&extra_metadata)),
+                    },
+                ))
+            }
+            _ => panic!("expected exactly one token input variant"),
         };
 
-        let hash = hash_partial_token_transaction(&partial).unwrap();
-        assert_eq!(
-            hex_string(&hash),
-            "fa4f5957723efae39c0bb512c5a04ac5fb8c740ffa72896fb247ce51d5529034"
-        );
+        PartialTokenTransaction {
+            version: json.version,
+            token_transaction_metadata: json.token_transaction_metadata.map(|metadata| {
+                TokenTransactionMetadata {
+                    spark_operator_identity_public_keys: metadata
+                        .spark_operator_identity_public_keys
+                        .into_iter()
+                        .map(|key| decode_base64(&key))
+                        .collect(),
+                    network: parse_network(&metadata.network),
+                    client_created_timestamp: metadata
+                        .client_created_timestamp
+                        .as_deref()
+                        .map(parse_timestamp),
+                    validity_duration_seconds: parse_u64_string(
+                        metadata.validity_duration_seconds.as_deref(),
+                    ),
+                    invoice_attachments: metadata
+                        .invoice_attachments
+                        .into_iter()
+                        .map(|invoice| spark_token::InvoiceAttachment {
+                            spark_invoice: invoice.spark_invoice,
+                        })
+                        .collect(),
+                }
+            }),
+            token_inputs,
+            partial_token_outputs: json
+                .partial_token_outputs
+                .into_iter()
+                .map(|output| PartialTokenOutput {
+                    owner_public_key: decode_base64(&output.owner_public_key),
+                    withdraw_bond_sats: parse_u64_string(output.withdraw_bond_sats.as_deref()),
+                    withdraw_relative_block_locktime: parse_u64_string(
+                        output.withdraw_relative_block_locktime.as_deref(),
+                    ),
+                    token_identifier: decode_base64(&output.token_identifier),
+                    token_amount: decode_base64(&output.token_amount),
+                })
+                .collect(),
+            execute_before: json.execute_before.as_deref().map(parse_timestamp),
+        }
+    }
+
+    fn partial_hash_cases_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../spark/testdata/partial_token_transaction_hash_cases.json")
+    }
+
+    #[test]
+    fn hash_partial_token_transaction_matches_shared_hash_cases() {
+        let data = fs::read_to_string(partial_hash_cases_path()).unwrap();
+        let file: PartialHashCaseFile = serde_json::from_str(&data).unwrap();
+
+        for tc in file.test_cases {
+            let derived_partial_transaction =
+                build_partial_transaction(tc.partial_token_transaction);
+            let derived_encoded_bytes = derived_partial_transaction.encode_to_vec();
+
+            if tc.expected_hash.is_empty() {
+                let computed_hash =
+                    hash_partial_token_transaction_impl(&derived_encoded_bytes).unwrap();
+                println!(
+                    "COMPUTED_PARTIAL_CASE {}: hash={}",
+                    tc.name,
+                    hex_string(&computed_hash),
+                );
+                continue;
+            }
+
+            let hash = hash_partial_token_transaction_impl(&derived_encoded_bytes).unwrap();
+            let got_hex = hex_string(&hash);
+
+            assert_eq!(
+                tc.expected_hash.to_ascii_lowercase(),
+                got_hex,
+                "hash mismatch for {}",
+                tc.name
+            );
+        }
     }
 
     #[test]

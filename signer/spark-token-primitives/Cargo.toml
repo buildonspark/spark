@@ -10,6 +10,12 @@ prost-types = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+base64 = "0.22.1"
+serde = { workspace = true, features = ["derive"] }
+serde_json = "1.0.132"
+time = { version = "0.3.37", features = ["parsing", "formatting"] }
+
 [build-dependencies]
 prost-build = { workspace = true }
 

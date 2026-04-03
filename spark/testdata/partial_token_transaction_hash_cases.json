@@ -1,0 +1,150 @@
+{
+  "description": "Cross-language hash cases in canonical Protobuf JSON for spark_token.PartialTokenTransaction",
+  "testCases": [
+    {
+      "name": "partial_transfer_basic",
+      "description": "Basic partial transfer transaction with one input and one output",
+      "expectedHash": "7d5029cf3d3426855d72d7cf82950aa4330fc30cc9aa5b5282ede2e38f8f9d0f",
+      "partialTokenTransaction": {
+        "version": 3,
+        "tokenTransactionMetadata": {
+          "sparkOperatorIdentityPublicKeys": [
+            "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+          ],
+          "network": "REGTEST",
+          "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+          "validityDurationSeconds": "60",
+          "invoiceAttachments": []
+        },
+        "transferInput": {
+          "outputsToSpend": [
+            {
+              "prevTokenTransactionHash": "rTW2SK1e5YJWb2L7n/F/Wps1NBxuoFKOi+P+c5hshJQ=",
+              "prevTokenTransactionVout": 0
+            }
+          ]
+        },
+        "partialTokenOutputs": [
+          {
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "withdrawBondSats": "10000",
+            "withdrawRelativeBlockLocktime": "100",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAD6A=="
+          }
+        ]
+      }
+    },
+    {
+      "name": "partial_transfer_with_invoice_attachments_and_execute_before",
+      "description": "Partial transfer transaction with multiple inputs, multiple outputs, invoice attachments, and execute_before",
+      "expectedHash": "7387f556ad6fc990764d8e7e2eebb8760aa7a2f26e5e9d18a37caa7df3451f7f",
+      "partialTokenTransaction": {
+        "version": 3,
+        "tokenTransactionMetadata": {
+          "sparkOperatorIdentityPublicKeys": [
+            "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+          ],
+          "network": "REGTEST",
+          "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+          "validityDurationSeconds": "120",
+          "invoiceAttachments": [
+            {
+              "sparkInvoice": "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzfmqsqgjzqqejtavuhf8n5uh9a74zw66kqaz5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5zcglrwcr3sxzzqt3wrjrgnq5gqf8eyp8ajx8t3tqw65s5q0urczca9jwlmsj4dgm89j4r4rj5zxzsfqyqlgrfqw9ucldgmfzs5zmkekj90thwzmn6ps55gdjnz23aarjkf245608yg0v2x6xdpdrz6m8xjlhtru0kygcu4zhqwlth9duadfqpruuzx4tc7fdckn"
+            },
+            {
+              "sparkInvoice": "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzfmssqgjzqqejtaxmwj8ms9rn58574nvlq4j5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5rqgandgr3sxzrqdmew8qydzvz3qpylysylkgcaw9vpm2jzspls0qtr5kfmlwz244rvuk25w5w2sgc2pyqsraqdyp8tf57a6cn2egttaas9ms3whssenmjqt8wag3lgyvdzjskfeupt8xwwdx4agxdm9f0wefzj28jmdxqeudwcwdj9vfl9sdr65x06r0tasf5fwz2"
+            }
+          ]
+        },
+        "transferInput": {
+          "outputsToSpend": [
+            {
+              "prevTokenTransactionHash": "rTW2SK1e5YJWb2L7n/F/Wps1NBxuoFKOi+P+c5hshJQ=",
+              "prevTokenTransactionVout": 0
+            },
+            {
+              "prevTokenTransactionHash": "rTW2SK1e5YJWb2L7n/F/Wps1NBxuoFKOi+P+c5hshJQ=",
+              "prevTokenTransactionVout": 1
+            }
+          ]
+        },
+        "partialTokenOutputs": [
+          {
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "withdrawBondSats": "10000",
+            "withdrawRelativeBlockLocktime": "100",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAB9A=="
+          },
+          {
+            "ownerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+            "withdrawBondSats": "5000",
+            "withdrawRelativeBlockLocktime": "50",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAB9A=="
+          }
+        ],
+        "executeBefore": "1970-01-01T00:01:00.123456Z"
+      }
+    },
+    {
+      "name": "partial_mint",
+      "description": "Partial mint transaction with token identifier and one output",
+      "expectedHash": "335e5d1afd02b4bcc37fa74f068097b37859198111a653d827d73f95351da799",
+      "partialTokenTransaction": {
+        "version": 3,
+        "tokenTransactionMetadata": {
+          "sparkOperatorIdentityPublicKeys": [
+            "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+          ],
+          "network": "REGTEST",
+          "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+          "validityDurationSeconds": "60",
+          "invoiceAttachments": []
+        },
+        "mintInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+        },
+        "partialTokenOutputs": [
+          {
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAD6A=="
+          }
+        ]
+      }
+    },
+    {
+      "name": "partial_create_full",
+      "description": "Partial create transaction with all hashed create input fields populated",
+      "expectedHash": "cfcbe7082fe9b1fbfe5ad511b570bbaeff7a88731b5acf1e7aba06e6af95f450",
+      "partialTokenTransaction": {
+        "version": 3,
+        "tokenTransactionMetadata": {
+          "sparkOperatorIdentityPublicKeys": [
+            "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+          ],
+          "network": "TESTNET",
+          "clientCreatedTimestamp": "1970-01-01T00:00:00.250Z",
+          "validityDurationSeconds": "180",
+          "invoiceAttachments": []
+        },
+        "createInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenName": "TestToken",
+          "tokenTicker": "TEST",
+          "decimals": 8,
+          "maxSupply": "AAAAAAAAAAAAAAAAAAAD6A==",
+          "isFreezable": true,
+          "creationEntityPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+          "extraMetadata": "AQIDBA=="
+        },
+        "partialTokenOutputs": []
+      }
+    }
+  ]
+}
