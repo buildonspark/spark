@@ -418,12 +418,14 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 		SetOutputSpentTokenTransaction(dbTx).
 		SetStatus(schematype.TokenOutputStatusSpentSigned).
 		SetSpentTransactionInputVout(0).
+		SetSpentOwnershipSignature(coordinatorSignature.Serialize()).
 		Save(setup.ctx)
 	require.NoError(t, err)
 	_, err = transferData.prevTokenOutput2.Update().
 		SetOutputSpentTokenTransaction(dbTx).
 		SetStatus(schematype.TokenOutputStatusSpentSigned).
 		SetSpentTransactionInputVout(1).
+		SetSpentOwnershipSignature(coordinatorSignature.Serialize()).
 		Save(setup.ctx)
 	require.NoError(t, err)
 }

@@ -428,6 +428,12 @@ func (h *SignTokenHandler) getOutputsToSpendForExchange(ctx context.Context, tok
 		if outputToSpend == nil {
 			continue
 		}
+		sigLen := len(outputToSpend.SpentOwnershipSignature)
+		if sigLen < 64 || sigLen > 73 {
+			return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+				"token output %s has invalid spent_ownership_signature length %d (expected 64-73 bytes) for token txHash: %x",
+				outputToSpend.ID, sigLen, tokenTransactionHash))
+		}
 		outputsToSpend = append(outputsToSpend, &tokeninternalpb.OutputToSpend{
 			CreatedTokenTransactionHash: outputToSpend.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
 			CreatedTokenTransactionVout: uint32(outputToSpend.CreatedTransactionOutputVout),
