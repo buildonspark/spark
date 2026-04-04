@@ -22,6 +22,7 @@
     "cli:dev": "cross-env NODE_ENV=development NETWORK=regtest CONFIG_FILE=../../private/config/dev-regtest-config.json tsx src/cli.ts",
     "cli:dev:mainnet": "cross-env NODE_ENV=development NETWORK=mainnet CONFIG_FILE=../../private/config/dev-mainnet-config.json tsx src/cli.ts",
     "cli:loadtest": "cross-env NODE_ENV=development NETWORK=regtest CONFIG_FILE=../../private/config/loadtest-regtest-config.json tsx src/cli.ts",
+    "cli:devcli": "cross-env NODE_ENV=development NETWORK=regtest CONFIG_FILE=../../private/config/devcli-regtest-config.json tsx src/cli.ts",
     "clean": "rm -rf dist",
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
