@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lib/pq"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uuids"
@@ -2433,7 +2434,9 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		leafMap[leaf.Edges.Leaf.ID.String()] = leaf
 	}
 
-	// Store key tweaks
+	// Store key tweaks - batch all updates into a single SQL statement
+	leafIDs := make([]uuid.UUID, 0, len(req.LeavesToReceive))
+	keyTweakValues := make([][]byte, 0, len(req.LeavesToReceive))
 	for _, leafTweak := range req.LeavesToReceive {
 		leaf, exists := leafMap[leafTweak.LeafId]
 		if !exists {
@@ -2443,10 +2446,21 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		if err != nil {
 			return fmt.Errorf("unable to marshal leaf tweak: %w", err)
 		}
-		_, err = leaf.Update().SetKeyTweak(leafTweakBytes).Save(ctx)
+		leafIDs = append(leafIDs, leaf.ID)
+		keyTweakValues = append(keyTweakValues, leafTweakBytes)
+	}
+	if len(leafIDs) > 0 {
+		//nolint:forbidigo // Batch update with per-row values using unnest cannot be expressed with ent query builders.
+		_, err = db.ExecContext(ctx, `
+			UPDATE transfer_leafs
+			SET key_tweak = data.key_tweak, update_time = NOW()
+			FROM (SELECT unnest($1::uuid[]) AS id, unnest($2::bytea[]) AS key_tweak) AS data
+			WHERE transfer_leafs.id = data.id
+		`, pq.Array(leafIDs), pq.Array(keyTweakValues))
 		if err != nil {
-			return fmt.Errorf("unable to update leaf %s: %w", leafTweak.LeafId, err)
+			return fmt.Errorf("unable to batch update key tweaks: %w", err)
 		}
+		ent.MarkTxDirty(ctx)
 	}
 
 	// MIMO - Dual write status changes
@@ -2550,7 +2564,7 @@ func (h *TransferHandler) getLeavesFromTransfer(ctx context.Context, transfer *e
 }
 
 func (h *TransferHandler) ValidateKeyTweakProof(ctx context.Context, transferLeaves []*ent.TransferLeaf, keyTweakProofs map[string]*pb.SecretProof) error {
-	ctx, span := tracer.Start(ctx, "TransferHandler.ValidateKeyTweakProof")
+	_, span := tracer.Start(ctx, "TransferHandler.ValidateKeyTweakProof")
 	defer span.End()
 
 	if len(transferLeaves) != len(keyTweakProofs) {
@@ -2558,16 +2572,16 @@ func (h *TransferHandler) ValidateKeyTweakProof(ctx context.Context, transferLea
 	}
 
 	for _, leaf := range transferLeaves {
-		treeNode, err := leaf.QueryLeaf().Only(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to get tree node for leaf %s: %w", leaf.ID.String(), err)
+		treeNode := leaf.Edges.Leaf
+		if treeNode == nil {
+			return fmt.Errorf("tree node edge not loaded for transfer leaf %s: ensure WithLeaf() is used when querying", leaf.ID.String())
 		}
 		proof, exists := keyTweakProofs[treeNode.ID.String()]
 		if !exists {
 			return fmt.Errorf("key tweak proof for leaf %s not found", leaf.ID.String())
 		}
 		keyTweakProto := &pb.ClaimLeafKeyTweak{}
-		err = proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
+		err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
 		if err != nil {
 			return fmt.Errorf("unable to unmarshal key tweak for leaf %s: %w", leaf.ID.String(), err)
 		}
@@ -4183,7 +4197,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		}
 	}
 
-	transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).All(ctx)
+	transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).WithLeaf().All(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get leaves from transfer %s: %w", transferID, err)
 	}
