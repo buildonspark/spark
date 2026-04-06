@@ -1986,6 +1986,7 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.Pr
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to get transfer: %w", err)
 	}
+
 	return preimageRequest, transfer, nil
 }
 

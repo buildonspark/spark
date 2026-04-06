@@ -2284,6 +2284,22 @@ func (h *BaseTransferHandler) validateKeyTweakProofs(ctx context.Context, transf
 	return nil
 }
 
+// validateTransferLeavesNotExitedToL1 rejects operations that assume the transfer
+// is still fully off-chain when any transfer leaf has already been exited to L1.
+func (h *BaseTransferHandler) validateTransferLeavesNotExitedToL1(ctx context.Context, transfer *ent.Transfer, operation string) error {
+	transferLeafNodes, err := transfer.QueryTransferLeaves().QueryLeaf().All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to query transfer leaf nodes: %w", err)
+	}
+	for _, node := range transferLeafNodes {
+		if node.Status == st.TreeNodeStatusOnChain || node.Status == st.TreeNodeStatusExited || node.Status == st.TreeNodeStatusParentExited {
+			return sparkerrors.FailedPreconditionInvalidState(
+				fmt.Errorf("cannot %s: leaf %s has been exited to L1 (status: %s)", operation, node.ID, node.Status))
+		}
+	}
+	return nil
+}
+
 func (h *BaseTransferHandler) CommitSenderKeyTweaks(ctx context.Context, transferID uuid.UUID, senderKeyTweakProofs map[string]*pbspark.SecretProof) (*ent.Transfer, error) {
 	transfer, err := h.loadTransferForUpdate(ctx, transferID)
 	if err != nil {
@@ -2303,6 +2319,14 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 	if err != nil {
 		return nil, fmt.Errorf("unable to load transfer: %w", err)
 	}
+
+	// Reject the transfer if any leaf has been exited to L1. This is a unified
+	// guard that protects all transfer types (preimage swaps, standard transfers,
+	// etc.) against double-spend via concurrent unilateral exit.
+	if err := h.validateTransferLeavesNotExitedToL1(ctx, transfer, "commit sender key tweaks"); err != nil {
+		return nil, err
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Checking commitSenderKeyTweaks for transfer %s (status: %s)", transfer.ID, transfer.Status)
 	if transfer.Status == st.TransferStatusSenderInitiated {
