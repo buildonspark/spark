@@ -2,19 +2,21 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/logging"
-	"github.com/lightsparkdev/spark/so/errors"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/middleware"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -24,7 +26,7 @@ import (
 // (ops/helm/monitoring/files/alerts.yaml, spark-service-error-rate) so that
 // Warn-level logs here don't mask errors that still trigger alerts.
 func isClientError(err error) bool {
-	code, _ := errors.CodeAndReasonFrom(err)
+	code, _ := sparkerrors.CodeAndReasonFrom(err)
 	switch code {
 	case codes.InvalidArgument,
 		codes.AlreadyExists,
@@ -104,11 +106,59 @@ func LogInterceptor(rootLogger *zap.Logger, tableLogger *logging.TableLogger) gr
 		}
 
 		if err != nil {
-			logGRPCError(loggerWithAccumulatedRequestFields, "error in grpc", err)
+			if isContextCanceled(err) {
+				reason := contextCancelReason(ctx, duration)
+				if isDeadlineExpired(ctx) {
+					loggerWithAccumulatedRequestFields.Error("request deadline expired",
+						zap.Error(err),
+						zap.Duration("duration", duration),
+						zap.String("cancel_reason", reason),
+					)
+				} else {
+					loggerWithAccumulatedRequestFields.Warn("request canceled",
+						zap.Error(err),
+						zap.Duration("duration", duration),
+						zap.String("cancel_reason", reason),
+					)
+				}
+			} else {
+				logGRPCError(loggerWithAccumulatedRequestFields, "error in grpc", err)
+			}
 		}
 
 		return response, err
 	}
+}
+
+func isContextCanceled(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	if st, ok := status.FromError(err); ok && (st.Code() == codes.Canceled || st.Code() == codes.DeadlineExceeded) {
+		return true
+	}
+	return false
+}
+
+func isDeadlineExpired(ctx context.Context) bool {
+	if deadline, ok := ctx.Deadline(); ok {
+		return time.Until(deadline) <= 0
+	}
+	return false
+}
+
+func contextCancelReason(ctx context.Context, duration time.Duration) string {
+	if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) {
+		return fmt.Sprintf("cause: %v", cause)
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return fmt.Sprintf("deadline expired %v ago (elapsed: %v)", -remaining, duration)
+		}
+		return fmt.Sprintf("canceled with %v remaining of deadline (elapsed: %v)", remaining, duration)
+	}
+	return fmt.Sprintf("no deadline set (elapsed: %v)", duration)
 }
 
 type WrappedServerStream struct {
@@ -174,5 +224,5 @@ func (g *GRPCClientInfoProvider) GetClientIP(ctx context.Context) (string, error
 	if ip := middleware.GetClientIP(ctx, g.xffClientIpPosition); ip != "" {
 		return ip, nil
 	}
-	return "", errors.InternalObjectMissingField(fmt.Errorf("no client IP found in header or peer context"))
+	return "", sparkerrors.InternalObjectMissingField(fmt.Errorf("no client IP found in header or peer context"))
 }
