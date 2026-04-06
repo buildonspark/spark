@@ -588,6 +588,9 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 		if sig == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("ownership signature cannot be nil"))
 		}
+		if _, ok := sig.AuthoritySignatures.(*tokenpb.SignatureWithIndex_MultisigSignatures); ok {
+			return sparkerrors.UnimplementedMethodDisabled(fmt.Errorf("multisig owner signatures are not supported for token transfers"))
+		}
 		ownerSignaturesByIndex[sig.InputIndex] = sig
 	}
 

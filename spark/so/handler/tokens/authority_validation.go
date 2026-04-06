@@ -47,6 +47,18 @@ func ValidateOwnershipSignatureFromAuthority(
 	}
 	switch v := sig.AuthoritySignatures.(type) {
 	case *tokenpb.SignatureWithIndex_SingleSignature:
+		pubKeyBytes := v.SingleSignature.GetPublicKey()
+		if len(pubKeyBytes) == 0 {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("single_signature must include a public key"))
+		}
+		claimedKey, err := keys.ParsePublicKey(pubKeyBytes)
+		if err != nil {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid public key in single_signature: %w", err))
+		}
+		if !claimedKey.Equals(ownerPublicKey) {
+			return sparkerrors.FailedPreconditionBadSignature(
+				fmt.Errorf("single_signature public key does not match output owner"))
+		}
 		return utils.ValidateOwnershipSignature(v.SingleSignature.GetSignature(), hash, ownerPublicKey)
 	case *tokenpb.SignatureWithIndex_MultisigSignatures:
 		return validateMultisigFromProvidedConfig(hash, v.MultisigSignatures)

@@ -129,6 +129,57 @@ func TestBroadcastTokenTransaction_Phase2_TransferWithSingleSignatureOneof(t *te
 	assert.NotNil(t, resp.FinalTokenTransaction)
 }
 
+func TestBroadcastTokenTransaction_Phase2_TransferRejectsMultisigSignature(t *testing.T) {
+	setup := setUpPhase2BroadcastTestHandlerPostgres(t)
+	ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())
+
+	ownerPriv, tokenCreate := setup.fixtures.CreateTokenCreateWithIssuer(btcnetwork.Regtest, nil, nil)
+	_, outputs := setup.fixtures.CreateMintTransaction(
+		tokenCreate,
+		entfixtures.OutputSpecsWithOwner(ownerPriv.Public(), big.NewInt(100)),
+		st.TokenTransactionStatusFinalized,
+	)
+	inputTTXO := outputs[0]
+	setup.fixtures.CreateKeyshare()
+
+	partial := setup.buildTransferPartial(ownerPriv, tokenCreate, inputTTXO)
+	partialHash, _ := setup.computeHashes(partial)
+
+	sig, err := schnorr.Sign(ownerPriv.ToBTCEC(), partialHash)
+	require.NoError(t, err)
+
+	req := &tokenpb.BroadcastTransactionRequest{
+		PartialTokenTransaction: partial,
+		TokenTransactionOwnerSignatures: []*tokenpb.SignatureWithIndex{
+			{
+				InputIndex: 0,
+				AuthoritySignatures: &tokenpb.SignatureWithIndex_MultisigSignatures{
+					MultisigSignatures: &multisigpb.MultisigSignatureSet{
+						MultisigConfig: &multisigpb.MultisigConfig{
+							Version:    0,
+							Threshold:  1,
+							PublicKeys: [][]byte{ownerPriv.Public().Serialize(), keys.GeneratePrivateKey().Public().Serialize()},
+						},
+						Signatures: []*multisigpb.KeyedSignature{
+							{
+								PublicKey: ownerPriv.Public().Serialize(),
+								Signature: sig.Serialize(),
+							},
+						},
+					},
+				},
+			},
+		},
+		IdentityPublicKey: ownerPriv.Public().Serialize(),
+	}
+
+	resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Contains(t, err.Error(), "multisig owner signatures are not supported for token transfers")
+}
+
 func TestBroadcastTokenTransaction_Phase2_MintWithNoSignature(t *testing.T) {
 	setup := setUpPhase2BroadcastTestHandlerPostgres(t)
 	ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())
@@ -243,6 +294,56 @@ func TestValidateOwnershipSignatureFromAuthority_SingleSignatureOneof(t *testing
 
 	err = ValidateOwnershipSignatureFromAuthority(ctx, sigWithIndex, hash, privKey.Public())
 	require.NoError(t, err)
+}
+
+func TestValidateOwnershipSignatureFromAuthority_SingleSignatureMissingPublicKey(t *testing.T) {
+	ctx := t.Context()
+
+	privKey := keys.GeneratePrivateKey()
+	hash := make([]byte, 32)
+	hash[0] = 0xAB
+
+	sig, err := schnorr.Sign(privKey.ToBTCEC(), hash)
+	require.NoError(t, err)
+
+	sigWithIndex := &tokenpb.SignatureWithIndex{
+		InputIndex: 0,
+		AuthoritySignatures: &tokenpb.SignatureWithIndex_SingleSignature{
+			SingleSignature: &multisigpb.KeyedSignature{
+				Signature: sig.Serialize(),
+			},
+		},
+	}
+
+	err = ValidateOwnershipSignatureFromAuthority(ctx, sigWithIndex, hash, privKey.Public())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "single_signature must include a public key")
+}
+
+func TestValidateOwnershipSignatureFromAuthority_SingleSignatureMismatchedPublicKey(t *testing.T) {
+	ctx := t.Context()
+
+	ownerKey := keys.GeneratePrivateKey()
+	wrongKey := keys.GeneratePrivateKey()
+	hash := make([]byte, 32)
+	hash[0] = 0xAB
+
+	sig, err := schnorr.Sign(ownerKey.ToBTCEC(), hash)
+	require.NoError(t, err)
+
+	sigWithIndex := &tokenpb.SignatureWithIndex{
+		InputIndex: 0,
+		AuthoritySignatures: &tokenpb.SignatureWithIndex_SingleSignature{
+			SingleSignature: &multisigpb.KeyedSignature{
+				PublicKey: wrongKey.Public().Serialize(),
+				Signature: sig.Serialize(),
+			},
+		},
+	}
+
+	err = ValidateOwnershipSignatureFromAuthority(ctx, sigWithIndex, hash, ownerKey.Public())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "single_signature public key does not match output owner")
 }
 
 func TestValidateOwnershipSignatureFromAuthority_DeprecatedFieldFallback(t *testing.T) {
