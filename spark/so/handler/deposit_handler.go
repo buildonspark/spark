@@ -1060,38 +1060,37 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	}
 
 	networkString := network.String()
-	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobEnableDepositFlowValidation, &networkString, 0) > 0 {
-		combinedPublicKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
+	combinedPublicKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
 
-		var directRootTxRaw, directRefundTxRaw []byte
-		if req.DirectRootTxSigningJob != nil {
-			directRootTxRaw = req.DirectRootTxSigningJob.RawTx
-		}
-		if req.DirectRefundTxSigningJob != nil {
-			directRefundTxRaw = req.DirectRefundTxSigningJob.RawTx
-		}
-		var directFromCpfpRefundTxRaw []byte
-		if req.DirectFromCpfpRefundTxSigningJob != nil {
-			directFromCpfpRefundTxRaw = req.DirectFromCpfpRefundTxSigningJob.RawTx
-		}
-
-		err = validateBitcoinTransactions(
-			ctx,
-			req.OnChainUtxo.RawTx,
-			req.OnChainUtxo.Vout,
-			req.RootTxSigningJob.RawTx,
-			req.RefundTxSigningJob.RawTx,
-			directFromCpfpRefundTxRaw,
-			directRootTxRaw,
-			directRefundTxRaw,
-			combinedPublicKey,
-			depositAddress.OwnerSigningPubkey,
-			networkString,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to validate transaction in tree creation request: %w", err)
-		}
+	var directRootTxRaw, directRefundTxRaw []byte
+	if req.DirectRootTxSigningJob != nil {
+		directRootTxRaw = req.DirectRootTxSigningJob.RawTx
 	}
+	if req.DirectRefundTxSigningJob != nil {
+		directRefundTxRaw = req.DirectRefundTxSigningJob.RawTx
+	}
+	var directFromCpfpRefundTxRaw []byte
+	if req.DirectFromCpfpRefundTxSigningJob != nil {
+		directFromCpfpRefundTxRaw = req.DirectFromCpfpRefundTxSigningJob.RawTx
+	}
+
+	err = validateBitcoinTransactions(
+		ctx,
+		req.OnChainUtxo.RawTx,
+		req.OnChainUtxo.Vout,
+		req.RootTxSigningJob.RawTx,
+		req.RefundTxSigningJob.RawTx,
+		directFromCpfpRefundTxRaw,
+		directRootTxRaw,
+		directRefundTxRaw,
+		combinedPublicKey,
+		depositAddress.OwnerSigningPubkey,
+		networkString,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate transaction in tree creation request: %w", err)
+	}
+
 	signingResults, err := helper.SignFrost(ctx, config, signingJobs)
 	if err != nil {
 		return nil, err
