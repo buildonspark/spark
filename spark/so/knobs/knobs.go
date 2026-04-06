@@ -116,8 +116,7 @@ const (
 	// Enable more rigorous checks for finalize signature requests. See SPARK-236
 	KnobEnableStrictFinalizeSignature = "spark.so.enable_strict_finalize_signature"
 
-	KnobSoEnhancedBitcoinTxValidation     = "spark.so.enhanced_bitcoin_tx_validation"
-	KnobEnhancedTransferReceiveValidation = "spark.so.enhanced_transfer_receive_validation"
+	KnobSoEnhancedBitcoinTxValidation = "spark.so.enhanced_bitcoin_tx_validation"
 
 	KnobShutdownRenewNode        = "spark.so.shutdown_renew_node"
 	KnobShutdownHodlInvoices     = "spark.so.shutdown_hodl_invoices"
