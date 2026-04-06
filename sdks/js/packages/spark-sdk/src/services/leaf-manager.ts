@@ -759,7 +759,16 @@ export default class LeafManager {
         }
         default:
           if (transfer.status !== TransferStatus.UNRECOGNIZED) {
-            this.transition(activeLeafIds, LeafStatus.SPENT, { source });
+            // Skip SWAP_PENDING leaves — their lifecycle is managed by the
+            // swap/optimization path which transitions them to SPENT and adds
+            // replacement leaves atomically. Letting the stream pre-empt this
+            // would delete the leaf before replacements are added, causing a
+            // temporary balance drop.
+            const nonSwapIds = activeLeafIds.filter((id) => {
+              const record = this.leaves.get(id);
+              return !record || record.status !== LeafStatus.SWAP_PENDING;
+            });
+            this.transition(nonSwapIds, LeafStatus.SPENT, { source });
             changed = true;
           }
           break;
