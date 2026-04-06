@@ -50,8 +50,12 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(err)
 	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerIDPubKey); err != nil {
-		return nil, err
+	if !canBroadcastForSession(ctx) {
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerIDPubKey); err != nil {
+			return nil, err
+		}
+	} else {
+		logging.GetLoggerFromContext(ctx).Sugar().Infof("authorized broadcaster bypassing sender identity check in CommitTransaction for target %s", ownerIDPubKey.ToHex())
 	}
 
 	calculatedHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, false)

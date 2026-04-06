@@ -96,6 +96,10 @@ const (
 	// When enabled (> 0), allows multisig issuer signatures for issuer operations (mint, freeze).
 	// Gated until the roles system provides proper authority management.
 	KnobMultisigIssuerEnabled = "spark.so.tokens.multisig_issuer_enabled"
+	// KnobTokenBroadcastAllowedPubkeys allows specific identity public keys to broadcast token
+	// transactions on behalf of any identity, bypassing the sender identity check.
+	// Use as a per-pubkey target: spark.so.tokens.broadcast_allowed_pubkeys@<identityPubKeyHex> = 1
+	KnobTokenBroadcastAllowedPubkeys = "spark.so.tokens.broadcast_allowed_pubkeys"
 
 	// Tokens - Killswitches
 	// When enabled (> 0), enforces owner signature validation for token withdrawals.
