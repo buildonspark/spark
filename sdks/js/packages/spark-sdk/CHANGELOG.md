@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.7.5
+
+### Patch Changes
+
+- - Fix temporary balance drop during swaps by skipping `SWAP_PENDING` leaves when the event stream transitions leaves to spent
+  - Add `getOwnedBalance()` to `SparkReadonlyClient` returning total owned sats including available leaves, pending outgoing transfers, and in-flight swaps
+
 ## 0.7.4
 
 ### Patch Changes
