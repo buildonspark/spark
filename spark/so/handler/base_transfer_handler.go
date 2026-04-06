@@ -1760,7 +1760,7 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 			requireConnectorTx := knobs.GetKnobsService(ctx).GetValueTarget(
 				knobs.KnobRequireConnectorTxValidation, &networkString, 0) > 0
 			if requireConnectorTx {
-				return fmt.Errorf("connector_tx is required for cooperative exit validation. Please upgrade to the latest SDK version")
+				return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector_tx is required for cooperative exit validation. Please upgrade to the latest SDK version"))
 			}
 		}
 
