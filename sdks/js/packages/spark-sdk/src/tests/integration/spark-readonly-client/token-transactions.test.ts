@@ -12,9 +12,9 @@ import {
   createEmptyWallet,
   createPublicReadonlyClient,
   type FundedWallet,
-} from "./helpers.js";
-import { SparkReadonlyClient } from "../../spark-readonly-client/spark-readonly-client.node.js";
-import { SparkValidationError } from "../../errors/types.js";
+} from "../../spark-readonly-client/helpers.js";
+import { SparkReadonlyClient } from "../../../spark-readonly-client/spark-readonly-client.node.js";
+import { SparkValidationError } from "../../../errors/types.js";
 
 describe("getTokenTransactions", () => {
   jest.setTimeout(30_000);

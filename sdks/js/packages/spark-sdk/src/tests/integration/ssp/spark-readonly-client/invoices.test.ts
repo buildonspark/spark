@@ -1,17 +1,16 @@
 /**
- * Integration tests for SparkReadonlyClient.getSparkInvoices.
+ * SSP-backed integration tests for SparkReadonlyClient.getSparkInvoices.
  *
- * Creates wallets, generates spark invoices, and queries their status
- * through the readonly client.
+ * Invoice creation uses SSP-backed wallet flows during setup.
  */
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
-import { SparkValidationError } from "../../errors/types.js";
-import { SparkReadonlyClient } from "../../spark-readonly-client/spark-readonly-client.node.js";
+import { SparkValidationError } from "../../../../errors/types.js";
+import { SparkReadonlyClient } from "../../../../spark-readonly-client/spark-readonly-client.node.js";
 import {
   createEmptyWallet,
   createPublicReadonlyClient,
   type FundedWallet,
-} from "./helpers.js";
+} from "../../../spark-readonly-client/helpers.js";
 
 describe("getSparkInvoices", () => {
   jest.setTimeout(30_000);
@@ -32,8 +31,6 @@ describe("getSparkInvoices", () => {
 
     publicClient = createPublicReadonlyClient();
   });
-
-  // ── Happy Paths ──────────────────────────────────────────
 
   it("returns status for a known invoice", async () => {
     const result = await publicClient.getSparkInvoices({
@@ -57,7 +54,7 @@ describe("getSparkInvoices", () => {
     expect(result.invoiceStatuses.length).toBe(2);
   });
 
-  it("respects limit parameter", async () => {
+  it("returns explicit invoice lookups even when limit is set", async () => {
     const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24);
     const invoices: string[] = [];
     for (let i = 0; i < 3; i++) {
@@ -74,10 +71,10 @@ describe("getSparkInvoices", () => {
       invoices,
       limit: 1,
     });
-    expect(result.invoiceStatuses.length).toBeLessThanOrEqual(1);
+    expect(result.invoiceStatuses.map((status) => status.invoice)).toEqual(
+      invoices,
+    );
   });
-
-  // ── Unhappy Paths ────────────────────────────────────────
 
   it("rejects empty invoices array", async () => {
     await expect(

@@ -1,97 +1,381 @@
 /**
- * Integration tests for SparkReadonlyClient balance methods:
- *   - getAvailableBalance
- *   - getTokenBalance
- *
- * Uses a real funded wallet and queries it via both an owner-authenticated
- * readonly client and an unauthenticated public readonly client.
+ * Unit tests for SparkReadonlyClient balance aggregation logic.
  */
-import { describe, it, expect, jest, beforeAll } from "@jest/globals";
+import { hexToBytes } from "@noble/curves/utils";
+import { describe, expect, it, jest } from "@jest/globals";
+import { SparkRequestError, SparkValidationError } from "../../errors/types.js";
 import {
-  createFundedWallet,
-  createEmptyWallet,
-  createPublicReadonlyClient,
-  createOwnerReadonlyClient,
-  type FundedWallet,
-} from "./helpers.js";
-import { SparkReadonlyClient } from "../../spark-readonly-client/spark-readonly-client.node.js";
-import { SparkRequestError } from "../../errors/types.js";
+  Network as SparkNetwork,
+  type SparkServiceClient,
+  TreeNodeStatus,
+} from "../../proto/spark.js";
+import { DefaultSparkSigner } from "../../signer/signer.js";
+import { SparkReadonlyClient } from "../../spark-readonly-client/spark-readonly-client.js";
+import { WalletConfigService } from "../../services/config.js";
+import { type AuthMode } from "../../services/connection/connection.js";
+import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
+import {
+  ACTIVE_COUNTER_SWAP_STATUSES,
+  COUNTER_SWAP_TYPES,
+  OUTGOING_TRANSFER_TYPES,
+  PRIMARY_SWAP_TYPES,
+  SENDER_PENDING_STATUSES,
+} from "../../services/transfer.js";
+import { encodeSparkAddress } from "../../utils/address.js";
 
-describe("getAvailableBalance", () => {
-  jest.setTimeout(30_000);
-
-  let funded: FundedWallet;
-  let publicClient: SparkReadonlyClient;
-  let ownerClient: SparkReadonlyClient;
-
-  beforeAll(async () => {
-    funded = await createFundedWallet(10_000n);
-    publicClient = createPublicReadonlyClient();
-    ownerClient = await createOwnerReadonlyClient(funded.mnemonic);
-  });
-
-  // ── Happy Paths ──────────────────────────────────────────
-
-  it("owner client returns the correct funded balance", async () => {
-    const balance = await ownerClient.getAvailableBalance(funded.sparkAddress);
-    expect(balance).toBe(10_000n);
-  });
-
-  it("public client returns the correct funded balance (non-private wallet)", async () => {
-    // By default wallets are non-private, so public queries should work
-    const balance = await publicClient.getAvailableBalance(funded.sparkAddress);
-    expect(balance).toBe(10_000n);
-  });
-
-  it("returns 0n for an empty wallet", async () => {
-    const empty = await createEmptyWallet();
-    const balance = await publicClient.getAvailableBalance(empty.sparkAddress);
-    expect(balance).toBe(0n);
-  });
-
-  // ── Unhappy Paths ────────────────────────────────────────
-
-  it("throws on an invalid spark address", async () => {
-    await expect(
-      publicClient.getAvailableBalance("invalid-address"),
-    ).rejects.toThrow();
-  });
+const TEST_COORDINATOR_IDENTIFIER = "test-coordinator";
+const TEST_COORDINATOR_ADDRESS = "https://coordinator.test";
+const TEST_IDENTITY_PUBLIC_KEY =
+  "02ccb26ba79c63aaf60c9192fd874be3087ae8d8703275df0e558704a6d3a4f132";
+const TEST_IDENTITY_PUBLIC_KEY_BYTES = hexToBytes(TEST_IDENTITY_PUBLIC_KEY);
+const TEST_SPARK_ADDRESS = encodeSparkAddress({
+  identityPublicKey: TEST_IDENTITY_PUBLIC_KEY,
+  network: "LOCAL",
 });
 
-describe("getTokenBalance", () => {
-  jest.setTimeout(30_000);
+type QueryNodes = SparkServiceClient["query_nodes"];
+type QueryAllTransfers = SparkServiceClient["query_all_transfers"];
+type QueryNodesRequest = Parameters<QueryNodes>[0];
+type QueryTransfersRequest = Parameters<QueryAllTransfers>[0];
+type QueryNodesResponse = Awaited<ReturnType<QueryNodes>>;
+type QueryTransfersResponse = Awaited<ReturnType<QueryAllTransfers>>;
+type SenderTransferRequest = QueryTransfersRequest & {
+  participant: {
+    $case: "senderIdentityPublicKey";
+    senderIdentityPublicKey: Uint8Array;
+  };
+};
+type ReceiverTransferRequest = QueryTransfersRequest & {
+  participant: {
+    $case: "receiverIdentityPublicKey";
+    receiverIdentityPublicKey: Uint8Array;
+  };
+};
 
-  let emptyWallet: FundedWallet;
-  let publicClient: SparkReadonlyClient;
+let nextConnectionManager!: ConnectionManagerNodeJS;
 
-  beforeAll(async () => {
-    emptyWallet = await createEmptyWallet();
-    publicClient = createPublicReadonlyClient();
-  });
+class TestSparkReadonlyClient extends SparkReadonlyClient {
+  protected override buildConnectionManager(
+    _config: WalletConfigService,
+    _authMode: AuthMode,
+  ): ConnectionManagerNodeJS {
+    return nextConnectionManager;
+  }
+}
 
-  // ── Happy Paths ──────────────────────────────────────────
+function createTestClient(
+  sparkClient: Pick<SparkServiceClient, "query_all_transfers" | "query_nodes">,
+): {
+  client: TestSparkReadonlyClient;
+  createSparkClient: jest.Mock;
+} {
+  const createSparkClient = jest.fn(async () => sparkClient);
+  nextConnectionManager = {
+    createSparkClient,
+  } as unknown as ConnectionManagerNodeJS;
 
-  it("returns an empty map when the wallet has no tokens", async () => {
-    const balances = await publicClient.getTokenBalance(
-      emptyWallet.sparkAddress,
+  return {
+    client: new TestSparkReadonlyClient(
+      {
+        network: "LOCAL",
+        coordinatorIdentifier: TEST_COORDINATOR_IDENTIFIER,
+        signingOperators: {
+          [TEST_COORDINATOR_IDENTIFIER]: {
+            id: 0,
+            identifier: TEST_COORDINATOR_IDENTIFIER,
+            address: TEST_COORDINATOR_ADDRESS,
+            identityPublicKey: TEST_IDENTITY_PUBLIC_KEY,
+          },
+        },
+      },
+      new DefaultSparkSigner(),
+      "identity",
+    ),
+    createSparkClient,
+  };
+}
+
+function createNodePage(values: number[], offset: number) {
+  return {
+    nodes: Object.fromEntries(
+      values.map((value, index) => [`node-${offset}-${index}`, { value }]),
+    ),
+    offset,
+  };
+}
+
+function createTransfer(values: Array<number | undefined>) {
+  return {
+    leaves: values.map((value) =>
+      value === undefined ? {} : { leaf: { value } },
+    ),
+  };
+}
+
+describe("SparkReadonlyClient.getOwnedBalance", () => {
+  it("sums available leaves, pending outgoing leaves, and counter-swap leaves across paginated RPCs", async () => {
+    const nodePages = [createNodePage([80, 20], 1), createNodePage([15], -1)];
+    const senderPages = [
+      {
+        transfers: Array.from({ length: 100 }, (_, index) =>
+          createTransfer(index === 0 ? [10, undefined] : [0]),
+        ),
+        offset: 1,
+      },
+      {
+        transfers: [createTransfer([25]), createTransfer([undefined])],
+        offset: -1,
+      },
+    ];
+    const receiverPages = [
+      {
+        transfers: [createTransfer([7, 8]), createTransfer([undefined])],
+        offset: -1,
+      },
+    ];
+
+    const query_nodes = jest.fn<QueryNodes>().mockImplementation(async () => {
+      const nextPage = nodePages.shift();
+      if (!nextPage) {
+        throw new Error("No scripted node page remaining");
+      }
+      return nextPage as QueryNodesResponse;
+    });
+
+    const query_all_transfers = jest
+      .fn<QueryAllTransfers>()
+      .mockImplementation(async (filter) => {
+        const pages =
+          filter.participant?.$case === "senderIdentityPublicKey"
+            ? senderPages
+            : filter.participant?.$case === "receiverIdentityPublicKey"
+              ? receiverPages
+              : undefined;
+        if (!pages) {
+          throw new Error("Unexpected transfer participant");
+        }
+
+        const nextPage = pages.shift();
+        if (!nextPage) {
+          throw new Error("No scripted transfer page remaining");
+        }
+
+        return nextPage as QueryTransfersResponse;
+      });
+
+    const { client, createSparkClient } = createTestClient({
+      query_nodes,
+      query_all_transfers,
+    });
+
+    await expect(client.getOwnedBalance(TEST_SPARK_ADDRESS)).resolves.toBe(
+      165n,
     );
-    expect(balances).toBeInstanceOf(Map);
-    expect(balances.size).toBe(0);
+
+    expect(createSparkClient).toHaveBeenCalledWith(TEST_COORDINATOR_ADDRESS);
+
+    expect(query_nodes).toHaveBeenCalledTimes(2);
+    const firstNodeRequest = query_nodes.mock.calls[0]![0] as QueryNodesRequest;
+    const secondNodeRequest = query_nodes.mock
+      .calls[1]![0] as QueryNodesRequest;
+    expect(firstNodeRequest.source?.$case).toBe("ownerIdentityPubkey");
+    if (firstNodeRequest.source?.$case !== "ownerIdentityPubkey") {
+      throw new Error("Expected node query to target ownerIdentityPubkey");
+    }
+    expect(firstNodeRequest.source.ownerIdentityPubkey).toEqual(
+      TEST_IDENTITY_PUBLIC_KEY_BYTES,
+    );
+    expect(firstNodeRequest.statuses).toEqual([
+      TreeNodeStatus.TREE_NODE_STATUS_AVAILABLE,
+    ]);
+    expect(firstNodeRequest.network).toBe(SparkNetwork.REGTEST);
+    expect(firstNodeRequest.offset).toBe(0);
+    expect(firstNodeRequest.limit).toBe(100);
+    expect(firstNodeRequest.includeParents).toBe(false);
+    expect(secondNodeRequest.offset).toBe(1);
+
+    const senderRequests = query_all_transfers.mock.calls
+      .map(([filter]) => filter)
+      .filter(
+        (filter): filter is SenderTransferRequest =>
+          filter.participant?.$case === "senderIdentityPublicKey",
+      );
+    expect(senderRequests).toHaveLength(2);
+    expect(senderRequests[0]!.participant.senderIdentityPublicKey).toEqual(
+      TEST_IDENTITY_PUBLIC_KEY_BYTES,
+    );
+    expect(senderRequests[0]!.types).toEqual([
+      ...OUTGOING_TRANSFER_TYPES,
+      ...PRIMARY_SWAP_TYPES,
+    ]);
+    expect(senderRequests[0]!.statuses).toEqual(SENDER_PENDING_STATUSES);
+    expect(senderRequests[0]!.network).toBe(SparkNetwork.REGTEST);
+    expect(senderRequests[0]!.limit).toBe(100);
+    expect(senderRequests[0]!.offset).toBe(0);
+    expect(senderRequests[1]!.offset).toBe(1);
+
+    const receiverRequests = query_all_transfers.mock.calls
+      .map(([filter]) => filter)
+      .filter(
+        (filter): filter is ReceiverTransferRequest =>
+          filter.participant?.$case === "receiverIdentityPublicKey",
+      );
+    expect(receiverRequests).toHaveLength(1);
+    expect(receiverRequests[0]!.participant.receiverIdentityPublicKey).toEqual(
+      TEST_IDENTITY_PUBLIC_KEY_BYTES,
+    );
+    expect(receiverRequests[0]!.types).toEqual(COUNTER_SWAP_TYPES);
+    expect(receiverRequests[0]!.statuses).toEqual(ACTIVE_COUNTER_SWAP_STATUSES);
+    expect(receiverRequests[0]!.network).toBe(SparkNetwork.REGTEST);
+    expect(receiverRequests[0]!.limit).toBe(100);
+    expect(receiverRequests[0]!.offset).toBe(0);
   });
 
-  // ── Unhappy Paths ────────────────────────────────────────
+  it("treats an empty first transfer page as complete even when the server returns a non-negative offset", async () => {
+    const query_nodes = jest
+      .fn<QueryNodes>()
+      .mockResolvedValue(createNodePage([], -1) as QueryNodesResponse);
+    const query_all_transfers = jest.fn<QueryAllTransfers>().mockResolvedValue({
+      transfers: [],
+      offset: 0,
+    } as QueryTransfersResponse);
 
-  it("throws on an invalid spark address", async () => {
-    await expect(
-      publicClient.getTokenBalance("invalid-address"),
-    ).rejects.toThrow();
+    const { client } = createTestClient({
+      query_nodes,
+      query_all_transfers,
+    });
+
+    await expect(client.getOwnedBalance(TEST_SPARK_ADDRESS)).resolves.toBe(0n);
+
+    expect(query_all_transfers).toHaveBeenCalledTimes(2);
+    expect(
+      query_all_transfers.mock.calls.map(
+        ([filter]) => filter.participant?.$case,
+      ),
+    ).toEqual(["senderIdentityPublicKey", "receiverIdentityPublicKey"]);
   });
 
-  it("throws on an invalid token identifier", async () => {
-    await expect(
-      publicClient.getTokenBalance(emptyWallet.sparkAddress, [
-        "not-a-bech32m-token-id",
-      ]),
-    ).rejects.toThrow();
+  it("rejects invalid spark addresses before any RPC is attempted", async () => {
+    const { client, createSparkClient } = createTestClient({
+      query_nodes: jest.fn<QueryNodes>(),
+      query_all_transfers: jest.fn<QueryAllTransfers>(),
+    });
+
+    let error: unknown;
+    try {
+      await client.getOwnedBalance("not-a-valid-spark-address");
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(SparkValidationError);
+    expect(createSparkClient).not.toHaveBeenCalled();
+  });
+
+  it("wraps repeated node offsets in SparkRequestError for available balance queries", async () => {
+    const query_nodes = jest
+      .fn<QueryNodes>()
+      .mockResolvedValue(createNodePage([5], 0) as QueryNodesResponse);
+
+    const { client } = createTestClient({
+      query_nodes,
+      query_all_transfers: jest.fn<QueryAllTransfers>(),
+    });
+
+    let error: unknown;
+    try {
+      await client.getAvailableBalance(TEST_SPARK_ADDRESS);
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(SparkRequestError);
+    expect(query_nodes).toHaveBeenCalledTimes(1);
+
+    const requestError = error as SparkRequestError;
+    expect(requestError.originalError?.message).toContain(
+      "Detected repeated offset while paginating node query",
+    );
+    expect(requestError.getContext().operation).toBe("query_nodes");
+  });
+
+  it("wraps transfer query failures in SparkRequestError while preserving the original error", async () => {
+    const expectedError = new Error("query_all_transfers unavailable");
+    const query_nodes = jest
+      .fn<QueryNodes>()
+      .mockResolvedValue(createNodePage([12], -1) as QueryNodesResponse);
+    const query_all_transfers = jest
+      .fn<QueryAllTransfers>()
+      .mockImplementation(async (filter) => {
+        if (filter.participant?.$case === "senderIdentityPublicKey") {
+          throw expectedError;
+        }
+
+        return {
+          transfers: [],
+          offset: -1,
+        } as QueryTransfersResponse;
+      });
+
+    const { client } = createTestClient({
+      query_nodes,
+      query_all_transfers,
+    });
+
+    let error: unknown;
+    try {
+      await client.getOwnedBalance(TEST_SPARK_ADDRESS);
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(SparkRequestError);
+
+    const requestError = error as SparkRequestError;
+    expect(requestError.originalError).toBe(expectedError);
+    expect(requestError.getContext().operation).toBe("query_all_transfers");
+    expect(requestError.message).toContain("Failed to get owned balance");
+  });
+
+  it("wraps repeated transfer offsets in SparkRequestError for owned balance queries", async () => {
+    const query_nodes = jest
+      .fn<QueryNodes>()
+      .mockResolvedValue(createNodePage([12], -1) as QueryNodesResponse);
+    const query_all_transfers = jest
+      .fn<QueryAllTransfers>()
+      .mockImplementation(async (filter) => {
+        if (filter.participant?.$case === "senderIdentityPublicKey") {
+          return {
+            transfers: Array.from({ length: 100 }, () => createTransfer([1])),
+            offset: 0,
+          } as QueryTransfersResponse;
+        }
+
+        return {
+          transfers: [],
+          offset: -1,
+        } as QueryTransfersResponse;
+      });
+
+    const { client } = createTestClient({
+      query_nodes,
+      query_all_transfers,
+    });
+
+    let error: unknown;
+    try {
+      await client.getOwnedBalance(TEST_SPARK_ADDRESS);
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(SparkRequestError);
+
+    const requestError = error as SparkRequestError;
+    expect(requestError.originalError?.message).toContain(
+      "Detected repeated offset while paginating transfer query",
+    );
+    expect(requestError.getContext().operation).toBe("query_all_transfers");
+    expect(requestError.message).toContain("Failed to get owned balance");
   });
 });

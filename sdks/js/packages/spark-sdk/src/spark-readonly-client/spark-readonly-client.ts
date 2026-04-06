@@ -19,6 +19,7 @@ import {
   HashVariant,
   InvoiceResponse,
   Order,
+  type SparkServiceClient,
   Transfer,
   TransferFilter,
   TransferType,
@@ -36,6 +37,13 @@ import {
   ConnectionManager,
   WalletConfigService,
 } from "../services/index.js";
+import {
+  ACTIVE_COUNTER_SWAP_STATUSES,
+  COUNTER_SWAP_TYPES,
+  OUTGOING_TRANSFER_TYPES,
+  PRIMARY_SWAP_TYPES,
+  SENDER_PENDING_STATUSES,
+} from "../services/transfer.js";
 import { parseCompressedPublicKeyHex } from "../utils/keys.js";
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -147,44 +155,150 @@ export abstract class SparkReadonlyClient {
     );
 
     try {
-      let availableBalance = 0n;
-      let offset = 0;
-      const seenOffsets = new Set<number>();
-
-      while (offset >= 0) {
-        if (seenOffsets.has(offset)) {
-          throw new Error(
-            "Detected repeated offset while paginating available balance",
-          );
-        }
-        seenOffsets.add(offset);
-
-        const result = await sparkClient.query_nodes({
-          source: {
-            $case: "ownerIdentityPubkey",
-            ownerIdentityPubkey: identityPublicKey,
-          },
-          includeParents: false,
-          network: this.config.getNetworkProto(),
-          statuses: [TreeNodeStatus.TREE_NODE_STATUS_AVAILABLE],
-          offset,
-          limit: 100,
-        });
-
-        availableBalance += Object.values(result.nodes).reduce(
-          (acc, node) => acc + BigInt(node.value),
-          0n,
-        );
-        offset = result.offset;
-      }
-
-      return availableBalance;
+      return await this.queryNodeBalance(sparkClient, identityPublicKey, [
+        TreeNodeStatus.TREE_NODE_STATUS_AVAILABLE,
+      ]);
     } catch (error) {
       throw new SparkRequestError("Failed to get available balance", {
         operation: "query_nodes",
         error,
       });
     }
+  }
+
+  /**
+   * Returns the total owned sats balance, mirroring SparkWallet's
+   * satsBalance.owned semantics. This includes:
+   * - Available leaves
+   * - Leaves in pending outgoing transfers (pre-sender_key_tweaked)
+   * - Leaves in pending swaps (primary and counter)
+   *
+   * Requires an authenticated client (createWithMasterKey or
+   * createWithSigner) since transfer queries need identity auth.
+   * Always >= the available balance. Auto-paginates internally.
+   */
+  public async getOwnedBalance(sparkAddress: string): Promise<bigint> {
+    const identityPublicKey = this.resolveIdentityPublicKey(sparkAddress);
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    const network = this.config.getNetworkProto();
+
+    try {
+      const [availableBalance, outgoingBalance, counterSwapBalance] =
+        await Promise.all([
+          this.queryNodeBalance(sparkClient, identityPublicKey, [
+            TreeNodeStatus.TREE_NODE_STATUS_AVAILABLE,
+          ]),
+          // Pending outgoing transfers + primary swaps (sender = user,
+          // pre-sender_key_tweaked). Once sender_key_tweaked is reached the
+          // sender no longer owns the leaves even though
+          // owner_identity_key hasn't flipped yet.
+          this.sumTransferLeafValues(sparkClient, {
+            participant: {
+              $case: "senderIdentityPublicKey" as const,
+              senderIdentityPublicKey: identityPublicKey,
+            },
+            types: [...OUTGOING_TRANSFER_TYPES, ...PRIMARY_SWAP_TYPES],
+            statuses: SENDER_PENDING_STATUSES,
+            network,
+          }),
+          // Pending counter-swaps (receiver = user). These leaves still
+          // have the SSP's identity key, so query_nodes won't find them,
+          // but they are incoming replacement leaves the user will own.
+          this.sumTransferLeafValues(sparkClient, {
+            participant: {
+              $case: "receiverIdentityPublicKey" as const,
+              receiverIdentityPublicKey: identityPublicKey,
+            },
+            types: COUNTER_SWAP_TYPES,
+            statuses: ACTIVE_COUNTER_SWAP_STATUSES,
+            network,
+          }),
+        ]);
+
+      return availableBalance + outgoingBalance + counterSwapBalance;
+    } catch (error) {
+      throw new SparkRequestError("Failed to get owned balance", {
+        operation: "query_all_transfers",
+        error,
+      });
+    }
+  }
+
+  private async queryNodeBalance(
+    sparkClient: SparkServiceClient,
+    identityPublicKey: Uint8Array,
+    statuses: TreeNodeStatus[],
+  ): Promise<bigint> {
+    let balance = 0n;
+    let offset = 0;
+    const seenOffsets = new Set<number>();
+
+    while (offset >= 0) {
+      if (seenOffsets.has(offset)) {
+        throw new Error("Detected repeated offset while paginating node query");
+      }
+      seenOffsets.add(offset);
+
+      const result = await sparkClient.query_nodes({
+        source: {
+          $case: "ownerIdentityPubkey",
+          ownerIdentityPubkey: identityPublicKey,
+        },
+        includeParents: false,
+        network: this.config.getNetworkProto(),
+        statuses,
+        offset,
+        limit: 100,
+      });
+
+      balance += Object.values(result.nodes).reduce(
+        (acc, node) => acc + BigInt(node.value),
+        0n,
+      );
+      offset = result.offset;
+    }
+
+    return balance;
+  }
+
+  private async sumTransferLeafValues(
+    sparkClient: SparkServiceClient,
+    filter: DeepPartial<TransferFilter>,
+  ): Promise<bigint> {
+    const PAGE_SIZE = 100;
+    let total = 0n;
+    let offset = 0;
+    const seenOffsets = new Set<number>();
+
+    while (offset >= 0) {
+      if (seenOffsets.has(offset)) {
+        throw new Error(
+          "Detected repeated offset while paginating transfer query",
+        );
+      }
+      seenOffsets.add(offset);
+
+      const result = await sparkClient.query_all_transfers({
+        ...filter,
+        limit: PAGE_SIZE,
+        offset,
+      });
+
+      for (const transfer of result.transfers) {
+        for (const transferLeaf of transfer.leaves) {
+          if (transferLeaf.leaf) {
+            total += BigInt(transferLeaf.leaf.value);
+          }
+        }
+      }
+
+      if (result.transfers.length < PAGE_SIZE) break;
+      offset = result.offset;
+    }
+
+    return total;
   }
 
   /** Returns token balances grouped by token identifier. Auto-paginates internally. */

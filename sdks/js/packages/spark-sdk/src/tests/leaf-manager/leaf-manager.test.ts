@@ -169,6 +169,7 @@ function createTestableLeafManager(overrides?: {
     owned: number;
     incoming: number;
   }) => void;
+  onAutoOptimize?: () => Promise<void>;
 }): TestableLeafManager {
   return new TestableLeafManager(
     (overrides?.config ?? {}) as any,
@@ -176,6 +177,7 @@ function createTestableLeafManager(overrides?: {
     (overrides?.transferService ?? {}) as any,
     (overrides?.connectionManager ?? {}) as any,
     overrides?.onBalanceUpdate,
+    overrides?.onAutoOptimize,
   );
 }
 
@@ -186,8 +188,8 @@ function createMockTreeNode(overrides: Partial<TreeNode> = {}): TreeNode {
     id: overrides.id ?? `node-${nodeCounter}`,
     treeId: "tree-1",
     value: 1000,
-    nodeTx: new Uint8Array(32).fill(1),
-    refundTx: new Uint8Array(32).fill(2),
+    nodeTx: buildRawTx(500),
+    refundTx: buildRawTx(500),
     vout: 0,
     verifyingPublicKey: new Uint8Array(33).fill(0),
     ownerIdentityPublicKey: new Uint8Array(33).fill(0),
@@ -1572,16 +1574,14 @@ describe("LeafManager", () => {
 
       const result = await lm.recoverLeavesPublic([inputLeaf], keyDerivation);
 
-      expect(sendMock).toHaveBeenCalledWith(
-        [
-          expect.objectContaining({
-            leaf: inputLeaf,
-            keyDerivation,
-            newKeyDerivation: { type: KeyDerivationType.RANDOM },
-          }),
-        ],
-        fakeIdentityPubkey,
-      );
+      expect(sendMock).toHaveBeenCalledWith([
+        expect.objectContaining({
+          leaf: inputLeaf,
+          keyDerivation,
+          newKeyDerivation: { type: KeyDerivationType.RANDOM },
+          receiverIdentityPublicKey: fakeIdentityPubkey,
+        }),
+      ]);
       expect(queryMock).toHaveBeenCalledWith("transfer-1");
       expect(claimMock).toHaveBeenCalledWith(mockPendingTransfer);
       expect(result).toEqual([recoveredNode]);
@@ -4648,12 +4648,7 @@ describe("LeafManager", () => {
 
   describe("autoOptimizeIfNeeded", () => {
     it("triggers optimization when auto=true and shouldOptimize returns true", async () => {
-      const requestLeavesSwapMock = jest.fn(async (params: any) => {
-        await params.onSwapInitiated?.();
-        return params.targetAmounts.map((v: number, i: number) =>
-          createMockTreeNode({ id: `opt-${i}`, value: v }),
-        );
-      });
+      const onAutoOptimizeMock = jest.fn(async () => {});
 
       const lm = createTestableLeafManager({
         config: {
@@ -4661,7 +4656,7 @@ describe("LeafManager", () => {
           getCoordinatorAddress: () => "mock-addr",
           getNetworkProto: () => 0,
         } as any,
-        swapService: { requestLeavesSwap: requestLeavesSwapMock },
+        onAutoOptimize: onAutoOptimizeMock,
       });
 
       // checkRenewLeaves is called by registerClaimedLeaves — mock it
@@ -4678,17 +4673,17 @@ describe("LeafManager", () => {
       // autoOptimizeIfNeeded is fire-and-forget — yield to let it complete
       await new Promise((r) => setTimeout(r, 100));
 
-      expect(requestLeavesSwapMock).toHaveBeenCalled();
+      expect(onAutoOptimizeMock).toHaveBeenCalled();
     });
 
     it("does not trigger when auto=false", async () => {
-      const requestLeavesSwapMock = jest.fn(async () => []);
+      const onAutoOptimizeMock = jest.fn(async () => {});
 
       const lm = createTestableLeafManager({
         config: {
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
         },
-        swapService: { requestLeavesSwap: requestLeavesSwapMock },
+        onAutoOptimize: onAutoOptimizeMock,
       });
       (lm as any).checkRenewLeaves = jest.fn(
         async (nodes: TreeNode[]) => nodes,
@@ -4699,17 +4694,17 @@ describe("LeafManager", () => {
       );
       await lm.registerClaimedLeaves(leaves);
 
-      expect(requestLeavesSwapMock).not.toHaveBeenCalled();
+      expect(onAutoOptimizeMock).not.toHaveBeenCalled();
     });
 
     it("does not trigger when leaves are already optimal", async () => {
-      const requestLeavesSwapMock = jest.fn(async () => []);
+      const onAutoOptimizeMock = jest.fn(async () => {});
 
       const lm = createTestableLeafManager({
         config: {
           getOptimizationOptions: () => ({ auto: true, multiplicity: 0 }),
         },
-        swapService: { requestLeavesSwap: requestLeavesSwapMock },
+        onAutoOptimize: onAutoOptimizeMock,
       });
       (lm as any).checkRenewLeaves = jest.fn(
         async (nodes: TreeNode[]) => nodes,
@@ -4720,19 +4715,19 @@ describe("LeafManager", () => {
         createMockTreeNode({ id: "a", value: 128 }),
       ]);
 
-      expect(requestLeavesSwapMock).not.toHaveBeenCalled();
+      expect(onAutoOptimizeMock).not.toHaveBeenCalled();
     });
 
     it("swallows optimization errors silently", async () => {
+      const onAutoOptimizeMock = jest.fn(async () => {
+        throw new Error("optimization unavailable");
+      });
+
       const lm = createTestableLeafManager({
         config: {
           getOptimizationOptions: () => ({ auto: true, multiplicity: 0 }),
         },
-        swapService: {
-          requestLeavesSwap: jest.fn(async () => {
-            throw new Error("swap service unavailable");
-          }),
-        },
+        onAutoOptimize: onAutoOptimizeMock,
       });
       (lm as any).checkRenewLeaves = jest.fn(
         async (nodes: TreeNode[]) => nodes,
@@ -4749,6 +4744,7 @@ describe("LeafManager", () => {
       await new Promise((r) => setTimeout(r, 50));
 
       expect(result).toHaveLength(8);
+      expect(onAutoOptimizeMock).toHaveBeenCalled();
 
       // Leaves should be restored to AVAILABLE (not stuck in LOCAL_LOCKED)
       for (const leaf of leaves) {

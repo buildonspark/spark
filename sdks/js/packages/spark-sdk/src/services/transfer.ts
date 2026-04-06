@@ -73,6 +73,42 @@ import {
   UserSignedTxSigningJobWithSelfCommitment,
 } from "./signing.js";
 
+// Transfer statuses before the sender key tweak is applied — the sender
+// still owns the leaves in these states.
+export const SENDER_PENDING_STATUSES = [
+  TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+  TransferStatus.TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
+  TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK,
+  TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
+];
+
+// Counter-swap statuses covering the full lifecycle until completion.
+export const ACTIVE_COUNTER_SWAP_STATUSES = [
+  ...SENDER_PENDING_STATUSES,
+  TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+  TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED,
+  TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED,
+  TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED,
+  TransferStatus.TRANSFER_STATUS_RECEIVER_REFUND_SIGNED,
+];
+
+export const PRIMARY_SWAP_TYPES = [
+  TransferType.PRIMARY_SWAP_V3,
+  TransferType.SWAP,
+];
+
+export const COUNTER_SWAP_TYPES = [
+  TransferType.COUNTER_SWAP_V3,
+  TransferType.COUNTER_SWAP,
+];
+
+export const OUTGOING_TRANSFER_TYPES = [
+  TransferType.COOPERATIVE_EXIT,
+  TransferType.UTXO_SWAP,
+  TransferType.PREIMAGE_SWAP,
+  TransferType.TRANSFER,
+];
+
 export type TransferQueryOptions = {
   limit: number;
   offset: number;
@@ -1028,13 +1064,8 @@ export class TransferService extends BaseTransferService {
     return await this.queryAllTransfers({
       ...options,
       senderOnly: true,
-      types: [TransferType.PRIMARY_SWAP_V3, TransferType.SWAP],
-      statuses: [
-        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
-        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
-        TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK,
-        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
-      ],
+      types: PRIMARY_SWAP_TYPES,
+      statuses: SENDER_PENDING_STATUSES,
     });
   }
 
@@ -1043,18 +1074,8 @@ export class TransferService extends BaseTransferService {
   ): Promise<QueryTransfersResponse> {
     return await this.queryAllTransfers({
       ...options,
-      types: [TransferType.COUNTER_SWAP_V3, TransferType.COUNTER_SWAP],
-      statuses: [
-        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
-        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
-        TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK,
-        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
-        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
-        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED,
-        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED,
-        TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED,
-        TransferStatus.TRANSFER_STATUS_RECEIVER_REFUND_SIGNED,
-      ],
+      types: COUNTER_SWAP_TYPES,
+      statuses: ACTIVE_COUNTER_SWAP_STATUSES,
     });
   }
 
@@ -1064,18 +1085,8 @@ export class TransferService extends BaseTransferService {
     return await this.queryAllTransfers({
       ...options,
       senderOnly: true,
-      types: [
-        TransferType.COOPERATIVE_EXIT,
-        TransferType.UTXO_SWAP,
-        TransferType.PREIMAGE_SWAP,
-        TransferType.TRANSFER,
-      ],
-      statuses: [
-        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
-        TransferStatus.TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
-        TransferStatus.TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK,
-        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
-      ],
+      types: OUTGOING_TRANSFER_TYPES,
+      statuses: SENDER_PENDING_STATUSES,
     });
   }
 

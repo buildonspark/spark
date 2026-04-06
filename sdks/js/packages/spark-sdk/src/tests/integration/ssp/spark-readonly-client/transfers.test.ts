@@ -1,11 +1,10 @@
 /**
- * Integration tests for SparkReadonlyClient transfer query methods:
+ * SSP-backed integration tests for SparkReadonlyClient transfer query methods:
  *   - getTransfers
  *   - getTransfersByIds
  *   - getPendingTransfers
  *
- * Creates two funded wallets, performs a transfer between them,
- * and then queries the resulting transfers via the readonly client.
+ * Setup performs real wallet transfers, which depend on SSP-backed swap flows.
  */
 import { describe, it, expect, jest, beforeAll } from "@jest/globals";
 import {
@@ -14,9 +13,9 @@ import {
   createPublicReadonlyClient,
   createOwnerReadonlyClient,
   type FundedWallet,
-} from "./helpers.js";
-import { SparkReadonlyClient } from "../../spark-readonly-client/spark-readonly-client.node.js";
-import { SparkValidationError } from "../../errors/types.js";
+} from "../../../spark-readonly-client/helpers.js";
+import { SparkReadonlyClient } from "../../../../spark-readonly-client/spark-readonly-client.node.js";
+import { SparkValidationError } from "../../../../errors/types.js";
 
 describe("getTransfers", () => {
   jest.setTimeout(60_000);
@@ -30,7 +29,6 @@ describe("getTransfers", () => {
     sender = await createFundedWallet(10_000n);
     receiver = await createEmptyWallet();
 
-    // Send a transfer from sender → receiver
     await sender.wallet.transfer({
       amountSats: 5_000,
       receiverSparkAddress: receiver.sparkAddress,
@@ -39,8 +37,6 @@ describe("getTransfers", () => {
     publicClient = createPublicReadonlyClient();
     senderOwnerClient = await createOwnerReadonlyClient(sender.mnemonic);
   });
-
-  // ── Happy Paths ──────────────────────────────────────────
 
   it("returns transfers for the sender wallet", async () => {
     const result = await publicClient.getTransfers({
@@ -90,8 +86,6 @@ describe("getTransfers", () => {
     expect(result.transfers.length).toBeGreaterThanOrEqual(1);
   });
 
-  // ── Edge Cases ─────────────────────────────────────────
-
   it("createdAfter far in the future returns empty", async () => {
     const future = new Date("2099-01-01");
     const result = await publicClient.getTransfers({
@@ -132,8 +126,6 @@ describe("getTransfersByIds", () => {
     publicClient = createPublicReadonlyClient();
   });
 
-  // ── Happy Paths ──────────────────────────────────────────
-
   it("returns the correct transfer by ID", async () => {
     const transfers = await publicClient.getTransfersByIds([transferId]);
     expect(transfers.length).toBeGreaterThanOrEqual(1);
@@ -143,17 +135,13 @@ describe("getTransfersByIds", () => {
   });
 
   it("returns results for multiple IDs", async () => {
-    // Query with the known ID plus a non-existent one
     const transfers = await publicClient.getTransfersByIds([
       transferId,
       "00000000-0000-0000-0000-000000000000",
     ]);
-    // At least the known transfer should be present
     const found = transfers.find((t) => t.id === transferId);
     expect(found).toBeDefined();
   });
-
-  // ── Unhappy Paths ────────────────────────────────────────
 
   it("rejects empty array", async () => {
     await expect(publicClient.getTransfersByIds([])).rejects.toThrow(

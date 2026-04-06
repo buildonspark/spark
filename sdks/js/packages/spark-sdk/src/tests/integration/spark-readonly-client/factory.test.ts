@@ -8,13 +8,13 @@
  * making real network calls against the local backend.
  */
 import { describe, it, expect, jest } from "@jest/globals";
-import { SparkReadonlyClient } from "../../spark-readonly-client/spark-readonly-client.node.js";
-import { DefaultSparkSigner } from "../../signer/signer.js";
+import { SparkReadonlyClient } from "../../../spark-readonly-client/spark-readonly-client.node.js";
+import { DefaultSparkSigner } from "../../../signer/signer.js";
 import {
   createEmptyWallet,
   createPublicReadonlyClient,
   LOCAL_OPTIONS,
-} from "./helpers.js";
+} from "../../spark-readonly-client/helpers.js";
 
 describe("SparkReadonlyClient factory methods", () => {
   jest.setTimeout(30_000);

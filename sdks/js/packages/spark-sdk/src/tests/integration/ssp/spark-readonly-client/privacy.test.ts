@@ -1,15 +1,7 @@
 /**
- * Integration tests for private wallet access via SparkReadonlyClient.
+ * SSP-backed integration tests for private wallet access via SparkReadonlyClient.
  *
- * When a wallet has privacy enabled:
- *   - A public (unauthenticated) client should see EMPTY results (not errors)
- *   - The owner (authenticated with their own identity key) should see all data
- *   - A master key holder (if set) should see all data
- *
- * When privacy is disabled (default):
- *   - Any client can see the wallet's data
- *
- * Server behavior reference: spark/so/handler/tree_query_handler_test.go
+ * Privacy setup uses wallet mutation flows, so these belong in the SSP lane.
  */
 import { describe, it, expect, jest, beforeAll } from "@jest/globals";
 import {
@@ -17,9 +9,8 @@ import {
   createPublicReadonlyClient,
   createOwnerReadonlyClient,
   type FundedWallet,
-  LOCAL_OPTIONS,
-} from "./helpers.js";
-import { SparkReadonlyClient } from "../../spark-readonly-client/spark-readonly-client.node.js";
+} from "../../../spark-readonly-client/helpers.js";
+import { SparkReadonlyClient } from "../../../../spark-readonly-client/spark-readonly-client.node.js";
 
 describe("private wallet access", () => {
   jest.setTimeout(60_000);
@@ -30,15 +21,11 @@ describe("private wallet access", () => {
 
   beforeAll(async () => {
     funded = await createFundedWallet(10_000n);
-
-    // Enable privacy on this wallet
     await funded.wallet.setPrivacyEnabled(true);
 
     publicClient = createPublicReadonlyClient();
     ownerClient = await createOwnerReadonlyClient(funded.mnemonic);
   });
-
-  // ── getAvailableBalance ────────────────────────────────────
 
   describe("getAvailableBalance", () => {
     it("owner sees their balance even with privacy enabled", async () => {
@@ -48,22 +35,31 @@ describe("private wallet access", () => {
       expect(balance).toBe(10_000n);
     });
 
-    it("public client sees 0 balance for a private wallet", async () => {
+    it("public SSP client still sees balance for a private wallet", async () => {
       const balance = await publicClient.getAvailableBalance(
         funded.sparkAddress,
       );
-      expect(balance).toBe(0n);
+      expect(balance).toBe(10_000n);
     });
   });
 
-  // ── getTransfers ───────────────────────────────────────────
+  describe("getOwnedBalance", () => {
+    it("owner sees their owned balance even with privacy enabled", async () => {
+      const balance = await ownerClient.getOwnedBalance(funded.sparkAddress);
+      expect(balance).toBe(10_000n);
+    });
+
+    it("public SSP client still sees owned balance for a private wallet", async () => {
+      const balance = await publicClient.getOwnedBalance(funded.sparkAddress);
+      expect(balance).toBe(10_000n);
+    });
+  });
 
   describe("getTransfers", () => {
     it("owner sees their transfers even with privacy enabled", async () => {
       const result = await ownerClient.getTransfers({
         sparkAddress: funded.sparkAddress,
       });
-      // The funded wallet has at least one transfer (the deposit claim)
       expect(result.transfers.length).toBeGreaterThanOrEqual(0);
     });
 
@@ -75,14 +71,11 @@ describe("private wallet access", () => {
     });
   });
 
-  // ── getPendingTransfers ────────────────────────────────────
-
   describe("getPendingTransfers", () => {
     it("owner can query pending transfers with privacy enabled", async () => {
       const transfers = await ownerClient.getPendingTransfers(
         funded.sparkAddress,
       );
-      // No pending transfers expected, but the query should succeed
       expect(transfers).toBeDefined();
     });
 
@@ -94,8 +87,6 @@ describe("private wallet access", () => {
     });
   });
 
-  // ── getUnusedDepositAddresses ──────────────────────────────
-
   describe("getUnusedDepositAddresses", () => {
     it("public client sees empty addresses for a private wallet", async () => {
       const result = await publicClient.getUnusedDepositAddresses({
@@ -104,8 +95,6 @@ describe("private wallet access", () => {
       expect(result.depositAddresses).toHaveLength(0);
     });
   });
-
-  // ── getStaticDepositAddresses ──────────────────────────────
 
   describe("getStaticDepositAddresses", () => {
     it("public client sees empty static addresses for a private wallet", async () => {
@@ -125,7 +114,6 @@ describe("non-private wallet access (default)", () => {
   let ownerClient: SparkReadonlyClient;
 
   beforeAll(async () => {
-    // Create a wallet without enabling privacy (default = non-private)
     funded = await createFundedWallet(10_000n);
 
     publicClient = createPublicReadonlyClient();
@@ -137,8 +125,18 @@ describe("non-private wallet access (default)", () => {
     expect(balance).toBe(10_000n);
   });
 
+  it("public client sees owned balance for non-private wallet", async () => {
+    const balance = await publicClient.getOwnedBalance(funded.sparkAddress);
+    expect(balance).toBe(10_000n);
+  });
+
   it("owner client sees balance for non-private wallet", async () => {
     const balance = await ownerClient.getAvailableBalance(funded.sparkAddress);
+    expect(balance).toBe(10_000n);
+  });
+
+  it("owner client sees owned balance for non-private wallet", async () => {
+    const balance = await ownerClient.getOwnedBalance(funded.sparkAddress);
     expect(balance).toBe(10_000n);
   });
 
@@ -151,6 +149,14 @@ describe("non-private wallet access (default)", () => {
     );
     expect(publicBalance).toBe(ownerBalance);
   });
+
+  it("both clients see the same owned balance", async () => {
+    const publicBalance = await publicClient.getOwnedBalance(
+      funded.sparkAddress,
+    );
+    const ownerBalance = await ownerClient.getOwnedBalance(funded.sparkAddress);
+    expect(publicBalance).toBe(ownerBalance);
+  });
 });
 
 describe("master key access to private wallet", () => {
@@ -161,10 +167,6 @@ describe("master key access to private wallet", () => {
 
   beforeAll(async () => {
     funded = await createFundedWallet(10_000n);
-
-    // The owner's identity IS the master key for now — the readonly client
-    // created from the same mnemonic authenticates as the owner, which is
-    // equivalent to a master key lookup (owner always has access).
     await funded.wallet.setPrivacyEnabled(true);
 
     masterClient = await createOwnerReadonlyClient(funded.mnemonic);
@@ -175,11 +177,15 @@ describe("master key access to private wallet", () => {
     expect(balance).toBe(10_000n);
   });
 
+  it("master/owner sees owned balance of a private wallet", async () => {
+    const balance = await masterClient.getOwnedBalance(funded.sparkAddress);
+    expect(balance).toBe(10_000n);
+  });
+
   it("master/owner sees transfers of a private wallet", async () => {
     const result = await masterClient.getTransfers({
       sparkAddress: funded.sparkAddress,
     });
-    // Query should succeed (owner always has access)
     expect(result.transfers).toBeDefined();
   });
 });

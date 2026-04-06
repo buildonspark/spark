@@ -12,11 +12,11 @@ import {
   createPublicReadonlyClient,
   createOwnerReadonlyClient,
   type FundedWallet,
-} from "./helpers.js";
-import { SparkReadonlyClient } from "../../spark-readonly-client/spark-readonly-client.node.js";
-import { SparkWalletTestingWithStream } from "../utils/spark-testing-wallet.js";
-import { BitcoinFaucet } from "../utils/test-faucet.js";
-import { SparkValidationError } from "../../errors/types.js";
+} from "../../spark-readonly-client/helpers.js";
+import { SparkReadonlyClient } from "../../../spark-readonly-client/spark-readonly-client.node.js";
+import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
+import { BitcoinFaucet } from "../../utils/test-faucet.js";
+import { SparkValidationError } from "../../../errors/types.js";
 
 describe("getUnusedDepositAddresses", () => {
   jest.setTimeout(30_000);
