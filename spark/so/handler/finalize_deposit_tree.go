@@ -165,6 +165,12 @@ func loadAndValidateDepositAddress(
 	}
 	onChainOutput = onChainTx.TxOut[req.OnChainUtxo.Vout]
 
+	// Reject zero-value deposits: a zero-value UTXO cannot back a meaningful Spark leaf.
+	if onChainOutput.Value <= 0 {
+		err = status.Errorf(codes.InvalidArgument, "deposit UTXO output value must be greater than zero")
+		return
+	}
+
 	utxoAddress, err := common.P2TRAddressFromPkScript(onChainOutput.PkScript, network)
 	if err != nil {
 		err = fmt.Errorf("invalid utxo address: %w", err)
@@ -198,6 +204,12 @@ func loadAndValidateDepositAddress(
 		seenOutpoints[outpoint] = true
 
 		addOutput := addTx.TxOut[additionalUtxo.Vout]
+
+		// Reject zero-value additional UTXOs
+		if addOutput.Value <= 0 {
+			err = status.Errorf(codes.InvalidArgument, "additional utxo %d output value must be greater than zero", i)
+			return
+		}
 
 		// Verify additional UTXO pays to the same deposit address
 		var addAddress *string
@@ -336,6 +348,20 @@ func loadAndValidateDepositAddress(
 		onChainTxid := onChainTx.TxHash().String()
 		if onChainTxid != depositAddress.ConfirmationTxid {
 			err = fmt.Errorf("primary utxo txid %s does not match confirmed deposit txid %s", onChainTxid, depositAddress.ConfirmationTxid)
+			return
+		}
+	}
+
+	// Cross-check the claimed UTXO value against the chain-watcher's Utxo table
+	// to prevent balance inflation from fabricated raw TX bytes.
+	if err = validateDepositUtxoValueAgainstChain(ctx, db, network, onChainTx, req.OnChainUtxo.Vout, onChainOutput); err != nil {
+		return
+	}
+
+	// Also validate additional UTXOs values against the chain
+	for i, add := range additionalUtxos {
+		if err = validateDepositUtxoValueAgainstChain(ctx, db, network, add.onChainTx, add.vout, add.onChainOutput); err != nil {
+			err = fmt.Errorf("additional utxo %d: %w", i, err)
 			return
 		}
 	}

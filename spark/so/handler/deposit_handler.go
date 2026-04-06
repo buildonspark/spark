@@ -836,6 +836,13 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, fmt.Errorf("utxo index out of bounds")
 	}
 	onChainOutput := onChainTx.TxOut[req.OnChainUtxo.Vout]
+
+	// Reject zero-value deposits: a zero-value UTXO cannot back a meaningful Spark leaf
+	// and would allow creating tree nodes with no economic value.
+	if onChainOutput.Value <= 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "deposit UTXO output value must be greater than zero")
+	}
+
 	network, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, err
@@ -884,6 +891,14 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		if onChainTxid != depositAddress.ConfirmationTxid {
 			return nil, fmt.Errorf("transaction ID does not match confirmed transaction ID")
 		}
+	}
+
+	// Cross-check the claimed UTXO value against the chain-watcher's Utxo table.
+	// The client provides raw TX bytes which could be fabricated with an inflated
+	// output value. If the chain watcher has already recorded this UTXO, compare
+	// the on-chain amount to prevent balance inflation.
+	if err := validateDepositUtxoValueAgainstChain(ctx, db, network, onChainTx, req.OnChainUtxo.Vout, onChainOutput); err != nil {
+		return nil, err
 	}
 
 	// Existing flow
@@ -1264,6 +1279,53 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 			DirectFromCpfpRefundTxSigningResult: directFromCpfpRefundTxSigningResult,
 		},
 	}, nil
+}
+
+// validateDepositUtxoValueAgainstChain cross-checks the claimed UTXO output value
+// (from client-provided raw TX bytes) against the value recorded by the chain watcher
+// in the Utxo table. This prevents an attacker from submitting fabricated raw TX bytes
+// with an inflated output value to create a Spark leaf worth more than the actual
+// on-chain deposit.
+//
+// If the chain watcher has not yet recorded the UTXO (e.g., the TX is unconfirmed),
+// this check is skipped — the tree will remain in Pending status until confirmation,
+// at which point the chain watcher validates the UTXO independently.
+func validateDepositUtxoValueAgainstChain(
+	ctx context.Context,
+	db *ent.Client,
+	network btcnetwork.Network,
+	onChainTx *wire.MsgTx,
+	vout uint32,
+	onChainOutput *wire.TxOut,
+) error {
+	txidHash := onChainTx.TxHash()
+	txidBytes, err := hex.DecodeString(txidHash.String())
+	if err != nil {
+		return fmt.Errorf("failed to encode txid: %w", err)
+	}
+
+	utxoEntity, err := db.Utxo.Query().
+		Where(entutxo.NetworkEQ(network)).
+		Where(entutxo.Txid(txidBytes)).
+		Where(entutxo.Vout(vout)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			// UTXO not yet recorded by chain watcher; tree will stay Pending
+			// until the chain watcher confirms it.
+			return nil
+		}
+		return fmt.Errorf("failed to query utxo: %w", err)
+	}
+
+	claimedValue := uint64(onChainOutput.Value)
+	if claimedValue > utxoEntity.Amount {
+		return status.Errorf(codes.InvalidArgument,
+			"claimed deposit value %d exceeds on-chain UTXO value %d",
+			claimedValue, utxoEntity.Amount)
+	}
+
+	return nil
 }
 
 func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wire.MsgTx, onChainVout uint32, isDirect bool) error {
