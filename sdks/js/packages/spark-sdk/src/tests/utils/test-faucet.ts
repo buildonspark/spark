@@ -500,53 +500,21 @@ export class BitcoinFaucet {
     amount: bigint,
     blocksToGenerate: number = 1,
   ): Promise<Transaction> {
-    const coin = await this.fund();
-    if (!coin) {
-      throw new Error("No coins available");
-    }
+    const amountBtc = Number(amount) / SATS_PER_BTC;
+    const txid: string = await this.call("sendtoaddress", [address, amountBtc]);
 
-    const tx = new Transaction();
-    tx.addInput(coin.outpoint);
-
-    const availableAmount = COIN_AMOUNT - FEE_AMOUNT;
-
-    const destinationAddress = Address(getNetwork(Network.LOCAL)).decode(
-      address,
-    );
-    const destinationScript = OutScript.encode(destinationAddress);
-    tx.addOutput({
-      script: destinationScript,
-      amount: amount,
-    });
-
-    const changeAmount = availableAmount - amount;
-    if (changeAmount > 0) {
-      const changeKey = secp256k1.utils.randomPrivateKey();
-      const changePubKey = secp256k1.getPublicKey(changeKey);
-      const changeScript = getP2TRScriptFromPublicKey(
-        changePubKey,
+    if (blocksToGenerate > 0) {
+      const randomKey = secp256k1.utils.randomPrivateKey();
+      const randomPubKey = secp256k1.getPublicKey(randomKey);
+      const randomAddress = getP2TRAddressFromPublicKey(
+        randomPubKey,
         Network.LOCAL,
       );
-      tx.addOutput({
-        script: changeScript,
-        amount: changeAmount,
-      });
+      await this.generateToAddress(blocksToGenerate, randomAddress);
     }
 
-    const signedTx = await this.signFaucetCoin(tx, coin.txout, coin.key);
-    const txHex = bytesToHex(signedTx.extract());
-    await this.broadcastTx(txHex);
-
-    const randomKey = secp256k1.utils.randomPrivateKey();
-    const randomPubKey = secp256k1.getPublicKey(randomKey);
-    const randomAddress = getP2TRAddressFromPublicKey(
-      randomPubKey,
-      Network.LOCAL,
-    );
-
-    await this.generateToAddress(blocksToGenerate, randomAddress);
-
-    return signedTx;
+    const rawTx = await this.getRawTransaction(txid);
+    return Transaction.fromRaw(hexToBytes(rawTx.hex));
   }
 
   private async buildAndBroadcastTx(
