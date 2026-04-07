@@ -61,8 +61,6 @@ knobs:
     spark.database.only_commit_dirty: 100
     spark.database.pool.min_conns: 4
     # Deposit/transfer validation
-    spark.so.enable_deposit_flow_validation@REGTEST: 100
-    spark.so.enhanced_transfer_receive_validation@REGTEST: 100
     spark.so.require_multiple_conf_for_non_static_deposit: 1
     spark.so.max_unused_deposit_addresses: 64
     spark.so.filter_ssp_counter_swap_as_transfer@REGTEST: 100
