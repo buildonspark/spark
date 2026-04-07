@@ -63,8 +63,6 @@ const (
 
 	KnobSoDkgBatchSize = "spark.so.dkg.batch_size"
 
-	KnobRequireDirectFromCPFPRefund = "spark.so.require_direct_from_cpfp_refund"
-
 	// Task / gocron related knobs.
 	KnobSoTaskEnabled = "spark.so.task.enabled"
 	KnobSoTaskTimeout = "spark.so.task.timeout"

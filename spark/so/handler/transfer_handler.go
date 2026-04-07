@@ -3828,10 +3828,6 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		if job.DirectFromCpfpRefundTxSigningJob != nil {
 			directFromCpfpRefundTxSigningJob = job.DirectFromCpfpRefundTxSigningJob
 		} else if !isSwap && requireDirectTx {
-			networkString := transfer.Network.String()
-			if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobRequireDirectFromCPFPRefund, &networkString, 0) > 0 {
-				return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
-			}
 			if len(leaf.DirectTx) > 0 {
 				return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 			}
