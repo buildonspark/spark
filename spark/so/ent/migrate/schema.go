@@ -402,15 +402,23 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "partner_id", Type: field.TypeString, Unique: true, Size: 255},
+		{Name: "partner_id", Type: field.TypeString, Size: 255},
+		{Name: "label", Type: field.TypeString, Size: 255},
 		{Name: "partner_name", Type: field.TypeString, Size: 255},
-		{Name: "jwt_public_key", Type: field.TypeBytes, Unique: true},
+		{Name: "jwt_public_key", Type: field.TypeBytes},
 	}
 	// PartnersTable holds the schema information for the "partners" table.
 	PartnersTable = &schema.Table{
 		Name:       "partners",
 		Columns:    PartnersColumns,
 		PrimaryKey: []*schema.Column{PartnersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "partner_partner_id_label",
+				Unique:  true,
+				Columns: []*schema.Column{PartnersColumns[3], PartnersColumns[4]},
+			},
+		},
 	}
 	// PaymentIntentsColumns holds the columns for the "payment_intents" table.
 	PaymentIntentsColumns = []*schema.Column{

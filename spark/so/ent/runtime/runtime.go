@@ -409,8 +409,26 @@ func init() {
 			return nil
 		}
 	}()
+	// partnerDescLabel is the schema descriptor for label field.
+	partnerDescLabel := partnerFields[1].Descriptor()
+	// partner.LabelValidator is a validator for the "label" field. It is called by the builders before save.
+	partner.LabelValidator = func() func(string) error {
+		validators := partnerDescLabel.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(label string) error {
+			for _, fn := range fns {
+				if err := fn(label); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// partnerDescPartnerName is the schema descriptor for partner_name field.
-	partnerDescPartnerName := partnerFields[1].Descriptor()
+	partnerDescPartnerName := partnerFields[2].Descriptor()
 	// partner.PartnerNameValidator is a validator for the "partner_name" field. It is called by the builders before save.
 	partner.PartnerNameValidator = func() func(string) error {
 		validators := partnerDescPartnerName.Validators

@@ -50,6 +50,20 @@ func (pu *PartnerUpdate) SetNillablePartnerID(s *string) *PartnerUpdate {
 	return pu
 }
 
+// SetLabel sets the "label" field.
+func (pu *PartnerUpdate) SetLabel(s string) *PartnerUpdate {
+	pu.mutation.SetLabel(s)
+	return pu
+}
+
+// SetNillableLabel sets the "label" field if the given value is not nil.
+func (pu *PartnerUpdate) SetNillableLabel(s *string) *PartnerUpdate {
+	if s != nil {
+		pu.SetLabel(*s)
+	}
+	return pu
+}
+
 // SetPartnerName sets the "partner_name" field.
 func (pu *PartnerUpdate) SetPartnerName(s string) *PartnerUpdate {
 	pu.mutation.SetPartnerName(s)
@@ -126,6 +140,11 @@ func (pu *PartnerUpdate) check() error {
 			return &ValidationError{Name: "partner_id", err: fmt.Errorf(`ent: validator failed for field "Partner.partner_id": %w`, err)}
 		}
 	}
+	if v, ok := pu.mutation.Label(); ok {
+		if err := partner.LabelValidator(v); err != nil {
+			return &ValidationError{Name: "label", err: fmt.Errorf(`ent: validator failed for field "Partner.label": %w`, err)}
+		}
+	}
 	if v, ok := pu.mutation.PartnerName(); ok {
 		if err := partner.PartnerNameValidator(v); err != nil {
 			return &ValidationError{Name: "partner_name", err: fmt.Errorf(`ent: validator failed for field "Partner.partner_name": %w`, err)}
@@ -157,6 +176,9 @@ func (pu *PartnerUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := pu.mutation.PartnerID(); ok {
 		_spec.SetField(partner.FieldPartnerID, field.TypeString, value)
+	}
+	if value, ok := pu.mutation.Label(); ok {
+		_spec.SetField(partner.FieldLabel, field.TypeString, value)
 	}
 	if value, ok := pu.mutation.PartnerName(); ok {
 		_spec.SetField(partner.FieldPartnerName, field.TypeString, value)
@@ -202,6 +224,20 @@ func (puo *PartnerUpdateOne) SetPartnerID(s string) *PartnerUpdateOne {
 func (puo *PartnerUpdateOne) SetNillablePartnerID(s *string) *PartnerUpdateOne {
 	if s != nil {
 		puo.SetPartnerID(*s)
+	}
+	return puo
+}
+
+// SetLabel sets the "label" field.
+func (puo *PartnerUpdateOne) SetLabel(s string) *PartnerUpdateOne {
+	puo.mutation.SetLabel(s)
+	return puo
+}
+
+// SetNillableLabel sets the "label" field if the given value is not nil.
+func (puo *PartnerUpdateOne) SetNillableLabel(s *string) *PartnerUpdateOne {
+	if s != nil {
+		puo.SetLabel(*s)
 	}
 	return puo
 }
@@ -295,6 +331,11 @@ func (puo *PartnerUpdateOne) check() error {
 			return &ValidationError{Name: "partner_id", err: fmt.Errorf(`ent: validator failed for field "Partner.partner_id": %w`, err)}
 		}
 	}
+	if v, ok := puo.mutation.Label(); ok {
+		if err := partner.LabelValidator(v); err != nil {
+			return &ValidationError{Name: "label", err: fmt.Errorf(`ent: validator failed for field "Partner.label": %w`, err)}
+		}
+	}
 	if v, ok := puo.mutation.PartnerName(); ok {
 		if err := partner.PartnerNameValidator(v); err != nil {
 			return &ValidationError{Name: "partner_name", err: fmt.Errorf(`ent: validator failed for field "Partner.partner_name": %w`, err)}
@@ -343,6 +384,9 @@ func (puo *PartnerUpdateOne) sqlSave(ctx context.Context) (_node *Partner, err e
 	}
 	if value, ok := puo.mutation.PartnerID(); ok {
 		_spec.SetField(partner.FieldPartnerID, field.TypeString, value)
+	}
+	if value, ok := puo.mutation.Label(); ok {
+		_spec.SetField(partner.FieldLabel, field.TypeString, value)
 	}
 	if value, ok := puo.mutation.PartnerName(); ok {
 		_spec.SetField(partner.FieldPartnerName, field.TypeString, value)

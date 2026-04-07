@@ -59,6 +59,12 @@ func (pc *PartnerCreate) SetPartnerID(s string) *PartnerCreate {
 	return pc
 }
 
+// SetLabel sets the "label" field.
+func (pc *PartnerCreate) SetLabel(s string) *PartnerCreate {
+	pc.mutation.SetLabel(s)
+	return pc
+}
+
 // SetPartnerName sets the "partner_name" field.
 func (pc *PartnerCreate) SetPartnerName(s string) *PartnerCreate {
 	pc.mutation.SetPartnerName(s)
@@ -150,6 +156,14 @@ func (pc *PartnerCreate) check() error {
 			return &ValidationError{Name: "partner_id", err: fmt.Errorf(`ent: validator failed for field "Partner.partner_id": %w`, err)}
 		}
 	}
+	if _, ok := pc.mutation.Label(); !ok {
+		return &ValidationError{Name: "label", err: errors.New(`ent: missing required field "Partner.label"`)}
+	}
+	if v, ok := pc.mutation.Label(); ok {
+		if err := partner.LabelValidator(v); err != nil {
+			return &ValidationError{Name: "label", err: fmt.Errorf(`ent: validator failed for field "Partner.label": %w`, err)}
+		}
+	}
 	if _, ok := pc.mutation.PartnerName(); !ok {
 		return &ValidationError{Name: "partner_name", err: errors.New(`ent: missing required field "Partner.partner_name"`)}
 	}
@@ -208,6 +222,10 @@ func (pc *PartnerCreate) createSpec() (*Partner, *sqlgraph.CreateSpec) {
 	if value, ok := pc.mutation.PartnerID(); ok {
 		_spec.SetField(partner.FieldPartnerID, field.TypeString, value)
 		_node.PartnerID = value
+	}
+	if value, ok := pc.mutation.Label(); ok {
+		_spec.SetField(partner.FieldLabel, field.TypeString, value)
+		_node.Label = value
 	}
 	if value, ok := pc.mutation.PartnerName(); ok {
 		_spec.SetField(partner.FieldPartnerName, field.TypeString, value)
@@ -290,6 +308,18 @@ func (u *PartnerUpsert) SetPartnerID(v string) *PartnerUpsert {
 // UpdatePartnerID sets the "partner_id" field to the value that was provided on create.
 func (u *PartnerUpsert) UpdatePartnerID() *PartnerUpsert {
 	u.SetExcluded(partner.FieldPartnerID)
+	return u
+}
+
+// SetLabel sets the "label" field.
+func (u *PartnerUpsert) SetLabel(v string) *PartnerUpsert {
+	u.Set(partner.FieldLabel, v)
+	return u
+}
+
+// UpdateLabel sets the "label" field to the value that was provided on create.
+func (u *PartnerUpsert) UpdateLabel() *PartnerUpsert {
+	u.SetExcluded(partner.FieldLabel)
 	return u
 }
 
@@ -393,6 +423,20 @@ func (u *PartnerUpsertOne) SetPartnerID(v string) *PartnerUpsertOne {
 func (u *PartnerUpsertOne) UpdatePartnerID() *PartnerUpsertOne {
 	return u.Update(func(s *PartnerUpsert) {
 		s.UpdatePartnerID()
+	})
+}
+
+// SetLabel sets the "label" field.
+func (u *PartnerUpsertOne) SetLabel(v string) *PartnerUpsertOne {
+	return u.Update(func(s *PartnerUpsert) {
+		s.SetLabel(v)
+	})
+}
+
+// UpdateLabel sets the "label" field to the value that was provided on create.
+func (u *PartnerUpsertOne) UpdateLabel() *PartnerUpsertOne {
+	return u.Update(func(s *PartnerUpsert) {
+		s.UpdateLabel()
 	})
 }
 
@@ -667,6 +711,20 @@ func (u *PartnerUpsertBulk) SetPartnerID(v string) *PartnerUpsertBulk {
 func (u *PartnerUpsertBulk) UpdatePartnerID() *PartnerUpsertBulk {
 	return u.Update(func(s *PartnerUpsert) {
 		s.UpdatePartnerID()
+	})
+}
+
+// SetLabel sets the "label" field.
+func (u *PartnerUpsertBulk) SetLabel(v string) *PartnerUpsertBulk {
+	return u.Update(func(s *PartnerUpsert) {
+		s.SetLabel(v)
+	})
+}
+
+// UpdateLabel sets the "label" field to the value that was provided on create.
+func (u *PartnerUpsertBulk) UpdateLabel() *PartnerUpsertBulk {
+	return u.Update(func(s *PartnerUpsert) {
+		s.UpdateLabel()
 	})
 }
 

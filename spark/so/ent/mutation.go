@@ -9713,6 +9713,7 @@ type PartnerMutation struct {
 	create_time    *time.Time
 	update_time    *time.Time
 	partner_id     *string
+	label          *string
 	partner_name   *string
 	jwt_public_key *keys.JwtPubKey
 	clearedFields  map[string]struct{}
@@ -9933,6 +9934,42 @@ func (m *PartnerMutation) ResetPartnerID() {
 	m.partner_id = nil
 }
 
+// SetLabel sets the "label" field.
+func (m *PartnerMutation) SetLabel(s string) {
+	m.label = &s
+}
+
+// Label returns the value of the "label" field in the mutation.
+func (m *PartnerMutation) Label() (r string, exists bool) {
+	v := m.label
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLabel returns the old "label" field's value of the Partner entity.
+// If the Partner object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PartnerMutation) OldLabel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLabel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLabel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLabel: %w", err)
+	}
+	return oldValue.Label, nil
+}
+
+// ResetLabel resets all changes to the "label" field.
+func (m *PartnerMutation) ResetLabel() {
+	m.label = nil
+}
+
 // SetPartnerName sets the "partner_name" field.
 func (m *PartnerMutation) SetPartnerName(s string) {
 	m.partner_name = &s
@@ -10039,7 +10076,7 @@ func (m *PartnerMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PartnerMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.create_time != nil {
 		fields = append(fields, partner.FieldCreateTime)
 	}
@@ -10048,6 +10085,9 @@ func (m *PartnerMutation) Fields() []string {
 	}
 	if m.partner_id != nil {
 		fields = append(fields, partner.FieldPartnerID)
+	}
+	if m.label != nil {
+		fields = append(fields, partner.FieldLabel)
 	}
 	if m.partner_name != nil {
 		fields = append(fields, partner.FieldPartnerName)
@@ -10069,6 +10109,8 @@ func (m *PartnerMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdateTime()
 	case partner.FieldPartnerID:
 		return m.PartnerID()
+	case partner.FieldLabel:
+		return m.Label()
 	case partner.FieldPartnerName:
 		return m.PartnerName()
 	case partner.FieldJwtPublicKey:
@@ -10088,6 +10130,8 @@ func (m *PartnerMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldUpdateTime(ctx)
 	case partner.FieldPartnerID:
 		return m.OldPartnerID(ctx)
+	case partner.FieldLabel:
+		return m.OldLabel(ctx)
 	case partner.FieldPartnerName:
 		return m.OldPartnerName(ctx)
 	case partner.FieldJwtPublicKey:
@@ -10121,6 +10165,13 @@ func (m *PartnerMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPartnerID(v)
+		return nil
+	case partner.FieldLabel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLabel(v)
 		return nil
 	case partner.FieldPartnerName:
 		v, ok := value.(string)
@@ -10193,6 +10244,9 @@ func (m *PartnerMutation) ResetField(name string) error {
 		return nil
 	case partner.FieldPartnerID:
 		m.ResetPartnerID()
+		return nil
+	case partner.FieldLabel:
+		m.ResetLabel()
 		return nil
 	case partner.FieldPartnerName:
 		m.ResetPartnerName()

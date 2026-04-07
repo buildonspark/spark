@@ -226,6 +226,71 @@ func PartnerIDContainsFold(v string) predicate.Partner {
 	return predicate.Partner(sql.FieldContainsFold(FieldPartnerID, v))
 }
 
+// LabelEQ applies the EQ predicate on the "label" field.
+func LabelEQ(v string) predicate.Partner {
+	return predicate.Partner(sql.FieldEQ(FieldLabel, v))
+}
+
+// LabelNEQ applies the NEQ predicate on the "label" field.
+func LabelNEQ(v string) predicate.Partner {
+	return predicate.Partner(sql.FieldNEQ(FieldLabel, v))
+}
+
+// LabelIn applies the In predicate on the "label" field.
+func LabelIn(vs ...string) predicate.Partner {
+	return predicate.Partner(sql.FieldIn(FieldLabel, vs...))
+}
+
+// LabelNotIn applies the NotIn predicate on the "label" field.
+func LabelNotIn(vs ...string) predicate.Partner {
+	return predicate.Partner(sql.FieldNotIn(FieldLabel, vs...))
+}
+
+// LabelGT applies the GT predicate on the "label" field.
+func LabelGT(v string) predicate.Partner {
+	return predicate.Partner(sql.FieldGT(FieldLabel, v))
+}
+
+// LabelGTE applies the GTE predicate on the "label" field.
+func LabelGTE(v string) predicate.Partner {
+	return predicate.Partner(sql.FieldGTE(FieldLabel, v))
+}
+
+// LabelLT applies the LT predicate on the "label" field.
+func LabelLT(v string) predicate.Partner {
+	return predicate.Partner(sql.FieldLT(FieldLabel, v))
+}
+
+// LabelLTE applies the LTE predicate on the "label" field.
+func LabelLTE(v string) predicate.Partner {
+	return predicate.Partner(sql.FieldLTE(FieldLabel, v))
+}
+
+// LabelContains applies the Contains predicate on the "label" field.
+func LabelContains(v string) predicate.Partner {
+	return predicate.Partner(sql.FieldContains(FieldLabel, v))
+}
+
+// LabelHasPrefix applies the HasPrefix predicate on the "label" field.
+func LabelHasPrefix(v string) predicate.Partner {
+	return predicate.Partner(sql.FieldHasPrefix(FieldLabel, v))
+}
+
+// LabelHasSuffix applies the HasSuffix predicate on the "label" field.
+func LabelHasSuffix(v string) predicate.Partner {
+	return predicate.Partner(sql.FieldHasSuffix(FieldLabel, v))
+}
+
+// LabelEqualFold applies the EqualFold predicate on the "label" field.
+func LabelEqualFold(v string) predicate.Partner {
+	return predicate.Partner(sql.FieldEqualFold(FieldLabel, v))
+}
+
+// LabelContainsFold applies the ContainsFold predicate on the "label" field.
+func LabelContainsFold(v string) predicate.Partner {
+	return predicate.Partner(sql.FieldContainsFold(FieldLabel, v))
+}
+
 // PartnerNameEQ applies the EQ predicate on the "partner_name" field.
 func PartnerNameEQ(v string) predicate.Partner {
 	return predicate.Partner(sql.FieldEQ(FieldPartnerName, v))

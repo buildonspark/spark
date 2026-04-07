@@ -23,8 +23,10 @@ type Partner struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Arbitrary string identifier that the partner includes in their JWT. Partners may use any string value.
+	// Identifier for the partner, included as the 'iss' claim in their JWT.
 	PartnerID string `json:"partner_id,omitempty"`
+	// Label identifying the partner's client or application, included as the 'sub' claim in their JWT.
+	Label string `json:"label,omitempty"`
 	// Human-readable display name for the partner.
 	PartnerName string `json:"partner_name,omitempty"`
 	// Compressed public key (34 bytes: 1-byte curve discriminator + 33-byte compressed key) used to verify partner JWTs. Supports both secp256k1 (ES256K) and P-256 (ES256).
@@ -39,7 +41,7 @@ func (*Partner) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case partner.FieldJwtPublicKey:
 			values[i] = new(keys.JwtPubKey)
-		case partner.FieldPartnerID, partner.FieldPartnerName:
+		case partner.FieldPartnerID, partner.FieldLabel, partner.FieldPartnerName:
 			values[i] = new(sql.NullString)
 		case partner.FieldCreateTime, partner.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -83,6 +85,12 @@ func (pa *Partner) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field partner_id", values[i])
 			} else if value.Valid {
 				pa.PartnerID = value.String
+			}
+		case partner.FieldLabel:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field label", values[i])
+			} else if value.Valid {
+				pa.Label = value.String
 			}
 		case partner.FieldPartnerName:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -140,6 +148,9 @@ func (pa *Partner) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("partner_id=")
 	builder.WriteString(pa.PartnerID)
+	builder.WriteString(", ")
+	builder.WriteString("label=")
+	builder.WriteString(pa.Label)
 	builder.WriteString(", ")
 	builder.WriteString("partner_name=")
 	builder.WriteString(pa.PartnerName)

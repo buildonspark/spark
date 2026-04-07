@@ -1932,6 +1932,7 @@ type PartnerExample struct {
 
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	PartnerID    *string
+	Label        *string
 	PartnerName  *string
 	JwtPublicKey *keys.JwtPubKey
 
@@ -1949,6 +1950,12 @@ func NewPartnerExample(t *testing.T, client *ent.Client) *PartnerExample {
 // SetPartnerID sets the partner_id field.
 func (pa *PartnerExample) SetPartnerID(v string) *PartnerExample {
 	pa.PartnerID = &v
+	return pa
+}
+
+// SetLabel sets the label field.
+func (pa *PartnerExample) SetLabel(v string) *PartnerExample {
+	pa.Label = &v
 	return pa
 }
 
@@ -1975,6 +1982,12 @@ func (pa *PartnerExample) MustExec(ctx context.Context) *ent.Partner {
 	} else {
 		// Use default from annotation
 		create.SetPartnerID("partner-a")
+	}
+	if pa.Label != nil {
+		create.SetLabel(*pa.Label)
+	} else {
+		// Use default from annotation
+		create.SetLabel("client-1")
 	}
 	if pa.PartnerName != nil {
 		create.SetPartnerName(*pa.PartnerName)
@@ -2011,6 +2024,12 @@ func (pa *PartnerExample) Exec(ctx context.Context) (*ent.Partner, error) {
 	} else {
 		// Use default from annotation
 		create.SetPartnerID("partner-a")
+	}
+	if pa.Label != nil {
+		create.SetLabel(*pa.Label)
+	} else {
+		// Use default from annotation
+		create.SetLabel("client-1")
 	}
 	if pa.PartnerName != nil {
 		create.SetPartnerName(*pa.PartnerName)
