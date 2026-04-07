@@ -1,3 +1,4 @@
+mod invoice;
 pub mod proto;
 mod token_transaction;
 
@@ -68,6 +69,33 @@ pub struct BroadcastBuildRequest {
     pub owner_signatures: Vec<SignatureWithIndexInput>,
 }
 
+#[derive(Debug, Clone)]
+pub struct PrepareTokenInvoiceRequest {
+    pub receiver_identity_public_key: Vec<u8>,
+    pub network: u32,
+    pub token_identifier: Option<Vec<u8>>,
+    pub token_amount: Option<Vec<u8>>,
+    pub memo: Option<String>,
+    pub sender_spark_address: Option<String>,
+    pub expiry_time_unix_millis: Option<u64>,
+    pub invoice_id: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PreparedTokenInvoice {
+    pub spark_invoice_fields_bytes: Vec<u8>,
+    pub spark_invoice_hash: Vec<u8>,
+    pub unsigned_spark_address: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct FinalizeTokenInvoiceRequest {
+    pub receiver_identity_public_key: Vec<u8>,
+    pub network: u32,
+    pub spark_invoice_fields_bytes: Vec<u8>,
+    pub signature: Option<Vec<u8>>,
+}
+
 pub fn construct_partial_transfer_transaction(
     request: TransferBuildRequest,
 ) -> Result<PartialTransferBuildResult, SparkTokenPrimitivesError> {
@@ -84,4 +112,16 @@ pub fn build_broadcast_transaction_request(
     request: BroadcastBuildRequest,
 ) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
     token_transaction::build_broadcast_transaction_request_impl(request)
+}
+
+pub fn prepare_token_invoice(
+    request: PrepareTokenInvoiceRequest,
+) -> Result<PreparedTokenInvoice, SparkTokenPrimitivesError> {
+    invoice::prepare_token_invoice_impl(request)
+}
+
+pub fn finalize_token_invoice(
+    request: FinalizeTokenInvoiceRequest,
+) -> Result<String, SparkTokenPrimitivesError> {
+    invoice::finalize_token_invoice_impl(request)
 }

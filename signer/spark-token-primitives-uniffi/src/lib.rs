@@ -3,7 +3,8 @@
 uniffi::include_scaffolding!("spark_token_primitives");
 
 pub use spark_token_primitives::{
-    BroadcastBuildRequest, PartialTransferBuildResult, ReceiverTokenOutput, SelectedTokenOutput,
+    BroadcastBuildRequest, FinalizeTokenInvoiceRequest, PartialTransferBuildResult,
+    PrepareTokenInvoiceRequest, PreparedTokenInvoice, ReceiverTokenOutput, SelectedTokenOutput,
     SignatureWithIndexInput, SparkTokenPrimitivesError, TransferBuildRequest,
 };
 
@@ -23,4 +24,16 @@ pub fn build_broadcast_transaction_request(
     request: BroadcastBuildRequest,
 ) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
     spark_token_primitives::build_broadcast_transaction_request(request)
+}
+
+pub fn prepare_token_invoice(
+    request: PrepareTokenInvoiceRequest,
+) -> Result<PreparedTokenInvoice, SparkTokenPrimitivesError> {
+    spark_token_primitives::prepare_token_invoice(request)
+}
+
+pub fn finalize_token_invoice(
+    request: FinalizeTokenInvoiceRequest,
+) -> Result<String, SparkTokenPrimitivesError> {
+    spark_token_primitives::finalize_token_invoice(request)
 }

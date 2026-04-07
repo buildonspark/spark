@@ -7,6 +7,12 @@ namespace spark_token_primitives {
 
     [Throws=SparkTokenPrimitivesError]
     bytes build_broadcast_transaction_request(BroadcastBuildRequest request);
+
+    [Throws=SparkTokenPrimitivesError]
+    PreparedTokenInvoice prepare_token_invoice(PrepareTokenInvoiceRequest request);
+
+    [Throws=SparkTokenPrimitivesError]
+    string finalize_token_invoice(FinalizeTokenInvoiceRequest request);
 };
 
 [Error]
@@ -55,4 +61,28 @@ dictionary BroadcastBuildRequest {
     bytes identity_public_key;
     bytes partial_token_transaction_bytes;
     sequence<SignatureWithIndexInput> owner_signatures;
+};
+
+dictionary PrepareTokenInvoiceRequest {
+    bytes receiver_identity_public_key;
+    u32 network;
+    bytes? token_identifier;
+    bytes? token_amount;
+    string? memo;
+    string? sender_spark_address;
+    u64? expiry_time_unix_millis;
+    bytes? invoice_id;
+};
+
+dictionary PreparedTokenInvoice {
+    bytes spark_invoice_fields_bytes;
+    bytes spark_invoice_hash;
+    string unsigned_spark_address;
+};
+
+dictionary FinalizeTokenInvoiceRequest {
+    bytes receiver_identity_public_key;
+    u32 network;
+    bytes spark_invoice_fields_bytes;
+    bytes? signature;
 };
