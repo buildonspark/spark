@@ -12,7 +12,7 @@ export {
   type SigningCommitmentWithOptionalNonce,
   type SigningNonce,
   type SigningCommitment,
-  type KeyDerivationType,
+  KeyDerivationType,
   type KeyDerivation,
   type SignFrostParams,
   type AggregateFrostParams,
