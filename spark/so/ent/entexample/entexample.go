@@ -5848,6 +5848,125 @@ func (tl *TransferLeafExample) Exec(ctx context.Context) (*ent.TransferLeaf, err
 	return create.Save(ctx)
 }
 
+// TransferPartnerExample is a test fixture builder for TransferPartner.
+type TransferPartnerExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	Type *schematype.TransferPartnerType
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	Partner  *ent.Partner
+	Transfer *ent.Transfer
+}
+
+// NewTransferPartnerExample creates a new TransferPartnerExample for testing.
+func NewTransferPartnerExample(t *testing.T, client *ent.Client) *TransferPartnerExample {
+	return &TransferPartnerExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetType sets the type field.
+func (tp *TransferPartnerExample) SetType(v schematype.TransferPartnerType) *TransferPartnerExample {
+	tp.Type = &v
+	return tp
+}
+
+// SetPartner sets the partner edge.
+func (tp *TransferPartnerExample) SetPartner(v *ent.Partner) *TransferPartnerExample {
+	tp.Partner = v
+	return tp
+}
+
+// SetTransfer sets the transfer edge.
+func (tp *TransferPartnerExample) SetTransfer(v *ent.Transfer) *TransferPartnerExample {
+	tp.Transfer = v
+	return tp
+}
+
+// MustExec builds and saves the TransferPartner entity to the database.
+// It panics if the save fails.
+func (tp *TransferPartnerExample) MustExec(ctx context.Context) *ent.TransferPartner {
+	create := tp.client.TransferPartner.Create()
+
+	// Set fields
+	if tp.Type != nil {
+		create.SetType(*tp.Type)
+	} else {
+		// Use default from annotation
+		create.SetType("TRANSFER")
+	}
+
+	// Handle edges
+	if tp.Partner != nil {
+		create.SetPartner(tp.Partner)
+	} else {
+		// Auto-create required edge
+		tp.t.Helper()
+		tp.Partner = NewPartnerExample(tp.t, tp.client).MustExec(ctx)
+		create.SetPartner(tp.Partner)
+	}
+	if tp.Transfer != nil {
+		create.SetTransfer(tp.Transfer)
+	} else {
+		// Auto-create required edge
+		tp.t.Helper()
+		tp.Transfer = NewTransferExample(tp.t, tp.client).MustExec(ctx)
+		create.SetTransfer(tp.Transfer)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		tp.t.Helper()
+		tp.t.Fatalf("failed to create TransferPartner: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the TransferPartner entity to the database.
+// It returns an error if the save fails.
+func (tp *TransferPartnerExample) Exec(ctx context.Context) (*ent.TransferPartner, error) {
+	create := tp.client.TransferPartner.Create()
+
+	// Set fields
+	if tp.Type != nil {
+		create.SetType(*tp.Type)
+	} else {
+		// Use default from annotation
+		create.SetType("TRANSFER")
+	}
+
+	// Handle edges
+	if tp.Partner != nil {
+		create.SetPartner(tp.Partner)
+	} else {
+		// Auto-create required edge
+		var err error
+		tp.Partner, err = NewPartnerExample(tp.t, tp.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create partner: %w", err)
+		}
+		create.SetPartner(tp.Partner)
+	}
+	if tp.Transfer != nil {
+		create.SetTransfer(tp.Transfer)
+	} else {
+		// Auto-create required edge
+		var err error
+		tp.Transfer, err = NewTransferExample(tp.t, tp.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create transfer: %w", err)
+		}
+		create.SetTransfer(tp.Transfer)
+	}
+
+	return create.Save(ctx)
+}
+
 // TransferReceiverExample is a test fixture builder for TransferReceiver.
 type TransferReceiverExample struct {
 	client *ent.Client

@@ -40,6 +40,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferpartner"
 	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/lightsparkdev/spark/so/ent/transfersender"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -943,6 +944,33 @@ func (f TraverseTransferLeaf) Traverse(ctx context.Context, q ent.Query) error {
 	return fmt.Errorf("unexpected query type %T. expect *ent.TransferLeafQuery", q)
 }
 
+// The TransferPartnerFunc type is an adapter to allow the use of ordinary function as a Querier.
+type TransferPartnerFunc func(context.Context, *ent.TransferPartnerQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f TransferPartnerFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.TransferPartnerQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.TransferPartnerQuery", q)
+}
+
+// The TraverseTransferPartner type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseTransferPartner func(context.Context, *ent.TransferPartnerQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseTransferPartner) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseTransferPartner) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.TransferPartnerQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.TransferPartnerQuery", q)
+}
+
 // The TransferReceiverFunc type is an adapter to allow the use of ordinary function as a Querier.
 type TransferReceiverFunc func(context.Context, *ent.TransferReceiverQuery) (ent.Value, error)
 
@@ -1224,6 +1252,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.TransferQuery, predicate.Transfer, transfer.OrderOption]{typ: ent.TypeTransfer, tq: q}, nil
 	case *ent.TransferLeafQuery:
 		return &query[*ent.TransferLeafQuery, predicate.TransferLeaf, transferleaf.OrderOption]{typ: ent.TypeTransferLeaf, tq: q}, nil
+	case *ent.TransferPartnerQuery:
+		return &query[*ent.TransferPartnerQuery, predicate.TransferPartner, transferpartner.OrderOption]{typ: ent.TypeTransferPartner, tq: q}, nil
 	case *ent.TransferReceiverQuery:
 		return &query[*ent.TransferReceiverQuery, predicate.TransferReceiver, transferreceiver.OrderOption]{typ: ent.TypeTransferReceiver, tq: q}, nil
 	case *ent.TransferSenderQuery:

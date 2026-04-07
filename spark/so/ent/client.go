@@ -47,6 +47,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferpartner"
 	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/lightsparkdev/spark/so/ent/transfersender"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -126,6 +127,8 @@ type Client struct {
 	Transfer *TransferClient
 	// TransferLeaf is the client for interacting with the TransferLeaf builders.
 	TransferLeaf *TransferLeafClient
+	// TransferPartner is the client for interacting with the TransferPartner builders.
+	TransferPartner *TransferPartnerClient
 	// TransferReceiver is the client for interacting with the TransferReceiver builders.
 	TransferReceiver *TransferReceiverClient
 	// TransferSender is the client for interacting with the TransferSender builders.
@@ -184,6 +187,7 @@ func (c *Client) init() {
 	c.TokenTransactionPeerSignature = NewTokenTransactionPeerSignatureClient(c.config)
 	c.Transfer = NewTransferClient(c.config)
 	c.TransferLeaf = NewTransferLeafClient(c.config)
+	c.TransferPartner = NewTransferPartnerClient(c.config)
 	c.TransferReceiver = NewTransferReceiverClient(c.config)
 	c.TransferSender = NewTransferSenderClient(c.config)
 	c.Tree = NewTreeClient(c.config)
@@ -315,6 +319,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		TokenTransactionPeerSignature:     NewTokenTransactionPeerSignatureClient(cfg),
 		Transfer:                          NewTransferClient(cfg),
 		TransferLeaf:                      NewTransferLeafClient(cfg),
+		TransferPartner:                   NewTransferPartnerClient(cfg),
 		TransferReceiver:                  NewTransferReceiverClient(cfg),
 		TransferSender:                    NewTransferSenderClient(cfg),
 		Tree:                              NewTreeClient(cfg),
@@ -373,6 +378,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		TokenTransactionPeerSignature:     NewTokenTransactionPeerSignatureClient(cfg),
 		Transfer:                          NewTransferClient(cfg),
 		TransferLeaf:                      NewTransferLeafClient(cfg),
+		TransferPartner:                   NewTransferPartnerClient(cfg),
 		TransferReceiver:                  NewTransferReceiverClient(cfg),
 		TransferSender:                    NewTransferSenderClient(cfg),
 		Tree:                              NewTreeClient(cfg),
@@ -418,7 +424,7 @@ func (c *Client) Use(hooks ...Hook) {
 		c.SigningCommitment, c.SigningKeyshare, c.SigningNonce, c.SparkInvoice,
 		c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
 		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf,
+		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.TransferPartner,
 		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
 		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
 	} {
@@ -438,7 +444,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.SigningCommitment, c.SigningKeyshare, c.SigningNonce, c.SparkInvoice,
 		c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
 		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf,
+		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.TransferPartner,
 		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
 		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
 	} {
@@ -511,6 +517,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Transfer.mutate(ctx, m)
 	case *TransferLeafMutation:
 		return c.TransferLeaf.mutate(ctx, m)
+	case *TransferPartnerMutation:
+		return c.TransferPartner.mutate(ctx, m)
 	case *TransferReceiverMutation:
 		return c.TransferReceiver.mutate(ctx, m)
 	case *TransferSenderMutation:
@@ -5591,6 +5599,171 @@ func (c *TransferLeafClient) mutate(ctx context.Context, m *TransferLeafMutation
 	}
 }
 
+// TransferPartnerClient is a client for the TransferPartner schema.
+type TransferPartnerClient struct {
+	config
+}
+
+// NewTransferPartnerClient returns a client for the TransferPartner from the given config.
+func NewTransferPartnerClient(c config) *TransferPartnerClient {
+	return &TransferPartnerClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `transferpartner.Hooks(f(g(h())))`.
+func (c *TransferPartnerClient) Use(hooks ...Hook) {
+	c.hooks.TransferPartner = append(c.hooks.TransferPartner, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `transferpartner.Intercept(f(g(h())))`.
+func (c *TransferPartnerClient) Intercept(interceptors ...Interceptor) {
+	c.inters.TransferPartner = append(c.inters.TransferPartner, interceptors...)
+}
+
+// Create returns a builder for creating a TransferPartner entity.
+func (c *TransferPartnerClient) Create() *TransferPartnerCreate {
+	mutation := newTransferPartnerMutation(c.config, OpCreate)
+	return &TransferPartnerCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of TransferPartner entities.
+func (c *TransferPartnerClient) CreateBulk(builders ...*TransferPartnerCreate) *TransferPartnerCreateBulk {
+	return &TransferPartnerCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TransferPartnerClient) MapCreateBulk(slice any, setFunc func(*TransferPartnerCreate, int)) *TransferPartnerCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TransferPartnerCreateBulk{err: fmt.Errorf("calling to TransferPartnerClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TransferPartnerCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TransferPartnerCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for TransferPartner.
+func (c *TransferPartnerClient) Update() *TransferPartnerUpdate {
+	mutation := newTransferPartnerMutation(c.config, OpUpdate)
+	return &TransferPartnerUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TransferPartnerClient) UpdateOne(tp *TransferPartner) *TransferPartnerUpdateOne {
+	mutation := newTransferPartnerMutation(c.config, OpUpdateOne, withTransferPartner(tp))
+	return &TransferPartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TransferPartnerClient) UpdateOneID(id uuid.UUID) *TransferPartnerUpdateOne {
+	mutation := newTransferPartnerMutation(c.config, OpUpdateOne, withTransferPartnerID(id))
+	return &TransferPartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for TransferPartner.
+func (c *TransferPartnerClient) Delete() *TransferPartnerDelete {
+	mutation := newTransferPartnerMutation(c.config, OpDelete)
+	return &TransferPartnerDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TransferPartnerClient) DeleteOne(tp *TransferPartner) *TransferPartnerDeleteOne {
+	return c.DeleteOneID(tp.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TransferPartnerClient) DeleteOneID(id uuid.UUID) *TransferPartnerDeleteOne {
+	builder := c.Delete().Where(transferpartner.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TransferPartnerDeleteOne{builder}
+}
+
+// Query returns a query builder for TransferPartner.
+func (c *TransferPartnerClient) Query() *TransferPartnerQuery {
+	return &TransferPartnerQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTransferPartner},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a TransferPartner entity by its id.
+func (c *TransferPartnerClient) Get(ctx context.Context, id uuid.UUID) (*TransferPartner, error) {
+	return c.Query().Where(transferpartner.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TransferPartnerClient) GetX(ctx context.Context, id uuid.UUID) *TransferPartner {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPartner queries the partner edge of a TransferPartner.
+func (c *TransferPartnerClient) QueryPartner(tp *TransferPartner) *PartnerQuery {
+	query := (&PartnerClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tp.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transferpartner.Table, transferpartner.FieldID, id),
+			sqlgraph.To(partner.Table, partner.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transferpartner.PartnerTable, transferpartner.PartnerColumn),
+		)
+		fromV = sqlgraph.Neighbors(tp.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryTransfer queries the transfer edge of a TransferPartner.
+func (c *TransferPartnerClient) QueryTransfer(tp *TransferPartner) *TransferQuery {
+	query := (&TransferClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tp.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transferpartner.Table, transferpartner.FieldID, id),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transferpartner.TransferTable, transferpartner.TransferColumn),
+		)
+		fromV = sqlgraph.Neighbors(tp.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *TransferPartnerClient) Hooks() []Hook {
+	return c.hooks.TransferPartner
+}
+
+// Interceptors returns the client interceptors.
+func (c *TransferPartnerClient) Interceptors() []Interceptor {
+	return c.inters.TransferPartner
+}
+
+func (c *TransferPartnerClient) mutate(ctx context.Context, m *TransferPartnerMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TransferPartnerCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TransferPartnerUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TransferPartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TransferPartnerDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown TransferPartner mutation op: %q", m.Op())
+	}
+}
+
 // TransferReceiverClient is a client for the TransferReceiver schema.
 type TransferReceiverClient struct {
 	config
@@ -6956,9 +7129,9 @@ type (
 		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
 		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,
-		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferReceiver,
-		TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo, UtxoSwap,
-		WalletSetting []ent.Hook
+		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
+		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,
+		UtxoSwap, WalletSetting []ent.Hook
 	}
 	inters struct {
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
@@ -6968,9 +7141,9 @@ type (
 		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
 		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,
-		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferReceiver,
-		TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo, UtxoSwap,
-		WalletSetting []ent.Interceptor
+		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
+		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,
+		UtxoSwap, WalletSetting []ent.Interceptor
 	}
 )
 

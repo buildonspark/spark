@@ -39,6 +39,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferpartner"
 	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/lightsparkdev/spark/so/ent/transfersender"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -867,6 +868,25 @@ func init() {
 	transferleafDescID := transferleafMixinFields0[0].Descriptor()
 	// transferleaf.DefaultID holds the default value on creation for the id field.
 	transferleaf.DefaultID = transferleafDescID.Default.(func() uuid.UUID)
+	transferpartnerMixin := schema.TransferPartner{}.Mixin()
+	transferpartnerMixinFields0 := transferpartnerMixin[0].Fields()
+	_ = transferpartnerMixinFields0
+	transferpartnerFields := schema.TransferPartner{}.Fields()
+	_ = transferpartnerFields
+	// transferpartnerDescCreateTime is the schema descriptor for create_time field.
+	transferpartnerDescCreateTime := transferpartnerMixinFields0[1].Descriptor()
+	// transferpartner.DefaultCreateTime holds the default value on creation for the create_time field.
+	transferpartner.DefaultCreateTime = transferpartnerDescCreateTime.Default.(func() time.Time)
+	// transferpartnerDescUpdateTime is the schema descriptor for update_time field.
+	transferpartnerDescUpdateTime := transferpartnerMixinFields0[2].Descriptor()
+	// transferpartner.DefaultUpdateTime holds the default value on creation for the update_time field.
+	transferpartner.DefaultUpdateTime = transferpartnerDescUpdateTime.Default.(func() time.Time)
+	// transferpartner.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	transferpartner.UpdateDefaultUpdateTime = transferpartnerDescUpdateTime.UpdateDefault.(func() time.Time)
+	// transferpartnerDescID is the schema descriptor for id field.
+	transferpartnerDescID := transferpartnerMixinFields0[0].Descriptor()
+	// transferpartner.DefaultID holds the default value on creation for the id field.
+	transferpartner.DefaultID = transferpartnerDescID.Default.(func() uuid.UUID)
 	transferreceiverMixin := schema.TransferReceiver{}.Mixin()
 	transferreceiverMixinHooks1 := transferreceiverMixin[1].Hooks()
 	transferreceiver.Hooks[0] = transferreceiverMixinHooks1[0]

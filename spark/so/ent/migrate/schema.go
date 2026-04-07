@@ -1296,6 +1296,47 @@ var (
 			},
 		},
 	}
+	// TransferPartnersColumns holds the columns for the "transfer_partners" table.
+	TransferPartnersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"LIGHTNING_SEND", "LIGHTNING_RECEIVE", "TRANSFER"}},
+		{Name: "transfer_partner_partner", Type: field.TypeUUID},
+		{Name: "transfer_partner_transfer", Type: field.TypeUUID},
+	}
+	// TransferPartnersTable holds the schema information for the "transfer_partners" table.
+	TransferPartnersTable = &schema.Table{
+		Name:       "transfer_partners",
+		Columns:    TransferPartnersColumns,
+		PrimaryKey: []*schema.Column{TransferPartnersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "transfer_partners_partners_partner",
+				Columns:    []*schema.Column{TransferPartnersColumns[4]},
+				RefColumns: []*schema.Column{PartnersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "transfer_partners_transfers_transfer",
+				Columns:    []*schema.Column{TransferPartnersColumns[5]},
+				RefColumns: []*schema.Column{TransfersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "transferpartner_transfer_partner_transfer",
+				Unique:  true,
+				Columns: []*schema.Column{TransferPartnersColumns[5]},
+			},
+			{
+				Name:    "transferpartner_transfer_partner_partner",
+				Unique:  false,
+				Columns: []*schema.Column{TransferPartnersColumns[4]},
+			},
+		},
+	}
 	// TransferReceiversColumns holds the columns for the "transfer_receivers" table.
 	TransferReceiversColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1821,6 +1862,7 @@ var (
 		TokenTransactionPeerSignaturesTable,
 		TransfersTable,
 		TransferLeafsTable,
+		TransferPartnersTable,
 		TransferReceiversTable,
 		TransferSendersTable,
 		TreesTable,
@@ -1864,6 +1906,8 @@ func init() {
 	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable
 	TransferLeafsTable.ForeignKeys[2].RefTable = TransferReceiversTable
 	TransferLeafsTable.ForeignKeys[3].RefTable = TransferSendersTable
+	TransferPartnersTable.ForeignKeys[0].RefTable = PartnersTable
+	TransferPartnersTable.ForeignKeys[1].RefTable = TransfersTable
 	TransferReceiversTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferSendersTable.ForeignKeys[0].RefTable = TransfersTable
 	TreesTable.ForeignKeys[0].RefTable = DepositAddressesTable

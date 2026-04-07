@@ -381,6 +381,18 @@ func (f TransferLeafFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TransferLeafMutation", m)
 }
 
+// The TransferPartnerFunc type is an adapter to allow the use of ordinary
+// function as TransferPartner mutator.
+type TransferPartnerFunc func(context.Context, *ent.TransferPartnerMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TransferPartnerFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TransferPartnerMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TransferPartnerMutation", m)
+}
+
 // The TransferReceiverFunc type is an adapter to allow the use of ordinary
 // function as TransferReceiver mutator.
 type TransferReceiverFunc func(context.Context, *ent.TransferReceiverMutation) (ent.Value, error)

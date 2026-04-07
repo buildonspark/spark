@@ -49,6 +49,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/transferpartner"
 	"github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/lightsparkdev/spark/so/ent/transfersender"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -100,6 +101,7 @@ const (
 	TypeTokenTransactionPeerSignature     = "TokenTransactionPeerSignature"
 	TypeTransfer                          = "Transfer"
 	TypeTransferLeaf                      = "TransferLeaf"
+	TypeTransferPartner                   = "TransferPartner"
 	TypeTransferReceiver                  = "TransferReceiver"
 	TypeTransferSender                    = "TransferSender"
 	TypeTree                              = "Tree"
@@ -27760,6 +27762,572 @@ func (m *TransferLeafMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf edge %s", name)
+}
+
+// TransferPartnerMutation represents an operation that mutates the TransferPartner nodes in the graph.
+type TransferPartnerMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *uuid.UUID
+	create_time     *time.Time
+	update_time     *time.Time
+	_type           *schematype.TransferPartnerType
+	clearedFields   map[string]struct{}
+	partner         *uuid.UUID
+	clearedpartner  bool
+	transfer        *uuid.UUID
+	clearedtransfer bool
+	done            bool
+	oldValue        func(context.Context) (*TransferPartner, error)
+	predicates      []predicate.TransferPartner
+}
+
+var _ ent.Mutation = (*TransferPartnerMutation)(nil)
+
+// transferpartnerOption allows management of the mutation configuration using functional options.
+type transferpartnerOption func(*TransferPartnerMutation)
+
+// newTransferPartnerMutation creates new mutation for the TransferPartner entity.
+func newTransferPartnerMutation(c config, op Op, opts ...transferpartnerOption) *TransferPartnerMutation {
+	m := &TransferPartnerMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeTransferPartner,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withTransferPartnerID sets the ID field of the mutation.
+func withTransferPartnerID(id uuid.UUID) transferpartnerOption {
+	return func(m *TransferPartnerMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *TransferPartner
+		)
+		m.oldValue = func(ctx context.Context) (*TransferPartner, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().TransferPartner.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withTransferPartner sets the old TransferPartner of the mutation.
+func withTransferPartner(node *TransferPartner) transferpartnerOption {
+	return func(m *TransferPartnerMutation) {
+		m.oldValue = func(context.Context) (*TransferPartner, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m TransferPartnerMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m TransferPartnerMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of TransferPartner entities.
+func (m *TransferPartnerMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *TransferPartnerMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *TransferPartnerMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().TransferPartner.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *TransferPartnerMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *TransferPartnerMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the TransferPartner entity.
+// If the TransferPartner object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferPartnerMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *TransferPartnerMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *TransferPartnerMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *TransferPartnerMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the TransferPartner entity.
+// If the TransferPartner object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferPartnerMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *TransferPartnerMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetType sets the "type" field.
+func (m *TransferPartnerMutation) SetType(spt schematype.TransferPartnerType) {
+	m._type = &spt
+}
+
+// GetType returns the value of the "type" field in the mutation.
+func (m *TransferPartnerMutation) GetType() (r schematype.TransferPartnerType, exists bool) {
+	v := m._type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldType returns the old "type" field's value of the TransferPartner entity.
+// If the TransferPartner object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferPartnerMutation) OldType(ctx context.Context) (v schematype.TransferPartnerType, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldType: %w", err)
+	}
+	return oldValue.Type, nil
+}
+
+// ResetType resets all changes to the "type" field.
+func (m *TransferPartnerMutation) ResetType() {
+	m._type = nil
+}
+
+// SetPartnerID sets the "partner" edge to the Partner entity by id.
+func (m *TransferPartnerMutation) SetPartnerID(id uuid.UUID) {
+	m.partner = &id
+}
+
+// ClearPartner clears the "partner" edge to the Partner entity.
+func (m *TransferPartnerMutation) ClearPartner() {
+	m.clearedpartner = true
+}
+
+// PartnerCleared reports if the "partner" edge to the Partner entity was cleared.
+func (m *TransferPartnerMutation) PartnerCleared() bool {
+	return m.clearedpartner
+}
+
+// PartnerID returns the "partner" edge ID in the mutation.
+func (m *TransferPartnerMutation) PartnerID() (id uuid.UUID, exists bool) {
+	if m.partner != nil {
+		return *m.partner, true
+	}
+	return
+}
+
+// PartnerIDs returns the "partner" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PartnerID instead. It exists only for internal usage by the builders.
+func (m *TransferPartnerMutation) PartnerIDs() (ids []uuid.UUID) {
+	if id := m.partner; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPartner resets all changes to the "partner" edge.
+func (m *TransferPartnerMutation) ResetPartner() {
+	m.partner = nil
+	m.clearedpartner = false
+}
+
+// SetTransferID sets the "transfer" edge to the Transfer entity by id.
+func (m *TransferPartnerMutation) SetTransferID(id uuid.UUID) {
+	m.transfer = &id
+}
+
+// ClearTransfer clears the "transfer" edge to the Transfer entity.
+func (m *TransferPartnerMutation) ClearTransfer() {
+	m.clearedtransfer = true
+}
+
+// TransferCleared reports if the "transfer" edge to the Transfer entity was cleared.
+func (m *TransferPartnerMutation) TransferCleared() bool {
+	return m.clearedtransfer
+}
+
+// TransferID returns the "transfer" edge ID in the mutation.
+func (m *TransferPartnerMutation) TransferID() (id uuid.UUID, exists bool) {
+	if m.transfer != nil {
+		return *m.transfer, true
+	}
+	return
+}
+
+// TransferIDs returns the "transfer" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TransferID instead. It exists only for internal usage by the builders.
+func (m *TransferPartnerMutation) TransferIDs() (ids []uuid.UUID) {
+	if id := m.transfer; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTransfer resets all changes to the "transfer" edge.
+func (m *TransferPartnerMutation) ResetTransfer() {
+	m.transfer = nil
+	m.clearedtransfer = false
+}
+
+// Where appends a list predicates to the TransferPartnerMutation builder.
+func (m *TransferPartnerMutation) Where(ps ...predicate.TransferPartner) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the TransferPartnerMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *TransferPartnerMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.TransferPartner, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *TransferPartnerMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *TransferPartnerMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (TransferPartner).
+func (m *TransferPartnerMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *TransferPartnerMutation) Fields() []string {
+	fields := make([]string, 0, 3)
+	if m.create_time != nil {
+		fields = append(fields, transferpartner.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, transferpartner.FieldUpdateTime)
+	}
+	if m._type != nil {
+		fields = append(fields, transferpartner.FieldType)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *TransferPartnerMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case transferpartner.FieldCreateTime:
+		return m.CreateTime()
+	case transferpartner.FieldUpdateTime:
+		return m.UpdateTime()
+	case transferpartner.FieldType:
+		return m.GetType()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *TransferPartnerMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case transferpartner.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case transferpartner.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case transferpartner.FieldType:
+		return m.OldType(ctx)
+	}
+	return nil, fmt.Errorf("unknown TransferPartner field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TransferPartnerMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case transferpartner.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case transferpartner.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case transferpartner.FieldType:
+		v, ok := value.(schematype.TransferPartnerType)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetType(v)
+		return nil
+	}
+	return fmt.Errorf("unknown TransferPartner field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *TransferPartnerMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *TransferPartnerMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TransferPartnerMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown TransferPartner numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *TransferPartnerMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *TransferPartnerMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *TransferPartnerMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown TransferPartner nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *TransferPartnerMutation) ResetField(name string) error {
+	switch name {
+	case transferpartner.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case transferpartner.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case transferpartner.FieldType:
+		m.ResetType()
+		return nil
+	}
+	return fmt.Errorf("unknown TransferPartner field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *TransferPartnerMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.partner != nil {
+		edges = append(edges, transferpartner.EdgePartner)
+	}
+	if m.transfer != nil {
+		edges = append(edges, transferpartner.EdgeTransfer)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *TransferPartnerMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case transferpartner.EdgePartner:
+		if id := m.partner; id != nil {
+			return []ent.Value{*id}
+		}
+	case transferpartner.EdgeTransfer:
+		if id := m.transfer; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *TransferPartnerMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *TransferPartnerMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *TransferPartnerMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedpartner {
+		edges = append(edges, transferpartner.EdgePartner)
+	}
+	if m.clearedtransfer {
+		edges = append(edges, transferpartner.EdgeTransfer)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *TransferPartnerMutation) EdgeCleared(name string) bool {
+	switch name {
+	case transferpartner.EdgePartner:
+		return m.clearedpartner
+	case transferpartner.EdgeTransfer:
+		return m.clearedtransfer
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *TransferPartnerMutation) ClearEdge(name string) error {
+	switch name {
+	case transferpartner.EdgePartner:
+		m.ClearPartner()
+		return nil
+	case transferpartner.EdgeTransfer:
+		m.ClearTransfer()
+		return nil
+	}
+	return fmt.Errorf("unknown TransferPartner unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *TransferPartnerMutation) ResetEdge(name string) error {
+	switch name {
+	case transferpartner.EdgePartner:
+		m.ResetPartner()
+		return nil
+	case transferpartner.EdgeTransfer:
+		m.ResetTransfer()
+		return nil
+	}
+	return fmt.Errorf("unknown TransferPartner edge %s", name)
 }
 
 // TransferReceiverMutation represents an operation that mutates the TransferReceiver nodes in the graph.

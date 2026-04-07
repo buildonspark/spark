@@ -1,4 +1,4 @@
-h1:bpdGpEKMibUoDZipGswmlnWiase9CiqWO+f6Nbu0plk=
+h1:/MRFsnrhY2U1Aea3sw99qHXCkzYofHIaCw2cYHmtIq0=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -139,3 +139,4 @@ h1:bpdGpEKMibUoDZipGswmlnWiase9CiqWO+f6Nbu0plk=
 20260331232749_remove_secret_version.sql h1:ENsdPtyQruXKGEfMw7ZF8amlA5JGUpHAprtdxg8Wweo=
 20260331233749_add_execute_before_to_token_transaction.sql h1:msQ70yLADbNBEY3YDociQecZU/M+IOhHmOXxWMt7dFY=
 20260407185429_update_partner_table.sql h1:8/hTdpycX7Ss8uFnExPQAoM2rN+zjASRx6GqzP54h7k=
+20260407195137_create_transfer_partner_table.sql h1:VdrUD9v77SAZPYKZjHMYSlogFEGfz2NN3GmwmWWN+o8=
