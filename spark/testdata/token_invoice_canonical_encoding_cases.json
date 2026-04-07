@@ -1,0 +1,93 @@
+{
+  "description": "Cross-language canonical encoding cases for token SparkInvoiceFields bytes",
+  "testCases": [
+    {
+      "name": "minimal_tokens_payment",
+      "expectedCanonicalEncoding": "080112100198b4ec3d207e4bb2881107ecf64d491a260a2049046dd67bbe5fc8e3abb45bc4f809b9cb5cb5871a19292fa5c7120389641363120203e8",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M=",
+          "amount": "A+g="
+        }
+      }
+    },
+    {
+      "name": "with_memo",
+      "expectedCanonicalEncoding": "080112100198b4ec3d207e4bb2881107ecf64d492a046d656d6f1a260a2049046dd67bbe5fc8e3abb45bc4f809b9cb5cb5871a19292fa5c7120389641363120203e8",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M=",
+          "amount": "A+g="
+        },
+        "memo": "memo"
+      }
+    },
+    {
+      "name": "with_sender_public_key",
+      "expectedCanonicalEncoding": "080112100198b4ec3d207e4bb2881107ecf64d49322102b0e3203121de9df0bd7c2b3846100e25c63310392e05961d8042fa81906d6f2b1a260a2049046dd67bbe5fc8e3abb45bc4f809b9cb5cb5871a19292fa5c7120389641363120203e8",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M=",
+          "amount": "A+g="
+        },
+        "senderPublicKey": "ArDjIDEh3p3wvXwrOEYQDiXGMxA5LgWWHYBC+oGQbW8r"
+      }
+    },
+    {
+      "name": "with_expiry_time",
+      "expectedCanonicalEncoding": "080112100198b4ec3d207e4bb2881107ecf64d493a0c08c18484c50610c0e796f9021a260a2049046dd67bbe5fc8e3abb45bc4f809b9cb5cb5871a19292fa5c7120389641363120203e8",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M=",
+          "amount": "A+g="
+        },
+        "expiryTime": "2025-08-16T22:12:17.791Z"
+      }
+    },
+    {
+      "name": "all_fields_set",
+      "expectedCanonicalEncoding": "080112100198b4ec3d207e4bb2881107ecf64d492a046d656d6f322102b0e3203121de9df0bd7c2b3846100e25c63310392e05961d8042fa81906d6f2b3a0c08c18484c50610c0e796f9021a260a2049046dd67bbe5fc8e3abb45bc4f809b9cb5cb5871a19292fa5c7120389641363120203e8",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M=",
+          "amount": "A+g="
+        },
+        "memo": "memo",
+        "senderPublicKey": "ArDjIDEh3p3wvXwrOEYQDiXGMxA5LgWWHYBC+oGQbW8r",
+        "expiryTime": "2025-08-16T22:12:17.791Z"
+      }
+    },
+    {
+      "name": "tokens_only_identifier",
+      "expectedCanonicalEncoding": "080112100198b4ec3d207e4bb2881107ecf64d491a220a2049046dd67bbe5fc8e3abb45bc4f809b9cb5cb5871a19292fa5c7120389641363",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M="
+        }
+      }
+    },
+    {
+      "name": "tokens_only_amount",
+      "expectedCanonicalEncoding": "080112100198b4ec3d207e4bb2881107ecf64d491a03120101",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "amount": "AQ=="
+        }
+      }
+    }
+  ]
+}
