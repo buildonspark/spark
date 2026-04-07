@@ -144,7 +144,7 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	}
 
 	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Handling for gossip message ID %s failed with error: %v", gossipMessage.MessageId, err)
+		logger.With(zap.Error(err)).Sugar().Errorf("Handling for gossip message ID %s of type %s failed with error: %v", gossipMessage.MessageId, messageType, err)
 	}
 
 	// Record metric
