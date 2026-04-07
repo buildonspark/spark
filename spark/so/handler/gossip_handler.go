@@ -26,6 +26,7 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
@@ -391,6 +392,9 @@ func (h *GossipHandler) handleRollbackUtxoSwapGossipMessage(ctx context.Context,
 		CoordinatorPublicKey: rollbackUtxoSwap.CoordinatorPublicKey,
 	})
 	if err != nil {
+		if ent.IsNotFound(err) || status.Code(err) == codes.NotFound {
+			return nil
+		}
 		logger.Error("failed to rollback utxo swap with gossip message", zap.Error(err))
 	}
 	return err
@@ -409,6 +413,9 @@ func (h *GossipHandler) handleRollbackInstantUtxoSwapGossipMessage(ctx context.C
 		RollbackToStatus:     rollbackInstantUtxoSwap.RollbackToStatus,
 	})
 	if err != nil {
+		if ent.IsNotFound(err) || status.Code(err) == codes.NotFound {
+			return nil
+		}
 		logger.Error("failed to rollback instant utxo swap with gossip message", zap.Error(err))
 	}
 	return err

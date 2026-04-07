@@ -3,8 +3,10 @@ package handler
 import (
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/google/uuid"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/db"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
@@ -85,4 +87,27 @@ func TestHandleSettleSenderKeyTweakGossipMessage_InvalidTransferID_ReturnsError(
 	err := handler.handleSettleSenderKeyTweakGossipMessage(ctx, settleSenderKeyTweak)
 
 	require.Error(t, err, "settling sender key tweak with a malformed transfer ID should return an error")
+}
+
+func TestHandleRollbackUtxoSwapGossipMessage_NonExistentUtxo_Succeeds(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewGossipHandler(cfg)
+
+	nonExistentTxid := chainhash.DoubleHashB([]byte("nonexistent_txid_for_gossip_test"))
+	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, cfg, &pb.UTXO{
+		Txid:    nonExistentTxid,
+		Vout:    0,
+		Network: pb.Network_REGTEST,
+	})
+	require.NoError(t, err)
+
+	gossipMsg := &pbgossip.GossipMessageRollbackUtxoSwap{
+		OnChainUtxo:          rollbackRequest.OnChainUtxo,
+		Signature:            rollbackRequest.Signature,
+		CoordinatorPublicKey: rollbackRequest.CoordinatorPublicKey,
+	}
+
+	err = handler.handleRollbackUtxoSwapGossipMessage(ctx, gossipMsg)
+	require.NoError(t, err, "rolling back a non-existent UTXO should succeed")
 }
