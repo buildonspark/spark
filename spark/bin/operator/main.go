@@ -43,6 +43,7 @@ import (
 	_ "github.com/lightsparkdev/spark/so/ent/runtime"
 	"github.com/lightsparkdev/spark/so/entephemeral"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/partner"
 
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -713,6 +714,7 @@ func main() {
 			sparkgrpc.TimeoutInterceptor(knobsService, config.GRPC.ServerUnaryHandlerTimeout),
 			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
+			partner.NewInterceptor(dbClient).KnobGatedInterceptor(knobsService),
 			// Concurrency and rate limiting after authentication so pubkey is available for rate limiting
 			// but before DB session.
 			sparkgrpc.ConcurrencyInterceptor(concurrencyGuard, clientInfoProvider, knobsService),
