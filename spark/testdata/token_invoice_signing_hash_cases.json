@@ -1,0 +1,130 @@
+{
+  "description": "Cross-language hash cases for token invoice signing hash (SparkInvoiceFields + receiver public key + network)",
+  "testCases": [
+    {
+      "name": "minimal_tokens_payment",
+      "description": "Minimal token invoice with identifier and amount",
+      "network": "REGTEST",
+      "receiverPublicKey": "AmyUO/73EEA3HKHB0e4dWyA1c9yX/fZJegt05a7AIg4h",
+      "expectedHash": "33ecaf82bcdfb4c17cffbb387c2e3b62b95a63d40d55a7a4ccdc44a91fccc2f8",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M=",
+          "amount": "A+g="
+        }
+      }
+    },
+    {
+      "name": "with_memo",
+      "description": "Token invoice including memo",
+      "network": "REGTEST",
+      "receiverPublicKey": "AmyUO/73EEA3HKHB0e4dWyA1c9yX/fZJegt05a7AIg4h",
+      "expectedHash": "1015bb840c28a5ab45a675f88db0294efc1c50436cddb763bfad47d5c10c3920",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M=",
+          "amount": "A+g="
+        },
+        "memo": "memo"
+      }
+    },
+    {
+      "name": "with_sender_public_key",
+      "description": "Token invoice including sender public key",
+      "network": "REGTEST",
+      "receiverPublicKey": "AmyUO/73EEA3HKHB0e4dWyA1c9yX/fZJegt05a7AIg4h",
+      "expectedHash": "e01c323e86cac2ea3f16c77857d758384dc5860671836646b8c0d6f5b937791e",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M=",
+          "amount": "A+g="
+        },
+        "senderPublicKey": "ArDjIDEh3p3wvXwrOEYQDiXGMxA5LgWWHYBC+oGQbW8r"
+      }
+    },
+    {
+      "name": "with_expiry_time",
+      "description": "Token invoice including expiry time",
+      "network": "REGTEST",
+      "receiverPublicKey": "AmyUO/73EEA3HKHB0e4dWyA1c9yX/fZJegt05a7AIg4h",
+      "expectedHash": "ce50a6c601a947dbdcb644973770aab221444e9876c49f1bdbfaa487eb34e298",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M=",
+          "amount": "A+g="
+        },
+        "expiryTime": "2025-08-16T22:12:17.791Z"
+      }
+    },
+    {
+      "name": "all_fields_set",
+      "description": "Token invoice with memo, sender public key, and expiry",
+      "network": "REGTEST",
+      "receiverPublicKey": "AmyUO/73EEA3HKHB0e4dWyA1c9yX/fZJegt05a7AIg4h",
+      "expectedHash": "21f91b971cccc74f76fcac5384ba99d8629baff87d602f9614f6c032a2e6fb2d",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M=",
+          "amount": "A+g="
+        },
+        "memo": "memo",
+        "senderPublicKey": "ArDjIDEh3p3wvXwrOEYQDiXGMxA5LgWWHYBC+oGQbW8r",
+        "expiryTime": "2025-08-16T22:12:17.791Z"
+      }
+    },
+    {
+      "name": "tokens_only_identifier",
+      "description": "Token invoice with identifier only",
+      "network": "REGTEST",
+      "receiverPublicKey": "AmyUO/73EEA3HKHB0e4dWyA1c9yX/fZJegt05a7AIg4h",
+      "expectedHash": "31f5b9d1422d4d6c8d69bc859cd930120479d910a00297694e41d34bf4a9adb9",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M="
+        }
+      }
+    },
+    {
+      "name": "tokens_only_amount",
+      "description": "Token invoice with amount only",
+      "network": "REGTEST",
+      "receiverPublicKey": "AmyUO/73EEA3HKHB0e4dWyA1c9yX/fZJegt05a7AIg4h",
+      "expectedHash": "1b6ddf390f77f9da2a2f82b7ae13b1e0139361a41b2a1d0f26646a6b5694c5f0",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "amount": "AQ=="
+        }
+      }
+    },
+    {
+      "name": "mainnet_changes_hash",
+      "description": "Same invoice fields on a different network",
+      "network": "MAINNET",
+      "receiverPublicKey": "AmyUO/73EEA3HKHB0e4dWyA1c9yX/fZJegt05a7AIg4h",
+      "expectedHash": "e65beaf4c798de9f0931556c4a60856418f630c32ad48c7b55294f1930705e89",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AZi07D0gfkuyiBEH7PZNSQ==",
+        "tokensPayment": {
+          "tokenIdentifier": "SQRt1nu+X8jjq7RbxPgJuctctYcaGSkvpccSA4lkE2M=",
+          "amount": "A+g="
+        },
+        "memo": "memo"
+      }
+    }
+  ]
+}
