@@ -19,8 +19,8 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 )
 
-// TreeExitHandler is a handler for tree exit requests.
-type TreeExitHandler struct {
+// treeExitHandler is an internal helper for LS/SSP-owned tree exit flows.
+type treeExitHandler struct {
 	config *so.Config
 }
 
@@ -29,12 +29,22 @@ type cachedRoot struct {
 	value *ent.TreeNode
 }
 
-// NewTreeExitHandler creates a new TreeExitHandler.
-func NewTreeExitHandler(config *so.Config) *TreeExitHandler {
-	return &TreeExitHandler{config: config}
+// newTreeExitHandler creates a new internal tree-exit helper.
+func newTreeExitHandler(config *so.Config) *treeExitHandler {
+	return &treeExitHandler{config: config}
 }
 
-func (h *TreeExitHandler) MarkTreesExited(ctx context.Context, trees []*ent.Tree) error {
+// lockedNodeStatuses are node statuses that indicate an active operation is in
+// progress. Overwriting these with Exited would corrupt the in-flight operation.
+var lockedNodeStatuses = []st.TreeNodeStatus{
+	st.TreeNodeStatusTransferLocked,
+	st.TreeNodeStatusSplitLocked,
+	st.TreeNodeStatusAggregateLock,
+	st.TreeNodeStatusInvestigation,
+	st.TreeNodeStatusRenewLocked,
+}
+
+func (h *treeExitHandler) markTreesExited(ctx context.Context, trees []*ent.Tree) error {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -51,6 +61,23 @@ func (h *TreeExitHandler) MarkTreesExited(ctx context.Context, trees []*ent.Tree
 		return nil
 	}
 
+	// Check for nodes in active/locked statuses before proceeding.
+	// If any node is locked (e.g. TransferLocked), overwriting its status
+	// to Exited would corrupt the in-flight transfer (TOCTOU race).
+	lockedCount, err := db.TreeNode.
+		Query().
+		Where(
+			enttreenode.HasTreeWith(enttree.IDIn(treeIDs...)),
+			enttreenode.StatusIn(lockedNodeStatuses...),
+		).
+		Count(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check for locked tree nodes: %w", err)
+	}
+	if lockedCount > 0 {
+		return fmt.Errorf("cannot mark trees as exited: %d node(s) are in a locked status", lockedCount)
+	}
+
 	if _, err := db.Tree.
 		Update().
 		Where(enttree.IDIn(treeIDs...)).
@@ -59,9 +86,16 @@ func (h *TreeExitHandler) MarkTreesExited(ctx context.Context, trees []*ent.Tree
 		return fmt.Errorf("failed to update tree statuses: %w", err)
 	}
 
+	// Only update nodes that are not already in a terminal or locked status.
+	// This is a defense-in-depth measure: the check above should have caught
+	// locked nodes, but we add the WHERE clause to prevent races between the
+	// check and the update.
 	if _, err := db.TreeNode.
 		Update().
-		Where(enttreenode.HasTreeWith(enttree.IDIn(treeIDs...))).
+		Where(
+			enttreenode.HasTreeWith(enttree.IDIn(treeIDs...)),
+			enttreenode.StatusNotIn(lockedNodeStatuses...),
+		).
 		SetStatus(st.TreeNodeStatusExited).
 		Save(ctx); err != nil {
 		return fmt.Errorf("failed to update tree node statuses: %w", err)
@@ -70,7 +104,7 @@ func (h *TreeExitHandler) MarkTreesExited(ctx context.Context, trees []*ent.Tree
 	return nil
 }
 
-func (h *TreeExitHandler) gossipTreesExited(ctx context.Context, trees []*ent.Tree) error {
+func (h *treeExitHandler) gossipTreesExited(ctx context.Context, trees []*ent.Tree) error {
 	treeIDs := make([]string, len(trees))
 	for i, tree := range trees {
 		treeIDs[i] = tree.ID.String()
@@ -99,7 +133,7 @@ func (h *TreeExitHandler) gossipTreesExited(ctx context.Context, trees []*ent.Tr
 	return nil
 }
 
-func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees []*pb.ExitingTree, rawExitTx []byte, previousOutputs []*pb.BitcoinTransactionOutput, trees []*ent.Tree) ([]*pb.ExitSingleNodeTreeSigningResult, error) {
+func (h *treeExitHandler) signExitTransaction(ctx context.Context, exitingTrees []*pb.ExitingTree, rawExitTx []byte, previousOutputs []*pb.BitcoinTransactionOutput, trees []*ent.Tree) ([]*pb.ExitSingleNodeTreeSigningResult, error) {
 	tx, err := common.TxFromRawTxBytes(rawExitTx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load tx: %w", err)

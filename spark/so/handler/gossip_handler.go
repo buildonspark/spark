@@ -242,9 +242,10 @@ func (h *GossipHandler) handleMarkTreesExited(ctx context.Context, req *pbgossip
 		return err
 	}
 
-	treeExitHandler := NewTreeExitHandler(h.config)
-	if err := treeExitHandler.MarkTreesExited(ctx, trees); err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to mark trees %+q exited", req.TreeIds)
+	treeExitHandler := newTreeExitHandler(h.config)
+	if markErr := treeExitHandler.markTreesExited(ctx, trees); markErr != nil {
+		logger.With(zap.Error(markErr)).Sugar().Errorf("Failed to mark trees %+q exited", req.TreeIds)
+		return markErr
 	}
 	return err
 }
