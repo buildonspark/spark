@@ -1757,11 +1757,7 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 
 	case st.TransferTypeCooperativeExit:
 		if len(connectorTx) == 0 {
-			requireConnectorTx := knobs.GetKnobsService(ctx).GetValueTarget(
-				knobs.KnobRequireConnectorTxValidation, &networkString, 0) > 0
-			if requireConnectorTx {
-				return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector_tx is required for cooperative exit validation. Please upgrade to the latest SDK version"))
-			}
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector_tx is required for cooperative exit validation. Please upgrade to the latest SDK version"))
 		}
 
 		return validateTransactionCooperativeExitLeavesToSend(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey, connectorTx)

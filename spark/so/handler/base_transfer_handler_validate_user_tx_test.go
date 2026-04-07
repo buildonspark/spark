@@ -58,6 +58,11 @@ type testLeaf struct {
 	directTxHash chainhash.Hash
 }
 
+type testConnector struct {
+	raw    []byte
+	txHash chainhash.Hash
+}
+
 func createDbLeaf(t *testing.T, ctx context.Context, requireNodeTxTimelock bool) *testLeaf {
 	t.Helper()
 	tx, err := ent.GetDbFromContext(ctx)
@@ -167,11 +172,8 @@ func makeClientDirectFromCpfpTx(t *testing.T, leaf *testLeaf, refundDest keys.Pu
 	return serializeTx(t, tx)
 }
 
-func makeClientCoopExitCpfpTx(t *testing.T, leaf *testLeaf, refundDest keys.Public) []byte {
+func makeClientCoopExitCpfpTx(t *testing.T, leaf *testLeaf, refundDest keys.Public, connector *testConnector) []byte {
 	userScript, err := common.P2TRScriptFromPubKey(refundDest)
-	require.NoError(t, err)
-	randomPrivateKey := keys.GeneratePrivateKey()
-	randomTxHash, err := chainhash.NewHash(randomPrivateKey.Serialize())
 	require.NoError(t, err)
 
 	expectedCpfp := uint32(testTimeLock - spark.TimeLockInterval)
@@ -181,7 +183,7 @@ func makeClientCoopExitCpfpTx(t *testing.T, leaf *testLeaf, refundDest keys.Publ
 		Sequence:         expectedCpfp,
 	})
 	tx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: *randomTxHash, Index: 0},
+		PreviousOutPoint: wire.OutPoint{Hash: connector.txHash, Index: 0},
 		Sequence:         0,
 	})
 	tx.AddTxOut(&wire.TxOut{Value: testSourceValue, PkScript: userScript})
@@ -189,11 +191,8 @@ func makeClientCoopExitCpfpTx(t *testing.T, leaf *testLeaf, refundDest keys.Publ
 	return serializeTx(t, tx)
 }
 
-func makeClientCoopExitDirectTx(t *testing.T, leaf *testLeaf, refundDest keys.Public) []byte {
+func makeClientCoopExitDirectTx(t *testing.T, leaf *testLeaf, refundDest keys.Public, connector *testConnector) []byte {
 	userScript, err := common.P2TRScriptFromPubKey(refundDest)
-	require.NoError(t, err)
-	randomPrivateKey := keys.GeneratePrivateKey()
-	randomTxHash, err := chainhash.NewHash(randomPrivateKey.Serialize())
 	require.NoError(t, err)
 
 	expected := testTimeLock - spark.TimeLockInterval + spark.DirectTimelockOffset
@@ -203,18 +202,15 @@ func makeClientCoopExitDirectTx(t *testing.T, leaf *testLeaf, refundDest keys.Pu
 		Sequence:         expected,
 	})
 	tx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: *randomTxHash, Index: 0},
+		PreviousOutPoint: wire.OutPoint{Hash: connector.txHash, Index: 0},
 		Sequence:         0,
 	})
 	tx.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript})
 	return serializeTx(t, tx)
 }
 
-func makeClientCoopExitDirectFromCpfpTx(t *testing.T, leaf *testLeaf, refundDest keys.Public) []byte {
+func makeClientCoopExitDirectFromCpfpTx(t *testing.T, leaf *testLeaf, refundDest keys.Public, connector *testConnector) []byte {
 	userScript, err := common.P2TRScriptFromPubKey(refundDest)
-	require.NoError(t, err)
-	randomPrivateKey := keys.GeneratePrivateKey()
-	randomTxHash, err := chainhash.NewHash(randomPrivateKey.Serialize())
 	require.NoError(t, err)
 
 	expected := testTimeLock - spark.TimeLockInterval + spark.DirectTimelockOffset
@@ -224,11 +220,27 @@ func makeClientCoopExitDirectFromCpfpTx(t *testing.T, leaf *testLeaf, refundDest
 		Sequence:         expected,
 	})
 	tx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: *randomTxHash, Index: 0},
+		PreviousOutPoint: wire.OutPoint{Hash: connector.txHash, Index: 0},
 		Sequence:         0,
 	})
 	tx.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript})
 	return serializeTx(t, tx)
+}
+
+func makeConnectorTx(t *testing.T) *testConnector {
+	t.Helper()
+
+	connectorPkScript, err := common.P2TRScriptFromPubKey(keys.GeneratePrivateKey().Public())
+	require.NoError(t, err)
+
+	connectorTx := wire.NewMsgTx(3)
+	connectorTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{2}, Index: 0}, nil, nil))
+	connectorTx.AddTxOut(wire.NewTxOut(200_000, connectorPkScript))
+
+	return &testConnector{
+		raw:    serializeTx(t, connectorTx),
+		txHash: connectorTx.TxHash(),
+	}
 }
 
 func handlerWithConfig() *BaseTransferHandler {
@@ -247,7 +259,14 @@ func withKnob(ctx context.Context, enabled bool) context.Context {
 	return knobs.InjectKnobsService(ctx, k)
 }
 
-func validateAndConstructBitcoinTransactionsForTest(t *testing.T, ctx context.Context, h *BaseTransferHandler, req *pb.StartTransferRequest, transferType st.TransferType) error {
+func validateAndConstructBitcoinTransactionsForTest(
+	t *testing.T,
+	ctx context.Context,
+	h *BaseTransferHandler,
+	req *pb.StartTransferRequest,
+	transferType st.TransferType,
+	connectorTx []byte,
+) error {
 	t.Helper()
 
 	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadLeafRefundMaps(req)
@@ -275,7 +294,7 @@ func validateAndConstructBitcoinTransactionsForTest(t *testing.T, ctx context.Co
 		return fmt.Errorf("could not find all tree nodes: expected %d, found %d", len(cpfpLeafRefundMap), len(leaves))
 	}
 
-	return h.validateAndConstructBitcoinTransactions(ctx, req.GetTransferPackage(), transferType, leaves, cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, refundDestPubkey, nil)
+	return h.validateAndConstructBitcoinTransactions(ctx, req.GetTransferPackage(), transferType, leaves, cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, refundDestPubkey, connectorTx)
 }
 
 // --- Tests ---
@@ -298,7 +317,7 @@ func TestValidateUserTxs_Legacy_Cpfp_Success(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.NoError(t, err)
 }
 
@@ -322,7 +341,7 @@ func TestValidateUserTxs_Legacy_WithDirect_Success(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.NoError(t, err)
 }
 
@@ -345,7 +364,7 @@ func TestValidateUserTxs_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.ErrorContains(t, err, "CPFP refund tx validation failed")
 }
 
@@ -368,7 +387,7 @@ func TestValidateUserTxs_Legacy_MissingDirectFromCpfp_Error(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.ErrorContains(t, err, "missing required direct from CPFP refund tx")
 }
 
@@ -393,7 +412,7 @@ func TestValidateUserTxs_Legacy_WithoutDirect_Success(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.NoError(t, err)
 }
 
@@ -417,7 +436,7 @@ func TestValidateUserTxs_Legacy_InvalidDirectRefund_Error(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.ErrorContains(t, err, "direct refund tx validation failed")
 }
 
@@ -444,7 +463,7 @@ func TestValidateUserTxs_Package_WithDirect_Success(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.NoError(t, err)
 }
 
@@ -470,7 +489,7 @@ func TestValidateUserTxs_Package_WithoutDirect_Success(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.NoError(t, err)
 }
 
@@ -497,7 +516,7 @@ func TestValidateUserTxs_Package_InvalidDirectRefund_Error(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.ErrorContains(t, err, "direct refund tx validation failed")
 }
 
@@ -523,7 +542,7 @@ func TestValidateUserTxs_Package_MismatchedCounts_Error(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.ErrorContains(t, err, "mismatched number of leaves")
 }
 
@@ -546,7 +565,7 @@ func TestValidateUserTxs_Package_UnknownLeafIDs_Error(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.ErrorContains(t, err, "could not find all tree nodes")
 }
 
@@ -575,7 +594,7 @@ func TestValidateUserTxs_Package_OrphanDirectLeaf_Error(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.ErrorContains(t, err, "found orphan leaf in DirectLeavesToSend")
 }
 
@@ -597,7 +616,7 @@ func TestValidateUserTxs_Swap_Legacy_Success(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeSwap)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeSwap, nil)
 	require.NoError(t, err)
 }
 
@@ -619,7 +638,7 @@ func TestValidateUserTxs_Swap_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeSwap)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeSwap, nil)
 	require.ErrorContains(t, err, "CPFP refund tx validation failed")
 }
 
@@ -642,7 +661,7 @@ func TestValidateUserTxs_Swap_Package_Success(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeSwap)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeSwap, nil)
 	require.NoError(t, err)
 }
 
@@ -663,7 +682,7 @@ func TestValidateUserTxs_Swap_Package_UnknownLeafIDs_Error(t *testing.T) {
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeSwap)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeSwap, nil)
 	require.ErrorContains(t, err, "could not find all tree nodes")
 }
 
@@ -690,7 +709,7 @@ func TestValidateUserTxs_Swap_Package_IgnoresExtraDirectLeaves_Success(t *testin
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeSwap)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeSwap, nil)
 	require.NoError(t, err)
 }
 
@@ -700,21 +719,22 @@ func TestValidateUserTxs_CoopExit_Legacy_WithDirect_Success(t *testing.T) {
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
+	connector := makeConnectorTx(t)
 
 	req := &pb.StartTransferRequest{
 		ReceiverIdentityPublicKey: refundDest.Serialize(),
 		LeavesToSend: []*pb.LeafRefundTxSigningJob{
 			{
 				LeafId:                           leaf.node.ID.String(),
-				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest)},
-				DirectRefundTxSigningJob:         &pb.SigningJob{RawTx: makeClientCoopExitDirectTx(t, leaf, refundDest)},
-				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest)},
+				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest, connector)},
+				DirectRefundTxSigningJob:         &pb.SigningJob{RawTx: makeClientCoopExitDirectTx(t, leaf, refundDest, connector)},
+				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest, connector)},
 			},
 		},
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
 	require.NoError(t, err)
 }
 
@@ -725,21 +745,22 @@ func TestValidateUserTxs_CoopExit_Legacy_WithoutDirect_Success(t *testing.T) {
 	// Create leaf that could have direct, but we don't provide it (direct is optional)
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
+	connector := makeConnectorTx(t)
 
 	req := &pb.StartTransferRequest{
 		ReceiverIdentityPublicKey: refundDest.Serialize(),
 		LeavesToSend: []*pb.LeafRefundTxSigningJob{
 			{
 				LeafId:                           leaf.node.ID.String(),
-				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest)},
-				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest)},
+				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest, connector)},
+				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest, connector)},
 				// No DirectRefundTxSigningJob - should succeed since direct is optional
 			},
 		},
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
 	require.NoError(t, err)
 }
 
@@ -749,22 +770,23 @@ func TestValidateUserTxs_CoopExit_Legacy_InvalidDirectRefund_Error(t *testing.T)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
+	connector := makeConnectorTx(t)
 
 	req := &pb.StartTransferRequest{
 		ReceiverIdentityPublicKey: refundDest.Serialize(),
 		LeavesToSend: []*pb.LeafRefundTxSigningJob{
 			{
 				LeafId:                           leaf.node.ID.String(),
-				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest)},
+				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest, connector)},
 				DirectRefundTxSigningJob:         &pb.SigningJob{RawTx: []byte("not a valid tx")},
-				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest)},
+				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest, connector)},
 			},
 		},
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
-	require.ErrorContains(t, err, "failed to remove second input from Direct refund tx")
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
+	require.ErrorContains(t, err, "failed to parse refund transaction")
 }
 
 func TestValidateUserTxs_CoopExit_Legacy_InvalidClientCpfp_Error(t *testing.T) {
@@ -773,6 +795,7 @@ func TestValidateUserTxs_CoopExit_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 
 	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
+	connector := makeConnectorTx(t)
 
 	req := &pb.StartTransferRequest{
 		ReceiverIdentityPublicKey: refundDest.Serialize(),
@@ -780,14 +803,14 @@ func TestValidateUserTxs_CoopExit_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 			{
 				LeafId:                           leaf.node.ID.String(),
 				RefundTxSigningJob:               &pb.SigningJob{RawTx: []byte("not a tx")},
-				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest)},
+				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest, connector)},
 			},
 		},
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
-	require.ErrorContains(t, err, "failed to parse raw transaction")
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
+	require.ErrorContains(t, err, "failed to parse refund transaction")
 }
 
 func TestValidateUserTxs_CoopExit_Legacy_MissingDirectFromCpfp_Error(t *testing.T) {
@@ -796,21 +819,22 @@ func TestValidateUserTxs_CoopExit_Legacy_MissingDirectFromCpfp_Error(t *testing.
 
 	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
+	connector := makeConnectorTx(t)
 
 	req := &pb.StartTransferRequest{
 		ReceiverIdentityPublicKey: refundDest.Serialize(),
 		LeavesToSend: []*pb.LeafRefundTxSigningJob{
 			{
 				LeafId:             leaf.node.ID.String(),
-				RefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest)},
+				RefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest, connector)},
 				// Missing DirectFromCpfpRefundTxSigningJob
 			},
 		},
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
-	require.ErrorContains(t, err, "raw transaction is empty")
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
+	require.ErrorContains(t, err, "refund transaction is empty")
 }
 
 func TestValidateUserTxs_CoopExit_Legacy_MissingConnectorInput_Error(t *testing.T) {
@@ -819,6 +843,7 @@ func TestValidateUserTxs_CoopExit_Legacy_MissingConnectorInput_Error(t *testing.
 
 	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
+	connector := makeConnectorTx(t)
 
 	// Use `makeClientCpfpfTx` so that cpfpTx has 1 input
 	req := &pb.StartTransferRequest{
@@ -827,14 +852,14 @@ func TestValidateUserTxs_CoopExit_Legacy_MissingConnectorInput_Error(t *testing.
 			{
 				LeafId:                           leaf.node.ID.String(),
 				RefundTxSigningJob:               &pb.SigningJob{RawTx: makeClientCpfpTx(t, leaf, refundDest)},
-				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest)},
+				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest, connector)},
 			},
 		},
 	}
 
 	h := handlerWithConfig()
-	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
-	require.ErrorContains(t, err, "out of bounds vin")
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
+	require.ErrorContains(t, err, "expected 2 inputs in refund tx, got 1")
 }
 
 func TestValidateUserTxs_CoopExit_Legacy_ExceedInput_Error(t *testing.T) {
@@ -844,7 +869,8 @@ func TestValidateUserTxs_CoopExit_Legacy_ExceedInput_Error(t *testing.T) {
 	// Create leaf with direct tx timelock > 0, which requires direct refund tx
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
-	cpfpTxRaw := makeClientCoopExitCpfpTx(t, leaf, refundDest)
+	connector := makeConnectorTx(t)
+	cpfpTxRaw := makeClientCoopExitCpfpTx(t, leaf, refundDest, connector)
 	cpfpTx, err := common.TxFromRawTxBytes(cpfpTxRaw)
 	require.NoError(t, err)
 
@@ -857,12 +883,12 @@ func TestValidateUserTxs_CoopExit_Legacy_ExceedInput_Error(t *testing.T) {
 			{
 				LeafId:                           leaf.node.ID.String(),
 				RefundTxSigningJob:               &pb.SigningJob{RawTx: cpfpTxRawModified},
-				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest)},
+				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest, connector)},
 			},
 		},
 	}
 
 	h := handlerWithConfig()
-	err = validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit)
-	require.ErrorContains(t, err, "transaction does not match expected construction")
+	err = validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
+	require.ErrorContains(t, err, "expected 2 inputs in refund tx, got 3")
 }
