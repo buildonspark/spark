@@ -123,10 +123,7 @@ const (
 	KnobMultipleConfirmationForNonStaticDeposit = "spark.so.require_multiple_conf_for_non_static_deposit"
 
 	KnobMaxUnusedDepositAddresses = "spark.so.max_unused_deposit_addresses"
-	// Enforce that direct node transactions and direct refund transactions spending the deposit tx
-	// are not provided by the client. When enabled, the server will reject deprecated direct signing jobs.
-	KnobEnforceNoDirectTransactionsFromDepositTx = "spark.so.enforce_no_direct_transactions_from_deposit_tx"
-	KnobDisableV2TXs                             = "spark.so.disable_v2_txs"
+	KnobDisableV2TXs              = "spark.so.disable_v2_txs"
 
 	// The SSP sometimes sends a counter swap as a normal transfer when it happens from a celery job
 	// This knob filters out these transfers from the query transfers endpoint if counter swaps are not explicitly requested.

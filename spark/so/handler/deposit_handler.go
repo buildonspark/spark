@@ -960,14 +960,8 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	}
 
 	// New flow
-	directRootTxSigningJob := req.GetDirectRootTxSigningJob()
-	directRefundTxSigningJob := req.GetDirectRefundTxSigningJob()
-
-	if directRootTxSigningJob != nil || directRefundTxSigningJob != nil {
-		networkString := network.String()
-		if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobEnforceNoDirectTransactionsFromDepositTx, &networkString, 0) > 0 {
-			return nil, errors.InvalidArgumentInvalidVersion(fmt.Errorf("direct root tx signing job and direct refund tx signing job are deprecated, please upgrade to the latest SDK version"))
-		}
+	if req.GetDirectRootTxSigningJob() != nil || req.GetDirectRefundTxSigningJob() != nil {
+		return nil, errors.InvalidArgumentInvalidVersion(fmt.Errorf("direct root tx signing job and direct refund tx signing job are deprecated, please upgrade to the latest SDK version"))
 	}
 
 	directFromCpfpRefundTxSigningJob := req.GetDirectFromCpfpRefundTxSigningJob()
@@ -1005,81 +999,9 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		},
 	)
 
-	// Process direct root and refund txs if both are provided
-	if directRootTxSigningJob != nil && directRefundTxSigningJob != nil {
-		directRootTx, err := common.TxFromRawTxBytes(req.DirectRootTxSigningJob.RawTx)
-		if err != nil {
-			return nil, err
-		}
-		err = o.verifyRootTransaction(directRootTx, onChainTx, req.OnChainUtxo.Vout, true)
-		if err != nil {
-			return nil, err
-		}
-		directRootTxSigHash, err := common.SigHashFromTx(directRootTx, 0, onChainOutput)
-		if err != nil {
-			return nil, err
-		}
-		directRefundTx, err := common.TxFromRawTxBytes(req.DirectRefundTxSigningJob.RawTx)
-		if err != nil {
-			return nil, err
-		}
-		err = o.verifyRefundTransaction(cpfpRootTx, cpfpRefundTx)
-		if err != nil {
-			return nil, err
-		}
-		err = o.verifyRefundTransaction(directRootTx, directRefundTx)
-		if err != nil {
-			return nil, err
-		}
-		if len(cpfpRootTx.TxOut) == 0 {
-			return nil, fmt.Errorf("vout out of bounds, root tx has no outputs")
-		}
-		if len(directRootTx.TxOut) == 0 {
-			return nil, fmt.Errorf("vout out of bounds, direct root tx has no outputs")
-		}
-		directRefundTxSigHash, err := common.SigHashFromTx(directRefundTx, 0, directRootTx.TxOut[0])
-		if err != nil {
-			return nil, err
-		}
-		userDirectRootTxNonceCommitment := frost.SigningCommitment{}
-		if err := userDirectRootTxNonceCommitment.UnmarshalProto(directRootTxSigningJob.GetSigningNonceCommitment()); err != nil {
-			return nil, err
-		}
-		userDirectRefundTxNonceCommitment := frost.SigningCommitment{}
-		if err := userDirectRefundTxNonceCommitment.UnmarshalProto(directRefundTxSigningJob.GetSigningNonceCommitment()); err != nil {
-			return nil, err
-		}
-		signingJobs = append(
-			signingJobs,
-			&helper.SigningJob{
-				JobID:             uuid.New(),
-				SigningKeyshareID: signingKeyShare.ID,
-				Message:           directRootTxSigHash,
-				VerifyingKey:      &verifyingKey,
-				UserCommitment:    &userDirectRootTxNonceCommitment,
-			},
-			&helper.SigningJob{
-				JobID:             uuid.New(),
-				SigningKeyshareID: signingKeyShare.ID,
-				Message:           directRefundTxSigHash,
-				VerifyingKey:      &verifyingKey,
-				UserCommitment:    &userDirectRefundTxNonceCommitment,
-			},
-		)
-	} else if directRootTxSigningJob != nil || directRefundTxSigningJob != nil {
-		return nil, fmt.Errorf("direct root tx signing job and direct refund tx signing job must both be provided or neither of them")
-	}
-
 	networkString := network.String()
 	combinedPublicKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
 
-	var directRootTxRaw, directRefundTxRaw []byte
-	if req.DirectRootTxSigningJob != nil {
-		directRootTxRaw = req.DirectRootTxSigningJob.RawTx
-	}
-	if req.DirectRefundTxSigningJob != nil {
-		directRefundTxRaw = req.DirectRefundTxSigningJob.RawTx
-	}
 	directFromCpfpRefundTxRaw := directFromCpfpRefundTxSigningJob.RawTx
 
 	err = validateBitcoinTransactions(
@@ -1089,8 +1011,8 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		req.RootTxSigningJob.RawTx,
 		req.RefundTxSigningJob.RawTx,
 		directFromCpfpRefundTxRaw,
-		directRootTxRaw,
-		directRefundTxRaw,
+		nil,
+		nil,
 		combinedPublicKey,
 		depositAddress.OwnerSigningPubkey,
 		networkString,
@@ -1120,17 +1042,6 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	directFromCpfpRefundTxSigningResult, err = signingResults[resultIndex].MarshalProto()
 	if err != nil {
 		return nil, err
-	}
-	resultIndex++
-	if directRootTxSigningJob != nil && directRefundTxSigningJob != nil {
-		directNodeTxSigningResult, err = signingResults[resultIndex].MarshalProto()
-		if err != nil {
-			return nil, err
-		}
-		directRefundTxSigningResult, err = signingResults[resultIndex+1].MarshalProto()
-		if err != nil {
-			return nil, err
-		}
 	}
 	// Create the tree
 	txid := onChainTx.TxHash()
@@ -1179,13 +1090,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		}
 	}
 	var directTx []byte
-	if req.DirectRootTxSigningJob != nil {
-		directTx = req.DirectRootTxSigningJob.RawTx
-	}
 	var directRefundTx []byte
-	if req.DirectRefundTxSigningJob != nil {
-		directRefundTx = req.DirectRefundTxSigningJob.RawTx
-	}
 	// Check if a tree node already exists for this deposit
 	existingRoot, err := db.TreeNode.Query().
 		Where(treenode.OwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey)).
