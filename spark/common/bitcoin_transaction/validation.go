@@ -12,7 +12,6 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/knobs"
 )
 
 // TxType represents the type of refund transaction expected
@@ -65,16 +64,8 @@ func VerifyTransactionWithSource(ctx context.Context, clientRawTxBytes []byte, s
 		return fmt.Errorf("failed to validate user sequence: %w, tx type: %d", err, txType)
 	}
 
-	disableV2TXs := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobDisableV2TXs, &networkString, 0) > 0
-
-	if disableV2TXs {
-		if clientTx.Version != 3 {
-			return fmt.Errorf("unsupported transaction version: %d, tx type: %d", clientTx.Version, txType)
-		}
-	} else {
-		if clientTx.Version != 2 && clientTx.Version != 3 {
-			return fmt.Errorf("unsupported transaction version: %d, tx type: %d", clientTx.Version, txType)
-		}
+	if clientTx.Version != 3 {
+		return fmt.Errorf("unsupported transaction version: %d, tx type: %d", clientTx.Version, txType)
 	}
 
 	// Construct the expected transaction based on the type

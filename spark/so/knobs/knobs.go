@@ -123,7 +123,6 @@ const (
 	KnobMultipleConfirmationForNonStaticDeposit = "spark.so.require_multiple_conf_for_non_static_deposit"
 
 	KnobMaxUnusedDepositAddresses = "spark.so.max_unused_deposit_addresses"
-	KnobDisableV2TXs              = "spark.so.disable_v2_txs"
 
 	// The SSP sometimes sends a counter swap as a normal transfer when it happens from a celery job
 	// This knob filters out these transfers from the query transfers endpoint if counter swaps are not explicitly requested.

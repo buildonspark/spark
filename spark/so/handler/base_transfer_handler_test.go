@@ -56,19 +56,19 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 		t.Fatalf("failed to build p2tr: %v", err)
 	}
 
-	nodeTx := &wire.MsgTx{Version: 2}
+	nodeTx := &wire.MsgTx{Version: 3}
 	nodeTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
 	nodeTx.AddTxOut(common.EphemeralAnchorOutput())
 	nodeBytes := mustSerializeTx(t, nodeTx)
 	nodeHash := nodeTx.TxHash()
 
-	wrongParent := &wire.MsgTx{Version: 2}
+	wrongParent := &wire.MsgTx{Version: 3}
 	wrongParent.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
 	wrongParent.AddTxOut(common.EphemeralAnchorOutput())
 	wrongHash := wrongParent.TxHash()
 
 	const oldTimeLock uint32 = 600
-	oldRefund := &wire.MsgTx{Version: 2}
+	oldRefund := &wire.MsgTx{Version: 3}
 	oldRefund.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: wrongHash, Index: 0},
 		Sequence:         oldTimeLock,
@@ -76,7 +76,7 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 	oldRefund.AddTxOut(common.EphemeralAnchorOutput())
 	oldRefundBytes := mustSerializeTx(t, oldRefund)
 
-	newRefund := &wire.MsgTx{Version: 2}
+	newRefund := &wire.MsgTx{Version: 3}
 	newRefund.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
 		Sequence:         oldTimeLock - spark.TimeLockInterval,
@@ -85,7 +85,7 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 	newRefund.AddTxOut(common.EphemeralAnchorOutput())
 	newRefundBytes := mustSerializeTx(t, newRefund)
 
-	newDirectFromCpfpRefund := &wire.MsgTx{Version: 2}
+	newDirectFromCpfpRefund := &wire.MsgTx{Version: 3}
 	newDirectFromCpfpRefund.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
 		Sequence:         oldTimeLock - spark.TimeLockInterval + spark.DirectTimelockOffset,
@@ -185,18 +185,18 @@ func TestCreateTransfer_FailsWithWrongPrevOutpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to build p2tr: %v", err)
 	}
-	nodeTx := &wire.MsgTx{Version: 2}
+	nodeTx := &wire.MsgTx{Version: 3}
 	nodeTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
 	nodeTx.AddTxOut(common.EphemeralAnchorOutput())
 	nodeBytes := mustSerializeTx(t, nodeTx)
 
 	const oldTimeLock uint32 = 500
-	oldRefund := &wire.MsgTx{Version: 2}
+	oldRefund := &wire.MsgTx{Version: 3}
 	oldRefund.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: oldTimeLock})
 	oldRefund.AddTxOut(common.EphemeralAnchorOutput())
 	oldRefundBytes := mustSerializeTx(t, oldRefund)
 
-	newRefund := &wire.MsgTx{Version: 2}
+	newRefund := &wire.MsgTx{Version: 3}
 	newRefund.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: nodeTx.TxHash(), Index: 1},
 		Sequence:         oldTimeLock - spark.TimeLockInterval,
@@ -205,7 +205,7 @@ func TestCreateTransfer_FailsWithWrongPrevOutpoint(t *testing.T) {
 	newRefund.AddTxOut(common.EphemeralAnchorOutput())
 	newRefundBytes := mustSerializeTx(t, newRefund)
 
-	newDirectFromCpfpRefund := &wire.MsgTx{Version: 2}
+	newDirectFromCpfpRefund := &wire.MsgTx{Version: 3}
 	newDirectFromCpfpRefund.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0},
 		Sequence:         oldTimeLock - spark.TimeLockInterval + spark.DirectTimelockOffset,
@@ -318,14 +318,14 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedAmount(t *testing.T) {
 	p2tr, err := common.P2TRScriptFromPubKey(receiverPub)
 	require.NoError(t, err)
 
-	nodeTx := &wire.MsgTx{Version: 2}
+	nodeTx := &wire.MsgTx{Version: 3}
 	nodeTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
 	nodeTx.AddTxOut(common.EphemeralAnchorOutput())
 	nodeBytes := mustSerializeTx(t, nodeTx)
 	nodeHash := nodeTx.TxHash()
 
 	const oldTimeLock uint32 = 600
-	oldRefund := &wire.MsgTx{Version: 2}
+	oldRefund := &wire.MsgTx{Version: 3}
 	oldRefund.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
 		Sequence:         oldTimeLock,
@@ -333,7 +333,7 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedAmount(t *testing.T) {
 	oldRefund.AddTxOut(common.EphemeralAnchorOutput())
 	oldRefundBytes := mustSerializeTx(t, oldRefund)
 
-	newRefund := &wire.MsgTx{Version: 2}
+	newRefund := &wire.MsgTx{Version: 3}
 	newRefund.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
 		Sequence:         oldTimeLock - spark.TimeLockInterval,
@@ -444,14 +444,14 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedParties(t *testing.T) {
 	p2tr, err := common.P2TRScriptFromPubKey(charliePub)
 	require.NoError(t, err)
 
-	nodeTx := &wire.MsgTx{Version: 2}
+	nodeTx := &wire.MsgTx{Version: 3}
 	nodeTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
 	nodeTx.AddTxOut(common.EphemeralAnchorOutput())
 	nodeBytes := mustSerializeTx(t, nodeTx)
 	nodeHash := nodeTx.TxHash()
 
 	const oldTimeLock uint32 = 600
-	oldRefund := &wire.MsgTx{Version: 2}
+	oldRefund := &wire.MsgTx{Version: 3}
 	oldRefund.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
 		Sequence:         oldTimeLock,
@@ -459,7 +459,7 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedParties(t *testing.T) {
 	oldRefund.AddTxOut(common.EphemeralAnchorOutput())
 	oldRefundBytes := mustSerializeTx(t, oldRefund)
 
-	newRefund := &wire.MsgTx{Version: 2}
+	newRefund := &wire.MsgTx{Version: 3}
 	newRefund.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
 		Sequence:         oldTimeLock - spark.TimeLockInterval,

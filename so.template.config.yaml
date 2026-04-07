@@ -65,7 +65,6 @@ knobs:
     spark.so.enhanced_transfer_receive_validation@REGTEST: 100
     spark.so.require_multiple_conf_for_non_static_deposit: 1
     spark.so.max_unused_deposit_addresses: 64
-    spark.so.disable_v2_txs@REGTEST: 100
     spark.so.filter_ssp_counter_swap_as_transfer@REGTEST: 100
     # Chain watcher
     spark.so.watch_chain.tweak_keys_for_coop_exit_delay.enabled: 1

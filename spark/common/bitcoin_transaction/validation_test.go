@@ -28,7 +28,7 @@ func withKnob(ctx context.Context, enabled bool) context.Context {
 		v = 1.0
 	}
 	k := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobDisableV2TXs + "@REGTEST": v,
+		knobs.KnobEnableStrictFinalizeSignature + "@REGTEST": v,
 	})
 	return knobs.InjectKnobsService(ctx, k)
 }
