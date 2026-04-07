@@ -1921,7 +1921,7 @@ func (h *TransferHandler) checkTransferAccessMIMO(
 	return h.checkTransferAccessWithPubkeys(ctx, transfer.ID, senderPubkey, receiverPubkey, accessMap)
 }
 
-func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, isPending bool, isSSP bool) (*pb.QueryTransfersResponse, error) {
+func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, pendingOnly bool, isSSP bool) (*pb.QueryTransfersResponse, error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryTransfers")
 	defer span.End()
 
@@ -1934,8 +1934,8 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	if isPending && len(filter.Statuses) > 0 {
-		return nil, fmt.Errorf("cannot specify both isPending=true and filter.Statuses")
+	if pendingOnly && len(filter.Statuses) > 0 {
+		return nil, fmt.Errorf("cannot specify both pendingOnly=true and filter.Statuses")
 	}
 
 	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
@@ -1986,7 +1986,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		} else {
 			transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(receiverIDPubKey))
 		}
-		if isPending {
+		if pendingOnly {
 			transferPredicate = append(transferPredicate, enttransfer.StatusIn(receiverPendingStatuses...))
 		}
 		walletIdentityPubkey = &receiverIDPubKey
@@ -2013,7 +2013,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		} else {
 			transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(senderIDPubKey))
 		}
-		if isPending {
+		if pendingOnly {
 			transferPredicate = append(transferPredicate,
 				enttransfer.StatusIn(senderPendingStatuses...),
 				enttransfer.ExpiryTimeLT(time.Now()),
@@ -2054,7 +2054,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 				return &pb.QueryTransfersResponse{Offset: -1}, nil
 			}
 
-			if isPending {
+			if pendingOnly {
 				// Keep IDs separate to preserve role-based status filtering.
 				// Guard each arm against empty ID slices — a wallet may have
 				// only sent or only received transfers.
@@ -2100,7 +2100,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		} else {
 			receiverMatchesIdentity := enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey)
 			senderMatchesIdentity := enttransfer.SenderIdentityPubkeyEQ(identityPubKey)
-			if isPending {
+			if pendingOnly {
 				transferPredicate = append(transferPredicate, enttransfer.Or(
 					enttransfer.And(receiverMatchesIdentity, enttransfer.StatusIn(receiverPendingStatuses...)),
 					enttransfer.And(senderMatchesIdentity, enttransfer.StatusIn(senderPendingStatuses...), enttransfer.ExpiryTimeLT(time.Now())),
@@ -2111,7 +2111,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		}
 		walletIdentityPubkey = &identityPubKey
 	default:
-		if isPending {
+		if pendingOnly {
 			transferPredicate = append(
 				transferPredicate,
 				enttransfer.StatusIn(append(senderPendingStatuses, receiverPendingStatuses...)...),

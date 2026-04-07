@@ -39,7 +39,7 @@ func TestQueryTransfers_SSP_WithReceiverFilter(t *testing.T) {
 		Network: pb.Network_REGTEST,
 	}
 
-	// Call queryTransfers with isSSP=true, isPending=false
+	// Call queryTransfers with isSSP=true, pendingOnly=false
 	handler := NewTransferHandler(cfg)
 	resp, err := handler.queryTransfers(ctx, filter, false, true)
 
@@ -63,7 +63,7 @@ func TestQueryTransfers_SSP_WithSenderFilter(t *testing.T) {
 		Network: pb.Network_REGTEST,
 	}
 
-	// Call queryTransfers with isSSP=true, isPending=false
+	// Call queryTransfers with isSSP=true, pendingOnly=false
 	handler := NewTransferHandler(cfg)
 	resp, err := handler.queryTransfers(ctx, filter, false, true)
 
@@ -90,7 +90,7 @@ func TestQueryTransfers_NotSSP_RequiresAuthz(t *testing.T) {
 		Network: pb.Network_REGTEST,
 	}
 
-	// Call queryTransfers with isPending=false, isSSP=false
+	// Call queryTransfers with pendingOnly=false, isSSP=false
 	handler := NewTransferHandler(cfg)
 	resp, err := handler.queryTransfers(ctx, filter, false, false)
 
@@ -134,7 +134,7 @@ func TestQueryTransfers_NotSSP_RequiresAuthz_Mismatch(t *testing.T) {
 		Network: pb.Network_REGTEST,
 	}
 
-	// Call queryTransfers with isPending=false, isSSP=false
+	// Call queryTransfers with pendingOnly=false, isSSP=false
 	handler := NewTransferHandler(cfg)
 	resp, err := handler.queryTransfers(ctx, filter, false, false)
 
@@ -179,7 +179,7 @@ func TestQueryTransfers_NotSSP_NoSession(t *testing.T) {
 		Network: pb.Network_REGTEST,
 	}
 
-	// Call queryTransfers with isPending=false, isSSP=false
+	// Call queryTransfers with pendingOnly=false, isSSP=false
 	handler := NewTransferHandler(cfg)
 	resp, err := handler.queryTransfers(ctx, filter, false, false)
 
