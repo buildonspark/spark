@@ -395,8 +395,8 @@ func TestValidateUserTxs_Legacy_WithoutDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = withKnob(ctx, true)
 
-	// Create leaf that could have direct, but we don't provide it (direct is optional)
-	leaf := createDbLeaf(t, ctx, true)
+	// Create a zero node so direct refund tx remains optional.
+	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
 
 	req := &pb.StartTransferRequest{
@@ -471,7 +471,7 @@ func TestValidateUserTxs_Package_WithoutDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	ctx = withKnob(ctx, true)
 
-	leaf := createDbLeaf(t, ctx, true)
+	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
 
 	cpfp := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientCpfpTx(t, leaf, refundDest)}

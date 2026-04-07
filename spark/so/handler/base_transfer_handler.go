@@ -1811,11 +1811,9 @@ func validateSingleLeafRefundTxs(
 			return fmt.Errorf("failed to determine if node is zero node: %w", err)
 		}
 
-		// If the knob is enabled and the node is not a zero node, enforce direct refund tx validation
-		enforceDirectRefundTxValidation := knobs.GetKnobsService(ctx).RolloutRandomTarget(knobs.KnobDirectRefundTxValidation, &networkString, 0)
-
+		// If the node is not a zero node, enforce direct refund tx validation
 		if hasDirectRefundTx {
-			if isZeroNode && enforceDirectRefundTxValidation {
+			if isZeroNode {
 				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("leaf %s is a zero node, zero nodes must not have a direct refund tx", node.ID.String()))
 			}
 			if err := bitcointransaction.VerifyTransactionWithDatabase(
@@ -1828,7 +1826,7 @@ func validateSingleLeafRefundTxs(
 			); err != nil {
 				return fmt.Errorf("direct refund tx validation failed for leaf: %w", err)
 			}
-		} else if !hasDirectRefundTx && hasDirectNodeTx && !isZeroNode && enforceDirectRefundTxValidation {
+		} else if !hasDirectRefundTx && hasDirectNodeTx && !isZeroNode {
 			return fmt.Errorf("leaf %s does not have a direct refund tx and it is not a zero node, non-zero nodes must have a direct refund tx", node.ID.String())
 		}
 	}
