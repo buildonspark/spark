@@ -781,7 +781,10 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 
 		totalAmountSats -= feeSats
 	}
-	if amount.ValueSats != 0 && totalAmountSats < amount.ValueSats {
+	if amount.ValueSats == 0 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice amount must be greater than zero"))
+	}
+	if totalAmountSats < amount.ValueSats {
 		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("invalid amount, expected: %d or more, got: %d", amount.ValueSats, totalAmountSats))
 	}
 	return nil

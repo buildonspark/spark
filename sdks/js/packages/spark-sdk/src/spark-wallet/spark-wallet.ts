@@ -3627,6 +3627,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           receiverIdentityPubkey: hexToBytes(receiverIdentityPubkey),
           paymentHash,
           isInboundPayment: false,
+          amountSatsToSend: amountSats,
           startTransferRequest,
           expiryTime,
           transferID,

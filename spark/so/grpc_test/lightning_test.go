@@ -234,7 +234,7 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	_, err = wallet.SwapNodesForPreimage(
 		t.Context(),
 		sspConfig,
 		leaves,
@@ -245,38 +245,7 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 		true,
 		paymentAmountSats,
 	)
-	require.NoError(t, err)
-	require.Equal(t, response.Preimage, preimage[:])
-	senderTransfer := response.Transfer
-
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), sspConfig, response.Transfer, leaves, nil)
-	require.NoError(t, err)
-	require.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, transfer.Status)
-	require.Equal(t, transfer.TotalValue, paymentAmountSats)
-
-	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), userConfig)
-	require.NoError(t, err, "failed to authenticate receiver")
-	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
-	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, userConfig)
-	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer := pendingTransfer.Transfers[0]
-	require.Equal(t, receiverTransfer.Id, senderTransfer.Id)
-	require.Equal(t, spark.TransferType_PREIMAGE_SWAP, receiverTransfer.Type)
-
-	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), userConfig, receiverTransfer)
-	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{nodeToSend.Id: newLeafPrivKey}, leafPrivKeyMap)
-
-	finalLeafPrivKey := keys.GeneratePrivateKey()
-	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
-		SigningPrivKey:    newLeafPrivKey,
-		NewSigningPrivKey: finalLeafPrivKey,
-	}
-	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
-	_, err = wallet.ClaimTransfer(receiverCtx, receiverTransfer, userConfig, leavesToClaim)
-	require.NoError(t, err, "failed to ClaimTransfer")
+	require.ErrorContains(t, err, "invoice amount must be greater than zero")
 }
 
 func TestSendLightningPayment(t *testing.T) {

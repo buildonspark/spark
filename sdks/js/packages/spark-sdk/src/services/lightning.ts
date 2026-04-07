@@ -246,7 +246,7 @@ export class LightningService {
 
     const transferId = transferID ? transferID : uuidv7();
     let bolt11String = "";
-    let amountSats: number = 0;
+    let amountSats: number = amountSatsToSend ?? 0;
     if (invoiceString) {
       const decodedInvoice = decodeInvoice(invoiceString);
       let amountMsats = 0;
