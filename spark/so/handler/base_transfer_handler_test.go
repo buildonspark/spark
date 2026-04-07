@@ -81,8 +81,17 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
 		Sequence:         oldTimeLock - spark.TimeLockInterval,
 	})
-	newRefund.AddTxOut(&wire.TxOut{Value: 0, PkScript: p2tr})
+	newRefund.AddTxOut(&wire.TxOut{Value: nodeTx.TxOut[0].Value, PkScript: p2tr})
+	newRefund.AddTxOut(common.EphemeralAnchorOutput())
 	newRefundBytes := mustSerializeTx(t, newRefund)
+
+	newDirectFromCpfpRefund := &wire.MsgTx{Version: 2}
+	newDirectFromCpfpRefund.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
+		Sequence:         oldTimeLock - spark.TimeLockInterval + spark.DirectTimelockOffset,
+	})
+	newDirectFromCpfpRefund.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(nodeTx.TxOut[0].Value), PkScript: p2tr})
+	newDirectFromCpfpRefundBytes := mustSerializeTx(t, newDirectFromCpfpRefund)
 
 	// Create required signing keyshare edge
 	secret := keys.GeneratePrivateKey()
@@ -118,6 +127,9 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 	leafCpfpRefundMap := map[string][]byte{
 		leaf.ID.String(): newRefundBytes,
 	}
+	leafDirectFromCpfpRefundMap := map[string][]byte{
+		leaf.ID.String(): newDirectFromCpfpRefundBytes,
+	}
 
 	h := NewBaseTransferHandler(config)
 	transferID := uuid.New()
@@ -133,7 +145,7 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 		receiverPub,
 		leafCpfpRefundMap,
 		map[string][]byte{},
-		map[string][]byte{},
+		leafDirectFromCpfpRefundMap,
 		nil,
 		TransferRoleCoordinator,
 		false,
@@ -189,8 +201,17 @@ func TestCreateTransfer_FailsWithWrongPrevOutpoint(t *testing.T) {
 		PreviousOutPoint: wire.OutPoint{Hash: nodeTx.TxHash(), Index: 1},
 		Sequence:         oldTimeLock - spark.TimeLockInterval,
 	})
-	newRefund.AddTxOut(&wire.TxOut{Value: 0, PkScript: p2tr})
+	newRefund.AddTxOut(&wire.TxOut{Value: nodeTx.TxOut[0].Value, PkScript: p2tr})
+	newRefund.AddTxOut(common.EphemeralAnchorOutput())
 	newRefundBytes := mustSerializeTx(t, newRefund)
+
+	newDirectFromCpfpRefund := &wire.MsgTx{Version: 2}
+	newDirectFromCpfpRefund.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0},
+		Sequence:         oldTimeLock - spark.TimeLockInterval + spark.DirectTimelockOffset,
+	})
+	newDirectFromCpfpRefund.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(nodeTx.TxOut[0].Value), PkScript: p2tr})
+	newDirectFromCpfpRefundBytes := mustSerializeTx(t, newDirectFromCpfpRefund)
 
 	secret := keys.GeneratePrivateKey()
 	keyshare, err := client.SigningKeyshare.Create().
@@ -225,6 +246,9 @@ func TestCreateTransfer_FailsWithWrongPrevOutpoint(t *testing.T) {
 	leafCpfpRefundMap := map[string][]byte{
 		leaf.ID.String(): newRefundBytes,
 	}
+	leafDirectFromCpfpRefundMap := map[string][]byte{
+		leaf.ID.String(): newDirectFromCpfpRefundBytes,
+	}
 
 	h := NewBaseTransferHandler(config)
 	_, _, err = h.createTransfer(
@@ -237,7 +261,7 @@ func TestCreateTransfer_FailsWithWrongPrevOutpoint(t *testing.T) {
 		receiverPub,
 		leafCpfpRefundMap,
 		map[string][]byte{},
-		map[string][]byte{},
+		leafDirectFromCpfpRefundMap,
 		nil,
 		TransferRoleCoordinator,
 		false,

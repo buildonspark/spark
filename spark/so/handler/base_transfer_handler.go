@@ -1737,11 +1737,6 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 	if len(leaves) == 0 {
 		return fmt.Errorf("leaves cannot be empty")
 	}
-	networkString := leaves[0].Network.String()
-	enhancedValidationEnabled := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobSoEnhancedBitcoinTxValidation, &networkString, 0) > 0
-	if !enhancedValidationEnabled {
-		return nil
-	}
 
 	nodesByID := leavesToMap(leaves)
 

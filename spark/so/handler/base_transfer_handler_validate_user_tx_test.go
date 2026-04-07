@@ -254,7 +254,7 @@ func withKnob(ctx context.Context, enabled bool) context.Context {
 	}
 	k := knobs.NewFixedKnobs(map[string]float64{
 		// Tests run in regtest
-		knobs.KnobSoEnhancedBitcoinTxValidation + "@REGTEST": v,
+		knobs.KnobDisableV2TXs + "@REGTEST": v,
 	})
 	return knobs.InjectKnobsService(ctx, k)
 }
