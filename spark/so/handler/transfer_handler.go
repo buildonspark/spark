@@ -1741,6 +1741,16 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
+	// Verify that the request's owner_identity_public_key matches the DB-stored sender identity.
+	// This prevents a caller from supplying a different identity key that could bypass
+	// signature verification in ValidateTransferPackage.
+	reqOwnerPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
+	if !reqOwnerPubKey.Equals(senderPubkey) {
+		return nil, fmt.Errorf("owner_identity_public_key in request does not match the transfer sender identity")
+	}
 	if transfer.Status != st.TransferStatusSenderInitiated {
 		return nil, fmt.Errorf("transfer %s is in state %s; expected sender initiated status", transferID, transfer.Status)
 	}
@@ -1821,11 +1831,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if err != nil {
 		return nil, fmt.Errorf("failed to update status of transfer %s: %w", transferID, err)
 	}
-	ownerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	if err = h.setSoCoordinatorKeyTweaks(ctx, transfer, req.TransferPackage, ownerIDPubKey); err != nil {
+	if err = h.setSoCoordinatorKeyTweaks(ctx, transfer, req.TransferPackage, senderPubkey); err != nil {
 		return nil, err
 	}
 
