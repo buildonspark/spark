@@ -330,7 +330,14 @@ export interface TokenTransaction {
    * Should NOT be set explicitly on V2 transactions (protected with validation).
    * Provided here to enable cross-conversion between v3 token transaction protos during migration.
    */
-  validityDurationSeconds?: number | undefined;
+  validityDurationSeconds?:
+    | number
+    | undefined;
+  /**
+   * Optional client-specified deadline for transaction execution.
+   * Carried through from PartialTokenTransaction.execute_before during conversion.
+   */
+  executeBefore?: Date | undefined;
 }
 
 export interface TokenTransactionMetadata {
@@ -1482,6 +1489,7 @@ function createBaseTokenTransaction(): TokenTransaction {
     clientCreatedTimestamp: undefined,
     invoiceAttachments: [],
     validityDurationSeconds: undefined,
+    executeBefore: undefined,
   };
 }
 
@@ -1521,6 +1529,9 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     }
     if (message.validityDurationSeconds !== undefined) {
       writer.uint32(88).uint64(message.validityDurationSeconds);
+    }
+    if (message.executeBefore !== undefined) {
+      Timestamp.encode(toTimestamp(message.executeBefore), writer.uint32(98).fork()).join();
     }
     return writer;
   },
@@ -1623,6 +1634,14 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
           message.validityDurationSeconds = longToNumber(reader.uint64());
           continue;
         }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.executeBefore = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1659,6 +1678,7 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
       validityDurationSeconds: isSet(object.validityDurationSeconds)
         ? globalThis.Number(object.validityDurationSeconds)
         : undefined,
+      executeBefore: isSet(object.executeBefore) ? fromJsonTimestamp(object.executeBefore) : undefined,
     };
   },
 
@@ -1694,6 +1714,9 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     }
     if (message.validityDurationSeconds !== undefined) {
       obj.validityDurationSeconds = Math.round(message.validityDurationSeconds);
+    }
+    if (message.executeBefore !== undefined) {
+      obj.executeBefore = message.executeBefore.toISOString();
     }
     return obj;
   },
@@ -1740,6 +1763,7 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     message.clientCreatedTimestamp = object.clientCreatedTimestamp ?? undefined;
     message.invoiceAttachments = object.invoiceAttachments?.map((e) => InvoiceAttachment.fromPartial(e)) || [];
     message.validityDurationSeconds = object.validityDurationSeconds ?? undefined;
+    message.executeBefore = object.executeBefore ?? undefined;
     return message;
   },
 };

@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/common/protohash"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -24,6 +25,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type BroadcastTokenHandler struct {
@@ -185,7 +187,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 		}
 	}
 
-	partialHash, err := utils.HashTokenTransaction(partialTxV2Shape, true)
+	partialHash, err := protohash.Hash(partial)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash partial token transaction: %w", err)
 	}
@@ -194,7 +196,16 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 		return nil, fmt.Errorf("failed to fetch partial token transaction: %w", err)
 	}
 	if existingPartialTx != nil {
-		return h.handleExistingTransaction(ctx, existingPartialTx)
+		// For execute_before transactions: if the processing window (ExpiryTime) has passed
+		// but execute_before hasn't, allow resubmission by treating as a new transaction.
+		// The preemption logic will handle the expired old transaction's locked outputs.
+		resubmittable := !existingPartialTx.ExecuteBefore.IsZero() &&
+			!existingPartialTx.ExpiryTime.IsZero() &&
+			time.Now().After(existingPartialTx.ExpiryTime) &&
+			!time.Now().After(existingPartialTx.ExecuteBefore)
+		if !resubmittable {
+			return h.handleExistingTransaction(ctx, existingPartialTx)
+		}
 	}
 
 	if err := preemptOrRejectTransactions(ctx, partialTxV2Shape); err != nil {
@@ -221,6 +232,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 		FinalTokenTransaction:      legacyTokenTx,
 		TokenTransactionSignatures: req.GetTokenTransactionOwnerSignatures(),
 		CoordinatorPublicKey:       h.config.IdentityPublicKey().Serialize(),
+		ExecuteBefore:              partial.ExecuteBefore,
 	})
 	if err != nil {
 		return nil, err
@@ -244,6 +256,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 				FinalTokenTransaction:      legacyTokenTx,
 				TokenTransactionSignatures: req.GetTokenTransactionOwnerSignatures(),
 				CoordinatorPublicKey:       h.config.IdentityPublicKey().Serialize(),
+				ExecuteBefore:              partial.ExecuteBefore,
 			})
 		},
 	)
@@ -355,12 +368,16 @@ func (h *BroadcastTokenHandler) FanoutBroadcastAndFinalize(
 			defer conn.Close()
 
 			client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
-			return client.SignTokenTransaction(ctx, &tokeninternalpb.SignTokenTransactionRequest{
+			req := &tokeninternalpb.SignTokenTransactionRequest{
 				KeyshareIds:                keyshareIDs,
 				FinalTokenTransaction:      legacyTokenTx,
 				TokenTransactionSignatures: ownerSignatures,
 				CoordinatorPublicKey:       h.config.IdentityPublicKey().Serialize(),
-			})
+			}
+			if !tokenTxEnt.ExecuteBefore.IsZero() {
+				req.ExecuteBefore = timestamppb.New(tokenTxEnt.ExecuteBefore)
+			}
+			return client.SignTokenTransaction(ctx, req)
 		},
 	)
 	if err != nil {
@@ -435,6 +452,7 @@ func (h *BroadcastTokenHandler) constructFinalTokenTransaction(
 	final := &tokenpb.FinalTokenTransaction{
 		Version:                  partial.Version,
 		TokenTransactionMetadata: metadata,
+		ExecuteBefore:            partial.ExecuteBefore,
 	}
 
 	if mint := partial.GetMintInput(); mint != nil {
@@ -537,7 +555,6 @@ func (h *BroadcastTokenHandler) handleExistingTransaction(
 	}
 
 	// Check if the transaction has expired (and not finalized).
-	// so clients should check transaction status before creating a replacement.
 	// Note: In rare cases the expired transaction might still be in the process of finalizing if
 	// enough operators have signed, but not yet revealed. In this case if the client generates a new transaction
 	// with the same outputs that broadcast will fail.

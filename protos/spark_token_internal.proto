@@ -5,6 +5,7 @@ package spark_token;
 import "spark_token.proto";
 import "validate/validate.proto";
 import "spark.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/lightsparkdev/spark/proto/spark_token_internal";
 
@@ -42,6 +43,9 @@ message PrepareTransactionRequest {
         (validate.rules).repeated.items.string.uuid = true
     ];
     bytes coordinator_public_key = 4;
+    // Optional client-specified deadline, forwarded from PartialTokenTransaction.execute_before.
+    // When set, non-coordinator SOs use this to relax CCT freshness validation.
+    optional google.protobuf.Timestamp execute_before = 5;
 }
 
 message PrepareTransactionResponse {}
@@ -129,6 +133,9 @@ message SignTokenTransactionRequest {
         (validate.rules).repeated.items.string.uuid = true
     ];
     bytes coordinator_public_key = 4  [(validate.rules).bytes.len = 33];
+    // Optional client-specified deadline, forwarded from PartialTokenTransaction.execute_before.
+    // When set, non-coordinator SOs use this to relax CCT freshness validation.
+    optional google.protobuf.Timestamp execute_before = 5;
 }
 
 message SignTokenTransactionResponse {

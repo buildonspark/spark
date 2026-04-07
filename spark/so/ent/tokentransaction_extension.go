@@ -995,6 +995,10 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 		tokenTransaction.ValidityDurationSeconds = proto.Uint64(t.ValidityDurationSeconds)
 	}
 
+	if !t.ExecuteBefore.IsZero() {
+		tokenTransaction.ExecuteBefore = timestamppb.New(t.ExecuteBefore)
+	}
+
 	// Sort outputs to match the original token transaction using CreatedTransactionOutputVout
 	sortedCreatedOutputs := slices.SortedFunc(slices.Values(t.Edges.CreatedOutput), func(a, b *TokenOutput) int {
 		return cmp.Compare(a.CreatedTransactionOutputVout, b.CreatedTransactionOutputVout)
@@ -1106,7 +1110,23 @@ func setTokenTransactionTimingFields(
 		expiryTime := tokenTransaction.ClientCreatedTimestamp.AsTime().Add(
 			time.Duration(tokenTransaction.GetValidityDurationSeconds()) * time.Second,
 		)
+		// When execute_before is set, cap ExpiryTime to a short processing window.
+		// This prevents outputs from being locked for the full execute_before duration.
+		// The client can resubmit the same signed partial to get a fresh window.
+		if tokenTransaction.ExecuteBefore != nil {
+			executeBefore := tokenTransaction.ExecuteBefore.AsTime()
+			processingDeadline := time.Now().UTC().Add(time.Duration(tokenTransaction.GetValidityDurationSeconds()) * time.Second)
+			if executeBefore.Before(processingDeadline) {
+				expiryTime = executeBefore
+			} else {
+				expiryTime = processingDeadline
+			}
+		}
 		builder = builder.SetExpiryTime(expiryTime)
+		if tokenTransaction.ExecuteBefore != nil {
+			eb := tokenTransaction.ExecuteBefore.AsTime()
+			builder = builder.SetExecuteBefore(eb)
+		}
 		return builder, nil
 	}
 

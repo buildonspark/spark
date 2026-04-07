@@ -572,6 +572,9 @@ func (ttu *TokenTransactionUpdate) sqlSave(ctx context.Context) (n int, err erro
 	if ttu.mutation.ValidityDurationSecondsCleared() {
 		_spec.ClearField(tokentransaction.FieldValidityDurationSeconds, field.TypeUint64)
 	}
+	if ttu.mutation.ExecuteBeforeCleared() {
+		_spec.ClearField(tokentransaction.FieldExecuteBefore, field.TypeTime)
+	}
 	if ttu.mutation.SpentOutputCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -1469,6 +1472,9 @@ func (ttuo *TokenTransactionUpdateOne) sqlSave(ctx context.Context) (_node *Toke
 	}
 	if ttuo.mutation.ValidityDurationSecondsCleared() {
 		_spec.ClearField(tokentransaction.FieldValidityDurationSeconds, field.TypeUint64)
+	}
+	if ttuo.mutation.ExecuteBeforeCleared() {
+		_spec.ClearField(tokentransaction.FieldExecuteBefore, field.TypeTime)
 	}
 	if ttuo.mutation.SpentOutputCleared() {
 		edge := &sqlgraph.EdgeSpec{

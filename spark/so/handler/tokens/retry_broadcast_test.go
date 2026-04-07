@@ -153,6 +153,84 @@ func TestRetryIncompleteSignatureBroadcasts_FiltersCorrectly(t *testing.T) {
 	assert.Equal(t, hash1, foundTx.FinalizedTokenTransactionHash)
 }
 
+func TestRetryExecuteBeforeTransactionUsesExpiryTimeAsProcessingWindow(t *testing.T) {
+	setup := setUpRetryBroadcastTest(t)
+	ctx := knobs.InjectKnobsService(setup.ctx, retryEnabledKnobs())
+
+	createSig := func(hash []byte) []byte {
+		return ecdsa.Sign(setup.config.IdentityPrivateKey.ToBTCEC(), hash).Serialize()
+	}
+
+	// execute_before transaction with ExpiryTime still in the future (processing window active).
+	// ExpiryTime is capped at min(now + validity, execute_before) at creation time.
+	hash1 := []byte("test-hash-eb-active-window!!!")
+	setup.client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(hash1).
+		SetFinalizedTokenTransactionHash(hash1).
+		SetStatus(st.TokenTransactionStatusSigned).
+		SetOperatorSignature(createSig(hash1)).
+		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
+		SetVersion(st.TokenTransactionVersionV3).
+		SetExpiryTime(time.Now().Add(3 * time.Minute)). // processing window still active
+		SetExecuteBefore(time.Now().Add(1 * time.Hour)).
+		SaveX(ctx)
+
+	// execute_before transaction with ExpiryTime in the past (processing window expired).
+	// Even though execute_before is still in the future, the processing window has closed.
+	hash2 := []byte("test-hash-eb-expired-window!!")
+	setup.client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(hash2).
+		SetFinalizedTokenTransactionHash(hash2).
+		SetStatus(st.TokenTransactionStatusSigned).
+		SetOperatorSignature(createSig(hash2)).
+		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
+		SetVersion(st.TokenTransactionVersionV3).
+		SetExpiryTime(time.Now().Add(-1 * time.Minute)). // processing window expired
+		SetExecuteBefore(time.Now().Add(1 * time.Hour)).
+		SaveX(ctx)
+
+	ids, err := findTransactionIDsNeedingRetry(ctx, setup.config)
+	require.NoError(t, err)
+	require.Len(t, ids, 1, "only the transaction with active processing window should be retryable")
+}
+
+func TestRetryStandardTransactionWithoutExecuteBeforeUsesExpiryTime(t *testing.T) {
+	setup := setUpRetryBroadcastTest(t)
+	ctx := knobs.InjectKnobsService(setup.ctx, retryEnabledKnobs())
+
+	createSig := func(hash []byte) []byte {
+		return ecdsa.Sign(setup.config.IdentityPrivateKey.ToBTCEC(), hash).Serialize()
+	}
+
+	// Standard transaction (no execute_before) with valid expiry — should be retryable
+	hash1 := []byte("test-hash-standard-retryable!!")
+	setup.client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(hash1).
+		SetFinalizedTokenTransactionHash(hash1).
+		SetStatus(st.TokenTransactionStatusSigned).
+		SetOperatorSignature(createSig(hash1)).
+		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
+		SetVersion(st.TokenTransactionVersionV3).
+		SetExpiryTime(time.Now().Add(1 * time.Hour)).
+		SaveX(ctx)
+
+	// Standard transaction (no execute_before) with expired expiry — should NOT be retryable
+	hash2 := []byte("test-hash-standard-expired!!!!")
+	setup.client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(hash2).
+		SetFinalizedTokenTransactionHash(hash2).
+		SetStatus(st.TokenTransactionStatusSigned).
+		SetOperatorSignature(createSig(hash2)).
+		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
+		SetVersion(st.TokenTransactionVersionV3).
+		SetExpiryTime(time.Now().Add(-1 * time.Hour)).
+		SaveX(ctx)
+
+	ids, err := findTransactionIDsNeedingRetry(ctx, setup.config)
+	require.NoError(t, err)
+	require.Len(t, ids, 1, "only the non-expired standard transaction should be retryable")
+}
+
 func TestRetryIncompleteSignatureBroadcasts_PeerSignatureCountLogic(t *testing.T) {
 	setup := setUpRetryBroadcastTest(t)
 	ctx := knobs.InjectKnobsService(setup.ctx, retryEnabledKnobs())

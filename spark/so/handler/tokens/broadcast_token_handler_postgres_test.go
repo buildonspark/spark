@@ -18,6 +18,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/protohash"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
@@ -77,7 +78,10 @@ func (s *broadcastTokenPostgresTestSetup) computeHashes(partial *tokenpb.Partial
 }
 
 func (s *broadcastTokenPostgresTestSetup) signAndBuildRequest(partial *tokenpb.PartialTokenTransaction, signerKey keys.Private) *tokenpb.BroadcastTransactionRequest {
-	partialHash, _ := s.computeHashes(partial)
+	// Hash the partial directly (including execute_before when set),
+	// matching what the real client does.
+	partialHash, err := protohash.Hash(partial)
+	require.NoError(s.t, err)
 	sig, err := schnorr.Sign(signerKey.ToBTCEC(), partialHash)
 	require.NoError(s.t, err)
 
@@ -433,6 +437,51 @@ func TestBroadcastTokenTransaction_RejectsExpiredExecuteBefore(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, resp)
 	assert.Contains(t, err.Error(), "has already passed")
+}
+
+func TestBroadcastTokenTransaction_ExecuteBeforeRelaxesCCT(t *testing.T) {
+	setup := setUpPhase2BroadcastTestHandlerPostgres(t)
+	ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())
+
+	issuerPriv, tokenCreate := setup.fixtures.CreateTokenCreateWithIssuer(btcnetwork.Regtest, nil, nil)
+	setup.fixtures.CreateKeyshare()
+
+	partial := setup.buildMintPartial(issuerPriv, tokenCreate)
+	// Set CCT to 1 hour ago — would normally fail tight freshness check.
+	// But set execute_before to 1 hour from now, which should relax the validation.
+	now := time.Now().UTC()
+	oldCCT := utils.ToMicrosecondPrecision(now.Add(-1 * time.Hour))
+	futureDeadline := utils.ToMicrosecondPrecision(now.Add(1 * time.Hour))
+	partial.TokenTransactionMetadata.ClientCreatedTimestamp = timestamppb.New(oldCCT)
+	partial.ExecuteBefore = timestamppb.New(futureDeadline)
+
+	req := setup.signAndBuildRequest(partial, issuerPriv)
+	resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
+}
+
+func TestBroadcastTokenTransaction_OldCCTWithoutExecuteBeforeFails(t *testing.T) {
+	setup := setUpPhase2BroadcastTestHandlerPostgres(t)
+	ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())
+
+	issuerPriv, tokenCreate := setup.fixtures.CreateTokenCreateWithIssuer(btcnetwork.Regtest, nil, nil)
+	setup.fixtures.CreateKeyshare()
+
+	partial := setup.buildMintPartial(issuerPriv, tokenCreate)
+	// Set CCT to 1 hour ago with no execute_before — should fail the tight freshness check
+	now := time.Now().UTC()
+	oldCCT := utils.ToMicrosecondPrecision(now.Add(-1 * time.Hour))
+	partial.TokenTransactionMetadata.ClientCreatedTimestamp = timestamppb.New(oldCCT)
+
+	req := setup.signAndBuildRequest(partial, issuerPriv)
+	resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Contains(t, err.Error(), "client created timestamp too old")
 }
 
 func TestBroadcastTokenTransaction_Phase2_MintSuccess(t *testing.T) {

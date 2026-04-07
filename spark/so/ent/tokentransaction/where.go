@@ -109,6 +109,11 @@ func ValidityDurationSeconds(v uint64) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldEQ(FieldValidityDurationSeconds, v))
 }
 
+// ExecuteBefore applies equality check predicate on the "execute_before" field. It's identical to ExecuteBeforeEQ.
+func ExecuteBefore(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldEQ(FieldExecuteBefore, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldEQ(FieldCreateTime, v))
@@ -611,6 +616,56 @@ func ValidityDurationSecondsIsNil() predicate.TokenTransaction {
 // ValidityDurationSecondsNotNil applies the NotNil predicate on the "validity_duration_seconds" field.
 func ValidityDurationSecondsNotNil() predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldNotNull(FieldValidityDurationSeconds))
+}
+
+// ExecuteBeforeEQ applies the EQ predicate on the "execute_before" field.
+func ExecuteBeforeEQ(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldEQ(FieldExecuteBefore, v))
+}
+
+// ExecuteBeforeNEQ applies the NEQ predicate on the "execute_before" field.
+func ExecuteBeforeNEQ(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNEQ(FieldExecuteBefore, v))
+}
+
+// ExecuteBeforeIn applies the In predicate on the "execute_before" field.
+func ExecuteBeforeIn(vs ...time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldIn(FieldExecuteBefore, vs...))
+}
+
+// ExecuteBeforeNotIn applies the NotIn predicate on the "execute_before" field.
+func ExecuteBeforeNotIn(vs ...time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNotIn(FieldExecuteBefore, vs...))
+}
+
+// ExecuteBeforeGT applies the GT predicate on the "execute_before" field.
+func ExecuteBeforeGT(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldGT(FieldExecuteBefore, v))
+}
+
+// ExecuteBeforeGTE applies the GTE predicate on the "execute_before" field.
+func ExecuteBeforeGTE(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldGTE(FieldExecuteBefore, v))
+}
+
+// ExecuteBeforeLT applies the LT predicate on the "execute_before" field.
+func ExecuteBeforeLT(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldLT(FieldExecuteBefore, v))
+}
+
+// ExecuteBeforeLTE applies the LTE predicate on the "execute_before" field.
+func ExecuteBeforeLTE(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldLTE(FieldExecuteBefore, v))
+}
+
+// ExecuteBeforeIsNil applies the IsNil predicate on the "execute_before" field.
+func ExecuteBeforeIsNil() predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldIsNull(FieldExecuteBefore))
+}
+
+// ExecuteBeforeNotNil applies the NotNil predicate on the "execute_before" field.
+func ExecuteBeforeNotNil() predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNotNull(FieldExecuteBefore))
 }
 
 // HasSpentOutput applies the HasEdge predicate on the "spent_output" edge.

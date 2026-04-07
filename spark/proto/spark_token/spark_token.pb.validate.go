@@ -1400,6 +1400,39 @@ func (m *TokenTransaction) validate(all bool) error {
 		// no validation rules for ValidityDurationSeconds
 	}
 
+	if m.ExecuteBefore != nil {
+
+		if all {
+			switch v := interface{}(m.GetExecuteBefore()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TokenTransactionValidationError{
+						field:  "ExecuteBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TokenTransactionValidationError{
+						field:  "ExecuteBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetExecuteBefore()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TokenTransactionValidationError{
+					field:  "ExecuteBefore",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return TokenTransactionMultiError(errors)
 	}
@@ -2230,6 +2263,39 @@ func (m *FinalTokenTransaction) validate(all bool) error {
 
 	default:
 		_ = v // ensures v is used
+	}
+
+	if m.ExecuteBefore != nil {
+
+		if all {
+			switch v := interface{}(m.GetExecuteBefore()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, FinalTokenTransactionValidationError{
+						field:  "ExecuteBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, FinalTokenTransactionValidationError{
+						field:  "ExecuteBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetExecuteBefore()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return FinalTokenTransactionValidationError{
+					field:  "ExecuteBefore",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	}
 
 	if len(errors) > 0 {

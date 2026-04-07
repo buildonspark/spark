@@ -145,6 +145,9 @@ message TokenTransaction {
     // Should NOT be set explicitly on V2 transactions (protected with validation).
     // Provided here to enable cross-conversion between v3 token transaction protos during migration.
     optional uint64 validity_duration_seconds = 11;
+    // Optional client-specified deadline for transaction execution.
+    // Carried through from PartialTokenTransaction.execute_before during conversion.
+    optional google.protobuf.Timestamp execute_before = 12;
 }
 
 message TokenTransactionMetadata {
@@ -189,6 +192,10 @@ message FinalTokenTransaction {
         TokenCreateInput create_input = 5;
     }
     repeated FinalTokenOutput final_token_outputs = 6;
+    // Optional client-specified deadline for transaction execution.
+    // Included in the final hash to prevent malleability — an attacker cannot
+    // change the deadline without invalidating operator signatures.
+    optional google.protobuf.Timestamp execute_before = 7;
 }
 
 message InvoiceAttachment {

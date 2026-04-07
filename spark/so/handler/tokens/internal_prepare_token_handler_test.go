@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -53,4 +54,57 @@ func TestValidateClientCreatedTimestamp(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateClientCreatedTimestamp_WithExecuteBefore(t *testing.T) {
+	validitySecs := uint64(30)
+
+	// ValidateExecuteBefore requires microsecond precision (PostgreSQL constraint).
+	truncUS := func(d time.Duration) time.Time {
+		return time.Now().Add(d).UTC().Truncate(time.Microsecond)
+	}
+
+	newTx := func(cctOffset time.Duration) *tokenpb.TokenTransaction {
+		return &tokenpb.TokenTransaction{
+			Version:                 3,
+			ClientCreatedTimestamp:  timestamppb.New(truncUS(cctOffset)),
+			ValidityDurationSeconds: &validitySecs,
+		}
+	}
+
+	t.Run("CCT_in_past_with_valid_execute_before_passes", func(t *testing.T) {
+		tx := newTx(-1 * time.Hour)
+		tx.ExecuteBefore = timestamppb.New(truncUS(1 * time.Hour))
+		require.NoError(t, validateClientCreatedTimestamp(tx))
+	})
+
+	t.Run("CCT_after_execute_before_fails", func(t *testing.T) {
+		tx := newTx(0)
+		tx.ExecuteBefore = timestamppb.New(truncUS(-1 * time.Hour))
+		require.Error(t, validateClientCreatedTimestamp(tx))
+	})
+
+	t.Run("CCT_too_far_before_execute_before_fails", func(t *testing.T) {
+		tx := newTx(-(spark.TokenMaxExecuteBeforeWindow + 1*time.Hour))
+		tx.ExecuteBefore = timestamppb.New(truncUS(1 * time.Hour))
+		require.Error(t, validateClientCreatedTimestamp(tx))
+	})
+
+	t.Run("execute_before_already_expired_fails", func(t *testing.T) {
+		tx := newTx(-5 * time.Minute)
+		tx.ExecuteBefore = timestamppb.New(truncUS(-30 * time.Second))
+		require.Error(t, validateClientCreatedTimestamp(tx))
+	})
+
+	t.Run("execute_before_too_far_in_future_fails", func(t *testing.T) {
+		tx := newTx(0)
+		tx.ExecuteBefore = timestamppb.New(truncUS(spark.TokenMaxExecuteBeforeWindow + 5*time.Second))
+		require.Error(t, validateClientCreatedTimestamp(tx))
+	})
+
+	t.Run("execute_before_within_max_window_passes", func(t *testing.T) {
+		tx := newTx(0)
+		tx.ExecuteBefore = timestamppb.New(truncUS(spark.TokenMaxExecuteBeforeWindow - 1*time.Hour))
+		require.NoError(t, validateClientCreatedTimestamp(tx))
+	})
 }

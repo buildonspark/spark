@@ -42,6 +42,9 @@ func (h *SignTokenTransactionHandler) SignTokenTransaction(
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("final token transaction is required"))
 	}
 
+	// Set execute_before on the TokenTransaction before hashing so the hash includes it.
+	finalTokenTX.ExecuteBefore = req.ExecuteBefore
+
 	hash, err := utils.HashTokenTransaction(finalTokenTX, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash final token transaction: %w", err)

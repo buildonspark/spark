@@ -162,6 +162,20 @@ func (ttc *TokenTransactionCreate) SetNillableValidityDurationSeconds(u *uint64)
 	return ttc
 }
 
+// SetExecuteBefore sets the "execute_before" field.
+func (ttc *TokenTransactionCreate) SetExecuteBefore(t time.Time) *TokenTransactionCreate {
+	ttc.mutation.SetExecuteBefore(t)
+	return ttc
+}
+
+// SetNillableExecuteBefore sets the "execute_before" field if the given value is not nil.
+func (ttc *TokenTransactionCreate) SetNillableExecuteBefore(t *time.Time) *TokenTransactionCreate {
+	if t != nil {
+		ttc.SetExecuteBefore(*t)
+	}
+	return ttc
+}
+
 // SetID sets the "id" field.
 func (ttc *TokenTransactionCreate) SetID(u uuid.UUID) *TokenTransactionCreate {
 	ttc.mutation.SetID(u)
@@ -489,6 +503,10 @@ func (ttc *TokenTransactionCreate) createSpec() (*TokenTransaction, *sqlgraph.Cr
 	if value, ok := ttc.mutation.ValidityDurationSeconds(); ok {
 		_spec.SetField(tokentransaction.FieldValidityDurationSeconds, field.TypeUint64, value)
 		_node.ValidityDurationSeconds = value
+	}
+	if value, ok := ttc.mutation.ExecuteBefore(); ok {
+		_spec.SetField(tokentransaction.FieldExecuteBefore, field.TypeTime, value)
+		_node.ExecuteBefore = value
 	}
 	if nodes := ttc.mutation.SpentOutputIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -845,6 +863,9 @@ func (u *TokenTransactionUpsertOne) UpdateNewValues() *TokenTransactionUpsertOne
 		}
 		if _, exists := u.create.mutation.ExpiryTime(); exists {
 			s.SetIgnore(tokentransaction.FieldExpiryTime)
+		}
+		if _, exists := u.create.mutation.ExecuteBefore(); exists {
+			s.SetIgnore(tokentransaction.FieldExecuteBefore)
 		}
 	}))
 	return u
@@ -1240,6 +1261,9 @@ func (u *TokenTransactionUpsertBulk) UpdateNewValues() *TokenTransactionUpsertBu
 			}
 			if _, exists := b.mutation.ExpiryTime(); exists {
 				s.SetIgnore(tokentransaction.FieldExpiryTime)
+			}
+			if _, exists := b.mutation.ExecuteBefore(); exists {
+				s.SetIgnore(tokentransaction.FieldExecuteBefore)
 			}
 		}
 	}))

@@ -189,6 +189,7 @@ func ConvertPartialToV2TxShape(partial *tokenpb.PartialTokenTransaction) (*token
 		ClientCreatedTimestamp:          partial.TokenTransactionMetadata.GetClientCreatedTimestamp(),
 		InvoiceAttachments:              partial.TokenTransactionMetadata.GetInvoiceAttachments(),
 		ValidityDurationSeconds:         validityDuration,
+		ExecuteBefore:                   partial.GetExecuteBefore(),
 	}
 
 	switch input := partial.TokenInputs.(type) {
@@ -241,6 +242,7 @@ func ConvertFinalToV2TxShape(final *tokenpb.FinalTokenTransaction) (*tokenpb.Tok
 		ClientCreatedTimestamp:          final.TokenTransactionMetadata.GetClientCreatedTimestamp(),
 		InvoiceAttachments:              final.TokenTransactionMetadata.GetInvoiceAttachments(),
 		ValidityDurationSeconds:         validityDuration,
+		ExecuteBefore:                   final.GetExecuteBefore(),
 	}
 
 	switch input := final.TokenInputs.(type) {
@@ -316,6 +318,7 @@ func ConvertV2TxShapeToPartial(legacy *tokenpb.TokenTransaction) (*tokenpb.Parti
 			InvoiceAttachments:              legacy.GetInvoiceAttachments(),
 			ValidityDurationSeconds:         legacy.GetValidityDurationSeconds(),
 		},
+		ExecuteBefore: legacy.GetExecuteBefore(),
 	}
 
 	// Map inputs while erasing SO-filled fields for partials
@@ -397,6 +400,7 @@ func ConvertV2TxShapeToFinal(legacy *tokenpb.TokenTransaction) (*tokenpb.FinalTo
 			InvoiceAttachments:              legacy.GetInvoiceAttachments(),
 			ValidityDurationSeconds:         legacy.GetValidityDurationSeconds(),
 		},
+		ExecuteBefore: legacy.GetExecuteBefore(),
 	}
 
 	switch input := legacy.TokenInputs.(type) {

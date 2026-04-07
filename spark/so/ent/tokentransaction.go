@@ -45,6 +45,8 @@ type TokenTransaction struct {
 	Version schematype.TokenTransactionVersion `json:"version,omitempty"`
 	// Duration in seconds for which this transaction is valid.
 	ValidityDurationSeconds uint64 `json:"validity_duration_seconds,omitempty"`
+	// Client-specified deadline for transaction execution. When set, the transaction can be broadcast over a much longer period (up to the deadline) instead of the tight CCT freshness window.
+	ExecuteBefore time.Time `json:"execute_before,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenTransactionQuery when eager-loading is set.
 	Edges                            TokenTransactionEdges `json:"edges"`
@@ -168,7 +170,7 @@ func (*TokenTransaction) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case tokentransaction.FieldStatus:
 			values[i] = new(sql.NullString)
-		case tokentransaction.FieldCreateTime, tokentransaction.FieldUpdateTime, tokentransaction.FieldExpiryTime, tokentransaction.FieldClientCreatedTimestamp:
+		case tokentransaction.FieldCreateTime, tokentransaction.FieldUpdateTime, tokentransaction.FieldExpiryTime, tokentransaction.FieldClientCreatedTimestamp, tokentransaction.FieldExecuteBefore:
 			values[i] = new(sql.NullTime)
 		case tokentransaction.FieldID:
 			values[i] = new(uuid.UUID)
@@ -264,6 +266,12 @@ func (tt *TokenTransaction) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field validity_duration_seconds", values[i])
 			} else if value.Valid {
 				tt.ValidityDurationSeconds = uint64(value.Int64)
+			}
+		case tokentransaction.FieldExecuteBefore:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field execute_before", values[i])
+			} else if value.Valid {
+				tt.ExecuteBefore = value.Time
 			}
 		case tokentransaction.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -394,6 +402,9 @@ func (tt *TokenTransaction) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("validity_duration_seconds=")
 	builder.WriteString(fmt.Sprintf("%v", tt.ValidityDurationSeconds))
+	builder.WriteString(", ")
+	builder.WriteString("execute_before=")
+	builder.WriteString(tt.ExecuteBefore.Format(time.ANSIC))
 	builder.WriteByte(')')
 	return builder.String()
 }

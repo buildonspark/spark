@@ -18,9 +18,11 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/go-cmp/cmp"
+	"github.com/lightsparkdev/spark/common/protohash"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	legacypb "github.com/lightsparkdev/spark/proto/spark_token_legacy"
+	"github.com/lightsparkdev/spark/so/protoconverter"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -1225,6 +1227,117 @@ func TestHashTokenTransactionVersioning(t *testing.T) {
 			t.Errorf("unexpected error message: %v", err)
 		}
 	})
+}
+
+func TestPartialHashBackwardsCompatible_V2RoundTripMatchesDirectProtohash(t *testing.T) {
+	// Verify that protohashing a PartialTokenTransaction directly produces the same
+	// result as the V2 round-trip path (Partial → V2 shape → back to Partial → protohash).
+	// This ensures the BroadcastHandler change to hash the original partial is backwards compatible.
+	partial := &tokenpb.PartialTokenTransaction{
+		Version: 3,
+		TokenTransactionMetadata: &tokenpb.TokenTransactionMetadata{
+			SparkOperatorIdentityPublicKeys: [][]byte{bytes.Repeat([]byte{0x04}, 33)},
+			Network:                         pb.Network_REGTEST,
+			ClientCreatedTimestamp:          timestamppb.New(time.Unix(1000, 0)),
+			ValidityDurationSeconds:         300,
+		},
+		TokenInputs: &tokenpb.PartialTokenTransaction_MintInput{
+			MintInput: &tokenpb.TokenMintInput{
+				IssuerPublicKey: bytes.Repeat([]byte{0x01}, 33),
+				TokenIdentifier: bytes.Repeat([]byte{0xAB}, 32),
+			},
+		},
+		PartialTokenOutputs: []*tokenpb.PartialTokenOutput{
+			{
+				OwnerPublicKey:                bytes.Repeat([]byte{0x02}, 33),
+				TokenIdentifier:               bytes.Repeat([]byte{0xAB}, 32),
+				TokenAmount:                   []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+				WithdrawBondSats:              1000,
+				WithdrawRelativeBlockLocktime: 144,
+			},
+		},
+	}
+
+	// V2 round-trip path
+	v2Shape, err := protoconverter.ConvertPartialToV2TxShape(partial)
+	require.NoError(t, err)
+	v2RoundTripHash, err := HashTokenTransactionV3(v2Shape, true)
+	require.NoError(t, err)
+
+	// Direct protohash
+	directHash, err := protohash.Hash(partial)
+	require.NoError(t, err)
+
+	assert.Equal(t, v2RoundTripHash, directHash,
+		"direct protohash of partial must equal V2 round-trip hash for backwards compatibility")
+}
+
+func TestPartialHashChangesWhenExecuteBeforeIsSet(t *testing.T) {
+	partial := &tokenpb.PartialTokenTransaction{
+		Version: 3,
+		TokenTransactionMetadata: &tokenpb.TokenTransactionMetadata{
+			SparkOperatorIdentityPublicKeys: [][]byte{bytes.Repeat([]byte{0x04}, 33)},
+			Network:                         pb.Network_REGTEST,
+			ClientCreatedTimestamp:          timestamppb.New(time.Unix(1000, 0)),
+			ValidityDurationSeconds:         300,
+		},
+		TokenInputs: &tokenpb.PartialTokenTransaction_MintInput{
+			MintInput: &tokenpb.TokenMintInput{
+				IssuerPublicKey: bytes.Repeat([]byte{0x01}, 33),
+			},
+		},
+		PartialTokenOutputs: []*tokenpb.PartialTokenOutput{
+			{
+				OwnerPublicKey: bytes.Repeat([]byte{0x02}, 33),
+				TokenAmount:    []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+			},
+		},
+	}
+
+	hashWithout, err := protohash.Hash(partial)
+	require.NoError(t, err)
+
+	partial.ExecuteBefore = timestamppb.New(time.Now().Add(1 * time.Hour))
+	hashWith, err := protohash.Hash(partial)
+	require.NoError(t, err)
+
+	assert.NotEqual(t, hashWithout, hashWith,
+		"setting execute_before must change the partial hash")
+}
+
+func TestFinalHashChangesWhenExecuteBeforeIsSet(t *testing.T) {
+	// execute_before is included in FinalTokenTransaction to prevent malleability —
+	// an attacker cannot change the deadline without invalidating operator signatures.
+	vds := uint64(300)
+	tx := &tokenpb.TokenTransaction{
+		Version:                         3,
+		SparkOperatorIdentityPublicKeys: [][]byte{bytes.Repeat([]byte{0x04}, 33)},
+		Network:                         pb.Network_REGTEST,
+		ClientCreatedTimestamp:          timestamppb.New(time.Unix(1000, 0)),
+		ValidityDurationSeconds:         &vds,
+		TokenInputs: &tokenpb.TokenTransaction_MintInput{
+			MintInput: &tokenpb.TokenMintInput{
+				IssuerPublicKey: bytes.Repeat([]byte{0x01}, 33),
+			},
+		},
+		TokenOutputs: []*tokenpb.TokenOutput{
+			{
+				OwnerPublicKey:       bytes.Repeat([]byte{0x02}, 33),
+				TokenAmount:          []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+				RevocationCommitment: bytes.Repeat([]byte{0xaa}, 32),
+			},
+		},
+	}
+
+	hashWithout, err := HashTokenTransaction(tx, false)
+	require.NoError(t, err)
+
+	tx.ExecuteBefore = timestamppb.New(time.Now().Add(1 * time.Hour))
+	hashWith, err := HashTokenTransaction(tx, false)
+	require.NoError(t, err)
+
+	assert.NotEqual(t, hashWithout, hashWith,
+		"setting execute_before must change the final hash")
 }
 
 func TestHashTokenTransactionProtoEquivalence(t *testing.T) {

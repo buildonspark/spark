@@ -752,6 +752,7 @@ func TestRoundTrip_Final_Legacy_Equivalent(t *testing.T) {
 
 func TestRoundTrip_Partial_Legacy_Equivalent(t *testing.T) {
 	ts := timestamppb.New(time.UnixMilli(444))
+	eb := timestamppb.New(time.UnixMilli(999))
 	partial := &tokenpb.PartialTokenTransaction{
 		TokenTransactionMetadata: &tokenpb.TokenTransactionMetadata{
 			SparkOperatorIdentityPublicKeys: [][]byte{op1Key},
@@ -780,6 +781,7 @@ func TestRoundTrip_Partial_Legacy_Equivalent(t *testing.T) {
 				TokenAmount:                   tokenAmount,
 			},
 		},
+		ExecuteBefore: eb,
 	}
 
 	legacy, err := ConvertPartialToV2TxShape(partial)

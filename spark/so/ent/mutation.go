@@ -21916,6 +21916,7 @@ type TokenTransactionMutation struct {
 	addversion                       *schematype.TokenTransactionVersion
 	validity_duration_seconds        *uint64
 	addvalidity_duration_seconds     *int64
+	execute_before                   *time.Time
 	clearedFields                    map[string]struct{}
 	spent_output                     map[uuid.UUID]struct{}
 	removedspent_output              map[uuid.UUID]struct{}
@@ -22562,6 +22563,55 @@ func (m *TokenTransactionMutation) ResetValidityDurationSeconds() {
 	delete(m.clearedFields, tokentransaction.FieldValidityDurationSeconds)
 }
 
+// SetExecuteBefore sets the "execute_before" field.
+func (m *TokenTransactionMutation) SetExecuteBefore(t time.Time) {
+	m.execute_before = &t
+}
+
+// ExecuteBefore returns the value of the "execute_before" field in the mutation.
+func (m *TokenTransactionMutation) ExecuteBefore() (r time.Time, exists bool) {
+	v := m.execute_before
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExecuteBefore returns the old "execute_before" field's value of the TokenTransaction entity.
+// If the TokenTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenTransactionMutation) OldExecuteBefore(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExecuteBefore is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExecuteBefore requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExecuteBefore: %w", err)
+	}
+	return oldValue.ExecuteBefore, nil
+}
+
+// ClearExecuteBefore clears the value of the "execute_before" field.
+func (m *TokenTransactionMutation) ClearExecuteBefore() {
+	m.execute_before = nil
+	m.clearedFields[tokentransaction.FieldExecuteBefore] = struct{}{}
+}
+
+// ExecuteBeforeCleared returns if the "execute_before" field was cleared in this mutation.
+func (m *TokenTransactionMutation) ExecuteBeforeCleared() bool {
+	_, ok := m.clearedFields[tokentransaction.FieldExecuteBefore]
+	return ok
+}
+
+// ResetExecuteBefore resets all changes to the "execute_before" field.
+func (m *TokenTransactionMutation) ResetExecuteBefore() {
+	m.execute_before = nil
+	delete(m.clearedFields, tokentransaction.FieldExecuteBefore)
+}
+
 // AddSpentOutputIDs adds the "spent_output" edge to the TokenOutput entity by ids.
 func (m *TokenTransactionMutation) AddSpentOutputIDs(ids ...uuid.UUID) {
 	if m.spent_output == nil {
@@ -22983,7 +23033,7 @@ func (m *TokenTransactionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenTransactionMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.create_time != nil {
 		fields = append(fields, tokentransaction.FieldCreateTime)
 	}
@@ -23017,6 +23067,9 @@ func (m *TokenTransactionMutation) Fields() []string {
 	if m.validity_duration_seconds != nil {
 		fields = append(fields, tokentransaction.FieldValidityDurationSeconds)
 	}
+	if m.execute_before != nil {
+		fields = append(fields, tokentransaction.FieldExecuteBefore)
+	}
 	return fields
 }
 
@@ -23047,6 +23100,8 @@ func (m *TokenTransactionMutation) Field(name string) (ent.Value, bool) {
 		return m.Version()
 	case tokentransaction.FieldValidityDurationSeconds:
 		return m.ValidityDurationSeconds()
+	case tokentransaction.FieldExecuteBefore:
+		return m.ExecuteBefore()
 	}
 	return nil, false
 }
@@ -23078,6 +23133,8 @@ func (m *TokenTransactionMutation) OldField(ctx context.Context, name string) (e
 		return m.OldVersion(ctx)
 	case tokentransaction.FieldValidityDurationSeconds:
 		return m.OldValidityDurationSeconds(ctx)
+	case tokentransaction.FieldExecuteBefore:
+		return m.OldExecuteBefore(ctx)
 	}
 	return nil, fmt.Errorf("unknown TokenTransaction field %s", name)
 }
@@ -23164,6 +23221,13 @@ func (m *TokenTransactionMutation) SetField(name string, value ent.Value) error 
 		}
 		m.SetValidityDurationSeconds(v)
 		return nil
+	case tokentransaction.FieldExecuteBefore:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExecuteBefore(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction field %s", name)
 }
@@ -23239,6 +23303,9 @@ func (m *TokenTransactionMutation) ClearedFields() []string {
 	if m.FieldCleared(tokentransaction.FieldValidityDurationSeconds) {
 		fields = append(fields, tokentransaction.FieldValidityDurationSeconds)
 	}
+	if m.FieldCleared(tokentransaction.FieldExecuteBefore) {
+		fields = append(fields, tokentransaction.FieldExecuteBefore)
+	}
 	return fields
 }
 
@@ -23270,6 +23337,9 @@ func (m *TokenTransactionMutation) ClearField(name string) error {
 		return nil
 	case tokentransaction.FieldValidityDurationSeconds:
 		m.ClearValidityDurationSeconds()
+		return nil
+	case tokentransaction.FieldExecuteBefore:
+		m.ClearExecuteBefore()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction nullable field %s", name)
@@ -23311,6 +23381,9 @@ func (m *TokenTransactionMutation) ResetField(name string) error {
 		return nil
 	case tokentransaction.FieldValidityDurationSeconds:
 		m.ResetValidityDurationSeconds()
+		return nil
+	case tokentransaction.FieldExecuteBefore:
+		m.ResetExecuteBefore()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction field %s", name)

@@ -12,6 +12,7 @@ import (
 	spark_token "github.com/lightsparkdev/spark/proto/spark_token"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -30,8 +31,11 @@ type PrepareTransactionRequest struct {
 	TokenTransactionSignatures []*spark_token.SignatureWithIndex `protobuf:"bytes,2,rep,name=token_transaction_signatures,json=tokenTransactionSignatures,proto3" json:"token_transaction_signatures,omitempty"`
 	KeyshareIds                []string                          `protobuf:"bytes,3,rep,name=keyshare_ids,json=keyshareIds,proto3" json:"keyshare_ids,omitempty"`
 	CoordinatorPublicKey       []byte                            `protobuf:"bytes,4,opt,name=coordinator_public_key,json=coordinatorPublicKey,proto3" json:"coordinator_public_key,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	// Optional client-specified deadline, forwarded from PartialTokenTransaction.execute_before.
+	// When set, non-coordinator SOs use this to relax CCT freshness validation.
+	ExecuteBefore *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=execute_before,json=executeBefore,proto3,oneof" json:"execute_before,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PrepareTransactionRequest) Reset() {
@@ -88,6 +92,13 @@ func (x *PrepareTransactionRequest) GetKeyshareIds() []string {
 func (x *PrepareTransactionRequest) GetCoordinatorPublicKey() []byte {
 	if x != nil {
 		return x.CoordinatorPublicKey
+	}
+	return nil
+}
+
+func (x *PrepareTransactionRequest) GetExecuteBefore() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExecuteBefore
 	}
 	return nil
 }
@@ -730,8 +741,11 @@ type SignTokenTransactionRequest struct {
 	TokenTransactionSignatures []*spark_token.SignatureWithIndex `protobuf:"bytes,2,rep,name=token_transaction_signatures,json=tokenTransactionSignatures,proto3" json:"token_transaction_signatures,omitempty"`
 	KeyshareIds                []string                          `protobuf:"bytes,3,rep,name=keyshare_ids,json=keyshareIds,proto3" json:"keyshare_ids,omitempty"`
 	CoordinatorPublicKey       []byte                            `protobuf:"bytes,4,opt,name=coordinator_public_key,json=coordinatorPublicKey,proto3" json:"coordinator_public_key,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	// Optional client-specified deadline, forwarded from PartialTokenTransaction.execute_before.
+	// When set, non-coordinator SOs use this to relax CCT freshness validation.
+	ExecuteBefore *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=execute_before,json=executeBefore,proto3,oneof" json:"execute_before,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SignTokenTransactionRequest) Reset() {
@@ -788,6 +802,13 @@ func (x *SignTokenTransactionRequest) GetKeyshareIds() []string {
 func (x *SignTokenTransactionRequest) GetCoordinatorPublicKey() []byte {
 	if x != nil {
 		return x.CoordinatorPublicKey
+	}
+	return nil
+}
+
+func (x *SignTokenTransactionRequest) GetExecuteBefore() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExecuteBefore
 	}
 	return nil
 }
@@ -946,13 +967,15 @@ var File_spark_token_internal_proto protoreflect.FileDescriptor
 
 const file_spark_token_internal_proto_rawDesc = "" +
 	"\n" +
-	"\x1aspark_token_internal.proto\x12\vspark_token\x1a\x11spark_token.proto\x1a\x17validate/validate.proto\x1a\vspark.proto\"\xbd\x02\n" +
+	"\x1aspark_token_internal.proto\x12\vspark_token\x1a\x11spark_token.proto\x1a\x17validate/validate.proto\x1a\vspark.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x98\x03\n" +
 	"\x19PrepareTransactionRequest\x12U\n" +
 	"\x17final_token_transaction\x18\x01 \x01(\v2\x1d.spark_token.TokenTransactionR\x15finalTokenTransaction\x12a\n" +
 	"\x1ctoken_transaction_signatures\x18\x02 \x03(\v2\x1f.spark_token.SignatureWithIndexR\x1atokenTransactionSignatures\x120\n" +
 	"\fkeyshare_ids\x18\x03 \x03(\tB\r\xfaB\n" +
 	"\x92\x01\a\"\x05r\x03\xb0\x01\x01R\vkeyshareIds\x124\n" +
-	"\x16coordinator_public_key\x18\x04 \x01(\fR\x14coordinatorPublicKey\"\x1c\n" +
+	"\x16coordinator_public_key\x18\x04 \x01(\fR\x14coordinatorPublicKey\x12F\n" +
+	"\x0eexecute_before\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\rexecuteBefore\x88\x01\x01B\x11\n" +
+	"\x0f_execute_before\"\x1c\n" +
 	"\x1aPrepareTransactionResponse\"\x8b\x03\n" +
 	"+SignTokenTransactionFromCoordinationRequest\x12U\n" +
 	"\x17final_token_transaction\x18\x01 \x01(\v2\x1d.spark_token.TokenTransactionR\x15finalTokenTransaction\x12H\n" +
@@ -999,13 +1022,15 @@ const file_spark_token_internal_proto_rawDesc = "" +
 	"\x1acreation_entity_public_key\x18\t \x01(\fB\a\xfaB\x04z\x02h!R\x17creationEntityPublicKey\x124\n" +
 	"\x0eextra_metadata\x18\n" +
 	" \x01(\fB\b\xfaB\x05z\x03\x18\x80\bH\x00R\rextraMetadata\x88\x01\x01B\x11\n" +
-	"\x0f_extra_metadata\"\xc8\x02\n" +
+	"\x0f_extra_metadata\"\xa3\x03\n" +
 	"\x1bSignTokenTransactionRequest\x12U\n" +
 	"\x17final_token_transaction\x18\x01 \x01(\v2\x1d.spark_token.TokenTransactionR\x15finalTokenTransaction\x12a\n" +
 	"\x1ctoken_transaction_signatures\x18\x02 \x03(\v2\x1f.spark_token.SignatureWithIndexR\x1atokenTransactionSignatures\x120\n" +
 	"\fkeyshare_ids\x18\x03 \x03(\tB\r\xfaB\n" +
 	"\x92\x01\a\"\x05r\x03\xb0\x01\x01R\vkeyshareIds\x12=\n" +
-	"\x16coordinator_public_key\x18\x04 \x01(\fB\a\xfaB\x04z\x02h!R\x14coordinatorPublicKey\"c\n" +
+	"\x16coordinator_public_key\x18\x04 \x01(\fB\a\xfaB\x04z\x02h!R\x14coordinatorPublicKey\x12F\n" +
+	"\x0eexecute_before\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\rexecuteBefore\x88\x01\x01B\x11\n" +
+	"\x0f_execute_before\"c\n" +
 	"\x1cSignTokenTransactionResponse\x12C\n" +
 	"\x18spark_operator_signature\x18\x01 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\x16sparkOperatorSignature\"\xa9\x01\n" +
 	"\x1bInternalFreezeTokensRequest\x12T\n" +
@@ -1052,44 +1077,47 @@ var file_spark_token_internal_proto_goTypes = []any{
 	(*InternalFreezeTokensResponse)(nil),                 // 14: spark_token.InternalFreezeTokensResponse
 	(*spark_token.TokenTransaction)(nil),                 // 15: spark_token.TokenTransaction
 	(*spark_token.SignatureWithIndex)(nil),               // 16: spark_token.SignatureWithIndex
-	(*spark_token.InputTtxoSignaturesPerOperator)(nil),   // 17: spark_token.InputTtxoSignaturesPerOperator
-	(*spark_token.TokenOutputToSpend)(nil),               // 18: spark_token.TokenOutputToSpend
-	(spark.Network)(0),                                   // 19: spark.Network
-	(*spark_token.FreezeTokensPayload)(nil),              // 20: spark_token.FreezeTokensPayload
-	(*spark_token.TokenOutputRef)(nil),                   // 21: spark_token.TokenOutputRef
+	(*timestamppb.Timestamp)(nil),                        // 17: google.protobuf.Timestamp
+	(*spark_token.InputTtxoSignaturesPerOperator)(nil),   // 18: spark_token.InputTtxoSignaturesPerOperator
+	(*spark_token.TokenOutputToSpend)(nil),               // 19: spark_token.TokenOutputToSpend
+	(spark.Network)(0),                                   // 20: spark.Network
+	(*spark_token.FreezeTokensPayload)(nil),              // 21: spark_token.FreezeTokensPayload
+	(*spark_token.TokenOutputRef)(nil),                   // 22: spark_token.TokenOutputRef
 }
 var file_spark_token_internal_proto_depIdxs = []int32{
 	15, // 0: spark_token.PrepareTransactionRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
 	16, // 1: spark_token.PrepareTransactionRequest.token_transaction_signatures:type_name -> spark_token.SignatureWithIndex
-	15, // 2: spark_token.SignTokenTransactionFromCoordinationRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
-	17, // 3: spark_token.SignTokenTransactionFromCoordinationRequest.input_ttxo_signatures_per_operator:type_name -> spark_token.InputTtxoSignaturesPerOperator
-	18, // 4: spark_token.RevocationSecretShare.input_ttxo_ref:type_name -> spark_token.TokenOutputToSpend
-	5,  // 5: spark_token.OperatorRevocationShares.shares:type_name -> spark_token.RevocationSecretShare
-	15, // 6: spark_token.ExchangeRevocationSecretsSharesRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
-	4,  // 7: spark_token.ExchangeRevocationSecretsSharesRequest.operator_transaction_signatures:type_name -> spark_token.OperatorTransactionSignature
-	6,  // 8: spark_token.ExchangeRevocationSecretsSharesRequest.operator_shares:type_name -> spark_token.OperatorRevocationShares
-	9,  // 9: spark_token.ExchangeRevocationSecretsSharesRequest.outputs_to_spend:type_name -> spark_token.OutputToSpend
-	6,  // 10: spark_token.ExchangeRevocationSecretsSharesResponse.received_operator_shares:type_name -> spark_token.OperatorRevocationShares
-	19, // 11: spark_token.UnencodedTokenIdentifier.network:type_name -> spark.Network
-	15, // 12: spark_token.SignTokenTransactionRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
-	16, // 13: spark_token.SignTokenTransactionRequest.token_transaction_signatures:type_name -> spark_token.SignatureWithIndex
-	20, // 14: spark_token.InternalFreezeTokensRequest.freeze_tokens_payload:type_name -> spark_token.FreezeTokensPayload
-	21, // 15: spark_token.InternalFreezeTokensResponse.impacted_token_outputs:type_name -> spark_token.TokenOutputRef
-	0,  // 16: spark_token.SparkTokenInternalService.prepare_transaction:input_type -> spark_token.PrepareTransactionRequest
-	2,  // 17: spark_token.SparkTokenInternalService.sign_token_transaction_from_coordination:input_type -> spark_token.SignTokenTransactionFromCoordinationRequest
-	7,  // 18: spark_token.SparkTokenInternalService.exchange_revocation_secrets_shares:input_type -> spark_token.ExchangeRevocationSecretsSharesRequest
-	11, // 19: spark_token.SparkTokenInternalService.sign_token_transaction:input_type -> spark_token.SignTokenTransactionRequest
-	13, // 20: spark_token.SparkTokenInternalService.internal_freeze_tokens:input_type -> spark_token.InternalFreezeTokensRequest
-	1,  // 21: spark_token.SparkTokenInternalService.prepare_transaction:output_type -> spark_token.PrepareTransactionResponse
-	3,  // 22: spark_token.SparkTokenInternalService.sign_token_transaction_from_coordination:output_type -> spark_token.SignTokenTransactionFromCoordinationResponse
-	8,  // 23: spark_token.SparkTokenInternalService.exchange_revocation_secrets_shares:output_type -> spark_token.ExchangeRevocationSecretsSharesResponse
-	12, // 24: spark_token.SparkTokenInternalService.sign_token_transaction:output_type -> spark_token.SignTokenTransactionResponse
-	14, // 25: spark_token.SparkTokenInternalService.internal_freeze_tokens:output_type -> spark_token.InternalFreezeTokensResponse
-	21, // [21:26] is the sub-list for method output_type
-	16, // [16:21] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	17, // 2: spark_token.PrepareTransactionRequest.execute_before:type_name -> google.protobuf.Timestamp
+	15, // 3: spark_token.SignTokenTransactionFromCoordinationRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
+	18, // 4: spark_token.SignTokenTransactionFromCoordinationRequest.input_ttxo_signatures_per_operator:type_name -> spark_token.InputTtxoSignaturesPerOperator
+	19, // 5: spark_token.RevocationSecretShare.input_ttxo_ref:type_name -> spark_token.TokenOutputToSpend
+	5,  // 6: spark_token.OperatorRevocationShares.shares:type_name -> spark_token.RevocationSecretShare
+	15, // 7: spark_token.ExchangeRevocationSecretsSharesRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
+	4,  // 8: spark_token.ExchangeRevocationSecretsSharesRequest.operator_transaction_signatures:type_name -> spark_token.OperatorTransactionSignature
+	6,  // 9: spark_token.ExchangeRevocationSecretsSharesRequest.operator_shares:type_name -> spark_token.OperatorRevocationShares
+	9,  // 10: spark_token.ExchangeRevocationSecretsSharesRequest.outputs_to_spend:type_name -> spark_token.OutputToSpend
+	6,  // 11: spark_token.ExchangeRevocationSecretsSharesResponse.received_operator_shares:type_name -> spark_token.OperatorRevocationShares
+	20, // 12: spark_token.UnencodedTokenIdentifier.network:type_name -> spark.Network
+	15, // 13: spark_token.SignTokenTransactionRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
+	16, // 14: spark_token.SignTokenTransactionRequest.token_transaction_signatures:type_name -> spark_token.SignatureWithIndex
+	17, // 15: spark_token.SignTokenTransactionRequest.execute_before:type_name -> google.protobuf.Timestamp
+	21, // 16: spark_token.InternalFreezeTokensRequest.freeze_tokens_payload:type_name -> spark_token.FreezeTokensPayload
+	22, // 17: spark_token.InternalFreezeTokensResponse.impacted_token_outputs:type_name -> spark_token.TokenOutputRef
+	0,  // 18: spark_token.SparkTokenInternalService.prepare_transaction:input_type -> spark_token.PrepareTransactionRequest
+	2,  // 19: spark_token.SparkTokenInternalService.sign_token_transaction_from_coordination:input_type -> spark_token.SignTokenTransactionFromCoordinationRequest
+	7,  // 20: spark_token.SparkTokenInternalService.exchange_revocation_secrets_shares:input_type -> spark_token.ExchangeRevocationSecretsSharesRequest
+	11, // 21: spark_token.SparkTokenInternalService.sign_token_transaction:input_type -> spark_token.SignTokenTransactionRequest
+	13, // 22: spark_token.SparkTokenInternalService.internal_freeze_tokens:input_type -> spark_token.InternalFreezeTokensRequest
+	1,  // 23: spark_token.SparkTokenInternalService.prepare_transaction:output_type -> spark_token.PrepareTransactionResponse
+	3,  // 24: spark_token.SparkTokenInternalService.sign_token_transaction_from_coordination:output_type -> spark_token.SignTokenTransactionFromCoordinationResponse
+	8,  // 25: spark_token.SparkTokenInternalService.exchange_revocation_secrets_shares:output_type -> spark_token.ExchangeRevocationSecretsSharesResponse
+	12, // 26: spark_token.SparkTokenInternalService.sign_token_transaction:output_type -> spark_token.SignTokenTransactionResponse
+	14, // 27: spark_token.SparkTokenInternalService.internal_freeze_tokens:output_type -> spark_token.InternalFreezeTokensResponse
+	23, // [23:28] is the sub-list for method output_type
+	18, // [18:23] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_spark_token_internal_proto_init() }
@@ -1097,7 +1125,9 @@ func file_spark_token_internal_proto_init() {
 	if File_spark_token_internal_proto != nil {
 		return
 	}
+	file_spark_token_internal_proto_msgTypes[0].OneofWrappers = []any{}
 	file_spark_token_internal_proto_msgTypes[10].OneofWrappers = []any{}
+	file_spark_token_internal_proto_msgTypes[11].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

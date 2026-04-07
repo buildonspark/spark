@@ -160,7 +160,8 @@ func retryTokenTransactionBroadcast(
 	}
 
 	// Check if the transaction expired between finding the ID and processing it.
-	// This indicates the retry mechanism is too slow and should trigger an alert.
+	// For execute_before transactions, ExpiryTime is capped to a short processing window;
+	// expiry here means the window closed, not that the overall deadline passed.
 	if !tokenTx.ExpiryTime.IsZero() && time.Now().After(tokenTx.ExpiryTime) {
 		return sparkerrors.InternalOperationTooSlow(
 			fmt.Errorf("retry broadcast: transaction %s expired before retry could complete", id))

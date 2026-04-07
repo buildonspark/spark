@@ -339,8 +339,9 @@ func BroadcastTokenTransactionV3WithResponse(
 	tokenTransaction *tokenpb.TokenTransaction,
 	ownerPrivateKeys []keys.Private,
 	validityDuration time.Duration,
+	opts ...BroadcastV3Options,
 ) (*tokenpb.BroadcastTransactionResponse, error) {
-	req, err := convertTokenTransactionToV3Request(config, tokenTransaction, ownerPrivateKeys, validityDuration)
+	req, err := convertTokenTransactionToV3Request(config, tokenTransaction, ownerPrivateKeys, validityDuration, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -366,11 +367,17 @@ func BroadcastTokenTransactionV3WithResponse(
 	return response, nil
 }
 
+// BroadcastV3Options contains optional parameters for V3 broadcast requests.
+type BroadcastV3Options struct {
+	ExecuteBefore *time.Time
+}
+
 func convertTokenTransactionToV3Request(
 	config *TestWalletConfig,
 	tokenTransaction *tokenpb.TokenTransaction,
 	ownerPrivateKeys []keys.Private,
 	validityDuration time.Duration,
+	opts ...BroadcastV3Options,
 ) (*tokenpb.BroadcastTransactionRequest, error) {
 	if config == nil {
 		return nil, fmt.Errorf("wallet config cannot be nil")
@@ -409,6 +416,10 @@ func convertTokenTransactionToV3Request(
 	partialTx, err := protoconverter.ConvertV2TxShapeToPartial(tokenTransaction)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert legacy token transaction to partial: %w", err)
+	}
+
+	if len(opts) > 0 && opts[0].ExecuteBefore != nil {
+		partialTx.ExecuteBefore = timestamppb.New(*opts[0].ExecuteBefore)
 	}
 
 	// Hash and sign the PartialTokenTransaction (request payload), not the legacy proto.

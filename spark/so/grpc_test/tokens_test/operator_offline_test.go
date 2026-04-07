@@ -13,6 +13,7 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var internalBroadcastMethod = tokenpbinternal.SparkTokenInternalService_SignTokenTransaction_FullMethodName
@@ -96,6 +97,53 @@ func TestTokenMintOperatorOfflineAutoRetry(t *testing.T) {
 	})
 }
 
+// TestTokenMintWithExecuteBeforeRetryForwardsDeadline tests that when a mint with
+// execute_before and an old CCT partially commits (operator offline), the retry task
+// forwards execute_before so non-coordinator SOs accept the relaxed CCT.
+func TestTokenMintWithExecuteBeforeRetryForwardsDeadline(t *testing.T) {
+	skipIfNotPhase2(t)
+
+	sparktesting.WithTimeout(t, 2*time.Minute, func(t *testing.T) {
+		kc, err := sparktesting.NewKnobController(t)
+		require.NoError(t, err)
+		err = kc.SetKnob(t, knobs.KnobTokenTransactionV3Phase2RetryEnabled, 100)
+		require.NoError(t, err)
+
+		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+		tokenPrivKey := config.IdentityPrivateKey
+		tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+
+		disableInternalBroadcast(t, kc)
+
+		recipientPrivKey := keys.GeneratePrivateKey()
+		mintTx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+			TokenIdentityPubKey: tokenPrivKey.Public(),
+			TokenIdentifier:     tokenIdentifier,
+			NumOutputs:          1,
+			OutputAmounts:       []uint64{500},
+		})
+		require.NoError(t, err)
+		mintTx.TokenOutputs[0].OwnerPublicKey = recipientPrivKey.Public().Serialize()
+
+		// Set CCT to 5 minutes ago — would fail tight freshness check without execute_before.
+		// Truncate to microseconds to match server-required precision.
+		mintTx.ClientCreatedTimestamp = timestamppb.New(time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Microsecond))
+
+		executeBefore := time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond)
+		resp, err := wallet.BroadcastTokenTransactionV3WithResponse(
+			t.Context(), config, mintTx, []keys.Private{tokenPrivKey}, wallet.DefaultValidityDuration,
+			wallet.BroadcastV3Options{ExecuteBefore: &executeBefore},
+		)
+		require.NoError(t, err)
+		requirePartialCommit(t, resp)
+
+		enableInternalBroadcast(t, kc)
+		triggerRetryTask(t, config)
+
+		verifyTokenBalance(t, recipientPrivKey, tokenPrivKey.Public(), 500, "mint with execute_before auto-retry")
+	})
+}
+
 // TestTokenTransferOperatorOfflineAutoRetry tests that a transfer transaction can be retried
 // via the retry task when an operator comes back online before the transaction expires.
 func TestTokenTransferOperatorOfflineAutoRetry(t *testing.T) {
@@ -148,6 +196,69 @@ func TestTokenTransferOperatorOfflineAutoRetry(t *testing.T) {
 		triggerRetryTask(t, config)
 
 		verifyTokenBalance(t, recipientPrivKey, tokenPrivKey.Public(), 1000, "transfer auto-retry")
+	})
+}
+
+// TestTokenTransferWithExecuteBeforeRetryForwardsDeadline tests that a transfer with
+// execute_before and old CCT partially commits then retries successfully.
+func TestTokenTransferWithExecuteBeforeRetryForwardsDeadline(t *testing.T) {
+	skipIfNotPhase2(t)
+
+	sparktesting.WithTimeout(t, 2*time.Minute, func(t *testing.T) {
+		kc, err := sparktesting.NewKnobController(t)
+		require.NoError(t, err)
+		err = kc.SetKnob(t, knobs.KnobTokenTransactionV3Phase2RetryEnabled, 100)
+		require.NoError(t, err)
+
+		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+		tokenPrivKey := config.IdentityPrivateKey
+		tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+
+		// First mint tokens to the sender (standard, no execute_before)
+		senderPrivKey := keys.GeneratePrivateKey()
+		mintTx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+			TokenIdentityPubKey: tokenPrivKey.Public(),
+			TokenIdentifier:     tokenIdentifier,
+			NumOutputs:          1,
+			OutputAmounts:       []uint64{1000},
+		})
+		require.NoError(t, err)
+		mintTx.TokenOutputs[0].OwnerPublicKey = senderPrivKey.Public().Serialize()
+
+		finalMint, err := broadcastTokenTransaction(t, t.Context(), config, mintTx, []keys.Private{tokenPrivKey})
+		require.NoError(t, err)
+		mintTxHash, err := utils.HashTokenTransaction(finalMint, false)
+		require.NoError(t, err)
+
+		disableInternalBroadcast(t, kc)
+
+		// Transfer with old CCT + execute_before
+		recipientPrivKey := keys.GeneratePrivateKey()
+		transferTx, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+			TokenIdentityPubKey:            tokenPrivKey.Public(),
+			TokenIdentifier:                tokenIdentifier,
+			FinalIssueTokenTransactionHash: mintTxHash,
+			NumOutputsToSpend:              1,
+		})
+		require.NoError(t, err)
+		transferTx.TokenOutputs[0].OwnerPublicKey = recipientPrivKey.Public().Serialize()
+		transferTx.TokenOutputs[0].TokenAmount = int64ToUint128Bytes(0, 1000)
+
+		// Set CCT to 5 minutes ago — truncate to microseconds to match server-required precision.
+		transferTx.ClientCreatedTimestamp = timestamppb.New(time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Microsecond))
+
+		executeBefore := time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond)
+		resp, err := wallet.BroadcastTokenTransactionV3WithResponse(
+			t.Context(), config, transferTx, []keys.Private{senderPrivKey}, wallet.DefaultValidityDuration,
+			wallet.BroadcastV3Options{ExecuteBefore: &executeBefore},
+		)
+		require.NoError(t, err)
+		requirePartialCommit(t, resp)
+
+		enableInternalBroadcast(t, kc)
+		triggerRetryTask(t, config)
+
+		verifyTokenBalance(t, recipientPrivKey, tokenPrivKey.Public(), 1000, "transfer with execute_before auto-retry")
 	})
 }
 

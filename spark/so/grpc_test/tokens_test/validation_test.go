@@ -303,6 +303,116 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 	}
 }
 
+func TestMintWithExecuteBeforeAndOldCCTSucceeds(t *testing.T) {
+	if !broadcastTokenTestsUsePhase2 {
+		t.Skip("Skipping - execute_before requires Phase2 (Phase1 uses V2 shape which drops execute_before)")
+	}
+	sparktesting.RequireMinikube(t)
+
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+
+	mintTx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+		TokenIdentityPubKey: tokenPrivKey.Public(),
+		TokenIdentifier:     tokenIdentifier,
+		NumOutputs:          1,
+		OutputAmounts:       []uint64{100},
+	})
+	require.NoError(t, err)
+
+	// Set CCT to 5 minutes ago — would normally fail freshness check.
+	// Truncate to microseconds to match server-required precision.
+	mintTx.ClientCreatedTimestamp = timestamppb.New(time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Microsecond))
+
+	executeBefore := time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond)
+	resp, err := wallet.BroadcastTokenTransactionV3WithResponse(
+		t.Context(), config, mintTx, []keys.Private{tokenPrivKey}, wallet.DefaultValidityDuration,
+		wallet.BroadcastV3Options{ExecuteBefore: &executeBefore},
+	)
+	require.NoError(t, err, "mint with execute_before and old CCT should succeed")
+	require.NotNil(t, resp)
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
+}
+
+func TestTransferWithExecuteBeforeAndOldCCTSucceeds(t *testing.T) {
+	if !broadcastTokenTestsUsePhase2 {
+		t.Skip("Skipping - execute_before requires Phase2 (Phase1 uses V2 shape which drops execute_before)")
+	}
+	sparktesting.RequireMinikube(t)
+
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+
+	// Mint first
+	senderPrivKey := keys.GeneratePrivateKey()
+	mintTx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+		TokenIdentityPubKey: tokenPrivKey.Public(),
+		TokenIdentifier:     tokenIdentifier,
+		NumOutputs:          1,
+		OutputAmounts:       []uint64{100},
+	})
+	require.NoError(t, err)
+	mintTx.TokenOutputs[0].OwnerPublicKey = senderPrivKey.Public().Serialize()
+
+	finalMint, err := broadcastTokenTransaction(t, t.Context(), config, mintTx, []keys.Private{tokenPrivKey})
+	require.NoError(t, err)
+	mintTxHash, err := utils.HashTokenTransaction(finalMint, false)
+	require.NoError(t, err)
+
+	// Transfer with old CCT + execute_before
+	transferTx, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+		TokenIdentityPubKey:            tokenPrivKey.Public(),
+		TokenIdentifier:                tokenIdentifier,
+		FinalIssueTokenTransactionHash: mintTxHash,
+		NumOutputsToSpend:              1,
+	})
+	require.NoError(t, err)
+	transferTx.TokenOutputs[0].TokenAmount = int64ToUint128Bytes(0, 100)
+
+	// Set CCT to 5 minutes ago — truncate to microseconds to match server-required precision.
+	transferTx.ClientCreatedTimestamp = timestamppb.New(time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Microsecond))
+
+	executeBefore := time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond)
+	resp, err := wallet.BroadcastTokenTransactionV3WithResponse(
+		t.Context(), config, transferTx, []keys.Private{senderPrivKey}, wallet.DefaultValidityDuration,
+		wallet.BroadcastV3Options{ExecuteBefore: &executeBefore},
+	)
+	require.NoError(t, err, "transfer with execute_before and old CCT should succeed")
+	require.NotNil(t, resp)
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
+}
+
+func TestMintWithOldCCTAndNoExecuteBeforeFails(t *testing.T) {
+	if !broadcastTokenTestsUseV3 {
+		t.Skip("Skipping - CCT validation requires V3+")
+	}
+	sparktesting.RequireMinikube(t)
+
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentifier := queryTokenIdentifierOrFail(t, config, tokenPrivKey.Public())
+
+	mintTx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+		TokenIdentityPubKey: tokenPrivKey.Public(),
+		TokenIdentifier:     tokenIdentifier,
+		NumOutputs:          1,
+		OutputAmounts:       []uint64{100},
+	})
+	require.NoError(t, err)
+
+	// Set CCT to 5 minutes ago with no execute_before — should fail.
+	// Truncate to microseconds to match server-required precision.
+	mintTx.ClientCreatedTimestamp = timestamppb.New(time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Microsecond))
+
+	_, err = wallet.BroadcastTokenTransactionV3WithResponse(
+		t.Context(), config, mintTx, []keys.Private{tokenPrivKey}, wallet.DefaultValidityDuration,
+	)
+	require.Error(t, err, "mint with old CCT and no execute_before should fail")
+	require.Contains(t, err.Error(), "client created timestamp too old")
+}
+
 func TestTokenMintWithWrongIssuerPublicKeyFails(t *testing.T) {
 	runSignatureTypeTestCases(t, func(t *testing.T, tc signatureTypeTestCase) {
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())

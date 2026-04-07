@@ -82,6 +82,10 @@ func (TokenTransaction) Fields() []ent.Field {
 		field.Uint64("validity_duration_seconds").
 			Optional().
 			Comment("Duration in seconds for which this transaction is valid."),
+		field.Time("execute_before").
+			Optional().
+			Immutable().
+			Comment("Client-specified deadline for transaction execution. When set, the transaction can be broadcast over a much longer period (up to the deadline) instead of the tight CCT freshness window."),
 	}
 }
 

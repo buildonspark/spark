@@ -4539,6 +4539,7 @@ type TokenTransactionExample struct {
 	CoordinatorPublicKey          *keys.Public
 	ClientCreatedTimestamp        *time.Time
 	ValidityDurationSeconds       *uint64
+	ExecuteBefore                 *time.Time
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 	SpentOutput    []*ent.TokenOutput
@@ -4604,6 +4605,12 @@ func (tt *TokenTransactionExample) SetClientCreatedTimestamp(v time.Time) *Token
 // SetValidityDurationSeconds sets the validity_duration_seconds field.
 func (tt *TokenTransactionExample) SetValidityDurationSeconds(v uint64) *TokenTransactionExample {
 	tt.ValidityDurationSeconds = &v
+	return tt
+}
+
+// SetExecuteBefore sets the execute_before field.
+func (tt *TokenTransactionExample) SetExecuteBefore(v time.Time) *TokenTransactionExample {
+	tt.ExecuteBefore = &v
 	return tt
 }
 
@@ -4742,6 +4749,10 @@ func (tt *TokenTransactionExample) MustExec(ctx context.Context) *ent.TokenTrans
 		create.SetValidityDurationSeconds(*tt.ValidityDurationSeconds)
 	} else {
 	}
+	if tt.ExecuteBefore != nil {
+		create.SetExecuteBefore(*tt.ExecuteBefore)
+	} else {
+	}
 
 	// Handle edges
 	if len(tt.SpentOutput) > 0 {
@@ -4833,6 +4844,10 @@ func (tt *TokenTransactionExample) Exec(ctx context.Context) (*ent.TokenTransact
 	}
 	if tt.ValidityDurationSeconds != nil {
 		create.SetValidityDurationSeconds(*tt.ValidityDurationSeconds)
+	} else {
+	}
+	if tt.ExecuteBefore != nil {
+		create.SetExecuteBefore(*tt.ExecuteBefore)
 	} else {
 	}
 

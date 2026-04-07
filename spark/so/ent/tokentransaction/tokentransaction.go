@@ -40,6 +40,8 @@ const (
 	FieldVersion = "version"
 	// FieldValidityDurationSeconds holds the string denoting the validity_duration_seconds field in the database.
 	FieldValidityDurationSeconds = "validity_duration_seconds"
+	// FieldExecuteBefore holds the string denoting the execute_before field in the database.
+	FieldExecuteBefore = "execute_before"
 	// EdgeSpentOutput holds the string denoting the spent_output edge name in mutations.
 	EdgeSpentOutput = "spent_output"
 	// EdgeSpentOutputV2 holds the string denoting the spent_output_v2 edge name in mutations.
@@ -126,6 +128,7 @@ var Columns = []string{
 	FieldClientCreatedTimestamp,
 	FieldVersion,
 	FieldValidityDurationSeconds,
+	FieldExecuteBefore,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "token_transactions"
@@ -236,6 +239,11 @@ func ByVersion(opts ...sql.OrderTermOption) OrderOption {
 // ByValidityDurationSeconds orders the results by the validity_duration_seconds field.
 func ByValidityDurationSeconds(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldValidityDurationSeconds, opts...).ToFunc()
+}
+
+// ByExecuteBefore orders the results by the execute_before field.
+func ByExecuteBefore(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExecuteBefore, opts...).ToFunc()
 }
 
 // BySpentOutputCount orders the results by spent_output count.

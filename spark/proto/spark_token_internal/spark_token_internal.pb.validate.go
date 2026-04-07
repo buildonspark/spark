@@ -146,6 +146,39 @@ func (m *PrepareTransactionRequest) validate(all bool) error {
 
 	// no validation rules for CoordinatorPublicKey
 
+	if m.ExecuteBefore != nil {
+
+		if all {
+			switch v := interface{}(m.GetExecuteBefore()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, PrepareTransactionRequestValidationError{
+						field:  "ExecuteBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, PrepareTransactionRequestValidationError{
+						field:  "ExecuteBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetExecuteBefore()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PrepareTransactionRequestValidationError{
+					field:  "ExecuteBefore",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return PrepareTransactionRequestMultiError(errors)
 	}
@@ -1881,6 +1914,39 @@ func (m *SignTokenTransactionRequest) validate(all bool) error {
 			return err
 		}
 		errors = append(errors, err)
+	}
+
+	if m.ExecuteBefore != nil {
+
+		if all {
+			switch v := interface{}(m.GetExecuteBefore()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SignTokenTransactionRequestValidationError{
+						field:  "ExecuteBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SignTokenTransactionRequestValidationError{
+						field:  "ExecuteBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetExecuteBefore()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SignTokenTransactionRequestValidationError{
+					field:  "ExecuteBefore",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	}
 
 	if len(errors) > 0 {

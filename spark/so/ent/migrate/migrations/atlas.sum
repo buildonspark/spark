@@ -1,4 +1,4 @@
-h1:bF7/uPSA8aQrVl5YQ1EQasJLCvpaQ6xzLi4C114y8Ak=
+h1:pA0WgkYCWlYRDF9IeY35ZLRhJWYlTJGXQFRqtO0Aohs=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -137,3 +137,4 @@ h1:bF7/uPSA8aQrVl5YQ1EQasJLCvpaQ6xzLi4C114y8Ak=
 20260330000000_add_signing_keyshare_secret_version.sql h1:5WBb8NS/XX1OYMb+jpyVCT/iGCv2KXBzdqzQN8jfFIo=
 20260331175515_readd_old_idempotency_index.sql h1:/qe2ULZQPoJil8mRki51FQf9A5IuIIoaVqztamxPTaE=
 20260331232749_remove_secret_version.sql h1:ENsdPtyQruXKGEfMw7ZF8amlA5JGUpHAprtdxg8Wweo=
+20260331233749_add_execute_before_to_token_transaction.sql h1:msQ70yLADbNBEY3YDociQecZU/M+IOhHmOXxWMt7dFY=

@@ -11,8 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/protohash"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -35,6 +37,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/tokens/signature"
 	"github.com/lightsparkdev/spark/so/utils"
 )
@@ -57,6 +60,9 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	logger.Sugar().Infof("%s %s", msg, tokens.FormatTokenTransactionHashes(req.FinalTokenTransaction))
 
 	finalTokenTx := req.GetFinalTokenTransaction()
+	// Set execute_before on the TokenTransaction so all downstream code (validation, hashing, entity creation) can derive it.
+	finalTokenTx.ExecuteBefore = req.ExecuteBefore
+
 	inputTtxos, err := h.validateAndLockForCommit(
 		ctx,
 		finalTokenTx,
@@ -411,6 +417,20 @@ type potentiallySpendableOutput struct {
 	Err    error
 }
 
+// hashPartial computes the partial hash of a token transaction. For V3+, converts
+// to PartialTokenTransaction (including execute_before when set) and uses protohash.
+// For older versions, falls back to the version-specific hash.
+func hashPartial(tokenTransaction *tokenpb.TokenTransaction) ([]byte, error) {
+	if tokenTransaction.Version >= 3 {
+		partial, err := protoconverter.ConvertV2TxShapeToPartial(tokenTransaction)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert to partial: %w", err)
+		}
+		return protohash.Hash(partial)
+	}
+	return utils.HashTokenTransaction(tokenTransaction, true)
+}
+
 // validateCreateSignature validates the issuer signature for a Create token
 // transaction. Unlike Mint, Create does not support multisig -- the
 // issuer_public_key in the CreateInput is the sole signing authority.
@@ -419,7 +439,7 @@ func validateCreateSignature(
 	signaturesWithIndex []*tokenpb.SignatureWithIndex,
 	issuerPublicKey keys.Public,
 ) error {
-	partialHash, err := utils.HashTokenTransaction(tokenTransaction, true)
+	partialHash, err := hashPartial(tokenTransaction)
 	if err != nil {
 		return tokens.FormatErrorWithTransactionProto("failed to hash token transaction", tokenTransaction, err)
 	}
@@ -445,8 +465,9 @@ func validateIssuerSignature(
 	signaturesWithIndex []*tokenpb.SignatureWithIndex,
 	issuerPublicKey keys.Public,
 ) error {
-	// Although this token transaction is final we pass in 'true' to generate the partial hash.
-	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
+	// Hash the partial transaction, including execute_before when present so the
+	// hash matches what the client signed.
+	partialTokenTransactionHash, err := hashPartial(tokenTransaction)
 	if err != nil {
 		return tokens.FormatErrorWithTransactionProto("failed to hash token transaction", tokenTransaction, err)
 	}
@@ -577,8 +598,9 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 	}
 
 	// Validate that the ownership signatures match the ownership public keys in the outputs to spend.
-	// Although this token transaction is final we pass in 'true' to generate the partial hash.
-	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
+	// Hash the partial transaction, including execute_before when present so the
+	// hash matches what the client signed.
+	partialTokenTransactionHash, err := hashPartial(tokenTransaction)
 	if err != nil {
 		return fmt.Errorf("failed to hash token transaction: %w", err)
 	}
@@ -1024,20 +1046,39 @@ func validateClientCreatedTimestamp(tokenTransaction *tokenpb.TokenTransaction) 
 	}
 	now := time.Now().UTC()
 	clientTimestamp := tokenTransaction.GetClientCreatedTimestamp().AsTime().UTC()
-	// The client created timestamp must be within the validity duration seconds (plus skew tolerance)
-	// otherwise this transaction is expired.
-	oldestAllowed := now.Add(-time.Duration(tokenTransaction.GetValidityDurationSeconds()) * time.Second).Add(-MaxTimestampSkew)
-	// The client created timestamp must be within MaxTimestampSkewTolerance of the current time
-	// otherwise this transaction is too far in the future. The clients clock is either not synced
-	// or the client is intending to construct a transaction with a longer than allowed validity duration.
-	latestAllowed := now.Add(MaxTimestampSkew)
-	if clientTimestamp.Before(oldestAllowed) {
-		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("client created timestamp too old: %s, oldest allowed: %s", clientTimestamp.Format(time.RFC3339), oldestAllowed.Format(time.RFC3339)))
+
+	// Validate execute_before universally using the same function the coordinator uses.
+	// This is a no-op when execute_before is nil.
+	var ebPtr *time.Time
+	if tokenTransaction.GetExecuteBefore() != nil {
+		eb := tokenTransaction.GetExecuteBefore().AsTime().UTC()
+		ebPtr = &eb
 	}
-	if clientTimestamp.After(latestAllowed) {
-		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("client created timestamp too far in the future: %s, latest allowed: %s", clientTimestamp.Format(time.RFC3339), latestAllowed.Format(time.RFC3339)))
+	if err := utils.ValidateExecuteBefore(ebPtr, clientTimestamp, spark.TokenMaxExecuteBeforeWindow); err != nil {
+		return err
 	}
-	return nil
+
+	if tokenTransaction.GetExecuteBefore() != nil {
+		// When execute_before is set, it serves as the liveness check instead of the tight
+		// CCT freshness window. This supports offline multisig flows where multiple parties
+		// need time to collect signatures before submission.
+		return nil
+	} else {
+		// Standard CCT validation: the client created timestamp must be within the validity
+		// duration seconds (plus skew tolerance), otherwise this transaction is expired.
+		oldestAllowed := now.Add(-time.Duration(tokenTransaction.GetValidityDurationSeconds()) * time.Second).Add(-MaxTimestampSkew)
+		// The client created timestamp must be within MaxTimestampSkew of the current time,
+		// otherwise the client's clock is not synced or the client is constructing a
+		// transaction with a longer than allowed validity duration.
+		latestAllowed := now.Add(MaxTimestampSkew)
+		if clientTimestamp.Before(oldestAllowed) {
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("client created timestamp too old: %s, oldest allowed: %s", clientTimestamp.Format(time.RFC3339), oldestAllowed.Format(time.RFC3339)))
+		}
+		if clientTimestamp.After(latestAllowed) {
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("client created timestamp too far in the future: %s, latest allowed: %s", clientTimestamp.Format(time.RFC3339), latestAllowed.Format(time.RFC3339)))
+		}
+		return nil
+	}
 }
 
 func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) error {
