@@ -39,7 +39,8 @@ export class ConnectionManagerBrowser extends ConnectionManager {
   }
 
   protected prepareMetadata(metadata: Metadata): Metadata {
-    return metadata
+    return super
+      .prepareMetadata(metadata)
       .set("X-Requested-With", "XMLHttpRequest")
       .set("X-Grpc-Web", "1")
       .set("X-Client-Env", getClientEnv())

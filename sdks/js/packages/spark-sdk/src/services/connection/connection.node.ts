@@ -47,7 +47,7 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
   }
 
   protected prepareMetadata(metadata: Metadata): Metadata {
-    return metadata.set("X-Client-Env", getClientEnv());
+    return super.prepareMetadata(metadata).set("X-Client-Env", getClientEnv());
   }
 
   public async createMockClient(address: string): Promise<

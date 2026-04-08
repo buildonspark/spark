@@ -10,6 +10,7 @@ import {
   Status,
 } from "nice-grpc-common";
 import { type Channel as ChannelWeb } from "nice-grpc-web";
+import { uuidv7 } from "uuidv7";
 import { SparkError } from "../../errors/base.js";
 import { SparkAuthenticationError } from "../../errors/types.js";
 import {
@@ -252,6 +253,7 @@ export abstract class ConnectionManager {
   private config: WalletConfigService;
   private timeSync: ServerTimeSync;
   private authMode: AuthMode;
+  protected readonly sessionId: string;
 
   // Note clientsByType is a per instance cache whereas channelCache is static and shared by all instances
   private clientsByType: Map<
@@ -269,6 +271,7 @@ export abstract class ConnectionManager {
     this.config = config;
     this.timeSync = new ServerTimeSync();
     this.authMode = authMode;
+    this.sessionId = uuidv7();
   }
 
   public getCurrentServerTime(): Date {
@@ -519,7 +522,7 @@ export abstract class ConnectionManager {
   }
 
   protected prepareMetadata(metadata: Metadata): Metadata {
-    return metadata;
+    return metadata.set("X-Session-Id", this.sessionId);
   }
 
   protected createAuthnMiddleware() {
