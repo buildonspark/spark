@@ -121,7 +121,7 @@
     "test:integration:ssp:unilateral": "yarn test-cmd src/tests/integration/ssp/unilateral",
     "types:watch": "tsc-absolute --watch",
     "types": "tsc",
-    "patch-wasm": "node ./wasm/patch-wasm-browser.mjs && node ./wasm/patch-wasm-nodejs.mjs",
+    "patch-wasm": "node ./wasm/patch-wasm-browser.mjs && node ./wasm/patch-wasm-nodejs.mjs && node ./wasm/patch-token-primitives-wasm-browser.mjs && node ./wasm/patch-token-primitives-wasm-nodejs.mjs",
     "generate:proto": "./generate-proto.sh"
   },
   "devDependencies": {
