@@ -2,6 +2,9 @@ package logging
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"strings"
 	"sync"
 	"time"
 
@@ -207,6 +210,12 @@ func (t *TableLogger) Log(
 
 		if len(md.Get("x-client-env")) > 0 {
 			result["grpc.client.client_env"] = md.Get("x-client-env")[0]
+		}
+
+		if tokens := md.Get("authorization"); len(tokens) > 0 {
+			token := strings.TrimPrefix(tokens[0], "Bearer ")
+			hash := sha256.Sum256([]byte(token))
+			result["grpc.client.authorization"] = hex.EncodeToString(hash[:])
 		}
 	}
 
