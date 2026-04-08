@@ -40,6 +40,10 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, e
 	}
 
 	treeIDStr := tree.ID.String()
+	treenodeStatus := pbspark.TreeNodeStatus(pbspark.TreeNodeStatus_value["TREE_NODE_STATUS_"+string(tn.Status)])
+	if tn.Status == st.TreeNodeStatusInvestigation || tn.Status == st.TreeNodeStatusLost || tn.Status == st.TreeNodeStatusReimbursed {
+		treenodeStatus = pbspark.TreeNodeStatus_TREE_NODE_STATUS_UNAVAILABLE
+	}
 	return &pbspark.TreeNode{
 		Id:                     tn.ID.String(),
 		TreeId:                 treeIDStr,
@@ -56,6 +60,7 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, e
 		OwnerSigningPublicKey:  tn.OwnerSigningPubkey.Serialize(),
 		SigningKeyshare:        signingKeyshare.MarshalProto(),
 		Status:                 string(tn.Status),
+		TreenodeStatus:         treenodeStatus,
 		Network:                networkProto,
 		CreatedTime:            timestamppb.New(tn.CreateTime),
 		UpdatedTime:            timestamppb.New(tn.UpdateTime),

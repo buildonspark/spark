@@ -602,6 +602,8 @@ message TreeNode {
     bytes direct_refund_tx = 17;
     // The refund transaction of the node, this transaction is to pay to the user.
     bytes direct_from_cpfp_refund_tx = 18;
+    // The status of the node as a typed enum.
+    TreeNodeStatus treenode_status = 19;
 }
 
 /**
@@ -1575,6 +1577,8 @@ enum TreeNodeStatus {
     TREE_NODE_STATUS_AGGREGATE_LOCK = 8;
     TREE_NODE_STATUS_EXITED = 9;
     TREE_NODE_STATUS_RENEW_LOCKED = 10;
+    TREE_NODE_STATUS_UNAVAILABLE = 11;
+    TREE_NODE_STATUS_PARENT_EXITED = 12;
 }
 
 message WalletSetting {

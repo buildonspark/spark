@@ -234,6 +234,7 @@ describe("sdk-types mapping functions", () => {
         ownerIdentityPublicKey: hexToBytes("03ef12"),
         signingKeyshare: undefined,
         status: "ACTIVE",
+        treenodeStatus: 0,
         network: Network.REGTEST,
         createdTime: undefined,
         updatedTime: undefined,

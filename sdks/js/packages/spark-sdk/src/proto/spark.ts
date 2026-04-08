@@ -555,6 +555,8 @@ export enum TreeNodeStatus {
   TREE_NODE_STATUS_AGGREGATE_LOCK = 8,
   TREE_NODE_STATUS_EXITED = 9,
   TREE_NODE_STATUS_RENEW_LOCKED = 10,
+  TREE_NODE_STATUS_UNAVAILABLE = 11,
+  TREE_NODE_STATUS_PARENT_EXITED = 12,
   UNRECOGNIZED = -1,
 }
 
@@ -593,6 +595,12 @@ export function treeNodeStatusFromJSON(object: any): TreeNodeStatus {
     case 10:
     case "TREE_NODE_STATUS_RENEW_LOCKED":
       return TreeNodeStatus.TREE_NODE_STATUS_RENEW_LOCKED;
+    case 11:
+    case "TREE_NODE_STATUS_UNAVAILABLE":
+      return TreeNodeStatus.TREE_NODE_STATUS_UNAVAILABLE;
+    case 12:
+    case "TREE_NODE_STATUS_PARENT_EXITED":
+      return TreeNodeStatus.TREE_NODE_STATUS_PARENT_EXITED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -624,6 +632,10 @@ export function treeNodeStatusToJSON(object: TreeNodeStatus): string {
       return "TREE_NODE_STATUS_EXITED";
     case TreeNodeStatus.TREE_NODE_STATUS_RENEW_LOCKED:
       return "TREE_NODE_STATUS_RENEW_LOCKED";
+    case TreeNodeStatus.TREE_NODE_STATUS_UNAVAILABLE:
+      return "TREE_NODE_STATUS_UNAVAILABLE";
+    case TreeNodeStatus.TREE_NODE_STATUS_PARENT_EXITED:
+      return "TREE_NODE_STATUS_PARENT_EXITED";
     case TreeNodeStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -1206,6 +1218,8 @@ export interface TreeNode {
   directRefundTx: Uint8Array;
   /** The refund transaction of the node, this transaction is to pay to the user. */
   directFromCpfpRefundTx: Uint8Array;
+  /** The status of the node as a typed enum. */
+  treenodeStatus: TreeNodeStatus;
 }
 
 /** FinalizeNodeSignaturesRequest is the request to finalize the signatures for a node. */
@@ -6872,6 +6886,7 @@ function createBaseTreeNode(): TreeNode {
     directTx: new Uint8Array(0),
     directRefundTx: new Uint8Array(0),
     directFromCpfpRefundTx: new Uint8Array(0),
+    treenodeStatus: 0,
   };
 }
 
@@ -6930,6 +6945,9 @@ export const TreeNode: MessageFns<TreeNode> = {
     }
     if (message.directFromCpfpRefundTx.length !== 0) {
       writer.uint32(146).bytes(message.directFromCpfpRefundTx);
+    }
+    if (message.treenodeStatus !== 0) {
+      writer.uint32(152).int32(message.treenodeStatus);
     }
     return writer;
   },
@@ -7085,6 +7103,14 @@ export const TreeNode: MessageFns<TreeNode> = {
           message.directFromCpfpRefundTx = reader.bytes();
           continue;
         }
+        case 19: {
+          if (tag !== 152) {
+            break;
+          }
+
+          message.treenodeStatus = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7122,6 +7148,7 @@ export const TreeNode: MessageFns<TreeNode> = {
       directFromCpfpRefundTx: isSet(object.directFromCpfpRefundTx)
         ? bytesFromBase64(object.directFromCpfpRefundTx)
         : new Uint8Array(0),
+      treenodeStatus: isSet(object.treenodeStatus) ? treeNodeStatusFromJSON(object.treenodeStatus) : 0,
     };
   },
 
@@ -7181,6 +7208,9 @@ export const TreeNode: MessageFns<TreeNode> = {
     if (message.directFromCpfpRefundTx.length !== 0) {
       obj.directFromCpfpRefundTx = base64FromBytes(message.directFromCpfpRefundTx);
     }
+    if (message.treenodeStatus !== 0) {
+      obj.treenodeStatus = treeNodeStatusToJSON(message.treenodeStatus);
+    }
     return obj;
   },
 
@@ -7209,6 +7239,7 @@ export const TreeNode: MessageFns<TreeNode> = {
     message.directTx = object.directTx ?? new Uint8Array(0);
     message.directRefundTx = object.directRefundTx ?? new Uint8Array(0);
     message.directFromCpfpRefundTx = object.directFromCpfpRefundTx ?? new Uint8Array(0);
+    message.treenodeStatus = object.treenodeStatus ?? 0;
     return message;
   },
 };

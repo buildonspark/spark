@@ -6315,6 +6315,8 @@ func (m *TreeNode) validate(all bool) error {
 
 	// no validation rules for DirectFromCpfpRefundTx
 
+	// no validation rules for TreenodeStatus
+
 	if m.ParentNodeId != nil {
 		// no validation rules for ParentNodeId
 	}

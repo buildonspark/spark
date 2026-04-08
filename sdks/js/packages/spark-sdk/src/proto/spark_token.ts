@@ -388,6 +388,12 @@ export interface FinalTokenTransaction {
     | { $case: "createInput"; createInput: TokenCreateInput }
     | undefined;
   finalTokenOutputs: FinalTokenOutput[];
+  /**
+   * Optional client-specified deadline for transaction execution.
+   * Included in the final hash to prevent malleability — an attacker cannot
+   * change the deadline without invalidating operator signatures.
+   */
+  executeBefore?: Date | undefined;
 }
 
 export interface InvoiceAttachment {
@@ -2109,7 +2115,13 @@ export const PartialTokenTransaction: MessageFns<PartialTokenTransaction> = {
 };
 
 function createBaseFinalTokenTransaction(): FinalTokenTransaction {
-  return { version: 0, tokenTransactionMetadata: undefined, tokenInputs: undefined, finalTokenOutputs: [] };
+  return {
+    version: 0,
+    tokenTransactionMetadata: undefined,
+    tokenInputs: undefined,
+    finalTokenOutputs: [],
+    executeBefore: undefined,
+  };
 }
 
 export const FinalTokenTransaction: MessageFns<FinalTokenTransaction> = {
@@ -2133,6 +2145,9 @@ export const FinalTokenTransaction: MessageFns<FinalTokenTransaction> = {
     }
     for (const v of message.finalTokenOutputs) {
       FinalTokenOutput.encode(v!, writer.uint32(50).fork()).join();
+    }
+    if (message.executeBefore !== undefined) {
+      Timestamp.encode(toTimestamp(message.executeBefore), writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -2195,6 +2210,14 @@ export const FinalTokenTransaction: MessageFns<FinalTokenTransaction> = {
           message.finalTokenOutputs.push(FinalTokenOutput.decode(reader, reader.uint32()));
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.executeBefore = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2220,6 +2243,7 @@ export const FinalTokenTransaction: MessageFns<FinalTokenTransaction> = {
       finalTokenOutputs: globalThis.Array.isArray(object?.finalTokenOutputs)
         ? object.finalTokenOutputs.map((e: any) => FinalTokenOutput.fromJSON(e))
         : [],
+      executeBefore: isSet(object.executeBefore) ? fromJsonTimestamp(object.executeBefore) : undefined,
     };
   },
 
@@ -2240,6 +2264,9 @@ export const FinalTokenTransaction: MessageFns<FinalTokenTransaction> = {
     }
     if (message.finalTokenOutputs?.length) {
       obj.finalTokenOutputs = message.finalTokenOutputs.map((e) => FinalTokenOutput.toJSON(e));
+    }
+    if (message.executeBefore !== undefined) {
+      obj.executeBefore = message.executeBefore.toISOString();
     }
     return obj;
   },
@@ -2284,6 +2311,7 @@ export const FinalTokenTransaction: MessageFns<FinalTokenTransaction> = {
       }
     }
     message.finalTokenOutputs = object.finalTokenOutputs?.map((e) => FinalTokenOutput.fromPartial(e)) || [];
+    message.executeBefore = object.executeBefore ?? undefined;
     return message;
   },
 };
