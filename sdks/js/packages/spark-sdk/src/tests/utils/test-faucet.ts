@@ -517,6 +517,20 @@ export class BitcoinFaucet {
     return Transaction.fromRaw(hexToBytes(rawTx.hex));
   }
 
+  static findOutputIndex(tx: Transaction, script: Uint8Array): number {
+    for (let i = 0; i < tx.outputsLength; i++) {
+      const output = tx.getOutput(i);
+      if (
+        output.script &&
+        output.script.length === script.length &&
+        output.script.every((b, j) => b === script[j])
+      ) {
+        return i;
+      }
+    }
+    throw new Error("Output not found in transaction");
+  }
+
   private async buildAndBroadcastTx(
     coin: FaucetCoin,
     address: string,

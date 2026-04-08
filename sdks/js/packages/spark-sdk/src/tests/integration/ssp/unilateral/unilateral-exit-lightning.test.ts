@@ -136,10 +136,11 @@ const unilateralExitWallet = async (
 
   const pubKeyHash = hash160(fundingWalletPubKey);
   const p2wpkhScript = new Uint8Array([0x00, 0x14, ...pubKeyHash]);
+  const fundingVout = BitcoinFaucet.findOutputIndex(fundingTx, p2wpkhScript);
   const utxos = [
     {
       txid: fundingTx.id,
-      vout: 0,
+      vout: fundingVout,
       value: EXTERNAL_FUNDING_AMOUNT,
       script: bytesToHex(p2wpkhScript),
       publicKey: bytesToHex(fundingWalletPubKey),

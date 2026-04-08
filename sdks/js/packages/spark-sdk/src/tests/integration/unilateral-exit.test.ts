@@ -65,11 +65,12 @@ describe("unilateral exit", () => {
 
     const pubKeyHash = hash160(fundingWalletPubKey);
     const p2wpkhScript = new Uint8Array([0x00, 0x14, ...pubKeyHash]);
+    const fundingVout = BitcoinFaucet.findOutputIndex(fundingTx, p2wpkhScript);
 
     const utxos = [
       {
         txid: fundingTx.id,
-        vout: 0,
+        vout: fundingVout,
         value: 50_000n,
         script: bytesToHex(p2wpkhScript),
         publicKey: bytesToHex(fundingWalletPubKey),
@@ -146,10 +147,11 @@ describe("unilateral exit", () => {
     await faucet.mineBlocksAndWaitForMiningToComplete(6);
     const pubKeyHash = hash160(fundingWalletPubKey);
     const p2wpkhScript = new Uint8Array([0x00, 0x14, ...pubKeyHash]);
+    const fundingVout = BitcoinFaucet.findOutputIndex(fundingTx, p2wpkhScript);
     const utxos = [
       {
         txid: fundingTx.id,
-        vout: 0,
+        vout: fundingVout,
         value: 50_000n,
         script: bytesToHex(p2wpkhScript),
         publicKey: bytesToHex(fundingWalletPubKey),
