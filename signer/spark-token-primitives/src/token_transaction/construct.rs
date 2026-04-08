@@ -326,10 +326,9 @@ fn resolve_receiver_output(
             32,
             "token_identifier",
         )?;
-        let token_amount = resolve_invoice_or_explicit_bytes(
+        let token_amount = resolve_invoice_or_explicit_token_amount(
             explicit_token_amount,
             tokens_payment.amount,
-            16,
             "token_amount",
         )?;
         spark_invoice = Some(output.receiver_spark_address.clone());
@@ -392,6 +391,55 @@ fn resolve_invoice_or_explicit_bytes(
         )
         .into()),
     }
+}
+
+fn resolve_invoice_or_explicit_token_amount(
+    explicit: Option<Vec<u8>>,
+    embedded: Option<Vec<u8>>,
+    field_name: &str,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    if let Some(ref explicit_bytes) = explicit {
+        validate_length(explicit_bytes, 16, field_name)?;
+    }
+    let normalized_embedded = embedded
+        .map(|embedded_bytes| normalize_invoice_token_amount(&embedded_bytes, field_name))
+        .transpose()?;
+
+    match (explicit, normalized_embedded) {
+        (Some(explicit_bytes), Some(embedded_bytes)) => {
+            if explicit_bytes != embedded_bytes {
+                Err(format!(
+                    "{field_name} mismatch between explicit receiver output and embedded invoice"
+                )
+                .into())
+            } else {
+                Ok(explicit_bytes)
+            }
+        }
+        (Some(explicit_bytes), None) => Ok(explicit_bytes),
+        (None, Some(embedded_bytes)) => Ok(embedded_bytes),
+        (None, None) => Err(format!(
+            "{field_name} is required either explicitly or in receiver_spark_address invoice"
+        )
+        .into()),
+    }
+}
+
+fn normalize_invoice_token_amount(
+    bytes: &[u8],
+    field_name: &str,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    if bytes.is_empty() || bytes.len() > 16 {
+        return Err(format!(
+            "{field_name} must be between 1 and 16 bytes in embedded invoice, got {}",
+            bytes.len()
+        )
+        .into());
+    }
+
+    let mut normalized = vec![0_u8; 16 - bytes.len()];
+    normalized.extend_from_slice(bytes);
+    Ok(normalized)
 }
 
 fn matches_network_hrp(hrp: &str, network: u32) -> bool {

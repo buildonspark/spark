@@ -250,7 +250,7 @@ fn construct_partial_transfer_transaction_rejects_too_many_outputs_total() {
 fn construct_partial_transfer_transaction_extracts_token_invoice_fields() {
     let receiver_public_key = sample_key(0x02);
     let token_identifier = sample_token(0x10);
-    let token_amount = encode_u128_be(80);
+    let token_amount = vec![80];
     let invoice = encode_spark_address(
         receiver_public_key.clone(),
         Network::Regtest,
@@ -302,10 +302,66 @@ fn construct_partial_transfer_transaction_extracts_token_invoice_fields() {
         partial.partial_token_outputs[0].token_identifier,
         token_identifier
     );
-    assert_eq!(partial.partial_token_outputs[0].token_amount, token_amount);
+    assert_eq!(
+        partial.partial_token_outputs[0].token_amount,
+        encode_u128_be(80)
+    );
     let metadata = partial.token_transaction_metadata.unwrap();
     assert_eq!(metadata.invoice_attachments.len(), 1);
     assert_eq!(metadata.invoice_attachments[0].spark_invoice, invoice);
+}
+
+#[test]
+fn construct_partial_transfer_transaction_accepts_var_bytes_invoice_amount_when_matching_explicit_amount(
+) {
+    let token_identifier = sample_token(0x10);
+    let invoice = encode_spark_address(
+        sample_key(0x02),
+        Network::Regtest,
+        Some(SparkInvoiceFields {
+            version: 1,
+            id: vec![0x44; 16],
+            memo: None,
+            sender_public_key: None,
+            expiry_time: None,
+            payment_type: Some(spark::spark_invoice_fields::PaymentType::TokensPayment(
+                TokensPayment {
+                    token_identifier: Some(token_identifier.clone()),
+                    amount: Some(vec![80]),
+                },
+            )),
+        }),
+    );
+    let request = TransferBuildRequest {
+        identity_public_key: sample_key(0x01),
+        selected_outputs: vec![SelectedTokenOutput {
+            previous_transaction_hash: sample_hash(0xaa),
+            previous_transaction_vout: 0,
+            owner_public_key: sample_key(0x01),
+            token_identifier: token_identifier.clone(),
+            token_amount: encode_u128_be(100),
+        }],
+        receiver_outputs: vec![ReceiverTokenOutput {
+            receiver_spark_address: invoice,
+            token_identifier: Some(token_identifier),
+            token_amount: Some(encode_u128_be(80)),
+        }],
+        operator_identity_public_keys: vec![sample_key(0x03)],
+        network: Network::Regtest as u32,
+        validity_duration_seconds: 60,
+        client_created_timestamp_unix_micros: 100_000,
+        withdraw_bond_sats: 10_000,
+        withdraw_relative_block_locktime: 100,
+    };
+
+    let result = construct_partial_transfer_transaction_impl(request).unwrap();
+    let partial =
+        PartialTokenTransaction::decode(result.partial_token_transaction_bytes.as_slice()).unwrap();
+
+    assert_eq!(
+        partial.partial_token_outputs[0].token_amount,
+        encode_u128_be(80)
+    );
 }
 
 #[test]
