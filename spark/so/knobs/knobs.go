@@ -109,6 +109,10 @@ const (
 	// from invalid withdrawals where the revocation secret is available.
 	KnobEnableJusticeTransactions = "spark.so.tokens.enable_justice_transactions"
 
+	// When enabled (> 0), emits per-participant TokenTransactionEvent
+	// notifications on the unified SubscribeToEvents stream.
+	KnobTokenTxEventsEnabled = "spark.so.tokens.tx_events_enabled"
+
 	// Number of confirmations required before finalizing tree creation
 	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
 	KnobPrivacyEnabled           = "spark.so.privacy.enabled"

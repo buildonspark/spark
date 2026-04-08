@@ -65,6 +65,7 @@ import {
   QuerySparkInvoicesResponse,
   SigningJob,
   SubscribeToEventsResponse,
+  TokenTransactionEvent,
   Transfer,
   TransferStatus,
   TransferType,
@@ -215,6 +216,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   private mutexes: Map<string, Mutex> = new Map();
   private sparkAddress: SparkAddressFormat | undefined;
   private streamController: AbortController | null = null;
+  private tokenSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private tokenSyncPendingIds: Set<Bech32mTokenIdentifier> = new Set();
   private tokenOptimizationInProgress = false;
   private tokenOptimizationInterval: Interval | null = null;
   private tokenOutputManager: TokenOutputManager;
@@ -526,9 +529,53 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             BigInt(this.leafManager.getAvailableBalance()),
           );
         }
+      } else if (isTokenTransactionStreamEvent(event)) {
+        const bech32mIds = (event.tokenTransaction.tokenIdentifiers ?? []).map(
+          (raw) =>
+            encodeBech32mTokenIdentifier({
+              tokenIdentifier: raw,
+              network: this.config.getNetworkType(),
+            }),
+        );
+        this.scheduleTokenSync(bech32mIds);
       }
     } catch (error) {
       console.error("Error processing event", error);
+    }
+  }
+
+  /**
+   * Debounce token sync: accumulates token identifiers across rapid-fire
+   * events and flushes once after a 200ms window of inactivity. This avoids
+   * redundant network calls when multiple token transactions finalize in a
+   * burst.
+   */
+  private scheduleTokenSync(bech32mIds: Bech32mTokenIdentifier[]) {
+    for (const id of bech32mIds) {
+      this.tokenSyncPendingIds.add(id);
+    }
+    if (this.tokenSyncDebounceTimer) {
+      clearTimeout(this.tokenSyncDebounceTimer);
+    }
+    this.tokenSyncDebounceTimer = setTimeout(() => {
+      void this.flushTokenSync();
+    }, 200);
+  }
+
+  private async flushTokenSync() {
+    const ids = [...this.tokenSyncPendingIds];
+    this.tokenSyncPendingIds.clear();
+    this.tokenSyncDebounceTimer = null;
+
+    try {
+      await this.syncTokenOutputs(ids.length > 0 ? ids : undefined);
+      const tokenBalances = await this.getTokenBalanceMap();
+      this.emit(SparkWalletEvent.TokenBalanceUpdate, {
+        tokenTransactionHash: new Uint8Array(0),
+        tokenBalances,
+      });
+    } catch (error) {
+      console.error("Error flushing token sync", error);
     }
   }
 
@@ -643,6 +690,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           `claimTransfers completed claimedTransfers=${claimedTransfersIds.length}`,
         );
         let heartbeatListenerEnabled = false;
+        await this.syncTokenOutputs();
 
         try {
           for await (const data of stream) {
@@ -6145,4 +6193,16 @@ function isDepositStreamEvent(
   event: SubscribeToEventsResponse["event"],
 ): event is { $case: "deposit"; deposit: { deposit: TreeNode } } {
   return Boolean(event?.$case === "deposit" && event.deposit.deposit);
+}
+
+function isTokenTransactionStreamEvent(
+  event: SubscribeToEventsResponse["event"],
+): event is {
+  $case: "tokenTransaction";
+  tokenTransaction: TokenTransactionEvent;
+} {
+  return Boolean(
+    event?.$case === "tokenTransaction" &&
+    event.tokenTransaction.tokenTransactionHash,
+  );
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/entexample"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -1034,6 +1035,389 @@ func TestEventRouter_MIMOFanOutNotifications(t *testing.T) {
 	secondaryCancel()
 	nonReceiverCancel()
 	for range 4 {
+		select {
+		case err := <-errCh:
+			require.NoError(t, err)
+		case <-time.After(time.Second):
+			t.Fatal("router did not exit after cancel")
+		}
+	}
+}
+
+func TestEventRouter_TokenTransactionFanOut(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	router := NewEventRouter(dbClient, dbEvents, logger, &so.Config{})
+	rng := rand.NewChaCha8([32]byte{42})
+
+	// Enable the token tx events knob for this test.
+	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobTokenTxEventsEnabled: 100,
+	})
+
+	senderKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiver2Key := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	selfTransferKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	otherKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Subscribe all streams via the public SubscribeToEvents API.
+	type testStream struct {
+		stream *mockStream
+		cancel context.CancelFunc
+	}
+	streams := make(map[string]*testStream)
+	allKeys := map[string]keys.Public{
+		"sender":       senderKey,
+		"receiver":     receiverKey,
+		"receiver2":    receiver2Key,
+		"selfTransfer": selfTransferKey,
+		"other":        otherKey,
+	}
+	errCh := make(chan error, len(allKeys))
+	for name, key := range allKeys {
+		streamCtx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		streamCtx = knobs.InjectKnobsService(streamCtx, fixedKnobs)
+		defer cancel()
+		s := &mockStream{ctx: streamCtx}
+		streams[name] = &testStream{stream: s, cancel: cancel}
+		go func(k keys.Public, st *mockStream) {
+			errCh <- router.SubscribeToEvents(k, st)
+		}(key, s)
+		_ = name
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	sessionFactory := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs())
+
+	createKeyshare := func() *ent.SigningKeyshare {
+		return entexample.NewSigningKeyshareExample(t, dbClient).
+			SetStatus(schematype.KeyshareStatusAvailable).
+			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+			MustExec(t.Context())
+	}
+
+	getTokenTxHashes := func(stream *mockStream) [][]byte {
+		stream.mu.Lock()
+		defer stream.mu.Unlock()
+		var hashes [][]byte
+		for _, msg := range stream.messages {
+			if msg.GetTokenTransaction() != nil {
+				hashes = append(hashes, msg.GetTokenTransaction().GetTokenTransactionHash())
+			}
+		}
+		return hashes
+	}
+
+	// finalizeTx creates a token transaction at STARTED, wires up the given
+	// outputs, then transitions to FINALIZED via a notifier-enabled session.
+	finalizeTx := func(t *testing.T, spentOwners []keys.Public, createdOwners []keys.Public) []byte {
+		t.Helper()
+
+		hash := make([]byte, 32)
+		_, _ = rng.Read(hash)
+
+		issuerSig := make([]byte, 64)
+		_, _ = rng.Read(issuerSig)
+		tokenID := make([]byte, 32)
+		_, _ = rng.Read(tokenID)
+		tokenCreate := entexample.NewTokenCreateExample(t, dbClient).
+			SetIssuerSignature(issuerSig).
+			SetTokenIdentifier(tokenID).
+			MustExec(t.Context())
+		mint := entexample.NewTokenMintExample(t, dbClient).MustExec(t.Context())
+		opSig := make([]byte, 64)
+		_, _ = rng.Read(opSig)
+		tokenTx := entexample.NewTokenTransactionExample(t, dbClient).
+			SetStatus(schematype.TokenTransactionStatusStarted).
+			SetFinalizedTokenTransactionHash(hash).
+			SetOperatorSignature(opSig).
+			SetMint(mint).
+			MustExec(t.Context())
+
+		vout := int32(0)
+		for _, owner := range spentOwners {
+			fHash := make([]byte, 32)
+			_, _ = rng.Read(fHash)
+			entexample.NewTokenOutputExample(t, dbClient).
+				SetOwnerPublicKey(owner).
+				SetCreatedTransactionOutputVout(vout).
+				SetCreatedTransactionFinalizedHash(fHash).
+				SetOutputCreatedTokenTransaction(tokenTx).
+				SetOutputSpentTokenTransaction(tokenTx).
+				SetTokenCreate(tokenCreate).
+				SetRevocationKeyshare(createKeyshare()).
+				MustExec(t.Context())
+			vout++
+		}
+		for _, owner := range createdOwners {
+			fHash := make([]byte, 32)
+			_, _ = rng.Read(fHash)
+			entexample.NewTokenOutputExample(t, dbClient).
+				SetOwnerPublicKey(owner).
+				SetCreatedTransactionOutputVout(vout).
+				SetCreatedTransactionFinalizedHash(fHash).
+				SetOutputCreatedTokenTransaction(tokenTx).
+				SetTokenCreate(tokenCreate).
+				SetRevocationKeyshare(createKeyshare()).
+				MustExec(t.Context())
+			vout++
+		}
+
+		session := sessionFactory.NewSession(t.Context())
+		mutationCtx := knobs.InjectKnobsService(
+			ent.InjectNotifier(ent.Inject(t.Context(), session), session),
+			fixedKnobs,
+		)
+		tx, err := session.GetOrBeginTx(mutationCtx)
+		require.NoError(t, err)
+
+		_, err = tx.TokenTransaction.UpdateOneID(tokenTx.ID).
+			SetStatus(schematype.TokenTransactionStatusFinalized).
+			Save(mutationCtx)
+		require.NoError(t, err)
+		ent.MarkTxDirty(mutationCtx)
+		require.NoError(t, tx.Commit())
+
+		return hash
+	}
+
+	waitForHash := func(t *testing.T, name string, stream *mockStream, hash []byte) {
+		t.Helper()
+		require.Eventuallyf(t, func() bool {
+			for _, h := range getTokenTxHashes(stream) {
+				if slices.Equal(h, hash) {
+					return true
+				}
+			}
+			return false
+		}, 5*time.Second, 50*time.Millisecond, "%s should receive token tx hash", name)
+	}
+
+	hasHash := func(stream *mockStream, hash []byte) bool {
+		for _, h := range getTokenTxHashes(stream) {
+			if slices.Equal(h, hash) {
+				return true
+			}
+		}
+		return false
+	}
+
+	countHash := func(stream *mockStream, hash []byte) int {
+		count := 0
+		for _, h := range getTokenTxHashes(stream) {
+			if slices.Equal(h, hash) {
+				count++
+			}
+		}
+		return count
+	}
+
+	// ---- Test case 1: receiver-only (mint/create — only created outputs) ----
+	t.Run("receiver only (no spent outputs)", func(t *testing.T) {
+		hash := finalizeTx(t,
+			nil,                        // no spent outputs
+			[]keys.Public{receiverKey}, // one created output
+		)
+		waitForHash(t, "receiver", streams["receiver"].stream, hash)
+
+		time.Sleep(300 * time.Millisecond)
+		for _, name := range []string{"sender", "receiver2", "selfTransfer", "other"} {
+			require.False(t, hasHash(streams[name].stream, hash),
+				"%s should NOT receive receiver-only tx", name)
+		}
+	})
+
+	// ---- Test case 2: transfer with change output back to sender ----
+	t.Run("transfer with change output", func(t *testing.T) {
+		hash := finalizeTx(t,
+			[]keys.Public{senderKey},              // sender's input
+			[]keys.Public{receiverKey, senderKey}, // receiver + change
+		)
+		waitForHash(t, "sender", streams["sender"].stream, hash)
+		waitForHash(t, "receiver", streams["receiver"].stream, hash)
+
+		time.Sleep(300 * time.Millisecond)
+		for _, name := range []string{"receiver2", "selfTransfer", "other"} {
+			require.False(t, hasHash(streams[name].stream, hash),
+				"%s should NOT receive sender→receiver tx", name)
+		}
+	})
+
+	// ---- Test case 3: MIMO — multiple receivers ----
+	t.Run("MIMO multiple receivers", func(t *testing.T) {
+		hash := finalizeTx(t,
+			[]keys.Public{senderKey},                            // sender's input
+			[]keys.Public{receiverKey, receiver2Key, senderKey}, // two receivers + change
+		)
+		waitForHash(t, "sender", streams["sender"].stream, hash)
+		waitForHash(t, "receiver", streams["receiver"].stream, hash)
+		waitForHash(t, "receiver2", streams["receiver2"].stream, hash)
+
+		time.Sleep(300 * time.Millisecond)
+		for _, name := range []string{"selfTransfer", "other"} {
+			require.False(t, hasHash(streams[name].stream, hash),
+				"%s should NOT receive MIMO tx", name)
+		}
+	})
+
+	// ---- Test case 4: self-transfer (sender == receiver) ----
+	t.Run("self-transfer deduplicates", func(t *testing.T) {
+		hash := finalizeTx(t,
+			[]keys.Public{selfTransferKey},                  // spent by self
+			[]keys.Public{selfTransferKey, selfTransferKey}, // two outputs back to self
+		)
+		waitForHash(t, "selfTransfer", streams["selfTransfer"].stream, hash)
+
+		// Should receive exactly ONE notification despite appearing on 3 outputs.
+		time.Sleep(300 * time.Millisecond)
+		require.Equal(t, 1, countHash(streams["selfTransfer"].stream, hash),
+			"self-transfer should produce exactly one notification")
+
+		for _, name := range []string{"sender", "receiver", "receiver2", "other"} {
+			require.False(t, hasHash(streams[name].stream, hash),
+				"%s should NOT receive self-transfer tx", name)
+		}
+	})
+
+	// Cleanup
+	for _, ts := range streams {
+		ts.cancel()
+	}
+	for range len(allKeys) {
+		select {
+		case err := <-errCh:
+			require.NoError(t, err)
+		case <-time.After(time.Second):
+			t.Fatal("router did not exit after cancel")
+		}
+	}
+}
+
+func TestEventRouter_TokenTransactionKnobDisabled(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	router := NewEventRouter(dbClient, dbEvents, logger, &so.Config{})
+	rng := rand.NewChaCha8([32]byte{99})
+
+	// Knob is OFF (default 0) — no token events should be delivered.
+	disabledKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobTokenTxEventsEnabled: 0,
+	})
+
+	senderKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	senderStreamCtx, senderCancel := context.WithTimeout(t.Context(), 15*time.Second)
+	senderStreamCtx = knobs.InjectKnobsService(senderStreamCtx, disabledKnobs)
+	defer senderCancel()
+	senderStream := &mockStream{ctx: senderStreamCtx}
+
+	receiverStreamCtx, receiverCancel := context.WithTimeout(t.Context(), 15*time.Second)
+	receiverStreamCtx = knobs.InjectKnobsService(receiverStreamCtx, disabledKnobs)
+	defer receiverCancel()
+	receiverStream := &mockStream{ctx: receiverStreamCtx}
+
+	errCh := make(chan error, 2)
+	go func() { errCh <- router.SubscribeToEvents(senderKey, senderStream) }()
+	go func() { errCh <- router.SubscribeToEvents(receiverKey, receiverStream) }()
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Create and finalize a token transaction (with knob disabled in mutation ctx too).
+	hash := make([]byte, 32)
+	_, _ = rng.Read(hash)
+	issuerSig := make([]byte, 64)
+	_, _ = rng.Read(issuerSig)
+	tokenID := make([]byte, 32)
+	_, _ = rng.Read(tokenID)
+	opSig := make([]byte, 64)
+	_, _ = rng.Read(opSig)
+
+	tokenCreate := entexample.NewTokenCreateExample(t, dbClient).
+		SetIssuerSignature(issuerSig).
+		SetTokenIdentifier(tokenID).
+		MustExec(t.Context())
+	mint := entexample.NewTokenMintExample(t, dbClient).MustExec(t.Context())
+	tokenTx := entexample.NewTokenTransactionExample(t, dbClient).
+		SetStatus(schematype.TokenTransactionStatusStarted).
+		SetFinalizedTokenTransactionHash(hash).
+		SetOperatorSignature(opSig).
+		SetMint(mint).
+		MustExec(t.Context())
+
+	createKeyshare := func() *ent.SigningKeyshare {
+		return entexample.NewSigningKeyshareExample(t, dbClient).
+			SetStatus(schematype.KeyshareStatusAvailable).
+			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+			MustExec(t.Context())
+	}
+
+	fHash1 := make([]byte, 32)
+	_, _ = rng.Read(fHash1)
+	entexample.NewTokenOutputExample(t, dbClient).
+		SetOwnerPublicKey(senderKey).
+		SetCreatedTransactionOutputVout(0).
+		SetCreatedTransactionFinalizedHash(fHash1).
+		SetOutputCreatedTokenTransaction(tokenTx).
+		SetOutputSpentTokenTransaction(tokenTx).
+		SetTokenCreate(tokenCreate).
+		SetRevocationKeyshare(createKeyshare()).
+		MustExec(t.Context())
+
+	fHash2 := make([]byte, 32)
+	_, _ = rng.Read(fHash2)
+	entexample.NewTokenOutputExample(t, dbClient).
+		SetOwnerPublicKey(receiverKey).
+		SetCreatedTransactionOutputVout(1).
+		SetCreatedTransactionFinalizedHash(fHash2).
+		SetOutputCreatedTokenTransaction(tokenTx).
+		SetTokenCreate(tokenCreate).
+		SetRevocationKeyshare(createKeyshare()).
+		MustExec(t.Context())
+
+	sessionFactory := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs())
+	session := sessionFactory.NewSession(t.Context())
+	mutationCtx := knobs.InjectKnobsService(
+		ent.InjectNotifier(ent.Inject(t.Context(), session), session),
+		disabledKnobs,
+	)
+	tx, err := session.GetOrBeginTx(mutationCtx)
+	require.NoError(t, err)
+
+	_, err = tx.TokenTransaction.UpdateOneID(tokenTx.ID).
+		SetStatus(schematype.TokenTransactionStatusFinalized).
+		Save(mutationCtx)
+	require.NoError(t, err)
+	ent.MarkTxDirty(mutationCtx)
+	require.NoError(t, tx.Commit())
+
+	// Wait long enough for events to propagate if they were going to.
+	time.Sleep(500 * time.Millisecond)
+
+	getTokenTxCount := func(stream *mockStream) int {
+		stream.mu.Lock()
+		defer stream.mu.Unlock()
+		count := 0
+		for _, msg := range stream.messages {
+			if msg.GetTokenTransaction() != nil {
+				count++
+			}
+		}
+		return count
+	}
+
+	require.Equal(t, 0, getTokenTxCount(senderStream), "sender should NOT receive token events when knob is disabled")
+	require.Equal(t, 0, getTokenTxCount(receiverStream), "receiver should NOT receive token events when knob is disabled")
+
+	senderCancel()
+	receiverCancel()
+	for range 2 {
 		select {
 		case err := <-errCh:
 			require.NoError(t, err)

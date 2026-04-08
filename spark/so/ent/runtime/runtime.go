@@ -783,6 +783,7 @@ func init() {
 	tokentransactionMixin := schema.TokenTransaction{}.Mixin()
 	tokentransactionHooks := schema.TokenTransaction{}.Hooks()
 	tokentransaction.Hooks[0] = tokentransactionHooks[0]
+	tokentransaction.Hooks[1] = tokentransactionHooks[1]
 	tokentransactionMixinFields0 := tokentransactionMixin[0].Fields()
 	_ = tokentransactionMixinFields0
 	tokentransactionFields := schema.TokenTransaction{}.Fields()

@@ -107,7 +107,13 @@ message SubscribeToEventsResponse {
         ConnectedEvent connected = 3;
         TransferEvent sender_transfer = 4;
         HeartbeatEvent heartbeat = 5;
+        TokenTransactionEvent token_transaction = 6;
     }
+}
+
+message TokenTransactionEvent {
+    bytes token_transaction_hash = 1;
+    repeated bytes token_identifiers = 2;
 }
 
 message ConnectedEvent { }

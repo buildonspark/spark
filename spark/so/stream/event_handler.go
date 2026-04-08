@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
@@ -24,8 +25,9 @@ import (
 )
 
 const (
-	eventNameDepositAddress = "depositaddress"
-	eventNameTransfer       = "transfer"
+	eventNameDepositAddress   = "depositaddress"
+	eventNameTransfer         = "transfer"
+	eventNameTokenTransaction = "tokentransaction"
 )
 
 // streamHeartbeatInterval controls how often a HeartbeatEvent is sent to idle
@@ -67,7 +69,7 @@ func (s *EventRouter) SubscribeToEvents(identityPublicKey keys.Public, stream pb
 		return sparkerrors.PermissionDeniedNoReadAccess(fmt.Errorf("user does not have read access to the wallet"))
 	}
 
-	notificationChan, cleanup := s.createNotificationChannel(identityPublicKey)
+	notificationChan, cleanup := s.createNotificationChannel(stream.Context(), identityPublicKey)
 	defer cleanup()
 
 	connectedEvent := &pb.SubscribeToEventsResponse{
@@ -125,8 +127,8 @@ func (s *EventRouter) SubscribeToEvents(identityPublicKey keys.Public, stream pb
 	}
 }
 
-func (s *EventRouter) createNotificationChannel(identityPublicKey keys.Public) (chan db.EventData, func()) {
-	notificationChan, cleanup := s.dbEvents.AddListeners([]db.Subscription{
+func (s *EventRouter) createNotificationChannel(ctx context.Context, identityPublicKey keys.Public) (chan db.EventData, func()) {
+	subscriptions := []db.Subscription{
 		{
 			EventName: eventNameDepositAddress,
 			Field:     depositaddress.FieldOwnerIdentityPubkey,
@@ -142,8 +144,17 @@ func (s *EventRouter) createNotificationChannel(identityPublicKey keys.Public) (
 			Field:     transfer.FieldSenderIdentityPubkey,
 			Value:     identityPublicKey.String(),
 		},
-	})
+	}
 
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobTokenTxEventsEnabled, 0) > 0 {
+		subscriptions = append(subscriptions, db.Subscription{
+			EventName: eventNameTokenTransaction,
+			Field:     "owner_public_key",
+			Value:     identityPublicKey.String(),
+		})
+	}
+
+	notificationChan, cleanup := s.dbEvents.AddListeners(subscriptions)
 	return notificationChan, cleanup
 }
 
@@ -185,6 +196,10 @@ func (s *EventRouter) processNotification(ctx context.Context, eventData db.Even
 		}
 	case eventNameTransfer:
 		notifications = s.processTransferNotification(ctx, event, identityPublicKey)
+	case eventNameTokenTransaction:
+		if notification := s.processTokenTransactionNotification(ctx, event); notification != nil {
+			notifications = append(notifications, notification)
+		}
 	default:
 		return nil, fmt.Errorf("unknown event type: %s", eventData.Channel)
 	}
@@ -329,6 +344,42 @@ func (s *EventRouter) buildTransferEvent(ctx context.Context, transferID uuid.UU
 	return &pb.SubscribeToEventsResponse{
 		Event: &pb.SubscribeToEventsResponse_ReceiverTransfer{
 			ReceiverTransfer: &pb.TransferEvent{Transfer: transferProto},
+		},
+	}
+}
+
+func (s *EventRouter) processTokenTransactionNotification(ctx context.Context, event processEventPayload) *pb.SubscribeToEventsResponse {
+	// The fan-out hook pre-filters by owner_public_key, so we know the
+	// subscriber is involved. Query the transaction to build the response.
+	tx, err := s.dbClient.TokenTransaction.Query().
+		Where(tokentransaction.ID(event.ID)).
+		WithSpentOutput().
+		WithCreatedOutput().
+		Only(ctx)
+	if err != nil {
+		s.logger.With(zap.Error(err)).Sugar().Warnf("failed to query token transaction %s for stream event", event.ID)
+		return nil
+	}
+
+	tokenIDSet := make(map[string][]byte)
+	for _, output := range tx.Edges.SpentOutput {
+		tokenIDSet[string(output.TokenIdentifier)] = output.TokenIdentifier
+	}
+	for _, output := range tx.Edges.CreatedOutput {
+		tokenIDSet[string(output.TokenIdentifier)] = output.TokenIdentifier
+	}
+
+	tokenIdentifiers := make([][]byte, 0, len(tokenIDSet))
+	for _, id := range tokenIDSet {
+		tokenIdentifiers = append(tokenIdentifiers, id)
+	}
+
+	return &pb.SubscribeToEventsResponse{
+		Event: &pb.SubscribeToEventsResponse_TokenTransaction{
+			TokenTransaction: &pb.TokenTransactionEvent{
+				TokenTransactionHash: tx.FinalizedTokenTransactionHash,
+				TokenIdentifiers:     tokenIdentifiers,
+			},
 		},
 	}
 }

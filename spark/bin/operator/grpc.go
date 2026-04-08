@@ -54,7 +54,7 @@ func RegisterGrpcServers(
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
 	// Public SO token endpoint
-	sparkTokenServer := sparkgrpc.NewSparkTokenServer(config, config, dbClient)
+	sparkTokenServer := sparkgrpc.NewSparkTokenServer(config, config, dbClient, eventsRouter)
 	pbtoken.RegisterSparkTokenServiceServer(grpcServer, sparkTokenServer)
 
 	// Gossip endpoint

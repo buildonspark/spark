@@ -192,6 +192,7 @@ export type HandlePublicMethodErrorParams = {
 export const SparkWalletEvent = {
   All: "*",
   BalanceUpdate: "balance:update",
+  TokenBalanceUpdate: "token-balance:update",
   TransferClaimed: "transfer:claimed",
   DepositConfirmed: "deposit:confirmed",
   StreamConnected: "stream:connected",
@@ -209,6 +210,11 @@ export interface SparkWalletEvents {
     available: bigint;
     owned: bigint;
     incoming: bigint;
+  }) => void;
+  /** Emitted when a token transaction is finalized (both sender and receiver). Includes the updated balances for affected tokens. */
+  [SparkWalletEvent.TokenBalanceUpdate]: (event: {
+    tokenTransactionHash: Uint8Array;
+    tokenBalances: TokenBalanceMap;
   }) => void;
   /** Emitted when an incoming transfer is successfully claimed. Includes the transfer ID and new total balance. */
   [SparkWalletEvent.TransferClaimed]: (

@@ -484,11 +484,7 @@ func fetchSignatureForOutputToSpend(
 func fetchSignatureForInput(signaturesWithIndex []*tokenpb.SignatureWithIndex, inputIndex uint32) ([]byte, error) {
 	for _, s := range signaturesWithIndex {
 		if s.InputIndex == inputIndex {
-			sig := signature.GetEffectiveSingleSignature(s)
-			if sig == nil {
-				return nil, fmt.Errorf("signature at input index %d resolved to nil (multisig signatures are not storable as single-sig bytes)", inputIndex)
-			}
-			return sig, nil
+			return signature.GetEffectiveSingleSignature(s), nil
 		}
 	}
 	return nil, fmt.Errorf("no signature found for input index %d", inputIndex)

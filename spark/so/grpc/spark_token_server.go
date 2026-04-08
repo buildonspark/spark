@@ -9,6 +9,7 @@ import (
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/handler/tokens"
+	events "github.com/lightsparkdev/spark/so/stream"
 	sotokens "github.com/lightsparkdev/spark/so/tokens"
 )
 
@@ -19,7 +20,7 @@ type SparkTokenServer struct {
 	db          *ent.Client
 }
 
-func NewSparkTokenServer(authzConfig authz.Config, soConfig *so.Config, db *ent.Client) *SparkTokenServer {
+func NewSparkTokenServer(authzConfig authz.Config, soConfig *so.Config, db *ent.Client, eventsRouter *events.EventRouter) *SparkTokenServer {
 	return &SparkTokenServer{
 		authzConfig: authzConfig,
 		soConfig:    soConfig,

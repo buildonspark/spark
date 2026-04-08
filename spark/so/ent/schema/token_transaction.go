@@ -122,6 +122,7 @@ func (TokenTransaction) Indexes() []ent.Index {
 
 func (TokenTransaction) Hooks() []ent.Hook {
 	return []ent.Hook{
+		tokenTransactionParticipantFanOutHook(),
 		func(next ent.Mutator) ent.Mutator {
 			return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
 				tm, ok := m.(*entgen.TokenTransactionMutation)
