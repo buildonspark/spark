@@ -1,0 +1,157 @@
+x-operator-common: &operator-common
+  image: spark-operator:local
+  pull_policy: never
+  depends_on:
+    postgres:
+      condition: service_healthy
+    bitcoin-init:
+      condition: service_completed_successfully
+    cert-init:
+      condition: service_completed_successfully
+  restart: unless-stopped
+  entrypoint: ["/bin/sh", "-c"]
+  volumes:
+    - ./docker/entrypoint.sh:/opt/spark/entrypoint.sh:ro
+    - ./docker/config.json:/opt/spark/config.json:ro
+    - ./docker/operator.config.yaml:/opt/spark/operator.config.yaml:ro
+    - ./docker/keys:/opt/spark/keys:ro
+    - tls-certs:/opt/spark/tls:ro
+
+services:
+  cert-init:
+    image: alpine:3.20
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        apk add --no-cache openssl > /dev/null
+        for i in 0 1 2; do
+          KEY="/tls/server_$${i}.key"
+          CERT="/tls/server_$${i}.crt"
+          if [ -f "$$KEY" ] && [ -f "$$CERT" ]; then
+            echo "TLS key/cert for operator $$i already exist, skipping"
+            continue
+          fi
+          echo "Generating TLS key/cert for operator $$i..."
+          openssl genrsa -out "$$KEY" 2048 2>/dev/null
+          openssl req -new -x509 \
+            -key "$$KEY" -out "$$CERT" \
+            -days 3650 \
+            -subj "/CN=spark-operator-$${i}" \
+            -addext "subjectAltName = DNS:spark-operator-$${i},DNS:localhost"
+        done
+        echo "TLS certificates ready"
+    volumes:
+      - tls-certs:/tls
+
+  postgres:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  bitcoind:
+    image: lncm/bitcoind:v28.0
+    command:
+      - -conf=/bitcoin.conf
+    ports:
+      - "8332:8332"
+      - "28332:28332"
+      - "28333:28333"
+    volumes:
+      - bitcoind-data:/data/.bitcoin
+      - ./docker/bitcoin.conf:/bitcoin.conf:ro
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-regtest", "-rpcuser=testutil", "-rpcpassword=testutilpassword", "-rpcport=8332", "getblockchaininfo"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  bitcoin-init:
+    image: lncm/bitcoind:v28.0
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        CLI="bitcoin-cli -regtest -rpcuser=testutil -rpcpassword=testutilpassword -rpcconnect=bitcoind -rpcport=8332"
+
+        # Create wallet if it doesn't exist
+        if ! $$CLI listwallets | grep -q default; then
+          $$CLI createwallet default false false '' false true
+        fi
+
+        # Fund wallet if balance is low (mine 101 blocks for maturity)
+        BALANCE=$$($$CLI -rpcwallet=default getbalance)
+        case "$$BALANCE" in
+          0|0.00000000) NEEDS_FUND=1 ;;
+          *) NEEDS_FUND=0 ;;
+        esac
+
+        if [ "$$NEEDS_FUND" = "1" ]; then
+          ADDRESS=$$($$CLI -rpcwallet=default getnewaddress)
+          $$CLI generatetoaddress 101 "$$ADDRESS" > /dev/null
+          echo "Funded wallet with 101 blocks"
+        fi
+
+        echo "Bitcoin wallet ready"
+
+  bitcoin-miner:
+    image: lncm/bitcoind:v28.0
+    depends_on:
+      bitcoin-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        CLI="bitcoin-cli -regtest -rpcuser=testutil -rpcpassword=testutilpassword -rpcconnect=bitcoind -rpcport=8332"
+        while true; do
+          ADDRESS=$$($$CLI -rpcwallet=default getnewaddress 2>&1) || { sleep 30; continue; }
+          $$CLI generatetoaddress 1 "$$ADDRESS" > /dev/null 2>&1 && \
+            echo "$$(date): Mined 1 block" || \
+            echo "$$(date): ERROR: Failed to mine block"
+          sleep 30
+        done
+
+  spark-operator-0:
+    <<: *operator-common
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      - /opt/spark/entrypoint.sh 0
+    ports:
+      - "8535:8535"
+
+  spark-operator-1:
+    <<: *operator-common
+    command:
+      - /opt/spark/entrypoint.sh 1
+    ports:
+      - "8536:8535"
+
+  spark-operator-2:
+    <<: *operator-common
+    command:
+      - /opt/spark/entrypoint.sh 2
+    ports:
+      - "8537:8535"
+
+volumes:
+  postgres-data:
+  bitcoind-data:
+  tls-certs:

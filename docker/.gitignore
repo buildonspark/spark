@@ -1,0 +1,3 @@
+# Docker compose generated TLS keys/certs
+keys/server_*.key
+keys/server_*.crt

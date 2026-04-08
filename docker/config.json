@@ -1,0 +1,23 @@
+[
+  {
+    "id": 0,
+    "address": "spark-operator-0:8535",
+    "external_address": "spark-operator-0:8535",
+    "identity_public_key": "0322ca18fc489ae25418a0e768273c2c61cabb823edfb14feb891e9bec62016510",
+    "cert_path": "/opt/spark/tls/server_0.crt"
+  },
+  {
+    "id": 1,
+    "address": "spark-operator-1:8535",
+    "external_address": "spark-operator-1:8535",
+    "identity_public_key": "0341727a6c41b168f07eb50865ab8c397a53c7eef628ac1020956b705e43b6cb27",
+    "cert_path": "/opt/spark/tls/server_1.crt"
+  },
+  {
+    "id": 2,
+    "address": "spark-operator-2:8535",
+    "external_address": "spark-operator-2:8535",
+    "identity_public_key": "0305ab8d485cc752394de4981f8a5ae004f2becfea6f432c9a59d5022d8764f0a6",
+    "cert_path": "/opt/spark/tls/server_2.crt"
+  }
+]
