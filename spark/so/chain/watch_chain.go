@@ -270,7 +270,7 @@ func scanChainUpdates(
 		Where(blockheight.NetworkEQ(network)).
 		Only(ctx)
 	if ent.IsNotFound(err) {
-		startHeight := max(0, latestBlockHeight-6)
+		startHeight := max(0, latestBlockHeight-18)
 		logger.Sugar().Infof("Block height %d not found, creating new entry", startHeight)
 		dbBlockHeight, err = dbClient.BlockHeight.Create().SetHeight(startHeight).SetNetwork(network).Save(ctx)
 	}
