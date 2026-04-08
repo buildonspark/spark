@@ -615,7 +615,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }, intervalMs);
   }
 
-  private async syncWallet() {
+  public async syncWallet() {
     await this.syncTokenOutputs();
     await this.leafManager.sync();
   }
@@ -5742,6 +5742,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "setPrivacyEnabled",
   "signMessageWithIdentityKey",
   "signTransaction",
+  "syncWallet",
   "transfer",
   "transferV2",
   "transferTokens",

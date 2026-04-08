@@ -1,5 +1,14 @@
 # @buildonspark/spark-sdk
 
+## 0.7.6
+
+### Patch Changes
+
+- Add `execute_before` field to token transaction protos, enabling offline multisig flows with client-signed deadlines
+- Export `KeyDerivationType` as a value instead of only as a type, allowing consumers to access the enum values at runtime
+- Fix lightning send to correctly pass `amountSatsToSend` for zero-amount invoices, preventing leaves from being locked for zero-value payments
+- Temporarily expose syncWallet
+
 ## 0.7.5
 
 ### Patch Changes
