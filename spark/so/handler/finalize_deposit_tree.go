@@ -418,7 +418,7 @@ func loadAndValidateDepositAddress(
 // verifyMultiInputRootTransaction validates a multi-input root tx by reconstructing
 // the expected transaction server-side and comparing byte-for-byte.
 // Input ordering convention: primary UTXO first, then additional UTXOs in request array order.
-func (o *DepositHandler) verifyMultiInputRootTransaction(
+func verifyMultiInputRootTransaction(
 	clientRootTx *wire.MsgTx,
 	onChainTx *wire.MsgTx,
 	onChainVout uint32,
@@ -480,7 +480,7 @@ func (o *DepositHandler) verifyMultiInputRootTransaction(
 // For multi-input root transactions, it creates one signing job per root tx input,
 // followed by 1 refund job and 1 directFromCpfpRefund job.
 // rootTxInputCount returns the number of root tx signing jobs created.
-func (o *DepositHandler) prepareSigningJobs(
+func prepareSigningJobs(
 	req *pb.FinalizeDepositTreeCreationRequest,
 	depositAddress *ent.DepositAddress,
 	onChainTx *wire.MsgTx,
@@ -496,12 +496,12 @@ func (o *DepositHandler) prepareSigningJobs(
 
 	isMultiInput := len(additionalUtxos) > 0
 	if isMultiInput {
-		if err = o.verifyMultiInputRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout, onChainOutput, additionalUtxos); err != nil {
+		if err = verifyMultiInputRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout, onChainOutput, additionalUtxos); err != nil {
 			err = fmt.Errorf("multi-input root transaction verification failed: %w", err)
 			return
 		}
 	} else {
-		if err = o.verifyRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout, false); err != nil {
+		if err = verifyRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout, false); err != nil {
 			err = fmt.Errorf("root transaction verification failed: %w", err)
 			return
 		}
@@ -513,7 +513,7 @@ func (o *DepositHandler) prepareSigningJobs(
 		err = fmt.Errorf("invalid refund transaction: %w", err)
 		return
 	}
-	if err = o.verifyRefundTransaction(cpfpRootTx, cpfpRefundTx); err != nil {
+	if err = verifyRefundTransaction(cpfpRootTx, cpfpRefundTx); err != nil {
 		err = fmt.Errorf("cpfp refund verification failed: %w", err)
 		return
 	}
@@ -617,7 +617,7 @@ func (o *DepositHandler) prepareSigningJobs(
 		err = fmt.Errorf("invalid direct from cpfp refund transaction: %w", err)
 		return
 	}
-	if err = o.verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundTx); err != nil {
+	if err = verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundTx); err != nil {
 		err = fmt.Errorf("direct from cpfp refund verification failed: %w", err)
 		return
 	}
@@ -646,7 +646,7 @@ func (o *DepositHandler) prepareSigningJobs(
 // aggregateSignatures aggregates SE and user signature shares.
 // rootTxInputCount indicates how many of the initial signing results are for root tx inputs.
 // Returns signatures in the same order as signingResults.
-func (o *DepositHandler) aggregateSignatures(
+func aggregateDepositSignatures(
 	ctx context.Context,
 	config *so.Config,
 	req *pb.FinalizeDepositTreeCreationRequest,
@@ -741,7 +741,7 @@ func (o *DepositHandler) aggregateSignatures(
 
 // applySignaturesToTransactions applies aggregated signatures to the raw transactions.
 // rootTxInputCount indicates how many of the initial signatures are for root tx inputs.
-func (o *DepositHandler) applySignaturesToTransactions(
+func applySignaturesToTransactions(
 	req *pb.FinalizeDepositTreeCreationRequest,
 	signatures [][]byte,
 	rootTxInputCount int,
@@ -778,7 +778,7 @@ func (o *DepositHandler) applySignaturesToTransactions(
 // verifySignedTransactions verifies all signed transactions using the Bitcoin script engine.
 // For the root tx (which may have multiple inputs), it verifies each input against its prev output.
 // For the refund txs (single input each), it verifies against the root tx output.
-func (o *DepositHandler) verifySignedTransactions(
+func verifySignedTransactions(
 	signedCpfpRootTxBytes []byte,
 	signedCpfpRefundTxBytes []byte,
 	signedDirectFromCpfpRefundTxBytes []byte,
@@ -842,7 +842,7 @@ func (o *DepositHandler) verifySignedTransactions(
 // createTreeAndNode creates the tree and root node in the database.
 // For multi-UTXO deposits, the root node value is the sum of all UTXO amounts.
 // UTXO confirmation is enforced during validation in loadAndValidateDepositAddress.
-func (o *DepositHandler) createTreeAndNode(
+func createTreeAndNode(
 	ctx context.Context,
 	depositAddress *ent.DepositAddress,
 	onChainTx *wire.MsgTx,
@@ -974,7 +974,7 @@ func (o *DepositHandler) createTreeAndNode(
 // convertToSigningJobsWithPregeneratedNonce converts signing jobs to jobs with pregenerated nonces
 // using the SE commitments provided by the client.
 // rootTxInputCount indicates how many of the initial signing jobs are for root tx inputs.
-func (o *DepositHandler) convertToSigningJobsWithPregeneratedNonce(
+func convertToSigningJobsWithPregeneratedNonce(
 	signingJobs []*helper.SigningJob,
 	req *pb.FinalizeDepositTreeCreationRequest,
 	rootTxInputCount int,

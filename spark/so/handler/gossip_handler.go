@@ -635,9 +635,10 @@ func (h *GossipHandler) handleFinalizeTreeNodeGossipMessage(
 // dispatchConsensusCommit routes an incoming ConsensusCommit gossip message to
 // the appropriate FlowHandler.Commit based on operation type. New consensus
 // flows add a case here.
-func dispatchConsensusCommit(_ context.Context, _ *so.Config, opType pbgossip.ConsensusOperationType, _ proto.Message) error {
+func dispatchConsensusCommit(ctx context.Context, config *so.Config, opType pbgossip.ConsensusOperationType, op proto.Message) error {
 	switch opType {
-	// TODO: Add cases here as domain flows are migrated to the consensus engine.
+	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE:
+		return NewDepositTreeFlowHandler(config).Commit(ctx, op)
 	default:
 		return fmt.Errorf("unknown consensus operation type for commit: %d", opType)
 	}
@@ -646,9 +647,10 @@ func dispatchConsensusCommit(_ context.Context, _ *so.Config, opType pbgossip.Co
 // dispatchConsensusRollback routes an incoming ConsensusRollback gossip message
 // to the appropriate FlowHandler.Rollback based on operation type. New consensus
 // flows add a case here.
-func dispatchConsensusRollback(_ context.Context, _ *so.Config, opType pbgossip.ConsensusOperationType, _ proto.Message) error {
+func dispatchConsensusRollback(ctx context.Context, config *so.Config, opType pbgossip.ConsensusOperationType, op proto.Message) error {
 	switch opType {
-	// TODO: Add cases here as domain flows are migrated to the consensus engine.
+	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE:
+		return NewDepositTreeFlowHandler(config).Rollback(ctx, op)
 	default:
 		return fmt.Errorf("unknown consensus operation type for rollback: %d", opType)
 	}

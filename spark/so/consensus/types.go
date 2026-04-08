@@ -4,7 +4,6 @@ import (
 	"context"
 
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
-	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -47,12 +46,8 @@ type CoordinatorFlow interface {
 
 	// PrepareOp returns the operation message passed to FlowHandler.Prepare
 	// on each participant. Used by the engine for the local self-call and by
-	// PrepareTask for the ConsensusPrepare RPC payload.
+	// DefaultPrepareTask for the ConsensusPrepare RPC payload.
 	PrepareOp() proto.Message
-
-	// PrepareTask is fanned out to all remote operators during the prepare phase.
-	// For the coordinator (self), the engine calls FlowHandler.Prepare locally instead.
-	PrepareTask(ctx context.Context, operator *so.SigningOperator) (proto.Message, error)
 
 	// BuildCommitPayload produces the commit gossip payload from prepare results.
 	// For aggregating flows (e.g., FROST signing), this aggregates signature shares

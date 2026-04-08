@@ -6,6 +6,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/logging"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/helper"
 	"go.uber.org/zap"
@@ -68,7 +69,7 @@ func (e *TwoPCEngine) Execute(
 		return nil, fmt.Errorf("failed to resolve participants: %w", err)
 	}
 
-	// Wrap prepareTask: remote operators use flow.PrepareTask (gRPC),
+	// Wrap prepareTask: remote operators use DefaultPrepareTask (gRPC),
 	// self uses flow.Prepare locally to avoid deadlock.
 	// Both return proto.Message which is marshaled into *anypb.Any for the results map.
 	prepareTask := func(ctx context.Context, operator *so.SigningOperator) (*anypb.Any, error) {
@@ -77,7 +78,7 @@ func (e *TwoPCEngine) Execute(
 		if operator.Identifier == e.config.Identifier {
 			result, err = flow.Prepare(ctx, flow.PrepareOp())
 		} else {
-			result, err = flow.PrepareTask(ctx, operator)
+			result, err = DefaultPrepareTask(ctx, operator, opType, flow.PrepareOp())
 		}
 		if err != nil {
 			return nil, err
@@ -150,4 +151,31 @@ func (e *TwoPCEngine) rollback(ctx context.Context, opType pbgossip.ConsensusOpe
 	}
 	_, err = e.gossip.CreateCommitAndSendGossipMessage(ctx, msg, participants)
 	return err
+}
+
+// DefaultPrepareTask sends a ConsensusPrepare RPC to a remote operator.
+// This is the common implementation for CoordinatorFlow.PrepareTask — every
+// flow does the same thing, just with a different opType and prepareOp.
+func DefaultPrepareTask(ctx context.Context, operator *so.SigningOperator, opType pbgossip.ConsensusOperationType, prepareOp proto.Message) (proto.Message, error) {
+	conn, err := operator.NewOperatorGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	anyOp, err := anypb.New(prepareOp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal prepare request: %w", err)
+	}
+	client := pbinternal.NewSparkInternalServiceClient(conn)
+	resp, err := client.ConsensusPrepare(ctx, &pbinternal.ConsensusPrepareRequest{
+		OpType:    int32(opType),
+		Operation: anyOp,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if resp.Result == nil {
+		return nil, nil
+	}
+	return resp.Result.UnmarshalNew()
 }

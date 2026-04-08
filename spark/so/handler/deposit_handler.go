@@ -31,6 +31,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/authz"
+	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
@@ -906,7 +907,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	if err != nil {
 		return nil, err
 	}
-	err = o.verifyRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout, false)
+	err = verifyRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout, false)
 	if err != nil {
 		return nil, err
 	}
@@ -973,7 +974,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	if err != nil {
 		return nil, err
 	}
-	if err := o.verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundWireTx); err != nil {
+	if err := verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundWireTx); err != nil {
 		return nil, err
 	}
 	if len(cpfpRootTx.TxOut) == 0 {
@@ -1220,7 +1221,7 @@ func validateDepositUtxoValueAgainstChain(
 	return nil
 }
 
-func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wire.MsgTx, onChainVout uint32, isDirect bool) error {
+func verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wire.MsgTx, onChainVout uint32, isDirect bool) error {
 	if err := common.ValidateBitcoinTxVersion(rootTx); err != nil {
 		return fmt.Errorf("root tx version validation failed: %w", err)
 	}
@@ -1254,7 +1255,7 @@ func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wi
 	return nil
 }
 
-func (o *DepositHandler) verifyRefundTransaction(tx *wire.MsgTx, refundTx *wire.MsgTx) error {
+func verifyRefundTransaction(tx *wire.MsgTx, refundTx *wire.MsgTx) error {
 	if err := common.ValidateBitcoinTxVersion(tx); err != nil {
 		return fmt.Errorf("tx version validation failed: %w", err)
 	}
@@ -1923,6 +1924,25 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 		return nil, err
 	}
 
+	// Consensus path: use 2PC engine for all SO communication
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusDepositTree, 0) > 0 {
+		flow, err := buildDepositCoordinatorFlow(ctx, config, req)
+		if err != nil {
+			return nil, err
+		}
+		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+		engine := consensus.NewTwoPCEngine(config, NewSendGossipHandler(config))
+		_, err = engine.Execute(ctx,
+			pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE,
+			&selection,
+			flow,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("consensus deposit tree finalization failed: %w", err)
+		}
+		return flow.response, nil
+	}
+
 	network, err := convertAndValidateProtoNetwork(config, req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, fmt.Errorf("invalid network %s: %w", req.OnChainUtxo.Network, err)
@@ -1942,13 +1962,13 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 	logger.Sugar().Infof("Finalizing deposit tree creation for address %s", depositAddress.Address)
 
 	// Step 2: Prepare signing jobs with pregenerated nonces
-	signingJobs, verifyingKey, rootTxInputCount, err := o.prepareSigningJobs(req, depositAddress, onChainTx, onChainOutput, additionalUtxos)
+	signingJobs, verifyingKey, rootTxInputCount, err := prepareSigningJobs(req, depositAddress, onChainTx, onChainOutput, additionalUtxos)
 	if err != nil {
 		return nil, err
 	}
 
 	// Convert to SigningJobWithPregeneratedNonce using SE commitments from request
-	signingJobsWithNonce, err := o.convertToSigningJobsWithPregeneratedNonce(signingJobs, req, rootTxInputCount)
+	signingJobsWithNonce, err := convertToSigningJobsWithPregeneratedNonce(signingJobs, req, rootTxInputCount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert signing jobs: %w", err)
 	}
@@ -1973,7 +1993,7 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse root signing key: %w", err)
 	}
-	signatures, err := o.aggregateSignatures(ctx, config, req, signingResults, verifyingKey, rootSigningPubKey, rootTxInputCount)
+	signatures, err := aggregateDepositSignatures(ctx, config, req, signingResults, verifyingKey, rootSigningPubKey, rootTxInputCount)
 	if err != nil {
 		return nil, err
 	}
@@ -1981,19 +2001,19 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 	logger.Sugar().Infof("Successfully aggregated %d signatures", len(signatures))
 
 	// Step 5: Apply signatures to transactions
-	signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx, err := o.applySignaturesToTransactions(req, signatures, rootTxInputCount)
+	signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx, err := applySignaturesToTransactions(req, signatures, rootTxInputCount)
 	if err != nil {
 		return nil, err
 	}
 
 	// Step 5b: Verify signed transactions using Bitcoin script engine
-	if err := o.verifySignedTransactions(signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx, onChainTx, onChainOutput, additionalUtxos); err != nil {
+	if err := verifySignedTransactions(signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx, onChainTx, onChainOutput, additionalUtxos); err != nil {
 		return nil, fmt.Errorf("signed transaction verification failed: %w", err)
 	}
 
 	// Step 6: Create tree and node in database with signed transactions
 	// Note: The tree is automatically linked to deposit address via SetDepositAddress() in createTreeAndNode
-	createdTree, createdNode, err := o.createTreeAndNode(ctx, depositAddress, onChainTx, onChainOutput, additionalUtxos, req.OnChainUtxo.Vout, network, verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
+	createdTree, createdNode, err := createTreeAndNode(ctx, depositAddress, onChainTx, onChainOutput, additionalUtxos, req.OnChainUtxo.Vout, network, verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
 	if err != nil {
 		return nil, err
 	}
