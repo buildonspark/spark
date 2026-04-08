@@ -175,6 +175,7 @@ message GossipMessageFinalizeTreeNode {
 // Each value corresponds to a case in the gossip handler's dispatch switch.
 enum ConsensusOperationType {
     CONSENSUS_OPERATION_TYPE_UNSPECIFIED = 0;
+    CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE = 1;
 }
 
 // GossipMessageConsensusCommit delivers the commit phase of a consensus operation.

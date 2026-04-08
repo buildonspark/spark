@@ -543,6 +543,13 @@ message SyncNodeRequest {
     string operator_id = 2;
 }
 
+// DepositTreePrepareRequest is the 2PC prepare payload for consensus deposit tree finalization.
+// Each SO independently validates the deposit address, constructs signing jobs,
+// and produces FROST signature shares.
+message DepositTreePrepareRequest {
+    spark.FinalizeDepositTreeCreationRequest original_request = 1;
+}
+
 message ConsensusPrepareRequest {
     // Corresponds to gossip.ConsensusOperationType. Defined as int32 to avoid
     // a circular proto import (gossip.proto already imports spark_internal.proto).
