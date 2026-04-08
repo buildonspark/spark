@@ -49,3 +49,25 @@ func TestSumOfSigningKeyshares_DoesNotMutateInputs(t *testing.T) {
 	require.True(t, first.PublicShares["01"].Equals(originalFirstPublicShares["01"]))
 	require.False(t, sum.PublicShares["01"].Equals(sumShareBefore))
 }
+
+func TestSumOfSigningKeyshares_ClearsSecretVersion(t *testing.T) {
+	makeKeyshare := func(v *int32) *SigningKeyshare {
+		priv := keys.GeneratePrivateKey()
+		pub := priv.Public()
+		return &SigningKeyshare{
+			SecretShare:   &priv,
+			SecretVersion: v,
+			PublicShares:  map[string]keys.Public{"op": pub},
+			PublicKey:     pub,
+		}
+	}
+
+	v0, v1 := int32(0), int32(1)
+	sum, err := sumOfSigningKeyshares([]*SigningKeyshare{
+		makeKeyshare(&v0),
+		makeKeyshare(nil),
+		makeKeyshare(&v1),
+	})
+	require.NoError(t, err)
+	require.Nil(t, sum.SecretVersion)
+}

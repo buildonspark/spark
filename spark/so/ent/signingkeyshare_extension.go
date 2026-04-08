@@ -142,6 +142,7 @@ func getUnusedSigningKeysharesTx(ctx context.Context, client *Client, cfg *so.Co
 			signing_keyshares.update_time,
 			signing_keyshares.status,
 			signing_keyshares.secret_share,
+			signing_keyshares.secret_version,
 			signing_keyshares.public_shares,
 			signing_keyshares.public_key,
 			signing_keyshares.min_signers,
@@ -198,6 +199,7 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UU
 			signing_keyshares.update_time,
 			signing_keyshares.status,
 			signing_keyshares.secret_share,
+			signing_keyshares.secret_version,
 			signing_keyshares.public_shares,
 			signing_keyshares.public_key,
 			signing_keyshares.min_signers,
@@ -365,6 +367,7 @@ func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, erro
 
 	firstSecret := *keyshares[0].SecretShare
 	sum.SecretShare = &firstSecret
+	sum.SecretVersion = nil
 
 	sum.PublicShares = make(map[string]keys.Public, len(keyshares[0].PublicShares))
 	maps.Copy(sum.PublicShares, keyshares[0].PublicShares)
@@ -431,6 +434,7 @@ func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *Signing
 	lastKey, err := db.SigningKeyshare.Create().
 		SetID(id).
 		SetSecretShare(lastSecretShare).
+		SetNillableSecretVersion(sumKeyshare.SecretVersion).
 		SetPublicShares(publicShares).
 		SetPublicKey(verifyingKey).
 		SetStatus(st.KeyshareStatusInUse).
@@ -461,11 +465,12 @@ func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningK
 	if sumKeyshare.SecretShare == nil {
 		return nil, fmt.Errorf("summed keyshare has no secret share")
 	}
-	updateKeyshare, err := db.SigningKeyshare.UpdateOneID(updateKeyshareID).
+	updateQuery := db.SigningKeyshare.UpdateOneID(updateKeyshareID).
 		SetSecretShare(*sumKeyshare.SecretShare).
 		SetPublicKey(sumKeyshare.PublicKey).
-		SetPublicShares(sumKeyshare.PublicShares).
-		Save(ctx)
+		SetPublicShares(sumKeyshare.PublicShares)
+	updateQuery = updateQuery.ClearSecretVersion()
+	updateKeyshare, err := updateQuery.Save(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -74,6 +74,20 @@ func (skc *SigningKeyshareCreate) SetNillableSecretShare(k *keys.Private) *Signi
 	return skc
 }
 
+// SetSecretVersion sets the "secret_version" field.
+func (skc *SigningKeyshareCreate) SetSecretVersion(i int32) *SigningKeyshareCreate {
+	skc.mutation.SetSecretVersion(i)
+	return skc
+}
+
+// SetNillableSecretVersion sets the "secret_version" field if the given value is not nil.
+func (skc *SigningKeyshareCreate) SetNillableSecretVersion(i *int32) *SigningKeyshareCreate {
+	if i != nil {
+		skc.SetSecretVersion(*i)
+	}
+	return skc
+}
+
 // SetPublicShares sets the "public_shares" field.
 func (skc *SigningKeyshareCreate) SetPublicShares(m map[string]keys.Public) *SigningKeyshareCreate {
 	skc.mutation.SetPublicShares(m)
@@ -241,6 +255,10 @@ func (skc *SigningKeyshareCreate) createSpec() (*SigningKeyshare, *sqlgraph.Crea
 		_spec.SetField(signingkeyshare.FieldSecretShare, field.TypeBytes, value)
 		_node.SecretShare = &value
 	}
+	if value, ok := skc.mutation.SecretVersion(); ok {
+		_spec.SetField(signingkeyshare.FieldSecretVersion, field.TypeInt32, value)
+		_node.SecretVersion = &value
+	}
 	if value, ok := skc.mutation.PublicShares(); ok {
 		_spec.SetField(signingkeyshare.FieldPublicShares, field.TypeJSON, value)
 		_node.PublicShares = value
@@ -348,6 +366,30 @@ func (u *SigningKeyshareUpsert) UpdateSecretShare() *SigningKeyshareUpsert {
 // ClearSecretShare clears the value of the "secret_share" field.
 func (u *SigningKeyshareUpsert) ClearSecretShare() *SigningKeyshareUpsert {
 	u.SetNull(signingkeyshare.FieldSecretShare)
+	return u
+}
+
+// SetSecretVersion sets the "secret_version" field.
+func (u *SigningKeyshareUpsert) SetSecretVersion(v int32) *SigningKeyshareUpsert {
+	u.Set(signingkeyshare.FieldSecretVersion, v)
+	return u
+}
+
+// UpdateSecretVersion sets the "secret_version" field to the value that was provided on create.
+func (u *SigningKeyshareUpsert) UpdateSecretVersion() *SigningKeyshareUpsert {
+	u.SetExcluded(signingkeyshare.FieldSecretVersion)
+	return u
+}
+
+// AddSecretVersion adds v to the "secret_version" field.
+func (u *SigningKeyshareUpsert) AddSecretVersion(v int32) *SigningKeyshareUpsert {
+	u.Add(signingkeyshare.FieldSecretVersion, v)
+	return u
+}
+
+// ClearSecretVersion clears the value of the "secret_version" field.
+func (u *SigningKeyshareUpsert) ClearSecretVersion() *SigningKeyshareUpsert {
+	u.SetNull(signingkeyshare.FieldSecretVersion)
 	return u
 }
 
@@ -508,6 +550,34 @@ func (u *SigningKeyshareUpsertOne) UpdateSecretShare() *SigningKeyshareUpsertOne
 func (u *SigningKeyshareUpsertOne) ClearSecretShare() *SigningKeyshareUpsertOne {
 	return u.Update(func(s *SigningKeyshareUpsert) {
 		s.ClearSecretShare()
+	})
+}
+
+// SetSecretVersion sets the "secret_version" field.
+func (u *SigningKeyshareUpsertOne) SetSecretVersion(v int32) *SigningKeyshareUpsertOne {
+	return u.Update(func(s *SigningKeyshareUpsert) {
+		s.SetSecretVersion(v)
+	})
+}
+
+// AddSecretVersion adds v to the "secret_version" field.
+func (u *SigningKeyshareUpsertOne) AddSecretVersion(v int32) *SigningKeyshareUpsertOne {
+	return u.Update(func(s *SigningKeyshareUpsert) {
+		s.AddSecretVersion(v)
+	})
+}
+
+// UpdateSecretVersion sets the "secret_version" field to the value that was provided on create.
+func (u *SigningKeyshareUpsertOne) UpdateSecretVersion() *SigningKeyshareUpsertOne {
+	return u.Update(func(s *SigningKeyshareUpsert) {
+		s.UpdateSecretVersion()
+	})
+}
+
+// ClearSecretVersion clears the value of the "secret_version" field.
+func (u *SigningKeyshareUpsertOne) ClearSecretVersion() *SigningKeyshareUpsertOne {
+	return u.Update(func(s *SigningKeyshareUpsert) {
+		s.ClearSecretVersion()
 	})
 }
 
@@ -845,6 +915,34 @@ func (u *SigningKeyshareUpsertBulk) UpdateSecretShare() *SigningKeyshareUpsertBu
 func (u *SigningKeyshareUpsertBulk) ClearSecretShare() *SigningKeyshareUpsertBulk {
 	return u.Update(func(s *SigningKeyshareUpsert) {
 		s.ClearSecretShare()
+	})
+}
+
+// SetSecretVersion sets the "secret_version" field.
+func (u *SigningKeyshareUpsertBulk) SetSecretVersion(v int32) *SigningKeyshareUpsertBulk {
+	return u.Update(func(s *SigningKeyshareUpsert) {
+		s.SetSecretVersion(v)
+	})
+}
+
+// AddSecretVersion adds v to the "secret_version" field.
+func (u *SigningKeyshareUpsertBulk) AddSecretVersion(v int32) *SigningKeyshareUpsertBulk {
+	return u.Update(func(s *SigningKeyshareUpsert) {
+		s.AddSecretVersion(v)
+	})
+}
+
+// UpdateSecretVersion sets the "secret_version" field to the value that was provided on create.
+func (u *SigningKeyshareUpsertBulk) UpdateSecretVersion() *SigningKeyshareUpsertBulk {
+	return u.Update(func(s *SigningKeyshareUpsert) {
+		s.UpdateSecretVersion()
+	})
+}
+
+// ClearSecretVersion clears the value of the "secret_version" field.
+func (u *SigningKeyshareUpsertBulk) ClearSecretVersion() *SigningKeyshareUpsertBulk {
+	return u.Update(func(s *SigningKeyshareUpsert) {
+		s.ClearSecretVersion()
 	})
 }
 

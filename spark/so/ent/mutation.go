@@ -13698,6 +13698,8 @@ type SigningKeyshareMutation struct {
 	update_time          *time.Time
 	status               *schematype.SigningKeyshareStatus
 	secret_share         *keys.Private
+	secret_version       *int32
+	addsecret_version    *int32
 	public_shares        *map[string]keys.Public
 	public_key           *keys.Public
 	min_signers          *int32
@@ -13971,6 +13973,76 @@ func (m *SigningKeyshareMutation) ResetSecretShare() {
 	delete(m.clearedFields, signingkeyshare.FieldSecretShare)
 }
 
+// SetSecretVersion sets the "secret_version" field.
+func (m *SigningKeyshareMutation) SetSecretVersion(i int32) {
+	m.secret_version = &i
+	m.addsecret_version = nil
+}
+
+// SecretVersion returns the value of the "secret_version" field in the mutation.
+func (m *SigningKeyshareMutation) SecretVersion() (r int32, exists bool) {
+	v := m.secret_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSecretVersion returns the old "secret_version" field's value of the SigningKeyshare entity.
+// If the SigningKeyshare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SigningKeyshareMutation) OldSecretVersion(ctx context.Context) (v *int32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSecretVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSecretVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSecretVersion: %w", err)
+	}
+	return oldValue.SecretVersion, nil
+}
+
+// AddSecretVersion adds i to the "secret_version" field.
+func (m *SigningKeyshareMutation) AddSecretVersion(i int32) {
+	if m.addsecret_version != nil {
+		*m.addsecret_version += i
+	} else {
+		m.addsecret_version = &i
+	}
+}
+
+// AddedSecretVersion returns the value that was added to the "secret_version" field in this mutation.
+func (m *SigningKeyshareMutation) AddedSecretVersion() (r int32, exists bool) {
+	v := m.addsecret_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSecretVersion clears the value of the "secret_version" field.
+func (m *SigningKeyshareMutation) ClearSecretVersion() {
+	m.secret_version = nil
+	m.addsecret_version = nil
+	m.clearedFields[signingkeyshare.FieldSecretVersion] = struct{}{}
+}
+
+// SecretVersionCleared returns if the "secret_version" field was cleared in this mutation.
+func (m *SigningKeyshareMutation) SecretVersionCleared() bool {
+	_, ok := m.clearedFields[signingkeyshare.FieldSecretVersion]
+	return ok
+}
+
+// ResetSecretVersion resets all changes to the "secret_version" field.
+func (m *SigningKeyshareMutation) ResetSecretVersion() {
+	m.secret_version = nil
+	m.addsecret_version = nil
+	delete(m.clearedFields, signingkeyshare.FieldSecretVersion)
+}
+
 // SetPublicShares sets the "public_shares" field.
 func (m *SigningKeyshareMutation) SetPublicShares(value map[string]keys.Public) {
 	m.public_shares = &value
@@ -14189,7 +14261,7 @@ func (m *SigningKeyshareMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SigningKeyshareMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.create_time != nil {
 		fields = append(fields, signingkeyshare.FieldCreateTime)
 	}
@@ -14201,6 +14273,9 @@ func (m *SigningKeyshareMutation) Fields() []string {
 	}
 	if m.secret_share != nil {
 		fields = append(fields, signingkeyshare.FieldSecretShare)
+	}
+	if m.secret_version != nil {
+		fields = append(fields, signingkeyshare.FieldSecretVersion)
 	}
 	if m.public_shares != nil {
 		fields = append(fields, signingkeyshare.FieldPublicShares)
@@ -14230,6 +14305,8 @@ func (m *SigningKeyshareMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case signingkeyshare.FieldSecretShare:
 		return m.SecretShare()
+	case signingkeyshare.FieldSecretVersion:
+		return m.SecretVersion()
 	case signingkeyshare.FieldPublicShares:
 		return m.PublicShares()
 	case signingkeyshare.FieldPublicKey:
@@ -14255,6 +14332,8 @@ func (m *SigningKeyshareMutation) OldField(ctx context.Context, name string) (en
 		return m.OldStatus(ctx)
 	case signingkeyshare.FieldSecretShare:
 		return m.OldSecretShare(ctx)
+	case signingkeyshare.FieldSecretVersion:
+		return m.OldSecretVersion(ctx)
 	case signingkeyshare.FieldPublicShares:
 		return m.OldPublicShares(ctx)
 	case signingkeyshare.FieldPublicKey:
@@ -14300,6 +14379,13 @@ func (m *SigningKeyshareMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSecretShare(v)
 		return nil
+	case signingkeyshare.FieldSecretVersion:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSecretVersion(v)
+		return nil
 	case signingkeyshare.FieldPublicShares:
 		v, ok := value.(map[string]keys.Public)
 		if !ok {
@@ -14336,6 +14422,9 @@ func (m *SigningKeyshareMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *SigningKeyshareMutation) AddedFields() []string {
 	var fields []string
+	if m.addsecret_version != nil {
+		fields = append(fields, signingkeyshare.FieldSecretVersion)
+	}
 	if m.addmin_signers != nil {
 		fields = append(fields, signingkeyshare.FieldMinSigners)
 	}
@@ -14350,6 +14439,8 @@ func (m *SigningKeyshareMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *SigningKeyshareMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case signingkeyshare.FieldSecretVersion:
+		return m.AddedSecretVersion()
 	case signingkeyshare.FieldMinSigners:
 		return m.AddedMinSigners()
 	case signingkeyshare.FieldCoordinatorIndex:
@@ -14363,6 +14454,13 @@ func (m *SigningKeyshareMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *SigningKeyshareMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case signingkeyshare.FieldSecretVersion:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSecretVersion(v)
+		return nil
 	case signingkeyshare.FieldMinSigners:
 		v, ok := value.(int32)
 		if !ok {
@@ -14388,6 +14486,9 @@ func (m *SigningKeyshareMutation) ClearedFields() []string {
 	if m.FieldCleared(signingkeyshare.FieldSecretShare) {
 		fields = append(fields, signingkeyshare.FieldSecretShare)
 	}
+	if m.FieldCleared(signingkeyshare.FieldSecretVersion) {
+		fields = append(fields, signingkeyshare.FieldSecretVersion)
+	}
 	return fields
 }
 
@@ -14404,6 +14505,9 @@ func (m *SigningKeyshareMutation) ClearField(name string) error {
 	switch name {
 	case signingkeyshare.FieldSecretShare:
 		m.ClearSecretShare()
+		return nil
+	case signingkeyshare.FieldSecretVersion:
+		m.ClearSecretVersion()
 		return nil
 	}
 	return fmt.Errorf("unknown SigningKeyshare nullable field %s", name)
@@ -14424,6 +14528,9 @@ func (m *SigningKeyshareMutation) ResetField(name string) error {
 		return nil
 	case signingkeyshare.FieldSecretShare:
 		m.ResetSecretShare()
+		return nil
+	case signingkeyshare.FieldSecretVersion:
+		m.ResetSecretVersion()
 		return nil
 	case signingkeyshare.FieldPublicShares:
 		m.ResetPublicShares()

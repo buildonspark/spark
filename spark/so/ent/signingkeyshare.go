@@ -29,6 +29,8 @@ type SigningKeyshare struct {
 	Status schematype.SigningKeyshareStatus `json:"status,omitempty"`
 	// The secret share of the signing keyshare held by this SO.
 	SecretShare *keys.Private `json:"secret_share,omitempty"`
+	// The active secret version for this signing keyshare.
+	SecretVersion *int32 `json:"secret_version,omitempty"`
 	// A map from SO identifier to the public key of the secret share held by that SO.
 	PublicShares map[string]keys.Public `json:"public_shares,omitempty"`
 	// The public key of the combined secret represented by this signing keyshare.
@@ -51,7 +53,7 @@ func (*SigningKeyshare) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case signingkeyshare.FieldPublicKey:
 			values[i] = new(keys.Public)
-		case signingkeyshare.FieldMinSigners, signingkeyshare.FieldCoordinatorIndex:
+		case signingkeyshare.FieldSecretVersion, signingkeyshare.FieldMinSigners, signingkeyshare.FieldCoordinatorIndex:
 			values[i] = new(sql.NullInt64)
 		case signingkeyshare.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -104,6 +106,13 @@ func (sk *SigningKeyshare) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				sk.SecretShare = new(keys.Private)
 				*sk.SecretShare = *value.S.(*keys.Private)
+			}
+		case signingkeyshare.FieldSecretVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field secret_version", values[i])
+			} else if value.Valid {
+				sk.SecretVersion = new(int32)
+				*sk.SecretVersion = int32(value.Int64)
 			}
 		case signingkeyshare.FieldPublicShares:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -178,6 +187,11 @@ func (sk *SigningKeyshare) String() string {
 	builder.WriteString(", ")
 	if v := sk.SecretShare; v != nil {
 		builder.WriteString("secret_share=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := sk.SecretVersion; v != nil {
+		builder.WriteString("secret_version=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

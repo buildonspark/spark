@@ -55,6 +55,12 @@ func (SigningKeyshare) Fields() []ent.Field {
 			Nillable().
 			Annotations(entexample.Default("adeab186b64a2239f15640cb43d7c57c35376f5e1c42f574671880a34a4a80ad")),
 		field.
+			Int32("secret_version").
+			Comment("The active secret version for this signing keyshare.").
+			Optional().
+			Nillable().
+			Annotations(entexample.Default(0)),
+		field.
 			JSON("public_shares", map[string]keys.Public{}).
 			Comment("A map from SO identifier to the public key of the secret share held by that SO.").
 			Annotations(entexample.Default(map[string]string{
