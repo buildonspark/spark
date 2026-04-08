@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.7.7
+
+### Patch Changes
+
+- Rename the manual wallet sync escape hatch to `experimental_syncWallet()` and keep `syncWallet()` internal.
+
 ## 0.7.6
 
 ### Patch Changes

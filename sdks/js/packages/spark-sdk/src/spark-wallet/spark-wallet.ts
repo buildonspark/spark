@@ -615,7 +615,22 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }, intervalMs);
   }
 
-  public async syncWallet() {
+  /**
+   * Manually triggers a full wallet state sync, refreshing token outputs and
+   * leaf state from the network.
+   *
+   * This API is a temporary workaround for clients that need to force a resync
+   * outside the normal background update flow.
+   *
+   * @experimental This API is experimental and may change or be removed without notice.
+   *
+   * @returns {Promise<void>} Resolves when the wallet state sync completes.
+   */
+  public async experimental_syncWallet(): Promise<void> {
+    await this.syncWallet();
+  }
+
+  private async syncWallet(): Promise<void> {
     await this.syncTokenOutputs();
     await this.leafManager.sync();
   }
@@ -5741,7 +5756,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "setPrivacyEnabled",
   "signMessageWithIdentityKey",
   "signTransaction",
-  "syncWallet",
+  "experimental_syncWallet",
   "transfer",
   "transferV2",
   "transferTokens",
