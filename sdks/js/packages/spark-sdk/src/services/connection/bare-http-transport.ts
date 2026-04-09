@@ -13,6 +13,8 @@ import type { Transport } from "nice-grpc-web/lib/client/Transport.js";
 /* This is essentially identical to nice-grpc-web NodeHttpTransport except
    for types and unref on responseStream RPCs to ensure the process can exit
    after the abort signal is triggered */
+const UNARY_REQUEST_TIMEOUT_MS = 15_000;
+
 export function BareHttpTransport(): Transport {
   return async function* bareHttpTransport({
     url,
@@ -74,10 +76,20 @@ export function BareHttpTransport(): Transport {
         },
       );
 
+      if (!method.responseStream) {
+        req.setTimeout(UNARY_REQUEST_TIMEOUT_MS, () => {
+          req.destroy(
+            new Error(
+              `UNAVAILABLE: request timed out after ${UNARY_REQUEST_TIMEOUT_MS}ms`,
+            ),
+          );
+        });
+      }
+
       signal.addEventListener("abort", abortListener);
 
       req.on("error", (err) => {
-        reject(err);
+        reject(toTransportClientError(method.path, err));
       });
 
       if (bodyBuffer != null) {
@@ -131,6 +143,8 @@ export function BareHttpTransport(): Transport {
           data,
         };
       }
+    } catch (err) {
+      throw toTransportClientError(method.path, err);
     } finally {
       try {
         pipeAbortController?.abort();
@@ -218,4 +232,11 @@ async function pipeBody(
   }
 }
 
-// tmp
+function toTransportClientError(path: string, error: unknown) {
+  if (error instanceof ClientError) {
+    return error;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  return new ClientError(path, Status.UNAVAILABLE, message);
+}
