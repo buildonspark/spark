@@ -1951,6 +1951,13 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
 	}
+	// TODO(SP-2727): The MIMO branches below use TransferSender/TransferReceiver
+	// inverted lookups that regress badly for high-volume wallets (50s for 3.2M
+	// rows). getSSPCounterSwapFilter bypasses this by using the direct column
+	// since each transfer currently has exactly one sender. The entire query
+	// strategy here needs reworking before multi-sender MIMO is enabled — both
+	// the inverted lookups and the counter-swap filter (which assumes a single
+	// SSP identity per swap).
 	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelQueryTransfers, 0) > 0
 
 	var transferPredicate []predicate.Transfer
@@ -2164,7 +2171,9 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		}
 		transferPredicate = append(transferPredicate, enttransfer.TypeIn(transferTypes...))
 
-		// Find the most recent swap sent by the participant to find the SSP identity public key to filter out
+		// Filter out legacy SSP "recovery transfers" — when a counter-swap
+		// failed, the SSP sent a plain transfer instead. No longer occurs
+		// with swap v3, but historical data still needs filtering.
 		if filterSSPCounterSwap && walletIdentityPubkey != nil {
 			if pred := h.getSSPCounterSwapFilter(ctx, db, network, *walletIdentityPubkey); pred != nil {
 				transferPredicate = append(transferPredicate, pred)
@@ -2274,45 +2283,22 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 }
 
 func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.Client, network btcnetwork.Network, walletIdentityPubkey keys.Public) predicate.Transfer {
-	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelQueryTransfers, 0) > 0
-
-	swapQuery := db.Transfer.Query().
-		Where(enttransfer.And(
+	swap, err := db.Transfer.Query().
+		Where(
+			enttransfer.SenderIdentityPubkeyEQ(walletIdentityPubkey),
 			enttransfer.TypeIn(st.TransferTypeSwap, st.TransferTypePrimarySwapV3),
 			enttransfer.NetworkEQ(network),
-		)).
-		WithTransferSenders().
-		WithTransferReceivers()
-	if useMIMO {
-		swapQuery = swapQuery.Where(enttransfer.HasTransferSendersWith(enttransfersender.IdentityPubkeyEQ(walletIdentityPubkey)))
-	} else {
-		swapQuery = swapQuery.Where(enttransfer.SenderIdentityPubkeyEQ(walletIdentityPubkey))
-	}
-	swap, err := swapQuery.Order(ent.Desc(enttransfer.FieldCreateTime)).First(ctx)
-
+		).
+		Order(ent.Desc(enttransfer.FieldCreateTime)).
+		First(ctx)
 	if err != nil || swap == nil {
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Sugar().Warnf("failed to find swap for wallet %s: %v", walletIdentityPubkey.String(), err)
-		// Don't want to fail the entire query if we can't find a swap or error here
+		if err != nil {
+			logger := logging.GetLoggerFromContext(ctx)
+			logger.Sugar().Warnf("failed to find swap for wallet %s: %v", walletIdentityPubkey.String(), err)
+		}
 		return nil
 	}
 
-	// include if !(sender is SSP and type is transfer)
-	// i.e. exclude SSP counter-swap transfers
-	if useMIMO {
-		_, swapReceiverPubkey, err := GetTransferSenderReceiver(swap)
-		if err != nil {
-			logger := logging.GetLoggerFromContext(ctx)
-			logger.Sugar().Warnf("failed to get swap receiver for wallet %s: %v", walletIdentityPubkey.String(), err)
-			return nil
-		}
-		return enttransfer.Not(
-			enttransfer.And(
-				enttransfer.HasTransferSendersWith(enttransfersender.IdentityPubkeyEQ(swapReceiverPubkey)),
-				enttransfer.TypeEQ(st.TransferTypeTransfer),
-			),
-		)
-	}
 	return enttransfer.Not(
 		enttransfer.And(
 			enttransfer.SenderIdentityPubkeyEQ(swap.ReceiverIdentityPubkey),
