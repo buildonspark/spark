@@ -63,12 +63,6 @@ func (IdempotencyKey) Edges() []ent.Edge {
 
 func (IdempotencyKey) Indexes() []ent.Index {
 	return []ent.Index{
-		// Temporary: keep old 2-column unique index for backwards-compatible rolling deploys.
-		// Old SO instances use ON CONFLICT(idempotency_key, method_name) which requires this index.
-		// Remove in a follow-up PR once all instances are on the new code.
-		index.Fields("idempotency_key", "method_name").
-			Unique().
-			StorageKey("idempotency_keys_idempotency_key_method_name"),
 		index.Fields("idempotency_key", "method_name", "identity_public_key").
 			Unique().
 			StorageKey("idempotency_keys_key_method_identity"),
