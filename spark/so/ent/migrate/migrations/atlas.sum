@@ -1,4 +1,4 @@
-h1:YDSJ8Cm3m9enXi06xmUZ9EoXrvrIlAuQi1wwBpimUYg=
+h1:WT92Syk+znquIzZTZXTuR+tC3/Wsrg3Kwxj/cCaFHl0=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -142,3 +142,4 @@ h1:YDSJ8Cm3m9enXi06xmUZ9EoXrvrIlAuQi1wwBpimUYg=
 20260407195137_create_transfer_partner_table.sql h1:VdrUD9v77SAZPYKZjHMYSlogFEGfz2NN3GmwmWWN+o8=
 20260407200000_add_back_secret_version.sql h1:YefZsZMsM8FAbQgHNP6GiP+QraZgeJ4+RLdSujZiB0o=
 20260408173857_drop_old_idempotency_index.sql h1:k7LBGpZNFqtrICgIHtBUH0QUVyx+cs3P54wcUggPhFY=
+20260409180045_add_mimo_query_composite_indexes.sql h1:i29mTineOFoiMRCoKF/ytXbOShdJVWKhRKBCJswaEGs=

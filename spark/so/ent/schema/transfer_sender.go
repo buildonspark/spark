@@ -2,6 +2,7 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -56,5 +57,10 @@ func (TransferSender) Indexes() []ent.Index {
 		// Also serves as our "transfer" index.
 		index.Fields("transfer_id", "identity_pubkey").
 			Unique(),
+
+		// Optimizes MIMO queryTransfers ID lookup: allows Postgres to scan
+		// by identity_pubkey ordered by create_time without joining to transfers.
+		index.Fields("identity_pubkey", "create_time").
+			Annotations(entsql.DescColumns("create_time")),
 	}
 }

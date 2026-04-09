@@ -1372,6 +1372,16 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{TransferReceiversColumns[6], TransferReceiversColumns[4]},
 			},
+			{
+				Name:    "transferreceiver_identity_pubkey_create_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransferReceiversColumns[3], TransferReceiversColumns[1]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						TransferReceiversColumns[1].Name: true,
+					},
+				},
+			},
 		},
 	}
 	// TransferSendersColumns holds the columns for the "transfer_senders" table.
@@ -1405,6 +1415,16 @@ var (
 				Name:    "transfersender_transfer_id_identity_pubkey",
 				Unique:  true,
 				Columns: []*schema.Column{TransferSendersColumns[4], TransferSendersColumns[3]},
+			},
+			{
+				Name:    "transfersender_identity_pubkey_create_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransferSendersColumns[3], TransferSendersColumns[1]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						TransferSendersColumns[1].Name: true,
+					},
+				},
 			},
 		},
 	}

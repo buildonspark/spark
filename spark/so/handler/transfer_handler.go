@@ -1951,13 +1951,16 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
 	}
-	// TODO(SP-2727): The MIMO branches below use TransferSender/TransferReceiver
-	// inverted lookups that regress badly for high-volume wallets (50s for 3.2M
-	// rows). getSSPCounterSwapFilter bypasses this by using the direct column
-	// since each transfer currently has exactly one sender. The entire query
-	// strategy here needs reworking before multi-sender MIMO is enabled — both
-	// the inverted lookups and the counter-swap filter (which assumes a single
-	// SSP identity per swap).
+	// The MIMO branches below query TransferSender/TransferReceiver by
+	// identity_pubkey using a composite (identity_pubkey, create_time DESC)
+	// index, avoiding the expensive JOIN to transfers for sorting.
+	// The final transfers query still sorts by transfers.create_time.
+	//
+	// TODO(SP-2727): getSSPCounterSwapFilter bypasses this by using the direct
+	// column since each transfer currently has exactly one sender. The entire
+	// query strategy here needs reworking before multi-sender support is
+	// enabled — both the inverted lookups and the counter-swap filter (which
+	// assumes a single SSP identity per swap).
 	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelQueryTransfers, 0) > 0
 
 	var filterType string
@@ -1995,13 +1998,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
 		}
 		if useMIMO {
-			transferIDs, err := db.TransferReceiver.Query().
-				Where(enttransferreceiver.IdentityPubkeyEQ(receiverIDPubKey)).
-				QueryTransfer().
-				Unique(false).
-				Order(ent.Desc(enttransfer.FieldCreateTime)).
-				Limit(maxMIMOTransferIDs).
-				IDs(ctx)
+			transferIDs, err := queryReceiverTransferIDs(ctx, db, receiverIDPubKey)
 			if err != nil {
 				return nil, fmt.Errorf("failed to query receiver transfer IDs: %w", err)
 			}
@@ -2022,13 +2019,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			return nil, fmt.Errorf("invalid sender identity public key: %w", err)
 		}
 		if useMIMO {
-			transferIDs, err := db.TransferSender.Query().
-				Where(enttransfersender.IdentityPubkeyEQ(senderIDPubKey)).
-				QueryTransfer().
-				Unique(false).
-				Order(ent.Desc(enttransfer.FieldCreateTime)).
-				Limit(maxMIMOTransferIDs).
-				IDs(ctx)
+			transferIDs, err := querySenderTransferIDs(ctx, db, senderIDPubKey)
 			if err != nil {
 				return nil, fmt.Errorf("failed to query sender transfer IDs: %w", err)
 			}
@@ -2052,26 +2043,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			return nil, fmt.Errorf("invalid sender or receiver identity public key: %w", err)
 		}
 		if useMIMO {
-			// For MIMO, query TransferSender/TransferReceiver directly to get
-			// transfer IDs. This avoids the slow OR + EXISTS pattern that causes
-			// full table scans when querying from the transfers table.
-			receiverTransferIDs, err := db.TransferReceiver.Query().
-				Where(enttransferreceiver.IdentityPubkeyEQ(identityPubKey)).
-				QueryTransfer().
-				Unique(false).
-				Order(ent.Desc(enttransfer.FieldCreateTime)).
-				Limit(maxMIMOTransferIDs).
-				IDs(ctx)
+			receiverTransferIDs, err := queryReceiverTransferIDs(ctx, db, identityPubKey)
 			if err != nil {
 				return nil, fmt.Errorf("failed to query receiver transfer IDs: %w", err)
 			}
-			senderTransferIDs, err := db.TransferSender.Query().
-				Where(enttransfersender.IdentityPubkeyEQ(identityPubKey)).
-				QueryTransfer().
-				Unique(false).
-				Order(ent.Desc(enttransfer.FieldCreateTime)).
-				Limit(maxMIMOTransferIDs).
-				IDs(ctx)
+			senderTransferIDs, err := querySenderTransferIDs(ctx, db, identityPubKey)
 			if err != nil {
 				return nil, fmt.Errorf("failed to query sender transfer IDs: %w", err)
 			}
@@ -2343,6 +2319,32 @@ const CoopExitConfirmationThreshold = 6
 // parameter limit (65,535). With other predicates also consuming
 // parameters, 50,000 provides safe headroom.
 const maxMIMOTransferIDs = 50_000
+
+// queryReceiverTransferIDs returns up to maxMIMOTransferIDs transfer IDs for
+// the given receiver identity pubkey, ordered by the receiver record's create_time DESC.
+func queryReceiverTransferIDs(ctx context.Context, db *ent.Client, pubkey keys.Public) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	err := db.TransferReceiver.Query().
+		Where(enttransferreceiver.IdentityPubkeyEQ(pubkey)).
+		Order(ent.Desc(enttransferreceiver.FieldCreateTime)).
+		Limit(maxMIMOTransferIDs).
+		Select(enttransferreceiver.FieldTransferID).
+		Scan(ctx, &ids)
+	return ids, err
+}
+
+// querySenderTransferIDs returns up to maxMIMOTransferIDs transfer IDs for
+// the given sender identity pubkey, ordered by the sender record's create_time DESC.
+func querySenderTransferIDs(ctx context.Context, db *ent.Client, pubkey keys.Public) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	err := db.TransferSender.Query().
+		Where(enttransfersender.IdentityPubkeyEQ(pubkey)).
+		Order(ent.Desc(enttransfersender.FieldCreateTime)).
+		Limit(maxMIMOTransferIDs).
+		Select(enttransfersender.FieldTransferID).
+		Scan(ctx, &ids)
+	return ids, err
+}
 
 func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Client, transfer *ent.Transfer) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.checkCoopExitTxBroadcasted")
