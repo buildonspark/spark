@@ -121,6 +121,10 @@ export class WalletConfigService implements HasSspClientOptions {
     };
   }
 
+  public getLog(): boolean {
+    return this.config.log;
+  }
+
   public getEvents(): Partial<SparkWalletEvents> {
     return this.config.events;
   }

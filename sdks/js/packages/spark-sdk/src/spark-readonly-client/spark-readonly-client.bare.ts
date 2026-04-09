@@ -9,7 +9,11 @@ export class SparkReadonlyClientBare extends BaseSparkReadonlyClient {
     config: WalletConfigService,
     authMode: AuthMode,
   ) {
-    return new ConnectionManagerBrowser(config, authMode, BareHttpTransport());
+    return new ConnectionManagerBrowser(
+      config,
+      authMode,
+      BareHttpTransport({ log: config.getLog() }),
+    );
   }
 }
 

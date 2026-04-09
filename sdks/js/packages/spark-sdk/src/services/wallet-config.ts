@@ -114,6 +114,7 @@ export type TokenOptimizationOptions = {
 };
 
 export type ConfigOptions = MayHaveSspClientOptions & {
+  readonly log?: boolean;
   readonly network?: NetworkType;
   readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
   readonly coordinatorIdentifier?: string;
@@ -145,6 +146,7 @@ function getLocalFrostSignerAddress(): string {
 }
 
 const BASE_CONFIG: Required<ConfigOptions> = {
+  log: false,
   network: "LOCAL",
   coordinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",

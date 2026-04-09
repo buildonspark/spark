@@ -496,6 +496,15 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const MAX_RETRIES = 10;
     const INITIAL_DELAY = 1000;
     const MAX_DELAY = 60000;
+    const loggingEnabled = this.config.getLog();
+    const logStream = (message: string) => {
+      if (!loggingEnabled) {
+        return;
+      }
+      console.info(
+        `[${new Date().toISOString()}] [spark-sdk][stream] ${message}`,
+      );
+    };
 
     const delay = (ms: number, signal: AbortSignal) => {
       return new Promise<boolean>((resolve) => {
@@ -520,19 +529,29 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     while (retryCount <= MAX_RETRIES) {
       try {
         const address = this.config.getCoordinatorAddress();
+        logStream(`subscribing to ${address} (retry=${retryCount})`);
         const stream = await this.connectionManager.subscribeToEvents(
           address,
           streamController.signal,
         );
+        logStream("subscribeToEvents returned async iterator");
         const claimedTransfersIds = await this.claimTransfers();
+        logStream(
+          `claimTransfers completed claimedTransfers=${claimedTransfersIds.length}`,
+        );
 
         try {
           for await (const data of stream) {
             if (streamController.signal.aborted) {
+              logStream("stream controller aborted while iterating");
               break;
             }
 
+            logStream(
+              `stream event received type=${describeStreamEvent(data.event)}`,
+            );
             if (isConnectedStreamEvent(data.event)) {
+              logStream("connected");
               this.emit(SparkWalletEvent.StreamConnected);
               retryCount = 0;
             }
@@ -547,11 +566,18 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             }
             await this.handleStreamEvent(data);
           }
+          logStream("stream iterator completed without throwing");
         } catch (error) {
+          logStream(
+            `stream iterator threw: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
           throw error;
         }
       } catch (error) {
         if (streamController.signal.aborted) {
+          logStream("stream loop aborted");
           break;
         }
 
@@ -562,6 +588,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
         if (retryCount < MAX_RETRIES) {
           retryCount++;
+          logStream(
+            `error: ${
+              error instanceof Error ? error.message : String(error)
+            }; retrying in ${backoffDelay}ms (${retryCount}/${MAX_RETRIES})`,
+          );
           this.emit(
             SparkWalletEvent.StreamReconnecting,
             retryCount,
@@ -589,6 +620,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           );
           break;
         }
+      } finally {
+        logStream(
+          `stream loop iteration finished retryCount=${retryCount} aborted=${streamController.signal.aborted}`,
+        );
       }
     }
   }
@@ -5884,6 +5919,10 @@ function isConnectedStreamEvent(
   event: SubscribeToEventsResponse["event"],
 ): event is { $case: "connected"; connected: ConnectedEvent } {
   return event?.$case === "connected";
+}
+
+function describeStreamEvent(event: SubscribeToEventsResponse["event"]) {
+  return event?.$case ?? "unknown";
 }
 
 function isReceiverTransferStreamEvent(

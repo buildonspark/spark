@@ -8,7 +8,7 @@ export class SparkWalletBare extends BaseSparkWallet {
     return new ConnectionManagerBrowser(
       config,
       "identity",
-      BareHttpTransport(),
+      BareHttpTransport({ log: config.getLog() }),
     );
   }
 }
