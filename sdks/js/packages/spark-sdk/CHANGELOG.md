@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.7.9
+
+### Patch Changes
+
+- - Fix Bare transport recovery after network drops so wallet event streams reconnect instead of getting stuck on half-open requests.
+
 ## 0.7.8
 
 ### Patch Changes

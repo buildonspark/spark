@@ -1,5 +1,12 @@
 # @buildonspark/spark-mcp
 
+## 0.1.10
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.7.9
+
 ## 0.1.9
 
 ### Patch Changes
