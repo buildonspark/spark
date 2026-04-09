@@ -212,6 +212,10 @@ func (t *TableLogger) Log(
 			result["grpc.client.client_env"] = md.Get("x-client-env")[0]
 		}
 
+		if len(md.Get("x-session-id")) > 0 {
+			result["grpc.client.session_id"] = md.Get("x-session-id")[0]
+		}
+
 		if tokens := md.Get("authorization"); len(tokens) > 0 {
 			token := strings.TrimPrefix(tokens[0], "Bearer ")
 			hash := sha256.Sum256([]byte(token))
