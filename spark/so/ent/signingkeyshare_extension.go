@@ -5,6 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
+	"sort"
+	"strings"
+	"sync"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -20,8 +24,14 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/entephemeral"
+	"github.com/lightsparkdev/spark/so/entephemeral/predicate"
+	"github.com/lightsparkdev/spark/so/entephemeral/signingkeysharesecret"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -32,9 +42,253 @@ import (
 const defaultMinAvailableKeys = 100_000
 
 var (
-	ErrSigningKeyshareSecretUnavailable = errors.New("signing keyshare secret unavailable")
-	ErrSigningKeyshareSecretMissing     = errors.New("signing keyshare secret missing")
+	ErrSigningKeyshareSecretUnavailable        = errors.New("signing keyshare secret unavailable")
+	ErrSigningKeyshareSecretMissing            = errors.New("signing keyshare secret missing")
+	signingKeyshareSecretCleanupFailureCounter metric.Int64Counter
+	signingKeyshareSecretCleanupCounterInit    sync.Once
 )
+
+func getSigningKeyshareSecretCleanupFailureCounter() metric.Int64Counter {
+	signingKeyshareSecretCleanupCounterInit.Do(func() {
+		meter := otel.GetMeterProvider().Meter("spark.db.ent")
+		counter, err := meter.Int64Counter(
+			"spark_db_ent_signing_keyshare_secret_cleanup_failures_total",
+			metric.WithDescription("Total number of best-effort signing keyshare secret cleanup failures"),
+			metric.WithUnit("{count}"),
+		)
+		if err != nil {
+			otel.Handle(err)
+			signingKeyshareSecretCleanupFailureCounter = noop.Int64Counter{}
+			return
+		}
+		signingKeyshareSecretCleanupFailureCounter = counter
+	})
+	return signingKeyshareSecretCleanupFailureCounter
+}
+
+func recordSigningKeyshareSecretCleanupFailure(
+	ctx context.Context,
+	stage string,
+	reason string,
+) {
+	getSigningKeyshareSecretCleanupFailureCounter().Add(
+		ctx,
+		1,
+		metric.WithAttributes(
+			attribute.String("stage", stage),
+			attribute.String("reason", reason),
+		),
+	)
+}
+
+type signingKeyshareSecretDualWriteDecisionContextKey struct{}
+
+// FreezeSigningKeyshareSecretDualWriteDecision computes the dual-write decision once and stores it on context.
+func FreezeSigningKeyshareSecretDualWriteDecision(ctx context.Context) context.Context {
+	return context.WithValue(
+		ctx,
+		signingKeyshareSecretDualWriteDecisionContextKey{},
+		shouldDualWriteSigningKeyshareSecret(ctx),
+	)
+}
+
+func shouldDualWriteSigningKeyshareSecret(ctx context.Context) bool {
+	if ctx != nil {
+		if decision, ok := ctx.Value(signingKeyshareSecretDualWriteDecisionContextKey{}).(bool); ok {
+			return decision
+		}
+	}
+
+	knobService := knobs.GetKnobsService(ctx)
+	return knobService.RolloutRandom(knobs.KnobSoSigningKeyshareDualWriteSecret, 100)
+}
+
+func deleteSigningKeyshareSecretVersionBestEffort(ctx context.Context, signingKeyshareID uuid.UUID, version int32, reason string) {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	ephemeralTx, err := entephemeral.GetTxFromContext(ctx)
+	if err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "get_tx", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to start ephemeral tx to cleanup signing keyshare %s version %d (%s)",
+			signingKeyshareID,
+			version,
+			reason,
+		)
+		return
+	}
+	defer func() { _ = ephemeralTx.Rollback() }()
+
+	if err := entephemeral.DeleteSigningKeyshareSecretVersion(ctx, signingKeyshareID, version); err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "delete", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to delete signing keyshare %s version %d (%s)",
+			signingKeyshareID,
+			version,
+			reason,
+		)
+		return
+	}
+
+	if err := ephemeralTx.Commit(); err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "commit", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to commit ephemeral cleanup tx for signing keyshare %s version %d (%s)",
+			signingKeyshareID,
+			version,
+			reason,
+		)
+	}
+}
+
+type signingKeyshareSecretRotation struct {
+	newVersion   *int32
+	oldVersion   *int32
+	useEphemeral bool
+}
+
+func prepareSigningKeyshareSecretRotation(ctx context.Context, signingKeyshareID uuid.UUID, newSecretShare keys.Private) (*signingKeyshareSecretRotation, error) {
+	ephemeralTx, err := entephemeral.GetTxFromContext(ctx)
+	if err != nil {
+		if errors.Is(err, entephemeral.ErrNoTransactionProvider) {
+			return &signingKeyshareSecretRotation{
+				newVersion:   nil,
+				oldVersion:   nil,
+				useEphemeral: false,
+			}, nil
+		}
+		return nil, err
+	}
+	defer func() { _ = ephemeralTx.Rollback() }()
+
+	latest, err := entephemeral.GetLatestSigningKeyshareSecretVersionForUpdate(ctx, signingKeyshareID)
+	if err != nil {
+		return nil, err
+	}
+
+	var oldVersion *int32
+	var newVersion int32
+	if latest != nil {
+		if latest.Version == math.MaxInt32 {
+			return nil, fmt.Errorf("signing keyshare secret version overflow for keyshare %s", signingKeyshareID)
+		}
+		oldVersion = new(int32)
+		*oldVersion = latest.Version
+		newVersion = latest.Version + 1
+	}
+
+	if _, err := entephemeral.CreateSigningKeyshareSecretVersion(ctx, signingKeyshareID, newVersion, newSecretShare); err != nil {
+		return nil, err
+	}
+
+	if err := ephemeralTx.Commit(); err != nil {
+		return nil, err
+	}
+
+	// Cleanup must not inherit request cancellation, or rollback/commit hooks can leave orphaned versions.
+	cleanupCtx := context.WithoutCancel(ctx)
+
+	tx, err := GetTxFromContext(ctx)
+	if err != nil {
+		// If we cannot access the main transaction after creating the new secret version,
+		// delete the newly-created version to avoid dangling references.
+		deleteSigningKeyshareSecretVersionBestEffort(cleanupCtx, signingKeyshareID, newVersion, "main tx unavailable after ephemeral commit")
+		return nil, err
+	}
+
+	tx.OnRollback(func(fn Rollbacker) Rollbacker {
+		return RollbackFunc(func(ctx context.Context, tx *Tx) error {
+			// Preserve rollback semantics from the wrapped hook while always attempting
+			// ephemeral cleanup to avoid leaking versions when the main tx aborts.
+			err := fn.Rollback(ctx, tx)
+			deleteSigningKeyshareSecretVersionBestEffort(cleanupCtx, signingKeyshareID, newVersion, "main tx rollback")
+			return err
+		})
+	})
+
+	if oldVersion != nil {
+		oldVersionValue := *oldVersion
+		tx.OnCommit(func(fn Committer) Committer {
+			return CommitFunc(func(ctx context.Context, tx *Tx) error {
+				err := fn.Commit(ctx, tx)
+				if err == nil {
+					deleteSigningKeyshareSecretVersionBestEffort(cleanupCtx, signingKeyshareID, oldVersionValue, "main tx commit")
+				}
+				return err
+			})
+		})
+	}
+
+	return &signingKeyshareSecretRotation{
+		newVersion:   &newVersion,
+		oldVersion:   oldVersion,
+		useEphemeral: true,
+	}, nil
+}
+
+// UpdateSigningKeyshareWithRotatedSecret rotates the external secret version for a keyshare and
+// updates the signing_keyshares row in the main database within the same request transaction flow.
+// Batch callers must freeze the dual-write rollout decision once via
+// FreezeSigningKeyshareSecretDualWriteDecision and reuse that context across all invocations.
+func UpdateSigningKeyshareWithRotatedSecret(
+	ctx context.Context,
+	signingKeyshareID uuid.UUID,
+	newSecretShare keys.Private,
+	mutate func(*SigningKeyshareUpdateOne) *SigningKeyshareUpdateOne,
+) (*SigningKeyshare, error) {
+	rotation, err := prepareSigningKeyshareSecretRotation(ctx, signingKeyshareID, newSecretShare)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := GetDbFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	update := db.SigningKeyshare.UpdateOneID(signingKeyshareID)
+	if rotation.useEphemeral && rotation.newVersion != nil {
+		update = update.SetSecretVersion(*rotation.newVersion)
+	} else {
+		update = update.ClearSecretVersion()
+	}
+	// prepareSigningKeyshareSecretRotation has already committed the ephemeral write by this point.
+	// Batch callers should freeze the dual-write rollout decision up front via
+	// FreezeSigningKeyshareSecretDualWriteDecision so this branch stays stable for the whole flow.
+	if !rotation.useEphemeral || shouldDualWriteSigningKeyshareSecret(ctx) {
+		update = update.SetSecretShare(newSecretShare)
+	} else {
+		update = update.ClearSecretShare()
+	}
+	if mutate != nil {
+		update = mutate(update)
+	}
+
+	return update.Save(ctx)
+}
+
+// PrepareSigningKeyshareCreateWithSecret writes a secret version in the ephemeral store and
+// mutates the create builder so main-db creation references that version.
+func PrepareSigningKeyshareCreateWithSecret(
+	ctx context.Context,
+	create *SigningKeyshareCreate,
+	signingKeyshareID uuid.UUID,
+	secretShare keys.Private,
+) (*SigningKeyshareCreate, error) {
+	rotation, err := prepareSigningKeyshareSecretRotation(ctx, signingKeyshareID, secretShare)
+	if err != nil {
+		return nil, err
+	}
+
+	if rotation.useEphemeral && rotation.newVersion != nil {
+		create = create.SetSecretVersion(*rotation.newVersion)
+	}
+	if !rotation.useEphemeral || shouldDualWriteSigningKeyshareSecret(ctx) {
+		create = create.SetSecretShare(secretShare)
+	}
+
+	return create, nil
+}
 
 // GetSecretShare returns the secret share for this keyshare using the following order:
 // 1) signing_keyshares.secret_share, 2) preloaded ExternalSecret, 3) ephemeral secret store lookup by secret_version.
@@ -61,6 +315,12 @@ func (sk *SigningKeyshare) GetSecretShare(ctx context.Context) (*keys.Private, e
 			sk.ID,
 		)
 	}
+
+	logging.GetLoggerFromContext(ctx).Sugar().Infof(
+		"signing keyshare %s secret not hydrated; fetching from ephemeral store (version=%d)",
+		sk.ID,
+		*sk.SecretVersion,
+	)
 
 	secret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, sk.ID, *sk.SecretVersion)
 	if err != nil {
@@ -89,10 +349,110 @@ func (sk *SigningKeyshare) GetSecretShare(ctx context.Context) (*keys.Private, e
 	return sk.ExternalSecret, nil
 }
 
+func setExternalSecret(keyshare *SigningKeyshare, secret keys.Private) {
+	keyshare.secretMu.Lock()
+	defer keyshare.secretMu.Unlock()
+	keyshare.ExternalSecret = &secret
+}
+
+func hasExternalSecret(keyshare *SigningKeyshare) bool {
+	keyshare.secretMu.Lock()
+	defer keyshare.secretMu.Unlock()
+	return keyshare.ExternalSecret != nil
+}
+
+// HydrateSigningKeyshareSecrets preloads external secret shares for keyshares that do not
+// have secret_share populated on the main signing_keyshares table.
+func HydrateSigningKeyshareSecrets(ctx context.Context, keyshares []*SigningKeyshare) error {
+	type signingKeyshareSecretLookupKey struct {
+		id      uuid.UUID
+		version int32
+	}
+
+	keysharesByLookup := make(map[signingKeyshareSecretLookupKey][]*SigningKeyshare)
+	secretLookupPredicates := make([]predicate.SigningKeyshareSecret, 0, len(keyshares))
+	for _, keyshare := range keyshares {
+		if keyshare == nil || keyshare.SecretShare != nil || hasExternalSecret(keyshare) || keyshare.SecretVersion == nil {
+			continue
+		}
+		lookupKey := signingKeyshareSecretLookupKey{id: keyshare.ID, version: *keyshare.SecretVersion}
+		if _, exists := keysharesByLookup[lookupKey]; exists {
+			keysharesByLookup[lookupKey] = append(keysharesByLookup[lookupKey], keyshare)
+			continue
+		}
+		keysharesByLookup[lookupKey] = []*SigningKeyshare{keyshare}
+		secretLookupPredicates = append(secretLookupPredicates, signingkeysharesecret.And(
+			signingkeysharesecret.SigningKeyshareIDEQ(keyshare.ID),
+			signingkeysharesecret.VersionEQ(*keyshare.SecretVersion),
+		))
+	}
+
+	if len(secretLookupPredicates) == 0 {
+		return nil
+	}
+
+	ephemeralDB, err := entephemeral.GetDbFromContext(ctx)
+	if err != nil {
+		if errors.Is(err, entephemeral.ErrNoTransactionProvider) {
+			return fmt.Errorf(
+				"%w: one or more signing keyshares have null secret_share in main DB and ephemeral DB is unavailable",
+				ErrSigningKeyshareSecretUnavailable,
+			)
+		}
+		return err
+	}
+
+	secrets, err := ephemeralDB.SigningKeyshareSecret.Query().
+		Where(signingkeysharesecret.Or(secretLookupPredicates...)).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, secret := range secrets {
+		lookupKey := signingKeyshareSecretLookupKey{id: secret.SigningKeyshareID, version: secret.Version}
+		keyshareSet, exists := keysharesByLookup[lookupKey]
+		if !exists {
+			continue
+		}
+		for _, keyshare := range keyshareSet {
+			setExternalSecret(keyshare, secret.SecretShare)
+		}
+	}
+	missing := make([]string, 0)
+	for lookupKey, keyshareSet := range keysharesByLookup {
+		allHydrated := true
+		for _, keyshare := range keyshareSet {
+			if !hasExternalSecret(keyshare) {
+				allHydrated = false
+				break
+			}
+		}
+		if allHydrated {
+			continue
+		}
+		missing = append(missing, fmt.Sprintf("%s@v%d", lookupKey.id, lookupKey.version))
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return fmt.Errorf(
+			"%w: signing keyshares not found in ephemeral store: %s",
+			ErrSigningKeyshareSecretMissing,
+			strings.Join(missing, ", "),
+		)
+	}
+
+	return nil
+}
+
 // TweakKeyShare tweaks the given keyshare with the given tweak, updates the keyshare in the database and returns the updated keyshare.
 func (sk *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak keys.Private, pubKeyTweak keys.Public, pubKeySharesTweak map[string]keys.Public) (*SigningKeyshare, error) {
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.TweakKeyShare")
 	defer span.End()
+
+	if err := HydrateSigningKeyshareSecrets(ctx, []*SigningKeyshare{sk}); err != nil {
+		return nil, err
+	}
 
 	secretShare, err := sk.GetSecretShare(ctx)
 	if err != nil {
@@ -107,11 +467,16 @@ func (sk *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak keys.Pr
 		newPublicShares[id] = pubShare.Add(pubKeySharesTweak[id])
 	}
 
-	return sk.Update().
-		SetSecretShare(newSecretShare).
-		SetPublicKey(newPubKey).
-		SetPublicShares(newPublicShares).
-		Save(ctx)
+	return UpdateSigningKeyshareWithRotatedSecret(
+		ctx,
+		sk.ID,
+		newSecretShare,
+		func(update *SigningKeyshareUpdateOne) *SigningKeyshareUpdateOne {
+			return update.
+				SetPublicKey(newPubKey).
+				SetPublicShares(newPublicShares)
+		},
+	)
 }
 
 // MarshalProto converts a SigningKeyshare to a spark protobuf SigningKeyshare.
@@ -314,6 +679,9 @@ func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID)
 	if err != nil {
 		return nil, err
 	}
+	if err := HydrateSigningKeyshareSecrets(ctx, []*SigningKeyshare{keyshare}); err != nil {
+		return nil, err
+	}
 	secretShare, err := keyshare.GetSecretShare(ctx)
 	if err != nil {
 		return nil, err
@@ -346,6 +714,9 @@ func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.U
 	if err != nil {
 		return nil, err
 	}
+	if err := HydrateSigningKeyshareSecrets(ctx, keyshares); err != nil {
+		return nil, err
+	}
 
 	keyPackages := make(map[uuid.UUID]*pbfrost.KeyPackage, len(keyshares))
 	for _, keyshare := range keyshares {
@@ -372,7 +743,7 @@ func GetKeyPackagesArray(ctx context.Context, keyshareIDs []uuid.UUID) ([]*Signi
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.GetKeyPackagesArray")
 	defer span.End()
 
-	keysharesMap, err := GetSigningKeysharesMap(ctx, keyshareIDs)
+	keysharesMap, err := GetSigningKeysharesMapWithSecrets(ctx, keyshareIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -413,6 +784,24 @@ func GetSigningKeysharesMap(ctx context.Context, keyshareIDs []uuid.UUID) (map[u
 	keysharesMap := make(map[uuid.UUID]*SigningKeyshare, len(keyshares))
 	for _, keyshare := range keyshares {
 		keysharesMap[keyshare.ID] = keyshare
+	}
+
+	return keysharesMap, nil
+}
+
+// GetSigningKeysharesMapWithSecrets returns keyshares with external secrets preloaded when available.
+func GetSigningKeysharesMapWithSecrets(ctx context.Context, keyshareIDs []uuid.UUID) (map[uuid.UUID]*SigningKeyshare, error) {
+	keysharesMap, err := GetSigningKeysharesMap(ctx, keyshareIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	keyshares := make([]*SigningKeyshare, 0, len(keysharesMap))
+	for _, keyshare := range keysharesMap {
+		keyshares = append(keyshares, keyshare)
+	}
+	if err := HydrateSigningKeyshareSecrets(ctx, keyshares); err != nil {
+		return nil, err
 	}
 
 	return keysharesMap, nil
@@ -473,6 +862,13 @@ func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *Signing
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Calculating last key for %d keyshares", len(keyshares))
 
+	keysharesToHydrate := make([]*SigningKeyshare, 0, len(keyshares)+1)
+	keysharesToHydrate = append(keysharesToHydrate, keyshares...)
+	keysharesToHydrate = append(keysharesToHydrate, target)
+	if err := HydrateSigningKeyshareSecrets(ctx, keysharesToHydrate); err != nil {
+		return nil, err
+	}
+
 	sumKeyshare, err := sumOfSigningKeyshares(ctx, keyshares)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sum keyshares: %w", err)
@@ -506,16 +902,24 @@ func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *Signing
 		return nil, err
 	}
 
-	lastKey, err := db.SigningKeyshare.Create().
-		SetID(id).
-		SetSecretShare(lastSecretShare).
-		SetNillableSecretVersion(sumKeyshare.SecretVersion).
-		SetPublicShares(publicShares).
-		SetPublicKey(verifyingKey).
-		SetStatus(st.KeyshareStatusInUse).
-		SetCoordinatorIndex(0).
-		SetMinSigners(target.MinSigners).
-		Save(ctx)
+	ctx = FreezeSigningKeyshareSecretDualWriteDecision(ctx)
+	lastKeyCreate, err := PrepareSigningKeyshareCreateWithSecret(
+		ctx,
+		db.SigningKeyshare.Create().
+			SetID(id).
+			SetPublicShares(publicShares).
+			SetPublicKey(verifyingKey).
+			SetStatus(st.KeyshareStatusInUse).
+			SetCoordinatorIndex(0).
+			SetMinSigners(target.MinSigners),
+		id,
+		lastSecretShare,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	lastKey, err := lastKeyCreate.Save(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -528,8 +932,7 @@ func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningK
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.AggregateKeyshares")
 	defer span.End()
 
-	db, err := GetDbFromContext(ctx)
-	if err != nil {
+	if err := HydrateSigningKeyshareSecrets(ctx, keyshares); err != nil {
 		return nil, err
 	}
 
@@ -537,15 +940,17 @@ func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningK
 	if err != nil {
 		return nil, fmt.Errorf("failed to sum keyshares: %w", err)
 	}
-	if sumKeyshare.SecretShare == nil {
-		return nil, fmt.Errorf("summed keyshare has no secret share")
-	}
-	updateQuery := db.SigningKeyshare.UpdateOneID(updateKeyshareID).
-		SetSecretShare(*sumKeyshare.SecretShare).
-		SetPublicKey(sumKeyshare.PublicKey).
-		SetPublicShares(sumKeyshare.PublicShares)
-	updateQuery = updateQuery.ClearSecretVersion()
-	updateKeyshare, err := updateQuery.Save(ctx)
+
+	updateKeyshare, err := UpdateSigningKeyshareWithRotatedSecret(
+		ctx,
+		updateKeyshareID,
+		*sumKeyshare.SecretShare,
+		func(update *SigningKeyshareUpdateOne) *SigningKeyshareUpdateOne {
+			return update.
+				SetPublicKey(sumKeyshare.PublicKey).
+				SetPublicShares(sumKeyshare.PublicShares)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

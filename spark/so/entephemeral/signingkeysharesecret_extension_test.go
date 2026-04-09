@@ -166,22 +166,22 @@ func TestCreateSigningKeyshareSecretVersionLocked_GetReturnsInsertedValue(t *tes
 	require.True(t, got.SecretShare.Equals(secretShare), "retrieved secret share should match the one that was inserted")
 }
 
-func TestSigningKeyshareSecretVersionMutationMethods_RequirePostgresDialect(t *testing.T) {
+func TestSigningKeyshareSecretVersionMutationMethods_WorkOnSQLite(t *testing.T) {
 	ctx, _, _ := newSQLiteContextWithSession(t)
 	signingKeyshareID := uuid.New()
 	secretShare := keys.GeneratePrivateKey()
 
-	_, err := GetLatestSigningKeyshareSecretVersionForUpdate(ctx, signingKeyshareID)
-	require.ErrorContains(t, err, "only supported on Postgres")
-	require.ErrorContains(t, err, "sqlite")
+	latest, err := GetLatestSigningKeyshareSecretVersionForUpdate(ctx, signingKeyshareID)
+	require.NoError(t, err)
+	require.Nil(t, latest)
 
-	_, err = AddSigningKeyshareSecretVersion(ctx, signingKeyshareID, secretShare)
-	require.ErrorContains(t, err, "only supported on Postgres")
-	require.ErrorContains(t, err, "sqlite")
+	created, err := AddSigningKeyshareSecretVersion(ctx, signingKeyshareID, secretShare)
+	require.NoError(t, err)
+	require.Equal(t, int32(0), created.Version)
 
 	_, err = CreateSigningKeyshareSecretVersion(ctx, signingKeyshareID, 0, secretShare)
-	require.ErrorContains(t, err, "only supported on Postgres")
-	require.ErrorContains(t, err, "sqlite")
+	require.Error(t, err)
+	require.True(t, IsConstraintError(err))
 }
 
 func TestSigningKeyshareIDToAdvisoryLockKey_IsDeterministic(t *testing.T) {

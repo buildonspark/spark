@@ -53,6 +53,7 @@ const (
 	KnobSoMaxTransactionsPerRequest             = "spark.so.max_transactions_per_request"
 	KnobSoMaxParallelFrostValidationsPerRequest = "spark.so.max_parallel_frost_validations_per_request"
 	KnobSoMaxKeysharesPerRequest                = "spark.so.max_keyshares_per_request"
+	KnobSoSigningKeyshareDualWriteSecret        = "spark.so.signing_keyshare.dual_write_secret_share"
 	KnobGRPCClientTimeout                       = "spark.so.grpc.client.timeout"
 	KnobGrpcClientPoolMinConnections            = "spark.so.grpc.client.pool.min_connections"
 	KnobGrpcClientPoolMaxConnections            = "spark.so.grpc.client.pool.max_connections"

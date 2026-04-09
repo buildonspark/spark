@@ -51,6 +51,15 @@ Concurrency/caching behavior:
 - `ExternalSecret` is mutable cache state and is guarded by `secretMu` to avoid data races and duplicate fetches.
 - This gives a single synchronized ephemeral fetch per entity pointer in the common case.
 
+Hydration behavior:
+
+- `HydrateSigningKeyshareSecrets(ctx, keyshares)` batch-loads secrets for keyshares missing main-db `secret_share`.
+- It deduplicates lookups by `(signing_keyshare_id, secret_version)` and populates `ExternalSecret` for all matching in-memory pointers (including duplicate pointers to the same keyshare).
+- If ephemeral DB context is unavailable when hydration is required, it returns `ErrSigningKeyshareSecretUnavailable`.
+- If any requested `(id,version)` is missing in ephemeral storage, hydration fails fast with `ErrSigningKeyshareSecretMissing` and lists missing pairs.
+
+Several key paths call hydration up-front to avoid N+1 secret fetches and to fail deterministically before cryptographic work (`GetKeyPackage(s)`, keyshare aggregation/summing, tweak/fix/recovery paths).
+
 Error behavior:
 
 - Null main secret + nil `secret_version` => missing-secret error.
@@ -72,6 +81,26 @@ When combining keyshares, version information is intentionally discarded:
 
 - aggregate/sum logic sets `SecretVersion = nil` on the result regardless of input versions
 - the combined secret is stored directly in `SecretShare`, not as a versioned row
+
+## Secret Rotation and Dual-Write Rollout
+
+This branch introduces helpers that rotate secrets in ephemeral storage and then update main DB pointers:
+
+- `PrepareSigningKeyshareCreateWithSecret(...)` for keyshare creation flows.
+- `UpdateSigningKeyshareWithRotatedSecret(...)` for update/rotation flows.
+
+Behavior:
+
+- If ephemeral DB is available, a new version is created in ephemeral DB first, then main DB is updated to point to that version.
+- If ephemeral DB is unavailable, logic falls back to main-db `secret_share` only (legacy mode).
+- Dual-write to main `secret_share` during ephemeral mode is controlled by knob `spark.so.signing_keyshare.dual_write_secret_share`.
+- Batch/loop flows should freeze the rollout decision once per request via `FreezeSigningKeyshareSecretDualWriteDecision(ctx)` so behavior is consistent within that flow.
+
+Cleanup semantics for rotations are best-effort and instrumented:
+
+- On main transaction rollback: newly-created ephemeral version is best-effort deleted.
+- On successful main commit: previous ephemeral version is best-effort deleted.
+- Cleanup failures are counted in metric `spark_db_ent_signing_keyshare_secret_cleanup_failures_total` with stage/reason attributes.
 
 ## Secret Version APIs
 
@@ -99,7 +128,7 @@ To serialize concurrent version allocation per `signing_keyshare_id`, writes tak
 
 The UUID hashing step is deliberate: using FNV-64a over the full UUID avoids collision/pathological contention patterns from simpler folding strategies.
 
-This lock is required by mutation flows (`Add*`, `Create*`, and latest-for-update path). These paths are Postgres-only; they return an error on non-Postgres dialects.
+This lock is applied by mutation flows (`Add*`, `Create*`, and latest-for-update path) when running on Postgres. On sqlite (used in unit tests), advisory locking is skipped because `pg_advisory_xact_lock` is unavailable.
 
 ## Transaction and Commit Semantics
 
@@ -115,6 +144,34 @@ Current middleware behavior is explicit:
   successfully, middleware returns an error and discards the success response/result.
 - If main commit fails after ephemeral commit, log a divergence error and return an error.
 
+Ephemeral transaction creation is intentionally lazy in the normal request/task path:
+
+- When ephemeral DB is configured, middleware injects an ephemeral session broadly, but only a
+  narrow subset of flows actually mutate ephemeral state.
+- Some production ephemeral access is pure read-only secret lookup / hydration and should not pay
+  the cost of opening a transaction just to query `signing_keyshare_secrets`.
+- `GetDbFromContext(...)` is therefore allowed to return a raw ephemeral client for non-locking
+  reads, while `GetTxFromContext(...)` is the explicit opt-in for write and locking flows.
+
+Examples:
+
+- Read-only path:
+  - `SigningKeyshare.GetSecretShare(...)` and `HydrateSigningKeyshareSecrets(...)` resolve
+    secrets through `GetDbFromContext(...)` and query `signing_keyshare_secrets` without forcing
+    a transaction.
+  - `GetSigningKeyshareSecretVersion(...)` is intentionally implemented as a pure read against the
+    context client rather than requiring a transaction.
+- Transactional path:
+  - `prepareSigningKeyshareSecretRotation(...)` explicitly calls `entephemeral.GetTxFromContext(...)`
+    before version allocation / insertion, and **commits the ephemeral transaction itself** before
+    registering compensating hooks on the main transaction. This is safe because secret rotation
+    only runs in the gRPC/task middleware path (where `EphemeralSession` manages the tx lifecycle),
+    never inside the chain watcher's block processing.
+  - `GetLatestSigningKeyshareSecretVersionForUpdate(...)`,
+    `CreateSigningKeyshareSecretVersion(...)`, and
+    `DeleteSigningKeyshareSecretVersion(...)` all require an ephemeral transaction because they
+    either lock, write, or both.
+
 This behavior is implemented consistently in:
 
 - gRPC request middleware (`spark/so/grpc/database_middleware.go`)
@@ -129,6 +186,15 @@ This behavior is implemented consistently in:
 - Separate session/factory types exist for ephemeral context injection and transaction lifecycle (`spark/so/db/session_ephemeral.go`).
 - `GetClient` on tx providers returns the underlying client and does not implicitly begin a transaction.
   Explicit transaction creation happens only through `GetOrBeginTx` via session-managed flows.
+- Chain watcher is the main exception to lazy transaction creation:
+  - `so/chain/watch_chain.go` opens main and ephemeral transactions up front for block processing.
+  - It injects a tx-backed ephemeral session into context instead of relying on session-managed lazy
+    creation.
+  - This is intentional because block handling wants explicit ownership of both transactions across
+    the entire block-processing unit of work.
+  - Block processing does not invoke secret rotation flows (`prepareSigningKeyshareSecretRotation`,
+    `UpdateSigningKeyshareWithRotatedSecret`, `TweakKeyShare`), so there is no conflict with
+    those functions committing the ephemeral transaction mid-flow.
 
 ## Operational Notes
 

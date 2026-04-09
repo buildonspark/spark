@@ -59,6 +59,10 @@ type TestContext struct {
 	databasePath string
 }
 
+func (tc *TestContext) DatabasePath() string {
+	return tc.databasePath
+}
+
 func (tc *TestContext) close() {
 	if tx := tc.Session.GetTxIfExists(); tx != nil {
 		if tc.t.Failed() {

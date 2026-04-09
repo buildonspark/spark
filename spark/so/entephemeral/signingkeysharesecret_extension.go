@@ -70,11 +70,15 @@ func getLatestSigningKeyshareSecretVersionForUpdateLocked(
 	// above serialises all callers for the same signingKeyshareID, so concurrent
 	// writers cannot interleave and produce a different "latest" row between the
 	// snapshot and the lock.
-	secret, err := tx.SigningKeyshareSecret.Query().
+	query := tx.SigningKeyshareSecret.Query().
 		Where(signingkeysharesecret.SigningKeyshareIDEQ(signingKeyshareID)).
-		Order(signingkeysharesecret.ByVersion(sql.OrderDesc())).
-		ForUpdate().
-		First(ctx)
+		Order(signingkeysharesecret.ByVersion(sql.OrderDesc()))
+
+	if tx.config.driver.Dialect() == dialect.Postgres {
+		query = query.ForUpdate()
+	}
+
+	secret, err := query.First(ctx)
 	if err != nil {
 		if IsNotFound(err) {
 			return nil, nil
@@ -181,10 +185,9 @@ func DeleteSigningKeyshareSecretVersion(
 
 func lockSigningKeyshareIDForVersioning(ctx context.Context, tx *Tx, signingKeyshareID uuid.UUID) error {
 	if tx.config.driver.Dialect() != dialect.Postgres {
-		return fmt.Errorf(
-			"advisory locking for signing keyshare versioning is only supported on Postgres, got %q",
-			tx.config.driver.Dialect(),
-		)
+		// sqlite is used in unit tests for ephemeral DB; it does not support
+		// pg_advisory_xact_lock, so version writes proceed without advisory lock.
+		return nil
 	}
 
 	txDriver, ok := tx.config.driver.(*txDriver)

@@ -478,11 +478,16 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 	if err != nil {
 		return fmt.Errorf("failed to parse secret share: %w", err)
 	}
-	_, err = db.SigningKeyshare.UpdateOneID(badKeyshare.ID).
-		SetSecretShare(secretShare).
-		SetPublicShares(pubShares).
-		SetPublicKey(pubKey).
-		Save(ctx)
+	_, err = ent.UpdateSigningKeyshareWithRotatedSecret(
+		ctx,
+		badKeyshare.ID,
+		secretShare,
+		func(update *ent.SigningKeyshareUpdateOne) *ent.SigningKeyshareUpdateOne {
+			return update.
+				SetPublicShares(pubShares).
+				SetPublicKey(pubKey)
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("failed to update keyshare: %w", err)
 	}

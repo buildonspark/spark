@@ -297,6 +297,7 @@ func (s *State) Round3(ctx context.Context, requestID string, frostConnection *g
 	}
 
 	signingKeyshares := make([]*ent.SigningKeyshareCreate, 0, len(response.KeyPackages))
+	ctx = ent.FreezeSigningKeyshareSecretDualWriteDecision(ctx)
 	for i, kp := range response.KeyPackages {
 		keyID := deriveKeyIndex(batchID, uint16(i))
 
@@ -317,10 +318,13 @@ func (s *State) Round3(ctx context.Context, requestID string, frostConnection *g
 			SetID(keyID).
 			SetStatus(startingStatus).
 			SetMinSigners(int32(s.MinSigners)).
-			SetSecretShare(secretShare).
 			SetPublicShares(publicShares).
 			SetPublicKey(publicKey).
 			SetCoordinatorIndex(s.CoordinatorIndex)
+		create, err = ent.PrepareSigningKeyshareCreateWithSecret(ctx, create, keyID, secretShare)
+		if err != nil {
+			return err
+		}
 		signingKeyshares = append(signingKeyshares, create)
 	}
 
