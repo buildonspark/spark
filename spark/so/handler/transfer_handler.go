@@ -1960,6 +1960,19 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	// SSP identity per swap).
 	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelQueryTransfers, 0) > 0
 
+	var filterType string
+	switch filter.Participant.(type) {
+	case *pb.TransferFilter_ReceiverIdentityPublicKey:
+		filterType = "receiver"
+	case *pb.TransferFilter_SenderIdentityPublicKey:
+		filterType = "sender"
+	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
+		filterType = "sender_or_receiver"
+	default:
+		filterType = "none"
+	}
+	metrics := newTransferQueryRecorder("query_transfers", useMIMO, filterType)
+
 	var transferPredicate []predicate.Transfer
 
 	receiverPendingStatuses := []st.TransferStatus{
@@ -2234,6 +2247,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	}
 
 	transfers, err := query.All(ctx)
+	metrics.record(ctx, len(transfers), err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query transfers: %w", err)
 	}
@@ -2283,6 +2297,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 }
 
 func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.Client, network btcnetwork.Network, walletIdentityPubkey keys.Public) predicate.Transfer {
+	metrics := newTransferQueryRecorder("get_ssp_counter_swap_filter", false, "sender")
+	var resultCount int
+	var internalErr error
+	defer func() { metrics.record(ctx, resultCount, internalErr) }()
+
 	swap, err := db.Transfer.Query().
 		Where(
 			enttransfer.SenderIdentityPubkeyEQ(walletIdentityPubkey),
@@ -2295,10 +2314,12 @@ func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.C
 		if err != nil {
 			logger := logging.GetLoggerFromContext(ctx)
 			logger.Sugar().Warnf("failed to find swap for wallet %s: %v", walletIdentityPubkey.String(), err)
+			internalErr = err
 		}
 		return nil
 	}
 
+	resultCount = 1
 	return enttransfer.Not(
 		enttransfer.And(
 			enttransfer.SenderIdentityPubkeyEQ(swap.ReceiverIdentityPubkey),
