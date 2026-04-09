@@ -139,6 +139,20 @@ function createWallClockTimeout(timeoutMs: number, onTimeout: () => void) {
   };
 }
 
+function getSocketChain(root: unknown): any[] {
+  const chain: any[] = [];
+  const seen = new Set<object>();
+  let current: any = root;
+
+  while (current != null && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    chain.push(current);
+    current = current.socket ?? current._socket;
+  }
+
+  return chain;
+}
+
 export function attachPrematureSocketCloseGuard(
   path: string,
   requestId: number,
@@ -251,6 +265,8 @@ export function BareHttpTransport({
     }>((resolve, reject) => {
       let req: http.ClientRequest;
       let reqSocketCleanup = () => {};
+      let attachedRequestSocket: unknown;
+      let clearRequestTimeout = () => {};
       let response: http.IncomingMessage | undefined;
       let requestSetupSettled = false;
       let abortListener = () => {};
@@ -273,6 +289,7 @@ export function BareHttpTransport({
                 : " before response start"
             }: ${error.message}`,
           );
+          clearRequestTimeout();
           if (!method.responseStream) {
             // A unary timeout is the best signal we have that the Bare transport
             // wedged for this origin, so use it to fail any older tracked stream.
@@ -302,7 +319,7 @@ export function BareHttpTransport({
         }
         requestSetupSettled = true;
         wallClockTimeout.clear();
-        reqSocketCleanup();
+        clearRequestTimeout();
         signal.removeEventListener("abort", abortListener);
         try {
           pipeAbortController?.abort();
@@ -313,6 +330,7 @@ export function BareHttpTransport({
       abortListener = () => {
         log("abort signal received, destroying request");
         wallClockTimeout.clear();
+        clearRequestTimeout();
         const abortError = new Error("request aborted");
         if (response != null) {
           try {
@@ -343,6 +361,11 @@ export function BareHttpTransport({
             wallClockTimeout.clear();
           } else {
             wallClockTimeout.refresh();
+            // Bare keeps the unary request timeout on the underlying socket
+            // until it is explicitly cleared. Once headers arrive, rely on the
+            // wall-clock guard for the rest of the response lifecycle instead
+            // of leaving a stale socket timeout behind.
+            clearRequestTimeout();
           }
           log(
             `response received status=${res.statusCode ?? "unknown"} headers=${JSON.stringify(
@@ -385,6 +408,7 @@ export function BareHttpTransport({
             res,
             removeAbortListener() {
               wallClockTimeout.clear();
+              clearRequestTimeout();
               reqSocketCleanup();
               signal.removeEventListener("abort", abortListener);
             },
@@ -392,46 +416,77 @@ export function BareHttpTransport({
         },
       );
 
-      req.on("socket", (socket) => {
-        log("request socket assigned");
-        const onSocketClose = (hadError: boolean) => {
-          log(`request socket close event hadError=${hadError}`);
-        };
-        const onSocketEnd = () => {
-          log("request socket end event");
-        };
-        const onSocketError = (err: Error) => {
-          log(`request socket error event: ${err.message}`);
-        };
-        const onSocketConnect = () => {
-          log("request socket connect event");
-        };
-        const onSocketTimeout = () => {
-          log("request socket timeout event");
-        };
-        const onSocketFree = () => {
-          log("request socket free event");
-        };
+      const attachRequestSocketListeners = (requestSocket: unknown) => {
+        if (requestSocket == null || attachedRequestSocket === requestSocket) {
+          return;
+        }
 
-        socket.on("close", onSocketClose);
-        socket.on("end", onSocketEnd);
-        socket.on("error", onSocketError);
-        socket.on("connect", onSocketConnect);
-        socket.on("timeout", onSocketTimeout);
-        socket.on("free", onSocketFree);
+        reqSocketCleanup();
+        attachedRequestSocket = requestSocket;
+        const socketChain = getSocketChain(requestSocket);
+        const cleanupFns: Array<() => void> = [];
+
+        log(`request socket assigned levels=${socketChain.length}`);
+
+        socketChain.forEach((socket, level) => {
+          const suffix = socketChain.length > 1 ? ` level=${level}` : "";
+          const onSocketClose = (hadError: boolean) => {
+            log(`request socket close event hadError=${hadError}${suffix}`);
+            reqSocketCleanup();
+          };
+          const onSocketEnd = () => {
+            log(`request socket end event${suffix}`);
+          };
+          const onSocketError = (err: Error) => {
+            log(`request socket error event${suffix}: ${err.message}`);
+          };
+          const onSocketConnect = () => {
+            log(`request socket connect event${suffix}`);
+          };
+          const onSocketTimeout = () => {
+            log(`request socket timeout event${suffix}`);
+          };
+          const onSocketFree = () => {
+            log(`request socket free event${suffix}`);
+          };
+
+          socket.on("close", onSocketClose);
+          socket.on("end", onSocketEnd);
+          socket.on("error", onSocketError);
+          socket.on("connect", onSocketConnect);
+          socket.on("timeout", onSocketTimeout);
+          socket.on("free", onSocketFree);
+
+          cleanupFns.push(() => {
+            socket.off("close", onSocketClose);
+            socket.off("end", onSocketEnd);
+            socket.off("error", onSocketError);
+            socket.off("connect", onSocketConnect);
+            socket.off("timeout", onSocketTimeout);
+            socket.off("free", onSocketFree);
+          });
+        });
 
         reqSocketCleanup = () => {
-          socket.off("close", onSocketClose);
-          socket.off("end", onSocketEnd);
-          socket.off("error", onSocketError);
-          socket.off("connect", onSocketConnect);
-          socket.off("timeout", onSocketTimeout);
-          socket.off("free", onSocketFree);
+          for (const cleanup of cleanupFns) {
+            cleanup();
+          }
+          attachedRequestSocket = undefined;
+          reqSocketCleanup = () => {};
         };
-      });
+      };
+
+      const requestSocket = (req as http.ClientRequest & { socket?: any })
+        .socket;
+      if (requestSocket != null) {
+        attachRequestSocketListeners(requestSocket);
+      } else {
+        log("request socket was not available after request creation");
+      }
+      req.on("socket", attachRequestSocketListeners);
 
       if (!method.responseStream) {
-        req.setTimeout(UNARY_REQUEST_TIMEOUT_MS, () => {
+        const onRequestTimeout = () => {
           if (requestSetupSettled) {
             return;
           }
@@ -440,6 +495,7 @@ export function BareHttpTransport({
             `UNAVAILABLE: request timed out after ${UNARY_REQUEST_TIMEOUT_MS}ms`,
           );
           log(`request timeout after ${UNARY_REQUEST_TIMEOUT_MS}ms`);
+          clearRequestTimeout();
           // req.setTimeout can beat the wall-clock timeout by a few ticks. When
           // that happens, force the same stuck-stream recovery path instead of
           // leaving the old response-stream RPC parked forever.
@@ -450,7 +506,17 @@ export function BareHttpTransport({
             error,
           );
           req.destroy(error);
-        });
+        };
+        clearRequestTimeout = () => {
+          try {
+            req.off("timeout", onRequestTimeout);
+          } catch {}
+          try {
+            req.setTimeout(0);
+          } catch {}
+        };
+        req.once("timeout", onRequestTimeout);
+        req.setTimeout(UNARY_REQUEST_TIMEOUT_MS);
       }
 
       signal.addEventListener("abort", abortListener);
