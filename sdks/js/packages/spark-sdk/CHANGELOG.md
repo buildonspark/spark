@@ -1,5 +1,13 @@
 # @buildonspark/spark-sdk
 
+## 0.7.8
+
+### Patch Changes
+
+- Add `SparkWallet.getOrCreateWallet()` so apps can reuse a single wallet instance per identity and avoid duplicate background streams and claims.
+- Add typed `TreeNodeStatus` values and `executeBefore` support to the generated Spark protocol types.
+- Return a transport error when bare unary requests time out instead of leaving them pending indefinitely.
+
 ## 0.7.7
 
 ### Patch Changes

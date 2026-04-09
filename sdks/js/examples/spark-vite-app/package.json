@@ -1,7 +1,7 @@
 {
   "name": "@buildonspark/spark-vite-app",
   "private": true,
-  "version": "0.0.114",
+  "version": "0.0.115",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.7.7",
+    "@buildonspark/spark-sdk": "0.7.8",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
