@@ -432,12 +432,24 @@ export function BareHttpTransport({
 
       if (!method.responseStream) {
         req.setTimeout(UNARY_REQUEST_TIMEOUT_MS, () => {
-          log(`request timeout after ${UNARY_REQUEST_TIMEOUT_MS}ms`);
-          req.destroy(
-            new Error(
-              `UNAVAILABLE: request timed out after ${UNARY_REQUEST_TIMEOUT_MS}ms`,
-            ),
+          if (requestSetupSettled) {
+            return;
+          }
+
+          const error = new Error(
+            `UNAVAILABLE: request timed out after ${UNARY_REQUEST_TIMEOUT_MS}ms`,
           );
+          log(`request timeout after ${UNARY_REQUEST_TIMEOUT_MS}ms`);
+          // req.setTimeout can beat the wall-clock timeout by a few ticks. When
+          // that happens, force the same stuck-stream recovery path instead of
+          // leaving the old response-stream RPC parked forever.
+          resetActiveResponseStreamsForOrigin(
+            transportState,
+            originKey,
+            requestId,
+            error,
+          );
+          req.destroy(error);
         });
       }
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { EventEmitter } from "events";
 import http from "http";
 import type { ClientRequest, IncomingMessage } from "http";
+import { PassThrough } from "stream";
 import { ClientError, Metadata } from "nice-grpc-common";
 import {
   attachPrematureSocketCloseGuard,
@@ -30,6 +31,21 @@ function createMockIncomingMessage() {
   Object.assign(res, {
     socket,
     destroy: jest.fn(),
+  });
+
+  return { socket, res };
+}
+
+function createMockStreamingIncomingMessage() {
+  const socket = Object.assign(new EventEmitter(), {
+    unref: jest.fn(),
+  });
+  const res = new PassThrough() as IncomingMessage & PassThrough;
+
+  Object.assign(res, {
+    headers: {},
+    socket,
+    statusCode: 200,
   });
 
   return { socket, res };
@@ -315,5 +331,119 @@ describe("BareHttpTransport", () => {
         clearedTimeoutHandles.has(handle),
       ),
     ).toBe(true);
+  });
+
+  it("resets an older active stream when req.setTimeout fires before the wall-clock timeout", async () => {
+    const streamReq = createMockClientRequest();
+    const unaryReq = createMockClientRequest();
+    const requests = [streamReq, unaryReq];
+    const responseCallbacks: Array<(res: IncomingMessage) => void> = [];
+    let unaryTimeoutCallback: (() => void) | undefined;
+
+    jest.spyOn(http, "request").mockImplementation(((
+      ...args: Parameters<typeof http.request>
+    ) => {
+      const onResponse = args[2];
+      if (onResponse == null) {
+        throw new Error("missing response callback");
+      }
+      responseCallbacks.push(onResponse);
+      const req = requests.shift();
+      if (req == null) {
+        throw new Error("unexpected extra request");
+      }
+      return req;
+    }) as typeof http.request);
+
+    unaryReq.setTimeout.mockImplementation(((timeout, callback) => {
+      if (timeout === 15_000) {
+        unaryTimeoutCallback = callback as () => void;
+      }
+      return unaryReq;
+    }) as typeof unaryReq.setTimeout);
+    unaryReq.destroy.mockImplementation(((error?: Error) => {
+      if (error != null) {
+        setImmediate(() => unaryReq.emit("error", error));
+      }
+      return unaryReq;
+    }) as typeof unaryReq.destroy);
+
+    const { res: streamRes } = createMockStreamingIncomingMessage();
+    const streamDestroySpy = jest.spyOn(streamRes, "destroy");
+    const transport = BareHttpTransport();
+
+    const streamIterator = transport({
+      body: createUnaryBody(),
+      metadata: new Metadata(),
+      method: {
+        path: "/spark.SparkService/subscribe_to_events",
+        requestStream: false,
+        responseStream: true,
+      } as any,
+      signal: new AbortController().signal,
+      url: "http://example.com/stream",
+    })[Symbol.asyncIterator]();
+
+    const streamHeaderPromise = streamIterator.next();
+    for (
+      let attempt = 0;
+      attempt < 10 && responseCallbacks.length === 0;
+      attempt++
+    ) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    expect(responseCallbacks).toHaveLength(1);
+    responseCallbacks[0]!(streamRes);
+    await streamHeaderPromise;
+
+    const streamDataPromise = streamIterator.next();
+
+    const unaryIterator = transport({
+      body: createUnaryBody(),
+      metadata: new Metadata(),
+      method: {
+        path: "/spark.SparkService/query_nodes",
+        requestStream: false,
+        responseStream: false,
+      } as any,
+      signal: new AbortController().signal,
+      url: "http://example.com/query",
+    })[Symbol.asyncIterator]();
+
+    const unaryErrorPromise = unaryIterator.next().then(
+      () => null,
+      (error) => error,
+    );
+    for (
+      let attempt = 0;
+      attempt < 10 && unaryTimeoutCallback == null;
+      attempt++
+    ) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    expect(unaryTimeoutCallback).toBeDefined();
+
+    unaryTimeoutCallback?.();
+
+    const [streamError, unaryError] = await Promise.all([
+      streamDataPromise.then(
+        () => null,
+        (error) => error,
+      ),
+      unaryErrorPromise,
+    ]);
+
+    expect(streamDestroySpy).toHaveBeenCalledWith(expect.any(Error));
+    expect(String(streamDestroySpy.mock.calls[0]?.[0]?.message)).toContain(
+      "request timed out after 15000ms",
+    );
+    expect(streamError).toBeInstanceOf(ClientError);
+    expect(String((streamError as Error).message)).toContain(
+      "request timed out after 15000ms",
+    );
+    expect(unaryError).toBeInstanceOf(ClientError);
+    expect(String((unaryError as Error).message)).toContain(
+      "request timed out after 15000ms",
+    );
   });
 });
