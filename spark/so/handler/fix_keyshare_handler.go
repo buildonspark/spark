@@ -79,8 +79,10 @@ func (h *FixKeyshareHandler) parseRequest(ctx context.Context, badKeyshareId str
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bad keyshare: %w", err)
 	}
-	if badKeyshare.SecretShare == nil {
-		return nil, fmt.Errorf("bad keyshare %s has nil secret share", badKeyshare.ID)
+	// Pre-load the secret share into ExternalSecret cache; this also validates
+	// that the secret is accessible before starting the fix protocol.
+	if _, err := badKeyshare.GetSecretShare(ctx); err != nil {
+		return nil, fmt.Errorf("bad keyshare %s secret share unavailable: %w", badKeyshare.ID, err)
 	}
 
 	args := FixKeyshareArgs{
@@ -239,16 +241,15 @@ func (h FixKeyshareHandler) createConfig(args FixKeyshareArgs) (*secretsharing.I
 	return &config, nil
 }
 
-func (h FixKeyshareHandler) createSender(args FixKeyshareArgs) (*secretsharing.IssueSender, error) {
+func (h FixKeyshareHandler) createSender(ctx context.Context, args FixKeyshareArgs) (*secretsharing.IssueSender, error) {
 	config, err := h.createConfig(args)
 	if err != nil {
 		return nil, err
 	}
 
-	sb := args.badKeyshare.SecretShare
-	if sb == nil {
-		// parseRequest enforces this already; keep as a defensive invariant check for direct callers.
-		return nil, fmt.Errorf("bad keyshare %s has nil secret share", args.badKeyshare.ID)
+	sb, err := args.badKeyshare.GetSecretShare(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("bad keyshare %s secret share unavailable: %w", args.badKeyshare.ID, err)
 	}
 	ownSecretShare, err := curve.ParseScalar(sb.Serialize())
 	if err != nil {
@@ -309,17 +310,17 @@ func (h FixKeyshareHandler) Round1(ctx context.Context, req *pb.FixKeyshareRound
 		return nil, fmt.Errorf("failed to parse request: %w", err)
 	}
 
-	return h.coreRound1(args)
+	return h.coreRound1(ctx, args)
 }
 
-func (h FixKeyshareHandler) coreRound1(args *FixKeyshareArgs) (*pb.FixKeyshareRound1Response, error) {
+func (h FixKeyshareHandler) coreRound1(ctx context.Context, args *FixKeyshareArgs) (*pb.FixKeyshareRound1Response, error) {
 	// Make sure this operator is one of the request's good operators.
 	_, exists := args.goodOperators[h.config.Identifier]
 	if !exists {
 		return nil, fmt.Errorf("a sender must be a good operator: sender ID is %s, should be in %v", h.config.Identifier, slices.Collect(maps.Keys(args.goodOperators)))
 	}
 
-	sender, err := h.createSender(*args)
+	sender, err := h.createSender(ctx, *args)
 	if err != nil {
 		return nil, err
 	}
@@ -353,10 +354,10 @@ func (h FixKeyshareHandler) Round2(ctx context.Context, req *pb.FixKeyshareRound
 		return nil, fmt.Errorf("failed to parse request: %w", err)
 	}
 
-	return h.coreRound2(args, req.Message)
+	return h.coreRound2(ctx, args, req.Message)
 }
 
-func (h FixKeyshareHandler) coreRound2(args *FixKeyshareArgs, messages [][]byte) (*pb.FixKeyshareRound2Response, error) {
+func (h FixKeyshareHandler) coreRound2(ctx context.Context, args *FixKeyshareArgs, messages [][]byte) (*pb.FixKeyshareRound2Response, error) {
 	// Make sure this operator is one of the request's good operators.
 	_, exists := args.goodOperators[h.config.Identifier]
 	if !exists {
@@ -364,7 +365,7 @@ func (h FixKeyshareHandler) coreRound2(args *FixKeyshareArgs, messages [][]byte)
 	}
 
 	// In principle, we could cache the sender, but reconstructing it is simpler.
-	sender, err := h.createSender(*args)
+	sender, err := h.createSender(ctx, *args)
 	if err != nil {
 		return nil, err
 	}

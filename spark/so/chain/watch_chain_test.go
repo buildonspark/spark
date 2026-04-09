@@ -12,6 +12,11 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	transferent "github.com/lightsparkdev/spark/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/entephemeral"
+	ephemeralenttest "github.com/lightsparkdev/spark/so/entephemeral/enttest"
 	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -21,11 +26,13 @@ import (
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestProcessTransactions(t *testing.T) {
@@ -1005,6 +1012,162 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 	assert.True(t, confirmedTransferIDs[transfer1.ID], "Exit 1 (transfer1) should be confirmed")
 	assert.True(t, confirmedTransferIDs[transfer2.ID], "Exit 2 (transfer2) should be confirmed")
 	assert.False(t, confirmedTransferIDs[transfer3.ID], "Exit 3 (transfer3) should NOT be confirmed")
+}
+
+func TestTweakKeysForCoopExit_UsesEphemeralSecrets(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{7})
+	stop := db.StartPostgresServer()
+	t.Cleanup(stop)
+
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	ephemeralClient := ephemeralenttest.Open(t, "sqlite3", "file:watch_chain_ephemeral?mode=memory&_fk=1")
+	t.Cleanup(func() { _ = ephemeralClient.Close() })
+
+	ephemeralSession := db.NewDefaultEphemeralSessionFactory(ephemeralClient).NewSession(ctx)
+	t.Cleanup(func() {
+		if tx := ephemeralSession.GetTxIfExists(); tx != nil {
+			_ = tx.Rollback()
+		}
+	})
+	ctxWithEphemeral := entephemeral.Inject(ctx, ephemeralSession)
+
+	ownerIdentity := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	initialSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+	initialPub := initialSecret.Public()
+	verifyingPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	tweakSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+	tweakPub := tweakSecret.Public()
+
+	treeTxid := schematype.NewRandomTxIDForTesting(t)
+	tree, err := dbClient.Tree.Create().
+		SetStatus(schematype.TreeStatusAvailable).
+		SetBaseTxid(treeTxid).
+		SetOwnerIdentityPubkey(ownerIdentity).
+		SetNetwork(btcnetwork.Testnet).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	version := int32(0)
+	keyshare, err := dbClient.SigningKeyshare.Create().
+		SetPublicKey(initialPub).
+		SetSecretVersion(version).
+		SetMinSigners(1).
+		SetPublicShares(map[string]keys.Public{}).
+		SetStatus(schematype.KeyshareStatusInUse).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Seed the ephemeral secret directly (bypasses advisory lock; safe for
+	// single-goroutine test setup).
+	_, err = ephemeralClient.SigningKeyshareSecret.Create().
+		SetSigningKeyshareID(keyshare.ID).
+		SetVersion(version).
+		SetSecretShare(initialSecret).
+		Save(ctx)
+	require.NoError(t, err)
+
+	baseTx := wire.MsgTx{
+		Version: 1,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut:   []*wire.TxOut{{Value: 1_000}},
+	}
+	var rawTxBuf bytes.Buffer
+	err = baseTx.Serialize(&rawTxBuf)
+	require.NoError(t, err)
+	rawTx := rawTxBuf.Bytes()
+	leaf, err := dbClient.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(btcnetwork.Testnet).
+		SetValue(1_000).
+		SetStatus(schematype.TreeNodeStatusAvailable).
+		SetVerifyingPubkey(verifyingPub).
+		SetOwnerIdentityPubkey(ownerIdentity).
+		SetOwnerSigningPubkey(ownerIdentity).
+		SetRawTx(rawTx).
+		SetVout(0).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer, err := dbClient.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiatedCoordinator).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(ownerIdentity).
+		SetReceiverIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetTotalValue(1_000).
+		SetExpiryTime(time.Now().Add(1 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyTweakPayload := &pbspark.SendLeafKeyTweak{
+		LeafId: leaf.ID.String(),
+		SecretShareTweak: &pbspark.SecretShare{
+			SecretShare: tweakSecret.Serialize(),
+			Proofs:      [][]byte{tweakPub.Serialize()},
+		},
+		PubkeySharesTweak: map[string][]byte{},
+	}
+	keyTweakBytes, err := proto.Marshal(keyTweakPayload)
+	require.NoError(t, err)
+
+	refundTx := rawTx
+	_, err = dbClient.TransferLeaf.Create().
+		SetTransfer(transfer).
+		SetLeaf(leaf).
+		SetPreviousRefundTx(refundTx).
+		SetIntermediateRefundTx(refundTx).
+		SetKeyTweak(keyTweakBytes).
+		Save(ctx)
+	require.NoError(t, err)
+
+	exitTx := wire.MsgTx{
+		Version: 2,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut:   []*wire.TxOut{{Value: 1_000}, {Value: 100}},
+	}
+	exitHash := exitTx.TxHash()
+	exitTxid, err := schematype.NewTxIDFromBytes(exitHash[:])
+	require.NoError(t, err)
+
+	coopExit, err := dbClient.CooperativeExit.Create().
+		SetTransfer(transfer).
+		SetExitTxid(exitTxid).
+		Save(ctx)
+	require.NoError(t, err)
+
+	err = tweakKeysForCoopExit(ctx, coopExit, 200)
+	require.ErrorContains(t, err, "ephemeral DB is unavailable")
+
+	err = tweakKeysForCoopExit(ctxWithEphemeral, coopExit, 200)
+	require.NoError(t, err)
+
+	updatedTransfer, err := dbClient.Transfer.Get(ctxWithEphemeral, transfer.ID)
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TransferStatusSenderKeyTweaked, updatedTransfer.Status)
+
+	updatedTransferLeaf, err := dbClient.TransferLeaf.Query().
+		Where(
+			transferleaf.HasTransferWith(transferent.IDEQ(transfer.ID)),
+			transferleaf.HasLeafWith(treenode.IDEQ(leaf.ID)),
+		).
+		Only(ctxWithEphemeral)
+	require.NoError(t, err)
+	assert.Nil(t, updatedTransferLeaf.KeyTweak)
+
+	updatedKeyshare, err := dbClient.SigningKeyshare.Get(ctxWithEphemeral, keyshare.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updatedKeyshare.SecretVersion)
+
+	expectedSecret := initialSecret.Add(tweakSecret)
+	resolvedSecret, err := updatedKeyshare.GetSecretShare(ctxWithEphemeral)
+	require.NoError(t, err)
+	assert.Equal(t, expectedSecret, *resolvedSecret)
 }
 
 func createTestDepositAddress(

@@ -23,12 +23,15 @@ func GetSigningKeyshareSecretVersion(
 	signingKeyshareID uuid.UUID,
 	version int32,
 ) (*SigningKeyshareSecret, error) {
-	tx, err := GetTxFromContext(ctx)
+	// This is a pure read path, so use the context client instead of forcing
+	// GetTxFromContext. Read-only ephemeral sessions intentionally do not expose
+	// explicit transactions.
+	db, err := GetDbFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	secret, err := tx.SigningKeyshareSecret.Query().
+	secret, err := db.SigningKeyshareSecret.Query().
 		Where(signingkeysharesecret.SigningKeyshareIDEQ(signingKeyshareID), signingkeysharesecret.VersionEQ(version)).
 		Only(ctx)
 	if err != nil {

@@ -23,7 +23,10 @@ func main() {
 			gen.FeatureModifier,
 			gen.FeatureUpsert,
 		},
-	}, entc.Extensions(exampleExt, commentsExt))
+	},
+		entc.Extensions(exampleExt, commentsExt),
+		entc.TemplateDir("./templates"),
+	)
 
 	if err != nil {
 		log.Fatalf("running ent codegen: %v", err)

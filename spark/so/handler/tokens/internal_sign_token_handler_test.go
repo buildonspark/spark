@@ -151,6 +151,34 @@ func TestBuildInputOperatorShareMap(t *testing.T) {
 	})
 }
 
+func TestRecoverFullRevocationSecretsAndFinalize_ReturnsNotReadyWhenThresholdNotMetAndEphemeralUnavailable(t *testing.T) {
+	setup := setUpInternalSignTokenTestHandler(t)
+	defer setup.cleanup()
+	setup.handler.config.Token.RequireThresholdOperators = true
+	setup.handler.config.Threshold = 2
+
+	version := int32(0)
+	tx := &ent.TokenTransaction{
+		Edges: ent.TokenTransactionEdges{
+			SpentOutput: []*ent.TokenOutput{
+				{
+					Edges: ent.TokenOutputEdges{
+						RevocationKeyshare: &ent.SigningKeyshare{
+							ID:            uuid.New(),
+							SecretVersion: &version,
+						},
+						TokenPartialRevocationSecretShares: []*ent.TokenPartialRevocationSecretShare{},
+					},
+				},
+			},
+		},
+	}
+
+	finalized, err := setup.handler.RecoverFullRevocationSecretsAndFinalize(setup.ctx, tx)
+	require.NoError(t, err)
+	require.False(t, finalized)
+}
+
 func TestExchangeRevocationSecretsShares_TransferTransaction(t *testing.T) {
 	setup := setUpInternalSignTokenTestHandler(t)
 	defer setup.cleanup()

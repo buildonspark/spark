@@ -2,6 +2,7 @@ package entephemeral
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"google.golang.org/grpc/codes"
@@ -17,6 +18,8 @@ type (
 const (
 	dbSessionKey dbSessionContextKey = "dbsession_ephemeral"
 )
+
+var ErrNoTransactionProvider = errors.New("no transaction provider found in context")
 
 // A TxProvider is an interface that provides a method to either get an existing transaction,
 // or begin a new transaction if none exists.
@@ -81,7 +84,7 @@ func GetDbFromContext(ctx context.Context) (*Client, error) {
 		return txProvider.GetClient(ctx)
 	}
 
-	return nil, fmt.Errorf("no transaction provider found in context")
+	return nil, ErrNoTransactionProvider
 }
 
 // GetTxFromContext returns the underlying database transaction from the context.
@@ -91,7 +94,7 @@ func GetTxFromContext(ctx context.Context) (*Tx, error) {
 		return txProvider.GetOrBeginTx(ctx)
 	}
 
-	return nil, fmt.Errorf("no transaction provider found in context")
+	return nil, ErrNoTransactionProvider
 }
 
 func MarkTxDirty(ctx context.Context) {

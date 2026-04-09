@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"entgo.io/ent"
@@ -40,6 +41,10 @@ type SigningKeyshare struct {
 	// The SO index of the coordinator that initiated the DKG round that produced this signing keyshare. An SO can only claim a signing keyshare to mark it in-use for which it is the coordinator.
 	CoordinatorIndex uint64 `json:"coordinator_index,omitempty"`
 	selectValues     sql.SelectValues
+
+	// ExternalSecret stores a secret loaded from the ephemeral signing_keyshare_secrets table.
+	ExternalSecret *keys.Private `json:"-"`
+	secretMu       sync.Mutex    `json:"-"`
 }
 
 // scanValues returns the types for scanning values from sql.Rows.

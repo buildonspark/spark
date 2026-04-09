@@ -1,0 +1,7 @@
+{{ define "model/fields/additional" }}
+	{{- if eq $.Name "SigningKeyshare" }}
+		// ExternalSecret stores a secret loaded from the ephemeral signing_keyshare_secrets table.
+		ExternalSecret *keys.Private `json:"-"`
+		secretMu       sync.Mutex    `json:"-"`
+	{{- end }}
+{{ end }}

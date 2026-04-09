@@ -2,6 +2,7 @@ package ent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/entephemeral"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"go.uber.org/zap"
@@ -29,16 +31,75 @@ import (
 // keys.
 const defaultMinAvailableKeys = 100_000
 
+var (
+	ErrSigningKeyshareSecretUnavailable = errors.New("signing keyshare secret unavailable")
+	ErrSigningKeyshareSecretMissing     = errors.New("signing keyshare secret missing")
+)
+
+// GetSecretShare returns the secret share for this keyshare using the following order:
+// 1) signing_keyshares.secret_share, 2) preloaded ExternalSecret, 3) ephemeral secret store lookup by secret_version.
+func (sk *SigningKeyshare) GetSecretShare(ctx context.Context) (*keys.Private, error) {
+	// SecretShare is immutable after struct initialization (set during DB scan),
+	// so it is safe to read without holding secretMu.
+	if sk.SecretShare != nil {
+		return sk.SecretShare, nil
+	}
+
+	// ExternalSecret is mutable cache state on the entity pointer, so accesses must be synchronized.
+	sk.secretMu.Lock()
+	defer sk.secretMu.Unlock()
+
+	// SecretShare was already checked above (it is immutable), only ExternalSecret
+	// needs re-checking under the lock to guard against concurrent fetches.
+	if sk.ExternalSecret != nil {
+		return sk.ExternalSecret, nil
+	}
+	if sk.SecretVersion == nil {
+		return nil, fmt.Errorf(
+			"%w: signing keyshare %s has null secret_share in main DB and no secret_version",
+			ErrSigningKeyshareSecretMissing,
+			sk.ID,
+		)
+	}
+
+	secret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, sk.ID, *sk.SecretVersion)
+	if err != nil {
+		if errors.Is(err, entephemeral.ErrNoTransactionProvider) {
+			return nil, fmt.Errorf(
+				"%w: signing keyshare %s secret_share is null in main DB and ephemeral DB is unavailable",
+				ErrSigningKeyshareSecretUnavailable,
+				sk.ID,
+			)
+		}
+		if errors.Is(err, entephemeral.ErrNoSecretVersion) {
+			return nil, fmt.Errorf(
+				"%w: signing keyshare %s version %d was not found in ephemeral DB",
+				ErrSigningKeyshareSecretMissing,
+				sk.ID,
+				*sk.SecretVersion,
+			)
+		}
+		return nil, fmt.Errorf("failed to fetch secret for signing keyshare %s version %d: %w", sk.ID, *sk.SecretVersion, err)
+	}
+
+	// Store a copy before taking its address so that callers holding the
+	// returned pointer cannot corrupt the cache via writes.
+	fetched := secret.SecretShare
+	sk.ExternalSecret = &fetched
+	return sk.ExternalSecret, nil
+}
+
 // TweakKeyShare tweaks the given keyshare with the given tweak, updates the keyshare in the database and returns the updated keyshare.
 func (sk *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak keys.Private, pubKeyTweak keys.Public, pubKeySharesTweak map[string]keys.Public) (*SigningKeyshare, error) {
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.TweakKeyShare")
 	defer span.End()
 
-	if sk.SecretShare == nil {
-		return nil, fmt.Errorf("signing keyshare %s has no secret share", sk.ID)
+	secretShare, err := sk.GetSecretShare(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	newSecretShare := sk.SecretShare.Add(shareTweak)
+	newSecretShare := secretShare.Add(shareTweak)
 	newPubKey := sk.PublicKey.Add(pubKeyTweak)
 
 	newPublicShares := make(map[string]keys.Public)
@@ -253,13 +314,14 @@ func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID)
 	if err != nil {
 		return nil, err
 	}
-	if keyshare.SecretShare == nil {
-		return nil, fmt.Errorf("signing keyshare %s has no secret share", keyshare.ID)
+	secretShare, err := keyshare.GetSecretShare(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	keyPackage := &pbfrost.KeyPackage{
 		Identifier:   config.Identifier,
-		SecretShare:  keyshare.SecretShare.Serialize(),
+		SecretShare:  secretShare.Serialize(),
 		PublicShares: keys.ToBytesMap(keyshare.PublicShares),
 		PublicKey:    keyshare.PublicKey.Serialize(),
 		MinSigners:   uint32(keyshare.MinSigners),
@@ -287,13 +349,14 @@ func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.U
 
 	keyPackages := make(map[uuid.UUID]*pbfrost.KeyPackage, len(keyshares))
 	for _, keyshare := range keyshares {
-		if keyshare.SecretShare == nil {
-			return nil, fmt.Errorf("signing keyshare %s has no secret share", keyshare.ID)
+		secretShare, secretErr := keyshare.GetSecretShare(ctx)
+		if secretErr != nil {
+			return nil, secretErr
 		}
 
 		keyPackages[keyshare.ID] = &pbfrost.KeyPackage{
 			Identifier:   config.Identifier,
-			SecretShare:  keyshare.SecretShare.Serialize(),
+			SecretShare:  secretShare.Serialize(),
 			PublicShares: keys.ToBytesMap(keyshare.PublicShares),
 			PublicKey:    keyshare.PublicKey.Serialize(),
 			MinSigners:   uint32(keyshare.MinSigners),
@@ -355,28 +418,39 @@ func GetSigningKeysharesMap(ctx context.Context, keyshareIDs []uuid.UUID) (map[u
 	return keysharesMap, nil
 }
 
-func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, error) {
+// sumOfSigningKeyshares returns an aggregate keyshare with only the fields needed by its callers:
+// ID, SecretShare, PublicKey, and PublicShares. SecretVersion is always nil on the result
+// (the summed secret is stored directly in SecretShare regardless of input versions).
+// All other SigningKeyshare fields are left unset and must not be accessed by callers.
+//
+// If the ephemeral DB is unavailable, GetSecretShare will return ErrSigningKeyshareSecretUnavailable,
+// which propagates to callers (CalculateAndStoreLastKey, AggregateKeyshares) as a hard failure.
+// Callers should treat this error as a transient condition and retry.
+func sumOfSigningKeyshares(ctx context.Context, keyshares []*SigningKeyshare) (*SigningKeyshare, error) {
 	if len(keyshares) == 0 {
 		return nil, fmt.Errorf("at least one keyshare is required")
 	}
-	if keyshares[0].SecretShare == nil {
-		return nil, fmt.Errorf("signing keyshare %s has no secret share", keyshares[0].ID)
+	firstSecret, err := keyshares[0].GetSecretShare(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	sum := *keyshares[0]
-
-	firstSecret := *keyshares[0].SecretShare
-	sum.SecretShare = &firstSecret
+	sumSecret := *firstSecret
+	sum := &SigningKeyshare{
+		ID:           keyshares[0].ID,
+		PublicKey:    keyshares[0].PublicKey,
+		SecretShare:  &sumSecret,
+		PublicShares: make(map[string]keys.Public, len(keyshares[0].PublicShares)),
+	}
 	sum.SecretVersion = nil
-
-	sum.PublicShares = make(map[string]keys.Public, len(keyshares[0].PublicShares))
 	maps.Copy(sum.PublicShares, keyshares[0].PublicShares)
 
 	for _, keyshare := range keyshares[1:] {
-		if keyshare.SecretShare == nil {
-			return nil, fmt.Errorf("signing keyshare %s has no secret share", keyshare.ID)
+		keyshareSecret, secretErr := keyshare.GetSecretShare(ctx)
+		if secretErr != nil {
+			return nil, secretErr
 		}
-		newSecret := sum.SecretShare.Add(*keyshare.SecretShare)
+		newSecret := sum.SecretShare.Add(*keyshareSecret)
 		sum.SecretShare = &newSecret
 		sum.PublicKey = sum.PublicKey.Add(keyshare.PublicKey)
 
@@ -384,7 +458,7 @@ func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, erro
 			sum.PublicShares[shareID] = publicShare.Add(keyshare.PublicShares[shareID])
 		}
 	}
-	return &sum, nil
+	return sum, nil
 }
 
 // CalculateAndStoreLastKey calculates the last key from the given keyshares and stores it in the database.
@@ -399,18 +473,19 @@ func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *Signing
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Calculating last key for %d keyshares", len(keyshares))
 
-	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
+	sumKeyshare, err := sumOfSigningKeyshares(ctx, keyshares)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sum keyshares: %w", err)
 	}
-	if target.SecretShare == nil {
-		return nil, fmt.Errorf("target keyshare %s has no secret share", target.ID)
+	targetSecretShare, err := target.GetSecretShare(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	lastSecretShare := target.SecretShare.Sub(*sumKeyshare.SecretShare)
+	lastSecretShare := targetSecretShare.Sub(*sumKeyshare.SecretShare)
 	verifyLastKey := sumKeyshare.SecretShare.Add(lastSecretShare)
 
-	if !verifyLastKey.Equals(*target.SecretShare) {
+	if !verifyLastKey.Equals(*targetSecretShare) {
 		return nil, fmt.Errorf("last key verification failed")
 	}
 
@@ -458,7 +533,7 @@ func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningK
 		return nil, err
 	}
 
-	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
+	sumKeyshare, err := sumOfSigningKeyshares(ctx, keyshares)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sum keyshares: %w", err)
 	}

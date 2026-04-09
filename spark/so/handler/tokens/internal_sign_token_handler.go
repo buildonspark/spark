@@ -1028,13 +1028,13 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalize(ctx c
 }
 
 func (h *InternalSignTokenHandler) RecoverFullRevocationSecretsAndFinalize(ctx context.Context, tokenTransaction *ent.TokenTransaction) (finalized bool, err error) {
-	if canRecover, err := h.canRecoverAndFinalizeTransaction(tokenTransaction); err != nil {
+	if canRecover, err := h.canRecoverAndFinalizeTransaction(ctx, tokenTransaction); err != nil {
 		return false, tokens.FormatErrorWithTransactionEnt("failed to check if can recover and finalize transaction", tokenTransaction, err)
 	} else if !canRecover {
 		return false, nil
 	}
 
-	outputRecoveredSecrets, outputToSpendRevocationCommitments, err := h.recoverFullRevocationSecrets(tokenTransaction)
+	outputRecoveredSecrets, outputToSpendRevocationCommitments, err := h.recoverFullRevocationSecrets(ctx, tokenTransaction)
 	if err != nil {
 		return false, tokens.FormatErrorWithTransactionEnt("failed to recover full revocation secrets", tokenTransaction, err)
 	}
@@ -1055,16 +1055,12 @@ func (h *InternalSignTokenHandler) RecoverFullRevocationSecretsAndFinalize(ctx c
 	return true, nil
 }
 
-func (h *InternalSignTokenHandler) canRecoverAndFinalizeTransaction(tokenTransaction *ent.TokenTransaction) (canRecoverAndFinalize bool, err error) {
+func (h *InternalSignTokenHandler) canRecoverAndFinalizeTransaction(ctx context.Context, tokenTransaction *ent.TokenTransaction) (canRecoverAndFinalize bool, err error) {
 	minCountOutputPartialRevocationSecretSharesForAllOutputs := len(h.config.SigningOperatorMap)
 	for _, spentOutput := range tokenTransaction.Edges.SpentOutput {
 		if spentOutput.Edges.RevocationKeyshare == nil {
 			return false, tokens.FormatErrorWithTransactionEnt(
 				"missing revocation key-share on output", tokenTransaction, sparkerrors.InternalDatabaseMissingEdge(nil))
-		}
-		if spentOutput.Edges.RevocationKeyshare.SecretShare == nil {
-			return false, tokens.FormatErrorWithTransactionEnt(
-				"nil revocation secret share on output", tokenTransaction, sparkerrors.InternalObjectMissingField(nil))
 		}
 		minCountOutputPartialRevocationSecretSharesForAllOutputs = min(
 			minCountOutputPartialRevocationSecretSharesForAllOutputs,
@@ -1073,13 +1069,25 @@ func (h *InternalSignTokenHandler) canRecoverAndFinalizeTransaction(tokenTransac
 	}
 	requiredOperators := h.config.TokenRequiredParticipatingOperatorsCount()
 	// min count of partial revocation secret shares + this server's share must be >= threshold, for all outputs
-	if minCountOutputPartialRevocationSecretSharesForAllOutputs+1 >= requiredOperators {
-		return true, nil
+	if minCountOutputPartialRevocationSecretSharesForAllOutputs+1 < requiredOperators {
+		return false, nil
 	}
-	return false, nil
+
+	// Only resolve local secret shares once threshold can be met.
+	for _, spentOutput := range tokenTransaction.Edges.SpentOutput {
+		secretShare, secretErr := spentOutput.Edges.RevocationKeyshare.GetSecretShare(ctx)
+		if secretErr != nil {
+			return false, tokens.FormatErrorWithTransactionEnt("failed to resolve revocation key-share secret", tokenTransaction, secretErr)
+		}
+		if secretShare.IsZero() {
+			return false, tokens.FormatErrorWithTransactionEnt(
+				"nil revocation secret share on output", tokenTransaction, sparkerrors.InternalObjectMissingField(nil))
+		}
+	}
+	return true, nil
 }
 
-func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction *ent.TokenTransaction) (outputRecoveredSecrets []*ent.RecoveredRevocationSecret, outputToSpendRevocationCommitments []keys.Public, err error) {
+func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(ctx context.Context, tokenTransaction *ent.TokenTransaction) (outputRecoveredSecrets []*ent.RecoveredRevocationSecret, outputToSpendRevocationCommitments []keys.Public, err error) {
 	outputRecoveredSecrets = make([]*ent.RecoveredRevocationSecret, 0, len(tokenTransaction.Edges.SpentOutput))
 	outputToSpendRevocationCommitments = make([]keys.Public, 0, len(tokenTransaction.Edges.SpentOutput))
 
@@ -1091,7 +1099,15 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 		if output.Edges.RevocationKeyshare == nil {
 			return nil, nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("missing revocation key-share edge on output"))
 		}
-		if output.Edges.RevocationKeyshare.SecretShare == nil {
+		secretShare, secretErr := output.Edges.RevocationKeyshare.GetSecretShare(ctx)
+		if secretErr != nil {
+			return nil, nil, tokens.FormatErrorWithTransactionEnt(
+				"failed to resolve revocation key-share secret",
+				tokenTransaction,
+				secretErr,
+			)
+		}
+		if secretShare.IsZero() {
 			return nil, nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("nil revocation secret share on output"))
 		}
 		outputToSpendRevocationCommitments = append(outputToSpendRevocationCommitments, commitment)
@@ -1116,7 +1132,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 			FieldModulus: secp256k1.S256().N,
 			Threshold:    int(h.config.Threshold),
 			Index:        big.NewInt(coordinatorIndex),
-			Share:        new(big.Int).SetBytes(output.Edges.RevocationKeyshare.SecretShare.Serialize()),
+			Share:        new(big.Int).SetBytes(secretShare.Serialize()),
 		})
 		recoveredSecret, err := secretsharing.RecoverSecret(outputShares)
 		if err != nil {

@@ -30,6 +30,33 @@ The secret share bytes are stored in `signing_keyshare_secrets` in the ephemeral
 
 There are no cross-database foreign keys; integrity is maintained by application logic.
 
+Current main-DB schema also has:
+
+- nullable `signing_keyshares.secret_share` (legacy/back-compat path)
+- nullable `signing_keyshares.secret_version` (active pointer into ephemeral versions)
+
+`secret_version` is the durable link to the active ephemeral secret row.
+
+## Secret Resolution (`GetSecretShare`)
+
+`SigningKeyshare.GetSecretShare(ctx)` is the canonical read path for secret material. Resolution order is:
+
+- `signing_keyshares.secret_share` (main DB, if present)
+- cached in-memory `ExternalSecret` on the entity
+- ephemeral lookup by `(signing_keyshare_id, secret_version)`
+
+Concurrency/caching behavior:
+
+- `SecretShare` from DB scan is treated as immutable and can be read without locking.
+- `ExternalSecret` is mutable cache state and is guarded by `secretMu` to avoid data races and duplicate fetches.
+- This gives a single synchronized ephemeral fetch per entity pointer in the common case.
+
+Error behavior:
+
+- Null main secret + nil `secret_version` => missing-secret error.
+- Null main secret + no injected ephemeral session/tx provider => unavailable error.
+- Nonexistent `(id, version)` in ephemeral store => missing-secret error.
+
 ## Versioning Model
 
 Versioning is used to coordinate updates across two independent databases:
@@ -40,6 +67,11 @@ Versioning is used to coordinate updates across two independent databases:
 - Old versions are cleaned up with best-effort deletion once the new version is safely persisted.
 
 This avoids in-place mutation races and provides deterministic lookup of the secret for a specific main-db version.
+
+When combining keyshares, version information is intentionally discarded:
+
+- aggregate/sum logic sets `SecretVersion = nil` on the result regardless of input versions
+- the combined secret is stored directly in `SecretShare`, not as a versioned row
 
 ## Secret Version APIs
 
