@@ -550,6 +550,13 @@ message DepositTreePrepareRequest {
     spark.FinalizeDepositTreeCreationRequest original_request = 1;
 }
 
+// StorePreimageSharePrepareRequest is the 2PC prepare payload for consensus
+// preimage share storage. Each SO validates, decrypts, and writes its share
+// during Prepare. Commit and Rollback are no-ops.
+message StorePreimageSharePrepareRequest {
+    spark.StorePreimageShareV2Request original_request = 1;
+}
+
 message ConsensusPrepareRequest {
     // Corresponds to gossip.ConsensusOperationType. Defined as int32 to avoid
     // a circular proto import (gossip.proto already imports spark_internal.proto).

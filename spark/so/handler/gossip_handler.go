@@ -639,6 +639,8 @@ func dispatchConsensusCommit(ctx context.Context, config *so.Config, opType pbgo
 	switch opType {
 	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE:
 		return NewDepositTreeFlowHandler(config).Commit(ctx, op)
+	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE:
+		return NewPreimageShareFlowHandler(config).Commit(ctx, op)
 	default:
 		return fmt.Errorf("unknown consensus operation type for commit: %d", opType)
 	}
@@ -651,6 +653,8 @@ func dispatchConsensusRollback(ctx context.Context, config *so.Config, opType pb
 	switch opType {
 	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE:
 		return NewDepositTreeFlowHandler(config).Rollback(ctx, op)
+	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE:
+		return NewPreimageShareFlowHandler(config).Rollback(ctx, op)
 	default:
 		return fmt.Errorf("unknown consensus operation type for rollback: %d", opType)
 	}

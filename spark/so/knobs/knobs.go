@@ -117,10 +117,11 @@ const (
 	// Enable more rigorous checks for finalize signature requests. See SPARK-236
 	KnobEnableStrictFinalizeSignature = "spark.so.enable_strict_finalize_signature"
 
-	KnobEnablePartnerJWT        = "spark.so.enable_partner_jwt"
-	KnobShutdownRenewNode       = "spark.so.shutdown_renew_node"
-	KnobUseConsensusDepositTree = "spark.so.use_consensus_deposit_tree"
-	KnobShutdownHodlInvoices    = "spark.so.shutdown_hodl_invoices"
+	KnobEnablePartnerJWT          = "spark.so.enable_partner_jwt"
+	KnobShutdownRenewNode         = "spark.so.shutdown_renew_node"
+	KnobUseConsensusDepositTree   = "spark.so.use_consensus_deposit_tree"
+	KnobUseConsensusPreimageShare = "spark.so.use_consensus_preimage_share"
+	KnobShutdownHodlInvoices      = "spark.so.shutdown_hodl_invoices"
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)
 	KnobMultipleConfirmationForNonStaticDeposit = "spark.so.require_multiple_conf_for_non_static_deposit"

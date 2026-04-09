@@ -38,6 +38,19 @@ func (h *ConsensusHandler) DispatchPrepare(ctx context.Context, opType pbgossip.
 			return nil, nil
 		}
 		return anypb.New(result)
+	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE:
+		msg := &pbinternal.StorePreimageSharePrepareRequest{}
+		if err := op.UnmarshalTo(msg); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal preimage share prepare request: %w", err)
+		}
+		result, err := NewPreimageShareFlowHandler(h.config).Prepare(ctx, msg)
+		if err != nil {
+			return nil, err
+		}
+		if result == nil {
+			return nil, nil
+		}
+		return anypb.New(result)
 	default:
 		return nil, fmt.Errorf("unknown consensus operation type for prepare: %d", opType)
 	}

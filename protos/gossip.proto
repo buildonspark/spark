@@ -176,6 +176,7 @@ message GossipMessageFinalizeTreeNode {
 enum ConsensusOperationType {
     CONSENSUS_OPERATION_TYPE_UNSPECIFIED = 0;
     CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE = 1;
+    CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE = 2;
 }
 
 // GossipMessageConsensusCommit delivers the commit phase of a consensus operation.

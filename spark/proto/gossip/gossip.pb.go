@@ -34,6 +34,7 @@ type ConsensusOperationType int32
 const (
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_UNSPECIFIED           ConsensusOperationType = 0
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE ConsensusOperationType = 1
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE  ConsensusOperationType = 2
 )
 
 // Enum value maps for ConsensusOperationType.
@@ -41,10 +42,12 @@ var (
 	ConsensusOperationType_name = map[int32]string{
 		0: "CONSENSUS_OPERATION_TYPE_UNSPECIFIED",
 		1: "CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE",
+		2: "CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE",
 	}
 	ConsensusOperationType_value = map[string]int32{
 		"CONSENSUS_OPERATION_TYPE_UNSPECIFIED":           0,
 		"CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE": 1,
+		"CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE":  2,
 	}
 )
 
@@ -1765,10 +1768,11 @@ const file_gossip_proto_rawDesc = "" +
 	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation\"\x8d\x01\n" +
 	"\x1eGossipMessageConsensusRollback\x127\n" +
 	"\aop_type\x18\x01 \x01(\x0e2\x1e.gossip.ConsensusOperationTypeR\x06opType\x122\n" +
-	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation*v\n" +
+	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation*\xa9\x01\n" +
 	"\x16ConsensusOperationType\x12(\n" +
 	"$CONSENSUS_OPERATION_TYPE_UNSPECIFIED\x10\x00\x122\n" +
-	".CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE\x10\x012H\n" +
+	".CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE\x10\x01\x121\n" +
+	"-CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE\x10\x022H\n" +
 	"\rGossipService\x127\n" +
 	"\x06gossip\x12\x15.gossip.GossipMessage\x1a\x16.google.protobuf.EmptyB-Z+github.com/lightsparkdev/spark/proto/gossipb\x06proto3"
 

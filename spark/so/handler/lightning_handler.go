@@ -34,6 +34,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/authz"
+	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -128,6 +129,24 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 // StorePreimageShareV2 stores preimage shares for all SOs via a single coordinator call.
 // The coordinator decrypts and stores its own share, then fans out to other SOs via internal RPC.
 func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspark.StorePreimageShareV2Request) error {
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusPreimageShare, 0) > 0 {
+		prepareReq := &pbinternal.StorePreimageSharePrepareRequest{OriginalRequest: req}
+		flow := &preimageShareCoordinatorFlow{
+			PreimageShareFlowHandler: NewPreimageShareFlowHandler(h.config),
+			prepareReq:               prepareReq,
+		}
+		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+		engine := consensus.NewTwoPCEngine(h.config, NewSendGossipHandler(h.config))
+		_, err := engine.Execute(ctx,
+			pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE,
+			&selection, flow)
+		if err != nil {
+			return fmt.Errorf("consensus store preimage share failed: %w", err)
+		}
+		return nil
+	}
+
+	// Legacy path
 	if err := h.decryptAndStorePreimageShare(ctx, req); err != nil {
 		return fmt.Errorf("unable to store coordinator preimage share: %w", err)
 	}
