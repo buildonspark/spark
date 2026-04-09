@@ -84,7 +84,7 @@ When combining keyshares, version information is intentionally discarded:
 
 ## Secret Rotation and Dual-Write Rollout
 
-This branch introduces helpers that rotate secrets in ephemeral storage and then update main DB pointers:
+The helpers below rotate secrets in ephemeral storage and then update main DB pointers:
 
 - `PrepareSigningKeyshareCreateWithSecret(...)` for keyshare creation flows.
 - `UpdateSigningKeyshareWithRotatedSecret(...)` for update/rotation flows.
@@ -101,6 +101,27 @@ Cleanup semantics for rotations are best-effort and instrumented:
 - On main transaction rollback: newly-created ephemeral version is best-effort deleted.
 - On successful main commit: previous ephemeral version is best-effort deleted.
 - Cleanup failures are counted in metric `spark_db_ent_signing_keyshare_secret_cleanup_failures_total` with stage/reason attributes.
+
+## Backstop Cleanup Job (Dangling Secrets)
+
+Because rotation cleanup is best-effort, a scheduled backstop task handles lingering rows:
+
+- Task: `purge_dangling_signing_keyshare_secrets`
+- Schedule: every 5 minutes
+- Purpose: remove old ephemeral secret rows that are no longer referenced by main `signing_keyshares.secret_version`
+
+Selection/safety model:
+
+- Only considers aged rows (grace period: 10 minutes) using UUIDv7 time ordering (`id < cutoff_id`).
+- Processes in bounded batches (size 1000) to keep runtime predictable.
+- A candidate is deleted only when its `(signing_keyshare_id, version)` is not the currently referenced main version
+  (or the main keyshare row does not exist / has null `secret_version`).
+
+Operational behavior:
+
+- If ephemeral DB session is not present, task is a no-op.
+- If a batch is full, logs note that additional candidates may remain for later runs.
+- Recently created unreferenced rows (inside grace period) are intentionally preserved until they age out.
 
 ## Secret Version APIs
 

@@ -73,7 +73,6 @@ func getLatestSigningKeyshareSecretVersionForUpdateLocked(
 	query := tx.SigningKeyshareSecret.Query().
 		Where(signingkeysharesecret.SigningKeyshareIDEQ(signingKeyshareID)).
 		Order(signingkeysharesecret.ByVersion(sql.OrderDesc()))
-
 	if tx.config.driver.Dialect() == dialect.Postgres {
 		query = query.ForUpdate()
 	}
@@ -184,12 +183,24 @@ func DeleteSigningKeyshareSecretVersion(
 }
 
 func lockSigningKeyshareIDForVersioning(ctx context.Context, tx *Tx, signingKeyshareID uuid.UUID) error {
-	if tx.config.driver.Dialect() != dialect.Postgres {
-		// sqlite is used in unit tests for ephemeral DB; it does not support
-		// pg_advisory_xact_lock, so version writes proceed without advisory lock.
+	switch tx.config.driver.Dialect() {
+	case dialect.Postgres:
+		// Use transaction-scoped advisory locks in Postgres so concurrent updates on the
+		// same keyshare serialize cleanly.
+	case dialect.SQLite:
+		// Unit tests run entephemeral on SQLite. SQLite does not support advisory locks,
+		// and writes are already serialized at the database level; allow the transaction
+		// to proceed without an explicit lock.
 		return nil
+	default:
+		return fmt.Errorf(
+			"advisory locking for signing keyshare versioning is only supported on Postgres/SQLite, got %q",
+			tx.config.driver.Dialect(),
+		)
 	}
 
+	// Postgres intentionally falls through from the switch above; acquire the
+	// transaction-scoped advisory lock here.
 	txDriver, ok := tx.config.driver.(*txDriver)
 	if !ok {
 		return fmt.Errorf("unexpected tx driver type: %T", tx.config.driver)

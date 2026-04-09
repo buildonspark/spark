@@ -819,6 +819,58 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 		{
 			ExecutionInterval: 5 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
+				Name:         "purge_dangling_signing_keyshare_secrets",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					logger := logging.GetLoggerFromContext(ctx)
+					batchSize := int(knobsService.GetValue(knobs.KnobPurgeDanglingSigningKeyshareSecretsBatchSize, purgeDanglingSigningKeyshareSecretsDefaultBatchSize))
+					if batchSize <= 0 {
+						logger.Sugar().Warnf("purge_dangling_signing_keyshare_secrets: invalid batchSize %d (knob %s), skipping run", batchSize, knobs.KnobPurgeDanglingSigningKeyshareSecretsBatchSize)
+						return nil
+					}
+					cutoffID := uuids.UUIDv7FromTime(time.Now().Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
+					candidateCount, deletedCount, err := purgeDanglingSigningKeyshareSecretsBatch(
+						ctx,
+						cutoffID,
+						batchSize,
+					)
+					if err != nil {
+						return err
+					}
+
+					if candidateCount == batchSize {
+						if deletedCount > 0 {
+							logger.Sugar().Warnf(
+								"Purge batch was full (%d candidates, %d deleted); additional dangling signing keyshare secrets may remain",
+								batchSize,
+								deletedCount,
+							)
+						} else {
+							logger.Sugar().Infof(
+								"Purge batch was full (%d candidates); aged signing keyshare secrets in this batch were all active",
+								batchSize,
+							)
+						}
+					} else if deletedCount > 0 {
+						logger.Sugar().Infof(
+							"Purged %d dangling signing keyshare secrets out of %d aged candidates",
+							deletedCount,
+							candidateCount,
+						)
+					} else if candidateCount > 0 {
+						logger.Sugar().Infof(
+							"No dangling signing keyshare secrets found; %d aged candidates were all actively referenced",
+							candidateCount,
+						)
+					}
+
+					return nil
+				},
+			},
+		},
+		{
+			ExecutionInterval: 5 * time.Minute,
+			BaseTaskSpec: BaseTaskSpec{
 				Name:         "purge_idempotency_keys",
 				RunInTestEnv: true,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {

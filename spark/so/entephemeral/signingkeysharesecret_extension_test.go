@@ -166,6 +166,18 @@ func TestCreateSigningKeyshareSecretVersionLocked_GetReturnsInsertedValue(t *tes
 	require.True(t, got.SecretShare.Equals(secretShare), "retrieved secret share should match the one that was inserted")
 }
 
+func TestCreateSigningKeyshareSecretVersion_DuplicateVersionFails(t *testing.T) {
+	ctx, _, _ := newSQLiteContextWithSession(t)
+	signingKeyshareID := uuid.New()
+
+	_, err := CreateSigningKeyshareSecretVersion(ctx, signingKeyshareID, 0, keys.GeneratePrivateKey())
+	require.NoError(t, err)
+
+	_, err = CreateSigningKeyshareSecretVersion(ctx, signingKeyshareID, 0, keys.GeneratePrivateKey())
+	require.Error(t, err)
+	require.True(t, IsConstraintError(err))
+}
+
 func TestSigningKeyshareSecretVersionMutationMethods_WorkOnSQLite(t *testing.T) {
 	ctx, _, _ := newSQLiteContextWithSession(t)
 	signingKeyshareID := uuid.New()
@@ -178,10 +190,13 @@ func TestSigningKeyshareSecretVersionMutationMethods_WorkOnSQLite(t *testing.T) 
 	created, err := AddSigningKeyshareSecretVersion(ctx, signingKeyshareID, secretShare)
 	require.NoError(t, err)
 	require.Equal(t, int32(0), created.Version)
+	require.True(t, created.SecretShare.Equals(secretShare))
 
-	_, err = CreateSigningKeyshareSecretVersion(ctx, signingKeyshareID, 0, secretShare)
-	require.Error(t, err)
-	require.True(t, IsConstraintError(err))
+	otherSecret := keys.GeneratePrivateKey()
+	created, err = CreateSigningKeyshareSecretVersion(ctx, signingKeyshareID, 1, otherSecret)
+	require.NoError(t, err)
+	require.Equal(t, int32(1), created.Version)
+	require.True(t, created.SecretShare.Equals(otherSecret))
 }
 
 func TestSigningKeyshareIDToAdvisoryLockKey_IsDeterministic(t *testing.T) {

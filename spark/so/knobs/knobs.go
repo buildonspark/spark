@@ -145,6 +145,8 @@ const (
 	KnobEnableInstantStaticDeposit = "spark.so.enable_instant_static_deposit"
 	// Total number of sats that can be pending in the instant static deposit flow
 	KnobMaxPendingInstantStaticDepositAmount = "spark.so.max_pending_instant_static_deposit_amount"
+
+	KnobPurgeDanglingSigningKeyshareSecretsBatchSize = "spark.so.purge_dangling_signing_keyshare_secrets_batch_size"
 )
 
 type Config struct {
