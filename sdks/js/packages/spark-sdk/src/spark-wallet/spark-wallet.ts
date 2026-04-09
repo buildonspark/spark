@@ -185,6 +185,16 @@ import { SparkWalletEvent } from "./types.js";
  * and interacting with the Lightning Network.
  */
 export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
+  // ---------------------------------------------------------------------------
+  // Singleton registry — ensures only one live instance per identity key within
+  // a single JS process. Prevents duplicate streams, duplicate claims, and
+  // competing optimizations
+  // ---------------------------------------------------------------------------
+  private static instances: Map<string, SparkWallet> = new Map();
+  private static initMutexes: Map<string, Mutex> = new Map();
+  private singletonKey: string | null = null;
+  private disposed = false;
+
   protected config: WalletConfigService;
   protected connectionManager: ConnectionManager;
   protected coopExitService: CoopExitService;
@@ -301,6 +311,101 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const wrappedInit = SparkWallet.wrapMethod(
       "initialize",
       () => wallet.initWallet(mnemonicOrSeed, accountNumber, options),
+      wallet,
+    );
+
+    const initWalletResponse = await wrappedInit();
+    return initWalletResponse as InitWalletResponse<T>;
+  }
+
+  private static getInitMutex(identityHex: string): Mutex {
+    let mutex = SparkWallet.initMutexes.get(identityHex);
+    if (!mutex) {
+      mutex = new Mutex();
+      SparkWallet.initMutexes.set(identityHex, mutex);
+    }
+    return mutex;
+  }
+
+  /**
+   * Returns an existing wallet instance for the given identity key if one is
+   * already initialized, or creates and initializes a new one. This prevents
+   * duplicate streams, duplicate claims, and competing optimizations when the
+   * same wallet is initialized multiple times in the same process (e.g., React
+   * re-renders without cleanup).
+   *
+   * Use this instead of {@link initialize} when your application may call
+   * initialization multiple times for the same wallet (same seed/account).
+   *
+   * @param props - Same options as {@link initialize}, plus:
+   *   - forceReinit: tears down any existing instance and creates a fresh one
+   */
+  public static async getOrCreateWallet<T extends SparkWallet>(
+    this: new (options?: ConfigOptions, signer?: SparkSigner) => T,
+    {
+      mnemonicOrSeed,
+      accountNumber,
+      signer,
+      options = {},
+      forceReinit, // Tear down existing instance and create fresh connections
+    }: SparkWalletProps & { forceReinit?: boolean },
+  ): Promise<InitWalletResponse<T>> {
+    let wallet: T;
+
+    try {
+      wallet = new this(options, signer);
+    } catch (error) {
+      const err = await SparkWallet.handlePublicMethodError(error);
+      throw err;
+    }
+
+    const wrappedInit = SparkWallet.wrapMethod(
+      "getOrCreateWallet",
+      async () => {
+        // Resolve seed and derive identity key (cheap — no connections)
+        // so we can check the singleton cache before expensive init.
+        let mnemonic: string | undefined;
+        let seed: Uint8Array | undefined;
+        if (!options.signerWithPreExistingKeys) {
+          const resolved = await wallet.resolveSeedAndMnemonic(
+            mnemonicOrSeed,
+            accountNumber,
+          );
+          seed = resolved.seed;
+          mnemonic = resolved.mnemonic;
+          accountNumber = resolved.accountNumber;
+          await wallet.config.signer.createSparkWalletFromSeed(
+            seed,
+            accountNumber,
+          );
+        }
+
+        const identityPublicKey =
+          await wallet.config.signer.getIdentityPublicKey();
+        const identityHex = bytesToHex(identityPublicKey);
+
+        return SparkWallet.getInitMutex(identityHex).runExclusive(async () => {
+          const existing = SparkWallet.instances.get(identityHex);
+          if (existing && !existing.disposed) {
+            if (forceReinit) {
+              await existing.cleanupConnections();
+            } else {
+              wallet.cleanup();
+              return { wallet: existing as unknown as T, mnemonic };
+            }
+          }
+
+          // Pass seed so initWallet skips re-resolving
+          const result = await wallet.initWallet(
+            seed ?? mnemonicOrSeed,
+            accountNumber,
+            options,
+          );
+          wallet.singletonKey = identityHex;
+          SparkWallet.instances.set(identityHex, wallet);
+          return { ...result, mnemonic } as InitWalletResponse<T>;
+        });
+      },
       wallet,
     );
 
@@ -824,23 +929,33 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     );
   }
 
-  /**
-   * Initializes the wallet using either a mnemonic phrase or a raw seed.
-   * initWallet will also claim any pending incoming lightning payment, spark transfer,
-   * or bitcoin deposit.
-   *
-   * @param {Uint8Array | string} [mnemonicOrSeed] - (Optional) Either:
-   *   - A BIP-39 mnemonic phrase as string
-   *   - A raw seed as Uint8Array or hex string
-   *   If not provided, generates a new mnemonic and uses it to create a new wallet
-   *
-   * @param {number} [accountNumber] - (Optional) The account number to use for the wallet. Defaults to 1 to maintain backwards compatability for legacy mainnet wallets.
-   *
-   * @returns {Promise<Object>} Object containing:
-   *   - mnemonic: The mnemonic if one was generated (undefined for raw seed)
-   *   - wallet: The wallet instance
-   * @private
-   */
+  private async resolveSeedAndMnemonic(
+    mnemonicOrSeed?: Uint8Array | string,
+    accountNumber?: number,
+  ): Promise<{
+    seed: Uint8Array;
+    mnemonic: string | undefined;
+    accountNumber: number;
+  }> {
+    if (accountNumber === undefined) {
+      accountNumber = this.config.getNetwork() === Network.REGTEST ? 0 : 1;
+    }
+    let mnemonic: string | undefined;
+    let seed: Uint8Array;
+    if (!mnemonicOrSeed) {
+      mnemonic = await this.config.signer.generateMnemonic();
+      seed = await this.config.signer.mnemonicToSeed(mnemonic);
+    } else if (typeof mnemonicOrSeed !== "string") {
+      seed = mnemonicOrSeed;
+    } else if (validateMnemonic(mnemonicOrSeed, wordlist)) {
+      mnemonic = mnemonicOrSeed;
+      seed = await this.config.signer.mnemonicToSeed(mnemonicOrSeed);
+    } else {
+      seed = hexToBytes(mnemonicOrSeed);
+    }
+    return { seed, mnemonic, accountNumber };
+  }
+
   protected async initWallet(
     mnemonicOrSeed?: Uint8Array | string,
     accountNumber?: number,
@@ -854,32 +969,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       };
     }
 
-    if (accountNumber === undefined) {
-      if (this.config.getNetwork() === Network.REGTEST) {
-        accountNumber = 0;
-      } else {
-        accountNumber = 1;
-      }
-    }
-    let mnemonic: string | undefined;
-    if (!mnemonicOrSeed) {
-      mnemonic = await this.config.signer.generateMnemonic();
-      mnemonicOrSeed = mnemonic;
-    }
+    const {
+      seed,
+      mnemonic,
+      accountNumber: resolvedAccount,
+    } = await this.resolveSeedAndMnemonic(mnemonicOrSeed, accountNumber);
 
-    let seed: Uint8Array;
-    if (typeof mnemonicOrSeed !== "string") {
-      seed = mnemonicOrSeed;
-    } else {
-      if (validateMnemonic(mnemonicOrSeed, wordlist)) {
-        mnemonic = mnemonicOrSeed;
-        seed = await this.config.signer.mnemonicToSeed(mnemonicOrSeed);
-      } else {
-        seed = hexToBytes(mnemonicOrSeed);
-      }
-    }
-
-    await this.initWalletFromSeed(seed, accountNumber);
+    await this.initWalletFromSeed(seed, resolvedAccount);
 
     return {
       mnemonic,
@@ -887,10 +983,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     };
   }
 
-  /**
-   * Initializes the wallet without a seed. Meant for use with a signer with pre-existing keys.
-   * @private
-   */
   protected async initWalletWithoutSeed() {
     await this.createClientsAndSyncWallet();
 
@@ -914,13 +1006,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return this.sparkAddress;
   }
 
-  /**
-   * Initializes a wallet from a seed.
-   *
-   * @param {Uint8Array | string} seed - The seed to initialize the wallet from
-   * @returns {Promise<string>} The Spark address
-   * @private
-   */
   private async initWalletFromSeed(
     seed: Uint8Array | string,
     accountNumber?: number,
@@ -5419,6 +5504,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   private cleanup() {
+    this.disposed = true;
+    if (this.singletonKey) {
+      if (SparkWallet.instances.get(this.singletonKey) === this) {
+        SparkWallet.instances.delete(this.singletonKey);
+      }
+    }
     if (this.claimTransfersInterval) {
       clearInterval(this.claimTransfersInterval);
       this.claimTransfersInterval = null;
@@ -5436,6 +5527,20 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   public async cleanupConnections() {
     this.cleanup();
     await this.connectionManager.closeConnections();
+  }
+
+  /**
+   * Clears the singleton registry. Intended for test cleanup only — in
+   * production, use cleanupConnections() on individual wallet instances.
+   */
+  public static async resetInstances() {
+    const cleanups: Promise<void>[] = [];
+    for (const wallet of SparkWallet.instances.values()) {
+      cleanups.push(wallet.cleanupConnections().catch(() => {}));
+    }
+    await Promise.all(cleanups);
+    SparkWallet.instances.clear();
+    SparkWallet.initMutexes.clear();
   }
 
   // Add this new method to start periodic claiming
