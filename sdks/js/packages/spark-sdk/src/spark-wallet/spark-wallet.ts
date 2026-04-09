@@ -493,9 +493,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   protected async setupBackgroundStream() {
-    const MAX_RETRIES = 10;
     const INITIAL_DELAY = 1000;
-    const MAX_DELAY = 60000;
+    const MAX_DELAY = 15000;
+    const RETRY_FOREVER = Number.POSITIVE_INFINITY;
     const loggingEnabled = this.config.getLog();
     const logStream = (message: string) => {
       if (!loggingEnabled) {
@@ -526,7 +526,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     let retryCount = 0;
     const streamController = new AbortController();
     this.streamController = streamController;
-    while (retryCount <= MAX_RETRIES) {
+    while (!streamController.signal.aborted) {
       try {
         const address = this.config.getCoordinatorAddress();
         logStream(`subscribing to ${address} (retry=${retryCount})`);
@@ -581,44 +581,34 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           break;
         }
 
+        const attempt = retryCount + 1;
         const backoffDelay = Math.min(
           INITIAL_DELAY * Math.pow(2, retryCount),
           MAX_DELAY,
         );
+        retryCount = attempt;
 
-        if (retryCount < MAX_RETRIES) {
-          retryCount++;
-          logStream(
-            `error: ${
-              error instanceof Error ? error.message : String(error)
-            }; retrying in ${backoffDelay}ms (${retryCount}/${MAX_RETRIES})`,
-          );
-          this.emit(
-            SparkWalletEvent.StreamReconnecting,
-            retryCount,
-            MAX_RETRIES,
-            backoffDelay,
-            error instanceof Error ? error.message : String(error),
-          );
-          try {
-            const completed = await delay(
-              backoffDelay,
-              streamController.signal,
-            );
-            if (!completed) {
-              break;
-            }
-          } catch (error) {
-            if (streamController.signal.aborted) {
-              break;
-            }
+        logStream(
+          `error: ${
+            error instanceof Error ? error.message : String(error)
+          }; retrying in ${backoffDelay}ms (attempt=${attempt})`,
+        );
+        this.emit(
+          SparkWalletEvent.StreamReconnecting,
+          attempt,
+          RETRY_FOREVER,
+          backoffDelay,
+          error instanceof Error ? error.message : String(error),
+        );
+        try {
+          const completed = await delay(backoffDelay, streamController.signal);
+          if (!completed) {
+            break;
           }
-        } else {
-          this.emit(
-            SparkWalletEvent.StreamDisconnected,
-            "Max reconnection attempts reached",
-          );
-          break;
+        } catch (error) {
+          if (streamController.signal.aborted) {
+            break;
+          }
         }
       } finally {
         logStream(
@@ -5553,7 +5543,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       clearInterval(this.tokenOptimizationInterval);
       this.tokenOptimizationInterval = null;
     }
-    if (this.streamController) {
+    if (this.streamController && !this.streamController.signal.aborted) {
+      this.emit(
+        SparkWalletEvent.StreamDisconnected,
+        "Wallet cleanup requested",
+      );
       this.streamController.abort();
     }
     this.removeAllListeners();

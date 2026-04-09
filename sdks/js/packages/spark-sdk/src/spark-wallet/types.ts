@@ -222,9 +222,9 @@ export interface SparkWalletEvents {
   ) => void;
   /** Emitted when the stream is connected */
   [SparkWalletEvent.StreamConnected]: () => void;
-  /** Emitted when the stream disconnects and fails to reconnect after max attempts */
+  /** Emitted when the stream stops and will not retry again on this wallet instance. */
   [SparkWalletEvent.StreamDisconnected]: (reason: string) => void;
-  /** Emitted when attempting to reconnect the stream */
+  /** Emitted when attempting to reconnect the stream. maxAttempts is Infinity when retries are unbounded. */
   [SparkWalletEvent.StreamReconnecting]: (
     attempt: number,
     maxAttempts: number,
