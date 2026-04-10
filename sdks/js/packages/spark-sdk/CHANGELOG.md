@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.7.10
+
+### Patch Changes
+
+- - Fix Bare transport timeouts so hung requests tear down stuck response streams instead of leaving wallet connections wedged after network drops.
+  - Keep wallet background event streams retrying until cleanup, with reconnect events that reflect unbounded retry behavior for long-lived clients.
+
 ## 0.7.9
 
 ### Patch Changes
