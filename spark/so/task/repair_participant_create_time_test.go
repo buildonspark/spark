@@ -18,12 +18,22 @@ import (
 
 func TestParseRepairCursor_RoundTrip(t *testing.T) {
 	t.Parallel()
-	original := repairCursor{UnixSeconds: 1741733334, ID: "abc-123-def"}
+	original := repairCursor{UnixMicros: 1741733334000000, ID: "abc-123-def"}
 	serialized := original.String()
 	parsed, ok := parseRepairCursor(serialized)
 	require.True(t, ok)
-	assert.Equal(t, original.UnixSeconds, parsed.UnixSeconds)
+	assert.Equal(t, original.UnixMicros, parsed.UnixMicros)
 	assert.Equal(t, original.ID, parsed.ID)
+}
+
+func TestParseRepairCursor_LegacySeconds(t *testing.T) {
+	t.Parallel()
+	// A legacy second-precision cursor should be converted to microseconds
+	// with +1 second so we re-process the boundary rather than skip transfers.
+	parsed, ok := parseRepairCursor("1741733334:abc-123-def")
+	require.True(t, ok)
+	assert.Equal(t, int64(1741733335000000), parsed.UnixMicros) // +1 second
+	assert.Equal(t, "abc-123-def", parsed.ID)
 }
 
 func TestParseRepairCursor_InvalidInputs(t *testing.T) {
@@ -59,7 +69,7 @@ func TestRepairCursorKey_IncludesOperatorIndex(t *testing.T) {
 func TestSeedCursor_AtCutoff(t *testing.T) {
 	t.Parallel()
 	cursor := seedCursor()
-	assert.Equal(t, repairCutoff.Unix(), cursor.UnixSeconds)
+	assert.Equal(t, repairCutoff.UnixMicro(), cursor.UnixMicros)
 	assert.Equal(t, "ffffffff-ffff-ffff-ffff-ffffffffffff", cursor.ID)
 }
 
