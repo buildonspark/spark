@@ -351,7 +351,7 @@ input CreateInstantStaticDepositQuoteInput {
   network: BitcoinNetwork!
 
   """Optional partner identifier for scoring service."""
-  partner_id: String = null
+  partner_id: String = null @deprecated(reason: "No longer supported.")
 }
 
 type CreateInstantStaticDepositQuoteOutput {
