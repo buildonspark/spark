@@ -139,20 +139,6 @@ function createWallClockTimeout(timeoutMs: number, onTimeout: () => void) {
   };
 }
 
-function getSocketChain(root: unknown): any[] {
-  const chain: any[] = [];
-  const seen = new Set<object>();
-  let current: any = root;
-
-  while (current != null && typeof current === "object" && !seen.has(current)) {
-    seen.add(current);
-    chain.push(current);
-    current = current.socket ?? current._socket;
-  }
-
-  return chain;
-}
-
 export function attachPrematureSocketCloseGuard(
   path: string,
   requestId: number,
@@ -264,8 +250,6 @@ export function BareHttpTransport({
       removeAbortListener: () => void;
     }>((resolve, reject) => {
       let req: http.ClientRequest;
-      let reqSocketCleanup = () => {};
-      let attachedRequestSocket: unknown;
       let clearRequestTimeout = () => {};
       let response: http.IncomingMessage | undefined;
       let requestSetupSettled = false;
@@ -409,81 +393,11 @@ export function BareHttpTransport({
             removeAbortListener() {
               wallClockTimeout.clear();
               clearRequestTimeout();
-              reqSocketCleanup();
               signal.removeEventListener("abort", abortListener);
             },
           });
         },
       );
-
-      const attachRequestSocketListeners = (requestSocket: unknown) => {
-        if (requestSocket == null || attachedRequestSocket === requestSocket) {
-          return;
-        }
-
-        reqSocketCleanup();
-        attachedRequestSocket = requestSocket;
-        const socketChain = getSocketChain(requestSocket);
-        const cleanupFns: Array<() => void> = [];
-
-        log(`request socket assigned levels=${socketChain.length}`);
-
-        socketChain.forEach((socket, level) => {
-          const suffix = socketChain.length > 1 ? ` level=${level}` : "";
-          const onSocketClose = (hadError: boolean) => {
-            log(`request socket close event hadError=${hadError}${suffix}`);
-            reqSocketCleanup();
-          };
-          const onSocketEnd = () => {
-            log(`request socket end event${suffix}`);
-          };
-          const onSocketError = (err: Error) => {
-            log(`request socket error event${suffix}: ${err.message}`);
-          };
-          const onSocketConnect = () => {
-            log(`request socket connect event${suffix}`);
-          };
-          const onSocketTimeout = () => {
-            log(`request socket timeout event${suffix}`);
-          };
-          const onSocketFree = () => {
-            log(`request socket free event${suffix}`);
-          };
-
-          socket.on("close", onSocketClose);
-          socket.on("end", onSocketEnd);
-          socket.on("error", onSocketError);
-          socket.on("connect", onSocketConnect);
-          socket.on("timeout", onSocketTimeout);
-          socket.on("free", onSocketFree);
-
-          cleanupFns.push(() => {
-            socket.off("close", onSocketClose);
-            socket.off("end", onSocketEnd);
-            socket.off("error", onSocketError);
-            socket.off("connect", onSocketConnect);
-            socket.off("timeout", onSocketTimeout);
-            socket.off("free", onSocketFree);
-          });
-        });
-
-        reqSocketCleanup = () => {
-          for (const cleanup of cleanupFns) {
-            cleanup();
-          }
-          attachedRequestSocket = undefined;
-          reqSocketCleanup = () => {};
-        };
-      };
-
-      const requestSocket = (req as http.ClientRequest & { socket?: any })
-        .socket;
-      if (requestSocket != null) {
-        attachRequestSocketListeners(requestSocket);
-      } else {
-        log("request socket was not available after request creation");
-      }
-      req.on("socket", attachRequestSocketListeners);
 
       if (!method.responseStream) {
         const onRequestTimeout = () => {

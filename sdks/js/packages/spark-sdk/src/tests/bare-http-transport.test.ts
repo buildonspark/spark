@@ -19,11 +19,6 @@ type MockIncomingMessage = IncomingMessage & {
 type MockClientRequest = ClientRequest & {
   destroy: ReturnType<typeof jest.fn>;
   end: ReturnType<typeof jest.fn>;
-  socket?: EventEmitter & {
-    socket: EventEmitter & {
-      _socket: EventEmitter;
-    };
-  };
   setHeader: ReturnType<typeof jest.fn>;
   setTimeout: ReturnType<typeof jest.fn>;
   write: ReturnType<typeof jest.fn>;
@@ -58,29 +53,16 @@ function createMockStreamingIncomingMessage() {
 
 function createMockClientRequest() {
   const req = new EventEmitter() as MockClientRequest;
-  const socket = createMockRequestSocketChain();
 
   Object.assign(req, {
     destroy: jest.fn(),
     end: jest.fn(),
-    socket,
     setHeader: jest.fn(),
     setTimeout: jest.fn(),
     write: jest.fn(),
   });
 
   return req;
-}
-
-function createMockRequestSocketChain() {
-  const rawSocket = new EventEmitter();
-  const tlsSocket = Object.assign(new EventEmitter(), {
-    _socket: rawSocket,
-  });
-
-  return Object.assign(new EventEmitter(), {
-    socket: tlsSocket,
-  });
 }
 
 async function* createUnaryBody() {
@@ -274,89 +256,6 @@ describe("BareHttpTransport", () => {
     expect(req.setTimeout).toHaveBeenNthCalledWith(1, 15_000);
     expect(req.setTimeout).toHaveBeenNthCalledWith(2, 0);
     expect(req.destroy).toHaveBeenCalledWith(expect.any(Error));
-  });
-
-  it("keeps a request socket error listener attached after a wall-clock timeout", async () => {
-    jest.useFakeTimers();
-
-    const req = createMockClientRequest();
-    jest
-      .spyOn(http, "request")
-      .mockImplementation((() => req) as unknown as typeof http.request);
-
-    const transport = BareHttpTransport();
-    const iterator = transport({
-      body: createUnaryBody(),
-      metadata: new Metadata(),
-      method: {
-        path: "/spark.SparkService/query_pending_transfers",
-        requestStream: false,
-        responseStream: false,
-      } as any,
-      signal: new AbortController().signal,
-      url: "http://example.com/test",
-    });
-
-    const nextResultPromise = iterator[Symbol.asyncIterator]().next();
-    const errorPromise = nextResultPromise.then(
-      () => null,
-      (error) => error,
-    );
-    await jest.advanceTimersByTimeAsync(15_000);
-    await errorPromise;
-
-    expect(req.socket.socket._socket.listenerCount("error")).toBeGreaterThan(0);
-    expect(() => {
-      req.socket.socket._socket.emit(
-        "error",
-        new Error("connection timed out"),
-      );
-    }).not.toThrow();
-  });
-
-  it("attaches request socket listeners when the socket is assigned asynchronously", async () => {
-    jest.useFakeTimers();
-
-    const req = createMockClientRequest();
-    Reflect.deleteProperty(req as object, "socket");
-    jest
-      .spyOn(http, "request")
-      .mockImplementation((() => req) as unknown as typeof http.request);
-
-    const transport = BareHttpTransport();
-    const iterator = transport({
-      body: createUnaryBody(),
-      metadata: new Metadata(),
-      method: {
-        path: "/spark.SparkService/query_pending_transfers",
-        requestStream: false,
-        responseStream: false,
-      } as any,
-      signal: new AbortController().signal,
-      url: "http://example.com/test",
-    });
-
-    const nextResultPromise = iterator[Symbol.asyncIterator]().next();
-    const errorPromise = nextResultPromise.then(
-      () => null,
-      (error) => error,
-    );
-    await jest.advanceTimersByTimeAsync(15_000);
-    await errorPromise;
-
-    const deferredSocket = createMockRequestSocketChain();
-    Object.assign(req, { socket: deferredSocket });
-    req.emit("socket", deferredSocket);
-
-    expect(
-      deferredSocket.socket._socket.listenerCount("error"),
-    ).toBeGreaterThan(0);
-    expect(() => {
-      deferredSocket.socket._socket.emit(
-        "error",
-        new Error("connection timed out"),
-      );
-    }).not.toThrow();
   });
 
   it("clears the unary wall-clock timeout after a non-2xx response", async () => {
