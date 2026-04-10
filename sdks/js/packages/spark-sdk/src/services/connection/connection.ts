@@ -274,6 +274,10 @@ export abstract class ConnectionManager {
     this.sessionId = uuidv7();
   }
 
+  public getSessionId(): string {
+    return this.sessionId;
+  }
+
   public getCurrentServerTime(): Date {
     const serverTime = this.timeSync.getCurrentServerTime();
     if (!serverTime) {

@@ -980,6 +980,16 @@ export default class LeafManager {
   // Optimization
   // ---------------------------------------------------------------------------
 
+  private logOptimize(message: string) {
+    const loggingEnabled = this.config.getLog();
+    if (!loggingEnabled) {
+      return;
+    }
+    console.info(
+      `[${new Date().toISOString()}][${this.connectionManager.getSessionId()}] [spark-sdk][optimize] ${message}`,
+    );
+  }
+
   private async autoOptimizeIfNeeded(): Promise<void> {
     try {
       if (!this.config.getOptimizationOptions().auto) return;
@@ -989,10 +999,15 @@ export default class LeafManager {
           available.map((l) => l.value),
           this.config.getOptimizationOptions().multiplicity ?? 0,
         )
-      )
+      ) {
+        this.logOptimize(
+          `No optimization needed for ${available.length} leaves`,
+        );
         return;
+      }
 
       if (!this.onAutoOptimize) return;
+      this.logOptimize(`Optimizing leaves for ${available.length} leaves`);
       await this.onAutoOptimize();
     } catch {
       // Optimization is best-effort. If it fails (e.g., config error, another
@@ -1016,7 +1031,13 @@ export default class LeafManager {
       throw new SparkValidationError("Multiplicity cannot be greater than 5");
     }
 
-    if (this.optimizationInProgress) return;
+    this.logOptimize(
+      `Starting optimization with multiplicity ${multiplicityValue}`,
+    );
+    if (this.optimizationInProgress) {
+      this.logOptimize(`Optimization already in progress`);
+      return;
+    }
 
     const controller = new AbortController();
     let ownsFlag = false;
@@ -1026,7 +1047,12 @@ export default class LeafManager {
     try {
       // Second check under lock — guards against TOCTOU where two callers
       // both pass the optimistic check before either acquires the mutex.
-      if (this.optimizationInProgress) return;
+      if (this.optimizationInProgress) {
+        this.logOptimize(
+          `Second check under lock — Optimization already in progress`,
+        );
+        return;
+      }
       this.optimizationInProgress = true;
       ownsFlag = true;
 
@@ -1035,7 +1061,16 @@ export default class LeafManager {
         availableLeaves.map((leaf) => leaf.value),
         multiplicityValue,
       );
-      if (swaps.length === 0) return;
+      if (swaps.length === 0) {
+        this.logOptimize(
+          `No swaps needed for ${availableLeaves.length} leaves`,
+        );
+        return;
+      }
+
+      this.logOptimize(
+        `Planned ${swaps.length} swap(s): ${JSON.stringify(swaps.map((s) => ({ in: s.inLeaves, out: s.outLeaves })))}`,
+      );
 
       const valueToNodes = new Map<number, TreeNode[]>();
       for (const leaf of availableLeaves) {
@@ -1057,6 +1092,9 @@ export default class LeafManager {
           }
         }
         swapBatches.push({ leavesToSend, outLeaves: swap.outLeaves });
+        this.logOptimize(
+          `Batch ${swapBatches.length}: LOCAL_LOCKED ${leavesToSend.length} leaves (${leavesToSend.reduce((acc, leaf) => acc + leaf.value, 0)} sats) ids=[${leavesToSend.map((l) => l.id).join(",")}]`,
+        );
         this.transition(
           leavesToSend.map((l) => l.id),
           LeafStatus.LOCAL_LOCKED,
@@ -1074,11 +1112,21 @@ export default class LeafManager {
         if (controller.signal.aborted) break;
 
         const swapLeafIds = swap.leavesToSend.map((l) => l.id);
+        const totalValue = swap.leavesToSend.reduce(
+          (acc, leaf) => acc + leaf.value,
+          0,
+        );
         try {
+          this.logOptimize(
+            `Requesting swap ${i + 1} of ${swapBatches.length}: ${totalValue} sats, ids=[${swapLeafIds.join(",")}] -> [${swap.outLeaves.join(",")}]`,
+          );
           const newLeaves = await this.swapService.requestLeavesSwap({
             leaves: swap.leavesToSend,
             targetAmounts: swap.outLeaves,
             onSwapInitiated: async () => {
+              this.logOptimize(
+                `Swap ${i + 1} initiated. Transitioning leaves to SWAP_PENDING: ${totalValue} sats`,
+              );
               await this.leavesMutex.runExclusive(() => {
                 this.transition(swapLeafIds, LeafStatus.SWAP_PENDING);
               });
@@ -1086,6 +1134,9 @@ export default class LeafManager {
           });
 
           await this.leavesMutex.runExclusive(() => {
+            this.logOptimize(
+              `Swap ${i + 1} completed. SPENT ${totalValue} sats ids=[${swapLeafIds.join(",")}], received ${newLeaves.length} leaves (${newLeaves.reduce((acc, leaf) => acc + leaf.value, 0)} sats) ids=[${newLeaves.map((l) => l.id).join(",")}]`,
+            );
             this.transition(swapLeafIds, LeafStatus.SPENT);
             for (const leaf of newLeaves) {
               this.leaves.set(leaf.id, {
@@ -1095,14 +1146,23 @@ export default class LeafManager {
               });
             }
             this.emitBalanceUpdate();
+            this.logOptimize(
+              `Post-swap balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()}`,
+            );
           });
         } catch (error) {
+          this.logOptimize(
+            `Error requesting swap ${i + 1} of ${swapBatches.length}: ${error}. Restoring ids=[${swapLeafIds.join(",")}]`,
+          );
           // Only restore LOCAL_LOCKED leaves — SWAP_PENDING means the SO was
           // contacted and has them locked; sync() will reconcile those.
           this.restoreLocalLockedToAvailable(swapLeafIds);
           // Restore all remaining unprocessed batches (always LOCAL_LOCKED)
           for (let j = i + 1; j < swapBatches.length; j++) {
             const remainingIds = swapBatches[j]!.leavesToSend.map((l) => l.id);
+            this.logOptimize(
+              `Restoring remaining batch ${j + 1} ids=[${remainingIds.join(",")}]`,
+            );
             this.restoreLocalLockedToAvailable(remainingIds);
           }
           // emitBalanceUpdate deferred to finally block
@@ -1119,12 +1179,15 @@ export default class LeafManager {
         // is idempotent (no-op for non-LOCAL_LOCKED leaves).
         if (swapBatches.length > 0) {
           for (const swap of swapBatches) {
-            this.restoreLocalLockedToAvailable(
-              swap.leavesToSend.map((l) => l.id),
-            );
+            const ids = swap.leavesToSend.map((l) => l.id);
+            this.logOptimize(`Cleanup: restoring batch ids=[${ids.join(",")}]`);
+            this.restoreLocalLockedToAvailable(ids);
           }
           this.emitBalanceUpdate();
         }
+        this.logOptimize(
+          `Optimization complete. Final balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()}`,
+        );
       }
       outerRelease?.();
     }

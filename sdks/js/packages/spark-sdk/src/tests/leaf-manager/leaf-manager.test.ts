@@ -128,6 +128,7 @@ interface MockConfig {
   getNetworkProto?: () => number;
   getSigningOperators?: () => Record<string, { address: string }>;
   getOptimizationOptions?: () => { auto?: boolean; multiplicity?: number };
+  getLog?: () => boolean;
   signer?: {
     getIdentityPublicKey: () => Promise<Uint8Array>;
     getPublicKeyFromDerivation?: jest.Mock;
@@ -171,8 +172,11 @@ function createTestableLeafManager(overrides?: {
   }) => void;
   onAutoOptimize?: () => Promise<void>;
 }): TestableLeafManager {
+  const defaultConfig: MockConfig = {
+    getLog: () => false,
+  };
   return new TestableLeafManager(
-    (overrides?.config ?? {}) as any,
+    { ...defaultConfig, ...overrides?.config } as any,
     (overrides?.swapService ?? {}) as any,
     (overrides?.transferService ?? {}) as any,
     (overrides?.connectionManager ?? {}) as any,
