@@ -173,6 +173,48 @@ func TestRepairParticipantCreateTime_SkipsTransfersAfterCutoff(t *testing.T) {
 	assert.WithinDuration(t, wrongTime, senders[0].CreateTime, time.Second)
 }
 
+func TestRepairParticipantCreateTime_SkipsUnspecifiedNetwork(t *testing.T) {
+	t.Parallel()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	client := sessionCtx.Client
+	cfg := sparktesting.TestConfig(t)
+
+	senderKey := keys.MustGeneratePrivateKeyFromRand(rand.Reader).Public()
+	receiverKey := keys.MustGeneratePrivateKeyFromRand(rand.Reader).Public()
+
+	transferTime := time.Date(2026, time.February, 15, 12, 0, 0, 0, time.UTC)
+	wrongTime := time.Date(2026, time.March, 10, 0, 0, 0, 0, time.UTC)
+
+	// Create an Unspecified-network transfer — should be skipped.
+	tr := client.Transfer.Create().
+		SetNetwork(btcnetwork.Unspecified).
+		SetStatus(st.TransferStatusSenderKeyTweaked).
+		SetType(st.TransferTypeTransfer).
+		SetSenderIdentityPubkey(senderKey).
+		SetReceiverIdentityPubkey(receiverKey).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		SetCreateTime(transferTime).
+		SaveX(ctx)
+
+	client.TransferSender.Create().
+		SetTransferID(tr.ID).
+		SetIdentityPubkey(senderKey).
+		SetCreateTime(wrongTime).
+		SaveX(ctx)
+
+	task, err := getRepairTask()
+	require.NoError(t, err)
+	err = task.RunOnce(ctx, cfg, client, nil, defaultKnobs())
+	require.NoError(t, err)
+
+	// Sender should still have the wrong time — Unspecified transfers are skipped.
+	senders, err := client.TransferSender.Query().All(ctx)
+	require.NoError(t, err)
+	require.Len(t, senders, 1)
+	assert.WithinDuration(t, wrongTime, senders[0].CreateTime, time.Second)
+}
+
 func TestRepairParticipantCreateTime_BatchPagination(t *testing.T) {
 	t.Parallel()
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)

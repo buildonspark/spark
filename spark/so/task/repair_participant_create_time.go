@@ -11,6 +11,7 @@ import (
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/google/uuid"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -116,9 +117,15 @@ func repairParticipantCreateTime(ctx context.Context, config *so.Config, client 
 		return 0, fmt.Errorf("invalid cursor ID %q: %w", cursor.ID, err)
 	}
 
-	// Fetch a batch of transfers older than the cursor using keyset pagination.
-	transfers, err := client.Transfer.Query().
+	// Only select id and create_time to avoid scanning columns with malformed data.
+	type transferRow struct {
+		ID         uuid.UUID `json:"id"`
+		CreateTime time.Time `json:"create_time"`
+	}
+	var transfers []transferRow
+	err = client.Transfer.Query().
 		Where(
+			transfer.NetworkNEQ(btcnetwork.Unspecified),
 			transfer.Or(
 				transfer.CreateTimeLT(cursorTime),
 				transfer.And(
@@ -129,7 +136,8 @@ func repairParticipantCreateTime(ctx context.Context, config *so.Config, client 
 		).
 		Order(transfer.ByCreateTime(entsql.OrderDesc()), transfer.ByID(entsql.OrderDesc())).
 		Limit(batchSize).
-		All(ctx)
+		Select(transfer.FieldID, transfer.FieldCreateTime).
+		Scan(ctx, &transfers)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query transfers: %w", err)
 	}
