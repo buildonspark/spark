@@ -1443,3 +1443,70 @@ func TestSettleReceiverKeyTweak_RejectsEarlyTransferStatus(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func TestStartTransferV3_MultiReceiverRequiresKnob(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{50})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiver1PubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiver2PubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	// Build a minimal V3 request with two distinct receivers.
+	makeReq := func(receivers map[string][]byte) *pb.StartTransferV3Request {
+		return &pb.StartTransferV3Request{
+			TransferId: uuid.New().String(),
+			SenderPackages: []*pb.SenderTransferPackage{{
+				OwnerIdentityPublicKey:     senderPrivKey.Public().Serialize(),
+				TransferPackage:            &pb.TransferPackage{},
+				ReceiverIdentityPublicKeys: receivers,
+			}},
+		}
+	}
+
+	t.Run("multi-receiver rejected when knob disabled", func(t *testing.T) {
+		ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobMimoTransferMultiReceiverEnabled: 0,
+		}))
+		_, err := handler.startTransferV3Internal(ctx, makeReq(map[string][]byte{
+			"leaf-1": receiver1PubKey.Serialize(),
+			"leaf-2": receiver2PubKey.Serialize(),
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "multi-receiver transfers are not enabled")
+	})
+
+	t.Run("multi-receiver rejected when knob service absent", func(t *testing.T) {
+		// No knob service injected at all.
+		_, err := handler.startTransferV3Internal(t.Context(), makeReq(map[string][]byte{
+			"leaf-1": receiver1PubKey.Serialize(),
+			"leaf-2": receiver2PubKey.Serialize(),
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "multi-receiver transfers are not enabled")
+	})
+
+	t.Run("multi-receiver allowed when knob enabled", func(t *testing.T) {
+		ctx := mimoEnabledContext(t.Context())
+		_, err := handler.startTransferV3Internal(ctx, makeReq(map[string][]byte{
+			"leaf-1": receiver1PubKey.Serialize(),
+			"leaf-2": receiver2PubKey.Serialize(),
+		}))
+		// Should pass the knob check and fail later (e.g., transfer package validation).
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "multi-receiver transfers are not enabled")
+	})
+
+	t.Run("single-receiver allowed regardless of knob", func(t *testing.T) {
+		ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobMimoTransferMultiReceiverEnabled: 0,
+		}))
+		_, err := handler.startTransferV3Internal(ctx, makeReq(map[string][]byte{
+			"leaf-1": receiver1PubKey.Serialize(),
+		}))
+		// Should pass the knob check and fail later.
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "multi-receiver transfers are not enabled")
+	})
+}

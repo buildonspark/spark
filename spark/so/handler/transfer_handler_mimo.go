@@ -80,6 +80,13 @@ func (h *TransferHandler) startTransferV3Internal(
 		return bytes.Compare(a.Serialize(), b.Serialize())
 	})
 
+	// Multi-receiver transfers require the MIMO knob to be enabled.
+	if len(receivers) > 1 {
+		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoTransferMultiReceiverEnabled, 0) == 0 {
+			return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("multi-receiver transfers are not enabled"))
+		}
+	}
+
 	// Validate transfer package.
 	leafTweakMap, err := h.ValidateTransferPackage(ctx, transferID, senderPkg.TransferPackage, senderIDPK, true /* requireDirectFromCpfpLeaves */)
 	if err != nil {
@@ -90,12 +97,9 @@ func (h *TransferHandler) startTransferV3Internal(
 	}
 
 	// Verify the transfer size doesn't exceed the transfer limit.
-	knobService := knobs.GetKnobsService(ctx)
-	if knobService != nil {
-		transferLimit := knobService.GetValue(knobs.KnobSoTransferLimit, 0)
-		if transferLimit > 0 && len(leafTweakMap) > int(transferLimit) {
-			return nil, status.Errorf(codes.InvalidArgument, "transfer limit reached, please send %d leaves at a time", int(transferLimit))
-		}
+	transferLimit := knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoTransferLimit, 0)
+	if transferLimit > 0 && len(leafTweakMap) > int(transferLimit) {
+		return nil, status.Errorf(codes.InvalidArgument, "transfer limit reached, please send %d leaves at a time", int(transferLimit))
 	}
 
 	leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap := loadLeafRefundMapsFromTransferPackage(senderPkg.TransferPackage)
