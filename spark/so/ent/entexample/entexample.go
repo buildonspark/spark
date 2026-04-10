@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -1934,7 +1935,7 @@ type PartnerExample struct {
 	PartnerID    *string
 	Label        *string
 	PartnerName  *string
-	JwtPublicKey *keys.JwtPubKey
+	JwtPublicKey *jwt.Public
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 }
@@ -1966,7 +1967,7 @@ func (pa *PartnerExample) SetPartnerName(v string) *PartnerExample {
 }
 
 // SetJwtPublicKey sets the jwt_public_key field.
-func (pa *PartnerExample) SetJwtPublicKey(v keys.JwtPubKey) *PartnerExample {
+func (pa *PartnerExample) SetJwtPublicKey(v jwt.Public) *PartnerExample {
 	pa.JwtPublicKey = &v
 	return pa
 }
@@ -1999,7 +2000,7 @@ func (pa *PartnerExample) MustExec(ctx context.Context) *ent.Partner {
 		create.SetJwtPublicKey(*pa.JwtPublicKey)
 	} else {
 		// Use default from annotation
-		create.SetJwtPublicKey(keys.MustParseJwtPubKeyHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+		create.SetJwtPublicKey(jwt.MustParsePublicHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
 	}
 
 	// Handle edges
@@ -2041,7 +2042,7 @@ func (pa *PartnerExample) Exec(ctx context.Context) (*ent.Partner, error) {
 		create.SetJwtPublicKey(*pa.JwtPublicKey)
 	} else {
 		// Use default from annotation
-		create.SetJwtPublicKey(keys.MustParseJwtPubKeyHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+		create.SetJwtPublicKey(jwt.MustParsePublicHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
 	}
 
 	// Handle edges

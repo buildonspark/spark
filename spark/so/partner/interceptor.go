@@ -3,12 +3,11 @@ package partner
 import (
 	"context"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	jwtkeys "github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/ent"
 	entpartner "github.com/lightsparkdev/spark/so/ent/partner"
@@ -53,7 +52,7 @@ type PartnerInfo struct {
 
 // keyLookupResult contains the public key and database ID for a partner.
 type keyLookupResult struct {
-	pubKey      *ecdsa.PublicKey
+	pubKey      jwtkeys.Public
 	partnerDBID uuid.UUID
 }
 
@@ -153,7 +152,7 @@ func (i *Interceptor) verifyPartnerJWT(ctx context.Context, tokenStr string) (*P
 		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %s", token.Header["alg"])
 		}
-		return result.pubKey, nil
+		return result.pubKey.ToECDSA(), nil
 	},
 		jwt.WithExpirationRequired(),
 		jwt.WithValidMethods(validMethodsForKey(result.pubKey)),
@@ -171,8 +170,8 @@ func (i *Interceptor) verifyPartnerJWT(ctx context.Context, tokenStr string) (*P
 }
 
 // validMethodsForKey returns the JWT algorithm name(s) accepted for the given key's curve.
-func validMethodsForKey(pub *ecdsa.PublicKey) []string {
-	if pub.Curve == elliptic.P256() {
+func validMethodsForKey(pub jwtkeys.Public) []string {
+	if pub.KeyType() == jwtkeys.KeyTypeP256 {
 		return []string{"ES256"}
 	}
 	return []string{"ES256K"}
@@ -199,11 +198,12 @@ func dbKeyLookup(dbClient *ent.Client) func(ctx context.Context, partnerID, labe
 			return nil, fmt.Errorf("partner lookup failed for %s/%s: %w", partnerID, label, err)
 		}
 
-		if p.JwtPublicKey.IsZero() {
+		pubKey := p.JwtPublicKey
+		if pubKey.IsZero() {
 			return nil, fmt.Errorf("partner %s/%s has no public key", partnerID, label)
 		}
 		return &keyLookupResult{
-			pubKey:      p.JwtPublicKey.ToECDSA(),
+			pubKey:      pubKey,
 			partnerDBID: p.ID,
 		}, nil
 	}

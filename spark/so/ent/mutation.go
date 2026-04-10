@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
@@ -9717,7 +9718,7 @@ type PartnerMutation struct {
 	partner_id     *string
 	label          *string
 	partner_name   *string
-	jwt_public_key *keys.JwtPubKey
+	jwt_public_key *jwt.Public
 	clearedFields  map[string]struct{}
 	done           bool
 	oldValue       func(context.Context) (*Partner, error)
@@ -10009,12 +10010,12 @@ func (m *PartnerMutation) ResetPartnerName() {
 }
 
 // SetJwtPublicKey sets the "jwt_public_key" field.
-func (m *PartnerMutation) SetJwtPublicKey(kpk keys.JwtPubKey) {
-	m.jwt_public_key = &kpk
+func (m *PartnerMutation) SetJwtPublicKey(j jwt.Public) {
+	m.jwt_public_key = &j
 }
 
 // JwtPublicKey returns the value of the "jwt_public_key" field in the mutation.
-func (m *PartnerMutation) JwtPublicKey() (r keys.JwtPubKey, exists bool) {
+func (m *PartnerMutation) JwtPublicKey() (r jwt.Public, exists bool) {
 	v := m.jwt_public_key
 	if v == nil {
 		return
@@ -10025,7 +10026,7 @@ func (m *PartnerMutation) JwtPublicKey() (r keys.JwtPubKey, exists bool) {
 // OldJwtPublicKey returns the old "jwt_public_key" field's value of the Partner entity.
 // If the Partner object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PartnerMutation) OldJwtPublicKey(ctx context.Context) (v keys.JwtPubKey, err error) {
+func (m *PartnerMutation) OldJwtPublicKey(ctx context.Context) (v jwt.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldJwtPublicKey is only allowed on UpdateOne operations")
 	}
@@ -10183,7 +10184,7 @@ func (m *PartnerMutation) SetField(name string, value ent.Value) error {
 		m.SetPartnerName(v)
 		return nil
 	case partner.FieldJwtPublicKey:
-		v, ok := value.(keys.JwtPubKey)
+		v, ok := value.(jwt.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

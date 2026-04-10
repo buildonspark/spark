@@ -7,7 +7,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
 
@@ -77,7 +77,7 @@ func PartnerName(v string) predicate.Partner {
 }
 
 // JwtPublicKey applies equality check predicate on the "jwt_public_key" field. It's identical to JwtPublicKeyEQ.
-func JwtPublicKey(v keys.JwtPubKey) predicate.Partner {
+func JwtPublicKey(v jwt.Public) predicate.Partner {
 	return predicate.Partner(sql.FieldEQ(FieldJwtPublicKey, v))
 }
 
@@ -357,42 +357,42 @@ func PartnerNameContainsFold(v string) predicate.Partner {
 }
 
 // JwtPublicKeyEQ applies the EQ predicate on the "jwt_public_key" field.
-func JwtPublicKeyEQ(v keys.JwtPubKey) predicate.Partner {
+func JwtPublicKeyEQ(v jwt.Public) predicate.Partner {
 	return predicate.Partner(sql.FieldEQ(FieldJwtPublicKey, v))
 }
 
 // JwtPublicKeyNEQ applies the NEQ predicate on the "jwt_public_key" field.
-func JwtPublicKeyNEQ(v keys.JwtPubKey) predicate.Partner {
+func JwtPublicKeyNEQ(v jwt.Public) predicate.Partner {
 	return predicate.Partner(sql.FieldNEQ(FieldJwtPublicKey, v))
 }
 
 // JwtPublicKeyIn applies the In predicate on the "jwt_public_key" field.
-func JwtPublicKeyIn(vs ...keys.JwtPubKey) predicate.Partner {
+func JwtPublicKeyIn(vs ...jwt.Public) predicate.Partner {
 	return predicate.Partner(sql.FieldIn(FieldJwtPublicKey, vs...))
 }
 
 // JwtPublicKeyNotIn applies the NotIn predicate on the "jwt_public_key" field.
-func JwtPublicKeyNotIn(vs ...keys.JwtPubKey) predicate.Partner {
+func JwtPublicKeyNotIn(vs ...jwt.Public) predicate.Partner {
 	return predicate.Partner(sql.FieldNotIn(FieldJwtPublicKey, vs...))
 }
 
 // JwtPublicKeyGT applies the GT predicate on the "jwt_public_key" field.
-func JwtPublicKeyGT(v keys.JwtPubKey) predicate.Partner {
+func JwtPublicKeyGT(v jwt.Public) predicate.Partner {
 	return predicate.Partner(sql.FieldGT(FieldJwtPublicKey, v))
 }
 
 // JwtPublicKeyGTE applies the GTE predicate on the "jwt_public_key" field.
-func JwtPublicKeyGTE(v keys.JwtPubKey) predicate.Partner {
+func JwtPublicKeyGTE(v jwt.Public) predicate.Partner {
 	return predicate.Partner(sql.FieldGTE(FieldJwtPublicKey, v))
 }
 
 // JwtPublicKeyLT applies the LT predicate on the "jwt_public_key" field.
-func JwtPublicKeyLT(v keys.JwtPubKey) predicate.Partner {
+func JwtPublicKeyLT(v jwt.Public) predicate.Partner {
 	return predicate.Partner(sql.FieldLT(FieldJwtPublicKey, v))
 }
 
 // JwtPublicKeyLTE applies the LTE predicate on the "jwt_public_key" field.
-func JwtPublicKeyLTE(v keys.JwtPubKey) predicate.Partner {
+func JwtPublicKeyLTE(v jwt.Public) predicate.Partner {
 	return predicate.Partner(sql.FieldLTE(FieldJwtPublicKey, v))
 }
 

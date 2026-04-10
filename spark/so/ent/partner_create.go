@@ -13,7 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/ent/partner"
 )
 
@@ -72,8 +72,8 @@ func (pc *PartnerCreate) SetPartnerName(s string) *PartnerCreate {
 }
 
 // SetJwtPublicKey sets the "jwt_public_key" field.
-func (pc *PartnerCreate) SetJwtPublicKey(kpk keys.JwtPubKey) *PartnerCreate {
-	pc.mutation.SetJwtPublicKey(kpk)
+func (pc *PartnerCreate) SetJwtPublicKey(j jwt.Public) *PartnerCreate {
+	pc.mutation.SetJwtPublicKey(j)
 	return pc
 }
 
@@ -336,7 +336,7 @@ func (u *PartnerUpsert) UpdatePartnerName() *PartnerUpsert {
 }
 
 // SetJwtPublicKey sets the "jwt_public_key" field.
-func (u *PartnerUpsert) SetJwtPublicKey(v keys.JwtPubKey) *PartnerUpsert {
+func (u *PartnerUpsert) SetJwtPublicKey(v jwt.Public) *PartnerUpsert {
 	u.Set(partner.FieldJwtPublicKey, v)
 	return u
 }
@@ -455,7 +455,7 @@ func (u *PartnerUpsertOne) UpdatePartnerName() *PartnerUpsertOne {
 }
 
 // SetJwtPublicKey sets the "jwt_public_key" field.
-func (u *PartnerUpsertOne) SetJwtPublicKey(v keys.JwtPubKey) *PartnerUpsertOne {
+func (u *PartnerUpsertOne) SetJwtPublicKey(v jwt.Public) *PartnerUpsertOne {
 	return u.Update(func(s *PartnerUpsert) {
 		s.SetJwtPublicKey(v)
 	})
@@ -743,7 +743,7 @@ func (u *PartnerUpsertBulk) UpdatePartnerName() *PartnerUpsertBulk {
 }
 
 // SetJwtPublicKey sets the "jwt_public_key" field.
-func (u *PartnerUpsertBulk) SetJwtPublicKey(v keys.JwtPubKey) *PartnerUpsertBulk {
+func (u *PartnerUpsertBulk) SetJwtPublicKey(v jwt.Public) *PartnerUpsertBulk {
 	return u.Update(func(s *PartnerUpsert) {
 		s.SetJwtPublicKey(v)
 	})

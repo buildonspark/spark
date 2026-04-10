@@ -10,7 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/ent/partner"
 )
 
@@ -30,7 +30,7 @@ type Partner struct {
 	// Human-readable display name for the partner.
 	PartnerName string `json:"partner_name,omitempty"`
 	// Compressed public key (34 bytes: 1-byte curve discriminator + 33-byte compressed key) used to verify partner JWTs. Supports both secp256k1 (ES256K) and P-256 (ES256).
-	JwtPublicKey keys.JwtPubKey `json:"jwt_public_key,omitempty"`
+	JwtPublicKey jwt.Public `json:"jwt_public_key,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -40,7 +40,7 @@ func (*Partner) scanValues(columns []string) ([]any, error) {
 	for i := range columns {
 		switch columns[i] {
 		case partner.FieldJwtPublicKey:
-			values[i] = new(keys.JwtPubKey)
+			values[i] = new(jwt.Public)
 		case partner.FieldPartnerID, partner.FieldLabel, partner.FieldPartnerName:
 			values[i] = new(sql.NullString)
 		case partner.FieldCreateTime, partner.FieldUpdateTime:
@@ -99,7 +99,7 @@ func (pa *Partner) assignValues(columns []string, values []any) error {
 				pa.PartnerName = value.String
 			}
 		case partner.FieldJwtPublicKey:
-			if value, ok := values[i].(*keys.JwtPubKey); !ok {
+			if value, ok := values[i].(*jwt.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field jwt_public_key", values[i])
 			} else if value != nil {
 				pa.JwtPublicKey = *value

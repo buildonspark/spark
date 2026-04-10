@@ -11,7 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/ent/partner"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
@@ -79,15 +79,15 @@ func (pu *PartnerUpdate) SetNillablePartnerName(s *string) *PartnerUpdate {
 }
 
 // SetJwtPublicKey sets the "jwt_public_key" field.
-func (pu *PartnerUpdate) SetJwtPublicKey(kpk keys.JwtPubKey) *PartnerUpdate {
-	pu.mutation.SetJwtPublicKey(kpk)
+func (pu *PartnerUpdate) SetJwtPublicKey(j jwt.Public) *PartnerUpdate {
+	pu.mutation.SetJwtPublicKey(j)
 	return pu
 }
 
 // SetNillableJwtPublicKey sets the "jwt_public_key" field if the given value is not nil.
-func (pu *PartnerUpdate) SetNillableJwtPublicKey(kpk *keys.JwtPubKey) *PartnerUpdate {
-	if kpk != nil {
-		pu.SetJwtPublicKey(*kpk)
+func (pu *PartnerUpdate) SetNillableJwtPublicKey(j *jwt.Public) *PartnerUpdate {
+	if j != nil {
+		pu.SetJwtPublicKey(*j)
 	}
 	return pu
 }
@@ -257,15 +257,15 @@ func (puo *PartnerUpdateOne) SetNillablePartnerName(s *string) *PartnerUpdateOne
 }
 
 // SetJwtPublicKey sets the "jwt_public_key" field.
-func (puo *PartnerUpdateOne) SetJwtPublicKey(kpk keys.JwtPubKey) *PartnerUpdateOne {
-	puo.mutation.SetJwtPublicKey(kpk)
+func (puo *PartnerUpdateOne) SetJwtPublicKey(j jwt.Public) *PartnerUpdateOne {
+	puo.mutation.SetJwtPublicKey(j)
 	return puo
 }
 
 // SetNillableJwtPublicKey sets the "jwt_public_key" field if the given value is not nil.
-func (puo *PartnerUpdateOne) SetNillableJwtPublicKey(kpk *keys.JwtPubKey) *PartnerUpdateOne {
-	if kpk != nil {
-		puo.SetJwtPublicKey(*kpk)
+func (puo *PartnerUpdateOne) SetNillableJwtPublicKey(j *jwt.Public) *PartnerUpdateOne {
+	if j != nil {
+		puo.SetJwtPublicKey(*j)
 	}
 	return puo
 }

@@ -4,7 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
-	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/entexample"
 )
 
@@ -46,7 +46,7 @@ func (Partner) Fields() []ent.Field {
 			Comment("Human-readable display name for the partner.").
 			Annotations(entexample.Default("Partner A")),
 		field.Bytes("jwt_public_key").
-			GoType(keys.JwtPubKey{}).
+			GoType(jwt.Public{}).
 			Comment("Compressed public key (34 bytes: 1-byte curve discriminator + 33-byte compressed key) used to verify partner JWTs. Supports both secp256k1 (ES256K) and P-256 (ES256).").
 			Annotations(entexample.Default("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3")),
 	}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	jwtkeys "github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -26,18 +27,23 @@ import (
 // integration test would pass whether or not the interceptor rejects a wrong-curve key,
 // but a missing check causes security vulnerabilities in production.
 
-// makeP256Key generates a fresh P-256 key pair for testing.
-func makeP256Key(t *testing.T) *ecdsa.PrivateKey {
+// makeP256Key generates a fresh P-256 key pair, returning the private key (for signing JWTs)
+// and the corresponding jwtkeys.Public (for test lookup entries).
+func makeP256Key(t *testing.T) (*ecdsa.PrivateKey, jwtkeys.Public) {
 	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	return key
+	p256, err := keys.P256PublicFromECDSA(&priv.PublicKey)
+	require.NoError(t, err)
+	return priv, jwtkeys.PublicFromP256(p256)
 }
 
-// makeSecp256k1Key generates a fresh secp256k1 key pair for testing.
-func makeSecp256k1Key(t *testing.T) keys.Private {
+// makeSecp256k1Key generates a fresh secp256k1 key pair, returning the private key (for signing JWTs)
+// and the corresponding jwtkeys.Public (for test lookup entries).
+func makeSecp256k1Key(t *testing.T) (keys.Private, jwtkeys.Public) {
 	t.Helper()
-	return keys.GeneratePrivateKey()
+	priv := keys.GeneratePrivateKey()
+	return priv, jwtkeys.PublicFromSecp256k1(priv.Public())
 }
 
 // makeES256JWT signs an ES256 JWT with a P-256 key using standard claims (iss, sub, aud).
@@ -98,7 +104,7 @@ func makeES256KJWT(t *testing.T, key keys.Private, partnerID, label string, exp 
 }
 
 type testPartnerEntry struct {
-	pubKey *ecdsa.PublicKey
+	pubKey jwtkeys.Public
 	dbID   uuid.UUID
 }
 
@@ -118,8 +124,17 @@ func mapKeyLookup(entries map[string]*testPartnerEntry) func(ctx context.Context
 	}
 }
 
-func noopHandler(ctx context.Context, req any) (any, error) {
+func noopHandler(ctx context.Context, _ any) (any, error) {
 	return ctx, nil
+}
+
+// respCtx extracts the context.Context from the interceptor response, failing the test if
+// the type assertion fails.
+func respCtx(t *testing.T, resp any) context.Context {
+	t.Helper()
+	ctx, ok := resp.(context.Context)
+	require.True(t, ok, "expected interceptor response to be context.Context")
+	return ctx
 }
 
 const testLabel = "client-1"
@@ -133,26 +148,26 @@ func TestPartnerJWTInterceptor_NoHeader(t *testing.T) {
 	resp, err := i.PartnerJWTInterceptor(t.Context(), nil, info, noopHandler)
 
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
 func TestPartnerJWTInterceptor_ValidES256JWT(t *testing.T) {
-	key := makeP256Key(t)
+	priv, pub := makeP256Key(t)
 	partnerID := "partner-a"
 	dbID := uuid.New()
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: &key.PublicKey, dbID: dbID},
+		partnerID + "/" + testLabel: {pubKey: pub, dbID: dbID},
 	}))
 
-	token := makeES256JWT(t, key, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
+	token := makeES256JWT(t, priv, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	got, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.True(t, ok)
 	assert.Equal(t, partnerID, got.PartnerID)
 	assert.Equal(t, testLabel, got.Label)
@@ -160,54 +175,54 @@ func TestPartnerJWTInterceptor_ValidES256JWT(t *testing.T) {
 }
 
 func TestPartnerJWTInterceptor_ExpiredES256JWT(t *testing.T) {
-	key := makeP256Key(t)
+	priv, pub := makeP256Key(t)
 	partnerID := "partner-a"
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: &key.PublicKey, dbID: uuid.New()},
+		partnerID + "/" + testLabel: {pubKey: pub, dbID: uuid.New()},
 	}))
 
-	token := makeES256JWT(t, key, partnerID, testLabel, time.Now().Add(-time.Hour).Unix())
+	token := makeES256JWT(t, priv, partnerID, testLabel, time.Now().Add(-time.Hour).Unix())
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
 func TestPartnerJWTInterceptor_WrongKey(t *testing.T) {
-	key := makeP256Key(t)
-	otherKey := makeP256Key(t)
+	priv, _ := makeP256Key(t)
+	_, otherPub := makeP256Key(t)
 	partnerID := "partner-a"
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: &otherKey.PublicKey, dbID: uuid.New()},
+		partnerID + "/" + testLabel: {pubKey: otherPub, dbID: uuid.New()},
 	}))
 
-	token := makeES256JWT(t, key, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
+	token := makeES256JWT(t, priv, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
 func TestPartnerJWTInterceptor_UnknownPartner(t *testing.T) {
-	key := makeP256Key(t)
+	priv, _ := makeP256Key(t)
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{}))
 
-	token := makeES256JWT(t, key, "unknown-partner", testLabel, time.Now().Add(time.Hour).Unix())
+	token := makeES256JWT(t, priv, "unknown-partner", testLabel, time.Now().Add(time.Hour).Unix())
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
@@ -218,17 +233,17 @@ func TestPartnerJWTInterceptor_MalformedToken(t *testing.T) {
 
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
 func TestPartnerJWTInterceptor_WrongAlgorithm(t *testing.T) {
-	key := makeP256Key(t)
+	_, pub := makeP256Key(t)
 	partnerID := "partner-a"
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: &key.PublicKey, dbID: uuid.New()},
+		partnerID + "/" + testLabel: {pubKey: pub, dbID: uuid.New()},
 	}))
 
 	header, err := json.Marshal(map[string]string{"alg": "RS256"})
@@ -248,30 +263,30 @@ func TestPartnerJWTInterceptor_WrongAlgorithm(t *testing.T) {
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
 func TestPartnerJWTInterceptor_CorrectlyIdentifiesEachPartner(t *testing.T) {
-	partnerAKey := makeP256Key(t)
-	partnerBKey := makeP256Key(t)
+	privA, pubA := makeP256Key(t)
+	privB, pubB := makeP256Key(t)
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		"partner-a/" + testLabel: {pubKey: &partnerAKey.PublicKey, dbID: uuid.New()},
-		"partner-b/" + testLabel: {pubKey: &partnerBKey.PublicKey, dbID: uuid.New()},
+		"partner-a/" + testLabel: {pubKey: pubA, dbID: uuid.New()},
+		"partner-b/" + testLabel: {pubKey: pubB, dbID: uuid.New()},
 	}))
 
 	info := &grpc.UnaryServerInfo{}
 
-	for partnerID, key := range map[string]*ecdsa.PrivateKey{"partner-a": partnerAKey, "partner-b": partnerBKey} {
-		token := makeES256JWT(t, key, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
+	for partnerID, priv := range map[string]*ecdsa.PrivateKey{"partner-a": privA, "partner-b": privB} {
+		token := makeES256JWT(t, priv, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 
 		resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
 		require.NoError(t, err)
 
-		got, ok := GetPartnerInfoFromContext(resp.(context.Context))
+		got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 		assert.True(t, ok)
 		assert.Equal(t, partnerID, got.PartnerID)
 		assert.Equal(t, testLabel, got.Label)
@@ -281,134 +296,134 @@ func TestPartnerJWTInterceptor_CorrectlyIdentifiesEachPartner(t *testing.T) {
 // --- ES256K (secp256k1) interceptor tests ---
 
 func TestPartnerJWTInterceptor_ValidES256KJWT(t *testing.T) {
-	key := makeSecp256k1Key(t)
+	priv, pub := makeSecp256k1Key(t)
 	partnerID := "partner-a"
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: key.Public().ToBTCEC().ToECDSA(), dbID: uuid.New()},
+		partnerID + "/" + testLabel: {pubKey: pub, dbID: uuid.New()},
 	}))
 
-	token := makeES256KJWT(t, key, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
+	token := makeES256KJWT(t, priv, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
 
 	require.NoError(t, err)
-	got, ok := GetPartnerInfoFromContext(resp.(context.Context))
+	got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.True(t, ok)
 	assert.Equal(t, partnerID, got.PartnerID)
 	assert.Equal(t, testLabel, got.Label)
 }
 
 func TestPartnerJWTInterceptor_ExpiredES256KJWT(t *testing.T) {
-	key := makeSecp256k1Key(t)
+	priv, pub := makeSecp256k1Key(t)
 	partnerID := "partner-a"
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: key.Public().ToBTCEC().ToECDSA(), dbID: uuid.New()},
+		partnerID + "/" + testLabel: {pubKey: pub, dbID: uuid.New()},
 	}))
 
-	token := makeES256KJWT(t, key, partnerID, testLabel, time.Now().Add(-time.Hour).Unix())
+	token := makeES256KJWT(t, priv, partnerID, testLabel, time.Now().Add(-time.Hour).Unix())
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
 func TestPartnerJWTInterceptor_WrongSecp256k1Key(t *testing.T) {
-	key := makeSecp256k1Key(t)
-	otherKey := makeSecp256k1Key(t)
+	priv, _ := makeSecp256k1Key(t)
+	_, otherPub := makeSecp256k1Key(t)
 	partnerID := "partner-a"
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: otherKey.Public().ToBTCEC().ToECDSA(), dbID: uuid.New()},
+		partnerID + "/" + testLabel: {pubKey: otherPub, dbID: uuid.New()},
 	}))
 
-	token := makeES256KJWT(t, key, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
+	token := makeES256KJWT(t, priv, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
 func TestPartnerJWTInterceptor_ES256KJWTRejectedForES256Key(t *testing.T) {
-	secp256k1Key := makeSecp256k1Key(t)
-	p256Key := makeP256Key(t)
+	secpPriv, _ := makeSecp256k1Key(t)
+	_, p256Pub := makeP256Key(t)
 	partnerID := "partner-a"
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: &p256Key.PublicKey, dbID: uuid.New()},
+		partnerID + "/" + testLabel: {pubKey: p256Pub, dbID: uuid.New()},
 	}))
 
-	token := makeES256KJWT(t, secp256k1Key, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
+	token := makeES256KJWT(t, secpPriv, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
 func TestPartnerJWTInterceptor_ES256JWTRejectedForSecp256k1Key(t *testing.T) {
-	p256Key := makeP256Key(t)
-	secp256k1Key := makeSecp256k1Key(t)
+	p256Priv, _ := makeP256Key(t)
+	_, secpPub := makeSecp256k1Key(t)
 	partnerID := "partner-a"
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: secp256k1Key.Public().ToBTCEC().ToECDSA(), dbID: uuid.New()},
+		partnerID + "/" + testLabel: {pubKey: secpPub, dbID: uuid.New()},
 	}))
 
-	token := makeES256JWT(t, p256Key, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
+	token := makeES256JWT(t, p256Priv, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
 func TestPartnerJWTInterceptor_CorrectlyIdentifiesEachPartnerMixedKeyTypes(t *testing.T) {
-	p256Key := makeP256Key(t)
-	secp256k1Key := makeSecp256k1Key(t)
+	p256Priv, p256Pub := makeP256Key(t)
+	secpPriv, secpPub := makeSecp256k1Key(t)
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		"partner-a/" + testLabel: {pubKey: &p256Key.PublicKey, dbID: uuid.New()},
-		"partner-b/" + testLabel: {pubKey: secp256k1Key.Public().ToBTCEC().ToECDSA(), dbID: uuid.New()},
+		"partner-a/" + testLabel: {pubKey: p256Pub, dbID: uuid.New()},
+		"partner-b/" + testLabel: {pubKey: secpPub, dbID: uuid.New()},
 	}))
 
 	info := &grpc.UnaryServerInfo{}
 
-	tokenA := makeES256JWT(t, p256Key, "partner-a", testLabel, time.Now().Add(time.Hour).Unix())
+	tokenA := makeES256JWT(t, p256Priv, "partner-a", testLabel, time.Now().Add(time.Hour).Unix())
 	ctxA := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, tokenA))
 	respA, err := i.PartnerJWTInterceptor(ctxA, nil, info, noopHandler)
 	require.NoError(t, err)
-	gotA, ok := GetPartnerInfoFromContext(respA.(context.Context))
+	gotA, ok := GetPartnerInfoFromContext(respCtx(t, respA))
 	assert.True(t, ok)
 	assert.Equal(t, "partner-a", gotA.PartnerID)
 	assert.Equal(t, testLabel, gotA.Label)
 
-	tokenB := makeES256KJWT(t, secp256k1Key, "partner-b", testLabel, time.Now().Add(time.Hour).Unix())
+	tokenB := makeES256KJWT(t, secpPriv, "partner-b", testLabel, time.Now().Add(time.Hour).Unix())
 	ctxB := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, tokenB))
 	respB, err := i.PartnerJWTInterceptor(ctxB, nil, info, noopHandler)
 	require.NoError(t, err)
-	gotB, ok := GetPartnerInfoFromContext(respB.(context.Context))
+	gotB, ok := GetPartnerInfoFromContext(respCtx(t, respB))
 	assert.True(t, ok)
 	assert.Equal(t, "partner-b", gotB.PartnerID)
 	assert.Equal(t, testLabel, gotB.Label)
 }
 
 func TestPartnerJWTInterceptor_WrongAudience(t *testing.T) {
-	key := makeP256Key(t)
+	priv, pub := makeP256Key(t)
 	partnerID := "partner-a"
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: &key.PublicKey, dbID: uuid.New()},
+		partnerID + "/" + testLabel: {pubKey: pub, dbID: uuid.New()},
 	}))
 
 	header, err := json.Marshal(map[string]string{"alg": "ES256", "typ": "JWT"})
@@ -424,7 +439,7 @@ func TestPartnerJWTInterceptor_WrongAudience(t *testing.T) {
 
 	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(claims)
 	digest := sha256.Sum256([]byte(signingInput))
-	r, s, err := ecdsa.Sign(rand.Reader, key, digest[:])
+	r, s, err := ecdsa.Sign(rand.Reader, priv, digest[:])
 	require.NoError(t, err)
 	sig := make([]byte, 64)
 	r.FillBytes(sig[:32])
@@ -434,36 +449,36 @@ func TestPartnerJWTInterceptor_WrongAudience(t *testing.T) {
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
 func TestPartnerJWTInterceptor_WrongLabel(t *testing.T) {
-	key := makeP256Key(t)
+	priv, pub := makeP256Key(t)
 	partnerID := "partner-a"
 	// Register with testLabel, but JWT will use a different label.
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: &key.PublicKey, dbID: uuid.New()},
+		partnerID + "/" + testLabel: {pubKey: pub, dbID: uuid.New()},
 	}))
 
-	token := makeES256JWT(t, key, partnerID, "wrong-label", time.Now().Add(time.Hour).Unix())
+	token := makeES256JWT(t, priv, partnerID, "wrong-label", time.Now().Add(time.Hour).Unix())
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
 }
 
 func TestPartnerJWTInterceptor_MissingSubClaim(t *testing.T) {
-	key := makeP256Key(t)
+	priv, pub := makeP256Key(t)
 	partnerID := "partner-a"
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
-		partnerID + "/" + testLabel: {pubKey: &key.PublicKey, dbID: uuid.New()},
+		partnerID + "/" + testLabel: {pubKey: pub, dbID: uuid.New()},
 	}))
 
 	header, err := json.Marshal(map[string]string{"alg": "ES256", "typ": "JWT"})
@@ -478,7 +493,7 @@ func TestPartnerJWTInterceptor_MissingSubClaim(t *testing.T) {
 
 	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(claims)
 	digest := sha256.Sum256([]byte(signingInput))
-	r, s, err := ecdsa.Sign(rand.Reader, key, digest[:])
+	r, s, err := ecdsa.Sign(rand.Reader, priv, digest[:])
 	require.NoError(t, err)
 	sig := make([]byte, 64)
 	r.FillBytes(sig[:32])
@@ -488,8 +503,36 @@ func TestPartnerJWTInterceptor_MissingSubClaim(t *testing.T) {
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
+	require.NoError(t, err)
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	assert.False(t, ok)
+}
+
+// Regression test: verifyPartnerJWT must correctly handle secp256k1 keys stored as
+// jwtkeys.Public. A prior bug unconditionally called .P256().ToECDSA() on the sum type,
+// which returned nil for secp256k1 keys and panicked in validMethodsForKey.
+func TestPartnerJWTInterceptor_Secp256k1KeyViaJWTPublicSumType(t *testing.T) {
+	priv, pub := makeSecp256k1Key(t)
+	partnerID := "partner-secp"
+	dbID := uuid.New()
+
+	// The lookup returns a jwtkeys.Public wrapping a secp256k1 key — the exact path
+	// that dbKeyLookup takes when reading from the database.
+	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
+		partnerID + "/" + testLabel: {pubKey: pub, dbID: dbID},
+	}))
+
+	token := makeES256KJWT(t, priv, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
+
+	info := &grpc.UnaryServerInfo{}
+	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
 
 	require.NoError(t, err)
-	_, ok := GetPartnerInfoFromContext(resp.(context.Context))
-	assert.False(t, ok)
+	got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	require.True(t, ok, "expected partner info in context for secp256k1 key")
+	assert.Equal(t, partnerID, got.PartnerID)
+	assert.Equal(t, testLabel, got.Label)
+	assert.Equal(t, dbID, got.PartnerDBID)
 }
