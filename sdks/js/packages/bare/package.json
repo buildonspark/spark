@@ -62,7 +62,8 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.4",
     "@noble/hashes": "^1.7.0",
-    "bare": "^1.23.3",
+    "bare": "^1.28.4",
+    "bare-runtime": "^1.28.4",
     "depcheck": "^1.4.7",
     "madge": "^8.0.0",
     "prettier": "^3.7.4",
@@ -73,7 +74,7 @@
   "dependencies": {
     "@buildonspark/spark-frost-bare-addon": "0.0.11",
     "@buildonspark/spark-sdk": "0.7.10",
-    "bare-node-runtime": "^1.1.4"
+    "bare-node-runtime": "^1.2.0"
   },
   "engines": {
     "node": ">=18.0.0"

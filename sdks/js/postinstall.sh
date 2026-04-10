@@ -19,7 +19,7 @@ if [[ "${OS:-}" == "Windows_NT" ]] || [[ -n "${MSYSTEM:-}" ]] || [[ "$(uname -s 
 else
   LIST_SEP=":"
 fi
-export CMAKE_PREFIX_PATH="../cmake-bare${LIST_SEP}../cmake-npm"
+export CMAKE_PREFIX_PATH="../cmake-bare${LIST_SEP}../cmake-npm${LIST_SEP}../cmake-fetch"
 
 # Build the native addon
 yarn run --top-level bare-make generate
