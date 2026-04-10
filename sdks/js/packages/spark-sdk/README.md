@@ -22,14 +22,14 @@ pnpm add @buildonspark/spark-sdk
 import { SparkWallet } from "@buildonspark/spark-sdk";
 
 // Create a new wallet (generates a new mnemonic)
-const { wallet, mnemonic } = await SparkWallet.create({
+const { wallet, mnemonic } = await SparkWallet.initialize({
   options: {
     network: "MAINNET", // or "REGTEST" for testing
   },
 });
 
 // Or initialize with an existing mnemonic
-const wallet = await SparkWallet.initialize({
+const { wallet } = await SparkWallet.initialize({
   mnemonicOrSeed: "your twelve word mnemonic phrase here ...",
   options: {
     network: "MAINNET",
