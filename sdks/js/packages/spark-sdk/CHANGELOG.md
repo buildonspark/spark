@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.7.11
+
+### Patch Changes
+
+- - Improve compatibility with newer Bare runtimes by updating Bare runtime dependencies and removing obsolete request socket listener handling.
+
 ## 0.7.10
 
 ### Patch Changes
