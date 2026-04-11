@@ -892,9 +892,10 @@ export default class LeafManager {
             // replacement leaves atomically. Letting the stream pre-empt this
             // would delete the leaf before replacements are added, causing a
             // temporary balance drop.
+
             const nonSwapIds = activeLeafIds.filter((id) => {
               const record = this.leaves.get(id);
-              return !record || record.status !== LeafStatus.SWAP_PENDING;
+              return !record || record.source.kind !== "swap";
             });
             const skippedSwapIds = activeLeafIds.filter(
               (id) => !nonSwapIds.includes(id),
@@ -1019,6 +1020,12 @@ export default class LeafManager {
         onSwapInitiated: async () => {
           await this.leavesMutex.runExclusive(() => {
             this.transition(swapLeafIds, LeafStatus.SWAP_PENDING);
+          });
+        },
+        registerSwapTransferId: (transferId) => {
+          this.updateLeavesSource(swapLeafIds, {
+            kind: "swap",
+            swapId: transferId,
           });
         },
       });
@@ -1278,6 +1285,12 @@ export default class LeafManager {
                 this.transition(swapLeafIds, LeafStatus.SWAP_PENDING);
               });
             },
+            registerSwapTransferId: (transferId) => {
+              this.updateLeavesSource(swapLeafIds, {
+                kind: "swap",
+                swapId: transferId,
+              });
+            },
           });
 
           await this.leavesMutex.runExclusive(() => {
@@ -1373,6 +1386,16 @@ export default class LeafManager {
 
       leaf.status = toStatus;
       if (meta?.source !== undefined) leaf.source = meta.source;
+    }
+  }
+
+  private updateLeavesSource(leafIds: string[], meta: LeafSource): void {
+    for (const leafId of leafIds) {
+      const leaf = this.leaves.get(leafId);
+      if (!leaf || leaf.status === LeafStatus.AVAILABLE) {
+        continue;
+      }
+      leaf.source = meta;
     }
   }
 
@@ -1704,6 +1727,7 @@ export default class LeafManager {
       const record = this.leaves.get(id);
       if (record?.status === LeafStatus.LOCAL_LOCKED) {
         record.status = LeafStatus.AVAILABLE;
+        record.source = { kind: "none" };
         changed = true;
       }
     }

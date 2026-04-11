@@ -1,4 +1,5 @@
 import { bytesToHex, hexToBytes } from "@lightsparkdev/core";
+import { uuidv7 } from "uuidv7";
 import { SparkValidationError } from "../errors/index.js";
 import SspClient from "../graphql/client.js";
 import { TreeNode } from "../proto/spark.js";
@@ -14,6 +15,7 @@ type RequestLeavesSwapParams = {
   leaves: TreeNode[];
   targetAmounts: number[];
   onSwapInitiated?: (leafIds: string[]) => void | Promise<void>;
+  registerSwapTransferId?: (transferId: string) => void;
 };
 
 export default class SwapService {
@@ -27,6 +29,7 @@ export default class SwapService {
     leaves,
     targetAmounts,
     onSwapInitiated,
+    registerSwapTransferId,
   }: RequestLeavesSwapParams): Promise<TreeNode[]> {
     this.validateSwapInputs(leaves, targetAmounts);
 
@@ -35,6 +38,7 @@ export default class SwapService {
         leaves,
         targetAmounts,
         onSwapInitiated,
+        registerSwapTransferId,
       );
     }
 
@@ -63,6 +67,7 @@ export default class SwapService {
         batch,
         batchTargetAmounts,
         onSwapInitiated,
+        registerSwapTransferId,
       );
       results.push(...result);
     }
@@ -116,6 +121,7 @@ export default class SwapService {
     leaves: TreeNode[],
     targetAmounts: number[],
     onSwapInitiated?: (leafIds: string[]) => void | Promise<void>,
+    registerSwapTransferId?: (transferId: string) => void,
   ): Promise<TreeNode[]> {
     this.validateSwapInputs(leaves, targetAmounts);
 
@@ -132,8 +138,11 @@ export default class SwapService {
       receiverIdentityPublicKey: sspIdentityPubkey,
     }));
 
+    const transferId = uuidv7();
+
+    registerSwapTransferId?.(transferId);
     const { swapTransfer, adaptorPubkey, adaptorAddedSignatureMap } =
-      await this.transferService.sendSwapTransfer(leafKeyTweaks);
+      await this.transferService.sendSwapTransfer(leafKeyTweaks, transferId);
 
     await onSwapInitiated?.(leaves.map((leaf) => leaf.id));
 

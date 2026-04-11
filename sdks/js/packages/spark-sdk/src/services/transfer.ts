@@ -335,7 +335,10 @@ export class BaseTransferService {
     return response.transfer;
   }
 
-  async sendSwapTransfer(leaves: LeafKeyTweak[]): Promise<{
+  async sendSwapTransfer(
+    leaves: LeafKeyTweak[],
+    transferId?: string,
+  ): Promise<{
     swapTransfer: InitiateSwapPrimaryTransferResponse;
     adaptorPubkey: Uint8Array;
     adaptorAddedSignatureMap: Map<string, Uint8Array>;
@@ -344,7 +347,7 @@ export class BaseTransferService {
       throw new SparkValidationError("leaves must not be empty");
     }
 
-    const transferID = uuidv7();
+    const transferID = transferId ?? uuidv7();
 
     const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
       transferID,
