@@ -435,6 +435,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
   }
 
+  private logEvent(message: string) {
+    if (!this.config.getLog()) return;
+    console.info(
+      `[${new Date().toISOString()}][${this.connectionManager.getSessionId()}] [spark-sdk][event] ${message}`,
+    );
+  }
+
   private getSspClient() {
     if (!this.sspClient) {
       throw new SparkError("SSP client not initialized", {
@@ -453,14 +460,24 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       ) {
         const transfer = event.receiverTransfer.transfer;
         const { senderIdentityPublicKey, receiverIdentityPublicKey } = transfer;
+        const isSelf = equalBytes(
+          senderIdentityPublicKey,
+          receiverIdentityPublicKey,
+        );
+        this.logEvent(
+          `Receiver transfer: id=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue} leaves=${transfer.leaves.length} selfTransfer=${isSelf}`,
+        );
 
         // Don't claim if this is a self transfer, that's handled elsewhere
-        if (!equalBytes(senderIdentityPublicKey, receiverIdentityPublicKey)) {
+        if (!isSelf) {
           // Add leaves as INCOMING immediately so balance reflects them during claim
           const incomingLeaves = transfer.leaves
             .map((l) => l.leaf)
             .filter((l): l is TreeNode => !!l);
           if (incomingLeaves.length > 0) {
+            this.logEvent(
+              `Receiver transfer ${transfer.id}: adding ${incomingLeaves.length} incoming leaves (${incomingLeaves.reduce((a, l) => a + l.value, 0)} sats) ids=[${incomingLeaves.map((l) => l.id).join(",")}]`,
+            );
             await this.leafManager.addIncomingLeaves(
               incomingLeaves,
               transfer.id,
@@ -472,12 +489,32 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             emit: true,
           });
         }
-      } else if (isSenderTransferStreamEvent(event)) {
-        await this.leafManager.handleTransferEvent(
-          event.senderTransfer.transfer,
+      } else if (
+        isReceiverTransferStreamEvent(event) &&
+        (event.receiverTransfer.transfer.type === TransferType.COUNTER_SWAP ||
+          event.receiverTransfer.transfer.type === TransferType.COUNTER_SWAP_V3)
+      ) {
+        const transfer = event.receiverTransfer.transfer;
+        const counterSwapLeafIds = transfer.leaves.flatMap((l) =>
+          l.leaf ? [l.leaf.id] : [],
         );
+        this.logEvent(
+          `Counter-swap receiver transfer (skipped): id=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue} leafIds=[${counterSwapLeafIds.join(",")}]`,
+        );
+      } else if (isSenderTransferStreamEvent(event)) {
+        const transfer = event.senderTransfer.transfer;
+        const senderLeafIds = transfer.leaves.flatMap((l) =>
+          l.leaf ? [l.leaf.id] : [],
+        );
+        this.logEvent(
+          `Sender transfer: id=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue} leafIds=[${senderLeafIds.join(",")}]`,
+        );
+        await this.leafManager.handleTransferEvent(transfer);
       } else if (isDepositStreamEvent(event)) {
         const deposit = event.deposit.deposit;
+        this.logEvent(
+          `Deposit: id=${deposit.id} status=${deposit.status} value=${deposit.value}`,
+        );
         const wasAdded = await this.leafManager.handleDepositEvent(deposit);
         if (deposit.status === "AVAILABLE" && wasAdded) {
           this.emit(
@@ -2937,6 +2974,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     transfer: Transfer,
     emit?: boolean,
   ): Promise<TreeNode[]> {
+    this.logEvent(
+      `processClaimedTransferResults: transfer=${transfer.id} type=${transfer.type} claimed ${result.length} leaves (${result.reduce((a, l) => a + l.value, 0)} sats) ids=[${result.map((l) => l.id).join(",")}]`,
+    );
     result = await this.leafManager.registerClaimedLeaves(result, transfer.id);
 
     if (
@@ -2967,6 +3007,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     transfer: Transfer;
     emit?: boolean;
   }): Promise<TreeNode[]> {
+    this.logEvent(
+      `claimTransfer: transfer=${transfer.id} type=${transfer.type} status=${transfer.status} leaves=${transfer.leaves.length}`,
+    );
     const result = await this.claimTransferMutex.runExclusive(async () => {
       return await this.transferService.claimTransfer(transfer);
     });
@@ -2983,9 +3026,15 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     emit?: boolean,
   ): Promise<string[]> {
     const transfers = await this.transferService.queryPendingTransfers();
+    this.logEvent(
+      `claimTransfers: found ${transfers.transfers.length} pending transfers${types ? ` (filtering types=[${types.join(",")}])` : ""}`,
+    );
     const promises: Promise<string | null>[] = [];
+    let skippedType = 0;
+    let skippedStatus = 0;
     for (const transfer of transfers.transfers) {
       if (types && !types.includes(transfer.type)) {
+        skippedType++;
         continue;
       }
 
@@ -3000,8 +3049,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         transfer.status !==
           TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED
       ) {
+        skippedStatus++;
         continue;
       }
+      this.logEvent(
+        `claimTransfers: claiming transfer=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue}`,
+      );
       promises.push(
         this.claimTransfer({ transfer, emit })
           .then(() => transfer.id)
@@ -3011,12 +3064,21 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           }),
       );
     }
+    if (skippedType > 0 || skippedStatus > 0) {
+      this.logEvent(
+        `claimTransfers: skipped ${skippedType} by type, ${skippedStatus} by status`,
+      );
+    }
     const results = await Promise.allSettled(promises);
-    return results
+    const claimed = results
       .filter(
         (result) => result.status === "fulfilled" && result.value !== null,
       )
       .map((result) => (result as PromiseFulfilledResult<string>).value);
+    this.logEvent(
+      `claimTransfers: completed. Claimed ${claimed.length} of ${promises.length} attempted`,
+    );
+    return claimed;
   }
 
   // ***** Lightning Flow *****

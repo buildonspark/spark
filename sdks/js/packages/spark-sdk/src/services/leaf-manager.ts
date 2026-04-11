@@ -114,6 +114,13 @@ export default class LeafManager {
     private readonly onAutoOptimize?: () => Promise<void>,
   ) {}
 
+  private log(tag: string, message: string): void {
+    if (!this.config.getLog()) return;
+    console.info(
+      `[${new Date().toISOString()}][${this.connectionManager.getSessionId()}] [spark-sdk][${tag}] ${message}`,
+    );
+  }
+
   private emitBalanceUpdate(): void {
     this.onBalanceUpdate?.({
       available: this.getAvailableBalance(),
@@ -135,6 +142,17 @@ export default class LeafManager {
   public async sync() {
     this.identityPublicKey = await this.config.signer.getIdentityPublicKey();
 
+    const prevBalance = {
+      available: this.getAvailableBalance(),
+      owned: this.getOwnedBalance(),
+      incoming: this.getIncomingBalance(),
+      count: this.leaves.size,
+    };
+    this.log(
+      "sync",
+      `Starting sync. Pre-sync: ${prevBalance.count} leaves, available=${prevBalance.available} owned=${prevBalance.owned} incoming=${prevBalance.incoming}`,
+    );
+
     const [rawLeaves, swaps, outgoingTransfers, incomingTransfers] =
       await Promise.all([
         this.getLeaves(),
@@ -142,6 +160,11 @@ export default class LeafManager {
         this.getAllPendingOutgoingTransfers(),
         this.transferService.queryPendingTransfers(),
       ]);
+
+    this.log(
+      "sync",
+      `Fetched: ${rawLeaves.length} leaves, ${swaps.length} pending swaps, ${outgoingTransfers.length} outgoing, ${incomingTransfers.transfers.length} incoming`,
+    );
 
     const leaves = await this.checkRenewLeaves(rawLeaves);
 
@@ -151,6 +174,16 @@ export default class LeafManager {
         if (SYNC_PRESERVED_STATUSES.has(record.status)) {
           preserved.set(id, record);
         }
+      }
+      if (preserved.size > 0) {
+        this.log(
+          "sync",
+          `Preserving ${preserved.size} in-flight leaves: [${Array.from(
+            preserved.entries(),
+          )
+            .map(([id, r]) => `${id}(${r.status})`)
+            .join(",")}]`,
+        );
       }
 
       this.leaves.clear();
@@ -222,6 +255,10 @@ export default class LeafManager {
       this.hasSynced = true;
     });
 
+    this.log(
+      "sync",
+      `Sync complete. Post-sync: ${this.leaves.size} leaves, available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()} incoming=${this.getIncomingBalance()}`,
+    );
     this.autoOptimizeIfNeeded();
     this.emitBalanceUpdate();
   }
@@ -463,13 +500,23 @@ export default class LeafManager {
     await this.leavesMutex.runExclusive(() => {
       for (const leaf of leaves) {
         const existing = this.leaves.get(leaf.id);
-        if (existing && IN_FLIGHT_STATUSES.has(existing.status)) continue;
+        if (existing && IN_FLIGHT_STATUSES.has(existing.status)) {
+          this.log(
+            "add-leaves",
+            `Skipping leaf=${leaf.id} value=${leaf.value} — in-flight (${existing.status})`,
+          );
+          continue;
+        }
         // Skip if already AVAILABLE with same value — no change to emit
         if (
           existing?.status === LeafStatus.AVAILABLE &&
           existing.treeNode.value === leaf.value
         )
           continue;
+        this.log(
+          "add-leaves",
+          `Adding leaf=${leaf.id} value=${leaf.value}${existing ? ` (was ${existing.status})` : ""}`,
+        );
         this.leaves.set(leaf.id, {
           treeNode: leaf,
           status: LeafStatus.AVAILABLE,
@@ -484,11 +531,21 @@ export default class LeafManager {
   /** Add leaves as INCOMING (unclaimed transfer or unconfirmed deposit).
    *  Does not overwrite leaves already in the cache with a non-INCOMING status. */
   public async addIncomingLeaves(leaves: TreeNode[], transferId: string) {
+    this.log(
+      "incoming",
+      `Adding ${leaves.length} incoming leaves (${leaves.reduce((a, l) => a + l.value, 0)} sats) transfer=${transferId} ids=[${leaves.map((l) => l.id).join(",")}]`,
+    );
     let changed = false;
     await this.leavesMutex.runExclusive(() => {
       for (const leaf of leaves) {
         const existing = this.leaves.get(leaf.id);
-        if (existing && existing.status !== LeafStatus.INCOMING) continue;
+        if (existing && existing.status !== LeafStatus.INCOMING) {
+          this.log(
+            "incoming",
+            `Skipping leaf=${leaf.id} — already ${existing.status}`,
+          );
+          continue;
+        }
         this.leaves.set(leaf.id, {
           treeNode: leaf,
           status: LeafStatus.INCOMING,
@@ -506,6 +563,7 @@ export default class LeafManager {
    *  in the coordinator response. */
   public async evictStaleAvailable(freshIds: Set<string>) {
     let changed = false;
+    const evicted: string[] = [];
     await this.leavesMutex.runExclusive(() => {
       for (const [id, record] of this.leaves) {
         if (
@@ -513,15 +571,26 @@ export default class LeafManager {
           record.source.kind === "none" &&
           !freshIds.has(id)
         ) {
+          evicted.push(id);
           this.leaves.delete(id);
           changed = true;
         }
       }
     });
+    if (evicted.length > 0) {
+      this.log(
+        "evict",
+        `Evicted ${evicted.length} stale leaves: [${evicted.join(",")}]`,
+      );
+    }
     if (changed) this.emitBalanceUpdate();
   }
 
   public async removeLeaves(leafIds: string[]) {
+    this.log(
+      "remove-leaves",
+      `Removing ${leafIds.length} leaves: [${leafIds.join(",")}]`,
+    );
     let changed = false;
     await this.leavesMutex.runExclusive(() => {
       for (const id of leafIds) {
@@ -538,9 +607,20 @@ export default class LeafManager {
     leaves: TreeNode[],
     transferId?: string,
   ): Promise<TreeNode[]> {
+    this.log(
+      "claim",
+      `Registering ${leaves.length} claimed leaves (${leaves.reduce((a, l) => a + l.value, 0)} sats) transferId=${transferId ?? "none"} ids=[${leaves.map((l) => l.id).join(",")}]`,
+    );
     const renewed = await this.checkRenewLeaves(leaves);
     await this.leavesMutex.runExclusive(() => {
       for (const leaf of renewed) {
+        const existing = this.leaves.get(leaf.id);
+        if (existing) {
+          this.log(
+            "claim",
+            `Overwriting leaf ${leaf.id}: ${existing.status} → AVAILABLE`,
+          );
+        }
         this.leaves.set(leaf.id, {
           treeNode: leaf,
           status: LeafStatus.AVAILABLE,
@@ -552,6 +632,10 @@ export default class LeafManager {
         });
       }
     });
+    this.log(
+      "claim",
+      `Post-claim balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()} incoming=${this.getIncomingBalance()}`,
+    );
     this.emitBalanceUpdate();
     this.autoOptimizeIfNeeded();
     return renewed;
@@ -614,6 +698,10 @@ export default class LeafManager {
 
   /** Returns true if the deposit was added/updated in the cache. */
   public async handleDepositEvent(deposit: TreeNode): Promise<boolean> {
+    this.log(
+      "deposit-event",
+      `deposit=${deposit.id} status=${deposit.status} value=${deposit.value}`,
+    );
     let needsVerification = false;
     let added = false;
 
@@ -622,6 +710,7 @@ export default class LeafManager {
       if (deposit.status === "CREATING") {
         const existing = this.leaves.get(deposit.id);
         if (!existing) {
+          this.log("deposit-event", `leaf=${deposit.id} CREATING → INCOMING`);
           this.leaves.set(deposit.id, {
             treeNode: deposit,
             status: LeafStatus.INCOMING,
@@ -629,6 +718,11 @@ export default class LeafManager {
           });
           changed = true;
           added = true;
+        } else {
+          this.log(
+            "deposit-event",
+            `leaf=${deposit.id} CREATING — already in cache (${existing.status}), skipped`,
+          );
         }
       } else if (deposit.status === "AVAILABLE") {
         const existing = this.leaves.get(deposit.id);
@@ -637,13 +731,22 @@ export default class LeafManager {
             !IN_FLIGHT_STATUSES.has(existing.status) &&
             existing.status !== LeafStatus.AVAILABLE
           ) {
+            this.log(
+              "deposit-event",
+              `leaf=${deposit.id} ${existing.status} → AVAILABLE`,
+            );
             existing.treeNode = deposit;
             this.transition([deposit.id], LeafStatus.AVAILABLE);
             changed = true;
             added = true;
+          } else {
+            this.log(
+              "deposit-event",
+              `leaf=${deposit.id} already ${existing.status}, skipped`,
+            );
           }
-          // Already AVAILABLE or IN_FLIGHT — no change, don't signal as added
         } else if (!this.hasSynced) {
+          this.log("deposit-event", `leaf=${deposit.id} pre-sync → AVAILABLE`);
           this.leaves.set(deposit.id, {
             treeNode: deposit,
             status: LeafStatus.AVAILABLE,
@@ -659,9 +762,17 @@ export default class LeafManager {
     if (changed) this.emitBalanceUpdate();
 
     if (needsVerification) {
+      this.log(
+        "deposit-event",
+        `Deposit ${deposit.id} needs verification (post-sync unknown leaf)`,
+      );
       added = await this.verifyAndAddLeaf(deposit.id);
     }
 
+    this.log(
+      "deposit-event",
+      `Deposit ${deposit.id} result: added=${added} balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()}`,
+    );
     return added;
   }
 
@@ -716,6 +827,11 @@ export default class LeafManager {
       leaf.leaf ? [leaf.leaf.id] : [],
     );
 
+    this.log(
+      "transfer-event",
+      `transfer=${transfer.id} type=${transfer.type} status=${transfer.status} leaves=[${leafIds.join(",")}]`,
+    );
+
     let changed = false;
     await this.leavesMutex.runExclusive(() => {
       const source: LeafSource = { kind: "transfer", transferId: transfer.id };
@@ -737,6 +853,10 @@ export default class LeafManager {
       switch (transfer.status) {
         case TransferStatus.TRANSFER_STATUS_RETURNED:
         case TransferStatus.TRANSFER_STATUS_EXPIRED:
+          this.log(
+            "transfer-event",
+            `Returned/expired → restoring ${activeLeafIds.length} leaves to AVAILABLE`,
+          );
           this.transition(activeLeafIds, LeafStatus.AVAILABLE, {
             source: { kind: "none" },
           });
@@ -749,11 +869,19 @@ export default class LeafManager {
           const isSwap =
             transfer.type === TransferType.PRIMARY_SWAP_V3 ||
             transfer.type === TransferType.SWAP;
-          this.transition(
-            activeLeafIds,
-            isSwap ? LeafStatus.SWAP_PENDING : LeafStatus.OUTGOING,
-            { source },
+          const targetStatus = isSwap
+            ? LeafStatus.SWAP_PENDING
+            : LeafStatus.OUTGOING;
+          this.log(
+            "transfer-event",
+            `Sender initiated → ${targetStatus} for ${activeLeafIds.length} leaves (isSwap=${isSwap}), current statuses: [${activeLeafIds
+              .map((id) => {
+                const r = this.leaves.get(id);
+                return r ? `${id}(${r.status})` : `${id}(missing)`;
+              })
+              .join(",")}]`,
           );
+          this.transition(activeLeafIds, targetStatus, { source });
           changed = true;
           break;
         }
@@ -768,13 +896,32 @@ export default class LeafManager {
               const record = this.leaves.get(id);
               return !record || record.status !== LeafStatus.SWAP_PENDING;
             });
+            const skippedSwapIds = activeLeafIds.filter(
+              (id) => !nonSwapIds.includes(id),
+            );
+            if (skippedSwapIds.length > 0) {
+              this.log(
+                "transfer-event",
+                `Terminal status=${transfer.status} — skipping ${skippedSwapIds.length} SWAP_PENDING leaves: [${skippedSwapIds.join(",")}]`,
+              );
+            }
+            this.log(
+              "transfer-event",
+              `Terminal status=${transfer.status} → SPENT for ${nonSwapIds.length} leaves: [${nonSwapIds.join(",")}]`,
+            );
             this.transition(nonSwapIds, LeafStatus.SPENT, { source });
             changed = true;
           }
           break;
       }
     });
-    if (changed) this.emitBalanceUpdate();
+    if (changed) {
+      this.log(
+        "transfer-event",
+        `Post-event balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()} incoming=${this.getIncomingBalance()}`,
+      );
+      this.emitBalanceUpdate();
+    }
   }
 
   // ---------------------------------------------------------------------------
