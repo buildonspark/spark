@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.7.12
+
+### Patch Changes
+
+- Fixes
+
 ## 0.7.11
 
 ### Patch Changes
