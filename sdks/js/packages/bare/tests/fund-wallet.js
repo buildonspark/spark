@@ -24,6 +24,8 @@ async function fundWallet(wallet, amount = 100000n) {
   await retryUntilSuccess(() => wallet.claimDeposit(signedTx.id));
 
   // Poll until the balance reflects the new deposit instead of using a fixed sleep.
+  // Use a longer budget than the default (30 × 3s = 90s) because leaf creation
+  // in the CI minikube environment can be slow under resource pressure.
   const { balance } = await retryUntilSuccess(async () => {
     const result = await wallet.getBalance();
     if (result.balance <= balanceBefore) {
@@ -32,7 +34,7 @@ async function fundWallet(wallet, amount = 100000n) {
       );
     }
     return result;
-  });
+  }, { maxAttempts: 30, delayMs: 3000 });
 
   return balance;
 }
