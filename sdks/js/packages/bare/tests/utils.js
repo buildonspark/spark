@@ -69,6 +69,14 @@ function test(name, fn) {
   });
 }
 
+test.skip = function skip(name, _fn) {
+  scheduleQueueExit();
+
+  testQueue = testQueue.then(async () => {
+    console.log(`SKIP ${name}`);
+  });
+};
+
 async function retryUntilSuccess(
   fn,
   { maxAttempts = 20, delayMs = 2000 } = {},
