@@ -27,10 +27,19 @@ test.skip("multi-leaf-transfer: transfer spanning multiple leaves", async (asser
 
     const receiverAddress = await receiver.getSparkAddress();
     const transferAmount = Number(senderTotal);
-    const transferResult = await sender.transfer({
-      receiverSparkAddress: receiverAddress,
-      amountSats: transferAmount,
-    });
+    // Retry the transfer because deposited leaves may still be in CREATING
+    // status on the SO (waiting for on-chain confirmation) even though the
+    // SDK balance already reflects them. The SO rejects transfers on
+    // CREATING leaves with FAILED_PRECONDITION, so retry until they
+    // transition to AVAILABLE.
+    const transferResult = await retryUntilSuccess(
+      () =>
+        sender.transfer({
+          receiverSparkAddress: receiverAddress,
+          amountSats: transferAmount,
+        }),
+      { maxAttempts: 15, delayMs: 2000 },
+    );
     assert(!!transferResult, true, "transfer returned result");
 
     await new Promise((r) => setTimeout(r, 5000));
