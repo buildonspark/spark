@@ -247,8 +247,10 @@ func RotateStaticDepositAddress(
 	if err := validateDepositAddress(config, rotateResp.NewDepositAddress, signingPubKey, true); err != nil {
 		return nil, err
 	}
-	if err := validateDepositAddress(config, rotateResp.ArchivedDepositAddress, signingPubKey, true); err != nil {
-		return nil, err
+	if rotateResp.ArchivedDepositAddress != nil {
+		if err := validateDepositAddress(config, rotateResp.ArchivedDepositAddress, signingPubKey, true); err != nil {
+			return nil, err
+		}
 	}
 	return rotateResp, nil
 }

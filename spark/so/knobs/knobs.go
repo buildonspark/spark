@@ -142,6 +142,10 @@ const (
 	// gracefully create a non-default address instead of failing.
 	KnobGracefulConcurrentStaticDeposit = "spark.so.graceful_concurrent_static_deposit"
 
+	// When enabled, rotate_static_deposit_address creates a new address instead
+	// of returning NotFound when no existing default address exists.
+	KnobRotateStaticDepositCreateIfNotExists = "spark.so.rotate_static_deposit_create_if_not_exists"
+
 	// Enable instant static deposit flow.
 	KnobEnableInstantStaticDeposit = "spark.so.enable_instant_static_deposit"
 	// Total number of sats that can be pending in the instant static deposit flow

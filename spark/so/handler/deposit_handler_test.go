@@ -709,6 +709,51 @@ func TestGenerateStaticDepositAddress(t *testing.T) {
 	})
 }
 
+func TestRotateStaticDepositAddressCreateIfNotExistsKnob(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	testIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	testSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	config := &so.Config{
+		SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest},
+		SigningOperatorMap:         map[string]*so.SigningOperator{},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	handler := NewDepositHandler(config)
+
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(testIdentityPrivKey.Public().Serialize()), 9999999999)
+
+	req := &pb.RotateStaticDepositAddressRequest{
+		SigningPublicKey: testSigningPrivKey.Public().Serialize(),
+		Network:          pb.Network_REGTEST,
+	}
+
+	t.Run("returns NotFound when knob is off", func(t *testing.T) {
+		ctxWithKnob := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{}))
+		_, err := handler.RotateStaticDepositAddress(ctxWithKnob, config, req)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.NotFound, st.Code())
+	})
+
+	t.Run("attempts create when knob is on", func(t *testing.T) {
+		ctxWithKnob := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobRotateStaticDepositCreateIfNotExists: 100,
+		}))
+		_, err := handler.RotateStaticDepositAddress(ctxWithKnob, config, req)
+		// The call will fail downstream (no operator setup for key generation),
+		// but it should NOT be a NotFound error — it passed the knob gate.
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		if ok {
+			assert.NotEqual(t, codes.NotFound, st.Code())
+		}
+	})
+}
+
 func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
 	config := &so.Config{
 		BitcoindConfigs: map[string]so.BitcoindConfig{

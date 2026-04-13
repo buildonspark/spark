@@ -670,10 +670,11 @@ func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, 
 //
 // The method performs the following steps:
 //  1. Queries for the existing default static deposit address
-//  2. If no default address exists, returns an error
-//  3. Archives the existing default address (sets is_default = false)
+//  2. If no default address exists and CreateIfNotExists is true, creates a new one
+//     (ArchivedDepositAddress will be nil). Otherwise returns NotFound.
+//  3. If a default address exists, archives it (sets is_default = false)
 //  4. Sends a gossip message to other SOs commanding them to archive that
-//     specific address using a signed statement (idempotent handler).
+//     specific address using a signed statement (idempotent handler)
 //  5. Generates a new default static deposit address using the same logic
 //     as GenerateStaticDepositAddress (involves sending another gossip via
 //     MarkKeyshareForDepositAddress)
@@ -686,7 +687,7 @@ func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, 
 //
 // Returns:
 //   - NewDepositAddress: The newly generated default static deposit address
-//   - ArchivedDepositAddress: The archived (previous default) static deposit address
+//   - ArchivedDepositAddress: The archived (previous default) static deposit address, or nil if none existed
 func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config *so.Config, req *pb.RotateStaticDepositAddressRequest) (*pb.RotateStaticDepositAddressResponse, error) {
 	ctx, span := tracer.Start(ctx, "DepositHandler.RotateStaticDepositAddress")
 	defer span.End()
@@ -712,6 +713,11 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 		return nil, fmt.Errorf("failed to get or create current tx: %w", err)
 	}
 
+	reqSigningPubKey, err := keys.ParsePublicKey(req.GetSigningPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse signing public key: %w", err)
+	}
+
 	// Query for the existing default static deposit address
 	existingDefaultAddress, err := db.DepositAddress.Query().
 		Where(
@@ -721,11 +727,27 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 			depositaddress.NetworkEQ(network),
 		).
 		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
+	if err != nil && !ent.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to query static deposit address for user id %s: %w", idPubKey.Serialize(), err)
+	}
+
+	// If no existing address, either create a new one or return an error based on the knob.
+	if existingDefaultAddress == nil {
+		createIfNotExists := knobs.GetKnobsService(ctx).GetValue(knobs.KnobRotateStaticDepositCreateIfNotExists, 0) > 0
+		if !createIfNotExists {
 			return nil, errors.NotFoundMissingEntity(fmt.Errorf("no default static deposit address found for user; generate one first using generate_static_deposit_address"))
 		}
-		return nil, fmt.Errorf("failed to query static deposit address for user id %s: %w", idPubKey.Serialize(), err)
+
+		depositAddressInfo, err := createStaticDepositAddress(ctx, config, network, idPubKey, reqSigningPubKey, req.GetHashVariant())
+		if err != nil {
+			return nil, err
+		}
+
+		logger.Sugar().Infof("No existing static deposit address found, created new address: %s", depositAddressInfo.Address)
+
+		return &pb.RotateStaticDepositAddressResponse{
+			NewDepositAddress: depositAddressInfo,
+		}, nil
 	}
 
 	// Get keyshare for the existing address to construct the archived address response
@@ -787,11 +809,6 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 	}, participants)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send gossip message to archive static deposit address: %w", err)
-	}
-
-	reqSigningPubKey, err := keys.ParsePublicKey(req.GetSigningPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse signing public key: %w", err)
 	}
 
 	depositAddressInfo, err := createStaticDepositAddress(ctx, config, network, idPubKey, reqSigningPubKey, req.GetHashVariant())
