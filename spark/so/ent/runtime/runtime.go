@@ -24,6 +24,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark/so/ent/preimagesharepartner"
 	"github.com/lightsparkdev/spark/so/ent/schema"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingcommitment"
@@ -548,6 +549,25 @@ func init() {
 	preimageshareDescID := preimageshareMixinFields0[0].Descriptor()
 	// preimageshare.DefaultID holds the default value on creation for the id field.
 	preimageshare.DefaultID = preimageshareDescID.Default.(func() uuid.UUID)
+	preimagesharepartnerMixin := schema.PreimageSharePartner{}.Mixin()
+	preimagesharepartnerMixinFields0 := preimagesharepartnerMixin[0].Fields()
+	_ = preimagesharepartnerMixinFields0
+	preimagesharepartnerFields := schema.PreimageSharePartner{}.Fields()
+	_ = preimagesharepartnerFields
+	// preimagesharepartnerDescCreateTime is the schema descriptor for create_time field.
+	preimagesharepartnerDescCreateTime := preimagesharepartnerMixinFields0[1].Descriptor()
+	// preimagesharepartner.DefaultCreateTime holds the default value on creation for the create_time field.
+	preimagesharepartner.DefaultCreateTime = preimagesharepartnerDescCreateTime.Default.(func() time.Time)
+	// preimagesharepartnerDescUpdateTime is the schema descriptor for update_time field.
+	preimagesharepartnerDescUpdateTime := preimagesharepartnerMixinFields0[2].Descriptor()
+	// preimagesharepartner.DefaultUpdateTime holds the default value on creation for the update_time field.
+	preimagesharepartner.DefaultUpdateTime = preimagesharepartnerDescUpdateTime.Default.(func() time.Time)
+	// preimagesharepartner.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	preimagesharepartner.UpdateDefaultUpdateTime = preimagesharepartnerDescUpdateTime.UpdateDefault.(func() time.Time)
+	// preimagesharepartnerDescID is the schema descriptor for id field.
+	preimagesharepartnerDescID := preimagesharepartnerMixinFields0[0].Descriptor()
+	// preimagesharepartner.DefaultID holds the default value on creation for the id field.
+	preimagesharepartner.DefaultID = preimagesharepartnerDescID.Default.(func() uuid.UUID)
 	signingcommitmentMixin := schema.SigningCommitment{}.Mixin()
 	signingcommitmentMixinFields0 := signingcommitmentMixin[0].Fields()
 	_ = signingcommitmentMixinFields0

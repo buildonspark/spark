@@ -533,6 +533,46 @@ var (
 			},
 		},
 	}
+	// PreimageSharePartnersColumns holds the columns for the "preimage_share_partners" table.
+	PreimageSharePartnersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "preimage_share_partner_partner", Type: field.TypeUUID},
+		{Name: "preimage_share_partner_preimage_share", Type: field.TypeUUID},
+	}
+	// PreimageSharePartnersTable holds the schema information for the "preimage_share_partners" table.
+	PreimageSharePartnersTable = &schema.Table{
+		Name:       "preimage_share_partners",
+		Columns:    PreimageSharePartnersColumns,
+		PrimaryKey: []*schema.Column{PreimageSharePartnersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "preimage_share_partners_partners_partner",
+				Columns:    []*schema.Column{PreimageSharePartnersColumns[3]},
+				RefColumns: []*schema.Column{PartnersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "preimage_share_partners_preimage_shares_preimage_share",
+				Columns:    []*schema.Column{PreimageSharePartnersColumns[4]},
+				RefColumns: []*schema.Column{PreimageSharesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "preimagesharepartner_preimage_share_partner_preimage_share",
+				Unique:  true,
+				Columns: []*schema.Column{PreimageSharePartnersColumns[4]},
+			},
+			{
+				Name:    "preimagesharepartner_preimage_share_partner_partner",
+				Unique:  false,
+				Columns: []*schema.Column{PreimageSharePartnersColumns[3]},
+			},
+		},
+	}
 	// SigningCommitmentsColumns holds the columns for the "signing_commitments" table.
 	SigningCommitmentsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1865,6 +1905,7 @@ var (
 		PendingSendTransfersTable,
 		PreimageRequestsTable,
 		PreimageSharesTable,
+		PreimageSharePartnersTable,
 		SigningCommitmentsTable,
 		SigningKeysharesTable,
 		SigningNoncesTable,
@@ -1904,6 +1945,8 @@ func init() {
 	MultisigMembersTable.ForeignKeys[0].RefTable = MultisigConfigsTable
 	PreimageRequestsTable.ForeignKeys[0].RefTable = TransfersTable
 	PreimageSharesTable.ForeignKeys[0].RefTable = PreimageRequestsTable
+	PreimageSharePartnersTable.ForeignKeys[0].RefTable = PartnersTable
+	PreimageSharePartnersTable.ForeignKeys[1].RefTable = PreimageSharesTable
 	TokenCreatesTable.ForeignKeys[0].RefTable = L1tokenCreatesTable
 	TokenFreezesTable.ForeignKeys[0].RefTable = TokenCreatesTable
 	TokenOutputsTable.ForeignKeys[0].RefTable = TokenCreatesTable

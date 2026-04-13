@@ -2590,6 +2590,106 @@ func (ps *PreimageShareExample) Exec(ctx context.Context) (*ent.PreimageShare, e
 	return create.Save(ctx)
 }
 
+// PreimageSharePartnerExample is a test fixture builder for PreimageSharePartner.
+type PreimageSharePartnerExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	Partner       *ent.Partner
+	PreimageShare *ent.PreimageShare
+}
+
+// NewPreimageSharePartnerExample creates a new PreimageSharePartnerExample for testing.
+func NewPreimageSharePartnerExample(t *testing.T, client *ent.Client) *PreimageSharePartnerExample {
+	return &PreimageSharePartnerExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetPartner sets the partner edge.
+func (psp *PreimageSharePartnerExample) SetPartner(v *ent.Partner) *PreimageSharePartnerExample {
+	psp.Partner = v
+	return psp
+}
+
+// SetPreimageShare sets the preimage_share edge.
+func (psp *PreimageSharePartnerExample) SetPreimageShare(v *ent.PreimageShare) *PreimageSharePartnerExample {
+	psp.PreimageShare = v
+	return psp
+}
+
+// MustExec builds and saves the PreimageSharePartner entity to the database.
+// It panics if the save fails.
+func (psp *PreimageSharePartnerExample) MustExec(ctx context.Context) *ent.PreimageSharePartner {
+	create := psp.client.PreimageSharePartner.Create()
+
+	// Set fields
+
+	// Handle edges
+	if psp.Partner != nil {
+		create.SetPartner(psp.Partner)
+	} else {
+		// Auto-create required edge
+		psp.t.Helper()
+		psp.Partner = NewPartnerExample(psp.t, psp.client).MustExec(ctx)
+		create.SetPartner(psp.Partner)
+	}
+	if psp.PreimageShare != nil {
+		create.SetPreimageShare(psp.PreimageShare)
+	} else {
+		// Auto-create required edge
+		psp.t.Helper()
+		psp.PreimageShare = NewPreimageShareExample(psp.t, psp.client).MustExec(ctx)
+		create.SetPreimageShare(psp.PreimageShare)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		psp.t.Helper()
+		psp.t.Fatalf("failed to create PreimageSharePartner: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the PreimageSharePartner entity to the database.
+// It returns an error if the save fails.
+func (psp *PreimageSharePartnerExample) Exec(ctx context.Context) (*ent.PreimageSharePartner, error) {
+	create := psp.client.PreimageSharePartner.Create()
+
+	// Set fields
+
+	// Handle edges
+	if psp.Partner != nil {
+		create.SetPartner(psp.Partner)
+	} else {
+		// Auto-create required edge
+		var err error
+		psp.Partner, err = NewPartnerExample(psp.t, psp.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create partner: %w", err)
+		}
+		create.SetPartner(psp.Partner)
+	}
+	if psp.PreimageShare != nil {
+		create.SetPreimageShare(psp.PreimageShare)
+	} else {
+		// Auto-create required edge
+		var err error
+		psp.PreimageShare, err = NewPreimageShareExample(psp.t, psp.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create preimage_share: %w", err)
+		}
+		create.SetPreimageShare(psp.PreimageShare)
+	}
+
+	return create.Save(ctx)
+}
+
 // SigningCommitmentExample is a test fixture builder for SigningCommitment.
 type SigningCommitmentExample struct {
 	client *ent.Client

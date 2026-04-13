@@ -34,6 +34,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark/so/ent/preimagesharepartner"
 	"github.com/lightsparkdev/spark/so/ent/signingcommitment"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
@@ -101,6 +102,8 @@ type Client struct {
 	PreimageRequest *PreimageRequestClient
 	// PreimageShare is the client for interacting with the PreimageShare builders.
 	PreimageShare *PreimageShareClient
+	// PreimageSharePartner is the client for interacting with the PreimageSharePartner builders.
+	PreimageSharePartner *PreimageSharePartnerClient
 	// SigningCommitment is the client for interacting with the SigningCommitment builders.
 	SigningCommitment *SigningCommitmentClient
 	// SigningKeyshare is the client for interacting with the SigningKeyshare builders.
@@ -174,6 +177,7 @@ func (c *Client) init() {
 	c.PendingSendTransfer = NewPendingSendTransferClient(c.config)
 	c.PreimageRequest = NewPreimageRequestClient(c.config)
 	c.PreimageShare = NewPreimageShareClient(c.config)
+	c.PreimageSharePartner = NewPreimageSharePartnerClient(c.config)
 	c.SigningCommitment = NewSigningCommitmentClient(c.config)
 	c.SigningKeyshare = NewSigningKeyshareClient(c.config)
 	c.SigningNonce = NewSigningNonceClient(c.config)
@@ -306,6 +310,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PendingSendTransfer:               NewPendingSendTransferClient(cfg),
 		PreimageRequest:                   NewPreimageRequestClient(cfg),
 		PreimageShare:                     NewPreimageShareClient(cfg),
+		PreimageSharePartner:              NewPreimageSharePartnerClient(cfg),
 		SigningCommitment:                 NewSigningCommitmentClient(cfg),
 		SigningKeyshare:                   NewSigningKeyshareClient(cfg),
 		SigningNonce:                      NewSigningNonceClient(cfg),
@@ -365,6 +370,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PendingSendTransfer:               NewPendingSendTransferClient(cfg),
 		PreimageRequest:                   NewPreimageRequestClient(cfg),
 		PreimageShare:                     NewPreimageShareClient(cfg),
+		PreimageSharePartner:              NewPreimageSharePartnerClient(cfg),
 		SigningCommitment:                 NewSigningCommitmentClient(cfg),
 		SigningKeyshare:                   NewSigningKeyshareClient(cfg),
 		SigningNonce:                      NewSigningNonceClient(cfg),
@@ -421,8 +427,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
 		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
 		c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare,
-		c.SigningCommitment, c.SigningKeyshare, c.SigningNonce, c.SparkInvoice,
-		c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
+		c.PreimageSharePartner, c.SigningCommitment, c.SigningKeyshare, c.SigningNonce,
+		c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
 		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
 		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.TransferPartner,
 		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
@@ -441,8 +447,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
 		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
 		c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare,
-		c.SigningCommitment, c.SigningKeyshare, c.SigningNonce, c.SparkInvoice,
-		c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
+		c.PreimageSharePartner, c.SigningCommitment, c.SigningKeyshare, c.SigningNonce,
+		c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
 		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
 		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.TransferPartner,
 		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
@@ -491,6 +497,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PreimageRequest.mutate(ctx, m)
 	case *PreimageShareMutation:
 		return c.PreimageShare.mutate(ctx, m)
+	case *PreimageSharePartnerMutation:
+		return c.PreimageSharePartner.mutate(ctx, m)
 	case *SigningCommitmentMutation:
 		return c.SigningCommitment.mutate(ctx, m)
 	case *SigningKeyshareMutation:
@@ -3271,6 +3279,171 @@ func (c *PreimageShareClient) mutate(ctx context.Context, m *PreimageShareMutati
 		return (&PreimageShareDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown PreimageShare mutation op: %q", m.Op())
+	}
+}
+
+// PreimageSharePartnerClient is a client for the PreimageSharePartner schema.
+type PreimageSharePartnerClient struct {
+	config
+}
+
+// NewPreimageSharePartnerClient returns a client for the PreimageSharePartner from the given config.
+func NewPreimageSharePartnerClient(c config) *PreimageSharePartnerClient {
+	return &PreimageSharePartnerClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `preimagesharepartner.Hooks(f(g(h())))`.
+func (c *PreimageSharePartnerClient) Use(hooks ...Hook) {
+	c.hooks.PreimageSharePartner = append(c.hooks.PreimageSharePartner, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `preimagesharepartner.Intercept(f(g(h())))`.
+func (c *PreimageSharePartnerClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PreimageSharePartner = append(c.inters.PreimageSharePartner, interceptors...)
+}
+
+// Create returns a builder for creating a PreimageSharePartner entity.
+func (c *PreimageSharePartnerClient) Create() *PreimageSharePartnerCreate {
+	mutation := newPreimageSharePartnerMutation(c.config, OpCreate)
+	return &PreimageSharePartnerCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PreimageSharePartner entities.
+func (c *PreimageSharePartnerClient) CreateBulk(builders ...*PreimageSharePartnerCreate) *PreimageSharePartnerCreateBulk {
+	return &PreimageSharePartnerCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PreimageSharePartnerClient) MapCreateBulk(slice any, setFunc func(*PreimageSharePartnerCreate, int)) *PreimageSharePartnerCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PreimageSharePartnerCreateBulk{err: fmt.Errorf("calling to PreimageSharePartnerClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PreimageSharePartnerCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PreimageSharePartnerCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PreimageSharePartner.
+func (c *PreimageSharePartnerClient) Update() *PreimageSharePartnerUpdate {
+	mutation := newPreimageSharePartnerMutation(c.config, OpUpdate)
+	return &PreimageSharePartnerUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PreimageSharePartnerClient) UpdateOne(psp *PreimageSharePartner) *PreimageSharePartnerUpdateOne {
+	mutation := newPreimageSharePartnerMutation(c.config, OpUpdateOne, withPreimageSharePartner(psp))
+	return &PreimageSharePartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PreimageSharePartnerClient) UpdateOneID(id uuid.UUID) *PreimageSharePartnerUpdateOne {
+	mutation := newPreimageSharePartnerMutation(c.config, OpUpdateOne, withPreimageSharePartnerID(id))
+	return &PreimageSharePartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PreimageSharePartner.
+func (c *PreimageSharePartnerClient) Delete() *PreimageSharePartnerDelete {
+	mutation := newPreimageSharePartnerMutation(c.config, OpDelete)
+	return &PreimageSharePartnerDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PreimageSharePartnerClient) DeleteOne(psp *PreimageSharePartner) *PreimageSharePartnerDeleteOne {
+	return c.DeleteOneID(psp.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PreimageSharePartnerClient) DeleteOneID(id uuid.UUID) *PreimageSharePartnerDeleteOne {
+	builder := c.Delete().Where(preimagesharepartner.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PreimageSharePartnerDeleteOne{builder}
+}
+
+// Query returns a query builder for PreimageSharePartner.
+func (c *PreimageSharePartnerClient) Query() *PreimageSharePartnerQuery {
+	return &PreimageSharePartnerQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePreimageSharePartner},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PreimageSharePartner entity by its id.
+func (c *PreimageSharePartnerClient) Get(ctx context.Context, id uuid.UUID) (*PreimageSharePartner, error) {
+	return c.Query().Where(preimagesharepartner.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PreimageSharePartnerClient) GetX(ctx context.Context, id uuid.UUID) *PreimageSharePartner {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPartner queries the partner edge of a PreimageSharePartner.
+func (c *PreimageSharePartnerClient) QueryPartner(psp *PreimageSharePartner) *PartnerQuery {
+	query := (&PartnerClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := psp.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(preimagesharepartner.Table, preimagesharepartner.FieldID, id),
+			sqlgraph.To(partner.Table, partner.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, preimagesharepartner.PartnerTable, preimagesharepartner.PartnerColumn),
+		)
+		fromV = sqlgraph.Neighbors(psp.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPreimageShare queries the preimage_share edge of a PreimageSharePartner.
+func (c *PreimageSharePartnerClient) QueryPreimageShare(psp *PreimageSharePartner) *PreimageShareQuery {
+	query := (&PreimageShareClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := psp.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(preimagesharepartner.Table, preimagesharepartner.FieldID, id),
+			sqlgraph.To(preimageshare.Table, preimageshare.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, preimagesharepartner.PreimageShareTable, preimagesharepartner.PreimageShareColumn),
+		)
+		fromV = sqlgraph.Neighbors(psp.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *PreimageSharePartnerClient) Hooks() []Hook {
+	return c.hooks.PreimageSharePartner
+}
+
+// Interceptors returns the client interceptors.
+func (c *PreimageSharePartnerClient) Interceptors() []Interceptor {
+	return c.inters.PreimageSharePartner
+}
+
+func (c *PreimageSharePartnerClient) mutate(ctx context.Context, m *PreimageSharePartnerMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PreimageSharePartnerCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PreimageSharePartnerUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PreimageSharePartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PreimageSharePartnerDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PreimageSharePartner mutation op: %q", m.Op())
 	}
 }
 
@@ -7126,8 +7299,8 @@ type (
 		Gossip, IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
 		L1TokenOutputWithdrawal, L1WithdrawalTransaction, MultisigConfig,
 		MultisigMember, Partner, PaymentIntent, PendingSendTransfer, PreimageRequest,
-		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
-		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		PreimageShare, PreimageSharePartner, SigningCommitment, SigningKeyshare,
+		SigningNonce, SparkInvoice, TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,
 		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
 		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,
@@ -7138,8 +7311,8 @@ type (
 		Gossip, IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
 		L1TokenOutputWithdrawal, L1WithdrawalTransaction, MultisigConfig,
 		MultisigMember, Partner, PaymentIntent, PendingSendTransfer, PreimageRequest,
-		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
-		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		PreimageShare, PreimageSharePartner, SigningCommitment, SigningKeyshare,
+		SigningNonce, SparkInvoice, TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,
 		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
 		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,

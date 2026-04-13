@@ -30,6 +30,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark/so/ent/preimagesharepartner"
 	"github.com/lightsparkdev/spark/so/ent/signingcommitment"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
@@ -130,6 +131,7 @@ func checkColumn(table, column string) error {
 			pendingsendtransfer.Table:               pendingsendtransfer.ValidColumn,
 			preimagerequest.Table:                   preimagerequest.ValidColumn,
 			preimageshare.Table:                     preimageshare.ValidColumn,
+			preimagesharepartner.Table:              preimagesharepartner.ValidColumn,
 			signingcommitment.Table:                 signingcommitment.ValidColumn,
 			signingkeyshare.Table:                   signingkeyshare.ValidColumn,
 			signingnonce.Table:                      signingnonce.ValidColumn,

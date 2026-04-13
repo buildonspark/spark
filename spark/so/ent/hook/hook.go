@@ -225,6 +225,18 @@ func (f PreimageShareFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PreimageShareMutation", m)
 }
 
+// The PreimageSharePartnerFunc type is an adapter to allow the use of ordinary
+// function as PreimageSharePartner mutator.
+type PreimageSharePartnerFunc func(context.Context, *ent.PreimageSharePartnerMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PreimageSharePartnerFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PreimageSharePartnerMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PreimageSharePartnerMutation", m)
+}
+
 // The SigningCommitmentFunc type is an adapter to allow the use of ordinary
 // function as SigningCommitment mutator.
 type SigningCommitmentFunc func(context.Context, *ent.SigningCommitmentMutation) (ent.Value, error)

@@ -50,6 +50,8 @@ type Tx struct {
 	PreimageRequest *PreimageRequestClient
 	// PreimageShare is the client for interacting with the PreimageShare builders.
 	PreimageShare *PreimageShareClient
+	// PreimageSharePartner is the client for interacting with the PreimageSharePartner builders.
+	PreimageSharePartner *PreimageSharePartnerClient
 	// SigningCommitment is the client for interacting with the SigningCommitment builders.
 	SigningCommitment *SigningCommitmentClient
 	// SigningKeyshare is the client for interacting with the SigningKeyshare builders.
@@ -243,6 +245,7 @@ func (tx *Tx) init() {
 	tx.PendingSendTransfer = NewPendingSendTransferClient(tx.config)
 	tx.PreimageRequest = NewPreimageRequestClient(tx.config)
 	tx.PreimageShare = NewPreimageShareClient(tx.config)
+	tx.PreimageSharePartner = NewPreimageSharePartnerClient(tx.config)
 	tx.SigningCommitment = NewSigningCommitmentClient(tx.config)
 	tx.SigningKeyshare = NewSigningKeyshareClient(tx.config)
 	tx.SigningNonce = NewSigningNonceClient(tx.config)
