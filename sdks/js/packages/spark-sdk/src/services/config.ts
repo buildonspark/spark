@@ -141,6 +141,10 @@ export class WalletConfigService implements HasSspClientOptions {
     return this.config.tokenOutputLockExpiryMs;
   }
 
+  public getUseTokenPrimitivesBindings(): boolean {
+    return this.config.useTokenPrimitivesBindings;
+  }
+
   public getTokenTransactionVersion(): "V2" | "V3" {
     return this.config.tokenTransactionVersion;
   }

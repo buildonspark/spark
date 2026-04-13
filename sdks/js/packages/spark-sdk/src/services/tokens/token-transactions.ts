@@ -7,6 +7,7 @@ import { hexToBytes } from "@noble/hashes/utils";
 import { SparkRequestError, SparkValidationError } from "../../errors/types.js";
 import { Direction, Order } from "../../proto/spark.js";
 import {
+  BroadcastTransactionRequest,
   BroadcastTransactionResponse,
   CommitProgress,
   CommitStatus,
@@ -23,6 +24,7 @@ import {
 } from "../../proto/spark_token.js";
 import { TokenOutputsMap } from "../../spark-wallet/types.js";
 import { SparkCallOptions } from "../../types/grpc.js";
+import { getSparkTokenPrimitives } from "../../token-primitives-bindings/token-primitives-bindings.js";
 import {
   decodeSparkAddress,
   isValidPublicKey,
@@ -44,6 +46,10 @@ import { sumTokenOutputs } from "../../utils/token-transactions.js";
 import { WalletConfigService } from "../config.js";
 import { ConnectionManager } from "../connection/connection.js";
 import { SigningOperator } from "../wallet-config.js";
+import type {
+  BroadcastBuildRequestBindingParams,
+  SignatureWithIndexBindingParams,
+} from "../../token-primitives-bindings/types.js";
 
 const QUERY_TOKEN_OUTPUTS_PAGE_SIZE = 100;
 export const MAX_TOKEN_OUTPUTS_TX = 500;
@@ -86,6 +92,10 @@ export class TokenTransactionService {
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
+  }
+
+  private shouldUseTokenPrimitivesBindings(): boolean {
+    return this.config.getUseTokenPrimitivesBindings();
   }
 
   public async tokenTransfer({
@@ -189,12 +199,16 @@ export class TokenTransactionService {
 
       return txId;
     } else {
-      const partialTokenTransaction =
-        await this.constructPartialTransferTokenTransaction(
-          allOutputsToUse,
-          tokenOutputData,
-          sparkInvoices,
-        );
+      const partialTokenTransaction = this.shouldUseTokenPrimitivesBindings()
+        ? await this.constructPartialTransferTokenTransactionWithBindings(
+            allOutputsToUse,
+            receiverOutputs,
+          )
+        : await this.constructPartialTransferTokenTransaction(
+            allOutputsToUse,
+            tokenOutputData,
+            sparkInvoices,
+          );
 
       const txId = await this.broadcastTokenTransactionV3(
         partialTokenTransaction,
@@ -203,6 +217,52 @@ export class TokenTransactionService {
 
       return txId;
     }
+  }
+
+  private async constructPartialTransferTokenTransactionWithBindings(
+    selectedOutputs: OutputWithPreviousTransactionData[],
+    receiverOutputs: {
+      tokenIdentifier: Bech32mTokenIdentifier;
+      tokenAmount: bigint;
+      receiverSparkAddress: string;
+    }[],
+  ): Promise<PartialTokenTransaction> {
+    const sparkTokenPrimitives = getSparkTokenPrimitives();
+
+    selectedOutputs.sort(
+      (a, b) => a.previousTransactionVout - b.previousTransactionVout,
+    );
+
+    const result =
+      await sparkTokenPrimitives.constructPartialTransferTransaction({
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        selectedOutputs: selectedOutputs.map((output) => ({
+          previousTransactionHash: output.previousTransactionHash,
+          previousTransactionVout: output.previousTransactionVout,
+          ownerPublicKey: output.output!.ownerPublicKey,
+          tokenIdentifier: output.output!.tokenIdentifier!,
+          tokenAmount: output.output!.tokenAmount!,
+        })),
+        receiverOutputs: receiverOutputs.map((output) => ({
+          receiverSparkAddress: output.receiverSparkAddress,
+          tokenIdentifier: decodeBech32mTokenIdentifier(
+            output.tokenIdentifier,
+            this.config.getNetworkType(),
+          ).tokenIdentifier,
+          tokenAmount: numberToBytesBE(output.tokenAmount, 16),
+        })),
+        operatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
+        network: this.config.getNetworkProto(),
+        validityDurationSeconds:
+          await this.config.getTokenValidityDurationSeconds(),
+        clientCreatedTimestampUnixMicros:
+          this.connectionManager.getCurrentServerTime().getTime() * 1000,
+        withdrawBondSats: this.config.getExpectedWithdrawBondSats(),
+        withdrawRelativeBlockLocktime:
+          this.config.getExpectedWithdrawRelativeBlockLocktime(),
+      });
+
+    return PartialTokenTransaction.decode(result.partialTokenTransactionBytes);
   }
 
   private groupReceiverOutputsByToken(
@@ -660,11 +720,116 @@ export class TokenTransactionService {
       this.config.getCoordinatorAddress(),
     );
 
-    const partialTokenTransactionHash = await hashPartialTokenTransaction(
-      partialTokenTransaction,
-    );
+    if (!this.shouldUseTokenPrimitivesBindings()) {
+      const partialTokenTransactionHash = await hashPartialTokenTransaction(
+        partialTokenTransaction,
+      );
 
-    const ownerSignaturesWithIndex: SignatureWithIndex[] = [];
+      const ownerSignaturesWithIndex: SignatureWithIndex[] = [];
+      if (partialTokenTransaction.tokenInputs?.$case === "mintInput") {
+        const ownerPubkey =
+          partialTokenTransaction.partialTokenOutputs[0]?.ownerPublicKey;
+        if (!ownerPubkey) {
+          throw new SparkValidationError("Invalid mint input", {
+            field: "ownerPubkey",
+            value: null,
+            expected: "Non-null ownerPubkey",
+          });
+        }
+
+        const ownerSignature = await this.signMessageWithKey(
+          partialTokenTransactionHash,
+          ownerPubkey,
+        );
+
+        ownerSignaturesWithIndex.push({
+          signature: ownerSignature,
+          inputIndex: 0,
+        });
+      } else if (partialTokenTransaction.tokenInputs?.$case === "createInput") {
+        const issuerPublicKey =
+          partialTokenTransaction.tokenInputs.createInput.issuerPublicKey;
+        if (!issuerPublicKey) {
+          throw new SparkValidationError("Invalid create input", {
+            field: "issuerPublicKey",
+            value: null,
+            expected: "Non-null issuer public key",
+          });
+        }
+
+        const ownerSignature = await this.signMessageWithKey(
+          partialTokenTransactionHash,
+          issuerPublicKey,
+        );
+
+        ownerSignaturesWithIndex.push({
+          signature: ownerSignature,
+          inputIndex: 0,
+        });
+      } else if (
+        partialTokenTransaction.tokenInputs?.$case === "transferInput"
+      ) {
+        if (!outputsToSpendSigningPublicKeys) {
+          throw new SparkValidationError("Invalid transfer input", {
+            field: "outputsToSpend",
+            value: {
+              signingPublicKeys: outputsToSpendSigningPublicKeys,
+            },
+            expected: "Non-null signing public keys",
+          });
+        }
+
+        for (const [i, key] of outputsToSpendSigningPublicKeys.entries()) {
+          if (!key) {
+            throw new SparkValidationError("Invalid signing key", {
+              field: "outputsToSpendSigningPublicKeys",
+              value: i,
+              expected: "Non-null signing key",
+            });
+          }
+          const ownerSignature = await this.signMessageWithKey(
+            partialTokenTransactionHash,
+            key,
+          );
+
+          ownerSignaturesWithIndex.push({
+            signature: ownerSignature,
+            inputIndex: i,
+          });
+        }
+      }
+
+      return await sparkClient.broadcast_transaction(
+        {
+          identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+          partialTokenTransaction,
+          tokenTransactionOwnerSignatures: ownerSignaturesWithIndex,
+        },
+        {
+          retry: true,
+          retryableStatuses: [
+            "UNKNOWN",
+            "UNAVAILABLE",
+            "CANCELLED",
+            "INTERNAL",
+          ],
+          retryMaxAttempts: 3,
+        } as SparkCallOptions,
+      );
+    }
+
+    const sparkTokenPrimitives = getSparkTokenPrimitives();
+
+    const partialTokenTransactionBytes = PartialTokenTransaction.encode(
+      partialTokenTransaction,
+    ).finish();
+
+    const partialTokenTransactionHash =
+      await sparkTokenPrimitives.hashPartialTokenTransaction(
+        partialTokenTransactionBytes,
+      );
+
+    const ownerSignaturesForBindings: SignatureWithIndexBindingParams[] = [];
 
     if (partialTokenTransaction.tokenInputs?.$case === "mintInput") {
       const ownerPubkey =
@@ -682,9 +847,10 @@ export class TokenTransactionService {
         ownerPubkey,
       );
 
-      ownerSignaturesWithIndex.push({
+      ownerSignaturesForBindings.push({
         signature: ownerSignature,
         inputIndex: 0,
+        publicKey: ownerPubkey,
       });
     } else if (partialTokenTransaction.tokenInputs?.$case === "createInput") {
       const issuerPublicKey =
@@ -702,9 +868,10 @@ export class TokenTransactionService {
         issuerPublicKey,
       );
 
-      ownerSignaturesWithIndex.push({
+      ownerSignaturesForBindings.push({
         signature: ownerSignature,
         inputIndex: 0,
+        publicKey: issuerPublicKey,
       });
     } else if (partialTokenTransaction.tokenInputs?.$case === "transferInput") {
       if (!outputsToSpendSigningPublicKeys) {
@@ -730,19 +897,23 @@ export class TokenTransactionService {
           key,
         );
 
-        ownerSignaturesWithIndex.push({
+        ownerSignaturesForBindings.push({
           signature: ownerSignature,
           inputIndex: i,
+          publicKey: key,
         });
       }
     }
 
-    return await sparkClient.broadcast_transaction(
-      {
+    const broadcastRequestBytes =
+      await sparkTokenPrimitives.buildBroadcastTransactionRequest({
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
-        partialTokenTransaction,
-        tokenTransactionOwnerSignatures: ownerSignaturesWithIndex,
-      },
+        partialTokenTransactionBytes,
+        ownerSignatures: ownerSignaturesForBindings,
+      } satisfies BroadcastBuildRequestBindingParams);
+
+    return await sparkClient.broadcast_transaction(
+      BroadcastTransactionRequest.decode(broadcastRequestBytes),
       {
         retry: true,
         retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED", "INTERNAL"],

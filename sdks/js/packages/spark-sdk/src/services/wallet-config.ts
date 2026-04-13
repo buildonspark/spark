@@ -133,6 +133,7 @@ export type ConfigOptions = MayHaveSspClientOptions & {
   readonly tokenOptimizationOptions?: TokenOptimizationOptions;
   readonly tokenOutputLockExpiryMs?: number;
   readonly tokenTransactionVersion?: "V2" | "V3";
+  readonly useTokenPrimitivesBindings?: boolean;
 };
 
 const PROD_PUBKEYS = [
@@ -179,6 +180,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   },
   tokenOutputLockExpiryMs: 20000, // 20 seconds
   tokenTransactionVersion: "V3",
+  useTokenPrimitivesBindings: false,
 };
 
 const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {

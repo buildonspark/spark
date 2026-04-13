@@ -4,6 +4,8 @@ import nodeCrypto from "crypto";
 
 import { setSparkFrostOnce } from "./spark-bindings/spark-bindings.js";
 import { SparkFrost } from "./spark-bindings/spark-bindings.node.js";
+import { setSparkTokenPrimitivesOnce } from "./token-primitives-bindings/token-primitives-bindings.js";
+import { SparkTokenPrimitives } from "./token-primitives-bindings/token-primitives-bindings.node.js";
 import { setCrypto } from "./utils/crypto.js";
 
 const cryptoImpl =
@@ -11,6 +13,7 @@ const cryptoImpl =
 
 setCrypto(cryptoImpl);
 setSparkFrostOnce(new SparkFrost());
+setSparkTokenPrimitivesOnce(new SparkTokenPrimitives());
 
 export * from "./index-shared.js";
 

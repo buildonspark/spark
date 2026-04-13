@@ -2,6 +2,7 @@ import { numberToBytesBE } from "@noble/curves/utils";
 import { describe, expect, it, jest } from "@jest/globals";
 import {
   OutputWithPreviousTransactionData,
+  PartialTokenTransaction,
   TokenOutputStatus,
 } from "../proto/spark_token.js";
 import { WalletConfigService } from "../services/config.js";
@@ -9,10 +10,88 @@ import { ConnectionManagerNodeJS } from "../services/connection/connection.node.
 import { TokenOutputManager } from "../services/tokens/output-manager.js";
 import { TokenTransactionService } from "../services/tokens/token-transactions.js";
 import { SparkWallet } from "../spark-wallet/spark-wallet.node.js";
+import {
+  setSparkTokenPrimitivesOnce,
+  SparkTokenPrimitivesBase,
+} from "../token-primitives-bindings/token-primitives-bindings.js";
+import type {
+  BroadcastBuildRequestBindingParams,
+  FinalizeTokenInvoiceRequestBindingParams,
+  PartialTransferBuildResultBinding,
+  PreparedTokenInvoiceBinding,
+  PrepareTokenInvoiceRequestBindingParams,
+  TransferBuildRequestBindingParams,
+} from "../token-primitives-bindings/types.js";
 import { encodeSparkAddress } from "../utils/address.js";
 import { encodeBech32mTokenIdentifier } from "../utils/token-identifier.js";
 
 let nextConnectionManager!: ConnectionManagerNodeJS;
+
+class MockSparkTokenPrimitives extends SparkTokenPrimitivesBase {
+  async constructPartialTransferTransaction(
+    request: TransferBuildRequestBindingParams,
+  ): Promise<PartialTransferBuildResultBinding> {
+    const partialTokenTransaction = PartialTokenTransaction.create({
+      version: 3,
+      tokenTransactionMetadata: {
+        network: request.network,
+        sparkOperatorIdentityPublicKeys: request.operatorIdentityPublicKeys,
+        validityDurationSeconds: request.validityDurationSeconds,
+        clientCreatedTimestamp: new Date(
+          Math.floor(request.clientCreatedTimestampUnixMicros / 1000),
+        ),
+      },
+      tokenInputs: {
+        $case: "transferInput",
+        transferInput: {
+          outputsToSpend: request.selectedOutputs.map((output) => ({
+            prevTokenTransactionHash: output.previousTransactionHash,
+            prevTokenTransactionVout: output.previousTransactionVout,
+          })),
+        },
+      },
+      partialTokenOutputs: [],
+    });
+
+    return {
+      partialTokenTransactionBytes: PartialTokenTransaction.encode(
+        partialTokenTransaction,
+      ).finish(),
+      partialTokenTransactionHash: new Uint8Array(32),
+    };
+  }
+
+  async hashPartialTokenTransaction(
+    _partialTokenTransactionBytes: Uint8Array,
+  ): Promise<Uint8Array> {
+    return new Uint8Array(32);
+  }
+
+  async buildBroadcastTransactionRequest(
+    _request: BroadcastBuildRequestBindingParams,
+  ): Promise<Uint8Array> {
+    return new Uint8Array();
+  }
+
+  async prepareTokenInvoice(
+    _request: PrepareTokenInvoiceRequestBindingParams,
+  ): Promise<PreparedTokenInvoiceBinding> {
+    return {
+      sparkInvoiceFieldsBytes: new Uint8Array(),
+      sparkInvoiceHash: new Uint8Array(32),
+      unsignedSparkAddress: "sprt1test",
+    };
+  }
+
+  async finalizeTokenInvoice(
+    _request: FinalizeTokenInvoiceRequestBindingParams,
+  ): Promise<string> {
+    return "sprt1test";
+  }
+}
+
+const mockSparkTokenPrimitives = new MockSparkTokenPrimitives();
+setSparkTokenPrimitivesOnce(mockSparkTokenPrimitives);
 
 class TestSparkWallet extends SparkWallet {
   protected override buildConnectionManager(
@@ -21,10 +100,17 @@ class TestSparkWallet extends SparkWallet {
     return nextConnectionManager;
   }
 
-  public constructor(lockExpiryMs: number = 20000) {
+  public constructor({
+    lockExpiryMs = 20000,
+    useTokenPrimitivesBindings = true,
+  }: {
+    lockExpiryMs?: number;
+    useTokenPrimitivesBindings?: boolean;
+  } = {}) {
     super({
       network: "LOCAL",
       tokenOutputLockExpiryMs: lockExpiryMs,
+      useTokenPrimitivesBindings,
     });
   }
 
@@ -73,10 +159,12 @@ async function createWalletWithScript({
   outputSnapshots,
   transferResults,
   lockExpiryMs,
+  useTokenPrimitivesBindings,
 }: {
   outputSnapshots: OutputWithPreviousTransactionData[][];
   transferResults: Array<string | Error>;
   lockExpiryMs?: number;
+  useTokenPrimitivesBindings?: boolean;
 }): Promise<TestSparkWallet> {
   const scriptedSnapshots = [...outputSnapshots];
   const tokenClient = {
@@ -96,7 +184,10 @@ async function createWalletWithScript({
     getCurrentServerTime: jest.fn(() => new Date("2026-01-01T00:00:00.000Z")),
   } as unknown as ConnectionManagerNodeJS;
 
-  const wallet = new TestSparkWallet(lockExpiryMs);
+  const wallet = new TestSparkWallet({
+    lockExpiryMs,
+    useTokenPrimitivesBindings,
+  });
   await wallet.initializeSignerForTest();
 
   const scriptedTransferResults = [...transferResults];
@@ -127,6 +218,69 @@ function createReceiverSparkAddress(): string {
 }
 
 describe("token transfer local lock lifecycle", () => {
+  it("uses token primitive bindings only when enabled in config", async () => {
+    const tokenIdentifierBytes = new Uint8Array(32).fill(6);
+    const tokenIdentifier = encodeBech32mTokenIdentifier({
+      tokenIdentifier: tokenIdentifierBytes,
+      network: "LOCAL",
+    });
+    const receiverSparkAddress = createReceiverSparkAddress();
+    const constructSpy = jest.spyOn(
+      mockSparkTokenPrimitives,
+      "constructPartialTransferTransaction",
+    );
+
+    const walletWithBindings = await createWalletWithScript({
+      outputSnapshots: [
+        [
+          createMockTokenOutput({
+            id: "with-bindings",
+            tokenIdentifier: tokenIdentifierBytes,
+            tokenAmount: 100n,
+          }),
+        ],
+      ],
+      transferResults: ["tx-hash-bindings-on"],
+      useTokenPrimitivesBindings: true,
+    });
+
+    await expect(
+      walletWithBindings.transferTokens({
+        tokenIdentifier,
+        tokenAmount: 100n,
+        receiverSparkAddress,
+      }),
+    ).resolves.toBe("tx-hash-bindings-on");
+    expect(constructSpy).toHaveBeenCalledTimes(1);
+
+    constructSpy.mockClear();
+
+    const walletWithoutBindings = await createWalletWithScript({
+      outputSnapshots: [
+        [
+          createMockTokenOutput({
+            id: "without-bindings",
+            tokenIdentifier: tokenIdentifierBytes,
+            tokenAmount: 100n,
+          }),
+        ],
+      ],
+      transferResults: ["tx-hash-bindings-off"],
+      useTokenPrimitivesBindings: false,
+    });
+
+    await expect(
+      walletWithoutBindings.transferTokens({
+        tokenIdentifier,
+        tokenAmount: 100n,
+        receiverSparkAddress,
+      }),
+    ).resolves.toBe("tx-hash-bindings-off");
+    expect(constructSpy).not.toHaveBeenCalled();
+
+    constructSpy.mockRestore();
+  });
+
   it("should remove local lock when output becomes pending on server", async () => {
     const manager = new TokenOutputManager();
     const tokenIdentifierBytes = new Uint8Array(32).fill(5);
