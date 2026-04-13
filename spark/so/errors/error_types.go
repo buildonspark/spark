@@ -33,6 +33,7 @@ const (
 	ReasonFailedPreconditionTokenRulesViolation       = "TOKEN_RULES_VIOLATION"
 	ReasonFailedPreconditionInsufficientConfirmations = "INSUFFICIENT_CONFIRMATIONS"
 	ReasonFailedPreconditionInvalidState              = "INVALID_STATE"
+	ReasonFailedPreconditionLeafUnavailable           = "LEAF_UNAVAILABLE"
 	ReasonFailedPreconditionExpired                   = "EXPIRED"
 	ReasonFailedPreconditionReplay                    = "REPLAY"
 	ReasonFailedPreconditionHashMismatch              = "HASH_MISMATCH"
@@ -167,6 +168,10 @@ func FailedPreconditionInsufficientConfirmations(err error) error {
 
 func FailedPreconditionInvalidState(err error) error {
 	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionInvalidState)
+}
+
+func FailedPreconditionLeafUnavailable(err error) error {
+	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionLeafUnavailable)
 }
 
 func FailedPreconditionExpired(err error) error {
