@@ -2287,7 +2287,7 @@ func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.C
 		Order(ent.Desc(enttransfer.FieldCreateTime)).
 		First(ctx)
 	if err != nil || swap == nil {
-		if err != nil {
+		if err != nil && !ent.IsNotFound(err) {
 			logger := logging.GetLoggerFromContext(ctx)
 			logger.Sugar().Warnf("failed to find swap for wallet %s: %v", walletIdentityPubkey.String(), err)
 			internalErr = err
