@@ -576,6 +576,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     } catch (error) {
       console.error("Error flushing token sync", error);
+      for (const id of ids) {
+        this.tokenSyncPendingIds.add(id);
+      }
     }
   }
 
