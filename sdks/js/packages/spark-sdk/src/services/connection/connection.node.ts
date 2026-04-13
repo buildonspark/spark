@@ -148,7 +148,7 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
   }
 
   override async subscribeToEvents(address: string, signal: AbortSignal) {
-    const stream = super.subscribeToEvents(address, signal);
+    const stream = await super.subscribeToEvents(address, signal);
     const channel = await this.getChannelForClient("stream", address);
 
     if (!channel) {

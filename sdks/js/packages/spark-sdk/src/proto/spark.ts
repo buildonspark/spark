@@ -654,10 +654,14 @@ export interface SubscribeToEventsResponse {
     | { $case: "deposit"; deposit: DepositEvent }
     | { $case: "connected"; connected: ConnectedEvent }
     | { $case: "senderTransfer"; senderTransfer: TransferEvent }
+    | { $case: "heartbeat"; heartbeat: HeartbeatEvent }
     | undefined;
 }
 
 export interface ConnectedEvent {
+}
+
+export interface HeartbeatEvent {
 }
 
 export interface TransferEvent {
@@ -2369,6 +2373,9 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
       case "senderTransfer":
         TransferEvent.encode(message.event.senderTransfer, writer.uint32(34).fork()).join();
         break;
+      case "heartbeat":
+        HeartbeatEvent.encode(message.event.heartbeat, writer.uint32(42).fork()).join();
+        break;
     }
     return writer;
   },
@@ -2415,6 +2422,14 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
           message.event = { $case: "senderTransfer", senderTransfer: TransferEvent.decode(reader, reader.uint32()) };
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.event = { $case: "heartbeat", heartbeat: HeartbeatEvent.decode(reader, reader.uint32()) };
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2434,6 +2449,8 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
         ? { $case: "connected", connected: ConnectedEvent.fromJSON(object.connected) }
         : isSet(object.senderTransfer)
         ? { $case: "senderTransfer", senderTransfer: TransferEvent.fromJSON(object.senderTransfer) }
+        : isSet(object.heartbeat)
+        ? { $case: "heartbeat", heartbeat: HeartbeatEvent.fromJSON(object.heartbeat) }
         : undefined,
     };
   },
@@ -2448,6 +2465,8 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
       obj.connected = ConnectedEvent.toJSON(message.event.connected);
     } else if (message.event?.$case === "senderTransfer") {
       obj.senderTransfer = TransferEvent.toJSON(message.event.senderTransfer);
+    } else if (message.event?.$case === "heartbeat") {
+      obj.heartbeat = HeartbeatEvent.toJSON(message.event.heartbeat);
     }
     return obj;
   },
@@ -2485,6 +2504,12 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
             $case: "senderTransfer",
             senderTransfer: TransferEvent.fromPartial(object.event.senderTransfer),
           };
+        }
+        break;
+      }
+      case "heartbeat": {
+        if (object.event?.heartbeat !== undefined && object.event?.heartbeat !== null) {
+          message.event = { $case: "heartbeat", heartbeat: HeartbeatEvent.fromPartial(object.event.heartbeat) };
         }
         break;
       }
@@ -2532,6 +2557,49 @@ export const ConnectedEvent: MessageFns<ConnectedEvent> = {
   },
   fromPartial(_: DeepPartial<ConnectedEvent>): ConnectedEvent {
     const message = createBaseConnectedEvent();
+    return message;
+  },
+};
+
+function createBaseHeartbeatEvent(): HeartbeatEvent {
+  return {};
+}
+
+export const HeartbeatEvent: MessageFns<HeartbeatEvent> = {
+  encode(_: HeartbeatEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): HeartbeatEvent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseHeartbeatEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): HeartbeatEvent {
+    return {};
+  },
+
+  toJSON(_: HeartbeatEvent): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<HeartbeatEvent>): HeartbeatEvent {
+    return HeartbeatEvent.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<HeartbeatEvent>): HeartbeatEvent {
+    const message = createBaseHeartbeatEvent();
     return message;
   },
 };

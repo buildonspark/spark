@@ -106,10 +106,13 @@ message SubscribeToEventsResponse {
         DepositEvent deposit = 2;
         ConnectedEvent connected = 3;
         TransferEvent sender_transfer = 4;
+        HeartbeatEvent heartbeat = 5;
     }
 }
 
 message ConnectedEvent { }
+
+message HeartbeatEvent { }
 
 message TransferEvent {
     Transfer transfer = 10;

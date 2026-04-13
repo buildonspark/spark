@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/handler"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"go.uber.org/zap"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -26,6 +27,12 @@ const (
 	eventNameDepositAddress = "depositaddress"
 	eventNameTransfer       = "transfer"
 )
+
+// streamHeartbeatInterval controls how often a HeartbeatEvent is sent to idle
+// subscribers. The SDK-side inactivity timeout
+// (STREAM_HEARTBEAT_TIMEOUT_MS in spark-wallet.ts) should stay at least 2x this
+// value so one missed heartbeat does not trigger an unnecessary reconnect.
+var streamHeartbeatInterval = 5 * time.Second
 
 type EventRouter struct {
 	dbEvents *db.DBEvents
@@ -49,6 +56,7 @@ func (s *EventRouter) SubscribeToEvents(identityPublicKey keys.Public, stream pb
 	readCtx := stream.Context()
 	readOnlySession := db.NewReadOnlySession(readCtx, s.dbClient)
 	readCtx = ent.Inject(readCtx, readOnlySession)
+	knobsService := knobs.GetKnobsService(stream.Context())
 
 	walletSettingHandler := handler.NewWalletSettingHandler(s.config)
 	hasReadAccess, err := walletSettingHandler.HasReadAccessToWallet(readCtx, identityPublicKey)
@@ -67,15 +75,36 @@ func (s *EventRouter) SubscribeToEvents(identityPublicKey keys.Public, stream pb
 			Connected: &pb.ConnectedEvent{},
 		},
 	}
-
 	if err := stream.Send(connectedEvent); err != nil {
 		return nil
+	}
+	// Default off so the SDK-side listener can land before heartbeats are
+	// rolled out on coordinators.
+	heartbeatEnabled := knobsService.GetValue(
+		knobs.KnobGrpcServerStreamHeartbeatEnabled,
+		0,
+	) > 0
+	var heartbeatTicker *time.Ticker
+	var heartbeatEvents <-chan time.Time
+	if heartbeatEnabled {
+		heartbeatTicker = time.NewTicker(streamHeartbeatInterval)
+		heartbeatEvents = heartbeatTicker.C
+		defer heartbeatTicker.Stop()
+	}
+	heartbeatEvent := &pb.SubscribeToEventsResponse{
+		Event: &pb.SubscribeToEventsResponse_Heartbeat{
+			Heartbeat: &pb.HeartbeatEvent{},
+		},
 	}
 
 	for {
 		select {
 		case <-stream.Context().Done():
 			return nil
+		case <-heartbeatEvents:
+			if err := stream.Send(heartbeatEvent); err != nil {
+				return nil
+			}
 		case eventData, ok := <-notificationChan:
 			if !ok {
 				return nil

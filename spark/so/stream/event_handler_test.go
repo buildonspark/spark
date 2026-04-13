@@ -413,6 +413,75 @@ func TestEventRouter_PrivacyEnabled_OwnerAccess(t *testing.T) {
 	stream.mu.Unlock()
 }
 
+func TestEventRouter_SendsHeartbeatWhileIdle(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	cfg := sparktesting.TestConfig(t)
+	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobGrpcServerStreamHeartbeatEnabled: 100,
+	})
+	rng := rand.NewChaCha8([32]byte{})
+	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	originalInterval := streamHeartbeatInterval
+	streamHeartbeatInterval = 10 * time.Millisecond
+	t.Cleanup(func() {
+		streamHeartbeatInterval = originalInterval
+	})
+
+	streamCtx, cancel := context.WithTimeout(t.Context(), 35*time.Millisecond)
+	defer cancel()
+	streamCtx = knobs.InjectKnobsService(streamCtx, fixedKnobs)
+
+	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
+
+	err := router.SubscribeToEvents(identityKey, stream)
+	require.NoError(t, err)
+
+	stream.mu.Lock()
+	defer stream.mu.Unlock()
+
+	require.GreaterOrEqual(t, len(stream.messages), 2)
+	require.NotNil(t, stream.messages[0].GetConnected())
+	for _, message := range stream.messages[1:] {
+		require.NotNil(t, message.GetHeartbeat())
+	}
+}
+
+func TestEventRouter_DoesNotSendHeartbeatWhenDisabled(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	cfg := sparktesting.TestConfig(t)
+	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	rng := rand.NewChaCha8([32]byte{})
+	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	originalInterval := streamHeartbeatInterval
+	streamHeartbeatInterval = 10 * time.Millisecond
+	t.Cleanup(func() {
+		streamHeartbeatInterval = originalInterval
+	})
+
+	streamCtx, cancel := context.WithTimeout(t.Context(), 35*time.Millisecond)
+	defer cancel()
+
+	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
+
+	err := router.SubscribeToEvents(identityKey, stream)
+	require.NoError(t, err)
+
+	stream.mu.Lock()
+	defer stream.mu.Unlock()
+
+	require.Len(t, stream.messages, 1)
+	require.NotNil(t, stream.messages[0].GetConnected())
+}
+
 func TestEventRouter_PrivacyEnabled_NoAccess(t *testing.T) {
 	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
 	dbClient := ctx.Client

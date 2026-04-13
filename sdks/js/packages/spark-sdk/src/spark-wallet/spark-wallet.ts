@@ -56,6 +56,7 @@ import {
   ConnectedEvent,
   DepositAddressQueryResult,
   Direction,
+  HeartbeatEvent,
   Network as NetworkProto,
   networkToJSON,
   PreimageRequestRole,
@@ -533,6 +534,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const INITIAL_DELAY = 1000;
     const MAX_DELAY = 15000;
     const RETRY_FOREVER = Number.POSITIVE_INFINITY;
+    const STREAM_HEARTBEAT_TIMEOUT_MS = 15_000;
+    type StreamActivityTimeoutHandle = ReturnType<typeof setTimeout> & {
+      unref?: () => void;
+    };
     const loggingEnabled = this.config.getLog();
     const logStream = (message: string) => {
       if (!loggingEnabled) {
@@ -560,28 +565,101 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     };
 
+    const createStreamAttemptController = (signal: AbortSignal) => {
+      const controller = new AbortController();
+      const onAbort = () => {
+        controller.abort();
+      };
+
+      signal.addEventListener("abort", onAbort);
+
+      return {
+        controller,
+        cleanup() {
+          signal.removeEventListener("abort", onAbort);
+        },
+      };
+    };
+
+    const createStreamActivityTimeout = (onTimeout: () => void) => {
+      let timer: StreamActivityTimeoutHandle | null = null;
+
+      return {
+        arm() {
+          if (timer != null) {
+            clearTimeout(timer);
+          }
+          timer = setTimeout(
+            onTimeout,
+            STREAM_HEARTBEAT_TIMEOUT_MS,
+          ) as StreamActivityTimeoutHandle;
+          timer.unref?.();
+        },
+        clear() {
+          if (timer != null) {
+            clearTimeout(timer);
+            timer = null;
+          }
+        },
+      };
+    };
+
     let retryCount = 0;
     const streamController = new AbortController();
     this.streamController = streamController;
     while (!streamController.signal.aborted) {
+      const { controller: streamAttemptController, cleanup: cleanupAttempt } =
+        createStreamAttemptController(streamController.signal);
+      let heartbeatTimeoutError: Error | undefined;
+      const streamActivityTimeout = createStreamActivityTimeout(() => {
+        if (
+          streamController.signal.aborted ||
+          streamAttemptController.signal.aborted
+        ) {
+          return;
+        }
+
+        heartbeatTimeoutError = new Error(
+          `UNAVAILABLE: stream heartbeat timed out after ${STREAM_HEARTBEAT_TIMEOUT_MS}ms`,
+        );
+        logStream(
+          `heartbeat timeout after ${STREAM_HEARTBEAT_TIMEOUT_MS}ms; aborting current stream attempt`,
+        );
+        streamAttemptController.abort();
+      });
+
       try {
         const address = this.config.getCoordinatorAddress();
         logStream(`subscribing to ${address} (retry=${retryCount})`);
         const stream = await this.connectionManager.subscribeToEvents(
           address,
-          streamController.signal,
+          streamAttemptController.signal,
         );
         logStream("subscribeToEvents returned async iterator");
         const claimedTransfersIds = await this.claimTransfers();
         logStream(
           `claimTransfers completed claimedTransfers=${claimedTransfersIds.length}`,
         );
+        let heartbeatListenerEnabled = false;
 
         try {
           for await (const data of stream) {
             if (streamController.signal.aborted) {
               logStream("stream controller aborted while iterating");
               break;
+            }
+
+            // Do not enable the heartbeat listener until the stream proves the
+            // connected coordinator actually emits heartbeat events. During a
+            // mixed rollout, older SOs can still serve healthy streams without
+            // heartbeats, and timing those out would create reconnect churn.
+            if (heartbeatListenerEnabled) {
+              streamActivityTimeout.clear();
+            }
+            if (isHeartbeatStreamEvent(data.event)) {
+              heartbeatListenerEnabled = true;
+              streamActivityTimeout.arm();
+              continue;
             }
 
             logStream(
@@ -599,20 +677,38 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
                 data.event.receiverTransfer.transfer.id,
               )
             ) {
+              if (heartbeatListenerEnabled) {
+                streamActivityTimeout.arm();
+              }
               continue;
             }
+
             await this.handleStreamEvent(data);
+            if (
+              heartbeatListenerEnabled &&
+              !streamController.signal.aborted &&
+              !streamAttemptController.signal.aborted
+            ) {
+              streamActivityTimeout.arm();
+            }
           }
           logStream("stream iterator completed without throwing");
+          if (
+            heartbeatTimeoutError != null &&
+            !streamController.signal.aborted
+          ) {
+            throw heartbeatTimeoutError;
+          }
         } catch (error) {
           logStream(
             `stream iterator threw: ${
               error instanceof Error ? error.message : String(error)
             }`,
           );
-          throw error;
+          throw heartbeatTimeoutError ?? error;
         }
       } catch (error) {
+        const retryError = heartbeatTimeoutError ?? error;
         if (streamController.signal.aborted) {
           logStream("stream loop aborted");
           break;
@@ -627,7 +723,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
         logStream(
           `error: ${
-            error instanceof Error ? error.message : String(error)
+            retryError instanceof Error
+              ? retryError.message
+              : String(retryError)
           }; retrying in ${backoffDelay}ms (attempt=${attempt})`,
         );
         this.emit(
@@ -635,7 +733,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           attempt,
           RETRY_FOREVER,
           backoffDelay,
-          error instanceof Error ? error.message : String(error),
+          retryError instanceof Error ? retryError.message : String(retryError),
         );
         try {
           const completed = await delay(backoffDelay, streamController.signal);
@@ -648,6 +746,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           }
         }
       } finally {
+        streamActivityTimeout.clear();
+        cleanupAttempt();
         logStream(
           `stream loop iteration finished retryCount=${retryCount} aborted=${streamController.signal.aborted}`,
         );
@@ -5975,6 +6075,12 @@ function isConnectedStreamEvent(
   event: SubscribeToEventsResponse["event"],
 ): event is { $case: "connected"; connected: ConnectedEvent } {
   return event?.$case === "connected";
+}
+
+function isHeartbeatStreamEvent(
+  event: SubscribeToEventsResponse["event"],
+): event is { $case: "heartbeat"; heartbeat: HeartbeatEvent } {
+  return event?.$case === "heartbeat";
 }
 
 function describeStreamEvent(event: SubscribeToEventsResponse["event"]) {
