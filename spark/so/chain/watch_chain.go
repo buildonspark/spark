@@ -792,8 +792,9 @@ func handleBlock(
 			return fmt.Errorf("failed to query coop exits to tweak: %w", err)
 		}
 
+		requiredConfirmations := int64(knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainCoopExitKeyTweakRequiredConfirmations, 3))
 		for _, coopExit := range coopExitsToTweak {
-			if blockHeight-*coopExit.ConfirmationHeight >= 2 {
+			if blockHeight-*coopExit.ConfirmationHeight+1 >= requiredConfirmations {
 				// Attempt to tweak keys for the coop exit. Ok to log the error and continue here
 				// since this is not critical for the block processing.
 				err = tweakKeysForCoopExitFunc(ctx, coopExit, blockHeight)

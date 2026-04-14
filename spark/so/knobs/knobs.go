@@ -72,8 +72,9 @@ const (
 	// Watch Chain
 	// Set to 0 to disable updating exiting Tree Nodes in Chain Watcher.
 	// DANGEROUS: Disabling it can lead to loss of funds.
-	KnobWatchChainMarkExitingNodesEnabled          = "spark.so.watch_chain.mark_exiting_nodes.enabled"
-	KnobWatchChainTweakKeysForCoopExitDelayEnabled = "spark.so.watch_chain.tweak_keys_for_coop_exit_delay.enabled"
+	KnobWatchChainMarkExitingNodesEnabled               = "spark.so.watch_chain.mark_exiting_nodes.enabled"
+	KnobWatchChainTweakKeysForCoopExitDelayEnabled      = "spark.so.watch_chain.tweak_keys_for_coop_exit_delay.enabled"
+	KnobWatchChainCoopExitKeyTweakRequiredConfirmations = "spark.so.watch_chain.coop_exit_key_tweak_required_confirmations"
 
 	// Tokens
 	KnobTokenTransactionV3Enabled = "spark.so.tokens.token_transaction_v3_enabled"
