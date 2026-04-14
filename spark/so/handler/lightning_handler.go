@@ -2107,6 +2107,10 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.Pr
 		return nil, nil, fmt.Errorf("unable to get transfer: %w", err)
 	}
 
+	if transfer.ExpiryTime.Unix() != 0 && transfer.ExpiryTime.Before(time.Now()) {
+		return nil, nil, fmt.Errorf("transfer %s has expired", transfer.ID)
+	}
+
 	return preimageRequest, transfer, nil
 }
 
