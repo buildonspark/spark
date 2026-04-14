@@ -844,6 +844,7 @@ func verifySignedTransactions(
 // UTXO confirmation is enforced during validation in loadAndValidateDepositAddress.
 func createTreeAndNode(
 	ctx context.Context,
+	config *so.Config,
 	depositAddress *ent.DepositAddress,
 	onChainTx *wire.MsgTx,
 	onChainOutput *wire.TxOut,
@@ -902,24 +903,29 @@ func createTreeAndNode(
 	// Determine tree status based on deposit confirmation.
 	// For multi-UTXO deposits, all UTXOs are already confirmed (enforced in
 	// loadAndValidateDepositAddress), so the tree starts as Available.
-	// For single-UTXO deposits, check the deposit address confirmation status.
-	//
-	// Re-read availability_confirmed_at from the DB rather than using the
-	// cached Go struct. There is a race where the chain watcher confirms the
-	// deposit (sets availability_confirmed_at) between the handler's initial
-	// read and this point. Under READ COMMITTED isolation each statement sees
-	// the latest committed data, so this SELECT picks up the chain watcher's
-	// update. Without this, the node can be created as CREATING even though
-	// the deposit is already confirmed, and neither chain watcher code path
-	// will revisit it — leaving the node stuck in CREATING permanently.
-	freshDepositAddr, err := db.DepositAddress.Get(ctx, depositAddress.ID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to re-read deposit address: %w", err)
+	// For single-UTXO deposits, rely on durable confirmation state instead of
+	// just availability_confirmed_at on the locked deposit address row. The
+	// chain watcher can determine that the deposit has enough confirmations
+	// before its UPDATE on deposit_addresses commits, and this handler may still
+	// be holding a FOR UPDATE lock on that row.
+	depositConfirmed := len(additionalUtxos) > 0
+	if !depositConfirmed {
+		depositConfirmed, err = isDepositUtxoAvailableForTreeCreation(
+			ctx,
+			config,
+			network,
+			depositAddress,
+			onChainTx,
+			vout,
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to determine deposit confirmation state: %w", err)
+		}
 	}
 
 	var treeStatus st.TreeStatus
 	var treeNodeStatus st.TreeNodeStatus
-	if freshDepositAddr.AvailabilityConfirmedAt.IsZero() {
+	if !depositConfirmed {
 		treeStatus = st.TreeStatusPending
 		treeNodeStatus = st.TreeNodeStatusCreating
 	} else {

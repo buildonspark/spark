@@ -902,7 +902,17 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, fmt.Errorf("unexpected signing public key")
 	}
 
-	txConfirmed := !depositAddress.AvailabilityConfirmedAt.IsZero()
+	txConfirmed, err := isDepositUtxoAvailableForTreeCreation(
+		ctx,
+		config,
+		network,
+		depositAddress,
+		onChainTx,
+		req.OnChainUtxo.Vout,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	if txConfirmed && depositAddress.ConfirmationTxid != "" {
 		onChainTxid := onChainTx.TxHash().String()
@@ -2030,7 +2040,7 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 
 	// Step 6: Create tree and node in database with signed transactions
 	// Note: The tree is automatically linked to deposit address via SetDepositAddress() in createTreeAndNode
-	createdTree, createdNode, err := createTreeAndNode(ctx, depositAddress, onChainTx, onChainOutput, additionalUtxos, req.OnChainUtxo.Vout, network, verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
+	createdTree, createdNode, err := createTreeAndNode(ctx, config, depositAddress, onChainTx, onChainOutput, additionalUtxos, req.OnChainUtxo.Vout, network, verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
 	if err != nil {
 		return nil, err
 	}

@@ -236,7 +236,7 @@ func (f *depositTreeCoordinatorFlow) BuildCommitPayload(ctx context.Context, res
 	}
 
 	// 8. Create tree and node on coordinator
-	createdTree, createdNode, err := createTreeAndNode(ctx, f.depositAddressEnt, f.onChainTxWire, f.onChainOutputWire, f.additionalUtxos, f.origReq.OnChainUtxo.Vout, f.networkTyped, f.verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
+	createdTree, createdNode, err := createTreeAndNode(ctx, f.config, f.depositAddressEnt, f.onChainTxWire, f.onChainOutputWire, f.additionalUtxos, f.origReq.OnChainUtxo.Vout, f.networkTyped, f.verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
 	if err != nil {
 		return nil, err
 	}
