@@ -103,6 +103,7 @@ import {
 import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
 import { KeyDerivation, KeyDerivationType } from "../signer/types.js";
 import type { WalletGetUtxosForIdentityParams } from "../spark-readonly-client/types.js";
+import { getSparkTokenPrimitives } from "../token-primitives-bindings/token-primitives-bindings.js";
 import { BitcoinFaucet } from "../tests/utils/test-faucet.js";
 import { Interval } from "../types/index.js";
 import {
@@ -1052,43 +1053,69 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         this.config.getNetworkType(),
       ).tokenIdentifier;
     }
-    const protoPayment = {
-      $case: "tokensPayment",
-      tokensPayment: {
-        tokenIdentifier: decodedTokenIdentifier ?? undefined,
-        amount: amount ? numberToVarBytesBE(amount) : undefined,
-      },
-    } as const;
-    const senderPublicKey = senderSparkAddress
-      ? hexToBytes(
-          decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
-            .identityPublicKey,
-        )
-      : undefined;
-    const invoiceFields = {
-      version: 1,
-      id: uuidv7obj().bytes,
-      paymentType: protoPayment,
-      memo: memo ?? undefined,
-      senderPublicKey,
-      expiryTime: expiryTime ?? undefined,
-    };
-    validateSparkInvoiceFields(invoiceFields);
     const identityPublicKey = await this.config.signer.getIdentityPublicKey();
-    const hash = HashSparkInvoice(
-      invoiceFields,
-      identityPublicKey,
-      this.config.getNetworkType(),
+    if (!this.config.getUseTokenPrimitivesBindings()) {
+      const protoPayment = {
+        $case: "tokensPayment",
+        tokensPayment: {
+          tokenIdentifier: decodedTokenIdentifier ?? undefined,
+          amount: amount ? numberToVarBytesBE(amount) : undefined,
+        },
+      } as const;
+      const senderPublicKey = senderSparkAddress
+        ? hexToBytes(
+            decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
+              .identityPublicKey,
+          )
+        : undefined;
+      const invoiceFields = {
+        version: 1,
+        id: uuidv7obj().bytes,
+        paymentType: protoPayment,
+        memo: memo ?? undefined,
+        senderPublicKey,
+        expiryTime: expiryTime ?? undefined,
+      };
+      validateSparkInvoiceFields(invoiceFields);
+      const hash = HashSparkInvoice(
+        invoiceFields,
+        identityPublicKey,
+        this.config.getNetworkType(),
+      );
+      const signature =
+        await this.config.signer.signSchnorrWithIdentityKey(hash);
+      return encodeSparkAddressWithSignature(
+        {
+          identityPublicKey: bytesToHex(identityPublicKey),
+          network: this.config.getNetworkType(),
+          sparkInvoiceFields: invoiceFields,
+        },
+        signature,
+      );
+    }
+
+    const sparkTokenPrimitives = getSparkTokenPrimitives();
+
+    const preparedInvoice = await sparkTokenPrimitives.prepareTokenInvoice({
+      receiverIdentityPublicKey: identityPublicKey,
+      network: this.config.getNetworkProto(),
+      tokenIdentifier: decodedTokenIdentifier,
+      tokenAmount: amount ? numberToVarBytesBE(amount) : undefined,
+      memo: memo ?? undefined,
+      senderSparkAddress: senderSparkAddress ?? undefined,
+      expiryTimeUnixMillis: expiryTime?.getTime(),
+    });
+    const signature = await this.config.signer.signSchnorrWithIdentityKey(
+      preparedInvoice.sparkInvoiceHash,
     );
-    const signature = await this.config.signer.signSchnorrWithIdentityKey(hash);
-    return encodeSparkAddressWithSignature(
-      {
-        identityPublicKey: bytesToHex(identityPublicKey),
-        network: this.config.getNetworkType(),
-        sparkInvoiceFields: invoiceFields,
-      },
+    const signedInvoice = await sparkTokenPrimitives.finalizeTokenInvoice({
+      receiverIdentityPublicKey: identityPublicKey,
+      network: this.config.getNetworkProto(),
+      sparkInvoiceFieldsBytes: preparedInvoice.sparkInvoiceFieldsBytes,
       signature,
-    );
+    });
+    decodeSparkAddress(signedInvoice, this.config.getNetworkType());
+    return signedInvoice as SparkAddressFormat;
   }
 
   private async resolveSeedAndMnemonic(
