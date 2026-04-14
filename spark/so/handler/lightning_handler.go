@@ -1614,6 +1614,9 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	// For HODL invoices in lightning receive flow without preimageShare, return transfer without preimage
 	// The user will provide the preimage later via ProvidePreimage, and SSP can query it via QueryPreimage
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND || preimageShare == nil {
+		if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
+			partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeLightningSend)
+		}
 		return &pbspark.InitiatePreimageSwapResponse{Transfer: transferProto}, nil
 	}
 
