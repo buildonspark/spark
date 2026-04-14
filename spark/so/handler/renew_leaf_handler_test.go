@@ -17,7 +17,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -25,13 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func createTestRenewLeafHandler() *RenewLeafHandler {
-	config := &so.Config{
-		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
-	}
-	return NewRenewLeafHandler(config)
-}
 
 func createValidTestTransactionBytesWithSequence(t *testing.T, sequence uint32) []byte {
 	tx := wire.NewMsgTx(2)
@@ -340,7 +332,7 @@ func TestConstructRenewNodeTransactions(t *testing.T) {
 func TestConstructRenewRefundTransactions(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
-	handler := createTestRenewLeafHandler()
+
 	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -381,7 +373,7 @@ func TestConstructRenewRefundTransactions(t *testing.T) {
 			signingJob := createTestRenewRefundTimelockSigningJob(t, rng, leafNode, tt.updateBits)
 
 			// Test the function
-			refundTxs, err := handler.constructRenewRefundTransactions(leafNode, parentNode, signingJob)
+			refundTxs, err := constructRenewRefundTransactions(leafNode, parentNode, signingJob)
 			require.NoError(t, err)
 
 			// Parse parent tx to get expected values
@@ -454,7 +446,7 @@ func TestConstructRenewRefundTransactions(t *testing.T) {
 func TestConstructRenewZeroNodeTransactions(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
-	handler := createTestRenewLeafHandler()
+
 	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -492,7 +484,7 @@ func TestConstructRenewZeroNodeTransactions(t *testing.T) {
 			signingJob := createTestRenewNodeZeroTimelockSigningJob(t, rng, leafNode, tt.updateBits)
 
 			// Test the function
-			zeroTxs, err := handler.constructRenewZeroNodeTransactions(leafNode, signingJob)
+			zeroTxs, err := constructRenewZeroNodeTransactions(leafNode, signingJob)
 			require.NoError(t, err)
 
 			// Parse leaf tx to get expected values
@@ -552,8 +544,6 @@ func TestValidateRenewNodeTimelocks(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-
-	handler := createTestRenewLeafHandler()
 
 	// Create test data
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -644,7 +634,7 @@ func TestValidateRenewNodeTimelocks(t *testing.T) {
 			require.NoError(t, err)
 
 			// Test validation
-			err = handler.validateRenewNodeTimelocks(leaf)
+			err = validateRenewNodeTimelocks(leaf)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -661,8 +651,6 @@ func TestValidateRenewRefundTimelock(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-
-	handler := createTestRenewLeafHandler()
 
 	// Create test data
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -746,7 +734,7 @@ func TestValidateRenewRefundTimelock(t *testing.T) {
 			require.NoError(t, err)
 
 			// Test validation
-			err = handler.validateRenewRefundTimelock(leaf)
+			err = validateRenewRefundTimelock(leaf)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -763,8 +751,6 @@ func TestValidateRenewNodeZeroTimelock(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-
-	handler := createTestRenewLeafHandler()
 
 	// Create test data
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -855,7 +841,7 @@ func TestValidateRenewNodeZeroTimelock(t *testing.T) {
 			require.NoError(t, err)
 
 			// Test validation
-			err = handler.validateRenewNodeZeroTimelock(leaf)
+			err = validateRenewNodeZeroTimelock(leaf)
 
 			if tt.expectError {
 				require.Error(t, err)

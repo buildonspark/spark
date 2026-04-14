@@ -633,29 +633,21 @@ func (h *GossipHandler) handleFinalizeTreeNodeGossipMessage(
 }
 
 // dispatchConsensusCommit routes an incoming ConsensusCommit gossip message to
-// the appropriate FlowHandler.Commit based on operation type. New consensus
-// flows add a case here.
+// the appropriate FlowHandler.Commit based on operation type.
 func dispatchConsensusCommit(ctx context.Context, config *so.Config, opType pbgossip.ConsensusOperationType, op proto.Message) error {
-	switch opType {
-	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE:
-		return NewDepositTreeFlowHandler(config).Commit(ctx, op)
-	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE:
-		return NewPreimageShareFlowHandler(config).Commit(ctx, op)
-	default:
-		return fmt.Errorf("unknown consensus operation type for commit: %d", opType)
+	handler, err := consensusFlowHandler(config, opType)
+	if err != nil {
+		return err
 	}
+	return handler.Commit(ctx, op)
 }
 
 // dispatchConsensusRollback routes an incoming ConsensusRollback gossip message
-// to the appropriate FlowHandler.Rollback based on operation type. New consensus
-// flows add a case here.
+// to the appropriate FlowHandler.Rollback based on operation type.
 func dispatchConsensusRollback(ctx context.Context, config *so.Config, opType pbgossip.ConsensusOperationType, op proto.Message) error {
-	switch opType {
-	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE:
-		return NewDepositTreeFlowHandler(config).Rollback(ctx, op)
-	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE:
-		return NewPreimageShareFlowHandler(config).Rollback(ctx, op)
-	default:
-		return fmt.Errorf("unknown consensus operation type for rollback: %d", opType)
+	handler, err := consensusFlowHandler(config, opType)
+	if err != nil {
+		return err
 	}
+	return handler.Rollback(ctx, op)
 }

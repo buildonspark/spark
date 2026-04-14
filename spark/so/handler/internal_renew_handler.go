@@ -49,8 +49,10 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		return fmt.Errorf("failed to query extended leaf node %s: %w", extendedLeafID, err)
 	}
 
-	if extendedLeafNode.Status != st.TreeNodeStatusAvailable {
-		return fmt.Errorf("extended leaf node %s must have status Available, but has status %s", extendedLeafID, extendedLeafNode.Status)
+	// Accept both Available (legacy gossip path where no locking occurs) and
+	// RenewLocked (2PC consensus path where Prepare locks the node before Commit).
+	if extendedLeafNode.Status != st.TreeNodeStatusAvailable && extendedLeafNode.Status != st.TreeNodeStatusRenewLocked {
+		return fmt.Errorf("extended leaf node %s must have status Available or RenewLocked, but has status %s", extendedLeafID, extendedLeafNode.Status)
 	}
 
 	// Process the split node (newly created node) - first node
@@ -165,8 +167,9 @@ func (h *InternalRenewLeafHandler) FinalizeRenewRefundTimelock(ctx context.Conte
 		return fmt.Errorf("failed to query leaf %v: %w", leafID, err)
 	}
 
-	if leafNode.Status != st.TreeNodeStatusAvailable {
-		return fmt.Errorf("leaf node %s must have status Available, but has status %s", leafID, leafNode.Status)
+	// Accept both Available (legacy gossip path) and RenewLocked (2PC consensus path).
+	if leafNode.Status != st.TreeNodeStatusAvailable && leafNode.Status != st.TreeNodeStatusRenewLocked {
+		return fmt.Errorf("leaf node %s must have status Available or RenewLocked, but has status %s", leafID, leafNode.Status)
 	}
 
 	leaf := req.Node

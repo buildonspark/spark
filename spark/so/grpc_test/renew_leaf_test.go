@@ -8,7 +8,10 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/knobs"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -178,4 +181,84 @@ func TestRenewRefundTimelock(t *testing.T) {
 
 	queriedRenewedLeaf := queryLeafByID(t, config, authToken, renewedLeaf3.Id)
 	require.Equal(t, "AVAILABLE", queriedRenewedLeaf.Status)
+}
+
+// queryLeafStatusOnAllOperators queries the node status on each SO individually.
+func queryLeafStatusOnAllOperators(t *testing.T, config *wallet.TestWalletConfig, authToken string, leafID string) map[string]string {
+	t.Helper()
+	statuses := make(map[string]string)
+	ctx := wallet.ContextWithToken(t.Context(), authToken)
+	for identifier, operator := range config.SigningOperators {
+		func() {
+			conn, err := operator.NewOperatorGRPCConnection()
+			require.NoError(t, err)
+			defer conn.Close()
+			sparkClient := pb.NewSparkServiceClient(conn)
+			resp, err := sparkClient.QueryNodes(ctx, &pb.QueryNodesRequest{
+				Source: &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{leafID}}},
+			})
+			require.NoError(t, err)
+			if node, ok := resp.Nodes[leafID]; ok {
+				statuses[identifier] = node.Status
+			}
+		}()
+	}
+	return statuses
+}
+
+// TestRenewConsensusRollbackUnlocksAllOperators verifies that when a renew
+// operation fails after prepare (with the consensus knob enabled), all SOs
+// have their leaf status reset from RenewLocked back to Available.
+func TestRenewConsensusRollbackUnlocksAllOperators(t *testing.T) {
+	kc, err := sparktesting.NewKnobController(t)
+	if err != nil {
+		t.Skipf("skipping: knob controller not available (requires minikube): %v", err)
+	}
+
+	// Enable consensus renew on all SOs
+	err = kc.SetKnob(t, knobs.KnobUseConsensusRenew, 100)
+	require.NoError(t, err)
+
+	config := wallet.NewTestWalletConfig(t)
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100000)
+	require.NoError(t, err)
+	require.Equal(t, "AVAILABLE", rootNode.Status)
+
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
+	require.NoError(t, err)
+
+	// Verify all SOs show Available
+	statuses := queryLeafStatusOnAllOperators(t, config, authToken, rootNode.Id)
+	for id, status := range statuses {
+		assert.Equal(t, "AVAILABLE", status, "SO %s should be Available before renew", id)
+	}
+
+	// Mock: reduce refund_tx timelock to trigger renewal
+	modifyNodeTimelockAllOperators(t, config, rootNode.Id, 0, timelockBelowRenewThreshold)
+	leaf := queryLeafByID(t, config, authToken, rootNode.Id)
+
+	// Attempt a renew with a corrupt signing job to force a failure after prepare.
+	// Send an invalid RenewNodeZeroTimelockSigningJob with empty transactions.
+	ctx := wallet.ContextWithToken(t.Context(), authToken)
+	conn, err := config.NewCoordinatorGRPCConnection()
+	require.NoError(t, err)
+	defer conn.Close()
+	sparkClient := pb.NewSparkServiceClient(conn)
+
+	_, renewErr := sparkClient.RenewLeaf(ctx, &pb.RenewLeafRequest{
+		LeafId: leaf.Id,
+		SigningJobs: &pb.RenewLeafRequest_RenewNodeZeroTimelockSigningJob{
+			RenewNodeZeroTimelockSigningJob: &pb.RenewNodeZeroTimelockSigningJob{
+				// Empty/nil signing jobs — should fail during validation
+			},
+		},
+	})
+	require.Error(t, renewErr, "renew with invalid signing data should fail")
+
+	// Verify all SOs have the leaf back to Available (rollback worked)
+	statuses = queryLeafStatusOnAllOperators(t, config, authToken, rootNode.Id)
+	for id, status := range statuses {
+		assert.Equal(t, "AVAILABLE", status, "SO %s should be Available after failed renew (rollback)", id)
+	}
 }

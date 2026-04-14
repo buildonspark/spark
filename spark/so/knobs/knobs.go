@@ -153,6 +153,9 @@ const (
 	KnobMaxPendingInstantStaticDepositAmount = "spark.so.max_pending_instant_static_deposit_amount"
 
 	KnobPurgeDanglingSigningKeyshareSecretsBatchSize = "spark.so.purge_dangling_signing_keyshare_secrets_batch_size"
+
+	// Enable consensus engine for renew leaf operations.
+	KnobUseConsensusRenew = "spark.so.use_consensus_renew"
 )
 
 type Config struct {

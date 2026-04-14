@@ -389,6 +389,26 @@ func NewSigningJobWithPregeneratedNonce(
 	return signingJob, nil
 }
 
+// NewSigningJobWithDeterministicID is like NewSigningJobWithPregeneratedNonce
+// but uses a caller-provided deterministic job ID instead of a random UUID.
+// This allows multiple SOs to independently construct identical signing jobs
+// that can be correlated by the coordinator during signature aggregation.
+func NewSigningJobWithDeterministicID(
+	jobID uuid.UUID,
+	signingJobProto *pbspark.UserSignedTxSigningJob,
+	signingKeyshare *ent.SigningKeyshare,
+	verifyingPubKey keys.Public,
+	deserializedTx *wire.MsgTx,
+	prevOutput *wire.TxOut,
+) (*SigningJobWithPregeneratedNonce, error) {
+	job, err := NewSigningJobWithPregeneratedNonce(signingJobProto, signingKeyshare, verifyingPubKey, deserializedTx, prevOutput)
+	if err != nil {
+		return nil, err
+	}
+	job.JobID = jobID
+	return job, nil
+}
+
 // SigningKeyshareIDsFromSigningJobs returns the IDs of the keyshares used for signing.
 func SigningKeyshareIDsFromSigningJobs(jobs []*SigningJob) []uuid.UUID {
 	ids := make([]uuid.UUID, len(jobs))
