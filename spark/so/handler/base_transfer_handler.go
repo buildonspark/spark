@@ -460,15 +460,9 @@ func (h *BaseTransferHandler) createTransfer(
 			return nil, nil, fmt.Errorf("primary swap transfer %s amount %d does not match counter transfer amount %d", primaryTransferId.String(), primaryTransfer.TotalValue, counterTransferAmount)
 		}
 		// Validate that the parties in the Swap V3 counter transfer are the reverse of the primary transfer to ensure atomic swap correctness
-		var primarySender, primaryReceiver keys.Public
-		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
-			primarySender, primaryReceiver, err = GetTransferSenderReceiver(primaryTransfer)
-			if err != nil {
-				return nil, nil, err
-			}
-		} else {
-			primarySender = primaryTransfer.SenderIdentityPubkey
-			primaryReceiver = primaryTransfer.ReceiverIdentityPubkey
+		primarySender, primaryReceiver, err := GetSingleTransferSenderReceiver(ctx, primaryTransfer)
+		if err != nil {
+			return nil, nil, err
 		}
 		if !primarySender.Equals(receiverIdentityPubKey) {
 			return nil, nil, fmt.Errorf("counter transfer receiver must be the primary transfer sender: expected %s, got %s", primarySender, receiverIdentityPubKey)
@@ -974,15 +968,10 @@ func (h *BaseTransferHandler) LeafAvailableToTransfer(ctx context.Context, leaf 
 	if err := leafAvailableStatus(leaf); err != nil {
 		return err
 	}
-	var senderPubkey keys.Public
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
-		var err error
-		senderPubkey, err = GetTransferSender(transfer)
-		if err != nil {
-			return err
-		}
-	} else {
-		senderPubkey = transfer.SenderIdentityPubkey
+	// SP-2784: update for multi-sender
+	senderPubkey, err := GetSingleTransferSender(ctx, transfer)
+	if err != nil {
+		return err
 	}
 	if !leaf.OwnerIdentityPubkey.Equals(senderPubkey) {
 		return fmt.Errorf("leaf %v is not owned by sender", leaf.ID)
@@ -1109,15 +1098,10 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 		logger.Sugar().Infof("Transfer %v not found", transferID)
 		return &pbspark.CancelTransferResponse{}, nil
 	}
-	var senderPubkey keys.Public
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
-		var err error
-		senderPubkey, err = GetTransferSender(transfer)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		senderPubkey = transfer.SenderIdentityPubkey
+	// SP-2784: update for multi-sender
+	senderPubkey, err := GetSingleTransferSender(ctx, transfer)
+	if err != nil {
+		return nil, err
 	}
 	if !senderPubkey.Equals(reqSenderIDPubKey) {
 		return nil, fmt.Errorf("only sender is eligible to cancel the transfer %s", transferID)

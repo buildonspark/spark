@@ -1728,14 +1728,9 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
-	var senderPubkey keys.Public
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelTransferSend, 0) > 0 {
-		senderPubkey, err = GetTransferSender(transfer)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		senderPubkey = transfer.SenderIdentityPubkey
+	senderPubkey, err := GetSingleTransferSender(ctx, transfer)
+	if err != nil {
+		return nil, err
 	}
 	err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderPubkey)
 	if err != nil {
@@ -1920,7 +1915,7 @@ func (h *TransferHandler) checkTransferAccessMIMO(
 	transfer *ent.Transfer,
 	accessMap map[keys.Public]bool,
 ) (bool, error) {
-	senderPubkey, receiverPubkey, err := GetTransferSenderReceiver(transfer)
+	senderPubkey, receiverPubkey, err := GetSingleTransferSenderReceiver(ctx, transfer)
 	if err != nil {
 		return false, err
 	}
