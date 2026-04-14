@@ -2377,8 +2377,9 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Client, transfer *e
 	if coopExit.ConfirmationHeight == nil {
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("coop exit tx hasn't been broadcasted"))
 	}
-	if *coopExit.ConfirmationHeight+CoopExitConfirmationThreshold-1 > blockHeight.Height {
-		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height))
+	requiredConfirmations := int64(knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainCoopExitKeyTweakRequiredConfirmations, CoopExitConfirmationThreshold))
+	if blockHeight.Height-*coopExit.ConfirmationHeight+1 < requiredConfirmations {
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", *coopExit.ConfirmationHeight, blockHeight.Height))
 	}
 	return nil
 }
@@ -2423,9 +2424,6 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
-	}
-	if err := checkCoopExitTxBroadcasted(ctx, db, transfer); err != nil {
-		return fmt.Errorf("failed to unlock transfer %s: %w", transferID, err)
 	}
 
 	// This guarantees that the transfer has only one receiver and logic changes to filter leaves, etc
