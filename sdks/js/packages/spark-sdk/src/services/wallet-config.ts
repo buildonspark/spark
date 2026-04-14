@@ -136,11 +136,27 @@ export type ConfigOptions = MayHaveSspClientOptions & {
   readonly useTokenPrimitivesBindings?: boolean;
 };
 
+const VALID_NETWORK_TYPES = new Set<NetworkType>([
+  "LOCAL",
+  "MAINNET",
+  "REGTEST",
+  "SIGNET",
+  "TESTNET",
+]);
+
 const PROD_PUBKEYS = [
   "03dfbdff4b6332c220f8fa2ba8ed496c698ceada563fa01b67d9983bfc5c95e763",
   "03e625e9768651c9be268e287245cc33f96a68ce9141b0b4769205db027ee8ed77",
   "022eda13465a59205413086130a65dc0ed1b8f8e51937043161f8be0c369b1a410",
 ];
+
+const LOCAL_OPERATOR_PUBLIC_KEYS = [
+  "0322ca18fc489ae25418a0e768273c2c61cabb823edfb14feb891e9bec62016510",
+  "0341727a6c41b168f07eb50865ab8c397a53c7eef628ac1020956b705e43b6cb27",
+  "0305ab8d485cc752394de4981f8a5ae004f2becfea6f432c9a59d5022d8764f0a6",
+  "0352aef4d49439dedd798ac4aef1e7ebef95f569545b647a25338398c1247ffdea",
+  "02c05c88cc8fc181b1ba30006df6a4b0597de6490e24514fbdd0266d2b9cd3d0ba",
+] as const;
 
 function getLocalFrostSignerAddress(): string {
   return isHermeticTest ? "localhost:9999" : "unix:///tmp/frost_0.sock";
@@ -233,6 +249,30 @@ export const WalletConfig = {
   MAINNET: MAINNET_WALLET_CONFIG,
 };
 
+export function createLocalSigningOperators(
+  addresses: readonly string[],
+): Record<string, SigningOperator> {
+  if (addresses.length > LOCAL_OPERATOR_PUBLIC_KEYS.length) {
+    throw new Error(
+      `Expected at most ${LOCAL_OPERATOR_PUBLIC_KEYS.length} local signing operators, got ${addresses.length}`,
+    );
+  }
+
+  const operators: Record<string, SigningOperator> = {};
+
+  for (let i = 0; i < addresses.length; i++) {
+    const identifier = `000000000000000000000000000000000000000000000000000000000000000${i + 1}`;
+    operators[identifier] = {
+      id: i,
+      identifier,
+      address: addresses[i]!,
+      identityPublicKey: LOCAL_OPERATOR_PUBLIC_KEYS[i]!,
+    };
+  }
+
+  return operators;
+}
+
 function getSigningOperators(): Record<string, SigningOperator> {
   return {
     "0000000000000000000000000000000000000000000000000000000000000001": {
@@ -274,31 +314,61 @@ export function getLocalSigningOperators(): Record<string, SigningOperator> {
       ? `https://${i}.${hermeticDomain}`
       : `https://localhost:${8535 + i}`,
   );
-
-  const pubkeys = [
-    "0322ca18fc489ae25418a0e768273c2c61cabb823edfb14feb891e9bec62016510",
-    "0341727a6c41b168f07eb50865ab8c397a53c7eef628ac1020956b705e43b6cb27",
-    "0305ab8d485cc752394de4981f8a5ae004f2becfea6f432c9a59d5022d8764f0a6",
-    "0352aef4d49439dedd798ac4aef1e7ebef95f569545b647a25338398c1247ffdea",
-    "02c05c88cc8fc181b1ba30006df6a4b0597de6490e24514fbdd0266d2b9cd3d0ba",
-  ];
-
-  const operators: Record<string, SigningOperator> = {};
-  for (let i = 0; i < numOperators; i++) {
-    // 64-char hex identifier: "000...0001", "000...0002", etc.
-    const identifier = `000000000000000000000000000000000000000000000000000000000000000${i + 1}`;
-    operators[identifier] = {
-      id: i,
-      identifier,
-      address: addresses[i]!,
-      identityPublicKey: pubkeys[i]!,
-    };
-  }
-
-  return operators;
+  return createLocalSigningOperators(addresses);
 }
 
-export function getLocalSigningThreshold(): number {
-  const numOperators = Object.keys(getLocalSigningOperators()).length;
+export function getLocalSigningThreshold(
+  signingOperators: Readonly<
+    Record<string, SigningOperator>
+  > = getLocalSigningOperators(),
+): number {
+  const numOperators = Object.keys(signingOperators).length;
   return Math.floor((numOperators + 2) / 2);
+}
+
+export function normalizeNetworkType(
+  value: string | undefined,
+  defaultNetwork: NetworkType = "REGTEST",
+): NetworkType {
+  const normalizedValue = value?.toUpperCase();
+  return VALID_NETWORK_TYPES.has(normalizedValue as NetworkType)
+    ? (normalizedValue as NetworkType)
+    : defaultNetwork;
+}
+
+export function mergeConfigOptionsForNetwork(
+  network: NetworkType,
+  configOverride?: ConfigOptions,
+): ConfigOptions {
+  if (!configOverride) {
+    return { network };
+  }
+
+  if (configOverride.network && configOverride.network !== network) {
+    throw new Error(
+      `Config file network ${configOverride.network} does not match ${network}`,
+    );
+  }
+
+  return {
+    ...configOverride,
+    network,
+  };
+}
+
+export function rewriteSigningOperatorAddresses(
+  signingOperators: Readonly<Record<string, SigningOperator>>,
+  rewriteAddress: (signingOperator: SigningOperator) => string,
+): Record<string, SigningOperator> {
+  return Object.fromEntries(
+    Object.values(signingOperators)
+      .sort((left, right) => left.id - right.id)
+      .map((signingOperator) => [
+        signingOperator.identifier,
+        {
+          ...signingOperator,
+          address: rewriteAddress(signingOperator),
+        },
+      ]),
+  );
 }

@@ -1,14 +1,13 @@
 // Example Bare script using Spark SDK and Frost addon
 import { SparkWallet } from "@buildonspark/bare";
 import process from "bare-process";
-import walletConfig from "./wallet-config.js";
+import walletConfig, { getExampleWalletOptions } from "./wallet-config.js";
 
 async function transfer(mnemonicInit, receiverSparkAddress, amountSats) {
-  let { wallet, mnemonic } = await SparkWallet.initialize({
+  const options = getExampleWalletOptions(process.env, "REGTEST");
+  let { wallet } = await SparkWallet.initialize({
     mnemonicOrSeed: mnemonicInit,
-    options: {
-      network: "REGTEST",
-    },
+    options,
   });
   const transfer = await wallet.transfer({
     receiverSparkAddress,

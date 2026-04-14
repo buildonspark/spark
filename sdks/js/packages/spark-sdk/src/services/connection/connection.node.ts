@@ -173,7 +173,8 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
       ) {
         internalChannel.currentPicker.subchannel.child.transport.session.socket.unref();
       } else {
-        setTimeout(maybeUnref, 100);
+        const retryTimer = setTimeout(maybeUnref, 100);
+        (retryTimer as unknown as NodeJS.Timeout).unref?.();
       }
     };
 

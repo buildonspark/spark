@@ -6,11 +6,17 @@
   "scripts": {
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
-    "get-wallet-details": "bare get-wallet-details.js",
-    "get-static-deposit-address": "bare get-static-deposit-address.js",
-    "auto-claim-static-deposit": "bare auto-claim-static-deposit.js",
-    "create-lightning-invoice": "bare create-lightning-invoice.js",
-    "transfer": "bare transfer.js"
+    "get-or-create-wallet": "node ./scripts/run-script.mjs get-or-create-wallet",
+    "get-static-deposit-address": "node ./scripts/run-script.mjs get-static-deposit-address",
+    "auto-claim-static-deposit": "node ./scripts/run-script.mjs auto-claim-static-deposit",
+    "create-lightning-invoice": "node ./scripts/run-script.mjs create-lightning-invoice",
+    "transfer": "node ./scripts/run-script.mjs transfer",
+    "run": "node ./scripts/run-script.mjs",
+    "run:local": "cross-env NODE_ENV=development NETWORK=LOCAL node ./scripts/run-script.mjs",
+    "run:k8s": "cross-env-shell NODE_ENV=development NETWORK=LOCAL MINIKUBE_IP=\"${MINIKUBE_IP:-$(minikube ip 2>/dev/null || printf 127.0.0.1)}\" node ./scripts/run-script.mjs",
+    "run:mainnet": "cross-env NODE_ENV=production NETWORK=MAINNET node ./scripts/run-script.mjs",
+    "run:dev": "cross-env NODE_ENV=development NETWORK=REGTEST CONFIG_FILE=../../private/config/dev-regtest-config.json node ./scripts/run-script.mjs",
+    "run:dev:mainnet": "cross-env NODE_ENV=development NETWORK=MAINNET CONFIG_FILE=../../private/config/dev-mainnet-config.json node ./scripts/run-script.mjs"
   },
   "dependencies": {
     "@buildonspark/bare": "0.0.62",
@@ -19,6 +25,7 @@
     "bare-runtime": "^1.28.4"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "prettier": "^3.7.4"
   }
 }

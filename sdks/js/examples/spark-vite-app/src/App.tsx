@@ -6,9 +6,17 @@ import {
   type DummyTx,
 } from "@buildonspark/spark-sdk";
 import { useState } from "react";
+import {
+  getExampleSparkNetwork,
+  getExampleWalletOptions,
+} from "./wallet-config.js";
 
-type Network = "MAINNET" | "TESTNET" | "REGTEST";
+type Network = "LOCAL" | "MAINNET" | "REGTEST" | "TESTNET";
 type StatusType = "info" | "success" | "error";
+const DEFAULT_NETWORK = getExampleSparkNetwork(
+  import.meta.env,
+  "MAINNET",
+) as Network;
 
 function App() {
   const [status, setStatus] = useState<{ type: StatusType; message: string }>({
@@ -16,7 +24,7 @@ function App() {
     message: "Ready",
   });
   const [mnemonic, setMnemonic] = useState("");
-  const [network, setNetwork] = useState<Network>("MAINNET");
+  const [network, setNetwork] = useState<Network>(DEFAULT_NETWORK);
   const [wallet, setWallet] = useState<SparkWallet | null>(null);
   const [sparkAddress, setSparkAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
@@ -29,6 +37,8 @@ function App() {
   const [invoice, setInvoice] = useState<string | null>(null);
 
   const inferNetworkFromAddress = (address: string): Network | null => {
+    if (address.startsWith("sparkl") || address.startsWith("spl"))
+      return "LOCAL";
     if (address.startsWith("sparkrt") || address.startsWith("sprt"))
       return "REGTEST";
     if (address.startsWith("sparkt") || address.startsWith("spt"))
@@ -37,6 +47,9 @@ function App() {
       return "MAINNET";
     return null;
   };
+
+  const buildWalletOptions = () =>
+    getExampleWalletOptions(import.meta.env, network, window.location.origin);
 
   const handleRecipientChange = (address: string) => {
     setRecipientAddress(address);
@@ -74,7 +87,7 @@ function App() {
     try {
       const { wallet: w } = await SparkWallet.initialize({
         mnemonicOrSeed: mnemonic.trim(),
-        options: { network },
+        options: buildWalletOptions(),
       });
       setWallet(w);
       setSparkAddress(await w.getSparkAddress());
@@ -91,7 +104,7 @@ function App() {
     setStatus({ type: "info", message: "Generating..." });
     try {
       const { wallet: w, mnemonic: m } = await SparkWallet.initialize({
-        options: { network },
+        options: buildWalletOptions(),
       });
       setWallet(w);
       if (m) setMnemonic(m);
@@ -193,50 +206,6 @@ function App() {
       <h1>Spark + Vite</h1>
       <p>{new window.s.SparkError("test").message}</p>
 
-      <p>wallet one:</p>
-      <div
-        className="code clickable"
-        onClick={() =>
-          copyToClipboard(
-            "defy only anchor dish kid decorate twist great soon organ moon impulse",
-          )
-        }
-      >
-        defy only anchor dish kid decorate twist great soon organ moon impulse
-      </div>
-      <div
-        className="code clickable"
-        onClick={() =>
-          copyToClipboard(
-            "sprt1pgssx5d7xymk5yq0mfz7823e73fjqrgjez5k8lafch6ldd37aae5uaaek8re32",
-          )
-        }
-      >
-        sprt1pgssx5d7xymk5yq0mfz7823e73fjqrgjez5k8lafch6ldd37aae5uaaek8re32
-      </div>
-      <p>wallet two:</p>
-      <div
-        className="code clickable"
-        onClick={() =>
-          copyToClipboard(
-            "vacuum victory garden veteran bone speak valid today sea bid bench butter",
-          )
-        }
-      >
-        vacuum victory garden veteran bone speak valid today sea bid bench
-        butter
-      </div>
-      <div
-        className="code clickable"
-        onClick={() =>
-          copyToClipboard(
-            "sparkrt1pgss8s364j06fdhptuukgvz2vqkwt0w866yfn9tmx3v0wd57a5yd0rje2c4us7",
-          )
-        }
-      >
-        sparkrt1pgss8s364j06fdhptuukgvz2vqkwt0w866yfn9tmx3v0wd57a5yd0rje2c4us7
-      </div>
-
       <div className={`status ${status.type}`}>{status.message}</div>
 
       <div className="card">
@@ -258,7 +227,7 @@ function App() {
         <div className="section">
           <h3>2. Initialize Wallet</h3>
           <div className="network-selector">
-            {(["MAINNET", "TESTNET", "REGTEST"] as const).map((n) => (
+            {(["MAINNET", "TESTNET", "REGTEST", "LOCAL"] as const).map((n) => (
               <button
                 key={n}
                 onClick={() => setNetwork(n)}

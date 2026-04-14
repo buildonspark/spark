@@ -6,6 +6,7 @@ export interface Template {
 }
 
 const WEB_STEPS = ["{pm} install", "{run} dev"];
+const VITE_STEPS = ["{pm} install", "{run} start"];
 const SERVER_STEPS = ["{pm} install", "{run} start:dev"];
 const START_STEPS = ["{pm} install", "{run} start"];
 
@@ -13,7 +14,7 @@ export const TEMPLATES = {
   vite: {
     dir: "spark-vite-app",
     description: "React + Vite",
-    steps: WEB_STEPS,
+    steps: VITE_STEPS,
   },
   nextjs: {
     dir: "spark-nextjs-app",
@@ -60,12 +61,12 @@ export const TEMPLATES = {
   bare: {
     dir: "spark-bare-app",
     description: "Bare runtime",
-    steps: ["{pm} install", "{run} get-wallet-details"],
+    steps: ["{pm} install", "{run} get-or-create-wallet"],
   },
   "nodejs-scripts": {
     dir: "nodejs-scripts",
     description: "Node.js scripts",
-    steps: ["{pm} install", "npx tsx src/spark-sdk/get_balance.ts"],
+    steps: ["{pm} install", "{run} example"],
   },
 } as const satisfies Record<string, Template>;
 

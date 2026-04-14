@@ -1,54 +1,52 @@
-# React + TypeScript + Vite
+# Spark Vite App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This example app can target local signing operators through the Vite dev server
+proxy while keeping the browser on same-origin URLs.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-});
+```bash
+yarn start
+yarn start:local
+yarn start:k8s
+yarn start:mainnet
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Local SO mode
 
-```js
-// eslint.config.js
-import reactX from "eslint-plugin-react-x";
-import reactDom from "eslint-plugin-react-dom";
+`start:local` proxies browser traffic to:
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    "react-x": reactX,
-    "react-dom": reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs["recommended-typescript"].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-});
+- `https://localhost:8535` via `/spark-rpc/0`
+- `https://localhost:8536` via `/spark-rpc/1`
+- `https://localhost:8537` via `/spark-rpc/2`
+- `http://127.0.0.1:30000` via `/spark-electrs`
+- `http://127.0.0.1:5000` via `/spark-ssp`
+
+`start:k8s` switches those proxy targets to the local Kubernetes ingress:
+
+- `https://0.spark-web.minikube.local` via `/spark-rpc/0`
+- `https://1.spark-web.minikube.local` via `/spark-rpc/1`
+- `https://2.spark-web.minikube.local` via `/spark-rpc/2`
+- `http://mempool.minikube.local/api` via `/spark-electrs`
+- `http://app.minikube.local` via `/spark-ssp`
+
+You can still override any target in `.env.local`:
+
+```bash
+VITE_LOCAL_SPARK_OPERATOR_0_TARGET=https://localhost:8535
+VITE_LOCAL_SPARK_OPERATOR_1_TARGET=https://localhost:8536
+VITE_LOCAL_SPARK_OPERATOR_2_TARGET=https://localhost:8537
+VITE_LOCAL_ELECTRS_TARGET=http://127.0.0.1:30000
+VITE_LOCAL_SSP_TARGET=http://127.0.0.1:5000
+VITE_NUM_SPARK_OPERATORS=3
 ```
+
+The app's `LOCAL` button uses those same-origin proxy URLs so the browser does
+not need to trust the operator certs directly.
+
+## Notes
+
+- The local proxy only exists while running `yarn start*`.
+- The Spark repo's `docker compose up --build` path brings up local signing
+  operators and electrs. Lightning or other SSP-backed flows still need a local
+  SSP if you want those parts of the example to work in `LOCAL`.

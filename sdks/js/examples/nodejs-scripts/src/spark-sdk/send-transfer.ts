@@ -1,16 +1,19 @@
 import { SparkWallet } from "@buildonspark/spark-sdk";
+import {
+  getExampleWalletOptions,
+  requireExampleMnemonic,
+} from "./wallet-config.js";
 
 async function main() {
   // Get mnemonic and receiver address from command line arguments
-  const mnemonic = process.argv[2] || "your_mnemonic_here";
+  const mnemonic = requireExampleMnemonic(process.argv[2]);
   const receiverAddress = process.argv[3] || "your_receiver_address_here";
+  const options = getExampleWalletOptions(process.env, "REGTEST");
 
   // Initialize wallet with configuration object
   const { wallet, mnemonic: walletMnemonic } = await SparkWallet.initialize({
     mnemonicOrSeed: mnemonic,
-    options: {
-      network: "REGTEST",
-    },
+    options,
   });
 
   console.log("wallet mnemonic phrase:", walletMnemonic);

@@ -39,6 +39,16 @@ export { getLatestDepositTxId } from "../utils/mempool.js";
 export { decodeSparkAddress } from "../utils/address.js";
 export { Network, type NetworkType } from "../utils/network.js";
 export {
+  createLocalSigningOperators,
+  getLocalSigningOperators,
+  getLocalSigningThreshold,
+  getSspIdentityPublicKey,
+  getSspSchemaEndpoint,
+  mergeConfigOptionsForNetwork,
+  normalizeNetworkType,
+  rewriteSigningOperatorAddresses,
+} from "../services/wallet-config.js";
+export {
   DefaultSparkSigner,
   UnsafeStatelessSparkSigner,
   type SparkSigner,
