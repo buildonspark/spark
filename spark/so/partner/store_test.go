@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,6 +30,9 @@ func getDB(t *testing.T, ctx context.Context) *ent.Client {
 
 func TestSaveTransferPartner_NoPartnerInContext(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.New(knobs.NewStaticValuesProvider(map[string]float64{
+		knobs.KnobEnablePartnerJWT: 100,
+	})))
 	dbClient := getDB(t, ctx)
 
 	transferID := createTestTransfer(t, ctx, dbClient)
@@ -41,6 +45,9 @@ func TestSaveTransferPartner_NoPartnerInContext(t *testing.T) {
 
 func TestSaveTransferPartner_WithPartnerInContext(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.New(knobs.NewStaticValuesProvider(map[string]float64{
+		knobs.KnobEnablePartnerJWT: 100,
+	})))
 	dbClient := getDB(t, ctx)
 
 	p := createTestPartner(t, ctx, dbClient, "partner-a", "client-1")

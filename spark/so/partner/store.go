@@ -10,13 +10,18 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transferpartner"
+	"github.com/lightsparkdev/spark/so/knobs"
 )
 
 // SaveTransferPartner creates a TransferPartner record on the coordinator linking
 // the transfer to the partner from the request context.
-// If no partner info is present in the context, this is a no-op.
+// Only runs when the partner JWT knob is enabled and partner info is present.
 // Failures are logged but never block the caller.
 func SaveTransferPartner(ctx context.Context, transferID uuid.UUID, transferPartnerType schematype.TransferPartnerType) {
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnablePartnerJWT, 0) == 0 {
+		return
+	}
+
 	pInfo, ok := GetPartnerInfoFromContext(ctx)
 	if !ok {
 		return

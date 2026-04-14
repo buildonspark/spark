@@ -49,6 +49,7 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/partner"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
@@ -413,6 +414,10 @@ func (h *TransferHandler) startTransferInternal(
 
 	// After this point, the transfer send is considered successful.
 	needsRollback = false
+
+	if transferType == st.TransferTypeTransfer {
+		partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeTransfer)
+	}
 
 	if req.TransferPackage != nil {
 		entTx, err := ent.GetTxFromContext(ctx)
