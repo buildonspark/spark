@@ -1037,6 +1037,33 @@ export default class LeafManager {
       throw error;
     }
 
+    // Renew SSP-returned leaves before caching. The SSP may send leaves
+    // with low timelocks (≤200) that would crash the next swap signing
+    // path (signRefundsCore: "timelock interval is less than or equal to 0").
+    try {
+      const preRenewalLeaves = newLeaves;
+      const renewedLeaves = await this.checkRenewLeaves(preRenewalLeaves);
+      if (renewedLeaves.length === preRenewalLeaves.length) {
+        newLeaves = renewedLeaves;
+      } else {
+        // Partial renewal — one or more nodes were silently dropped. Cache
+        // the originals so Phase 4 can still select the correct amounts;
+        // low-timelock leaves will be renewed on next sync() or access.
+        console.warn(
+          "[LeafManager] checkRenewLeaves returned fewer leaves after swap, caching originals",
+          { before: preRenewalLeaves.length, after: renewedLeaves.length },
+        );
+      }
+    } catch (err) {
+      // Renewal failed (e.g. network error). Cache the original leaves so
+      // Phase 4 can still update state and preserve the user's balance.
+      // Low-timelock leaves will be renewed on the next sync() or access.
+      console.warn(
+        "[LeafManager] checkRenewLeaves failed after swap, caching original leaves",
+        err,
+      );
+    }
+
     // Phase 4: Update state and re-select under lock
     return await this.leavesMutex.runExclusive(() => {
       this.transition(swapLeafIds, LeafStatus.SPENT);
