@@ -46,6 +46,7 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/partner"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -2196,6 +2197,8 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 	if err != nil {
 		return nil, fmt.Errorf("unable to create and send gossip message to settle sender key tweak: %w", err)
 	}
+
+	partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeLightningReceive)
 
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {

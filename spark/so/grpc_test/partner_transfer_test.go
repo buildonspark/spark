@@ -16,7 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent/partner"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/ent/transfer"
+	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferpartner"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
@@ -119,7 +119,7 @@ func testTransferWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signToke
 
 	tp, err := coordClient.TransferPartner.Query().
 		Where(
-			transferpartner.HasTransferWith(transfer.IDEQ(transferID)),
+			transferpartner.HasTransferWith(enttransfer.IDEQ(transferID)),
 			transferpartner.HasPartnerWith(
 				partner.PartnerID(testPartnerID),
 				partner.LabelEQ(testLabel),
@@ -128,6 +128,125 @@ func testTransferWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signToke
 		Only(t.Context())
 	require.NoError(t, err, "transfer_partners record not found on coordinator for transfer %s", transferID)
 	require.Equal(t, st.TransferPartnerTypeTransfer, tp.Type)
+}
+
+func TestHodlReceiveWithPartnerAttribution_ES256(t *testing.T) {
+	partnerKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	compressedKey := elliptic.MarshalCompressed(elliptic.P256(), partnerKey.PublicKey.X, partnerKey.PublicKey.Y)
+	p256Key, err := keys.ParseP256PublicKey(compressedKey)
+	require.NoError(t, err)
+	jwtPubKey := jwtkeys.PublicFromP256(p256Key)
+
+	testHodlReceiveWithPartnerJWT(t, jwtPubKey, func(partnerID, label string) string {
+		return signJWT(t, "ES256", partnerID, label, func(digest []byte) []byte {
+			r, s, err := ecdsa.Sign(rand.Reader, partnerKey, digest)
+			require.NoError(t, err)
+			sig := make([]byte, 64)
+			r.FillBytes(sig[:32])
+			s.FillBytes(sig[32:])
+			return sig
+		})
+	})
+}
+
+func TestHodlReceiveWithPartnerAttribution_ES256K(t *testing.T) {
+	partnerKey := keys.GeneratePrivateKey()
+	jwtPubKey := jwtkeys.PublicFromSecp256k1(partnerKey.Public())
+
+	ecKey := partnerKey.ToBTCEC().ToECDSA()
+	testHodlReceiveWithPartnerJWT(t, jwtPubKey, func(partnerID, label string) string {
+		return signJWT(t, "ES256K", partnerID, label, func(digest []byte) []byte {
+			r, s, err := ecdsa.Sign(rand.Reader, ecKey, digest)
+			require.NoError(t, err)
+			sig := make([]byte, 64)
+			r.FillBytes(sig[:32])
+			s.FillBytes(sig[32:])
+			return sig
+		})
+	})
+}
+
+func testHodlReceiveWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signToken func(partnerID, label string) string) {
+	t.Helper()
+
+	testPartnerID := "test-partner-" + uuid.New().String()[:8]
+	testLabel := "client-1"
+
+	// User config (receiver who will ProvidePreimage) and SSP config (sender).
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
+
+	// Create the partner record on the coordinator database.
+	coordSetupClient := db.NewPostgresEntClientForIntegrationTest(t, userConfig.CoordinatorDatabaseURI)
+	defer coordSetupClient.Close()
+	_, err := coordSetupClient.Partner.Create().
+		SetPartnerID(testPartnerID).
+		SetLabel(testLabel).
+		SetPartnerName("Integration Test Partner").
+		SetJwtPublicKey(jwtPubKey).
+		Save(t.Context())
+	require.NoError(t, err, "failed to create partner on coordinator")
+
+	amountSats := uint64(100)
+	preimage, paymentHash := testPreimageHash(t, amountSats)
+	invoice := testInvoice
+
+	// SSP creates a tree and initiates the preimage swap.
+	userLeafPrivKey := keys.GeneratePrivateKey()
+	feeSats := uint64(2)
+	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, userLeafPrivKey, 12347)
+	require.NoError(t, err)
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	leaves := []wallet.LeafKeyTweak{{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    userLeafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}}
+
+	response, err := wallet.SwapNodesForPreimage(
+		t.Context(),
+		sspConfig,
+		leaves,
+		userConfig.IdentityPublicKey(),
+		paymentHash[:],
+		&invoice,
+		feeSats,
+		false,
+		amountSats,
+	)
+	require.NoError(t, err)
+
+	transfer, err := wallet.DeliverTransferPackage(t.Context(), sspConfig, response.Transfer, leaves, nil)
+	require.NoError(t, err)
+
+	// User provides preimage WITH partner JWT header.
+	token := signToken(testPartnerID, testLabel)
+	ctx := metadata.AppendToOutgoingContext(t.Context(), "x-partner-jwt", token)
+	receiverTransfer, err := wallet.ProvidePreimage(ctx, userConfig, preimage[:])
+	require.NoError(t, err)
+	require.Equal(t, transfer.Id, receiverTransfer.Id)
+
+	transferID, err := uuid.Parse(receiverTransfer.Id)
+	require.NoError(t, err)
+
+	// Verify a transfer_partners record was created on the coordinator.
+	coordClient := db.NewPostgresEntClientForIntegrationTest(t, userConfig.CoordinatorDatabaseURI)
+	defer coordClient.Close()
+
+	tp, err := coordClient.TransferPartner.Query().
+		Where(
+			transferpartner.HasTransferWith(enttransfer.IDEQ(transferID)),
+			transferpartner.HasPartnerWith(
+				partner.PartnerID(testPartnerID),
+				partner.LabelEQ(testLabel),
+			),
+		).
+		Only(t.Context())
+	require.NoError(t, err, "transfer_partners record not found on coordinator for transfer %s", transferID)
+	require.Equal(t, st.TransferPartnerTypeLightningReceive, tp.Type)
 }
 
 func signJWT(t *testing.T, alg, partnerID, label string, signer func(digest []byte) []byte) string {
