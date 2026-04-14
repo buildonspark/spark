@@ -711,18 +711,18 @@ func applySignaturesToTransactionsAndVerify(ctx context.Context, leafRefundMap m
 func ApplySignatureToTxAndVerify(rawTx []byte, signature []byte, adaptorPublicKey keys.Public, outpoint *wire.TxOut, verifyingPubkey keys.Public) ([]byte, error) {
 	updatedTx, err := common.UpdateTxWithSignature(rawTx, 0, signature)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update tx signature: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to update tx signature: %w", err))
 	}
 
 	tx, err := common.TxFromRawTxBytes(updatedTx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to deserialize tx: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to deserialize tx: %w", err))
 	}
 
 	// Check that the signatures are not adapted and can be verified directly
 	if adaptorPublicKey.IsZero() {
 		if err := common.VerifySignatureSingleInput(tx, 0, outpoint); err != nil {
-			return nil, fmt.Errorf("unable to verify tx signature: %w", err)
+			return nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify tx signature: %w", err))
 		}
 	} else {
 		// Swap V3 flow
@@ -733,7 +733,7 @@ func ApplySignatureToTxAndVerify(rawTx []byte, signature []byte, adaptorPublicKe
 		}
 		err = common.ValidateAdaptorSignature(taprootKey, sighash, signature, adaptorPublicKey)
 		if err != nil {
-			return nil, fmt.Errorf("unable to validate adaptor signature: %w", err)
+			return nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate adaptor signature: %w", err))
 		}
 	}
 	return updatedTx, nil
