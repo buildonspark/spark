@@ -40,8 +40,10 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark/so/ent/preimagesharepartner"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/ent/transferpartner"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -124,6 +126,11 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 	if err != nil {
 		return fmt.Errorf("unable to store preimage share: %w", err)
 	}
+
+	if err := savePreimageSharePartner(ctx, tx, req.PaymentHash); err != nil {
+		logging.GetLoggerFromContext(ctx).Sugar().Warnf("failed to save preimage share partner attribution: %v", err)
+	}
+
 	return nil
 }
 
@@ -144,31 +151,38 @@ func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspar
 		if err != nil {
 			return fmt.Errorf("consensus store preimage share failed: %w", err)
 		}
-		return nil
+	} else {
+		// Legacy path
+		if err := h.decryptAndStorePreimageShare(ctx, req); err != nil {
+			return fmt.Errorf("unable to store coordinator preimage share: %w", err)
+		}
+
+		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+		_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+			conn, err := operator.NewOperatorGRPCConnection()
+			if err != nil {
+				return nil, err
+			}
+			defer conn.Close()
+
+			client := pbinternal.NewSparkInternalServiceClient(conn)
+			_, err = client.StorePreimageShare(ctx, req)
+			if err != nil {
+				return nil, fmt.Errorf("unable to store preimage share on operator %s: %w", operator.Identifier, err)
+			}
+			return nil, nil
+		})
+		if err != nil {
+			return fmt.Errorf("unable to store preimage share on all operators: %w", err)
+		}
 	}
 
-	// Legacy path
-	if err := h.decryptAndStorePreimageShare(ctx, req); err != nil {
-		return fmt.Errorf("unable to store coordinator preimage share: %w", err)
-	}
-
-	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
-		if err != nil {
-			return nil, err
-		}
-		defer conn.Close()
-
-		client := pbinternal.NewSparkInternalServiceClient(conn)
-		_, err = client.StorePreimageShare(ctx, req)
-		if err != nil {
-			return nil, fmt.Errorf("unable to store preimage share on operator %s: %w", operator.Identifier, err)
-		}
-		return nil, nil
-	})
+	// Save partner attribution on the coordinator only.
+	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to store preimage share on all operators: %w", err)
+		logging.GetLoggerFromContext(ctx).Sugar().Warnf("failed to get db context for preimage share partner attribution: %v", err)
+	} else if err := savePreimageSharePartner(ctx, db, req.PaymentHash); err != nil {
+		logging.GetLoggerFromContext(ctx).Sugar().Warnf("failed to save preimage share partner attribution: %v", err)
 	}
 
 	return nil
@@ -252,6 +266,84 @@ func (h *LightningHandler) decryptAndStorePreimageShare(ctx context.Context, req
 		Exec(ctx)
 	if err != nil && !errors.Is(err, dbSql.ErrNoRows) {
 		return fmt.Errorf("unable to store preimage share: %w", err)
+	}
+
+	return nil
+}
+
+// savePreimageSharePartner associates the preimage share with the partner from
+// the request context. No-op if the partner JWT knob is disabled or no partner
+// info is present in context.
+func savePreimageSharePartner(ctx context.Context, db *ent.Client, paymentHash []byte) error {
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnablePartnerJWT, 0) == 0 {
+		return nil
+	}
+
+	pInfo, ok := partner.GetPartnerInfoFromContext(ctx)
+	if !ok {
+		return nil
+	}
+
+	share, err := db.PreimageShare.Query().Where(preimageshare.PaymentHash(paymentHash)).Only(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to query preimage share for partner attribution: %w", err)
+	}
+
+	err = db.PreimageSharePartner.Create().
+		SetPartnerID(pInfo.PartnerDBID).
+		SetPreimageShareID(share.ID).
+		OnConflictColumns(preimagesharepartner.PreimageShareColumn).
+		Ignore().
+		Exec(ctx)
+	if err != nil && !errors.Is(err, dbSql.ErrNoRows) {
+		return fmt.Errorf("unable to save preimage share partner: %w", err)
+	}
+	return nil
+}
+
+// saveTransferPartnerFromPreimageShare looks up the partner attributed to the
+// preimage share and creates a corresponding transfer_partner record.
+// This is only called for non-hodl lightning receive (preimageShare != nil
+// implies REASON_RECEIVE), so the type is always LIGHTNING_RECEIVE.
+// No-op if the preimage share has no partner attribution.
+func saveTransferPartnerFromPreimageShare(ctx context.Context, preimageShare *ent.PreimageShare, transfer *ent.Transfer) error {
+	if preimageShare == nil {
+		return nil
+	}
+
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnablePartnerJWT, 0) == 0 {
+		return nil
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get db from context: %w", err)
+	}
+
+	psp, err := db.PreimageSharePartner.Query().
+		Where(preimagesharepartner.HasPreimageShareWith(preimageshare.IDEQ(preimageShare.ID))).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("unable to query preimage share partner: %w", err)
+	}
+
+	partnerID, err := psp.QueryPartner().OnlyID(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to query partner from preimage share partner: %w", err)
+	}
+
+	err = db.TransferPartner.Create().
+		SetPartnerID(partnerID).
+		SetTransferID(transfer.ID).
+		SetType(st.TransferPartnerTypeLightningReceive).
+		OnConflictColumns(transferpartner.TransferColumn).
+		Ignore().
+		Exec(ctx)
+	if err != nil && !errors.Is(err, dbSql.ErrNoRows) {
+		return fmt.Errorf("unable to save transfer partner: %w", err)
 	}
 	return nil
 }
@@ -1696,6 +1788,11 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	_, err = db.PreimageRequest.UpdateOneID(preimageRequest.ID).SetPreimage(secretBytes).SetStatus(st.PreimageRequestStatusPreimageShared).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
+	}
+
+	// Save partner attribution after all critical work succeeds.
+	if err := saveTransferPartnerFromPreimageShare(ctx, preimageShare, transfer); err != nil {
+		logger.Sugar().Warnf("failed to save transfer partner attribution for transfer %s: %v", transfer.ID, err)
 	}
 
 	return &pbspark.InitiatePreimageSwapResponse{Preimage: secretBytes, Transfer: transferProto}, nil

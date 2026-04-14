@@ -13,11 +13,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	jwtkeys "github.com/lightsparkdev/spark/common/keys/jwt"
+	"github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent/partner"
+	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferpartner"
+	"github.com/lightsparkdev/spark/so/knobs"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
@@ -346,6 +350,161 @@ func testLightningSendWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, sig
 	require.Equal(t, st.TransferPartnerTypeLightningSend, tp.Type)
 }
 
+// TestNonHodlReceiveWithPartnerAttribution verifies that partner info stored
+// with StorePreimageShareV2 propagates to transfer_partner during
+// InitiatePreimageSwapV2 (non-hodl receive).
+func TestNonHodlReceiveWithPartnerAttribution(t *testing.T) {
+	partnerKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	compressedKey := elliptic.MarshalCompressed(elliptic.P256(), partnerKey.PublicKey.X, partnerKey.PublicKey.Y)
+	p256Key, err := keys.ParseP256PublicKey(compressedKey)
+	require.NoError(t, err)
+	jwtPubKey := jwtkeys.PublicFromP256(p256Key)
+
+	testPartnerID := "test-partner-" + uuid.New().String()[:8]
+	testLabel := "client-1"
+
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
+
+	// Enable partner JWT knob.
+	kc, err := sparktesting.NewKnobController(t)
+	require.NoError(t, err)
+	err = kc.SetKnob(t, knobs.KnobEnablePartnerJWT, 100)
+	require.NoError(t, err)
+
+	// Create partner on coordinator.
+	coordSetupClient := db.NewPostgresEntClientForIntegrationTest(t, userConfig.CoordinatorDatabaseURI)
+	defer coordSetupClient.Close()
+	_, err = coordSetupClient.Partner.Create().
+		SetPartnerID(testPartnerID).
+		SetLabel(testLabel).
+		SetPartnerName("Integration Test Partner").
+		SetJwtPublicKey(jwtPubKey).
+		Save(t.Context())
+	require.NoError(t, err)
+
+	amountSats := uint64(100)
+	preimage, paymentHash := testPreimageHash(t, amountSats)
+	invoice := testInvoice
+
+	// Clean stale preimage data from prior runs (hardcoded preimage is shared).
+	coordSetupClient.PreimageSharePartner.Delete().Exec(t.Context())                                           //nolint:errcheck // best-effort cleanup
+	coordSetupClient.PreimageShare.Delete().Where(preimageshare.PaymentHash(paymentHash[:])).Exec(t.Context()) //nolint:errcheck // best-effort cleanup
+	cleanUpPreimageShareOnNonCoordinators(t, userConfig, paymentHash)
+
+	// Store preimage shares on all SOs with partner JWT in context.
+	// The v1 StorePreimageShare handler saves preimage_share_partner when the
+	// partner JWT knob is enabled and the JWT is in context.
+	partnerJWT := signJWT(t, "ES256", testPartnerID, testLabel, func(digest []byte) []byte {
+		r, s, err := ecdsa.Sign(rand.Reader, partnerKey, digest)
+		require.NoError(t, err)
+		sig := make([]byte, 64)
+		r.FillBytes(sig[:32])
+		s.FillBytes(sig[32:])
+		return sig
+	})
+	jwtCtx := metadata.AppendToOutgoingContext(t.Context(), "x-partner-jwt", partnerJWT)
+
+	fakeInvoiceCreator := NewFakeLightningInvoiceCreator()
+	_, err = wallet.CreateLightningInvoiceWithPreimage(
+		jwtCtx, userConfig, fakeInvoiceCreator, amountSats, "test", preimage,
+	)
+	require.NoError(t, err)
+
+	// Clean up after this test: delete partner FK on coordinator, then use the
+	// shared cleanUp which handles all SOs via mock RPC.
+	// Use defer instead of t.Cleanup because cleanUp makes gRPC calls with
+	// t.Context(), which is canceled before t.Cleanup runs (Go 1.24+).
+	defer func() {
+		coordSetupClient.PreimageSharePartner.Delete().Exec(t.Context()) //nolint:errcheck // best-effort cleanup
+		cleanUp(t, userConfig, paymentHash)
+	}()
+
+	// Initiate preimage swap (non-hodl receive).
+	sspLeafPrivKey := keys.GeneratePrivateKey()
+	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
+	require.NoError(t, err)
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	leaves := []wallet.LeafKeyTweak{{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    sspLeafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}}
+
+	conn, err := sspConfig.NewCoordinatorGRPCConnection()
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), sspConfig, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+	client := spark.NewSparkServiceClient(conn)
+
+	transferID, err := uuid.NewV7()
+	require.NoError(t, err)
+
+	keyTweakInputMap, err := wallet.PrepareSendTransferKeyTweaks(
+		sspConfig, transferID, userConfig.IdentityPublicKey(), leaves, map[string][]byte{},
+	)
+	require.NoError(t, err)
+
+	transferPackage, err := wallet.PrepareTransferPackage(
+		ctx, sspConfig, client, transferID, keyTweakInputMap, leaves,
+		userConfig.IdentityPublicKey(), keys.Public{},
+	)
+	require.NoError(t, err)
+
+	userSignedLeavesToSend, err := wallet.PrepareUserSignedLeafSigningJobs(
+		ctx, sspConfig, client, leaves, userConfig.IdentityPublicKey(), keys.Public{},
+	)
+	require.NoError(t, err)
+
+	response, err := client.InitiatePreimageSwapV2(ctx, &spark.InitiatePreimageSwapRequest{
+		PaymentHash: paymentHash[:],
+		Reason:      spark.InitiatePreimageSwapRequest_REASON_RECEIVE,
+		InvoiceAmount: &spark.InvoiceAmount{
+			InvoiceAmountProof: &spark.InvoiceAmountProof{Bolt11Invoice: invoice},
+			ValueSats:          amountSats,
+		},
+		Transfer: &spark.StartUserSignedTransferRequest{
+			TransferId:                transferID.String(),
+			OwnerIdentityPublicKey:    sspConfig.IdentityPublicKey().Serialize(),
+			ReceiverIdentityPublicKey: userConfig.IdentityPublicKey().Serialize(),
+			LeavesToSend:              userSignedLeavesToSend,
+		},
+		TransferRequest: &spark.StartTransferRequest{
+			TransferId:                transferID.String(),
+			OwnerIdentityPublicKey:    sspConfig.IdentityPublicKey().Serialize(),
+			ReceiverIdentityPublicKey: userConfig.IdentityPublicKey().Serialize(),
+			TransferPackage:           transferPackage,
+		},
+		ReceiverIdentityPublicKey: userConfig.IdentityPublicKey().Serialize(),
+		FeeSats:                   0,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	require.NotEmpty(t, response.Preimage)
+
+	// Verify transfer_partner on coordinator.
+	coordClient := db.NewPostgresEntClientForIntegrationTest(t, userConfig.CoordinatorDatabaseURI)
+	defer coordClient.Close()
+
+	tp, err := coordClient.TransferPartner.Query().
+		Where(
+			transferpartner.HasTransferWith(enttransfer.IDEQ(transferID)),
+			transferpartner.HasPartnerWith(
+				partner.PartnerID(testPartnerID),
+				partner.LabelEQ(testLabel),
+			),
+		).
+		Only(t.Context())
+	require.NoError(t, err, "transfer_partners record not found on coordinator for transfer %s", transferID)
+	require.Equal(t, st.TransferPartnerTypeLightningReceive, tp.Type)
+}
+
 func signJWT(t *testing.T, alg, partnerID, label string, signer func(digest []byte) []byte) string {
 	t.Helper()
 
@@ -365,4 +524,20 @@ func signJWT(t *testing.T, alg, partnerID, label string, signer func(digest []by
 	sig := signer(digest[:])
 
 	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+// cleanUpPreimageShareOnNonCoordinators deletes preimage shares from non-coordinator
+// SOs via direct DB. Errors are ignored since the shares may not exist.
+func cleanUpPreimageShareOnNonCoordinators(t *testing.T, config *wallet.TestWalletConfig, paymentHash [32]byte) {
+	t.Helper()
+	numOperators := len(sparktesting.GetAllSigningOperators(t))
+	for i := range numOperators {
+		dbURI := sparktesting.GetTestDatabasePath(i)
+		if dbURI == config.CoordinatorDatabaseURI {
+			continue
+		}
+		entClient := db.NewPostgresEntClientForIntegrationTest(t, dbURI)
+		entClient.PreimageShare.Delete().Where(preimageshare.PaymentHash(paymentHash[:])).Exec(t.Context()) //nolint:errcheck // best-effort cleanup
+		entClient.Close()
+	}
 }

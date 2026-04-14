@@ -18,6 +18,7 @@ import (
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark/so/ent/preimagesharepartner"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
@@ -44,6 +45,12 @@ func (o *MockServer) CleanUpPreimageShare(ctx context.Context, req *pbmock.Clean
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	// Delete preimage_share_partners before preimage_shares (FK constraint).
+	shares, _ := db.PreimageShare.Query().Where(preimageshare.PaymentHashEQ(req.PaymentHash)).All(ctx)
+	for _, s := range shares {
+		db.PreimageSharePartner.Delete().Where(preimagesharepartner.HasPreimageShareWith(preimageshare.IDEQ(s.ID))).Exec(ctx) //nolint:errcheck // best-effort
 	}
 
 	_, err = db.PreimageShare.Delete().Where(preimageshare.PaymentHashEQ(req.PaymentHash)).Exec(ctx)
