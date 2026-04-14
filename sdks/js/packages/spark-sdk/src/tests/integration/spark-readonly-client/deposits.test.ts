@@ -16,6 +16,7 @@ import {
 import { SparkReadonlyClient } from "../../../spark-readonly-client/spark-readonly-client.node.js";
 import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
+import { retryUntilSuccess } from "../../utils/utils.js";
 import { SparkValidationError } from "../../../errors/types.js";
 
 describe("getUnusedDepositAddresses", () => {
@@ -163,9 +164,16 @@ describe("getUtxosForDepositAddress", () => {
     await faucet.sendToAddress(depositAddress, 5_000n);
     await faucet.mineBlocksAndWaitForMiningToComplete(3);
 
-    const result = await publicClient.getUtxosForDepositAddress({
-      depositAddress,
-    });
+    const result = await retryUntilSuccess(
+      async () => {
+        const utxos = await publicClient.getUtxosForDepositAddress({
+          depositAddress,
+        });
+        expect(utxos.utxos.length).toBeGreaterThanOrEqual(1);
+        return utxos;
+      },
+      { maxAttempts: 20, delayMs: 1000 },
+    );
     expect(result.utxos.length).toBeGreaterThanOrEqual(1);
     expect(result.utxos[0]!.txid).toBeDefined();
     expect(result.utxos[0]!.vout).toBeDefined();

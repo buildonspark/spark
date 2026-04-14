@@ -12,6 +12,7 @@ import {
   SparkWalletTestingWithStream,
 } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
+import { retryUntilSuccess } from "../utils/utils.js";
 import { DefaultSparkSigner } from "../../signer/signer.js";
 import type { ConfigOptions } from "../../services/wallet-config.js";
 import { encodeSparkAddress } from "../../utils/address.js";
@@ -52,6 +53,17 @@ export async function createFundedWallet(
   const signedTx = await faucet.sendToAddress(depositAddress, amountSats);
   await faucet.mineBlocksAndWaitForMiningToComplete(3);
   await wallet.claimDeposit(signedTx.id);
+  await retryUntilSuccess(
+    async () => {
+      const balance = await wallet.getBalance();
+      if (balance.satsBalance.available !== amountSats) {
+        throw new Error(
+          `expected available balance ${amountSats}, got ${balance.satsBalance.available}`,
+        );
+      }
+    },
+    { maxAttempts: 20, delayMs: 1000 },
+  );
 
   const sparkAddress = await wallet.getSparkAddress();
   const identityPublicKey = await wallet.getIdentityPublicKey();
