@@ -213,7 +213,10 @@ export interface SparkWalletEvents {
   }) => void;
   /** Emitted when a token transaction is finalized (both sender and receiver). Includes the updated balances for affected tokens. */
   [SparkWalletEvent.TokenBalanceUpdate]: (event: {
-    tokenTransactionHash: Uint8Array;
+    finalizedTokenTransactions: Array<{
+      tokenTransactionHash: Uint8Array;
+      sparkInvoices: string[];
+    }>;
     tokenBalances: TokenBalanceMap;
   }) => void;
   /** Emitted when an incoming transfer is successfully claimed. Includes the transfer ID and new total balance. */

@@ -114,6 +114,7 @@ message SubscribeToEventsResponse {
 message TokenTransactionEvent {
     bytes token_transaction_hash = 1;
     repeated bytes token_identifiers = 2;
+    repeated string spark_invoices = 3;
 }
 
 message ConnectedEvent { }

@@ -355,6 +355,7 @@ func (s *EventRouter) processTokenTransactionNotification(ctx context.Context, e
 		Where(tokentransaction.ID(event.ID)).
 		WithSpentOutput().
 		WithCreatedOutput().
+		WithSparkInvoice().
 		Only(ctx)
 	if err != nil {
 		s.logger.With(zap.Error(err)).Sugar().Warnf("failed to query token transaction %s for stream event", event.ID)
@@ -374,11 +375,17 @@ func (s *EventRouter) processTokenTransactionNotification(ctx context.Context, e
 		tokenIdentifiers = append(tokenIdentifiers, id)
 	}
 
+	sparkInvoices := make([]string, 0, len(tx.Edges.SparkInvoice))
+	for _, inv := range tx.Edges.SparkInvoice {
+		sparkInvoices = append(sparkInvoices, inv.SparkInvoice)
+	}
+
 	return &pb.SubscribeToEventsResponse{
 		Event: &pb.SubscribeToEventsResponse_TokenTransaction{
 			TokenTransaction: &pb.TokenTransactionEvent{
 				TokenTransactionHash: tx.FinalizedTokenTransactionHash,
 				TokenIdentifiers:     tokenIdentifiers,
+				SparkInvoices:        sparkInvoices,
 			},
 		},
 	}

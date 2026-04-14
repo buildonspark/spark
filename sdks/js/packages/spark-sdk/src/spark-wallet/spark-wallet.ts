@@ -218,6 +218,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   private streamController: AbortController | null = null;
   private tokenSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private tokenSyncPendingIds: Set<Bech32mTokenIdentifier> = new Set();
+  private tokenSyncPendingTransactions: Array<{
+    tokenTransactionHash: Uint8Array;
+    sparkInvoices: string[];
+  }> = [];
   private tokenOptimizationInProgress = false;
   private tokenOptimizationInterval: Interval | null = null;
   private tokenOutputManager: TokenOutputManager;
@@ -530,14 +534,17 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           );
         }
       } else if (isTokenTransactionStreamEvent(event)) {
-        const bech32mIds = (event.tokenTransaction.tokenIdentifiers ?? []).map(
-          (raw) =>
-            encodeBech32mTokenIdentifier({
-              tokenIdentifier: raw,
-              network: this.config.getNetworkType(),
-            }),
+        const tokenTx = event.tokenTransaction;
+        const bech32mIds = (tokenTx.tokenIdentifiers ?? []).map((raw) =>
+          encodeBech32mTokenIdentifier({
+            tokenIdentifier: raw,
+            network: this.config.getNetworkType(),
+          }),
         );
-        this.scheduleTokenSync(bech32mIds);
+        this.scheduleTokenSync(bech32mIds, {
+          tokenTransactionHash: tokenTx.tokenTransactionHash,
+          sparkInvoices: tokenTx.sparkInvoices ?? [],
+        });
       }
     } catch (error) {
       console.error("Error processing event", error);
@@ -550,10 +557,17 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * redundant network calls when multiple token transactions finalize in a
    * burst.
    */
-  private scheduleTokenSync(bech32mIds: Bech32mTokenIdentifier[]) {
+  private scheduleTokenSync(
+    bech32mIds: Bech32mTokenIdentifier[],
+    transaction: {
+      tokenTransactionHash: Uint8Array;
+      sparkInvoices: string[];
+    },
+  ) {
     for (const id of bech32mIds) {
       this.tokenSyncPendingIds.add(id);
     }
+    this.tokenSyncPendingTransactions.push(transaction);
     if (this.tokenSyncDebounceTimer) {
       clearTimeout(this.tokenSyncDebounceTimer);
     }
@@ -564,14 +578,16 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   private async flushTokenSync() {
     const ids = [...this.tokenSyncPendingIds];
+    const transactions = [...this.tokenSyncPendingTransactions];
     this.tokenSyncPendingIds.clear();
+    this.tokenSyncPendingTransactions = [];
     this.tokenSyncDebounceTimer = null;
 
     try {
       await this.syncTokenOutputs(ids.length > 0 ? ids : undefined);
       const tokenBalances = await this.getTokenBalanceMap();
       this.emit(SparkWalletEvent.TokenBalanceUpdate, {
-        tokenTransactionHash: new Uint8Array(0),
+        finalizedTokenTransactions: transactions,
         tokenBalances,
       });
     } catch (error) {
@@ -579,6 +595,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       for (const id of ids) {
         this.tokenSyncPendingIds.add(id);
       }
+      this.tokenSyncPendingTransactions.push(...transactions);
     }
   }
 
