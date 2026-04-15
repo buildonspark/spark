@@ -1763,9 +1763,24 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	}
 
 	if req.TransferRequest != nil {
+		transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get transfer leaves for settlement gossip: %w", err)
+		}
+		keyTweakProofMap := make(map[string]*pbspark.SecretProof)
+		for _, leaf := range transferLeaves {
+			keyTweakProto := &pbspark.SendLeafKeyTweak{}
+			if err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto); err != nil {
+				return nil, fmt.Errorf("unable to unmarshal key tweak: %w", err)
+			}
+			keyTweakProofMap[keyTweakProto.LeafId] = &pbspark.SecretProof{
+				Proofs: keyTweakProto.SecretShareTweak.Proofs,
+			}
+		}
+
 		transferHandler := NewTransferHandler(h.config)
-		if err := transferHandler.settleSenderKeyTweaks(ctx, transfer.ID, pbinternal.SettleKeyTweakAction_COMMIT); err != nil {
-			return nil, fmt.Errorf("unable to settle sender key tweaks for transfer %s: %w", transfer.ID, err)
+		if err := transferHandler.syncSettleSenderKeyTweaks(ctx, transfer.ID.String(), keyTweakProofMap); err != nil {
+			logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: failed to send settlement gossip for transfer %s, will be retried", transfer.ID)
 		}
 
 		transfer, err = baseHandler.commitSenderKeyTweaks(ctx, transfer)

@@ -18,13 +18,12 @@ import (
 )
 
 // TestPreimageSwapSettleFailure_TransferSurvives verifies that a preimage swap
-// transfer is persisted on all SOs — including the coordinator — even when
-// settleSenderKeyTweaks fails after a successful fanout. It then verifies that
-// ProvidePreimage can recover the transfer to SENDER_KEY_TWEAKED, proving the
-// settlement path is idempotent.
+// succeeds even when non-coordinator SOs cannot process settlement, and that
+// those SOs eventually converge once the endpoint is available again.
 //
-// The test disables the SettleSenderKeyTweak internal endpoint via knob to
-// engineer the failure, then re-enables it and asserts full recovery.
+// The test disables the SettleSenderKeyTweak internal endpoint via knob,
+// verifies the call still returns the preimage, then re-enables the endpoint
+// and asserts all SOs reach SENDER_KEY_TWEAKED via gossip-based recovery.
 func TestPreimageSwapSettleFailure_TransferSurvives(t *testing.T) {
 	userConfig := wallet.NewTestWalletConfig(t)
 	sspConfig := wallet.NewTestWalletConfig(t)
@@ -147,29 +146,32 @@ func TestPreimageSwapSettleFailure_TransferSurvives(t *testing.T) {
 		FeeSats:                   0,
 	})
 
-	// The call should fail because settleSenderKeyTweaks is disabled.
-	require.Error(t, err, "InitiatePreimageSwapV2 should fail when settle is disabled")
-	require.Nil(t, response)
+	// The call should succeed: the coordinator settles its own key tweaks
+	// locally and returns the preimage. Other SOs receive settlement via
+	// gossip, which is persisted even though delivery is blocked by the
+	// disabled knob.
+	require.NoError(t, err, "InitiatePreimageSwapV2 should succeed even when settle RPC is disabled")
+	require.NotNil(t, response)
+	assert.Equal(t, transferID.String(), response.Transfer.Id)
 
-	// Verify the transfer data survived on ALL operators despite the error.
-	// Before the fix, the coordinator's transfer was rolled back while
-	// non-coordinator SOs kept theirs.
 	network, err := sspConfig.Network.ToProtoNetwork()
 	require.NoError(t, err)
 
+	// Coordinator (SO0) should be settled; non-coordinators may still be
+	// pending because gossip delivery is blocked by the disabled knob.
 	assertTransferOnAllOperators(t, sspConfig, transferID.String(), network, []spark.TransferStatus{
-		spark.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
+		spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
 		spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
+		spark.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR,
 	})
 
-	// Re-enable SettleSenderKeyTweak and verify recovery is idempotent.
+	// Re-enable SettleSenderKeyTweak so the gossip retry task can deliver
+	// the settlement to non-coordinator SOs.
 	err = kc.SetKnobWithTarget(t, knobs.KnobGrpcServerMethodEnabled, settleMethod, 100)
 	require.NoError(t, err)
 
-	// Recovery: ProvidePreimage triggers gossip-based settlement, which
-	// settles the sender key tweaks on all SOs. Called with userConfig
-	// because the preimage request's ReceiverIdentityPubkey is the invoice
-	// creator (user), not the SSP.
+	// ProvidePreimage triggers gossip-based settlement on any SOs that
+	// haven't settled yet.
 	receiverTransfer, err := wallet.ProvidePreimage(t.Context(), userConfig, preimage)
 	require.NoError(t, err, "ProvidePreimage should succeed after settle is re-enabled")
 	assert.Equal(t,
