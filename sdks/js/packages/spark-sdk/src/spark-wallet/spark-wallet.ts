@@ -220,6 +220,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   private tokenSyncPendingIds: Set<Bech32mTokenIdentifier> = new Set();
   private tokenSyncPendingTransactions: Array<{
     tokenTransactionHash: Uint8Array;
+    tokenIdentifiers: string[];
     sparkInvoices: string[];
   }> = [];
   private tokenOptimizationInProgress = false;
@@ -543,6 +544,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         );
         this.scheduleTokenSync(bech32mIds, {
           tokenTransactionHash: tokenTx.tokenTransactionHash,
+          tokenIdentifiers: bech32mIds,
           sparkInvoices: tokenTx.sparkInvoices ?? [],
         });
       }
@@ -561,6 +563,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     bech32mIds: Bech32mTokenIdentifier[],
     transaction: {
       tokenTransactionHash: Uint8Array;
+      tokenIdentifiers: string[];
       sparkInvoices: string[];
     },
   ) {

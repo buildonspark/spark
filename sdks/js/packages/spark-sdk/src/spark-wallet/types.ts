@@ -215,6 +215,7 @@ export interface SparkWalletEvents {
   [SparkWalletEvent.TokenBalanceUpdate]: (event: {
     finalizedTokenTransactions: Array<{
       tokenTransactionHash: Uint8Array;
+      tokenIdentifiers: string[];
       sparkInvoices: string[];
     }>;
     tokenBalances: TokenBalanceMap;

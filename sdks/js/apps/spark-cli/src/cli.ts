@@ -1307,6 +1307,9 @@ async function runCLI() {
                   "hex",
                 );
                 console.log(`  tx: ${hashHex}`);
+                if (tx.tokenIdentifiers.length > 0) {
+                  console.log(`  tokens: ${tx.tokenIdentifiers.join(", ")}`);
+                }
                 if (tx.sparkInvoices.length > 0) {
                   console.log(`  invoices: ${tx.sparkInvoices.join(", ")}`);
                 }
