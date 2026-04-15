@@ -66,6 +66,28 @@ func TestSaveTransferPartner_WithPartnerInContext(t *testing.T) {
 	assert.Equal(t, 1, count)
 }
 
+// Iss-only PartnerInfo (Label="") should not create a transfer_partner record.
+func TestSaveTransferPartner_IssOnlyPartner_Skips(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.New(knobs.NewStaticValuesProvider(map[string]float64{
+		knobs.KnobEnablePartnerJWT: 100,
+	})))
+	dbClient := getDB(t, ctx)
+
+	transferID := createTestTransfer(t, ctx, dbClient)
+
+	ctx = context.WithValue(ctx, partnerContextKey, &PartnerInfo{
+		PartnerID: "partner-a",
+		Label:     "",
+	})
+
+	SaveTransferPartner(ctx, transferID, schematype.TransferPartnerTypeTransfer)
+
+	count, err := dbClient.TransferPartner.Query().Count(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+}
+
 func createTestPartner(t *testing.T, ctx context.Context, client *ent.Client, partnerID, label string) *ent.Partner {
 	t.Helper()
 	p, err := client.Partner.Create().

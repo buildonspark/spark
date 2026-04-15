@@ -58,12 +58,16 @@ type keyLookupResult struct {
 
 // Interceptor validates partner JWTs and injects partner info into the context.
 type Interceptor struct {
-	lookupKey func(ctx context.Context, partnerID, label string) (*keyLookupResult, error)
+	lookupKey             func(ctx context.Context, partnerID, label string) (*keyLookupResult, error)
+	lookupKeysByPartnerID func(ctx context.Context, partnerID string) ([]*keyLookupResult, error)
 }
 
 // NewInterceptor creates a new partner JWT Interceptor backed by the database.
 func NewInterceptor(dbClient *ent.Client) *Interceptor {
-	return &Interceptor{lookupKey: dbKeyLookup(dbClient)}
+	return &Interceptor{
+		lookupKey:             dbKeyLookup(dbClient),
+		lookupKeysByPartnerID: dbKeyLookupByPartnerID(dbClient),
+	}
 }
 
 // newInterceptorWithKeyLookup creates an Interceptor with a custom key lookup function, for testing.
@@ -118,8 +122,9 @@ func GetPartnerInfoFromContext(ctx context.Context) (*PartnerInfo, bool) {
 
 // verifyPartnerJWT parses and verifies a partner JWT (ES256 or ES256K).
 // Uses standard claims: "iss" → partner_id, "sub" → label.
-// The public key is looked up by (partner_id, label) from the database,
-// then the signature is verified.
+// When "sub" is present, the public key is looked up by (partner_id, label).
+// When "sub" is absent, all keys for partner_id are tried (read-only access).
+// Traffic attribution (write path) still requires both "iss" and "sub".
 func (i *Interceptor) verifyPartnerJWT(ctx context.Context, tokenStr string) (*PartnerInfo, error) {
 	// Parse without verification first to extract iss/sub for key lookup.
 	unverified, _, err := jwt.NewParser().ParseUnverified(tokenStr, &jwt.RegisteredClaims{})
@@ -137,36 +142,68 @@ func (i *Interceptor) verifyPartnerJWT(ctx context.Context, tokenStr string) (*P
 	if partnerID == "" {
 		return nil, fmt.Errorf("JWT missing iss claim")
 	}
-	if label == "" {
-		return nil, fmt.Errorf("JWT missing sub claim")
-	}
 
+	if label != "" {
+		return i.verifyWithLabel(ctx, tokenStr, partnerID, label)
+	}
+	return i.verifyWithoutLabel(ctx, tokenStr, partnerID)
+}
+
+// verifyWithLabel verifies a JWT using the public key for (partner_id, label).
+func (i *Interceptor) verifyWithLabel(ctx context.Context, tokenStr, partnerID, label string) (*PartnerInfo, error) {
 	result, err := i.lookupKey(ctx, partnerID, label)
 	if err != nil {
 		return nil, err
 	}
-
-	// Now verify with the correct public key, accepting only the algorithm that
-	// matches the key's curve. Also verify the audience claim.
-	_, err = jwt.ParseWithClaims(tokenStr, &jwt.RegisteredClaims{}, func(token *jwt.Token) (any, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %s", token.Header["alg"])
-		}
-		return result.pubKey.ToECDSA(), nil
-	},
-		jwt.WithExpirationRequired(),
-		jwt.WithValidMethods(validMethodsForKey(result.pubKey)),
-		jwt.WithAudience(expectedAudience),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("JWT verification failed: %w", err)
+	if err := i.verifySignature(tokenStr, result.pubKey); err != nil {
+		return nil, err
 	}
-
 	return &PartnerInfo{
 		PartnerDBID: result.partnerDBID,
 		PartnerID:   partnerID,
 		Label:       label,
 	}, nil
+}
+
+// verifyWithoutLabel verifies a JWT by trying all keys registered for the partner_id.
+// Returns PartnerInfo with Label="" indicating aggregate (read-only) access.
+func (i *Interceptor) verifyWithoutLabel(ctx context.Context, tokenStr, partnerID string) (*PartnerInfo, error) {
+	if i.lookupKeysByPartnerID == nil {
+		return nil, fmt.Errorf("iss-only JWT verification is not supported")
+	}
+
+	results, err := i.lookupKeysByPartnerID(ctx, partnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, result := range results {
+		if err := i.verifySignature(tokenStr, result.pubKey); err == nil {
+			return &PartnerInfo{
+				PartnerID: partnerID,
+				Label:     "",
+			}, nil
+		}
+	}
+	return nil, fmt.Errorf("JWT verification failed: no matching key for partner_id %s", partnerID)
+}
+
+// verifySignature verifies the JWT signature against the given public key.
+func (i *Interceptor) verifySignature(tokenStr string, pubKey jwtkeys.Public) error {
+	_, err := jwt.ParseWithClaims(tokenStr, &jwt.RegisteredClaims{}, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %s", token.Header["alg"])
+		}
+		return pubKey.ToECDSA(), nil
+	},
+		jwt.WithExpirationRequired(),
+		jwt.WithValidMethods(validMethodsForKey(pubKey)),
+		jwt.WithAudience(expectedAudience),
+	)
+	if err != nil {
+		return fmt.Errorf("JWT verification failed: %w", err)
+	}
+	return nil
 }
 
 // validMethodsForKey returns the JWT algorithm name(s) accepted for the given key's curve.
@@ -175,6 +212,43 @@ func validMethodsForKey(pub jwtkeys.Public) []string {
 		return []string{"ES256"}
 	}
 	return []string{"ES256K"}
+}
+
+// dbKeyLookupByPartnerID returns a lookup function that fetches all public keys
+// for a given partner_id. Used when the JWT has no "sub" claim (iss-only).
+func dbKeyLookupByPartnerID(dbClient *ent.Client) func(ctx context.Context, partnerID string) ([]*keyLookupResult, error) {
+	return func(ctx context.Context, partnerID string) ([]*keyLookupResult, error) {
+		partners, err := dbClient.Partner.Query().
+			Where(entpartner.PartnerID(partnerID)).
+			All(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("partner lookup failed for %s: %w", partnerID, err)
+		}
+		if len(partners) == 0 {
+			return nil, fmt.Errorf("unknown partner_id %s", partnerID)
+		}
+
+		seen := make(map[string]bool)
+		var results []*keyLookupResult
+		for _, p := range partners {
+			if p.JwtPublicKey.IsZero() {
+				continue
+			}
+			keyStr := p.JwtPublicKey.ToHex()
+			if seen[keyStr] {
+				continue
+			}
+			seen[keyStr] = true
+			results = append(results, &keyLookupResult{
+				pubKey:      p.JwtPublicKey,
+				partnerDBID: p.ID,
+			})
+		}
+		if len(results) == 0 {
+			return nil, fmt.Errorf("partner %s has no public keys", partnerID)
+		}
+		return results, nil
+	}
 }
 
 // dbKeyLookup returns a key lookup function that fetches the partner's JwtPubKey

@@ -46,6 +46,24 @@ func makeSecp256k1Key(t *testing.T) (keys.Private, jwtkeys.Public) {
 	return priv, jwtkeys.PublicFromSecp256k1(priv.Public())
 }
 
+// makeES256JWTWithClaims signs an ES256 JWT with arbitrary claims.
+func makeES256JWTWithClaims(t *testing.T, key *ecdsa.PrivateKey, claims map[string]any) string {
+	t.Helper()
+	header, err := json.Marshal(map[string]string{"alg": "ES256", "typ": "JWT"})
+	require.NoError(t, err)
+	claimsJSON, err := json.Marshal(claims)
+	require.NoError(t, err)
+
+	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(claimsJSON)
+	digest := sha256.Sum256([]byte(signingInput))
+	r, s, err := ecdsa.Sign(rand.Reader, key, digest[:])
+	require.NoError(t, err)
+	sig := make([]byte, 64)
+	r.FillBytes(sig[:32])
+	s.FillBytes(sig[32:])
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
 // makeES256JWT signs an ES256 JWT with a P-256 key using standard claims (iss, sub, aud).
 func makeES256JWT(t *testing.T, key *ecdsa.PrivateKey, partnerID, label string, exp int64) string {
 	t.Helper()
@@ -474,31 +492,20 @@ func TestPartnerJWTInterceptor_WrongLabel(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestPartnerJWTInterceptor_MissingSubClaim(t *testing.T) {
+// Iss-only JWT (no sub) falls back gracefully when lookupKeysByPartnerID is nil.
+func TestPartnerJWTInterceptor_MissingSubClaim_NoFallback(t *testing.T) {
 	priv, pub := makeP256Key(t)
 	partnerID := "partner-a"
 	i := newInterceptorWithKeyLookup(mapKeyLookup(map[string]*testPartnerEntry{
 		partnerID + "/" + testLabel: {pubKey: pub, dbID: uuid.New()},
 	}))
 
-	header, err := json.Marshal(map[string]string{"alg": "ES256", "typ": "JWT"})
-	require.NoError(t, err)
-	claims, err := json.Marshal(map[string]any{
+	token := makeES256JWTWithClaims(t, priv, map[string]any{
 		"iss": partnerID,
 		"aud": expectedAudience,
 		"iat": time.Now().Unix(),
 		"exp": time.Now().Add(time.Hour).Unix(),
 	})
-	require.NoError(t, err)
-
-	signingInput := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(claims)
-	digest := sha256.Sum256([]byte(signingInput))
-	r, s, err := ecdsa.Sign(rand.Reader, priv, digest[:])
-	require.NoError(t, err)
-	sig := make([]byte, 64)
-	r.FillBytes(sig[:32])
-	s.FillBytes(sig[32:])
-	token := signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
 
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 	info := &grpc.UnaryServerInfo{}
@@ -507,6 +514,69 @@ func TestPartnerJWTInterceptor_MissingSubClaim(t *testing.T) {
 
 	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.False(t, ok)
+}
+
+// Iss-only JWT succeeds when lookupKeysByPartnerID is configured and a matching key exists.
+// Verifies the key-iteration loop and that PartnerInfo has Label="" (read-only access).
+func TestPartnerJWTInterceptor_IssOnlyJWT_SuccessPath(t *testing.T) {
+	priv, pub := makeP256Key(t)
+	partnerID := "partner-a"
+
+	i := &Interceptor{
+		lookupKey: mapKeyLookup(map[string]*testPartnerEntry{}),
+		lookupKeysByPartnerID: func(_ context.Context, pid string) ([]*keyLookupResult, error) {
+			if pid != partnerID {
+				return nil, fmt.Errorf("unknown partner_id: %s", pid)
+			}
+			return []*keyLookupResult{{pubKey: pub, partnerDBID: uuid.New()}}, nil
+		},
+	}
+
+	token := makeES256JWTWithClaims(t, priv, map[string]any{
+		"iss": partnerID,
+		"aud": expectedAudience,
+		"iat": time.Now().Unix(),
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
+	info := &grpc.UnaryServerInfo{}
+	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
+	require.NoError(t, err)
+
+	got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	require.True(t, ok, "expected partner info in context for iss-only JWT")
+	assert.Equal(t, partnerID, got.PartnerID)
+	assert.Empty(t, got.Label, "iss-only JWT should have empty Label")
+}
+
+// Iss-only JWT fails when none of the registered keys match the signature.
+func TestPartnerJWTInterceptor_IssOnlyJWT_NoMatchingKey(t *testing.T) {
+	priv, _ := makeP256Key(t)
+	_, otherPub := makeP256Key(t) // different key
+	partnerID := "partner-a"
+
+	i := &Interceptor{
+		lookupKey: mapKeyLookup(map[string]*testPartnerEntry{}),
+		lookupKeysByPartnerID: func(_ context.Context, pid string) ([]*keyLookupResult, error) {
+			return []*keyLookupResult{{pubKey: otherPub, partnerDBID: uuid.New()}}, nil
+		},
+	}
+
+	token := makeES256JWTWithClaims(t, priv, map[string]any{
+		"iss": partnerID,
+		"aud": expectedAudience,
+		"iat": time.Now().Unix(),
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
+	info := &grpc.UnaryServerInfo{}
+	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
+	require.NoError(t, err)
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	assert.False(t, ok, "iss-only JWT with wrong key should not set partner info")
 }
 
 // Regression test: verifyPartnerJWT must correctly handle secp256k1 keys stored as
