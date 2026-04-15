@@ -56,6 +56,7 @@ var (
 	deleteStaleTreeNodesTaskTimeout    = 10 * time.Minute
 	purgeSigningNoncePartitionsTimeout = 10 * time.Minute
 	repairParticipantCreateTimeTimeout = 10 * time.Minute
+	backfillMimoTransfersTimeout       = 20 * time.Minute
 
 	meter                       = otel.Meter("gossip")
 	oldestPendingGossipAgeGauge metric.Int64Gauge
@@ -1050,6 +1051,35 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						}
 					}
 
+					return nil
+				},
+			},
+		},
+		{
+			ExecutionInterval: 30 * time.Second,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:                "backfill_mimo_transfers",
+				RunInTestEnv:        true,
+				Disabled:            false,
+				Timeout:             &backfillMimoTransfersTimeout,
+				RequiresRawDBClient: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // Backfill manages per-transfer transactions to avoid a single long-running transaction.
+					if err != nil {
+						return fmt.Errorf("failed to get raw db client: %w", err)
+					}
+					drv := sql.OpenDB(entdialect.Postgres, rawDB)
+					client := ent.NewClient(ent.Driver(drv))
+
+					result, err := backfillMimoTransfers(ctx, config, client, 1000, backfillMimoTransfersTimeout)
+					if err != nil {
+						return err
+					}
+					if result.TransfersProcessed > 0 || result.ReachedEnd {
+						logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "backfill_mimo_transfers"))
+						logger.Sugar().Infof("backfill run complete: processed=%d, cursor=%s, reached_end=%t",
+							result.TransfersProcessed, result.BackfillCursor.Format(time.RFC3339), result.ReachedEnd)
+					}
 					return nil
 				},
 			},
