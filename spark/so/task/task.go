@@ -1089,22 +1089,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				},
 			},
 		},
-		{
-			ExecutionInterval: 30 * time.Second,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "repair_wallet_participant_create_time",
-				RunInTestEnv: false,
-				Timeout:      &repairParticipantCreateTimeTimeout,
-				Task: func(ctx context.Context, config *so.Config, _ knobs.Knobs) error {
-					client, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get db client: %w", err)
-					}
-					_, err = repairWalletParticipantCreateTime(ctx, config, client, repairTargetWalletPubkey, 1000)
-					return err
-				},
-			},
-		},
 	}
 }
 
