@@ -22,6 +22,7 @@ function stripProxyPrefix(path: string, prefix: string) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const configOverride = getConfigOverride(env["CONFIG_FILE"]);
+  const privateConfigs = getPrivateConfigs();
   const operatorProxyEntries = Array.from(
     { length: getLocalOperatorCount(env, configOverride) },
     (_, index) => {
@@ -53,6 +54,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     define: {
       __SPARK_CONFIG_OVERRIDE__: JSON.stringify(configOverride),
+      __SPARK_PRIVATE_CONFIGS__: JSON.stringify(privateConfigs),
     },
     server: {
       port: 5173,
@@ -99,6 +101,17 @@ export default defineConfig(({ mode }) => {
   };
 });
 
+function getPrivateConfigs(): {
+  dev: Partial<Record<"MAINNET" | "REGTEST" | "TESTNET", ConfigOptions>>;
+} {
+  return {
+    dev: {
+      MAINNET: readPrivateConfig("dev-mainnet-config.json"),
+      REGTEST: readPrivateConfig("dev-regtest-config.json"),
+    },
+  };
+}
+
 function getConfigOverride(
   configFile: string | undefined,
 ): ConfigOptions | undefined {
@@ -109,6 +122,26 @@ function getConfigOverride(
   return JSON.parse(
     fs.readFileSync(path.resolve(process.cwd(), configFile), "utf8"),
   ) as ConfigOptions;
+}
+
+function readPrivateConfig(filename: string): ConfigOptions | undefined {
+  const configPath = path.resolve(
+    process.cwd(),
+    "../../private/config",
+    filename,
+  );
+
+  if (!fs.existsSync(configPath)) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(configPath, "utf8")) as ConfigOptions;
+  } catch (error) {
+    throw new Error(
+      `Failed to parse private config ${filename}: ${String(error)}`,
+    );
+  }
 }
 
 function getLocalOperatorTarget(

@@ -2,6 +2,7 @@ import "./App.css";
 import * as spark from "@buildonspark/spark-sdk";
 import {
   SparkWallet,
+  type ConfigOptions,
   getSparkFrost,
   type DummyTx,
 } from "@buildonspark/spark-sdk";
@@ -11,12 +12,117 @@ import {
   getExampleWalletOptions,
 } from "./wallet-config.js";
 
-type Network = "LOCAL" | "MAINNET" | "REGTEST" | "TESTNET";
+type Network = "MAINNET" | "REGTEST" | "TESTNET";
+type Target = "DEV" | "LOCAL" | "PROD";
 type StatusType = "info" | "success" | "error";
-const DEFAULT_NETWORK = getExampleSparkNetwork(
-  import.meta.env,
-  "MAINNET",
-) as Network;
+type PrivateConfigMap = Partial<Record<Network, ConfigOptions>>;
+
+declare const __SPARK_PRIVATE_CONFIGS__: {
+  dev?: PrivateConfigMap;
+};
+
+const PUBLIC_NETWORKS: readonly Network[] = ["MAINNET", "TESTNET", "REGTEST"];
+const LOCALHOST_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
+const IS_LOCALHOST = LOCALHOST_HOSTNAMES.has(window.location.hostname);
+const PRIVATE_DEV_CONFIGS = getPrivateDevConfigs();
+const HAS_PRIVATE_DEV_CONFIGS = PUBLIC_NETWORKS.some(
+  (network) => PRIVATE_DEV_CONFIGS[network],
+);
+const DEFAULT_NETWORK = getDefaultNetwork();
+const DEFAULT_TARGET = getDefaultTarget();
+
+function getPrivateDevConfigs(): PrivateConfigMap {
+  return typeof __SPARK_PRIVATE_CONFIGS__ === "object" &&
+    __SPARK_PRIVATE_CONFIGS__ !== null &&
+    typeof __SPARK_PRIVATE_CONFIGS__.dev === "object" &&
+    __SPARK_PRIVATE_CONFIGS__.dev !== null
+    ? __SPARK_PRIVATE_CONFIGS__.dev
+    : {};
+}
+
+function getDefaultNetwork(): Network {
+  const configuredNetwork = getExampleSparkNetwork(import.meta.env, "MAINNET");
+
+  if (configuredNetwork === "REGTEST" || configuredNetwork === "TESTNET") {
+    return configuredNetwork;
+  }
+
+  return "MAINNET";
+}
+
+function getDefaultTarget(): Target {
+  const configuredTarget = String(
+    import.meta.env.VITE_SPARK_TARGET ?? "",
+  ).toUpperCase();
+
+  if (configuredTarget === "LOCAL" && IS_LOCALHOST) {
+    return "LOCAL";
+  }
+
+  if (configuredTarget === "DEV" && HAS_PRIVATE_DEV_CONFIGS) {
+    return "DEV";
+  }
+
+  if (
+    getExampleSparkNetwork(import.meta.env, "MAINNET") === "LOCAL" &&
+    IS_LOCALHOST
+  ) {
+    return "LOCAL";
+  }
+
+  return "PROD";
+}
+
+function getNetworksForTarget(target: Target): Network[] {
+  if (target !== "DEV") {
+    return [...PUBLIC_NETWORKS];
+  }
+
+  return PUBLIC_NETWORKS.filter((network) =>
+    Boolean(PRIVATE_DEV_CONFIGS[network]),
+  );
+}
+
+function getInitialNetwork(target: Target): Network {
+  const availableNetworks = getNetworksForTarget(target);
+  return availableNetworks.includes(DEFAULT_NETWORK)
+    ? DEFAULT_NETWORK
+    : (availableNetworks[0] ?? "MAINNET");
+}
+
+function getWalletOptions(target: Target, network: Network): ConfigOptions {
+  if (target === "LOCAL") {
+    return {
+      ...getExampleWalletOptions(
+        import.meta.env,
+        "LOCAL",
+        window.location.origin,
+      ),
+      log: true,
+    };
+  }
+
+  if (target === "DEV") {
+    const config = PRIVATE_DEV_CONFIGS[network];
+    if (!config) {
+      throw new Error(`No DEV config available for ${network}`);
+    }
+
+    return {
+      ...config,
+      log: true,
+    };
+  }
+
+  return {
+    ...getExampleWalletOptions(
+      import.meta.env,
+      network,
+      window.location.origin,
+    ),
+    log: true,
+  };
+}
 
 function App() {
   const [status, setStatus] = useState<{ type: StatusType; message: string }>({
@@ -24,7 +130,10 @@ function App() {
     message: "Ready",
   });
   const [mnemonic, setMnemonic] = useState("");
-  const [network, setNetwork] = useState<Network>(DEFAULT_NETWORK);
+  const [target, setTarget] = useState<Target>(DEFAULT_TARGET);
+  const [network, setNetwork] = useState<Network>(() =>
+    getInitialNetwork(DEFAULT_TARGET),
+  );
   const [wallet, setWallet] = useState<SparkWallet | null>(null);
   const [sparkAddress, setSparkAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
@@ -35,28 +144,72 @@ function App() {
   const [dummyTx, setDummyTx] = useState<DummyTx | null>(null);
   const [invoiceAmount, setInvoiceAmount] = useState("");
   const [invoice, setInvoice] = useState<string | null>(null);
+  const availableNetworks = getNetworksForTarget(target);
+  const showTargetSelector = HAS_PRIVATE_DEV_CONFIGS || IS_LOCALHOST;
+  const showNetworkSelector = target !== "LOCAL";
+  const targetOptions = [
+    "PROD",
+    ...(HAS_PRIVATE_DEV_CONFIGS ? (["DEV"] as const) : []),
+    ...(IS_LOCALHOST ? (["LOCAL"] as const) : []),
+  ] as const;
 
-  const inferNetworkFromAddress = (address: string): Network | null => {
-    if (address.startsWith("sparkl") || address.startsWith("spl"))
-      return "LOCAL";
-    if (address.startsWith("sparkrt") || address.startsWith("sprt"))
-      return "REGTEST";
-    if (address.startsWith("sparkt") || address.startsWith("spt"))
-      return "TESTNET";
-    if (address.startsWith("spark") || address.startsWith("sp"))
-      return "MAINNET";
+  const inferNetworkFromAddress = (
+    address: string,
+  ): { network?: Network; target?: Target } | null => {
+    if (address.startsWith("sparkl") || address.startsWith("spl")) {
+      return IS_LOCALHOST ? { target: "LOCAL" } : null;
+    }
+    if (address.startsWith("sparkrt") || address.startsWith("sprt")) {
+      return { network: "REGTEST" };
+    }
+    if (address.startsWith("sparkt") || address.startsWith("spt")) {
+      return { network: "TESTNET" };
+    }
+    if (address.startsWith("spark") || address.startsWith("sp")) {
+      return { network: "MAINNET" };
+    }
     return null;
   };
 
-  const buildWalletOptions = () =>
-    getExampleWalletOptions(import.meta.env, network, window.location.origin);
+  const handleTargetChange = (nextTarget: Target) => {
+    setTarget(nextTarget);
+    if (nextTarget === "LOCAL") {
+      return;
+    }
+
+    const nextAvailableNetworks = getNetworksForTarget(nextTarget);
+    if (!nextAvailableNetworks.includes(network)) {
+      setNetwork(nextAvailableNetworks[0] ?? "MAINNET");
+    }
+  };
 
   const handleRecipientChange = (address: string) => {
     setRecipientAddress(address);
     const inferred = inferNetworkFromAddress(address);
-    if (inferred && inferred !== network && !wallet) {
-      setNetwork(inferred);
-      setStatus({ type: "info", message: `Network set to ${inferred}` });
+    if (!inferred || wallet) {
+      return;
+    }
+
+    if (inferred.target === "LOCAL" && target !== "LOCAL") {
+      setTarget("LOCAL");
+      setStatus({ type: "info", message: "Target set to LOCAL" });
+      return;
+    }
+
+    if (inferred.network && inferred.network !== network) {
+      if (target === "LOCAL") {
+        setTarget("PROD");
+      } else if (
+        target === "DEV" &&
+        !getNetworksForTarget("DEV").includes(inferred.network)
+      ) {
+        setTarget("PROD");
+      }
+      setNetwork(inferred.network);
+      setStatus({
+        type: "info",
+        message: `Network set to ${inferred.network}`,
+      });
     }
   };
 
@@ -87,7 +240,7 @@ function App() {
     try {
       const { wallet: w } = await SparkWallet.initialize({
         mnemonicOrSeed: mnemonic.trim(),
-        options: buildWalletOptions(),
+        options: getWalletOptions(target, network),
       });
       setWallet(w);
       setSparkAddress(await w.getSparkAddress());
@@ -104,7 +257,7 @@ function App() {
     setStatus({ type: "info", message: "Generating..." });
     try {
       const { wallet: w, mnemonic: m } = await SparkWallet.initialize({
-        options: buildWalletOptions(),
+        options: getWalletOptions(target, network),
       });
       setWallet(w);
       if (m) setMnemonic(m);
@@ -204,7 +357,7 @@ function App() {
   return (
     <>
       <h1>Spark + Vite</h1>
-      <p>{new window.s.SparkError("test").message}</p>
+      <p className="debug-message">{new window.s.SparkError("test").message}</p>
 
       <div className={`status ${status.type}`}>{status.message}</div>
 
@@ -226,17 +379,38 @@ function App() {
         {/* Wallet Init */}
         <div className="section">
           <h3>2. Initialize Wallet</h3>
-          <div className="network-selector">
-            {(["MAINNET", "TESTNET", "REGTEST", "LOCAL"] as const).map((n) => (
-              <button
-                key={n}
-                onClick={() => setNetwork(n)}
-                className={network === n ? "active" : ""}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
+          {showTargetSelector && (
+            <>
+              <div className="selector-label">Target</div>
+              <div className="network-selector">
+                {targetOptions.map((option) => (
+                  <button
+                    key={option}
+                    onClick={() => handleTargetChange(option)}
+                    className={target === option ? "active" : ""}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {showNetworkSelector && (
+            <>
+              <div className="selector-label">Network</div>
+              <div className="network-selector">
+                {availableNetworks.map((option) => (
+                  <button
+                    key={option}
+                    onClick={() => setNetwork(option)}
+                    className={network === option ? "active" : ""}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <textarea
             placeholder="Enter 12 or 24 word mnemonic..."
             value={mnemonic}
