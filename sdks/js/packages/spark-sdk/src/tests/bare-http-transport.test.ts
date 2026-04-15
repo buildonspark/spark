@@ -7,9 +7,6 @@ import { ClientError, Metadata } from "nice-grpc-common";
 import {
   attachPrematureSocketCloseGuard,
   BareHttpTransport,
-  createBareTransportState,
-  registerActiveResponseStream,
-  resetActiveResponseStreamsForOrigin,
 } from "../services/connection/bare-http-transport.js";
 
 type MockIncomingMessage = IncomingMessage & {
@@ -127,99 +124,6 @@ describe("attachPrematureSocketCloseGuard", () => {
 });
 
 describe("BareHttpTransport", () => {
-  it("does not destroy a newer active stream when an older unary request times out", () => {
-    const transportState = createBareTransportState();
-    const destroy = jest.fn();
-    const log = jest.fn();
-    const unregister = registerActiveResponseStream(
-      transportState,
-      "https://example.com",
-      47,
-      destroy,
-      log,
-    );
-
-    resetActiveResponseStreamsForOrigin(
-      transportState,
-      "https://example.com",
-      44,
-      new Error("UNAVAILABLE: request timed out after 15000ms"),
-    );
-
-    expect(destroy).not.toHaveBeenCalled();
-    expect(log).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "skipping active response stream reset because request #44 timed out before this newer stream was created",
-      ),
-    );
-
-    unregister();
-  });
-
-  it("destroys an older active stream when a newer unary request times out", () => {
-    const transportState = createBareTransportState();
-    const destroy = jest.fn();
-    const log = jest.fn();
-    const unregister = registerActiveResponseStream(
-      transportState,
-      "https://example.com",
-      15,
-      destroy,
-      log,
-    );
-
-    const error = new Error("UNAVAILABLE: request timed out after 15000ms");
-    resetActiveResponseStreamsForOrigin(
-      transportState,
-      "https://example.com",
-      37,
-      error,
-    );
-
-    expect(destroy).toHaveBeenCalledWith(error);
-    expect(log).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "destroying active response stream because request #37 timed out",
-      ),
-    );
-
-    unregister();
-  });
-
-  it("isolates active stream tracking between transport instances", () => {
-    const firstTransportState = createBareTransportState();
-    const secondTransportState = createBareTransportState();
-    const firstDestroy = jest.fn();
-    const secondDestroy = jest.fn();
-    const firstUnregister = registerActiveResponseStream(
-      firstTransportState,
-      "https://example.com",
-      15,
-      firstDestroy,
-      jest.fn(),
-    );
-    const secondUnregister = registerActiveResponseStream(
-      secondTransportState,
-      "https://example.com",
-      15,
-      secondDestroy,
-      jest.fn(),
-    );
-
-    resetActiveResponseStreamsForOrigin(
-      firstTransportState,
-      "https://example.com",
-      37,
-      new Error("UNAVAILABLE: request timed out after 15000ms"),
-    );
-
-    expect(firstDestroy).toHaveBeenCalledWith(expect.any(Error));
-    expect(secondDestroy).not.toHaveBeenCalled();
-
-    firstUnregister();
-    secondUnregister();
-  });
-
   it("rejects a unary request when the wall-clock timeout fires before headers arrive", async () => {
     jest.useFakeTimers();
 
@@ -337,7 +241,7 @@ describe("BareHttpTransport", () => {
     ).toBe(true);
   });
 
-  it("resets an older active stream when req.setTimeout fires before the wall-clock timeout", async () => {
+  it("does not tear down an established stream when a later unary request times out", async () => {
     const streamReq = createMockClientRequest();
     const unaryReq = createMockClientRequest();
     const requests = [streamReq, unaryReq];
@@ -421,25 +325,18 @@ describe("BareHttpTransport", () => {
 
     unaryReq.emit("timeout");
 
-    const [streamError, unaryError] = await Promise.all([
-      streamDataPromise.then(
-        () => null,
-        (error) => error,
-      ),
-      unaryErrorPromise,
-    ]);
+    const unaryError = await unaryErrorPromise;
 
-    expect(streamDestroySpy).toHaveBeenCalledWith(expect.any(Error));
-    expect(String(streamDestroySpy.mock.calls[0]?.[0]?.message)).toContain(
-      "request timed out after 15000ms",
-    );
-    expect(streamError).toBeInstanceOf(ClientError);
-    expect(String((streamError as Error).message)).toContain(
-      "request timed out after 15000ms",
-    );
+    expect(streamDestroySpy).not.toHaveBeenCalled();
     expect(unaryError).toBeInstanceOf(ClientError);
     expect(String((unaryError as Error).message)).toContain(
       "request timed out after 15000ms",
+    );
+
+    streamRes.destroy(new Error("test cleanup"));
+    await streamDataPromise.then(
+      () => null,
+      () => null,
     );
   });
 });

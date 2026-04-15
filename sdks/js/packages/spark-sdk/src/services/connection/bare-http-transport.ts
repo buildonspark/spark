@@ -16,17 +16,8 @@ import type { Transport } from "nice-grpc-web/lib/client/Transport.js";
 const UNARY_REQUEST_TIMEOUT_MS = 15_000;
 const STREAM_CONNECT_TIMEOUT_MS = 15_000;
 
-type ActiveResponseStream = {
-  destroy: (error: Error) => void;
-  log: (message: string) => void;
-};
-
 export type BareTransportState = {
   nextRequestId: number;
-  // Bare can leave grpc-web responses half-open across a network drop. Track
-  // the active response streams per origin so a later unary timeout can tear
-  // down the older stuck stream and let higher-level reconnect logic run.
-  activeResponseStreamsByOrigin: Map<string, Map<number, ActiveResponseStream>>;
 };
 
 function debugTs() {
@@ -48,81 +39,15 @@ function makeTransportLogger(
   };
 }
 
-function getOriginKey(url: string) {
-  try {
-    const parsed = new URL(url);
-    return `${parsed.protocol}//${parsed.host}`;
-  } catch {
-    return url;
-  }
-}
-
 export function createBareTransportState(): BareTransportState {
   return {
     nextRequestId: 0,
-    activeResponseStreamsByOrigin: new Map(),
   };
 }
 
 function nextBareTransportRequestId(state: BareTransportState) {
   state.nextRequestId += 1;
   return state.nextRequestId;
-}
-
-export function registerActiveResponseStream(
-  state: BareTransportState,
-  originKey: string,
-  requestId: number,
-  destroy: (error: Error) => void,
-  log: (message: string) => void,
-) {
-  let streams = state.activeResponseStreamsByOrigin.get(originKey);
-  if (!streams) {
-    streams = new Map();
-    state.activeResponseStreamsByOrigin.set(originKey, streams);
-  }
-  streams.set(requestId, { destroy, log });
-
-  return () => {
-    const activeStreams = state.activeResponseStreamsByOrigin.get(originKey);
-    if (!activeStreams) {
-      return;
-    }
-    activeStreams.delete(requestId);
-    if (activeStreams.size === 0) {
-      state.activeResponseStreamsByOrigin.delete(originKey);
-    }
-  };
-}
-
-export function resetActiveResponseStreamsForOrigin(
-  state: BareTransportState,
-  originKey: string,
-  initiatorRequestId: number,
-  error: Error,
-) {
-  const streams = state.activeResponseStreamsByOrigin.get(originKey);
-  if (!streams || streams.size === 0) {
-    return;
-  }
-
-  for (const [requestId, stream] of streams) {
-    // Timeouts are only a transport-wedge heuristic. If a newer stream was
-    // created after this request started, leave it alone so an outage-era
-    // timeout cannot knock down a healthy post-reconnect subscription.
-    if (requestId > initiatorRequestId) {
-      stream.log(
-        `skipping active response stream reset because request #${initiatorRequestId} timed out before this newer stream was created`,
-      );
-      continue;
-    }
-    stream.log(
-      `destroying active response stream because request #${initiatorRequestId} timed out: ${error.message}`,
-    );
-    try {
-      stream.destroy(error);
-    } catch {}
-  }
 }
 
 function createWallClockTimeout(timeoutMs: number, onTimeout: () => void) {
@@ -226,10 +151,8 @@ export function BareHttpTransport({
   }) {
     const requestId = nextBareTransportRequestId(transportState);
     const log = makeTransportLogger(method.path, requestId, loggingEnabled);
-    const originKey = getOriginKey(url);
     let bodyBuffer: Uint8Array | undefined;
     let pipeAbortController: AbortController | undefined;
-    let unregisterActiveResponseStream = () => {};
 
     log(`starting request url=${url} responseStream=${method.responseStream}`);
 
@@ -274,16 +197,6 @@ export function BareHttpTransport({
             }: ${error.message}`,
           );
           clearRequestTimeout();
-          if (!method.responseStream) {
-            // A unary timeout is the best signal we have that the Bare transport
-            // wedged for this origin, so use it to fail any older tracked stream.
-            resetActiveResponseStreamsForOrigin(
-              transportState,
-              originKey,
-              requestId,
-              error,
-            );
-          }
           if (response != null) {
             try {
               response.destroy(error);
@@ -410,15 +323,9 @@ export function BareHttpTransport({
           );
           log(`request timeout after ${UNARY_REQUEST_TIMEOUT_MS}ms`);
           clearRequestTimeout();
-          // req.setTimeout can beat the wall-clock timeout by a few ticks. When
-          // that happens, force the same stuck-stream recovery path instead of
-          // leaving the old response-stream RPC parked forever.
-          resetActiveResponseStreamsForOrigin(
-            transportState,
-            originKey,
-            requestId,
-            error,
-          );
+          // Established stream liveness is handled by the heartbeat listener in
+          // SparkWallet, so a unary timeout should only fail the request that
+          // actually timed out.
           req.destroy(error);
         };
         clearRequestTimeout = () => {
@@ -524,18 +431,6 @@ export function BareHttpTransport({
       res,
       loggingEnabled,
     );
-    if (method.responseStream) {
-      unregisterActiveResponseStream = registerActiveResponseStream(
-        transportState,
-        originKey,
-        requestId,
-        (error) => {
-          log(`destroying tracked response stream: ${error.message}`);
-          res.destroy(error);
-        },
-        log,
-      );
-    }
 
     let chunkCount = 0;
     try {
@@ -557,7 +452,6 @@ export function BareHttpTransport({
       throw toTransportClientError(method.path, err);
     } finally {
       log(`response iterator finally after ${chunkCount} chunks`);
-      unregisterActiveResponseStream();
       prematureCloseGuard.cleanup();
       try {
         pipeAbortController?.abort();
