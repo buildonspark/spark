@@ -16,7 +16,11 @@ import type {
   PrepareTokenInvoiceRequestBindingParams,
   TransferBuildRequestBindingParams,
 } from "../token-primitives-bindings/types.js";
-import { decodeSparkAddress, encodeSparkAddress } from "../utils/address.js";
+import {
+  decodeSparkAddress,
+  encodeSparkAddress,
+  getNetworkFromSparkAddress,
+} from "../utils/address.js";
 import { encodeBech32mTokenIdentifier } from "../utils/token-identifier.js";
 
 let nextConnectionManager!: ConnectionManagerNodeJS;
@@ -110,6 +114,10 @@ describe("token invoice bindings", () => {
     } satisfies PreparedTokenInvoiceBinding;
     const signedInvoice = encodeSparkAddress({
       identityPublicKey: TEST_SENDER_IDENTITY_PUBKEY,
+      network: "REGTEST",
+    });
+    const expectedLocalInvoice = encodeSparkAddress({
+      identityPublicKey: TEST_SENDER_IDENTITY_PUBKEY,
       network: "LOCAL",
     });
     prepareTokenInvoiceMock.mockResolvedValue(preparedInvoice);
@@ -144,7 +152,8 @@ describe("token invoice bindings", () => {
       expiryTime,
     });
 
-    expect(result).toBe(signedInvoice);
+    expect(result).toBe(expectedLocalInvoice);
+    expect(getNetworkFromSparkAddress(result)).toBe("LOCAL");
     expect(prepareTokenInvoiceMock).toHaveBeenCalledWith({
       receiverIdentityPublicKey: identityPublicKey,
       network: NetworkProto.REGTEST,

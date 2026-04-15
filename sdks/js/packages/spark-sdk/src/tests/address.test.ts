@@ -15,6 +15,7 @@ import {
   encodeSparkAddressWithSignature,
   getNetworkFromSparkAddress,
   isLegacySparkAddress,
+  normalizeSparkAddressToNetwork,
   SparkAddressData,
   SparkAddressFormat,
 } from "../utils/address.js";
@@ -249,6 +250,35 @@ describe("getNetworkFromSparkAddress", () => {
       "sp1pgssxwh6hznfdc3c0cuqrhgttder539d52a0rqcf34amge69huh664gd2ew787",
     );
     expect(network).toBe("MAINNET");
+  });
+});
+
+describe("normalizeSparkAddressToNetwork", () => {
+  test("rewrites REGTEST primary prefix to LOCAL", () => {
+    const regtestAddress =
+      "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnxxdy83";
+
+    const normalized = normalizeSparkAddressToNetwork(regtestAddress, "LOCAL");
+
+    expect(normalized.startsWith("sparkl1")).toBe(true);
+    expect(decodeSparkAddress(normalized, "LOCAL").identityPublicKey).toBe(
+      "0353908bac090ba741de6147a540a665537006911590f93249b2823dbe187d3213",
+    );
+  });
+
+  test("rewrites REGTEST legacy prefix to LOCAL legacy prefix", () => {
+    const legacyRegtestAddress =
+      "sprt1pgssx63fa5g6uyv450rajp5ndwy9laxzpsp9e37su58jddmcdsvhgm5n7y0ud6";
+
+    const normalized = normalizeSparkAddressToNetwork(
+      legacyRegtestAddress,
+      "LOCAL",
+    );
+
+    expect(normalized.startsWith("spl1")).toBe(true);
+    expect(decodeSparkAddress(normalized, "LOCAL").identityPublicKey).toBe(
+      "036a29ed11ae1195a3c7d906936b885ff4c20c025cc7d0e50f26b7786c19746e93",
+    );
   });
 });
 

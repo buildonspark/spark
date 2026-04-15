@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
-import { TEST_CONFIGS } from "./test-configs.js";
+import { TEST_CONFIGS_WITH_BINDINGS } from "./test-configs.js";
 import { IssuerSparkWallet } from "../../issuer-wallet/issuer-spark-wallet.js";
 import {
   burnSingleIssuerToken,
@@ -54,7 +54,7 @@ const setupMultipleTokens = async (issuerWallet: IssuerSparkWallet) => {
   };
 };
 
-describe.each(TEST_CONFIGS)(
+describe.each(TEST_CONFIGS_WITH_BINDINGS)(
   "multi token issuer tests - $name",
   ({ name, config }) => {
     jest.setTimeout(80000);

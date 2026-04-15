@@ -122,6 +122,7 @@ import {
   getNetworkFromSparkAddress,
   isLegacySparkAddress,
   isSafeForNumber,
+  normalizeSparkAddressToNetwork,
   SparkAddressFormat,
   validateSparkInvoiceFields,
 } from "../utils/address.js";
@@ -1114,8 +1115,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       sparkInvoiceFieldsBytes: preparedInvoice.sparkInvoiceFieldsBytes,
       signature,
     });
-    decodeSparkAddress(signedInvoice, this.config.getNetworkType());
-    return signedInvoice as SparkAddressFormat;
+    const normalizedSignedInvoice = normalizeSparkAddressToNetwork(
+      signedInvoice,
+      this.config.getNetworkType(),
+    );
+    decodeSparkAddress(normalizedSignedInvoice, this.config.getNetworkType());
+    return normalizedSignedInvoice as SparkAddressFormat;
   }
 
   private async resolveSeedAndMnemonic(

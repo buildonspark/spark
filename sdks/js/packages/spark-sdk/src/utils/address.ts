@@ -206,6 +206,43 @@ export function getNetworkFromSparkAddress(address: string): NetworkType {
   return network;
 }
 
+export function normalizeSparkAddressToNetwork(
+  address: string,
+  network: NetworkType,
+): string {
+  const decoded = bech32mDecode(address);
+  const currentNetwork =
+    PrefixToNetwork[decoded.prefix] ?? LegacyPrefixToNetwork[decoded.prefix];
+
+  if (!currentNetwork) {
+    throw new SparkValidationError("Invalid Spark address prefix", {
+      field: "network",
+      value: address,
+      expected:
+        "prefix='spark1', 'sparkt1', 'sparkrt1', 'sparks1', 'sparkl1' or legacy ('sp1', 'spt1', 'sprt1', 'sps1', 'spl1')",
+    });
+  }
+
+  if (currentNetwork === network) {
+    return address;
+  }
+
+  const isLocalRegtestPair =
+    (currentNetwork === "LOCAL" || currentNetwork === "REGTEST") &&
+    (network === "LOCAL" || network === "REGTEST");
+
+  if (!isLocalRegtestPair) {
+    return address;
+  }
+
+  const isLegacy = decoded.prefix in LegacyPrefixToNetwork;
+  const targetPrefix = isLegacy
+    ? LegacyAddressNetwork[network]
+    : AddressNetwork[network];
+
+  return bech32mEncode(targetPrefix, decoded.words);
+}
+
 export function isLegacySparkAddress(
   address: string,
 ): address is LegacySparkAddressFormat {

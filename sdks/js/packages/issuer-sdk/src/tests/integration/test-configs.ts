@@ -30,9 +30,25 @@ export const TOKENS_ECDSA_V3_CONFIG: Required<ConfigOptions> = {
   tokenTransactionVersion: "V3",
 };
 
+export const TOKENS_SCHNORR_V3_BINDINGS_CONFIG: Required<ConfigOptions> = {
+  ...TOKENS_SCHNORR_V3_CONFIG,
+  useTokenPrimitivesBindings: true,
+};
+
+export const TOKENS_ECDSA_V3_BINDINGS_CONFIG: Required<ConfigOptions> = {
+  ...TOKENS_ECDSA_V3_CONFIG,
+  useTokenPrimitivesBindings: true,
+};
+
 export const TEST_CONFIGS = [
   { name: "E2", config: TOKENS_ECDSA_V2_CONFIG },
   { name: "E3", config: TOKENS_ECDSA_V3_CONFIG },
   { name: "S2", config: TOKENS_SCHNORR_V2_CONFIG },
   { name: "S3", config: TOKENS_SCHNORR_V3_CONFIG },
+];
+
+export const TEST_CONFIGS_WITH_BINDINGS = [
+  ...TEST_CONFIGS,
+  { name: "E3B", config: TOKENS_ECDSA_V3_BINDINGS_CONFIG },
+  { name: "S3B", config: TOKENS_SCHNORR_V3_BINDINGS_CONFIG },
 ];

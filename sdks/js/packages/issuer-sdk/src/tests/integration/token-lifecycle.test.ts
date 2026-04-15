@@ -9,9 +9,9 @@ import {
   mintSingleIssuerToken,
   unfreezeSingleIssuerToken,
 } from "../utils/multi-token-utils.js";
-import { TEST_CONFIGS } from "./test-configs.js";
+import { TEST_CONFIGS_WITH_BINDINGS } from "./test-configs.js";
 
-describe.each(TEST_CONFIGS)(
+describe.each(TEST_CONFIGS_WITH_BINDINGS)(
   "token lifecycle tests - $name",
   ({ name, config }) => {
     jest.setTimeout(80000);

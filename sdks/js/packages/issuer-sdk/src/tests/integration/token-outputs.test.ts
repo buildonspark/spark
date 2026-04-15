@@ -7,7 +7,7 @@ import {
   getSingleIssuerTokenIdentifier,
   mintSingleIssuerToken,
 } from "../utils/multi-token-utils.js";
-import { TEST_CONFIGS } from "./test-configs.js";
+import { TEST_CONFIGS_WITH_BINDINGS } from "./test-configs.js";
 
 type TokenIdentifier = Parameters<
   typeof filterTokenBalanceForTokenIdentifier
@@ -66,7 +66,7 @@ const getOwnedBalance = async ({
   ).ownedBalance;
 };
 
-describe.each(TEST_CONFIGS)(
+describe.each(TEST_CONFIGS_WITH_BINDINGS)(
   "token output tests - $name",
   ({ name, config }) => {
     jest.setTimeout(80000);
