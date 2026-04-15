@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
@@ -32,6 +33,7 @@ import (
 )
 
 var gossipMessageHandledTotal metric.Int64Counter
+var gossipMessageHandledDuration metric.Float64Histogram
 
 func init() {
 	meter := otel.GetMeterProvider().Meter("spark.grpc")
@@ -48,6 +50,20 @@ func init() {
 		}
 	}
 	gossipMessageHandledTotal = counter
+
+	histogram, err := meter.Float64Histogram(
+		"gossip.message_handled_duration",
+		metric.WithDescription("Duration of gossip message handling by type"),
+		metric.WithUnit("ms"),
+		metric.WithExplicitBucketBoundaries(1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000),
+	)
+	if err != nil {
+		otel.Handle(err)
+		if histogram == nil {
+			histogram = noop.Float64Histogram{}
+		}
+	}
+	gossipMessageHandledDuration = histogram
 }
 
 type GossipHandler struct {
@@ -68,6 +84,7 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 
 	messageType := getGossipMessageType(gossipMessage)
 
+	startTime := time.Now()
 	var err error
 	switch gossipMessage.Message.(type) {
 	case *pbgossip.GossipMessage_CancelTransfer:
@@ -148,12 +165,14 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 		logger.With(zap.Error(err)).Sugar().Errorf("Handling for gossip message ID %s of type %s failed with error: %v", gossipMessage.MessageId, messageType, err)
 	}
 
-	// Record metric
+	// Record metrics
 	statusCode := status.Code(err)
-	gossipMessageHandledTotal.Add(ctx, 1, metric.WithAttributes(
+	metricAttrs := metric.WithAttributes(
 		attribute.String("message_type", messageType),
 		semconv.RPCGRPCStatusCodeKey.Int(int(statusCode)),
-	))
+	)
+	gossipMessageHandledTotal.Add(ctx, 1, metricAttrs)
+	gossipMessageHandledDuration.Record(ctx, time.Since(startTime).Seconds()*1000, metricAttrs)
 
 	return err
 }
