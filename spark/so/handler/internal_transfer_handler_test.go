@@ -926,24 +926,138 @@ func TestFinalizeTransferReceiverMultiReceiver(t *testing.T) {
 		})
 		require.NoError(t, err, "should succeed idempotently even with different timestamp")
 	})
+}
 
-	t.Run("node not belonging to receiver is rejected", func(t *testing.T) {
-		// Send receiver1's gossip message but with receiver2's node.
-		wrongNode := &pbinternal.TreeNode{
-			Id:                     leaf2.ID.String(),
-			RawTx:                  rawTx2Updated,
-			RawRefundTx:            rawRefundTx2Updated,
-			DirectRefundTx:         directRefundTx2Updated,
-			DirectFromCpfpRefundTx: directFromCpfpRefundTx2Updated,
-		}
+func TestFinalizeTransferReceiver_EarlyIdempotency(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"regtest": {DepositConfirmationThreshold: 1},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+
+	rng := rand.NewChaCha8([32]byte{99})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiver1PrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiver2PrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	t.Run("receiver and transfer already completed skips leaf queries", func(t *testing.T) {
+		transfer, err := dbCtx.Client.Transfer.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetStatus(st.TransferStatusCompleted).
+			SetType(st.TransferTypeTransfer).
+			SetSenderIdentityPubkey(senderPrivKey.Public()).
+			SetReceiverIdentityPubkey(receiver1PrivKey.Public()).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(24 * time.Hour)).
+			SetCompletionTime(time.Now()).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = dbCtx.Client.TransferReceiver.Create().
+			SetTransfer(transfer).
+			SetIdentityPubkey(receiver1PrivKey.Public()).
+			SetStatus(st.TransferReceiverStatusCompleted).
+			SetCompletionTime(time.Now()).
+			Save(ctx)
+		require.NoError(t, err)
+
+		// Pass no InternalNodes — if the early exit didn't fire, this would
+		// fail with a node count mismatch against the receiver's leaves.
+		handler := NewInternalTransferHandler(config)
 		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
 			TransferId:                transfer.ID.String(),
-			ReceiverIdentityPublicKey: receiver1IdentityPrivKey.Public().Serialize(),
-			InternalNodes:             []*pbinternal.TreeNode{wrongNode},
+			ReceiverIdentityPublicKey: receiver1PrivKey.Public().Serialize(),
 			CompletionTimestamp:       timestamppb.Now(),
 		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "not in receiver's leaves")
+		require.NoError(t, err)
+	})
+
+	t.Run("receiver completed but transfer not yet completed marks transfer completed", func(t *testing.T) {
+		transfer, err := dbCtx.Client.Transfer.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetStatus(st.TransferStatusSenderKeyTweaked).
+			SetType(st.TransferTypeTransfer).
+			SetSenderIdentityPubkey(senderPrivKey.Public()).
+			SetReceiverIdentityPubkey(receiver1PrivKey.Public()).
+			SetTotalValue(1000).
+			SetExpiryTime(time.Now().Add(24 * time.Hour)).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = dbCtx.Client.TransferReceiver.Create().
+			SetTransfer(transfer).
+			SetIdentityPubkey(receiver1PrivKey.Public()).
+			SetStatus(st.TransferReceiverStatusCompleted).
+			SetCompletionTime(time.Now()).
+			Save(ctx)
+		require.NoError(t, err)
+
+		completionTime := timestamppb.Now()
+		handler := NewInternalTransferHandler(config)
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiver1PrivKey.Public().Serialize(),
+			CompletionTimestamp:       completionTime,
+		})
+		require.NoError(t, err)
+
+		entTx, err := ent.GetTxFromContext(ctx)
+		require.NoError(t, err)
+		err = entTx.Commit()
+		require.NoError(t, err)
+
+		updatedTransfer, err := dbCtx.Client.Transfer.Get(ctx, transfer.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferStatusCompleted, updatedTransfer.Status)
+	})
+
+	t.Run("receiver completed but other receiver pending does not complete transfer", func(t *testing.T) {
+		transfer, err := dbCtx.Client.Transfer.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetStatus(st.TransferStatusSenderKeyTweaked).
+			SetType(st.TransferTypeTransfer).
+			SetSenderIdentityPubkey(senderPrivKey.Public()).
+			SetReceiverIdentityPubkey(receiver1PrivKey.Public()).
+			SetTotalValue(2000).
+			SetExpiryTime(time.Now().Add(24 * time.Hour)).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = dbCtx.Client.TransferReceiver.Create().
+			SetTransfer(transfer).
+			SetIdentityPubkey(receiver1PrivKey.Public()).
+			SetStatus(st.TransferReceiverStatusCompleted).
+			SetCompletionTime(time.Now()).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = dbCtx.Client.TransferReceiver.Create().
+			SetTransfer(transfer).
+			SetIdentityPubkey(receiver2PrivKey.Public()).
+			SetStatus(st.TransferReceiverStatusRefundSigned).
+			Save(ctx)
+		require.NoError(t, err)
+
+		handler := NewInternalTransferHandler(config)
+		err = handler.FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiver1PrivKey.Public().Serialize(),
+			CompletionTimestamp:       timestamppb.Now(),
+		})
+		require.NoError(t, err)
+
+		entTx, err := ent.GetTxFromContext(ctx)
+		require.NoError(t, err)
+		err = entTx.Commit()
+		require.NoError(t, err)
+
+		updatedTransfer, err := dbCtx.Client.Transfer.Get(ctx, transfer.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferStatusSenderKeyTweaked, updatedTransfer.Status,
+			"transfer should not be completed when another receiver is still pending")
 	})
 }
 

@@ -223,6 +223,33 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 	}
 	receiver := receivers[0]
 
+	// Idempotency: if this receiver is already completed, exit early.
+	// Also mark the transfer completed if all receivers are now done.
+	if receiver.Status == st.TransferReceiverStatusCompleted {
+		if transfer.Status != st.TransferStatusCompleted {
+			pendingCount, err := transfer.QueryTransferReceivers().
+				Where(enttransferreceiver.StatusNEQ(st.TransferReceiverStatusCompleted)).
+				Count(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to count pending receivers for transfer %s: %w", transferID, err)
+			}
+			if pendingCount == 0 {
+				_, err = transfer.Update().
+					SetStatus(st.TransferStatusCompleted).
+					SetCompletionTime(req.CompletionTimestamp.AsTime()).
+					Save(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to mark transfer completed for %s: %w", transferID, err)
+				}
+				logger.With(zap.String("transfer_id", transferID.String())).
+					Info("Promoted transfer to completed, all receivers done")
+			}
+		}
+		logger.With(zap.String("transfer_id", transferID.String())).
+			Info("Receiver already completed, accepting gossip idempotently")
+		return nil
+	}
+
 	receiverLeaves, err := db.TransferLeaf.Query().
 		Where(enttransferleaf.TransferReceiverID(receiver.ID)).
 		QueryLeaf().
