@@ -39,21 +39,24 @@ func TestGetSingleTransferSenderReceiver_Success(t *testing.T) {
 	require.True(t, receiverPub.Equals(gotReceiver))
 }
 
-func TestGetSingleTransferSenderReceiver_ZeroSenders_ReturnsError(t *testing.T) {
+func TestGetSingleTransferSenderReceiver_ZeroSenders_FallsBack(t *testing.T) {
+	senderPub := keys.GeneratePrivateKey().Public()
 	receiverPub := keys.GeneratePrivateKey().Public()
 
 	transfer := &ent.Transfer{
-		ID: uuid.New(),
+		ID:                     uuid.New(),
+		SenderIdentityPubkey:   senderPub,
+		ReceiverIdentityPubkey: receiverPub,
 		Edges: ent.TransferEdges{
 			TransferSenders:   nil,
 			TransferReceivers: []*ent.TransferReceiver{{IdentityPubkey: receiverPub}},
 		},
 	}
 
-	_, _, err := GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "transfer senders")
-	require.Contains(t, err.Error(), "expected 1")
+	gotSender, gotReceiver, err := GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
+	require.NoError(t, err)
+	require.True(t, senderPub.Equals(gotSender))
+	require.True(t, receiverPub.Equals(gotReceiver))
 }
 
 func TestGetSingleTransferSenderReceiver_MultipleSenders_ReturnsError(t *testing.T) {
@@ -78,21 +81,24 @@ func TestGetSingleTransferSenderReceiver_MultipleSenders_ReturnsError(t *testing
 	require.Contains(t, err.Error(), "expected 1")
 }
 
-func TestGetSingleTransferSenderReceiver_ZeroReceivers_ReturnsError(t *testing.T) {
+func TestGetSingleTransferSenderReceiver_ZeroReceivers_FallsBack(t *testing.T) {
 	senderPub := keys.GeneratePrivateKey().Public()
+	receiverPub := keys.GeneratePrivateKey().Public()
 
 	transfer := &ent.Transfer{
-		ID: uuid.New(),
+		ID:                     uuid.New(),
+		SenderIdentityPubkey:   senderPub,
+		ReceiverIdentityPubkey: receiverPub,
 		Edges: ent.TransferEdges{
 			TransferSenders:   []*ent.TransferSender{{IdentityPubkey: senderPub}},
 			TransferReceivers: nil,
 		},
 	}
 
-	_, _, err := GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "transfer receivers")
-	require.Contains(t, err.Error(), "expected 1")
+	gotSender, gotReceiver, err := GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
+	require.NoError(t, err)
+	require.True(t, senderPub.Equals(gotSender))
+	require.True(t, receiverPub.Equals(gotReceiver))
 }
 
 func TestGetSingleTransferSenderReceiver_MultipleReceivers_ReturnsError(t *testing.T) {
