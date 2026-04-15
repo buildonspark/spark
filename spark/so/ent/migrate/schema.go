@@ -1330,6 +1330,22 @@ var (
 					Where: "intermediate_direct_from_cpfp_refund_timelock is not null",
 				},
 			},
+			{
+				Name:    "transferleaf_transfer_receiver_id",
+				Unique:  false,
+				Columns: []*schema.Column{TransferLeafsColumns[22]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "transfer_receiver_id is not null",
+				},
+			},
+			{
+				Name:    "transferleaf_transfer_sender_id",
+				Unique:  false,
+				Columns: []*schema.Column{TransferLeafsColumns[23]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "transfer_sender_id is not null",
+				},
+			},
 		},
 	}
 	// TransferPartnersColumns holds the columns for the "transfer_partners" table.

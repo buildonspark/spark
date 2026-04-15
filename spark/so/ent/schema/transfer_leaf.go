@@ -180,6 +180,13 @@ func (TransferLeaf) Indexes() []ent.Index {
 		index.Fields("intermediate_direct_from_cpfp_refund_timelock").Annotations(
 			entsql.IndexWhere("intermediate_direct_from_cpfp_refund_timelock is not null"),
 		),
+
+		index.Fields("transfer_receiver_id").Annotations(
+			entsql.IndexWhere("transfer_receiver_id is not null"),
+		),
+		index.Fields("transfer_sender_id").Annotations(
+			entsql.IndexWhere("transfer_sender_id is not null"),
+		),
 	}
 }
 
