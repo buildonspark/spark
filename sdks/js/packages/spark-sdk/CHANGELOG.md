@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.7.13
+
+### Patch Changes
+
+- - Improve Bare transport reconnect behavior by relying on event stream heartbeats instead of cancelling long-lived streams when unrelated requests time out.
+- - Renew low-timelock leaves returned from swaps before caching them to avoid later swap-signing failures.
+
 ## 0.7.12
 
 ### Patch Changes
