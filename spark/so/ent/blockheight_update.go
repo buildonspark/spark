@@ -71,6 +71,18 @@ func (bhu *BlockHeightUpdate) SetNillableNetwork(b *btcnetwork.Network) *BlockHe
 	return bhu
 }
 
+// SetBlockHash sets the "block_hash" field.
+func (bhu *BlockHeightUpdate) SetBlockHash(b []byte) *BlockHeightUpdate {
+	bhu.mutation.SetBlockHash(b)
+	return bhu
+}
+
+// ClearBlockHash clears the value of the "block_hash" field.
+func (bhu *BlockHeightUpdate) ClearBlockHash() *BlockHeightUpdate {
+	bhu.mutation.ClearBlockHash()
+	return bhu
+}
+
 // Mutation returns the BlockHeightMutation object of the builder.
 func (bhu *BlockHeightUpdate) Mutation() *BlockHeightMutation {
 	return bhu.mutation
@@ -119,6 +131,11 @@ func (bhu *BlockHeightUpdate) check() error {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "BlockHeight.network": %w`, err)}
 		}
 	}
+	if v, ok := bhu.mutation.BlockHash(); ok {
+		if err := blockheight.BlockHashValidator(v); err != nil {
+			return &ValidationError{Name: "block_hash", err: fmt.Errorf(`ent: validator failed for field "BlockHeight.block_hash": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -151,6 +168,12 @@ func (bhu *BlockHeightUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := bhu.mutation.Network(); ok {
 		_spec.SetField(blockheight.FieldNetwork, field.TypeEnum, value)
+	}
+	if value, ok := bhu.mutation.BlockHash(); ok {
+		_spec.SetField(blockheight.FieldBlockHash, field.TypeBytes, value)
+	}
+	if bhu.mutation.BlockHashCleared() {
+		_spec.ClearField(blockheight.FieldBlockHash, field.TypeBytes)
 	}
 	_spec.AddModifiers(bhu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, bhu.driver, _spec); err != nil {
@@ -215,6 +238,18 @@ func (bhuo *BlockHeightUpdateOne) SetNillableNetwork(b *btcnetwork.Network) *Blo
 	return bhuo
 }
 
+// SetBlockHash sets the "block_hash" field.
+func (bhuo *BlockHeightUpdateOne) SetBlockHash(b []byte) *BlockHeightUpdateOne {
+	bhuo.mutation.SetBlockHash(b)
+	return bhuo
+}
+
+// ClearBlockHash clears the value of the "block_hash" field.
+func (bhuo *BlockHeightUpdateOne) ClearBlockHash() *BlockHeightUpdateOne {
+	bhuo.mutation.ClearBlockHash()
+	return bhuo
+}
+
 // Mutation returns the BlockHeightMutation object of the builder.
 func (bhuo *BlockHeightUpdateOne) Mutation() *BlockHeightMutation {
 	return bhuo.mutation
@@ -276,6 +311,11 @@ func (bhuo *BlockHeightUpdateOne) check() error {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "BlockHeight.network": %w`, err)}
 		}
 	}
+	if v, ok := bhuo.mutation.BlockHash(); ok {
+		if err := blockheight.BlockHashValidator(v); err != nil {
+			return &ValidationError{Name: "block_hash", err: fmt.Errorf(`ent: validator failed for field "BlockHeight.block_hash": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -325,6 +365,12 @@ func (bhuo *BlockHeightUpdateOne) sqlSave(ctx context.Context) (_node *BlockHeig
 	}
 	if value, ok := bhuo.mutation.Network(); ok {
 		_spec.SetField(blockheight.FieldNetwork, field.TypeEnum, value)
+	}
+	if value, ok := bhuo.mutation.BlockHash(); ok {
+		_spec.SetField(blockheight.FieldBlockHash, field.TypeBytes, value)
+	}
+	if bhuo.mutation.BlockHashCleared() {
+		_spec.ClearField(blockheight.FieldBlockHash, field.TypeBytes)
 	}
 	_spec.AddModifiers(bhuo.modifiers...)
 	_node = &BlockHeight{config: bhuo.config}

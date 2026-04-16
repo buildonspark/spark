@@ -26,7 +26,9 @@ type BlockHeight struct {
 	// The height of the most recent block processed by the chain watcher.
 	Height int64 `json:"height,omitempty"`
 	// The bitcoin network to which this block height belongs.
-	Network      btcnetwork.Network `json:"network,omitempty"`
+	Network btcnetwork.Network `json:"network,omitempty"`
+	// The hash of the most recent block processed by the chain watcher. Used to detect chain reorganizations.
+	BlockHash    *[]byte `json:"block_hash,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -35,6 +37,8 @@ func (*BlockHeight) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case blockheight.FieldBlockHash:
+			values[i] = new([]byte)
 		case blockheight.FieldNetwork:
 			values[i] = new(btcnetwork.Network)
 		case blockheight.FieldHeight:
@@ -88,6 +92,12 @@ func (bh *BlockHeight) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				bh.Network = *value
 			}
+		case blockheight.FieldBlockHash:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field block_hash", values[i])
+			} else if value != nil {
+				bh.BlockHash = value
+			}
 		default:
 			bh.selectValues.Set(columns[i], values[i])
 		}
@@ -135,6 +145,11 @@ func (bh *BlockHeight) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("network=")
 	builder.WriteString(fmt.Sprintf("%v", bh.Network))
+	builder.WriteString(", ")
+	if v := bh.BlockHash; v != nil {
+		builder.WriteString("block_hash=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

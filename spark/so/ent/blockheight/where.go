@@ -71,6 +71,11 @@ func Height(v int64) predicate.BlockHeight {
 	return predicate.BlockHeight(sql.FieldEQ(FieldHeight, v))
 }
 
+// BlockHash applies equality check predicate on the "block_hash" field. It's identical to BlockHashEQ.
+func BlockHash(v []byte) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldEQ(FieldBlockHash, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.BlockHeight {
 	return predicate.BlockHeight(sql.FieldEQ(FieldCreateTime, v))
@@ -209,6 +214,56 @@ func NetworkIn(vs ...btcnetwork.Network) predicate.BlockHeight {
 // NetworkNotIn applies the NotIn predicate on the "network" field.
 func NetworkNotIn(vs ...btcnetwork.Network) predicate.BlockHeight {
 	return predicate.BlockHeight(sql.FieldNotIn(FieldNetwork, vs...))
+}
+
+// BlockHashEQ applies the EQ predicate on the "block_hash" field.
+func BlockHashEQ(v []byte) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldEQ(FieldBlockHash, v))
+}
+
+// BlockHashNEQ applies the NEQ predicate on the "block_hash" field.
+func BlockHashNEQ(v []byte) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldNEQ(FieldBlockHash, v))
+}
+
+// BlockHashIn applies the In predicate on the "block_hash" field.
+func BlockHashIn(vs ...[]byte) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldIn(FieldBlockHash, vs...))
+}
+
+// BlockHashNotIn applies the NotIn predicate on the "block_hash" field.
+func BlockHashNotIn(vs ...[]byte) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldNotIn(FieldBlockHash, vs...))
+}
+
+// BlockHashGT applies the GT predicate on the "block_hash" field.
+func BlockHashGT(v []byte) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldGT(FieldBlockHash, v))
+}
+
+// BlockHashGTE applies the GTE predicate on the "block_hash" field.
+func BlockHashGTE(v []byte) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldGTE(FieldBlockHash, v))
+}
+
+// BlockHashLT applies the LT predicate on the "block_hash" field.
+func BlockHashLT(v []byte) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldLT(FieldBlockHash, v))
+}
+
+// BlockHashLTE applies the LTE predicate on the "block_hash" field.
+func BlockHashLTE(v []byte) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldLTE(FieldBlockHash, v))
+}
+
+// BlockHashIsNil applies the IsNil predicate on the "block_hash" field.
+func BlockHashIsNil() predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldIsNull(FieldBlockHash))
+}
+
+// BlockHashNotNil applies the NotNil predicate on the "block_hash" field.
+func BlockHashNotNil() predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldNotNull(FieldBlockHash))
 }
 
 // And groups predicates with the AND operator between them.

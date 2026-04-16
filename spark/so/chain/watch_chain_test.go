@@ -837,6 +837,178 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 	assert.False(t, tweakedTransferIDs[transfer3.ID], "Exit 3 (transfer3) should NOT be tweaked")
 }
 
+// TestHandleBlock_CoopExitProcessing_Reorg tests that when a block is re-processed
+// after a chain reorganization, previously-missed coop exits are picked up and
+// already-confirmed exits are not duplicated.
+func TestHandleBlock_CoopExitProcessing_Reorg(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	knobsService := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled: 1.0,
+	})
+	ctx = knobs.InjectKnobsService(ctx, knobsService)
+
+	originalTweakFunc := tweakKeysForCoopExitFunc
+	tweakKeysForCoopExitFunc = func(ctx context.Context, coopExit *ent.CooperativeExit, blockHeight int64) error {
+		return nil
+	}
+	defer func() { tweakKeysForCoopExitFunc = originalTweakFunc }()
+
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	// Transaction in the original block (pre-reorg)
+	txInOriginalBlock := wire.MsgTx{
+		Version: 2,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut:   []*wire.TxOut{{Value: 900}, {Value: 100}},
+	}
+	// Transaction only in the reorged block (missed during first processing)
+	txOnlyInReorgBlock := wire.MsgTx{
+		Version: 2,
+		TxIn:    []*wire.TxIn{{PreviousOutPoint: wire.OutPoint{Index: 1}}},
+		TxOut:   []*wire.TxOut{{Value: 1800}, {Value: 200}},
+	}
+
+	senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	transfer1, err := dbTx.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer2, err := dbTx.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(2000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create coop exits with reversed byte order (matching production behavior)
+	txHash1 := txInOriginalBlock.TxHash()
+	reversedHash1 := make([]byte, chainhash.HashSize)
+	copy(reversedHash1, txHash1[:])
+	for i := 0; i < len(reversedHash1)/2; i++ {
+		reversedHash1[i], reversedHash1[len(reversedHash1)-1-i] = reversedHash1[len(reversedHash1)-1-i], reversedHash1[i]
+	}
+	exitTxid1, err := schematype.NewTxIDFromBytes(reversedHash1)
+	require.NoError(t, err)
+	_, err = dbTx.CooperativeExit.Create().
+		SetTransfer(transfer1).
+		SetExitTxid(exitTxid1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	txHash2 := txOnlyInReorgBlock.TxHash()
+	reversedHash2 := make([]byte, chainhash.HashSize)
+	copy(reversedHash2, txHash2[:])
+	for i := 0; i < len(reversedHash2)/2; i++ {
+		reversedHash2[i], reversedHash2[len(reversedHash2)-1-i] = reversedHash2[len(reversedHash2)-1-i], reversedHash2[i]
+	}
+	exitTxid2, err := schematype.NewTxIDFromBytes(reversedHash2)
+	require.NoError(t, err)
+	_, err = dbTx.CooperativeExit.Create().
+		SetTransfer(transfer2).
+		SetExitTxid(exitTxid2).
+		Save(ctx)
+	require.NoError(t, err)
+
+	config := so.Config{
+		SupportedNetworks: []btcnetwork.Network{btcnetwork.Testnet},
+		Lrc20Configs: map[string]so.Lrc20Config{
+			btcnetwork.Testnet.String(): {DisableRpcs: true},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+
+	connCfg := &rpcclient.ConnConfig{DisableTLS: true, HTTPPostMode: true}
+	bitcoinClient, err := rpcclient.New(connCfg, nil)
+	require.NoError(t, err)
+
+	// Create the BlockHeight record (normally created by scanChainUpdates on first run)
+	_, err = dbTx.BlockHeight.Create().
+		SetHeight(99).
+		SetNetwork(btcnetwork.Testnet).
+		Save(ctx)
+	require.NoError(t, err)
+
+	blockHeight := int64(100)
+
+	// --- Step 1: Process original block (only contains txInOriginalBlock) ---
+	originalBlockHash := chainhash.HashH([]byte("original-block"))
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, []wire.MsgTx{txInOriginalBlock}, blockHeight, originalBlockHash, btcnetwork.Testnet)
+	require.NoError(t, err)
+
+	allExits, err := dbTx.CooperativeExit.Query().WithTransfer().All(ctx)
+	require.NoError(t, err)
+	require.Len(t, allExits, 2)
+
+	confirmedCount := 0
+	for _, exit := range allExits {
+		if exit.ConfirmationHeight != nil {
+			confirmedCount++
+			assert.Equal(t, blockHeight, *exit.ConfirmationHeight)
+			assert.Equal(t, transfer1.ID, exit.Edges.Transfer.ID, "Only exit 1 should be confirmed from original block")
+		}
+	}
+	assert.Equal(t, 1, confirmedCount, "Only 1 coop exit should be confirmed from original block")
+
+	// Verify block hash was stored
+	storedBlockHeight, err := dbTx.BlockHeight.Query().Only(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, storedBlockHeight.BlockHash)
+	assert.Equal(t, originalBlockHash.CloneBytes(), *storedBlockHeight.BlockHash)
+
+	// --- Step 2: Re-process same height with reorged block (contains BOTH transactions) ---
+	reorgBlockHash := chainhash.HashH([]byte("reorged-block"))
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, []wire.MsgTx{txInOriginalBlock, txOnlyInReorgBlock}, blockHeight, reorgBlockHash, btcnetwork.Testnet)
+	require.NoError(t, err)
+
+	allExits, err = dbTx.CooperativeExit.Query().WithTransfer().All(ctx)
+	require.NoError(t, err)
+	require.Len(t, allExits, 2)
+
+	// Both exits should now be confirmed at the same block height
+	for _, exit := range allExits {
+		require.NotNil(t, exit.ConfirmationHeight, "Exit for transfer %s should be confirmed after reorg", exit.Edges.Transfer.ID)
+		assert.Equal(t, blockHeight, *exit.ConfirmationHeight)
+	}
+
+	// Verify block hash was updated to the reorged block
+	storedBlockHeight, err = dbTx.BlockHeight.Query().Only(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, storedBlockHeight.BlockHash)
+	assert.Equal(t, reorgBlockHash.CloneBytes(), *storedBlockHeight.BlockHash)
+
+	// --- Step 3: Process enough blocks for key tweaking ---
+	blockHeight = int64(102)
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, []wire.MsgTx{}, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
+	require.NoError(t, err)
+
+	allExits, err = dbTx.CooperativeExit.Query().WithTransfer().All(ctx)
+	require.NoError(t, err)
+
+	tweakedCount := 0
+	for _, exit := range allExits {
+		if exit.KeyTweakedHeight != nil {
+			tweakedCount++
+		}
+	}
+	assert.Equal(t, 2, tweakedCount, "Both exits should have keys tweaked after enough confirmations")
+}
+
 func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	ctx, _ := db.NewTestSQLiteContext(t)

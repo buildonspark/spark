@@ -16,6 +16,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "height", Type: field.TypeInt64},
 		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "block_hash", Type: field.TypeBytes, Nullable: true, Size: 32},
 	}
 	// BlockHeightsTable holds the schema information for the "block_heights" table.
 	BlockHeightsTable = &schema.Table{

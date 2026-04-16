@@ -126,6 +126,7 @@ type BlockHeightMutation struct {
 	height        *int64
 	addheight     *int64
 	network       *btcnetwork.Network
+	block_hash    *[]byte
 	clearedFields map[string]struct{}
 	done          bool
 	oldValue      func(context.Context) (*BlockHeight, error)
@@ -400,6 +401,55 @@ func (m *BlockHeightMutation) ResetNetwork() {
 	m.network = nil
 }
 
+// SetBlockHash sets the "block_hash" field.
+func (m *BlockHeightMutation) SetBlockHash(b []byte) {
+	m.block_hash = &b
+}
+
+// BlockHash returns the value of the "block_hash" field in the mutation.
+func (m *BlockHeightMutation) BlockHash() (r []byte, exists bool) {
+	v := m.block_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBlockHash returns the old "block_hash" field's value of the BlockHeight entity.
+// If the BlockHeight object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BlockHeightMutation) OldBlockHash(ctx context.Context) (v *[]byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBlockHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBlockHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBlockHash: %w", err)
+	}
+	return oldValue.BlockHash, nil
+}
+
+// ClearBlockHash clears the value of the "block_hash" field.
+func (m *BlockHeightMutation) ClearBlockHash() {
+	m.block_hash = nil
+	m.clearedFields[blockheight.FieldBlockHash] = struct{}{}
+}
+
+// BlockHashCleared returns if the "block_hash" field was cleared in this mutation.
+func (m *BlockHeightMutation) BlockHashCleared() bool {
+	_, ok := m.clearedFields[blockheight.FieldBlockHash]
+	return ok
+}
+
+// ResetBlockHash resets all changes to the "block_hash" field.
+func (m *BlockHeightMutation) ResetBlockHash() {
+	m.block_hash = nil
+	delete(m.clearedFields, blockheight.FieldBlockHash)
+}
+
 // Where appends a list predicates to the BlockHeightMutation builder.
 func (m *BlockHeightMutation) Where(ps ...predicate.BlockHeight) {
 	m.predicates = append(m.predicates, ps...)
@@ -434,7 +484,7 @@ func (m *BlockHeightMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BlockHeightMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.create_time != nil {
 		fields = append(fields, blockheight.FieldCreateTime)
 	}
@@ -446,6 +496,9 @@ func (m *BlockHeightMutation) Fields() []string {
 	}
 	if m.network != nil {
 		fields = append(fields, blockheight.FieldNetwork)
+	}
+	if m.block_hash != nil {
+		fields = append(fields, blockheight.FieldBlockHash)
 	}
 	return fields
 }
@@ -463,6 +516,8 @@ func (m *BlockHeightMutation) Field(name string) (ent.Value, bool) {
 		return m.Height()
 	case blockheight.FieldNetwork:
 		return m.Network()
+	case blockheight.FieldBlockHash:
+		return m.BlockHash()
 	}
 	return nil, false
 }
@@ -480,6 +535,8 @@ func (m *BlockHeightMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldHeight(ctx)
 	case blockheight.FieldNetwork:
 		return m.OldNetwork(ctx)
+	case blockheight.FieldBlockHash:
+		return m.OldBlockHash(ctx)
 	}
 	return nil, fmt.Errorf("unknown BlockHeight field %s", name)
 }
@@ -516,6 +573,13 @@ func (m *BlockHeightMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetNetwork(v)
+		return nil
+	case blockheight.FieldBlockHash:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBlockHash(v)
 		return nil
 	}
 	return fmt.Errorf("unknown BlockHeight field %s", name)
@@ -561,7 +625,11 @@ func (m *BlockHeightMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *BlockHeightMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(blockheight.FieldBlockHash) {
+		fields = append(fields, blockheight.FieldBlockHash)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -574,6 +642,11 @@ func (m *BlockHeightMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *BlockHeightMutation) ClearField(name string) error {
+	switch name {
+	case blockheight.FieldBlockHash:
+		m.ClearBlockHash()
+		return nil
+	}
 	return fmt.Errorf("unknown BlockHeight nullable field %s", name)
 }
 
@@ -592,6 +665,9 @@ func (m *BlockHeightMutation) ResetField(name string) error {
 		return nil
 	case blockheight.FieldNetwork:
 		m.ResetNetwork()
+		return nil
+	case blockheight.FieldBlockHash:
+		m.ResetBlockHash()
 		return nil
 	}
 	return fmt.Errorf("unknown BlockHeight field %s", name)

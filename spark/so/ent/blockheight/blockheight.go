@@ -24,6 +24,8 @@ const (
 	FieldHeight = "height"
 	// FieldNetwork holds the string denoting the network field in the database.
 	FieldNetwork = "network"
+	// FieldBlockHash holds the string denoting the block_hash field in the database.
+	FieldBlockHash = "block_hash"
 	// Table holds the table name of the blockheight in the database.
 	Table = "block_heights"
 )
@@ -35,6 +37,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldHeight,
 	FieldNetwork,
+	FieldBlockHash,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -54,6 +57,8 @@ var (
 	DefaultUpdateTime func() time.Time
 	// UpdateDefaultUpdateTime holds the default value on update for the "update_time" field.
 	UpdateDefaultUpdateTime func() time.Time
+	// BlockHashValidator is a validator for the "block_hash" field. It is called by the builders before save.
+	BlockHashValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )

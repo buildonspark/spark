@@ -70,6 +70,10 @@ func init() {
 	blockheight.DefaultUpdateTime = blockheightDescUpdateTime.Default.(func() time.Time)
 	// blockheight.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	blockheight.UpdateDefaultUpdateTime = blockheightDescUpdateTime.UpdateDefault.(func() time.Time)
+	// blockheightDescBlockHash is the schema descriptor for block_hash field.
+	blockheightDescBlockHash := blockheightFields[2].Descriptor()
+	// blockheight.BlockHashValidator is a validator for the "block_hash" field. It is called by the builders before save.
+	blockheight.BlockHashValidator = blockheightDescBlockHash.Validators[0].(func([]byte) error)
 	// blockheightDescID is the schema descriptor for id field.
 	blockheightDescID := blockheightMixinFields0[0].Descriptor()
 	// blockheight.DefaultID holds the default value on creation for the id field.

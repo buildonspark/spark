@@ -65,6 +65,12 @@ func (bhc *BlockHeightCreate) SetNetwork(b btcnetwork.Network) *BlockHeightCreat
 	return bhc
 }
 
+// SetBlockHash sets the "block_hash" field.
+func (bhc *BlockHeightCreate) SetBlockHash(b []byte) *BlockHeightCreate {
+	bhc.mutation.SetBlockHash(b)
+	return bhc
+}
+
 // SetID sets the "id" field.
 func (bhc *BlockHeightCreate) SetID(u uuid.UUID) *BlockHeightCreate {
 	bhc.mutation.SetID(u)
@@ -147,6 +153,11 @@ func (bhc *BlockHeightCreate) check() error {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "BlockHeight.network": %w`, err)}
 		}
 	}
+	if v, ok := bhc.mutation.BlockHash(); ok {
+		if err := blockheight.BlockHashValidator(v); err != nil {
+			return &ValidationError{Name: "block_hash", err: fmt.Errorf(`ent: validator failed for field "BlockHeight.block_hash": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -198,6 +209,10 @@ func (bhc *BlockHeightCreate) createSpec() (*BlockHeight, *sqlgraph.CreateSpec) 
 	if value, ok := bhc.mutation.Network(); ok {
 		_spec.SetField(blockheight.FieldNetwork, field.TypeEnum, value)
 		_node.Network = value
+	}
+	if value, ok := bhc.mutation.BlockHash(); ok {
+		_spec.SetField(blockheight.FieldBlockHash, field.TypeBytes, value)
+		_node.BlockHash = &value
 	}
 	return _node, _spec
 }
@@ -290,6 +305,24 @@ func (u *BlockHeightUpsert) SetNetwork(v btcnetwork.Network) *BlockHeightUpsert 
 // UpdateNetwork sets the "network" field to the value that was provided on create.
 func (u *BlockHeightUpsert) UpdateNetwork() *BlockHeightUpsert {
 	u.SetExcluded(blockheight.FieldNetwork)
+	return u
+}
+
+// SetBlockHash sets the "block_hash" field.
+func (u *BlockHeightUpsert) SetBlockHash(v []byte) *BlockHeightUpsert {
+	u.Set(blockheight.FieldBlockHash, v)
+	return u
+}
+
+// UpdateBlockHash sets the "block_hash" field to the value that was provided on create.
+func (u *BlockHeightUpsert) UpdateBlockHash() *BlockHeightUpsert {
+	u.SetExcluded(blockheight.FieldBlockHash)
+	return u
+}
+
+// ClearBlockHash clears the value of the "block_hash" field.
+func (u *BlockHeightUpsert) ClearBlockHash() *BlockHeightUpsert {
+	u.SetNull(blockheight.FieldBlockHash)
 	return u
 }
 
@@ -390,6 +423,27 @@ func (u *BlockHeightUpsertOne) SetNetwork(v btcnetwork.Network) *BlockHeightUpse
 func (u *BlockHeightUpsertOne) UpdateNetwork() *BlockHeightUpsertOne {
 	return u.Update(func(s *BlockHeightUpsert) {
 		s.UpdateNetwork()
+	})
+}
+
+// SetBlockHash sets the "block_hash" field.
+func (u *BlockHeightUpsertOne) SetBlockHash(v []byte) *BlockHeightUpsertOne {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.SetBlockHash(v)
+	})
+}
+
+// UpdateBlockHash sets the "block_hash" field to the value that was provided on create.
+func (u *BlockHeightUpsertOne) UpdateBlockHash() *BlockHeightUpsertOne {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.UpdateBlockHash()
+	})
+}
+
+// ClearBlockHash clears the value of the "block_hash" field.
+func (u *BlockHeightUpsertOne) ClearBlockHash() *BlockHeightUpsertOne {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.ClearBlockHash()
 	})
 }
 
@@ -657,6 +711,27 @@ func (u *BlockHeightUpsertBulk) SetNetwork(v btcnetwork.Network) *BlockHeightUps
 func (u *BlockHeightUpsertBulk) UpdateNetwork() *BlockHeightUpsertBulk {
 	return u.Update(func(s *BlockHeightUpsert) {
 		s.UpdateNetwork()
+	})
+}
+
+// SetBlockHash sets the "block_hash" field.
+func (u *BlockHeightUpsertBulk) SetBlockHash(v []byte) *BlockHeightUpsertBulk {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.SetBlockHash(v)
+	})
+}
+
+// UpdateBlockHash sets the "block_hash" field to the value that was provided on create.
+func (u *BlockHeightUpsertBulk) UpdateBlockHash() *BlockHeightUpsertBulk {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.UpdateBlockHash()
+	})
+}
+
+// ClearBlockHash clears the value of the "block_hash" field.
+func (u *BlockHeightUpsertBulk) ClearBlockHash() *BlockHeightUpsertBulk {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.ClearBlockHash()
 	})
 }
 

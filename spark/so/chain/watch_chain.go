@@ -272,18 +272,37 @@ func scanChainUpdates(
 	if ent.IsNotFound(err) {
 		startHeight := max(0, latestBlockHeight-18)
 		logger.Sugar().Infof("Block height %d not found, creating new entry", startHeight)
-		dbBlockHeight, err = dbClient.BlockHeight.Create().SetHeight(startHeight).SetNetwork(network).Save(ctx)
+		startBlockHash, hashErr := bitcoinClient.GetBlockHash(startHeight)
+		if hashErr != nil {
+			return fmt.Errorf("failed to get block hash at start height %d: %w", startHeight, hashErr)
+		}
+		dbBlockHeight, err = dbClient.BlockHeight.Create().
+			SetHeight(startHeight).
+			SetNetwork(network).
+			SetBlockHash(startBlockHash.CloneBytes()).
+			Save(ctx)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to query block height: %w", err)
 	}
-	dbBlockHash, err := bitcoinClient.GetBlockHash(dbBlockHeight.Height)
-	if err != nil {
-		return fmt.Errorf("failed to get block hash at db height %d: %w", dbBlockHeight.Height, err)
+	var dbChainTip Tip
+	if dbBlockHeight.BlockHash != nil && len(*dbBlockHeight.BlockHash) == chainhash.HashSize {
+		storedHash, err := chainhash.NewHash(*dbBlockHeight.BlockHash)
+		if err != nil {
+			return fmt.Errorf("failed to parse stored block hash at height %d: %w", dbBlockHeight.Height, err)
+		}
+		dbChainTip = NewTip(dbBlockHeight.Height, *storedHash)
+		logger.Sugar().Infof("DB chain tip height: %d, hash: %s (from stored hash)", dbBlockHeight.Height, storedHash.String())
+	} else {
+		// Backwards compatibility: fetch from node if hash not stored yet.
+		// After the next block is processed, the hash will be stored.
+		dbBlockHash, err := bitcoinClient.GetBlockHash(dbBlockHeight.Height)
+		if err != nil {
+			return fmt.Errorf("failed to get block hash at db height %d: %w", dbBlockHeight.Height, err)
+		}
+		dbChainTip = NewTip(dbBlockHeight.Height, *dbBlockHash)
+		logger.Sugar().Infof("DB chain tip height: %d, hash: %s (from node, no stored hash)", dbBlockHeight.Height, dbBlockHash.String())
 	}
-
-	dbChainTip := NewTip(dbBlockHeight.Height, *dbBlockHash)
-	logger.Sugar().Infof("DB chain tip height: %d, hash: %s", dbBlockHeight.Height, dbBlockHash.String())
 	difference, err := findDifference(dbChainTip, latestChainTip, bitcoinClient)
 	if err != nil {
 		return fmt.Errorf("failed to find difference: %w", err)
@@ -475,11 +494,7 @@ func connectBlocks(
 		lastProcessedHeight = chainTip.Height
 		blockCtx := ctx
 
-		blockHash, err := bitcoinClient.GetBlockHash(chainTip.Height)
-		if err != nil {
-			return err
-		}
-		block, err := bitcoinClient.GetBlockVerboseTx(blockHash)
+		block, err := bitcoinClient.GetBlockVerboseTx(&chainTip.Hash)
 		if err != nil {
 			return err
 		}
@@ -669,8 +684,10 @@ func handleBlock(
 	if err != nil {
 		return err
 	}
+	hashBytes := blockHash.CloneBytes()
 	_, err = dbClient.BlockHeight.Update().
 		SetHeight(blockHeight).
+		SetBlockHash(hashBytes).
 		Where(blockheight.NetworkEQ(network)).
 		Save(ctx)
 	if err != nil {

@@ -26,8 +26,9 @@ type BlockHeightExample struct {
 	t      *testing.T
 
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
-	Height  *int64
-	Network *btcnetwork.Network
+	Height    *int64
+	Network   *btcnetwork.Network
+	BlockHash *[]byte
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 }
@@ -52,6 +53,12 @@ func (bh *BlockHeightExample) SetNetwork(v btcnetwork.Network) *BlockHeightExamp
 	return bh
 }
 
+// SetBlockHash sets the block_hash field.
+func (bh *BlockHeightExample) SetBlockHash(v []byte) *BlockHeightExample {
+	bh.BlockHash = &v
+	return bh
+}
+
 // MustExec builds and saves the BlockHeight entity to the database.
 // It panics if the save fails.
 func (bh *BlockHeightExample) MustExec(ctx context.Context) *ent.BlockHeight {
@@ -69,6 +76,15 @@ func (bh *BlockHeightExample) MustExec(ctx context.Context) *ent.BlockHeight {
 	} else {
 		// Use default from annotation
 		create.SetNetwork(2)
+	}
+	if bh.BlockHash != nil {
+		create.SetBlockHash(*bh.BlockHash)
+	} else {
+		// Use default from annotation
+		create.SetBlockHash(func() []byte {
+			b, _ := hex.DecodeString("00000000000000000001bcb0c9fede3f8863b077acc30e312377e6580ceb831b")
+			return b
+		}())
 	}
 
 	// Handle edges
@@ -99,6 +115,15 @@ func (bh *BlockHeightExample) Exec(ctx context.Context) (*ent.BlockHeight, error
 	} else {
 		// Use default from annotation
 		create.SetNetwork(2)
+	}
+	if bh.BlockHash != nil {
+		create.SetBlockHash(*bh.BlockHash)
+	} else {
+		// Use default from annotation
+		create.SetBlockHash(func() []byte {
+			b, _ := hex.DecodeString("00000000000000000001bcb0c9fede3f8863b077acc30e312377e6580ceb831b")
+			return b
+		}())
 	}
 
 	// Handle edges

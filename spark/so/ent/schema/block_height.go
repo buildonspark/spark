@@ -29,6 +29,14 @@ func (BlockHeight) Fields() []ent.Field {
 			GoType(btcnetwork.Unspecified).
 			Comment("The bitcoin network to which this block height belongs.").
 			Annotations(entexample.Default(btcnetwork.Regtest)),
+		field.Bytes("block_hash").
+			Optional().
+			Nillable().
+			MaxLen(32).
+			Comment("The hash of the most recent block processed by the chain watcher. Used to detect chain reorganizations.").
+			Annotations(entexample.Default(
+				"00000000000000000001bcb0c9fede3f8863b077acc30e312377e6580ceb831b",
+			)),
 	}
 }
 
