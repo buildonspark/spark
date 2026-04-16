@@ -7,7 +7,9 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/utils"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,6 +34,12 @@ func TestTokenTransactionStreamNotification(t *testing.T) {
 	tokenIdentifier := verifyNativeToken(t, params)
 
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+	// Enable token transaction stream events (disabled by default).
+	kc, err := sparktesting.NewKnobController(t)
+	require.NoError(t, err)
+	err = kc.SetKnob(t, knobs.KnobTokenTxEventsEnabled, 100)
+	require.NoError(t, err)
 
 	// Subscribe to events before minting.
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
