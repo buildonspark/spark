@@ -2,7 +2,13 @@
 name = "spark-token-primitives"
 version = "0.1.0"
 edition = "2021"
+authors = ["Dhruv Pareek <dhruv@lightspark.com>"]
+description = "Reusable Rust client helpers for constructing Spark token transfer transactions."
+repository = "https://github.com/lightsparkdev/spark"
+readme = "README.md"
 license = "Apache-2.0"
+keywords = ["bitcoin", "spark", "token"]
+categories = ["cryptography::cryptocurrencies"]
 include = [
     "src/**",
     "build.rs",
