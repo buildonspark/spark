@@ -18,6 +18,7 @@ class BackgroundStreamRetryTestWallet extends SparkWallet {
     });
     this.connectionManager = connectionManagerStub as any;
     (this as any).claimTransfers = claimTransfersStub;
+    (this as any).syncTokenOutputs = jest.fn(async () => {});
   }
 
   protected override buildConnectionManager() {
