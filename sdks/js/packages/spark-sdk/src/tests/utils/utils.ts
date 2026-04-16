@@ -61,3 +61,29 @@ export async function waitForClaim({
     wallet.once(SparkWalletEvent.TransferClaimed, onClaim);
   });
 }
+
+/**
+ * Polls getBalance() until it reaches the expected value.
+ *
+ * After a static deposit claim, the leaves are TRANSFER_LOCKED on the SO
+ * until the wallet's background stream receives the transfer event and
+ * completes the auto-claim (tweak keys → sign refunds → finalize).
+ * This polls until that pipeline finishes and the balance is visible.
+ */
+export async function waitForBalance(
+  wallet: SparkWalletTesting,
+  expectedBalance: bigint,
+  timeoutMs: number = 30000,
+): Promise<void> {
+  const start = Date.now();
+  let lastBalance: bigint = 0n;
+  while (Date.now() - start < timeoutMs) {
+    const { balance } = await wallet.getBalance();
+    lastBalance = balance;
+    if (balance === expectedBalance) return;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(
+    `waitForBalance timed out after ${timeoutMs}ms: expected ${expectedBalance}, last seen ${lastBalance}`,
+  );
+}

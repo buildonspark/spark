@@ -4,7 +4,7 @@ import {
 } from "../../utils/spark-testing-wallet.js";
 import { bytesToHex } from "@noble/hashes/utils";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
-import { retryUntilSuccess, waitForClaim } from "../../utils/utils.js";
+import { retryUntilSuccess, waitForBalance } from "../../utils/utils.js";
 
 export const DEPOSIT_AMOUNT = 10000n;
 const SECOND_DEPOSIT_AMOUNT = 20000n;
@@ -59,9 +59,7 @@ describe("SSP static deposit address integration", () => {
           }),
       );
 
-      await waitForClaim({ wallet: userWallet });
-      const { balance } = await userWallet.getBalance();
-      expect(balance).toBe(BigInt(quoteAmount));
+      await waitForBalance(userWallet, BigInt(quoteAmount));
 
       // Test depositing money to the same address and second time and claiming.
       const signedTx2 = await faucet.sendToAddress(
@@ -81,9 +79,7 @@ describe("SSP static deposit address integration", () => {
         creditAmountSats: quoteAmount2,
         sspSignature: sspSignature2,
       });
-      await waitForClaim({ wallet: userWallet });
-      const { balance: balance2 } = await userWallet.getBalance();
-      expect(balance2).toBe(BigInt(quoteAmount + quoteAmount2));
+      await waitForBalance(userWallet, BigInt(quoteAmount + quoteAmount2));
 
       // Test depositing money to the same address and test claim with max fee flow.
       const signedTx3 = await faucet.sendToAddress(
@@ -101,9 +97,10 @@ describe("SSP static deposit address integration", () => {
         transactionId: transactionId3,
         maxFee: 1000,
       });
-      await waitForClaim({ wallet: userWallet });
-      const { balance: balance3 } = await userWallet.getBalance();
-      expect(balance3).toBe(BigInt(quoteAmount + quoteAmount2 + quoteAmount3));
+      await waitForBalance(
+        userWallet,
+        BigInt(quoteAmount + quoteAmount2 + quoteAmount3),
+      );
       // Get transfers should include static deposit transfers.
       const transfers = await userWallet.getTransfers();
       expect(transfers.transfers.length).toBe(3);
@@ -163,7 +160,7 @@ describe("SSP static deposit address integration", () => {
       expect(claimResult!.transferId).toBeDefined();
       expect(claimResult!.transferId.length).toBeGreaterThan(0);
 
-      await waitForClaim({ wallet: userWallet });
+      await waitForBalance(userWallet, BigInt(quoteAmount));
 
       // Look up the transfer by the returned ID via the SSP.
       // If the wrong ID was returned, this lookup will fail.
@@ -175,10 +172,6 @@ describe("SSP static deposit address integration", () => {
       expect((transfer!.userRequest as any).typename).toBe(
         "ClaimStaticDeposit",
       );
-
-      // Sanity check: balance matches the quoted amount
-      const { balance } = await userWallet.getBalance();
-      expect(balance).toBe(BigInt(quoteAmount));
     }, 60000);
 
     it("should create a refund transaction", async () => {
@@ -290,9 +283,7 @@ describe("SSP static deposit address integration", () => {
           }),
       );
 
-      await waitForClaim({ wallet: userWallet });
-      const { balance } = await userWallet.getBalance();
-      expect(balance).toBe(BigInt(quoteAmount));
+      await waitForBalance(userWallet, BigInt(quoteAmount));
 
       // Test depositing money to the same address and second time and claiming.
       const signedTx2 = await faucet.sendToAddress(
@@ -315,9 +306,7 @@ describe("SSP static deposit address integration", () => {
             sspSignature: sspSignature2,
           }),
       );
-      await waitForClaim({ wallet: userWallet });
-      const { balance: balance2 } = await userWallet.getBalance();
-      expect(balance2).toBe(BigInt(quoteAmount + quoteAmount2));
+      await waitForBalance(userWallet, BigInt(quoteAmount + quoteAmount2));
 
       // Test depositing money to the same address and test claim with max fee flow.
       const signedTx3 = await faucet.sendToAddress(
@@ -338,9 +327,10 @@ describe("SSP static deposit address integration", () => {
             maxFee: 1000,
           }),
       );
-      await waitForClaim({ wallet: userWallet });
-      const { balance: balance3 } = await userWallet.getBalance();
-      expect(balance3).toBe(BigInt(quoteAmount + quoteAmount2 + quoteAmount3));
+      await waitForBalance(
+        userWallet,
+        BigInt(quoteAmount + quoteAmount2 + quoteAmount3),
+      );
       // Get transfers should include static deposit transfers.
       const transfers = await userWallet.getTransfers();
       expect(transfers.transfers.length).toBe(3);
@@ -443,15 +433,8 @@ describe("SSP static deposit address integration", () => {
       expect(successes).toHaveLength(1);
       expect(failures).toHaveLength(1);
 
-      await waitForClaim({ wallet: aliceWallet });
-
-      const { balance: aliceBalance } = await aliceWallet.getBalance();
-      const { balance: alice2Balance } = await aliceWallet2.getBalance();
-
-      expect(aliceBalance).toBe(BigInt(quote!.creditAmountSats));
-      expect(alice2Balance).toBe(BigInt(quote2!.creditAmountSats));
-
-      expect(aliceBalance).toBe(alice2Balance);
+      await waitForBalance(aliceWallet, BigInt(quote!.creditAmountSats));
+      await waitForBalance(aliceWallet2, BigInt(quote2!.creditAmountSats));
     }, 60000);
 
     it("Wallet balance should be correct after concurrent claims of the same initted wallet", async () => {
@@ -505,11 +488,7 @@ describe("SSP static deposit address integration", () => {
       expect(successes).toHaveLength(1);
       expect(failures).toHaveLength(4);
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      const { balance: aliceBalance } = await aliceWallet.getBalance();
-
-      expect(aliceBalance).toBe(BigInt(quote!.creditAmountSats));
+      await waitForBalance(aliceWallet, BigInt(quote!.creditAmountSats));
     }, 60000);
   });
 
@@ -615,11 +594,7 @@ describe("SSP static deposit address integration", () => {
         creditAmountSats: quote.creditAmountSats,
         sspSignature: quote.signature,
       });
-      await waitForClaim({ wallet: aliceWallet });
-
-      const { balance } = await aliceWallet.getBalance();
-
-      expect(balance).toBe(BigInt(quote.creditAmountSats));
+      await waitForBalance(aliceWallet, BigInt(quote.creditAmountSats));
 
       await expect(
         aliceWallet.getClaimStaticDepositQuote(transactionId),
@@ -647,8 +622,6 @@ describe("SSP static deposit address integration", () => {
         transactionId,
         vout!,
       );
-
-      await new Promise((resolve) => setTimeout(resolve, 10000));
 
       const quoteAmount = quote!.creditAmountSats;
 
@@ -688,8 +661,6 @@ describe("SSP static deposit address integration", () => {
         vout!,
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 10000));
-
       const quoteAmount = quote!.creditAmountSats;
       const sspSignature = quote!.signature;
 
@@ -700,8 +671,6 @@ describe("SSP static deposit address integration", () => {
         sspSignature,
         outputIndex: vout!,
       });
-
-      await waitForClaim({ wallet: userWallet });
 
       expect(outputs).toBeDefined();
 
@@ -751,24 +720,14 @@ describe("SSP static deposit address integration", () => {
         outputIndex: vout!,
       });
 
-      await waitForClaim({ wallet: userWallet });
+      await waitForBalance(userWallet, BigInt(quoteAmount));
 
-      console.log("Fetching wallet balance after claim...");
-      const { balance } = await userWallet.getBalance();
-      expect(balance).toBe(BigInt(quoteAmount));
-
-      console.log(`Alice balance: ${balance}`);
-
-      console.log("Initiating transfer to Spark address...");
       const sparkAddress = await userWallet.getSparkAddress();
       const transfer = await userWallet.transfer({
-        amountSats: Number(balance),
+        amountSats: quoteAmount,
         receiverSparkAddress: sparkAddress,
       });
-
       expect(transfer).toBeDefined();
-
-      await waitForClaim({ wallet: userWallet });
 
       // Try to refund the deposit after claiming and transfer
       console.log("Attempting refund of claimed deposit...");

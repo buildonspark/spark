@@ -1,6 +1,6 @@
 import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
-import { waitForClaim } from "../../utils/utils.js";
+import { waitForBalance } from "../../utils/utils.js";
 import { CurrencyUnit } from "@lightsparkdev/core";
 import { Transaction } from "@scure/btc-signer";
 
@@ -109,11 +109,8 @@ describe("SSP instant static deposit integration", () => {
       expect(claimResult).toBeDefined();
       expect(claimResult.claimId).toBeDefined();
 
-      await waitForClaim({ wallet: userWallet, timeoutMs: 30000 });
-
-      const { balance } = await userWallet.getBalance();
-      expect(balance).toBeGreaterThan(0n);
-      expect(balance).toBe(
+      await waitForBalance(
+        userWallet,
         BigInt(quoteResult.quote.creditAmount.originalValue),
       );
 
@@ -158,11 +155,8 @@ describe("SSP instant static deposit integration", () => {
       expect(claimResult).toBeDefined();
       expect(claimResult.claimId).toBeDefined();
 
-      await waitForClaim({ wallet: userWallet, timeoutMs: 30000 });
-
-      const { balance } = await userWallet.getBalance();
-      expect(balance).toBeGreaterThan(0n);
-      expect(balance).toBe(
+      await waitForBalance(
+        userWallet,
         BigInt(quoteResult.quote.creditAmount.originalValue),
       );
 
@@ -239,11 +233,8 @@ describe("SSP instant static deposit integration", () => {
         // Now mine to confirm the replacement tx
         await faucet.mineBlocks(1);
 
-        await waitForClaim({ wallet: userWallet, timeoutMs: 30000 });
-
-        const { balance } = await userWallet.getBalance();
-        expect(balance).toBeGreaterThan(0n);
-        expect(balance).toBe(
+        await waitForBalance(
+          userWallet,
           BigInt(quoteResult.quote.creditAmount.originalValue),
         );
 
@@ -295,11 +286,8 @@ describe("SSP instant static deposit integration", () => {
       expect(claimResult).toBeDefined();
       expect(claimResult.claimId).toBeDefined();
 
-      await waitForClaim({ wallet: userWallet, timeoutMs: 30000 });
-
-      const { balance } = await userWallet.getBalance();
-      expect(balance).toBeGreaterThan(0n);
-      expect(balance).toBe(
+      await waitForBalance(
+        userWallet,
         BigInt(quoteResult.quote.creditAmount.originalValue),
       );
 
@@ -374,11 +362,8 @@ describe("SSP instant static deposit integration", () => {
       expect(claimResult).toBeDefined();
       expect(claimResult.claimId).toBeDefined();
 
-      await waitForClaim({ wallet: userWallet, timeoutMs: 30000 });
-
-      const { balance } = await userWallet.getBalance();
-      expect(balance).toBeGreaterThan(0n);
-      expect(balance).toBe(
+      await waitForBalance(
+        userWallet,
         BigInt(quoteResult.quote.creditAmount.originalValue),
       );
 
@@ -530,11 +515,8 @@ describe("SSP instant static deposit integration", () => {
         expect(claimResult).toBeDefined();
         expect(claimResult.claimId).toBeDefined();
 
-        await waitForClaim({ wallet: userWallet, timeoutMs: 30000 });
-
-        const { balance } = await userWallet.getBalance();
-        expect(balance).toBeGreaterThan(0n);
-        expect(balance).toBe(
+        await waitForBalance(
+          userWallet,
           BigInt(quoteResult.quote.creditAmount.originalValue),
         );
 

@@ -14,7 +14,7 @@ import {
 } from "../../../utils/address.js";
 import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
-import { waitForClaim } from "../../utils/utils.js";
+import { waitForBalance, waitForClaim } from "../../utils/utils.js";
 
 const DEPOSIT_AMOUNT = 10000n;
 const INVOICE_AMOUNT = 1000;
@@ -95,11 +95,7 @@ describe("Lightning Network provider", () => {
       await faucet.mineBlocksAndWaitForMiningToComplete(6);
 
       await aliceWallet.claimDeposit(signedTx.id);
-
-      await waitForClaim({ wallet: aliceWallet });
-
-      const { balance } = await aliceWallet.getBalance();
-      expect(balance).toBe(DEPOSIT_AMOUNT);
+      await waitForBalance(aliceWallet, DEPOSIT_AMOUNT);
 
       const invoice = await bobWallet.createLightningInvoice({
         amountSats: INVOICE_AMOUNT,
@@ -109,12 +105,15 @@ describe("Lightning Network provider", () => {
 
       expect(invoice).toBeDefined();
 
+      // Register listener before payment so we don't miss the stream event.
+      const bobClaimed = waitForClaim({ wallet: bobWallet });
       await aliceWallet.payLightningInvoice({
         invoice: invoice.invoice.encodedInvoice,
         maxFeeSats: 100,
       });
 
-      await waitForClaim({ wallet: bobWallet });
+      // wait for the claim event, we care about the transfer completing...
+      await bobClaimed;
 
       const { balance: bobBalance } = await bobWallet.getBalance();
       expect(bobBalance).toBe(BigInt(INVOICE_AMOUNT));
@@ -238,10 +237,7 @@ describe("Lightning Network provider", () => {
       );
       await faucet.mineBlocksAndWaitForMiningToComplete(6);
       await aliceWallet.claimDeposit(signedTx.id);
-      await waitForClaim({ wallet: aliceWallet });
-
-      const { balance: aliceInitialBalance } = await aliceWallet.getBalance();
-      expect(aliceInitialBalance).toBe(DEPOSIT_AMOUNT);
+      await waitForBalance(aliceWallet, DEPOSIT_AMOUNT);
 
       // Bob creates invoice with embedded spark invoice
       const invoice = await bobWallet.createLightningInvoice({
@@ -261,13 +257,15 @@ describe("Lightning Network provider", () => {
       );
 
       // Alice pays with preferSpark - should use embedded spark invoice
+      // Register listener before payment so we don't miss the stream event.
+      const bobClaimed = waitForClaim({ wallet: bobWallet });
       await aliceWallet.payLightningInvoice({
         invoice: invoice.invoice.encodedInvoice,
         maxFeeSats: 100,
         preferSpark: true,
       });
 
-      await waitForClaim({ wallet: bobWallet });
+      await bobClaimed;
 
       // Verify Bob received the payment
       const { balance: bobBalance } = await bobWallet.getBalance();
@@ -299,10 +297,7 @@ describe("Lightning Network provider", () => {
       );
       await faucet.mineBlocksAndWaitForMiningToComplete(6);
       await aliceWallet.claimDeposit(signedTx.id);
-      await waitForClaim({ wallet: aliceWallet });
-
-      const { balance: aliceInitialBalance } = await aliceWallet.getBalance();
-      expect(aliceInitialBalance).toBe(DEPOSIT_AMOUNT);
+      await waitForBalance(aliceWallet, DEPOSIT_AMOUNT);
 
       // Bob creates zero-amount invoice with embedded spark invoice
       const invoice = await bobWallet.createLightningInvoice({
@@ -325,6 +320,8 @@ describe("Lightning Network provider", () => {
       const paymentAmount = 5000;
 
       // Alice pays zero-amount invoice with preferSpark and amountSatsToSend
+      // Register listener before payment so we don't miss the stream event.
+      const bobClaimed = waitForClaim({ wallet: bobWallet });
       await aliceWallet.payLightningInvoice({
         invoice: invoice.invoice.encodedInvoice,
         maxFeeSats: 100,
@@ -332,7 +329,7 @@ describe("Lightning Network provider", () => {
         amountSatsToSend: paymentAmount,
       });
 
-      await waitForClaim({ wallet: bobWallet });
+      await bobClaimed;
 
       // Verify Bob received the payment
       const { balance: bobBalance } = await bobWallet.getBalance();
@@ -366,7 +363,7 @@ describe("Lightning Network provider", () => {
       );
       await faucet.mineBlocksAndWaitForMiningToComplete(6);
       await aliceWallet.claimDeposit(signedTx.id);
-      await waitForClaim({ wallet: aliceWallet });
+      await waitForBalance(aliceWallet, DEPOSIT_AMOUNT);
 
       // Bob creates zero-amount lightning invoice with embedded zero-amount spark invoice
       const invoice = await bobWallet.createLightningInvoice({
@@ -383,6 +380,8 @@ describe("Lightning Network provider", () => {
       const paymentAmount = 3000;
 
       // Paying with preferSpark should validate that both invoices are zero-amount
+      // Register listener before payment so we don't miss the stream event.
+      const bobClaimed = waitForClaim({ wallet: bobWallet });
       await aliceWallet.payLightningInvoice({
         invoice: invoice.invoice.encodedInvoice,
         maxFeeSats: 100,
@@ -390,7 +389,7 @@ describe("Lightning Network provider", () => {
         amountSatsToSend: paymentAmount,
       });
 
-      await waitForClaim({ wallet: bobWallet });
+      await bobClaimed;
 
       const { balance: bobBalance } = await bobWallet.getBalance();
       expect(bobBalance).toBe(BigInt(paymentAmount));
@@ -417,7 +416,7 @@ describe("Lightning Network provider", () => {
       );
       await faucet.mineBlocksAndWaitForMiningToComplete(6);
       await aliceWallet.claimDeposit(signedTx.id);
-      await waitForClaim({ wallet: aliceWallet });
+      await waitForBalance(aliceWallet, DEPOSIT_AMOUNT);
 
       const invoiceAmount = 2000;
 
@@ -434,13 +433,15 @@ describe("Lightning Network provider", () => {
       expect(decodedInvoice.fallbackAddress).toBeDefined();
 
       // Paying with preferSpark should validate that amounts match
+      // Register listener before payment so we don't miss the stream event.
+      const bobClaimed = waitForClaim({ wallet: bobWallet });
       await aliceWallet.payLightningInvoice({
         invoice: invoice.invoice.encodedInvoice,
         maxFeeSats: 100,
         preferSpark: true,
       });
 
-      await waitForClaim({ wallet: bobWallet });
+      await bobClaimed;
 
       const { balance: bobBalance } = await bobWallet.getBalance();
       expect(bobBalance).toBe(BigInt(invoiceAmount));
@@ -570,11 +571,7 @@ describe("Lightning Network provider", () => {
       await faucet.mineBlocksAndWaitForMiningToComplete(6);
 
       await alice.claimDeposit(signedTx.id);
-
-      await waitForClaim({ wallet: alice });
-
-      const { balance } = await alice.getBalance();
-      expect(balance).toBe(DEPOSIT_AMOUNT);
+      await waitForBalance(alice, DEPOSIT_AMOUNT);
 
       const invoice = await alice.createLightningInvoice({
         amountSats: 1000,
@@ -585,12 +582,14 @@ describe("Lightning Network provider", () => {
 
       expect(invoice).toBeDefined();
 
+      // Register listener before payment so we don't miss the stream event.
+      const bobClaimed = waitForClaim({ wallet: bob });
       await alice.payLightningInvoice({
         invoice: invoice.invoice.encodedInvoice,
         maxFeeSats: 100,
       });
 
-      await waitForClaim({ wallet: bob });
+      await bobClaimed;
 
       const { balance: bobBalance } = await bob.getBalance();
       expect(bobBalance).toBe(BigInt(1000));
