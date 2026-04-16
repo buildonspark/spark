@@ -4,12 +4,7 @@
   "version": "0.0.120",
   "type": "module",
   "scripts": {
-    "start": "vite",
-    "start:local": "cross-env NODE_ENV=development VITE_SPARK_NETWORK=LOCAL vite",
-    "start:k8s": "cross-env-shell NODE_ENV=development VITE_SPARK_NETWORK=LOCAL MINIKUBE_IP=\"${MINIKUBE_IP:-$(minikube ip 2>/dev/null || printf 127.0.0.1)}\" vite",
-    "start:mainnet": "cross-env NODE_ENV=production VITE_SPARK_NETWORK=MAINNET vite",
-    "start:dev": "cross-env NODE_ENV=development VITE_SPARK_NETWORK=REGTEST CONFIG_FILE=../../private/config/dev-regtest-config.json vite",
-    "start:dev:mainnet": "cross-env NODE_ENV=development VITE_SPARK_NETWORK=MAINNET CONFIG_FILE=../../private/config/dev-mainnet-config.json vite",
+    "start": "cross-env NODE_ENV=development vite",
     "build": "tsc -b && vite build",
     "format:fix": "prettier . --write",
     "format": "prettier . --check",

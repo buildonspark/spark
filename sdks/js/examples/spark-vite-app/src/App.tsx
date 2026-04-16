@@ -25,10 +25,12 @@ type BitcoinRpcResponse<T> = {
 declare const __SPARK_PRIVATE_CONFIGS__: {
   dev?: PrivateConfigMap;
 };
+declare const __SPARK_LOCAL_CONFIG_AVAILABLE__: boolean;
 
 const PUBLIC_NETWORKS: readonly Network[] = ["MAINNET", "TESTNET", "REGTEST"];
 const LOCALHOST_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
 const IS_LOCALHOST = LOCALHOST_HOSTNAMES.has(window.location.hostname);
+const HAS_LOCAL_CONFIG = IS_LOCALHOST && __SPARK_LOCAL_CONFIG_AVAILABLE__;
 const PRIVATE_DEV_CONFIGS = getPrivateDevConfigs();
 const HAS_PRIVATE_DEV_CONFIGS = PUBLIC_NETWORKS.some(
   (network) => PRIVATE_DEV_CONFIGS[network],
@@ -88,7 +90,7 @@ function getDefaultTarget(): Target {
     import.meta.env.VITE_SPARK_TARGET ?? "",
   ).toUpperCase();
 
-  if (configuredTarget === "LOCAL" && IS_LOCALHOST) {
+  if (configuredTarget === "LOCAL" && HAS_LOCAL_CONFIG) {
     return "LOCAL";
   }
 
@@ -98,7 +100,7 @@ function getDefaultTarget(): Target {
 
   if (
     getExampleSparkNetwork(import.meta.env, "MAINNET") === "LOCAL" &&
-    IS_LOCALHOST
+    HAS_LOCAL_CONFIG
   ) {
     return "LOCAL";
   }
@@ -265,19 +267,19 @@ function App() {
   const [dummyTx, setDummyTx] = useState<DummyTx | null>(null);
   const [invoiceAmount, setInvoiceAmount] = useState("");
   const [invoice, setInvoice] = useState<string | null>(null);
-  const availableNetworks = getNetworksForTarget(target);
-  const showTargetSelector = HAS_PRIVATE_DEV_CONFIGS || IS_LOCALHOST;
   const targetOptions = [
     "PROD",
     ...(HAS_PRIVATE_DEV_CONFIGS ? (["DEV"] as const) : []),
-    ...(IS_LOCALHOST ? (["LOCAL"] as const) : []),
+    ...(HAS_LOCAL_CONFIG ? (["LOCAL"] as const) : []),
   ] as const;
+  const showTargetSelector = targetOptions.length > 1;
+  const availableNetworks = getNetworksForTarget(target);
 
   const inferNetworkFromAddress = (
     address: string,
   ): { network?: Network; target?: Target } | null => {
     if (address.startsWith("sparkl") || address.startsWith("spl")) {
-      return IS_LOCALHOST ? { target: "LOCAL" } : null;
+      return HAS_LOCAL_CONFIG ? { target: "LOCAL" } : null;
     }
     if (address.startsWith("sparkrt") || address.startsWith("sprt")) {
       return { network: "REGTEST" };

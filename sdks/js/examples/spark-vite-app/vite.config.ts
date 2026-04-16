@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { execFileSync } from "node:child_process";
 import type { IncomingMessage } from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -26,6 +27,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const configOverride = getConfigOverride(env["CONFIG_FILE"]);
   const privateConfigs = getPrivateConfigs();
+  const localIngressHost = resolveLocalIngressHost(env);
+  const hasLocalConfig = Boolean(localIngressHost);
   const operatorProxyEntries = Array.from(
     { length: getLocalOperatorCount(env, configOverride) },
     (_, index) => {
@@ -36,14 +39,11 @@ export default defineConfig(({ mode }) => {
         {
           target:
             env[`VITE_LOCAL_SPARK_OPERATOR_${index}_TARGET`] ??
-            getLocalOperatorTarget(index, env),
+            getLocalOperatorTarget(index, localIngressHost),
           changeOrigin: true,
           secure: false,
-          headers: getMinikubeHeaders(env["MINIKUBE_IP"], minikubeHost),
-          configure: createMinikubeHostForwarder(
-            env["MINIKUBE_IP"],
-            minikubeHost,
-          ),
+          headers: getIngressHostHeaders(localIngressHost, minikubeHost),
+          configure: createIngressHostForwarder(localIngressHost, minikubeHost),
           rewrite: (path: string) => stripProxyPrefix(path, proxyPath),
         },
       ] as const;
@@ -59,6 +59,7 @@ export default defineConfig(({ mode }) => {
     define: {
       __SPARK_CONFIG_OVERRIDE__: JSON.stringify(configOverride),
       __SPARK_PRIVATE_CONFIGS__: JSON.stringify(privateConfigs),
+      __SPARK_LOCAL_CONFIG_AVAILABLE__: JSON.stringify(hasLocalConfig),
     },
     server: {
       port: 5173,
@@ -69,15 +70,16 @@ export default defineConfig(({ mode }) => {
           electrsProxyPath,
           {
             target:
-              env["VITE_LOCAL_ELECTRS_TARGET"] ?? getLocalElectrsTarget(env),
+              env["VITE_LOCAL_ELECTRS_TARGET"] ??
+              getLocalElectrsTarget(localIngressHost),
             changeOrigin: true,
             secure: false,
-            headers: getMinikubeHeaders(
-              env["MINIKUBE_IP"],
+            headers: getIngressHostHeaders(
+              localIngressHost,
               "mempool.minikube.local",
             ),
-            configure: createMinikubeHostForwarder(
-              env["MINIKUBE_IP"],
+            configure: createIngressHostForwarder(
+              localIngressHost,
               "mempool.minikube.local",
             ),
             rewrite: (path: string) => stripProxyPrefix(path, electrsProxyPath),
@@ -86,15 +88,17 @@ export default defineConfig(({ mode }) => {
         [
           sspProxyPath,
           {
-            target: env["VITE_LOCAL_SSP_TARGET"] ?? getLocalSspTarget(env),
+            target:
+              env["VITE_LOCAL_SSP_TARGET"] ??
+              getLocalSspTarget(localIngressHost),
             changeOrigin: true,
             secure: false,
-            headers: getMinikubeHeaders(
-              env["MINIKUBE_IP"],
+            headers: getIngressHostHeaders(
+              localIngressHost,
               "app.minikube.local",
             ),
-            configure: createMinikubeHostForwarder(
-              env["MINIKUBE_IP"],
+            configure: createIngressHostForwarder(
+              localIngressHost,
               "app.minikube.local",
             ),
             rewrite: (path: string) => stripProxyPrefix(path, sspProxyPath),
@@ -106,7 +110,7 @@ export default defineConfig(({ mode }) => {
             target:
               env["VITE_LOCAL_BITCOIN_RPC_TARGET"] ??
               env["BITCOIN_RPC_URL"] ??
-              getLocalBitcoinRpcTarget(env),
+              getLocalBitcoinRpcTarget(localIngressHost),
             changeOrigin: true,
             headers: getBitcoinRpcHeaders(env),
             rewrite: (path: string) =>
@@ -163,34 +167,30 @@ function readPrivateConfig(filename: string): ConfigOptions | undefined {
 
 function getLocalOperatorTarget(
   index: number,
-  env: Record<string, string | undefined>,
+  localIngressHost: string,
 ): string {
-  if (env["MINIKUBE_IP"]) {
-    return `https://${env["MINIKUBE_IP"]}`;
+  if (localIngressHost) {
+    return `https://${localIngressHost}`;
   }
 
   return `https://localhost:${8535 + index}`;
 }
 
-function getLocalElectrsTarget(
-  env: Record<string, string | undefined>,
-): string {
-  return env["MINIKUBE_IP"]
-    ? `http://${env["MINIKUBE_IP"]}/api`
+function getLocalElectrsTarget(localIngressHost: string): string {
+  return localIngressHost
+    ? `http://${localIngressHost}/api`
     : "http://127.0.0.1:30000";
 }
 
-function getLocalSspTarget(env: Record<string, string | undefined>): string {
-  return env["MINIKUBE_IP"]
-    ? `http://${env["MINIKUBE_IP"]}`
+function getLocalSspTarget(localIngressHost: string): string {
+  return localIngressHost
+    ? `http://${localIngressHost}`
     : "http://127.0.0.1:5000";
 }
 
-function getLocalBitcoinRpcTarget(
-  env: Record<string, string | undefined>,
-): string {
-  return env["MINIKUBE_IP"]
-    ? `http://${env["MINIKUBE_IP"]}:8332`
+function getLocalBitcoinRpcTarget(localIngressHost: string): string {
+  return localIngressHost
+    ? `http://${localIngressHost}:8332`
     : "http://127.0.0.1:8332";
 }
 
@@ -278,11 +278,11 @@ function createLocalOnlyProxyGuard(proxyPath: string): Plugin {
   };
 }
 
-function getMinikubeHeaders(
-  minikubeIp: string | undefined,
+function getIngressHostHeaders(
+  localIngressHost: string,
   host: string,
 ): Record<string, string> | undefined {
-  if (!minikubeIp) {
+  if (!localIngressHost) {
     return undefined;
   }
 
@@ -291,11 +291,11 @@ function getMinikubeHeaders(
   };
 }
 
-function createMinikubeHostForwarder(
-  minikubeIp: string | undefined,
+function createIngressHostForwarder(
+  localIngressHost: string,
   host: string,
 ): ProxyOptions["configure"] | undefined {
-  if (!minikubeIp) {
+  if (!localIngressHost) {
     return undefined;
   }
 
@@ -304,4 +304,48 @@ function createMinikubeHostForwarder(
       proxyReq.setHeader("host", host);
     });
   };
+}
+
+function resolveLocalIngressHost(
+  env: Record<string, string | undefined>,
+): string {
+  const explicitHost =
+    env["SPARK_LOCAL_INGRESS_HOST"]?.trim() || env["MINIKUBE_IP"]?.trim();
+
+  if (explicitHost) {
+    return explicitHost;
+  }
+
+  if (isKindLikeKubectlContext()) {
+    return "127.0.0.1";
+  }
+
+  return getMinikubeIp();
+}
+
+function isKindLikeKubectlContext(): boolean {
+  const currentContext = runCommand("kubectl", ["config", "current-context"]);
+  if (!currentContext) {
+    return false;
+  }
+
+  const normalizedContext = currentContext.toLowerCase();
+  return (
+    normalizedContext.includes("kind") || normalizedContext.includes("kdev")
+  );
+}
+
+function getMinikubeIp(): string {
+  return runCommand("minikube", ["ip"]);
+}
+
+function runCommand(command: string, args: string[]): string {
+  try {
+    return execFileSync(command, args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "";
+  }
 }
