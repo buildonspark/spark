@@ -80,24 +80,6 @@
   border-color: #646cff;
 }
 
-.network-selector {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  justify-content: center;
-  width: 100%;
-}
-
-.network-selector button {
-  flex: 1;
-  min-width: 0;
-}
-
-.network-selector button.active {
-  background: #646cff;
-  border-color: #646cff;
-}
-
 textarea,
 input[type="text"],
 input[type="number"] {

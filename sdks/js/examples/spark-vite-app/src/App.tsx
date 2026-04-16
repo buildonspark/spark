@@ -84,6 +84,10 @@ function getNetworksForTarget(target: Target): Network[] {
 }
 
 function getInitialNetwork(target: Target): Network {
+  if (target === "LOCAL") {
+    return "REGTEST";
+  }
+
   const availableNetworks = getNetworksForTarget(target);
   return availableNetworks.includes(DEFAULT_NETWORK)
     ? DEFAULT_NETWORK
@@ -146,7 +150,6 @@ function App() {
   const [invoice, setInvoice] = useState<string | null>(null);
   const availableNetworks = getNetworksForTarget(target);
   const showTargetSelector = HAS_PRIVATE_DEV_CONFIGS || IS_LOCALHOST;
-  const showNetworkSelector = target !== "LOCAL";
   const targetOptions = [
     "PROD",
     ...(HAS_PRIVATE_DEV_CONFIGS ? (["DEV"] as const) : []),
@@ -174,6 +177,7 @@ function App() {
   const handleTargetChange = (nextTarget: Target) => {
     setTarget(nextTarget);
     if (nextTarget === "LOCAL") {
+      setNetwork("REGTEST");
       return;
     }
 
@@ -192,6 +196,7 @@ function App() {
 
     if (inferred.target === "LOCAL" && target !== "LOCAL") {
       setTarget("LOCAL");
+      setNetwork("REGTEST");
       setStatus({ type: "info", message: "Target set to LOCAL" });
       return;
     }
@@ -357,7 +362,6 @@ function App() {
   return (
     <>
       <h1>Spark + Vite</h1>
-      <p className="debug-message">{new window.s.SparkError("test").message}</p>
 
       <div className={`status ${status.type}`}>{status.message}</div>
 
@@ -381,8 +385,8 @@ function App() {
           <h3>2. Initialize Wallet</h3>
           {showTargetSelector && (
             <>
-              <div className="selector-label">Target</div>
-              <div className="network-selector">
+              <h3>Target</h3>
+              <div className="toggle-row">
                 {targetOptions.map((option) => (
                   <button
                     key={option}
@@ -395,22 +399,22 @@ function App() {
               </div>
             </>
           )}
-          {showNetworkSelector && (
-            <>
-              <div className="selector-label">Network</div>
-              <div className="network-selector">
-                {availableNetworks.map((option) => (
-                  <button
-                    key={option}
-                    onClick={() => setNetwork(option)}
-                    className={network === option ? "active" : ""}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          <h3>Network</h3>
+          <div className="toggle-row">
+            {availableNetworks.map((option) => {
+              const disabled = target === "LOCAL" && option !== "REGTEST";
+              return (
+                <button
+                  key={option}
+                  onClick={() => setNetwork(option)}
+                  className={network === option ? "active" : ""}
+                  disabled={disabled}
+                >
+                  {option}
+                </button>
+              );
+            })}
+          </div>
           <textarea
             placeholder="Enter 12 or 24 word mnemonic..."
             value={mnemonic}
