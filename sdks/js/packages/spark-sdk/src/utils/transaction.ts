@@ -307,6 +307,7 @@ export async function createDecrementedTimelockRefundTxs(
   return createRefundTxs({
     ...params,
     sequence: nextSequence,
+    enforceTimelocks: true,
   });
 }
 

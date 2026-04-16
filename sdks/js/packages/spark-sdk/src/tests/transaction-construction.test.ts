@@ -151,6 +151,28 @@ describe("transaction construction via Rust bindings", () => {
         expectedTimelock,
       );
     });
+
+    it("normalizes a non-aligned sequence before decrementing", async () => {
+      const parentTx = getTxFromRawTxHex(parentTxHex);
+      const { nodeTx, directNodeTx } = await createInitialTimelockNodeTx(
+        parentTx,
+        Network.MAINNET,
+      );
+
+      // Simulate a leaf whose refund tx has a non-normalized sequence (e.g. 550
+      // instead of 500). The send path should round down to 500 then decrement
+      // to 400.
+      const nonAlignedSequence = 500 + DIRECT_TIMELOCK_OFFSET; // 550
+      const { cpfpRefundTx } = await createDecrementedTimelockRefundTxs({
+        nodeTx,
+        directNodeTx,
+        sequence: nonAlignedSequence,
+        receivingPubkey,
+        network: Network.MAINNET,
+      });
+
+      expect(getCurrentTimelock(cpfpRefundTx.getInput(0).sequence)).toBe(400);
+    });
   });
 
   describe("computeMultiInputSighash", () => {
