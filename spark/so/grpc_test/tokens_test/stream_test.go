@@ -78,23 +78,29 @@ func TestTokenTransactionStreamNotification(t *testing.T) {
 	expectedHash, err := utils.HashTokenTransaction(finalMintTx, false)
 	require.NoError(t, err)
 
-	// Wait for token transaction event.
-	select {
-	case ev := <-events:
-		tokenEvent := ev.GetTokenTransaction()
-		require.NotNil(t, tokenEvent, "expected token_transaction event, got: %v", ev)
-		assert.Equal(t, expectedHash, tokenEvent.TokenTransactionHash)
-		require.NotEmpty(t, tokenEvent.TokenIdentifiers, "expected token identifiers")
-
-		found := false
-		for _, id := range tokenEvent.TokenIdentifiers {
-			if bytes.Equal(id, tokenIdentifier) {
-				found = true
-				break
+	// Wait for token transaction event, skipping heartbeats.
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			tokenEvent := ev.GetTokenTransaction()
+			if tokenEvent == nil {
+				continue // skip heartbeats and other non-token events
 			}
+			assert.Equal(t, expectedHash, tokenEvent.TokenTransactionHash)
+			require.NotEmpty(t, tokenEvent.TokenIdentifiers, "expected token identifiers")
+
+			found := false
+			for _, id := range tokenEvent.TokenIdentifiers {
+				if bytes.Equal(id, tokenIdentifier) {
+					found = true
+					break
+				}
+			}
+			assert.True(t, found, "expected token identifier %x in event identifiers", tokenIdentifier)
+			return
+		case <-timeout:
+			t.Fatal("timed out waiting for token transaction event")
 		}
-		assert.True(t, found, "expected token identifier %x in event identifiers", tokenIdentifier)
-	case <-time.After(10 * time.Second):
-		t.Fatal("timed out waiting for token transaction event")
 	}
 }
