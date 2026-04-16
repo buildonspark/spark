@@ -38,6 +38,7 @@ message GossipMessage {
         GossipMessageFinalizeTreeNode finalize_tree_node = 21;
         GossipMessageConsensusCommit consensus_commit = 22;
         GossipMessageConsensusRollback consensus_rollback = 23;
+        GossipMessagePreimageSwap preimage_swap = 24;
     }
 }
 
@@ -137,6 +138,16 @@ message GossipMessageDepositCleanup {
 message GossipMessagePreimage {
     bytes preimage = 1;
     bytes payment_hash = 2;
+}
+
+// PreimageSwap combines the preimage and optional key tweak settlement into a
+// single atomic gossip message. When transfer_id is set, the receiver applies
+// both the preimage update and the sender key tweaks in one transaction.
+message GossipMessagePreimageSwap {
+    bytes preimage = 1;
+    bytes payment_hash = 2;
+    string transfer_id = 3;
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 4;
 }
 
 // SettleSwapKeyTweak is called in Swap V3 flow when a counter transfer is

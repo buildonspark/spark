@@ -925,6 +925,47 @@ func (m *GossipMessage) validate(all bool) error {
 			}
 		}
 
+	case *GossipMessage_PreimageSwap:
+		if v == nil {
+			err := GossipMessageValidationError{
+				field:  "Message",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetPreimageSwap()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "PreimageSwap",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "PreimageSwap",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetPreimageSwap()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GossipMessageValidationError{
+					field:  "PreimageSwap",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -3015,6 +3056,160 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GossipMessagePreimageValidationError{}
+
+// Validate checks the field values on GossipMessagePreimageSwap with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GossipMessagePreimageSwap) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GossipMessagePreimageSwap with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GossipMessagePreimageSwapMultiError, or nil if none found.
+func (m *GossipMessagePreimageSwap) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GossipMessagePreimageSwap) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Preimage
+
+	// no validation rules for PaymentHash
+
+	// no validation rules for TransferId
+
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, GossipMessagePreimageSwapValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, GossipMessagePreimageSwapValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return GossipMessagePreimageSwapValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	if len(errors) > 0 {
+		return GossipMessagePreimageSwapMultiError(errors)
+	}
+
+	return nil
+}
+
+// GossipMessagePreimageSwapMultiError is an error wrapping multiple validation
+// errors returned by GossipMessagePreimageSwap.ValidateAll() if the
+// designated constraints aren't met.
+type GossipMessagePreimageSwapMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GossipMessagePreimageSwapMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GossipMessagePreimageSwapMultiError) AllErrors() []error { return m }
+
+// GossipMessagePreimageSwapValidationError is the validation error returned by
+// GossipMessagePreimageSwap.Validate if the designated constraints aren't met.
+type GossipMessagePreimageSwapValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GossipMessagePreimageSwapValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GossipMessagePreimageSwapValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GossipMessagePreimageSwapValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GossipMessagePreimageSwapValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GossipMessagePreimageSwapValidationError) ErrorName() string {
+	return "GossipMessagePreimageSwapValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GossipMessagePreimageSwapValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGossipMessagePreimageSwap.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GossipMessagePreimageSwapValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GossipMessagePreimageSwapValidationError{}
 
 // Validate checks the field values on GossipMessageSettleSwapKeyTweak with the
 // rules defined in the proto definition for this message. If any rules are

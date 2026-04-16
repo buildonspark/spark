@@ -126,6 +126,9 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	case *pbgossip.GossipMessage_Preimage:
 		preimage := gossipMessage.GetPreimage()
 		err = h.handlePreimageGossipMessage(ctx, preimage, forCoordinator)
+	case *pbgossip.GossipMessage_PreimageSwap:
+		preimageSwap := gossipMessage.GetPreimageSwap()
+		err = h.handlePreimageSwapGossipMessage(ctx, preimageSwap, forCoordinator)
 	case *pbgossip.GossipMessage_SettleSwapKeyTweak:
 		settleSwapKeyTweak := gossipMessage.GetSettleSwapKeyTweak()
 		err = h.handleSettleSwapKeyTweakGossipMessage(ctx, settleSwapKeyTweak)
@@ -474,6 +477,49 @@ func (h *GossipHandler) handlePreimageGossipMessage(ctx context.Context, gossip 
 			return err
 		}
 	}
+	return nil
+}
+
+func (h *GossipHandler) handlePreimageSwapGossipMessage(ctx context.Context, gossip *pbgossip.GossipMessagePreimageSwap, forCoordinator bool) error {
+	if forCoordinator {
+		return nil
+	}
+
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Info("Handling preimage swap gossip message")
+
+	calculatedHash := sha256.Sum256(gossip.Preimage)
+	if !bytes.Equal(calculatedHash[:], gossip.PaymentHash) {
+		return fmt.Errorf("preimage hash mismatch (expected %x, got %x)", calculatedHash[:], gossip.PaymentHash)
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get db context: %w", err)
+	}
+
+	preimageRequests, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(gossip.PaymentHash)).ForUpdate().All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get preimage requests for %x: %w", gossip.PaymentHash, err)
+	}
+	for _, preimageRequest := range preimageRequests {
+		if _, err = preimageRequest.Update().SetPreimage(gossip.Preimage).Save(ctx); err != nil {
+			return fmt.Errorf("failed to update preimage request for %x: %w", gossip.PaymentHash, err)
+		}
+	}
+
+	if gossip.TransferId != "" {
+		transferHandler := NewBaseTransferHandler(h.config)
+		transferID, err := uuid.Parse(gossip.TransferId)
+		if err != nil {
+			return fmt.Errorf("invalid transfer ID in preimage swap gossip: %s: %w", gossip.TransferId, err)
+		}
+		if _, err = transferHandler.CommitSenderKeyTweaks(ctx, transferID, gossip.SenderKeyTweakProofs); err != nil {
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle sender key tweak for transfer %s", transferID)
+			return err
+		}
+	}
+
 	return nil
 }
 
