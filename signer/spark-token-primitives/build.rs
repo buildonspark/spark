@@ -4,11 +4,6 @@ use std::{
 };
 
 fn main() -> Result<()> {
-    println!("cargo:rerun-if-changed=../../protos/common.proto");
-    println!("cargo:rerun-if-changed=../../protos/spark.proto");
-    println!("cargo:rerun-if-changed=../../protos/spark_token.proto");
-    println!("cargo:rerun-if-changed=../../protos/multisig.proto");
-
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").map_err(|err| {
         Error::new(
             ErrorKind::NotFound,
@@ -16,7 +11,32 @@ fn main() -> Result<()> {
         )
     })?;
     let manifest_dir = Path::new(&manifest_dir);
-    let proto_dir = manifest_dir.join("../../protos");
+
+    // Prefer vendored protos (present in published crate tarballs), fall back to monorepo path.
+    let local_proto_dir = manifest_dir.join("protos");
+    let proto_dir = if local_proto_dir.exists() {
+        local_proto_dir
+    } else {
+        manifest_dir.join("../../protos")
+    };
+
+    println!(
+        "cargo:rerun-if-changed={}",
+        proto_dir.join("common.proto").display()
+    );
+    println!(
+        "cargo:rerun-if-changed={}",
+        proto_dir.join("spark.proto").display()
+    );
+    println!(
+        "cargo:rerun-if-changed={}",
+        proto_dir.join("spark_token.proto").display()
+    );
+    println!(
+        "cargo:rerun-if-changed={}",
+        proto_dir.join("multisig.proto").display()
+    );
+
     let protos = &[
         proto_dir.join("common.proto"),
         proto_dir.join("spark.proto"),

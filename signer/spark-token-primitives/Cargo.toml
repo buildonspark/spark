@@ -3,6 +3,16 @@ name = "spark-token-primitives"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
+include = [
+    "src/**",
+    "build.rs",
+    "Cargo.toml",
+    "README.md",
+    "protos/common.proto",
+    "protos/spark.proto",
+    "protos/spark_token.proto",
+    "protos/multisig.proto",
+]
 
 [dependencies]
 bech32 = { workspace = true }
