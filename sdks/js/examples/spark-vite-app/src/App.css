@@ -114,6 +114,23 @@ input:focus {
   width: 100%;
 }
 
+.deposit-action-row {
+  justify-content: flex-start;
+}
+
+.deposit-action-row + .deposit-action-row {
+  margin-top: 12px;
+}
+
+.deposit-action-row input {
+  flex: 1 1 220px;
+  margin-bottom: 0;
+}
+
+.deposit-action-row button {
+  margin-bottom: 0;
+}
+
 .code {
   background: #1a1a1a;
   padding: 12px;

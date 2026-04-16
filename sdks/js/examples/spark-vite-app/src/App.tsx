@@ -9,6 +9,7 @@ import {
 import { useState } from "react";
 import {
   getExampleSparkNetwork,
+  getLocalBitcoinRpcProxyPath,
   getExampleWalletOptions,
 } from "./wallet-config.js";
 
@@ -16,6 +17,10 @@ type Network = "MAINNET" | "REGTEST" | "TESTNET";
 type Target = "DEV" | "LOCAL" | "PROD";
 type StatusType = "info" | "success" | "error";
 type PrivateConfigMap = Partial<Record<Network, ConfigOptions>>;
+type BitcoinRpcResponse<T> = {
+  result: T;
+  error: { message: string } | null;
+};
 
 declare const __SPARK_PRIVATE_CONFIGS__: {
   dev?: PrivateConfigMap;
@@ -30,6 +35,34 @@ const HAS_PRIVATE_DEV_CONFIGS = PUBLIC_NETWORKS.some(
 );
 const DEFAULT_NETWORK = getDefaultNetwork();
 const DEFAULT_TARGET = getDefaultTarget();
+const BITCOIN_RPC_PROXY_PATH = getLocalBitcoinRpcProxyPath();
+
+function configureBrowserBitcoinRpcProxy() {
+  const globalScope = globalThis as typeof globalThis & {
+    process?: unknown;
+  };
+  const processShim = globalScope.process as
+    | {
+        env?: Record<string, string | undefined>;
+      }
+    | undefined;
+
+  if (!processShim) {
+    (globalScope as { process?: unknown }).process = { env: {} };
+  } else if (!processShim.env) {
+    processShim.env = {};
+  }
+
+  const env = (
+    globalScope.process as { env: Record<string, string | undefined> }
+  ).env;
+  env.BITCOIN_RPC_URL = new URL(
+    BITCOIN_RPC_PROXY_PATH,
+    window.location.origin,
+  ).toString();
+  env.BITCOIN_RPC_USER ??= "testutil";
+  env.BITCOIN_RPC_PASSWORD ??= "testutilpassword";
+}
 
 function getPrivateDevConfigs(): PrivateConfigMap {
   return typeof __SPARK_PRIVATE_CONFIGS__ === "object" &&
@@ -96,6 +129,7 @@ function getInitialNetwork(target: Target): Network {
 
 function getWalletOptions(target: Target, network: Network): ConfigOptions {
   if (target === "LOCAL") {
+    configureBrowserBitcoinRpcProxy();
     return {
       ...getExampleWalletOptions(
         import.meta.env,
@@ -128,6 +162,84 @@ function getWalletOptions(target: Target, network: Network): ConfigOptions {
   };
 }
 
+async function bitcoinRpc<T>(method: string, params: unknown[]): Promise<T> {
+  const response = await fetch(BITCOIN_RPC_PROXY_PATH, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      jsonrpc: "1.0",
+      id: "spark-vite-app",
+      method,
+      params,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Bitcoin RPC HTTP error: ${response.status}`);
+  }
+
+  const data = (await response.json()) as BitcoinRpcResponse<T>;
+  if (data.error) {
+    throw new Error(`Bitcoin RPC error: ${data.error.message}`);
+  }
+
+  return data.result;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function satsToBitcoinAmount(amountSats: number): number {
+  return Number((amountSats / 100_000_000).toFixed(8));
+}
+
+async function waitForBalanceAtLeast(
+  wallet: SparkWallet,
+  targetBalance: bigint,
+  timeoutMs: number = 30_000,
+  pollIntervalMs: number = 2_000,
+): Promise<bigint | null> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const { balance } = await wallet.getBalance();
+    if (balance >= targetBalance) {
+      return balance;
+    }
+
+    await sleep(pollIntervalMs);
+  }
+
+  return null;
+}
+
+async function claimDepositWithRetry(
+  wallet: SparkWallet,
+  txid: string,
+  attempts: number = 20,
+  delayMs: number = 2_000,
+): Promise<bigint> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const leaves = await wallet.claimDeposit(txid);
+      return leaves.reduce((sum, leaf) => sum + BigInt(leaf.value), 0n);
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts - 1) {
+        break;
+      }
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
+
 function App() {
   const [status, setStatus] = useState<{ type: StatusType; message: string }>({
     type: "info",
@@ -139,8 +251,13 @@ function App() {
     getInitialNetwork(DEFAULT_TARGET),
   );
   const [wallet, setWallet] = useState<SparkWallet | null>(null);
+  const [walletTarget, setWalletTarget] = useState<Target | null>(null);
   const [sparkAddress, setSparkAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
+  const [depositAddress, setDepositAddress] = useState<string | null>(null);
+  const [depositAmount, setDepositAmount] = useState("50000");
+  const [depositTxid, setDepositTxid] = useState("");
+  const [depositActionPending, setDepositActionPending] = useState(false);
   const [recipientAddress, setRecipientAddress] = useState("");
   const [sendAmount, setSendAmount] = useState("");
   const [sendType, setSendType] = useState<"spark" | "lightning">("spark");
@@ -243,11 +360,17 @@ function App() {
     }
     setStatus({ type: "info", message: "Initializing..." });
     try {
+      const selectedTarget = target;
+      const selectedNetwork = network;
       const { wallet: w } = await SparkWallet.initialize({
         mnemonicOrSeed: mnemonic.trim(),
-        options: getWalletOptions(target, network),
+        options: getWalletOptions(selectedTarget, selectedNetwork),
       });
       setWallet(w);
+      setWalletTarget(selectedTarget);
+      setBalance(null);
+      setDepositAddress(null);
+      setDepositTxid("");
       setSparkAddress(await w.getSparkAddress());
       setStatus({ type: "success", message: "Wallet initialized!" });
     } catch (err) {
@@ -261,11 +384,17 @@ function App() {
   const generateWallet = async () => {
     setStatus({ type: "info", message: "Generating..." });
     try {
+      const selectedTarget = target;
+      const selectedNetwork = network;
       const { wallet: w, mnemonic: m } = await SparkWallet.initialize({
-        options: getWalletOptions(target, network),
+        options: getWalletOptions(selectedTarget, selectedNetwork),
       });
       setWallet(w);
+      setWalletTarget(selectedTarget);
       if (m) setMnemonic(m);
+      setBalance(null);
+      setDepositAddress(null);
+      setDepositTxid("");
       setSparkAddress(await w.getSparkAddress());
       setStatus({ type: "success", message: "Wallet generated!" });
     } catch (err) {
@@ -288,6 +417,135 @@ function App() {
         type: "error",
         message: `Error: ${err instanceof Error ? err.message : err}`,
       });
+    }
+  };
+
+  const createDepositAddress = async () => {
+    if (!wallet) return;
+
+    setDepositActionPending(true);
+    setStatus({ type: "info", message: "Creating deposit address..." });
+    try {
+      const address = await wallet.getSingleUseDepositAddress();
+      setDepositAddress(address);
+      setDepositTxid("");
+      setStatus({ type: "success", message: "Deposit address ready!" });
+    } catch (err) {
+      setStatus({
+        type: "error",
+        message: `Error: ${err instanceof Error ? err.message : err}`,
+      });
+    } finally {
+      setDepositActionPending(false);
+    }
+  };
+
+  const claimDeposit = async () => {
+    if (!wallet) return;
+
+    const txid = depositTxid.trim();
+    if (!txid) {
+      setStatus({ type: "error", message: "Enter a deposit transaction ID" });
+      return;
+    }
+
+    setDepositActionPending(true);
+    setStatus({ type: "info", message: "Claiming deposit..." });
+    try {
+      const { balance: beforeBalance } = await wallet.getBalance();
+      const claimedSats = await claimDepositWithRetry(wallet, txid);
+      const settledBalance =
+        claimedSats > 0n
+          ? await waitForBalanceAtLeast(wallet, beforeBalance + claimedSats)
+          : beforeBalance;
+
+      if (settledBalance !== null) {
+        setBalance(settledBalance.toString());
+      }
+
+      setStatus({
+        type: "success",
+        message:
+          claimedSats > 0n
+            ? `Claimed ${claimedSats} sats from deposit ${txid}`
+            : `Deposit ${txid} claimed`,
+      });
+    } catch (err) {
+      setStatus({
+        type: "error",
+        message: `Error: ${err instanceof Error ? err.message : err}`,
+      });
+    } finally {
+      setDepositActionPending(false);
+    }
+  };
+
+  const fundLocally = async () => {
+    if (!wallet) return;
+    if (walletTarget !== "LOCAL") {
+      setStatus({
+        type: "error",
+        message: "Fund Locally requires a wallet initialized with LOCAL target",
+      });
+      return;
+    }
+    if (!IS_LOCALHOST) {
+      setStatus({
+        type: "error",
+        message:
+          "Fund Locally is only available when the app is opened from localhost",
+      });
+      return;
+    }
+
+    const amountSats = Number.parseInt(depositAmount, 10);
+    if (!Number.isFinite(amountSats) || amountSats <= 0) {
+      setStatus({ type: "error", message: "Enter a valid deposit amount" });
+      return;
+    }
+
+    setDepositActionPending(true);
+    setStatus({ type: "info", message: "Funding local deposit..." });
+    try {
+      const depositConfirmationBlocks = 3;
+      const { balance: beforeBalance } = await wallet.getBalance();
+      const address = await wallet.getSingleUseDepositAddress();
+      setDepositAddress(address);
+
+      const txid = await bitcoinRpc<string>("sendtoaddress", [
+        address,
+        satsToBitcoinAmount(amountSats),
+      ]);
+      setDepositTxid(txid);
+
+      const miningAddress = await bitcoinRpc<string>("getnewaddress", []);
+      await bitcoinRpc("generatetoaddress", [
+        depositConfirmationBlocks,
+        miningAddress,
+      ]);
+      await sleep(3_000);
+
+      const claimedSats = await claimDepositWithRetry(wallet, txid);
+      const settledBalance =
+        claimedSats > 0n
+          ? await waitForBalanceAtLeast(wallet, beforeBalance + claimedSats)
+          : beforeBalance;
+
+      if (settledBalance !== null) {
+        setBalance(settledBalance.toString());
+      }
+
+      setStatus({
+        type: "success",
+        message: `Funded and claimed ${claimedSats || BigInt(amountSats)} sats (${txid})`,
+      });
+    } catch (err) {
+      setStatus({
+        type: "error",
+        message: `Error: ${err instanceof Error ? err.message : err}`,
+      });
+    } finally {
+      setDepositActionPending(false);
     }
   };
 
@@ -453,9 +711,59 @@ function App() {
               </div>
             </div>
 
+            {/* Deposit */}
+            <div className="section">
+              <h3>4. Deposit</h3>
+              <div className="button-row">
+                <button
+                  onClick={createDepositAddress}
+                  disabled={depositActionPending}
+                >
+                  Get Deposit Address
+                </button>
+              </div>
+              {depositAddress && (
+                <div
+                  className="code clickable"
+                  onClick={() => copyToClipboard(depositAddress)}
+                >
+                  {depositAddress}
+                </div>
+              )}
+              {walletTarget === "LOCAL" && IS_LOCALHOST && (
+                <div className="button-row deposit-action-row">
+                  <input
+                    type="number"
+                    placeholder="Amount (sats)"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    disabled={depositActionPending}
+                  />
+                  <button onClick={fundLocally} disabled={depositActionPending}>
+                    Fund Locally
+                  </button>
+                </div>
+              )}
+              <div className="button-row deposit-action-row">
+                <input
+                  type="text"
+                  placeholder="Deposit transaction ID"
+                  value={depositTxid}
+                  onChange={(e) => setDepositTxid(e.target.value)}
+                  disabled={depositActionPending}
+                />
+                <button
+                  onClick={() => claimDeposit()}
+                  disabled={depositActionPending}
+                >
+                  Claim Deposit
+                </button>
+              </div>
+            </div>
+
             {/* Receive */}
             <div className="section">
-              <h3>4. Receive</h3>
+              <h3>5. Receive</h3>
               <div className="button-row" style={{ marginBottom: "12px" }}>
                 <input
                   type="number"
@@ -480,7 +788,7 @@ function App() {
 
             {/* Send */}
             <div className="section">
-              <h3>5. Send</h3>
+              <h3>6. Send</h3>
               <div className="toggle-row">
                 <button
                   onClick={() => setSendType("spark")}

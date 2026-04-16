@@ -61,6 +61,10 @@ export function getLocalSspProxyPath(): string {
   return "/spark-ssp";
 }
 
+export function getLocalBitcoinRpcProxyPath(): string {
+  return "/bitcoin-rpc";
+}
+
 export function getExampleWalletOptions(
   env: Record<string, string | undefined>,
   network: NetworkType,

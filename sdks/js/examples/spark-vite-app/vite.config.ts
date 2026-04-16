@@ -1,8 +1,11 @@
+import { Buffer } from "node:buffer";
+import type { IncomingMessage } from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import { defineConfig, loadEnv, type ProxyOptions } from "vite";
+import { defineConfig, loadEnv, type Plugin, type ProxyOptions } from "vite";
 import react from "@vitejs/plugin-react";
 import {
+  getLocalBitcoinRpcProxyPath,
   getLocalElectrsProxyPath,
   getLocalOperatorCount,
   getLocalOperatorProxyPath,
@@ -49,9 +52,10 @@ export default defineConfig(({ mode }) => {
 
   const electrsProxyPath = getLocalElectrsProxyPath();
   const sspProxyPath = getLocalSspProxyPath();
+  const bitcoinRpcProxyPath = getLocalBitcoinRpcProxyPath();
 
   return {
-    plugins: [react()],
+    plugins: [react(), createLocalOnlyProxyGuard(bitcoinRpcProxyPath)],
     define: {
       __SPARK_CONFIG_OVERRIDE__: JSON.stringify(configOverride),
       __SPARK_PRIVATE_CONFIGS__: JSON.stringify(privateConfigs),
@@ -94,6 +98,19 @@ export default defineConfig(({ mode }) => {
               "app.minikube.local",
             ),
             rewrite: (path: string) => stripProxyPrefix(path, sspProxyPath),
+          },
+        ],
+        [
+          bitcoinRpcProxyPath,
+          {
+            target:
+              env["VITE_LOCAL_BITCOIN_RPC_TARGET"] ??
+              env["BITCOIN_RPC_URL"] ??
+              getLocalBitcoinRpcTarget(env),
+            changeOrigin: true,
+            headers: getBitcoinRpcHeaders(env),
+            rewrite: (path: string) =>
+              stripProxyPrefix(path, bitcoinRpcProxyPath),
           },
         ],
       ]),
@@ -167,6 +184,98 @@ function getLocalSspTarget(env: Record<string, string | undefined>): string {
   return env["MINIKUBE_IP"]
     ? `http://${env["MINIKUBE_IP"]}`
     : "http://127.0.0.1:5000";
+}
+
+function getLocalBitcoinRpcTarget(
+  env: Record<string, string | undefined>,
+): string {
+  return env["MINIKUBE_IP"]
+    ? `http://${env["MINIKUBE_IP"]}:8332`
+    : "http://127.0.0.1:8332";
+}
+
+function getBitcoinRpcHeaders(
+  env: Record<string, string | undefined>,
+): Record<string, string> {
+  const user = env["BITCOIN_RPC_USER"] ?? "testutil";
+  const pass = env["BITCOIN_RPC_PASSWORD"] ?? "testutilpassword";
+
+  return {
+    Authorization: `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`,
+  };
+}
+
+function isLoopbackAddress(address: string | undefined): boolean {
+  const normalizedAddress = address?.replace(/^\[(.*)\]$/, "$1");
+
+  return (
+    normalizedAddress === "localhost" ||
+    normalizedAddress === "127.0.0.1" ||
+    normalizedAddress === "::1" ||
+    normalizedAddress === "::ffff:127.0.0.1"
+  );
+}
+
+function isLoopbackHost(hostHeader: string | undefined): boolean {
+  if (!hostHeader) {
+    return false;
+  }
+
+  try {
+    return isLoopbackAddress(new URL(`http://${hostHeader}`).hostname);
+  } catch {
+    return false;
+  }
+}
+
+function hasSameOriginLoopbackHeaders(req: IncomingMessage): boolean {
+  const host = req.headers.host;
+  if (!isLoopbackHost(host)) {
+    return false;
+  }
+
+  const allowedOrigins = new Set([`http://${host}`, `https://${host}`]);
+  const origin = req.headers.origin;
+  if (origin) {
+    return allowedOrigins.has(origin);
+  }
+
+  const referer = req.headers.referer;
+  if (!referer) {
+    return false;
+  }
+
+  try {
+    return allowedOrigins.has(new URL(referer).origin);
+  } catch {
+    return false;
+  }
+}
+
+function createLocalOnlyProxyGuard(proxyPath: string): Plugin {
+  return {
+    name: "local-only-bitcoin-rpc-proxy",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.startsWith(proxyPath)) {
+          return next();
+        }
+
+        if (
+          isLoopbackAddress(req.socket.remoteAddress) &&
+          hasSameOriginLoopbackHeaders(req)
+        ) {
+          return next();
+        }
+
+        res.statusCode = 403;
+        res.setHeader("Content-Type", "text/plain");
+        res.end(
+          "The local Bitcoin RPC proxy is only available from same-origin localhost requests.",
+        );
+      });
+    },
+  };
 }
 
 function getMinikubeHeaders(
