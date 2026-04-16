@@ -291,32 +291,16 @@ class BitcoinFaucet {
   }
 
   async sendToAddress(address, amount, blocksToGenerate = 1) {
-    const coin = await this.fund();
-    if (!coin) throw new Error("No coins available");
+    const amountBtc = Number(amount) / SATS_PER_BTC;
+    const txid = await this._call("sendtoaddress", [address, amountBtc]);
 
-    const tx = new btc.Transaction();
-    tx.addInput(coin.outpoint);
-
-    const availableAmount = COIN_AMOUNT - FEE_AMOUNT;
-    const destinationAddress = btc.Address(REGTEST_NETWORK).decode(address);
-    const destinationScript = btc.OutScript.encode(destinationAddress);
-    tx.addOutput({ script: destinationScript, amount });
-
-    const changeAmount = availableAmount - amount;
-    if (changeAmount > 0n) {
-      const changeKey = secp256k1.utils.randomPrivateKey();
-      const changePubKey = secp256k1.getPublicKey(changeKey);
-      const changeScript = getP2TRScriptFromPublicKey(
-        changePubKey,
-        REGTEST_NETWORK,
-      );
-      tx.addOutput({ script: changeScript, amount: changeAmount });
+    if (blocksToGenerate > 0) {
+      const miningAddress = await this.getNewAddress();
+      await this.generateToAddress(blocksToGenerate, miningAddress);
     }
 
-    const signedTx = await this.signFaucetCoin(tx, coin.txout, coin.key);
-    await this.broadcastTx(bytesToHex(signedTx.extract()));
-    await this.generateToAddress(blocksToGenerate, await this.getNewAddress());
-    return signedTx;
+    const rawTx = await this._getRawTransaction(txid);
+    return btc.Transaction.fromRaw(hexToBytes(rawTx.hex));
   }
 
   async mineBlocks(numBlocks) {
