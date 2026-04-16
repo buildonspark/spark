@@ -98,6 +98,7 @@ type args struct {
 	RateLimiterMemcachedAddrs  string
 	EntDebug                   bool
 	PyroscopeServer            string
+	RisingWaveDatabasePath     string
 }
 
 const operatorPoolKnobRefreshInterval = time.Minute
@@ -152,6 +153,7 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.RateLimiterMemcachedAddrs, "rate-limiter-memcached-addrs", "", "Comma-separated list of Memcached addresses")
 	flag.BoolVar(&args.EntDebug, "ent-debug", false, "Log all the SQL queries")
 	flag.StringVar(&args.PyroscopeServer, "pyroscope-server", "", "The address of the Pyroscope server to connect to. Leave blank to skip Pyroscope monitoring.")
+	flag.StringVar(&args.RisingWaveDatabasePath, "risingwave-database", "", "RisingWave Postgres-compatible DSN for partner analytics queries")
 
 	flag.Parse()
 
