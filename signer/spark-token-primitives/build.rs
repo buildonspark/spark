@@ -36,6 +36,10 @@ fn main() -> Result<()> {
         "cargo:rerun-if-changed={}",
         proto_dir.join("multisig.proto").display()
     );
+    println!(
+        "cargo:rerun-if-changed={}",
+        proto_dir.join("validate/validate.proto").display()
+    );
 
     let protos = &[
         proto_dir.join("common.proto"),

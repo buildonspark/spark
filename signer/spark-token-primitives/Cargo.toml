@@ -19,6 +19,7 @@ include = [
     "protos/spark.proto",
     "protos/spark_token.proto",
     "protos/multisig.proto",
+    "protos/validate/validate.proto",
 ]
 
 [dependencies]
