@@ -14,6 +14,7 @@ include = [
     "build.rs",
     "Cargo.toml",
     "README.md",
+    "LICENSE",
     "protos/common.proto",
     "protos/spark.proto",
     "protos/spark_token.proto",
