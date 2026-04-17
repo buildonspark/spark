@@ -89,17 +89,21 @@ func (e *TwoPCEngine) Execute(
 		return anypb.New(result)
 	}
 
+	logger.Sugar().Infof("2PC prepare: starting fan-out for op type %d to %d participants", opType, len(participants))
 	results, err := helper.ExecuteTaskWithAllOperators(ctx, e.config, selection, prepareTask)
 	if err != nil {
+		logger.Sugar().Infof("2PC prepare: failed for op type %d, sending rollback", opType)
 		if rollbackErr := e.rollback(ctx, opType, flow.RollbackPayload(), participants); rollbackErr != nil {
 			logger.With(zap.Error(rollbackErr)).Sugar().Errorf(
 				"failed to send consensus rollback gossip for op type %d", opType)
 		}
 		return nil, fmt.Errorf("prepare failed: %w", err)
 	}
+	logger.Sugar().Infof("2PC prepare: all %d participants ready for op type %d", len(participants), opType)
 
 	commitOp, err := flow.BuildCommitPayload(ctx, results)
 	if err != nil {
+		logger.Sugar().Infof("2PC build-commit: failed for op type %d, sending rollback", opType)
 		if rollbackErr := e.rollback(ctx, opType, flow.RollbackPayload(), participants); rollbackErr != nil {
 			logger.With(zap.Error(rollbackErr)).Sugar().Errorf(
 				"failed to send consensus rollback gossip for op type %d", opType)
@@ -107,11 +111,13 @@ func (e *TwoPCEngine) Execute(
 		return nil, fmt.Errorf("build-commit failed: %w", err)
 	}
 
+	logger.Sugar().Infof("2PC commit: sending gossip for op type %d to %d participants", opType, len(participants))
 	if err := e.commit(ctx, opType, commitOp, participants); err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf(
 			"failed to send consensus commit gossip for op type %d", opType)
 		return nil, fmt.Errorf("commit gossip failed: %w", err)
 	}
+	logger.Sugar().Infof("2PC commit: complete for op type %d", opType)
 	return commitOp, nil
 }
 
@@ -137,6 +143,8 @@ func (e *TwoPCEngine) commit(ctx context.Context, opType pbgossip.ConsensusOpera
 // rollback builds a ConsensusRollback gossip message and sends it to all
 // participants for durable async delivery.
 func (e *TwoPCEngine) rollback(ctx context.Context, opType pbgossip.ConsensusOperationType, op proto.Message, participants []string) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Sugar().Infof("2PC rollback: sending gossip for op type %d to %d participants", opType, len(participants))
 	anyOp, err := anypb.New(op)
 	if err != nil {
 		return fmt.Errorf("failed to marshal operation to Any: %w", err)
