@@ -1615,10 +1615,15 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 			Order(entutxo.ByBlockHeight(sql.OrderDesc()))
 		if req.ExcludeClaimed {
 			query = query.Where(func(s *sql.Selector) {
-				// Exclude UTXOs that have non-cancelled UTXO swaps
+				// IS NOT NULL is required because utxo_swaps.utxo is nullable; a single
+				// non-cancelled row with NULL utxo would otherwise make NOT IN evaluate
+				// to NULL for every row and drop all results (SQL three-valued logic).
 				subquery := sql.Select(utxoswap.UtxoColumn).
 					From(sql.Table(utxoswap.Table)).
-					Where(sql.NEQ(utxoswap.FieldStatus, string(st.UtxoSwapStatusCancelled)))
+					Where(sql.And(
+						sql.NEQ(utxoswap.FieldStatus, string(st.UtxoSwapStatusCancelled)),
+						sql.NotNull(utxoswap.UtxoColumn),
+					))
 				s.Where(sql.NotIn(s.C(entutxo.FieldID), subquery))
 			})
 		}
@@ -1781,9 +1786,15 @@ func (o *DepositHandler) GetUtxosForIdentity(ctx context.Context, req *pb.GetUtx
 
 	if req.GetExcludeClaimed() {
 		query = query.Where(func(s *sql.Selector) {
+			// IS NOT NULL is required because utxo_swaps.utxo is nullable; a single
+			// non-cancelled row with NULL utxo would otherwise make NOT IN evaluate
+			// to NULL for every row and drop all results (SQL three-valued logic).
 			subquery := sql.Select(utxoswap.UtxoColumn).
 				From(sql.Table(utxoswap.Table)).
-				Where(sql.NEQ(utxoswap.FieldStatus, string(st.UtxoSwapStatusCancelled)))
+				Where(sql.And(
+					sql.NEQ(utxoswap.FieldStatus, string(st.UtxoSwapStatusCancelled)),
+					sql.NotNull(utxoswap.UtxoColumn),
+				))
 			s.Where(sql.NotIn(s.C(entutxo.FieldID), subquery))
 		})
 	}

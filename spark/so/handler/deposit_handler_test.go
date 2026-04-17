@@ -1520,6 +1520,53 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, response.Utxos, 3)
 	})
+
+	t.Run("exclude_claimed ignores non-cancelled swaps with null utxo edge", func(t *testing.T) {
+		// Regression: the utxo edge on utxo_swaps is optional, so a non-cancelled row
+		// can exist with NULL utxo. In SQL three-valued logic, a single NULL in the
+		// NOT IN subquery made the whole filter evaluate to NULL for every row and
+		// drop all results.
+		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jzec"
+		rng := rand.NewChaCha8([32]byte{42})
+		depositAddress, err := tx.DepositAddress.Create().
+			SetAddress(staticAddress).
+			SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+			SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+			SetSigningKeyshare(signingKeyshare).
+			SetIsStatic(true).
+			SetNetwork(btcnetwork.Regtest).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = tx.Utxo.Create().
+			SetNetwork(btcnetwork.Regtest).
+			SetTxid([]byte("null_edge_txid_1")).
+			SetVout(0).
+			SetBlockHeight(100).
+			SetAmount(1000).
+			SetPkScript([]byte("null_edge_script")).
+			SetDepositAddress(depositAddress).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = tx.UtxoSwap.Create().
+			SetStatus(st.UtxoSwapStatusCreated).
+			SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
+			SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+			SetUtxoValueSats(1000).
+			Save(ctx)
+		require.NoError(t, err)
+
+		response, err := handler.GetUtxosForAddress(ctx, &pb.GetUtxosForAddressRequest{
+			Address:        staticAddress,
+			Network:        pb.Network_REGTEST,
+			Offset:         0,
+			Limit:          10,
+			ExcludeClaimed: true,
+		})
+		require.NoError(t, err)
+		require.Len(t, response.Utxos, 1)
+	})
 }
 
 func TestGetUtxosForIdentity(t *testing.T) {
@@ -1860,6 +1907,37 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			{txid: string(response.Utxos[3].Utxo.Txid), isConfirmed: response.Utxos[3].IsConfirmed},
 			{txid: string(response.Utxos[4].Utxo.Txid), isConfirmed: response.Utxos[4].IsConfirmed},
 		})
+	})
+
+	t.Run("exclude_claimed ignores non-cancelled swaps with null utxo edge", func(t *testing.T) {
+		// Regression: the utxo edge on utxo_swaps is optional, so a non-cancelled row
+		// can exist with NULL utxo. In SQL three-valued logic, a single NULL in the
+		// NOT IN subquery made the whole filter evaluate to NULL for every row and
+		// drop all results.
+		env := newTestEnv(t)
+		tx, err := ent.GetDbFromContext(env.ctx)
+		require.NoError(t, err)
+
+		rng := rand.NewChaCha8([32]byte{42})
+		_, err = tx.UtxoSwap.Create().
+			SetStatus(st.UtxoSwapStatusCreated).
+			SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
+			SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+			SetUtxoValueSats(1000).
+			Save(env.ctx)
+		require.NoError(t, err)
+
+		response, err := env.handler.GetUtxosForIdentity(env.ctx, &pb.GetUtxosForIdentityRequest{
+			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
+			Network:           pb.Network_REGTEST,
+			ExcludeClaimed:    true,
+			IncludePending:    true,
+			Page: &pb.PageRequest{
+				PageSize: 10,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, response.Utxos, 5)
 	})
 
 	t.Run("privacy enabled returns empty results without access", func(t *testing.T) {
