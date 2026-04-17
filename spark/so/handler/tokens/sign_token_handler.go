@@ -423,8 +423,18 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 }
 
 func (h *SignTokenHandler) getOutputsToSpendForExchange(ctx context.Context, tokenTransactionHash []byte) ([]*tokeninternalpb.OutputToSpend, error) {
-	revealedTokenTransaction, err := ent.FetchTokenTransactionDataByHashForRead(ctx, tokenTransactionHash)
+	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context for token txHash: %x: %w", tokenTransactionHash, err))
+	}
+	revealedTokenTransaction, err := db.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(tokenTransactionHash)).
+		WithSpentOutput().
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token transaction not found for hash %x: %w", tokenTransactionHash, err))
+		}
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token transaction after setting status to revealed: %w for token txHash: %x", err, tokenTransactionHash))
 	}
 	outputsToSpend := make([]*tokeninternalpb.OutputToSpend, 0, len(revealedTokenTransaction.Edges.SpentOutput))
@@ -439,7 +449,7 @@ func (h *SignTokenHandler) getOutputsToSpendForExchange(ctx context.Context, tok
 				outputToSpend.ID, sigLen, tokenTransactionHash))
 		}
 		outputsToSpend = append(outputsToSpend, &tokeninternalpb.OutputToSpend{
-			CreatedTokenTransactionHash: outputToSpend.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
+			CreatedTokenTransactionHash: outputToSpend.CreatedTransactionFinalizedHash,
 			CreatedTokenTransactionVout: uint32(outputToSpend.CreatedTransactionOutputVout),
 			SpentTokenTransactionVout:   uint32(outputToSpend.SpentTransactionInputVout),
 			SpentOwnershipSignature:     outputToSpend.SpentOwnershipSignature,

@@ -31,7 +31,7 @@ func (h *InternalFinalizeTokenHandler) FinalizeTransferTransactionInternal(
 ) error {
 	ctx, span := GetTracer().Start(ctx, "InternalFinalizeTokenHandler.FinalizeTransferTransactionInternal")
 	defer span.End()
-	tokenTransaction, err := ent.FetchAndLockTokenTransactionDataByHash(ctx, tokenTransactionHash)
+	tokenTransaction, err := ent.FetchAndLockTokenTransactionOutputsForFinalizeByHash(ctx, tokenTransactionHash)
 	if err != nil {
 		return tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToFetchTransaction, tokenTransaction, err)
 	}

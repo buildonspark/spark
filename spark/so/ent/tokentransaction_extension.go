@@ -890,6 +890,35 @@ func FetchAndLockTokenTransactionDataByHash(ctx context.Context, tokenTransactio
 	return tokenTransaction, nil
 }
 
+// FetchAndLockTokenTransactionOutputsForFinalizeByHash refetches and locks only the token transaction
+// and the created/spent outputs needed to finalize a transfer transaction.
+func FetchAndLockTokenTransactionOutputsForFinalizeByHash(ctx context.Context, tokenTransactionHash []byte) (*TokenTransaction, error) {
+	db, err := GetDbFromContext(ctx)
+	if err != nil {
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
+	}
+
+	tokenTransaction, err := db.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHash(tokenTransactionHash)).
+		// Lock outputs which are updated during finalization.
+		WithCreatedOutput(func(q *TokenOutputQuery) {
+			q.ForUpdate()
+		}).
+		WithSpentOutput(func(q *TokenOutputQuery) {
+			q.ForUpdate()
+		}).
+		ForUpdate().
+		Only(ctx)
+	if err != nil {
+		if IsNotFound(err) {
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token transaction not found for hash %x: %w", tokenTransactionHash, err))
+		}
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch and lock token transaction outputs by hash: %w", err))
+	}
+
+	return tokenTransaction, nil
+}
+
 // FetchTokenTransactionDataByHashForRead refetches the transaction with all its relations without acquiring a row lock.
 func FetchTokenTransactionDataByHashForRead(ctx context.Context, tokenTransactionHash []byte) (*TokenTransaction, error) {
 	db, err := GetDbFromContext(ctx)
