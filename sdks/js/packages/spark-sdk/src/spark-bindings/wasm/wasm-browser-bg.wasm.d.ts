@@ -126,6 +126,7 @@ export const keypackage_new: (a: number, b: number, c: number, d: number, e: num
 export const next_sequence: (a: number, b: number, c: number) => [number, number, number];
 export const random_secret_key_bytes: () => [number, number, number, number];
 export const recover_secret_wasm: (a: any) => [number, number, number, number];
+export const round_down_to_timelock_interval: (a: number, b: number) => number;
 export const secretshareresult_new: (a: number, b: number, c: number, d: number) => number;
 export const signingcommitment_new: (a: number, b: number, c: number, d: number) => number;
 export const split_secret: (a: number, b: number, c: number, d: number) => [number, number, number, number];
@@ -221,7 +222,6 @@ export const __wbg_set_signingnonce_binding: (a: number, b: number, c: number) =
 export const __wbg_set_signingnonce_hiding: (a: number, b: number, c: number) => void;
 export const __wbg_set_transactionresult_sighash: (a: number, b: number, c: number) => void;
 export const __wbg_set_transactionresult_tx: (a: number, b: number, c: number) => void;
-export const round_down_to_timelock_interval: (a: number, b: number) => number;
 export const __wbg_get_refundtxtrioresult_cpfp_refund: (a: number) => number;
 export const __wbg_get_refundtxtrioresult_direct_from_cpfp_refund: (a: number) => number;
 export const __wbg_get_dummytx_tx: (a: number) => [number, number];

@@ -8,8 +8,7 @@ import { setSparkTokenPrimitivesOnce } from "./token-primitives-bindings/token-p
 import { SparkTokenPrimitives } from "./token-primitives-bindings/token-primitives-bindings.node.js";
 import { setCrypto } from "./utils/crypto.js";
 
-const cryptoImpl =
-  typeof global !== "undefined" && global.crypto ? global.crypto : nodeCrypto;
+const cryptoImpl = nodeCrypto.webcrypto;
 
 setCrypto(cryptoImpl);
 setSparkFrostOnce(new SparkFrost());

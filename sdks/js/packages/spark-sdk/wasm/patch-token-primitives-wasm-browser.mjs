@@ -12,6 +12,13 @@ let patched = content.replace(
   "./token-primitives-bindings/wasm/wasm-browser-bg.wasm",
 );
 
+patched = `import { getCrypto } from "../../utils/crypto.js";
+
+${patched}`.replace(
+  "globalThis.crypto.getRandomValues(",
+  "getCrypto().getRandomValues(",
+);
+
 patched = patched.replace(
   /if \(typeof module_or_path === 'undefined'\)\s*\{\s*module_or_path = new URL\('[^']+\.wasm', import\.meta\.url\);\s*\}/,
   `if (typeof module_or_path === 'undefined') {

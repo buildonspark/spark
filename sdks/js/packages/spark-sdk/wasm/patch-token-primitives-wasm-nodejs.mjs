@@ -7,7 +7,9 @@ const outputDir = "./src/token-primitives-bindings/wasm";
 
 const content = await readFile(`${generatedDir}/${name}.js`, "utf8");
 
-const patched = content
+const patched = `import { getCrypto } from "../../utils/crypto.js";
+
+${content}`
   .replace("require(`util`)", "globalThis")
   .replace(/\nclass (.*?) \{/g, "\nclass $1Src {")
   .replace(/\b(?!Uint8Array)(\w+)\.prototype/g, "$1Src.prototype")
@@ -17,6 +19,7 @@ const patched = content
   .replace(/\nexports\.(.*?)\s+/g, "\nexport const $1 = imports.$1 ")
   .replace(/$/, "export default imports")
   .replace(/\nconst\swasmPath\s=\s.*/g, "")
+  .replace("globalThis.crypto.getRandomValues(", "getCrypto().getRandomValues(")
   .replace(
     /\nconst wasmBytes.*\n/,
     `

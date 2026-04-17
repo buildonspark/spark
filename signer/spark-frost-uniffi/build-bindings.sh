@@ -3,7 +3,8 @@ wasm-pack build --target web --out-dir ../../sdks/js/packages/spark-sdk/wasm/bro
 
 cd ../../sdks/js/packages/spark-sdk/wasm/nodejs
 rm .gitignore
-cd ../../sdks/js/packages/spark-sdk/wasm/browser
+cd ../browser
 rm .gitignore
+cd ../..
 yarn
 yarn patch-wasm

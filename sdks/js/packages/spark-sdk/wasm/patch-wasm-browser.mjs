@@ -14,6 +14,17 @@ let patched = content.replace(
   "./spark-bindings/wasm/wasm-browser-bg.wasm",
 );
 
+patched = `import { getCrypto } from "../../utils/crypto.js";
+
+${patched}`
+  .replace("const ret = arg0.crypto;", "const ret = getCrypto();")
+  .replace(
+    /const ret = module\.require;\s*return ret;/,
+    `throw new Error(
+            "WASM ESM wrapper should receive crypto via setCrypto(), not module.require."
+        );`,
+  );
+
 /* import.meta.url is widely available in ESM environments but causes a script
    parse in e.g. extension content scripts. The generated filename may vary
    (underscores/hyphens), so match any .wasm URL initializer. */

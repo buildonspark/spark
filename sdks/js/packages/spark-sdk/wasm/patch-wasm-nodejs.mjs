@@ -9,7 +9,9 @@ const generatedDir = "./wasm/nodejs";
 
 const content = await readFile(`${generatedDir}/${name}.js`, "utf8");
 
-const patched = content
+const patched = `import { getCrypto } from "../../utils/crypto.js";
+
+${content}`
   // use global TextDecoder TextEncoder
   .replace("require(`util`)", "globalThis")
   // handle class exports (https://bit.ly/421kbmk):
@@ -22,6 +24,13 @@ const patched = content
   .replace(/\nexports\.(.*?)\s+/g, "\nexport const $1 = imports.$1 ")
   .replace(/$/, "export default imports")
   .replace(/\nconst\swasmPath\s=\s.*/g, "")
+  .replace("const ret = arg0.crypto;", "const ret = getCrypto();")
+  .replace(
+    /const ret = module\.require;\s*return ret;/,
+    `throw new Error(
+        "WASM ESM wrapper should receive crypto via setCrypto(), not module.require."
+    );`,
+  )
   // inline bytes Uint8Array
   .replace(
     /\nconst wasmBytes.*\n/,

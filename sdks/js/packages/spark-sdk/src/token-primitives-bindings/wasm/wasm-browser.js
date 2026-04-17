@@ -1,3 +1,5 @@
+import { getCrypto } from "../../utils/crypto.js";
+
 let wasm;
 
 let cachedUint8ArrayMemory0 = null;
@@ -182,39 +184,17 @@ function getArrayU8FromWasm0(ptr, len) {
     return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
 }
 
-function takeFromExternrefTable0(idx) {
-    const value = wasm.__wbindgen_externrefs.get(idx);
-    wasm.__externref_table_dealloc(idx);
-    return value;
-}
-/**
- * @param {any} request
- * @returns {string}
- */
-export function finalize_token_invoice(request) {
-    let deferred2_0;
-    let deferred2_1;
-    try {
-        const ret = wasm.finalize_token_invoice(request);
-        var ptr1 = ret[0];
-        var len1 = ret[1];
-        if (ret[3]) {
-            ptr1 = 0; len1 = 0;
-            throw takeFromExternrefTable0(ret[2]);
-        }
-        deferred2_0 = ptr1;
-        deferred2_1 = len1;
-        return getStringFromWasm0(ptr1, len1);
-    } finally {
-        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
-    }
-}
-
 function passArray8ToWasm0(arg, malloc) {
     const ptr = malloc(arg.length * 1, 1) >>> 0;
     getUint8ArrayMemory0().set(arg, ptr / 1);
     WASM_VECTOR_LEN = arg.length;
     return ptr;
+}
+
+function takeFromExternrefTable0(idx) {
+    const value = wasm.__wbindgen_externrefs.get(idx);
+    wasm.__externref_table_dealloc(idx);
+    return value;
 }
 /**
  * @param {Uint8Array} partial_token_transaction_bytes
@@ -236,8 +216,8 @@ export function hash_partial_token_transaction(partial_token_transaction_bytes) 
  * @param {any} request
  * @returns {any}
  */
-export function construct_partial_transfer_transaction(request) {
-    const ret = wasm.construct_partial_transfer_transaction(request);
+export function prepare_token_invoice(request) {
+    const ret = wasm.prepare_token_invoice(request);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -248,12 +228,35 @@ export function construct_partial_transfer_transaction(request) {
  * @param {any} request
  * @returns {any}
  */
-export function prepare_token_invoice(request) {
-    const ret = wasm.prepare_token_invoice(request);
+export function construct_partial_transfer_transaction(request) {
+    const ret = wasm.construct_partial_transfer_transaction(request);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * @param {any} request
+ * @returns {string}
+ */
+export function finalize_token_invoice(request) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ret = wasm.finalize_token_invoice(request);
+        var ptr1 = ret[0];
+        var len1 = ret[1];
+        if (ret[3]) {
+            ptr1 = 0; len1 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred2_0 = ptr1;
+        deferred2_1 = len1;
+        return getStringFromWasm0(ptr1, len1);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
 }
 
 /**
@@ -396,7 +399,7 @@ function __wbg_get_imports() {
         return ret;
     };
     imports.wbg.__wbg_getRandomValues_38a1ff1ea09f6cc7 = function() { return handleError(function (arg0, arg1) {
-        globalThis.crypto.getRandomValues(getArrayU8FromWasm0(arg0, arg1));
+        getCrypto().getRandomValues(getArrayU8FromWasm0(arg0, arg1));
     }, arguments) };
     imports.wbg.__wbg_get_7bed016f185add81 = function(arg0, arg1) {
         const ret = arg0[arg1 >>> 0];
