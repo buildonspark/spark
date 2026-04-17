@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/frost"
 	"github.com/lightsparkdev/spark/so/handler"
+	"github.com/lightsparkdev/spark/so/knobs"
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -28,6 +29,33 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// runDepositWithBothPaths runs testFn twice: once on the legacy path (knob=0),
+// once on the consensus 2PC path (knob=100). The consensus subtest is
+// skipped if the knob controller is unavailable (no minikube).
+func runDepositWithBothPaths(t *testing.T, testFn func(t *testing.T)) {
+	t.Run("legacy", func(t *testing.T) {
+		kc, err := sparktesting.NewKnobController(t)
+		if err == nil {
+			err = kc.SetKnob(t, knobs.KnobUseConsensusDepositTree, 0)
+			require.NoError(t, err)
+		}
+		testFn(t)
+	})
+	t.Run("consensus", func(t *testing.T) {
+		kc, err := sparktesting.NewKnobController(t)
+		if err != nil {
+			t.Skipf("skipping consensus subtest: knob controller not available: %v", err)
+		}
+		err = kc.SetKnob(t, knobs.KnobUseConsensusDepositTree, 100)
+		require.NoError(t, err)
+		defer func() {
+			err := kc.SetKnob(t, knobs.KnobUseConsensusDepositTree, 0)
+			assert.NoError(t, err, "failed to reset KnobUseConsensusDepositTree")
+		}()
+		testFn(t)
+	})
+}
 
 func TestGenerateDepositAddress(t *testing.T) {
 	config := wallet.NewTestWalletConfig(t)
@@ -326,120 +354,122 @@ func TestStartDepositTreeCreationBasic(t *testing.T) {
 }
 
 func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
-	config := wallet.NewTestWalletConfig(t)
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
-	require.NoError(t, err)
-	defer conn.Close()
+	runDepositWithBothPaths(t, func(t *testing.T) {
+		config := wallet.NewTestWalletConfig(t)
+		conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+		require.NoError(t, err)
+		defer conn.Close()
 
-	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
-	require.NoError(t, err)
-	ctx := wallet.ContextWithToken(t.Context(), token)
+		token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+		require.NoError(t, err)
+		ctx := wallet.ContextWithToken(t.Context(), token)
 
-	privKey := keys.GeneratePrivateKey()
-	leafID := uuid.NewString()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
-	require.NoError(t, err)
+		privKey := keys.GeneratePrivateKey()
+		leafID := uuid.NewString()
+		depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+		require.NoError(t, err)
 
-	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
-	require.NoError(t, err)
-	require.Len(t, unusedDepositAddresses.DepositAddresses, 1)
-	require.Equal(t, leafID, unusedDepositAddresses.DepositAddresses[0].GetLeafId())
+		unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
+		require.NoError(t, err)
+		require.Len(t, unusedDepositAddresses.DepositAddresses, 1)
+		require.Equal(t, leafID, unusedDepositAddresses.DepositAddresses[0].GetLeafId())
 
-	client := sparktesting.GetBitcoinClient()
+		client := sparktesting.GetBitcoinClient()
 
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
+		coin, err := faucet.Fund()
+		require.NoError(t, err)
 
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
-	require.NoError(t, err, "failed to create deposit tx")
-	vout := 0
+		depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+		require.NoError(t, err, "failed to create deposit tx")
+		vout := 0
 
-	// Sign, broadcast, and mine deposit tx
-	signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
-	require.NoError(t, err, "failed to sign faucet coin")
-	_, err = client.SendRawTransaction(signedDepositTx, true)
-	require.NoError(t, err)
+		// Sign, broadcast, and mine deposit tx
+		signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+		require.NoError(t, err, "failed to sign faucet coin")
+		_, err = client.SendRawTransaction(signedDepositTx, true)
+		require.NoError(t, err)
 
-	randomKey := keys.GeneratePrivateKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
-	require.NoError(t, err, "failed to get p2tr raw address")
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
-	require.NoError(t, err, "failed to generate to address")
+		randomKey := keys.GeneratePrivateKey()
+		randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
+		require.NoError(t, err, "failed to get p2tr raw address")
+		_, err = client.GenerateToAddress(1, randomAddress, nil)
+		require.NoError(t, err, "failed to generate to address")
 
-	time.Sleep(100 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
-	require.NoError(t, err)
-	resp, err := wallet.CreateTreeRootWithFinalizeDepositTreeCreation(ctx, config, privKey, verifyingKey, depositTx, vout)
-	if err != nil {
-		t.Fatalf("failed to create tree: %v", err)
-	}
+		verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+		require.NoError(t, err)
+		resp, err := wallet.CreateTreeRootWithFinalizeDepositTreeCreation(ctx, config, privKey, verifyingKey, depositTx, vout)
+		if err != nil {
+			t.Fatalf("failed to create tree: %v", err)
+		}
 
-	require.NotNil(t, resp.RootNode)
+		require.NotNil(t, resp.RootNode)
 
-	require.Nil(t, resp.RootNode.ParentNodeId, "must be a root node")
-	require.Equal(t, resp.RootNode.Id, leafID)
-	require.Equal(t, uint64(100_000), resp.RootNode.Value)
-	require.True(t,
-		resp.RootNode.Status == string(st.TreeNodeStatusCreating) ||
-			resp.RootNode.Status == string(st.TreeNodeStatusAvailable),
-		"status should be CREATING or AVAILABLE depending on confirmation, got %s", resp.RootNode.Status)
+		require.Nil(t, resp.RootNode.ParentNodeId, "must be a root node")
+		require.Equal(t, resp.RootNode.Id, leafID)
+		require.Equal(t, uint64(100_000), resp.RootNode.Value)
+		require.True(t,
+			resp.RootNode.Status == string(st.TreeNodeStatusCreating) ||
+				resp.RootNode.Status == string(st.TreeNodeStatusAvailable),
+			"status should be CREATING or AVAILABLE depending on confirmation, got %s", resp.RootNode.Status)
 
-	tx, err := common.TxFromRawTxBytes(resp.RootNode.NodeTx)
-	require.NoError(t, err)
-	require.Len(t, tx.TxIn, 1)
-	require.NotNil(t, tx.TxIn[0])
-	require.Len(t, tx.TxIn[0].Witness, 1)
-	require.Len(t, tx.TxOut, 2)
+		tx, err := common.TxFromRawTxBytes(resp.RootNode.NodeTx)
+		require.NoError(t, err)
+		require.Len(t, tx.TxIn, 1)
+		require.NotNil(t, tx.TxIn[0])
+		require.Len(t, tx.TxIn[0].Witness, 1)
+		require.Len(t, tx.TxOut, 2)
 
-	// Verify the NodeTx signature is cryptographically valid (spends from deposit)
-	depositPrevOut := &wire.TxOut{
-		Value:    signedDepositTx.TxOut[vout].Value,
-		PkScript: signedDepositTx.TxOut[vout].PkScript,
-	}
-	err = common.VerifySignatureSingleInput(tx, 0, depositPrevOut)
-	require.NoError(t, err, "NodeTx signature should be valid")
+		// Verify the NodeTx signature is cryptographically valid (spends from deposit)
+		depositPrevOut := &wire.TxOut{
+			Value:    signedDepositTx.TxOut[vout].Value,
+			PkScript: signedDepositTx.TxOut[vout].PkScript,
+		}
+		err = common.VerifySignatureSingleInput(tx, 0, depositPrevOut)
+		require.NoError(t, err, "NodeTx signature should be valid")
 
-	refundTx, err := common.TxFromRawTxBytes(resp.RootNode.RefundTx)
-	require.NoError(t, err)
-	require.Len(t, refundTx.TxIn, 1)
-	require.NotNil(t, refundTx.TxIn[0])
-	require.Len(t, refundTx.TxIn[0].Witness, 1)
-	require.Len(t, refundTx.TxOut, 2)
+		refundTx, err := common.TxFromRawTxBytes(resp.RootNode.RefundTx)
+		require.NoError(t, err)
+		require.Len(t, refundTx.TxIn, 1)
+		require.NotNil(t, refundTx.TxIn[0])
+		require.Len(t, refundTx.TxIn[0].Witness, 1)
+		require.Len(t, refundTx.TxOut, 2)
 
-	// Verify the RefundTx signature is cryptographically valid (spends from NodeTx output 0)
-	nodeTxPrevOut := &wire.TxOut{
-		Value:    tx.TxOut[0].Value,
-		PkScript: tx.TxOut[0].PkScript,
-	}
-	err = common.VerifySignatureSingleInput(refundTx, 0, nodeTxPrevOut)
-	require.NoError(t, err, "RefundTx signature should be valid")
+		// Verify the RefundTx signature is cryptographically valid (spends from NodeTx output 0)
+		nodeTxPrevOut := &wire.TxOut{
+			Value:    tx.TxOut[0].Value,
+			PkScript: tx.TxOut[0].PkScript,
+		}
+		err = common.VerifySignatureSingleInput(refundTx, 0, nodeTxPrevOut)
+		require.NoError(t, err, "RefundTx signature should be valid")
 
-	directFromCpfpRefundTx, err := common.TxFromRawTxBytes(resp.RootNode.DirectFromCpfpRefundTx)
-	require.NoError(t, err)
-	require.Len(t, directFromCpfpRefundTx.TxIn, 1)
-	require.NotNil(t, directFromCpfpRefundTx.TxIn[0])
-	require.Len(t, directFromCpfpRefundTx.TxIn[0].Witness, 1)
-	require.Len(t, directFromCpfpRefundTx.TxOut, 1)
+		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(resp.RootNode.DirectFromCpfpRefundTx)
+		require.NoError(t, err)
+		require.Len(t, directFromCpfpRefundTx.TxIn, 1)
+		require.NotNil(t, directFromCpfpRefundTx.TxIn[0])
+		require.Len(t, directFromCpfpRefundTx.TxIn[0].Witness, 1)
+		require.Len(t, directFromCpfpRefundTx.TxOut, 1)
 
-	// Verify the DirectFromCpfpRefundTx signature is cryptographically valid (spends from NodeTx)
-	err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, nodeTxPrevOut)
-	require.NoError(t, err, "DirectFromCpfpRefundTx signature should be valid")
+		// Verify the DirectFromCpfpRefundTx signature is cryptographically valid (spends from NodeTx)
+		err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, nodeTxPrevOut)
+		require.NoError(t, err, "DirectFromCpfpRefundTx signature should be valid")
 
-	// Mine 2 more blocks because deposits won't be available until there are 3 confirmations
-	_, err = client.GenerateToAddress(2, randomAddress, nil)
-	require.NoError(t, err, "failed to generate to address")
+		// Mine 2 more blocks because deposits won't be available until there are 3 confirmations
+		_, err = client.GenerateToAddress(2, randomAddress, nil)
+		require.NoError(t, err, "failed to generate to address")
 
-	sparkClient := pb.NewSparkServiceClient(conn)
-	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.RootNode)
-	require.NoError(t, err)
-	assert.Equal(t, rootNode.Id, leafID)
-	assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
+		sparkClient := pb.NewSparkServiceClient(conn)
+		rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.RootNode)
+		require.NoError(t, err)
+		assert.Equal(t, rootNode.Id, leafID)
+		assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
 
-	unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
-	require.NoError(t, err, "failed to query unused deposit addresses")
+		unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
+		require.NoError(t, err, "failed to query unused deposit addresses")
 
-	assert.Zero(t, unusedDepositAddresses.GetDepositAddresses())
+		assert.Zero(t, unusedDepositAddresses.GetDepositAddresses())
+	})
 }
 
 func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
@@ -1576,7 +1606,6 @@ func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
 	require.Len(t, directFromCpfpRefundTx.TxIn[0].Witness, 1)
 	err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, nodeTxPrevOut)
 	require.NoError(t, err, "directFromCpfpRefund tx signature should be valid")
-
 }
 
 func TestFinalizeDepositTreeCreationMultiUtxoWrongInputOrder(t *testing.T) {
@@ -1614,11 +1643,12 @@ func TestFinalizeDepositTreeCreationMultiUtxoWrongInputOrder(t *testing.T) {
 	_, err = client.SendRawTransaction(signedDepositTx2, true)
 	require.NoError(t, err)
 
-	// Mine 3 blocks to meet confirmation threshold
+	// Mine 6 blocks: 3 to meet confirmation threshold + 3 extra to ensure
+	// the chain watcher processes all pending blocks from earlier tests.
 	randomKey := keys.GeneratePrivateKey()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
-	_, err = client.GenerateToAddress(3, randomAddress, nil)
+	_, err = client.GenerateToAddress(6, randomAddress, nil)
 	require.NoError(t, err)
 
 	time.Sleep(3 * time.Second)
@@ -1672,7 +1702,7 @@ func TestFinalizeDepositTreeCreationMultiUtxoRejectsUnconfirmedPrimary(t *testin
 	randomKey := keys.GeneratePrivateKey()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
-	_, err = client.GenerateToAddress(3, randomAddress, nil)
+	_, err = client.GenerateToAddress(6, randomAddress, nil)
 	require.NoError(t, err)
 
 	time.Sleep(3 * time.Second)
