@@ -140,7 +140,6 @@ func callValidateBitcoinTransactions(
 // --- Tests ---
 func TestValidateUserTxs_Cpfp_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -169,7 +168,6 @@ func TestValidateUserTxs_Cpfp_Success(t *testing.T) {
 
 func TestValidateUserDepositTxs_Legacy_Cpfp_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -200,7 +198,6 @@ func TestValidateUserDepositTxs_Legacy_Cpfp_Success(t *testing.T) {
 
 func TestValidateUserTxs_Direct_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -236,7 +233,6 @@ func TestValidateUserTxs_Direct_Success(t *testing.T) {
 
 func TestValidateUserTxs_DirectFromCpfp_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -269,7 +265,6 @@ func TestValidateUserTxs_DirectFromCpfp_Success(t *testing.T) {
 
 func TestValidateUserTxs_InvalidRefundCpfp_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -298,7 +293,6 @@ func TestValidateUserTxs_InvalidRefundCpfp_Error(t *testing.T) {
 
 func TestValidateUserTxs_InvalidRootTxInput_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	randomScript, err := common.P2TRScriptFromPubKey(keys.GeneratePrivateKey().Public())
@@ -334,7 +328,6 @@ func TestValidateUserTxs_InvalidRootTxInput_Error(t *testing.T) {
 
 func TestValidateUserTxs_CpfpRootTxInvalidSequence_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -364,7 +357,6 @@ func TestValidateUserTxs_CpfpRootTxInvalidSequence_Error(t *testing.T) {
 
 func TestValidateUserTxs_CpfpRootTxTwoOutputs_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -402,7 +394,6 @@ func TestValidateUserTxs_CpfpRootTxTwoOutputs_Error(t *testing.T) {
 
 func TestValidateUserTxs_DirectRootTxInvalidSequence_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -439,7 +430,6 @@ func TestValidateUserTxs_DirectRootTxInvalidSequence_Error(t *testing.T) {
 
 func TestValidateUserTxs_DirectRootTxTwoOutputs_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -484,7 +474,6 @@ func TestValidateUserTxs_DirectRootTxTwoOutputs_Error(t *testing.T) {
 
 func TestValidateUserTxs_CpfpRefundTxFinalSequence_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -515,7 +504,6 @@ func TestValidateUserTxs_CpfpRefundTxFinalSequence_Error(t *testing.T) {
 
 func TestValidateUserTxs_DirectRefundTxFinalSequence_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -553,7 +541,6 @@ func TestValidateUserTxs_DirectRefundTxFinalSequence_Error(t *testing.T) {
 
 func TestValidateUserTxs_DirectFromCpfpRefundTxFinalSequence_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()

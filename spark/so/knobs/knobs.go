@@ -120,9 +120,6 @@ const (
 	KnobGossipLimit              = "spark.so.gossip.limit"
 	KnobResumeSendTransferLimit  = "spark.so.resume_send_transfer.limit"
 
-	// Enable more rigorous checks for finalize signature requests. See SPARK-236
-	KnobEnableStrictFinalizeSignature = "spark.so.enable_strict_finalize_signature"
-
 	KnobEnablePartnerJWT          = "spark.so.enable_partner_jwt"
 	KnobShutdownRenewNode         = "spark.so.shutdown_renew_node"
 	KnobUseConsensusDepositTree   = "spark.so.use_consensus_deposit_tree"

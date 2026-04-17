@@ -21,7 +21,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
-	"github.com/lightsparkdev/spark/so/knobs"
 )
 
 // --- Helpers for constructing minimal valid transactions and DB state ---
@@ -247,18 +246,6 @@ func handlerWithConfig() *BaseTransferHandler {
 	return &BaseTransferHandler{config: &so.Config{}}
 }
 
-func withKnob(ctx context.Context, enabled bool) context.Context {
-	v := 0.0
-	if enabled {
-		v = 1.0
-	}
-	k := knobs.NewFixedKnobs(map[string]float64{
-		// Tests run in regtest
-		knobs.KnobEnableStrictFinalizeSignature + "@REGTEST": v,
-	})
-	return knobs.InjectKnobsService(ctx, k)
-}
-
 func validateAndConstructBitcoinTransactionsForTest(
 	t *testing.T,
 	ctx context.Context,
@@ -300,7 +287,6 @@ func validateAndConstructBitcoinTransactionsForTest(
 // --- Tests ---
 func TestValidateUserTxs_Legacy_Cpfp_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -323,7 +309,6 @@ func TestValidateUserTxs_Legacy_Cpfp_Success(t *testing.T) {
 
 func TestValidateUserTxs_Legacy_WithDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -347,7 +332,6 @@ func TestValidateUserTxs_Legacy_WithDirect_Success(t *testing.T) {
 
 func TestValidateUserTxs_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -370,7 +354,6 @@ func TestValidateUserTxs_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 
 func TestValidateUserTxs_Legacy_MissingDirectFromCpfp_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -393,7 +376,6 @@ func TestValidateUserTxs_Legacy_MissingDirectFromCpfp_Error(t *testing.T) {
 
 func TestValidateUserTxs_Legacy_WithoutDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	// Create a zero node so direct refund tx remains optional.
 	leaf := createDbLeaf(t, ctx, false)
@@ -418,7 +400,6 @@ func TestValidateUserTxs_Legacy_WithoutDirect_Success(t *testing.T) {
 
 func TestValidateUserTxs_Legacy_InvalidDirectRefund_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -442,7 +423,6 @@ func TestValidateUserTxs_Legacy_InvalidDirectRefund_Error(t *testing.T) {
 
 func TestValidateUserTxs_Package_WithDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -469,7 +449,6 @@ func TestValidateUserTxs_Package_WithDirect_Success(t *testing.T) {
 
 func TestValidateUserTxs_Package_WithoutDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -495,7 +474,6 @@ func TestValidateUserTxs_Package_WithoutDirect_Success(t *testing.T) {
 
 func TestValidateUserTxs_Package_InvalidDirectRefund_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -522,7 +500,6 @@ func TestValidateUserTxs_Package_InvalidDirectRefund_Error(t *testing.T) {
 
 func TestValidateUserTxs_Package_MismatchedCounts_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -548,7 +525,6 @@ func TestValidateUserTxs_Package_MismatchedCounts_Error(t *testing.T) {
 
 func TestValidateUserTxs_Package_UnknownLeafIDs_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	refundDest := keys.GeneratePrivateKey().Public()
 	cpfp := &pb.UserSignedTxSigningJob{LeafId: uuid.New().String(), RawTx: []byte{0x00}} // invalid but we won't reach validation
@@ -571,7 +547,6 @@ func TestValidateUserTxs_Package_UnknownLeafIDs_Error(t *testing.T) {
 
 func TestValidateUserTxs_Package_OrphanDirectLeaf_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -600,7 +575,6 @@ func TestValidateUserTxs_Package_OrphanDirectLeaf_Error(t *testing.T) {
 
 func TestValidateUserTxs_Swap_Legacy_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -622,7 +596,6 @@ func TestValidateUserTxs_Swap_Legacy_Success(t *testing.T) {
 
 func TestValidateUserTxs_Swap_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -644,7 +617,6 @@ func TestValidateUserTxs_Swap_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 
 func TestValidateUserTxs_Swap_Package_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -667,7 +639,6 @@ func TestValidateUserTxs_Swap_Package_Success(t *testing.T) {
 
 func TestValidateUserTxs_Swap_Package_UnknownLeafIDs_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	refundDest := keys.GeneratePrivateKey().Public()
 	cpfp := &pb.UserSignedTxSigningJob{LeafId: uuid.New().String(), RawTx: []byte{0x00}}
@@ -688,7 +659,6 @@ func TestValidateUserTxs_Swap_Package_UnknownLeafIDs_Error(t *testing.T) {
 
 func TestValidateUserTxs_Swap_Package_IgnoresExtraDirectLeaves_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -715,7 +685,6 @@ func TestValidateUserTxs_Swap_Package_IgnoresExtraDirectLeaves_Success(t *testin
 
 func TestValidateUserTxs_CoopExit_Legacy_WithDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -740,7 +709,6 @@ func TestValidateUserTxs_CoopExit_Legacy_WithDirect_Success(t *testing.T) {
 
 func TestValidateUserTxs_CoopExit_Legacy_WithoutDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	// Create leaf that could have direct, but we don't provide it (direct is optional)
 	leaf := createDbLeaf(t, ctx, true)
@@ -766,7 +734,6 @@ func TestValidateUserTxs_CoopExit_Legacy_WithoutDirect_Success(t *testing.T) {
 
 func TestValidateUserTxs_CoopExit_Legacy_InvalidDirectRefund_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, true)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -791,7 +758,6 @@ func TestValidateUserTxs_CoopExit_Legacy_InvalidDirectRefund_Error(t *testing.T)
 
 func TestValidateUserTxs_CoopExit_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -815,7 +781,6 @@ func TestValidateUserTxs_CoopExit_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 
 func TestValidateUserTxs_CoopExit_Legacy_MissingDirectFromCpfp_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -839,7 +804,6 @@ func TestValidateUserTxs_CoopExit_Legacy_MissingDirectFromCpfp_Error(t *testing.
 
 func TestValidateUserTxs_CoopExit_Legacy_MissingConnectorInput_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	leaf := createDbLeaf(t, ctx, false)
 	refundDest := keys.GeneratePrivateKey().Public()
@@ -864,7 +828,6 @@ func TestValidateUserTxs_CoopExit_Legacy_MissingConnectorInput_Error(t *testing.
 
 func TestValidateUserTxs_CoopExit_Legacy_ExceedInput_Error(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	// Create leaf with direct tx timelock > 0, which requires direct refund tx
 	leaf := createDbLeaf(t, ctx, true)

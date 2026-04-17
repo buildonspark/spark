@@ -277,66 +277,40 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		leafIDsAny[i] = id
 	}
 
-	var transfer *ent.Transfer
-	if knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobEnableStrictFinalizeSignature, 0) {
-		// Find all ongoing transfers that involves any of these leaves. All these leaves should be
-		// part of a **single** transfer so we expect one result.
-		transfer, err = db.Transfer.Query().
-			Select(enttransfer.FieldID, enttransfer.FieldStatus, enttransfer.FieldReceiverIdentityPubkey).
-			Where(
-				enttransfer.StatusNotIn(st.TransferStatusCompleted, st.TransferStatusExpired, st.TransferStatusReturned),
-				func(s *sql.Selector) {
-					// Check transfer_leafs FK directly, avoiding tree_nodes join
-					s.Where(sql.Exists(
-						sql.Select("transfer_leaf_transfer").
-							From(sql.Table("transfer_leafs")).
-							Where(sql.ColumnsEQ(
-								s.C(enttransfer.FieldID),
-								"transfer_leaf_transfer",
-							)).
-							Where(sql.In("transfer_leaf_leaf", leafIDsAny...)),
-					))
-				},
-			).
-			ForUpdate().
-			Only(ctx)
-		if err != nil || transfer == nil {
-			return nil, fmt.Errorf("failed to find pending transfer for leaves %s: %w", leafIDs, err)
-		}
-		if transfer.Status != st.TransferStatusReceiverRefundSigned {
-			return nil, fmt.Errorf("transfer %s is not in receiver refund signed status", transfer.ID.String())
-		}
+	// Find all ongoing transfers that involves any of these leaves. All these leaves should be
+	// part of a **single** transfer so we expect one result.
+	transfer, err := db.Transfer.Query().
+		Select(enttransfer.FieldID, enttransfer.FieldStatus, enttransfer.FieldReceiverIdentityPubkey).
+		Where(
+			enttransfer.StatusNotIn(st.TransferStatusCompleted, st.TransferStatusExpired, st.TransferStatusReturned),
+			func(s *sql.Selector) {
+				// Check transfer_leafs FK directly, avoiding tree_nodes join
+				s.Where(sql.Exists(
+					sql.Select("transfer_leaf_transfer").
+						From(sql.Table("transfer_leafs")).
+						Where(sql.ColumnsEQ(
+							s.C(enttransfer.FieldID),
+							"transfer_leaf_transfer",
+						)).
+						Where(sql.In("transfer_leaf_leaf", leafIDsAny...)),
+				))
+			},
+		).
+		ForUpdate().
+		Only(ctx)
+	if err != nil || transfer == nil {
+		return nil, fmt.Errorf("failed to find pending transfer for leaves %s: %w", leafIDs, err)
+	}
+	if transfer.Status != st.TransferStatusReceiverRefundSigned {
+		return nil, fmt.Errorf("transfer %s is not in receiver refund signed status", transfer.ID.String())
+	}
 
-		session, err := authn.GetSessionFromContext(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if !transfer.ReceiverIdentityPubkey.Equals(session.IdentityPublicKey()) {
-			return nil, fmt.Errorf("transfer %s is not owned by the authenticated identity public key %x", transfer.ID.String(), session.IdentityPublicKey())
-		}
-	} else {
-		transfer, err = db.Transfer.Query().
-			Select(enttransfer.FieldID).
-			Where(
-				enttransfer.StatusEQ(st.TransferStatusReceiverRefundSigned),
-				func(s *sql.Selector) {
-					// Check transfer_leafs FK directly, avoiding tree_nodes join
-					s.Where(sql.Exists(
-						sql.Select("transfer_leaf_transfer").
-							From(sql.Table("transfer_leafs")).
-							Where(sql.ColumnsEQ(
-								s.C(enttransfer.FieldID),
-								"transfer_leaf_transfer",
-							)).
-							Where(sql.In("transfer_leaf_leaf", leafIDsAny...)),
-					))
-				},
-			).
-			ForUpdate().
-			Only(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find pending transfer for leaves %s: %w", leafIDs, err)
-		}
+	session, err := authn.GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !transfer.ReceiverIdentityPubkey.Equals(session.IdentityPublicKey()) {
+		return nil, fmt.Errorf("transfer %s is not owned by the authenticated identity public key %x", transfer.ID.String(), session.IdentityPublicKey())
 	}
 
 	// Count transfer leaves without loading them
@@ -560,8 +534,6 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	if treeEnt.Status == st.TreeStatusAvailable && tree.TreeNodeCanBecomeAvailable(node) {
 		if len(node.RawRefundTx) == 0 || hasChildren {
 			nodeMutator.SetStatus(st.TreeNodeStatusSplitted)
-		} else if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobEnableStrictFinalizeSignature, 0) {
-			nodeMutator.SetStatus(st.TreeNodeStatusAvailable)
 		} else if (intent == pbcommon.SignatureIntent_CREATION && node.Status == st.TreeNodeStatusCreating) || intent == pbcommon.SignatureIntent_TRANSFER {
 			nodeMutator.SetStatus(st.TreeNodeStatusAvailable)
 		}

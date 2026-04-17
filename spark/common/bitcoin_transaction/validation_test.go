@@ -2,7 +2,6 @@ package bitcointransaction_test
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -17,21 +16,9 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func withKnob(ctx context.Context, enabled bool) context.Context {
-	v := 0.0
-	if enabled {
-		v = 1.0
-	}
-	k := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobEnableStrictFinalizeSignature + "@REGTEST": v,
-	})
-	return knobs.InjectKnobsService(ctx, k)
-}
 
 const (
 	defaultVersion       = 3
@@ -118,7 +105,6 @@ func createClientTx(t *testing.T, prevTxHash chainhash.Hash, sequence uint32, ou
 // Verifies CPFP refund transaction matches expected construction.
 func TestVerifyTransactionWithDatabase_Success_CPFP(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -138,7 +124,6 @@ func TestVerifyTransactionWithDatabase_Success_CPFP(t *testing.T) {
 // Verifies Direct refund transaction matches expected construction.
 func TestVerifyTransactionWithDatabase_Success_Direct(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -157,7 +142,6 @@ func TestVerifyTransactionWithDatabase_Success_Direct(t *testing.T) {
 // Verifies Direct-from-CPFP refund transaction matches expected construction.
 func TestVerifyTransactionWithDatabase_Success_DirectFromCPFP(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -176,7 +160,6 @@ func TestVerifyTransactionWithDatabase_Success_DirectFromCPFP(t *testing.T) {
 // Errors on invalid client transaction bytes.
 func TestVerifyTransactionWithDatabase_Error_InvalidClientTxBytes(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -187,7 +170,6 @@ func TestVerifyTransactionWithDatabase_Error_InvalidClientTxBytes(t *testing.T) 
 // Errors when the client transaction has no inputs.
 func TestVerifyTransactionWithDatabase_Error_ClientTxNoInputs(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -211,7 +193,6 @@ func TestVerifyTransactionWithDatabase_Error_ClientTxNoInputs(t *testing.T) {
 // Errors when client transaction outputs/values don't match expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedTransaction(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -232,7 +213,6 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedTransaction(t *testing.T)
 // Errors when client sequence bit 31 is set.
 func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit31Set(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -253,7 +233,6 @@ func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit31Set(t *testi
 // Errors when client sequence bit 22 is set.
 func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit22Set(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -274,7 +253,6 @@ func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit22Set(t *testi
 // Verifies that a version 2 transaction is not accepted.
 func TestVerifyTransactionWithDatabase_Fail_Version2(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -297,7 +275,6 @@ func TestVerifyTransactionWithDatabase_Fail_Version2(t *testing.T) {
 // Errors when client timelock does not match expected.
 func TestVerifyTransactionWithDatabase_Error_TimelockMismatch(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -318,7 +295,6 @@ func TestVerifyTransactionWithDatabase_Error_TimelockMismatch(t *testing.T) {
 // Errors when DB-stored node transaction data is corrupt.
 func TestVerifyTransactionWithDatabase_Error_CorruptedDBData(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -342,7 +318,6 @@ func TestVerifyTransactionWithDatabase_Error_CorruptedDBData(t *testing.T) {
 // Errors when DB refund timelock is too small to subtract interval.
 func TestVerifyTransactionWithDatabase_Error_InsufficientTimelockInDB(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -370,7 +345,6 @@ func TestVerifyTransactionWithDatabase_Error_InsufficientTimelockInDB(t *testing
 // Errors on unknown refund transaction type.
 func TestVerifyTransactionWithDatabase_Error_UnknownTxType(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -562,7 +536,6 @@ func TestValidateSequence_TimelockMismatchErrorContains(t *testing.T) {
 // Errors when the client tx version does not match expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedVersion(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -586,7 +559,6 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedVersion(t *testing.T) {
 // Errors when the client tx has a different number of inputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_CPFP(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -616,7 +588,6 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_CPFP(t *testing
 // Errors when the client tx has a different number of outputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_CPFP(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -640,7 +611,6 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_CPFP(t *testin
 // Errors when the client tx spends the wrong previous outpoint (TxID/index).
 func TestVerifyTransactionWithDatabase_Error_MismatchedPrevTxID(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -665,7 +635,6 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedPrevTxID(t *testing.T) {
 // Errors when the client tx locktime does not match expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedLocktime(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -691,7 +660,6 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedLocktime(t *testing.T) {
 // Errors when the client tx (Direct) has a different number of inputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_Direct(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -721,7 +689,6 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_Direct(t *testi
 // Errors when the client tx (Direct) has a different number of outputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_Direct(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -747,7 +714,6 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_Direct(t *test
 // Errors when the client tx (DirectFromCPFP) has a different number of inputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_DirectFromCPFP(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -777,7 +743,6 @@ func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_DirectFromCPFP(
 // Errors when the client tx (DirectFromCPFP) has a different number of outputs than expected.
 func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_DirectFromCPFP(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	networkString := dbLeaf.Network.String()
@@ -862,7 +827,6 @@ func TestValidateSequence_MisalignedTimelock_WrongClient(t *testing.T) {
 // Tests full verification with misaligned timelock in database
 func TestVerifyTransactionWithDatabase_MisalignedTimelock(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = withKnob(ctx, true)
 
 	networkString := btcnetwork.Mainnet.String()
 

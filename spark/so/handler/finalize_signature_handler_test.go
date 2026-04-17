@@ -18,6 +18,7 @@ import (
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -1156,6 +1157,7 @@ func TestVerifyAndUpdateTransfer_UpdatesReceiverStatus(t *testing.T) {
 		Intent: pbcommon.SignatureIntent_TRANSFER,
 	}
 
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
 	updatedTransfer, err := handler.verifyAndUpdateTransfer(ctx, req)
 	require.NoError(t, err)
 	require.Equal(t, st.TransferStatusCompleted, updatedTransfer.Status)
@@ -1215,6 +1217,7 @@ func TestVerifyAndUpdateTransfer_SkipsAlreadyCompletedReceiver(t *testing.T) {
 		Intent: pbcommon.SignatureIntent_TRANSFER,
 	}
 
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
 	updatedTransfer, err := handler.verifyAndUpdateTransfer(ctx, req)
 	require.NoError(t, err)
 	require.Equal(t, st.TransferStatusCompleted, updatedTransfer.Status)
@@ -1281,6 +1284,7 @@ func TestVerifyAndUpdateTransfer_ErrorsOnMultipleReceivers(t *testing.T) {
 		Intent: pbcommon.SignatureIntent_TRANSFER,
 	}
 
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub1.Serialize()), time.Now().Add(time.Hour).Unix())
 	_, err = handler.verifyAndUpdateTransfer(ctx, req)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "does not support multi-receiver transfers")

@@ -1028,17 +1028,6 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
 
-// Enable strict finalize signature knob for double claim transfer test
-type TestDoubleClaimTransferKnobProvider struct{}
-
-func (TestDoubleClaimTransferKnobProvider) GetValue(key string, defaultValue float64) float64 {
-	return defaultValue
-}
-
-func (TestDoubleClaimTransferKnobProvider) RolloutRandom(key string, defaultValue float64) bool {
-	return key == knobs.KnobEnableStrictFinalizeSignature
-}
-
 func TestDoubleClaimTransfer(t *testing.T) {
 	// Sender initiates transfer
 	senderConfig := wallet.NewTestWalletConfig(t)
@@ -1068,9 +1057,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
-	receiverCtxTmp := wallet.ContextWithToken(t.Context(), receiverToken)
-
-	receiverCtx := knobs.InjectKnobsService(receiverCtxTmp, knobs.New(TestDoubleClaimTransferKnobProvider{}))
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
