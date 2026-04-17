@@ -7,7 +7,6 @@ import * as btc from "@scure/btc-signer";
 import * as psbt from "@scure/btc-signer/psbt";
 import type { SparkServiceClient } from "../proto/spark.js";
 import {
-  Network as NetworkProto,
   TreeNode,
   TreeNodeStatus,
   treeNodeStatusToJSON,
@@ -18,6 +17,7 @@ import {
   getTxEstimatedVbytesSizeByNumberOfInputsOutputs,
 } from "../utils/bitcoin.js";
 import { isTxBroadcast } from "../utils/mempool.js";
+import { Network, NetworkToProto } from "../utils/network.js";
 
 // Types
 export interface LeafInfo {
@@ -89,7 +89,7 @@ export async function buildUnilateralExitChain(
   node: TreeNode,
   nodeMap: Map<string, TreeNode>,
   sparkClient?: SparkServiceClient,
-  networkProto: NetworkProto = NetworkProto.MAINNET,
+  network: Network = Network.MAINNET,
 ): Promise<TreeNode[]> {
   const chain: TreeNode[] = [];
   let currentNode = node;
@@ -119,7 +119,7 @@ export async function buildUnilateralExitChain(
             },
           },
           includeParents: true,
-          network: networkProto,
+          network: NetworkToProto[network],
         });
 
         for (const returnedNode of Object.values(response.nodes)) {
@@ -183,13 +183,9 @@ export async function constructUnilateralExitFeeBumpPackages(
   nodeHexStrings: string[],
   utxos: Utxo[],
   feeRate: FeeRate,
-  electrsUrl: string,
+  network: Network,
   sparkClient?: SparkServiceClient,
-  networkProto?: NetworkProto,
 ): Promise<FeeBumpTxChain[]> {
-  if (networkProto === undefined || networkProto === NetworkProto.UNSPECIFIED) {
-    networkProto = NetworkProto.MAINNET;
-  }
   const result: FeeBumpTxChain[] = [];
 
   // Sort UTXOs by value in descending order and make a copy we can modify
@@ -267,7 +263,7 @@ export async function constructUnilateralExitFeeBumpPackages(
       node,
       nodeMap,
       sparkClient,
-      networkProto,
+      network,
     );
 
     // Now walk down the chain from root to leaf to build fee bump packages
@@ -284,7 +280,7 @@ export async function constructUnilateralExitFeeBumpPackages(
           continue;
         }
         broadcastTxs.set(txid, true);
-        const isBroadcast = await isTxBroadcast(txid, electrsUrl, networkProto);
+        const isBroadcast = await isTxBroadcast(txid, network);
         if (isBroadcast) {
           // This node has already been broadcast, so we don't need to do so.
           continue;

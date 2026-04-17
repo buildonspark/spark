@@ -5,6 +5,7 @@ import { Transaction } from "@scure/btc-signer";
 import { SparkError } from "../../errors/index.js";
 import { TreeNode } from "../../proto/spark.js";
 import { getTxId } from "../../utils/bitcoin.js";
+import { Network } from "../../utils/network.js";
 import {
   constructUnilateralExitFeeBumpPackages,
   hash160,
@@ -13,8 +14,6 @@ import { signPsbtWithExternalKey } from "../utils/signing.js";
 import { SparkWalletTestingIntegration } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
 import { waitForClaim } from "../utils/utils.js";
-
-const LOCAL_MEMPOOL_URL = "http://mempool.minikube.local/api";
 
 const didTxSucceed = (response: any) => {
   return response.package_msg === "success";
@@ -88,9 +87,8 @@ describe("unilateral exit", () => {
       [hexString],
       utxos,
       { satPerVbyte: 5 },
-      LOCAL_MEMPOOL_URL,
+      Network.LOCAL,
       sparkClient,
-      configService.getNetworkProto(),
     );
 
     const txPackages = constructedTx[0]?.txPackages;
@@ -168,9 +166,8 @@ describe("unilateral exit", () => {
       [hexString],
       utxos,
       { satPerVbyte: 5 },
-      LOCAL_MEMPOOL_URL,
+      Network.LOCAL,
       sparkClient,
-      configService.getNetworkProto(),
     );
 
     const txPackages = constructedTx[0]?.txPackages.slice(0, 1);

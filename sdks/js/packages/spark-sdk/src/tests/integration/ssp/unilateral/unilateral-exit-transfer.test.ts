@@ -5,6 +5,7 @@ import { SparkError } from "../../../../errors/index.js";
 import { TreeNode } from "../../../../proto/spark.js";
 import { SparkWalletEvent } from "../../../../spark-wallet/types.js";
 import { getTxFromRawTxHex, getTxId } from "../../../../utils/bitcoin.js";
+import { Network } from "../../../../utils/network.js";
 import {
   constructUnilateralExitFeeBumpPackages,
   hash160,
@@ -16,8 +17,6 @@ import {
 } from "../../../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../../../utils/test-faucet.js";
 import { retryUntilSuccess } from "../../../utils/utils.js";
-
-const LOCAL_MEMPOOL_URL = "http://mempool.minikube.local/api";
 const DEPOSIT_AMOUNT = 10_000n;
 const TRANSFER_AMOUNT = 1_000;
 const EXTERNAL_FUNDING_AMOUNT = 100_000n;
@@ -157,9 +156,8 @@ const unilateralExitWallet = async (
     [encodedLeaf],
     utxos,
     { satPerVbyte: 5 },
-    LOCAL_MEMPOOL_URL,
+    Network.LOCAL,
     sparkClient,
-    configService.getNetworkProto(),
   );
 
   expect(constructedTx).toHaveLength(1);

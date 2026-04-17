@@ -3153,16 +3153,12 @@ async function runCLI() {
               (wallet as any).config.getCoordinatorAddress(),
             );
 
-            // Get electrs URL from wallet config
-            const electrsUrl = (wallet as any).config.getElectrsUrl();
-
             const feeBumpChains = await constructUnilateralExitFeeBumpPackages(
               nodeHexStrings,
               utxos,
               { satPerVbyte: feeRate },
-              electrsUrl,
+              (wallet as any).config.getNetwork(),
               sparkClient,
-              (wallet as any).config.getNetworkProto(),
             );
 
             console.log(
@@ -3797,9 +3793,8 @@ async function runCLI() {
               hexStrings, // Use all selected leaves
               utxos,
               { satPerVbyte: feeRate },
-              electrsUrl,
+              (wallet as any).config.getNetwork(),
               sparkClient,
-              (wallet as any).config.getNetworkProto(),
             );
 
             // Display results

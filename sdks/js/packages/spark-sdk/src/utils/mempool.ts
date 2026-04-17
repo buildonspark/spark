@@ -2,10 +2,10 @@ import {
   ELECTRS_CREDENTIALS,
   getElectrsUrl,
 } from "../services/wallet-config.js";
+import { BitcoinFaucet } from "../tests/utils/test-faucet.js";
 import { BitcoinNetwork } from "../types/index.js";
-import { Network as NetworkProto } from "../proto/spark.js";
 import { getFetch } from "./fetch.js";
-import { Network, getNetworkFromAddress } from "./network.js";
+import { Network, NetworkType, getNetworkFromAddress } from "./network.js";
 
 /**
  * @deprecated Use `SparkWallet.getUtxosForDepositAddress()` instead.
@@ -55,13 +55,23 @@ export async function getLatestDepositTxId(
 
 export async function isTxBroadcast(
   txid: string,
-  baseUrl: string,
-  networkProto?: NetworkProto,
+  network: Network,
 ): Promise<boolean> {
+  if (network === Network.LOCAL) {
+    try {
+      const localFaucet = BitcoinFaucet.getInstance();
+      await localFaucet.getRawTransaction(txid);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  const baseUrl = getElectrsUrl(Network[network] as NetworkType);
   const { fetch, Headers } = getFetch();
   const headers = new Headers();
 
-  if (networkProto === NetworkProto.REGTEST) {
+  if (network === Network.REGTEST) {
     const auth = btoa(
       `${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`,
     );
