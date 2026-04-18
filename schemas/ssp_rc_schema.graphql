@@ -533,6 +533,9 @@ enum CurrencyUnit {
   """Pakistani Rupee."""
   PKR
 
+  """Argentine Peso."""
+  ARS
+
   """Tether"""
   USDT
 
