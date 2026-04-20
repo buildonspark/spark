@@ -1,5 +1,15 @@
 # @buildonspark/spark-sdk
 
+## 0.7.14
+
+### Patch Changes
+
+- - Merge token events into the unified `SubscribeToEvents` stream; transfer notifications now include `finalizedTokenTransactions` (hash, spark invoices, token identifiers per tx).
+  - Route WASM bindings through the SDK crypto abstraction so randomness works on Node 18 ESM.
+  - Use bitcoind RPC on `Network.LOCAL` instead of electrs. `constructUnilateralExitFeeBumpPackages` now takes a single `network` param.
+  - Align the current timelock to `TIME_LOCK_INTERVAL` in `getNextTransactionSequence` to avoid misaligned sequence values.
+  - Multi-receiver transfers (MIMO) — `StartTransferV3` enables sending to multiple recipients in a single atomic transaction
+
 ## 0.7.13
 
 ### Patch Changes
