@@ -6,7 +6,6 @@ import {
   ConfigOptions,
   WalletConfig,
   SigningOperator,
-  ConsoleOptions,
   OptimizationOptions,
   TokenOptimizationOptions,
 } from "./wallet-config.js";
@@ -113,12 +112,6 @@ export class WalletConfigService implements HasSspClientOptions {
 
   public getSspIdentityPublicKey(): string {
     return this.config.sspClientOptions.identityPublicKey;
-  }
-
-  public getConsoleOptions(): ConsoleOptions {
-    return {
-      ...this.config.console,
-    };
   }
 
   public getLog(): boolean {

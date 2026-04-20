@@ -36,7 +36,6 @@ const BURN_ADDRESS = "02".repeat(33);
 export abstract class IssuerSparkWallet extends SparkWallet {
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
-  protected tracerId = "issuer-sdk";
 
   /**
    * Initializes a new IssuerSparkWallet instance.
@@ -875,10 +874,6 @@ export abstract class IssuerSparkWallet extends SparkWallet {
         });
       }
     }
-  }
-
-  protected getTraceName(methodName: string) {
-    return `IssuerSparkWallet.${methodName}`;
   }
 
   private wrapIssuerPublicMethod<M extends keyof IssuerSparkWallet>(

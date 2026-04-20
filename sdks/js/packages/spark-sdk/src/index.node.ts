@@ -16,7 +16,6 @@ setSparkTokenPrimitivesOnce(new SparkTokenPrimitives());
 
 export * from "./index-shared.js";
 
-export { initializeTracerEnv } from "./otel/initializeTracerEnv.node.js";
 export { type ConnectionManager as BaseConnectionManager } from "./services/connection/connection.js";
 export { ConnectionManagerNodeJS as ConnectionManager } from "./services/connection/connection.node.js";
 export { SparkReadonlyClientNodeJS as SparkReadonlyClient } from "./spark-readonly-client/spark-readonly-client.node.js";

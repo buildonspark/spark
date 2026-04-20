@@ -12,7 +12,6 @@ import {
 } from "nice-grpc-client-middleware-retry";
 import type { ClientMiddleware } from "nice-grpc-common";
 import { Metadata, Status } from "nice-grpc-common";
-import { openTelemetryClientMiddleware } from "nice-grpc-opentelemetry";
 import { getClientEnv } from "../../constants.js";
 import { SparkRequestError } from "../../errors/types.js";
 import { MockServiceClient, MockServiceDefinition } from "../../proto/mock.js";
@@ -129,9 +128,7 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
     let clientFactory = createClientFactory();
     if (withRetries) {
       options = retryOptions;
-      clientFactory = clientFactory
-        .use(openTelemetryClientMiddleware())
-        .use(retryMiddleware);
+      clientFactory = clientFactory.use(retryMiddleware);
     }
     if (middleware) {
       clientFactory = clientFactory.use(middleware);

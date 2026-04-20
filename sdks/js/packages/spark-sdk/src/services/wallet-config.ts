@@ -98,10 +98,6 @@ export type SigningOperator = {
   readonly identityPublicKey: string;
 };
 
-export type ConsoleOptions = {
-  otel?: boolean;
-};
-
 export type OptimizationOptions = {
   readonly auto?: boolean;
   readonly multiplicity?: number;
@@ -127,7 +123,6 @@ export type ConfigOptions = MayHaveSspClientOptions & {
   readonly expectedWithdrawBondSats?: number;
   readonly expectedWithdrawRelativeBlockLocktime?: number;
   readonly signerWithPreExistingKeys?: boolean;
-  readonly console?: ConsoleOptions;
   readonly events?: Partial<SparkWalletEvents>;
   readonly optimizationOptions?: OptimizationOptions;
   readonly tokenOptimizationOptions?: TokenOptimizationOptions;
@@ -181,9 +176,6 @@ const BASE_CONFIG: Required<ConfigOptions> = {
     schemaEndpoint: getSspSchemaEndpoint("LOCAL"),
   },
   signerWithPreExistingKeys: false,
-  console: {
-    otel: false,
-  },
   events: {},
   optimizationOptions: {
     auto: true,

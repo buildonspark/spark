@@ -185,7 +185,6 @@ export interface SparkWalletProps {
 }
 
 export type HandlePublicMethodErrorParams = {
-  traceId?: string;
   wallet?: SparkWallet;
 };
 

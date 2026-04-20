@@ -7,12 +7,6 @@ import {
   numberToVarBytesBE,
 } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
-import { type Tracer } from "@opentelemetry/api";
-import {
-  ConsoleSpanExporter,
-  SimpleSpanProcessor,
-  SpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
@@ -227,8 +221,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   private tokenOptimizationInterval: Interval | null = null;
   private tokenOutputManager: TokenOutputManager;
   protected tokenMetadata: TokenMetadataMap = new Map();
-  protected tracer: Tracer | null = null;
-  protected tracerId = "spark-sdk";
 
   protected abstract buildConnectionManager(
     config: WalletConfigService,
@@ -300,9 +292,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       },
     );
 
-    if (this.getTracer()) {
-      this.initializeTracer(this);
-    }
     this.wrapPublicMethods();
   }
 
@@ -5929,53 +5918,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return this.tokenOptimizationInProgress;
   }
 
-  protected getOtelTraceUrls() {
-    const soConfig = this.config.getSigningOperators();
-    const sspBaseUrl = this.config.getSspBaseUrl();
-    const domains: string[] = [];
-    Object.values(soConfig).forEach((so) => {
-      domains.push(so.address);
-    });
-    if (sspBaseUrl) {
-      domains.push(sspBaseUrl);
-    }
-    return domains;
-  }
-
-  protected initializeTracer(wallet: SparkWallet) {
-    const consoleOptions = wallet.config.getConsoleOptions();
-    const spanProcessors: SpanProcessor[] = [];
-    if (consoleOptions.otel) {
-      spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
-    }
-    const traceUrls = this.getOtelTraceUrls();
-    wallet.initializeTracerEnv({ spanProcessors, traceUrls });
-  }
-
-  protected getTracer(): Tracer | null {
-    return null;
-  }
-
-  protected initializeTracerEnv({
-    spanProcessors,
-    traceUrls,
-  }: {
-    spanProcessors: SpanProcessor[];
-    traceUrls: string[];
-  }) {
-    /* This needs to be implemented differently depending on platform due to
-       incompatible dependencies in both */
-  }
-
   protected static async handlePublicMethodError(
     error: unknown,
-    { wallet, traceId }: HandlePublicMethodErrorParams = {},
+    { wallet }: HandlePublicMethodErrorParams = {},
   ) {
     const context: Record<string, unknown> = {};
-
-    if (typeof traceId === "string" && traceId.length > 0) {
-      context.traceId = traceId;
-    }
 
     if (wallet) {
       try {
@@ -6002,57 +5949,22 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return new SparkError(message, { ...context, error });
   }
 
-  protected getTraceName(methodName: string) {
-    return `SparkWallet.${methodName}`;
-  }
-
   protected static wrapMethod(
     methodName: string,
     originalFn: (...args: unknown[]) => Promise<unknown>,
     wallet: SparkWallet,
   ) {
-    const tracer = wallet.getTracer();
-    let wrapped: (...args: unknown[]) => Promise<unknown>;
-
-    if (tracer) {
-      wrapped = async (...args: unknown[]) => {
-        const activeTracer = wallet.getTracer();
-        if (!activeTracer) {
-          throw new Error("Tracer not initialized");
-        }
-        return activeTracer.startActiveSpan(
-          wallet.getTraceName(methodName),
-          async (span) => {
-            const traceId = span.spanContext().traceId;
-            try {
-              const result = await originalFn.apply(wallet, args);
-              return result;
-            } catch (error) {
-              const err = await SparkWallet.handlePublicMethodError(error, {
-                wallet,
-                traceId,
-              });
-              throw err;
-            } finally {
-              span.end();
-            }
-          },
-        );
-      };
-    } else {
-      wrapped = async (...args: unknown[]) => {
-        try {
-          const result = await originalFn.apply(wallet, args);
-          return result;
-        } catch (error) {
-          const err = await SparkWallet.handlePublicMethodError(error, {
-            wallet,
-          });
-          throw err;
-        }
-      };
-    }
-    return wrapped;
+    return async (...args: unknown[]) => {
+      try {
+        const result = await originalFn.apply(wallet, args);
+        return result;
+      } catch (error) {
+        const err = await SparkWallet.handlePublicMethodError(error, {
+          wallet,
+        });
+        throw err;
+      }
+    };
   }
 
   protected wrapPublicMethod<M extends keyof SparkWallet>(methodName: M) {
