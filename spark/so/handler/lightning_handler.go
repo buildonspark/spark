@@ -1758,31 +1758,11 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		}
 
 		return nil, fmt.Errorf("recovered preimage did not match payment hash: %x and transfer id: %s", req.PaymentHash, transfer.ID)
-	} else if err := h.sendPreimageGossipMessage(ctx, secretBytes, req.PaymentHash); err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage gossip message for payment hash %x", req.PaymentHash)
+	} else if err := h.sendPreimageSwapGossipMessage(ctx, secretBytes, req.PaymentHash, transfer, req.TransferRequest != nil); err != nil {
+		logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage swap gossip for payment hash %x", req.PaymentHash)
 	}
 
 	if req.TransferRequest != nil {
-		transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get transfer leaves for settlement gossip: %w", err)
-		}
-		keyTweakProofMap := make(map[string]*pbspark.SecretProof)
-		for _, leaf := range transferLeaves {
-			keyTweakProto := &pbspark.SendLeafKeyTweak{}
-			if err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto); err != nil {
-				return nil, fmt.Errorf("unable to unmarshal key tweak: %w", err)
-			}
-			keyTweakProofMap[keyTweakProto.LeafId] = &pbspark.SecretProof{
-				Proofs: keyTweakProto.SecretShareTweak.Proofs,
-			}
-		}
-
-		transferHandler := NewTransferHandler(h.config)
-		if err := transferHandler.syncSettleSenderKeyTweaks(ctx, transfer.ID.String(), keyTweakProofMap); err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: failed to send settlement gossip for transfer %s, will be retried", transfer.ID)
-		}
-
 		transfer, err = baseHandler.commitSenderKeyTweaks(ctx, transfer)
 		if err != nil {
 			return nil, fmt.Errorf("unable to commit sender key tweaks for transfer %s: %w", transfer.ID, err)
@@ -1813,7 +1793,31 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	return &pbspark.InitiatePreimageSwapResponse{Preimage: secretBytes, Transfer: transferProto}, nil
 }
 
-func (h *LightningHandler) sendPreimageGossipMessage(ctx context.Context, preimage []byte, paymentHash []byte) error {
+func (h *LightningHandler) sendPreimageSwapGossipMessage(ctx context.Context, preimage []byte, paymentHash []byte, transfer *ent.Transfer, includeKeyTweaks bool) error {
+	gossipMsg := &pbgossip.GossipMessagePreimageSwap{
+		Preimage:    preimage,
+		PaymentHash: paymentHash,
+	}
+
+	if includeKeyTweaks {
+		transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to get transfer leaves for settlement gossip: %w", err)
+		}
+		keyTweakProofMap := make(map[string]*pbspark.SecretProof)
+		for _, leaf := range transferLeaves {
+			keyTweakProto := &pbspark.SendLeafKeyTweak{}
+			if err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto); err != nil {
+				return fmt.Errorf("unable to unmarshal key tweak: %w", err)
+			}
+			keyTweakProofMap[keyTweakProto.LeafId] = &pbspark.SecretProof{
+				Proofs: keyTweakProto.SecretShareTweak.Proofs,
+			}
+		}
+		gossipMsg.TransferId = transfer.ID.String()
+		gossipMsg.SenderKeyTweakProofs = keyTweakProofMap
+	}
+
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	participants, err := selection.OperatorIdentifierList(h.config)
 	if err != nil {
@@ -1821,16 +1825,13 @@ func (h *LightningHandler) sendPreimageGossipMessage(ctx context.Context, preima
 	}
 
 	sendGossipHandler := NewSendGossipHandler(h.config)
-	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
-		Message: &pbgossip.GossipMessage_Preimage{
-			Preimage: &pbgossip.GossipMessagePreimage{
-				Preimage:    preimage,
-				PaymentHash: paymentHash,
-			},
+	_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_PreimageSwap{
+			PreimageSwap: gossipMsg,
 		},
 	}, participants)
 	if err != nil {
-		return fmt.Errorf("unable to create and send gossip message: %w", err)
+		return fmt.Errorf("unable to create and send preimage swap gossip: %w", err)
 	}
 	return nil
 }
