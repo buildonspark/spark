@@ -486,18 +486,11 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
 
-	transferSender, err := db.TransferSender.Create().
-		SetTransferID(transfer.ID).
-		SetIdentityPubkey(senderIdentityPubKey).
-		Save(ctx)
+	transferSender, err := createTransferSender(ctx, db, transfer, senderIdentityPubKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer sender: %w", err)
 	}
-	transferReceiver, err := db.TransferReceiver.Create().
-		SetTransferID(transfer.ID).
-		SetIdentityPubkey(receiverIdentityPubKey).
-		SetStatus(st.TransferReceiverStatusSenderInitiated).
-		Save(ctx)
+	transferReceiver, err := createTransferReceiver(ctx, db, transfer, receiverIdentityPubKey, st.TransferReceiverStatusSenderInitiated)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer receiver: %w", err)
 	}
@@ -667,21 +660,14 @@ func (h *BaseTransferHandler) createTransferV3(
 		return nil, nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
 
-	transferSender, err := db.TransferSender.Create().
-		SetTransferID(transfer.ID).
-		SetIdentityPubkey(senderIdentityPubKey).
-		Save(ctx)
+	transferSender, err := createTransferSender(ctx, db, transfer, senderIdentityPubKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer sender: %w", err)
 	}
 
 	// Create one TransferReceiver per receiver, then create transfer leaves for each group.
 	for _, g := range groupsByReceiver {
-		transferReceiver, err := db.TransferReceiver.Create().
-			SetTransferID(transfer.ID).
-			SetIdentityPubkey(g.receiverPubKey).
-			SetStatus(st.TransferReceiverStatusSenderInitiated).
-			Save(ctx)
+		transferReceiver, err := createTransferReceiver(ctx, db, transfer, g.receiverPubKey, st.TransferReceiverStatusSenderInitiated)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to create transfer receiver: %w", err)
 		}
@@ -977,6 +963,39 @@ func (h *BaseTransferHandler) LeafAvailableToTransfer(ctx context.Context, leaf 
 		return fmt.Errorf("leaf %v is not owned by sender", leaf.ID)
 	}
 	return nil
+}
+
+// createTransferSender creates a TransferSender row whose create_time matches
+// the parent transfer's create_time, so (transfer, sender, receiver) share a
+// single timestamp within the same SO.
+func createTransferSender(
+	ctx context.Context,
+	db *ent.Client,
+	transfer *ent.Transfer,
+	identityPubKey keys.Public,
+) (*ent.TransferSender, error) {
+	return db.TransferSender.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(identityPubKey).
+		SetCreateTime(transfer.CreateTime).
+		Save(ctx)
+}
+
+// createTransferReceiver creates a TransferReceiver row whose create_time
+// matches the parent transfer's create_time. See createTransferSender.
+func createTransferReceiver(
+	ctx context.Context,
+	db *ent.Client,
+	transfer *ent.Transfer,
+	identityPubKey keys.Public,
+	status st.TransferReceiverStatus,
+) (*ent.TransferReceiver, error) {
+	return db.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(identityPubKey).
+		SetStatus(status).
+		SetCreateTime(transfer.CreateTime).
+		Save(ctx)
 }
 
 func createTransferLeaves(
