@@ -4,13 +4,6 @@ Client-side Rust library for constructing [Spark](https://www.spark.info) token 
 
 This crate owns the transaction-building, hashing, and protobuf assembly logic for Spark token operations.
 
-## Installation
-
-```toml
-[dependencies]
-spark-token-primitives = "0.1.0"
-```
-
 ## Overview
 
 Spark tokens are Bitcoin-native assets that transfer off-chain via the Spark Layer 2 protocol. This crate provides the building blocks needed to construct and sign token transactions client-side before submitting them to a Spark Operator cluster.
