@@ -345,8 +345,24 @@ func validateOutputTransactionReassignments(ctx context.Context, m *entgen.Token
 			),
 			tokentransaction.Not(tokentransaction.Or(tokentransaction.HasMint(), tokentransaction.HasCreate())),
 		).
-		WithSpentOutput().
-		WithCreatedOutput().
+		WithSpentOutput(func(q *entgen.TokenOutputQuery) {
+			q.Select(
+				tokenoutput.FieldID,
+				tokenoutput.FieldTokenAmount,
+				tokenoutput.FieldTokenCreateID,
+				tokenoutput.FieldTokenPublicKey,
+				tokenoutput.FieldTokenIdentifier,
+			)
+		}).
+		WithCreatedOutput(func(q *entgen.TokenOutputQuery) {
+			q.Select(
+				tokenoutput.FieldID,
+				tokenoutput.FieldTokenAmount,
+				tokenoutput.FieldTokenCreateID,
+				tokenoutput.FieldTokenPublicKey,
+				tokenoutput.FieldTokenIdentifier,
+			)
+		}).
 		All(ctx)
 	if err != nil {
 		return errors.InternalDatabaseReadError(fmt.Errorf("failed to fetch affected transactions: %w", err))

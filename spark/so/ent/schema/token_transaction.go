@@ -9,9 +9,13 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	entgen "github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/tokencreate"
+	"github.com/lightsparkdev/spark/so/ent/tokenmint"
+	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/entexample"
 	"github.com/lightsparkdev/spark/so/errors"
@@ -144,16 +148,52 @@ func (TokenTransaction) Hooks() []ent.Hook {
 
 				tx, err := tm.Client().TokenTransaction.Query().
 					Where(tokentransaction.ID(txID)).
-					WithSpentOutput().
-					WithCreatedOutput().
-					WithMint().
-					WithCreate().
+					Select(tokentransaction.FieldID, tokentransaction.FieldStatus).
+					WithMint(func(q *entgen.TokenMintQuery) {
+						q.Select(tokenmint.FieldID)
+					}).
+					WithCreate(func(q *entgen.TokenCreateQuery) {
+						q.Select(tokencreate.FieldID)
+					}).
 					Only(ctx)
 				if err != nil {
 					return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to fetch transaction for balance validation: %w", err))
 				}
 
-				if err := ValidateTransferTransactionBalance(tx); err != nil {
+				// Mint/create transactions have their own validation rules.
+				if tx.Edges.Mint != nil || tx.Edges.Create != nil {
+					return result, nil
+				}
+
+				spentOutputs, err := tm.Client().TokenOutput.Query().
+					Where(tokenoutput.HasOutputSpentTokenTransactionWith(tokentransaction.ID(txID))).
+					Select(
+						tokenoutput.FieldID,
+						tokenoutput.FieldTokenAmount,
+						tokenoutput.FieldTokenCreateID,
+						tokenoutput.FieldTokenPublicKey,
+						tokenoutput.FieldTokenIdentifier,
+					).
+					All(ctx)
+				if err != nil {
+					return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to fetch spent outputs for balance validation: %w", err))
+				}
+
+				createdOutputs, err := tm.Client().TokenOutput.Query().
+					Where(tokenoutput.HasOutputCreatedTokenTransactionWith(tokentransaction.ID(txID))).
+					Select(
+						tokenoutput.FieldID,
+						tokenoutput.FieldTokenAmount,
+						tokenoutput.FieldTokenCreateID,
+						tokenoutput.FieldTokenPublicKey,
+						tokenoutput.FieldTokenIdentifier,
+					).
+					All(ctx)
+				if err != nil {
+					return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to fetch created outputs for balance validation: %w", err))
+				}
+
+				if err := validateTransferTransactionBalanceWithOutputs(tx.ID, tx.Status, spentOutputs, createdOutputs); err != nil {
 					return nil, errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("transaction balance validation failed: %w", err))
 				}
 
@@ -170,6 +210,16 @@ func ValidateTransferTransactionBalance(tx *entgen.TokenTransaction) error {
 	if tx.Edges.Mint != nil || tx.Edges.Create != nil {
 		return nil
 	}
+
+	return validateTransferTransactionBalanceWithOutputs(tx.ID, tx.Status, tx.Edges.SpentOutput, tx.Edges.CreatedOutput)
+}
+
+func validateTransferTransactionBalanceWithOutputs(
+	txID uuid.UUID,
+	txStatus st.TokenTransactionStatus,
+	spentOutputs []*entgen.TokenOutput,
+	createdOutputs []*entgen.TokenOutput,
+) error {
 
 	type tokenBalance struct {
 		inputSum          *big.Int
@@ -190,7 +240,7 @@ func ValidateTransferTransactionBalance(tx *entgen.TokenTransaction) error {
 	balances := make(map[string]*tokenBalance)
 
 	// Sum inputs per token type
-	for _, input := range tx.Edges.SpentOutput {
+	for _, input := range spentOutputs {
 		tokenKey := input.TokenCreateID.String()
 
 		if balances[tokenKey] == nil {
@@ -205,7 +255,7 @@ func ValidateTransferTransactionBalance(tx *entgen.TokenTransaction) error {
 	}
 
 	// Sum outputs per token type
-	for _, output := range tx.Edges.CreatedOutput {
+	for _, output := range createdOutputs {
 		tokenKey := output.TokenCreateID.String()
 
 		if balances[tokenKey] == nil {
@@ -223,7 +273,7 @@ func ValidateTransferTransactionBalance(tx *entgen.TokenTransaction) error {
 	for _, balance := range balances {
 		if balance.inputSum.Cmp(balance.outputSum) != 0 {
 			return errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("transaction %s in %s state: token %s inputs (%s) must equal outputs (%s)",
-				tx.ID, tx.Status, balance.displayIdentifier, balance.inputSum.String(), balance.outputSum.String()))
+				txID, txStatus, balance.displayIdentifier, balance.inputSum.String(), balance.outputSum.String()))
 		}
 	}
 

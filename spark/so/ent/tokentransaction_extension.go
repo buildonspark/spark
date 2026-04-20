@@ -902,9 +902,18 @@ func FetchAndLockTokenTransactionOutputsForFinalizeByHash(ctx context.Context, t
 		Where(tokentransaction.FinalizedTokenTransactionHash(tokenTransactionHash)).
 		// Lock outputs which are updated during finalization.
 		WithCreatedOutput(func(q *TokenOutputQuery) {
+			q.Select(
+				tokenoutput.FieldID,
+				tokenoutput.FieldStatus,
+			)
 			q.ForUpdate()
 		}).
 		WithSpentOutput(func(q *TokenOutputQuery) {
+			q.Select(
+				tokenoutput.FieldID,
+				tokenoutput.FieldStatus,
+				tokenoutput.FieldSpentTransactionInputVout,
+			)
 			q.ForUpdate()
 		}).
 		ForUpdate().

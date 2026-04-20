@@ -425,23 +425,26 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 func (h *SignTokenHandler) getOutputsToSpendForExchange(ctx context.Context, tokenTransactionHash []byte) ([]*tokeninternalpb.OutputToSpend, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context for token txHash: %x: %w", tokenTransactionHash, err))
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w for token txHash: %x", err, tokenTransactionHash))
 	}
-	revealedTokenTransaction, err := db.TokenTransaction.Query().
-		Where(tokentransaction.FinalizedTokenTransactionHashEQ(tokenTransactionHash)).
-		WithSpentOutput().
-		Only(ctx)
+	spentOutputs, err := db.TokenOutput.Query().
+		Where(tokenoutput.HasOutputSpentTokenTransactionWith(tokentransaction.FinalizedTokenTransactionHashEQ(tokenTransactionHash))).
+		Select(
+			tokenoutput.FieldID,
+			tokenoutput.FieldCreatedTransactionFinalizedHash,
+			tokenoutput.FieldCreatedTransactionOutputVout,
+			tokenoutput.FieldSpentTransactionInputVout,
+			tokenoutput.FieldSpentOwnershipSignature,
+		).
+		All(ctx)
 	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token transaction not found for hash %x: %w", tokenTransactionHash, err))
-		}
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token transaction after setting status to revealed: %w for token txHash: %x", err, tokenTransactionHash))
 	}
-	outputsToSpend := make([]*tokeninternalpb.OutputToSpend, 0, len(revealedTokenTransaction.Edges.SpentOutput))
-	for _, outputToSpend := range revealedTokenTransaction.Edges.SpentOutput {
-		if outputToSpend == nil {
-			continue
-		}
+	if len(spentOutputs) == 0 {
+		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("no spent outputs found for token txHash: %x", tokenTransactionHash))
+	}
+	outputsToSpend := make([]*tokeninternalpb.OutputToSpend, 0, len(spentOutputs))
+	for _, outputToSpend := range spentOutputs {
 		sigLen := len(outputToSpend.SpentOwnershipSignature)
 		if sigLen < 64 || sigLen > 73 {
 			return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
