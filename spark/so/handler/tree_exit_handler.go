@@ -64,18 +64,19 @@ func (h *treeExitHandler) markTreesExited(ctx context.Context, trees []*ent.Tree
 	// Check for nodes in active/locked statuses before proceeding.
 	// If any node is locked (e.g. TransferLocked), overwriting its status
 	// to Exited would corrupt the in-flight transfer (TOCTOU race).
-	lockedCount, err := db.TreeNode.
+	lockedNodes, err := db.TreeNode.
 		Query().
 		Where(
 			enttreenode.HasTreeWith(enttree.IDIn(treeIDs...)),
 			enttreenode.StatusIn(lockedNodeStatuses...),
 		).
-		Count(ctx)
+		Select(enttreenode.FieldID).
+		All(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to check for locked tree nodes: %w", err)
 	}
-	if lockedCount > 0 {
-		return fmt.Errorf("cannot mark trees as exited: %d node(s) are in a locked status", lockedCount)
+	if len(lockedNodes) > 0 {
+		return fmt.Errorf("cannot mark trees as exited: %d node(s) are in a locked status: %v", len(lockedNodes), lockedNodes)
 	}
 
 	if _, err := db.Tree.
