@@ -1104,7 +1104,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 30 * time.Second,
+			ExecutionInterval: 5 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "repair_transfer_participant_create_time",
 				RunInTestEnv: false,
