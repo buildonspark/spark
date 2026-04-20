@@ -48,7 +48,7 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest, requireDirectTx bool) (resp *pb.CooperativeExitResponse, retErr error) {
 	reqTransferOwnerIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer owner identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse transfer owner identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqTransferOwnerIdentityPubKey); err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 
 	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer receiver identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse transfer receiver identity public key: %w", err))
 	}
 
 	entTx, err := ent.GetTxFromContext(ctx)
@@ -222,7 +222,7 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 
 	reqTransferOwnerIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer owner identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse transfer owner identity public key: %w", err))
 	}
 
 	transferID, err := uuid.Parse(req.Transfer.TransferId)
@@ -243,7 +243,7 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 
 	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer receiver identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse transfer receiver identity public key: %w", err))
 	}
 
 	// Mutual exclusivity
