@@ -135,6 +135,9 @@ type Config struct {
 	GRPC GRPCConfig
 	// CacheURI is an optional URI specifying external cache endpoints (e.g., memcaches://host:11212[,host2:11212])
 	CacheURI string
+	// RisingWaveDSN is a Postgres-compatible connection string for RisingWave.
+	// Passed via --risingwave-database CLI flag. Empty means disabled.
+	RisingWaveDSN string
 }
 
 // DatabaseDriver returns the database driver based on the database path.

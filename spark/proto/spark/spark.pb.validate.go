@@ -24460,3 +24460,447 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = QueryWalletSettingResponseValidationError{}
+
+// Validate checks the field values on QuerySparkTransactionVolumesRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *QuerySparkTransactionVolumesRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QuerySparkTransactionVolumesRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// QuerySparkTransactionVolumesRequestMultiError, or nil if none found.
+func (m *QuerySparkTransactionVolumesRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QuerySparkTransactionVolumesRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetStartDate()) != 10 {
+		err := QuerySparkTransactionVolumesRequestValidationError{
+			field:  "StartDate",
+			reason: "value length must be 10 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+
+	}
+
+	if !_QuerySparkTransactionVolumesRequest_StartDate_Pattern.MatchString(m.GetStartDate()) {
+		err := QuerySparkTransactionVolumesRequestValidationError{
+			field:  "StartDate",
+			reason: "value does not match regex pattern \"^[0-9]{4}-[0-9]{2}-[0-9]{2}$\"",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetEndDate()) != 10 {
+		err := QuerySparkTransactionVolumesRequestValidationError{
+			field:  "EndDate",
+			reason: "value length must be 10 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+
+	}
+
+	if !_QuerySparkTransactionVolumesRequest_EndDate_Pattern.MatchString(m.GetEndDate()) {
+		err := QuerySparkTransactionVolumesRequestValidationError{
+			field:  "EndDate",
+			reason: "value does not match regex pattern \"^[0-9]{4}-[0-9]{2}-[0-9]{2}$\"",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.TransactionType != nil {
+
+		if _, ok := _QuerySparkTransactionVolumesRequest_TransactionType_NotInLookup[m.GetTransactionType()]; ok {
+			err := QuerySparkTransactionVolumesRequestValidationError{
+				field:  "TransactionType",
+				reason: "value must not be in list [SPARK_TRANSACTION_TYPE_UNSPECIFIED]",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if _, ok := SparkTransactionType_name[int32(m.GetTransactionType())]; !ok {
+			err := QuerySparkTransactionVolumesRequestValidationError{
+				field:  "TransactionType",
+				reason: "value must be one of the defined enum values",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return QuerySparkTransactionVolumesRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// QuerySparkTransactionVolumesRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// QuerySparkTransactionVolumesRequest.ValidateAll() if the designated
+// constraints aren't met.
+type QuerySparkTransactionVolumesRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QuerySparkTransactionVolumesRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QuerySparkTransactionVolumesRequestMultiError) AllErrors() []error { return m }
+
+// QuerySparkTransactionVolumesRequestValidationError is the validation error
+// returned by QuerySparkTransactionVolumesRequest.Validate if the designated
+// constraints aren't met.
+type QuerySparkTransactionVolumesRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QuerySparkTransactionVolumesRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QuerySparkTransactionVolumesRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QuerySparkTransactionVolumesRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QuerySparkTransactionVolumesRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QuerySparkTransactionVolumesRequestValidationError) ErrorName() string {
+	return "QuerySparkTransactionVolumesRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QuerySparkTransactionVolumesRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQuerySparkTransactionVolumesRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QuerySparkTransactionVolumesRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QuerySparkTransactionVolumesRequestValidationError{}
+
+var _QuerySparkTransactionVolumesRequest_StartDate_Pattern = regexp.MustCompile("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+
+var _QuerySparkTransactionVolumesRequest_EndDate_Pattern = regexp.MustCompile("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+
+var _QuerySparkTransactionVolumesRequest_TransactionType_NotInLookup = map[SparkTransactionType]struct{}{
+	0: {},
+}
+
+// Validate checks the field values on SparkTransactionVolume with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SparkTransactionVolume) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SparkTransactionVolume with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SparkTransactionVolumeMultiError, or nil if none found.
+func (m *SparkTransactionVolume) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SparkTransactionVolume) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransactionType
+
+	// no validation rules for VolumeSats
+
+	// no validation rules for TransactionCount
+
+	if len(errors) > 0 {
+		return SparkTransactionVolumeMultiError(errors)
+	}
+
+	return nil
+}
+
+// SparkTransactionVolumeMultiError is an error wrapping multiple validation
+// errors returned by SparkTransactionVolume.ValidateAll() if the designated
+// constraints aren't met.
+type SparkTransactionVolumeMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SparkTransactionVolumeMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SparkTransactionVolumeMultiError) AllErrors() []error { return m }
+
+// SparkTransactionVolumeValidationError is the validation error returned by
+// SparkTransactionVolume.Validate if the designated constraints aren't met.
+type SparkTransactionVolumeValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SparkTransactionVolumeValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SparkTransactionVolumeValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SparkTransactionVolumeValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SparkTransactionVolumeValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SparkTransactionVolumeValidationError) ErrorName() string {
+	return "SparkTransactionVolumeValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SparkTransactionVolumeValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSparkTransactionVolume.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SparkTransactionVolumeValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SparkTransactionVolumeValidationError{}
+
+// Validate checks the field values on QuerySparkTransactionVolumesResponse
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *QuerySparkTransactionVolumesResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QuerySparkTransactionVolumesResponse
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// QuerySparkTransactionVolumesResponseMultiError, or nil if none found.
+func (m *QuerySparkTransactionVolumesResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QuerySparkTransactionVolumesResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for PartnerId
+
+	// no validation rules for Label
+
+	// no validation rules for StartDate
+
+	// no validation rules for EndDate
+
+	for idx, item := range m.GetTransactionTypes() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QuerySparkTransactionVolumesResponseValidationError{
+						field:  fmt.Sprintf("TransactionTypes[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QuerySparkTransactionVolumesResponseValidationError{
+						field:  fmt.Sprintf("TransactionTypes[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QuerySparkTransactionVolumesResponseValidationError{
+					field:  fmt.Sprintf("TransactionTypes[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for TotalVolumeSats
+
+	// no validation rules for TotalTransactionCount
+
+	if len(errors) > 0 {
+		return QuerySparkTransactionVolumesResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// QuerySparkTransactionVolumesResponseMultiError is an error wrapping multiple
+// validation errors returned by
+// QuerySparkTransactionVolumesResponse.ValidateAll() if the designated
+// constraints aren't met.
+type QuerySparkTransactionVolumesResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QuerySparkTransactionVolumesResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QuerySparkTransactionVolumesResponseMultiError) AllErrors() []error { return m }
+
+// QuerySparkTransactionVolumesResponseValidationError is the validation error
+// returned by QuerySparkTransactionVolumesResponse.Validate if the designated
+// constraints aren't met.
+type QuerySparkTransactionVolumesResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QuerySparkTransactionVolumesResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QuerySparkTransactionVolumesResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QuerySparkTransactionVolumesResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QuerySparkTransactionVolumesResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QuerySparkTransactionVolumesResponseValidationError) ErrorName() string {
+	return "QuerySparkTransactionVolumesResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QuerySparkTransactionVolumesResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQuerySparkTransactionVolumesResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QuerySparkTransactionVolumesResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QuerySparkTransactionVolumesResponseValidationError{}

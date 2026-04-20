@@ -93,6 +93,8 @@ service SparkService {
 
     rpc update_wallet_setting(UpdateWalletSettingRequest) returns (UpdateWalletSettingResponse) {}
     rpc query_wallet_setting(QueryWalletSettingRequest) returns (QueryWalletSettingResponse) {}
+
+    rpc query_spark_transaction_volumes(QuerySparkTransactionVolumesRequest) returns (QuerySparkTransactionVolumesResponse) {}
 }
 
 message SubscribeToEventsRequest {
@@ -1615,4 +1617,33 @@ message QueryWalletSettingRequest {
 
 message QueryWalletSettingResponse {
     WalletSetting wallet_setting = 1;
+}
+
+enum SparkTransactionType {
+    SPARK_TRANSACTION_TYPE_UNSPECIFIED = 0;
+    SPARK_TRANSACTION_TYPE_TRANSFER = 1;
+    SPARK_TRANSACTION_TYPE_LIGHTNING_SEND = 2;
+    SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE = 3;
+}
+
+message QuerySparkTransactionVolumesRequest {
+    string start_date = 1 [(validate.rules).string = {len: 10, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}];
+    string end_date = 2 [(validate.rules).string = {len: 10, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}];
+    optional SparkTransactionType transaction_type = 3 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
+}
+
+message SparkTransactionVolume {
+    SparkTransactionType transaction_type = 1;
+    int64 volume_sats = 2;
+    int64 transaction_count = 3;
+}
+
+message QuerySparkTransactionVolumesResponse {
+    string partner_id = 1;
+    string label = 2;
+    string start_date = 3;
+    string end_date = 4;
+    repeated SparkTransactionVolume transaction_types = 5;
+    int64 total_volume_sats = 6;
+    int64 total_transaction_count = 7;
 }

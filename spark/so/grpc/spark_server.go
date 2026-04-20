@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/partner"
 	events "github.com/lightsparkdev/spark/so/stream"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -22,13 +23,14 @@ type SparkServer struct {
 	pb.UnimplementedSparkServiceServer
 	config       *so.Config
 	eventsRouter *events.EventRouter
+	rwClient     *partner.RisingWaveClient
 }
 
 var emptyResponse = &emptypb.Empty{}
 
 // NewSparkServer creates a new SparkServer.
-func NewSparkServer(config *so.Config, eventsRouter *events.EventRouter) *SparkServer {
-	return &SparkServer{config: config, eventsRouter: eventsRouter}
+func NewSparkServer(config *so.Config, eventsRouter *events.EventRouter, rwClient *partner.RisingWaveClient) *SparkServer {
+	return &SparkServer{config: config, eventsRouter: eventsRouter, rwClient: rwClient}
 }
 
 // GenerateDepositAddress generates a deposit address for the given public key.
@@ -355,4 +357,9 @@ func (s *SparkServer) UpdateWalletSetting(ctx context.Context, req *pb.UpdateWal
 func (s *SparkServer) QueryWalletSetting(ctx context.Context, req *pb.QueryWalletSettingRequest) (*pb.QueryWalletSettingResponse, error) {
 	walletSettingHandler := handler.NewWalletSettingHandler(s.config)
 	return walletSettingHandler.QueryWalletSetting(ctx, req)
+}
+
+func (s *SparkServer) QuerySparkTransactionVolumes(ctx context.Context, req *pb.QuerySparkTransactionVolumesRequest) (*pb.QuerySparkTransactionVolumesResponse, error) {
+	partnerQueryHandler := handler.NewPartnerQueryHandler(s.rwClient)
+	return partnerQueryHandler.QuerySparkTransactionVolumes(ctx, req)
 }

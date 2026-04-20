@@ -19,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/entephemeral"
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
+	"github.com/lightsparkdev/spark/so/partner"
 	events "github.com/lightsparkdev/spark/so/stream"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -34,7 +35,7 @@ func RegisterGrpcServers(
 	frostClient *grpc.ClientConn,
 	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier,
 	eventsRouter *events.EventRouter,
-) error {
+) (cleanup func(), err error) {
 	if args.RunningLocally {
 		mockServer := sparkgrpc.NewMockServer(config, dbClient, ephemeralDBClient)
 		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
@@ -49,8 +50,16 @@ func RegisterGrpcServers(
 	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config)
 	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
 
+	// Create RisingWave client (connects lazily on first query).
+	rwClient := partner.NewRisingWaveClient(config.RisingWaveDSN)
+	cleanup = func() {
+		if rwClient != nil {
+			_ = rwClient.Close()
+		}
+	}
+
 	// Public SO endpoint
-	sparkServer := sparkgrpc.NewSparkServer(config, eventsRouter)
+	sparkServer := sparkgrpc.NewSparkServer(config, eventsRouter, rwClient)
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
 	// Public SO token endpoint
@@ -72,11 +81,11 @@ func RegisterGrpcServers(
 		SessionDuration:    args.SessionDuration,
 	}, sessionTokenCreatorVerifier)
 	if err != nil {
-		return fmt.Errorf("failed to create authentication server: %w", err)
+		return cleanup, fmt.Errorf("failed to create authentication server: %w", err)
 	}
 	pbauthn.RegisterSparkAuthnServiceServer(grpcServer, authnServer)
 
-	return nil
+	return cleanup, nil
 }
 
 func GetProtectedServices() []string {

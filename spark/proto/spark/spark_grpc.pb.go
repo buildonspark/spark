@@ -60,6 +60,7 @@ const (
 	SparkService_InitiateSwapPrimaryTransfer_FullMethodName         = "/spark.SparkService/initiate_swap_primary_transfer"
 	SparkService_UpdateWalletSetting_FullMethodName                 = "/spark.SparkService/update_wallet_setting"
 	SparkService_QueryWalletSetting_FullMethodName                  = "/spark.SparkService/query_wallet_setting"
+	SparkService_QuerySparkTransactionVolumes_FullMethodName        = "/spark.SparkService/query_spark_transaction_volumes"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -126,6 +127,7 @@ type SparkServiceClient interface {
 	InitiateSwapPrimaryTransfer(ctx context.Context, in *InitiateSwapPrimaryTransferRequest, opts ...grpc.CallOption) (*InitiateSwapPrimaryTransferResponse, error)
 	UpdateWalletSetting(ctx context.Context, in *UpdateWalletSettingRequest, opts ...grpc.CallOption) (*UpdateWalletSettingResponse, error)
 	QueryWalletSetting(ctx context.Context, in *QueryWalletSettingRequest, opts ...grpc.CallOption) (*QueryWalletSettingResponse, error)
+	QuerySparkTransactionVolumes(ctx context.Context, in *QuerySparkTransactionVolumesRequest, opts ...grpc.CallOption) (*QuerySparkTransactionVolumesResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -545,6 +547,16 @@ func (c *sparkServiceClient) QueryWalletSetting(ctx context.Context, in *QueryWa
 	return out, nil
 }
 
+func (c *sparkServiceClient) QuerySparkTransactionVolumes(ctx context.Context, in *QuerySparkTransactionVolumesRequest, opts ...grpc.CallOption) (*QuerySparkTransactionVolumesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuerySparkTransactionVolumesResponse)
+	err := c.cc.Invoke(ctx, SparkService_QuerySparkTransactionVolumes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -609,6 +621,7 @@ type SparkServiceServer interface {
 	InitiateSwapPrimaryTransfer(context.Context, *InitiateSwapPrimaryTransferRequest) (*InitiateSwapPrimaryTransferResponse, error)
 	UpdateWalletSetting(context.Context, *UpdateWalletSettingRequest) (*UpdateWalletSettingResponse, error)
 	QueryWalletSetting(context.Context, *QueryWalletSettingRequest) (*QueryWalletSettingResponse, error)
+	QuerySparkTransactionVolumes(context.Context, *QuerySparkTransactionVolumesRequest) (*QuerySparkTransactionVolumesResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -738,6 +751,9 @@ func (UnimplementedSparkServiceServer) UpdateWalletSetting(context.Context, *Upd
 }
 func (UnimplementedSparkServiceServer) QueryWalletSetting(context.Context, *QueryWalletSettingRequest) (*QueryWalletSettingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryWalletSetting not implemented")
+}
+func (UnimplementedSparkServiceServer) QuerySparkTransactionVolumes(context.Context, *QuerySparkTransactionVolumesRequest) (*QuerySparkTransactionVolumesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method QuerySparkTransactionVolumes not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -1473,6 +1489,24 @@ func _SparkService_QueryWalletSetting_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_QuerySparkTransactionVolumes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySparkTransactionVolumesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).QuerySparkTransactionVolumes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_QuerySparkTransactionVolumes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).QuerySparkTransactionVolumes(ctx, req.(*QuerySparkTransactionVolumesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1635,6 +1669,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "query_wallet_setting",
 			Handler:    _SparkService_QueryWalletSetting_Handler,
+		},
+		{
+			MethodName: "query_spark_transaction_volumes",
+			Handler:    _SparkService_QuerySparkTransactionVolumes_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

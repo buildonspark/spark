@@ -314,6 +314,8 @@ func main() {
 		logger.Fatal("Failed to create config", zap.Error(err))
 	}
 
+	config.RisingWaveDSN = args.RisingWaveDatabasePath
+
 	// OBSERVABILITY
 	promExporter, err := otelprom.New()
 	if err != nil {
@@ -785,7 +787,7 @@ func main() {
 	serverOpts = append(serverOpts, grpc.Creds(creds))
 	grpcServer := grpc.NewServer(serverOpts...)
 
-	err = RegisterGrpcServers(
+	grpcCleanup, err := RegisterGrpcServers(
 		grpcServer,
 		args,
 		config,
@@ -799,6 +801,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to register all gRPC servers", zap.Error(err))
 	}
+	defer grpcCleanup()
 
 	healthServer := sparkgrpc.NewHealthServer(errCtx, dbClient, ephemeralDbClient)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
