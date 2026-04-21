@@ -401,21 +401,7 @@ func init() {
 	// partnerDescPartnerID is the schema descriptor for partner_id field.
 	partnerDescPartnerID := partnerFields[0].Descriptor()
 	// partner.PartnerIDValidator is a validator for the "partner_id" field. It is called by the builders before save.
-	partner.PartnerIDValidator = func() func(string) error {
-		validators := partnerDescPartnerID.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(partner_id string) error {
-			for _, fn := range fns {
-				if err := fn(partner_id); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
+	partner.PartnerIDValidator = partnerDescPartnerID.Validators[0].(func(string) error)
 	// partnerDescLabel is the schema descriptor for label field.
 	partnerDescLabel := partnerFields[1].Descriptor()
 	// partner.LabelValidator is a validator for the "label" field. It is called by the builders before save.
@@ -437,21 +423,7 @@ func init() {
 	// partnerDescPartnerName is the schema descriptor for partner_name field.
 	partnerDescPartnerName := partnerFields[2].Descriptor()
 	// partner.PartnerNameValidator is a validator for the "partner_name" field. It is called by the builders before save.
-	partner.PartnerNameValidator = func() func(string) error {
-		validators := partnerDescPartnerName.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(partner_name string) error {
-			for _, fn := range fns {
-				if err := fn(partner_name); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
+	partner.PartnerNameValidator = partnerDescPartnerName.Validators[0].(func(string) error)
 	// partnerDescID is the schema descriptor for id field.
 	partnerDescID := partnerMixinFields0[0].Descriptor()
 	// partner.DefaultID holds the default value on creation for the id field.

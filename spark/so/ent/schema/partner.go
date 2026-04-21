@@ -25,7 +25,6 @@ func (Partner) Mixin() []ent.Mixin {
 // Indexes are the indexes for the Partner table.
 func (Partner) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("partner_id", "label").Unique(),
 		index.Edges("partner_key").Fields("label").Unique(),
 	}
 }
@@ -34,9 +33,10 @@ func (Partner) Indexes() []ent.Index {
 func (Partner) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("partner_id").
-			NotEmpty().
+			Optional().
+			Nillable().
 			MaxLen(255).
-			Comment("Identifier for the partner, included as the 'iss' claim in their JWT.").
+			Comment("Identifier for the partner. Nullable — migrating to partner_keys table.").
 			Annotations(entexample.Default("partner-a")),
 		field.String("label").
 			NotEmpty().
@@ -44,13 +44,16 @@ func (Partner) Fields() []ent.Field {
 			Comment("Label identifying the partner's client or application, included as the 'sub' claim in their JWT.").
 			Annotations(entexample.Default("client-1")),
 		field.String("partner_name").
-			NotEmpty().
+			Optional().
+			Nillable().
 			MaxLen(255).
-			Comment("Human-readable display name for the partner.").
+			Comment("Human-readable display name. Nullable — migrating to partner_keys table.").
 			Annotations(entexample.Default("Partner A")),
 		field.Bytes("jwt_public_key").
 			GoType(jwt.Public{}).
-			Comment("Compressed public key (34 bytes: 1-byte curve discriminator + 33-byte compressed key) used to verify partner JWTs. Supports both secp256k1 (ES256K) and P-256 (ES256).").
+			Optional().
+			Nillable().
+			Comment("Compressed public key. Nullable — migrating to partner_keys table.").
 			Annotations(entexample.Default("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3")),
 	}
 }
@@ -60,6 +63,7 @@ func (Partner) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("partner_key", PartnerKey.Type).
 			Unique().
-			Comment("The partner key (identity + public key) this label belongs to. Nullable during migration; backfill manually."),
+			Required().
+			Comment("The partner key (identity + public key) this label belongs to."),
 	}
 }

@@ -217,6 +217,16 @@ func PartnerIDHasSuffix(v string) predicate.Partner {
 	return predicate.Partner(sql.FieldHasSuffix(FieldPartnerID, v))
 }
 
+// PartnerIDIsNil applies the IsNil predicate on the "partner_id" field.
+func PartnerIDIsNil() predicate.Partner {
+	return predicate.Partner(sql.FieldIsNull(FieldPartnerID))
+}
+
+// PartnerIDNotNil applies the NotNil predicate on the "partner_id" field.
+func PartnerIDNotNil() predicate.Partner {
+	return predicate.Partner(sql.FieldNotNull(FieldPartnerID))
+}
+
 // PartnerIDEqualFold applies the EqualFold predicate on the "partner_id" field.
 func PartnerIDEqualFold(v string) predicate.Partner {
 	return predicate.Partner(sql.FieldEqualFold(FieldPartnerID, v))
@@ -347,6 +357,16 @@ func PartnerNameHasSuffix(v string) predicate.Partner {
 	return predicate.Partner(sql.FieldHasSuffix(FieldPartnerName, v))
 }
 
+// PartnerNameIsNil applies the IsNil predicate on the "partner_name" field.
+func PartnerNameIsNil() predicate.Partner {
+	return predicate.Partner(sql.FieldIsNull(FieldPartnerName))
+}
+
+// PartnerNameNotNil applies the NotNil predicate on the "partner_name" field.
+func PartnerNameNotNil() predicate.Partner {
+	return predicate.Partner(sql.FieldNotNull(FieldPartnerName))
+}
+
 // PartnerNameEqualFold applies the EqualFold predicate on the "partner_name" field.
 func PartnerNameEqualFold(v string) predicate.Partner {
 	return predicate.Partner(sql.FieldEqualFold(FieldPartnerName, v))
@@ -395,6 +415,16 @@ func JwtPublicKeyLT(v jwt.Public) predicate.Partner {
 // JwtPublicKeyLTE applies the LTE predicate on the "jwt_public_key" field.
 func JwtPublicKeyLTE(v jwt.Public) predicate.Partner {
 	return predicate.Partner(sql.FieldLTE(FieldJwtPublicKey, v))
+}
+
+// JwtPublicKeyIsNil applies the IsNil predicate on the "jwt_public_key" field.
+func JwtPublicKeyIsNil() predicate.Partner {
+	return predicate.Partner(sql.FieldIsNull(FieldJwtPublicKey))
+}
+
+// JwtPublicKeyNotNil applies the NotNil predicate on the "jwt_public_key" field.
+func JwtPublicKeyNotNil() predicate.Partner {
+	return predicate.Partner(sql.FieldNotNull(FieldJwtPublicKey))
 }
 
 // HasPartnerKey applies the HasEdge predicate on the "partner_key" edge.

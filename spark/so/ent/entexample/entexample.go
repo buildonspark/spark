@@ -2038,6 +2038,11 @@ func (pa *PartnerExample) MustExec(ctx context.Context) *ent.Partner {
 	// Handle edges
 	if pa.PartnerKey != nil {
 		create.SetPartnerKey(pa.PartnerKey)
+	} else {
+		// Auto-create required edge
+		pa.t.Helper()
+		pa.PartnerKey = NewPartnerKeyExample(pa.t, pa.client).MustExec(ctx)
+		create.SetPartnerKey(pa.PartnerKey)
 	}
 
 	entity, err := create.Save(ctx)
@@ -2082,6 +2087,14 @@ func (pa *PartnerExample) Exec(ctx context.Context) (*ent.Partner, error) {
 
 	// Handle edges
 	if pa.PartnerKey != nil {
+		create.SetPartnerKey(pa.PartnerKey)
+	} else {
+		// Auto-create required edge
+		var err error
+		pa.PartnerKey, err = NewPartnerKeyExample(pa.t, pa.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create partner_key: %w", err)
+		}
 		create.SetPartnerKey(pa.PartnerKey)
 	}
 

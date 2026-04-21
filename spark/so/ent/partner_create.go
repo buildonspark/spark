@@ -60,6 +60,14 @@ func (pc *PartnerCreate) SetPartnerID(s string) *PartnerCreate {
 	return pc
 }
 
+// SetNillablePartnerID sets the "partner_id" field if the given value is not nil.
+func (pc *PartnerCreate) SetNillablePartnerID(s *string) *PartnerCreate {
+	if s != nil {
+		pc.SetPartnerID(*s)
+	}
+	return pc
+}
+
 // SetLabel sets the "label" field.
 func (pc *PartnerCreate) SetLabel(s string) *PartnerCreate {
 	pc.mutation.SetLabel(s)
@@ -72,9 +80,25 @@ func (pc *PartnerCreate) SetPartnerName(s string) *PartnerCreate {
 	return pc
 }
 
+// SetNillablePartnerName sets the "partner_name" field if the given value is not nil.
+func (pc *PartnerCreate) SetNillablePartnerName(s *string) *PartnerCreate {
+	if s != nil {
+		pc.SetPartnerName(*s)
+	}
+	return pc
+}
+
 // SetJwtPublicKey sets the "jwt_public_key" field.
 func (pc *PartnerCreate) SetJwtPublicKey(j jwt.Public) *PartnerCreate {
 	pc.mutation.SetJwtPublicKey(j)
+	return pc
+}
+
+// SetNillableJwtPublicKey sets the "jwt_public_key" field if the given value is not nil.
+func (pc *PartnerCreate) SetNillableJwtPublicKey(j *jwt.Public) *PartnerCreate {
+	if j != nil {
+		pc.SetJwtPublicKey(*j)
+	}
 	return pc
 }
 
@@ -95,14 +119,6 @@ func (pc *PartnerCreate) SetNillableID(u *uuid.UUID) *PartnerCreate {
 // SetPartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID.
 func (pc *PartnerCreate) SetPartnerKeyID(id uuid.UUID) *PartnerCreate {
 	pc.mutation.SetPartnerKeyID(id)
-	return pc
-}
-
-// SetNillablePartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID if the given value is not nil.
-func (pc *PartnerCreate) SetNillablePartnerKeyID(id *uuid.UUID) *PartnerCreate {
-	if id != nil {
-		pc = pc.SetPartnerKeyID(*id)
-	}
 	return pc
 }
 
@@ -168,9 +184,6 @@ func (pc *PartnerCreate) check() error {
 	if _, ok := pc.mutation.UpdateTime(); !ok {
 		return &ValidationError{Name: "update_time", err: errors.New(`ent: missing required field "Partner.update_time"`)}
 	}
-	if _, ok := pc.mutation.PartnerID(); !ok {
-		return &ValidationError{Name: "partner_id", err: errors.New(`ent: missing required field "Partner.partner_id"`)}
-	}
 	if v, ok := pc.mutation.PartnerID(); ok {
 		if err := partner.PartnerIDValidator(v); err != nil {
 			return &ValidationError{Name: "partner_id", err: fmt.Errorf(`ent: validator failed for field "Partner.partner_id": %w`, err)}
@@ -184,16 +197,13 @@ func (pc *PartnerCreate) check() error {
 			return &ValidationError{Name: "label", err: fmt.Errorf(`ent: validator failed for field "Partner.label": %w`, err)}
 		}
 	}
-	if _, ok := pc.mutation.PartnerName(); !ok {
-		return &ValidationError{Name: "partner_name", err: errors.New(`ent: missing required field "Partner.partner_name"`)}
-	}
 	if v, ok := pc.mutation.PartnerName(); ok {
 		if err := partner.PartnerNameValidator(v); err != nil {
 			return &ValidationError{Name: "partner_name", err: fmt.Errorf(`ent: validator failed for field "Partner.partner_name": %w`, err)}
 		}
 	}
-	if _, ok := pc.mutation.JwtPublicKey(); !ok {
-		return &ValidationError{Name: "jwt_public_key", err: errors.New(`ent: missing required field "Partner.jwt_public_key"`)}
+	if len(pc.mutation.PartnerKeyIDs()) == 0 {
+		return &ValidationError{Name: "partner_key", err: errors.New(`ent: missing required edge "Partner.partner_key"`)}
 	}
 	return nil
 }
@@ -241,7 +251,7 @@ func (pc *PartnerCreate) createSpec() (*Partner, *sqlgraph.CreateSpec) {
 	}
 	if value, ok := pc.mutation.PartnerID(); ok {
 		_spec.SetField(partner.FieldPartnerID, field.TypeString, value)
-		_node.PartnerID = value
+		_node.PartnerID = &value
 	}
 	if value, ok := pc.mutation.Label(); ok {
 		_spec.SetField(partner.FieldLabel, field.TypeString, value)
@@ -249,11 +259,11 @@ func (pc *PartnerCreate) createSpec() (*Partner, *sqlgraph.CreateSpec) {
 	}
 	if value, ok := pc.mutation.PartnerName(); ok {
 		_spec.SetField(partner.FieldPartnerName, field.TypeString, value)
-		_node.PartnerName = value
+		_node.PartnerName = &value
 	}
 	if value, ok := pc.mutation.JwtPublicKey(); ok {
 		_spec.SetField(partner.FieldJwtPublicKey, field.TypeBytes, value)
-		_node.JwtPublicKey = value
+		_node.JwtPublicKey = &value
 	}
 	if nodes := pc.mutation.PartnerKeyIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -348,6 +358,12 @@ func (u *PartnerUpsert) UpdatePartnerID() *PartnerUpsert {
 	return u
 }
 
+// ClearPartnerID clears the value of the "partner_id" field.
+func (u *PartnerUpsert) ClearPartnerID() *PartnerUpsert {
+	u.SetNull(partner.FieldPartnerID)
+	return u
+}
+
 // SetLabel sets the "label" field.
 func (u *PartnerUpsert) SetLabel(v string) *PartnerUpsert {
 	u.Set(partner.FieldLabel, v)
@@ -372,6 +388,12 @@ func (u *PartnerUpsert) UpdatePartnerName() *PartnerUpsert {
 	return u
 }
 
+// ClearPartnerName clears the value of the "partner_name" field.
+func (u *PartnerUpsert) ClearPartnerName() *PartnerUpsert {
+	u.SetNull(partner.FieldPartnerName)
+	return u
+}
+
 // SetJwtPublicKey sets the "jwt_public_key" field.
 func (u *PartnerUpsert) SetJwtPublicKey(v jwt.Public) *PartnerUpsert {
 	u.Set(partner.FieldJwtPublicKey, v)
@@ -381,6 +403,12 @@ func (u *PartnerUpsert) SetJwtPublicKey(v jwt.Public) *PartnerUpsert {
 // UpdateJwtPublicKey sets the "jwt_public_key" field to the value that was provided on create.
 func (u *PartnerUpsert) UpdateJwtPublicKey() *PartnerUpsert {
 	u.SetExcluded(partner.FieldJwtPublicKey)
+	return u
+}
+
+// ClearJwtPublicKey clears the value of the "jwt_public_key" field.
+func (u *PartnerUpsert) ClearJwtPublicKey() *PartnerUpsert {
+	u.SetNull(partner.FieldJwtPublicKey)
 	return u
 }
 
@@ -463,6 +491,13 @@ func (u *PartnerUpsertOne) UpdatePartnerID() *PartnerUpsertOne {
 	})
 }
 
+// ClearPartnerID clears the value of the "partner_id" field.
+func (u *PartnerUpsertOne) ClearPartnerID() *PartnerUpsertOne {
+	return u.Update(func(s *PartnerUpsert) {
+		s.ClearPartnerID()
+	})
+}
+
 // SetLabel sets the "label" field.
 func (u *PartnerUpsertOne) SetLabel(v string) *PartnerUpsertOne {
 	return u.Update(func(s *PartnerUpsert) {
@@ -491,6 +526,13 @@ func (u *PartnerUpsertOne) UpdatePartnerName() *PartnerUpsertOne {
 	})
 }
 
+// ClearPartnerName clears the value of the "partner_name" field.
+func (u *PartnerUpsertOne) ClearPartnerName() *PartnerUpsertOne {
+	return u.Update(func(s *PartnerUpsert) {
+		s.ClearPartnerName()
+	})
+}
+
 // SetJwtPublicKey sets the "jwt_public_key" field.
 func (u *PartnerUpsertOne) SetJwtPublicKey(v jwt.Public) *PartnerUpsertOne {
 	return u.Update(func(s *PartnerUpsert) {
@@ -502,6 +544,13 @@ func (u *PartnerUpsertOne) SetJwtPublicKey(v jwt.Public) *PartnerUpsertOne {
 func (u *PartnerUpsertOne) UpdateJwtPublicKey() *PartnerUpsertOne {
 	return u.Update(func(s *PartnerUpsert) {
 		s.UpdateJwtPublicKey()
+	})
+}
+
+// ClearJwtPublicKey clears the value of the "jwt_public_key" field.
+func (u *PartnerUpsertOne) ClearJwtPublicKey() *PartnerUpsertOne {
+	return u.Update(func(s *PartnerUpsert) {
+		s.ClearJwtPublicKey()
 	})
 }
 
@@ -751,6 +800,13 @@ func (u *PartnerUpsertBulk) UpdatePartnerID() *PartnerUpsertBulk {
 	})
 }
 
+// ClearPartnerID clears the value of the "partner_id" field.
+func (u *PartnerUpsertBulk) ClearPartnerID() *PartnerUpsertBulk {
+	return u.Update(func(s *PartnerUpsert) {
+		s.ClearPartnerID()
+	})
+}
+
 // SetLabel sets the "label" field.
 func (u *PartnerUpsertBulk) SetLabel(v string) *PartnerUpsertBulk {
 	return u.Update(func(s *PartnerUpsert) {
@@ -779,6 +835,13 @@ func (u *PartnerUpsertBulk) UpdatePartnerName() *PartnerUpsertBulk {
 	})
 }
 
+// ClearPartnerName clears the value of the "partner_name" field.
+func (u *PartnerUpsertBulk) ClearPartnerName() *PartnerUpsertBulk {
+	return u.Update(func(s *PartnerUpsert) {
+		s.ClearPartnerName()
+	})
+}
+
 // SetJwtPublicKey sets the "jwt_public_key" field.
 func (u *PartnerUpsertBulk) SetJwtPublicKey(v jwt.Public) *PartnerUpsertBulk {
 	return u.Update(func(s *PartnerUpsert) {
@@ -790,6 +853,13 @@ func (u *PartnerUpsertBulk) SetJwtPublicKey(v jwt.Public) *PartnerUpsertBulk {
 func (u *PartnerUpsertBulk) UpdateJwtPublicKey() *PartnerUpsertBulk {
 	return u.Update(func(s *PartnerUpsert) {
 		s.UpdateJwtPublicKey()
+	})
+}
+
+// ClearJwtPublicKey clears the value of the "jwt_public_key" field.
+func (u *PartnerUpsertBulk) ClearJwtPublicKey() *PartnerUpsertBulk {
+	return u.Update(func(s *PartnerUpsert) {
+		s.ClearJwtPublicKey()
 	})
 }
 

@@ -10000,7 +10000,7 @@ func (m *PartnerMutation) PartnerID() (r string, exists bool) {
 // OldPartnerID returns the old "partner_id" field's value of the Partner entity.
 // If the Partner object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PartnerMutation) OldPartnerID(ctx context.Context) (v string, err error) {
+func (m *PartnerMutation) OldPartnerID(ctx context.Context) (v *string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldPartnerID is only allowed on UpdateOne operations")
 	}
@@ -10014,9 +10014,22 @@ func (m *PartnerMutation) OldPartnerID(ctx context.Context) (v string, err error
 	return oldValue.PartnerID, nil
 }
 
+// ClearPartnerID clears the value of the "partner_id" field.
+func (m *PartnerMutation) ClearPartnerID() {
+	m.partner_id = nil
+	m.clearedFields[partner.FieldPartnerID] = struct{}{}
+}
+
+// PartnerIDCleared returns if the "partner_id" field was cleared in this mutation.
+func (m *PartnerMutation) PartnerIDCleared() bool {
+	_, ok := m.clearedFields[partner.FieldPartnerID]
+	return ok
+}
+
 // ResetPartnerID resets all changes to the "partner_id" field.
 func (m *PartnerMutation) ResetPartnerID() {
 	m.partner_id = nil
+	delete(m.clearedFields, partner.FieldPartnerID)
 }
 
 // SetLabel sets the "label" field.
@@ -10072,7 +10085,7 @@ func (m *PartnerMutation) PartnerName() (r string, exists bool) {
 // OldPartnerName returns the old "partner_name" field's value of the Partner entity.
 // If the Partner object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PartnerMutation) OldPartnerName(ctx context.Context) (v string, err error) {
+func (m *PartnerMutation) OldPartnerName(ctx context.Context) (v *string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldPartnerName is only allowed on UpdateOne operations")
 	}
@@ -10086,9 +10099,22 @@ func (m *PartnerMutation) OldPartnerName(ctx context.Context) (v string, err err
 	return oldValue.PartnerName, nil
 }
 
+// ClearPartnerName clears the value of the "partner_name" field.
+func (m *PartnerMutation) ClearPartnerName() {
+	m.partner_name = nil
+	m.clearedFields[partner.FieldPartnerName] = struct{}{}
+}
+
+// PartnerNameCleared returns if the "partner_name" field was cleared in this mutation.
+func (m *PartnerMutation) PartnerNameCleared() bool {
+	_, ok := m.clearedFields[partner.FieldPartnerName]
+	return ok
+}
+
 // ResetPartnerName resets all changes to the "partner_name" field.
 func (m *PartnerMutation) ResetPartnerName() {
 	m.partner_name = nil
+	delete(m.clearedFields, partner.FieldPartnerName)
 }
 
 // SetJwtPublicKey sets the "jwt_public_key" field.
@@ -10108,7 +10134,7 @@ func (m *PartnerMutation) JwtPublicKey() (r jwt.Public, exists bool) {
 // OldJwtPublicKey returns the old "jwt_public_key" field's value of the Partner entity.
 // If the Partner object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PartnerMutation) OldJwtPublicKey(ctx context.Context) (v jwt.Public, err error) {
+func (m *PartnerMutation) OldJwtPublicKey(ctx context.Context) (v *jwt.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldJwtPublicKey is only allowed on UpdateOne operations")
 	}
@@ -10122,9 +10148,22 @@ func (m *PartnerMutation) OldJwtPublicKey(ctx context.Context) (v jwt.Public, er
 	return oldValue.JwtPublicKey, nil
 }
 
+// ClearJwtPublicKey clears the value of the "jwt_public_key" field.
+func (m *PartnerMutation) ClearJwtPublicKey() {
+	m.jwt_public_key = nil
+	m.clearedFields[partner.FieldJwtPublicKey] = struct{}{}
+}
+
+// JwtPublicKeyCleared returns if the "jwt_public_key" field was cleared in this mutation.
+func (m *PartnerMutation) JwtPublicKeyCleared() bool {
+	_, ok := m.clearedFields[partner.FieldJwtPublicKey]
+	return ok
+}
+
 // ResetJwtPublicKey resets all changes to the "jwt_public_key" field.
 func (m *PartnerMutation) ResetJwtPublicKey() {
 	m.jwt_public_key = nil
+	delete(m.clearedFields, partner.FieldJwtPublicKey)
 }
 
 // SetPartnerKeyID sets the "partner_key" edge to the PartnerKey entity by id.
@@ -10340,7 +10379,17 @@ func (m *PartnerMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *PartnerMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(partner.FieldPartnerID) {
+		fields = append(fields, partner.FieldPartnerID)
+	}
+	if m.FieldCleared(partner.FieldPartnerName) {
+		fields = append(fields, partner.FieldPartnerName)
+	}
+	if m.FieldCleared(partner.FieldJwtPublicKey) {
+		fields = append(fields, partner.FieldJwtPublicKey)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -10353,6 +10402,17 @@ func (m *PartnerMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *PartnerMutation) ClearField(name string) error {
+	switch name {
+	case partner.FieldPartnerID:
+		m.ClearPartnerID()
+		return nil
+	case partner.FieldPartnerName:
+		m.ClearPartnerName()
+		return nil
+	case partner.FieldJwtPublicKey:
+		m.ClearJwtPublicKey()
+		return nil
+	}
 	return fmt.Errorf("unknown Partner nullable field %s", name)
 }
 

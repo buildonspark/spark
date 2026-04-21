@@ -24,14 +24,14 @@ type Partner struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Identifier for the partner, included as the 'iss' claim in their JWT.
-	PartnerID string `json:"partner_id,omitempty"`
+	// Identifier for the partner. Nullable — migrating to partner_keys table.
+	PartnerID *string `json:"partner_id,omitempty"`
 	// Label identifying the partner's client or application, included as the 'sub' claim in their JWT.
 	Label string `json:"label,omitempty"`
-	// Human-readable display name for the partner.
-	PartnerName string `json:"partner_name,omitempty"`
-	// Compressed public key (34 bytes: 1-byte curve discriminator + 33-byte compressed key) used to verify partner JWTs. Supports both secp256k1 (ES256K) and P-256 (ES256).
-	JwtPublicKey jwt.Public `json:"jwt_public_key,omitempty"`
+	// Human-readable display name. Nullable — migrating to partner_keys table.
+	PartnerName *string `json:"partner_name,omitempty"`
+	// Compressed public key. Nullable — migrating to partner_keys table.
+	JwtPublicKey *jwt.Public `json:"jwt_public_key,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PartnerQuery when eager-loading is set.
 	Edges               PartnerEdges `json:"edges"`
@@ -41,7 +41,7 @@ type Partner struct {
 
 // PartnerEdges holds the relations/edges for other nodes in the graph.
 type PartnerEdges struct {
-	// The partner key (identity + public key) this label belongs to. Nullable during migration; backfill manually.
+	// The partner key (identity + public key) this label belongs to.
 	PartnerKey *PartnerKey `json:"partner_key,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
@@ -65,7 +65,7 @@ func (*Partner) scanValues(columns []string) ([]any, error) {
 	for i := range columns {
 		switch columns[i] {
 		case partner.FieldJwtPublicKey:
-			values[i] = new(jwt.Public)
+			values[i] = &sql.NullScanner{S: new(jwt.Public)}
 		case partner.FieldPartnerID, partner.FieldLabel, partner.FieldPartnerName:
 			values[i] = new(sql.NullString)
 		case partner.FieldCreateTime, partner.FieldUpdateTime:
@@ -111,7 +111,8 @@ func (pa *Partner) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field partner_id", values[i])
 			} else if value.Valid {
-				pa.PartnerID = value.String
+				pa.PartnerID = new(string)
+				*pa.PartnerID = value.String
 			}
 		case partner.FieldLabel:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -123,13 +124,15 @@ func (pa *Partner) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field partner_name", values[i])
 			} else if value.Valid {
-				pa.PartnerName = value.String
+				pa.PartnerName = new(string)
+				*pa.PartnerName = value.String
 			}
 		case partner.FieldJwtPublicKey:
-			if value, ok := values[i].(*jwt.Public); !ok {
+			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field jwt_public_key", values[i])
-			} else if value != nil {
-				pa.JwtPublicKey = *value
+			} else if value.Valid {
+				pa.JwtPublicKey = new(jwt.Public)
+				*pa.JwtPublicKey = *value.S.(*jwt.Public)
 			}
 		case partner.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -185,17 +188,23 @@ func (pa *Partner) String() string {
 	builder.WriteString("update_time=")
 	builder.WriteString(pa.UpdateTime.Format(time.ANSIC))
 	builder.WriteString(", ")
-	builder.WriteString("partner_id=")
-	builder.WriteString(pa.PartnerID)
+	if v := pa.PartnerID; v != nil {
+		builder.WriteString("partner_id=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	builder.WriteString("label=")
 	builder.WriteString(pa.Label)
 	builder.WriteString(", ")
-	builder.WriteString("partner_name=")
-	builder.WriteString(pa.PartnerName)
+	if v := pa.PartnerName; v != nil {
+		builder.WriteString("partner_name=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
-	builder.WriteString("jwt_public_key=")
-	builder.WriteString(fmt.Sprintf("%v", pa.JwtPublicKey))
+	if v := pa.JwtPublicKey; v != nil {
+		builder.WriteString("jwt_public_key=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

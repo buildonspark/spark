@@ -398,11 +398,11 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "partner_id", Type: field.TypeString, Size: 255},
+		{Name: "partner_id", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "label", Type: field.TypeString, Size: 255},
-		{Name: "partner_name", Type: field.TypeString, Size: 255},
-		{Name: "jwt_public_key", Type: field.TypeBytes},
-		{Name: "partner_partner_key", Type: field.TypeUUID, Nullable: true},
+		{Name: "partner_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "jwt_public_key", Type: field.TypeBytes, Nullable: true},
+		{Name: "partner_partner_key", Type: field.TypeUUID},
 	}
 	// PartnersTable holds the schema information for the "partners" table.
 	PartnersTable = &schema.Table{
@@ -414,15 +414,10 @@ var (
 				Symbol:     "partners_partner_keys_partner_key",
 				Columns:    []*schema.Column{PartnersColumns[7]},
 				RefColumns: []*schema.Column{PartnerKeysColumns[0]},
-				OnDelete:   schema.SetNull,
+				OnDelete:   schema.NoAction,
 			},
 		},
 		Indexes: []*schema.Index{
-			{
-				Name:    "partner_partner_id_label",
-				Unique:  true,
-				Columns: []*schema.Column{PartnersColumns[3], PartnersColumns[4]},
-			},
 			{
 				Name:    "partner_label_partner_partner_key",
 				Unique:  true,

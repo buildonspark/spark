@@ -52,6 +52,12 @@ func (pu *PartnerUpdate) SetNillablePartnerID(s *string) *PartnerUpdate {
 	return pu
 }
 
+// ClearPartnerID clears the value of the "partner_id" field.
+func (pu *PartnerUpdate) ClearPartnerID() *PartnerUpdate {
+	pu.mutation.ClearPartnerID()
+	return pu
+}
+
 // SetLabel sets the "label" field.
 func (pu *PartnerUpdate) SetLabel(s string) *PartnerUpdate {
 	pu.mutation.SetLabel(s)
@@ -80,6 +86,12 @@ func (pu *PartnerUpdate) SetNillablePartnerName(s *string) *PartnerUpdate {
 	return pu
 }
 
+// ClearPartnerName clears the value of the "partner_name" field.
+func (pu *PartnerUpdate) ClearPartnerName() *PartnerUpdate {
+	pu.mutation.ClearPartnerName()
+	return pu
+}
+
 // SetJwtPublicKey sets the "jwt_public_key" field.
 func (pu *PartnerUpdate) SetJwtPublicKey(j jwt.Public) *PartnerUpdate {
 	pu.mutation.SetJwtPublicKey(j)
@@ -94,17 +106,15 @@ func (pu *PartnerUpdate) SetNillableJwtPublicKey(j *jwt.Public) *PartnerUpdate {
 	return pu
 }
 
-// SetPartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID.
-func (pu *PartnerUpdate) SetPartnerKeyID(id uuid.UUID) *PartnerUpdate {
-	pu.mutation.SetPartnerKeyID(id)
+// ClearJwtPublicKey clears the value of the "jwt_public_key" field.
+func (pu *PartnerUpdate) ClearJwtPublicKey() *PartnerUpdate {
+	pu.mutation.ClearJwtPublicKey()
 	return pu
 }
 
-// SetNillablePartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID if the given value is not nil.
-func (pu *PartnerUpdate) SetNillablePartnerKeyID(id *uuid.UUID) *PartnerUpdate {
-	if id != nil {
-		pu = pu.SetPartnerKeyID(*id)
-	}
+// SetPartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID.
+func (pu *PartnerUpdate) SetPartnerKeyID(id uuid.UUID) *PartnerUpdate {
+	pu.mutation.SetPartnerKeyID(id)
 	return pu
 }
 
@@ -177,6 +187,9 @@ func (pu *PartnerUpdate) check() error {
 			return &ValidationError{Name: "partner_name", err: fmt.Errorf(`ent: validator failed for field "Partner.partner_name": %w`, err)}
 		}
 	}
+	if pu.mutation.PartnerKeyCleared() && len(pu.mutation.PartnerKeyIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "Partner.partner_key"`)
+	}
 	return nil
 }
 
@@ -204,14 +217,23 @@ func (pu *PartnerUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := pu.mutation.PartnerID(); ok {
 		_spec.SetField(partner.FieldPartnerID, field.TypeString, value)
 	}
+	if pu.mutation.PartnerIDCleared() {
+		_spec.ClearField(partner.FieldPartnerID, field.TypeString)
+	}
 	if value, ok := pu.mutation.Label(); ok {
 		_spec.SetField(partner.FieldLabel, field.TypeString, value)
 	}
 	if value, ok := pu.mutation.PartnerName(); ok {
 		_spec.SetField(partner.FieldPartnerName, field.TypeString, value)
 	}
+	if pu.mutation.PartnerNameCleared() {
+		_spec.ClearField(partner.FieldPartnerName, field.TypeString)
+	}
 	if value, ok := pu.mutation.JwtPublicKey(); ok {
 		_spec.SetField(partner.FieldJwtPublicKey, field.TypeBytes, value)
+	}
+	if pu.mutation.JwtPublicKeyCleared() {
+		_spec.ClearField(partner.FieldJwtPublicKey, field.TypeBytes)
 	}
 	if pu.mutation.PartnerKeyCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -284,6 +306,12 @@ func (puo *PartnerUpdateOne) SetNillablePartnerID(s *string) *PartnerUpdateOne {
 	return puo
 }
 
+// ClearPartnerID clears the value of the "partner_id" field.
+func (puo *PartnerUpdateOne) ClearPartnerID() *PartnerUpdateOne {
+	puo.mutation.ClearPartnerID()
+	return puo
+}
+
 // SetLabel sets the "label" field.
 func (puo *PartnerUpdateOne) SetLabel(s string) *PartnerUpdateOne {
 	puo.mutation.SetLabel(s)
@@ -312,6 +340,12 @@ func (puo *PartnerUpdateOne) SetNillablePartnerName(s *string) *PartnerUpdateOne
 	return puo
 }
 
+// ClearPartnerName clears the value of the "partner_name" field.
+func (puo *PartnerUpdateOne) ClearPartnerName() *PartnerUpdateOne {
+	puo.mutation.ClearPartnerName()
+	return puo
+}
+
 // SetJwtPublicKey sets the "jwt_public_key" field.
 func (puo *PartnerUpdateOne) SetJwtPublicKey(j jwt.Public) *PartnerUpdateOne {
 	puo.mutation.SetJwtPublicKey(j)
@@ -326,17 +360,15 @@ func (puo *PartnerUpdateOne) SetNillableJwtPublicKey(j *jwt.Public) *PartnerUpda
 	return puo
 }
 
-// SetPartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID.
-func (puo *PartnerUpdateOne) SetPartnerKeyID(id uuid.UUID) *PartnerUpdateOne {
-	puo.mutation.SetPartnerKeyID(id)
+// ClearJwtPublicKey clears the value of the "jwt_public_key" field.
+func (puo *PartnerUpdateOne) ClearJwtPublicKey() *PartnerUpdateOne {
+	puo.mutation.ClearJwtPublicKey()
 	return puo
 }
 
-// SetNillablePartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID if the given value is not nil.
-func (puo *PartnerUpdateOne) SetNillablePartnerKeyID(id *uuid.UUID) *PartnerUpdateOne {
-	if id != nil {
-		puo = puo.SetPartnerKeyID(*id)
-	}
+// SetPartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID.
+func (puo *PartnerUpdateOne) SetPartnerKeyID(id uuid.UUID) *PartnerUpdateOne {
+	puo.mutation.SetPartnerKeyID(id)
 	return puo
 }
 
@@ -422,6 +454,9 @@ func (puo *PartnerUpdateOne) check() error {
 			return &ValidationError{Name: "partner_name", err: fmt.Errorf(`ent: validator failed for field "Partner.partner_name": %w`, err)}
 		}
 	}
+	if puo.mutation.PartnerKeyCleared() && len(puo.mutation.PartnerKeyIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "Partner.partner_key"`)
+	}
 	return nil
 }
 
@@ -466,14 +501,23 @@ func (puo *PartnerUpdateOne) sqlSave(ctx context.Context) (_node *Partner, err e
 	if value, ok := puo.mutation.PartnerID(); ok {
 		_spec.SetField(partner.FieldPartnerID, field.TypeString, value)
 	}
+	if puo.mutation.PartnerIDCleared() {
+		_spec.ClearField(partner.FieldPartnerID, field.TypeString)
+	}
 	if value, ok := puo.mutation.Label(); ok {
 		_spec.SetField(partner.FieldLabel, field.TypeString, value)
 	}
 	if value, ok := puo.mutation.PartnerName(); ok {
 		_spec.SetField(partner.FieldPartnerName, field.TypeString, value)
 	}
+	if puo.mutation.PartnerNameCleared() {
+		_spec.ClearField(partner.FieldPartnerName, field.TypeString)
+	}
 	if value, ok := puo.mutation.JwtPublicKey(); ok {
 		_spec.SetField(partner.FieldJwtPublicKey, field.TypeBytes, value)
+	}
+	if puo.mutation.JwtPublicKeyCleared() {
+		_spec.ClearField(partner.FieldJwtPublicKey, field.TypeBytes)
 	}
 	if puo.mutation.PartnerKeyCleared() {
 		edge := &sqlgraph.EdgeSpec{
