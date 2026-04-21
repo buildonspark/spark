@@ -2126,7 +2126,9 @@ type ReserveInstantStaticDepositUtxoSwapRequest struct {
 	CreditAmountSats int64 `protobuf:"varint,7,opt,name=credit_amount_sats,json=creditAmountSats,proto3" json:"credit_amount_sats,omitempty"`
 	// secondary credit amount in satoshis.
 	SecondaryCreditAmountSats int64 `protobuf:"varint,8,opt,name=secondary_credit_amount_sats,json=secondaryCreditAmountSats,proto3" json:"secondary_credit_amount_sats,omitempty"`
-	// expiry time of the swap
+	// Deprecated: the SO no longer reads or stores this field. Will be removed once the SSP stops sending it.
+	//
+	// Deprecated: Marked as deprecated in spark_internal.proto.
 	ExpiryTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=expiry_time,json=expiryTime,proto3" json:"expiry_time,omitempty"`
 	// Optional: requested secondary transfer ID for secondary credit amount.
 	RequestedSecondaryTransferId string `protobuf:"bytes,10,opt,name=requested_secondary_transfer_id,json=requestedSecondaryTransferId,proto3" json:"requested_secondary_transfer_id,omitempty"`
@@ -2220,6 +2222,7 @@ func (x *ReserveInstantStaticDepositUtxoSwapRequest) GetSecondaryCreditAmountSat
 	return 0
 }
 
+// Deprecated: Marked as deprecated in spark_internal.proto.
 func (x *ReserveInstantStaticDepositUtxoSwapRequest) GetExpiryTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ExpiryTime
@@ -4348,7 +4351,7 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x1bSettleSenderKeyTweakRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x12<\n" +
-	"\x06action\x18\x02 \x01(\x0e2$.spark_internal.SettleKeyTweakActionR\x06action\"\xa5\x04\n" +
+	"\x06action\x18\x02 \x01(\x0e2$.spark_internal.SettleKeyTweakActionR\x06action\"\xa9\x04\n" +
 	"*ReserveInstantStaticDepositUtxoSwapRequest\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12#\n" +
 	"\rssp_signature\x18\x02 \x01(\fR\fsspSignature\x12%\n" +
@@ -4358,8 +4361,8 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\n" +
 	"value_sats\x18\x06 \x01(\x03R\tvalueSats\x12,\n" +
 	"\x12credit_amount_sats\x18\a \x01(\x03R\x10creditAmountSats\x12?\n" +
-	"\x1csecondary_credit_amount_sats\x18\b \x01(\x03R\x19secondaryCreditAmountSats\x12;\n" +
-	"\vexpiry_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"\x1csecondary_credit_amount_sats\x18\b \x01(\x03R\x19secondaryCreditAmountSats\x12?\n" +
+	"\vexpiry_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x02\x18\x01R\n" +
 	"expiryTime\x12E\n" +
 	"\x1frequested_secondary_transfer_id\x18\n" +
 	" \x01(\tR\x1crequestedSecondaryTransferId\"\xd5\x01\n" +

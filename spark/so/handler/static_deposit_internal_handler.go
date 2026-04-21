@@ -465,10 +465,6 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
 		SetRequestedTransferID(transferID)
 
-	if req.ExpiryTime != nil {
-		utxoSwapCreate = utxoSwapCreate.SetExpiryTime(req.ExpiryTime.AsTime())
-	}
-
 	if req.SecondaryCreditAmountSats > 0 {
 		utxoSwapCreate = utxoSwapCreate.SetSecondaryCreditAmountSats(uint64(req.SecondaryCreditAmountSats))
 	}

@@ -367,8 +367,8 @@ message ReserveInstantStaticDepositUtxoSwapRequest {
     int64 credit_amount_sats = 7;
     // secondary credit amount in satoshis.
     int64 secondary_credit_amount_sats = 8;
-    // expiry time of the swap
-    google.protobuf.Timestamp expiry_time = 9;
+    // Deprecated: the SO no longer reads or stores this field. Will be removed once the SSP stops sending it.
+    google.protobuf.Timestamp expiry_time = 9 [deprecated = true];
     // Optional: requested secondary transfer ID for secondary credit amount.
     string requested_secondary_transfer_id = 10;
 }
