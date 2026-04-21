@@ -24,13 +24,19 @@ type Partner struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Identifier for the partner. Nullable — migrating to partner_keys table.
+	// Deprecated: use partner_key edge.
+	//
+	// Deprecated: Field "partner_id" was marked as deprecated in the schema.
 	PartnerID *string `json:"partner_id,omitempty"`
 	// Label identifying the partner's client or application, included as the 'sub' claim in their JWT.
 	Label string `json:"label,omitempty"`
-	// Human-readable display name. Nullable — migrating to partner_keys table.
+	// Deprecated: use partner_key edge.
+	//
+	// Deprecated: Field "partner_name" was marked as deprecated in the schema.
 	PartnerName *string `json:"partner_name,omitempty"`
-	// Compressed public key. Nullable — migrating to partner_keys table.
+	// Deprecated: use partner_key edge.
+	//
+	// Deprecated: Field "jwt_public_key" was marked as deprecated in the schema.
 	JwtPublicKey *jwt.Public `json:"jwt_public_key,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PartnerQuery when eager-loading is set.

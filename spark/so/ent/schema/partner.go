@@ -36,7 +36,8 @@ func (Partner) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(255).
-			Comment("Identifier for the partner. Nullable — migrating to partner_keys table.").
+			Deprecated().
+			Comment("Deprecated: use partner_key edge.").
 			Annotations(entexample.Default("partner-a")),
 		field.String("label").
 			NotEmpty().
@@ -47,13 +48,15 @@ func (Partner) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(255).
-			Comment("Human-readable display name. Nullable — migrating to partner_keys table.").
+			Deprecated().
+			Comment("Deprecated: use partner_key edge.").
 			Annotations(entexample.Default("Partner A")),
 		field.Bytes("jwt_public_key").
 			GoType(jwt.Public{}).
 			Optional().
 			Nillable().
-			Comment("Compressed public key. Nullable — migrating to partner_keys table.").
+			Deprecated().
+			Comment("Deprecated: use partner_key edge.").
 			Annotations(entexample.Default("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3")),
 	}
 }

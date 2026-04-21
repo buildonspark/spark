@@ -45,10 +45,7 @@ var Columns = []string{
 	FieldID,
 	FieldCreateTime,
 	FieldUpdateTime,
-	FieldPartnerID,
 	FieldLabel,
-	FieldPartnerName,
-	FieldJwtPublicKey,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "partners"
@@ -66,6 +63,11 @@ func ValidColumn(column string) bool {
 	}
 	for i := range ForeignKeys {
 		if column == ForeignKeys[i] {
+			return true
+		}
+	}
+	for _, f := range [...]string{FieldPartnerID, FieldPartnerName, FieldJwtPublicKey} {
+		if column == f {
 			return true
 		}
 	}
