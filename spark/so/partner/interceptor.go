@@ -62,7 +62,7 @@ type partnerKeyResult struct {
 type Interceptor struct {
 	lookupPartnerKey func(ctx context.Context, partnerID string) (*partnerKeyResult, error)
 	lookupPartner    func(ctx context.Context, partnerKeyID uuid.UUID, label string) (uuid.UUID, error)
-	createPartner    func(ctx context.Context, partnerKeyID uuid.UUID, partnerID, label string, pubKey jwtkeys.Public) (uuid.UUID, error)
+	createPartner    func(ctx context.Context, partnerKeyID uuid.UUID, label string) (uuid.UUID, error)
 }
 
 // NewInterceptor creates a new partner JWT Interceptor backed by the database.
@@ -78,7 +78,7 @@ func NewInterceptor(dbClient *ent.Client) *Interceptor {
 func newInterceptorWithLookups(
 	lookupPartnerKey func(ctx context.Context, partnerID string) (*partnerKeyResult, error),
 	lookupPartner func(ctx context.Context, partnerKeyID uuid.UUID, label string) (uuid.UUID, error),
-	createPartner func(ctx context.Context, partnerKeyID uuid.UUID, partnerID, label string, pubKey jwtkeys.Public) (uuid.UUID, error),
+	createPartner func(ctx context.Context, partnerKeyID uuid.UUID, label string) (uuid.UUID, error),
 ) *Interceptor {
 	return &Interceptor{
 		lookupPartnerKey: lookupPartnerKey,
@@ -174,7 +174,7 @@ func (i *Interceptor) verifyPartnerJWT(ctx context.Context, tokenStr string) (*P
 			}, nil
 		}
 		// Label not found — auto-create.
-		partnerDBID, err = i.createPartner(ctx, pkResult.partnerKeyID, partnerID, label, pkResult.pubKey)
+		partnerDBID, err = i.createPartner(ctx, pkResult.partnerKeyID, label)
 		if err == nil {
 			return &PartnerInfo{
 				PartnerDBID: partnerDBID,
@@ -272,20 +272,17 @@ func dbPartnerLookup(dbClient *ent.Client) func(ctx context.Context, partnerKeyI
 
 // dbCreatePartner creates a partners row for the given (partner_key, label).
 // On conflict (row already exists), looks up the existing ID.
-func dbCreatePartner(dbClient *ent.Client) func(ctx context.Context, partnerKeyID uuid.UUID, partnerID, label string, pubKey jwtkeys.Public) (uuid.UUID, error) {
-	return func(ctx context.Context, partnerKeyID uuid.UUID, partnerID, label string, pubKey jwtkeys.Public) (uuid.UUID, error) {
+func dbCreatePartner(dbClient *ent.Client) func(ctx context.Context, partnerKeyID uuid.UUID, label string) (uuid.UUID, error) {
+	return func(ctx context.Context, partnerKeyID uuid.UUID, label string) (uuid.UUID, error) {
 		p, err := dbClient.Partner.Create().
 			SetLabel(label).
 			SetPartnerKeyID(partnerKeyID).
-			SetPartnerID(partnerID).
-			SetPartnerName(partnerID).
-			SetJwtPublicKey(pubKey).
 			Save(ctx)
 		if err == nil {
 			return p.ID, nil
 		}
 		if !ent.IsConstraintError(err) {
-			return uuid.Nil, fmt.Errorf("failed to create partner for %s/%s: %w", partnerID, label, err)
+			return uuid.Nil, fmt.Errorf("failed to create partner for key %s / label %s: %w", partnerKeyID, label, err)
 		}
 		// Already exists — look up the existing ID.
 		existing, lookupErr := dbClient.Partner.Query().
@@ -295,7 +292,7 @@ func dbCreatePartner(dbClient *ent.Client) func(ctx context.Context, partnerKeyI
 			).
 			Only(ctx)
 		if lookupErr != nil {
-			return uuid.Nil, fmt.Errorf("failed to look up existing partner for %s/%s: %w", partnerID, label, lookupErr)
+			return uuid.Nil, fmt.Errorf("failed to look up existing partner for key %s / label %s: %w", partnerKeyID, label, lookupErr)
 		}
 		return existing.ID, nil
 	}

@@ -98,10 +98,7 @@ func createTestPartner(t *testing.T, ctx context.Context, client *ent.Client, pa
 		Save(ctx)
 	require.NoError(t, err)
 	p, err := client.Partner.Create().
-		SetPartnerID(partnerID).
 		SetLabel(label).
-		SetPartnerName("Test Partner").
-		SetJwtPublicKey(pubKey).
 		SetPartnerKeyID(pk.ID).
 		Save(ctx)
 	require.NoError(t, err)

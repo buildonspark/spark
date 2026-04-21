@@ -155,7 +155,7 @@ func mockPartnerLookup(entries map[string]uuid.UUID) func(ctx context.Context, p
 }
 
 // noopCreatePartner is a createPartner that always fails (no auto-create).
-func noopCreatePartner(_ context.Context, _ uuid.UUID, _, _ string, _ jwtkeys.Public) (uuid.UUID, error) {
+func noopCreatePartner(_ context.Context, _ uuid.UUID, _ string) (uuid.UUID, error) {
 	return uuid.Nil, fmt.Errorf("auto-create not configured")
 }
 
@@ -626,9 +626,8 @@ func TestPartnerJWTInterceptor_AutoCreateOnNewLabel(t *testing.T) {
 			partnerID: {pubKey: pub, partnerKeyID: pkID},
 		}),
 		lookupPartner: mockPartnerLookup(map[string]uuid.UUID{}), // empty — label not found
-		createPartner: func(_ context.Context, partnerKeyID uuid.UUID, pid, label string, _ jwtkeys.Public) (uuid.UUID, error) {
+		createPartner: func(_ context.Context, partnerKeyID uuid.UUID, label string) (uuid.UUID, error) {
 			assert.Equal(t, pkID, partnerKeyID)
-			assert.Equal(t, partnerID, pid)
 			assert.Equal(t, "new-label", label)
 			return createdDBID, nil
 		},
@@ -660,7 +659,7 @@ func TestPartnerJWTInterceptor_AutoCreateFails_StillReturnsInfo(t *testing.T) {
 			partnerID: {pubKey: pub, partnerKeyID: pkID},
 		}),
 		lookupPartner: mockPartnerLookup(map[string]uuid.UUID{}), // empty — label not found
-		createPartner: func(_ context.Context, _ uuid.UUID, _, _ string, _ jwtkeys.Public) (uuid.UUID, error) {
+		createPartner: func(_ context.Context, _ uuid.UUID, _ string) (uuid.UUID, error) {
 			return uuid.Nil, fmt.Errorf("db error")
 		},
 	}
@@ -696,12 +695,12 @@ func TestDbCreatePartner_Idempotent(t *testing.T) {
 	create := dbCreatePartner(client)
 
 	// First create — should succeed.
-	id1, err := create(t.Context(), pk.ID, "test-partner", "label-1", pubKey)
+	id1, err := create(t.Context(), pk.ID, "label-1")
 	require.NoError(t, err)
 	assert.NotEqual(t, uuid.Nil, id1)
 
 	// Second create with same (partner_key, label) — should return same ID.
-	id2, err := create(t.Context(), pk.ID, "test-partner", "label-1", pubKey)
+	id2, err := create(t.Context(), pk.ID, "label-1")
 	require.NoError(t, err)
 	assert.Equal(t, id1, id2, "second create should return the same partner ID")
 }

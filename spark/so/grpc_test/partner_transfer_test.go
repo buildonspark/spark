@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent/partner"
+	"github.com/lightsparkdev/spark/so/ent/partnerkey"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
@@ -85,10 +86,7 @@ func testTransferWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signToke
 		Save(t.Context())
 	require.NoError(t, err, "failed to create partner key on coordinator")
 	_, err = coordSetupClient.Partner.Create().
-		SetPartnerID(testPartnerID).
 		SetLabel(testLabel).
-		SetPartnerName("Integration Test Partner").
-		SetJwtPublicKey(jwtPubKey).
 		SetPartnerKeyID(pk.ID).
 		Save(t.Context())
 	require.NoError(t, err, "failed to create partner on coordinator")
@@ -132,7 +130,7 @@ func testTransferWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signToke
 		Where(
 			transferpartner.HasTransferWith(enttransfer.IDEQ(transferID)),
 			transferpartner.HasPartnerWith(
-				partner.PartnerID(testPartnerID),
+				partner.HasPartnerKeyWith(partnerkey.PartnerIDEQ(testPartnerID)),
 				partner.LabelEQ(testLabel),
 			),
 		).
@@ -199,10 +197,7 @@ func testHodlReceiveWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signT
 		Save(t.Context())
 	require.NoError(t, err, "failed to create partner key on coordinator")
 	_, err = coordSetupClient.Partner.Create().
-		SetPartnerID(testPartnerID).
 		SetLabel(testLabel).
-		SetPartnerName("Integration Test Partner").
-		SetJwtPublicKey(jwtPubKey).
 		SetPartnerKeyID(pk.ID).
 		Save(t.Context())
 	require.NoError(t, err, "failed to create partner on coordinator")
@@ -258,7 +253,7 @@ func testHodlReceiveWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signT
 		Where(
 			transferpartner.HasTransferWith(enttransfer.IDEQ(transferID)),
 			transferpartner.HasPartnerWith(
-				partner.PartnerID(testPartnerID),
+				partner.HasPartnerKeyWith(partnerkey.PartnerIDEQ(testPartnerID)),
 				partner.LabelEQ(testLabel),
 			),
 		).
@@ -308,10 +303,7 @@ func testLightningSendWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, sig
 		Save(t.Context())
 	require.NoError(t, err, "failed to create partner key on coordinator")
 	_, err = coordSetupClient.Partner.Create().
-		SetPartnerID(testPartnerID).
 		SetLabel(testLabel).
-		SetPartnerName("Integration Test Partner").
-		SetJwtPublicKey(jwtPubKey).
 		SetPartnerKeyID(pk.ID).
 		Save(t.Context())
 	require.NoError(t, err, "failed to create partner on coordinator")
@@ -362,7 +354,7 @@ func testLightningSendWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, sig
 		Where(
 			transferpartner.HasTransferWith(enttransfer.IDEQ(transferID)),
 			transferpartner.HasPartnerWith(
-				partner.PartnerID(testPartnerID),
+				partner.HasPartnerKeyWith(partnerkey.PartnerIDEQ(testPartnerID)),
 				partner.LabelEQ(testLabel),
 			),
 		).
@@ -405,10 +397,7 @@ func TestNonHodlReceiveWithPartnerAttribution(t *testing.T) {
 		Save(t.Context())
 	require.NoError(t, err)
 	_, err = coordSetupClient.Partner.Create().
-		SetPartnerID(testPartnerID).
 		SetLabel(testLabel).
-		SetPartnerName("Integration Test Partner").
-		SetJwtPublicKey(jwtPubKey).
 		SetPartnerKeyID(pk.ID).
 		Save(t.Context())
 	require.NoError(t, err)
@@ -524,7 +513,7 @@ func TestNonHodlReceiveWithPartnerAttribution(t *testing.T) {
 		Where(
 			transferpartner.HasTransferWith(enttransfer.IDEQ(transferID)),
 			transferpartner.HasPartnerWith(
-				partner.PartnerID(testPartnerID),
+				partner.HasPartnerKeyWith(partnerkey.PartnerIDEQ(testPartnerID)),
 				partner.LabelEQ(testLabel),
 			),
 		).
