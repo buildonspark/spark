@@ -402,19 +402,48 @@ var (
 		{Name: "label", Type: field.TypeString, Size: 255},
 		{Name: "partner_name", Type: field.TypeString, Size: 255},
 		{Name: "jwt_public_key", Type: field.TypeBytes},
+		{Name: "partner_partner_key", Type: field.TypeUUID, Nullable: true},
 	}
 	// PartnersTable holds the schema information for the "partners" table.
 	PartnersTable = &schema.Table{
 		Name:       "partners",
 		Columns:    PartnersColumns,
 		PrimaryKey: []*schema.Column{PartnersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "partners_partner_keys_partner_key",
+				Columns:    []*schema.Column{PartnersColumns[7]},
+				RefColumns: []*schema.Column{PartnerKeysColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "partner_partner_id_label",
 				Unique:  true,
 				Columns: []*schema.Column{PartnersColumns[3], PartnersColumns[4]},
 			},
+			{
+				Name:    "partner_label_partner_partner_key",
+				Unique:  true,
+				Columns: []*schema.Column{PartnersColumns[4], PartnersColumns[7]},
+			},
 		},
+	}
+	// PartnerKeysColumns holds the columns for the "partner_keys" table.
+	PartnerKeysColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "partner_id", Type: field.TypeString, Unique: true, Size: 255},
+		{Name: "partner_name", Type: field.TypeString, Size: 255},
+		{Name: "jwt_public_key", Type: field.TypeBytes, Unique: true},
+	}
+	// PartnerKeysTable holds the schema information for the "partner_keys" table.
+	PartnerKeysTable = &schema.Table{
+		Name:       "partner_keys",
+		Columns:    PartnerKeysColumns,
+		PrimaryKey: []*schema.Column{PartnerKeysColumns[0]},
 	}
 	// PaymentIntentsColumns holds the columns for the "payment_intents" table.
 	PaymentIntentsColumns = []*schema.Column{
@@ -1918,6 +1947,7 @@ var (
 		MultisigConfigsTable,
 		MultisigMembersTable,
 		PartnersTable,
+		PartnerKeysTable,
 		PaymentIntentsTable,
 		PendingSendTransfersTable,
 		PreimageRequestsTable,
@@ -1960,6 +1990,7 @@ func init() {
 	L1tokenOutputWithdrawalsTable.ForeignKeys[1].RefTable = TokenOutputsTable
 	L1withdrawalTransactionsTable.ForeignKeys[0].RefTable = EntityDkgKeysTable
 	MultisigMembersTable.ForeignKeys[0].RefTable = MultisigConfigsTable
+	PartnersTable.ForeignKeys[0].RefTable = PartnerKeysTable
 	PreimageRequestsTable.ForeignKeys[0].RefTable = TransfersTable
 	PreimageSharesTable.ForeignKeys[0].RefTable = PreimageRequestsTable
 	PreimageSharePartnersTable.ForeignKeys[0].RefTable = PartnersTable

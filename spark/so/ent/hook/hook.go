@@ -177,6 +177,18 @@ func (f PartnerFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, err
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PartnerMutation", m)
 }
 
+// The PartnerKeyFunc type is an adapter to allow the use of ordinary
+// function as PartnerKey mutator.
+type PartnerKeyFunc func(context.Context, *ent.PartnerKeyMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PartnerKeyFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PartnerKeyMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PartnerKeyMutation", m)
+}
+
 // The PaymentIntentFunc type is an adapter to allow the use of ordinary
 // function as PaymentIntent mutator.
 type PaymentIntentFunc func(context.Context, *ent.PaymentIntentMutation) (ent.Value, error)

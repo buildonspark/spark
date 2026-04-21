@@ -48,6 +48,9 @@ type MultisigMember func(*sql.Selector)
 // Partner is the predicate function for partner builders.
 type Partner func(*sql.Selector)
 
+// PartnerKey is the predicate function for partnerkey builders.
+type PartnerKey func(*sql.Selector)
+
 // PaymentIntent is the predicate function for paymentintent builders.
 type PaymentIntent func(*sql.Selector)
 

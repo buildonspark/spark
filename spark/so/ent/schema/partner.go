@@ -2,13 +2,15 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/entexample"
 )
 
-// Partner holds the partner_id and its corresponding public key used to verify partner JWTs.
+// Partner represents a (partner_key, label) combination for partner attribution.
+// The partner identity (partner_id, name, public key) lives in PartnerKey.
 type Partner struct {
 	ent.Schema
 }
@@ -24,6 +26,7 @@ func (Partner) Mixin() []ent.Mixin {
 func (Partner) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("partner_id", "label").Unique(),
+		index.Edges("partner_key").Fields("label").Unique(),
 	}
 }
 
@@ -49,5 +52,14 @@ func (Partner) Fields() []ent.Field {
 			GoType(jwt.Public{}).
 			Comment("Compressed public key (34 bytes: 1-byte curve discriminator + 33-byte compressed key) used to verify partner JWTs. Supports both secp256k1 (ES256K) and P-256 (ES256).").
 			Annotations(entexample.Default("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3")),
+	}
+}
+
+// Edges are the edges for the Partner table.
+func (Partner) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.To("partner_key", PartnerKey.Type).
+			Unique().
+			Comment("The partner key (identity + public key) this label belongs to. Nullable during migration; backfill manually."),
 	}
 }

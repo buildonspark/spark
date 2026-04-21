@@ -26,6 +26,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/partner"
+	"github.com/lightsparkdev/spark/so/ent/partnerkey"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -127,6 +128,7 @@ func checkColumn(table, column string) error {
 			multisigconfig.Table:                    multisigconfig.ValidColumn,
 			multisigmember.Table:                    multisigmember.ValidColumn,
 			partner.Table:                           partner.ValidColumn,
+			partnerkey.Table:                        partnerkey.ValidColumn,
 			paymentintent.Table:                     paymentintent.ValidColumn,
 			pendingsendtransfer.Table:               pendingsendtransfer.ValidColumn,
 			preimagerequest.Table:                   preimagerequest.ValidColumn,

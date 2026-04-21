@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -394,6 +395,29 @@ func JwtPublicKeyLT(v jwt.Public) predicate.Partner {
 // JwtPublicKeyLTE applies the LTE predicate on the "jwt_public_key" field.
 func JwtPublicKeyLTE(v jwt.Public) predicate.Partner {
 	return predicate.Partner(sql.FieldLTE(FieldJwtPublicKey, v))
+}
+
+// HasPartnerKey applies the HasEdge predicate on the "partner_key" edge.
+func HasPartnerKey() predicate.Partner {
+	return predicate.Partner(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, PartnerKeyTable, PartnerKeyColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPartnerKeyWith applies the HasEdge predicate on the "partner_key" edge with a given conditions (other predicates).
+func HasPartnerKeyWith(preds ...predicate.PartnerKey) predicate.Partner {
+	return predicate.Partner(func(s *sql.Selector) {
+		step := newPartnerKeyStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

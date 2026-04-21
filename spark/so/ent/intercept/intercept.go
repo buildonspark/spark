@@ -22,6 +22,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/partner"
+	"github.com/lightsparkdev/spark/so/ent/partnerkey"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -484,6 +485,33 @@ func (f TraversePartner) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.PartnerQuery", q)
+}
+
+// The PartnerKeyFunc type is an adapter to allow the use of ordinary function as a Querier.
+type PartnerKeyFunc func(context.Context, *ent.PartnerKeyQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f PartnerKeyFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.PartnerKeyQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.PartnerKeyQuery", q)
+}
+
+// The TraversePartnerKey type is an adapter to allow the use of ordinary function as Traverser.
+type TraversePartnerKey func(context.Context, *ent.PartnerKeyQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraversePartnerKey) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraversePartnerKey) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PartnerKeyQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.PartnerKeyQuery", q)
 }
 
 // The PaymentIntentFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1246,6 +1274,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.MultisigMemberQuery, predicate.MultisigMember, multisigmember.OrderOption]{typ: ent.TypeMultisigMember, tq: q}, nil
 	case *ent.PartnerQuery:
 		return &query[*ent.PartnerQuery, predicate.Partner, partner.OrderOption]{typ: ent.TypePartner, tq: q}, nil
+	case *ent.PartnerKeyQuery:
+		return &query[*ent.PartnerKeyQuery, predicate.PartnerKey, partnerkey.OrderOption]{typ: ent.TypePartnerKey, tq: q}, nil
 	case *ent.PaymentIntentQuery:
 		return &query[*ent.PaymentIntentQuery, predicate.PaymentIntent, paymentintent.OrderOption]{typ: ent.TypePaymentIntent, tq: q}, nil
 	case *ent.PendingSendTransferQuery:

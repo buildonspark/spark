@@ -14,17 +14,20 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/partner"
+	"github.com/lightsparkdev/spark/so/ent/partnerkey"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
 
 // PartnerQuery is the builder for querying Partner entities.
 type PartnerQuery struct {
 	config
-	ctx        *QueryContext
-	order      []partner.OrderOption
-	inters     []Interceptor
-	predicates []predicate.Partner
-	modifiers  []func(*sql.Selector)
+	ctx            *QueryContext
+	order          []partner.OrderOption
+	inters         []Interceptor
+	predicates     []predicate.Partner
+	withPartnerKey *PartnerKeyQuery
+	withFKs        bool
+	modifiers      []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -59,6 +62,28 @@ func (pq *PartnerQuery) Unique(unique bool) *PartnerQuery {
 func (pq *PartnerQuery) Order(o ...partner.OrderOption) *PartnerQuery {
 	pq.order = append(pq.order, o...)
 	return pq
+}
+
+// QueryPartnerKey chains the current query on the "partner_key" edge.
+func (pq *PartnerQuery) QueryPartnerKey() *PartnerKeyQuery {
+	query := (&PartnerKeyClient{config: pq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := pq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := pq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(partner.Table, partner.FieldID, selector),
+			sqlgraph.To(partnerkey.Table, partnerkey.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, partner.PartnerKeyTable, partner.PartnerKeyColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(pq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first Partner entity from the query.
@@ -248,16 +273,28 @@ func (pq *PartnerQuery) Clone() *PartnerQuery {
 		return nil
 	}
 	return &PartnerQuery{
-		config:     pq.config,
-		ctx:        pq.ctx.Clone(),
-		order:      append([]partner.OrderOption{}, pq.order...),
-		inters:     append([]Interceptor{}, pq.inters...),
-		predicates: append([]predicate.Partner{}, pq.predicates...),
+		config:         pq.config,
+		ctx:            pq.ctx.Clone(),
+		order:          append([]partner.OrderOption{}, pq.order...),
+		inters:         append([]Interceptor{}, pq.inters...),
+		predicates:     append([]predicate.Partner{}, pq.predicates...),
+		withPartnerKey: pq.withPartnerKey.Clone(),
 		// clone intermediate query.
 		sql:       pq.sql.Clone(),
 		path:      pq.path,
 		modifiers: append([]func(*sql.Selector){}, pq.modifiers...),
 	}
+}
+
+// WithPartnerKey tells the query-builder to eager-load the nodes that are connected to
+// the "partner_key" edge. The optional arguments are used to configure the query builder of the edge.
+func (pq *PartnerQuery) WithPartnerKey(opts ...func(*PartnerKeyQuery)) *PartnerQuery {
+	query := (&PartnerKeyClient{config: pq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	pq.withPartnerKey = query
+	return pq
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -336,15 +373,26 @@ func (pq *PartnerQuery) prepareQuery(ctx context.Context) error {
 
 func (pq *PartnerQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Partner, error) {
 	var (
-		nodes = []*Partner{}
-		_spec = pq.querySpec()
+		nodes       = []*Partner{}
+		withFKs     = pq.withFKs
+		_spec       = pq.querySpec()
+		loadedTypes = [1]bool{
+			pq.withPartnerKey != nil,
+		}
 	)
+	if pq.withPartnerKey != nil {
+		withFKs = true
+	}
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, partner.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*Partner).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &Partner{config: pq.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	if len(pq.modifiers) > 0 {
@@ -359,7 +407,46 @@ func (pq *PartnerQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Part
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := pq.withPartnerKey; query != nil {
+		if err := pq.loadPartnerKey(ctx, query, nodes, nil,
+			func(n *Partner, e *PartnerKey) { n.Edges.PartnerKey = e }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (pq *PartnerQuery) loadPartnerKey(ctx context.Context, query *PartnerKeyQuery, nodes []*Partner, init func(*Partner), assign func(*Partner, *PartnerKey)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*Partner)
+	for i := range nodes {
+		if nodes[i].partner_partner_key == nil {
+			continue
+		}
+		fk := *nodes[i].partner_partner_key
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(partnerkey.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "partner_partner_key" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
 }
 
 func (pq *PartnerQuery) sqlCount(ctx context.Context) (int, error) {

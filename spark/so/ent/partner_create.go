@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/ent/partner"
+	"github.com/lightsparkdev/spark/so/ent/partnerkey"
 )
 
 // PartnerCreate is the builder for creating a Partner entity.
@@ -89,6 +90,25 @@ func (pc *PartnerCreate) SetNillableID(u *uuid.UUID) *PartnerCreate {
 		pc.SetID(*u)
 	}
 	return pc
+}
+
+// SetPartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID.
+func (pc *PartnerCreate) SetPartnerKeyID(id uuid.UUID) *PartnerCreate {
+	pc.mutation.SetPartnerKeyID(id)
+	return pc
+}
+
+// SetNillablePartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID if the given value is not nil.
+func (pc *PartnerCreate) SetNillablePartnerKeyID(id *uuid.UUID) *PartnerCreate {
+	if id != nil {
+		pc = pc.SetPartnerKeyID(*id)
+	}
+	return pc
+}
+
+// SetPartnerKey sets the "partner_key" edge to the PartnerKey entity.
+func (pc *PartnerCreate) SetPartnerKey(p *PartnerKey) *PartnerCreate {
+	return pc.SetPartnerKeyID(p.ID)
 }
 
 // Mutation returns the PartnerMutation object of the builder.
@@ -234,6 +254,23 @@ func (pc *PartnerCreate) createSpec() (*Partner, *sqlgraph.CreateSpec) {
 	if value, ok := pc.mutation.JwtPublicKey(); ok {
 		_spec.SetField(partner.FieldJwtPublicKey, field.TypeBytes, value)
 		_node.JwtPublicKey = value
+	}
+	if nodes := pc.mutation.PartnerKeyIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   partner.PartnerKeyTable,
+			Columns: []string{partner.PartnerKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(partnerkey.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.partner_partner_key = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

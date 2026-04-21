@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/ent/partner"
+	"github.com/lightsparkdev/spark/so/ent/partnerkey"
 )
 
 // Partner is the model entity for the Partner schema.
@@ -31,7 +32,31 @@ type Partner struct {
 	PartnerName string `json:"partner_name,omitempty"`
 	// Compressed public key (34 bytes: 1-byte curve discriminator + 33-byte compressed key) used to verify partner JWTs. Supports both secp256k1 (ES256K) and P-256 (ES256).
 	JwtPublicKey jwt.Public `json:"jwt_public_key,omitempty"`
-	selectValues sql.SelectValues
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the PartnerQuery when eager-loading is set.
+	Edges               PartnerEdges `json:"edges"`
+	partner_partner_key *uuid.UUID
+	selectValues        sql.SelectValues
+}
+
+// PartnerEdges holds the relations/edges for other nodes in the graph.
+type PartnerEdges struct {
+	// The partner key (identity + public key) this label belongs to. Nullable during migration; backfill manually.
+	PartnerKey *PartnerKey `json:"partner_key,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// PartnerKeyOrErr returns the PartnerKey value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e PartnerEdges) PartnerKeyOrErr() (*PartnerKey, error) {
+	if e.PartnerKey != nil {
+		return e.PartnerKey, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: partnerkey.Label}
+	}
+	return nil, &NotLoadedError{edge: "partner_key"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -47,6 +72,8 @@ func (*Partner) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullTime)
 		case partner.FieldID:
 			values[i] = new(uuid.UUID)
+		case partner.ForeignKeys[0]: // partner_partner_key
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -104,6 +131,13 @@ func (pa *Partner) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				pa.JwtPublicKey = *value
 			}
+		case partner.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field partner_partner_key", values[i])
+			} else if value.Valid {
+				pa.partner_partner_key = new(uuid.UUID)
+				*pa.partner_partner_key = *value.S.(*uuid.UUID)
+			}
 		default:
 			pa.selectValues.Set(columns[i], values[i])
 		}
@@ -115,6 +149,11 @@ func (pa *Partner) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (pa *Partner) Value(name string) (ent.Value, error) {
 	return pa.selectValues.Get(name)
+}
+
+// QueryPartnerKey queries the "partner_key" edge of the Partner entity.
+func (pa *Partner) QueryPartnerKey() *PartnerKeyQuery {
+	return NewPartnerClient(pa.config).QueryPartnerKey(pa)
 }
 
 // Update returns a builder for updating this Partner.

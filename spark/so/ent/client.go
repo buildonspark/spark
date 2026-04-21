@@ -30,6 +30,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/partner"
+	"github.com/lightsparkdev/spark/so/ent/partnerkey"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -94,6 +95,8 @@ type Client struct {
 	MultisigMember *MultisigMemberClient
 	// Partner is the client for interacting with the Partner builders.
 	Partner *PartnerClient
+	// PartnerKey is the client for interacting with the PartnerKey builders.
+	PartnerKey *PartnerKeyClient
 	// PaymentIntent is the client for interacting with the PaymentIntent builders.
 	PaymentIntent *PaymentIntentClient
 	// PendingSendTransfer is the client for interacting with the PendingSendTransfer builders.
@@ -173,6 +176,7 @@ func (c *Client) init() {
 	c.MultisigConfig = NewMultisigConfigClient(c.config)
 	c.MultisigMember = NewMultisigMemberClient(c.config)
 	c.Partner = NewPartnerClient(c.config)
+	c.PartnerKey = NewPartnerKeyClient(c.config)
 	c.PaymentIntent = NewPaymentIntentClient(c.config)
 	c.PendingSendTransfer = NewPendingSendTransferClient(c.config)
 	c.PreimageRequest = NewPreimageRequestClient(c.config)
@@ -306,6 +310,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		MultisigConfig:                    NewMultisigConfigClient(cfg),
 		MultisigMember:                    NewMultisigMemberClient(cfg),
 		Partner:                           NewPartnerClient(cfg),
+		PartnerKey:                        NewPartnerKeyClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
 		PendingSendTransfer:               NewPendingSendTransferClient(cfg),
 		PreimageRequest:                   NewPreimageRequestClient(cfg),
@@ -366,6 +371,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		MultisigConfig:                    NewMultisigConfigClient(cfg),
 		MultisigMember:                    NewMultisigMemberClient(cfg),
 		Partner:                           NewPartnerClient(cfg),
+		PartnerKey:                        NewPartnerKeyClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
 		PendingSendTransfer:               NewPendingSendTransferClient(cfg),
 		PreimageRequest:                   NewPreimageRequestClient(cfg),
@@ -426,13 +432,14 @@ func (c *Client) Use(hooks ...Hook) {
 		c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
 		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
 		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
-		c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare,
-		c.PreimageSharePartner, c.SigningCommitment, c.SigningKeyshare, c.SigningNonce,
-		c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
-		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.TransferPartner,
-		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
-		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
+		c.PartnerKey, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
+		c.PreimageShare, c.PreimageSharePartner, c.SigningCommitment,
+		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenCreate,
+		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
+		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
+		c.TransferLeaf, c.TransferPartner, c.TransferReceiver, c.TransferSender,
+		c.Tree, c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
+		c.WalletSetting,
 	} {
 		n.Use(hooks...)
 	}
@@ -446,13 +453,14 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
 		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
 		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
-		c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare,
-		c.PreimageSharePartner, c.SigningCommitment, c.SigningKeyshare, c.SigningNonce,
-		c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
-		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.TransferPartner,
-		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
-		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
+		c.PartnerKey, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
+		c.PreimageShare, c.PreimageSharePartner, c.SigningCommitment,
+		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenCreate,
+		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
+		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
+		c.TransferLeaf, c.TransferPartner, c.TransferReceiver, c.TransferSender,
+		c.Tree, c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
+		c.WalletSetting,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -489,6 +497,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.MultisigMember.mutate(ctx, m)
 	case *PartnerMutation:
 		return c.Partner.mutate(ctx, m)
+	case *PartnerKeyMutation:
+		return c.PartnerKey.mutate(ctx, m)
 	case *PaymentIntentMutation:
 		return c.PaymentIntent.mutate(ctx, m)
 	case *PendingSendTransferMutation:
@@ -2628,6 +2638,22 @@ func (c *PartnerClient) GetX(ctx context.Context, id uuid.UUID) *Partner {
 	return obj
 }
 
+// QueryPartnerKey queries the partner_key edge of a Partner.
+func (c *PartnerClient) QueryPartnerKey(pa *Partner) *PartnerKeyQuery {
+	query := (&PartnerKeyClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := pa.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(partner.Table, partner.FieldID, id),
+			sqlgraph.To(partnerkey.Table, partnerkey.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, partner.PartnerKeyTable, partner.PartnerKeyColumn),
+		)
+		fromV = sqlgraph.Neighbors(pa.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *PartnerClient) Hooks() []Hook {
 	return c.hooks.Partner
@@ -2650,6 +2676,155 @@ func (c *PartnerClient) mutate(ctx context.Context, m *PartnerMutation) (Value, 
 		return (&PartnerDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Partner mutation op: %q", m.Op())
+	}
+}
+
+// PartnerKeyClient is a client for the PartnerKey schema.
+type PartnerKeyClient struct {
+	config
+}
+
+// NewPartnerKeyClient returns a client for the PartnerKey from the given config.
+func NewPartnerKeyClient(c config) *PartnerKeyClient {
+	return &PartnerKeyClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `partnerkey.Hooks(f(g(h())))`.
+func (c *PartnerKeyClient) Use(hooks ...Hook) {
+	c.hooks.PartnerKey = append(c.hooks.PartnerKey, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `partnerkey.Intercept(f(g(h())))`.
+func (c *PartnerKeyClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PartnerKey = append(c.inters.PartnerKey, interceptors...)
+}
+
+// Create returns a builder for creating a PartnerKey entity.
+func (c *PartnerKeyClient) Create() *PartnerKeyCreate {
+	mutation := newPartnerKeyMutation(c.config, OpCreate)
+	return &PartnerKeyCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PartnerKey entities.
+func (c *PartnerKeyClient) CreateBulk(builders ...*PartnerKeyCreate) *PartnerKeyCreateBulk {
+	return &PartnerKeyCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PartnerKeyClient) MapCreateBulk(slice any, setFunc func(*PartnerKeyCreate, int)) *PartnerKeyCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PartnerKeyCreateBulk{err: fmt.Errorf("calling to PartnerKeyClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PartnerKeyCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PartnerKeyCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PartnerKey.
+func (c *PartnerKeyClient) Update() *PartnerKeyUpdate {
+	mutation := newPartnerKeyMutation(c.config, OpUpdate)
+	return &PartnerKeyUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PartnerKeyClient) UpdateOne(pk *PartnerKey) *PartnerKeyUpdateOne {
+	mutation := newPartnerKeyMutation(c.config, OpUpdateOne, withPartnerKey(pk))
+	return &PartnerKeyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PartnerKeyClient) UpdateOneID(id uuid.UUID) *PartnerKeyUpdateOne {
+	mutation := newPartnerKeyMutation(c.config, OpUpdateOne, withPartnerKeyID(id))
+	return &PartnerKeyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PartnerKey.
+func (c *PartnerKeyClient) Delete() *PartnerKeyDelete {
+	mutation := newPartnerKeyMutation(c.config, OpDelete)
+	return &PartnerKeyDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PartnerKeyClient) DeleteOne(pk *PartnerKey) *PartnerKeyDeleteOne {
+	return c.DeleteOneID(pk.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PartnerKeyClient) DeleteOneID(id uuid.UUID) *PartnerKeyDeleteOne {
+	builder := c.Delete().Where(partnerkey.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PartnerKeyDeleteOne{builder}
+}
+
+// Query returns a query builder for PartnerKey.
+func (c *PartnerKeyClient) Query() *PartnerKeyQuery {
+	return &PartnerKeyQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePartnerKey},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PartnerKey entity by its id.
+func (c *PartnerKeyClient) Get(ctx context.Context, id uuid.UUID) (*PartnerKey, error) {
+	return c.Query().Where(partnerkey.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PartnerKeyClient) GetX(ctx context.Context, id uuid.UUID) *PartnerKey {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPartners queries the partners edge of a PartnerKey.
+func (c *PartnerKeyClient) QueryPartners(pk *PartnerKey) *PartnerQuery {
+	query := (&PartnerClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := pk.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(partnerkey.Table, partnerkey.FieldID, id),
+			sqlgraph.To(partner.Table, partner.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, partnerkey.PartnersTable, partnerkey.PartnersColumn),
+		)
+		fromV = sqlgraph.Neighbors(pk.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *PartnerKeyClient) Hooks() []Hook {
+	return c.hooks.PartnerKey
+}
+
+// Interceptors returns the client interceptors.
+func (c *PartnerKeyClient) Interceptors() []Interceptor {
+	return c.inters.PartnerKey
+}
+
+func (c *PartnerKeyClient) mutate(ctx context.Context, m *PartnerKeyMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PartnerKeyCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PartnerKeyUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PartnerKeyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PartnerKeyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PartnerKey mutation op: %q", m.Op())
 	}
 }
 
@@ -7298,10 +7473,10 @@ type (
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
 		Gossip, IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
 		L1TokenOutputWithdrawal, L1WithdrawalTransaction, MultisigConfig,
-		MultisigMember, Partner, PaymentIntent, PendingSendTransfer, PreimageRequest,
-		PreimageShare, PreimageSharePartner, SigningCommitment, SigningKeyshare,
-		SigningNonce, SparkInvoice, TokenCreate, TokenFreeze, TokenMint, TokenOutput,
-		TokenPartialRevocationSecretShare, TokenTransaction,
+		MultisigMember, Partner, PartnerKey, PaymentIntent, PendingSendTransfer,
+		PreimageRequest, PreimageShare, PreimageSharePartner, SigningCommitment,
+		SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate, TokenFreeze,
+		TokenMint, TokenOutput, TokenPartialRevocationSecretShare, TokenTransaction,
 		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
 		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,
 		UtxoSwap, WalletSetting []ent.Hook
@@ -7310,10 +7485,10 @@ type (
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
 		Gossip, IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
 		L1TokenOutputWithdrawal, L1WithdrawalTransaction, MultisigConfig,
-		MultisigMember, Partner, PaymentIntent, PendingSendTransfer, PreimageRequest,
-		PreimageShare, PreimageSharePartner, SigningCommitment, SigningKeyshare,
-		SigningNonce, SparkInvoice, TokenCreate, TokenFreeze, TokenMint, TokenOutput,
-		TokenPartialRevocationSecretShare, TokenTransaction,
+		MultisigMember, Partner, PartnerKey, PaymentIntent, PendingSendTransfer,
+		PreimageRequest, PreimageShare, PreimageSharePartner, SigningCommitment,
+		SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate, TokenFreeze,
+		TokenMint, TokenOutput, TokenPartialRevocationSecretShare, TokenTransaction,
 		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
 		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,
 		UtxoSwap, WalletSetting []ent.Interceptor

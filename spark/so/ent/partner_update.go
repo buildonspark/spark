@@ -11,8 +11,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/ent/partner"
+	"github.com/lightsparkdev/spark/so/ent/partnerkey"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
 
@@ -92,9 +94,34 @@ func (pu *PartnerUpdate) SetNillableJwtPublicKey(j *jwt.Public) *PartnerUpdate {
 	return pu
 }
 
+// SetPartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID.
+func (pu *PartnerUpdate) SetPartnerKeyID(id uuid.UUID) *PartnerUpdate {
+	pu.mutation.SetPartnerKeyID(id)
+	return pu
+}
+
+// SetNillablePartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID if the given value is not nil.
+func (pu *PartnerUpdate) SetNillablePartnerKeyID(id *uuid.UUID) *PartnerUpdate {
+	if id != nil {
+		pu = pu.SetPartnerKeyID(*id)
+	}
+	return pu
+}
+
+// SetPartnerKey sets the "partner_key" edge to the PartnerKey entity.
+func (pu *PartnerUpdate) SetPartnerKey(p *PartnerKey) *PartnerUpdate {
+	return pu.SetPartnerKeyID(p.ID)
+}
+
 // Mutation returns the PartnerMutation object of the builder.
 func (pu *PartnerUpdate) Mutation() *PartnerMutation {
 	return pu.mutation
+}
+
+// ClearPartnerKey clears the "partner_key" edge to the PartnerKey entity.
+func (pu *PartnerUpdate) ClearPartnerKey() *PartnerUpdate {
+	pu.mutation.ClearPartnerKey()
+	return pu
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -186,6 +213,35 @@ func (pu *PartnerUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := pu.mutation.JwtPublicKey(); ok {
 		_spec.SetField(partner.FieldJwtPublicKey, field.TypeBytes, value)
 	}
+	if pu.mutation.PartnerKeyCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   partner.PartnerKeyTable,
+			Columns: []string{partner.PartnerKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(partnerkey.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := pu.mutation.PartnerKeyIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   partner.PartnerKeyTable,
+			Columns: []string{partner.PartnerKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(partnerkey.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	_spec.AddModifiers(pu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, pu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -270,9 +326,34 @@ func (puo *PartnerUpdateOne) SetNillableJwtPublicKey(j *jwt.Public) *PartnerUpda
 	return puo
 }
 
+// SetPartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID.
+func (puo *PartnerUpdateOne) SetPartnerKeyID(id uuid.UUID) *PartnerUpdateOne {
+	puo.mutation.SetPartnerKeyID(id)
+	return puo
+}
+
+// SetNillablePartnerKeyID sets the "partner_key" edge to the PartnerKey entity by ID if the given value is not nil.
+func (puo *PartnerUpdateOne) SetNillablePartnerKeyID(id *uuid.UUID) *PartnerUpdateOne {
+	if id != nil {
+		puo = puo.SetPartnerKeyID(*id)
+	}
+	return puo
+}
+
+// SetPartnerKey sets the "partner_key" edge to the PartnerKey entity.
+func (puo *PartnerUpdateOne) SetPartnerKey(p *PartnerKey) *PartnerUpdateOne {
+	return puo.SetPartnerKeyID(p.ID)
+}
+
 // Mutation returns the PartnerMutation object of the builder.
 func (puo *PartnerUpdateOne) Mutation() *PartnerMutation {
 	return puo.mutation
+}
+
+// ClearPartnerKey clears the "partner_key" edge to the PartnerKey entity.
+func (puo *PartnerUpdateOne) ClearPartnerKey() *PartnerUpdateOne {
+	puo.mutation.ClearPartnerKey()
+	return puo
 }
 
 // Where appends a list predicates to the PartnerUpdate builder.
@@ -393,6 +474,35 @@ func (puo *PartnerUpdateOne) sqlSave(ctx context.Context) (_node *Partner, err e
 	}
 	if value, ok := puo.mutation.JwtPublicKey(); ok {
 		_spec.SetField(partner.FieldJwtPublicKey, field.TypeBytes, value)
+	}
+	if puo.mutation.PartnerKeyCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   partner.PartnerKeyTable,
+			Columns: []string{partner.PartnerKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(partnerkey.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := puo.mutation.PartnerKeyIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   partner.PartnerKeyTable,
+			Columns: []string{partner.PartnerKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(partnerkey.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_spec.AddModifiers(puo.modifiers...)
 	_node = &Partner{config: puo.config}

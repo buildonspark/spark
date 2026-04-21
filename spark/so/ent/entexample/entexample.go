@@ -1963,6 +1963,7 @@ type PartnerExample struct {
 	JwtPublicKey *jwt.Public
 
 	// Edges - if set, use the provided entity; if nil, create a default one
+	PartnerKey *ent.PartnerKey
 }
 
 // NewPartnerExample creates a new PartnerExample for testing.
@@ -1994,6 +1995,12 @@ func (pa *PartnerExample) SetPartnerName(v string) *PartnerExample {
 // SetJwtPublicKey sets the jwt_public_key field.
 func (pa *PartnerExample) SetJwtPublicKey(v jwt.Public) *PartnerExample {
 	pa.JwtPublicKey = &v
+	return pa
+}
+
+// SetPartnerKey sets the partner_key edge.
+func (pa *PartnerExample) SetPartnerKey(v *ent.PartnerKey) *PartnerExample {
+	pa.PartnerKey = v
 	return pa
 }
 
@@ -2029,6 +2036,9 @@ func (pa *PartnerExample) MustExec(ctx context.Context) *ent.Partner {
 	}
 
 	// Handle edges
+	if pa.PartnerKey != nil {
+		create.SetPartnerKey(pa.PartnerKey)
+	}
 
 	entity, err := create.Save(ctx)
 	if err != nil {
@@ -2071,6 +2081,133 @@ func (pa *PartnerExample) Exec(ctx context.Context) (*ent.Partner, error) {
 	}
 
 	// Handle edges
+	if pa.PartnerKey != nil {
+		create.SetPartnerKey(pa.PartnerKey)
+	}
+
+	return create.Save(ctx)
+}
+
+// PartnerKeyExample is a test fixture builder for PartnerKey.
+type PartnerKeyExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	PartnerID    *string
+	PartnerName  *string
+	JwtPublicKey *jwt.Public
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	Partners []*ent.Partner
+}
+
+// NewPartnerKeyExample creates a new PartnerKeyExample for testing.
+func NewPartnerKeyExample(t *testing.T, client *ent.Client) *PartnerKeyExample {
+	return &PartnerKeyExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetPartnerID sets the partner_id field.
+func (pk *PartnerKeyExample) SetPartnerID(v string) *PartnerKeyExample {
+	pk.PartnerID = &v
+	return pk
+}
+
+// SetPartnerName sets the partner_name field.
+func (pk *PartnerKeyExample) SetPartnerName(v string) *PartnerKeyExample {
+	pk.PartnerName = &v
+	return pk
+}
+
+// SetJwtPublicKey sets the jwt_public_key field.
+func (pk *PartnerKeyExample) SetJwtPublicKey(v jwt.Public) *PartnerKeyExample {
+	pk.JwtPublicKey = &v
+	return pk
+}
+
+// AddPartner adds a Partner to the partners edge.
+func (pk *PartnerKeyExample) AddPartner(v *ent.Partner) *PartnerKeyExample {
+	pk.Partners = append(pk.Partners, v)
+	return pk
+}
+
+// SetPartners sets the partners edge.
+func (pk *PartnerKeyExample) SetPartners(v []*ent.Partner) *PartnerKeyExample {
+	pk.Partners = v
+	return pk
+}
+
+// MustExec builds and saves the PartnerKey entity to the database.
+// It panics if the save fails.
+func (pk *PartnerKeyExample) MustExec(ctx context.Context) *ent.PartnerKey {
+	create := pk.client.PartnerKey.Create()
+
+	// Set fields
+	if pk.PartnerID != nil {
+		create.SetPartnerID(*pk.PartnerID)
+	} else {
+		// Use default from annotation
+		create.SetPartnerID("partner-a")
+	}
+	if pk.PartnerName != nil {
+		create.SetPartnerName(*pk.PartnerName)
+	} else {
+		// Use default from annotation
+		create.SetPartnerName("Partner A")
+	}
+	if pk.JwtPublicKey != nil {
+		create.SetJwtPublicKey(*pk.JwtPublicKey)
+	} else {
+		// Use default from annotation
+		create.SetJwtPublicKey(jwt.MustParsePublicHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+	}
+
+	// Handle edges
+	if len(pk.Partners) > 0 {
+		create.AddPartners(pk.Partners...)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		pk.t.Helper()
+		pk.t.Fatalf("failed to create PartnerKey: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the PartnerKey entity to the database.
+// It returns an error if the save fails.
+func (pk *PartnerKeyExample) Exec(ctx context.Context) (*ent.PartnerKey, error) {
+	create := pk.client.PartnerKey.Create()
+
+	// Set fields
+	if pk.PartnerID != nil {
+		create.SetPartnerID(*pk.PartnerID)
+	} else {
+		// Use default from annotation
+		create.SetPartnerID("partner-a")
+	}
+	if pk.PartnerName != nil {
+		create.SetPartnerName(*pk.PartnerName)
+	} else {
+		// Use default from annotation
+		create.SetPartnerName("Partner A")
+	}
+	if pk.JwtPublicKey != nil {
+		create.SetJwtPublicKey(*pk.JwtPublicKey)
+	} else {
+		// Use default from annotation
+		create.SetJwtPublicKey(jwt.MustParsePublicHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+	}
+
+	// Handle edges
+	if len(pk.Partners) > 0 {
+		create.AddPartners(pk.Partners...)
+	}
 
 	return create.Save(ctx)
 }
