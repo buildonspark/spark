@@ -3,7 +3,7 @@ const { SparkWallet } = require("@buildonspark/bare");
 const { test, retryUntilSuccess } = require("../utils.js");
 const { fundWallet } = require("../fund-wallet.js");
 
-test.skip("multi-leaf-transfer: transfer spanning multiple leaves", async (assert) => {
+test("multi-leaf-transfer: transfer spanning multiple leaves", async (assert) => {
   const opts = {
     options: {
       network: "LOCAL",
