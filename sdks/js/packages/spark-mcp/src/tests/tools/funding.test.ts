@@ -26,7 +26,7 @@ function makeFetch(results: unknown[]): jest.MockedFunction<typeof fetch> {
 
 function clearEnv() {
   delete process.env["BITCOIN_NETWORK"];
-  delete process.env["MINIKUBE_IP"];
+  delete process.env["SPARK_LOCAL_INGRESS_HOST"];
   delete process.env["BITCOIN_RPC_URL"];
   delete process.env["BITCOIN_RPC_USER"];
   delete process.env["BITCOIN_RPC_PASSWORD"];
@@ -96,8 +96,8 @@ describe("handleFundAddress", () => {
     expect(body.params[0]).toBe(1);
   });
 
-  it("uses MINIKUBE_IP for RPC URL when set", async () => {
-    process.env["MINIKUBE_IP"] = "192.168.49.2";
+  it("uses SPARK_LOCAL_INGRESS_HOST for RPC URL when set", async () => {
+    process.env["SPARK_LOCAL_INGRESS_HOST"] = "192.168.49.2";
     const mockFetch = makeFetch([
       { result: "txid1", error: null },
       { result: "bcrt1qmining", error: null },

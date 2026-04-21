@@ -307,7 +307,7 @@ func TestMintWithExecuteBeforeAndOldCCTSucceeds(t *testing.T) {
 	if !broadcastTokenTestsUsePhase2 {
 		t.Skip("Skipping - execute_before requires Phase2 (Phase1 uses V2 shape which drops execute_before)")
 	}
-	sparktesting.RequireMinikube(t)
+	sparktesting.RequireLocalSparkIngressHost(t)
 
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	tokenPrivKey := config.IdentityPrivateKey
@@ -339,7 +339,7 @@ func TestTransferWithExecuteBeforeAndOldCCTSucceeds(t *testing.T) {
 	if !broadcastTokenTestsUsePhase2 {
 		t.Skip("Skipping - execute_before requires Phase2 (Phase1 uses V2 shape which drops execute_before)")
 	}
-	sparktesting.RequireMinikube(t)
+	sparktesting.RequireLocalSparkIngressHost(t)
 
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	tokenPrivKey := config.IdentityPrivateKey
@@ -388,7 +388,7 @@ func TestMintWithOldCCTAndNoExecuteBeforeFails(t *testing.T) {
 	if !broadcastTokenTestsUseV3 {
 		t.Skip("Skipping - CCT validation requires V3+")
 	}
-	sparktesting.RequireMinikube(t)
+	sparktesting.RequireLocalSparkIngressHost(t)
 
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	tokenPrivKey := config.IdentityPrivateKey

@@ -309,8 +309,7 @@ function createIngressHostForwarder(
 function resolveLocalIngressHost(
   env: Record<string, string | undefined>,
 ): string {
-  const explicitHost =
-    env["SPARK_LOCAL_INGRESS_HOST"]?.trim() || env["MINIKUBE_IP"]?.trim();
+  const explicitHost = env["SPARK_LOCAL_INGRESS_HOST"]?.trim();
 
   if (explicitHost) {
     return explicitHost;

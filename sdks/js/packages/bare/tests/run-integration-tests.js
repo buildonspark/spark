@@ -12,9 +12,9 @@ const testsDir = path.join(__dirname, "integration");
 const TIMEOUT_SECS = 120; // 2 minutes per test file
 
 function run() {
-  if (!process.env.MINIKUBE_IP) {
+  if (!process.env.SPARK_LOCAL_INGRESS_HOST) {
     console.error(
-      "MINIKUBE_IP not set. Integration tests require hermetic environment.",
+      "SPARK_LOCAL_INGRESS_HOST not set. Integration tests require hermetic environment.",
     );
     process.exit(1);
   }

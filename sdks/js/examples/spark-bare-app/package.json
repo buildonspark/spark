@@ -13,7 +13,7 @@
     "transfer": "node ./scripts/run-script.mjs transfer",
     "run": "node ./scripts/run-script.mjs",
     "run:local": "cross-env NODE_ENV=development NETWORK=LOCAL node ./scripts/run-script.mjs",
-    "run:k8s": "cross-env-shell NODE_ENV=development NETWORK=LOCAL MINIKUBE_IP=\"${MINIKUBE_IP:-$(minikube ip 2>/dev/null || printf 127.0.0.1)}\" node ./scripts/run-script.mjs",
+    "run:k8s": "cross-env-shell NODE_ENV=development NETWORK=LOCAL SPARK_LOCAL_INGRESS_HOST=\"${SPARK_LOCAL_INGRESS_HOST:-$(minikube ip 2>/dev/null || printf 127.0.0.1)}\" node ./scripts/run-script.mjs",
     "run:mainnet": "cross-env NODE_ENV=production NETWORK=MAINNET node ./scripts/run-script.mjs",
     "run:dev": "cross-env NODE_ENV=development NETWORK=REGTEST CONFIG_FILE=../../private/config/dev-regtest-config.json node ./scripts/run-script.mjs",
     "run:dev:mainnet": "cross-env NODE_ENV=development NETWORK=MAINNET CONFIG_FILE=../../private/config/dev-mainnet-config.json node ./scripts/run-script.mjs"

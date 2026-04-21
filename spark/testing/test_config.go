@@ -22,12 +22,16 @@ const (
 	signingOperatorPrefix            = "000000000000000000000000000000000000000000000000000000000000000"
 )
 
-func IsMinikube() bool {
-	return os.Getenv("MINIKUBE_IP") != ""
+func HasLocalSparkIngressHost() bool {
+	return getLocalSparkIngressHost() != ""
 }
 
-func GetMinikubeIP() string {
-	return os.Getenv("MINIKUBE_IP")
+func GetLocalSparkIngressHost() string {
+	return getLocalSparkIngressHost()
+}
+
+func getLocalSparkIngressHost() string {
+	return os.Getenv("SPARK_LOCAL_INGRESS_HOST")
 }
 
 // IsGripmock returns true if the GRIPMOCK environment variable is set to true.
@@ -79,7 +83,7 @@ func operatorCount(tb testing.TB) int {
 		}
 	}
 
-	if IsMinikube() {
+	if HasLocalSparkIngressHost() {
 		return minikubeDefaultNumSparkOperators
 	}
 
@@ -90,13 +94,13 @@ func operatorCount(tb testing.TB) int {
 func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 	opCount := operatorCount(tb)
 
-	isMinikube, isGripmock := IsMinikube(), IsGripmock()
-	if isMinikube && isGripmock {
-		tb.Fatal("Cannot set both MINIKUBE_IP and GRIPMOCK environment variables")
+	hasLocalSparkIngressHost, isGripmock := HasLocalSparkIngressHost(), IsGripmock()
+	if hasLocalSparkIngressHost && isGripmock {
+		tb.Fatal("Cannot set both SPARK_LOCAL_INGRESS_HOST and GRIPMOCK environment variables")
 	}
 
 	certPath := ""
-	if isMinikube {
+	if hasLocalSparkIngressHost {
 		certPath = minikubeCAFilePath
 	}
 
@@ -106,7 +110,7 @@ func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 		id := fmt.Sprintf("%064x", i+1) // "000…001", "000…002" …
 		address := fmt.Sprintf("localhost:%d", basePort+i)
 		var operatorConnectionFactory so.OperatorConnectionFactory = &DangerousTestOperatorConnectionFactoryNoVerifyTLS{}
-		if isMinikube {
+		if hasLocalSparkIngressHost {
 			address = fmt.Sprintf("dns:///%d.spark.minikube.local", i)
 		}
 		if isGripmock {
@@ -127,9 +131,9 @@ func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 }
 
 func GetTestDatabasePath(operatorIndex int) string {
-	if IsMinikube() {
+	if HasLocalSparkIngressHost() {
 		return fmt.Sprintf("postgresql://postgres@%s/sparkoperator_%d?sslmode=disable",
-			net.JoinHostPort(GetMinikubeIP(), "5432"),
+			net.JoinHostPort(GetLocalSparkIngressHost(), "5432"),
 			operatorIndex,
 		)
 	}
@@ -137,12 +141,12 @@ func GetTestDatabasePath(operatorIndex int) string {
 }
 
 func GetLocalFrostSignerAddress(tb testing.TB) string {
-	isMinikube, isGripmock := IsMinikube(), IsGripmock()
-	if isMinikube && isGripmock {
-		tb.Fatal("Cannot set both MINIKUBE_IP and GRIPMOCK environment variables")
+	hasLocalSparkIngressHost, isGripmock := HasLocalSparkIngressHost(), IsGripmock()
+	if hasLocalSparkIngressHost && isGripmock {
+		tb.Fatal("Cannot set both SPARK_LOCAL_INGRESS_HOST and GRIPMOCK environment variables")
 	}
 
-	if isMinikube {
+	if hasLocalSparkIngressHost {
 		return "localhost:9999"
 	}
 	if isGripmock {

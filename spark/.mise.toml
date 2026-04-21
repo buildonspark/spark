@@ -32,8 +32,8 @@ test-grpc-oss = """
     -- \
     -p 1
 """
-test-grpc-minikube = """
-  MINIKUBE_IP=$(minikube ip) \
+test-grpc-k8s = """
+  SPARK_LOCAL_INGRESS_HOST=$(minikube ip) \
   gotestsum \
     --format testname \
     --packages="./so/grpc_test/... ./so/grpc_test_internal/..." \
@@ -41,8 +41,8 @@ test-grpc-minikube = """
     -p 1 \
     -tags=lightspark
 """
-test-grpc-minikube-dbg = """
-  MINIKUBE_IP=$(minikube ip) \
+test-grpc-k8s-dbg = """
+  SPARK_LOCAL_INGRESS_HOST=$(minikube ip) \
   gotestsum \
     --format standard-verbose \
     --packages="./so/grpc_test/... ./so/grpc_test_internal/..." \
@@ -50,8 +50,8 @@ test-grpc-minikube-dbg = """
     -p 1 \
     -tags=lightspark
 """
-test-grpc-minikube-oss = """
-  MINIKUBE_IP=$(minikube ip) \
+test-grpc-k8s-oss = """
+  SPARK_LOCAL_INGRESS_HOST=$(minikube ip) \
   gotestsum \
     --format testname \
     --packages="./so/grpc_test/... ./so/grpc_test_internal/..." \

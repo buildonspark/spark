@@ -55,7 +55,7 @@ func skipIfNotPhase2(t *testing.T) {
 	if !broadcastTokenTestsUsePhase2 {
 		t.Skipf("Skipping %s - only runs for TTV3_Phase2", currentBroadcastRunLabel())
 	}
-	sparktesting.RequireMinikube(t)
+	sparktesting.RequireLocalSparkIngressHost(t)
 }
 
 // TestTokenMintOperatorOfflineAutoRetry tests that a mint transaction can be retried

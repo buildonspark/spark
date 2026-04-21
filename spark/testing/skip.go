@@ -14,10 +14,10 @@ func RequireGripMock(t testing.TB) {
 	}
 }
 
-func RequireMinikube(t testing.TB) {
+func RequireLocalSparkIngressHost(t testing.TB) {
 	t.Helper()
-	if !IsMinikube() {
-		t.Skipf("skipping %s because it requires Minikube; to enable it, set MINIKUBE_IP=$(minikube ip)", t.Name())
+	if !HasLocalSparkIngressHost() {
+		t.Skipf("skipping %s because it requires a local Spark ingress host; to enable it, set SPARK_LOCAL_INGRESS_HOST=$(minikube ip)", t.Name())
 	}
 }
 

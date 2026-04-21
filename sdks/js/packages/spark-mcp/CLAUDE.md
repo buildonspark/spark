@@ -72,13 +72,13 @@ This lets a single server instance operate on multiple networks per-call.
 
 The SDK determines endpoints based on its network config:
 
-- **`LOCAL`** — for minikube or run-everything.sh. Uses `getLocalSigningOperators()` which reads `MINIKUBE_IP`:
-  - `MINIKUBE_IP` set → `https://{i}.spark.minikube.local` SOs + `http://mempool.minikube.local/api` electrs
-  - `MINIKUBE_IP` unset → `https://localhost:{8535+i}` SOs + `http://127.0.0.1:30000` electrs
+- **`LOCAL`** — for minikube or run-everything.sh. Uses `getLocalSigningOperators()` which reads `SPARK_LOCAL_INGRESS_HOST`:
+  - `SPARK_LOCAL_INGRESS_HOST` set → `https://{i}.spark.minikube.local` SOs + `http://mempool.minikube.local/api` electrs
+  - `SPARK_LOCAL_INGRESS_HOST` unset → `https://localhost:{8535+i}` SOs + `http://127.0.0.1:30000` electrs
 - **`REGTEST`** — Lightspark-hosted shared regtest. Uses external SSP (`api.lightspark.com`) and external electrs (`regtest-mempool.us-west-2.sparkinfra.net`).
 - **`MAINNET`** — production. Uses external SSP (`api.lightspark.com`) and `mempool.space` electrs.
 
-`SPARK_ENDPOINT` does not exist — `ConfigOptions` has no such field. Pass `MINIKUBE_IP` via the MCP config `env` block; the SDK reads it from `process.env` automatically.
+`SPARK_ENDPOINT` does not exist — `ConfigOptions` has no such field. Pass `SPARK_LOCAL_INGRESS_HOST` via the MCP config `env` block; the SDK reads it from `process.env` automatically.
 
 ## SDK type notes
 

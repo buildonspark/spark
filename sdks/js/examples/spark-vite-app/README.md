@@ -15,12 +15,11 @@ The app surfaces additional targets based on what is available locally:
 
 ## Local Kubernetes mode
 
-`yarn start` resolves the local ingress host in this order:
+`yarn start` resolves the local host in this order:
 
 1. `SPARK_LOCAL_INGRESS_HOST`
-2. `MINIKUBE_IP` (compatibility fallback)
-3. `127.0.0.1` when `kubectl config current-context` looks like `kind` / `kdev`
-4. `minikube ip`
+2. `127.0.0.1` when `kubectl config current-context` looks like `kind` / `kdev`
+3. `minikube ip`
 
 If that produces a value, the `LOCAL` target becomes available and proxies
 browser traffic to the local Kubernetes ingress:
@@ -32,10 +31,9 @@ browser traffic to the local Kubernetes ingress:
 - `http://app.minikube.local` via `/spark-ssp`
 - `http://<local ingress host>:8332` via `/bitcoin-rpc`
 
-You can explicitly override the detected host before starting the app:
+You can explicitly override the detected host before starting the app with:
 
-- preferred: `SPARK_LOCAL_INGRESS_HOST`
-- compatibility fallback: `MINIKUBE_IP`
+- `SPARK_LOCAL_INGRESS_HOST`
 
 ## DEV configs
 

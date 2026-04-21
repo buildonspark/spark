@@ -3,7 +3,7 @@
  * Runs against a live Spark environment (minikube or run-everything.sh).
  *
  * Run with:
- *   BITCOIN_NETWORK=LOCAL MINIKUBE_IP=192.168.49.2 \
+ *   BITCOIN_NETWORK=LOCAL SPARK_LOCAL_INGRESS_HOST=192.168.49.2 \
  *     yarn test-cmd src/tests/integration.test.ts
  *
  * SPARK_MNEMONIC is optional. When omitted, set SPARK_MNEMONIC to a wallet

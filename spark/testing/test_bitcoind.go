@@ -43,8 +43,8 @@ func newSubmitPackageCmd(rawTxns []string) *submitPackageCmd {
 func newClient() (*rpcclient.Client, error) {
 	addr, exists := os.LookupEnv("BITCOIN_RPC_URL")
 	if !exists {
-		if minikubeIp, exists := os.LookupEnv("MINIKUBE_IP"); exists {
-			addr = net.JoinHostPort(minikubeIp, "8332")
+		if localSparkIngressHost := getLocalSparkIngressHost(); localSparkIngressHost != "" {
+			addr = net.JoinHostPort(localSparkIngressHost, "8332")
 		} else {
 			addr = "127.0.0.1:8332"
 		}

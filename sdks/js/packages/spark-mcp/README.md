@@ -49,14 +49,14 @@ Then add to `~/.claude.json` (or `.mcp.json` in the project root). See [Configur
 
 ### Environment variables
 
-| Variable               | Required | Description                                                                                                                                                                                |
-| ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `BITCOIN_NETWORK`      | No       | Bitcoin network: `LOCAL`, `REGTEST` (default), or `MAINNET`                                                                                                                                |
-| `SPARK_MNEMONIC`       | No       | Default BIP39 mnemonic (12 or 24 words). Omit to use `spark_create_wallet` or pass `mnemonic` per-tool call.                                                                               |
-| `MINIKUBE_IP`          | No       | Set to your minikube IP (e.g. `192.168.49.2`) to route to `https://{i}.spark.minikube.local`. Omit when using `run-everything.sh` — the SDK routes to `localhost:8535-8539` automatically. |
-| `BITCOIN_RPC_URL`      | No       | Bitcoin JSON-RPC URL for `spark_fund_address`. Defaults to `http://{MINIKUBE_IP}:8332` or `http://127.0.0.1:8332`.                                                                         |
-| `BITCOIN_RPC_USER`     | No       | Bitcoin RPC username (default: `testutil`)                                                                                                                                                 |
-| `BITCOIN_RPC_PASSWORD` | No       | Bitcoin RPC password (default: `testutilpassword`)                                                                                                                                         |
+| Variable                   | Required | Description                                                                                                                                                                                                                                       |
+| -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BITCOIN_NETWORK`          | No       | Bitcoin network: `LOCAL`, `REGTEST` (default), or `MAINNET`                                                                                                                                                                                       |
+| `SPARK_MNEMONIC`           | No       | Default BIP39 mnemonic (12 or 24 words). Omit to use `spark_create_wallet` or pass `mnemonic` per-tool call.                                                                                                                                      |
+| `SPARK_LOCAL_INGRESS_HOST` | No       | Set to your local Spark ingress host (for example `192.168.49.2` on minikube or `127.0.0.1` on kind) to route to `https://{i}.spark.minikube.local`. Omit when using `run-everything.sh` — the SDK routes to `localhost:8535-8539` automatically. |
+| `BITCOIN_RPC_URL`          | No       | Bitcoin JSON-RPC URL for `spark_fund_address`. Defaults to `http://{SPARK_LOCAL_INGRESS_HOST}:8332` or `http://127.0.0.1:8332`.                                                                                                                   |
+| `BITCOIN_RPC_USER`         | No       | Bitcoin RPC username (default: `testutil`)                                                                                                                                                                                                        |
+| `BITCOIN_RPC_PASSWORD`     | No       | Bitcoin RPC password (default: `testutilpassword`)                                                                                                                                                                                                |
 
 ### Networks
 
@@ -117,7 +117,7 @@ Every tool accepts an optional `network` parameter (`LOCAL`, `REGTEST`, or `MAIN
       "args": ["/path/to/spark/sdks/js/packages/spark-mcp/dist/index.js"],
       "env": {
         "BITCOIN_NETWORK": "LOCAL",
-        "MINIKUBE_IP": "192.168.49.2"
+        "SPARK_LOCAL_INGRESS_HOST": "192.168.49.2"
       }
     }
   }
@@ -216,7 +216,7 @@ On LOCAL networks (minikube or run-everything.sh), agents can fund a wallet end-
 4. spark_get_balance(mnemonic)         → verify the balance increased
 ```
 
-`spark_fund_address` calls the local bitcoind via JSON-RPC (`sendtoaddress` + `generatetoaddress`). It reads the RPC endpoint from `BITCOIN_RPC_URL`, defaulting to `http://{MINIKUBE_IP}:8332` or `http://127.0.0.1:8332` for `run-everything.sh`.
+`spark_fund_address` calls the local bitcoind via JSON-RPC (`sendtoaddress` + `generatetoaddress`). It reads the RPC endpoint from `BITCOIN_RPC_URL`, defaulting to `http://{SPARK_LOCAL_INGRESS_HOST}:8332` or `http://127.0.0.1:8332` for `run-everything.sh`.
 
 This tool is not available on REGTEST or MAINNET networks — on those, fund the deposit address through a faucet or external wallet.
 

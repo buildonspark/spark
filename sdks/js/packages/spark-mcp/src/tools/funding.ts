@@ -17,9 +17,9 @@ async function bitcoinRpc(
   params: unknown[],
   fetchFn: typeof fetch,
 ): Promise<unknown> {
-  const minikubeIp = process.env["MINIKUBE_IP"];
-  const defaultUrl = minikubeIp
-    ? `http://${minikubeIp}:8332`
+  const localIngressHost = process.env["SPARK_LOCAL_INGRESS_HOST"];
+  const defaultUrl = localIngressHost
+    ? `http://${localIngressHost}:8332`
     : "http://127.0.0.1:8332";
   const url = process.env["BITCOIN_RPC_URL"] ?? defaultUrl;
   const user = process.env["BITCOIN_RPC_USER"] ?? "testutil";

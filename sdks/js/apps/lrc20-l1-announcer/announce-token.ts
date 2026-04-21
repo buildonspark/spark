@@ -19,7 +19,7 @@ async function sleep(ms: number): Promise<void> {
 }
 
 export const isHermeticTest = Boolean(
-  typeof process !== "undefined" && process?.env?.MINIKUBE_IP,
+  typeof process !== "undefined" && process?.env?.SPARK_LOCAL_INGRESS_HOST,
 );
 
 const regtest = {

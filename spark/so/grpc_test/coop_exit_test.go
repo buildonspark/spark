@@ -377,7 +377,7 @@ func TestCoopExitFailureToSync(t *testing.T) {
 	// TODO(mhr): Figure out why this test hangs sometimes.
 	t.Skipf("This test sometimes hangs, needs investigation (SPARK-332)")
 
-	sparktesting.RequireMinikube(t)
+	sparktesting.RequireLocalSparkIngressHost(t)
 
 	sparktesting.WithTimeout(t, 1*time.Minute, func(t *testing.T) {
 		coin, err := faucet.Fund()

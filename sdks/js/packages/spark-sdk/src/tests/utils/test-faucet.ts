@@ -90,10 +90,11 @@ export class BitcoinFaucet {
 
   static getInstance(): BitcoinFaucet {
     if (!BitcoinFaucet.instance) {
+      const localIngressHost = process.env.SPARK_LOCAL_INGRESS_HOST;
       const url =
         process.env.BITCOIN_RPC_URL ||
-        (process.env.MINIKUBE_IP
-          ? `http://${process.env.MINIKUBE_IP}:8332`
+        (localIngressHost
+          ? `http://${localIngressHost}:8332`
           : "http://127.0.0.1:8332");
       const username = process.env.BITCOIN_RPC_USER || "testutil";
       const password = process.env.BITCOIN_RPC_PASSWORD || "testutilpassword";

@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["GITHUB_ACTIONS", "MINIKUBE_IP"],
+  "globalEnv": ["GITHUB_ACTIONS", "SPARK_LOCAL_INGRESS_HOST"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

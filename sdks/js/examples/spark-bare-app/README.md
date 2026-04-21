@@ -20,8 +20,8 @@ yarn run:mainnet get-or-create-wallet
 
 `LOCAL` uses the SDK's existing local routing:
 
-- `MINIKUBE_IP` unset: `https://localhost:8535-8537`
-- `MINIKUBE_IP` set: `https://{i}.spark-web.minikube.local`
+- `SPARK_LOCAL_INGRESS_HOST` unset: `https://localhost:8535-8537`
+- `SPARK_LOCAL_INGRESS_HOST` set: `https://{i}.spark-web.minikube.local`
 
 `NUM_SPARK_OPERATORS` is also respected if your local setup uses more than the
 default three operators. Scripts that need SSP services, such as Lightning or
