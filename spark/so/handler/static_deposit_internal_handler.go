@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
@@ -314,14 +313,6 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		return nil, fmt.Errorf("network %s not supported", network)
 	}
 
-	if req.ExpiryTime == nil {
-		return nil, fmt.Errorf("expiry time is required for instant deposit flow")
-	}
-
-	if req.ExpiryTime.AsTime().Before(time.Now()) {
-		return nil, fmt.Errorf("expiry time %s is in the past", req.ExpiryTime.AsTime())
-	}
-
 	if req.ValueSats <= 0 || req.CreditAmountSats < 0 || req.SecondaryCreditAmountSats < 0 {
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("amounts must be non-negative and value_sats must be positive"))
 	}
@@ -452,13 +443,12 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 	}
 
 	logger.Sugar().Infof(
-		"Creating instant UTXO swap record (transfer id %s, txid %x, vout %d, credit amount %d, secondary credit amount %d, expiry %s, deposit address %s)",
+		"Creating instant UTXO swap record (transfer id %s, txid %x, vout %d, credit amount %d, secondary credit amount %d, deposit address %s)",
 		transferID,
 		req.OnChainUtxo.Txid,
 		req.OnChainUtxo.Vout,
 		req.CreditAmountSats,
 		req.SecondaryCreditAmountSats,
-		req.ExpiryTime.AsTime(),
 		depositAddress.Address,
 	)
 
@@ -473,8 +463,11 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		SetUserSignature(req.UserSignature).
 		SetUserIdentityPublicKey(reqTransferReceiverIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
-		SetRequestedTransferID(transferID).
-		SetExpiryTime(req.ExpiryTime.AsTime())
+		SetRequestedTransferID(transferID)
+
+	if req.ExpiryTime != nil {
+		utxoSwapCreate = utxoSwapCreate.SetExpiryTime(req.ExpiryTime.AsTime())
+	}
 
 	if req.SecondaryCreditAmountSats > 0 {
 		utxoSwapCreate = utxoSwapCreate.SetSecondaryCreditAmountSats(uint64(req.SecondaryCreditAmountSats))
