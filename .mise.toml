@@ -24,7 +24,6 @@ build-to-minikube = { dir = "{{config_root}}", run = 'scripts/build-to-minikube.
 rds = { dir = "{{config_root}}", run = 'scripts/rds.sh' }
 run-minikube = { dir = "{{config_root}}", run = 'scripts/local-test.sh' }
 spark-cli-local = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:local' }
-spark-cli-k8s = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:k8s' }
 spark-cli-regtest = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli' }
 spark-cli-mainnet = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:mainnet' }
 spark-cli-dev = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:dev' }
@@ -38,10 +37,8 @@ test-grpc = { dir = "{{config_root}}/spark", run = 'mise test-grpc' }
 test-grpc-k8s = { dir = "{{config_root}}/spark", run = 'mise test-grpc-k8s' }
 build-js-packages = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages' }
 test-js = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test' }
-test-js-integration = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test:integration' }
-test-js-integration-k8s = { dir = "{{config_root}}/sdks/js", run = 'yarn install && SPARK_LOCAL_INGRESS_HOST=$(minikube ip) yarn test:integration' }
-test-js-integration-ssp = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test:integration:ssp' }
-test-js-integration-ssp-k8s = { dir = "{{config_root}}/sdks/js", run = 'yarn install && SPARK_LOCAL_INGRESS_HOST=$(minikube ip) yarn test:integration:ssp' }
+test-js-integration = { dir = "{{config_root}}/sdks/js", run = 'yarn install && ./scripts/with-local-ingress.sh yarn test:integration' }
+test-js-integration-ssp = { dir = "{{config_root}}/sdks/js", run = 'yarn install && ./scripts/with-local-ingress.sh yarn test:integration:ssp' }
 fix-atlas-conflicts = { dir = "{{config_root}}", run = 'scripts/fix-atlas-conflicts.sh' }
 fix-ent-conflicts = { dir = "{{config_root}}", run = 'scripts/fix-ent-conflicts.sh' }
 

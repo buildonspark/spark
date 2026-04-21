@@ -14,9 +14,15 @@ The generic wrappers match the CLI-style environments:
 ```bash
 yarn run get-or-create-wallet
 yarn run:local get-or-create-wallet
-yarn run:k8s get-or-create-wallet
 yarn run:mainnet get-or-create-wallet
 ```
+
+`run:local` auto-detects the local ingress host in this order:
+
+- `SPARK_LOCAL_INGRESS_HOST`
+- `127.0.0.1` when `kubectl config current-context` looks like `kind` / `kdev`
+- `minikube ip`
+- otherwise no ingress override
 
 `LOCAL` uses the SDK's existing local routing:
 

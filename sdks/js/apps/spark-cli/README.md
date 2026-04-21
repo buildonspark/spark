@@ -57,3 +57,10 @@ yarn cli            # regtest (default)
 yarn cli:mainnet    # mainnet
 yarn cli:local      # local network
 ```
+
+`cli:local` auto-detects the local ingress host in this order:
+
+- `SPARK_LOCAL_INGRESS_HOST`
+- `127.0.0.1` when `kubectl config current-context` looks like `kind` / `kdev`
+- `minikube ip`
+- otherwise no ingress override, which keeps the existing direct `localhost:8535+` flow

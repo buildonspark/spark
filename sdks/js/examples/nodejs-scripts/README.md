@@ -24,11 +24,17 @@ The generic wrappers match the CLI-style environments:
 
 ```bash
 yarn run:local get-balance "<mnemonic>"
-yarn run:k8s get-balance "<mnemonic>"
 yarn run:mainnet get-balance "<mnemonic>"
 ```
 
-`LOCAL` uses the SDK's existing local routing:
+`run:local` auto-detects the local ingress host in this order:
+
+- `SPARK_LOCAL_INGRESS_HOST`
+- `127.0.0.1` when `kubectl config current-context` looks like `kind` / `kdev`
+- `minikube ip`
+- otherwise no ingress override
+
+`LOCAL` then uses the SDK's existing local routing:
 
 - `SPARK_LOCAL_INGRESS_HOST` unset: `https://localhost:8535-8537`
 - `SPARK_LOCAL_INGRESS_HOST` set: `https://{i}.spark.minikube.local`
