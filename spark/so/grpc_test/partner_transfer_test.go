@@ -78,11 +78,18 @@ func testTransferWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signToke
 	// Create the partner record on the coordinator database.
 	coordSetupClient := db.NewPostgresEntClientForIntegrationTest(t, senderConfig.CoordinatorDatabaseURI)
 	defer coordSetupClient.Close()
-	_, err := coordSetupClient.Partner.Create().
+	pk, err := coordSetupClient.PartnerKey.Create().
+		SetPartnerID(testPartnerID).
+		SetPartnerName("Integration Test Partner").
+		SetJwtPublicKey(jwtPubKey).
+		Save(t.Context())
+	require.NoError(t, err, "failed to create partner key on coordinator")
+	_, err = coordSetupClient.Partner.Create().
 		SetPartnerID(testPartnerID).
 		SetLabel(testLabel).
 		SetPartnerName("Integration Test Partner").
 		SetJwtPublicKey(jwtPubKey).
+		SetPartnerKeyID(pk.ID).
 		Save(t.Context())
 	require.NoError(t, err, "failed to create partner on coordinator")
 
@@ -185,11 +192,18 @@ func testHodlReceiveWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signT
 	// Create the partner record on the coordinator database.
 	coordSetupClient := db.NewPostgresEntClientForIntegrationTest(t, userConfig.CoordinatorDatabaseURI)
 	defer coordSetupClient.Close()
-	_, err := coordSetupClient.Partner.Create().
+	pk, err := coordSetupClient.PartnerKey.Create().
+		SetPartnerID(testPartnerID).
+		SetPartnerName("Integration Test Partner").
+		SetJwtPublicKey(jwtPubKey).
+		Save(t.Context())
+	require.NoError(t, err, "failed to create partner key on coordinator")
+	_, err = coordSetupClient.Partner.Create().
 		SetPartnerID(testPartnerID).
 		SetLabel(testLabel).
 		SetPartnerName("Integration Test Partner").
 		SetJwtPublicKey(jwtPubKey).
+		SetPartnerKeyID(pk.ID).
 		Save(t.Context())
 	require.NoError(t, err, "failed to create partner on coordinator")
 
@@ -287,11 +301,18 @@ func testLightningSendWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, sig
 	// Create the partner record on the coordinator database.
 	coordSetupClient := db.NewPostgresEntClientForIntegrationTest(t, userConfig.CoordinatorDatabaseURI)
 	defer coordSetupClient.Close()
-	_, err := coordSetupClient.Partner.Create().
+	pk, err := coordSetupClient.PartnerKey.Create().
+		SetPartnerID(testPartnerID).
+		SetPartnerName("Integration Test Partner").
+		SetJwtPublicKey(jwtPubKey).
+		Save(t.Context())
+	require.NoError(t, err, "failed to create partner key on coordinator")
+	_, err = coordSetupClient.Partner.Create().
 		SetPartnerID(testPartnerID).
 		SetLabel(testLabel).
 		SetPartnerName("Integration Test Partner").
 		SetJwtPublicKey(jwtPubKey).
+		SetPartnerKeyID(pk.ID).
 		Save(t.Context())
 	require.NoError(t, err, "failed to create partner on coordinator")
 
@@ -377,11 +398,18 @@ func TestNonHodlReceiveWithPartnerAttribution(t *testing.T) {
 	// Create partner on coordinator.
 	coordSetupClient := db.NewPostgresEntClientForIntegrationTest(t, userConfig.CoordinatorDatabaseURI)
 	defer coordSetupClient.Close()
+	pk, err := coordSetupClient.PartnerKey.Create().
+		SetPartnerID(testPartnerID).
+		SetPartnerName("Integration Test Partner").
+		SetJwtPublicKey(jwtPubKey).
+		Save(t.Context())
+	require.NoError(t, err)
 	_, err = coordSetupClient.Partner.Create().
 		SetPartnerID(testPartnerID).
 		SetLabel(testLabel).
 		SetPartnerName("Integration Test Partner").
 		SetJwtPublicKey(jwtPubKey).
+		SetPartnerKeyID(pk.ID).
 		Save(t.Context())
 	require.NoError(t, err)
 

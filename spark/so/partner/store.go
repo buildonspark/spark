@@ -23,7 +23,7 @@ func SaveTransferPartner(ctx context.Context, transferID uuid.UUID, transferPart
 	}
 
 	pInfo, ok := GetPartnerInfoFromContext(ctx)
-	if !ok || pInfo.Label == "" {
+	if !ok || pInfo.PartnerDBID == uuid.Nil {
 		return
 	}
 

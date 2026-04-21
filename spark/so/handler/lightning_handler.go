@@ -280,7 +280,7 @@ func savePreimageSharePartner(ctx context.Context, db *ent.Client, paymentHash [
 	}
 
 	pInfo, ok := partner.GetPartnerInfoFromContext(ctx)
-	if !ok || pInfo.Label == "" {
+	if !ok || pInfo.PartnerDBID == uuid.Nil {
 		return nil
 	}
 

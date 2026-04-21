@@ -90,11 +90,19 @@ func TestSaveTransferPartner_IssOnlyPartner_Skips(t *testing.T) {
 
 func createTestPartner(t *testing.T, ctx context.Context, client *ent.Client, partnerID, label string) *ent.Partner {
 	t.Helper()
+	pubKey := jwtkeys.MustParsePublicHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3")
+	pk, err := client.PartnerKey.Create().
+		SetPartnerID(partnerID).
+		SetPartnerName("Test Partner").
+		SetJwtPublicKey(pubKey).
+		Save(ctx)
+	require.NoError(t, err)
 	p, err := client.Partner.Create().
 		SetPartnerID(partnerID).
 		SetLabel(label).
 		SetPartnerName("Test Partner").
-		SetJwtPublicKey(jwtkeys.MustParsePublicHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3")).
+		SetJwtPublicKey(pubKey).
+		SetPartnerKeyID(pk.ID).
 		Save(ctx)
 	require.NoError(t, err)
 	return p
