@@ -1,11 +1,13 @@
 package grpctest
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 	"time"
@@ -557,4 +559,156 @@ func cleanUpPreimageShareOnNonCoordinators(t *testing.T, config *wallet.TestWall
 		entClient.PreimageShare.Delete().Where(preimageshare.PaymentHash(paymentHash[:])).Exec(t.Context()) //nolint:errcheck // best-effort cleanup
 		entClient.Close()
 	}
+}
+
+// Basic coop exit flow (multi-step, no TransferPackage).
+func TestCoopExitWithPartnerAttribution_ES256(t *testing.T) {
+	partnerKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	compressedKey := elliptic.MarshalCompressed(elliptic.P256(), partnerKey.PublicKey.X, partnerKey.PublicKey.Y)
+	p256Key, err := keys.ParseP256PublicKey(compressedKey)
+	require.NoError(t, err)
+	jwtPubKey := jwtkeys.PublicFromP256(p256Key)
+
+	testCoopExitWithPartnerJWT(t, jwtPubKey, false, func(partnerID, label string) string {
+		return signJWT(t, "ES256", partnerID, label, func(digest []byte) []byte {
+			r, s, err := ecdsa.Sign(rand.Reader, partnerKey, digest)
+			require.NoError(t, err)
+			sig := make([]byte, 64)
+			r.FillBytes(sig[:32])
+			s.FillBytes(sig[32:])
+			return sig
+		})
+	})
+}
+
+// Single-call coop exit flow (with TransferPackage).
+func TestCoopExitWithTransferPackagePartnerAttribution_ES256(t *testing.T) {
+	partnerKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	compressedKey := elliptic.MarshalCompressed(elliptic.P256(), partnerKey.PublicKey.X, partnerKey.PublicKey.Y)
+	p256Key, err := keys.ParseP256PublicKey(compressedKey)
+	require.NoError(t, err)
+	jwtPubKey := jwtkeys.PublicFromP256(p256Key)
+
+	testCoopExitWithPartnerJWT(t, jwtPubKey, true, func(partnerID, label string) string {
+		return signJWT(t, "ES256", partnerID, label, func(digest []byte) []byte {
+			r, s, err := ecdsa.Sign(rand.Reader, partnerKey, digest)
+			require.NoError(t, err)
+			sig := make([]byte, 64)
+			r.FillBytes(sig[:32])
+			s.FillBytes(sig[32:])
+			return sig
+		})
+	})
+}
+
+// Basic coop exit flow with ES256K.
+func TestCoopExitWithPartnerAttribution_ES256K(t *testing.T) {
+	secpPriv := keys.GeneratePrivateKey()
+	secpPub := jwtkeys.PublicFromSecp256k1(secpPriv.Public())
+
+	testCoopExitWithPartnerJWT(t, secpPub, false, func(partnerID, label string) string {
+		return signJWT(t, "ES256K", partnerID, label, func(digest []byte) []byte {
+			ecKey := secpPriv.ToBTCEC().ToECDSA()
+			r, s, err := ecdsa.Sign(rand.Reader, ecKey, digest)
+			require.NoError(t, err)
+			sig := make([]byte, 64)
+			r.FillBytes(sig[:32])
+			s.FillBytes(sig[32:])
+			return sig
+		})
+	})
+}
+
+func testCoopExitWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, useTransferPackage bool, signToken func(partnerID, label string) string) {
+	t.Helper()
+
+	testPartnerID := "test-partner-" + uuid.New().String()[:8]
+	testLabel := "client-1"
+
+	config, sspConfig, transferNode := setupUsers(t, amountSatsToSend)
+
+	// Create partner key and partner on coordinator.
+	coordSetupClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
+	defer coordSetupClient.Close()
+	pk, err := coordSetupClient.PartnerKey.Create().
+		SetPartnerID(testPartnerID).
+		SetPartnerName("Integration Test Partner").
+		SetJwtPublicKey(jwtPubKey).
+		Save(t.Context())
+	require.NoError(t, err, "failed to create partner key on coordinator")
+	_, err = coordSetupClient.Partner.Create().
+		SetLabel(testLabel).
+		SetPartnerKeyID(pk.ID).
+		Save(t.Context())
+	require.NoError(t, err, "failed to create partner on coordinator")
+
+	token := signToken(testPartnerID, testLabel)
+
+	// SSP creates coop exit transactions.
+	coin, err := faucet.Fund()
+	require.NoError(t, err)
+
+	withdrawPrivKey := keys.GeneratePrivateKey()
+	exitTx, connectorTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
+		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSatsToSend,
+	)
+
+	exitTxID, err := hex.DecodeString(exitTx.TxID())
+	require.NoError(t, err)
+
+	var connectorTxBuf bytes.Buffer
+	err = connectorTx.Serialize(&connectorTxBuf)
+	require.NoError(t, err)
+
+	// Inject partner JWT into context for the coop exit call.
+	ctx := metadata.AppendToOutgoingContext(t.Context(), "x-partner-jwt", token)
+
+	var senderTransfer *spark.Transfer
+	if useTransferPackage {
+		senderTransfer, err = wallet.GetConnectorRefundSignaturesV2WithTransferPackage(
+			ctx,
+			config,
+			[]wallet.LeafKeyTweak{transferNode},
+			exitTxID,
+			connectorOutputs,
+			sspConfig.IdentityPublicKey(),
+			time.Now().Add(24*time.Hour),
+			connectorTxBuf.Bytes(),
+		)
+	} else {
+		senderTransfer, _, err = wallet.GetConnectorRefundSignaturesV2(
+			ctx,
+			config,
+			[]wallet.LeafKeyTweak{transferNode},
+			exitTxID,
+			connectorOutputs,
+			sspConfig.IdentityPublicKey(),
+			time.Now().Add(24*time.Hour),
+			connectorTxBuf.Bytes(),
+		)
+	}
+	require.NoError(t, err, "failed to initiate coop exit")
+
+	transferID, err := uuid.Parse(senderTransfer.Id)
+	require.NoError(t, err)
+
+	// Verify transfer_partner record on coordinator.
+	coordClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
+	defer coordClient.Close()
+
+	tp, err := coordClient.TransferPartner.Query().
+		Where(
+			transferpartner.HasTransferWith(enttransfer.IDEQ(transferID)),
+			transferpartner.HasPartnerWith(
+				partner.HasPartnerKeyWith(partnerkey.PartnerIDEQ(testPartnerID)),
+				partner.LabelEQ(testLabel),
+			),
+		).
+		Only(t.Context())
+	require.NoError(t, err, "transfer_partners record not found on coordinator for coop exit transfer %s", transferID)
+	require.Equal(t, st.TransferPartnerTypeCooperativeExit, tp.Type)
 }

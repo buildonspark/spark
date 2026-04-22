@@ -18,6 +18,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/partner"
 )
 
 // CooperativeExitHandler tracks transfers
@@ -195,6 +196,8 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		return nil, fmt.Errorf("unable to commit transfer data after successful sync: %w", err)
 	}
 
+	partner.SaveTransferPartner(ctx, transferUUID, st.TransferPartnerTypeCooperativeExit)
+
 	// Mark PendingSendTransfer finished on success.
 	db, err = ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -342,6 +345,8 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 	if err := entTx.Commit(); err != nil {
 		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
 	}
+
+	partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeCooperativeExit)
 
 	transfer, err = transferHandler.loadTransferForUpdate(ctx, transferID)
 	if err != nil {
