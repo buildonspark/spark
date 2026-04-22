@@ -3762,6 +3762,8 @@ func (m *GossipMessageConsensusCommit) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for FlowExecutionId
+
 	if len(errors) > 0 {
 		return GossipMessageConsensusCommitMultiError(errors)
 	}
@@ -3895,6 +3897,8 @@ func (m *GossipMessageConsensusRollback) validate(all bool) error {
 			}
 		}
 	}
+
+	// no validation rules for FlowExecutionId
 
 	if len(errors) > 0 {
 		return GossipMessageConsensusRollbackMultiError(errors)

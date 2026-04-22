@@ -63,6 +63,7 @@ const (
 	SparkInternalService_GenerateStaticDepositAddressProofs_FullMethodName = "/spark_internal.SparkInternalService/generate_static_deposit_address_proofs"
 	SparkInternalService_SyncNode_FullMethodName                           = "/spark_internal.SparkInternalService/sync_node"
 	SparkInternalService_ConsensusPrepare_FullMethodName                   = "/spark_internal.SparkInternalService/consensus_prepare"
+	SparkInternalService_ConsensusQueryOutcome_FullMethodName              = "/spark_internal.SparkInternalService/consensus_query_outcome"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -129,6 +130,12 @@ type SparkInternalServiceClient interface {
 	// The coordinator fans this out to all participants during Execute.
 	// Each participant dispatches to the appropriate FlowHandler.Prepare based on op_type.
 	ConsensusPrepare(ctx context.Context, in *ConsensusPrepareRequest, opts ...grpc.CallOption) (*ConsensusPrepareResponse, error)
+	// ConsensusQueryOutcome lets a participant ask the coordinator what the
+	// final outcome of a 2PC execution was. Used by the flow-execution
+	// reconciliation background task to resolve stuck participant rows.
+	// Looks up the coordinator's FlowExecution row by id and returns its
+	// status + decision payload.
+	ConsensusQueryOutcome(ctx context.Context, in *ConsensusQueryOutcomeRequest, opts ...grpc.CallOption) (*ConsensusQueryOutcomeResponse, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -561,6 +568,16 @@ func (c *sparkInternalServiceClient) ConsensusPrepare(ctx context.Context, in *C
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) ConsensusQueryOutcome(ctx context.Context, in *ConsensusQueryOutcomeRequest, opts ...grpc.CallOption) (*ConsensusQueryOutcomeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConsensusQueryOutcomeResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_ConsensusQueryOutcome_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -625,6 +642,12 @@ type SparkInternalServiceServer interface {
 	// The coordinator fans this out to all participants during Execute.
 	// Each participant dispatches to the appropriate FlowHandler.Prepare based on op_type.
 	ConsensusPrepare(context.Context, *ConsensusPrepareRequest) (*ConsensusPrepareResponse, error)
+	// ConsensusQueryOutcome lets a participant ask the coordinator what the
+	// final outcome of a 2PC execution was. Used by the flow-execution
+	// reconciliation background task to resolve stuck participant rows.
+	// Looks up the coordinator's FlowExecution row by id and returns its
+	// status + decision payload.
+	ConsensusQueryOutcome(context.Context, *ConsensusQueryOutcomeRequest) (*ConsensusQueryOutcomeResponse, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -760,6 +783,9 @@ func (UnimplementedSparkInternalServiceServer) SyncNode(context.Context, *SyncNo
 }
 func (UnimplementedSparkInternalServiceServer) ConsensusPrepare(context.Context, *ConsensusPrepareRequest) (*ConsensusPrepareResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConsensusPrepare not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) ConsensusQueryOutcome(context.Context, *ConsensusQueryOutcomeRequest) (*ConsensusQueryOutcomeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConsensusQueryOutcome not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -1538,6 +1564,24 @@ func _SparkInternalService_ConsensusPrepare_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_ConsensusQueryOutcome_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConsensusQueryOutcomeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).ConsensusQueryOutcome(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_ConsensusQueryOutcome_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).ConsensusQueryOutcome(ctx, req.(*ConsensusQueryOutcomeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1712,6 +1756,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "consensus_prepare",
 			Handler:    _SparkInternalService_ConsensusPrepare_Handler,
+		},
+		{
+			MethodName: "consensus_query_outcome",
+			Handler:    _SparkInternalService_ConsensusQueryOutcome_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

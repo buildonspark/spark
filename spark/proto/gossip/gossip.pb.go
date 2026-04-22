@@ -1646,9 +1646,14 @@ type GossipMessageConsensusCommit struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	OpType ConsensusOperationType `protobuf:"varint,1,opt,name=op_type,json=opType,proto3,enum=gossip.ConsensusOperationType" json:"op_type,omitempty"`
 	// Domain-specific proto message for the commit phase.
-	Operation     *anypb.Any `protobuf:"bytes,2,opt,name=operation,proto3" json:"operation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Operation *anypb.Any `protobuf:"bytes,2,opt,name=operation,proto3" json:"operation,omitempty"`
+	// UUID (as string) of the participant's FlowExecution row to mark
+	// terminal after dispatch. Empty string means the sender is a
+	// pre-upgrade coordinator and the receiver should skip the row
+	// transition.
+	FlowExecutionId string `protobuf:"bytes,3,opt,name=flow_execution_id,json=flowExecutionId,proto3" json:"flow_execution_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GossipMessageConsensusCommit) Reset() {
@@ -1695,6 +1700,13 @@ func (x *GossipMessageConsensusCommit) GetOperation() *anypb.Any {
 	return nil
 }
 
+func (x *GossipMessageConsensusCommit) GetFlowExecutionId() string {
+	if x != nil {
+		return x.FlowExecutionId
+	}
+	return ""
+}
+
 // GossipMessageConsensusRollback delivers the rollback phase of a consensus operation.
 // The op_type identifies the domain flow, and operation carries the serialized
 // domain-specific proto payload for the flow's rollback logic.
@@ -1702,9 +1714,14 @@ type GossipMessageConsensusRollback struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	OpType ConsensusOperationType `protobuf:"varint,1,opt,name=op_type,json=opType,proto3,enum=gossip.ConsensusOperationType" json:"op_type,omitempty"`
 	// Domain-specific proto message for the rollback phase.
-	Operation     *anypb.Any `protobuf:"bytes,2,opt,name=operation,proto3" json:"operation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Operation *anypb.Any `protobuf:"bytes,2,opt,name=operation,proto3" json:"operation,omitempty"`
+	// UUID (as string) of the participant's FlowExecution row to mark
+	// terminal after dispatch. Empty string means the sender is a
+	// pre-upgrade coordinator and the receiver should skip the row
+	// transition.
+	FlowExecutionId string `protobuf:"bytes,3,opt,name=flow_execution_id,json=flowExecutionId,proto3" json:"flow_execution_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GossipMessageConsensusRollback) Reset() {
@@ -1749,6 +1766,13 @@ func (x *GossipMessageConsensusRollback) GetOperation() *anypb.Any {
 		return x.Operation
 	}
 	return nil
+}
+
+func (x *GossipMessageConsensusRollback) GetFlowExecutionId() string {
+	if x != nil {
+		return x.FlowExecutionId
+	}
+	return ""
 }
 
 var File_gossip_proto protoreflect.FileDescriptor
@@ -1862,13 +1886,15 @@ const file_gossip_proto_rawDesc = "" +
 	"\tsignature\x18\x04 \x01(\fR\tsignature\x124\n" +
 	"\x16coordinator_public_key\x18\x05 \x01(\fR\x14coordinatorPublicKey\"O\n" +
 	"\x1dGossipMessageFinalizeTreeNode\x12.\n" +
-	"\x05nodes\x18\x01 \x03(\v2\x18.spark_internal.TreeNodeR\x05nodes\"\x8b\x01\n" +
+	"\x05nodes\x18\x01 \x03(\v2\x18.spark_internal.TreeNodeR\x05nodes\"\xb7\x01\n" +
 	"\x1cGossipMessageConsensusCommit\x127\n" +
 	"\aop_type\x18\x01 \x01(\x0e2\x1e.gossip.ConsensusOperationTypeR\x06opType\x122\n" +
-	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation\"\x8d\x01\n" +
+	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation\x12*\n" +
+	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId\"\xb9\x01\n" +
 	"\x1eGossipMessageConsensusRollback\x127\n" +
 	"\aop_type\x18\x01 \x01(\x0e2\x1e.gossip.ConsensusOperationTypeR\x06opType\x122\n" +
-	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation*\xd2\x01\n" +
+	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation\x12*\n" +
+	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId*\xd2\x01\n" +
 	"\x16ConsensusOperationType\x12(\n" +
 	"$CONSENSUS_OPERATION_TYPE_UNSPECIFIED\x10\x00\x122\n" +
 	".CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE\x10\x01\x121\n" +

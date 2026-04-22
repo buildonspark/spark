@@ -8634,6 +8634,8 @@ func (m *ConsensusPrepareRequest) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for FlowExecutionId
+
 	if len(errors) > 0 {
 		return ConsensusPrepareRequestMultiError(errors)
 	}
@@ -8844,3 +8846,244 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ConsensusPrepareResponseValidationError{}
+
+// Validate checks the field values on ConsensusQueryOutcomeRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ConsensusQueryOutcomeRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ConsensusQueryOutcomeRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ConsensusQueryOutcomeRequestMultiError, or nil if none found.
+func (m *ConsensusQueryOutcomeRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ConsensusQueryOutcomeRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for FlowExecutionId
+
+	if len(errors) > 0 {
+		return ConsensusQueryOutcomeRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ConsensusQueryOutcomeRequestMultiError is an error wrapping multiple
+// validation errors returned by ConsensusQueryOutcomeRequest.ValidateAll() if
+// the designated constraints aren't met.
+type ConsensusQueryOutcomeRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ConsensusQueryOutcomeRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ConsensusQueryOutcomeRequestMultiError) AllErrors() []error { return m }
+
+// ConsensusQueryOutcomeRequestValidationError is the validation error returned
+// by ConsensusQueryOutcomeRequest.Validate if the designated constraints
+// aren't met.
+type ConsensusQueryOutcomeRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ConsensusQueryOutcomeRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ConsensusQueryOutcomeRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ConsensusQueryOutcomeRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ConsensusQueryOutcomeRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ConsensusQueryOutcomeRequestValidationError) ErrorName() string {
+	return "ConsensusQueryOutcomeRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ConsensusQueryOutcomeRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sConsensusQueryOutcomeRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ConsensusQueryOutcomeRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ConsensusQueryOutcomeRequestValidationError{}
+
+// Validate checks the field values on ConsensusQueryOutcomeResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ConsensusQueryOutcomeResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ConsensusQueryOutcomeResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// ConsensusQueryOutcomeResponseMultiError, or nil if none found.
+func (m *ConsensusQueryOutcomeResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ConsensusQueryOutcomeResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Outcome
+
+	// no validation rules for OpType
+
+	if all {
+		switch v := interface{}(m.GetDecisionPayload()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ConsensusQueryOutcomeResponseValidationError{
+					field:  "DecisionPayload",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ConsensusQueryOutcomeResponseValidationError{
+					field:  "DecisionPayload",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetDecisionPayload()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ConsensusQueryOutcomeResponseValidationError{
+				field:  "DecisionPayload",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return ConsensusQueryOutcomeResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// ConsensusQueryOutcomeResponseMultiError is an error wrapping multiple
+// validation errors returned by ConsensusQueryOutcomeResponse.ValidateAll()
+// if the designated constraints aren't met.
+type ConsensusQueryOutcomeResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ConsensusQueryOutcomeResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ConsensusQueryOutcomeResponseMultiError) AllErrors() []error { return m }
+
+// ConsensusQueryOutcomeResponseValidationError is the validation error
+// returned by ConsensusQueryOutcomeResponse.Validate if the designated
+// constraints aren't met.
+type ConsensusQueryOutcomeResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ConsensusQueryOutcomeResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ConsensusQueryOutcomeResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ConsensusQueryOutcomeResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ConsensusQueryOutcomeResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ConsensusQueryOutcomeResponseValidationError) ErrorName() string {
+	return "ConsensusQueryOutcomeResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ConsensusQueryOutcomeResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sConsensusQueryOutcomeResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ConsensusQueryOutcomeResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ConsensusQueryOutcomeResponseValidationError{}

@@ -92,6 +92,13 @@ service SparkInternalService {
     // The coordinator fans this out to all participants during Execute.
     // Each participant dispatches to the appropriate FlowHandler.Prepare based on op_type.
     rpc consensus_prepare(ConsensusPrepareRequest) returns (ConsensusPrepareResponse) {}
+
+    // ConsensusQueryOutcome lets a participant ask the coordinator what the
+    // final outcome of a 2PC execution was. Used by the flow-execution
+    // reconciliation background task to resolve stuck participant rows.
+    // Looks up the coordinator's FlowExecution row by id and returns its
+    // status + decision payload.
+    rpc consensus_query_outcome(ConsensusQueryOutcomeRequest) returns (ConsensusQueryOutcomeResponse) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -563,9 +570,42 @@ message ConsensusPrepareRequest {
     int32 op_type = 1;
     // Domain-specific proto message passed to FlowHandler.Prepare.
     google.protobuf.Any operation = 2;
+    // UUID (as string) of the coordinator's FlowExecution row for this 2PC
+    // execution. Participants use this as the id of their own FlowExecution
+    // row (each SO has an independent database, so the same UUID is safely
+    // reused across roles). Empty means the caller is a pre-upgrade
+    // coordinator; participants skip writing a FlowExecution row.
+    string flow_execution_id = 3;
 }
 
 message ConsensusPrepareResponse {
     // Domain-specific result from FlowHandler.Prepare (e.g., signature shares).
     google.protobuf.Any result = 1;
+}
+
+message ConsensusQueryOutcomeRequest {
+    // UUID (as string) of the FlowExecution row to query. Same value the
+    // coordinator originally sent in ConsensusPrepareRequest.flow_execution_id.
+    string flow_execution_id = 1;
+}
+
+message ConsensusQueryOutcomeResponse {
+    enum Outcome {
+        // Coordinator has no record of this flow_execution_id.
+        // Reconciliation callers treat this as data loss requiring
+        // operator attention; it is not a normal-operation outcome
+        // because the coordinator writes the row before fan-out and
+        // retains it through the terminal transition.
+        OUTCOME_UNSPECIFIED = 0;
+        OUTCOME_IN_FLIGHT   = 1;
+        OUTCOME_COMMITTED   = 2;
+        OUTCOME_ROLLED_BACK = 3;
+    }
+    Outcome outcome = 1;
+    // Mirrors gossip.ConsensusOperationType on the matched row.
+    int32 op_type = 2;
+    // Populated when outcome is COMMITTED or ROLLED_BACK. Domain-specific
+    // commit/rollback proto (the same bytes the coordinator sends as the
+    // ConsensusCommit / ConsensusRollback gossip payload).
+    google.protobuf.Any decision_payload = 3;
 }

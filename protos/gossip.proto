@@ -198,6 +198,11 @@ message GossipMessageConsensusCommit {
     ConsensusOperationType op_type = 1;
     // Domain-specific proto message for the commit phase.
     google.protobuf.Any operation = 2;
+    // UUID (as string) of the participant's FlowExecution row to mark
+    // terminal after dispatch. Empty string means the sender is a
+    // pre-upgrade coordinator and the receiver should skip the row
+    // transition.
+    string flow_execution_id = 3;
 }
 
 // GossipMessageConsensusRollback delivers the rollback phase of a consensus operation.
@@ -207,4 +212,9 @@ message GossipMessageConsensusRollback {
     ConsensusOperationType op_type = 1;
     // Domain-specific proto message for the rollback phase.
     google.protobuf.Any operation = 2;
+    // UUID (as string) of the participant's FlowExecution row to mark
+    // terminal after dispatch. Empty string means the sender is a
+    // pre-upgrade coordinator and the receiver should skip the row
+    // transition.
+    string flow_execution_id = 3;
 }
