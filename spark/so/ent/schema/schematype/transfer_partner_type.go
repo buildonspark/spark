@@ -8,6 +8,7 @@ const (
 	TransferPartnerTypeLightningReceive TransferPartnerType = "LIGHTNING_RECEIVE"
 	TransferPartnerTypeTransfer         TransferPartnerType = "TRANSFER"
 	TransferPartnerTypeCooperativeExit  TransferPartnerType = "COOPERATIVE_EXIT"
+	TransferPartnerTypeDeposit          TransferPartnerType = "DEPOSIT"
 )
 
 // Values returns the valid enum values for ent schema validation.
@@ -17,5 +18,6 @@ func (TransferPartnerType) Values() []string {
 		string(TransferPartnerTypeLightningReceive),
 		string(TransferPartnerTypeTransfer),
 		string(TransferPartnerTypeCooperativeExit),
+		string(TransferPartnerTypeDeposit),
 	}
 }

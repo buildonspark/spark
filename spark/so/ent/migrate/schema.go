@@ -1415,7 +1415,7 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "type", Type: field.TypeEnum, Enums: []string{"LIGHTNING_SEND", "LIGHTNING_RECEIVE", "TRANSFER", "COOPERATIVE_EXIT"}},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"LIGHTNING_SEND", "LIGHTNING_RECEIVE", "TRANSFER", "COOPERATIVE_EXIT", "DEPOSIT"}},
 		{Name: "transfer_partner_partner", Type: field.TypeUUID},
 		{Name: "transfer_partner_transfer", Type: field.TypeUUID},
 	}

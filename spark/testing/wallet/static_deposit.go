@@ -46,6 +46,19 @@ func CreateSspFixedQuoteSignature(
 	return signature.Serialize(), nil
 }
 
+func CreateInstantUserSignature(
+	network btcnetwork.Network,
+	creditAmountSats uint64,
+	secondaryCreditAmountSats uint64,
+	destinationAddress string,
+	satsValue uint64,
+	sspSignature []byte,
+	identityPrivateKey keys.Private,
+) []byte {
+	hash := handler.CreateInstantUserStatement(network, creditAmountSats, secondaryCreditAmountSats, destinationAddress, satsValue, sspSignature)
+	return ecdsa.Sign(identityPrivateKey.ToBTCEC(), hash).Serialize()
+}
+
 func CreateUserSignature(
 	transactionID string,
 	outputIndex uint32,

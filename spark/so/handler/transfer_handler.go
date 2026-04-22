@@ -415,8 +415,11 @@ func (h *TransferHandler) startTransferInternal(
 	// After this point, the transfer send is considered successful.
 	needsRollback = false
 
-	if transferType == st.TransferTypeTransfer {
+	switch transferType { //nolint:exhaustive // only specific types need partner tracking
+	case st.TransferTypeTransfer:
 		partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeTransfer)
+	case st.TransferTypeUtxoSwap:
+		partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeDeposit)
 	}
 
 	if req.TransferPackage != nil {
