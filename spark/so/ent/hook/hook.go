@@ -81,6 +81,18 @@ func (f EventMessageFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EventMessageMutation", m)
 }
 
+// The FlowExecutionFunc type is an adapter to allow the use of ordinary
+// function as FlowExecution mutator.
+type FlowExecutionFunc func(context.Context, *ent.FlowExecutionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f FlowExecutionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.FlowExecutionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.FlowExecutionMutation", m)
+}
+
 // The GossipFunc type is an adapter to allow the use of ordinary
 // function as Gossip mutator.
 type GossipFunc func(context.Context, *ent.GossipMutation) (ent.Value, error)

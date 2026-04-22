@@ -26,6 +26,8 @@ type Tx struct {
 	EntityDkgKey *EntityDkgKeyClient
 	// EventMessage is the client for interacting with the EventMessage builders.
 	EventMessage *EventMessageClient
+	// FlowExecution is the client for interacting with the FlowExecution builders.
+	FlowExecution *FlowExecutionClient
 	// Gossip is the client for interacting with the Gossip builders.
 	Gossip *GossipClient
 	// IdempotencyKey is the client for interacting with the IdempotencyKey builders.
@@ -237,6 +239,7 @@ func (tx *Tx) init() {
 	tx.DepositAddressPartner = NewDepositAddressPartnerClient(tx.config)
 	tx.EntityDkgKey = NewEntityDkgKeyClient(tx.config)
 	tx.EventMessage = NewEventMessageClient(tx.config)
+	tx.FlowExecution = NewFlowExecutionClient(tx.config)
 	tx.Gossip = NewGossipClient(tx.config)
 	tx.IdempotencyKey = NewIdempotencyKeyClient(tx.config)
 	tx.L1TokenCreate = NewL1TokenCreateClient(tx.config)

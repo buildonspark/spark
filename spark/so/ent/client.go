@@ -22,6 +22,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddresspartner"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
+	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
@@ -80,6 +81,8 @@ type Client struct {
 	EntityDkgKey *EntityDkgKeyClient
 	// EventMessage is the client for interacting with the EventMessage builders.
 	EventMessage *EventMessageClient
+	// FlowExecution is the client for interacting with the FlowExecution builders.
+	FlowExecution *FlowExecutionClient
 	// Gossip is the client for interacting with the Gossip builders.
 	Gossip *GossipClient
 	// IdempotencyKey is the client for interacting with the IdempotencyKey builders.
@@ -171,6 +174,7 @@ func (c *Client) init() {
 	c.DepositAddressPartner = NewDepositAddressPartnerClient(c.config)
 	c.EntityDkgKey = NewEntityDkgKeyClient(c.config)
 	c.EventMessage = NewEventMessageClient(c.config)
+	c.FlowExecution = NewFlowExecutionClient(c.config)
 	c.Gossip = NewGossipClient(c.config)
 	c.IdempotencyKey = NewIdempotencyKeyClient(c.config)
 	c.L1TokenCreate = NewL1TokenCreateClient(c.config)
@@ -306,6 +310,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		DepositAddressPartner:             NewDepositAddressPartnerClient(cfg),
 		EntityDkgKey:                      NewEntityDkgKeyClient(cfg),
 		EventMessage:                      NewEventMessageClient(cfg),
+		FlowExecution:                     NewFlowExecutionClient(cfg),
 		Gossip:                            NewGossipClient(cfg),
 		IdempotencyKey:                    NewIdempotencyKeyClient(cfg),
 		L1TokenCreate:                     NewL1TokenCreateClient(cfg),
@@ -368,6 +373,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		DepositAddressPartner:             NewDepositAddressPartnerClient(cfg),
 		EntityDkgKey:                      NewEntityDkgKeyClient(cfg),
 		EventMessage:                      NewEventMessageClient(cfg),
+		FlowExecution:                     NewFlowExecutionClient(cfg),
 		Gossip:                            NewGossipClient(cfg),
 		IdempotencyKey:                    NewIdempotencyKeyClient(cfg),
 		L1TokenCreate:                     NewL1TokenCreateClient(cfg),
@@ -435,8 +441,8 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.DepositAddressPartner,
-		c.EntityDkgKey, c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
-		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
+		c.EntityDkgKey, c.EventMessage, c.FlowExecution, c.Gossip, c.IdempotencyKey,
+		c.L1TokenCreate, c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
 		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
 		c.PartnerKey, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
 		c.PreimageShare, c.PreimageSharePartner, c.SigningCommitment,
@@ -456,8 +462,8 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.DepositAddressPartner,
-		c.EntityDkgKey, c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
-		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
+		c.EntityDkgKey, c.EventMessage, c.FlowExecution, c.Gossip, c.IdempotencyKey,
+		c.L1TokenCreate, c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
 		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
 		c.PartnerKey, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
 		c.PreimageShare, c.PreimageSharePartner, c.SigningCommitment,
@@ -487,6 +493,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.EntityDkgKey.mutate(ctx, m)
 	case *EventMessageMutation:
 		return c.EventMessage.mutate(ctx, m)
+	case *FlowExecutionMutation:
+		return c.FlowExecution.mutate(ctx, m)
 	case *GossipMutation:
 		return c.Gossip.mutate(ctx, m)
 	case *IdempotencyKeyMutation:
@@ -1490,6 +1498,140 @@ func (c *EventMessageClient) mutate(ctx context.Context, m *EventMessageMutation
 		return (&EventMessageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown EventMessage mutation op: %q", m.Op())
+	}
+}
+
+// FlowExecutionClient is a client for the FlowExecution schema.
+type FlowExecutionClient struct {
+	config
+}
+
+// NewFlowExecutionClient returns a client for the FlowExecution from the given config.
+func NewFlowExecutionClient(c config) *FlowExecutionClient {
+	return &FlowExecutionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `flowexecution.Hooks(f(g(h())))`.
+func (c *FlowExecutionClient) Use(hooks ...Hook) {
+	c.hooks.FlowExecution = append(c.hooks.FlowExecution, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `flowexecution.Intercept(f(g(h())))`.
+func (c *FlowExecutionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.FlowExecution = append(c.inters.FlowExecution, interceptors...)
+}
+
+// Create returns a builder for creating a FlowExecution entity.
+func (c *FlowExecutionClient) Create() *FlowExecutionCreate {
+	mutation := newFlowExecutionMutation(c.config, OpCreate)
+	return &FlowExecutionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of FlowExecution entities.
+func (c *FlowExecutionClient) CreateBulk(builders ...*FlowExecutionCreate) *FlowExecutionCreateBulk {
+	return &FlowExecutionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *FlowExecutionClient) MapCreateBulk(slice any, setFunc func(*FlowExecutionCreate, int)) *FlowExecutionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &FlowExecutionCreateBulk{err: fmt.Errorf("calling to FlowExecutionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*FlowExecutionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &FlowExecutionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for FlowExecution.
+func (c *FlowExecutionClient) Update() *FlowExecutionUpdate {
+	mutation := newFlowExecutionMutation(c.config, OpUpdate)
+	return &FlowExecutionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *FlowExecutionClient) UpdateOne(fe *FlowExecution) *FlowExecutionUpdateOne {
+	mutation := newFlowExecutionMutation(c.config, OpUpdateOne, withFlowExecution(fe))
+	return &FlowExecutionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *FlowExecutionClient) UpdateOneID(id uuid.UUID) *FlowExecutionUpdateOne {
+	mutation := newFlowExecutionMutation(c.config, OpUpdateOne, withFlowExecutionID(id))
+	return &FlowExecutionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for FlowExecution.
+func (c *FlowExecutionClient) Delete() *FlowExecutionDelete {
+	mutation := newFlowExecutionMutation(c.config, OpDelete)
+	return &FlowExecutionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *FlowExecutionClient) DeleteOne(fe *FlowExecution) *FlowExecutionDeleteOne {
+	return c.DeleteOneID(fe.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *FlowExecutionClient) DeleteOneID(id uuid.UUID) *FlowExecutionDeleteOne {
+	builder := c.Delete().Where(flowexecution.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &FlowExecutionDeleteOne{builder}
+}
+
+// Query returns a query builder for FlowExecution.
+func (c *FlowExecutionClient) Query() *FlowExecutionQuery {
+	return &FlowExecutionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeFlowExecution},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a FlowExecution entity by its id.
+func (c *FlowExecutionClient) Get(ctx context.Context, id uuid.UUID) (*FlowExecution, error) {
+	return c.Query().Where(flowexecution.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *FlowExecutionClient) GetX(ctx context.Context, id uuid.UUID) *FlowExecution {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *FlowExecutionClient) Hooks() []Hook {
+	hooks := c.hooks.FlowExecution
+	return append(hooks[:len(hooks):len(hooks)], flowexecution.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *FlowExecutionClient) Interceptors() []Interceptor {
+	return c.inters.FlowExecution
+}
+
+func (c *FlowExecutionClient) mutate(ctx context.Context, m *FlowExecutionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&FlowExecutionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&FlowExecutionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&FlowExecutionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&FlowExecutionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown FlowExecution mutation op: %q", m.Op())
 	}
 }
 
@@ -7644,27 +7786,29 @@ func (c *WalletSettingClient) mutate(ctx context.Context, m *WalletSettingMutati
 type (
 	hooks struct {
 		BlockHeight, CooperativeExit, DepositAddress, DepositAddressPartner,
-		EntityDkgKey, EventMessage, Gossip, IdempotencyKey, L1TokenCreate,
-		L1TokenJusticeTransaction, L1TokenOutputWithdrawal, L1WithdrawalTransaction,
-		MultisigConfig, MultisigMember, Partner, PartnerKey, PaymentIntent,
-		PendingSendTransfer, PreimageRequest, PreimageShare, PreimageSharePartner,
-		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate,
-		TokenFreeze, TokenMint, TokenOutput, TokenPartialRevocationSecretShare,
-		TokenTransaction, TokenTransactionPeerSignature, Transfer, TransferLeaf,
-		TransferPartner, TransferReceiver, TransferSender, Tree, TreeNode,
-		UserSignedTransaction, Utxo, UtxoSwap, WalletSetting []ent.Hook
+		EntityDkgKey, EventMessage, FlowExecution, Gossip, IdempotencyKey,
+		L1TokenCreate, L1TokenJusticeTransaction, L1TokenOutputWithdrawal,
+		L1WithdrawalTransaction, MultisigConfig, MultisigMember, Partner, PartnerKey,
+		PaymentIntent, PendingSendTransfer, PreimageRequest, PreimageShare,
+		PreimageSharePartner, SigningCommitment, SigningKeyshare, SigningNonce,
+		SparkInvoice, TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		TokenPartialRevocationSecretShare, TokenTransaction,
+		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
+		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,
+		UtxoSwap, WalletSetting []ent.Hook
 	}
 	inters struct {
 		BlockHeight, CooperativeExit, DepositAddress, DepositAddressPartner,
-		EntityDkgKey, EventMessage, Gossip, IdempotencyKey, L1TokenCreate,
-		L1TokenJusticeTransaction, L1TokenOutputWithdrawal, L1WithdrawalTransaction,
-		MultisigConfig, MultisigMember, Partner, PartnerKey, PaymentIntent,
-		PendingSendTransfer, PreimageRequest, PreimageShare, PreimageSharePartner,
-		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate,
-		TokenFreeze, TokenMint, TokenOutput, TokenPartialRevocationSecretShare,
-		TokenTransaction, TokenTransactionPeerSignature, Transfer, TransferLeaf,
-		TransferPartner, TransferReceiver, TransferSender, Tree, TreeNode,
-		UserSignedTransaction, Utxo, UtxoSwap, WalletSetting []ent.Interceptor
+		EntityDkgKey, EventMessage, FlowExecution, Gossip, IdempotencyKey,
+		L1TokenCreate, L1TokenJusticeTransaction, L1TokenOutputWithdrawal,
+		L1WithdrawalTransaction, MultisigConfig, MultisigMember, Partner, PartnerKey,
+		PaymentIntent, PendingSendTransfer, PreimageRequest, PreimageShare,
+		PreimageSharePartner, SigningCommitment, SigningKeyshare, SigningNonce,
+		SparkInvoice, TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		TokenPartialRevocationSecretShare, TokenTransaction,
+		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
+		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,
+		UtxoSwap, WalletSetting []ent.Interceptor
 	}
 )
 

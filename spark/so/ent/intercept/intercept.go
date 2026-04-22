@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddresspartner"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
+	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
@@ -270,6 +271,33 @@ func (f TraverseEventMessage) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.EventMessageQuery", q)
+}
+
+// The FlowExecutionFunc type is an adapter to allow the use of ordinary function as a Querier.
+type FlowExecutionFunc func(context.Context, *ent.FlowExecutionQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f FlowExecutionFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.FlowExecutionQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.FlowExecutionQuery", q)
+}
+
+// The TraverseFlowExecution type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseFlowExecution func(context.Context, *ent.FlowExecutionQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseFlowExecution) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseFlowExecution) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.FlowExecutionQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.FlowExecutionQuery", q)
 }
 
 // The GossipFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1286,6 +1314,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.EntityDkgKeyQuery, predicate.EntityDkgKey, entitydkgkey.OrderOption]{typ: ent.TypeEntityDkgKey, tq: q}, nil
 	case *ent.EventMessageQuery:
 		return &query[*ent.EventMessageQuery, predicate.EventMessage, eventmessage.OrderOption]{typ: ent.TypeEventMessage, tq: q}, nil
+	case *ent.FlowExecutionQuery:
+		return &query[*ent.FlowExecutionQuery, predicate.FlowExecution, flowexecution.OrderOption]{typ: ent.TypeFlowExecution, tq: q}, nil
 	case *ent.GossipQuery:
 		return &query[*ent.GossipQuery, predicate.Gossip, gossip.OrderOption]{typ: ent.TypeGossip, tq: q}, nil
 	case *ent.IdempotencyKeyQuery:

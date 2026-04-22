@@ -24,6 +24,9 @@ type EntityDkgKey func(*sql.Selector)
 // EventMessage is the predicate function for eventmessage builders.
 type EventMessage func(*sql.Selector)
 
+// FlowExecution is the predicate function for flowexecution builders.
+type FlowExecution func(*sql.Selector)
+
 // Gossip is the predicate function for gossip builders.
 type Gossip func(*sql.Selector)
 

@@ -18,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddresspartner"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
+	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
@@ -121,6 +122,7 @@ func checkColumn(table, column string) error {
 			depositaddresspartner.Table:             depositaddresspartner.ValidColumn,
 			entitydkgkey.Table:                      entitydkgkey.ValidColumn,
 			eventmessage.Table:                      eventmessage.ValidColumn,
+			flowexecution.Table:                     flowexecution.ValidColumn,
 			gossip.Table:                            gossip.ValidColumn,
 			idempotencykey.Table:                    idempotencykey.ValidColumn,
 			l1tokencreate.Table:                     l1tokencreate.ValidColumn,

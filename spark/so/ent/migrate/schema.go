@@ -217,6 +217,30 @@ var (
 			},
 		},
 	}
+	// FlowExecutionsColumns holds the columns for the "flow_executions" table.
+	FlowExecutionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "role", Type: field.TypeEnum, Enums: []string{"COORDINATOR", "PARTICIPANT"}},
+		{Name: "op_type", Type: field.TypeInt32},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"IN_FLIGHT", "COMMITTED", "ROLLED_BACK"}, Default: "IN_FLIGHT"},
+		{Name: "coordinator_index", Type: field.TypeUint},
+		{Name: "decision_payload", Type: field.TypeBytes, Nullable: true},
+	}
+	// FlowExecutionsTable holds the schema information for the "flow_executions" table.
+	FlowExecutionsTable = &schema.Table{
+		Name:       "flow_executions",
+		Columns:    FlowExecutionsColumns,
+		PrimaryKey: []*schema.Column{FlowExecutionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "flowexecution_role_status_update_time",
+				Unique:  false,
+				Columns: []*schema.Column{FlowExecutionsColumns[3], FlowExecutionsColumns[5], FlowExecutionsColumns[2]},
+			},
+		},
+	}
 	// GossipsColumns holds the columns for the "gossips" table.
 	GossipsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1971,6 +1995,7 @@ var (
 		DepositAddressPartnersTable,
 		EntityDkgKeysTable,
 		EventMessagesTable,
+		FlowExecutionsTable,
 		GossipsTable,
 		IdempotencyKeysTable,
 		L1tokenCreatesTable,

@@ -874,6 +874,126 @@ func (em *EventMessageExample) Exec(ctx context.Context) (*ent.EventMessage, err
 	return create.Save(ctx)
 }
 
+// FlowExecutionExample is a test fixture builder for FlowExecution.
+type FlowExecutionExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	Role             *schematype.FlowExecutionRole
+	OpType           *int32
+	CoordinatorIndex *uint
+	DecisionPayload  *[]byte
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+}
+
+// NewFlowExecutionExample creates a new FlowExecutionExample for testing.
+func NewFlowExecutionExample(t *testing.T, client *ent.Client) *FlowExecutionExample {
+	return &FlowExecutionExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetRole sets the role field.
+func (fe *FlowExecutionExample) SetRole(v schematype.FlowExecutionRole) *FlowExecutionExample {
+	fe.Role = &v
+	return fe
+}
+
+// SetOpType sets the op_type field.
+func (fe *FlowExecutionExample) SetOpType(v int32) *FlowExecutionExample {
+	fe.OpType = &v
+	return fe
+}
+
+// SetCoordinatorIndex sets the coordinator_index field.
+func (fe *FlowExecutionExample) SetCoordinatorIndex(v uint) *FlowExecutionExample {
+	fe.CoordinatorIndex = &v
+	return fe
+}
+
+// SetDecisionPayload sets the decision_payload field.
+func (fe *FlowExecutionExample) SetDecisionPayload(v []byte) *FlowExecutionExample {
+	fe.DecisionPayload = &v
+	return fe
+}
+
+// MustExec builds and saves the FlowExecution entity to the database.
+// It panics if the save fails.
+func (fe *FlowExecutionExample) MustExec(ctx context.Context) *ent.FlowExecution {
+	create := fe.client.FlowExecution.Create()
+
+	// Set fields
+	if fe.Role != nil {
+		create.SetRole(*fe.Role)
+	} else {
+		// Use default from annotation
+		create.SetRole("COORDINATOR")
+	}
+	if fe.OpType != nil {
+		create.SetOpType(*fe.OpType)
+	} else {
+		// Use default from annotation
+		create.SetOpType(int32(1))
+	}
+	if fe.CoordinatorIndex != nil {
+		create.SetCoordinatorIndex(*fe.CoordinatorIndex)
+	} else {
+		// Use default from annotation
+		create.SetCoordinatorIndex(uint(0))
+	}
+	if fe.DecisionPayload != nil {
+		create.SetDecisionPayload(*fe.DecisionPayload)
+	} else {
+	}
+
+	// Handle edges
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		fe.t.Helper()
+		fe.t.Fatalf("failed to create FlowExecution: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the FlowExecution entity to the database.
+// It returns an error if the save fails.
+func (fe *FlowExecutionExample) Exec(ctx context.Context) (*ent.FlowExecution, error) {
+	create := fe.client.FlowExecution.Create()
+
+	// Set fields
+	if fe.Role != nil {
+		create.SetRole(*fe.Role)
+	} else {
+		// Use default from annotation
+		create.SetRole("COORDINATOR")
+	}
+	if fe.OpType != nil {
+		create.SetOpType(*fe.OpType)
+	} else {
+		// Use default from annotation
+		create.SetOpType(int32(1))
+	}
+	if fe.CoordinatorIndex != nil {
+		create.SetCoordinatorIndex(*fe.CoordinatorIndex)
+	} else {
+		// Use default from annotation
+		create.SetCoordinatorIndex(uint(0))
+	}
+	if fe.DecisionPayload != nil {
+		create.SetDecisionPayload(*fe.DecisionPayload)
+	} else {
+	}
+
+	// Handle edges
+
+	return create.Save(ctx)
+}
+
 // GossipExample is a test fixture builder for Gossip.
 type GossipExample struct {
 	client *ent.Client

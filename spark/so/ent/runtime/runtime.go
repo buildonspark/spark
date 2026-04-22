@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddresspartner"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
+	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
@@ -201,6 +202,27 @@ func init() {
 	eventmessageDescID := eventmessageMixinFields0[0].Descriptor()
 	// eventmessage.DefaultID holds the default value on creation for the id field.
 	eventmessage.DefaultID = eventmessageDescID.Default.(func() uuid.UUID)
+	flowexecutionMixin := schema.FlowExecution{}.Mixin()
+	flowexecutionHooks := schema.FlowExecution{}.Hooks()
+	flowexecution.Hooks[0] = flowexecutionHooks[0]
+	flowexecutionMixinFields0 := flowexecutionMixin[0].Fields()
+	_ = flowexecutionMixinFields0
+	flowexecutionFields := schema.FlowExecution{}.Fields()
+	_ = flowexecutionFields
+	// flowexecutionDescCreateTime is the schema descriptor for create_time field.
+	flowexecutionDescCreateTime := flowexecutionMixinFields0[1].Descriptor()
+	// flowexecution.DefaultCreateTime holds the default value on creation for the create_time field.
+	flowexecution.DefaultCreateTime = flowexecutionDescCreateTime.Default.(func() time.Time)
+	// flowexecutionDescUpdateTime is the schema descriptor for update_time field.
+	flowexecutionDescUpdateTime := flowexecutionMixinFields0[2].Descriptor()
+	// flowexecution.DefaultUpdateTime holds the default value on creation for the update_time field.
+	flowexecution.DefaultUpdateTime = flowexecutionDescUpdateTime.Default.(func() time.Time)
+	// flowexecution.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	flowexecution.UpdateDefaultUpdateTime = flowexecutionDescUpdateTime.UpdateDefault.(func() time.Time)
+	// flowexecutionDescID is the schema descriptor for id field.
+	flowexecutionDescID := flowexecutionMixinFields0[0].Descriptor()
+	// flowexecution.DefaultID holds the default value on creation for the id field.
+	flowexecution.DefaultID = flowexecutionDescID.Default.(func() uuid.UUID)
 	gossipMixin := schema.Gossip{}.Mixin()
 	gossipMixinFields0 := gossipMixin[0].Fields()
 	_ = gossipMixinFields0

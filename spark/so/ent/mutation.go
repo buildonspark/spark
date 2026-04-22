@@ -23,6 +23,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddresspartner"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
+	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/idempotencykey"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
@@ -80,6 +81,7 @@ const (
 	TypeDepositAddressPartner             = "DepositAddressPartner"
 	TypeEntityDkgKey                      = "EntityDkgKey"
 	TypeEventMessage                      = "EventMessage"
+	TypeFlowExecution                     = "FlowExecution"
 	TypeGossip                            = "Gossip"
 	TypeIdempotencyKey                    = "IdempotencyKey"
 	TypeL1TokenCreate                     = "L1TokenCreate"
@@ -4537,6 +4539,753 @@ func (m *EventMessageMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *EventMessageMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown EventMessage edge %s", name)
+}
+
+// FlowExecutionMutation represents an operation that mutates the FlowExecution nodes in the graph.
+type FlowExecutionMutation struct {
+	config
+	op                   Op
+	typ                  string
+	id                   *uuid.UUID
+	create_time          *time.Time
+	update_time          *time.Time
+	role                 *schematype.FlowExecutionRole
+	op_type              *int32
+	addop_type           *int32
+	status               *schematype.FlowExecutionStatus
+	coordinator_index    *uint
+	addcoordinator_index *int
+	decision_payload     *[]byte
+	clearedFields        map[string]struct{}
+	done                 bool
+	oldValue             func(context.Context) (*FlowExecution, error)
+	predicates           []predicate.FlowExecution
+}
+
+var _ ent.Mutation = (*FlowExecutionMutation)(nil)
+
+// flowexecutionOption allows management of the mutation configuration using functional options.
+type flowexecutionOption func(*FlowExecutionMutation)
+
+// newFlowExecutionMutation creates new mutation for the FlowExecution entity.
+func newFlowExecutionMutation(c config, op Op, opts ...flowexecutionOption) *FlowExecutionMutation {
+	m := &FlowExecutionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeFlowExecution,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withFlowExecutionID sets the ID field of the mutation.
+func withFlowExecutionID(id uuid.UUID) flowexecutionOption {
+	return func(m *FlowExecutionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *FlowExecution
+		)
+		m.oldValue = func(ctx context.Context) (*FlowExecution, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().FlowExecution.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withFlowExecution sets the old FlowExecution of the mutation.
+func withFlowExecution(node *FlowExecution) flowexecutionOption {
+	return func(m *FlowExecutionMutation) {
+		m.oldValue = func(context.Context) (*FlowExecution, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m FlowExecutionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m FlowExecutionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of FlowExecution entities.
+func (m *FlowExecutionMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *FlowExecutionMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *FlowExecutionMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().FlowExecution.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *FlowExecutionMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *FlowExecutionMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the FlowExecution entity.
+// If the FlowExecution object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FlowExecutionMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *FlowExecutionMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *FlowExecutionMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *FlowExecutionMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the FlowExecution entity.
+// If the FlowExecution object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FlowExecutionMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *FlowExecutionMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetRole sets the "role" field.
+func (m *FlowExecutionMutation) SetRole(ser schematype.FlowExecutionRole) {
+	m.role = &ser
+}
+
+// Role returns the value of the "role" field in the mutation.
+func (m *FlowExecutionMutation) Role() (r schematype.FlowExecutionRole, exists bool) {
+	v := m.role
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRole returns the old "role" field's value of the FlowExecution entity.
+// If the FlowExecution object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FlowExecutionMutation) OldRole(ctx context.Context) (v schematype.FlowExecutionRole, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRole is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRole requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRole: %w", err)
+	}
+	return oldValue.Role, nil
+}
+
+// ResetRole resets all changes to the "role" field.
+func (m *FlowExecutionMutation) ResetRole() {
+	m.role = nil
+}
+
+// SetOpType sets the "op_type" field.
+func (m *FlowExecutionMutation) SetOpType(i int32) {
+	m.op_type = &i
+	m.addop_type = nil
+}
+
+// OpType returns the value of the "op_type" field in the mutation.
+func (m *FlowExecutionMutation) OpType() (r int32, exists bool) {
+	v := m.op_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOpType returns the old "op_type" field's value of the FlowExecution entity.
+// If the FlowExecution object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FlowExecutionMutation) OldOpType(ctx context.Context) (v int32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOpType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOpType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOpType: %w", err)
+	}
+	return oldValue.OpType, nil
+}
+
+// AddOpType adds i to the "op_type" field.
+func (m *FlowExecutionMutation) AddOpType(i int32) {
+	if m.addop_type != nil {
+		*m.addop_type += i
+	} else {
+		m.addop_type = &i
+	}
+}
+
+// AddedOpType returns the value that was added to the "op_type" field in this mutation.
+func (m *FlowExecutionMutation) AddedOpType() (r int32, exists bool) {
+	v := m.addop_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOpType resets all changes to the "op_type" field.
+func (m *FlowExecutionMutation) ResetOpType() {
+	m.op_type = nil
+	m.addop_type = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *FlowExecutionMutation) SetStatus(ses schematype.FlowExecutionStatus) {
+	m.status = &ses
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *FlowExecutionMutation) Status() (r schematype.FlowExecutionStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the FlowExecution entity.
+// If the FlowExecution object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FlowExecutionMutation) OldStatus(ctx context.Context) (v schematype.FlowExecutionStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *FlowExecutionMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetCoordinatorIndex sets the "coordinator_index" field.
+func (m *FlowExecutionMutation) SetCoordinatorIndex(u uint) {
+	m.coordinator_index = &u
+	m.addcoordinator_index = nil
+}
+
+// CoordinatorIndex returns the value of the "coordinator_index" field in the mutation.
+func (m *FlowExecutionMutation) CoordinatorIndex() (r uint, exists bool) {
+	v := m.coordinator_index
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCoordinatorIndex returns the old "coordinator_index" field's value of the FlowExecution entity.
+// If the FlowExecution object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FlowExecutionMutation) OldCoordinatorIndex(ctx context.Context) (v uint, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCoordinatorIndex is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCoordinatorIndex requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCoordinatorIndex: %w", err)
+	}
+	return oldValue.CoordinatorIndex, nil
+}
+
+// AddCoordinatorIndex adds u to the "coordinator_index" field.
+func (m *FlowExecutionMutation) AddCoordinatorIndex(u int) {
+	if m.addcoordinator_index != nil {
+		*m.addcoordinator_index += u
+	} else {
+		m.addcoordinator_index = &u
+	}
+}
+
+// AddedCoordinatorIndex returns the value that was added to the "coordinator_index" field in this mutation.
+func (m *FlowExecutionMutation) AddedCoordinatorIndex() (r int, exists bool) {
+	v := m.addcoordinator_index
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCoordinatorIndex resets all changes to the "coordinator_index" field.
+func (m *FlowExecutionMutation) ResetCoordinatorIndex() {
+	m.coordinator_index = nil
+	m.addcoordinator_index = nil
+}
+
+// SetDecisionPayload sets the "decision_payload" field.
+func (m *FlowExecutionMutation) SetDecisionPayload(b []byte) {
+	m.decision_payload = &b
+}
+
+// DecisionPayload returns the value of the "decision_payload" field in the mutation.
+func (m *FlowExecutionMutation) DecisionPayload() (r []byte, exists bool) {
+	v := m.decision_payload
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDecisionPayload returns the old "decision_payload" field's value of the FlowExecution entity.
+// If the FlowExecution object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FlowExecutionMutation) OldDecisionPayload(ctx context.Context) (v *[]byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDecisionPayload is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDecisionPayload requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDecisionPayload: %w", err)
+	}
+	return oldValue.DecisionPayload, nil
+}
+
+// ClearDecisionPayload clears the value of the "decision_payload" field.
+func (m *FlowExecutionMutation) ClearDecisionPayload() {
+	m.decision_payload = nil
+	m.clearedFields[flowexecution.FieldDecisionPayload] = struct{}{}
+}
+
+// DecisionPayloadCleared returns if the "decision_payload" field was cleared in this mutation.
+func (m *FlowExecutionMutation) DecisionPayloadCleared() bool {
+	_, ok := m.clearedFields[flowexecution.FieldDecisionPayload]
+	return ok
+}
+
+// ResetDecisionPayload resets all changes to the "decision_payload" field.
+func (m *FlowExecutionMutation) ResetDecisionPayload() {
+	m.decision_payload = nil
+	delete(m.clearedFields, flowexecution.FieldDecisionPayload)
+}
+
+// Where appends a list predicates to the FlowExecutionMutation builder.
+func (m *FlowExecutionMutation) Where(ps ...predicate.FlowExecution) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the FlowExecutionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *FlowExecutionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.FlowExecution, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *FlowExecutionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *FlowExecutionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (FlowExecution).
+func (m *FlowExecutionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *FlowExecutionMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.create_time != nil {
+		fields = append(fields, flowexecution.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, flowexecution.FieldUpdateTime)
+	}
+	if m.role != nil {
+		fields = append(fields, flowexecution.FieldRole)
+	}
+	if m.op_type != nil {
+		fields = append(fields, flowexecution.FieldOpType)
+	}
+	if m.status != nil {
+		fields = append(fields, flowexecution.FieldStatus)
+	}
+	if m.coordinator_index != nil {
+		fields = append(fields, flowexecution.FieldCoordinatorIndex)
+	}
+	if m.decision_payload != nil {
+		fields = append(fields, flowexecution.FieldDecisionPayload)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *FlowExecutionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case flowexecution.FieldCreateTime:
+		return m.CreateTime()
+	case flowexecution.FieldUpdateTime:
+		return m.UpdateTime()
+	case flowexecution.FieldRole:
+		return m.Role()
+	case flowexecution.FieldOpType:
+		return m.OpType()
+	case flowexecution.FieldStatus:
+		return m.Status()
+	case flowexecution.FieldCoordinatorIndex:
+		return m.CoordinatorIndex()
+	case flowexecution.FieldDecisionPayload:
+		return m.DecisionPayload()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *FlowExecutionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case flowexecution.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case flowexecution.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case flowexecution.FieldRole:
+		return m.OldRole(ctx)
+	case flowexecution.FieldOpType:
+		return m.OldOpType(ctx)
+	case flowexecution.FieldStatus:
+		return m.OldStatus(ctx)
+	case flowexecution.FieldCoordinatorIndex:
+		return m.OldCoordinatorIndex(ctx)
+	case flowexecution.FieldDecisionPayload:
+		return m.OldDecisionPayload(ctx)
+	}
+	return nil, fmt.Errorf("unknown FlowExecution field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *FlowExecutionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case flowexecution.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case flowexecution.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case flowexecution.FieldRole:
+		v, ok := value.(schematype.FlowExecutionRole)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRole(v)
+		return nil
+	case flowexecution.FieldOpType:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOpType(v)
+		return nil
+	case flowexecution.FieldStatus:
+		v, ok := value.(schematype.FlowExecutionStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case flowexecution.FieldCoordinatorIndex:
+		v, ok := value.(uint)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCoordinatorIndex(v)
+		return nil
+	case flowexecution.FieldDecisionPayload:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDecisionPayload(v)
+		return nil
+	}
+	return fmt.Errorf("unknown FlowExecution field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *FlowExecutionMutation) AddedFields() []string {
+	var fields []string
+	if m.addop_type != nil {
+		fields = append(fields, flowexecution.FieldOpType)
+	}
+	if m.addcoordinator_index != nil {
+		fields = append(fields, flowexecution.FieldCoordinatorIndex)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *FlowExecutionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case flowexecution.FieldOpType:
+		return m.AddedOpType()
+	case flowexecution.FieldCoordinatorIndex:
+		return m.AddedCoordinatorIndex()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *FlowExecutionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case flowexecution.FieldOpType:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOpType(v)
+		return nil
+	case flowexecution.FieldCoordinatorIndex:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCoordinatorIndex(v)
+		return nil
+	}
+	return fmt.Errorf("unknown FlowExecution numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *FlowExecutionMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(flowexecution.FieldDecisionPayload) {
+		fields = append(fields, flowexecution.FieldDecisionPayload)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *FlowExecutionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *FlowExecutionMutation) ClearField(name string) error {
+	switch name {
+	case flowexecution.FieldDecisionPayload:
+		m.ClearDecisionPayload()
+		return nil
+	}
+	return fmt.Errorf("unknown FlowExecution nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *FlowExecutionMutation) ResetField(name string) error {
+	switch name {
+	case flowexecution.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case flowexecution.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case flowexecution.FieldRole:
+		m.ResetRole()
+		return nil
+	case flowexecution.FieldOpType:
+		m.ResetOpType()
+		return nil
+	case flowexecution.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case flowexecution.FieldCoordinatorIndex:
+		m.ResetCoordinatorIndex()
+		return nil
+	case flowexecution.FieldDecisionPayload:
+		m.ResetDecisionPayload()
+		return nil
+	}
+	return fmt.Errorf("unknown FlowExecution field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *FlowExecutionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *FlowExecutionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *FlowExecutionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *FlowExecutionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *FlowExecutionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *FlowExecutionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *FlowExecutionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown FlowExecution unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *FlowExecutionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown FlowExecution edge %s", name)
 }
 
 // GossipMutation represents an operation that mutates the Gossip nodes in the graph.
