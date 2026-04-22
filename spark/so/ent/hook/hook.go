@@ -45,18 +45,6 @@ func (f DepositAddressFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DepositAddressMutation", m)
 }
 
-// The DepositAddressPartnerFunc type is an adapter to allow the use of ordinary
-// function as DepositAddressPartner mutator.
-type DepositAddressPartnerFunc func(context.Context, *ent.DepositAddressPartnerMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f DepositAddressPartnerFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.DepositAddressPartnerMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DepositAddressPartnerMutation", m)
-}
-
 // The EntityDkgKeyFunc type is an adapter to allow the use of ordinary
 // function as EntityDkgKey mutator.
 type EntityDkgKeyFunc func(context.Context, *ent.EntityDkgKeyMutation) (ent.Value, error)

@@ -15,7 +15,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark/so/ent/depositaddresspartner"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/flowexecution"
@@ -119,7 +118,6 @@ func checkColumn(table, column string) error {
 			blockheight.Table:                       blockheight.ValidColumn,
 			cooperativeexit.Table:                   cooperativeexit.ValidColumn,
 			depositaddress.Table:                    depositaddress.ValidColumn,
-			depositaddresspartner.Table:             depositaddresspartner.ValidColumn,
 			entitydkgkey.Table:                      entitydkgkey.ValidColumn,
 			eventmessage.Table:                      eventmessage.ValidColumn,
 			flowexecution.Table:                     flowexecution.ValidColumn,

@@ -20,8 +20,6 @@ type Tx struct {
 	CooperativeExit *CooperativeExitClient
 	// DepositAddress is the client for interacting with the DepositAddress builders.
 	DepositAddress *DepositAddressClient
-	// DepositAddressPartner is the client for interacting with the DepositAddressPartner builders.
-	DepositAddressPartner *DepositAddressPartnerClient
 	// EntityDkgKey is the client for interacting with the EntityDkgKey builders.
 	EntityDkgKey *EntityDkgKeyClient
 	// EventMessage is the client for interacting with the EventMessage builders.
@@ -236,7 +234,6 @@ func (tx *Tx) init() {
 	tx.BlockHeight = NewBlockHeightClient(tx.config)
 	tx.CooperativeExit = NewCooperativeExitClient(tx.config)
 	tx.DepositAddress = NewDepositAddressClient(tx.config)
-	tx.DepositAddressPartner = NewDepositAddressPartnerClient(tx.config)
 	tx.EntityDkgKey = NewEntityDkgKeyClient(tx.config)
 	tx.EventMessage = NewEventMessageClient(tx.config)
 	tx.FlowExecution = NewFlowExecutionClient(tx.config)
