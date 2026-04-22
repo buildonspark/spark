@@ -19,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/depositaddresspartner"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
@@ -73,6 +74,8 @@ type Client struct {
 	CooperativeExit *CooperativeExitClient
 	// DepositAddress is the client for interacting with the DepositAddress builders.
 	DepositAddress *DepositAddressClient
+	// DepositAddressPartner is the client for interacting with the DepositAddressPartner builders.
+	DepositAddressPartner *DepositAddressPartnerClient
 	// EntityDkgKey is the client for interacting with the EntityDkgKey builders.
 	EntityDkgKey *EntityDkgKeyClient
 	// EventMessage is the client for interacting with the EventMessage builders.
@@ -165,6 +168,7 @@ func (c *Client) init() {
 	c.BlockHeight = NewBlockHeightClient(c.config)
 	c.CooperativeExit = NewCooperativeExitClient(c.config)
 	c.DepositAddress = NewDepositAddressClient(c.config)
+	c.DepositAddressPartner = NewDepositAddressPartnerClient(c.config)
 	c.EntityDkgKey = NewEntityDkgKeyClient(c.config)
 	c.EventMessage = NewEventMessageClient(c.config)
 	c.Gossip = NewGossipClient(c.config)
@@ -299,6 +303,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		BlockHeight:                       NewBlockHeightClient(cfg),
 		CooperativeExit:                   NewCooperativeExitClient(cfg),
 		DepositAddress:                    NewDepositAddressClient(cfg),
+		DepositAddressPartner:             NewDepositAddressPartnerClient(cfg),
 		EntityDkgKey:                      NewEntityDkgKeyClient(cfg),
 		EventMessage:                      NewEventMessageClient(cfg),
 		Gossip:                            NewGossipClient(cfg),
@@ -360,6 +365,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		BlockHeight:                       NewBlockHeightClient(cfg),
 		CooperativeExit:                   NewCooperativeExitClient(cfg),
 		DepositAddress:                    NewDepositAddressClient(cfg),
+		DepositAddressPartner:             NewDepositAddressPartnerClient(cfg),
 		EntityDkgKey:                      NewEntityDkgKeyClient(cfg),
 		EventMessage:                      NewEventMessageClient(cfg),
 		Gossip:                            NewGossipClient(cfg),
@@ -428,8 +434,8 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
-		c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
+		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.DepositAddressPartner,
+		c.EntityDkgKey, c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
 		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
 		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
 		c.PartnerKey, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
@@ -449,8 +455,8 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
-		c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
+		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.DepositAddressPartner,
+		c.EntityDkgKey, c.EventMessage, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
 		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
 		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
 		c.PartnerKey, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
@@ -475,6 +481,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.CooperativeExit.mutate(ctx, m)
 	case *DepositAddressMutation:
 		return c.DepositAddress.mutate(ctx, m)
+	case *DepositAddressPartnerMutation:
+		return c.DepositAddressPartner.mutate(ctx, m)
 	case *EntityDkgKeyMutation:
 		return c.EntityDkgKey.mutate(ctx, m)
 	case *EventMessageMutation:
@@ -1035,6 +1043,171 @@ func (c *DepositAddressClient) mutate(ctx context.Context, m *DepositAddressMuta
 		return (&DepositAddressDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown DepositAddress mutation op: %q", m.Op())
+	}
+}
+
+// DepositAddressPartnerClient is a client for the DepositAddressPartner schema.
+type DepositAddressPartnerClient struct {
+	config
+}
+
+// NewDepositAddressPartnerClient returns a client for the DepositAddressPartner from the given config.
+func NewDepositAddressPartnerClient(c config) *DepositAddressPartnerClient {
+	return &DepositAddressPartnerClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `depositaddresspartner.Hooks(f(g(h())))`.
+func (c *DepositAddressPartnerClient) Use(hooks ...Hook) {
+	c.hooks.DepositAddressPartner = append(c.hooks.DepositAddressPartner, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `depositaddresspartner.Intercept(f(g(h())))`.
+func (c *DepositAddressPartnerClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DepositAddressPartner = append(c.inters.DepositAddressPartner, interceptors...)
+}
+
+// Create returns a builder for creating a DepositAddressPartner entity.
+func (c *DepositAddressPartnerClient) Create() *DepositAddressPartnerCreate {
+	mutation := newDepositAddressPartnerMutation(c.config, OpCreate)
+	return &DepositAddressPartnerCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DepositAddressPartner entities.
+func (c *DepositAddressPartnerClient) CreateBulk(builders ...*DepositAddressPartnerCreate) *DepositAddressPartnerCreateBulk {
+	return &DepositAddressPartnerCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DepositAddressPartnerClient) MapCreateBulk(slice any, setFunc func(*DepositAddressPartnerCreate, int)) *DepositAddressPartnerCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DepositAddressPartnerCreateBulk{err: fmt.Errorf("calling to DepositAddressPartnerClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DepositAddressPartnerCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DepositAddressPartnerCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DepositAddressPartner.
+func (c *DepositAddressPartnerClient) Update() *DepositAddressPartnerUpdate {
+	mutation := newDepositAddressPartnerMutation(c.config, OpUpdate)
+	return &DepositAddressPartnerUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DepositAddressPartnerClient) UpdateOne(dap *DepositAddressPartner) *DepositAddressPartnerUpdateOne {
+	mutation := newDepositAddressPartnerMutation(c.config, OpUpdateOne, withDepositAddressPartner(dap))
+	return &DepositAddressPartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DepositAddressPartnerClient) UpdateOneID(id uuid.UUID) *DepositAddressPartnerUpdateOne {
+	mutation := newDepositAddressPartnerMutation(c.config, OpUpdateOne, withDepositAddressPartnerID(id))
+	return &DepositAddressPartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DepositAddressPartner.
+func (c *DepositAddressPartnerClient) Delete() *DepositAddressPartnerDelete {
+	mutation := newDepositAddressPartnerMutation(c.config, OpDelete)
+	return &DepositAddressPartnerDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DepositAddressPartnerClient) DeleteOne(dap *DepositAddressPartner) *DepositAddressPartnerDeleteOne {
+	return c.DeleteOneID(dap.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DepositAddressPartnerClient) DeleteOneID(id uuid.UUID) *DepositAddressPartnerDeleteOne {
+	builder := c.Delete().Where(depositaddresspartner.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DepositAddressPartnerDeleteOne{builder}
+}
+
+// Query returns a query builder for DepositAddressPartner.
+func (c *DepositAddressPartnerClient) Query() *DepositAddressPartnerQuery {
+	return &DepositAddressPartnerQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDepositAddressPartner},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DepositAddressPartner entity by its id.
+func (c *DepositAddressPartnerClient) Get(ctx context.Context, id uuid.UUID) (*DepositAddressPartner, error) {
+	return c.Query().Where(depositaddresspartner.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DepositAddressPartnerClient) GetX(ctx context.Context, id uuid.UUID) *DepositAddressPartner {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPartner queries the partner edge of a DepositAddressPartner.
+func (c *DepositAddressPartnerClient) QueryPartner(dap *DepositAddressPartner) *PartnerQuery {
+	query := (&PartnerClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := dap.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(depositaddresspartner.Table, depositaddresspartner.FieldID, id),
+			sqlgraph.To(partner.Table, partner.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, depositaddresspartner.PartnerTable, depositaddresspartner.PartnerColumn),
+		)
+		fromV = sqlgraph.Neighbors(dap.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryDepositAddress queries the deposit_address edge of a DepositAddressPartner.
+func (c *DepositAddressPartnerClient) QueryDepositAddress(dap *DepositAddressPartner) *DepositAddressQuery {
+	query := (&DepositAddressClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := dap.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(depositaddresspartner.Table, depositaddresspartner.FieldID, id),
+			sqlgraph.To(depositaddress.Table, depositaddress.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, depositaddresspartner.DepositAddressTable, depositaddresspartner.DepositAddressColumn),
+		)
+		fromV = sqlgraph.Neighbors(dap.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *DepositAddressPartnerClient) Hooks() []Hook {
+	return c.hooks.DepositAddressPartner
+}
+
+// Interceptors returns the client interceptors.
+func (c *DepositAddressPartnerClient) Interceptors() []Interceptor {
+	return c.inters.DepositAddressPartner
+}
+
+func (c *DepositAddressPartnerClient) mutate(ctx context.Context, m *DepositAddressPartnerMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DepositAddressPartnerCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DepositAddressPartnerUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DepositAddressPartnerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DepositAddressPartnerDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DepositAddressPartner mutation op: %q", m.Op())
 	}
 }
 
@@ -7470,28 +7643,28 @@ func (c *WalletSettingClient) mutate(ctx context.Context, m *WalletSettingMutati
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
-		Gossip, IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
-		L1TokenOutputWithdrawal, L1WithdrawalTransaction, MultisigConfig,
-		MultisigMember, Partner, PartnerKey, PaymentIntent, PendingSendTransfer,
-		PreimageRequest, PreimageShare, PreimageSharePartner, SigningCommitment,
-		SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate, TokenFreeze,
-		TokenMint, TokenOutput, TokenPartialRevocationSecretShare, TokenTransaction,
-		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
-		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,
-		UtxoSwap, WalletSetting []ent.Hook
+		BlockHeight, CooperativeExit, DepositAddress, DepositAddressPartner,
+		EntityDkgKey, EventMessage, Gossip, IdempotencyKey, L1TokenCreate,
+		L1TokenJusticeTransaction, L1TokenOutputWithdrawal, L1WithdrawalTransaction,
+		MultisigConfig, MultisigMember, Partner, PartnerKey, PaymentIntent,
+		PendingSendTransfer, PreimageRequest, PreimageShare, PreimageSharePartner,
+		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate,
+		TokenFreeze, TokenMint, TokenOutput, TokenPartialRevocationSecretShare,
+		TokenTransaction, TokenTransactionPeerSignature, Transfer, TransferLeaf,
+		TransferPartner, TransferReceiver, TransferSender, Tree, TreeNode,
+		UserSignedTransaction, Utxo, UtxoSwap, WalletSetting []ent.Hook
 	}
 	inters struct {
-		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
-		Gossip, IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
-		L1TokenOutputWithdrawal, L1WithdrawalTransaction, MultisigConfig,
-		MultisigMember, Partner, PartnerKey, PaymentIntent, PendingSendTransfer,
-		PreimageRequest, PreimageShare, PreimageSharePartner, SigningCommitment,
-		SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate, TokenFreeze,
-		TokenMint, TokenOutput, TokenPartialRevocationSecretShare, TokenTransaction,
-		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
-		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,
-		UtxoSwap, WalletSetting []ent.Interceptor
+		BlockHeight, CooperativeExit, DepositAddress, DepositAddressPartner,
+		EntityDkgKey, EventMessage, Gossip, IdempotencyKey, L1TokenCreate,
+		L1TokenJusticeTransaction, L1TokenOutputWithdrawal, L1WithdrawalTransaction,
+		MultisigConfig, MultisigMember, Partner, PartnerKey, PaymentIntent,
+		PendingSendTransfer, PreimageRequest, PreimageShare, PreimageSharePartner,
+		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate,
+		TokenFreeze, TokenMint, TokenOutput, TokenPartialRevocationSecretShare,
+		TokenTransaction, TokenTransactionPeerSignature, Transfer, TransferLeaf,
+		TransferPartner, TransferReceiver, TransferSender, Tree, TreeNode,
+		UserSignedTransaction, Utxo, UtxoSwap, WalletSetting []ent.Interceptor
 	}
 )
 

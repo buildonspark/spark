@@ -9,6 +9,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/depositaddresspartner"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
@@ -131,6 +132,25 @@ func init() {
 	depositaddressDescID := depositaddressMixinFields0[0].Descriptor()
 	// depositaddress.DefaultID holds the default value on creation for the id field.
 	depositaddress.DefaultID = depositaddressDescID.Default.(func() uuid.UUID)
+	depositaddresspartnerMixin := schema.DepositAddressPartner{}.Mixin()
+	depositaddresspartnerMixinFields0 := depositaddresspartnerMixin[0].Fields()
+	_ = depositaddresspartnerMixinFields0
+	depositaddresspartnerFields := schema.DepositAddressPartner{}.Fields()
+	_ = depositaddresspartnerFields
+	// depositaddresspartnerDescCreateTime is the schema descriptor for create_time field.
+	depositaddresspartnerDescCreateTime := depositaddresspartnerMixinFields0[1].Descriptor()
+	// depositaddresspartner.DefaultCreateTime holds the default value on creation for the create_time field.
+	depositaddresspartner.DefaultCreateTime = depositaddresspartnerDescCreateTime.Default.(func() time.Time)
+	// depositaddresspartnerDescUpdateTime is the schema descriptor for update_time field.
+	depositaddresspartnerDescUpdateTime := depositaddresspartnerMixinFields0[2].Descriptor()
+	// depositaddresspartner.DefaultUpdateTime holds the default value on creation for the update_time field.
+	depositaddresspartner.DefaultUpdateTime = depositaddresspartnerDescUpdateTime.Default.(func() time.Time)
+	// depositaddresspartner.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	depositaddresspartner.UpdateDefaultUpdateTime = depositaddresspartnerDescUpdateTime.UpdateDefault.(func() time.Time)
+	// depositaddresspartnerDescID is the schema descriptor for id field.
+	depositaddresspartnerDescID := depositaddresspartnerMixinFields0[0].Descriptor()
+	// depositaddresspartner.DefaultID holds the default value on creation for the id field.
+	depositaddresspartner.DefaultID = depositaddresspartnerDescID.Default.(func() uuid.UUID)
 	entitydkgkeyMixin := schema.EntityDkgKey{}.Mixin()
 	entitydkgkeyMixinFields0 := entitydkgkeyMixin[0].Fields()
 	_ = entitydkgkeyMixinFields0

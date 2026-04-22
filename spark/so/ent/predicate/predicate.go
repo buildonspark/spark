@@ -15,6 +15,9 @@ type CooperativeExit func(*sql.Selector)
 // DepositAddress is the predicate function for depositaddress builders.
 type DepositAddress func(*sql.Selector)
 
+// DepositAddressPartner is the predicate function for depositaddresspartner builders.
+type DepositAddressPartner func(*sql.Selector)
+
 // EntityDkgKey is the predicate function for entitydkgkey builders.
 type EntityDkgKey func(*sql.Selector)
 

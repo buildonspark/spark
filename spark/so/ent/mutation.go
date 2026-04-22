@@ -20,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/depositaddresspartner"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
@@ -76,6 +77,7 @@ const (
 	TypeBlockHeight                       = "BlockHeight"
 	TypeCooperativeExit                   = "CooperativeExit"
 	TypeDepositAddress                    = "DepositAddress"
+	TypeDepositAddressPartner             = "DepositAddressPartner"
 	TypeEntityDkgKey                      = "EntityDkgKey"
 	TypeEventMessage                      = "EventMessage"
 	TypeGossip                            = "Gossip"
@@ -3022,6 +3024,518 @@ func (m *DepositAddressMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress edge %s", name)
+}
+
+// DepositAddressPartnerMutation represents an operation that mutates the DepositAddressPartner nodes in the graph.
+type DepositAddressPartnerMutation struct {
+	config
+	op                     Op
+	typ                    string
+	id                     *uuid.UUID
+	create_time            *time.Time
+	update_time            *time.Time
+	clearedFields          map[string]struct{}
+	partner                *uuid.UUID
+	clearedpartner         bool
+	deposit_address        *uuid.UUID
+	cleareddeposit_address bool
+	done                   bool
+	oldValue               func(context.Context) (*DepositAddressPartner, error)
+	predicates             []predicate.DepositAddressPartner
+}
+
+var _ ent.Mutation = (*DepositAddressPartnerMutation)(nil)
+
+// depositaddresspartnerOption allows management of the mutation configuration using functional options.
+type depositaddresspartnerOption func(*DepositAddressPartnerMutation)
+
+// newDepositAddressPartnerMutation creates new mutation for the DepositAddressPartner entity.
+func newDepositAddressPartnerMutation(c config, op Op, opts ...depositaddresspartnerOption) *DepositAddressPartnerMutation {
+	m := &DepositAddressPartnerMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDepositAddressPartner,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDepositAddressPartnerID sets the ID field of the mutation.
+func withDepositAddressPartnerID(id uuid.UUID) depositaddresspartnerOption {
+	return func(m *DepositAddressPartnerMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DepositAddressPartner
+		)
+		m.oldValue = func(ctx context.Context) (*DepositAddressPartner, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DepositAddressPartner.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDepositAddressPartner sets the old DepositAddressPartner of the mutation.
+func withDepositAddressPartner(node *DepositAddressPartner) depositaddresspartnerOption {
+	return func(m *DepositAddressPartnerMutation) {
+		m.oldValue = func(context.Context) (*DepositAddressPartner, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DepositAddressPartnerMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DepositAddressPartnerMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DepositAddressPartner entities.
+func (m *DepositAddressPartnerMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DepositAddressPartnerMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DepositAddressPartnerMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DepositAddressPartner.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *DepositAddressPartnerMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *DepositAddressPartnerMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the DepositAddressPartner entity.
+// If the DepositAddressPartner object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressPartnerMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *DepositAddressPartnerMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *DepositAddressPartnerMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *DepositAddressPartnerMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the DepositAddressPartner entity.
+// If the DepositAddressPartner object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressPartnerMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *DepositAddressPartnerMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetPartnerID sets the "partner" edge to the Partner entity by id.
+func (m *DepositAddressPartnerMutation) SetPartnerID(id uuid.UUID) {
+	m.partner = &id
+}
+
+// ClearPartner clears the "partner" edge to the Partner entity.
+func (m *DepositAddressPartnerMutation) ClearPartner() {
+	m.clearedpartner = true
+}
+
+// PartnerCleared reports if the "partner" edge to the Partner entity was cleared.
+func (m *DepositAddressPartnerMutation) PartnerCleared() bool {
+	return m.clearedpartner
+}
+
+// PartnerID returns the "partner" edge ID in the mutation.
+func (m *DepositAddressPartnerMutation) PartnerID() (id uuid.UUID, exists bool) {
+	if m.partner != nil {
+		return *m.partner, true
+	}
+	return
+}
+
+// PartnerIDs returns the "partner" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PartnerID instead. It exists only for internal usage by the builders.
+func (m *DepositAddressPartnerMutation) PartnerIDs() (ids []uuid.UUID) {
+	if id := m.partner; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPartner resets all changes to the "partner" edge.
+func (m *DepositAddressPartnerMutation) ResetPartner() {
+	m.partner = nil
+	m.clearedpartner = false
+}
+
+// SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by id.
+func (m *DepositAddressPartnerMutation) SetDepositAddressID(id uuid.UUID) {
+	m.deposit_address = &id
+}
+
+// ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
+func (m *DepositAddressPartnerMutation) ClearDepositAddress() {
+	m.cleareddeposit_address = true
+}
+
+// DepositAddressCleared reports if the "deposit_address" edge to the DepositAddress entity was cleared.
+func (m *DepositAddressPartnerMutation) DepositAddressCleared() bool {
+	return m.cleareddeposit_address
+}
+
+// DepositAddressID returns the "deposit_address" edge ID in the mutation.
+func (m *DepositAddressPartnerMutation) DepositAddressID() (id uuid.UUID, exists bool) {
+	if m.deposit_address != nil {
+		return *m.deposit_address, true
+	}
+	return
+}
+
+// DepositAddressIDs returns the "deposit_address" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// DepositAddressID instead. It exists only for internal usage by the builders.
+func (m *DepositAddressPartnerMutation) DepositAddressIDs() (ids []uuid.UUID) {
+	if id := m.deposit_address; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetDepositAddress resets all changes to the "deposit_address" edge.
+func (m *DepositAddressPartnerMutation) ResetDepositAddress() {
+	m.deposit_address = nil
+	m.cleareddeposit_address = false
+}
+
+// Where appends a list predicates to the DepositAddressPartnerMutation builder.
+func (m *DepositAddressPartnerMutation) Where(ps ...predicate.DepositAddressPartner) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DepositAddressPartnerMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DepositAddressPartnerMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DepositAddressPartner, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DepositAddressPartnerMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DepositAddressPartnerMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DepositAddressPartner).
+func (m *DepositAddressPartnerMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DepositAddressPartnerMutation) Fields() []string {
+	fields := make([]string, 0, 2)
+	if m.create_time != nil {
+		fields = append(fields, depositaddresspartner.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, depositaddresspartner.FieldUpdateTime)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DepositAddressPartnerMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case depositaddresspartner.FieldCreateTime:
+		return m.CreateTime()
+	case depositaddresspartner.FieldUpdateTime:
+		return m.UpdateTime()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DepositAddressPartnerMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case depositaddresspartner.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case depositaddresspartner.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	}
+	return nil, fmt.Errorf("unknown DepositAddressPartner field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DepositAddressPartnerMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case depositaddresspartner.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case depositaddresspartner.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DepositAddressPartner field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DepositAddressPartnerMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DepositAddressPartnerMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DepositAddressPartnerMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown DepositAddressPartner numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DepositAddressPartnerMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DepositAddressPartnerMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DepositAddressPartnerMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown DepositAddressPartner nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DepositAddressPartnerMutation) ResetField(name string) error {
+	switch name {
+	case depositaddresspartner.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case depositaddresspartner.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	}
+	return fmt.Errorf("unknown DepositAddressPartner field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DepositAddressPartnerMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.partner != nil {
+		edges = append(edges, depositaddresspartner.EdgePartner)
+	}
+	if m.deposit_address != nil {
+		edges = append(edges, depositaddresspartner.EdgeDepositAddress)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DepositAddressPartnerMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case depositaddresspartner.EdgePartner:
+		if id := m.partner; id != nil {
+			return []ent.Value{*id}
+		}
+	case depositaddresspartner.EdgeDepositAddress:
+		if id := m.deposit_address; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DepositAddressPartnerMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DepositAddressPartnerMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DepositAddressPartnerMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedpartner {
+		edges = append(edges, depositaddresspartner.EdgePartner)
+	}
+	if m.cleareddeposit_address {
+		edges = append(edges, depositaddresspartner.EdgeDepositAddress)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DepositAddressPartnerMutation) EdgeCleared(name string) bool {
+	switch name {
+	case depositaddresspartner.EdgePartner:
+		return m.clearedpartner
+	case depositaddresspartner.EdgeDepositAddress:
+		return m.cleareddeposit_address
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DepositAddressPartnerMutation) ClearEdge(name string) error {
+	switch name {
+	case depositaddresspartner.EdgePartner:
+		m.ClearPartner()
+		return nil
+	case depositaddresspartner.EdgeDepositAddress:
+		m.ClearDepositAddress()
+		return nil
+	}
+	return fmt.Errorf("unknown DepositAddressPartner unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DepositAddressPartnerMutation) ResetEdge(name string) error {
+	switch name {
+	case depositaddresspartner.EdgePartner:
+		m.ResetPartner()
+		return nil
+	case depositaddresspartner.EdgeDepositAddress:
+		m.ResetDepositAddress()
+		return nil
+	}
+	return fmt.Errorf("unknown DepositAddressPartner edge %s", name)
 }
 
 // EntityDkgKeyMutation represents an operation that mutates the EntityDkgKey nodes in the graph.

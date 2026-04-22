@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/depositaddresspartner"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
@@ -188,6 +189,33 @@ func (f TraverseDepositAddress) Traverse(ctx context.Context, q ent.Query) error
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.DepositAddressQuery", q)
+}
+
+// The DepositAddressPartnerFunc type is an adapter to allow the use of ordinary function as a Querier.
+type DepositAddressPartnerFunc func(context.Context, *ent.DepositAddressPartnerQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f DepositAddressPartnerFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.DepositAddressPartnerQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.DepositAddressPartnerQuery", q)
+}
+
+// The TraverseDepositAddressPartner type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseDepositAddressPartner func(context.Context, *ent.DepositAddressPartnerQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseDepositAddressPartner) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseDepositAddressPartner) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.DepositAddressPartnerQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.DepositAddressPartnerQuery", q)
 }
 
 // The EntityDkgKeyFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1252,6 +1280,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.CooperativeExitQuery, predicate.CooperativeExit, cooperativeexit.OrderOption]{typ: ent.TypeCooperativeExit, tq: q}, nil
 	case *ent.DepositAddressQuery:
 		return &query[*ent.DepositAddressQuery, predicate.DepositAddress, depositaddress.OrderOption]{typ: ent.TypeDepositAddress, tq: q}, nil
+	case *ent.DepositAddressPartnerQuery:
+		return &query[*ent.DepositAddressPartnerQuery, predicate.DepositAddressPartner, depositaddresspartner.OrderOption]{typ: ent.TypeDepositAddressPartner, tq: q}, nil
 	case *ent.EntityDkgKeyQuery:
 		return &query[*ent.EntityDkgKeyQuery, predicate.EntityDkgKey, entitydkgkey.OrderOption]{typ: ent.TypeEntityDkgKey, tq: q}, nil
 	case *ent.EventMessageQuery:

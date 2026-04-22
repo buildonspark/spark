@@ -127,6 +127,46 @@ var (
 			},
 		},
 	}
+	// DepositAddressPartnersColumns holds the columns for the "deposit_address_partners" table.
+	DepositAddressPartnersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "deposit_address_partner_partner", Type: field.TypeUUID},
+		{Name: "deposit_address_partner_deposit_address", Type: field.TypeUUID},
+	}
+	// DepositAddressPartnersTable holds the schema information for the "deposit_address_partners" table.
+	DepositAddressPartnersTable = &schema.Table{
+		Name:       "deposit_address_partners",
+		Columns:    DepositAddressPartnersColumns,
+		PrimaryKey: []*schema.Column{DepositAddressPartnersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "deposit_address_partners_partners_partner",
+				Columns:    []*schema.Column{DepositAddressPartnersColumns[3]},
+				RefColumns: []*schema.Column{PartnersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "deposit_address_partners_deposit_addresses_deposit_address",
+				Columns:    []*schema.Column{DepositAddressPartnersColumns[4]},
+				RefColumns: []*schema.Column{DepositAddressesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "depositaddresspartner_deposit_address_partner_deposit_address",
+				Unique:  true,
+				Columns: []*schema.Column{DepositAddressPartnersColumns[4]},
+			},
+			{
+				Name:    "depositaddresspartner_deposit_address_partner_partner",
+				Unique:  false,
+				Columns: []*schema.Column{DepositAddressPartnersColumns[3]},
+			},
+		},
+	}
 	// EntityDkgKeysColumns holds the columns for the "entity_dkg_keys" table.
 	EntityDkgKeysColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1928,6 +1968,7 @@ var (
 		BlockHeightsTable,
 		CooperativeExitsTable,
 		DepositAddressesTable,
+		DepositAddressPartnersTable,
 		EntityDkgKeysTable,
 		EventMessagesTable,
 		GossipsTable,
@@ -1975,6 +2016,8 @@ var (
 func init() {
 	CooperativeExitsTable.ForeignKeys[0].RefTable = TransfersTable
 	DepositAddressesTable.ForeignKeys[0].RefTable = SigningKeysharesTable
+	DepositAddressPartnersTable.ForeignKeys[0].RefTable = PartnersTable
+	DepositAddressPartnersTable.ForeignKeys[1].RefTable = DepositAddressesTable
 	EntityDkgKeysTable.ForeignKeys[0].RefTable = SigningKeysharesTable
 	L1tokenJusticeTransactionsTable.ForeignKeys[0].RefTable = L1tokenOutputWithdrawalsTable
 	L1tokenJusticeTransactionsTable.ForeignKeys[1].RefTable = TokenOutputsTable

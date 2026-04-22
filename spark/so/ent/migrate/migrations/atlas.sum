@@ -1,4 +1,4 @@
-h1:iinGjEJfCLQTZsIbpwvkUsd9/1+GMros7D2hgOOmtNw=
+h1:7pTEd+kjiBCGhCS8q/cso5mNdzc7Lmwq5OPJg3CidX0=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -149,3 +149,4 @@ h1:iinGjEJfCLQTZsIbpwvkUsd9/1+GMros7D2hgOOmtNw=
 20260420201502_refactor_partner_keys.sql h1:E/SGCvq0BRHszMhAZhwMJb90jFJhF/FM4x4gEtXkGkQ=
 20260421053020_make_partner_fields_nullable.sql h1:oIH0ub6RDLeYFlxYbXNqjptHbxZl2jnTxNAGBwITKQg=
 20260421061453_drop_deprecated_partner_fields.sql h1:X/IcFtgSYFZnvhg5CbrTVf/RfETPXtbjH3r2lSWZXn4=
+20260421181908_add_deposit_address_partner.sql h1:eSSbC7ATpskPASFB5IPDHKX1ooB9FWqyC2PZ9zlOJfY=
