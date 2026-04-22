@@ -4,7 +4,7 @@
   "description": "Spark CLI",
   "type": "module",
   "bin": {
-    "spark-cli": "./dist/cli.js"
+    "spark-cli": "./dist/cli.mjs"
   },
   "files": [
     "dist",
