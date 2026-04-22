@@ -115,6 +115,10 @@ func mapTransactionType(t pb.SparkTransactionType) string {
 		return "LIGHTNING_SEND"
 	case pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE:
 		return "LIGHTNING_RECEIVE"
+	case pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT:
+		return "COOPERATIVE_EXIT"
+	case pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_DEPOSIT:
+		return "DEPOSIT"
 	default:
 		return ""
 	}
@@ -128,6 +132,10 @@ func mapTransactionTypeToProto(s string) pb.SparkTransactionType {
 		return pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_SEND
 	case "LIGHTNING_RECEIVE":
 		return pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE
+	case "COOPERATIVE_EXIT":
+		return pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT
+	case "DEPOSIT":
+		return pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_DEPOSIT
 	default:
 		return pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_UNSPECIFIED
 	}

@@ -703,6 +703,8 @@ const (
 	SparkTransactionType_SPARK_TRANSACTION_TYPE_TRANSFER          SparkTransactionType = 1
 	SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_SEND    SparkTransactionType = 2
 	SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE SparkTransactionType = 3
+	SparkTransactionType_SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT  SparkTransactionType = 4
+	SparkTransactionType_SPARK_TRANSACTION_TYPE_DEPOSIT           SparkTransactionType = 5
 )
 
 // Enum value maps for SparkTransactionType.
@@ -712,12 +714,16 @@ var (
 		1: "SPARK_TRANSACTION_TYPE_TRANSFER",
 		2: "SPARK_TRANSACTION_TYPE_LIGHTNING_SEND",
 		3: "SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE",
+		4: "SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT",
+		5: "SPARK_TRANSACTION_TYPE_DEPOSIT",
 	}
 	SparkTransactionType_value = map[string]int32{
 		"SPARK_TRANSACTION_TYPE_UNSPECIFIED":       0,
 		"SPARK_TRANSACTION_TYPE_TRANSFER":          1,
 		"SPARK_TRANSACTION_TYPE_LIGHTNING_SEND":    2,
 		"SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE": 3,
+		"SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT":  4,
+		"SPARK_TRANSACTION_TYPE_DEPOSIT":           5,
 	}
 )
 
@@ -12660,12 +12666,14 @@ const file_spark_proto_rawDesc = "" +
 	"\x1dTREE_NODE_STATUS_RENEW_LOCKED\x10\n" +
 	"\x12 \n" +
 	"\x1cTREE_NODE_STATUS_UNAVAILABLE\x10\v\x12\"\n" +
-	"\x1eTREE_NODE_STATUS_PARENT_EXITED\x10\f*\xbc\x01\n" +
+	"\x1eTREE_NODE_STATUS_PARENT_EXITED\x10\f*\x8d\x02\n" +
 	"\x14SparkTransactionType\x12&\n" +
 	"\"SPARK_TRANSACTION_TYPE_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fSPARK_TRANSACTION_TYPE_TRANSFER\x10\x01\x12)\n" +
 	"%SPARK_TRANSACTION_TYPE_LIGHTNING_SEND\x10\x02\x12,\n" +
-	"(SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE\x10\x032\xe6\x1f\n" +
+	"(SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE\x10\x03\x12+\n" +
+	"'SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT\x10\x04\x12\"\n" +
+	"\x1eSPARK_TRANSACTION_TYPE_DEPOSIT\x10\x052\xe6\x1f\n" +
 	"\fSparkService\x12i\n" +
 	"\x18generate_deposit_address\x12$.spark.GenerateDepositAddressRequest\x1a%.spark.GenerateDepositAddressResponse\"\x00\x12|\n" +
 	"\x1fgenerate_static_deposit_address\x12*.spark.GenerateStaticDepositAddressRequest\x1a+.spark.GenerateStaticDepositAddressResponse\"\x00\x12v\n" +
