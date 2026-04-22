@@ -156,10 +156,6 @@ const (
 
 	KnobPurgeDanglingSigningKeyshareSecretsBatchSize = "spark.so.purge_dangling_signing_keyshare_secrets_batch_size"
 
-	// When enabled (> 0), CooperativeExitV2 requires direct refund transactions.
-	// Default is 0 (disabled) to allow gradual rollout. Set to 1 to enforce.
-	KnobRequireCoopExitDirectTx = "spark.so.require_coop_exit_direct_tx"
-
 	// Enable consensus engine for renew leaf operations.
 	KnobUseConsensusRenew = "spark.so.use_consensus_renew"
 )

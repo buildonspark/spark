@@ -11,7 +11,6 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/handler"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/partner"
 	events "github.com/lightsparkdev/spark/so/stream"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -187,10 +186,7 @@ func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeEx
 // CooperativeExitV2 is the same as CooperativeExit, but enforces use of direct transactions for unilateral exits
 func (s *SparkServer) CooperativeExitV2(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
 	coopExitHandler := handler.NewCooperativeExitHandler(s.config)
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireCoopExitDirectTx, 0) > 0 {
-		return coopExitHandler.CooperativeExitV2(ctx, req)
-	}
-	return coopExitHandler.CooperativeExit(ctx, req)
+	return coopExitHandler.CooperativeExitV2(ctx, req)
 }
 
 // StartLeafSwap initiates a swap of leaves between two users.
