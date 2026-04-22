@@ -398,10 +398,7 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "partner_id", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "label", Type: field.TypeString, Size: 255},
-		{Name: "partner_name", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "jwt_public_key", Type: field.TypeBytes, Nullable: true},
 		{Name: "partner_partner_key", Type: field.TypeUUID},
 	}
 	// PartnersTable holds the schema information for the "partners" table.
@@ -412,7 +409,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "partners_partner_keys_partner_key",
-				Columns:    []*schema.Column{PartnersColumns[7]},
+				Columns:    []*schema.Column{PartnersColumns[4]},
 				RefColumns: []*schema.Column{PartnerKeysColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -421,7 +418,7 @@ var (
 			{
 				Name:    "partner_label_partner_partner_key",
 				Unique:  true,
-				Columns: []*schema.Column{PartnersColumns[4], PartnersColumns[7]},
+				Columns: []*schema.Column{PartnersColumns[3], PartnersColumns[4]},
 			},
 		},
 	}

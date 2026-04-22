@@ -19,14 +19,8 @@ const (
 	FieldCreateTime = "create_time"
 	// FieldUpdateTime holds the string denoting the update_time field in the database.
 	FieldUpdateTime = "update_time"
-	// FieldPartnerID holds the string denoting the partner_id field in the database.
-	FieldPartnerID = "partner_id"
 	// FieldLabel holds the string denoting the label field in the database.
 	FieldLabel = "label"
-	// FieldPartnerName holds the string denoting the partner_name field in the database.
-	FieldPartnerName = "partner_name"
-	// FieldJwtPublicKey holds the string denoting the jwt_public_key field in the database.
-	FieldJwtPublicKey = "jwt_public_key"
 	// EdgePartnerKey holds the string denoting the partner_key edge name in mutations.
 	EdgePartnerKey = "partner_key"
 	// Table holds the table name of the partner in the database.
@@ -66,11 +60,6 @@ func ValidColumn(column string) bool {
 			return true
 		}
 	}
-	for _, f := range [...]string{FieldPartnerID, FieldPartnerName, FieldJwtPublicKey} {
-		if column == f {
-			return true
-		}
-	}
 	return false
 }
 
@@ -81,12 +70,8 @@ var (
 	DefaultUpdateTime func() time.Time
 	// UpdateDefaultUpdateTime holds the default value on update for the "update_time" field.
 	UpdateDefaultUpdateTime func() time.Time
-	// PartnerIDValidator is a validator for the "partner_id" field. It is called by the builders before save.
-	PartnerIDValidator func(string) error
 	// LabelValidator is a validator for the "label" field. It is called by the builders before save.
 	LabelValidator func(string) error
-	// PartnerNameValidator is a validator for the "partner_name" field. It is called by the builders before save.
-	PartnerNameValidator func(string) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -109,19 +94,9 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
 }
 
-// ByPartnerID orders the results by the partner_id field.
-func ByPartnerID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldPartnerID, opts...).ToFunc()
-}
-
 // ByLabel orders the results by the label field.
 func ByLabel(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLabel, opts...).ToFunc()
-}
-
-// ByPartnerName orders the results by the partner_name field.
-func ByPartnerName(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldPartnerName, opts...).ToFunc()
 }
 
 // ByPartnerKeyField orders the results by partner_key field.

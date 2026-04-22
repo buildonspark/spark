@@ -1957,10 +1957,7 @@ type PartnerExample struct {
 	t      *testing.T
 
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
-	PartnerID    *string
-	Label        *string
-	PartnerName  *string
-	JwtPublicKey *jwt.Public
+	Label *string
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 	PartnerKey *ent.PartnerKey
@@ -1974,27 +1971,9 @@ func NewPartnerExample(t *testing.T, client *ent.Client) *PartnerExample {
 	}
 }
 
-// SetPartnerID sets the partner_id field.
-func (pa *PartnerExample) SetPartnerID(v string) *PartnerExample {
-	pa.PartnerID = &v
-	return pa
-}
-
 // SetLabel sets the label field.
 func (pa *PartnerExample) SetLabel(v string) *PartnerExample {
 	pa.Label = &v
-	return pa
-}
-
-// SetPartnerName sets the partner_name field.
-func (pa *PartnerExample) SetPartnerName(v string) *PartnerExample {
-	pa.PartnerName = &v
-	return pa
-}
-
-// SetJwtPublicKey sets the jwt_public_key field.
-func (pa *PartnerExample) SetJwtPublicKey(v jwt.Public) *PartnerExample {
-	pa.JwtPublicKey = &v
 	return pa
 }
 
@@ -2010,29 +1989,11 @@ func (pa *PartnerExample) MustExec(ctx context.Context) *ent.Partner {
 	create := pa.client.Partner.Create()
 
 	// Set fields
-	if pa.PartnerID != nil {
-		create.SetPartnerID(*pa.PartnerID)
-	} else {
-		// Use default from annotation
-		create.SetPartnerID("partner-a")
-	}
 	if pa.Label != nil {
 		create.SetLabel(*pa.Label)
 	} else {
 		// Use default from annotation
 		create.SetLabel("client-1")
-	}
-	if pa.PartnerName != nil {
-		create.SetPartnerName(*pa.PartnerName)
-	} else {
-		// Use default from annotation
-		create.SetPartnerName("Partner A")
-	}
-	if pa.JwtPublicKey != nil {
-		create.SetJwtPublicKey(*pa.JwtPublicKey)
-	} else {
-		// Use default from annotation
-		create.SetJwtPublicKey(jwt.MustParsePublicHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
 	}
 
 	// Handle edges
@@ -2060,29 +2021,11 @@ func (pa *PartnerExample) Exec(ctx context.Context) (*ent.Partner, error) {
 	create := pa.client.Partner.Create()
 
 	// Set fields
-	if pa.PartnerID != nil {
-		create.SetPartnerID(*pa.PartnerID)
-	} else {
-		// Use default from annotation
-		create.SetPartnerID("partner-a")
-	}
 	if pa.Label != nil {
 		create.SetLabel(*pa.Label)
 	} else {
 		// Use default from annotation
 		create.SetLabel("client-1")
-	}
-	if pa.PartnerName != nil {
-		create.SetPartnerName(*pa.PartnerName)
-	} else {
-		// Use default from annotation
-		create.SetPartnerName("Partner A")
-	}
-	if pa.JwtPublicKey != nil {
-		create.SetJwtPublicKey(*pa.JwtPublicKey)
-	} else {
-		// Use default from annotation
-		create.SetJwtPublicKey(jwt.MustParsePublicHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
 	}
 
 	// Handle edges

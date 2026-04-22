@@ -13,7 +13,6 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/ent/partner"
 	"github.com/lightsparkdev/spark/so/ent/partnerkey"
 )
@@ -54,51 +53,9 @@ func (pc *PartnerCreate) SetNillableUpdateTime(t *time.Time) *PartnerCreate {
 	return pc
 }
 
-// SetPartnerID sets the "partner_id" field.
-func (pc *PartnerCreate) SetPartnerID(s string) *PartnerCreate {
-	pc.mutation.SetPartnerID(s)
-	return pc
-}
-
-// SetNillablePartnerID sets the "partner_id" field if the given value is not nil.
-func (pc *PartnerCreate) SetNillablePartnerID(s *string) *PartnerCreate {
-	if s != nil {
-		pc.SetPartnerID(*s)
-	}
-	return pc
-}
-
 // SetLabel sets the "label" field.
 func (pc *PartnerCreate) SetLabel(s string) *PartnerCreate {
 	pc.mutation.SetLabel(s)
-	return pc
-}
-
-// SetPartnerName sets the "partner_name" field.
-func (pc *PartnerCreate) SetPartnerName(s string) *PartnerCreate {
-	pc.mutation.SetPartnerName(s)
-	return pc
-}
-
-// SetNillablePartnerName sets the "partner_name" field if the given value is not nil.
-func (pc *PartnerCreate) SetNillablePartnerName(s *string) *PartnerCreate {
-	if s != nil {
-		pc.SetPartnerName(*s)
-	}
-	return pc
-}
-
-// SetJwtPublicKey sets the "jwt_public_key" field.
-func (pc *PartnerCreate) SetJwtPublicKey(j jwt.Public) *PartnerCreate {
-	pc.mutation.SetJwtPublicKey(j)
-	return pc
-}
-
-// SetNillableJwtPublicKey sets the "jwt_public_key" field if the given value is not nil.
-func (pc *PartnerCreate) SetNillableJwtPublicKey(j *jwt.Public) *PartnerCreate {
-	if j != nil {
-		pc.SetJwtPublicKey(*j)
-	}
 	return pc
 }
 
@@ -184,22 +141,12 @@ func (pc *PartnerCreate) check() error {
 	if _, ok := pc.mutation.UpdateTime(); !ok {
 		return &ValidationError{Name: "update_time", err: errors.New(`ent: missing required field "Partner.update_time"`)}
 	}
-	if v, ok := pc.mutation.PartnerID(); ok {
-		if err := partner.PartnerIDValidator(v); err != nil {
-			return &ValidationError{Name: "partner_id", err: fmt.Errorf(`ent: validator failed for field "Partner.partner_id": %w`, err)}
-		}
-	}
 	if _, ok := pc.mutation.Label(); !ok {
 		return &ValidationError{Name: "label", err: errors.New(`ent: missing required field "Partner.label"`)}
 	}
 	if v, ok := pc.mutation.Label(); ok {
 		if err := partner.LabelValidator(v); err != nil {
 			return &ValidationError{Name: "label", err: fmt.Errorf(`ent: validator failed for field "Partner.label": %w`, err)}
-		}
-	}
-	if v, ok := pc.mutation.PartnerName(); ok {
-		if err := partner.PartnerNameValidator(v); err != nil {
-			return &ValidationError{Name: "partner_name", err: fmt.Errorf(`ent: validator failed for field "Partner.partner_name": %w`, err)}
 		}
 	}
 	if len(pc.mutation.PartnerKeyIDs()) == 0 {
@@ -249,21 +196,9 @@ func (pc *PartnerCreate) createSpec() (*Partner, *sqlgraph.CreateSpec) {
 		_spec.SetField(partner.FieldUpdateTime, field.TypeTime, value)
 		_node.UpdateTime = value
 	}
-	if value, ok := pc.mutation.PartnerID(); ok {
-		_spec.SetField(partner.FieldPartnerID, field.TypeString, value)
-		_node.PartnerID = &value
-	}
 	if value, ok := pc.mutation.Label(); ok {
 		_spec.SetField(partner.FieldLabel, field.TypeString, value)
 		_node.Label = value
-	}
-	if value, ok := pc.mutation.PartnerName(); ok {
-		_spec.SetField(partner.FieldPartnerName, field.TypeString, value)
-		_node.PartnerName = &value
-	}
-	if value, ok := pc.mutation.JwtPublicKey(); ok {
-		_spec.SetField(partner.FieldJwtPublicKey, field.TypeBytes, value)
-		_node.JwtPublicKey = &value
 	}
 	if nodes := pc.mutation.PartnerKeyIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -346,24 +281,6 @@ func (u *PartnerUpsert) UpdateUpdateTime() *PartnerUpsert {
 	return u
 }
 
-// SetPartnerID sets the "partner_id" field.
-func (u *PartnerUpsert) SetPartnerID(v string) *PartnerUpsert {
-	u.Set(partner.FieldPartnerID, v)
-	return u
-}
-
-// UpdatePartnerID sets the "partner_id" field to the value that was provided on create.
-func (u *PartnerUpsert) UpdatePartnerID() *PartnerUpsert {
-	u.SetExcluded(partner.FieldPartnerID)
-	return u
-}
-
-// ClearPartnerID clears the value of the "partner_id" field.
-func (u *PartnerUpsert) ClearPartnerID() *PartnerUpsert {
-	u.SetNull(partner.FieldPartnerID)
-	return u
-}
-
 // SetLabel sets the "label" field.
 func (u *PartnerUpsert) SetLabel(v string) *PartnerUpsert {
 	u.Set(partner.FieldLabel, v)
@@ -373,42 +290,6 @@ func (u *PartnerUpsert) SetLabel(v string) *PartnerUpsert {
 // UpdateLabel sets the "label" field to the value that was provided on create.
 func (u *PartnerUpsert) UpdateLabel() *PartnerUpsert {
 	u.SetExcluded(partner.FieldLabel)
-	return u
-}
-
-// SetPartnerName sets the "partner_name" field.
-func (u *PartnerUpsert) SetPartnerName(v string) *PartnerUpsert {
-	u.Set(partner.FieldPartnerName, v)
-	return u
-}
-
-// UpdatePartnerName sets the "partner_name" field to the value that was provided on create.
-func (u *PartnerUpsert) UpdatePartnerName() *PartnerUpsert {
-	u.SetExcluded(partner.FieldPartnerName)
-	return u
-}
-
-// ClearPartnerName clears the value of the "partner_name" field.
-func (u *PartnerUpsert) ClearPartnerName() *PartnerUpsert {
-	u.SetNull(partner.FieldPartnerName)
-	return u
-}
-
-// SetJwtPublicKey sets the "jwt_public_key" field.
-func (u *PartnerUpsert) SetJwtPublicKey(v jwt.Public) *PartnerUpsert {
-	u.Set(partner.FieldJwtPublicKey, v)
-	return u
-}
-
-// UpdateJwtPublicKey sets the "jwt_public_key" field to the value that was provided on create.
-func (u *PartnerUpsert) UpdateJwtPublicKey() *PartnerUpsert {
-	u.SetExcluded(partner.FieldJwtPublicKey)
-	return u
-}
-
-// ClearJwtPublicKey clears the value of the "jwt_public_key" field.
-func (u *PartnerUpsert) ClearJwtPublicKey() *PartnerUpsert {
-	u.SetNull(partner.FieldJwtPublicKey)
 	return u
 }
 
@@ -477,27 +358,6 @@ func (u *PartnerUpsertOne) UpdateUpdateTime() *PartnerUpsertOne {
 	})
 }
 
-// SetPartnerID sets the "partner_id" field.
-func (u *PartnerUpsertOne) SetPartnerID(v string) *PartnerUpsertOne {
-	return u.Update(func(s *PartnerUpsert) {
-		s.SetPartnerID(v)
-	})
-}
-
-// UpdatePartnerID sets the "partner_id" field to the value that was provided on create.
-func (u *PartnerUpsertOne) UpdatePartnerID() *PartnerUpsertOne {
-	return u.Update(func(s *PartnerUpsert) {
-		s.UpdatePartnerID()
-	})
-}
-
-// ClearPartnerID clears the value of the "partner_id" field.
-func (u *PartnerUpsertOne) ClearPartnerID() *PartnerUpsertOne {
-	return u.Update(func(s *PartnerUpsert) {
-		s.ClearPartnerID()
-	})
-}
-
 // SetLabel sets the "label" field.
 func (u *PartnerUpsertOne) SetLabel(v string) *PartnerUpsertOne {
 	return u.Update(func(s *PartnerUpsert) {
@@ -509,48 +369,6 @@ func (u *PartnerUpsertOne) SetLabel(v string) *PartnerUpsertOne {
 func (u *PartnerUpsertOne) UpdateLabel() *PartnerUpsertOne {
 	return u.Update(func(s *PartnerUpsert) {
 		s.UpdateLabel()
-	})
-}
-
-// SetPartnerName sets the "partner_name" field.
-func (u *PartnerUpsertOne) SetPartnerName(v string) *PartnerUpsertOne {
-	return u.Update(func(s *PartnerUpsert) {
-		s.SetPartnerName(v)
-	})
-}
-
-// UpdatePartnerName sets the "partner_name" field to the value that was provided on create.
-func (u *PartnerUpsertOne) UpdatePartnerName() *PartnerUpsertOne {
-	return u.Update(func(s *PartnerUpsert) {
-		s.UpdatePartnerName()
-	})
-}
-
-// ClearPartnerName clears the value of the "partner_name" field.
-func (u *PartnerUpsertOne) ClearPartnerName() *PartnerUpsertOne {
-	return u.Update(func(s *PartnerUpsert) {
-		s.ClearPartnerName()
-	})
-}
-
-// SetJwtPublicKey sets the "jwt_public_key" field.
-func (u *PartnerUpsertOne) SetJwtPublicKey(v jwt.Public) *PartnerUpsertOne {
-	return u.Update(func(s *PartnerUpsert) {
-		s.SetJwtPublicKey(v)
-	})
-}
-
-// UpdateJwtPublicKey sets the "jwt_public_key" field to the value that was provided on create.
-func (u *PartnerUpsertOne) UpdateJwtPublicKey() *PartnerUpsertOne {
-	return u.Update(func(s *PartnerUpsert) {
-		s.UpdateJwtPublicKey()
-	})
-}
-
-// ClearJwtPublicKey clears the value of the "jwt_public_key" field.
-func (u *PartnerUpsertOne) ClearJwtPublicKey() *PartnerUpsertOne {
-	return u.Update(func(s *PartnerUpsert) {
-		s.ClearJwtPublicKey()
 	})
 }
 
@@ -786,27 +604,6 @@ func (u *PartnerUpsertBulk) UpdateUpdateTime() *PartnerUpsertBulk {
 	})
 }
 
-// SetPartnerID sets the "partner_id" field.
-func (u *PartnerUpsertBulk) SetPartnerID(v string) *PartnerUpsertBulk {
-	return u.Update(func(s *PartnerUpsert) {
-		s.SetPartnerID(v)
-	})
-}
-
-// UpdatePartnerID sets the "partner_id" field to the value that was provided on create.
-func (u *PartnerUpsertBulk) UpdatePartnerID() *PartnerUpsertBulk {
-	return u.Update(func(s *PartnerUpsert) {
-		s.UpdatePartnerID()
-	})
-}
-
-// ClearPartnerID clears the value of the "partner_id" field.
-func (u *PartnerUpsertBulk) ClearPartnerID() *PartnerUpsertBulk {
-	return u.Update(func(s *PartnerUpsert) {
-		s.ClearPartnerID()
-	})
-}
-
 // SetLabel sets the "label" field.
 func (u *PartnerUpsertBulk) SetLabel(v string) *PartnerUpsertBulk {
 	return u.Update(func(s *PartnerUpsert) {
@@ -818,48 +615,6 @@ func (u *PartnerUpsertBulk) SetLabel(v string) *PartnerUpsertBulk {
 func (u *PartnerUpsertBulk) UpdateLabel() *PartnerUpsertBulk {
 	return u.Update(func(s *PartnerUpsert) {
 		s.UpdateLabel()
-	})
-}
-
-// SetPartnerName sets the "partner_name" field.
-func (u *PartnerUpsertBulk) SetPartnerName(v string) *PartnerUpsertBulk {
-	return u.Update(func(s *PartnerUpsert) {
-		s.SetPartnerName(v)
-	})
-}
-
-// UpdatePartnerName sets the "partner_name" field to the value that was provided on create.
-func (u *PartnerUpsertBulk) UpdatePartnerName() *PartnerUpsertBulk {
-	return u.Update(func(s *PartnerUpsert) {
-		s.UpdatePartnerName()
-	})
-}
-
-// ClearPartnerName clears the value of the "partner_name" field.
-func (u *PartnerUpsertBulk) ClearPartnerName() *PartnerUpsertBulk {
-	return u.Update(func(s *PartnerUpsert) {
-		s.ClearPartnerName()
-	})
-}
-
-// SetJwtPublicKey sets the "jwt_public_key" field.
-func (u *PartnerUpsertBulk) SetJwtPublicKey(v jwt.Public) *PartnerUpsertBulk {
-	return u.Update(func(s *PartnerUpsert) {
-		s.SetJwtPublicKey(v)
-	})
-}
-
-// UpdateJwtPublicKey sets the "jwt_public_key" field to the value that was provided on create.
-func (u *PartnerUpsertBulk) UpdateJwtPublicKey() *PartnerUpsertBulk {
-	return u.Update(func(s *PartnerUpsert) {
-		s.UpdateJwtPublicKey()
-	})
-}
-
-// ClearJwtPublicKey clears the value of the "jwt_public_key" field.
-func (u *PartnerUpsertBulk) ClearJwtPublicKey() *PartnerUpsertBulk {
-	return u.Update(func(s *PartnerUpsert) {
-		s.ClearJwtPublicKey()
 	})
 }
 

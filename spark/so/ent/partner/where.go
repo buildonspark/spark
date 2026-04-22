@@ -8,7 +8,6 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
 
@@ -65,21 +64,6 @@ func CreateTime(v time.Time) predicate.Partner {
 // UpdateTime applies equality check predicate on the "update_time" field. It's identical to UpdateTimeEQ.
 func UpdateTime(v time.Time) predicate.Partner {
 	return predicate.Partner(sql.FieldEQ(FieldUpdateTime, v))
-}
-
-// PartnerID applies equality check predicate on the "partner_id" field. It's identical to PartnerIDEQ.
-func PartnerID(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldEQ(FieldPartnerID, v))
-}
-
-// PartnerName applies equality check predicate on the "partner_name" field. It's identical to PartnerNameEQ.
-func PartnerName(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldEQ(FieldPartnerName, v))
-}
-
-// JwtPublicKey applies equality check predicate on the "jwt_public_key" field. It's identical to JwtPublicKeyEQ.
-func JwtPublicKey(v jwt.Public) predicate.Partner {
-	return predicate.Partner(sql.FieldEQ(FieldJwtPublicKey, v))
 }
 
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
@@ -162,81 +146,6 @@ func UpdateTimeLTE(v time.Time) predicate.Partner {
 	return predicate.Partner(sql.FieldLTE(FieldUpdateTime, v))
 }
 
-// PartnerIDEQ applies the EQ predicate on the "partner_id" field.
-func PartnerIDEQ(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldEQ(FieldPartnerID, v))
-}
-
-// PartnerIDNEQ applies the NEQ predicate on the "partner_id" field.
-func PartnerIDNEQ(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldNEQ(FieldPartnerID, v))
-}
-
-// PartnerIDIn applies the In predicate on the "partner_id" field.
-func PartnerIDIn(vs ...string) predicate.Partner {
-	return predicate.Partner(sql.FieldIn(FieldPartnerID, vs...))
-}
-
-// PartnerIDNotIn applies the NotIn predicate on the "partner_id" field.
-func PartnerIDNotIn(vs ...string) predicate.Partner {
-	return predicate.Partner(sql.FieldNotIn(FieldPartnerID, vs...))
-}
-
-// PartnerIDGT applies the GT predicate on the "partner_id" field.
-func PartnerIDGT(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldGT(FieldPartnerID, v))
-}
-
-// PartnerIDGTE applies the GTE predicate on the "partner_id" field.
-func PartnerIDGTE(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldGTE(FieldPartnerID, v))
-}
-
-// PartnerIDLT applies the LT predicate on the "partner_id" field.
-func PartnerIDLT(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldLT(FieldPartnerID, v))
-}
-
-// PartnerIDLTE applies the LTE predicate on the "partner_id" field.
-func PartnerIDLTE(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldLTE(FieldPartnerID, v))
-}
-
-// PartnerIDContains applies the Contains predicate on the "partner_id" field.
-func PartnerIDContains(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldContains(FieldPartnerID, v))
-}
-
-// PartnerIDHasPrefix applies the HasPrefix predicate on the "partner_id" field.
-func PartnerIDHasPrefix(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldHasPrefix(FieldPartnerID, v))
-}
-
-// PartnerIDHasSuffix applies the HasSuffix predicate on the "partner_id" field.
-func PartnerIDHasSuffix(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldHasSuffix(FieldPartnerID, v))
-}
-
-// PartnerIDIsNil applies the IsNil predicate on the "partner_id" field.
-func PartnerIDIsNil() predicate.Partner {
-	return predicate.Partner(sql.FieldIsNull(FieldPartnerID))
-}
-
-// PartnerIDNotNil applies the NotNil predicate on the "partner_id" field.
-func PartnerIDNotNil() predicate.Partner {
-	return predicate.Partner(sql.FieldNotNull(FieldPartnerID))
-}
-
-// PartnerIDEqualFold applies the EqualFold predicate on the "partner_id" field.
-func PartnerIDEqualFold(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldEqualFold(FieldPartnerID, v))
-}
-
-// PartnerIDContainsFold applies the ContainsFold predicate on the "partner_id" field.
-func PartnerIDContainsFold(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldContainsFold(FieldPartnerID, v))
-}
-
 // LabelEQ applies the EQ predicate on the "label" field.
 func LabelEQ(v string) predicate.Partner {
 	return predicate.Partner(sql.FieldEQ(FieldLabel, v))
@@ -300,131 +209,6 @@ func LabelEqualFold(v string) predicate.Partner {
 // LabelContainsFold applies the ContainsFold predicate on the "label" field.
 func LabelContainsFold(v string) predicate.Partner {
 	return predicate.Partner(sql.FieldContainsFold(FieldLabel, v))
-}
-
-// PartnerNameEQ applies the EQ predicate on the "partner_name" field.
-func PartnerNameEQ(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldEQ(FieldPartnerName, v))
-}
-
-// PartnerNameNEQ applies the NEQ predicate on the "partner_name" field.
-func PartnerNameNEQ(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldNEQ(FieldPartnerName, v))
-}
-
-// PartnerNameIn applies the In predicate on the "partner_name" field.
-func PartnerNameIn(vs ...string) predicate.Partner {
-	return predicate.Partner(sql.FieldIn(FieldPartnerName, vs...))
-}
-
-// PartnerNameNotIn applies the NotIn predicate on the "partner_name" field.
-func PartnerNameNotIn(vs ...string) predicate.Partner {
-	return predicate.Partner(sql.FieldNotIn(FieldPartnerName, vs...))
-}
-
-// PartnerNameGT applies the GT predicate on the "partner_name" field.
-func PartnerNameGT(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldGT(FieldPartnerName, v))
-}
-
-// PartnerNameGTE applies the GTE predicate on the "partner_name" field.
-func PartnerNameGTE(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldGTE(FieldPartnerName, v))
-}
-
-// PartnerNameLT applies the LT predicate on the "partner_name" field.
-func PartnerNameLT(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldLT(FieldPartnerName, v))
-}
-
-// PartnerNameLTE applies the LTE predicate on the "partner_name" field.
-func PartnerNameLTE(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldLTE(FieldPartnerName, v))
-}
-
-// PartnerNameContains applies the Contains predicate on the "partner_name" field.
-func PartnerNameContains(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldContains(FieldPartnerName, v))
-}
-
-// PartnerNameHasPrefix applies the HasPrefix predicate on the "partner_name" field.
-func PartnerNameHasPrefix(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldHasPrefix(FieldPartnerName, v))
-}
-
-// PartnerNameHasSuffix applies the HasSuffix predicate on the "partner_name" field.
-func PartnerNameHasSuffix(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldHasSuffix(FieldPartnerName, v))
-}
-
-// PartnerNameIsNil applies the IsNil predicate on the "partner_name" field.
-func PartnerNameIsNil() predicate.Partner {
-	return predicate.Partner(sql.FieldIsNull(FieldPartnerName))
-}
-
-// PartnerNameNotNil applies the NotNil predicate on the "partner_name" field.
-func PartnerNameNotNil() predicate.Partner {
-	return predicate.Partner(sql.FieldNotNull(FieldPartnerName))
-}
-
-// PartnerNameEqualFold applies the EqualFold predicate on the "partner_name" field.
-func PartnerNameEqualFold(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldEqualFold(FieldPartnerName, v))
-}
-
-// PartnerNameContainsFold applies the ContainsFold predicate on the "partner_name" field.
-func PartnerNameContainsFold(v string) predicate.Partner {
-	return predicate.Partner(sql.FieldContainsFold(FieldPartnerName, v))
-}
-
-// JwtPublicKeyEQ applies the EQ predicate on the "jwt_public_key" field.
-func JwtPublicKeyEQ(v jwt.Public) predicate.Partner {
-	return predicate.Partner(sql.FieldEQ(FieldJwtPublicKey, v))
-}
-
-// JwtPublicKeyNEQ applies the NEQ predicate on the "jwt_public_key" field.
-func JwtPublicKeyNEQ(v jwt.Public) predicate.Partner {
-	return predicate.Partner(sql.FieldNEQ(FieldJwtPublicKey, v))
-}
-
-// JwtPublicKeyIn applies the In predicate on the "jwt_public_key" field.
-func JwtPublicKeyIn(vs ...jwt.Public) predicate.Partner {
-	return predicate.Partner(sql.FieldIn(FieldJwtPublicKey, vs...))
-}
-
-// JwtPublicKeyNotIn applies the NotIn predicate on the "jwt_public_key" field.
-func JwtPublicKeyNotIn(vs ...jwt.Public) predicate.Partner {
-	return predicate.Partner(sql.FieldNotIn(FieldJwtPublicKey, vs...))
-}
-
-// JwtPublicKeyGT applies the GT predicate on the "jwt_public_key" field.
-func JwtPublicKeyGT(v jwt.Public) predicate.Partner {
-	return predicate.Partner(sql.FieldGT(FieldJwtPublicKey, v))
-}
-
-// JwtPublicKeyGTE applies the GTE predicate on the "jwt_public_key" field.
-func JwtPublicKeyGTE(v jwt.Public) predicate.Partner {
-	return predicate.Partner(sql.FieldGTE(FieldJwtPublicKey, v))
-}
-
-// JwtPublicKeyLT applies the LT predicate on the "jwt_public_key" field.
-func JwtPublicKeyLT(v jwt.Public) predicate.Partner {
-	return predicate.Partner(sql.FieldLT(FieldJwtPublicKey, v))
-}
-
-// JwtPublicKeyLTE applies the LTE predicate on the "jwt_public_key" field.
-func JwtPublicKeyLTE(v jwt.Public) predicate.Partner {
-	return predicate.Partner(sql.FieldLTE(FieldJwtPublicKey, v))
-}
-
-// JwtPublicKeyIsNil applies the IsNil predicate on the "jwt_public_key" field.
-func JwtPublicKeyIsNil() predicate.Partner {
-	return predicate.Partner(sql.FieldIsNull(FieldJwtPublicKey))
-}
-
-// JwtPublicKeyNotNil applies the NotNil predicate on the "jwt_public_key" field.
-func JwtPublicKeyNotNil() predicate.Partner {
-	return predicate.Partner(sql.FieldNotNull(FieldJwtPublicKey))
 }
 
 // HasPartnerKey applies the HasEdge predicate on the "partner_key" edge.

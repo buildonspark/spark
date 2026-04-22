@@ -398,12 +398,8 @@ func init() {
 	partner.DefaultUpdateTime = partnerDescUpdateTime.Default.(func() time.Time)
 	// partner.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	partner.UpdateDefaultUpdateTime = partnerDescUpdateTime.UpdateDefault.(func() time.Time)
-	// partnerDescPartnerID is the schema descriptor for partner_id field.
-	partnerDescPartnerID := partnerFields[0].Descriptor()
-	// partner.PartnerIDValidator is a validator for the "partner_id" field. It is called by the builders before save.
-	partner.PartnerIDValidator = partnerDescPartnerID.Validators[0].(func(string) error)
 	// partnerDescLabel is the schema descriptor for label field.
-	partnerDescLabel := partnerFields[1].Descriptor()
+	partnerDescLabel := partnerFields[0].Descriptor()
 	// partner.LabelValidator is a validator for the "label" field. It is called by the builders before save.
 	partner.LabelValidator = func() func(string) error {
 		validators := partnerDescLabel.Validators
@@ -420,10 +416,6 @@ func init() {
 			return nil
 		}
 	}()
-	// partnerDescPartnerName is the schema descriptor for partner_name field.
-	partnerDescPartnerName := partnerFields[2].Descriptor()
-	// partner.PartnerNameValidator is a validator for the "partner_name" field. It is called by the builders before save.
-	partner.PartnerNameValidator = partnerDescPartnerName.Validators[0].(func(string) error)
 	// partnerDescID is the schema descriptor for id field.
 	partnerDescID := partnerMixinFields0[0].Descriptor()
 	// partner.DefaultID holds the default value on creation for the id field.

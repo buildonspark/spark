@@ -10,7 +10,6 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/ent/partner"
 	"github.com/lightsparkdev/spark/so/ent/partnerkey"
 )
@@ -24,20 +23,8 @@ type Partner struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// The time when the entity was last updated.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// Deprecated: use partner_key edge.
-	//
-	// Deprecated: Field "partner_id" was marked as deprecated in the schema.
-	PartnerID *string `json:"partner_id,omitempty"`
 	// Label identifying the partner's client or application, included as the 'sub' claim in their JWT.
 	Label string `json:"label,omitempty"`
-	// Deprecated: use partner_key edge.
-	//
-	// Deprecated: Field "partner_name" was marked as deprecated in the schema.
-	PartnerName *string `json:"partner_name,omitempty"`
-	// Deprecated: use partner_key edge.
-	//
-	// Deprecated: Field "jwt_public_key" was marked as deprecated in the schema.
-	JwtPublicKey *jwt.Public `json:"jwt_public_key,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PartnerQuery when eager-loading is set.
 	Edges               PartnerEdges `json:"edges"`
@@ -70,9 +57,7 @@ func (*Partner) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case partner.FieldJwtPublicKey:
-			values[i] = &sql.NullScanner{S: new(jwt.Public)}
-		case partner.FieldPartnerID, partner.FieldLabel, partner.FieldPartnerName:
+		case partner.FieldLabel:
 			values[i] = new(sql.NullString)
 		case partner.FieldCreateTime, partner.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -113,32 +98,11 @@ func (pa *Partner) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				pa.UpdateTime = value.Time
 			}
-		case partner.FieldPartnerID:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field partner_id", values[i])
-			} else if value.Valid {
-				pa.PartnerID = new(string)
-				*pa.PartnerID = value.String
-			}
 		case partner.FieldLabel:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field label", values[i])
 			} else if value.Valid {
 				pa.Label = value.String
-			}
-		case partner.FieldPartnerName:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field partner_name", values[i])
-			} else if value.Valid {
-				pa.PartnerName = new(string)
-				*pa.PartnerName = value.String
-			}
-		case partner.FieldJwtPublicKey:
-			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field jwt_public_key", values[i])
-			} else if value.Valid {
-				pa.JwtPublicKey = new(jwt.Public)
-				*pa.JwtPublicKey = *value.S.(*jwt.Public)
 			}
 		case partner.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -194,23 +158,8 @@ func (pa *Partner) String() string {
 	builder.WriteString("update_time=")
 	builder.WriteString(pa.UpdateTime.Format(time.ANSIC))
 	builder.WriteString(", ")
-	if v := pa.PartnerID; v != nil {
-		builder.WriteString("partner_id=")
-		builder.WriteString(*v)
-	}
-	builder.WriteString(", ")
 	builder.WriteString("label=")
 	builder.WriteString(pa.Label)
-	builder.WriteString(", ")
-	if v := pa.PartnerName; v != nil {
-		builder.WriteString("partner_name=")
-		builder.WriteString(*v)
-	}
-	builder.WriteString(", ")
-	if v := pa.JwtPublicKey; v != nil {
-		builder.WriteString("jwt_public_key=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
 	builder.WriteByte(')')
 	return builder.String()
 }

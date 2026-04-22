@@ -9795,10 +9795,7 @@ type PartnerMutation struct {
 	id                 *uuid.UUID
 	create_time        *time.Time
 	update_time        *time.Time
-	partner_id         *string
 	label              *string
-	partner_name       *string
-	jwt_public_key     *jwt.Public
 	clearedFields      map[string]struct{}
 	partner_key        *uuid.UUID
 	clearedpartner_key bool
@@ -9983,55 +9980,6 @@ func (m *PartnerMutation) ResetUpdateTime() {
 	m.update_time = nil
 }
 
-// SetPartnerID sets the "partner_id" field.
-func (m *PartnerMutation) SetPartnerID(s string) {
-	m.partner_id = &s
-}
-
-// PartnerID returns the value of the "partner_id" field in the mutation.
-func (m *PartnerMutation) PartnerID() (r string, exists bool) {
-	v := m.partner_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldPartnerID returns the old "partner_id" field's value of the Partner entity.
-// If the Partner object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PartnerMutation) OldPartnerID(ctx context.Context) (v *string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldPartnerID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldPartnerID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldPartnerID: %w", err)
-	}
-	return oldValue.PartnerID, nil
-}
-
-// ClearPartnerID clears the value of the "partner_id" field.
-func (m *PartnerMutation) ClearPartnerID() {
-	m.partner_id = nil
-	m.clearedFields[partner.FieldPartnerID] = struct{}{}
-}
-
-// PartnerIDCleared returns if the "partner_id" field was cleared in this mutation.
-func (m *PartnerMutation) PartnerIDCleared() bool {
-	_, ok := m.clearedFields[partner.FieldPartnerID]
-	return ok
-}
-
-// ResetPartnerID resets all changes to the "partner_id" field.
-func (m *PartnerMutation) ResetPartnerID() {
-	m.partner_id = nil
-	delete(m.clearedFields, partner.FieldPartnerID)
-}
-
 // SetLabel sets the "label" field.
 func (m *PartnerMutation) SetLabel(s string) {
 	m.label = &s
@@ -10066,104 +10014,6 @@ func (m *PartnerMutation) OldLabel(ctx context.Context) (v string, err error) {
 // ResetLabel resets all changes to the "label" field.
 func (m *PartnerMutation) ResetLabel() {
 	m.label = nil
-}
-
-// SetPartnerName sets the "partner_name" field.
-func (m *PartnerMutation) SetPartnerName(s string) {
-	m.partner_name = &s
-}
-
-// PartnerName returns the value of the "partner_name" field in the mutation.
-func (m *PartnerMutation) PartnerName() (r string, exists bool) {
-	v := m.partner_name
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldPartnerName returns the old "partner_name" field's value of the Partner entity.
-// If the Partner object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PartnerMutation) OldPartnerName(ctx context.Context) (v *string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldPartnerName is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldPartnerName requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldPartnerName: %w", err)
-	}
-	return oldValue.PartnerName, nil
-}
-
-// ClearPartnerName clears the value of the "partner_name" field.
-func (m *PartnerMutation) ClearPartnerName() {
-	m.partner_name = nil
-	m.clearedFields[partner.FieldPartnerName] = struct{}{}
-}
-
-// PartnerNameCleared returns if the "partner_name" field was cleared in this mutation.
-func (m *PartnerMutation) PartnerNameCleared() bool {
-	_, ok := m.clearedFields[partner.FieldPartnerName]
-	return ok
-}
-
-// ResetPartnerName resets all changes to the "partner_name" field.
-func (m *PartnerMutation) ResetPartnerName() {
-	m.partner_name = nil
-	delete(m.clearedFields, partner.FieldPartnerName)
-}
-
-// SetJwtPublicKey sets the "jwt_public_key" field.
-func (m *PartnerMutation) SetJwtPublicKey(j jwt.Public) {
-	m.jwt_public_key = &j
-}
-
-// JwtPublicKey returns the value of the "jwt_public_key" field in the mutation.
-func (m *PartnerMutation) JwtPublicKey() (r jwt.Public, exists bool) {
-	v := m.jwt_public_key
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldJwtPublicKey returns the old "jwt_public_key" field's value of the Partner entity.
-// If the Partner object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PartnerMutation) OldJwtPublicKey(ctx context.Context) (v *jwt.Public, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldJwtPublicKey is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldJwtPublicKey requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldJwtPublicKey: %w", err)
-	}
-	return oldValue.JwtPublicKey, nil
-}
-
-// ClearJwtPublicKey clears the value of the "jwt_public_key" field.
-func (m *PartnerMutation) ClearJwtPublicKey() {
-	m.jwt_public_key = nil
-	m.clearedFields[partner.FieldJwtPublicKey] = struct{}{}
-}
-
-// JwtPublicKeyCleared returns if the "jwt_public_key" field was cleared in this mutation.
-func (m *PartnerMutation) JwtPublicKeyCleared() bool {
-	_, ok := m.clearedFields[partner.FieldJwtPublicKey]
-	return ok
-}
-
-// ResetJwtPublicKey resets all changes to the "jwt_public_key" field.
-func (m *PartnerMutation) ResetJwtPublicKey() {
-	m.jwt_public_key = nil
-	delete(m.clearedFields, partner.FieldJwtPublicKey)
 }
 
 // SetPartnerKeyID sets the "partner_key" edge to the PartnerKey entity by id.
@@ -10239,24 +10089,15 @@ func (m *PartnerMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PartnerMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 3)
 	if m.create_time != nil {
 		fields = append(fields, partner.FieldCreateTime)
 	}
 	if m.update_time != nil {
 		fields = append(fields, partner.FieldUpdateTime)
 	}
-	if m.partner_id != nil {
-		fields = append(fields, partner.FieldPartnerID)
-	}
 	if m.label != nil {
 		fields = append(fields, partner.FieldLabel)
-	}
-	if m.partner_name != nil {
-		fields = append(fields, partner.FieldPartnerName)
-	}
-	if m.jwt_public_key != nil {
-		fields = append(fields, partner.FieldJwtPublicKey)
 	}
 	return fields
 }
@@ -10270,14 +10111,8 @@ func (m *PartnerMutation) Field(name string) (ent.Value, bool) {
 		return m.CreateTime()
 	case partner.FieldUpdateTime:
 		return m.UpdateTime()
-	case partner.FieldPartnerID:
-		return m.PartnerID()
 	case partner.FieldLabel:
 		return m.Label()
-	case partner.FieldPartnerName:
-		return m.PartnerName()
-	case partner.FieldJwtPublicKey:
-		return m.JwtPublicKey()
 	}
 	return nil, false
 }
@@ -10291,14 +10126,8 @@ func (m *PartnerMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldCreateTime(ctx)
 	case partner.FieldUpdateTime:
 		return m.OldUpdateTime(ctx)
-	case partner.FieldPartnerID:
-		return m.OldPartnerID(ctx)
 	case partner.FieldLabel:
 		return m.OldLabel(ctx)
-	case partner.FieldPartnerName:
-		return m.OldPartnerName(ctx)
-	case partner.FieldJwtPublicKey:
-		return m.OldJwtPublicKey(ctx)
 	}
 	return nil, fmt.Errorf("unknown Partner field %s", name)
 }
@@ -10322,33 +10151,12 @@ func (m *PartnerMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetUpdateTime(v)
 		return nil
-	case partner.FieldPartnerID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetPartnerID(v)
-		return nil
 	case partner.FieldLabel:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLabel(v)
-		return nil
-	case partner.FieldPartnerName:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetPartnerName(v)
-		return nil
-	case partner.FieldJwtPublicKey:
-		v, ok := value.(jwt.Public)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetJwtPublicKey(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Partner field %s", name)
@@ -10379,17 +10187,7 @@ func (m *PartnerMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *PartnerMutation) ClearedFields() []string {
-	var fields []string
-	if m.FieldCleared(partner.FieldPartnerID) {
-		fields = append(fields, partner.FieldPartnerID)
-	}
-	if m.FieldCleared(partner.FieldPartnerName) {
-		fields = append(fields, partner.FieldPartnerName)
-	}
-	if m.FieldCleared(partner.FieldJwtPublicKey) {
-		fields = append(fields, partner.FieldJwtPublicKey)
-	}
-	return fields
+	return nil
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -10402,17 +10200,6 @@ func (m *PartnerMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *PartnerMutation) ClearField(name string) error {
-	switch name {
-	case partner.FieldPartnerID:
-		m.ClearPartnerID()
-		return nil
-	case partner.FieldPartnerName:
-		m.ClearPartnerName()
-		return nil
-	case partner.FieldJwtPublicKey:
-		m.ClearJwtPublicKey()
-		return nil
-	}
 	return fmt.Errorf("unknown Partner nullable field %s", name)
 }
 
@@ -10426,17 +10213,8 @@ func (m *PartnerMutation) ResetField(name string) error {
 	case partner.FieldUpdateTime:
 		m.ResetUpdateTime()
 		return nil
-	case partner.FieldPartnerID:
-		m.ResetPartnerID()
-		return nil
 	case partner.FieldLabel:
 		m.ResetLabel()
-		return nil
-	case partner.FieldPartnerName:
-		m.ResetPartnerName()
-		return nil
-	case partner.FieldJwtPublicKey:
-		m.ResetJwtPublicKey()
 		return nil
 	}
 	return fmt.Errorf("unknown Partner field %s", name)

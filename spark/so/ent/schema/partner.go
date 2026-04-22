@@ -5,7 +5,6 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
-	"github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/entexample"
 )
 
@@ -32,32 +31,11 @@ func (Partner) Indexes() []ent.Index {
 // Fields are the fields for the Partner table.
 func (Partner) Fields() []ent.Field {
 	return []ent.Field{
-		field.String("partner_id").
-			Optional().
-			Nillable().
-			MaxLen(255).
-			Deprecated().
-			Comment("Deprecated: use partner_key edge.").
-			Annotations(entexample.Default("partner-a")),
 		field.String("label").
 			NotEmpty().
 			MaxLen(255).
 			Comment("Label identifying the partner's client or application, included as the 'sub' claim in their JWT.").
 			Annotations(entexample.Default("client-1")),
-		field.String("partner_name").
-			Optional().
-			Nillable().
-			MaxLen(255).
-			Deprecated().
-			Comment("Deprecated: use partner_key edge.").
-			Annotations(entexample.Default("Partner A")),
-		field.Bytes("jwt_public_key").
-			GoType(jwt.Public{}).
-			Optional().
-			Nillable().
-			Deprecated().
-			Comment("Deprecated: use partner_key edge.").
-			Annotations(entexample.Default("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3")),
 	}
 }
 

@@ -1,4 +1,4 @@
-h1:L6MWT+DfWBVJgXvXgP2iSrVMTGTGzFQUHg4C+sqlfvs=
+h1:iinGjEJfCLQTZsIbpwvkUsd9/1+GMros7D2hgOOmtNw=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -148,3 +148,4 @@ h1:L6MWT+DfWBVJgXvXgP2iSrVMTGTGzFQUHg4C+sqlfvs=
 20260415021548_add_block_hash_to_block_height.sql h1:7zwIm+W0k3eWvJKHt8EzMW+zo6h0q71D/q4PYDxCI0Q=
 20260420201502_refactor_partner_keys.sql h1:E/SGCvq0BRHszMhAZhwMJb90jFJhF/FM4x4gEtXkGkQ=
 20260421053020_make_partner_fields_nullable.sql h1:oIH0ub6RDLeYFlxYbXNqjptHbxZl2jnTxNAGBwITKQg=
+20260421061453_drop_deprecated_partner_fields.sql h1:X/IcFtgSYFZnvhg5CbrTVf/RfETPXtbjH3r2lSWZXn4=
