@@ -22,7 +22,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
-	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -261,13 +260,18 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	// Extract leaf IDs from node signatures
+	// Extract leaf IDs from node signatures, rejecting duplicates.
 	leafIDs := make([]uuid.UUID, 0, len(req.NodeSignatures))
+	leafIDsSeen := make(map[uuid.UUID]struct{}, len(req.NodeSignatures))
 	for _, nodeSignatures := range req.NodeSignatures {
 		leafID, err := uuid.Parse(nodeSignatures.NodeId)
 		if err != nil {
 			return nil, fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 		}
+		if _, dup := leafIDsSeen[leafID]; dup {
+			return nil, fmt.Errorf("duplicate leaf %s in request", leafID)
+		}
+		leafIDsSeen[leafID] = struct{}{}
 		leafIDs = append(leafIDs, leafID)
 	}
 
@@ -313,15 +317,22 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		return nil, fmt.Errorf("transfer %s is not owned by the authenticated identity public key %x", transfer.ID.String(), session.IdentityPublicKey())
 	}
 
-	// Count transfer leaves without loading them
-	numTransferLeaves, err := db.TransferLeaf.Query().
-		Where(transferleaf.HasTransferWith(enttransfer.ID(transfer.ID))).
-		Count(ctx)
+	// Verify that every submitted leaf belongs to this transfer (set equality, not just count).
+	transferLeafIDs, err := transfer.QueryTransferLeaves().QueryLeaf().IDs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to count transfer leaves for transfer %s: %w", transfer.ID.String(), err)
+		return nil, fmt.Errorf("failed to query transfer leaf IDs for transfer %s: %w", transfer.ID.String(), err)
 	}
-	if len(req.NodeSignatures) != numTransferLeaves {
-		return nil, fmt.Errorf("missing signatures for transfer %s", transfer.ID.String())
+	if len(leafIDs) != len(transferLeafIDs) {
+		return nil, fmt.Errorf("signature count %d does not match transfer leaf count %d for transfer %s", len(leafIDs), len(transferLeafIDs), transfer.ID.String())
+	}
+	transferLeafIDSet := make(map[uuid.UUID]struct{}, len(transferLeafIDs))
+	for _, id := range transferLeafIDs {
+		transferLeafIDSet[id] = struct{}{}
+	}
+	for _, leafID := range leafIDs {
+		if _, ok := transferLeafIDSet[leafID]; !ok {
+			return nil, fmt.Errorf("leaf %s does not belong to transfer %s", leafID, transfer.ID.String())
+		}
 	}
 
 	receiverCount, err := transfer.QueryTransferReceivers().Count(ctx)

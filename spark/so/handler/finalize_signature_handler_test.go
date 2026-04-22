@@ -210,13 +210,20 @@ func TestFinalizeSignatureHandler_ErrorCases(t *testing.T) {
 	}
 }
 
+func createTestTreeWithSeed(t *testing.T, ctx context.Context, network btcnetwork.Network, status st.TreeStatus, seed [32]byte) (*ent.Tree, *ent.TreeNode) {
+	return createTestTreeInternal(t, ctx, network, status, rand.NewChaCha8(seed))
+}
+
 func createTestTree(t *testing.T, ctx context.Context, network btcnetwork.Network, status st.TreeStatus) (*ent.Tree, *ent.TreeNode) {
+	return createTestTreeInternal(t, ctx, network, status, rand.NewChaCha8([32]byte{}))
+}
+
+func createTestTreeInternal(t *testing.T, ctx context.Context, network btcnetwork.Network, status st.TreeStatus, rng *rand.ChaCha8) (*ent.Tree, *ent.TreeNode) {
 	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	baseTxid := st.NewRandomTxIDForTesting(t)
 
-	rng := rand.NewChaCha8([32]byte{})
 	ownerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
 	verifyingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	ownerSigningKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -1288,4 +1295,75 @@ func TestVerifyAndUpdateTransfer_ErrorsOnMultipleReceivers(t *testing.T) {
 	_, err = handler.verifyAndUpdateTransfer(ctx, req)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "does not support multi-receiver transfers")
+}
+
+func TestFinalizeNodeSignatures_RejectsSubstitutedTransferLeaf(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{}
+	handler := NewFinalizeSignatureHandler(config)
+
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	senderPub := keys.GeneratePrivateKey().Public()
+	receiverPub := keys.GeneratePrivateKey().Public()
+
+	// Create three leaves with unique key seeds to avoid postgres unique constraints.
+	_, node1 := createTestTreeWithSeed(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable, [32]byte{1})
+	_, node2 := createTestTreeWithSeed(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable, [32]byte{2})
+	_, unrelatedNode := createTestTreeWithSeed(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable, [32]byte{3})
+
+	// Make the receiver own all nodes so ownership validation passes.
+	_, err = node1.Update().SetOwnerIdentityPubkey(receiverPub).Save(ctx)
+	require.NoError(t, err)
+	_, err = node2.Update().SetOwnerIdentityPubkey(receiverPub).Save(ctx)
+	require.NoError(t, err)
+	_, err = unrelatedNode.Update().SetOwnerIdentityPubkey(receiverPub).Save(ctx)
+	require.NoError(t, err)
+
+	transfer, err := dbTx.Transfer.Create().
+		SetSenderIdentityPubkey(senderPub).
+		SetReceiverIdentityPubkey(receiverPub).
+		SetStatus(st.TransferStatusReceiverRefundSigned).
+		SetTotalValue(2000).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		SetType(st.TransferTypeTransfer).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	receiver, err := dbTx.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverPub).
+		SetStatus(st.TransferReceiverStatusRefundSigned).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Transfer has leaves [node1, node2].
+	for _, node := range []*ent.TreeNode{node1, node2} {
+		_, err = dbTx.TransferLeaf.Create().
+			SetTransfer(transfer).
+			SetLeaf(node).
+			SetTransferReceiverID(receiver.ID).
+			SetPreviousRefundTx(buildTestTxBytes(t, 3000)).
+			SetIntermediateRefundTx(buildTestTxBytes(t, 4000)).
+			Save(ctx)
+		require.NoError(t, err)
+	}
+
+	// Submit [node1, unrelatedNode] — count matches (2 == 2) but
+	// unrelatedNode is not part of the transfer. This should be rejected.
+	req := &pb.FinalizeNodeSignaturesRequest{
+		NodeSignatures: []*pb.NodeSignatures{
+			{NodeId: node1.ID.String()},
+			{NodeId: unrelatedNode.ID.String()},
+		},
+		Intent: pbcommon.SignatureIntent_TRANSFER,
+	}
+
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+	_, err = handler.FinalizeNodeSignatures(ctx, req)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "does not belong to transfer")
 }
