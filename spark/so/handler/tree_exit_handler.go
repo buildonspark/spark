@@ -38,9 +38,6 @@ func newTreeExitHandler(config *so.Config) *treeExitHandler {
 // progress. Overwriting these with Exited would corrupt the in-flight operation.
 var lockedNodeStatuses = []st.TreeNodeStatus{
 	st.TreeNodeStatusTransferLocked,
-	st.TreeNodeStatusSplitLocked,
-	st.TreeNodeStatusAggregateLock,
-	st.TreeNodeStatusInvestigation,
 	st.TreeNodeStatusRenewLocked,
 }
 
