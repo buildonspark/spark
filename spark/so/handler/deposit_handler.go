@@ -44,7 +44,6 @@ import (
 	"github.com/lightsparkdev/spark/so/frost"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
-	"github.com/lightsparkdev/spark/so/partner"
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
@@ -222,15 +221,12 @@ func (o *DepositHandler) generateDepositAddress(ctx context.Context, config *so.
 		depositAddressMutator.SetNodeID(leafID)
 	}
 
-	savedDepositAddr, err := depositAddressMutator.Save(ctx)
-	if err != nil {
+	if _, err := depositAddressMutator.Save(ctx); err != nil {
 		if sqlgraph.IsUniqueConstraintError(err) {
 			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("deposit address already exists: %w", err))
 		}
 		return nil, fmt.Errorf("failed to save deposit address: %w", err)
 	}
-
-	partner.SaveDepositAddressPartner(ctx, savedDepositAddr.ID)
 
 	response, err := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
