@@ -16,6 +16,8 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -63,6 +65,10 @@ const (
 // LightningHandler is the handler for the lightning service.
 type LightningHandler struct {
 	config *so.Config
+}
+
+func lightningPaymentHashSpanOption(paymentHash []byte) trace.SpanStartOption {
+	return trace.WithAttributes(attribute.String("payment_hash", hex.EncodeToString(paymentHash)))
 }
 
 // NewLightningHandler returns a new LightningHandler.
@@ -136,8 +142,15 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 
 // StorePreimageShareV2 stores preimage shares for all SOs via a single coordinator call.
 // The coordinator decrypts and stores its own share, then fans out to other SOs via internal RPC.
-func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspark.StorePreimageShareV2Request) error {
+func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspark.StorePreimageShareV2Request) (retErr error) {
+	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
+	ctx, span := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2", spanOpt)
+	defer func() {
+		endSpanWithError(span, retErr)
+	}()
+
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusPreimageShare, 0) > 0 {
+		consensusCtx, consensusSpan := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2.consensusExecute", spanOpt)
 		prepareReq := &pbinternal.StorePreimageSharePrepareRequest{OriginalRequest: req}
 		flow := &preimageShareCoordinatorFlow{
 			PreimageShareFlowHandler: NewPreimageShareFlowHandler(h.config),
@@ -145,20 +158,30 @@ func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspar
 		}
 		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
 		engine := consensus.NewTwoPCEngine(h.config, NewSendGossipHandler(h.config))
-		_, err := engine.Execute(ctx,
+		_, err := engine.Execute(consensusCtx,
 			pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE,
 			&selection, flow)
+		endSpanWithError(consensusSpan, err)
 		if err != nil {
 			return fmt.Errorf("consensus store preimage share failed: %w", err)
 		}
 	} else {
 		// Legacy path
-		if err := h.decryptAndStorePreimageShare(ctx, req); err != nil {
+		storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2.coordinatorStore", spanOpt)
+		err := h.decryptAndStorePreimageShare(storeCtx, req)
+		endSpanWithError(storeSpan, err)
+		if err != nil {
 			return fmt.Errorf("unable to store coordinator preimage share: %w", err)
 		}
 
 		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-		_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+		fanoutCtx, fanoutSpan := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2.fanout", spanOpt)
+		_, err = helper.ExecuteTaskWithAllOperators(fanoutCtx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (_ []byte, retErr error) {
+			operatorCtx, operatorSpan := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2.fanout.operator", spanOpt)
+			defer func() {
+				endSpanWithError(operatorSpan, retErr)
+			}()
+
 			conn, err := operator.NewOperatorGRPCConnection()
 			if err != nil {
 				return nil, err
@@ -166,12 +189,13 @@ func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspar
 			defer conn.Close()
 
 			client := pbinternal.NewSparkInternalServiceClient(conn)
-			_, err = client.StorePreimageShare(ctx, req)
+			_, err = client.StorePreimageShare(operatorCtx, req)
 			if err != nil {
 				return nil, fmt.Errorf("unable to store preimage share on operator %s: %w", operator.Identifier, err)
 			}
 			return nil, nil
 		})
+		endSpanWithError(fanoutSpan, err)
 		if err != nil {
 			return fmt.Errorf("unable to store preimage share on all operators: %w", err)
 		}
@@ -995,31 +1019,45 @@ func (h *LightningHandler) GetPreimageShare(
 	cpfpRefundSignatures map[string][]byte,
 	directRefundSignatures map[string][]byte,
 	directFromCpfpRefundSignatures map[string][]byte,
-) ([]byte, error) {
+) (preimageShareBytes []byte, retErr error) {
+	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
+	ctx, span := tracer.Start(ctx, "LightningHandler.GetPreimageShare", spanOpt)
+	defer func() {
+		endSpanWithError(span, retErr)
+	}()
+
+	validateCtx, validateSpan := tracer.Start(ctx, "LightningHandler.GetPreimageShare.validate", spanOpt)
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && req.FeeSats != 0 {
-		return nil, fmt.Errorf("fee is not allowed for receive preimage swap")
+		err := fmt.Errorf("fee is not allowed for receive preimage swap")
+		endSpanWithError(validateSpan, err)
+		return nil, err
 	}
 
 	var preimageShare *ent.PreimageShare
 	receiverIdentityPubKey, err := keys.ParsePublicKey(req.GetReceiverIdentityPublicKey())
 	if err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
 	}
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
-		tx, err := ent.GetDbFromContext(ctx)
+		tx, err := ent.GetDbFromContext(validateCtx)
 		if err != nil {
+			endSpanWithError(validateSpan, err)
 			return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 		}
 		// For HODL invoices in lightning receive flow, preimageShare may not exist yet, the user will provide it later via ProvidePreimage
-		preimageShare, err = tx.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
+		preimageShare, err = tx.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(validateCtx)
 		if err != nil {
 			if !ent.IsNotFound(err) {
+				endSpanWithError(validateSpan, err)
 				return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
 			}
 		} else if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
-			return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(
+			err = sparkerrors.InvalidArgumentPublicKeyMismatch(
 				fmt.Errorf("preimage share owner identity public key mismatch for payment hash: %x", req.PaymentHash),
 			)
+			endSpanWithError(validateSpan, err)
+			return nil, err
 		}
 	}
 
@@ -1027,6 +1065,7 @@ func (h *LightningHandler) GetPreimageShare(
 	if preimageShare != nil {
 		bolt11, err := decodepay.Decodepay(preimageShare.InvoiceString)
 		if err != nil {
+			endSpanWithError(validateSpan, err)
 			return nil, fmt.Errorf("unable to decode invoice: %w", err)
 		}
 		invoiceAmount = &pbspark.InvoiceAmount{
@@ -1036,8 +1075,9 @@ func (h *LightningHandler) GetPreimageShare(
 			},
 		}
 	}
-	err = h.ValidateDuplicateLeaves(ctx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
+	err = h.ValidateDuplicateLeaves(validateCtx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
 	if err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, err
 	}
 
@@ -1046,14 +1086,15 @@ func (h *LightningHandler) GetPreimageShare(
 	// The transactions will be reconstructed before signing, so we don't need to validate the transactions themselves.
 	transferRequest := req.GetTransferRequest()
 	if transferRequest != nil {
-		err := h.validateIdenticalLeavesInTransferAndTransferRequest(ctx, req)
+		err := h.validateIdenticalLeavesInTransferAndTransferRequest(validateCtx, req)
 		if err != nil {
+			endSpanWithError(validateSpan, err)
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer validation failed: %w", err))
 		}
 	}
 
 	err = h.ValidateGetPreimageRequest(
-		ctx,
+		validateCtx,
 		req.PaymentHash,
 		req.Transfer.LeavesToSend,
 		req.Transfer.DirectLeavesToSend,
@@ -1065,6 +1106,7 @@ func (h *LightningHandler) GetPreimageShare(
 		false,
 	)
 	if err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, fmt.Errorf("unable to validate get preimage request: %w", err)
 	}
 
@@ -1087,27 +1129,36 @@ func (h *LightningHandler) GetPreimageShare(
 	transferHandler := NewTransferHandler(h.config)
 	ownerIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
 	if err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
 	}
 
 	var keyTweakMap map[string]*pbspark.SendLeafKeyTweak
 	transferID, err := uuid.Parse(req.GetTransfer().GetTransferId())
 	if err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, fmt.Errorf("unable to parse transfer id: %w", err)
 	}
+	endSpanWithError(validateSpan, nil)
 	if req.TransferRequest != nil {
-		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, transferID, req.TransferRequest.TransferPackage, ownerIdentityPubKey, false)
+		buildCtx, buildSpan := tracer.Start(ctx, "LightningHandler.GetPreimageShare.buildHTLCRefunds", spanOpt)
+		keyTweakMap, err = transferHandler.ValidateTransferPackage(buildCtx, transferID, req.TransferRequest.TransferPackage, ownerIdentityPubKey, false)
 		if err != nil {
+			endSpanWithError(buildSpan, err)
 			return nil, fmt.Errorf("unable to validate transfer package: %w", err)
 		}
 
-		cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, err = h.buildHTLCRefundMaps(ctx, req)
+		cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, err = h.buildHTLCRefundMaps(buildCtx, req)
 		if err != nil {
+			endSpanWithError(buildSpan, err)
 			return nil, fmt.Errorf("unable to build htlc refund maps: %w", err)
 		}
+		endSpanWithError(buildSpan, nil)
 	}
+
+	createCtx, createSpan := tracer.Start(ctx, "LightningHandler.GetPreimageShare.createTransfer", spanOpt)
 	transfer, _, err := transferHandler.createTransfer(
-		ctx,
+		createCtx,
 		transferID,
 		nil,
 		st.TransferTypePreimageSwap,
@@ -1125,12 +1176,15 @@ func (h *LightningHandler) GetPreimageShare(
 		uuid.Nil,
 		nil,
 	)
+	endSpanWithError(createSpan, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
 
 	if req.TransferRequest != nil && req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
-		err = transferHandler.UpdateTransferLeavesSignatures(ctx, transfer, cpfpRefundSignatures, directRefundSignatures, directFromCpfpRefundSignatures)
+		signCtx, signSpan := tracer.Start(ctx, "LightningHandler.GetPreimageShare.applySignatures", spanOpt)
+		err = transferHandler.UpdateTransferLeavesSignatures(signCtx, transfer, cpfpRefundSignatures, directRefundSignatures, directFromCpfpRefundSignatures)
+		endSpanWithError(signSpan, err)
 		if err != nil {
 			return nil, fmt.Errorf("unable to update transfer leaves signatures: %w", err)
 		}
@@ -1142,8 +1196,9 @@ func (h *LightningHandler) GetPreimageShare(
 	} else {
 		status = st.PreimageRequestStatusWaitingForPreimage
 	}
+	storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.GetPreimageShare.storeSignedTransactions", spanOpt)
 	_, err = h.storeUserSignedTransactions(
-		ctx,
+		storeCtx,
 		req.PaymentHash,
 		preimageShare,
 		req.Transfer.LeavesToSend,
@@ -1152,6 +1207,7 @@ func (h *LightningHandler) GetPreimageShare(
 		receiverIdentityPubKey,
 		ownerIdentityPubKey,
 	)
+	endSpanWithError(storeSpan, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions: %w", err)
 	}
@@ -1399,33 +1455,51 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pbspar
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, requireDirectTx bool, expireTimeOverride *time.Time) (resp *pbspark.InitiatePreimageSwapResponse, retErr error) {
+	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
+	ctx, span := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap", spanOpt)
+	defer func() {
+		endSpanWithError(span, retErr)
+	}()
+
+	validateCtx, validateSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.validate", spanOpt)
 	if req.Transfer == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
+		retErr = sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
+		endSpanWithError(validateSpan, retErr)
+		return nil, retErr
 	}
 
 	ownerIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
 	if err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse owner identity public key: %w", err))
 	}
 
-	if err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerIdentityPubKey); err != nil {
+	if err = authz.EnforceSessionIdentityPublicKeyMatches(validateCtx, h.config, ownerIdentityPubKey); err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, err
 	}
 
 	if len(req.Transfer.LeavesToSend) == 0 {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one cpfp leaf tx must be provided"))
+		retErr = sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one cpfp leaf tx must be provided"))
+		endSpanWithError(validateSpan, retErr)
+		return nil, retErr
 	}
 
 	if req.Transfer.ReceiverIdentityPublicKey == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("receiver identity public key is required"))
+		retErr = sparkerrors.InvalidArgumentMissingField(fmt.Errorf("receiver identity public key is required"))
+		endSpanWithError(validateSpan, retErr)
+		return nil, retErr
 	}
 
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && req.FeeSats != 0 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("fee is not allowed for receive preimage swap"))
+		retErr = sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("fee is not allowed for receive preimage swap"))
+		endSpanWithError(validateSpan, retErr)
+		return nil, retErr
 	}
 
 	receiverIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetReceiverIdentityPublicKey())
 	if err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse receiver identity public key: %w", err))
 	}
 
@@ -1433,25 +1507,31 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 
 	var preimageShare *ent.PreimageShare
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
-		tx, err := ent.GetDbFromContext(ctx)
+		tx, err := ent.GetDbFromContext(validateCtx)
 		if err != nil {
+			endSpanWithError(validateSpan, err)
 			return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 		}
 		// For HODL invoices in lightning receive flow, preimageShare may not exist yet, the user will provide it later via ProvidePreimage
-		preimageShare, err = tx.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
+		preimageShare, err = tx.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(validateCtx)
 		if err != nil {
 			if !ent.IsNotFound(err) {
+				endSpanWithError(validateSpan, err)
 				return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
 			}
 			if knobs.GetKnobsService(ctx).GetValue(knobs.KnobShutdownHodlInvoices, 0) > 0 {
-				return nil, sparkerrors.UnavailableMethodDisabled(
+				retErr = sparkerrors.UnavailableMethodDisabled(
 					fmt.Errorf("hodl invoices are currently disabled"),
 				)
+				endSpanWithError(validateSpan, retErr)
+				return nil, retErr
 			}
 		} else if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
-			return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(
+			retErr = sparkerrors.InvalidArgumentPublicKeyMismatch(
 				fmt.Errorf("preimage share owner identity public key mismatch for payment hash: %x", req.PaymentHash),
 			)
+			endSpanWithError(validateSpan, retErr)
+			return nil, retErr
 		}
 	}
 
@@ -1459,6 +1539,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	if preimageShare != nil {
 		bolt11, err := decodepay.Decodepay(preimageShare.InvoiceString)
 		if err != nil {
+			endSpanWithError(validateSpan, err)
 			return nil, fmt.Errorf("unable to decode invoice: %w", err)
 		}
 		if bolt11.MSatoshi > 0 {
@@ -1471,8 +1552,9 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		}
 	}
 
-	err = h.ValidateDuplicateLeaves(ctx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
+	err = h.ValidateDuplicateLeaves(validateCtx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
 	if err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, err
 	}
 
@@ -1499,14 +1581,15 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	// The transactions will be reconstructed before signing, so we don't need to validate the transactions themselves.
 	transferRequest := req.GetTransferRequest()
 	if transferRequest != nil {
-		err := h.validateIdenticalLeavesInTransferAndTransferRequest(ctx, req)
+		err := h.validateIdenticalLeavesInTransferAndTransferRequest(validateCtx, req)
 		if err != nil {
+			endSpanWithError(validateSpan, err)
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer validation failed: %w", err))
 		}
 	}
 
 	err = h.ValidateGetPreimageRequest(
-		ctx,
+		validateCtx,
 		req.PaymentHash,
 		req.Transfer.LeavesToSend,
 		req.Transfer.DirectLeavesToSend,
@@ -1518,6 +1601,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		true,
 	)
 	if err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, fmt.Errorf("unable to validate request for payment hash: %x: %w", req.PaymentHash, err)
 	}
 
@@ -1539,8 +1623,11 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	// TODO: (LIG-8397) Remove once we can remove transfer
 	expiryTime := req.Transfer.ExpiryTime.AsTime()
 	if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expiry time is before current time"))
+		retErr = sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expiry time is before current time"))
+		endSpanWithError(validateSpan, retErr)
+		return nil, retErr
 	}
+	endSpanWithError(validateSpan, nil)
 
 	transferHandler := NewTransferHandler(h.config)
 	var keyTweakMap map[string]*pbspark.SendLeafKeyTweak
@@ -1549,26 +1636,34 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer id: %w", err))
 	}
 	if req.TransferRequest != nil {
-		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, transferID, req.TransferRequest.TransferPackage, ownerIdentityPubKey, false)
+		buildCtx, buildSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.buildHTLCRefunds", spanOpt)
+		keyTweakMap, err = transferHandler.ValidateTransferPackage(buildCtx, transferID, req.TransferRequest.TransferPackage, ownerIdentityPubKey, false)
 		if err != nil {
+			endSpanWithError(buildSpan, err)
 			return nil, fmt.Errorf("unable to validate transfer package: %w", err)
 		}
 
-		cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, err = h.buildHTLCRefundMaps(ctx, req)
+		cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, err = h.buildHTLCRefundMaps(buildCtx, req)
 		if err != nil {
+			endSpanWithError(buildSpan, err)
 			return nil, fmt.Errorf("unable to build htlc refund maps: %w", err)
 		}
+		endSpanWithError(buildSpan, nil)
 	}
 
-	entTx, err := ent.GetTxFromContext(ctx)
+	createCtx, createSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.createTransfer", spanOpt)
+	entTx, err := ent.GetTxFromContext(createCtx)
 	if err != nil {
+		endSpanWithError(createSpan, err)
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}
-	_, err = ent.CreateOrResetPendingSendTransfer(ctx, transferID)
+	_, err = ent.CreateOrResetPendingSendTransfer(createCtx, transferID)
 	if err != nil {
+		endSpanWithError(createSpan, err)
 		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
 	}
 	if err = entTx.Commit(); err != nil {
+		endSpanWithError(createSpan, err)
 		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
 	}
 
@@ -1586,7 +1681,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	}()
 
 	transfer, leafMap, err := transferHandler.createTransfer(
-		ctx,
+		createCtx,
 		transferID,
 		nil,
 		st.TransferTypePreimageSwap,
@@ -1603,6 +1698,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		uuid.Nil,
 		nil,
 	)
+	endSpanWithError(createSpan, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer for payment hash: %x: %w", req.PaymentHash, err)
 	}
@@ -1611,11 +1707,14 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	var directSignatureMap map[string][]byte
 	var directFromCpfpSignatureMap map[string][]byte
 	if req.TransferRequest != nil && req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
-		cpfpSignatureMap, directSignatureMap, directFromCpfpSignatureMap, err = h.signHTLCRefunds(ctx, req.TransferRequest, leafMap)
+		signCtx, signSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.signRefunds", spanOpt)
+		cpfpSignatureMap, directSignatureMap, directFromCpfpSignatureMap, err = h.signHTLCRefunds(signCtx, req.TransferRequest, leafMap)
 		if err != nil {
+			endSpanWithError(signSpan, err)
 			return nil, fmt.Errorf("unable to sign htlc refunds: %w", err)
 		}
-		err = transferHandler.UpdateTransferLeavesSignatures(ctx, transfer, cpfpSignatureMap, directSignatureMap, directFromCpfpSignatureMap)
+		err = transferHandler.UpdateTransferLeavesSignatures(signCtx, transfer, cpfpSignatureMap, directSignatureMap, directFromCpfpSignatureMap)
+		endSpanWithError(signSpan, err)
 		if err != nil {
 			return nil, fmt.Errorf("unable to update transfer leaves signatures: %w", err)
 		}
@@ -1628,8 +1727,9 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	} else {
 		status = st.PreimageRequestStatusWaitingForPreimage
 	}
+	storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.storeSignedTransactions", spanOpt)
 	preimageRequest, err := h.storeUserSignedTransactions(
-		ctx,
+		storeCtx,
 		req.PaymentHash,
 		preimageShare,
 		req.Transfer.LeavesToSend,
@@ -1638,13 +1738,20 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		receiverIdentityPubKey,
 		ownerIdentityPubKey,
 	)
+	endSpanWithError(storeSpan, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
 	cancelGossip = true
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	result, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+	fanoutCtx, fanoutSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.fanout", spanOpt)
+	result, err := helper.ExecuteTaskWithAllOperators(fanoutCtx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (_ []byte, retErr error) {
+		operatorCtx, operatorSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.fanout.operator", spanOpt)
+		defer func() {
+			endSpanWithError(operatorSpan, retErr)
+		}()
+
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
 			return nil, err
@@ -1652,7 +1759,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		defer conn.Close()
 
 		client := pbinternal.NewSparkInternalServiceClient(conn)
-		response, err := client.InitiatePreimageSwapV2(ctx, &pbinternal.InitiatePreimageSwapRequest{
+		response, err := client.InitiatePreimageSwapV2(operatorCtx, &pbinternal.InitiatePreimageSwapRequest{
 			Request:                        req,
 			CpfpRefundSignatures:           cpfpSignatureMap,
 			DirectRefundSignatures:         directSignatureMap,
@@ -1663,6 +1770,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		}
 		return response.PreimageShare, nil
 	})
+	endSpanWithError(fanoutSpan, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute task with all operators: %w", err)
 	}
@@ -1670,35 +1778,42 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	// After this point, the preimage swap sync is considered successful.
 	needsRollback = false
 
+	postFanoutCtx, postFanoutSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.postFanoutCommit", spanOpt)
 	// Commit the current transaction to persist the transfer data, ensuring
 	// consistency with non-coordinator SOs.
-	entTx, err = ent.GetTxFromContext(ctx)
+	entTx, err = ent.GetTxFromContext(postFanoutCtx)
 	if err != nil {
+		endSpanWithError(postFanoutSpan, err)
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}
 	if err = entTx.Commit(); err != nil {
+		endSpanWithError(postFanoutSpan, err)
 		return nil, fmt.Errorf("unable to commit transfer data after successful sync: %w", err)
 	}
 
 	// Reload transfer from the new transaction since the previous one was committed.
 	transferID = transfer.ID
 	baseHandler := NewBaseTransferHandler(h.config)
-	transfer, err = baseHandler.loadTransferForUpdate(ctx, transferID)
+	transfer, err = baseHandler.loadTransferForUpdate(postFanoutCtx, transferID)
 	if err != nil {
+		endSpanWithError(postFanoutSpan, err)
 		return nil, fmt.Errorf("unable to reload transfer %s: %w", transferID, err)
 	}
 
-	transferProto, err := transfer.MarshalProto(ctx)
+	transferProto, err := transfer.MarshalProto(postFanoutCtx)
 	if err != nil {
+		endSpanWithError(postFanoutSpan, err)
 		return nil, fmt.Errorf("unable to marshal transfer for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
 	// Mark PendingSendTransfer finished on success.
-	tx, err := ent.GetDbFromContext(ctx)
+	tx, err := ent.GetDbFromContext(postFanoutCtx)
 	if err != nil {
+		endSpanWithError(postFanoutSpan, err)
 		return nil, fmt.Errorf("unable to get database context: %w", err)
 	}
-	_, err = tx.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+	_, err = tx.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(postFanoutCtx)
+	endSpanWithError(postFanoutSpan, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
 	}
@@ -1713,6 +1828,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	}
 
 	// For non-HODL invoices in lightning receive flow: recover preimage from shares
+	recoverCtx, recoverSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.recoverPreimage", spanOpt)
 	var shares []*secretsharing.SecretShare
 	for identifier, share := range result {
 		if share == nil {
@@ -1720,7 +1836,9 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		}
 		index, ok := new(big.Int).SetString(identifier, 16)
 		if !ok {
-			return nil, fmt.Errorf("unable to parse index: %v", identifier)
+			err := fmt.Errorf("unable to parse index: %v", identifier)
+			endSpanWithError(recoverSpan, err)
+			return nil, err
 		}
 		shares = append(shares, &secretsharing.SecretShare{
 			FieldModulus: secp256k1.S256().N,
@@ -1732,6 +1850,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 
 	secret, err := secretsharing.RecoverSecret(shares)
 	if err != nil {
+		endSpanWithError(recoverSpan, err)
 		return nil, fmt.Errorf("unable to recover secret for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
@@ -1742,23 +1861,31 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 
 	hash := sha256.Sum256(secretBytes)
 	if !bytes.Equal(hash[:], req.PaymentHash) {
-		dbErr := ent.DbRollback(ctx)
+		dbErr := ent.DbRollback(recoverCtx)
 		if dbErr != nil {
 			logger.Error("Unable to rollback transaction after recovered preimage did not match payment hash", zap.Error(dbErr))
 		}
 
-		if err := baseHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID); err != nil {
+		if err := baseHandler.CreateCancelTransferGossipMessage(recoverCtx, transfer.ID); err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to cancel own send transfer %s (payment_hash: %x)",
 				transfer.ID,
 				req.PaymentHash,
 			)
 		}
-		if err := ent.DbCommit(ctx); err != nil {
+		if err := ent.DbCommit(recoverCtx); err != nil {
 			logger.Error("Unable to commit transaction after canceling transfer", zap.Error(err))
 		}
 
-		return nil, fmt.Errorf("recovered preimage did not match payment hash: %x and transfer id: %s", req.PaymentHash, transfer.ID)
-	} else if err := h.sendPreimageSwapGossipMessage(ctx, secretBytes, req.PaymentHash, transfer, req.TransferRequest != nil); err != nil {
+		err := fmt.Errorf("recovered preimage did not match payment hash: %x and transfer id: %s", req.PaymentHash, transfer.ID)
+		endSpanWithError(recoverSpan, err)
+		return nil, err
+	}
+	endSpanWithError(recoverSpan, nil)
+
+	gossipCtx, gossipSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.sendGossip", spanOpt)
+	err = h.sendPreimageSwapGossipMessage(gossipCtx, secretBytes, req.PaymentHash, transfer, req.TransferRequest != nil)
+	endSpanWithError(gossipSpan, err)
+	if err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage swap gossip for payment hash %x", req.PaymentHash)
 	}
 
@@ -2233,20 +2360,33 @@ func (h *LightningHandler) QueryPreimage(ctx context.Context, req *pbspark.Query
 	return response, nil
 }
 
-func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (*pbspark.ProvidePreimageResponse, error) {
+func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (resp *pbspark.ProvidePreimageResponse, retErr error) {
+	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
+	ctx, span := tracer.Start(ctx, "LightningHandler.ProvidePreimage", spanOpt)
+	defer func() {
+		endSpanWithError(span, retErr)
+	}()
+
+	validateCtx, validateSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.validate", spanOpt)
 	identityPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
 	if err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
 	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, identityPubKey); err != nil {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(validateCtx, h.config, identityPubKey); err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, err
 	}
-	preimageRequest, transfer, err := h.ValidatePreimage(ctx, req)
+	preimageRequest, transfer, err := h.ValidatePreimage(validateCtx, req)
 	if err != nil {
+		endSpanWithError(validateSpan, err)
 		return nil, fmt.Errorf("unable to provide preimage: %w", err)
 	}
+	endSpanWithError(validateSpan, nil)
 
-	_, err = h.StorePreimage(ctx, preimageRequest, req.Preimage)
+	storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.storePreimage", spanOpt)
+	_, err = h.StorePreimage(storeCtx, preimageRequest, req.Preimage)
+	endSpanWithError(storeSpan, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store preimage: %w", err)
 	}
@@ -2283,7 +2423,13 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 	internalReq.KeyTweakProofs = keyTweakProofMap
 
 	operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
+	fanoutCtx, fanoutSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.fanout", spanOpt)
+	_, err = helper.ExecuteTaskWithAllOperators(fanoutCtx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (_ any, retErr error) {
+		operatorCtx, operatorSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.fanout.operator", spanOpt)
+		defer func() {
+			endSpanWithError(operatorSpan, retErr)
+		}()
+
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
 			return nil, err
@@ -2291,12 +2437,13 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 		defer conn.Close()
 
 		client := pbinternal.NewSparkInternalServiceClient(conn)
-		_, err = client.ProvidePreimage(ctx, internalReq)
+		_, err = client.ProvidePreimage(operatorCtx, internalReq)
 		if err != nil {
 			return nil, fmt.Errorf("unable to provide preimage: %w", err)
 		}
 		return nil, nil
 	})
+	endSpanWithError(fanoutSpan, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute task with all operators: %w", err)
 	}
@@ -2306,7 +2453,8 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 		return nil, fmt.Errorf("unable to get operator list: %w", err)
 	}
 	sendGossipHandler := NewSendGossipHandler(h.config)
-	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+	gossipCtx, gossipSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.sendGossip", spanOpt)
+	_, err = sendGossipHandler.CreateAndSendGossipMessage(gossipCtx, &pbgossip.GossipMessage{
 		Message: &pbgossip.GossipMessage_SettleSenderKeyTweak{
 			SettleSenderKeyTweak: &pbgossip.GossipMessageSettleSenderKeyTweak{
 				TransferId:           transfer.ID.String(),
@@ -2314,22 +2462,27 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 			},
 		},
 	}, participants)
+	endSpanWithError(gossipSpan, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create and send gossip message to settle sender key tweak: %w", err)
 	}
 
 	partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeLightningReceive)
 
-	tx, err := ent.GetDbFromContext(ctx)
+	reloadCtx, reloadSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.reloadTransfer", spanOpt)
+	tx, err := ent.GetDbFromContext(reloadCtx)
 	if err != nil {
+		endSpanWithError(reloadSpan, err)
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	transfer, err = tx.Transfer.Get(ctx, transfer.ID)
+	transfer, err = tx.Transfer.Get(reloadCtx, transfer.ID)
 	if err != nil {
+		endSpanWithError(reloadSpan, err)
 		return nil, fmt.Errorf("unable to get transfer: %w", err)
 	}
 
-	transferProto, err := transfer.MarshalProto(ctx)
+	transferProto, err := transfer.MarshalProto(reloadCtx)
+	endSpanWithError(reloadSpan, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 	}
