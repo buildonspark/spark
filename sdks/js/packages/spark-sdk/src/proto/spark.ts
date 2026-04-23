@@ -647,6 +647,8 @@ export enum SparkTransactionType {
   SPARK_TRANSACTION_TYPE_TRANSFER = 1,
   SPARK_TRANSACTION_TYPE_LIGHTNING_SEND = 2,
   SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE = 3,
+  SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT = 4,
+  SPARK_TRANSACTION_TYPE_DEPOSIT = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -664,6 +666,12 @@ export function sparkTransactionTypeFromJSON(object: any): SparkTransactionType 
     case 3:
     case "SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE":
       return SparkTransactionType.SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE;
+    case 4:
+    case "SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT":
+      return SparkTransactionType.SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT;
+    case 5:
+    case "SPARK_TRANSACTION_TYPE_DEPOSIT":
+      return SparkTransactionType.SPARK_TRANSACTION_TYPE_DEPOSIT;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -681,6 +689,10 @@ export function sparkTransactionTypeToJSON(object: SparkTransactionType): string
       return "SPARK_TRANSACTION_TYPE_LIGHTNING_SEND";
     case SparkTransactionType.SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE:
       return "SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE";
+    case SparkTransactionType.SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT:
+      return "SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT";
+    case SparkTransactionType.SPARK_TRANSACTION_TYPE_DEPOSIT:
+      return "SPARK_TRANSACTION_TYPE_DEPOSIT";
     case SparkTransactionType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -2347,7 +2359,14 @@ export interface QueryWalletSettingResponse {
 export interface QuerySparkTransactionVolumesRequest {
   startDate: string;
   endDate: string;
-  transactionType?: SparkTransactionType | undefined;
+  transactionType?:
+    | SparkTransactionType
+    | undefined;
+  /**
+   * If unset, results include all networks. When set, results are scoped to that
+   * single network. All defined networks (MAINNET, REGTEST, TESTNET, SIGNET) are allowed.
+   */
+  network?: Network | undefined;
 }
 
 export interface SparkTransactionVolume {
@@ -21111,7 +21130,7 @@ export const QueryWalletSettingResponse: MessageFns<QueryWalletSettingResponse> 
 };
 
 function createBaseQuerySparkTransactionVolumesRequest(): QuerySparkTransactionVolumesRequest {
-  return { startDate: "", endDate: "", transactionType: undefined };
+  return { startDate: "", endDate: "", transactionType: undefined, network: undefined };
 }
 
 export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransactionVolumesRequest> = {
@@ -21124,6 +21143,9 @@ export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransacti
     }
     if (message.transactionType !== undefined) {
       writer.uint32(24).int32(message.transactionType);
+    }
+    if (message.network !== undefined) {
+      writer.uint32(32).int32(message.network);
     }
     return writer;
   },
@@ -21159,6 +21181,14 @@ export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransacti
           message.transactionType = reader.int32() as any;
           continue;
         }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -21173,6 +21203,7 @@ export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransacti
       startDate: isSet(object.startDate) ? globalThis.String(object.startDate) : "",
       endDate: isSet(object.endDate) ? globalThis.String(object.endDate) : "",
       transactionType: isSet(object.transactionType) ? sparkTransactionTypeFromJSON(object.transactionType) : undefined,
+      network: isSet(object.network) ? networkFromJSON(object.network) : undefined,
     };
   },
 
@@ -21187,6 +21218,9 @@ export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransacti
     if (message.transactionType !== undefined) {
       obj.transactionType = sparkTransactionTypeToJSON(message.transactionType);
     }
+    if (message.network !== undefined) {
+      obj.network = networkToJSON(message.network);
+    }
     return obj;
   },
 
@@ -21198,6 +21232,7 @@ export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransacti
     message.startDate = object.startDate ?? "";
     message.endDate = object.endDate ?? "";
     message.transactionType = object.transactionType ?? undefined;
+    message.network = object.network ?? undefined;
     return message;
   },
 };

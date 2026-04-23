@@ -63,6 +63,8 @@ func (c *RisingWaveClient) Close() error {
 // for the given partner, date range, and optional filters.
 // label is empty string to aggregate across all labels.
 // txType is nil to include all transaction types.
+// network is nil to include all networks; otherwise scoped to the single value
+// (one of MAINNET, REGTEST, TESTNET, SIGNET).
 func (c *RisingWaveClient) QueryTransactionVolumes(
 	ctx context.Context,
 	partnerID string,
@@ -70,6 +72,7 @@ func (c *RisingWaveClient) QueryTransactionVolumes(
 	startDate time.Time,
 	endDate time.Time,
 	txType *string,
+	network *string,
 ) ([]TransactionVolumeRow, error) {
 	db, err := c.connect()
 	if err != nil {
@@ -101,6 +104,13 @@ func (c *RisingWaveClient) QueryTransactionVolumes(
 	if txType != nil {
 		conditions = append(conditions, fmt.Sprintf("transaction_type = $%d", argIdx))
 		args = append(args, *txType)
+		argIdx++
+	}
+
+	if network != nil {
+		conditions = append(conditions, fmt.Sprintf("network = $%d", argIdx))
+		args = append(args, *network)
+		argIdx++ //nolint:ineffassign // keep for consistency; prevents future filters from silently reusing this index
 	}
 
 	query := fmt.Sprintf(

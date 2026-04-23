@@ -73,8 +73,19 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 		txTypeFilter = &mapped
 	}
 
+	var networkFilter *string
+	if req.Network != nil {
+		mapped := mapNetwork(*req.Network)
+		if mapped == "" {
+			return nil, sparkerrors.InvalidArgumentMalformedField(
+				fmt.Errorf("invalid network: %s", req.Network.String()),
+			)
+		}
+		networkFilter = &mapped
+	}
+
 	rows, err := h.rwClient.QueryTransactionVolumes(
-		ctx, pInfo.PartnerID, pInfo.Label, start, end, txTypeFilter,
+		ctx, pInfo.PartnerID, pInfo.Label, start, end, txTypeFilter, networkFilter,
 	)
 	if err != nil {
 		return nil, sparkerrors.InternalDatabaseReadError(
@@ -119,6 +130,24 @@ func mapTransactionType(t pb.SparkTransactionType) string {
 		return "COOPERATIVE_EXIT"
 	case pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_DEPOSIT:
 		return "DEPOSIT"
+	default:
+		return ""
+	}
+}
+
+// mapNetwork maps a proto Network enum to its RisingWave string value.
+// UNSPECIFIED returns "" so the handler rejects it (defense in depth beyond
+// proto validation).
+func mapNetwork(n pb.Network) string {
+	switch n {
+	case pb.Network_MAINNET:
+		return "MAINNET"
+	case pb.Network_REGTEST:
+		return "REGTEST"
+	case pb.Network_TESTNET:
+		return "TESTNET"
+	case pb.Network_SIGNET:
+		return "SIGNET"
 	default:
 		return ""
 	}

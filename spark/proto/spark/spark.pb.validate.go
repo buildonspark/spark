@@ -24556,6 +24556,32 @@ func (m *QuerySparkTransactionVolumesRequest) validate(all bool) error {
 
 	}
 
+	if m.Network != nil {
+
+		if _, ok := _QuerySparkTransactionVolumesRequest_Network_NotInLookup[m.GetNetwork()]; ok {
+			err := QuerySparkTransactionVolumesRequestValidationError{
+				field:  "Network",
+				reason: "value must not be in list [UNSPECIFIED]",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if _, ok := Network_name[int32(m.GetNetwork())]; !ok {
+			err := QuerySparkTransactionVolumesRequestValidationError{
+				field:  "Network",
+				reason: "value must be one of the defined enum values",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return QuerySparkTransactionVolumesRequestMultiError(errors)
 	}
@@ -24643,6 +24669,10 @@ var _QuerySparkTransactionVolumesRequest_StartDate_Pattern = regexp.MustCompile(
 var _QuerySparkTransactionVolumesRequest_EndDate_Pattern = regexp.MustCompile("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 
 var _QuerySparkTransactionVolumesRequest_TransactionType_NotInLookup = map[SparkTransactionType]struct{}{
+	0: {},
+}
+
+var _QuerySparkTransactionVolumesRequest_Network_NotInLookup = map[Network]struct{}{
 	0: {},
 }
 
