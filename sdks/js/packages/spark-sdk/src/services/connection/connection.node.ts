@@ -29,9 +29,21 @@ import { AuthMode, ConnectionManager } from "./connection.js";
 // message size limit.
 const MAX_MESSAGE_SIZE = 20 * 1024 * 1024; // 20 MB
 
+// grpc-js advertises a 64 KB HTTP/2 window by default. On high-RTT links, a
+// multi-MB response exhausts the window repeatedly and can get torn down by
+// the server's stall detector with RST_STREAM INTERNAL before the response
+// finishes delivering. `grpc-node.flow_control_window` is the grpc-js-specific
+// knob: a single value that's applied as the per-stream initial window size
+// (advertised in the HTTP/2 SETTINGS frame) AND, via session.setLocalWindowSize,
+// as the connection-level window. 16 MB eliminates the repeated-stall class for
+// any realistic response size and matches `WithInitialConnWindowSize` on the
+// SO-to-SO internal client (spark/so/operator.go).
+const HTTP2_FLOW_CONTROL_WINDOW = 16 * 1024 * 1024; // 16 MB
+
 const CHANNEL_OPTIONS = {
   "grpc.max_receive_message_length": MAX_MESSAGE_SIZE,
   "grpc.max_send_message_length": MAX_MESSAGE_SIZE,
+  "grpc-node.flow_control_window": HTTP2_FLOW_CONTROL_WINDOW,
 };
 
 export class ConnectionManagerNodeJS extends ConnectionManager {
