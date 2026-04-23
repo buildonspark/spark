@@ -11524,10 +11524,12 @@ func (x *QueryWalletSettingResponse) GetWalletSetting() *WalletSetting {
 }
 
 type QuerySparkTransactionVolumesRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	StartDate       string                 `protobuf:"bytes,1,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"`
-	EndDate         string                 `protobuf:"bytes,2,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`
-	TransactionType *SparkTransactionType  `protobuf:"varint,3,opt,name=transaction_type,json=transactionType,proto3,enum=spark.SparkTransactionType,oneof" json:"transaction_type,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	StartDate string                 `protobuf:"bytes,1,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"`
+	EndDate   string                 `protobuf:"bytes,2,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`
+	// If empty, results include all transaction types. Otherwise results are
+	// scoped to the listed types (e.g. [LIGHTNING_SEND, LIGHTNING_RECEIVE]).
+	TransactionTypes []SparkTransactionType `protobuf:"varint,3,rep,packed,name=transaction_types,json=transactionTypes,proto3,enum=spark.SparkTransactionType" json:"transaction_types,omitempty"`
 	// If unset, results include all networks. When set, results are scoped to that
 	// single network. All defined networks (MAINNET, REGTEST, TESTNET, SIGNET) are allowed.
 	Network       *Network `protobuf:"varint,4,opt,name=network,proto3,enum=spark.Network,oneof" json:"network,omitempty"`
@@ -11579,11 +11581,11 @@ func (x *QuerySparkTransactionVolumesRequest) GetEndDate() string {
 	return ""
 }
 
-func (x *QuerySparkTransactionVolumesRequest) GetTransactionType() SparkTransactionType {
-	if x != nil && x.TransactionType != nil {
-		return *x.TransactionType
+func (x *QuerySparkTransactionVolumesRequest) GetTransactionTypes() []SparkTransactionType {
+	if x != nil {
+		return x.TransactionTypes
 	}
-	return SparkTransactionType_SPARK_TRANSACTION_TYPE_UNSPECIFIED
+	return nil
 }
 
 func (x *QuerySparkTransactionVolumesRequest) GetNetwork() Network {
@@ -12572,18 +12574,16 @@ const file_spark_proto_rawDesc = "" +
 	"\x0ewallet_setting\x18\x01 \x01(\v2\x14.spark.WalletSettingR\rwalletSetting\"\x1b\n" +
 	"\x19QueryWalletSettingRequest\"Y\n" +
 	"\x1aQueryWalletSettingResponse\x12;\n" +
-	"\x0ewallet_setting\x18\x01 \x01(\v2\x14.spark.WalletSettingR\rwalletSetting\"\xe4\x02\n" +
+	"\x0ewallet_setting\x18\x01 \x01(\v2\x14.spark.WalletSettingR\rwalletSetting\"\xd1\x02\n" +
 	"#QuerySparkTransactionVolumesRequest\x12E\n" +
 	"\n" +
 	"start_date\x18\x01 \x01(\tB&\xfaB#r!2\x1c^[0-9]{4}-[0-9]{2}-[0-9]{2}$\x98\x01\n" +
 	"R\tstartDate\x12A\n" +
 	"\bend_date\x18\x02 \x01(\tB&\xfaB#r!2\x1c^[0-9]{4}-[0-9]{2}-[0-9]{2}$\x98\x01\n" +
-	"R\aendDate\x12W\n" +
-	"\x10transaction_type\x18\x03 \x01(\x0e2\x1b.spark.SparkTransactionTypeB\n" +
-	"\xfaB\a\x82\x01\x04\x10\x01 \x00H\x00R\x0ftransactionType\x88\x01\x01\x129\n" +
+	"R\aendDate\x12Y\n" +
+	"\x11transaction_types\x18\x03 \x03(\x0e2\x1b.spark.SparkTransactionTypeB\x0f\xfaB\f\x92\x01\t\"\a\x82\x01\x04\x10\x01 \x00R\x10transactionTypes\x129\n" +
 	"\anetwork\x18\x04 \x01(\x0e2\x0e.spark.NetworkB\n" +
-	"\xfaB\a\x82\x01\x04\x10\x01 \x00H\x01R\anetwork\x88\x01\x01B\x13\n" +
-	"\x11_transaction_typeB\n" +
+	"\xfaB\a\x82\x01\x04\x10\x01 \x00H\x00R\anetwork\x88\x01\x01B\n" +
 	"\n" +
 	"\b_network\"\xae\x01\n" +
 	"\x16SparkTransactionVolume\x12F\n" +
@@ -13221,7 +13221,7 @@ var file_spark_proto_depIdxs = []int32{
 	61,  // 270: spark.InitiateSwapPrimaryTransferResponse.signing_results:type_name -> spark.LeafRefundTxSigningResult
 	168, // 271: spark.UpdateWalletSettingResponse.wallet_setting:type_name -> spark.WalletSetting
 	168, // 272: spark.QueryWalletSettingResponse.wallet_setting:type_name -> spark.WalletSetting
-	12,  // 273: spark.QuerySparkTransactionVolumesRequest.transaction_type:type_name -> spark.SparkTransactionType
+	12,  // 273: spark.QuerySparkTransactionVolumesRequest.transaction_types:type_name -> spark.SparkTransactionType
 	0,   // 274: spark.QuerySparkTransactionVolumesRequest.network:type_name -> spark.Network
 	12,  // 275: spark.SparkTransactionVolume.transaction_type:type_name -> spark.SparkTransactionType
 	174, // 276: spark.QuerySparkTransactionVolumesResponse.transaction_types:type_name -> spark.SparkTransactionVolume

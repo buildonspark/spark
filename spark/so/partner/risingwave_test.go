@@ -99,20 +99,32 @@ func TestRisingWaveClient_QueryTransactionVolumes_Postgres(t *testing.T) {
 	assert.Equal(t, int64(20000), byType["LIGHTNING_SEND"].VolumeSats)
 	assert.Equal(t, int64(3), byType["LIGHTNING_SEND"].TransactionCount)
 
-	// Query with transaction type filter.
-	txType := "TRANSFER"
+	// Query with single transaction type filter.
 	rows, err = client.QueryTransactionVolumes(
-		t.Context(), "partner-a", "label-1", time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 3, 31, 0, 0, 0, 0, time.UTC), &txType, nil,
+		t.Context(), "partner-a", "label-1", time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 3, 31, 0, 0, 0, 0, time.UTC), []string{"TRANSFER"}, nil,
 	)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "TRANSFER", rows[0].TransactionType)
 	assert.Equal(t, int64(87000), rows[0].VolumeSats)
 
+	// Query with multi-type filter returns rows for any listed type.
+	rows, err = client.QueryTransactionVolumes(
+		t.Context(), "partner-a", "label-1", time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 3, 31, 0, 0, 0, 0, time.UTC), []string{"TRANSFER", "LIGHTNING_SEND"}, nil,
+	)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	byType = map[string]TransactionVolumeRow{}
+	for _, r := range rows {
+		byType[r.TransactionType] = r
+	}
+	assert.Equal(t, int64(87000), byType["TRANSFER"].VolumeSats)
+	assert.Equal(t, int64(20000), byType["LIGHTNING_SEND"].VolumeSats)
+
 	// Query with network filter (MAINNET only) excludes REGTEST rows.
 	mainnet := "MAINNET"
 	rows, err = client.QueryTransactionVolumes(
-		t.Context(), "partner-a", "label-1", time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 3, 31, 0, 0, 0, 0, time.UTC), &txType, &mainnet,
+		t.Context(), "partner-a", "label-1", time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 3, 31, 0, 0, 0, 0, time.UTC), []string{"TRANSFER"}, &mainnet,
 	)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)

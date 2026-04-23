@@ -62,15 +62,15 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 		)
 	}
 
-	var txTypeFilter *string
-	if req.TransactionType != nil {
-		mapped := mapTransactionType(*req.TransactionType)
+	var txTypeFilter []string
+	for _, t := range req.TransactionTypes {
+		mapped := mapTransactionType(t)
 		if mapped == "" {
 			return nil, sparkerrors.InvalidArgumentMalformedField(
-				fmt.Errorf("invalid transaction_type: %s", req.TransactionType.String()),
+				fmt.Errorf("invalid transaction_type: %s", t.String()),
 			)
 		}
-		txTypeFilter = &mapped
+		txTypeFilter = append(txTypeFilter, mapped)
 	}
 
 	var networkFilter *string

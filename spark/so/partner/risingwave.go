@@ -62,7 +62,7 @@ func (c *RisingWaveClient) Close() error {
 // QueryTransactionVolumes queries the spark_transaction_volume materialized view
 // for the given partner, date range, and optional filters.
 // label is empty string to aggregate across all labels.
-// txType is nil to include all transaction types.
+// txTypes is empty to include all transaction types; otherwise rows match any listed type.
 // network is nil to include all networks; otherwise scoped to the single value
 // (one of MAINNET, REGTEST, TESTNET, SIGNET).
 func (c *RisingWaveClient) QueryTransactionVolumes(
@@ -71,7 +71,7 @@ func (c *RisingWaveClient) QueryTransactionVolumes(
 	label string,
 	startDate time.Time,
 	endDate time.Time,
-	txType *string,
+	txTypes []string,
 	network *string,
 ) ([]TransactionVolumeRow, error) {
 	db, err := c.connect()
@@ -101,9 +101,9 @@ func (c *RisingWaveClient) QueryTransactionVolumes(
 		argIdx++
 	}
 
-	if txType != nil {
-		conditions = append(conditions, fmt.Sprintf("transaction_type = $%d", argIdx))
-		args = append(args, *txType)
+	if len(txTypes) > 0 {
+		conditions = append(conditions, fmt.Sprintf("transaction_type = ANY($%d)", argIdx))
+		args = append(args, txTypes)
 		argIdx++
 	}
 

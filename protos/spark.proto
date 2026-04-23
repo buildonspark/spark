@@ -1631,7 +1631,9 @@ enum SparkTransactionType {
 message QuerySparkTransactionVolumesRequest {
     string start_date = 1 [(validate.rules).string = {len: 10, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}];
     string end_date = 2 [(validate.rules).string = {len: 10, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}];
-    optional SparkTransactionType transaction_type = 3 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
+    // If empty, results include all transaction types. Otherwise results are
+    // scoped to the listed types (e.g. [LIGHTNING_SEND, LIGHTNING_RECEIVE]).
+    repeated SparkTransactionType transaction_types = 3 [(validate.rules).repeated = {items: {enum: {defined_only: true, not_in: [0]}}}];
     // If unset, results include all networks. When set, results are scoped to that
     // single network. All defined networks (MAINNET, REGTEST, TESTNET, SIGNET) are allowed.
     optional Network network = 4 [(validate.rules).enum = {defined_only: true, not_in: [0]}];

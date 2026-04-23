@@ -24530,12 +24530,13 @@ func (m *QuerySparkTransactionVolumesRequest) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if m.TransactionType != nil {
+	for idx, item := range m.GetTransactionTypes() {
+		_, _ = idx, item
 
-		if _, ok := _QuerySparkTransactionVolumesRequest_TransactionType_NotInLookup[m.GetTransactionType()]; ok {
+		if _, ok := _QuerySparkTransactionVolumesRequest_TransactionTypes_NotInLookup[item]; ok {
 			err := QuerySparkTransactionVolumesRequestValidationError{
-				field:  "TransactionType",
-				reason: "value must not be in list [SPARK_TRANSACTION_TYPE_UNSPECIFIED]",
+				field:  fmt.Sprintf("TransactionTypes[%v]", idx),
+				reason: "value must not be in list [0]",
 			}
 			if !all {
 				return err
@@ -24543,9 +24544,9 @@ func (m *QuerySparkTransactionVolumesRequest) validate(all bool) error {
 			errors = append(errors, err)
 		}
 
-		if _, ok := SparkTransactionType_name[int32(m.GetTransactionType())]; !ok {
+		if _, ok := SparkTransactionType_name[int32(item)]; !ok {
 			err := QuerySparkTransactionVolumesRequestValidationError{
-				field:  "TransactionType",
+				field:  fmt.Sprintf("TransactionTypes[%v]", idx),
 				reason: "value must be one of the defined enum values",
 			}
 			if !all {
@@ -24668,7 +24669,7 @@ var _QuerySparkTransactionVolumesRequest_StartDate_Pattern = regexp.MustCompile(
 
 var _QuerySparkTransactionVolumesRequest_EndDate_Pattern = regexp.MustCompile("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 
-var _QuerySparkTransactionVolumesRequest_TransactionType_NotInLookup = map[SparkTransactionType]struct{}{
+var _QuerySparkTransactionVolumesRequest_TransactionTypes_NotInLookup = map[SparkTransactionType]struct{}{
 	0: {},
 }
 

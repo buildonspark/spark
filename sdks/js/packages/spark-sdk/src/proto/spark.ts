@@ -2359,9 +2359,11 @@ export interface QueryWalletSettingResponse {
 export interface QuerySparkTransactionVolumesRequest {
   startDate: string;
   endDate: string;
-  transactionType?:
-    | SparkTransactionType
-    | undefined;
+  /**
+   * If empty, results include all transaction types. Otherwise results are
+   * scoped to the listed types (e.g. [LIGHTNING_SEND, LIGHTNING_RECEIVE]).
+   */
+  transactionTypes: SparkTransactionType[];
   /**
    * If unset, results include all networks. When set, results are scoped to that
    * single network. All defined networks (MAINNET, REGTEST, TESTNET, SIGNET) are allowed.
@@ -21130,7 +21132,7 @@ export const QueryWalletSettingResponse: MessageFns<QueryWalletSettingResponse> 
 };
 
 function createBaseQuerySparkTransactionVolumesRequest(): QuerySparkTransactionVolumesRequest {
-  return { startDate: "", endDate: "", transactionType: undefined, network: undefined };
+  return { startDate: "", endDate: "", transactionTypes: [], network: undefined };
 }
 
 export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransactionVolumesRequest> = {
@@ -21141,8 +21143,8 @@ export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransacti
     if (message.endDate !== "") {
       writer.uint32(18).string(message.endDate);
     }
-    if (message.transactionType !== undefined) {
-      writer.uint32(24).int32(message.transactionType);
+    for (const v of message.transactionTypes) {
+      writer.uint32(24).int32(v!);
     }
     if (message.network !== undefined) {
       writer.uint32(32).int32(message.network);
@@ -21174,12 +21176,22 @@ export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransacti
           continue;
         }
         case 3: {
-          if (tag !== 24) {
-            break;
+          if (tag === 24) {
+            message.transactionTypes.push(reader.int32() as any);
+
+            continue;
           }
 
-          message.transactionType = reader.int32() as any;
-          continue;
+          if (tag === 26) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.transactionTypes.push(reader.int32() as any);
+            }
+
+            continue;
+          }
+
+          break;
         }
         case 4: {
           if (tag !== 32) {
@@ -21202,7 +21214,9 @@ export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransacti
     return {
       startDate: isSet(object.startDate) ? globalThis.String(object.startDate) : "",
       endDate: isSet(object.endDate) ? globalThis.String(object.endDate) : "",
-      transactionType: isSet(object.transactionType) ? sparkTransactionTypeFromJSON(object.transactionType) : undefined,
+      transactionTypes: globalThis.Array.isArray(object?.transactionTypes)
+        ? object.transactionTypes.map((e: any) => sparkTransactionTypeFromJSON(e))
+        : [],
       network: isSet(object.network) ? networkFromJSON(object.network) : undefined,
     };
   },
@@ -21215,8 +21229,8 @@ export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransacti
     if (message.endDate !== "") {
       obj.endDate = message.endDate;
     }
-    if (message.transactionType !== undefined) {
-      obj.transactionType = sparkTransactionTypeToJSON(message.transactionType);
+    if (message.transactionTypes?.length) {
+      obj.transactionTypes = message.transactionTypes.map((e) => sparkTransactionTypeToJSON(e));
     }
     if (message.network !== undefined) {
       obj.network = networkToJSON(message.network);
@@ -21231,7 +21245,7 @@ export const QuerySparkTransactionVolumesRequest: MessageFns<QuerySparkTransacti
     const message = createBaseQuerySparkTransactionVolumesRequest();
     message.startDate = object.startDate ?? "";
     message.endDate = object.endDate ?? "";
-    message.transactionType = object.transactionType ?? undefined;
+    message.transactionTypes = object.transactionTypes?.map((e) => e) || [];
     message.network = object.network ?? undefined;
     return message;
   },
