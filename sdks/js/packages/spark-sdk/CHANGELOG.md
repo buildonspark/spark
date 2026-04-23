@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.7.15
+
+### Patch Changes
+
+- - Increase gRPC HTTP/2 window sizes in the Node connection layer to mitigate hangs and errors for long-response calls over high-latency links
+
 ## 0.7.14
 
 ### Patch Changes
