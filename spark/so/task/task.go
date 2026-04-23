@@ -55,7 +55,6 @@ var (
 	dkgTaskTimeout                     = 3 * time.Minute
 	deleteStaleTreeNodesTaskTimeout    = 10 * time.Minute
 	purgeSigningNoncePartitionsTimeout = 10 * time.Minute
-	repairParticipantCreateTimeTimeout = 10 * time.Minute
 
 	meter                       = otel.Meter("gossip")
 	oldestPendingGossipAgeGauge metric.Int64Gauge
@@ -1070,22 +1069,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					client := ent.NewClient(ent.Driver(drv))
 
 					return monitorReceiverStatusMismatches(ctx, client, 1000)
-				},
-			},
-		},
-		{
-			ExecutionInterval: 5 * time.Second,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "repair_transfer_participant_create_time",
-				RunInTestEnv: false,
-				Timeout:      &repairParticipantCreateTimeTimeout,
-				Task: func(ctx context.Context, config *so.Config, _ knobs.Knobs) error {
-					client, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get db client: %w", err)
-					}
-					_, err = repairParticipantCreateTime(ctx, config, client, 1000)
-					return err
 				},
 			},
 		},
