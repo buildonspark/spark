@@ -1,0 +1,3 @@
+include ./src/spark_token_primitives/libuniffi_spark_token_primitives.dylib
+include ./src/spark_token_primitives/uniffi_spark_token_primitives.dll
+include ./src/spark_token_primitives/libuniffi_spark_token_primitives.so

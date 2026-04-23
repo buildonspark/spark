@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name="spark_token_primitives_python",
+    name="spark_token_primitives",
     version="0.0.1",
     description="Python bindings for local Spark token transaction helpers",
     long_description=open("README.md").read(),
