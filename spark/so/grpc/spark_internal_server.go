@@ -263,7 +263,7 @@ func (s *SparkInternalServer) SyncNode(ctx context.Context, req *pb.SyncNodeRequ
 
 func (s *SparkInternalServer) ConsensusPrepare(ctx context.Context, req *pb.ConsensusPrepareRequest) (*pb.ConsensusPrepareResponse, error) {
 	ch := handler.NewConsensusHandler(s.config)
-	result, err := ch.DispatchPrepare(ctx, pbgossip.ConsensusOperationType(req.OpType), req.Operation)
+	result, err := ch.DispatchPrepare(ctx, pbgossip.ConsensusOperationType(req.OpType), req.Operation, req.FlowExecutionId, uint(req.CoordinatorIndex))
 	if err != nil {
 		return nil, err
 	}

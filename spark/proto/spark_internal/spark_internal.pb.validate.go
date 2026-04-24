@@ -8636,6 +8636,8 @@ func (m *ConsensusPrepareRequest) validate(all bool) error {
 
 	// no validation rules for FlowExecutionId
 
+	// no validation rules for CoordinatorIndex
+
 	if len(errors) > 0 {
 		return ConsensusPrepareRequestMultiError(errors)
 	}

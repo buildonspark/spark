@@ -17,6 +17,7 @@ import (
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
@@ -149,7 +150,7 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 			commit := gossipMessage.GetConsensusCommit()
 			var op proto.Message
 			if op, err = commit.Operation.UnmarshalNew(); err == nil {
-				err = dispatchConsensusCommit(ctx, h.config, commit.OpType, op)
+				err = dispatchConsensusCommit(ctx, h.config, commit.OpType, commit.FlowExecutionId, op)
 			}
 		}
 	case *pbgossip.GossipMessage_ConsensusRollback:
@@ -157,7 +158,7 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 			rollback := gossipMessage.GetConsensusRollback()
 			var op proto.Message
 			if op, err = rollback.Operation.UnmarshalNew(); err == nil {
-				err = dispatchConsensusRollback(ctx, h.config, rollback.OpType, op)
+				err = dispatchConsensusRollback(ctx, h.config, rollback.OpType, rollback.FlowExecutionId, op)
 			}
 		}
 	default:
@@ -698,21 +699,59 @@ func (h *GossipHandler) handleFinalizeTreeNodeGossipMessage(
 }
 
 // dispatchConsensusCommit routes an incoming ConsensusCommit gossip message to
-// the appropriate FlowHandler.Commit based on operation type.
-func dispatchConsensusCommit(ctx context.Context, config *so.Config, opType pbgossip.ConsensusOperationType, op proto.Message) error {
+// the appropriate FlowHandler.Commit based on operation type. After a
+// successful dispatch, transitions the matching PARTICIPANT FlowExecution row
+// to COMMITTED so the reconciliation task stops treating it as in-flight.
+func dispatchConsensusCommit(ctx context.Context, config *so.Config, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
 	handler, err := consensusFlowHandler(config, opType)
 	if err != nil {
 		return err
 	}
-	return handler.Commit(ctx, op)
+	if err := handler.Commit(ctx, op); err != nil {
+		return err
+	}
+	return markParticipantFlowExecutionTerminal(ctx, flowExecutionID, st.FlowExecutionStatusCommitted)
 }
 
 // dispatchConsensusRollback routes an incoming ConsensusRollback gossip message
-// to the appropriate FlowHandler.Rollback based on operation type.
-func dispatchConsensusRollback(ctx context.Context, config *so.Config, opType pbgossip.ConsensusOperationType, op proto.Message) error {
+// to the appropriate FlowHandler.Rollback based on operation type. After a
+// successful dispatch, transitions the matching PARTICIPANT FlowExecution row
+// to ROLLED_BACK.
+func dispatchConsensusRollback(ctx context.Context, config *so.Config, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
 	handler, err := consensusFlowHandler(config, opType)
 	if err != nil {
 		return err
 	}
-	return handler.Rollback(ctx, op)
+	if err := handler.Rollback(ctx, op); err != nil {
+		return err
+	}
+	return markParticipantFlowExecutionTerminal(ctx, flowExecutionID, st.FlowExecutionStatusRolledBack)
+}
+
+// markParticipantFlowExecutionTerminal transitions a PARTICIPANT FlowExecution
+// row to the target terminal status. Missing rows and already-terminal rows
+// are idempotent no-ops so gossip redelivery (which is common) stays safe.
+// Empty flowExecutionID means the gossip came from a pre-upgrade coordinator
+// and there is no participant row to transition.
+func markParticipantFlowExecutionTerminal(ctx context.Context, flowExecutionID string, target st.FlowExecutionStatus) error {
+	if flowExecutionID == "" {
+		return nil
+	}
+	id, err := uuid.Parse(flowExecutionID)
+	if err != nil {
+		return fmt.Errorf("invalid flow_execution_id in gossip: %w", err)
+	}
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = db.FlowExecution.Update().
+		Where(
+			flowexecution.ID(id),
+			flowexecution.RoleEQ(st.FlowExecutionRoleParticipant),
+			flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
+		).
+		SetStatus(target).
+		Save(ctx)
+	return err
 }

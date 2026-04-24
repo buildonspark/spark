@@ -4098,8 +4098,16 @@ type ConsensusPrepareRequest struct {
 	// reused across roles). Empty means the caller is a pre-upgrade
 	// coordinator; participants skip writing a FlowExecution row.
 	FlowExecutionId string `protobuf:"bytes,3,opt,name=flow_execution_id,json=flowExecutionId,proto3" json:"flow_execution_id,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// SigningOperator.ID of the coordinator. Participants store this on their
+	// FlowExecution row as coordinator_index so the reconciliation task knows
+	// which operator to query via ConsensusQueryOutcome. The authz
+	// interceptor already IP-restricts callers to operator addresses, so the
+	// worst a misbehaving caller can do is set a wrong index — at which point
+	// reconciliation queries the wrong operator, which has no record and
+	// responds OUTCOME_UNSPECIFIED.
+	CoordinatorIndex uint32 `protobuf:"varint,4,opt,name=coordinator_index,json=coordinatorIndex,proto3" json:"coordinator_index,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ConsensusPrepareRequest) Reset() {
@@ -4151,6 +4159,13 @@ func (x *ConsensusPrepareRequest) GetFlowExecutionId() string {
 		return x.FlowExecutionId
 	}
 	return ""
+}
+
+func (x *ConsensusPrepareRequest) GetCoordinatorIndex() uint32 {
+	if x != nil {
+		return x.CoordinatorIndex
+	}
+	return 0
 }
 
 type ConsensusPrepareResponse struct {
@@ -4661,11 +4676,12 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x19DepositTreePrepareRequest\x12T\n" +
 	"\x10original_request\x18\x01 \x01(\v2).spark.FinalizeDepositTreeCreationRequestR\x0foriginalRequest\"q\n" +
 	" StorePreimageSharePrepareRequest\x12M\n" +
-	"\x10original_request\x18\x01 \x01(\v2\".spark.StorePreimageShareV2RequestR\x0foriginalRequest\"\x92\x01\n" +
+	"\x10original_request\x18\x01 \x01(\v2\".spark.StorePreimageShareV2RequestR\x0foriginalRequest\"\xbf\x01\n" +
 	"\x17ConsensusPrepareRequest\x12\x17\n" +
 	"\aop_type\x18\x01 \x01(\x05R\x06opType\x122\n" +
 	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation\x12*\n" +
-	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId\"H\n" +
+	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId\x12+\n" +
+	"\x11coordinator_index\x18\x04 \x01(\rR\x10coordinatorIndex\"H\n" +
 	"\x18ConsensusPrepareResponse\x12,\n" +
 	"\x06result\x18\x01 \x01(\v2\x14.google.protobuf.AnyR\x06result\"J\n" +
 	"\x1cConsensusQueryOutcomeRequest\x12*\n" +

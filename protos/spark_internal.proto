@@ -576,6 +576,14 @@ message ConsensusPrepareRequest {
     // reused across roles). Empty means the caller is a pre-upgrade
     // coordinator; participants skip writing a FlowExecution row.
     string flow_execution_id = 3;
+    // SigningOperator.ID of the coordinator. Participants store this on their
+    // FlowExecution row as coordinator_index so the reconciliation task knows
+    // which operator to query via ConsensusQueryOutcome. The authz
+    // interceptor already IP-restricts callers to operator addresses, so the
+    // worst a misbehaving caller can do is set a wrong index — at which point
+    // reconciliation queries the wrong operator, which has no record and
+    // responds OUTCOME_UNSPECIFIED.
+    uint32 coordinator_index = 4;
 }
 
 message ConsensusPrepareResponse {

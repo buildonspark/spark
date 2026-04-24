@@ -89,7 +89,7 @@ func (e *TwoPCEngine) Execute(
 		if operator.Identifier == e.config.Identifier {
 			result, err = flow.Prepare(ctx, flow.PrepareOp())
 		} else {
-			result, err = DefaultPrepareTask(ctx, operator, opType, flow.PrepareOp(), executionID)
+			result, err = DefaultPrepareTask(ctx, operator, opType, flow.PrepareOp(), executionID, uint32(row.CoordinatorIndex))
 		}
 		if err != nil {
 			return nil, err
@@ -263,9 +263,9 @@ func (e *TwoPCEngine) rollback(ctx context.Context, opType pbgossip.ConsensusOpe
 
 // DefaultPrepareTask sends a ConsensusPrepare RPC to a remote operator.
 // This is the common implementation for CoordinatorFlow.PrepareTask — every
-// flow does the same thing, just with a different opType, prepareOp, and
-// executionID.
-func DefaultPrepareTask(ctx context.Context, operator *so.SigningOperator, opType pbgossip.ConsensusOperationType, prepareOp proto.Message, executionID string) (proto.Message, error) {
+// flow does the same thing, just with a different opType, prepareOp,
+// executionID, and coordinatorIndex.
+func DefaultPrepareTask(ctx context.Context, operator *so.SigningOperator, opType pbgossip.ConsensusOperationType, prepareOp proto.Message, executionID string, coordinatorIndex uint32) (proto.Message, error) {
 	conn, err := operator.NewOperatorGRPCConnection()
 	if err != nil {
 		return nil, err
@@ -277,9 +277,10 @@ func DefaultPrepareTask(ctx context.Context, operator *so.SigningOperator, opTyp
 	}
 	client := pbinternal.NewSparkInternalServiceClient(conn)
 	resp, err := client.ConsensusPrepare(ctx, &pbinternal.ConsensusPrepareRequest{
-		OpType:          int32(opType),
-		Operation:       anyOp,
-		FlowExecutionId: executionID,
+		OpType:           int32(opType),
+		Operation:        anyOp,
+		FlowExecutionId:  executionID,
+		CoordinatorIndex: coordinatorIndex,
 	})
 	if err != nil {
 		return nil, err
