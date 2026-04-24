@@ -269,3 +269,7 @@ func (s *SparkInternalServer) ConsensusPrepare(ctx context.Context, req *pb.Cons
 	}
 	return &pb.ConsensusPrepareResponse{Result: result}, nil
 }
+
+func (s *SparkInternalServer) ConsensusQueryOutcome(ctx context.Context, req *pb.ConsensusQueryOutcomeRequest) (*pb.ConsensusQueryOutcomeResponse, error) {
+	return handler.NewConsensusQueryHandler(s.config).QueryOutcome(ctx, req)
+}
