@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -23,42 +24,80 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// RetryPolicyConfig represents configuration for gRPC retry policy
+// RetryPolicyConfig represents configuration for the gRPC service config
+// applied to a client connection (retry policy + optional load balancing
+// policy). Kept named RetryPolicyConfig for backwards compatibility with
+// existing call sites.
 type RetryPolicyConfig struct {
 	MaxAttempts          int
 	InitialBackoff       time.Duration
 	MaxBackoff           time.Duration
 	BackoffMultiplier    float64
 	RetryableStatusCodes []string
+	// LoadBalancingPolicy, if non-empty, is emitted as the top-level
+	// "loadBalancingPolicy" field of the service config. Empty falls back to
+	// gRPC's default (pick_first). Setting this here instead of via a
+	// separate grpc.WithDefaultServiceConfig prevents the retry policy from
+	// being silently overwritten: grpc-go's WithDefaultServiceConfig is a
+	// single-pointer setter, so the last call wins.
+	LoadBalancingPolicy string
 }
 
-// defaultRetryPolicy provides the default retry configuration
+// defaultRetryPolicy provides the default retry configuration for pooled
+// client connections (SO-to-SO and other operator traffic).
 var defaultRetryPolicy = RetryPolicyConfig{
 	MaxAttempts:          3,
 	InitialBackoff:       1 * time.Second,
 	MaxBackoff:           10 * time.Second,
 	BackoffMultiplier:    2.0,
 	RetryableStatusCodes: []string{"UNAVAILABLE"},
+	LoadBalancingPolicy:  "round_robin",
 }
 
 type ClientTimeoutConfig struct {
 	TimeoutProvider sogrpc.TimeoutProvider
 }
 
-// createRetryPolicy generates a service config JSON string from a RetryPolicyConfig
+// createRetryPolicy generates a gRPC service config JSON string from a
+// RetryPolicyConfig. The emitted JSON contains a methodConfig with the
+// retry policy applied to all methods and, when set, a top-level
+// loadBalancingPolicy.
 func createRetryPolicy(config *RetryPolicyConfig) string {
-	return fmt.Sprintf(`{
-		"methodConfig": [{
-		  "name": [{}],
-		  "retryPolicy": {
-			  "MaxAttempts": %d,
-			  "InitialBackoff": "%s",
-			  "MaxBackoff": "%s",
-			  "BackoffMultiplier": %.1f,
-			  "RetryableStatusCodes": [ "%s" ]
-		  }
-		}]}`, config.MaxAttempts, config.InitialBackoff.String(), config.MaxBackoff.String(),
-		config.BackoffMultiplier, strings.Join(config.RetryableStatusCodes, "\", \""))
+	type retryPolicyJSON struct {
+		MaxAttempts          int      `json:"MaxAttempts"`
+		InitialBackoff       string   `json:"InitialBackoff"`
+		MaxBackoff           string   `json:"MaxBackoff"`
+		BackoffMultiplier    float64  `json:"BackoffMultiplier"`
+		RetryableStatusCodes []string `json:"RetryableStatusCodes"`
+	}
+	type methodConfigJSON struct {
+		Name        []struct{}      `json:"name"`
+		RetryPolicy retryPolicyJSON `json:"retryPolicy"`
+	}
+	type serviceConfigJSON struct {
+		LoadBalancingPolicy string             `json:"loadBalancingPolicy,omitempty"`
+		MethodConfig        []methodConfigJSON `json:"methodConfig"`
+	}
+
+	sc := serviceConfigJSON{
+		LoadBalancingPolicy: config.LoadBalancingPolicy,
+		MethodConfig: []methodConfigJSON{{
+			Name: []struct{}{{}},
+			RetryPolicy: retryPolicyJSON{
+				MaxAttempts:          config.MaxAttempts,
+				InitialBackoff:       config.InitialBackoff.String(),
+				MaxBackoff:           config.MaxBackoff.String(),
+				BackoffMultiplier:    config.BackoffMultiplier,
+				RetryableStatusCodes: config.RetryableStatusCodes,
+			},
+		}},
+	}
+	b, err := json.Marshal(sc)
+	if err != nil {
+		// Fields are all concrete, finite types; Marshal cannot fail.
+		panic(fmt.Sprintf("marshal service config: %v", err))
+	}
+	return string(b)
 }
 
 func loggingUnaryClientInterceptor(

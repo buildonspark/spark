@@ -65,7 +65,6 @@ type operatorConnectionFactorySecure struct {
 
 func (o *operatorConnectionFactorySecure) NewGRPCConnection(address string, retryPolicy *common.RetryPolicyConfig, clientTimeoutConfig *common.ClientTimeoutConfig) (*grpc.ClientConn, error) {
 	extraOpts := []grpc.DialOption{
-		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
 		// Spec-compliant client pings; server currently has no enforcement policy.
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                30 * time.Second,

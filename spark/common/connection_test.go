@@ -2,12 +2,48 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
+
+// The service config emitted by BasicClientOptions is invisible through
+// higher-level behavior: a *grpc.ClientConn doesn't publicly expose the
+// resolved service config, and retry behavior only manifests when a peer
+// returns a retryable status. The previous regression — operator.go
+// silently overwriting the retry policy by setting a second
+// grpc.WithDefaultServiceConfig for load balancing — compiled, dialed, and
+// passed every higher-level test, but caused internal SO-to-SO calls to
+// give up on the first 502 in production. This narrow contract test locks
+// in that the load balancing policy and retry policy coexist in a single
+// service config JSON.
+func TestDefaultRetryPolicy_IncludesLoadBalancingAndRetries(t *testing.T) {
+	var parsed struct {
+		LoadBalancingPolicy string `json:"loadBalancingPolicy"`
+		MethodConfig        []struct {
+			RetryPolicy struct {
+				MaxAttempts          int      `json:"MaxAttempts"`
+				RetryableStatusCodes []string `json:"RetryableStatusCodes"`
+			} `json:"retryPolicy"`
+		} `json:"methodConfig"`
+	}
+	if err := json.Unmarshal([]byte(createRetryPolicy(&defaultRetryPolicy)), &parsed); err != nil {
+		t.Fatalf("default service config is not valid JSON: %v", err)
+	}
+	if parsed.LoadBalancingPolicy != "round_robin" {
+		t.Errorf("loadBalancingPolicy: got %q, want round_robin", parsed.LoadBalancingPolicy)
+	}
+	if len(parsed.MethodConfig) != 1 || parsed.MethodConfig[0].RetryPolicy.MaxAttempts < 2 {
+		t.Errorf("expected a methodConfig retryPolicy with MaxAttempts >= 2, got %+v", parsed.MethodConfig)
+	}
+	retryable := parsed.MethodConfig[0].RetryPolicy.RetryableStatusCodes
+	if len(retryable) == 0 || retryable[0] != "UNAVAILABLE" {
+		t.Errorf("expected UNAVAILABLE in RetryableStatusCodes, got %v", retryable)
+	}
+}
 
 func TestIdempotencyKeyClientInterceptor_SetsHeader(t *testing.T) {
 	interceptor := IdempotencyKeyClientInterceptor()
