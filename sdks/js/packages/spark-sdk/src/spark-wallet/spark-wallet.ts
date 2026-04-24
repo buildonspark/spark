@@ -459,6 +459,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         event.receiverTransfer.transfer.type !== TransferType.COUNTER_SWAP_V3
       ) {
         const transfer = event.receiverTransfer.transfer;
+        const traceId = event.receiverTransfer.traceId;
+        if (this.config.getLog() && traceId) {
+          console.info(
+            `[spark-sdk][stream] receiver transfer ${transfer.id} [traceId: ${traceId}]`,
+          );
+        }
         const { senderIdentityPublicKey, receiverIdentityPublicKey } = transfer;
         const isSelf = equalBytes(
           senderIdentityPublicKey,
@@ -502,6 +508,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           `Counter-swap receiver transfer (skipped): id=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue} leafIds=[${counterSwapLeafIds.join(",")}]`,
         );
       } else if (isSenderTransferStreamEvent(event)) {
+        if (this.config.getLog() && event.senderTransfer.traceId) {
+          console.info(
+            `[spark-sdk][stream] sender transfer ${event.senderTransfer.transfer.id} [traceId: ${event.senderTransfer.traceId}]`,
+          );
+        }
         const transfer = event.senderTransfer.transfer;
         const senderLeafIds = transfer.leaves.flatMap((l) =>
           l.leaf ? [l.leaf.id] : [],
@@ -512,6 +523,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         await this.leafManager.handleTransferEvent(transfer);
       } else if (isDepositStreamEvent(event)) {
         const deposit = event.deposit.deposit;
+        if (this.config.getLog() && event.deposit.traceId) {
+          console.info(
+            `[spark-sdk][stream] deposit ${deposit.id} [traceId: ${event.deposit.traceId}]`,
+          );
+        }
         this.logEvent(
           `Deposit: id=${deposit.id} status=${deposit.status} value=${deposit.value}`,
         );
@@ -5920,9 +5936,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   protected static async handlePublicMethodError(
     error: unknown,
-    { wallet }: HandlePublicMethodErrorParams = {},
+    { wallet, serverTraceId }: HandlePublicMethodErrorParams = {},
   ) {
     const context: Record<string, unknown> = {};
+
+    if (typeof serverTraceId === "string" && serverTraceId.length > 0) {
+      context.serverTraceId = serverTraceId;
+    }
 
     if (wallet) {
       try {
@@ -5955,12 +5975,22 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     wallet: SparkWallet,
   ) {
     return async (...args: unknown[]) => {
+      const startTime = Date.now();
       try {
         const result = await originalFn.apply(wallet, args);
+        if (wallet.config.getLog()) {
+          const serverTraceId = wallet.connectionManager.lastServerTraceId;
+          console.info(
+            `[spark-sdk] ${methodName} completed in ${Date.now() - startTime}ms` +
+              (serverTraceId ? ` [serverTraceId: ${serverTraceId}]` : ""),
+          );
+        }
         return result;
       } catch (error) {
+        const serverTraceId = wallet.connectionManager.lastServerTraceId;
         const err = await SparkWallet.handlePublicMethodError(error, {
           wallet,
+          serverTraceId,
         });
         throw err;
       }

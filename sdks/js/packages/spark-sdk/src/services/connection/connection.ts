@@ -83,6 +83,10 @@ type Address = string;
 export abstract class ConnectionManager {
   protected static readonly DATE_HEADER = "date";
   protected static readonly PROCESSING_TIME_HEADER = "x-processing-time-ms";
+  protected static readonly TRACE_ID_HEADER = "x-trace-id";
+
+  /** Most recent server-assigned trace ID from gRPC response headers. */
+  lastServerTraceId: string | undefined;
 
   // Static caches shared across all instances
   private static channelCache: Map<
@@ -566,6 +570,11 @@ export abstract class ConnectionManager {
           metadata: metadata.set("Authorization", `Bearer ${authToken}`),
           onHeader: (header: Metadata) => {
             receiveTime.value = this.getMonotonicTime();
+
+            const traceIdHeader = header.get(ConnectionManager.TRACE_ID_HEADER);
+            if (traceIdHeader) {
+              this.lastServerTraceId = traceIdHeader;
+            }
 
             const dateHeader = header.get(ConnectionManager.DATE_HEADER);
             const processingTimeHeader = header.get(
