@@ -258,10 +258,13 @@ func (s *EventRouter) processDepositNotification(ctx context.Context, event proc
 		return nil
 	}
 
+	traceID, _ := event.Fields["trace_id"].(string)
+
 	return &pb.SubscribeToEventsResponse{
 		Event: &pb.SubscribeToEventsResponse_Deposit{
 			Deposit: &pb.DepositEvent{
 				Deposit: treeNodeProto,
+				TraceId: traceID,
 			},
 		},
 	}
@@ -284,24 +287,26 @@ func (s *EventRouter) processTransferNotification(ctx context.Context, event pro
 
 		var notifications []*pb.SubscribeToEventsResponse
 
+		traceID, _ := event.Fields["trace_id"].(string)
+
 		switch status {
 		case schematype.TransferStatusSenderInitiated,
 			schematype.TransferStatusSenderInitiatedCoordinator,
 			schematype.TransferStatusSenderKeyTweakPending,
 			schematype.TransferStatusReturned:
 			if senderOk && senderPubkey == subscriptionPubkey {
-				if notification := s.buildTransferEvent(ctx, event.ID, true, nil); notification != nil {
+				if notification := s.buildTransferEvent(ctx, event.ID, true, nil, traceID); notification != nil {
 					notifications = append(notifications, notification)
 				}
 			}
 		case schematype.TransferStatusSenderKeyTweaked:
 			if senderOk && senderPubkey == subscriptionPubkey {
-				if notification := s.buildTransferEvent(ctx, event.ID, true, nil); notification != nil {
+				if notification := s.buildTransferEvent(ctx, event.ID, true, nil, traceID); notification != nil {
 					notifications = append(notifications, notification)
 				}
 			}
 			if receiverOk && receiverPubkey == subscriptionPubkey {
-				if notification := s.buildTransferEvent(ctx, event.ID, false, &identityPublicKey); notification != nil {
+				if notification := s.buildTransferEvent(ctx, event.ID, false, &identityPublicKey, traceID); notification != nil {
 					notifications = append(notifications, notification)
 				}
 			}
@@ -313,7 +318,7 @@ func (s *EventRouter) processTransferNotification(ctx context.Context, event pro
 	return []*pb.SubscribeToEventsResponse{}
 }
 
-func (s *EventRouter) buildTransferEvent(ctx context.Context, transferID uuid.UUID, isSender bool, receiverPubkey *keys.Public) *pb.SubscribeToEventsResponse {
+func (s *EventRouter) buildTransferEvent(ctx context.Context, transferID uuid.UUID, isSender bool, receiverPubkey *keys.Public, traceID string) *pb.SubscribeToEventsResponse {
 	transferEnt, err := s.dbClient.Transfer.Query().
 		Where(transfer.ID(transferID)).
 		WithTransferReceivers().
@@ -337,13 +342,13 @@ func (s *EventRouter) buildTransferEvent(ctx context.Context, transferID uuid.UU
 	if isSender {
 		return &pb.SubscribeToEventsResponse{
 			Event: &pb.SubscribeToEventsResponse_SenderTransfer{
-				SenderTransfer: &pb.TransferEvent{Transfer: transferProto},
+				SenderTransfer: &pb.TransferEvent{Transfer: transferProto, TraceId: traceID},
 			},
 		}
 	}
 	return &pb.SubscribeToEventsResponse{
 		Event: &pb.SubscribeToEventsResponse_ReceiverTransfer{
-			ReceiverTransfer: &pb.TransferEvent{Transfer: transferProto},
+			ReceiverTransfer: &pb.TransferEvent{Transfer: transferProto, TraceId: traceID},
 		},
 	}
 }

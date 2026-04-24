@@ -730,10 +730,12 @@ export interface HeartbeatEvent {
 
 export interface TransferEvent {
   transfer: Transfer | undefined;
+  traceId: string;
 }
 
 export interface DepositEvent {
   deposit: TreeNode | undefined;
+  traceId: string;
 }
 
 export interface PageRequest {
@@ -2825,13 +2827,16 @@ export const HeartbeatEvent: MessageFns<HeartbeatEvent> = {
 };
 
 function createBaseTransferEvent(): TransferEvent {
-  return { transfer: undefined };
+  return { transfer: undefined, traceId: "" };
 }
 
 export const TransferEvent: MessageFns<TransferEvent> = {
   encode(message: TransferEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transfer !== undefined) {
       Transfer.encode(message.transfer, writer.uint32(82).fork()).join();
+    }
+    if (message.traceId !== "") {
+      writer.uint32(90).string(message.traceId);
     }
     return writer;
   },
@@ -2851,6 +2856,14 @@ export const TransferEvent: MessageFns<TransferEvent> = {
           message.transfer = Transfer.decode(reader, reader.uint32());
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.traceId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2861,13 +2874,19 @@ export const TransferEvent: MessageFns<TransferEvent> = {
   },
 
   fromJSON(object: any): TransferEvent {
-    return { transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined };
+    return {
+      transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined,
+      traceId: isSet(object.traceId) ? globalThis.String(object.traceId) : "",
+    };
   },
 
   toJSON(message: TransferEvent): unknown {
     const obj: any = {};
     if (message.transfer !== undefined) {
       obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    if (message.traceId !== "") {
+      obj.traceId = message.traceId;
     }
     return obj;
   },
@@ -2880,18 +2899,22 @@ export const TransferEvent: MessageFns<TransferEvent> = {
     message.transfer = (object.transfer !== undefined && object.transfer !== null)
       ? Transfer.fromPartial(object.transfer)
       : undefined;
+    message.traceId = object.traceId ?? "";
     return message;
   },
 };
 
 function createBaseDepositEvent(): DepositEvent {
-  return { deposit: undefined };
+  return { deposit: undefined, traceId: "" };
 }
 
 export const DepositEvent: MessageFns<DepositEvent> = {
   encode(message: DepositEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.deposit !== undefined) {
       TreeNode.encode(message.deposit, writer.uint32(82).fork()).join();
+    }
+    if (message.traceId !== "") {
+      writer.uint32(90).string(message.traceId);
     }
     return writer;
   },
@@ -2911,6 +2934,14 @@ export const DepositEvent: MessageFns<DepositEvent> = {
           message.deposit = TreeNode.decode(reader, reader.uint32());
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.traceId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2921,13 +2952,19 @@ export const DepositEvent: MessageFns<DepositEvent> = {
   },
 
   fromJSON(object: any): DepositEvent {
-    return { deposit: isSet(object.deposit) ? TreeNode.fromJSON(object.deposit) : undefined };
+    return {
+      deposit: isSet(object.deposit) ? TreeNode.fromJSON(object.deposit) : undefined,
+      traceId: isSet(object.traceId) ? globalThis.String(object.traceId) : "",
+    };
   },
 
   toJSON(message: DepositEvent): unknown {
     const obj: any = {};
     if (message.deposit !== undefined) {
       obj.deposit = TreeNode.toJSON(message.deposit);
+    }
+    if (message.traceId !== "") {
+      obj.traceId = message.traceId;
     }
     return obj;
   },
@@ -2940,6 +2977,7 @@ export const DepositEvent: MessageFns<DepositEvent> = {
     message.deposit = (object.deposit !== undefined && object.deposit !== null)
       ? TreeNode.fromPartial(object.deposit)
       : undefined;
+    message.traceId = object.traceId ?? "";
     return message;
   },
 };

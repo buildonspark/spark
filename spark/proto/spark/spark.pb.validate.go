@@ -854,6 +854,8 @@ func (m *TransferEvent) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for TraceId
+
 	if len(errors) > 0 {
 		return TransferEventMultiError(errors)
 	}
@@ -982,6 +984,8 @@ func (m *DepositEvent) validate(all bool) error {
 			}
 		}
 	}
+
+	// no validation rules for TraceId
 
 	if len(errors) > 0 {
 		return DepositEventMultiError(errors)

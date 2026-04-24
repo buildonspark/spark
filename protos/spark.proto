@@ -125,10 +125,12 @@ message HeartbeatEvent { }
 
 message TransferEvent {
     Transfer transfer = 10;
+    string trace_id = 11;
 }
 
 message DepositEvent {
     TreeNode deposit = 10;
+    string trace_id = 11;
 }
 
 /**

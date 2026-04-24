@@ -6106,7 +6106,7 @@ function isReceiverTransferStreamEvent(
   event: SubscribeToEventsResponse["event"],
 ): event is {
   $case: "receiverTransfer";
-  receiverTransfer: { transfer: Transfer };
+  receiverTransfer: { transfer: Transfer; traceId: string };
 } {
   return Boolean(
     event?.$case === "receiverTransfer" && event.receiverTransfer.transfer,
@@ -6117,7 +6117,7 @@ function isSenderTransferStreamEvent(
   event: SubscribeToEventsResponse["event"],
 ): event is {
   $case: "senderTransfer";
-  senderTransfer: { transfer: Transfer };
+  senderTransfer: { transfer: Transfer; traceId: string };
 } {
   return Boolean(
     event?.$case === "senderTransfer" && event.senderTransfer.transfer,
@@ -6126,7 +6126,10 @@ function isSenderTransferStreamEvent(
 
 function isDepositStreamEvent(
   event: SubscribeToEventsResponse["event"],
-): event is { $case: "deposit"; deposit: { deposit: TreeNode } } {
+): event is {
+  $case: "deposit";
+  deposit: { deposit: TreeNode; traceId: string };
+} {
   return Boolean(event?.$case === "deposit" && event.deposit.deposit);
 }
 

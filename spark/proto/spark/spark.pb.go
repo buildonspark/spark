@@ -1128,6 +1128,7 @@ func (*HeartbeatEvent) Descriptor() ([]byte, []int) {
 type TransferEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Transfer      *Transfer              `protobuf:"bytes,10,opt,name=transfer,proto3" json:"transfer,omitempty"`
+	TraceId       string                 `protobuf:"bytes,11,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1169,9 +1170,17 @@ func (x *TransferEvent) GetTransfer() *Transfer {
 	return nil
 }
 
+func (x *TransferEvent) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
 type DepositEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Deposit       *TreeNode              `protobuf:"bytes,10,opt,name=deposit,proto3" json:"deposit,omitempty"`
+	TraceId       string                 `protobuf:"bytes,11,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1211,6 +1220,13 @@ func (x *DepositEvent) GetDeposit() *TreeNode {
 		return x.Deposit
 	}
 	return nil
+}
+
+func (x *DepositEvent) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
 }
 
 type PageRequest struct {
@@ -11768,13 +11784,15 @@ const file_spark_proto_rawDesc = "" +
 	"\x11token_identifiers\x18\x02 \x03(\fR\x10tokenIdentifiers\x12%\n" +
 	"\x0espark_invoices\x18\x03 \x03(\tR\rsparkInvoices\"\x10\n" +
 	"\x0eConnectedEvent\"\x10\n" +
-	"\x0eHeartbeatEvent\"<\n" +
+	"\x0eHeartbeatEvent\"W\n" +
 	"\rTransferEvent\x12+\n" +
 	"\btransfer\x18\n" +
-	" \x01(\v2\x0f.spark.TransferR\btransfer\"9\n" +
+	" \x01(\v2\x0f.spark.TransferR\btransfer\x12\x19\n" +
+	"\btrace_id\x18\v \x01(\tR\atraceId\"T\n" +
 	"\fDepositEvent\x12)\n" +
 	"\adeposit\x18\n" +
-	" \x01(\v2\x0f.spark.TreeNodeR\adeposit\"\xb4\x01\n" +
+	" \x01(\v2\x0f.spark.TreeNodeR\adeposit\x12\x19\n" +
+	"\btrace_id\x18\v \x01(\tR\atraceId\"\xb4\x01\n" +
 	"\vPageRequest\x124\n" +
 	"\x10unsafe_page_size\x18\x01 \x01(\x05B\n" +
 	"\xfaB\a\x1a\x05\x18\xe8\a(\x00R\x0eunsafePageSize\x12'\n" +
