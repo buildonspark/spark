@@ -50,10 +50,15 @@ func insertCoordinatorRow(t *testing.T, ctx context.Context, id uuid.UUID, statu
 	require.NoError(t, err)
 }
 
-// insertParticipantRow inserts a PARTICIPANT FlowExecution row. QueryOutcome
-// should refuse to serve these because the querying operator should be
-// asking the actual coordinator, not a participant.
-func insertParticipantRow(t *testing.T, ctx context.Context, id uuid.UUID) {
+// insertParticipantRowForQueryOutcome inserts a PARTICIPANT FlowExecution
+// row used by the QueryOutcome negative test. QueryOutcome should refuse to
+// serve PARTICIPANT rows because the querying operator should be asking the
+// actual coordinator, not a participant.
+//
+// Named distinctly from insertParticipantRow in gossip_handler_test.go to
+// avoid the package-level collision between the two helpers (both files are
+// in package handler).
+func insertParticipantRowForQueryOutcome(t *testing.T, ctx context.Context, id uuid.UUID) {
 	t.Helper()
 	db, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -133,7 +138,7 @@ func TestQueryOutcome_MissingRow_ReturnsUnspecified(t *testing.T) {
 func TestQueryOutcome_ParticipantRow_ReturnsUnspecified(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	id := uuid.New()
-	insertParticipantRow(t, ctx, id)
+	insertParticipantRowForQueryOutcome(t, ctx, id)
 
 	h := NewConsensusQueryHandler(sparktesting.TestConfig(t))
 	resp, err := h.QueryOutcome(ctx, &pbinternal.ConsensusQueryOutcomeRequest{FlowExecutionId: id.String()})
