@@ -5,6 +5,13 @@
 # Output from building the SO (i.e. go build ./bin/operator)
 /operator
 
+# Output from building dbseed (i.e. go build ./cmd/dbseed)
+/dbseed
+/cmd/dbseed/dbseed
+
 # Air hot-reload artifacts
 /tmp/
 /build-errors.log
+
+# dbseed local snapshots — large .pgdump files from prod-scale seeds
+/cmd/dbseed/snapshots/

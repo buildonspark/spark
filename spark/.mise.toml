@@ -77,3 +77,66 @@ run = "atlas migrate hash --dir 'file://migrate/migrations'"
 [tasks.atlas-ephemeral-diff]
 dir = "so/entephemeral"
 run = "atlas migrate diff \"$@\" --env local"
+
+# dbseed — populate transfers/transfer_senders/transfer_receivers with
+# prod-shaped synthetic data. See cmd/dbseed/README.md for details.
+#
+# All tasks honor DBSEED_DSN as the target DB (default is minikube SO 0).
+# Override to target another SO, e.g.:
+#   DBSEED_DSN="postgres://postgres:postgres@$(minikube ip):5432/sparkoperator_1?sslmode=disable" mise run dbseed-smoke
+
+[tasks.dbseed]
+dir = "cmd/dbseed"
+description = "Run the dbseed binary with arbitrary flags. Forwards $@."
+run = 'go run . $@'
+
+[tasks.dbseed-smoke]
+dir = "cmd/dbseed"
+description = "Seed ~10k rows into sparkoperator_0 for fast iteration on the generator pipeline."
+run = '''
+go run . \
+  -profile=smoke \
+  -truncate \
+  -dsn="${DBSEED_DSN:-postgres://postgres:postgres@$(minikube ip):5432/sparkoperator_0?sslmode=disable}"
+'''
+
+[tasks.dbseed-full]
+dir = "cmd/dbseed"
+description = "Seed the full prod-shaped ladder INCLUDING the SSP (~61M rows, ~15+ min) into sparkoperator_0."
+run = '''
+go run . \
+  -profile=full \
+  -truncate \
+  -dsn="${DBSEED_DSN:-postgres://postgres:postgres@$(minikube ip):5432/sparkoperator_0?sslmode=disable}"
+'''
+
+[tasks.dbseed-full-no-ssp]
+dir = "cmd/dbseed"
+description = "Seed the full ladder minus the SSP T1 wallet (~11.5M rows, ~2-4 min). Useful for fast iteration on partial-index and mid-tier behavior without paying the 25M-edge cost."
+run = '''
+go run . \
+  -profile=full-no-ssp \
+  -truncate \
+  -dsn="${DBSEED_DSN:-postgres://postgres:postgres@$(minikube ip):5432/sparkoperator_0?sslmode=disable}"
+'''
+
+[tasks.dbseed-recover]
+dir = "cmd/dbseed"
+description = "Recover from a crashed dbseed run by replaying missing indexes/FKs via Ent's scoped schema migration."
+run = '''
+go run . \
+  -recover-schema \
+  -dsn="${DBSEED_DSN:-postgres://postgres:postgres@$(minikube ip):5432/sparkoperator_0?sslmode=disable}"
+'''
+
+[tasks.dbseed-snapshot]
+description = "pg_dump the seeded SO database to cmd/dbseed/snapshots/ (gitignored). Defaults to sparkoperator_0; override with DBSEED_DB=..."
+run = '''
+./cmd/dbseed/scripts/snapshot.sh --minikube "${DBSEED_DB:-sparkoperator_0}"
+'''
+
+[tasks.dbseed-restore]
+description = "pg_restore a snapshot into a fresh DB (drops and recreates). Usage: mise run dbseed-restore <snapshot-path>"
+run = '''
+./cmd/dbseed/scripts/restore.sh --minikube --drop "${DBSEED_DB:-sparkoperator_0}" "$1"
+'''
