@@ -53,6 +53,13 @@ func TracingInterceptor() grpc.UnaryServerInterceptor {
 			}
 		}
 
-		return handler(ctx, req)
+		resp, err := handler(ctx, req)
+
+		traceID := span.SpanContext().TraceID()
+		if traceID.IsValid() {
+			_ = grpc.SetHeader(ctx, metadata.Pairs("x-trace-id", traceID.String()))
+		}
+
+		return resp, err
 	}
 }

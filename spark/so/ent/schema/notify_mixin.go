@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
 
@@ -70,6 +71,10 @@ func (n NotifyMixin) Hooks() []ent.Hook {
 
 func (n NotifyMixin) sendNotification(ctx context.Context, m ent.Mutation, v ent.Value) error {
 	payload := n.buildPayload(v)
+
+	if tid := trace.SpanFromContext(ctx).SpanContext().TraceID(); tid.IsValid() {
+		payload["trace_id"] = tid.String()
+	}
 
 	notifier, err := ent.GetNotifierFromContext(ctx)
 	if err != nil {
