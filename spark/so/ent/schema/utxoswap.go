@@ -171,7 +171,8 @@ func (UtxoSwap) Fields() []ent.Field {
 		field.Time("expiry_time").
 			Optional().
 			Nillable().
-			Comment("When this swap offer/lock expires (if applicable)."),
+			Deprecated().
+			Comment("Deprecated: no longer written or read. Scheduled for removal after this PR is fully rolled out."),
 		field.Uint64("utxo_value_sats").
 			Comment("Amount of sats for 0-conf swap matching.").
 			Annotations(entexample.Default(10000)),

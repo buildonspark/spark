@@ -53,7 +53,9 @@ type UtxoSwap struct {
 	RequestedSecondaryTransferID uuid.UUID `json:"requested_secondary_transfer_id,omitempty"`
 	// The result of FROST signing the UTXO spend transaction.
 	SpendTxSigningResult []byte `json:"spend_tx_signing_result,omitempty"`
-	// When this swap offer/lock expires (if applicable).
+	// Deprecated: no longer written or read. Scheduled for removal after this PR is fully rolled out.
+	//
+	// Deprecated: Field "expiry_time" was marked as deprecated in the schema.
 	ExpiryTime *time.Time `json:"expiry_time,omitempty"`
 	// Amount of sats for 0-conf swap matching.
 	UtxoValueSats uint64 `json:"utxo_value_sats,omitempty"`

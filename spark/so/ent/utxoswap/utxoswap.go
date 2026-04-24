@@ -110,7 +110,6 @@ var Columns = []string{
 	FieldRequestedTransferID,
 	FieldRequestedSecondaryTransferID,
 	FieldSpendTxSigningResult,
-	FieldExpiryTime,
 	FieldUtxoValueSats,
 }
 
@@ -132,6 +131,11 @@ func ValidColumn(column string) bool {
 	}
 	for i := range ForeignKeys {
 		if column == ForeignKeys[i] {
+			return true
+		}
+	}
+	for _, f := range [...]string{FieldExpiryTime} {
+		if column == f {
 			return true
 		}
 	}
