@@ -74,5 +74,17 @@ func (TransferReceiver) Indexes() []ent.Index {
 		// by identity_pubkey ordered by create_time without joining to transfers.
 		index.Fields("identity_pubkey", "create_time").
 			Annotations(entsql.DescColumns("create_time")),
+
+		// Partial index covering all non-terminal receiver states. Serves both
+		// the GetStuckTransfers receiver arm (filters to RECEIVER_* subset)
+		// and the QueryTransfers receiver-pending path (includes INITIATED).
+		// WHERE clause is the complement of the receiver terminal set
+		// (COMPLETED / CANCELLED).
+		index.Fields("identity_pubkey", "create_time", "transfer_id").
+			Annotations(
+				entsql.DescColumns("create_time", "transfer_id"),
+				entsql.IndexWhere("CAST(status AS TEXT) IN ('INITIATED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')"),
+			).
+			StorageKey("idx_transferreceiver_pending_pubkey_time"),
 	}
 }

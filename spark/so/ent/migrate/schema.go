@@ -1237,6 +1237,19 @@ var (
 				},
 			},
 			{
+				Name:    "idx_transfers_active_network_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[5], TransfersColumns[1], TransfersColumns[0]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						TransfersColumns[1].Name: true,
+
+						TransfersColumns[0].Name: true,
+					},
+					Where: "CAST(status AS TEXT) IN ('SENDER_INITIATED', 'SENDER_INITIATED_COORDINATOR', 'SENDER_KEY_TWEAK_PENDING', 'SENDER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')",
+				},
+			},
+			{
 				Name:    "idx_transfers_spark_invoice_pending",
 				Unique:  true,
 				Columns: []*schema.Column{TransfersColumns[12]},
@@ -1482,6 +1495,19 @@ var (
 					DescColumns: map[string]bool{
 						TransferReceiversColumns[1].Name: true,
 					},
+				},
+			},
+			{
+				Name:    "idx_transferreceiver_pending_pubkey_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransferReceiversColumns[3], TransferReceiversColumns[1], TransferReceiversColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						TransferReceiversColumns[1].Name: true,
+
+						TransferReceiversColumns[6].Name: true,
+					},
+					Where: "CAST(status AS TEXT) IN ('INITIATED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')",
 				},
 			},
 		},

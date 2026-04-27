@@ -128,6 +128,17 @@ func (Transfer) Indexes() []ent.Index {
 			Annotations(entsql.DescColumns("create_time")).
 			StorageKey("idx_transfers_sender_status_create"),
 
+		// Partial index for all in-flight transfers — covers every non-terminal
+		// status. Serves QueryTransfers pending (sender + receiver) and
+		// GetStuckTransfers sender arm. WHERE clause is the complement of the
+		// terminal set (COMPLETED / CANCELLED / EXPIRED / RETURNED).
+		index.Fields("network", "create_time", "id").
+			Annotations(
+				entsql.DescColumns("create_time", "id"),
+				entsql.IndexWhere("CAST(status AS TEXT) IN ('SENDER_INITIATED', 'SENDER_INITIATED_COORDINATOR', 'SENDER_KEY_TWEAK_PENDING', 'SENDER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')"),
+			).
+			StorageKey("idx_transfers_active_network_time"),
+
 		index.Fields("spark_invoice_id").
 			Unique().
 			Annotations(

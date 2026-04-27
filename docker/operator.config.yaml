@@ -65,6 +65,7 @@ knobs:
     spark.so.shutdown_hodl_invoices: 0
     spark.so.mimo_transfer_multi_receiver_enabled: 1
     spark.so.read_mimo_data_model_query_transfers: 1
+    spark.so.read_mimo_data_model_get_stuck_transfers: 1
     spark.so.read_mimo_data_model_transfer_send: 1
     spark.so.tokens.allow_extra_metadata_on_mainnet: 0
     spark.so.tokens.backfill_create_mint_finalized_status_enabled: 0
