@@ -130,6 +130,11 @@ pub(crate) fn construct_partial_transfer_transaction_impl(
     validate_sorted_unique_operator_keys(&operator_identity_public_keys)?;
     invoice_attachments.sort_by(|a, b| a.spark_invoice.cmp(&b.spark_invoice));
 
+    let execute_before = request
+        .execute_before_unix_micros
+        .map(timestamp_from_unix_micros)
+        .transpose()?;
+
     let partial_transaction = PartialTokenTransaction {
         version: 3,
         token_transaction_metadata: Some(TokenTransactionMetadata {
@@ -153,7 +158,7 @@ pub(crate) fn construct_partial_transfer_transaction_impl(
             },
         )),
         partial_token_outputs: partial_outputs,
-        execute_before: None,
+        execute_before,
     };
 
     let partial_token_transaction_hash = hash_partial_token_transaction(&partial_transaction)?;
@@ -188,6 +193,15 @@ fn validate_transfer_request(
         || request.network == Network::Unspecified as u32
     {
         return Err(format!("invalid spark network value: {}", request.network).into());
+    }
+
+    if let Some(eb) = request.execute_before_unix_micros {
+        if eb <= request.client_created_timestamp_unix_micros {
+            return Err(
+                "execute_before_unix_micros must be after client_created_timestamp_unix_micros"
+                    .into(),
+            );
+        }
     }
 
     for (index, output) in request.selected_outputs.iter().enumerate() {

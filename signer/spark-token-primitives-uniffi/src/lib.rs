@@ -102,6 +102,7 @@ struct WasmTransferBuildRequest {
     client_created_timestamp_unix_micros: i64,
     withdraw_bond_sats: u64,
     withdraw_relative_block_locktime: u64,
+    execute_before_unix_micros: Option<i64>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -121,6 +122,7 @@ impl From<WasmTransferBuildRequest> for TransferBuildRequest {
             client_created_timestamp_unix_micros: value.client_created_timestamp_unix_micros,
             withdraw_bond_sats: value.withdraw_bond_sats,
             withdraw_relative_block_locktime: value.withdraw_relative_block_locktime,
+            execute_before_unix_micros: value.execute_before_unix_micros,
         }
     }
 }

@@ -47,6 +47,11 @@ pub struct TransferBuildRequest {
     pub client_created_timestamp_unix_micros: i64,
     pub withdraw_bond_sats: u64,
     pub withdraw_relative_block_locktime: u64,
+    /// Optional client-specified deadline for transaction execution (microseconds since epoch).
+    /// If set, the SO will reject the transaction if current time > execute_before.
+    /// Must be after client_created_timestamp, within the SO's max window (2 weeks),
+    /// and truncated to microsecond precision.
+    pub execute_before_unix_micros: Option<i64>,
 }
 
 #[derive(Debug, Clone)]

@@ -96,6 +96,7 @@ fn construct_partial_transfer_transaction_adds_change() {
         client_created_timestamp_unix_micros: 100_000,
         withdraw_bond_sats: 10_000,
         withdraw_relative_block_locktime: 100,
+        execute_before_unix_micros: None,
     };
 
     let result = construct_partial_transfer_transaction_impl(request).unwrap();
@@ -166,6 +167,7 @@ fn construct_partial_transfer_transaction_rejects_insufficient_amount() {
         client_created_timestamp_unix_micros: 100_000,
         withdraw_bond_sats: 10_000,
         withdraw_relative_block_locktime: 100,
+        execute_before_unix_micros: None,
     };
 
     let error = construct_partial_transfer_transaction_impl(request).unwrap_err();
@@ -200,6 +202,7 @@ fn construct_partial_transfer_transaction_rejects_too_many_inputs_total() {
         client_created_timestamp_unix_micros: 100_000,
         withdraw_bond_sats: 10_000,
         withdraw_relative_block_locktime: 100,
+        execute_before_unix_micros: None,
     };
 
     let error = construct_partial_transfer_transaction_impl(request).unwrap_err();
@@ -238,6 +241,7 @@ fn construct_partial_transfer_transaction_rejects_too_many_outputs_total() {
         client_created_timestamp_unix_micros: 100_000,
         withdraw_bond_sats: 10_000,
         withdraw_relative_block_locktime: 100,
+        execute_before_unix_micros: None,
     };
 
     let error = construct_partial_transfer_transaction_impl(request).unwrap_err();
@@ -288,6 +292,7 @@ fn construct_partial_transfer_transaction_extracts_token_invoice_fields() {
         client_created_timestamp_unix_micros: 100_000,
         withdraw_bond_sats: 10_000,
         withdraw_relative_block_locktime: 100,
+        execute_before_unix_micros: None,
     };
 
     let result = construct_partial_transfer_transaction_impl(request).unwrap();
@@ -352,6 +357,7 @@ fn construct_partial_transfer_transaction_accepts_var_bytes_invoice_amount_when_
         client_created_timestamp_unix_micros: 100_000,
         withdraw_bond_sats: 10_000,
         withdraw_relative_block_locktime: 100,
+        execute_before_unix_micros: None,
     };
 
     let result = construct_partial_transfer_transaction_impl(request).unwrap();
@@ -403,6 +409,7 @@ fn construct_partial_transfer_transaction_rejects_invoice_field_mismatch() {
         client_created_timestamp_unix_micros: 100_000,
         withdraw_bond_sats: 10_000,
         withdraw_relative_block_locktime: 100,
+        execute_before_unix_micros: None,
     };
 
     let error = construct_partial_transfer_transaction_impl(request).unwrap_err();
@@ -833,4 +840,149 @@ fn build_broadcast_transaction_request_rejects_non_zero_create_signature_index()
     .unwrap_err();
 
     assert!(error.to_string().contains("input_index 0"));
+}
+
+#[test]
+fn execute_before_changes_partial_hash() {
+    let base_request = TransferBuildRequest {
+        identity_public_key: sample_key(0x01),
+        selected_outputs: vec![SelectedTokenOutput {
+            previous_transaction_hash: sample_hash(0xaa),
+            previous_transaction_vout: 0,
+            owner_public_key: sample_key(0x01),
+            token_identifier: sample_token(0x10),
+            token_amount: encode_u128_be(100),
+        }],
+        receiver_outputs: vec![ReceiverTokenOutput {
+            receiver_spark_address: encode_spark_address(sample_key(0x02), Network::Regtest, None),
+            token_identifier: Some(sample_token(0x10)),
+            token_amount: Some(encode_u128_be(100)),
+        }],
+        operator_identity_public_keys: vec![sample_key(0x03)],
+        network: Network::Regtest as u32,
+        validity_duration_seconds: 60,
+        client_created_timestamp_unix_micros: 100_000,
+        withdraw_bond_sats: 10_000,
+        withdraw_relative_block_locktime: 100,
+        execute_before_unix_micros: None,
+    };
+
+    let result_without = construct_partial_transfer_transaction_impl(base_request.clone()).unwrap();
+
+    let request_with = TransferBuildRequest {
+        // 5 minutes from client_created_timestamp
+        execute_before_unix_micros: Some(100_000 + 300_000_000),
+        ..base_request
+    };
+
+    let result_with = construct_partial_transfer_transaction_impl(request_with).unwrap();
+
+    assert_ne!(
+        result_without.partial_token_transaction_hash, result_with.partial_token_transaction_hash,
+        "setting execute_before must change the partial hash"
+    );
+}
+
+#[test]
+fn execute_before_is_set_on_partial_transaction() {
+    let request = TransferBuildRequest {
+        identity_public_key: sample_key(0x01),
+        selected_outputs: vec![SelectedTokenOutput {
+            previous_transaction_hash: sample_hash(0xaa),
+            previous_transaction_vout: 0,
+            owner_public_key: sample_key(0x01),
+            token_identifier: sample_token(0x10),
+            token_amount: encode_u128_be(50),
+        }],
+        receiver_outputs: vec![ReceiverTokenOutput {
+            receiver_spark_address: encode_spark_address(sample_key(0x02), Network::Regtest, None),
+            token_identifier: Some(sample_token(0x10)),
+            token_amount: Some(encode_u128_be(50)),
+        }],
+        operator_identity_public_keys: vec![sample_key(0x03)],
+        network: Network::Regtest as u32,
+        validity_duration_seconds: 60,
+        client_created_timestamp_unix_micros: 100_000,
+        withdraw_bond_sats: 10_000,
+        withdraw_relative_block_locktime: 100,
+        execute_before_unix_micros: Some(100_000 + 300_000_000),
+    };
+
+    let result = construct_partial_transfer_transaction_impl(request).unwrap();
+    let partial =
+        PartialTokenTransaction::decode(result.partial_token_transaction_bytes.as_slice()).unwrap();
+
+    assert!(
+        partial.execute_before.is_some(),
+        "execute_before should be set on the partial transaction"
+    );
+    let eb = partial.execute_before.unwrap();
+    assert_eq!(eb.seconds, 300);
+    assert_eq!(eb.nanos, 100_000_000);
+}
+
+#[test]
+fn execute_before_none_leaves_field_unset() {
+    let request = TransferBuildRequest {
+        identity_public_key: sample_key(0x01),
+        selected_outputs: vec![SelectedTokenOutput {
+            previous_transaction_hash: sample_hash(0xaa),
+            previous_transaction_vout: 0,
+            owner_public_key: sample_key(0x01),
+            token_identifier: sample_token(0x10),
+            token_amount: encode_u128_be(50),
+        }],
+        receiver_outputs: vec![ReceiverTokenOutput {
+            receiver_spark_address: encode_spark_address(sample_key(0x02), Network::Regtest, None),
+            token_identifier: Some(sample_token(0x10)),
+            token_amount: Some(encode_u128_be(50)),
+        }],
+        operator_identity_public_keys: vec![sample_key(0x03)],
+        network: Network::Regtest as u32,
+        validity_duration_seconds: 60,
+        client_created_timestamp_unix_micros: 100_000,
+        withdraw_bond_sats: 10_000,
+        withdraw_relative_block_locktime: 100,
+        execute_before_unix_micros: None,
+    };
+
+    let result = construct_partial_transfer_transaction_impl(request).unwrap();
+    let partial =
+        PartialTokenTransaction::decode(result.partial_token_transaction_bytes.as_slice()).unwrap();
+
+    assert!(
+        partial.execute_before.is_none(),
+        "execute_before should be None when not set"
+    );
+}
+
+#[test]
+fn execute_before_rejects_value_before_client_timestamp() {
+    let request = TransferBuildRequest {
+        identity_public_key: sample_key(0x01),
+        selected_outputs: vec![SelectedTokenOutput {
+            previous_transaction_hash: vec![0xAA; 32],
+            previous_transaction_vout: 0,
+            owner_public_key: sample_key(0x01),
+            token_identifier: sample_token(0x10),
+            token_amount: encode_u128_be(50),
+        }],
+        receiver_outputs: vec![ReceiverTokenOutput {
+            receiver_spark_address: encode_spark_address(sample_key(0x02), Network::Regtest, None),
+            token_identifier: Some(sample_token(0x10)),
+            token_amount: Some(encode_u128_be(50)),
+        }],
+        operator_identity_public_keys: vec![sample_key(0x03)],
+        network: Network::Regtest as u32,
+        validity_duration_seconds: 60,
+        client_created_timestamp_unix_micros: 100_000,
+        withdraw_bond_sats: 10_000,
+        withdraw_relative_block_locktime: 100,
+        execute_before_unix_micros: Some(50_000),
+    };
+
+    let error = construct_partial_transfer_transaction_impl(request).unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("execute_before_unix_micros must be after"));
 }

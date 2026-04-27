@@ -44,6 +44,7 @@ dictionary TransferBuildRequest {
     i64 client_created_timestamp_unix_micros;
     u64 withdraw_bond_sats;
     u64 withdraw_relative_block_locktime;
+    i64? execute_before_unix_micros;
 };
 
 dictionary PartialTransferBuildResult {
