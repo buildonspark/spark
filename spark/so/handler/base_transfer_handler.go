@@ -1394,7 +1394,10 @@ func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, t
 		if err != nil || preimageRequest == nil {
 			return fmt.Errorf("cannot find preimage request for transfer %s", transfer.ID.String())
 		}
-		err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusReturned).Exec(ctx)
+		// Clear the preimage_shares edge so a retry can re-link the share to a new
+		// preimage_request. The share is unique per payment_hash and must be reusable
+		// after this attempt is abandoned.
+		err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusReturned).ClearPreimageShares().Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to update preimage request status: %w", err)
 		}
