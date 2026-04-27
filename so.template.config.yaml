@@ -86,6 +86,7 @@ knobs:
     spark.so.tokens.token_transaction_v3_enabled: 100
     spark.so.tokens.token_transaction_v3_phase2_enabled: 100
     spark.so.tokens.token_transaction_v3_phase2_retry_enabled: 100
+    spark.so.tokens.tx_events_enabled: 100
     # Read-only sessions
     spark.so.ro_session@/spark.SparkService/query_nodes: 100
     spark.so.ro_session@/spark.SparkService/query_pending_transfers: 100
