@@ -547,6 +547,26 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
+			ExecutionInterval: 30 * time.Second,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "reconcile_stuck_flow_executions",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					return ReconcileStuckParticipantFlows(ctx, config, knobsService)
+				},
+			},
+		},
+		{
+			ExecutionInterval: 1 * time.Minute,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "sweep_stale_coordinator_flow_executions",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					return SweepStaleCoordinatorFlows(ctx, config, knobsService)
+				},
+			},
+		},
+		{
 			ExecutionInterval: 1 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "complete_utxo_swap",

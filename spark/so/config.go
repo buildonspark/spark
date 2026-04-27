@@ -747,6 +747,18 @@ func (c *Config) GetOperatorIdentifierFromIdentityPublicKey(identityPublicKey ke
 	return c.identityPubkeyToOperatorIdentifierMap[identityPublicKey]
 }
 
+// GetOperatorByID returns the SigningOperator whose ID field matches id.
+// Used by the flow-execution reconciliation task to resolve a participant
+// row's coordinator_index back to an operator it can call via gRPC.
+func (c *Config) GetOperatorByID(id uint64) (*SigningOperator, error) {
+	for _, op := range c.SigningOperatorMap {
+		if op.ID == id {
+			return op, nil
+		}
+	}
+	return nil, fmt.Errorf("no signing operator with ID %d", id)
+}
+
 // IsAuthzEnforced returns whether authorization is enforced
 func (c *Config) IsAuthzEnforced() bool {
 	return c.AuthzEnforced

@@ -159,6 +159,21 @@ const (
 
 	// Enable consensus engine for renew leaf operations.
 	KnobUseConsensusRenew = "spark.so.use_consensus_renew"
+
+	// Seconds a PARTICIPANT FlowExecution row can stay IN_FLIGHT before the
+	// reconciliation task considers it stuck and asks the coordinator for
+	// the final outcome. Must exceed the gossip retry interval so gossip
+	// delivery gets a chance to finish on its own before we reconcile.
+	KnobFlowExecutionStuckThreshold = "spark.so.flow_execution.stuck_threshold_seconds"
+
+	// Seconds a COORDINATOR FlowExecution row can stay IN_FLIGHT before the
+	// self-sweep task marks it ROLLED_BACK (presumed-abort). Set generously
+	// above the longest legitimate 2PC decision window.
+	KnobFlowExecutionCoordinatorStallThreshold = "spark.so.flow_execution.coordinator_stall_threshold_seconds"
+
+	// Maximum number of stuck PARTICIPANT rows the reconciliation task
+	// processes per tick. Caps blast radius if many rows get stuck at once.
+	KnobFlowExecutionSweepBatchLimit = "spark.so.flow_execution.sweep_batch_limit"
 )
 
 type Config struct {
