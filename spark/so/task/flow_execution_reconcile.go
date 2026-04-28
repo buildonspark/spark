@@ -14,6 +14,8 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 )
 
@@ -21,6 +23,11 @@ const (
 	defaultFlowExecutionStuckThresholdSec            = 300
 	defaultFlowExecutionCoordinatorStallThresholdSec = 600
 	defaultFlowExecutionSweepBatchLimit              = 50
+	// Default for KnobFlowExecutionMetricsMinAgeSeconds. Rows younger than
+	// this don't appear in the in_flight gauges (still in gossip-retry
+	// territory). 10 minutes is generous relative to the 20s gossip retry
+	// interval so noisy "young IN_FLIGHT" rows don't reach dashboards.
+	defaultFlowExecutionMetricsMinAgeSec = 600
 )
 
 // outcomeQueryFunc calls the coordinator's ConsensusQueryOutcome RPC.
@@ -95,8 +102,90 @@ func (r *participantReconciler) reconcile(ctx context.Context) error {
 				row.ID, row.CoordinatorIndex, row.OpType)
 		}
 	}
+
+	// Emit per-(role, op_type) gauges from the post-sweep state. Gated on a
+	// knob (default off) and logged on failure but never returned — metric
+	// emission must not abort the task.
+	if r.metricsEnabled() {
+		if err := r.emitInFlightGauges(ctx, db); err != nil {
+			logger.With(zap.Error(err)).Warn("flow_execution reconcile: failed to emit in-flight gauges")
+		}
+	}
 	return nil
 }
+
+// metricsEnabled reports whether flow_execution.* metric emission is on for
+// this operator. Defaults to off so the feature can ship without spamming
+// dashboards before alerting policies are in place; flipped on via
+// KnobFlowExecutionMetricsEnabled when desired.
+func (r *participantReconciler) metricsEnabled() bool {
+	return r.knobs.GetValue(knobs.KnobFlowExecutionMetricsEnabled, 0) > 0
+}
+
+// recordReconciledOutcome increments flow_execution.reconciled_total with the
+// given outcome label. No-op when metrics are disabled.
+func (r *participantReconciler) recordReconciledOutcome(ctx context.Context, outcome string) {
+	if !r.metricsEnabled() {
+		return
+	}
+	flowExecutionReconciledTotal.Add(ctx, 1, metric.WithAttributes(attribute.String(outcomeAttribute, outcome)))
+}
+
+// inFlightAggregateRow is the schema scanned out of the per-role GROUP BY
+// query that drives the gauge emission. JSON tags must match Ent's column
+// aliases: "op_type" is the grouped field; "count" and "min" are the
+// default aliases for ent.Count() and ent.Min(...). The role is fixed per
+// query (not grouped) so it doesn't appear here.
+type inFlightAggregateRow struct {
+	OpType int32     `json:"op_type"`
+	Count  int64     `json:"count"`
+	Min    time.Time `json:"min"`
+}
+
+// emitInFlightGauges records flow_execution.in_flight_count and
+// flow_execution.oldest_in_flight_age_ms per (role, op_type). Only rows
+// older than KnobFlowExecutionMetricsMinAgeSeconds are counted — younger
+// rows are expected to resolve via gossip retry and would just clutter
+// dashboards. Groups with zero qualifying rows aren't emitted (they don't
+// appear in the GROUP BY result); for gauge purposes "no data" carries the
+// same meaning as "zero".
+//
+// The aggregation is issued as two per-role queries rather than one with a
+// GROUP BY across roles. The (role, status, update_time) index requires
+// role as the leading filter to be usable; a query that filters only by
+// status+update_time and groups by role would fall back to a sequential
+// scan of the IN_FLIGHT slice.
+func (r *participantReconciler) emitInFlightGauges(ctx context.Context, db *ent.Client) error {
+	minAgeSec := r.knobs.GetValue(knobs.KnobFlowExecutionMetricsMinAgeSeconds, float64(defaultFlowExecutionMetricsMinAgeSec))
+	cutoff := time.Now().Add(-time.Duration(minAgeSec) * time.Second)
+	now := time.Now()
+	for _, role := range []st.FlowExecutionRole{st.FlowExecutionRoleCoordinator, st.FlowExecutionRoleParticipant} {
+		var stats []inFlightAggregateRow
+		if err := db.FlowExecution.Query().
+			Where(
+				flowexecution.RoleEQ(role),
+				flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
+				flowexecution.UpdateTimeLT(cutoff),
+			).
+			GroupBy(flowexecution.FieldOpType).
+			Aggregate(ent.Count(), ent.Min(flowexecution.FieldUpdateTime)).
+			Scan(ctx, &stats); err != nil {
+			return fmt.Errorf("aggregate in-flight stats for role %s: %w", role, err)
+		}
+		for _, s := range stats {
+			attrs := metric.WithAttributes(
+				attribute.String("role", string(role)),
+				attribute.Int("op_type", int(s.OpType)),
+			)
+			flowExecutionInFlightCountGauge.Record(ctx, s.Count, attrs)
+			flowExecutionOldestInFlightAgeGauge.Record(ctx, now.Sub(s.Min).Milliseconds(), attrs)
+		}
+	}
+	return nil
+}
+
+// outcomeAttribute is the attribute key used on flow_execution.reconciled_total.
+const outcomeAttribute = "outcome"
 
 func (r *participantReconciler) reconcileOne(ctx context.Context, row *ent.FlowExecution) error {
 	logger := logging.GetLoggerFromContext(ctx)
@@ -113,7 +202,7 @@ func (r *participantReconciler) reconcileOne(ctx context.Context, row *ent.FlowE
 
 	switch resp.Outcome {
 	case pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_COMMITTED:
-		return r.gossipHandler.HandleGossipMessage(ctx, &pbgossip.GossipMessage{
+		if err := r.gossipHandler.HandleGossipMessage(ctx, &pbgossip.GossipMessage{
 			Message: &pbgossip.GossipMessage_ConsensusCommit{
 				ConsensusCommit: &pbgossip.GossipMessageConsensusCommit{
 					OpType:          pbgossip.ConsensusOperationType(resp.OpType),
@@ -121,9 +210,13 @@ func (r *participantReconciler) reconcileOne(ctx context.Context, row *ent.FlowE
 					FlowExecutionId: row.ID.String(),
 				},
 			},
-		}, false /* forCoordinator */)
+		}, false /* forCoordinator */); err != nil {
+			return err
+		}
+		r.recordReconciledOutcome(ctx, "committed")
+		return nil
 	case pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_ROLLED_BACK:
-		return r.gossipHandler.HandleGossipMessage(ctx, &pbgossip.GossipMessage{
+		if err := r.gossipHandler.HandleGossipMessage(ctx, &pbgossip.GossipMessage{
 			Message: &pbgossip.GossipMessage_ConsensusRollback{
 				ConsensusRollback: &pbgossip.GossipMessageConsensusRollback{
 					OpType:          pbgossip.ConsensusOperationType(resp.OpType),
@@ -131,9 +224,14 @@ func (r *participantReconciler) reconcileOne(ctx context.Context, row *ent.FlowE
 					FlowExecutionId: row.ID.String(),
 				},
 			},
-		}, false /* forCoordinator */)
+		}, false /* forCoordinator */); err != nil {
+			return err
+		}
+		r.recordReconciledOutcome(ctx, "rolled_back")
+		return nil
 	case pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_IN_FLIGHT:
 		// Coordinator still deciding. Leave the row IN_FLIGHT and try again next tick.
+		r.recordReconciledOutcome(ctx, "in_flight")
 		return nil
 	case pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_UNSPECIFIED:
 		// Under normal operation the coordinator writes its row before fan-out
@@ -144,6 +242,7 @@ func (r *participantReconciler) reconcileOne(ctx context.Context, row *ent.FlowE
 		logger.Sugar().Errorf(
 			"flow_execution reconcile: coordinator %d has no record of %s (op_type=%d); possible data loss",
 			row.CoordinatorIndex, row.ID, row.OpType)
+		r.recordReconciledOutcome(ctx, "unspecified")
 		return nil
 	default:
 		return fmt.Errorf("unexpected outcome %v for %s", resp.Outcome, row.ID)

@@ -57,9 +57,18 @@ var (
 	purgeSigningNoncePartitionsTimeout = 10 * time.Minute
 
 	meter                       = otel.Meter("gossip")
+	flowExecutionMeter          = otel.Meter("flow_execution")
 	oldestPendingGossipAgeGauge metric.Int64Gauge
 	pendingGossipCountGauge     metric.Int64Gauge
-	signingNoncesPartitioned    atomic.Bool
+
+	// flow_execution.* metrics are emitted by the reconciliation sweep
+	// (see flow_execution_reconcile.go). Labels: role, op_type on the
+	// gauges; outcome on the counter.
+	flowExecutionInFlightCountGauge     metric.Int64Gauge
+	flowExecutionOldestInFlightAgeGauge metric.Int64Gauge
+	flowExecutionReconciledTotal        metric.Int64Counter
+
+	signingNoncesPartitioned atomic.Bool
 )
 
 func init() {
@@ -81,6 +90,36 @@ func init() {
 	if err != nil {
 		otel.Handle(err)
 		pendingGossipCountGauge = noop.Int64Gauge{}
+	}
+
+	flowExecutionInFlightCountGauge, err = flowExecutionMeter.Int64Gauge(
+		"flow_execution.in_flight_count",
+		metric.WithDescription("Number of FlowExecution rows in IN_FLIGHT status, by role and op_type."),
+		metric.WithUnit("{count}"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		flowExecutionInFlightCountGauge = noop.Int64Gauge{}
+	}
+
+	flowExecutionOldestInFlightAgeGauge, err = flowExecutionMeter.Int64Gauge(
+		"flow_execution.oldest_in_flight_age_ms",
+		metric.WithDescription("Age in milliseconds of the oldest IN_FLIGHT FlowExecution row, by role and op_type."),
+		metric.WithUnit("ms"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		flowExecutionOldestInFlightAgeGauge = noop.Int64Gauge{}
+	}
+
+	flowExecutionReconciledTotal, err = flowExecutionMeter.Int64Counter(
+		"flow_execution.reconciled_total",
+		metric.WithDescription("Total participant FlowExecution rows visited by the reconciliation task, by outcome. For terminal outcomes (committed, rolled_back) this counts once per row since the row transitions out of IN_FLIGHT. For non-terminal outcomes (in_flight, unspecified) the row stays IN_FLIGHT and is counted again on every subsequent sweep tick until it resolves."),
+		metric.WithUnit("{count}"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		flowExecutionReconciledTotal = noop.Int64Counter{}
 	}
 }
 

@@ -174,6 +174,20 @@ const (
 	// Maximum number of stuck PARTICIPANT rows the reconciliation task
 	// processes per tick. Caps blast radius if many rows get stuck at once.
 	KnobFlowExecutionSweepBatchLimit = "spark.so.flow_execution.sweep_batch_limit"
+
+	// Master switch for flow_execution.* metric emission. Disabled by default
+	// (0). Set to a positive value to enable. When disabled, the reconcile
+	// task still runs and recovers stuck rows; only the gauge sampling and
+	// counter increments are skipped, so dashboards don't carry partial data
+	// before the recovery feature is fully wired up. Flip this on once
+	// alerting policies are in place.
+	KnobFlowExecutionMetricsEnabled = "spark.so.flow_execution.metrics_enabled"
+
+	// Minimum seconds an IN_FLIGHT row must have aged before it shows up in
+	// the in_flight_count / oldest_in_flight_age_ms gauges. Younger rows are
+	// still in the normal gossip-retry window and would just create noise on
+	// dashboards. Default 600s (10 minutes).
+	KnobFlowExecutionMetricsMinAgeSeconds = "spark.so.flow_execution.metrics_min_age_seconds"
 )
 
 type Config struct {
