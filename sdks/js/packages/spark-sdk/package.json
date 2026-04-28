@@ -155,7 +155,7 @@
     "abortcontroller-polyfill": "^1.7.8",
     "async-mutex": "^0.5.0",
     "bare-crypto": "^1.9.2",
-    "bare-fetch": "^2.4.1",
+    "bare-fetch": "^3.0.0",
     "buffer": "^6.0.3",
     "eventemitter3": "^5.0.1",
     "js-base64": "^3.7.7",
