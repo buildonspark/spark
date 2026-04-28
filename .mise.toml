@@ -20,9 +20,7 @@ tilt = "0.36.0"
 MISE_NODE_COREPACK = true
 
 [tasks]
-build-to-minikube = { dir = "{{config_root}}", run = 'scripts/build-to-minikube.sh' }
 rds = { dir = "{{config_root}}", run = 'scripts/rds.sh' }
-run-minikube = { dir = "{{config_root}}", run = 'scripts/local-test.sh' }
 spark-cli-local = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:local' }
 spark-cli-regtest = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli' }
 spark-cli-mainnet = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd apps/spark-cli && yarn build && yarn run cli:mainnet' }

@@ -36,7 +36,7 @@ mise format       # or: golangci-lint fmt
 ### Development Environment
 ```bash
 ./run-everything.sh                    # Local dev with tmux
-./scripts/local-test.sh                # Hermetic testing with minikube
+cd tilt && tilt up                     # Hermetic testing in minikube via Tilt
 ```
 
 ## Architecture

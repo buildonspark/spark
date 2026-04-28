@@ -68,13 +68,12 @@ atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql:/
 # Local development with tmux (requires setup)
 ./run-everything.sh
 
-# Hermetic testing with minikube (recommended)
-./scripts/local-test.sh
-
-# Build image for minikube development
-./scripts/build-to-minikube.sh
-./scripts/local-test.sh --dev-spark
+# Hermetic testing in minikube via Tilt (recommended)
+cd tilt && tilt up
 ```
+
+See `tilt/TILT.md` for full Tilt setup, including how to build and run a
+local image (`spark-tag: local` in `tilt/tilt_config.json`).
 
 ## Architecture Overview
 
