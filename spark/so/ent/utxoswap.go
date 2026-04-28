@@ -53,10 +53,6 @@ type UtxoSwap struct {
 	RequestedSecondaryTransferID uuid.UUID `json:"requested_secondary_transfer_id,omitempty"`
 	// The result of FROST signing the UTXO spend transaction.
 	SpendTxSigningResult []byte `json:"spend_tx_signing_result,omitempty"`
-	// Deprecated: no longer written or read. Scheduled for removal after this PR is fully rolled out.
-	//
-	// Deprecated: Field "expiry_time" was marked as deprecated in the schema.
-	ExpiryTime *time.Time `json:"expiry_time,omitempty"`
 	// Amount of sats for 0-conf swap matching.
 	UtxoValueSats uint64 `json:"utxo_value_sats,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -141,7 +137,7 @@ func (*UtxoSwap) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case utxoswap.FieldStatus, utxoswap.FieldRequestType:
 			values[i] = new(sql.NullString)
-		case utxoswap.FieldCreateTime, utxoswap.FieldUpdateTime, utxoswap.FieldExpiryTime:
+		case utxoswap.FieldCreateTime, utxoswap.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case utxoswap.FieldID, utxoswap.FieldRequestedTransferID, utxoswap.FieldRequestedSecondaryTransferID:
 			values[i] = new(uuid.UUID)
@@ -264,13 +260,6 @@ func (us *UtxoSwap) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field spend_tx_signing_result", values[i])
 			} else if value != nil {
 				us.SpendTxSigningResult = *value
-			}
-		case utxoswap.FieldExpiryTime:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field expiry_time", values[i])
-			} else if value.Valid {
-				us.ExpiryTime = new(time.Time)
-				*us.ExpiryTime = value.Time
 			}
 		case utxoswap.FieldUtxoValueSats:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -408,11 +397,6 @@ func (us *UtxoSwap) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("spend_tx_signing_result=")
 	builder.WriteString(fmt.Sprintf("%v", us.SpendTxSigningResult))
-	builder.WriteString(", ")
-	if v := us.ExpiryTime; v != nil {
-		builder.WriteString("expiry_time=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
 	builder.WriteString(", ")
 	builder.WriteString("utxo_value_sats=")
 	builder.WriteString(fmt.Sprintf("%v", us.UtxoValueSats))

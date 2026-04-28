@@ -123,11 +123,6 @@ func SpendTxSigningResult(v []byte) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldSpendTxSigningResult, v))
 }
 
-// ExpiryTime applies equality check predicate on the "expiry_time" field. It's identical to ExpiryTimeEQ.
-func ExpiryTime(v time.Time) predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldEQ(FieldExpiryTime, v))
-}
-
 // UtxoValueSats applies equality check predicate on the "utxo_value_sats" field. It's identical to UtxoValueSatsEQ.
 func UtxoValueSats(v uint64) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldUtxoValueSats, v))
@@ -811,56 +806,6 @@ func SpendTxSigningResultIsNil() predicate.UtxoSwap {
 // SpendTxSigningResultNotNil applies the NotNil predicate on the "spend_tx_signing_result" field.
 func SpendTxSigningResultNotNil() predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldNotNull(FieldSpendTxSigningResult))
-}
-
-// ExpiryTimeEQ applies the EQ predicate on the "expiry_time" field.
-func ExpiryTimeEQ(v time.Time) predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldEQ(FieldExpiryTime, v))
-}
-
-// ExpiryTimeNEQ applies the NEQ predicate on the "expiry_time" field.
-func ExpiryTimeNEQ(v time.Time) predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldNEQ(FieldExpiryTime, v))
-}
-
-// ExpiryTimeIn applies the In predicate on the "expiry_time" field.
-func ExpiryTimeIn(vs ...time.Time) predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldIn(FieldExpiryTime, vs...))
-}
-
-// ExpiryTimeNotIn applies the NotIn predicate on the "expiry_time" field.
-func ExpiryTimeNotIn(vs ...time.Time) predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldNotIn(FieldExpiryTime, vs...))
-}
-
-// ExpiryTimeGT applies the GT predicate on the "expiry_time" field.
-func ExpiryTimeGT(v time.Time) predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldGT(FieldExpiryTime, v))
-}
-
-// ExpiryTimeGTE applies the GTE predicate on the "expiry_time" field.
-func ExpiryTimeGTE(v time.Time) predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldGTE(FieldExpiryTime, v))
-}
-
-// ExpiryTimeLT applies the LT predicate on the "expiry_time" field.
-func ExpiryTimeLT(v time.Time) predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldLT(FieldExpiryTime, v))
-}
-
-// ExpiryTimeLTE applies the LTE predicate on the "expiry_time" field.
-func ExpiryTimeLTE(v time.Time) predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldLTE(FieldExpiryTime, v))
-}
-
-// ExpiryTimeIsNil applies the IsNil predicate on the "expiry_time" field.
-func ExpiryTimeIsNil() predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldIsNull(FieldExpiryTime))
-}
-
-// ExpiryTimeNotNil applies the NotNil predicate on the "expiry_time" field.
-func ExpiryTimeNotNil() predicate.UtxoSwap {
-	return predicate.UtxoSwap(sql.FieldNotNull(FieldExpiryTime))
 }
 
 // UtxoValueSatsEQ applies the EQ predicate on the "utxo_value_sats" field.

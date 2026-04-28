@@ -48,8 +48,6 @@ const (
 	FieldRequestedSecondaryTransferID = "requested_secondary_transfer_id"
 	// FieldSpendTxSigningResult holds the string denoting the spend_tx_signing_result field in the database.
 	FieldSpendTxSigningResult = "spend_tx_signing_result"
-	// FieldExpiryTime holds the string denoting the expiry_time field in the database.
-	FieldExpiryTime = "expiry_time"
 	// FieldUtxoValueSats holds the string denoting the utxo_value_sats field in the database.
 	FieldUtxoValueSats = "utxo_value_sats"
 	// EdgeUtxo holds the string denoting the utxo edge name in mutations.
@@ -131,11 +129,6 @@ func ValidColumn(column string) bool {
 	}
 	for i := range ForeignKeys {
 		if column == ForeignKeys[i] {
-			return true
-		}
-	}
-	for _, f := range [...]string{FieldExpiryTime} {
-		if column == f {
 			return true
 		}
 	}
@@ -230,11 +223,6 @@ func ByRequestedTransferID(opts ...sql.OrderTermOption) OrderOption {
 // ByRequestedSecondaryTransferID orders the results by the requested_secondary_transfer_id field.
 func ByRequestedSecondaryTransferID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequestedSecondaryTransferID, opts...).ToFunc()
-}
-
-// ByExpiryTime orders the results by the expiry_time field.
-func ByExpiryTime(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldExpiryTime, opts...).ToFunc()
 }
 
 // ByUtxoValueSats orders the results by the utxo_value_sats field.

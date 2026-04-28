@@ -1839,7 +1839,6 @@ var (
 		{Name: "requested_transfer_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "requested_secondary_transfer_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "spend_tx_signing_result", Type: field.TypeBytes, Nullable: true},
-		{Name: "expiry_time", Type: field.TypeTime, Nullable: true},
 		{Name: "utxo_value_sats", Type: field.TypeUint64},
 		{Name: "deposit_address_utxoswaps", Type: field.TypeUUID, Nullable: true},
 		{Name: "utxo_swap_utxo", Type: field.TypeUUID, Nullable: true},
@@ -1854,25 +1853,25 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "utxo_swaps_deposit_addresses_utxoswaps",
-				Columns:    []*schema.Column{UtxoSwapsColumns[18]},
+				Columns:    []*schema.Column{UtxoSwapsColumns[17]},
 				RefColumns: []*schema.Column{DepositAddressesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "utxo_swaps_utxos_utxo",
-				Columns:    []*schema.Column{UtxoSwapsColumns[19]},
+				Columns:    []*schema.Column{UtxoSwapsColumns[18]},
 				RefColumns: []*schema.Column{UtxosColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "utxo_swaps_transfers_transfer",
-				Columns:    []*schema.Column{UtxoSwapsColumns[20]},
+				Columns:    []*schema.Column{UtxoSwapsColumns[19]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "utxo_swaps_transfers_secondary_transfer",
-				Columns:    []*schema.Column{UtxoSwapsColumns[21]},
+				Columns:    []*schema.Column{UtxoSwapsColumns[20]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -1881,7 +1880,7 @@ var (
 			{
 				Name:    "utxoswap_utxo_swap_utxo",
 				Unique:  true,
-				Columns: []*schema.Column{UtxoSwapsColumns[19]},
+				Columns: []*schema.Column{UtxoSwapsColumns[18]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "status != 'CANCELLED'",
 				},
@@ -1889,7 +1888,7 @@ var (
 			{
 				Name:    "utxoswap_utxo_value_sats_deposit_address_utxoswaps",
 				Unique:  true,
-				Columns: []*schema.Column{UtxoSwapsColumns[17], UtxoSwapsColumns[18]},
+				Columns: []*schema.Column{UtxoSwapsColumns[16], UtxoSwapsColumns[17]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "status NOT IN ('CANCELLED', 'COMPLETED')",
 				},

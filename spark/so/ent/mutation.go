@@ -36334,7 +36334,6 @@ type UtxoSwapMutation struct {
 	requested_transfer_id           *uuid.UUID
 	requested_secondary_transfer_id *uuid.UUID
 	spend_tx_signing_result         *[]byte
-	expiry_time                     *time.Time
 	utxo_value_sats                 *uint64
 	addutxo_value_sats              *int64
 	clearedFields                   map[string]struct{}
@@ -37188,55 +37187,6 @@ func (m *UtxoSwapMutation) ResetSpendTxSigningResult() {
 	delete(m.clearedFields, utxoswap.FieldSpendTxSigningResult)
 }
 
-// SetExpiryTime sets the "expiry_time" field.
-func (m *UtxoSwapMutation) SetExpiryTime(t time.Time) {
-	m.expiry_time = &t
-}
-
-// ExpiryTime returns the value of the "expiry_time" field in the mutation.
-func (m *UtxoSwapMutation) ExpiryTime() (r time.Time, exists bool) {
-	v := m.expiry_time
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldExpiryTime returns the old "expiry_time" field's value of the UtxoSwap entity.
-// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UtxoSwapMutation) OldExpiryTime(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldExpiryTime is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldExpiryTime requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldExpiryTime: %w", err)
-	}
-	return oldValue.ExpiryTime, nil
-}
-
-// ClearExpiryTime clears the value of the "expiry_time" field.
-func (m *UtxoSwapMutation) ClearExpiryTime() {
-	m.expiry_time = nil
-	m.clearedFields[utxoswap.FieldExpiryTime] = struct{}{}
-}
-
-// ExpiryTimeCleared returns if the "expiry_time" field was cleared in this mutation.
-func (m *UtxoSwapMutation) ExpiryTimeCleared() bool {
-	_, ok := m.clearedFields[utxoswap.FieldExpiryTime]
-	return ok
-}
-
-// ResetExpiryTime resets all changes to the "expiry_time" field.
-func (m *UtxoSwapMutation) ResetExpiryTime() {
-	m.expiry_time = nil
-	delete(m.clearedFields, utxoswap.FieldExpiryTime)
-}
-
 // SetUtxoValueSats sets the "utxo_value_sats" field.
 func (m *UtxoSwapMutation) SetUtxoValueSats(u uint64) {
 	m.utxo_value_sats = &u
@@ -37483,7 +37433,7 @@ func (m *UtxoSwapMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UtxoSwapMutation) Fields() []string {
-	fields := make([]string, 0, 17)
+	fields := make([]string, 0, 16)
 	if m.create_time != nil {
 		fields = append(fields, utxoswap.FieldCreateTime)
 	}
@@ -37529,9 +37479,6 @@ func (m *UtxoSwapMutation) Fields() []string {
 	if m.spend_tx_signing_result != nil {
 		fields = append(fields, utxoswap.FieldSpendTxSigningResult)
 	}
-	if m.expiry_time != nil {
-		fields = append(fields, utxoswap.FieldExpiryTime)
-	}
 	if m.utxo_value_sats != nil {
 		fields = append(fields, utxoswap.FieldUtxoValueSats)
 	}
@@ -37573,8 +37520,6 @@ func (m *UtxoSwapMutation) Field(name string) (ent.Value, bool) {
 		return m.RequestedSecondaryTransferID()
 	case utxoswap.FieldSpendTxSigningResult:
 		return m.SpendTxSigningResult()
-	case utxoswap.FieldExpiryTime:
-		return m.ExpiryTime()
 	case utxoswap.FieldUtxoValueSats:
 		return m.UtxoValueSats()
 	}
@@ -37616,8 +37561,6 @@ func (m *UtxoSwapMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldRequestedSecondaryTransferID(ctx)
 	case utxoswap.FieldSpendTxSigningResult:
 		return m.OldSpendTxSigningResult(ctx)
-	case utxoswap.FieldExpiryTime:
-		return m.OldExpiryTime(ctx)
 	case utxoswap.FieldUtxoValueSats:
 		return m.OldUtxoValueSats(ctx)
 	}
@@ -37733,13 +37676,6 @@ func (m *UtxoSwapMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSpendTxSigningResult(v)
-		return nil
-	case utxoswap.FieldExpiryTime:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetExpiryTime(v)
 		return nil
 	case utxoswap.FieldUtxoValueSats:
 		v, ok := value.(uint64)
@@ -37859,9 +37795,6 @@ func (m *UtxoSwapMutation) ClearedFields() []string {
 	if m.FieldCleared(utxoswap.FieldSpendTxSigningResult) {
 		fields = append(fields, utxoswap.FieldSpendTxSigningResult)
 	}
-	if m.FieldCleared(utxoswap.FieldExpiryTime) {
-		fields = append(fields, utxoswap.FieldExpiryTime)
-	}
 	return fields
 }
 
@@ -37905,9 +37838,6 @@ func (m *UtxoSwapMutation) ClearField(name string) error {
 		return nil
 	case utxoswap.FieldSpendTxSigningResult:
 		m.ClearSpendTxSigningResult()
-		return nil
-	case utxoswap.FieldExpiryTime:
-		m.ClearExpiryTime()
 		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap nullable field %s", name)
@@ -37961,9 +37891,6 @@ func (m *UtxoSwapMutation) ResetField(name string) error {
 		return nil
 	case utxoswap.FieldSpendTxSigningResult:
 		m.ResetSpendTxSigningResult()
-		return nil
-	case utxoswap.FieldExpiryTime:
-		m.ResetExpiryTime()
 		return nil
 	case utxoswap.FieldUtxoValueSats:
 		m.ResetUtxoValueSats()

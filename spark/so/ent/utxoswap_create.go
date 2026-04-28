@@ -191,20 +191,6 @@ func (usc *UtxoSwapCreate) SetSpendTxSigningResult(b []byte) *UtxoSwapCreate {
 	return usc
 }
 
-// SetExpiryTime sets the "expiry_time" field.
-func (usc *UtxoSwapCreate) SetExpiryTime(t time.Time) *UtxoSwapCreate {
-	usc.mutation.SetExpiryTime(t)
-	return usc
-}
-
-// SetNillableExpiryTime sets the "expiry_time" field if the given value is not nil.
-func (usc *UtxoSwapCreate) SetNillableExpiryTime(t *time.Time) *UtxoSwapCreate {
-	if t != nil {
-		usc.SetExpiryTime(*t)
-	}
-	return usc
-}
-
 // SetUtxoValueSats sets the "utxo_value_sats" field.
 func (usc *UtxoSwapCreate) SetUtxoValueSats(u uint64) *UtxoSwapCreate {
 	usc.mutation.SetUtxoValueSats(u)
@@ -487,10 +473,6 @@ func (usc *UtxoSwapCreate) createSpec() (*UtxoSwap, *sqlgraph.CreateSpec) {
 	if value, ok := usc.mutation.SpendTxSigningResult(); ok {
 		_spec.SetField(utxoswap.FieldSpendTxSigningResult, field.TypeBytes, value)
 		_node.SpendTxSigningResult = value
-	}
-	if value, ok := usc.mutation.ExpiryTime(); ok {
-		_spec.SetField(utxoswap.FieldExpiryTime, field.TypeTime, value)
-		_node.ExpiryTime = &value
 	}
 	if value, ok := usc.mutation.UtxoValueSats(); ok {
 		_spec.SetField(utxoswap.FieldUtxoValueSats, field.TypeUint64, value)
@@ -862,24 +844,6 @@ func (u *UtxoSwapUpsert) ClearSpendTxSigningResult() *UtxoSwapUpsert {
 	return u
 }
 
-// SetExpiryTime sets the "expiry_time" field.
-func (u *UtxoSwapUpsert) SetExpiryTime(v time.Time) *UtxoSwapUpsert {
-	u.Set(utxoswap.FieldExpiryTime, v)
-	return u
-}
-
-// UpdateExpiryTime sets the "expiry_time" field to the value that was provided on create.
-func (u *UtxoSwapUpsert) UpdateExpiryTime() *UtxoSwapUpsert {
-	u.SetExcluded(utxoswap.FieldExpiryTime)
-	return u
-}
-
-// ClearExpiryTime clears the value of the "expiry_time" field.
-func (u *UtxoSwapUpsert) ClearExpiryTime() *UtxoSwapUpsert {
-	u.SetNull(utxoswap.FieldExpiryTime)
-	return u
-}
-
 // SetUtxoValueSats sets the "utxo_value_sats" field.
 func (u *UtxoSwapUpsert) SetUtxoValueSats(v uint64) *UtxoSwapUpsert {
 	u.Set(utxoswap.FieldUtxoValueSats, v)
@@ -1233,27 +1197,6 @@ func (u *UtxoSwapUpsertOne) UpdateSpendTxSigningResult() *UtxoSwapUpsertOne {
 func (u *UtxoSwapUpsertOne) ClearSpendTxSigningResult() *UtxoSwapUpsertOne {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.ClearSpendTxSigningResult()
-	})
-}
-
-// SetExpiryTime sets the "expiry_time" field.
-func (u *UtxoSwapUpsertOne) SetExpiryTime(v time.Time) *UtxoSwapUpsertOne {
-	return u.Update(func(s *UtxoSwapUpsert) {
-		s.SetExpiryTime(v)
-	})
-}
-
-// UpdateExpiryTime sets the "expiry_time" field to the value that was provided on create.
-func (u *UtxoSwapUpsertOne) UpdateExpiryTime() *UtxoSwapUpsertOne {
-	return u.Update(func(s *UtxoSwapUpsert) {
-		s.UpdateExpiryTime()
-	})
-}
-
-// ClearExpiryTime clears the value of the "expiry_time" field.
-func (u *UtxoSwapUpsertOne) ClearExpiryTime() *UtxoSwapUpsertOne {
-	return u.Update(func(s *UtxoSwapUpsert) {
-		s.ClearExpiryTime()
 	})
 }
 
@@ -1780,27 +1723,6 @@ func (u *UtxoSwapUpsertBulk) UpdateSpendTxSigningResult() *UtxoSwapUpsertBulk {
 func (u *UtxoSwapUpsertBulk) ClearSpendTxSigningResult() *UtxoSwapUpsertBulk {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.ClearSpendTxSigningResult()
-	})
-}
-
-// SetExpiryTime sets the "expiry_time" field.
-func (u *UtxoSwapUpsertBulk) SetExpiryTime(v time.Time) *UtxoSwapUpsertBulk {
-	return u.Update(func(s *UtxoSwapUpsert) {
-		s.SetExpiryTime(v)
-	})
-}
-
-// UpdateExpiryTime sets the "expiry_time" field to the value that was provided on create.
-func (u *UtxoSwapUpsertBulk) UpdateExpiryTime() *UtxoSwapUpsertBulk {
-	return u.Update(func(s *UtxoSwapUpsert) {
-		s.UpdateExpiryTime()
-	})
-}
-
-// ClearExpiryTime clears the value of the "expiry_time" field.
-func (u *UtxoSwapUpsertBulk) ClearExpiryTime() *UtxoSwapUpsertBulk {
-	return u.Update(func(s *UtxoSwapUpsert) {
-		s.ClearExpiryTime()
 	})
 }
 

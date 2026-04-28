@@ -280,26 +280,6 @@ func (usu *UtxoSwapUpdate) ClearSpendTxSigningResult() *UtxoSwapUpdate {
 	return usu
 }
 
-// SetExpiryTime sets the "expiry_time" field.
-func (usu *UtxoSwapUpdate) SetExpiryTime(t time.Time) *UtxoSwapUpdate {
-	usu.mutation.SetExpiryTime(t)
-	return usu
-}
-
-// SetNillableExpiryTime sets the "expiry_time" field if the given value is not nil.
-func (usu *UtxoSwapUpdate) SetNillableExpiryTime(t *time.Time) *UtxoSwapUpdate {
-	if t != nil {
-		usu.SetExpiryTime(*t)
-	}
-	return usu
-}
-
-// ClearExpiryTime clears the value of the "expiry_time" field.
-func (usu *UtxoSwapUpdate) ClearExpiryTime() *UtxoSwapUpdate {
-	usu.mutation.ClearExpiryTime()
-	return usu
-}
-
 // SetUtxoValueSats sets the "utxo_value_sats" field.
 func (usu *UtxoSwapUpdate) SetUtxoValueSats(u uint64) *UtxoSwapUpdate {
 	usu.mutation.ResetUtxoValueSats()
@@ -581,12 +561,6 @@ func (usu *UtxoSwapUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if usu.mutation.SpendTxSigningResultCleared() {
 		_spec.ClearField(utxoswap.FieldSpendTxSigningResult, field.TypeBytes)
-	}
-	if value, ok := usu.mutation.ExpiryTime(); ok {
-		_spec.SetField(utxoswap.FieldExpiryTime, field.TypeTime, value)
-	}
-	if usu.mutation.ExpiryTimeCleared() {
-		_spec.ClearField(utxoswap.FieldExpiryTime, field.TypeTime)
 	}
 	if value, ok := usu.mutation.UtxoValueSats(); ok {
 		_spec.SetField(utxoswap.FieldUtxoValueSats, field.TypeUint64, value)
@@ -977,26 +951,6 @@ func (usuo *UtxoSwapUpdateOne) ClearSpendTxSigningResult() *UtxoSwapUpdateOne {
 	return usuo
 }
 
-// SetExpiryTime sets the "expiry_time" field.
-func (usuo *UtxoSwapUpdateOne) SetExpiryTime(t time.Time) *UtxoSwapUpdateOne {
-	usuo.mutation.SetExpiryTime(t)
-	return usuo
-}
-
-// SetNillableExpiryTime sets the "expiry_time" field if the given value is not nil.
-func (usuo *UtxoSwapUpdateOne) SetNillableExpiryTime(t *time.Time) *UtxoSwapUpdateOne {
-	if t != nil {
-		usuo.SetExpiryTime(*t)
-	}
-	return usuo
-}
-
-// ClearExpiryTime clears the value of the "expiry_time" field.
-func (usuo *UtxoSwapUpdateOne) ClearExpiryTime() *UtxoSwapUpdateOne {
-	usuo.mutation.ClearExpiryTime()
-	return usuo
-}
-
 // SetUtxoValueSats sets the "utxo_value_sats" field.
 func (usuo *UtxoSwapUpdateOne) SetUtxoValueSats(u uint64) *UtxoSwapUpdateOne {
 	usuo.mutation.ResetUtxoValueSats()
@@ -1308,12 +1262,6 @@ func (usuo *UtxoSwapUpdateOne) sqlSave(ctx context.Context) (_node *UtxoSwap, er
 	}
 	if usuo.mutation.SpendTxSigningResultCleared() {
 		_spec.ClearField(utxoswap.FieldSpendTxSigningResult, field.TypeBytes)
-	}
-	if value, ok := usuo.mutation.ExpiryTime(); ok {
-		_spec.SetField(utxoswap.FieldExpiryTime, field.TypeTime, value)
-	}
-	if usuo.mutation.ExpiryTimeCleared() {
-		_spec.ClearField(utxoswap.FieldExpiryTime, field.TypeTime)
 	}
 	if value, ok := usuo.mutation.UtxoValueSats(); ok {
 		_spec.SetField(utxoswap.FieldUtxoValueSats, field.TypeUint64, value)

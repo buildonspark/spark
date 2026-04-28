@@ -7752,7 +7752,6 @@ type UtxoSwapExample struct {
 	RequestedTransferID          *uuid.UUID
 	RequestedSecondaryTransferID *uuid.UUID
 	SpendTxSigningResult         *[]byte
-	ExpiryTime                   *time.Time
 	UtxoValueSats                *uint64
 
 	// Edges - if set, use the provided entity; if nil, create a default one
@@ -7845,12 +7844,6 @@ func (us *UtxoSwapExample) SetRequestedSecondaryTransferID(v uuid.UUID) *UtxoSwa
 // SetSpendTxSigningResult sets the spend_tx_signing_result field.
 func (us *UtxoSwapExample) SetSpendTxSigningResult(v []byte) *UtxoSwapExample {
 	us.SpendTxSigningResult = &v
-	return us
-}
-
-// SetExpiryTime sets the expiry_time field.
-func (us *UtxoSwapExample) SetExpiryTime(v time.Time) *UtxoSwapExample {
-	us.ExpiryTime = &v
 	return us
 }
 
@@ -7970,10 +7963,6 @@ func (us *UtxoSwapExample) MustExec(ctx context.Context) *ent.UtxoSwap {
 		create.SetSpendTxSigningResult(*us.SpendTxSigningResult)
 	} else {
 	}
-	if us.ExpiryTime != nil {
-		create.SetExpiryTime(*us.ExpiryTime)
-	} else {
-	}
 	if us.UtxoValueSats != nil {
 		create.SetUtxoValueSats(*us.UtxoValueSats)
 	} else {
@@ -8088,10 +8077,6 @@ func (us *UtxoSwapExample) Exec(ctx context.Context) (*ent.UtxoSwap, error) {
 	}
 	if us.SpendTxSigningResult != nil {
 		create.SetSpendTxSigningResult(*us.SpendTxSigningResult)
-	} else {
-	}
-	if us.ExpiryTime != nil {
-		create.SetExpiryTime(*us.ExpiryTime)
 	} else {
 	}
 	if us.UtxoValueSats != nil {
