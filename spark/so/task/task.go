@@ -893,7 +893,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						return nil
 					}
 					cutoffID := uuids.UUIDv7FromTime(time.Now().Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
-					candidateCount, deletedCount, err := purgeDanglingSigningKeyshareSecretsBatch(
+					result, err := purgeDanglingSigningKeyshareSecretsBatch(
 						ctx,
 						cutoffID,
 						batchSize,
@@ -902,29 +902,28 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						return err
 					}
 
-					if candidateCount == batchSize {
-						if deletedCount > 0 {
-							logger.Sugar().Warnf(
-								"Purge batch was full (%d candidates, %d deleted); additional dangling signing keyshare secrets may remain",
-								batchSize,
-								deletedCount,
-							)
-						} else {
-							logger.Sugar().Infof(
-								"Purge batch was full (%d candidates); aged signing keyshare secrets in this batch were all active",
-								batchSize,
-							)
-						}
-					} else if deletedCount > 0 {
+					if result.FoundFullDeleteBatch {
+						logger.Sugar().Warnf(
+							"Found a full batch of dangling signing keyshare secrets; deleted %d after scanning %d aged candidates; additional dangling signing keyshare secrets may remain",
+							result.DeletedCount,
+							result.CandidateCount,
+						)
+					} else if result.ScanLimitReached {
+						logger.Sugar().Warnf(
+							"Reached the aged-candidate scan limit after scanning %d rows and deleting %d dangling signing keyshare secrets; additional dangling signing keyshare secrets may remain",
+							result.CandidateCount,
+							result.DeletedCount,
+						)
+					} else if result.DeletedCount > 0 {
 						logger.Sugar().Infof(
 							"Purged %d dangling signing keyshare secrets out of %d aged candidates",
-							deletedCount,
-							candidateCount,
+							result.DeletedCount,
+							result.CandidateCount,
 						)
-					} else if candidateCount > 0 {
+					} else if result.CandidateCount > 0 {
 						logger.Sugar().Infof(
 							"No dangling signing keyshare secrets found; %d aged candidates were all actively referenced",
-							candidateCount,
+							result.CandidateCount,
 						)
 					}
 
