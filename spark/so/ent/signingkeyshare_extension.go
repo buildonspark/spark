@@ -106,11 +106,23 @@ func shouldDualWriteSigningKeyshareSecret(ctx context.Context) bool {
 func deleteSigningKeyshareSecretVersionBestEffort(ctx context.Context, signingKeyshareID uuid.UUID, version int32, reason string) {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	ephemeralTx, err := entephemeral.GetTxFromContext(ctx)
+	ephemeralDB, err := entephemeral.GetDbFromContext(ctx)
 	if err != nil {
-		recordSigningKeyshareSecretCleanupFailure(ctx, "get_tx", reason)
+		recordSigningKeyshareSecretCleanupFailure(ctx, "get_db", reason)
 		logger.With(zap.Error(err)).Sugar().Warnf(
-			"failed to start ephemeral tx to cleanup signing keyshare %s version %d (%s)",
+			"failed to get ephemeral db client to cleanup signing keyshare %s version %d (%s)",
+			signingKeyshareID,
+			version,
+			reason,
+		)
+		return
+	}
+
+	ephemeralTx, err := ephemeralDB.Tx(ctx)
+	if err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "begin_tx", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to begin ephemeral cleanup tx for signing keyshare %s version %d (%s)",
 			signingKeyshareID,
 			version,
 			reason,
@@ -119,10 +131,26 @@ func deleteSigningKeyshareSecretVersionBestEffort(ctx context.Context, signingKe
 	}
 	defer func() { _ = ephemeralTx.Rollback() }()
 
-	if err := entephemeral.DeleteSigningKeyshareSecretVersion(ctx, signingKeyshareID, version); err != nil {
+	affected, err := ephemeralTx.SigningKeyshareSecret.Delete().
+		Where(
+			signingkeysharesecret.SigningKeyshareIDEQ(signingKeyshareID),
+			signingkeysharesecret.VersionEQ(version),
+		).
+		Exec(ctx)
+	if err != nil {
 		recordSigningKeyshareSecretCleanupFailure(ctx, "delete", reason)
 		logger.With(zap.Error(err)).Sugar().Warnf(
 			"failed to delete signing keyshare %s version %d (%s)",
+			signingKeyshareID,
+			version,
+			reason,
+		)
+		return
+	}
+	if affected == 0 {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "delete_missing", reason)
+		logger.Sugar().Warnf(
+			"cleanup did not find signing keyshare %s version %d to delete (%s)",
 			signingKeyshareID,
 			version,
 			reason,

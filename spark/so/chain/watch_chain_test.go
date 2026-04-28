@@ -3,6 +3,7 @@ package chain
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/entephemeral"
 	ephemeralenttest "github.com/lightsparkdev/spark/so/entephemeral/enttest"
+	"github.com/lightsparkdev/spark/so/entephemeral/signingkeysharesecret"
 	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -32,6 +34,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -1340,6 +1343,161 @@ func TestTweakKeysForCoopExit_UsesEphemeralSecrets(t *testing.T) {
 	resolvedSecret, err := updatedKeyshare.GetSecretShare(ctxWithEphemeral)
 	require.NoError(t, err)
 	assert.Equal(t, expectedSecret, *resolvedSecret)
+}
+
+func TestUpdateSigningKeyshareWithRotatedSecret_MainRollbackCleansUpWithTxBackedEphemeralSession(t *testing.T) {
+	ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 100,
+	}))
+	mainClient := db.NewTestSQLiteClient(t)
+	t.Cleanup(func() { _ = mainClient.Close() })
+
+	ephemeralClient := ephemeralenttest.Open(t, "sqlite3", "file:watch_chain_cleanup_ephemeral?mode=memory&_fk=1")
+	t.Cleanup(func() { _ = ephemeralClient.Close() })
+
+	oldSecret := keys.MustParsePrivateKeyHex("4b0f0f4bc26b635f8146bc06d130ad2fbde7f93334e9e48f9697e66b4dcf3f89")
+	newSecret := keys.MustParsePrivateKeyHex("2e3389bf1649f6f4f56cfd6f1fff404a08dbcf65f1d95f18dd1265f832f2bff6")
+	version := int32(0)
+
+	keyshare, err := mainClient.SigningKeyshare.Create().
+		SetPublicKey(oldSecret.Public()).
+		SetSecretShare(oldSecret).
+		SetSecretVersion(version).
+		SetMinSigners(1).
+		SetPublicShares(map[string]keys.Public{}).
+		SetStatus(schematype.KeyshareStatusInUse).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = ephemeralClient.SigningKeyshareSecret.Create().
+		SetSigningKeyshareID(keyshare.ID).
+		SetVersion(version).
+		SetSecretShare(oldSecret).
+		Save(ctx)
+	require.NoError(t, err)
+
+	mainTx, err := mainClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = mainTx.Rollback() })
+
+	ephemeralTx, err := ephemeralClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ephemeralTx.Rollback() })
+
+	chainCtx := ent.Inject(ctx, &txBackedSession{tx: mainTx})
+	chainCtx = entephemeral.Inject(chainCtx, newTxBackedEphemeralSession(ephemeralClient, ephemeralTx))
+
+	updated, err := ent.UpdateSigningKeyshareWithRotatedSecret(
+		chainCtx,
+		keyshare.ID,
+		newSecret,
+		nil,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, updated.SecretVersion)
+	require.Equal(t, int32(1), *updated.SecretVersion)
+
+	require.NoError(t, mainTx.Rollback())
+
+	versionOneCount, err := ephemeralClient.SigningKeyshareSecret.Query().
+		Where(
+			signingkeysharesecret.SigningKeyshareIDEQ(keyshare.ID),
+			signingkeysharesecret.VersionEQ(1),
+		).
+		Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, versionOneCount)
+
+	remainingSecret, err := ephemeralClient.SigningKeyshareSecret.Query().
+		Where(
+			signingkeysharesecret.SigningKeyshareIDEQ(keyshare.ID),
+			signingkeysharesecret.VersionEQ(version),
+		).
+		Only(ctx)
+	require.NoError(t, err)
+	require.True(t, remainingSecret.SecretShare.Equals(oldSecret))
+}
+
+// TestCommitBlockTransactions_SurvivesInlineEphemeralCommit covers the bug tracked
+// in SP-2913: prepareSigningKeyshareSecretRotation commits the per-block ephemeral
+// tx inline, so connectBlocks' post-handler commit must tolerate finding the tx
+// already finalized. Without commitBlockTransactions' GetTxIfExists guard, the
+// second Commit() call would return sql.ErrTxDone and the test would fail.
+func TestCommitBlockTransactions_SurvivesInlineEphemeralCommit(t *testing.T) {
+	ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 100,
+	}))
+	mainClient := db.NewTestSQLiteClient(t)
+	t.Cleanup(func() { _ = mainClient.Close() })
+
+	ephemeralClient := ephemeralenttest.Open(t, "sqlite3", "file:watch_chain_commit_ephemeral?mode=memory&_fk=1")
+	t.Cleanup(func() { _ = ephemeralClient.Close() })
+
+	oldSecret := keys.MustParsePrivateKeyHex("4b0f0f4bc26b635f8146bc06d130ad2fbde7f93334e9e48f9697e66b4dcf3f89")
+	newSecret := keys.MustParsePrivateKeyHex("2e3389bf1649f6f4f56cfd6f1fff404a08dbcf65f1d95f18dd1265f832f2bff6")
+	version := int32(0)
+
+	keyshare, err := mainClient.SigningKeyshare.Create().
+		SetPublicKey(oldSecret.Public()).
+		SetSecretShare(oldSecret).
+		SetSecretVersion(version).
+		SetMinSigners(1).
+		SetPublicShares(map[string]keys.Public{}).
+		SetStatus(schematype.KeyshareStatusInUse).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = ephemeralClient.SigningKeyshareSecret.Create().
+		SetSigningKeyshareID(keyshare.ID).
+		SetVersion(version).
+		SetSecretShare(oldSecret).
+		Save(ctx)
+	require.NoError(t, err)
+
+	mainTx, err := mainClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = mainTx.Rollback() })
+
+	ephemeralTx, err := ephemeralClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ephemeralTx.Rollback() })
+
+	ephemeralSession := newTxBackedEphemeralSession(ephemeralClient, ephemeralTx)
+	chainCtx := ent.Inject(ctx, &txBackedSession{tx: mainTx})
+	chainCtx = entephemeral.Inject(chainCtx, ephemeralSession)
+
+	// Simulates the chain watcher's handleBlock path triggering keyshare rotation,
+	// which commits the per-block ephemeral tx inline today (SP-2913).
+	_, err = ent.UpdateSigningKeyshareWithRotatedSecret(chainCtx, keyshare.ID, newSecret, nil)
+	require.NoError(t, err)
+	require.Nil(t, ephemeralSession.GetTxIfExists(), "callee should have finalized the ephemeral tx")
+	// The captured local tx pointer (the pre-fix pattern in connectBlocks) is now
+	// finalized. Calling Commit on it directly returns sql.ErrTxDone — which is
+	// what would have aborted the block before commitBlockTransactions added the
+	// GetTxIfExists guard.
+	require.ErrorIs(t, ephemeralTx.Commit(), sql.ErrTxDone, "captured tx should already be committed by the callee")
+
+	chainTip := Tip{Height: 1, Hash: chainhash.Hash{}}
+	var ephemeralCommitted bool
+	err = commitBlockTransactions(ephemeralSession, mainTx, chainTip, zap.NewNop(), &ephemeralCommitted)
+	require.NoError(t, err)
+	assert.False(t, ephemeralCommitted, "sentinel resets to false after both commits succeed")
+
+	reloaded, err := mainClient.SigningKeyshare.Get(ctx, keyshare.ID)
+	require.NoError(t, err)
+	require.NotNil(t, reloaded.SecretVersion)
+	assert.Equal(t, int32(1), *reloaded.SecretVersion)
+
+	v1, err := ephemeralClient.SigningKeyshareSecret.Query().
+		Where(
+			signingkeysharesecret.SigningKeyshareIDEQ(keyshare.ID),
+			signingkeysharesecret.VersionEQ(1),
+		).
+		Only(ctx)
+	require.NoError(t, err)
+	assert.True(t, v1.SecretShare.Equals(newSecret))
 }
 
 func createTestDepositAddress(

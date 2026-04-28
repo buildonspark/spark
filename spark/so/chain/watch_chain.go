@@ -93,22 +93,60 @@ func (s *txBackedSession) Notify(context.Context, ent.Notification) error { retu
 // txBackedEphemeralSession intentionally omits Notify: entephemeral.Session
 // has no notification interface, unlike ent.Session.
 type txBackedEphemeralSession struct {
-	tx *entephemeral.Tx
+	dbClient     *entephemeral.Client
+	tx           *entephemeral.Tx
+	txWasStarted bool
+}
+
+func newTxBackedEphemeralSession(dbClient *entephemeral.Client, tx *entephemeral.Tx) *txBackedEphemeralSession {
+	session := &txBackedEphemeralSession{
+		dbClient: dbClient,
+	}
+	session.bindTx(tx)
+	return session
+}
+
+func (s *txBackedEphemeralSession) bindTx(tx *entephemeral.Tx) {
+	s.tx = tx
+	if tx == nil {
+		return
+	}
+	s.txWasStarted = true
+	tx.OnCommit(func(fn entephemeral.Committer) entephemeral.Committer {
+		return entephemeral.CommitFunc(func(ctx context.Context, tx *entephemeral.Tx) error {
+			err := fn.Commit(ctx, tx)
+			if err == nil && s.tx == tx {
+				s.tx = nil
+			}
+			return err
+		})
+	})
+	tx.OnRollback(func(fn entephemeral.Rollbacker) entephemeral.Rollbacker {
+		return entephemeral.RollbackFunc(func(ctx context.Context, tx *entephemeral.Tx) error {
+			err := fn.Rollback(ctx, tx)
+			if s.tx == tx {
+				s.tx = nil
+			}
+			return err
+		})
+	})
 }
 
 func (s *txBackedEphemeralSession) GetOrBeginTx(context.Context) (*entephemeral.Tx, error) {
-	if s.tx == nil {
-		return nil, fmt.Errorf("no ephemeral transaction available")
+	if s.tx != nil {
+		return s.tx, nil
 	}
-	return s.tx, nil
+	return nil, fmt.Errorf("no ephemeral transaction available")
 }
 
-func (s *txBackedEphemeralSession) GetClient(ctx context.Context) (*entephemeral.Client, error) {
-	tx, err := s.GetOrBeginTx(ctx)
-	if err != nil {
-		return nil, err
+func (s *txBackedEphemeralSession) GetClient(context.Context) (*entephemeral.Client, error) {
+	if s.tx != nil {
+		return s.tx.Client(), nil
 	}
-	return tx.Client(), nil
+	if s.dbClient == nil {
+		return nil, fmt.Errorf("no ephemeral client available")
+	}
+	return s.dbClient, nil
 }
 
 func (s *txBackedEphemeralSession) MarkTxDirty(context.Context) {}
@@ -117,7 +155,7 @@ func (s *txBackedEphemeralSession) GetTxIfExists() *entephemeral.Tx { return s.t
 
 func (s *txBackedEphemeralSession) CommitError() error { return nil }
 
-func (s *txBackedEphemeralSession) TxWasStarted() bool { return s.tx != nil }
+func (s *txBackedEphemeralSession) TxWasStarted() bool { return s.txWasStarted }
 
 const (
 	nonStaticDefaultConfirmationThreshold = 3
@@ -456,6 +494,59 @@ func disconnectBlocks(_ context.Context, _ *ent.Client, _ []Tip, _ btcnetwork.Ne
 	return nil
 }
 
+// commitBlockTransactions performs the per-block two-phase commit: ephemeral first,
+// then main. It updates *ephemeralCommitted so connectBlocks' panic-recovery defer
+// can detect a panic that lands between the ephemeral commit and the main commit
+// (the only window where divergence is possible).
+//
+// If a callee has already finalized the ephemeral tx inline (see SP-2913),
+// GetTxIfExists() returns nil and we treat the ephemeral side as committed so
+// the divergence sentinel still arms correctly. When the proper fix lands, the
+// callee will no longer commit and this branch collapses to the unconditional path.
+func commitBlockTransactions(
+	ephemeralSession *txBackedEphemeralSession,
+	dbTx *ent.Tx,
+	chainTip Tip,
+	logger *zap.Logger,
+	ephemeralCommitted *bool,
+) error {
+	*ephemeralCommitted = false
+	if ephemeralSession != nil {
+		if currentTx := ephemeralSession.GetTxIfExists(); currentTx != nil {
+			if commitErr := currentTx.Commit(); commitErr != nil {
+				if rollbackErr := dbTx.Rollback(); rollbackErr != nil {
+					return errors.Join(commitErr, fmt.Errorf("failed to rollback main transaction after ephemeral commit failure: %w", rollbackErr))
+				}
+				return commitErr
+			}
+		}
+		*ephemeralCommitted = true
+	}
+	if commitErr := dbTx.Commit(); commitErr != nil {
+		if *ephemeralCommitted {
+			logger.With(zap.Error(commitErr)).Sugar().Errorf(
+				"Main database commit failed after ephemeral commit at block height %d (hash %s); ephemeral and main DB state have diverged",
+				chainTip.Height,
+				chainTip.Hash.String(),
+			)
+			return errors.Join(
+				commitErr,
+				fmt.Errorf(
+					"ephemeral and main DB state have diverged after main database commit failure at block height %d (hash %s)",
+					chainTip.Height,
+					chainTip.Hash.String(),
+				),
+				errEphemeralMainDBDiverged,
+			)
+		}
+		return commitErr
+	}
+	// Both commits succeeded; reset so a panic on a subsequent block in this
+	// batch is not misidentified as a divergence from the current block.
+	*ephemeralCommitted = false
+	return nil
+}
+
 // connectBlocks processes each chain tip in order, committing both the ephemeral
 // and main transactions per block.
 func connectBlocks(
@@ -525,8 +616,13 @@ func connectBlocks(
 			}
 		}
 		blockCtx = ent.Inject(blockCtx, &txBackedSession{tx: dbTx})
+		var ephemeralSession *txBackedEphemeralSession
 		if ephemeralTx != nil {
-			blockCtx = entephemeral.Inject(blockCtx, &txBackedEphemeralSession{tx: ephemeralTx})
+			// signing keyshare secret cleanup hooks can fire after the per-block tx has
+			// already committed or rolled back, so the session must be able to reopen a
+			// fresh tx instead of reusing a finalized handle.
+			ephemeralSession = newTxBackedEphemeralSession(ephemeralDBClient, ephemeralTx)
+			blockCtx = entephemeral.Inject(blockCtx, ephemeralSession)
 		}
 		err = handleBlock(
 			blockCtx,
@@ -541,7 +637,10 @@ func connectBlocks(
 		if err != nil {
 			logger.Error("Failed to handle block", zap.Error(err))
 			var rollbackErr error
-			if ephemeralTx != nil {
+			// If a callee already finalized the ephemeral tx (e.g. signing-keyshare rotation
+			// commits inline today; see SP-2913), GetTxIfExists() returns nil and we skip
+			// the redundant rollback that would otherwise fail with sql.ErrTxDone.
+			if ephemeralSession != nil && ephemeralSession.GetTxIfExists() != nil {
 				if ephemeralRollbackErr := ephemeralTx.Rollback(); ephemeralRollbackErr != nil {
 					rollbackErr = errors.Join(
 						rollbackErr,
@@ -560,46 +659,9 @@ func connectBlocks(
 			}
 			return err
 		}
-		// Two-phase commit: ephemeral DB is committed first, then the main DB.
-		// This ordering is intentional: if the ephemeral commit fails we can still
-		// roll back the main transaction atomically. However, if the ephemeral commit
-		// succeeds and the main commit subsequently fails, the two stores will diverge
-		// with no automatic recovery path. This is a known architectural trade-off;
-		// the operator must be restarted and the divergence resolved manually.
-		if ephemeralTx != nil {
-			err = ephemeralTx.Commit()
-			if err != nil {
-				if rollbackErr := dbTx.Rollback(); rollbackErr != nil {
-					return errors.Join(err, fmt.Errorf("failed to rollback main transaction after ephemeral commit failure: %w", rollbackErr))
-				}
-				return err
-			}
-			ephemeralCommittedOnLastBlock = true
-		}
-		err = dbTx.Commit()
-		if err != nil {
-			if ephemeralCommittedOnLastBlock {
-				logger.With(zap.Error(err)).Sugar().Errorf(
-					"Main database commit failed after ephemeral commit at block height %d (hash %s); ephemeral and main DB state have diverged",
-					chainTip.Height,
-					chainTip.Hash.String(),
-				)
-				return errors.Join(
-					err,
-					fmt.Errorf(
-						"ephemeral and main DB state have diverged after main database commit failure at block height %d (hash %s)",
-						chainTip.Height,
-						chainTip.Hash.String(),
-					),
-					errEphemeralMainDBDiverged,
-				)
-			}
+		if err := commitBlockTransactions(ephemeralSession, dbTx, chainTip, logger, &ephemeralCommittedOnLastBlock); err != nil {
 			return err
 		}
-
-		// Both commits succeeded; reset so a panic on a subsequent block in this
-		// batch is not misidentified as a divergence from the current block.
-		ephemeralCommittedOnLastBlock = false
 
 		err = notifier.Flush(blockCtx)
 		if err != nil {
