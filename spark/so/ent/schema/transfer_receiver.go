@@ -75,16 +75,29 @@ func (TransferReceiver) Indexes() []ent.Index {
 		index.Fields("identity_pubkey", "create_time").
 			Annotations(entsql.DescColumns("create_time")),
 
-		// Partial index covering all non-terminal receiver states. Serves both
-		// the GetStuckTransfers receiver arm (filters to RECEIVER_* subset)
-		// and the QueryTransfers receiver-pending path (includes INITIATED).
-		// WHERE clause is the complement of the receiver terminal set
-		// (COMPLETED / CANCELLED).
+		// Partial index covering all non-terminal receiver states (INITIATED
+		// + 4 stuck). Companion to idx_transferreceiver_stuck_create_time
+		// below; the leading identity_pubkey column makes this the per-user
+		// partial.
+		//
+		// Prefer plain `status IN (...)` for future migrations.
 		index.Fields("identity_pubkey", "create_time", "transfer_id").
 			Annotations(
 				entsql.DescColumns("create_time", "transfer_id"),
 				entsql.IndexWhere("CAST(status AS TEXT) IN ('INITIATED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')"),
 			).
 			StorageKey("idx_transferreceiver_pending_pubkey_time"),
+
+		// Partial index covering only the four receiver-stuck statuses,
+		// keyed on (create_time DESC, transfer_id DESC) — no identity_pubkey
+		// leading column. Companion to idx_transferreceiver_pending_pubkey_time
+		// above; the absence of a pubkey leading column makes this the
+		// time-ordered partial used for queries that scan across all users.
+		index.Fields("create_time", "transfer_id").
+			Annotations(
+				entsql.DescColumns("create_time", "transfer_id"),
+				entsql.IndexWhere("status IN ('RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')"),
+			).
+			StorageKey("idx_transferreceiver_stuck_create_time"),
 	}
 }

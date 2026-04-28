@@ -1510,6 +1510,19 @@ var (
 					Where: "CAST(status AS TEXT) IN ('INITIATED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')",
 				},
 			},
+			{
+				Name:    "idx_transferreceiver_stuck_create_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransferReceiversColumns[1], TransferReceiversColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						TransferReceiversColumns[1].Name: true,
+
+						TransferReceiversColumns[6].Name: true,
+					},
+					Where: "status IN ('RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')",
+				},
+			},
 		},
 	}
 	// TransferSendersColumns holds the columns for the "transfer_senders" table.
