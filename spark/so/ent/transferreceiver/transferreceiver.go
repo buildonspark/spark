@@ -84,7 +84,7 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schematype.TransferReceiverStatus) error {
 	switch s {
-	case "INITIATED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_KEY_TWEAK_APPLIED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "CANCELLED":
+	case "INITIATED", "RECEIVER_CLAIM_PENDING", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_KEY_TWEAK_APPLIED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "CANCELLED":
 		return nil
 	default:
 		return fmt.Errorf("transferreceiver: invalid enum value for status field: %q", s)

@@ -1454,7 +1454,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "identity_pubkey", Type: field.TypeBytes},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_KEY_TWEAK_APPLIED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "CANCELLED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "RECEIVER_CLAIM_PENDING", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_KEY_TWEAK_APPLIED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "CANCELLED"}},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
 		{Name: "transfer_id", Type: field.TypeUUID},
 	}
@@ -1508,6 +1508,19 @@ var (
 						TransferReceiversColumns[6].Name: true,
 					},
 					Where: "CAST(status AS TEXT) IN ('INITIATED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')",
+				},
+			},
+			{
+				Name:    "idx_transferreceiver_claim_pending_pubkey_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransferReceiversColumns[3], TransferReceiversColumns[1], TransferReceiversColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						TransferReceiversColumns[1].Name: true,
+
+						TransferReceiversColumns[6].Name: true,
+					},
+					Where: "status IN ('RECEIVER_CLAIM_PENDING', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')",
 				},
 			},
 			{

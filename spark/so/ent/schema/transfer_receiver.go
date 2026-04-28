@@ -40,7 +40,7 @@ func (TransferReceiver) Fields() []ent.Field {
 			)),
 		field.Enum("status").
 			GoType(schematype.TransferReceiverStatus("")).
-			Comment("Current state of this receiver in the claim process (e.g. INITIATED, PENDING_RECEIVER_CLAIM, COMPLETED)").
+			Comment("Current state of this receiver in the claim process (e.g. INITIATED, RECEIVER_CLAIM_PENDING, RECEIVER_KEY_TWEAKED, COMPLETED)").
 			Annotations(entexample.Default(schematype.TransferReceiverStatusCompleted)),
 		field.Time("completion_time").
 			Optional().
@@ -80,13 +80,26 @@ func (TransferReceiver) Indexes() []ent.Index {
 		// below; the leading identity_pubkey column makes this the per-user
 		// partial.
 		//
-		// Prefer plain `status IN (...)` for future migrations.
+		// **Deprecated** — being replaced by idx_transferreceiver_claim_pending_pubkey_time.
+		// The new partial drops INITIATED (which was only here to support the
+		// pending-receiver query path that now reads RECEIVER_CLAIM_PENDING
+		// instead). This index will be dropped after the
+		// INITIATED → RECEIVER_CLAIM_PENDING backfill completes.
 		index.Fields("identity_pubkey", "create_time", "transfer_id").
 			Annotations(
 				entsql.DescColumns("create_time", "transfer_id"),
 				entsql.IndexWhere("CAST(status AS TEXT) IN ('INITIATED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')"),
 			).
 			StorageKey("idx_transferreceiver_pending_pubkey_time"),
+
+		// Partial index covering RECEIVER_CLAIM_PENDING + the 4 stuck states.
+		// Drives the receiver-arm of queryPendingTransfers for multi-receiver.
+		index.Fields("identity_pubkey", "create_time", "transfer_id").
+			Annotations(
+				entsql.DescColumns("create_time", "transfer_id"),
+				entsql.IndexWhere("status IN ('RECEIVER_CLAIM_PENDING', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')"),
+			).
+			StorageKey("idx_transferreceiver_claim_pending_pubkey_time"),
 
 		// Partial index covering only the four receiver-stuck statuses,
 		// keyed on (create_time DESC, transfer_id DESC) — no identity_pubkey

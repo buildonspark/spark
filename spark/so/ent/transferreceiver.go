@@ -29,7 +29,7 @@ type TransferReceiver struct {
 	TransferID uuid.UUID `json:"transfer_id,omitempty"`
 	// The identity public key of this receiver of the transfer.
 	IdentityPubkey keys.Public `json:"identity_pubkey,omitempty"`
-	// Current state of this receiver in the claim process (e.g. INITIATED, PENDING_RECEIVER_CLAIM, COMPLETED)
+	// Current state of this receiver in the claim process (e.g. INITIATED, RECEIVER_CLAIM_PENDING, RECEIVER_KEY_TWEAKED, COMPLETED)
 	Status schematype.TransferReceiverStatus `json:"status,omitempty"`
 	// The time when the transfer claim was completed.
 	CompletionTime time.Time `json:"completion_time,omitempty"`

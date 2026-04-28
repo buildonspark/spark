@@ -1,4 +1,4 @@
-h1:SZJwnJ9QAGGqMYSVKpKL5wmVSfmjllKHxGO91VW66xs=
+h1:bP4j40Z0cU/wPyg9Ero0RVh98hpbmT4ilYI2jzNr5og=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -155,3 +155,4 @@ h1:SZJwnJ9QAGGqMYSVKpKL5wmVSfmjllKHxGO91VW66xs=
 20260422220128_add_partial_indexes_for_query_rewrite.sql h1:09UtGdKGmNHLHRORyyY2Uv4n1PDMOCcafTlK4vhUa18=
 20260427231947_drop_utxoswap_expiry_time.sql h1:E8svLDwKTWgEvygCujVjD5vzBhGR+BWM2QANJPPDrVM=
 20260428000000_add_partial_index_for_no_pubkey_stuck.sql h1:DyunUmGh/VbObQ6deM3BOa9Z5ksSD/scFyv13kQcsYw=
+20260428215802_add_receiver_claim_pending_partial_index.sql h1:ysaf6zmZ0EFk49QzqiP1E8MefVIwB+XBWZYgCMYhhc4=

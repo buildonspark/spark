@@ -3037,10 +3037,12 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 			st.TransferReceiverStatusRefundSigned:
 			useStoredKeyTweaks = true
 		case st.TransferReceiverStatusSenderInitiated,
+			st.TransferReceiverStatusReceiverClaimPending,
 			st.TransferReceiverStatusKeyTweaked,
 			st.TransferReceiverStatusCompleted,
 			st.TransferReceiverStatusCancelled:
-			// Use the new claim package.
+			// Use the new claim package — receiver hasn't progressed past
+			// Phase 1 commit yet, so no stored key tweaks to reuse.
 		}
 	} else {
 		switch transfer.Status {
