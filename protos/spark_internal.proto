@@ -442,6 +442,11 @@ message RollbackUtxoSwapRequest {
     spark.UTXO on_chain_utxo = 1;
     bytes signature = 2;
     bytes coordinator_public_key = 3;
+    // Optional: the confirmation threshold the swap was originally created with.
+    // When set, the receiving operator re-verifies the UTXO at this threshold
+    // instead of falling back to the network default. Defaults to nil for
+    // legacy callers; receiving handler falls back to existing behavior.
+    optional uint32 confirmation_threshold = 4;
 }
 
 message RollbackUtxoSwapResponse {
@@ -462,6 +467,11 @@ message UtxoSwapCompletedRequest {
     spark.UTXO on_chain_utxo = 1;
     bytes signature = 2;
     bytes coordinator_public_key = 3;
+    // Optional: the confirmation threshold the swap was originally created with.
+    // When set, the receiving operator re-verifies the UTXO at this threshold
+    // instead of falling back to the network default. Defaults to nil for
+    // legacy callers; receiving handler falls back to existing behavior.
+    optional uint32 confirmation_threshold = 4;
 }
 
 message UtxoSwapCompletedResponse {

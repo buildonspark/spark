@@ -56,7 +56,7 @@ func TestRollbackUtxoSwap_UtxoDoesNotExist(t *testing.T) {
 		Txid:    nonExistentTxid,
 		Vout:    0,
 		Network: pb.Network_REGTEST,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
@@ -89,7 +89,7 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapDoesNotExist(t *testing.T) {
 		Txid:    utxo.Txid,
 		Vout:    utxo.Vout,
 		Network: pb.Network_REGTEST,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
@@ -123,7 +123,7 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCancelled(t *testing.T) {
 		Txid:    utxo.Txid,
 		Vout:    utxo.Vout,
 		Network: pb.Network_REGTEST,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
@@ -167,7 +167,7 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCreated(t *testing.T) {
 		Txid:    utxo.Txid,
 		Vout:    utxo.Vout,
 		Network: pb.Network_REGTEST,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
@@ -216,7 +216,7 @@ func TestRollbackUtxoSwap_ErrorIfUtxoSwapCompleted(t *testing.T) {
 		Txid:    utxo.Txid,
 		Vout:    utxo.Vout,
 		Network: pb.Network_REGTEST,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
@@ -268,7 +268,7 @@ func generateRollbackInstantRequest(
 	t.Helper()
 
 	// Reuse the existing helper which generates the correct signature
-	baseReq, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, cfg, utxo)
+	baseReq, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, cfg, utxo, nil)
 	require.NoError(t, err)
 
 	return &pbinternal.RollbackInstantUtxoSwapRequest{

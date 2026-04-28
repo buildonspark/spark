@@ -347,7 +347,7 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), config, tc.utxo)
+			result, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), config, tc.utxo, nil)
 
 			if tc.expectError {
 				require.ErrorContains(t, err, tc.errorMsg)
@@ -400,7 +400,7 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest_InvalidNetwork(t *t
 		Network: pb.Network_UNSPECIFIED, // Invalid network
 	}
 
-	_, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), config, utxo)
+	_, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), config, utxo, nil)
 	require.ErrorContains(t, err, "network is required")
 }
 
@@ -415,7 +415,7 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest_EmptyTxid(t *testin
 		Network: pb.Network_REGTEST,
 	}
 
-	result, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), config, utxo)
+	result, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), config, utxo, nil)
 	require.Error(t, err)
 	require.Nil(t, result)
 }

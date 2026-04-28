@@ -113,6 +113,10 @@ message GossipMessageRollbackUtxoSwap {
     bytes signature = 2;
     // Identity key of the Coordinator
     bytes coordinator_public_key = 3;
+    // Optional: the confirmation threshold the swap was originally created with.
+    // Receiving operators use this when re-verifying the UTXO during rollback,
+    // matching the threshold the coordinator used during initial creation.
+    optional uint32 confirmation_threshold = 4;
 }
 
 // Rollback UTXO swap is called when Create UTXO swap transaction failed to

@@ -671,7 +671,9 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 								Network: protoNetwork,
 							}
 
-							completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo)
+							// Non-instant swaps: the cron does not know the original threshold.
+							// nil falls back to receiver-side default (network config / 3).
+							completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo, nil)
 							if err != nil {
 								logger.Warn("Failed to get complete swap for utxo request, cron task to retry", zap.Error(err))
 							} else {
@@ -736,7 +738,10 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 								Network: protoNetwork,
 							}
 
-							completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo)
+							// Cron is filtered to RequestType==Instant, so the original
+							// threshold is always 1.
+							instantThreshold := uint32(1)
+							completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo, &instantThreshold)
 							if err != nil {
 								logger.Warn("Failed to create complete swap request for instant utxo swap", zap.Error(err))
 							} else {

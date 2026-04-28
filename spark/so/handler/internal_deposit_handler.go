@@ -699,7 +699,12 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 		return nil, fmt.Errorf("unable to get schema network: %w", err)
 	}
 
-	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo, nil)
+	// Re-verify the UTXO using the threshold the coordinator originally
+	// created the swap with (forwarded via the request). When nil — e.g. from
+	// older coordinators or non-static-deposit callers — fall through to the
+	// receiver-side default. This avoids the case where a swap created at a
+	// 1-conf threshold is rejected here because the default is 3.
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo, req.ConfirmationThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -945,8 +950,12 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 		return &pbinternal.UtxoSwapCompletedResponse{}, nil
 	}
 
-	var confirmationThreshold *uint32
-	if utxoSwap.RequestType == st.UtxoSwapRequestTypeInstant {
+	// Prefer the threshold the coordinator forwarded (matches what was used
+	// to verify the UTXO at swap creation). Fall back to the legacy
+	// RequestType==Instant heuristic when the coordinator didn't supply one
+	// (older coordinators, or callers that don't track the threshold).
+	confirmationThreshold := req.ConfirmationThreshold
+	if confirmationThreshold == nil && utxoSwap.RequestType == st.UtxoSwapRequestTypeInstant {
 		threshold := uint32(1)
 		confirmationThreshold = &threshold
 	}
@@ -963,7 +972,11 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 	return &pbinternal.UtxoSwapCompletedResponse{}, nil
 }
 
-func CreateCompleteSwapForUtxoRequest(config *so.Config, utxo *pb.UTXO) (*pbinternal.UtxoSwapCompletedRequest, error) {
+// CreateCompleteSwapForUtxoRequest builds a signed UtxoSwapCompletedRequest.
+// confirmationThreshold is propagated to the receiving operator so its UTXO
+// re-verification matches the threshold the swap was originally created with;
+// nil falls back to the existing receiver-side defaulting logic.
+func CreateCompleteSwapForUtxoRequest(config *so.Config, utxo *pb.UTXO, confirmationThreshold *uint32) (*pbinternal.UtxoSwapCompletedRequest, error) {
 	network, err := btcnetwork.FromProtoNetwork(utxo.Network)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get network: %w", err)
@@ -979,9 +992,10 @@ func CreateCompleteSwapForUtxoRequest(config *so.Config, utxo *pb.UTXO) (*pbinte
 	}
 	completedUtxoSwapRequestSignature := ecdsa.Sign(config.IdentityPrivateKey.ToBTCEC(), completedUtxoSwapRequestMessageHash)
 	return &pbinternal.UtxoSwapCompletedRequest{
-		OnChainUtxo:          utxo,
-		Signature:            completedUtxoSwapRequestSignature.Serialize(),
-		CoordinatorPublicKey: config.IdentityPublicKey().Serialize(),
+		OnChainUtxo:           utxo,
+		Signature:             completedUtxoSwapRequestSignature.Serialize(),
+		CoordinatorPublicKey:  config.IdentityPublicKey().Serialize(),
+		ConfirmationThreshold: confirmationThreshold,
 	}, nil
 }
 

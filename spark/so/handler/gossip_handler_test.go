@@ -105,7 +105,7 @@ func TestHandleRollbackUtxoSwapGossipMessage_NonExistentUtxo_Succeeds(t *testing
 		Txid:    nonExistentTxid,
 		Vout:    0,
 		Network: pb.Network_REGTEST,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	gossipMsg := &pbgossip.GossipMessageRollbackUtxoSwap{

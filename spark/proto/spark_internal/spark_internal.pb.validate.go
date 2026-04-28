@@ -5791,6 +5791,10 @@ func (m *RollbackUtxoSwapRequest) validate(all bool) error {
 
 	// no validation rules for CoordinatorPublicKey
 
+	if m.ConfirmationThreshold != nil {
+		// no validation rules for ConfirmationThreshold
+	}
+
 	if len(errors) > 0 {
 		return RollbackUtxoSwapRequestMultiError(errors)
 	}
@@ -6268,6 +6272,10 @@ func (m *UtxoSwapCompletedRequest) validate(all bool) error {
 	// no validation rules for Signature
 
 	// no validation rules for CoordinatorPublicKey
+
+	if m.ConfirmationThreshold != nil {
+		// no validation rules for ConfirmationThreshold
+	}
 
 	if len(errors) > 0 {
 		return UtxoSwapCompletedRequestMultiError(errors)

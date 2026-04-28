@@ -410,9 +410,10 @@ func (h *GossipHandler) handleRollbackUtxoSwapGossipMessage(ctx context.Context,
 
 	depositHandler := NewInternalDepositHandler(h.config)
 	_, err := depositHandler.RollbackUtxoSwap(ctx, h.config, &pbinternal.RollbackUtxoSwapRequest{
-		OnChainUtxo:          rollbackUtxoSwap.OnChainUtxo,
-		Signature:            rollbackUtxoSwap.Signature,
-		CoordinatorPublicKey: rollbackUtxoSwap.CoordinatorPublicKey,
+		OnChainUtxo:           rollbackUtxoSwap.OnChainUtxo,
+		Signature:             rollbackUtxoSwap.Signature,
+		CoordinatorPublicKey:  rollbackUtxoSwap.CoordinatorPublicKey,
+		ConfirmationThreshold: rollbackUtxoSwap.ConfirmationThreshold,
 	})
 	if err != nil {
 		if ent.IsNotFound(err) || status.Code(err) == codes.NotFound {

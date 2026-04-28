@@ -2625,6 +2625,10 @@ func (m *GossipMessageRollbackUtxoSwap) validate(all bool) error {
 
 	// no validation rules for CoordinatorPublicKey
 
+	if m.ConfirmationThreshold != nil {
+		// no validation rules for ConfirmationThreshold
+	}
+
 	if len(errors) > 0 {
 		return GossipMessageRollbackUtxoSwapMultiError(errors)
 	}

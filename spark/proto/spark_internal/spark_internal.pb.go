@@ -2823,8 +2823,13 @@ type RollbackUtxoSwapRequest struct {
 	OnChainUtxo          *spark.UTXO            `protobuf:"bytes,1,opt,name=on_chain_utxo,json=onChainUtxo,proto3" json:"on_chain_utxo,omitempty"`
 	Signature            []byte                 `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 	CoordinatorPublicKey []byte                 `protobuf:"bytes,3,opt,name=coordinator_public_key,json=coordinatorPublicKey,proto3" json:"coordinator_public_key,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Optional: the confirmation threshold the swap was originally created with.
+	// When set, the receiving operator re-verifies the UTXO at this threshold
+	// instead of falling back to the network default. Defaults to nil for
+	// legacy callers; receiving handler falls back to existing behavior.
+	ConfirmationThreshold *uint32 `protobuf:"varint,4,opt,name=confirmation_threshold,json=confirmationThreshold,proto3,oneof" json:"confirmation_threshold,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *RollbackUtxoSwapRequest) Reset() {
@@ -2876,6 +2881,13 @@ func (x *RollbackUtxoSwapRequest) GetCoordinatorPublicKey() []byte {
 		return x.CoordinatorPublicKey
 	}
 	return nil
+}
+
+func (x *RollbackUtxoSwapRequest) GetConfirmationThreshold() uint32 {
+	if x != nil && x.ConfirmationThreshold != nil {
+		return *x.ConfirmationThreshold
+	}
+	return 0
 }
 
 type RollbackUtxoSwapResponse struct {
@@ -3031,8 +3043,13 @@ type UtxoSwapCompletedRequest struct {
 	OnChainUtxo          *spark.UTXO            `protobuf:"bytes,1,opt,name=on_chain_utxo,json=onChainUtxo,proto3" json:"on_chain_utxo,omitempty"`
 	Signature            []byte                 `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 	CoordinatorPublicKey []byte                 `protobuf:"bytes,3,opt,name=coordinator_public_key,json=coordinatorPublicKey,proto3" json:"coordinator_public_key,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Optional: the confirmation threshold the swap was originally created with.
+	// When set, the receiving operator re-verifies the UTXO at this threshold
+	// instead of falling back to the network default. Defaults to nil for
+	// legacy callers; receiving handler falls back to existing behavior.
+	ConfirmationThreshold *uint32 `protobuf:"varint,4,opt,name=confirmation_threshold,json=confirmationThreshold,proto3,oneof" json:"confirmation_threshold,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *UtxoSwapCompletedRequest) Reset() {
@@ -3084,6 +3101,13 @@ func (x *UtxoSwapCompletedRequest) GetCoordinatorPublicKey() []byte {
 		return x.CoordinatorPublicKey
 	}
 	return nil
+}
+
+func (x *UtxoSwapCompletedRequest) GetConfirmationThreshold() uint32 {
+	if x != nil && x.ConfirmationThreshold != nil {
+		return *x.ConfirmationThreshold
+	}
+	return 0
 }
 
 type UtxoSwapCompletedResponse struct {
@@ -4596,11 +4620,13 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +
 	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\"W\n" +
 	"%CreateStaticDepositUtxoRefundResponse\x12.\n" +
-	"\x12UtxoDepositAddress\x18\x01 \x01(\tR\x12UtxoDepositAddress\"\x9e\x01\n" +
+	"\x12UtxoDepositAddress\x18\x01 \x01(\tR\x12UtxoDepositAddress\"\xf5\x01\n" +
 	"\x17RollbackUtxoSwapRequest\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +
-	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\"\x1a\n" +
+	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\x12:\n" +
+	"\x16confirmation_threshold\x18\x04 \x01(\rH\x00R\x15confirmationThreshold\x88\x01\x01B\x19\n" +
+	"\x17_confirmation_threshold\"\x1a\n" +
 	"\x18RollbackUtxoSwapResponse\"\xb7\x02\n" +
 	"\x1eRollbackInstantUtxoSwapRequest\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12\x1c\n" +
@@ -4608,11 +4634,13 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\x12K\n" +
 	"\x16rollback_from_statuses\x18\x04 \x03(\x0e2\x15.spark.UtxoSwapStatusR\x14rollbackFromStatuses\x12C\n" +
 	"\x12rollback_to_status\x18\x05 \x01(\x0e2\x15.spark.UtxoSwapStatusR\x10rollbackToStatus\"!\n" +
-	"\x1fRollbackInstantUtxoSwapResponse\"\x9f\x01\n" +
+	"\x1fRollbackInstantUtxoSwapResponse\"\xf6\x01\n" +
 	"\x18UtxoSwapCompletedRequest\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +
-	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\"\x1b\n" +
+	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\x12:\n" +
+	"\x16confirmation_threshold\x18\x04 \x01(\rH\x00R\x15confirmationThreshold\x88\x01\x01B\x19\n" +
+	"\x17_confirmation_threshold\"\x1b\n" +
 	"\x19UtxoSwapCompletedResponse\"\x92\x01\n" +
 	"\x1bLinkUtxoSwapTransferRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
@@ -5054,6 +5082,8 @@ func file_spark_internal_proto_init() {
 	file_spark_internal_proto_msgTypes[1].OneofWrappers = []any{}
 	file_spark_internal_proto_msgTypes[15].OneofWrappers = []any{}
 	file_spark_internal_proto_msgTypes[36].OneofWrappers = []any{}
+	file_spark_internal_proto_msgTypes[41].OneofWrappers = []any{}
+	file_spark_internal_proto_msgTypes[45].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

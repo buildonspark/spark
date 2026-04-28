@@ -95,7 +95,11 @@ func (o *StaticDepositHandler) CreateStaticDepositUtxoSwapForAllOperators(ctx co
 	return err
 }
 
-func GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx context.Context, config *so.Config, utxo *pb.UTXO) (*pbinternal.RollbackUtxoSwapRequest, error) {
+// GenerateRollbackStaticDepositUtxoSwapForUtxoRequest builds a signed
+// RollbackUtxoSwapRequest. confirmationThreshold is propagated to the
+// receiving operator so its UTXO re-verification matches the threshold the
+// swap was originally created with; nil falls back to receiver-side defaults.
+func GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx context.Context, config *so.Config, utxo *pb.UTXO, confirmationThreshold *uint32) (*pbinternal.RollbackUtxoSwapRequest, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	if utxo == nil {
 		return nil, fmt.Errorf("utxo is required")
@@ -128,13 +132,14 @@ func GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx context.Context, co
 		rollbackUtxoSwapRequestMessageHash,
 	)
 	return &pbinternal.RollbackUtxoSwapRequest{
-		OnChainUtxo:          utxo,
-		Signature:            rollbackUtxoSwapRequestSignature.Serialize(),
-		CoordinatorPublicKey: config.IdentityPublicKey().Serialize(),
+		OnChainUtxo:           utxo,
+		Signature:             rollbackUtxoSwapRequestSignature.Serialize(),
+		CoordinatorPublicKey:  config.IdentityPublicKey().Serialize(),
+		ConfirmationThreshold: confirmationThreshold,
 	}, nil
 }
 
-func (o *StaticDepositHandler) rollbackUtxoSwapUsingGossip(ctx context.Context, config *so.Config, utxo *pb.UTXO) {
+func (o *StaticDepositHandler) rollbackUtxoSwapUsingGossip(ctx context.Context, config *so.Config, utxo *pb.UTXO, confirmationThreshold *uint32) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
@@ -143,7 +148,7 @@ func (o *StaticDepositHandler) rollbackUtxoSwapUsingGossip(ctx context.Context, 
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to get operator list for rollback utxo swap %x:%d", utxo.Txid, utxo.Vout)
 		return
 	}
-	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, config, utxo)
+	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, config, utxo, confirmationThreshold)
 	if err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to create rollback request for rollback utxo swap %x:%d", utxo.Txid, utxo.Vout)
 		return
@@ -152,9 +157,10 @@ func (o *StaticDepositHandler) rollbackUtxoSwapUsingGossip(ctx context.Context, 
 	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
 		Message: &pbgossip.GossipMessage_RollbackUtxoSwap{
 			RollbackUtxoSwap: &pbgossip.GossipMessageRollbackUtxoSwap{
-				OnChainUtxo:          utxo,
-				Signature:            rollbackRequest.Signature,
-				CoordinatorPublicKey: rollbackRequest.CoordinatorPublicKey,
+				OnChainUtxo:           utxo,
+				Signature:             rollbackRequest.Signature,
+				CoordinatorPublicKey:  rollbackRequest.CoordinatorPublicKey,
+				ConfirmationThreshold: confirmationThreshold,
 			},
 		},
 	}, participants)
@@ -269,7 +275,9 @@ func (o *StaticDepositHandler) rollbackInstantStaticDepositUtxoSwapUsingGossip(c
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to get operator list for rollback instant utxo swap %x:%d", utxo.Txid, utxo.Vout)
 		return
 	}
-	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, config, utxo)
+	// RollbackInstantUtxoSwap on the receiver doesn't re-verify confirmations,
+	// so the threshold is unused here.
+	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, config, utxo, nil)
 	if err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to create rollback request for rollback utxo swap %x:%d", utxo.Txid, utxo.Vout)
 		return
@@ -394,7 +402,8 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 	// At this point the swap is considered successful. We will not return an error if this step fails.
 	// The user can retry calling this API to get the signed spend transaction.
 	// **********************************************************************************************
-	completedUtxoSwapRequest, err := CreateCompleteSwapForUtxoRequest(config, req.OnChainUtxo)
+	// Refund flow uses the network-default threshold; no custom threshold to forward.
+	completedUtxoSwapRequest, err := CreateCompleteSwapForUtxoRequest(config, req.OnChainUtxo, nil)
 	if err != nil {
 		logger.Warn("Failed to get complete swap for utxo request, cron task to retry", zap.Error(err))
 	} else {
@@ -426,7 +435,8 @@ func (o *StaticDepositHandler) createStaticDepositUtxoRefundWithRollback(ctx con
 			req.OnChainUtxo.Txid,
 			req.OnChainUtxo.Vout,
 		)
-		o.rollbackUtxoSwapUsingGossip(ctx, config, req.OnChainUtxo)
+		// Refund flow uses the network-default threshold; no custom threshold to forward.
+		o.rollbackUtxoSwapUsingGossip(ctx, config, req.OnChainUtxo, nil)
 		return err
 	}
 

@@ -1062,8 +1062,12 @@ type GossipMessageRollbackUtxoSwap struct {
 	Signature []byte `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 	// Identity key of the Coordinator
 	CoordinatorPublicKey []byte `protobuf:"bytes,3,opt,name=coordinator_public_key,json=coordinatorPublicKey,proto3" json:"coordinator_public_key,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Optional: the confirmation threshold the swap was originally created with.
+	// Receiving operators use this when re-verifying the UTXO during rollback,
+	// matching the threshold the coordinator used during initial creation.
+	ConfirmationThreshold *uint32 `protobuf:"varint,4,opt,name=confirmation_threshold,json=confirmationThreshold,proto3,oneof" json:"confirmation_threshold,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *GossipMessageRollbackUtxoSwap) Reset() {
@@ -1115,6 +1119,13 @@ func (x *GossipMessageRollbackUtxoSwap) GetCoordinatorPublicKey() []byte {
 		return x.CoordinatorPublicKey
 	}
 	return nil
+}
+
+func (x *GossipMessageRollbackUtxoSwap) GetConfirmationThreshold() uint32 {
+	if x != nil && x.ConfirmationThreshold != nil {
+		return *x.ConfirmationThreshold
+	}
+	return 0
 }
 
 // Rollback UTXO swap is called when Create UTXO swap transaction failed to
@@ -1845,11 +1856,13 @@ const file_gossip_proto_rawDesc = "" +
 	"&GossipMessageFinalizeRenewNodeTimelock\x127\n" +
 	"\n" +
 	"split_node\x18\x01 \x01(\v2\x18.spark_internal.TreeNodeR\tsplitNode\x12,\n" +
-	"\x04node\x18\x02 \x01(\v2\x18.spark_internal.TreeNodeR\x04node\"\xa4\x01\n" +
+	"\x04node\x18\x02 \x01(\v2\x18.spark_internal.TreeNodeR\x04node\"\xfb\x01\n" +
 	"\x1dGossipMessageRollbackUtxoSwap\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +
-	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\"\xbd\x02\n" +
+	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\x12:\n" +
+	"\x16confirmation_threshold\x18\x04 \x01(\rH\x00R\x15confirmationThreshold\x88\x01\x01B\x19\n" +
+	"\x17_confirmation_threshold\"\xbd\x02\n" +
 	"$GossipMessageRollbackInstantUtxoSwap\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +
@@ -2039,6 +2052,7 @@ func file_gossip_proto_init() {
 		(*GossipMessage_ConsensusRollback)(nil),
 		(*GossipMessage_PreimageSwap)(nil),
 	}
+	file_gossip_proto_msgTypes[12].OneofWrappers = []any{}
 	file_gossip_proto_msgTypes[18].OneofWrappers = []any{
 		(*GossipMessageUpdateWalletSetting_SetMasterIdentityPublicKey)(nil),
 		(*GossipMessageUpdateWalletSetting_ClearMasterIdentityPublicKey)(nil),
