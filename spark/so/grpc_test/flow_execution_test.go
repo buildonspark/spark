@@ -5,9 +5,14 @@ import (
 	"os"
 	"os/user"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
+	pbmock "github.com/lightsparkdev/spark/proto/mock"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/flowexecution"
@@ -17,6 +22,8 @@ import (
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // operatorDatabasePath returns the DB URI for the given operator index,
@@ -189,4 +196,166 @@ func newFlowExecutionsSince(t *testing.T, dbURI string, preExisting map[uuid.UUI
 		newOnes = append(newOnes, r)
 	}
 	return newOnes
+}
+
+// TestFlowExecution_ReconcileRecoversStuckParticipantRow exercises the full
+// cross-operator recovery loop end-to-end:
+//
+//	participant.reconcile_task → coordinator.ConsensusQueryOutcome RPC →
+//	participant.gossip-replay dispatch → participant FlowHandler.Commit →
+//	row transition to COMMITTED.
+//
+// To exercise this without relying on a real 2PC flow execution (whose
+// FlowHandler.Commit may not be safely re-runnable on already-committed
+// state), the test seeds the FlowExecution rows directly:
+//
+//  1. On the coordinator's DB: insert a COORDINATOR row with
+//     op_type=STORE_PREIMAGE_SHARE, status=COMMITTED, decision_payload=<a
+//     well-formed StorePreimageSharePrepareRequest Any>.
+//  2. On a participant's DB: insert a PARTICIPANT row with the same id,
+//     status=IN_FLIGHT, coordinator_index pointing at the coordinator,
+//     update_time backdated past the stuck threshold.
+//  3. Trigger reconcile_stuck_flow_executions on the participant.
+//  4. Assert the participant row transitions to COMMITTED.
+//
+// STORE_PREIMAGE_SHARE is chosen because its Commit and Rollback are no-ops
+// (the share was written during Prepare); the gossip-replay still runs the
+// real handler and the real row transition, so all the cross-operator
+// plumbing is validated. Direct DB seeding is the fixture path; everything
+// after step 2 runs through production code.
+func TestFlowExecution_ReconcileRecoversStuckParticipantRow(t *testing.T) {
+	if !sparktesting.HasLocalSparkIngressHost() {
+		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
+	}
+
+	config := wallet.NewTestWalletConfig(t)
+	coordinatorIdx := int(config.SigningOperators[config.CoordinatorIdentifier].ID)
+
+	// Pick a participant (anything that isn't the coordinator).
+	var participantIdx int
+	foundParticipant := false
+	for _, op := range config.SigningOperators {
+		if int(op.ID) != coordinatorIdx {
+			participantIdx = int(op.ID)
+			foundParticipant = true
+			break
+		}
+	}
+	require.True(t, foundParticipant, "need at least two operators to pick a non-coordinator participant")
+
+	// Build a well-formed payload for the coordinator's decision_payload.
+	// The exact contents don't matter — preimage_share's Commit ignores the
+	// payload — but the bytes have to round-trip through anypb.Any.
+	payloadAny, err := anypb.New(&pbinternal.StorePreimageSharePrepareRequest{})
+	require.NoError(t, err)
+	payloadBytes, err := proto.Marshal(payloadAny)
+	require.NoError(t, err)
+
+	executionID := uuid.New()
+
+	// Coordinator-side seed: a COORDINATOR row already in COMMITTED state
+	// with the decision payload populated. This is what ConsensusQueryOutcome
+	// will return when the participant's reconcile task queries.
+	insertSeedCoordinatorRow(t, operatorDatabasePath(t, coordinatorIdx), executionID, uint(coordinatorIdx), payloadBytes)
+	t.Cleanup(func() {
+		deleteSeedRow(t, operatorDatabasePath(t, coordinatorIdx), executionID)
+	})
+
+	// Participant-side seed: a PARTICIPANT row stuck IN_FLIGHT, backdated
+	// past the reconcile sweep's threshold so the next sweep picks it up.
+	insertSeedParticipantRow(t, operatorDatabasePath(t, participantIdx), executionID, uint(coordinatorIdx))
+	t.Cleanup(func() {
+		deleteSeedRow(t, operatorDatabasePath(t, participantIdx), executionID)
+	})
+
+	// Trigger the reconcile task on the participant via the mock RPC.
+	triggerTask(t, config.SigningOperators[operatorIdentifier(participantIdx)], "reconcile_stuck_flow_executions")
+
+	// Open one client for the polling loop rather than creating a new
+	// connection per tick.
+	participantClient := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, participantIdx))
+	defer participantClient.Close()
+
+	// TriggerTask returns when the task body returns, but allow a short poll
+	// window in case any internal step is async.
+	require.Eventually(t, func() bool {
+		row, err := participantClient.FlowExecution.Get(t.Context(), executionID)
+		require.NoError(t, err)
+		return row.Status == st.FlowExecutionStatusCommitted
+	}, 10*time.Second, 200*time.Millisecond,
+		"reconcile task did not recover the stuck participant row to COMMITTED")
+}
+
+// insertSeedCoordinatorRow creates a COORDINATOR FlowExecution row in
+// COMMITTED state. Used as a test fixture so the participant's reconcile
+// task gets a real coordinator to query.
+func insertSeedCoordinatorRow(t *testing.T, dbURI string, id uuid.UUID, coordIdx uint, decisionPayload []byte) {
+	t.Helper()
+	client := db.NewPostgresEntClientForIntegrationTest(t, dbURI)
+	defer client.Close()
+	_, err := client.FlowExecution.Create().
+		SetID(id).
+		SetRole(st.FlowExecutionRoleCoordinator).
+		SetOpType(int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE)).
+		SetStatus(st.FlowExecutionStatusCommitted).
+		SetCoordinatorIndex(coordIdx).
+		SetDecisionPayload(decisionPayload).
+		Save(t.Context())
+	require.NoError(t, err)
+}
+
+// insertSeedParticipantRow creates a PARTICIPANT FlowExecution row in
+// IN_FLIGHT state with a backdated update_time so the reconcile sweep picks
+// it up immediately.
+func insertSeedParticipantRow(t *testing.T, dbURI string, id uuid.UUID, coordIdx uint) {
+	t.Helper()
+	client := db.NewPostgresEntClientForIntegrationTest(t, dbURI)
+	defer client.Close()
+	_, err := client.FlowExecution.Create().
+		SetID(id).
+		SetRole(st.FlowExecutionRoleParticipant).
+		SetOpType(int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE)).
+		SetCoordinatorIndex(coordIdx).
+		Save(t.Context())
+	require.NoError(t, err)
+	// Backdate update_time. Ent's UpdateDefault(time.Now) on the column
+	// re-stamps it on every Update, so the only way to set an older value
+	// is via a separate Update call after creation.
+	_, err = client.FlowExecution.Update().
+		Where(flowexecution.ID(id)).
+		SetUpdateTime(time.Now().Add(-1 * time.Hour)).
+		Save(t.Context())
+	require.NoError(t, err)
+}
+
+// deleteSeedRow removes the test-fixture row by id. Called in t.Cleanup so
+// repeated test runs don't leak rows.
+func deleteSeedRow(t *testing.T, dbURI string, id uuid.UUID) {
+	t.Helper()
+	client := db.NewPostgresEntClientForIntegrationTest(t, dbURI)
+	defer client.Close()
+	_, err := client.FlowExecution.Delete().Where(flowexecution.ID(id)).Exec(t.Context())
+	if err != nil {
+		t.Logf("cleanup of seed row %s failed (non-fatal): %v", id, err)
+	}
+}
+
+// triggerTask calls the mock TriggerTask RPC on the given operator. The
+// reconcile task swallows per-row errors internally and returns nil under
+// normal operation, so any error here represents a real problem (bad task
+// name, RPC failure, DB query failure inside the task) and should fail the
+// test fast rather than letting the polling loop time out.
+func triggerTask(t *testing.T, op *so.SigningOperator, taskName string) {
+	t.Helper()
+	conn, err := op.NewOperatorGRPCConnection()
+	require.NoError(t, err)
+	defer conn.Close()
+	_, err = pbmock.NewMockServiceClient(conn).TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{TaskName: taskName})
+	require.NoErrorf(t, err, "TriggerTask(%s) failed", taskName)
+}
+
+// operatorIdentifier derives the 32-byte-hex operator identifier from the
+// operator's ID (matching testing/wallet/testing.go's `fmt.Sprintf("%064d", id+1)`).
+func operatorIdentifier(id int) string {
+	return fmt.Sprintf("%064d", id+1)
 }
