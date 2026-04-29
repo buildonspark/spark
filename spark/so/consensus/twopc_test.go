@@ -305,3 +305,101 @@ func TestExecute_WritesCoordinatorRow_RolledBackOnBuildCommitFailure(t *testing.
 	require.NotNil(t, row.DecisionPayload)
 	assert.True(t, proto.Equal(rollbackOp, payloadFromAnyBytes(t, *row.DecisionPayload)))
 }
+
+// --- CAS conflict tests (markCommitted vs. self-sweep race) ---
+
+// TestExecute_MarkCommitted_PreemptedByExternalRollback simulates the race
+// where the coordinator self-sweep transitions the row to ROLLED_BACK after
+// the engine started Execute but before it gets to markCommitted. The CAS
+// in markCommitted should detect the preemption, return
+// ErrCoordinatorRowPreempted, and Execute must not send commit gossip.
+func TestExecute_MarkCommitted_PreemptedByExternalRollback(t *testing.T) {
+	ctx, _, gs, client, config := newTestEngine(t)
+	commitOp := &pbgossip.GossipMessage{MessageId: "commit-payload"}
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
+
+	// preemptingFlow flips the engine's coordinator row to ROLLED_BACK
+	// inside BuildCommitPayload, simulating the self-sweep winning the
+	// race. The flow's Commit/Rollback handlers are no-ops; we're
+	// testing the engine's response, not the flow's.
+	preempt := &preemptingFlow{
+		ctx:          ctx,
+		client:       client,
+		commitResult: commitOp,
+		rollbackOp:   rollbackOp,
+	}
+
+	_, err := NewTwoPCEngine(config, gs).Execute(ctx, testOpType, selfSelection(t, config), preempt)
+	require.ErrorIs(t, err, ErrCoordinatorRowPreempted, "Execute must propagate the preemption")
+
+	// Row stays ROLLED_BACK — markCommitted's conditional UPDATE matched
+	// zero rows, leaving the sweep's transition intact.
+	rows, err := client.FlowExecution.Query().All(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, st.FlowExecutionStatusRolledBack, rows[0].Status,
+		"sweep-driven ROLLED_BACK must not be clobbered by markCommitted")
+
+	// No commit gossip sent — the engine bailed before reaching e.commit.
+	for _, c := range gs.calls {
+		assert.Nil(t, c.msg.GetConsensusCommit(),
+			"no ConsensusCommit gossip must be sent after a markCommitted preemption")
+	}
+}
+
+// TestMarkRolledBack_AlreadyRolledBack_IsNoOp confirms markRolledBack's CAS
+// is benign on an already-terminal row: it returns nil rather than erroring
+// or overwriting (the row is already in the rolled-back state we wanted).
+func TestMarkRolledBack_AlreadyRolledBack_IsNoOp(t *testing.T) {
+	ctx, engine, _, client, _ := newTestEngine(t)
+	row, err := client.FlowExecution.Create().
+		SetRole(st.FlowExecutionRoleCoordinator).
+		SetOpType(int32(testOpType)).
+		SetCoordinatorIndex(uint(testCoordinatorID)).
+		SetStatus(st.FlowExecutionStatusRolledBack).
+		Save(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, engine.markRolledBack(ctx, row), "CAS conflict on markRolledBack must be benign")
+
+	updated, err := client.FlowExecution.Get(ctx, row.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.FlowExecutionStatusRolledBack, updated.Status)
+}
+
+// preemptingFlow simulates the coordinator self-sweep racing the engine: in
+// BuildCommitPayload it transitions the engine's coordinator row to
+// ROLLED_BACK out of band, so the engine's subsequent markCommitted hits
+// a CAS conflict.
+type preemptingFlow struct {
+	ctx          context.Context
+	client       *ent.Client
+	commitResult proto.Message
+	rollbackOp   proto.Message
+}
+
+func (f *preemptingFlow) Prepare(_ context.Context, _ proto.Message) (proto.Message, error) {
+	return nil, nil
+}
+func (f *preemptingFlow) Commit(_ context.Context, _ proto.Message) error   { return nil }
+func (f *preemptingFlow) Rollback(_ context.Context, _ proto.Message) error { return nil }
+func (f *preemptingFlow) PrepareOp() proto.Message                          { return f.rollbackOp }
+func (f *preemptingFlow) PrepareTask(_ context.Context, _ *so.SigningOperator) (proto.Message, error) {
+	return nil, nil
+}
+
+// BuildCommitPayload flips the (single) coordinator row to ROLLED_BACK
+// before returning the commit payload. This is the moral equivalent of the
+// sweep transitioning the row while the engine is mid-flight.
+func (f *preemptingFlow) BuildCommitPayload(_ context.Context, _ map[string]*anypb.Any) (proto.Message, error) {
+	if _, err := f.client.FlowExecution.Update().
+		SetStatus(st.FlowExecutionStatusRolledBack).
+		Save(f.ctx); err != nil {
+		return nil, fmt.Errorf("preempt: %w", err)
+	}
+	return f.commitResult, nil
+}
+
+func (f *preemptingFlow) RollbackPayload() proto.Message { return f.rollbackOp }
+
+var _ CoordinatorFlow = (*preemptingFlow)(nil)

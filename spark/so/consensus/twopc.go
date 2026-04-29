@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/logging"
@@ -9,12 +10,22 @@ import (
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/helper"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
+
+// ErrCoordinatorRowPreempted is returned by markCommitted (and is the cause
+// surfaced by Execute when applicable) if the coordinator's FlowExecution
+// row has been transitioned out of IN_FLIGHT before the engine got to its
+// commit-time write. Most likely cause: SweepStaleCoordinatorFlows raced
+// the engine and presumed-aborted the row to ROLLED_BACK, in which case
+// proceeding to commit gossip would diverge the coordinator's recorded
+// outcome from what participants will see when they reconcile.
+var ErrCoordinatorRowPreempted = errors.New("coordinator FlowExecution row was preempted before markCommitted (likely swept to ROLLED_BACK by the self-sweep task)")
 
 // TwoPCEngine orchestrates consensus using two-phase commit.
 //
@@ -104,14 +115,7 @@ func (e *TwoPCEngine) Execute(
 	results, err := helper.ExecuteTaskWithAllOperators(ctx, e.config, selection, prepareTask)
 	if err != nil {
 		logger.Sugar().Infof("2PC prepare: failed for op type %d, sending rollback", opType)
-		if markErr := e.markRolledBack(ctx, row); markErr != nil {
-			logger.With(zap.Error(markErr)).Sugar().Errorf(
-				"failed to mark FlowExecution rolled back for op type %d", opType)
-		}
-		if rollbackErr := e.rollback(ctx, opType, flow.RollbackPayload(), executionID, participants); rollbackErr != nil {
-			logger.With(zap.Error(rollbackErr)).Sugar().Errorf(
-				"failed to send consensus rollback gossip for op type %d", opType)
-		}
+		e.attemptRollback(ctx, row, opType, flow, executionID, participants)
 		return nil, fmt.Errorf("prepare failed: %w", err)
 	}
 	logger.Sugar().Infof("2PC prepare: all %d participants ready for op type %d", len(participants), opType)
@@ -119,18 +123,20 @@ func (e *TwoPCEngine) Execute(
 	commitOp, err := flow.BuildCommitPayload(ctx, results)
 	if err != nil {
 		logger.Sugar().Infof("2PC build-commit: failed for op type %d, sending rollback", opType)
-		if markErr := e.markRolledBack(ctx, row); markErr != nil {
-			logger.With(zap.Error(markErr)).Sugar().Errorf(
-				"failed to mark FlowExecution rolled back for op type %d", opType)
-		}
-		if rollbackErr := e.rollback(ctx, opType, flow.RollbackPayload(), executionID, participants); rollbackErr != nil {
-			logger.With(zap.Error(rollbackErr)).Sugar().Errorf(
-				"failed to send consensus rollback gossip for op type %d", opType)
-		}
+		e.attemptRollback(ctx, row, opType, flow, executionID, participants)
 		return nil, fmt.Errorf("build-commit failed: %w", err)
 	}
 
 	if err := e.markCommitted(ctx, row, commitOp); err != nil {
+		// CAS conflict: the row was already transitioned out of
+		// IN_FLIGHT by some other path (most likely the self-sweep).
+		// Don't send commit gossip; the participants will resolve to
+		// the actually-recorded outcome via ConsensusQueryOutcome.
+		if errors.Is(err, ErrCoordinatorRowPreempted) {
+			logger.With(zap.Error(err)).Sugar().Warnf(
+				"2PC commit: coordinator row preempted for op type %d, skipping commit gossip", opType)
+			return nil, fmt.Errorf("commit preempted: %w", err)
+		}
 		return nil, fmt.Errorf("failed to mark FlowExecution committed: %w", err)
 	}
 
@@ -142,6 +148,31 @@ func (e *TwoPCEngine) Execute(
 	}
 	logger.Sugar().Infof("2PC commit: complete for op type %d", opType)
 	return commitOp, nil
+}
+
+// attemptRollback runs the abort path: mark the coordinator row
+// ROLLED_BACK (CAS — benign no-op if the sweep has already done so) and
+// send rollback gossip to participants. Errors on each step are logged but
+// not returned: the caller is already in an error path with a primary
+// failure reason that should propagate, and best-effort cleanup of the
+// row plus rollback gossip is what the system is designed for.
+func (e *TwoPCEngine) attemptRollback(
+	ctx context.Context,
+	row *ent.FlowExecution,
+	opType pbgossip.ConsensusOperationType,
+	flow CoordinatorFlow,
+	executionID string,
+	participants []string,
+) {
+	logger := logging.GetLoggerFromContext(ctx)
+	if markErr := e.markRolledBack(ctx, row); markErr != nil {
+		logger.With(zap.Error(markErr)).Sugar().Errorf(
+			"failed to mark FlowExecution rolled back for op type %d", opType)
+	}
+	if rollbackErr := e.rollback(ctx, opType, flow.RollbackPayload(), executionID, participants); rollbackErr != nil {
+		logger.With(zap.Error(rollbackErr)).Sugar().Errorf(
+			"failed to send consensus rollback gossip for op type %d", opType)
+	}
 }
 
 // createCoordinatorRow inserts the coordinator's FlowExecution row with the
@@ -178,6 +209,14 @@ func (e *TwoPCEngine) createCoordinatorRow(
 // markCommitted updates the coordinator row with the commit payload bytes and
 // the COMMITTED status. Called before commit gossip is sent so a late crash
 // leaves the row in COMMITTED state with the correct payload.
+//
+// Uses a conditional UPDATE (status=IN_FLIGHT) rather than UpdateOne so a
+// concurrent self-sweep that has already transitioned the row to
+// ROLLED_BACK is not silently overwritten. Returns
+// ErrCoordinatorRowPreempted when the CAS finds zero rows; the caller
+// must abort the commit gossip in that case so the coordinator's recorded
+// outcome stays consistent with what participants will see via
+// ConsensusQueryOutcome.
 func (e *TwoPCEngine) markCommitted(ctx context.Context, row *ent.FlowExecution, commitOp proto.Message) error {
 	commitBytes, err := marshalAny(commitOp)
 	if err != nil {
@@ -187,22 +226,42 @@ func (e *TwoPCEngine) markCommitted(ctx context.Context, row *ent.FlowExecution,
 	if err != nil {
 		return err
 	}
-	_, err = db.FlowExecution.UpdateOne(row).
+	n, err := db.FlowExecution.Update().
+		Where(
+			flowexecution.ID(row.ID),
+			flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
+		).
 		SetStatus(st.FlowExecutionStatusCommitted).
 		SetDecisionPayload(commitBytes).
 		Save(ctx)
-	return err
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrCoordinatorRowPreempted
+	}
+	return nil
 }
 
-// markRolledBack transitions the coordinator row to ROLLED_BACK. decision_payload
-// already contains the rollback bytes from row creation, so no payload update
-// is needed.
+// markRolledBack transitions the coordinator row to ROLLED_BACK.
+// decision_payload already contains the rollback bytes from row creation,
+// so no payload update is needed.
+//
+// Like markCommitted, uses a conditional UPDATE so a row that's already
+// terminal (most likely already-rolled-back via the self-sweep) isn't
+// touched again. Unlike markCommitted, a CAS conflict here is benign:
+// the row is already in the rolled-back state we wanted, so the
+// zero-rows-affected case is silently treated as success.
 func (e *TwoPCEngine) markRolledBack(ctx context.Context, row *ent.FlowExecution) error {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return err
 	}
-	_, err = db.FlowExecution.UpdateOne(row).
+	_, err = db.FlowExecution.Update().
+		Where(
+			flowexecution.ID(row.ID),
+			flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
+		).
 		SetStatus(st.FlowExecutionStatusRolledBack).
 		Save(ctx)
 	return err
