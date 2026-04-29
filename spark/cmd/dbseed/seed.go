@@ -425,7 +425,7 @@ func emitDualRole(ctx context.Context, g *generator, count int,
 			expiryTime:             g.randomExpiry(ct, status),
 		}
 		sr := senderRow{id: g.newRowID(), createTime: ct, updateTime: ct, transferID: tid, identityPubkey: selfPk}
-		rr := receiverRow{id: g.newRowID(), createTime: ct, updateTime: ct, transferID: tid, identityPubkey: selfPk, status: g.pickReceiverStatus()}
+		rr := receiverRow{id: g.newRowID(), createTime: ct, updateTime: ct, transferID: tid, identityPubkey: selfPk, status: receiverStatusForTransfer(status)}
 		select {
 		case transferCh <- tr:
 		case <-ctx.Done():

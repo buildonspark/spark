@@ -52,31 +52,25 @@ type WalletGroup struct {
 }
 
 // WalletPhase is one emit pass for a WalletGroup: an exact row count, a fixed
-// role, and the three distributions used to sample status/type per row.
+// role, and the two distributions used to sample transfer status/type per
+// row. Receiver status is derived from the picked transfer status via
+// receiverStatusForTransfer.
 //
-// Counts are exact (no min/max range) because the whole point of these profiles
-// is to reproduce concrete observed cardinality. Distributions are required —
-// nil weights would silently fall back to nothing useful.
+// Counts are exact (no min/max range) because the whole point of these
+// profiles is to reproduce concrete observed cardinality. Distributions are
+// required — nil weights would silently fall back to nothing useful.
 type WalletPhase struct {
 	Label            string
 	Count            int
 	Role             PhaseRole
 	TransferStatuses []StatusWeight
 	TransferTypes    []TypeWeight
-	ReceiverStatuses []ReceiverStatusWeight
 }
 
 // StatusWeight is a (status, weight) pair. Weights are unnormalized; the
 // generator sums them and picks by proportional cumulative.
 type StatusWeight struct {
 	Status st.TransferStatus
-	Weight int
-}
-
-// ReceiverStatusWeight mirrors StatusWeight for the transfer_receivers.status
-// enum (different enum type).
-type ReceiverStatusWeight struct {
-	Status st.TransferReceiverStatus
 	Weight int
 }
 
@@ -113,13 +107,11 @@ type Config struct {
 	DualRoleTransfers int
 	DualRoleTierLabel string // which tier's pubkey to use for dual-role rows
 
-	// Status & type distributions for transfers.
+	// Status & type distributions for transfers. Receiver status is derived
+	// from the picked transfer status via receiverStatusForTransfer — it
+	// isn't independently configured.
 	TransferStatuses []StatusWeight
 	TransferTypes    []TypeWeight
-
-	// Receiver-side status distribution. Independent of transfer.status because
-	// the receiver enum is a different set of values.
-	ReceiverStatuses []ReceiverStatusWeight
 
 	// create_time is distributed uniformly in [now - CreateTimeSpan, now].
 	// For realistic ORDER BY behavior and uuid v7 temporal alignment.
@@ -217,15 +209,6 @@ func fullConfig(includeSSP bool) *Config {
 			{Type: st.TransferTypeCooperativeExit, Weight: 1},
 			{Type: st.TransferTypeSwap, Weight: 1},
 		},
-		ReceiverStatuses: []ReceiverStatusWeight{
-			{Status: st.TransferReceiverStatusCompleted, Weight: 9950},
-			{Status: st.TransferReceiverStatusKeyTweaked, Weight: 20},
-			{Status: st.TransferReceiverStatusKeyTweakLocked, Weight: 10},
-			{Status: st.TransferReceiverStatusKeyTweakApplied, Weight: 10},
-			{Status: st.TransferReceiverStatusRefundSigned, Weight: 5},
-			{Status: st.TransferReceiverStatusSenderInitiated, Weight: 3},
-			{Status: st.TransferReceiverStatusCancelled, Weight: 2},
-		},
 		CreateTimeSpanDays: 365,
 		Network:            "MAINNET",
 		ReportEvery:        500_000,
@@ -270,16 +253,17 @@ func smokeConfig() *Config {
 // Without the backdrop, the planner under-estimates how much the partial
 // index saves over walking the full per-pubkey index.
 func realisticSSPConfig() *Config {
-	// Pending mix on mainnet SSP (probe 1: status counts; probe 2: type counts).
-	// Captured 2026-04-28; total pending = 92 (status) / 91 (types) — the 1-row
-	// gap is in-flight mutation between the two probes. Status weights and type
-	// weights below are weighted-sample inputs, so 92 sampled rows will yield
-	// approximately these counts.
-	mainnetPendingStatus := []ReceiverStatusWeight{
-		{Status: st.TransferReceiverStatusSenderInitiated, Weight: 86},
-		{Status: st.TransferReceiverStatusRefundSigned, Weight: 3},
-		{Status: st.TransferReceiverStatusKeyTweaked, Weight: 2},
-		{Status: st.TransferReceiverStatusKeyTweakLocked, Weight: 1},
+	// Mainnet SSP pending: total 92. Transfer-status weights are chosen so
+	// the receiver mix falls out via receiverStatusForTransfer:
+	//   SENDER_KEY_TWEAKED:86         → 86 RECEIVER_CLAIM_PENDING
+	//   ReceiverRefundSigned:3        → 3 REFUND_SIGNED
+	//   ReceiverKeyTweaked:2          → 2 KEY_TWEAKED
+	//   ReceiverKeyTweakLocked:1      → 1 KEY_TWEAK_LOCKED
+	mainnetPendingTransferStatus := []StatusWeight{
+		{Status: st.TransferStatusSenderKeyTweaked, Weight: 86},
+		{Status: st.TransferStatusReceiverRefundSigned, Weight: 3},
+		{Status: st.TransferStatusReceiverKeyTweaked, Weight: 2},
+		{Status: st.TransferStatusReceiverKeyTweakLocked, Weight: 1},
 	}
 	mainnetPendingTypes := []TypeWeight{
 		{Type: st.TransferTypePreimageSwap, Weight: 48},
@@ -289,11 +273,11 @@ func realisticSSPConfig() *Config {
 		{Type: st.TransferTypePrimarySwapV3, Weight: 2},
 		{Type: st.TransferTypeCounterSwap, Weight: 1},
 	}
-	// Pending mix on regtest SSP (probes 1 and 2). Total 64 (status) / 60 (types).
-	regtestPendingStatus := []ReceiverStatusWeight{
-		{Status: st.TransferReceiverStatusSenderInitiated, Weight: 61},
-		{Status: st.TransferReceiverStatusRefundSigned, Weight: 2},
-		{Status: st.TransferReceiverStatusKeyTweakApplied, Weight: 1},
+	// Regtest SSP pending: total 64. Same correlation rule.
+	regtestPendingTransferStatus := []StatusWeight{
+		{Status: st.TransferStatusSenderKeyTweaked, Weight: 61},
+		{Status: st.TransferStatusReceiverRefundSigned, Weight: 2},
+		{Status: st.TransferStatusReceiverKeyTweakApplied, Weight: 1},
 	}
 	regtestPendingTypes := []TypeWeight{
 		{Type: st.TransferTypeSwap, Weight: 52},
@@ -302,22 +286,9 @@ func realisticSSPConfig() *Config {
 		{Type: st.TransferTypeTransfer, Weight: 2},
 		{Type: st.TransferTypePrimarySwapV3, Weight: 1},
 	}
-	// Completed backdrop. Each SSP's lifetime-COMPLETED receiver volume is
-	// dominated by the same swap families that show up in pending — so we reuse
-	// the pending type weights for the completed backdrop too. The status is
-	// pinned to COMPLETED.
-	completedStatus := []ReceiverStatusWeight{
-		{Status: st.TransferReceiverStatusCompleted, Weight: 1},
-	}
-	// transfers.status is always COMPLETED for completed receivers and a
-	// pending-family value for pending receivers. We flatten this — both phases
-	// pin transfers.status to a single value via a single-weight slice. (For
-	// pending, we pick the dominant pending status; planner only cares that
-	// this row appears in the receiver-side partial index, which is keyed off
-	// transfer_receivers.status, not transfers.status.)
-	pendingTransferStatus := []StatusWeight{
-		{Status: st.TransferStatusSenderKeyTweaked, Weight: 1},
-	}
+	// Completed backdrop — transfer.status COMPLETED maps to
+	// receiver.status COMPLETED. Reuse the pending type weights so the
+	// completed lifetime volume matches the pending swap-family bias.
 	completedTransferStatus := []StatusWeight{
 		{Status: st.TransferStatusCompleted, Weight: 1},
 	}
@@ -330,15 +301,14 @@ func realisticSSPConfig() *Config {
 			{
 				Label:   "ssp-mainnet",
 				Network: "MAINNET",
-				Purpose: "real mainnet SSP — 92 pending receivers (swap-family dominated) on top of a 23.7M-row completed backdrop. Models pubkey 023e33e2920326f64ea31058d44777442d97d7d5cbfcf54e3060bc1695e5261c93 (prod 2026-04-28).",
+				Purpose: "real mainnet SSP — 92 pending receivers (swap-family dominated) on top of a 23.7M-row completed backdrop. Models pubkey 023e33e2920326f64ea31058d44777442d97d7d5cbfcf54e3060bc1695e5261c93.",
 				Phases: []WalletPhase{
 					{
 						Label:            "pending",
 						Count:            92,
 						Role:             PhaseRoleReceiver,
-						TransferStatuses: pendingTransferStatus,
+						TransferStatuses: mainnetPendingTransferStatus,
 						TransferTypes:    mainnetPendingTypes,
-						ReceiverStatuses: mainnetPendingStatus,
 					},
 					{
 						Label:            "completed",
@@ -346,22 +316,20 @@ func realisticSSPConfig() *Config {
 						Role:             PhaseRoleReceiver,
 						TransferStatuses: completedTransferStatus,
 						TransferTypes:    mainnetPendingTypes,
-						ReceiverStatuses: completedStatus,
 					},
 				},
 			},
 			{
 				Label:   "ssp-regtest",
 				Network: "REGTEST",
-				Purpose: "real regtest SSP — 64 pending (SWAP-dominated, distinct from mainnet's PREIMAGE_SWAP-dominated mix) on top of a 752K completed backdrop. Models pubkey 022bf283544b16c0622daecb79422007d167eca6ce9f0c98c0c49833b1f7170bfe (prod 2026-04-28).",
+				Purpose: "real regtest SSP — 64 pending (SWAP-dominated, distinct from mainnet's PREIMAGE_SWAP-dominated mix) on top of a 752K completed backdrop. Models pubkey 022bf283544b16c0622daecb79422007d167eca6ce9f0c98c0c49833b1f7170bfe.",
 				Phases: []WalletPhase{
 					{
 						Label:            "pending",
 						Count:            64,
 						Role:             PhaseRoleReceiver,
-						TransferStatuses: pendingTransferStatus,
+						TransferStatuses: regtestPendingTransferStatus,
 						TransferTypes:    regtestPendingTypes,
-						ReceiverStatuses: regtestPendingStatus,
 					},
 					{
 						Label:            "completed",
@@ -369,65 +337,57 @@ func realisticSSPConfig() *Config {
 						Role:             PhaseRoleReceiver,
 						TransferStatuses: completedTransferStatus,
 						TransferTypes:    regtestPendingTypes,
-						ReceiverStatuses: completedStatus,
 					},
 				},
 			},
 		},
-		// Config-level Network is unused when WalletGroups is set — every group
-		// names its own network — but the field is still required to be set
-		// somewhere reasonable. Use MAINNET as a sensible default.
+		// Config-level Network is unused when WalletGroups is set — every
+		// group names its own network — but the field is still required to
+		// be set somewhere reasonable. Use MAINNET as a sensible default.
 		Network:            "MAINNET",
 		CreateTimeSpanDays: 365,
 		ReportEvery:        500_000,
 	}
 }
 
-// stuckUserConfig models the tail of stuck-user wallets — identities that have
-// accumulated tens of thousands of unclaimed inbound TRANSFERs and almost no
-// completed receivers. The primary fixture reproduces the worst-case prod
-// pubkey (~58.9k pending, ~100% INITIATED, ~100% TRANSFER); five smaller
-// secondary fixtures cover the next-largest stuck users so the planner
-// doesn't get confused by the 0329dd outlier alone.
+// stuckUserConfig models the tail of stuck-user wallets — identities sitting
+// on tens of thousands of unclaimed inbound TRANSFERs. All fixtures are
+// MAINNET; counts and type weights come from prod probes 4 and 6 (see
+// CLAUDE.md for probe SQL). The primary fixture reproduces the worst-case
+// prod pubkey; five smaller secondaries cover the next-largest so the
+// planner doesn't get to over-fit to the outlier.
 //
-// All fixtures are MAINNET — prod's stuck-user wallets are all mainnet. Phase
-// counts and type/status weights come from prod probes 4 and 6 (see CLAUDE.md
-// in this dir for the probe SQL); captured 2026-04-28.
+// Pending phase pins transfers.status to SENDER_KEY_TWEAKED, so all
+// receivers are post-tweak / awaiting-claim — RECEIVER_CLAIM_PENDING and
+// downstream RECEIVER_* states, no INITIATED. (RECEIVER_CLAIM_PENDING is
+// not in mimoStuckReceiverStatuses by design, and the "stuck" in this
+// profile name refers to the user being stuck, not the technical
+// stuck-transfer status set.)
 //
-// Each pubkey gets a small completed phase so postgres pg_stats sees a
-// realistic active-vs-total ratio — without it, the planner doesn't have the
-// right numerator/denominator for its partial-index cost estimates.
+// The primary fixture also gets a small completed phase so pg_stats sees a
+// realistic active-vs-total ratio for that pubkey.
 func stuckUserConfig() *Config {
-	// 100% INITIATED pending status, modeled with a tiny weighted tail to
-	// preserve the prod observation that ~2 of ~58.9k pending receivers had
-	// non-INITIATED status. The generator's weighted sample distributes
-	// proportionally across counts, so this tail produces a vanishing minority.
-	primaryPendingStatus := []ReceiverStatusWeight{
-		{Status: st.TransferReceiverStatusSenderInitiated, Weight: 58_951},
-		{Status: st.TransferReceiverStatusKeyTweakApplied, Weight: 1},
-		{Status: st.TransferReceiverStatusRefundSigned, Weight: 1},
+	// Pending transfer-status mix drives the receiver mix via
+	// receiverStatusForTransfer:
+	//   SENDER_KEY_TWEAKED:58951      → 58951 RECEIVER_CLAIM_PENDING
+	//   ReceiverKeyTweakApplied:1     → 1 KEY_TWEAK_APPLIED
+	//   ReceiverRefundSigned:1        → 1 REFUND_SIGNED
+	// The 1-row tail mirrors the prod observation that ~2 of ~58.9k were
+	// already past the awaiting-claim state.
+	primaryPendingTransferStatus := []StatusWeight{
+		{Status: st.TransferStatusSenderKeyTweaked, Weight: 58_951},
+		{Status: st.TransferStatusReceiverKeyTweakApplied, Weight: 1},
+		{Status: st.TransferStatusReceiverRefundSigned, Weight: 1},
 	}
 	// Pending types: ~all TRANSFER, 1 COUNTER_SWAP per probe 4.
 	primaryPendingTypes := []TypeWeight{
 		{Type: st.TransferTypeTransfer, Weight: 58_952},
 		{Type: st.TransferTypeCounterSwap, Weight: 1},
 	}
-	// Completed phase types/status (probe 4: 2439 TRANSFER + 8 COUNTER_SWAP).
+	// Completed phase types (probe 4: 2439 TRANSFER + 8 COUNTER_SWAP).
 	primaryCompletedTypes := []TypeWeight{
 		{Type: st.TransferTypeTransfer, Weight: 2_439},
 		{Type: st.TransferTypeCounterSwap, Weight: 8},
-	}
-	// Status weights pin to COMPLETED for the completed phase; INITIATED-family
-	// for the pending phase's transfers row. (transfers.status is independent of
-	// transfer_receivers.status; the partial index that matters is on the
-	// receiver side. We pin transfers.status conservatively to a pending-family
-	// value for pending, COMPLETED for completed, so any future query that does
-	// JOIN to transfers and filters by status sees consistent rows.)
-	completedReceiverStatus := []ReceiverStatusWeight{
-		{Status: st.TransferReceiverStatusCompleted, Weight: 1},
-	}
-	pendingTransferStatus := []StatusWeight{
-		{Status: st.TransferStatusSenderKeyTweaked, Weight: 1},
 	}
 	completedTransferStatus := []StatusWeight{
 		{Status: st.TransferStatusCompleted, Weight: 1},
@@ -437,15 +397,14 @@ func stuckUserConfig() *Config {
 		{
 			Label:   "stuck-user-primary",
 			Network: "MAINNET",
-			Purpose: "worst-case prod stuck user — 58953 pending receivers (~100% INITIATED + TRANSFER). Models pubkey 0329dd5999cc2ac895cb24118c0df7009ab4ca659e5d247f1857de91a869069c24 (prod 2026-04-28).",
+			Purpose: "worst-case prod stuck user — 58953 pending receivers (~all TRANSFER + RECEIVER_CLAIM_PENDING). Models pubkey 0329dd5999cc2ac895cb24118c0df7009ab4ca659e5d247f1857de91a869069c24.",
 			Phases: []WalletPhase{
 				{
 					Label:            "pending",
 					Count:            58_953,
 					Role:             PhaseRoleReceiver,
-					TransferStatuses: pendingTransferStatus,
+					TransferStatuses: primaryPendingTransferStatus,
 					TransferTypes:    primaryPendingTypes,
-					ReceiverStatuses: primaryPendingStatus,
 				},
 				{
 					Label:            "completed",
@@ -453,18 +412,17 @@ func stuckUserConfig() *Config {
 					Role:             PhaseRoleReceiver,
 					TransferStatuses: completedTransferStatus,
 					TransferTypes:    primaryCompletedTypes,
-					ReceiverStatuses: completedReceiverStatus,
 				},
 			},
 		},
 	}
-	// Secondary stuck-user pubkeys (probe 6). Counts and dominant type per
-	// pubkey from prod; status weights default to 100% INITIATED pending since
-	// probe 6 didn't break out status (the broader pattern from probe 4 is that
-	// stuck-user pending is ~all INITIATED). No completed phase for these —
-	// they're meant to verify the planner doesn't over-fit to the 0329dd
-	// outlier alone, which is best done with the partial-index population
-	// shape, not the lifetime receiver count.
+	// Secondary stuck-user pubkeys (probe 6). Transfer status pinned to
+	// SENDER_KEY_TWEAKED → all receivers map to RECEIVER_CLAIM_PENDING. No
+	// completed phase — secondaries exist purely to give the partial index
+	// a more representative population shape.
+	secondaryTransferStatus := []StatusWeight{
+		{Status: st.TransferStatusSenderKeyTweaked, Weight: 1},
+	}
 	type secondary struct {
 		label   string
 		count   int
@@ -503,9 +461,6 @@ func stuckUserConfig() *Config {
 			purpose: "sixth-largest stuck user — 3274 pending, ~100% TRANSFER. Models pubkey 023efa8b4ebd1e283cf6c513fc496eb5ff15e1e753e22c5416206eb573c9aebb66.",
 		},
 	}
-	secondaryStatus := []ReceiverStatusWeight{
-		{Status: st.TransferReceiverStatusSenderInitiated, Weight: 1},
-	}
 	for _, s := range secondaries {
 		groups = append(groups, WalletGroup{
 			Label:   s.label,
@@ -516,9 +471,8 @@ func stuckUserConfig() *Config {
 					Label:            "pending",
 					Count:            s.count,
 					Role:             PhaseRoleReceiver,
-					TransferStatuses: pendingTransferStatus,
+					TransferStatuses: secondaryTransferStatus,
 					TransferTypes:    s.types,
-					ReceiverStatuses: secondaryStatus,
 				},
 			},
 		})

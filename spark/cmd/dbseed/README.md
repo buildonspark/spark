@@ -85,7 +85,7 @@ Five profiles, two generation models. Pick one per use case:
 | `full-no-ssp` | Same as `full` minus the T1 SSP wallet — fast iteration when you need the prod-shaped ladder but can't pay the 25M-edge cost. | ~11.5M | 2-4 min | MAINNET | Tiers |
 | `smoke` | Iterating on the generator itself or the snapshot/restore workflow — *not* for query work. | ~10k | seconds | MAINNET | Tiers |
 | `realistic_ssp` | Validating queries against the *real* SSP cardinality shape — small pending count behind a multi-million completed backdrop, on both networks. Use when SSP-specific plan choice matters and the synthetic T1 wallet's distribution would mislead. | ~24.5M | 15-25 min | MAINNET + REGTEST | WalletGroups |
-| `stuck_user` | Validating queries against the worst-case unclaimed-inbound-backlog shape — pubkey with tens of thousands of pending TRANSFERs, almost all INITIATED. Use when the question is "does this hold up at the high end of pending-receiver cardinality, where SSP shape doesn't reach". | ~120k | seconds | MAINNET | WalletGroups |
+| `stuck_user` | Validating queries against the worst-case unclaimed-inbound-backlog shape — pubkey with tens of thousands of pending TRANSFERs, all `RECEIVER_CLAIM_PENDING` (the awaiting-claim state). Use when the question is "does this hold up at the high end of pending-receiver cardinality, where SSP shape doesn't reach". | ~120k | seconds | MAINNET | WalletGroups |
 
 **Tiers vs WalletGroups**: `full` / `full-no-ssp` / `smoke` are tier-driven —
 a population of synthetic wallets at varying scales, all sampling from the
@@ -124,6 +124,28 @@ Generation time observed locally: smoke ≈ seconds, full ≈ 15-25 min
 - ~0.3% `SENDER_KEY_TWEAKED` (dominates the receiver-union partial index)
 - Small minorities of each other pending/stuck status so partial-index
   cardinality is realistic for planner cost estimates.
+
+**Receiver status distribution** (for `transfer_receivers` table) is
+derived from `transfers.status` via `receiverStatusForTransfer` — every
+receiver row's status corresponds to its transfer's status (no
+independent sampling). On `full` the receiver mix follows directly from
+the transfer-status weights above:
+- ~99.5% `COMPLETED` (from `transfers.status = COMPLETED`)
+- ~0.3% `RECEIVER_CLAIM_PENDING` (from `SENDER_KEY_TWEAKED`)
+- Small minorities of `RECEIVER_KEY_TWEAKED`, `RECEIVER_KEY_TWEAK_LOCKED`,
+  `RECEIVER_KEY_TWEAK_APPLIED`, `RECEIVER_REFUND_SIGNED` (from their 1:1
+  transfer-side counterparts)
+- A smaller `INITIATED` tail (from the pre-tweak transfer family:
+  `SENDER_INITIATED`, `SENDER_INITIATED_COORDINATOR`,
+  `SENDER_KEY_TWEAK_PENDING`)
+- A `CANCELLED` tail (from `RETURNED` and `EXPIRED`)
+
+Both receiver-pending partial indexes get populated — the legacy
+`idx_transferreceiver_pending_pubkey_time` (5-status set including
+`INITIATED`) and the new
+`idx_transferreceiver_claim_pending_pubkey_time` (5-status set including
+`RECEIVER_CLAIM_PENDING`, excludes `INITIATED`) — so plan choice on
+either is exercised.
 
 **Type distribution**: 90% `TRANSFER`, 8% `PREIMAGE_SWAP`, trace `COOPERATIVE_EXIT` / `SWAP`.
 
@@ -175,12 +197,16 @@ against `transfer_receivers` (captured 2026-04-28; see `CLAUDE.md` in this dir
 for the probe SQL). Designed for `queryPendingTransfersMIMO` validation — the
 SSP-side perf question this profile answers.
 
-Two synthetic SSP wallets, each on its own network:
+Two synthetic SSP wallets, each on its own network. Pending phase weights
+`transfers.status` toward `SENDER_KEY_TWEAKED` plus the four post-claim
+`RECEIVER_*` statuses; receiver status follows the deterministic mapping,
+so receivers are `RECEIVER_CLAIM_PENDING` (the dominant post-tweak share)
+and downstream `RECEIVER_*` states, never `INITIATED`.
 
-| Wallet | Network | Pending phase | Completed phase | Pending status mix |
+| Wallet | Network | Pending phase | Completed phase | Pending receiver mix (derived from transfer-status weights) |
 |---|---|---|---|---|
-| `ssp-mainnet` | MAINNET | 92 receivers | 23,729,623 receivers | 86 INITIATED, 3 REFUND_SIGNED, 2 KEY_TWEAKED, 1 KEY_TWEAK_LOCKED |
-| `ssp-regtest` | REGTEST | 64 receivers | 752,154 receivers | 61 INITIATED, 2 REFUND_SIGNED, 1 KEY_TWEAK_APPLIED |
+| `ssp-mainnet` | MAINNET | 92 receivers | 23,729,623 receivers | 86 RECEIVER_CLAIM_PENDING, 3 REFUND_SIGNED, 2 KEY_TWEAKED, 1 KEY_TWEAK_LOCKED |
+| `ssp-regtest` | REGTEST | 64 receivers | 752,154 receivers | 61 RECEIVER_CLAIM_PENDING, 2 REFUND_SIGNED, 1 KEY_TWEAK_APPLIED |
 
 Pending type mix differs sharply between networks: mainnet pending is
 PREIMAGE_SWAP-dominated (~53%), regtest pending is SWAP-dominated (~81%) —
@@ -212,12 +238,15 @@ bind-parameter crash zone sits right around 50k-100k pending. This profile
 surfaces those failure modes; `realistic_ssp` doesn't.
 
 Reproduces the tail of stuck-user wallets — identities sitting on tens of
-thousands of unclaimed inbound TRANSFERs in `INITIATED` status. The primary
-fixture matches the worst-case prod pubkey
-(`0329dd5999cc2ac895cb24118c0df7009ab4ca659e5d247f1857de91a869069c24`,
-~58.9k pending receivers, ~100% INITIATED, ~100% TRANSFER); five smaller
-secondary fixtures cover the next-largest stuck users so the planner doesn't
-get to optimize against a single outlier and look fine.
+thousands of unclaimed inbound TRANSFERs. Stuck-user backlogs are
+post-sender-tweak by definition (the user is "stuck" because they haven't
+claimed, not because the sender hasn't finished), so the pending phase pins
+`transfers.status` to `SENDER_KEY_TWEAKED` and receivers are
+`RECEIVER_CLAIM_PENDING`. The primary fixture matches the worst-case prod
+pubkey (`0329dd5999cc2ac895cb24118c0df7009ab4ca659e5d247f1857de91a869069c24`,
+~58.9k pending receivers, ~100% TRANSFER); five smaller secondary fixtures
+cover the next-largest stuck users so the planner doesn't get to optimize
+against a single outlier and look fine.
 
 | Wallet | Network | Pending phase | Completed phase |
 |---|---|---|---|
@@ -228,9 +257,11 @@ get to optimize against a single outlier and look fine.
 | `stuck-user-0344608d` | MAINNET | 4,563 | — |
 | `stuck-user-023efa8b` | MAINNET | 3,274 | — |
 
-Pending status: ≥99.99% `INITIATED`. Pending type: ≥99% `TRANSFER` (a tiny
-COUNTER_SWAP / PREIMAGE_SWAP tail mirrors prod's outlier rows so the planner
-sees a representative type histogram).
+Pending status: ≥99.9% `RECEIVER_CLAIM_PENDING` (awaiting-claim state, with
+a vanishing tail of `RECEIVER_KEY_TWEAK_APPLIED` and `RECEIVER_REFUND_SIGNED`
+mirroring prod's 2 outlier rows). Pending type: ≥99% `TRANSFER` (a tiny
+`COUNTER_SWAP` / `PREIMAGE_SWAP` tail mirrors prod's outlier rows so the
+planner sees a representative type histogram).
 
 Total transfer rows: ~120k. Generates in seconds. Tiers and dual-role
 transfers from `full` are NOT included.
@@ -247,12 +278,16 @@ FROM transfer_receivers
 GROUP BY identity_pubkey
 ORDER BY COUNT(*) DESC LIMIT 10;
 
--- Partial index population — should be a nontrivial minority (~50k on full)
+-- transfers partial index population — should be a nontrivial minority (~50k on full)
 SELECT status, COUNT(*) FROM transfers
 WHERE status IN (
   'SENDER_KEY_TWEAKED','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
   'RECEIVER_KEY_TWEAK_APPLIED','RECEIVER_REFUND_SIGNED'
 ) GROUP BY status;
+
+-- transfer_receivers status histogram — confirms RECEIVER_CLAIM_PENDING
+-- gets generated alongside the legacy pending-family values
+SELECT status, COUNT(*) FROM transfer_receivers GROUP BY status ORDER BY count(*) DESC;
 
 -- Dual-role overlap (should be ~DualRoleTransfers)
 SELECT COUNT(*)

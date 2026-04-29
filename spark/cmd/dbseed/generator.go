@@ -49,20 +49,17 @@ type receiverRow struct {
 // generator emits rows for one wallet's contribution to the three tables.
 // Each wallet gets its own generator so progress and memory are bounded.
 type generator struct {
-	rng           *rand.Rand
-	wallet        walletID
-	cfg           *Config
-	statusCDF     []int
-	statusOrder   []st.TransferStatus
-	statusSum     int
-	typeCDF       []int
-	typeOrder     []st.TransferType
-	typeSum       int
-	receiverCDF   []int
-	receiverOrder []st.TransferReceiverStatus
-	receiverSum   int
-	baseTime      time.Time
-	spanNanos     int64
+	rng         *rand.Rand
+	wallet      walletID
+	cfg         *Config
+	statusCDF   []int
+	statusOrder []st.TransferStatus
+	statusSum   int
+	typeCDF     []int
+	typeOrder   []st.TransferType
+	typeSum     int
+	baseTime    time.Time
+	spanNanos   int64
 }
 
 // walletID identifies one wallet (tier + index-within-tier).
@@ -92,16 +89,65 @@ func newGenerator(cfg *Config, w walletID, globalSeed int64) *generator {
 
 	g.statusSum, g.statusCDF, g.statusOrder = cumulativeStatus(cfg.TransferStatuses)
 	g.typeSum, g.typeCDF, g.typeOrder = cumulativeType(cfg.TransferTypes)
-	g.receiverSum, g.receiverCDF, g.receiverOrder = cumulativeReceiverStatus(cfg.ReceiverStatuses)
 	return g
 }
 
-// cumulativeStatus / cumulativeType / cumulativeReceiverStatus return the
-// total weight, prefix-sum CDF, and the value slice in declaration order.
-// The CDF + order pair is what pickFromCDF needs to sample without holding a
-// reference to the original weight slice — used by both the tier-driven
-// emit() (CDFs cached on the generator) and the WalletGroup-driven
-// emitPhase() (CDFs built per-phase).
+// receiverStatusForTransfer maps a transfer's status to the corresponding
+// receiver status, modeling the state-machine progression where the receiver
+// row tracks the transfer it belongs to:
+//
+//   - Sender-side pending (pre-tweak) → INITIATED. The sender hasn't
+//     completed its key-tweak handoff yet, so the receiver can't act.
+//   - SENDER_KEY_TWEAKED → RECEIVER_CLAIM_PENDING. The sender finished;
+//     the receiver should now claim.
+//   - The four post-claim RECEIVER_* transfer statuses → their 1:1
+//     receiver-side counterpart (this is the "stuck receiver" range —
+//     receiver started claiming but didn't finish).
+//   - COMPLETED → COMPLETED.
+//   - RETURNED / EXPIRED → CANCELLED. There's no receiver-side
+//     RETURNED/EXPIRED enum value, so both terminal-failure transfer
+//     states collapse onto the receiver's CANCELLED.
+//
+// Deterministic — keeps transfer.status and transfer_receivers.status
+// consistent in seeded data instead of sampling them independently. Plan
+// validation against EXISTS-style joins or any predicate that hops the two
+// status columns is now meaningful.
+func receiverStatusForTransfer(s st.TransferStatus) st.TransferReceiverStatus {
+	switch s {
+	case st.TransferStatusCompleted:
+		return st.TransferReceiverStatusCompleted
+	case st.TransferStatusReturned, st.TransferStatusExpired:
+		return st.TransferReceiverStatusCancelled
+	case st.TransferStatusSenderInitiated,
+		st.TransferStatusSenderInitiatedCoordinator,
+		st.TransferStatusSenderKeyTweakPending,
+		st.TransferStatusApplyingSenderKeyTweak:
+		return st.TransferReceiverStatusSenderInitiated
+	case st.TransferStatusSenderKeyTweaked:
+		return st.TransferReceiverStatusReceiverClaimPending
+	case st.TransferStatusReceiverKeyTweaked:
+		return st.TransferReceiverStatusKeyTweaked
+	case st.TransferStatusReceiverKeyTweakLocked:
+		return st.TransferReceiverStatusKeyTweakLocked
+	case st.TransferStatusReceiverKeyTweakApplied:
+		return st.TransferReceiverStatusKeyTweakApplied
+	case st.TransferStatusReceiverRefundSigned:
+		return st.TransferReceiverStatusRefundSigned
+	}
+	// All TransferStatus values are enumerated above; if a new value is
+	// added to the schematype enum, the dbseed build will compile but the
+	// mapping won't cover it. Catching that at runtime is preferable to
+	// silently emitting a wrong receiver state.
+	panic("dbseed: unmapped TransferStatus " + string(s) + " — extend receiverStatusForTransfer")
+}
+
+// cumulativeStatus / cumulativeType return the total weight, prefix-sum
+// CDF, and the value slice in declaration order. The CDF + order pair is
+// what pickFromCDF needs to sample without holding a reference to the
+// original weight slice — used by both the tier-driven emit() (CDFs cached
+// on the generator) and the WalletGroup-driven emitPhase() (CDFs built
+// per-phase). Receiver status is not sampled — see
+// receiverStatusForTransfer.
 func cumulativeStatus(w []StatusWeight) (int, []int, []st.TransferStatus) {
 	cdf := make([]int, len(w))
 	order := make([]st.TransferStatus, len(w))
@@ -126,51 +172,31 @@ func cumulativeType(w []TypeWeight) (int, []int, []st.TransferType) {
 	return sum, cdf, order
 }
 
-func cumulativeReceiverStatus(w []ReceiverStatusWeight) (int, []int, []st.TransferReceiverStatus) {
-	cdf := make([]int, len(w))
-	order := make([]st.TransferReceiverStatus, len(w))
-	sum := 0
-	for i, x := range w {
-		sum += x.Weight
-		cdf[i] = sum
-		order[i] = x.Status
-	}
-	return sum, cdf, order
-}
-
-// phaseCDFs bundles the three caller-built distributions emitPhase samples
-// from. Bundling avoids 11 positional parameters at the call site without
-// changing semantics — each field is exactly what the underlying
-// cumulative* helper returned.
+// phaseCDFs bundles the two caller-built distributions emitPhase samples
+// from. Bundling avoids passing the underlying triplets as positional args.
+// Receiver status is derived from the picked transfer status via
+// receiverStatusForTransfer, so it's not sampled here.
 type phaseCDFs struct {
-	statusSum     int
-	statusCDF     []int
-	statusOrder   []st.TransferStatus
-	typeSum       int
-	typeCDF       []int
-	typeOrder     []st.TransferType
-	receiverSum   int
-	receiverCDF   []int
-	receiverOrder []st.TransferReceiverStatus
+	statusSum   int
+	statusCDF   []int
+	statusOrder []st.TransferStatus
+	typeSum     int
+	typeCDF     []int
+	typeOrder   []st.TransferType
 }
 
-// newPhaseCDFs builds the CDF bundle for a phase, calling the cumulative*
-// helpers in order. Cheap — phase weight slices are at most a handful of
-// entries each.
+// newPhaseCDFs builds the CDF bundle for a phase. Cheap — phase weight
+// slices are at most a handful of entries each.
 func newPhaseCDFs(phase WalletPhase) phaseCDFs {
 	statusSum, statusCDF, statusOrder := cumulativeStatus(phase.TransferStatuses)
 	typeSum, typeCDF, typeOrder := cumulativeType(phase.TransferTypes)
-	receiverSum, receiverCDF, receiverOrder := cumulativeReceiverStatus(phase.ReceiverStatuses)
 	return phaseCDFs{
-		statusSum:     statusSum,
-		statusCDF:     statusCDF,
-		statusOrder:   statusOrder,
-		typeSum:       typeSum,
-		typeCDF:       typeCDF,
-		typeOrder:     typeOrder,
-		receiverSum:   receiverSum,
-		receiverCDF:   receiverCDF,
-		receiverOrder: receiverOrder,
+		statusSum:   statusSum,
+		statusCDF:   statusCDF,
+		statusOrder: statusOrder,
+		typeSum:     typeSum,
+		typeCDF:     typeCDF,
+		typeOrder:   typeOrder,
 	}
 }
 
@@ -261,7 +287,7 @@ func (g *generator) emit(
 			updateTime:     ct,
 			transferID:     tid,
 			identityPubkey: receiverPk,
-			status:         g.pickReceiverStatus(),
+			status:         receiverStatusForTransfer(status),
 		}
 		select {
 		case transferCh <- tr:
@@ -290,10 +316,8 @@ func (g *generator) emit(
 // Config defaults cached on the generator — which is the whole reason
 // WalletPhase exists.
 //
-// Phase distributions are passed in as a phaseCDFs bundle. Building them at
-// the call site rather than caching on the generator keeps the existing emit()
-// path (used by tier seeding) unchanged and lets multiple phases for one
-// wallet use different distributions without mutating shared state.
+// Receiver status, as in emit(), is derived from the picked transfer status
+// via receiverStatusForTransfer rather than sampled independently.
 func (g *generator) emitPhase(
 	ctx context.Context,
 	count int,
@@ -311,8 +335,8 @@ func (g *generator) emitPhase(
 			tid = uuid.New()
 		}
 		ct := g.randomCreateTime()
-		// Phase-local CDF sampling. Same shape as g.pickStatus / pickType /
-		// pickReceiverStatus but using the caller-supplied CDF bundle.
+		// Phase-local CDF sampling. Same shape as g.pickStatus / pickType
+		// but using the caller-supplied CDF bundle.
 		status := pickFromCDF(g.rng.IntN(cdfs.statusSum), cdfs.statusCDF, cdfs.statusOrder)
 		ttype := pickFromCDF(g.rng.IntN(cdfs.typeSum), cdfs.typeCDF, cdfs.typeOrder)
 
@@ -350,7 +374,7 @@ func (g *generator) emitPhase(
 			updateTime:     ct,
 			transferID:     tid,
 			identityPubkey: receiverPk,
-			status:         pickFromCDF(g.rng.IntN(cdfs.receiverSum), cdfs.receiverCDF, cdfs.receiverOrder),
+			status:         receiverStatusForTransfer(status),
 		}
 		select {
 		case transferCh <- tr:
@@ -371,9 +395,9 @@ func (g *generator) emitPhase(
 	return nil
 }
 
-// pickFromCDF is the generic counterpart of pickStatus/pickType/pickReceiverStatus,
-// extracted so emitPhase can use caller-supplied CDFs without baking them into
-// the generator.
+// pickFromCDF is the generic counterpart of pickStatus / pickType, extracted
+// so emitPhase can use caller-supplied CDFs without baking them into the
+// generator.
 func pickFromCDF[T any](r int, cdf []int, order []T) T {
 	for i, cum := range cdf {
 		if r < cum {
@@ -423,8 +447,4 @@ func (g *generator) pickStatus() st.TransferStatus {
 
 func (g *generator) pickType() st.TransferType {
 	return pickFromCDF(g.rng.IntN(g.typeSum), g.typeCDF, g.typeOrder)
-}
-
-func (g *generator) pickReceiverStatus() st.TransferReceiverStatus {
-	return pickFromCDF(g.rng.IntN(g.receiverSum), g.receiverCDF, g.receiverOrder)
 }

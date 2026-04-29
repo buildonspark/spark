@@ -19,7 +19,7 @@ this is the "which one and why" map for someone extending the tool:
 | `full-no-ssp` | Tiers | Same as `full` minus the T1 SSP | Lets you keep the rest of the ladder while skipping the 25M-edge SSP that dominates wall-clock. |
 | `smoke` | Tiers | `full` scaled down ~1000× | For iterating on the dbseed code itself — *not* a query-perf profile. |
 | `realistic_ssp` | WalletGroups | Real SSP: low-hundreds pending + multi-million COMPLETED, both networks | Validates queries on the SSP shape, where the pending subset is a tiny needle behind a giant haystack. T1 in `full` doesn't reproduce this — its pending set is sampled per the global mix, not pinned to ~92. |
-| `stuck_user` | WalletGroups | Real stuck users: tens of thousands of pending TRANSFER+INITIATED | Validates queries on the *opposite* extreme from `realistic_ssp` — pending is most of the rows, partial-index doesn't help, and 50k-100k pending is the bind-parameter crash zone. |
+| `stuck_user` | WalletGroups | Real stuck users: tens of thousands of pending TRANSFER + RECEIVER_CLAIM_PENDING (awaiting-claim state) | Validates queries on the *opposite* extreme from `realistic_ssp` — pending is most of the rows, partial-index doesn't help, and 50k-100k pending is the bind-parameter crash zone. |
 
 When in doubt about extending: if the new shape is "a population of wallets
 varying by size", it's a tier. If it's "this specific prod identity with this
@@ -75,16 +75,27 @@ WHERE identity_pubkey = decode('<hex>','hex');
 
 #### Partial-index population (the queryable haystack)
 
+Two receiver-pending partial indexes coexist — pick the one matching the
+query under study. The legacy `idx_transferreceiver_pending_pubkey_time`
+covers a 5-status set including `INITIATED`; the new
+`idx_transferreceiver_claim_pending_pubkey_time` covers a 5-status set
+including `RECEIVER_CLAIM_PENDING` and excluding `INITIATED`.
+
 ```sql
--- transfer_receivers pending partial — what queryPendingTransfersMIMO walks
+-- Legacy pending partial
 SELECT count(*) FROM transfer_receivers
 WHERE status IN ('INITIATED','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
                  'RECEIVER_KEY_TWEAK_APPLIED','RECEIVER_REFUND_SIGNED');
 
--- Same, scoped to one pubkey (matches the partial's leading column)
+-- New pending partial — what queryPendingTransfersMIMO walks
+SELECT count(*) FROM transfer_receivers
+WHERE status IN ('RECEIVER_CLAIM_PENDING','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
+                 'RECEIVER_KEY_TWEAK_APPLIED','RECEIVER_REFUND_SIGNED');
+
+-- Same, scoped to one pubkey (matches each partial's leading column)
 SELECT count(*) FROM transfer_receivers
 WHERE identity_pubkey = decode('<hex>','hex')
-  AND status IN ('INITIATED','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
+  AND status IN ('RECEIVER_CLAIM_PENDING','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
                  'RECEIVER_KEY_TWEAK_APPLIED','RECEIVER_REFUND_SIGNED');
 ```
 
@@ -95,7 +106,7 @@ SELECT t.type, r.status, count(*)
 FROM transfer_receivers r
 INNER JOIN transfers t ON t.id = r.transfer_id
 WHERE r.identity_pubkey = decode('<hex>','hex')
-  AND r.status IN ('INITIATED','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
+  AND r.status IN ('RECEIVER_CLAIM_PENDING','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
                    'RECEIVER_KEY_TWEAK_APPLIED','RECEIVER_REFUND_SIGNED')
 GROUP BY t.type, r.status ORDER BY count(*) DESC;
 ```
@@ -111,20 +122,30 @@ Add `VERBOSE` only when you need to see column references in node detail.
 
 ### dbseed gotchas to call out in interpretation
 
-**Independent status assignment** — in the `full` profile, `transfers.status`
-and `transfer_receivers.status` are sampled independently, while in prod
-they're tightly correlated via dual-write. So `EXISTS`-style queries that
-join transfer-stuck conditions to receiver-stuck conditions get the wrong
-selectivity on dbseed `full`. Flag this any time the query hops the two
-status columns. The `realistic_ssp` and `stuck_user` profiles fix this for
-the wallets they model (statuses are pinned per-phase), but only for those
-specific identities.
+**Status correlation** — every receiver row's status is derived from the
+transfer's status via `receiverStatusForTransfer`. The two columns stay
+consistent across all profiles (no independent sampling), so
+`EXISTS`-style queries and any predicate that hops the two status columns
+get the right selectivity. Profile authors set transfer-status weights;
+the receiver mix falls out automatically.
 
-**Composition vs selectivity** — `full` matches prod *selectivity* (~0.3% in
-the receiver-pending partial index) but inverts *composition* (mostly
-`SENDER_KEY_TWEAKED` in dbseed; mostly `INITIATED` in prod). Selectivity
-drives plan choice, but composition can affect index ordering and predicate
-push-down — note both numbers when interpreting.
+**Composition vs selectivity** — `full` matches prod *selectivity* (~0.3%
+in the receiver-pending partial index) but inverts *composition* (mostly
+`SENDER_KEY_TWEAKED` in dbseed; mostly `RECEIVER_CLAIM_PENDING` in prod).
+Selectivity drives plan choice, but composition can affect index ordering
+and predicate push-down — note both numbers when interpreting.
+
+**INITIATED vs RECEIVER_CLAIM_PENDING** — `INITIATED` is the brief
+pre-sender-tweak window; `RECEIVER_CLAIM_PENDING` is the post-tweak /
+awaiting-claim state. The bulk of receiver pending in prod lives in
+`RECEIVER_CLAIM_PENDING`. The `realistic_ssp` and `stuck_user` profiles
+weight transfer.status toward `SENDER_KEY_TWEAKED` (and the four post-claim
+`RECEIVER_*` statuses) for their pending phase, so their receivers are all
+`RECEIVER_CLAIM_PENDING` or further along — no `INITIATED`. The `full`
+profile assigns small minority weight to the pre-tweak transfer statuses
+(`SENDER_INITIATED`, `SENDER_INITIATED_COORDINATOR`,
+`SENDER_KEY_TWEAK_PENDING`, `APPLYING_SENDER_KEY_TWEAK`) so a small
+`INITIATED`-receiver tail exists too — the legacy partial gets populated.
 
 **Profile-specific cardinality** — the same probe gives wildly different
 answers on `full` vs `realistic_ssp` vs `stuck_user`. State which profile is
@@ -293,11 +314,31 @@ Common causes:
   someone refactors to use the pool, the setting vanishes on each new conn.
 
 ### If partial index cardinality looks wrong
-The `full` profile targets ~0.3% `SENDER_KEY_TWEAKED` to populate the
-receiver-union partial index. On 11M transfers, expect ~33k rows. If you
-see orders of magnitude off, check `config.go:fullConfig` status weights —
-they're denominated in an unnormalized weight space where total sums to
-10000 (so weight 30 → 0.3%).
+The `full` profile targets ~0.3% `SENDER_KEY_TWEAKED` (weight 30 of 10000)
+to populate the receiver-union partial index. On 11M transfers, expect
+~33k rows. If you see orders of magnitude off, check
+`config.go:fullConfig` status weights — they're denominated in an
+unnormalized weight space where total sums to 10000.
+
+For the receiver-side, there are two partials:
+`idx_transferreceiver_pending_pubkey_time` (legacy, covers `INITIATED` +
+4 `RECEIVER_*`) and `idx_transferreceiver_claim_pending_pubkey_time`
+(new, covers `RECEIVER_CLAIM_PENDING` + same 4 `RECEIVER_*`). Receiver
+status is derived from transfer status, so the partial populations come
+from the `TransferStatuses` weights:
+
+- **Legacy partial** = `INITIATED` (= sum of pre-tweak transfer weights:
+  `SenderInitiated:2` + `SenderInitiatedCoordinator:1` +
+  `SenderKeyTweakPending:3` = 6) + 4 `RECEIVER_*` (= `ReceiverKeyTweaked:5`
+  + `ReceiverKeyTweakLocked:3` + `ReceiverKeyTweakApplied:2` +
+  `ReceiverRefundSigned:2` = 12) = **18 of 10000 (~0.18%)**.
+- **New partial** = `RECEIVER_CLAIM_PENDING` (= `SenderKeyTweaked:30`) +
+  same 4 `RECEIVER_*` (12) = **42 of 10000 (~0.42%)**.
+
+So the new partial should be ~2.3× more populated than the legacy on
+`full`. If the new partial is empty, check that
+`receiverStatusForTransfer` is wired up — every transfer status should
+map to a receiver status.
 
 ### If dual-role dedup isn't triggering
 `DualRoleTransfers = 2000` in full profile (20 in smoke). These are

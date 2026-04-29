@@ -63,10 +63,16 @@ func TestRealisticSSPDistribution(t *testing.T) {
 			regtest.pendingTypeCounts)
 	}
 
-	// Mainnet pending status: INITIATED must be the most common (~93%).
-	if !isMostCommonReceiverStatus(mainnet.pendingReceiverStatus, st.TransferReceiverStatusSenderInitiated) {
-		t.Errorf("ssp-mainnet/pending: expected INITIATED dominant; counts=%v",
+	// Mainnet + regtest pending: dominant value is RECEIVER_CLAIM_PENDING
+	// (post-sender-tweak / awaiting-claim — pending phase pins transfers
+	// to SENDER_KEY_TWEAKED, so receivers are never INITIATED).
+	if !isMostCommonReceiverStatus(mainnet.pendingReceiverStatus, st.TransferReceiverStatusReceiverClaimPending) {
+		t.Errorf("ssp-mainnet/pending: expected RECEIVER_CLAIM_PENDING dominant; counts=%v",
 			mainnet.pendingReceiverStatus)
+	}
+	if !isMostCommonReceiverStatus(regtest.pendingReceiverStatus, st.TransferReceiverStatusReceiverClaimPending) {
+		t.Errorf("ssp-regtest/pending: expected RECEIVER_CLAIM_PENDING dominant; counts=%v",
+			regtest.pendingReceiverStatus)
 	}
 
 	// Both pending phases must use the appropriate network on transfers.network.
@@ -80,8 +86,10 @@ func TestRealisticSSPDistribution(t *testing.T) {
 
 // TestStuckUserDistribution mirrors the realistic_ssp test but for the
 // stuck-user profile. Asserts the primary wallet's pending shape is
-// overwhelmingly TRANSFER + INITIATED, that all secondary wallets are
-// generated with their declared counts, and that everything is MAINNET.
+// overwhelmingly TRANSFER + RECEIVER_CLAIM_PENDING (post-sender-tweak /
+// awaiting-claim — where a stuck user's backlog lives), that all
+// secondary wallets are generated with their declared counts, and that
+// everything is MAINNET.
 func TestStuckUserDistribution(t *testing.T) {
 	cfg := mustProfile(t, "stuck_user")
 	if len(cfg.Tiers) != 0 {
@@ -116,16 +124,18 @@ func TestStuckUserDistribution(t *testing.T) {
 	}
 	primary := results.byGroup["stuck-user-primary"]
 
-	// Primary stuck-user pending must be ≥99.9% TRANSFER and ≥99.9% INITIATED.
+	// Primary stuck-user pending must be ≥99.9% TRANSFER and ≥99.9%
+	// RECEIVER_CLAIM_PENDING. Pending phase pins transfers.status to
+	// SENDER_KEY_TWEAKED, so receivers are all post-tweak — no INITIATED.
 	transferShare := float64(primary.pendingTypeCounts[st.TransferTypeTransfer]) / float64(primary.phaseRows["pending"])
 	if transferShare < 0.999 {
 		t.Errorf("stuck-user-primary/pending: expected ≥99.9%% TRANSFER, got %.4f%% (counts=%v)",
 			transferShare*100, primary.pendingTypeCounts)
 	}
-	initiatedShare := float64(primary.pendingReceiverStatus[st.TransferReceiverStatusSenderInitiated]) / float64(primary.phaseRows["pending"])
-	if initiatedShare < 0.999 {
-		t.Errorf("stuck-user-primary/pending: expected ≥99.9%% INITIATED, got %.4f%% (counts=%v)",
-			initiatedShare*100, primary.pendingReceiverStatus)
+	claimPendingShare := float64(primary.pendingReceiverStatus[st.TransferReceiverStatusReceiverClaimPending]) / float64(primary.phaseRows["pending"])
+	if claimPendingShare < 0.999 {
+		t.Errorf("stuck-user-primary/pending: expected ≥99.9%% RECEIVER_CLAIM_PENDING, got %.4f%% (counts=%v)",
+			claimPendingShare*100, primary.pendingReceiverStatus)
 	}
 
 	// The completed phase must exist for the primary wallet only — secondaries
