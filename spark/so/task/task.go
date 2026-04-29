@@ -50,11 +50,12 @@ import (
 )
 
 var (
-	confirmPendingDKGKeysCutoffAge     = 15 * time.Minute
-	defaultTaskTimeout                 = 1 * time.Minute
-	dkgTaskTimeout                     = 3 * time.Minute
-	deleteStaleTreeNodesTaskTimeout    = 10 * time.Minute
-	purgeSigningNoncePartitionsTimeout = 10 * time.Minute
+	confirmPendingDKGKeysCutoffAge          = 15 * time.Minute
+	defaultTaskTimeout                      = 1 * time.Minute
+	dkgTaskTimeout                          = 3 * time.Minute
+	deleteStaleTreeNodesTaskTimeout         = 10 * time.Minute
+	purgeSigningNoncePartitionsTimeout      = 10 * time.Minute
+	backfillReceiverClaimPendingTaskTimeout = 20 * time.Minute
 
 	meter                       = otel.Meter("gossip")
 	flowExecutionMeter          = otel.Meter("flow_execution")
@@ -1149,6 +1150,23 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					client := ent.NewClient(ent.Driver(drv))
 
 					return monitorReceiverStatusMismatches(ctx, client, 1000)
+				},
+			},
+		},
+		{
+			// One-shot backfill for SP-2923 phase 3: flips pre-existing
+			// transfer_receivers rows from INITIATED → RECEIVER_CLAIM_PENDING for
+			// transfers that are already past sender key tweak. The task drains
+			// to zero rows once prod is migrated, after which every tick is a
+			// fast no-op. Interval is set comfortably above the 20-minute
+			// per-tick timeout so a long-running drain never gets stomped.
+			ExecutionInterval: 30 * time.Minute,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "backfill_receiver_claim_pending",
+				RunInTestEnv: false,
+				Timeout:      &backfillReceiverClaimPendingTaskTimeout,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					return backfillReceiverClaimPending(ctx)
 				},
 			},
 		},
