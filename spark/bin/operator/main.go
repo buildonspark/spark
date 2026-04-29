@@ -46,6 +46,7 @@ import (
 	"github.com/lightsparkdev/spark/so/partner"
 
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
+	"github.com/lightsparkdev/spark/so/grpc/grpcutil"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/middleware"
 	events "github.com/lightsparkdev/spark/so/stream"
@@ -807,7 +808,7 @@ func main() {
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 
 	// Web compatibility layer
-	wrappedGrpc := grpcweb.WrapServer(grpcServer,
+	wrappedGrpcServer := grpcweb.WrapServer(grpcServer,
 		grpcweb.WithOriginFunc(func(_ string) bool {
 			return true
 		}),
@@ -817,6 +818,14 @@ func main() {
 		}),
 		grpcweb.WithCorsForRegisteredEndpointsOnly(false),
 	)
+	// Add a value to contexts that arrive via gRPC-web so downstream handlers can
+	// distinguish them from native gRPC requests.
+	wrappedGrpc := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if wrappedGrpcServer.IsGrpcWebRequest(r) || wrappedGrpcServer.IsGrpcWebSocketRequest(r) {
+			r = r.WithContext(grpcutil.WithGrpcWebRequest(r.Context()))
+		}
+		wrappedGrpcServer.ServeHTTP(w, r)
+	})
 
 	// Determine if we should serve native gRPC separately or use ServeHTTP multiplexing
 	useNativeGRPC := args.GrpcPort != 0 && args.GrpcPort != args.HttpPort
