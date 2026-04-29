@@ -16,6 +16,7 @@ import (
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -703,13 +704,33 @@ func (h *GossipHandler) handleFinalizeTreeNodeGossipMessage(
 // the appropriate FlowHandler.Commit based on operation type. After a
 // successful dispatch, transitions the matching PARTICIPANT FlowExecution row
 // to COMMITTED so the reconciliation task stops treating it as in-flight.
+//
+// codes.AlreadyExists from handler.Commit is treated as success: the
+// underlying business state has already reached the target state (e.g.,
+// because gossip was redelivered after a previous successful Commit, or
+// because the original Commit landed via a path that didn't update the
+// FlowExecution row), so the row should still be marked COMMITTED to
+// stop the reconciliation task from looping on it.
 func dispatchConsensusCommit(ctx context.Context, config *so.Config, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
 	handler, err := consensusFlowHandler(config, opType)
 	if err != nil {
 		return err
 	}
+	return runConsensusCommit(ctx, handler, opType, flowExecutionID, op)
+}
+
+// runConsensusCommit centralizes the post-handler logic so the
+// AlreadyExists-as-success rule is testable independently of the
+// production opType→handler mapping. handler is supplied by the caller.
+func runConsensusCommit(ctx context.Context, handler consensus.FlowHandler, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
 	if err := handler.Commit(ctx, op); err != nil {
-		return err
+		if status.Code(err) != codes.AlreadyExists {
+			return err
+		}
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.Sugar().Infof(
+			"consensus commit gossip: handler reports AlreadyExists for flow %s op_type %d — treating as success and marking participant row COMMITTED: %v",
+			flowExecutionID, opType, err)
 	}
 	return markParticipantFlowExecutionTerminal(ctx, flowExecutionID, st.FlowExecutionStatusCommitted)
 }
@@ -718,13 +739,28 @@ func dispatchConsensusCommit(ctx context.Context, config *so.Config, opType pbgo
 // to the appropriate FlowHandler.Rollback based on operation type. After a
 // successful dispatch, transitions the matching PARTICIPANT FlowExecution row
 // to ROLLED_BACK.
+//
+// codes.AlreadyExists is treated as success for the same reason as in
+// dispatchConsensusCommit: the rollback effect is already in place (or
+// indistinguishable from never-prepared), so mark the row terminal.
 func dispatchConsensusRollback(ctx context.Context, config *so.Config, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
 	handler, err := consensusFlowHandler(config, opType)
 	if err != nil {
 		return err
 	}
+	return runConsensusRollback(ctx, handler, opType, flowExecutionID, op)
+}
+
+// runConsensusRollback mirrors runConsensusCommit for the rollback path.
+func runConsensusRollback(ctx context.Context, handler consensus.FlowHandler, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
 	if err := handler.Rollback(ctx, op); err != nil {
-		return err
+		if status.Code(err) != codes.AlreadyExists {
+			return err
+		}
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.Sugar().Infof(
+			"consensus rollback gossip: handler reports AlreadyExists for flow %s op_type %d — treating as success and marking participant row ROLLED_BACK: %v",
+			flowExecutionID, opType, err)
 	}
 	return markParticipantFlowExecutionTerminal(ctx, flowExecutionID, st.FlowExecutionStatusRolledBack)
 }

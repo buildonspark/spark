@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -12,9 +13,11 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -261,4 +264,80 @@ func TestHandleGossipMessage_ConsensusCommit_AtCoordinatorIsSkippedAndRowUntouch
 	unchanged, err := sessionClient(t, ctx).FlowExecution.Get(ctx, row.ID)
 	require.NoError(t, err)
 	assert.Equal(t, st.FlowExecutionStatusInFlight, unchanged.Status)
+}
+
+// --- runConsensusCommit / runConsensusRollback: AlreadyExists-as-success rule ---
+
+// stubFlowHandler is a consensus.FlowHandler whose Commit and Rollback
+// return pre-set errors. Used to exercise the dispatch wrappers without
+// pulling in real handler side effects.
+type stubFlowHandler struct {
+	commitErr   error
+	rollbackErr error
+}
+
+func (s *stubFlowHandler) Prepare(_ context.Context, _ proto.Message) (proto.Message, error) {
+	return nil, nil
+}
+func (s *stubFlowHandler) Commit(_ context.Context, _ proto.Message) error   { return s.commitErr }
+func (s *stubFlowHandler) Rollback(_ context.Context, _ proto.Message) error { return s.rollbackErr }
+
+func TestRunConsensusCommit_AlreadyExists_MarksRowCommitted(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	row := insertParticipantRow(t, ctx, uuid.New())
+
+	staleErr := sparkerrors.AlreadyExistsDuplicateOperation(errors.New("stale finalize"))
+	h := &stubFlowHandler{commitErr: staleErr}
+
+	err := runConsensusCommit(ctx, h,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE,
+		row.ID.String(),
+		&pbinternal.StorePreimageSharePrepareRequest{},
+	)
+	require.NoError(t, err, "AlreadyExists from handler.Commit must be treated as success")
+
+	updated, err := sessionClient(t, ctx).FlowExecution.Get(ctx, row.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.FlowExecutionStatusCommitted, updated.Status,
+		"row must transition to COMMITTED when the handler reports AlreadyExists")
+}
+
+func TestRunConsensusCommit_NonAlreadyExistsError_PropagatesAndLeavesRowInFlight(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	row := insertParticipantRow(t, ctx, uuid.New())
+
+	internalErr := sparkerrors.InternalDatabaseWriteError(errors.New("disk full"))
+	h := &stubFlowHandler{commitErr: internalErr}
+
+	err := runConsensusCommit(ctx, h,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE,
+		row.ID.String(),
+		&pbinternal.StorePreimageSharePrepareRequest{},
+	)
+	require.Error(t, err, "non-AlreadyExists handler errors must propagate")
+
+	unchanged, err := sessionClient(t, ctx).FlowExecution.Get(ctx, row.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.FlowExecutionStatusInFlight, unchanged.Status,
+		"row must stay IN_FLIGHT when the handler returns a non-AlreadyExists error")
+}
+
+func TestRunConsensusRollback_AlreadyExists_MarksRowRolledBack(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	row := insertParticipantRow(t, ctx, uuid.New())
+
+	staleErr := sparkerrors.AlreadyExistsDuplicateOperation(errors.New("already rolled back"))
+	h := &stubFlowHandler{rollbackErr: staleErr}
+
+	err := runConsensusRollback(ctx, h,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE,
+		row.ID.String(),
+		&pbinternal.StorePreimageSharePrepareRequest{},
+	)
+	require.NoError(t, err, "AlreadyExists from handler.Rollback must be treated as success")
+
+	updated, err := sessionClient(t, ctx).FlowExecution.Get(ctx, row.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.FlowExecutionStatusRolledBack, updated.Status,
+		"row must transition to ROLLED_BACK when the handler reports AlreadyExists")
 }
