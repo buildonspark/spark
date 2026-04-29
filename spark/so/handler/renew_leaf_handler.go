@@ -1402,7 +1402,7 @@ func constructRenewZeroNodeTransactions(leaf *ent.TreeNode, signingJob *pb.Renew
 
 // validateRenewNodeTimelocks validates the timelock requirements for a renew
 // node timelock operation. Both the node transaction and the refund transaction
-// must have a timelock of 300 or less.
+// must have a timelock at or below spark.RenewTimelockThreshold.
 func validateRenewNodeTimelocks(leaf *ent.TreeNode) error {
 	// Check the leaf's node transaction sequence
 	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
@@ -1414,8 +1414,8 @@ func validateRenewNodeTimelocks(leaf *ent.TreeNode) error {
 	}
 	nodeTimelock := leafNodeTx.TxIn[0].Sequence & 0xffff
 
-	if nodeTimelock > 300 {
-		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s node transaction sequence must be less than or equal to 300, got %d", leaf.ID, nodeTimelock))
+	if nodeTimelock > spark.RenewTimelockThreshold {
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s node transaction sequence must be less than or equal to %d, got %d", leaf.ID, spark.RenewTimelockThreshold, nodeTimelock))
 	}
 
 	leafRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
@@ -1426,16 +1426,17 @@ func validateRenewNodeTimelocks(leaf *ent.TreeNode) error {
 		return fmt.Errorf("found no tx inputs for leaf refund tx %v", leafRefundTx)
 	}
 	refundTimelock := leafRefundTx.TxIn[0].Sequence & 0xffff
-	if refundTimelock > 300 {
-		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, refundTimelock))
+	if refundTimelock > spark.RenewTimelockThreshold {
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s refund transaction sequence must be less than or equal to %d, got %d", leaf.ID, spark.RenewTimelockThreshold, refundTimelock))
 	}
 
 	return nil
 }
 
 // validateRenewRefundTimelock validates the timelock requirements for a renew
-// refund timelock operation. Refund timelock must be <= 300, and the node
-// timelock must not go below 100 following a decrement.
+// refund timelock operation. Refund timelock must be at or below
+// spark.RenewTimelockThreshold, and the node timelock must not go below 100
+// following a decrement.
 func validateRenewRefundTimelock(leaf *ent.TreeNode) error {
 	// Check the leaf's refund transaction sequence
 	leafRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
@@ -1447,8 +1448,8 @@ func validateRenewRefundTimelock(leaf *ent.TreeNode) error {
 	}
 	refundTimelock := leafRefundTx.TxIn[0].Sequence & 0xffff
 
-	if refundTimelock > 300 {
-		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, refundTimelock))
+	if refundTimelock > spark.RenewTimelockThreshold {
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s refund transaction sequence must be less than or equal to %d, got %d", leaf.ID, spark.RenewTimelockThreshold, refundTimelock))
 	}
 
 	// Check the next sequence of the leaf's node transaction
@@ -1474,7 +1475,8 @@ func validateRenewRefundTimelock(leaf *ent.TreeNode) error {
 
 // validateRenewNodeZeroTimelock validates the timelock requirements for a renew
 // node zero timelock operation. The node transaction must have a timelock of 0
-// and the refund transaction must have a timelock of 300 or less.
+// and the refund transaction must have a timelock at or below
+// spark.RenewTimelockThreshold.
 func validateRenewNodeZeroTimelock(leaf *ent.TreeNode) error {
 	// Check the leaf's node transaction sequence
 	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
@@ -1500,8 +1502,8 @@ func validateRenewNodeZeroTimelock(leaf *ent.TreeNode) error {
 	}
 	refundTimelock := leafRefundTx.TxIn[0].Sequence & 0xffff
 
-	if refundTimelock > 300 {
-		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, refundTimelock))
+	if refundTimelock > spark.RenewTimelockThreshold {
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s refund transaction sequence must be less than or equal to %d, got %d", leaf.ID, spark.RenewTimelockThreshold, refundTimelock))
 	}
 
 	return nil
