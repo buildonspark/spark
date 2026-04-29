@@ -37,6 +37,7 @@ import (
 	"github.com/lightsparkdev/spark/so/entephemeral"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
+	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"github.com/lightsparkdev/spark/so/tree"
 	"github.com/lightsparkdev/spark/so/watchtower"
 	"go.opentelemetry.io/otel"
@@ -1354,6 +1355,14 @@ func tweakKeysForCoopExit(ctx context.Context, coopExit *ent.CooperativeExit, bl
 	_, err = transfer.Update().SetStatus(st.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update transfer status: %w", err)
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get db: %w", err)
+	}
+	if err := transferpkg.MarkReceiversClaimPending(ctx, db, transfer.ID); err != nil {
+		return fmt.Errorf("failed to mark receivers claim pending for coop-exit transfer %s: %w", transfer.ID, err)
 	}
 
 	logger.Sugar().Infof("Successfully tweaked key for coop exit transaction %x at block height %d", coopExit.ExitTxid, blockHeight)

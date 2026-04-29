@@ -1146,7 +1146,7 @@ func TestRevertClaimTransfer(t *testing.T) {
 
 		updatedReceiver, err := sessionCtx.Client.TransferReceiver.Get(ctx, receiver.ID)
 		require.NoError(t, err)
-		assert.Equal(t, st.TransferReceiverStatusSenderInitiated, updatedReceiver.Status)
+		assert.Equal(t, st.TransferReceiverStatusReceiverClaimPending, updatedReceiver.Status)
 
 		updatedLeaf, err := sessionCtx.Client.TransferLeaf.Get(ctx, transferLeaf.ID)
 		require.NoError(t, err)
@@ -1238,7 +1238,7 @@ func TestRevertClaimTransfer(t *testing.T) {
 
 		updatedReceiver, err := sessionCtx.Client.TransferReceiver.Get(ctx, receiver.ID)
 		require.NoError(t, err)
-		assert.Equal(t, st.TransferReceiverStatusSenderInitiated, updatedReceiver.Status)
+		assert.Equal(t, st.TransferReceiverStatusReceiverClaimPending, updatedReceiver.Status)
 	})
 }
 

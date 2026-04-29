@@ -1474,7 +1474,7 @@ func monitorReceiverStatusMismatches(ctx context.Context, db *ent.Client, batchS
 
 	mismatches := 0
 	for _, t := range transfers {
-		expectedStatus := mapTransferToReceiverStatus(t.Status)
+		expectedStatus := transferHelper.MapTransferToReceiverStatus(t.Status)
 		for _, r := range t.Edges.TransferReceivers {
 			if r.Status != expectedStatus {
 				mismatches++
@@ -1491,29 +1491,4 @@ func monitorReceiverStatusMismatches(ctx context.Context, db *ent.Client, batchS
 	}
 
 	return nil
-}
-
-func mapTransferToReceiverStatus(s st.TransferStatus) st.TransferReceiverStatus {
-	switch s {
-	case st.TransferStatusSenderInitiated,
-		st.TransferStatusSenderInitiatedCoordinator,
-		st.TransferStatusSenderKeyTweakPending,
-		st.TransferStatusApplyingSenderKeyTweak,
-		st.TransferStatusSenderKeyTweaked:
-		return st.TransferReceiverStatusSenderInitiated
-	case st.TransferStatusReceiverKeyTweaked:
-		return st.TransferReceiverStatusKeyTweaked
-	case st.TransferStatusReceiverKeyTweakLocked:
-		return st.TransferReceiverStatusKeyTweakLocked
-	case st.TransferStatusReceiverKeyTweakApplied:
-		return st.TransferReceiverStatusKeyTweakApplied
-	case st.TransferStatusReceiverRefundSigned:
-		return st.TransferReceiverStatusRefundSigned
-	case st.TransferStatusCompleted:
-		return st.TransferReceiverStatusCompleted
-	case st.TransferStatusExpired, st.TransferStatusReturned:
-		return st.TransferReceiverStatusCancelled
-	default:
-		return st.TransferReceiverStatusSenderInitiated
-	}
 }

@@ -43,6 +43,7 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
+	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -2355,6 +2356,14 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 	transfer, err = transfer.Update().SetStatus(st.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update transfer status: %w", err)
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get db: %w", err)
+	}
+	if err := transferpkg.MarkReceiversClaimPending(ctx, db, transfer.ID); err != nil {
+		return nil, fmt.Errorf("unable to mark receivers claim pending for transfer %s: %w", transfer.ID, err)
 	}
 
 	return transfer, nil

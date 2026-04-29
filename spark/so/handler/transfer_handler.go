@@ -2649,15 +2649,18 @@ func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent
 		}
 	}
 
-	// Revert transfer status to sender key tweaked and transfer receiver to SenderInitiated
-	// so the receiver can try to claim again
+	// Revert transfer status to sender key tweaked and transfer receiver to
+	// RECEIVER_CLAIM_PENDING so the receiver can try to claim again. This
+	// matches the dual-write contract: when transfers.status =
+	// SENDER_KEY_TWEAKED, all transfer_receivers in the pre-claim window are
+	// in RECEIVER_CLAIM_PENDING.
 	// MIMO - Dual write status changes
 	_, err := transfer.Update().SetStatus(st.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to update transfer status %v: %w", transfer.ID, err)
 	}
 	if receiver != nil {
-		_, err = receiver.Update().SetStatus(st.TransferReceiverStatusSenderInitiated).Save(ctx)
+		_, err = receiver.Update().SetStatus(st.TransferReceiverStatusReceiverClaimPending).Save(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to update transfer receiver status %v: %w", receiver.ID, err)
 		}
