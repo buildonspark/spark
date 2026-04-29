@@ -8,6 +8,134 @@ of transfer rows for query-planner work without the ceremony of real wallets.
 See `README.md` for how to run it. This file is the *why* — read before
 extending the tool or debugging unexpected output.
 
+## Profiles at a glance
+
+Five profiles, two generation models. The README has shapes and use cases;
+this is the "which one and why" map for someone extending the tool:
+
+| Profile | Driver | Models | Why it exists |
+|---|---|---|---|
+| `full` | Tiers | A population of synthetic wallets at varying scales sampling a global status/type mix | Prod-shaped baseline — exercises every wallet-size tier and every code path that branches on cardinality. |
+| `full-no-ssp` | Tiers | Same as `full` minus the T1 SSP | Lets you keep the rest of the ladder while skipping the 25M-edge SSP that dominates wall-clock. |
+| `smoke` | Tiers | `full` scaled down ~1000× | For iterating on the dbseed code itself — *not* a query-perf profile. |
+| `realistic_ssp` | WalletGroups | Real SSP: low-hundreds pending + multi-million COMPLETED, both networks | Validates queries on the SSP shape, where the pending subset is a tiny needle behind a giant haystack. T1 in `full` doesn't reproduce this — its pending set is sampled per the global mix, not pinned to ~92. |
+| `stuck_user` | WalletGroups | Real stuck users: tens of thousands of pending TRANSFER+INITIATED | Validates queries on the *opposite* extreme from `realistic_ssp` — pending is most of the rows, partial-index doesn't help, and 50k-100k pending is the bind-parameter crash zone. |
+
+When in doubt about extending: if the new shape is "a population of wallets
+varying by size", it's a tier. If it's "this specific prod identity with this
+exact cardinality", it's a WalletGroup with phases.
+
+## Cardinality assessment — required before EXPLAIN
+
+**Always assess cardinality first when querying a dbseed-seeded database for
+performance work.** Plan choices only make sense in the context of "how big
+is the haystack, how small is the needle." Don't read an EXPLAIN tree before
+you can predict its rough shape from cardinality alone.
+
+The canonical workflow lives in the **`mimo-query-perf` skill**
+(`~/.claude/skills/mimo-query-perf/SKILL.md`) — read that first for the full
+methodology. Key rules from the skill:
+
+- **Cadence**: one probe at a time, report SQL + raw result + interpretation,
+  wait for ack before the next probe.
+- **Cardinality first, EXPLAIN second**: status counts → per-pubkey counts →
+  partial-index population → THEN `EXPLAIN (ANALYZE, BUFFERS)`.
+- **Cross-check dbseed vs prod**: same probe via
+  `~/.claude/plugins/cache/lightspark/ls-claude/0.28.1/skills/read-db/scripts/spark-rds.sh -o 0 -c "<SQL>" prod`
+  (read-only, but no read replicas — be deliberate).
+- **Validate plan SHAPE on dbseed first**, not absolute timings; prod cost
+  falls out from the cardinality ratio.
+
+### Standard probe queries
+
+The probes you run depend on the query path under study. The most common ones:
+
+#### Status counts (selectivity for partial-index work)
+
+```sql
+-- Transfers status histogram
+SELECT status, count(*) FROM transfers GROUP BY status ORDER BY count(*) DESC;
+
+-- Transfer-receivers status histogram (where the pending partial index lives)
+SELECT status, count(*) FROM transfer_receivers GROUP BY status ORDER BY count(*) DESC;
+```
+
+#### Per-pubkey cardinality (wallet-tier sanity)
+
+```sql
+-- Top-N wallets by receiver count — verifies the seeded ladder shape
+SELECT encode(identity_pubkey,'hex') AS pubkey, count(*) AS receiver_count
+FROM transfer_receivers
+GROUP BY identity_pubkey ORDER BY count(*) DESC LIMIT 10;
+
+-- Specific pubkey cardinality
+SELECT count(*) FROM transfer_receivers
+WHERE identity_pubkey = decode('<hex>','hex');
+```
+
+#### Partial-index population (the queryable haystack)
+
+```sql
+-- transfer_receivers pending partial — what queryPendingTransfersMIMO walks
+SELECT count(*) FROM transfer_receivers
+WHERE status IN ('INITIATED','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
+                 'RECEIVER_KEY_TWEAK_APPLIED','RECEIVER_REFUND_SIGNED');
+
+-- Same, scoped to one pubkey (matches the partial's leading column)
+SELECT count(*) FROM transfer_receivers
+WHERE identity_pubkey = decode('<hex>','hex')
+  AND status IN ('INITIATED','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
+                 'RECEIVER_KEY_TWEAK_APPLIED','RECEIVER_REFUND_SIGNED');
+```
+
+#### Per-pubkey × type breakdown (when type-filtered queries are in scope)
+
+```sql
+SELECT t.type, r.status, count(*)
+FROM transfer_receivers r
+INNER JOIN transfers t ON t.id = r.transfer_id
+WHERE r.identity_pubkey = decode('<hex>','hex')
+  AND r.status IN ('INITIATED','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
+                   'RECEIVER_KEY_TWEAK_APPLIED','RECEIVER_REFUND_SIGNED')
+GROUP BY t.type, r.status ORDER BY count(*) DESC;
+```
+
+#### EXPLAIN — only after cardinality is in hand
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+<the-query-under-study>;
+```
+
+Add `VERBOSE` only when you need to see column references in node detail.
+
+### dbseed gotchas to call out in interpretation
+
+**Independent status assignment** — in the `full` profile, `transfers.status`
+and `transfer_receivers.status` are sampled independently, while in prod
+they're tightly correlated via dual-write. So `EXISTS`-style queries that
+join transfer-stuck conditions to receiver-stuck conditions get the wrong
+selectivity on dbseed `full`. Flag this any time the query hops the two
+status columns. The `realistic_ssp` and `stuck_user` profiles fix this for
+the wallets they model (statuses are pinned per-phase), but only for those
+specific identities.
+
+**Composition vs selectivity** — `full` matches prod *selectivity* (~0.3% in
+the receiver-pending partial index) but inverts *composition* (mostly
+`SENDER_KEY_TWEAKED` in dbseed; mostly `INITIATED` in prod). Selectivity
+drives plan choice, but composition can affect index ordering and predicate
+push-down — note both numbers when interpreting.
+
+**Profile-specific cardinality** — the same probe gives wildly different
+answers on `full` vs `realistic_ssp` vs `stuck_user`. State which profile is
+seeded before reporting numbers; an "is this fast enough" answer means
+nothing without that context.
+
+**Cross-check ratio** — when comparing dbseed to prod, build a ratio
+column. A query that's 2× faster on dbseed than prod will likely be slower
+on prod by a similar ratio at minimum; a query that's only 1.05× different
+between the two means dbseed is a faithful test bed for that path.
+
 ## Design rationale (non-obvious choices)
 
 ### Bypasses Ent entirely
@@ -79,6 +207,36 @@ nullable FKs to these two tables. Ent's `Create` validates that every FK's
 ref-table is in the passed list — without them, it errors with
 "unexpected fk ref-table". They're included for validation only; Create is
 additive, so tables already present no-op.
+
+### Tiers vs WalletGroups
+
+Two coexisting wallet-generation models, used by different profiles:
+
+- **Tiers** (`full`, `full-no-ssp`, `smoke`): rng-sampled per-tier row counts,
+  global status/type/receiver-status distributions sampled per row. Each
+  tier wallet emits both sender and receiver halves of its transfers (50/50).
+  Right when modeling a *population* of wallets at varying scales without
+  caring about any particular wallet's exact shape.
+
+- **WalletGroups** (`realistic_ssp`, `stuck_user`): each group is one concrete
+  identity pubkey emitting one or more *phases* with exact row counts, fixed
+  role (receiver-only or sender-only), and per-phase distributions overriding
+  the Config defaults. Right when modeling a *specific* prod wallet whose
+  exact cardinality matters for plan choice (e.g. an SSP's 92 pending
+  receivers behind a 23.7M completed backdrop, or a stuck user's 58.9k
+  inbound backlog).
+
+Both models can coexist in a single Config in principle, but the current
+profiles use one or the other exclusively — `full` profiles are
+tier-driven, `realistic_ssp` / `stuck_user` are WalletGroup-driven. To
+combine shapes, run dbseed twice with `-truncate=false` on the second pass
+(once tier-driven for the backdrop, once WalletGroup-driven for the
+specific wallet shape on top).
+
+WalletGroup pubkeys are derived from `globalIdx` in a high-numbered range
+(`walletGroupBaseIdx = 1_000_000`) so they don't collide with tier or
+long-tail counter-party pubkeys (the long-tail counter-party pool inside
+`counterpartyPubkey` lives at `100_000..109_999`).
 
 ### Single-producer, three-consumer pipeline
 
@@ -166,9 +324,13 @@ skip the dual-role pass.
 - **Adding more tables** — the query-planner workloads this tool targets don't
   read them. If you genuinely need `transfer_leaves` populated for some other
   workload, that's a separate tool; real Bitcoin tx construction is non-trivial.
-- **Supporting non-MAINNET network labels** — the whole point is planner
-  fidelity with prod, which is mainnet. If your workload genuinely needs
-  regtest-labeled data, parameterize Network and accept that EXPLAIN output
-  diverges from prod.
+- **Adding REGTEST rows to the tier-driven profiles** — the partial indexes
+  and prod queries pin `network = 'MAINNET'`, so REGTEST rows in `full` would
+  silently make EXPLAIN diverge from prod. The WalletGroup-driven profiles
+  (`realistic_ssp`) are the exception: they model concrete prod wallets
+  including the regtest SSP, so REGTEST is intentional and per-group via
+  `WalletGroup.Network`. Don't propagate that to tiers without thinking
+  through whether the partial-index plans on REGTEST are actually what you
+  want to study.
 - **Making it an Ent-based seed** — would take 50× longer and solve nothing.
   See "Bypasses Ent entirely" above.

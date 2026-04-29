@@ -120,6 +120,26 @@ go run . \
   -dsn="${DBSEED_DSN:-postgres://postgres:postgres@$(minikube ip):5432/sparkoperator_0?sslmode=disable}"
 '''
 
+[tasks.dbseed-realistic-ssp]
+dir = "cmd/dbseed"
+description = "Seed real SSP traffic shape (~24.5M rows: 92 mainnet + 64 regtest pending receivers on top of multi-million completed backdrops). Override DBSEED_DSN to target a different SO."
+run = '''
+go run . \
+  -profile=realistic_ssp \
+  -truncate \
+  -dsn="${DBSEED_DSN:-postgres://postgres:postgres@$(minikube ip):5432/sparkoperator_0?sslmode=disable}"
+'''
+
+[tasks.dbseed-stuck-user]
+dir = "cmd/dbseed"
+description = "Seed stuck-user backlog shape (~120k rows: 6 mainnet pubkeys, ≥99% TRANSFER+INITIATED). Override DBSEED_DSN to target a different SO."
+run = '''
+go run . \
+  -profile=stuck_user \
+  -truncate \
+  -dsn="${DBSEED_DSN:-postgres://postgres:postgres@$(minikube ip):5432/sparkoperator_0?sslmode=disable}"
+'''
+
 [tasks.dbseed-recover]
 dir = "cmd/dbseed"
 description = "Recover from a crashed dbseed run by replaying missing indexes/FKs via Ent's scoped schema migration."

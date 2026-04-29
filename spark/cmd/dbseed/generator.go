@@ -49,17 +49,20 @@ type receiverRow struct {
 // generator emits rows for one wallet's contribution to the three tables.
 // Each wallet gets its own generator so progress and memory are bounded.
 type generator struct {
-	rng         *rand.Rand
-	wallet      walletID
-	cfg         *Config
-	statusCDF   []int
-	statusSum   int
-	typeCDF     []int
-	typeSum     int
-	receiverCDF []int
-	receiverSum int
-	baseTime    time.Time
-	spanNanos   int64
+	rng           *rand.Rand
+	wallet        walletID
+	cfg           *Config
+	statusCDF     []int
+	statusOrder   []st.TransferStatus
+	statusSum     int
+	typeCDF       []int
+	typeOrder     []st.TransferType
+	typeSum       int
+	receiverCDF   []int
+	receiverOrder []st.TransferReceiverStatus
+	receiverSum   int
+	baseTime      time.Time
+	spanNanos     int64
 }
 
 // walletID identifies one wallet (tier + index-within-tier).
@@ -87,40 +90,88 @@ func newGenerator(cfg *Config, w walletID, globalSeed int64) *generator {
 	s2 := binary.LittleEndian.Uint64(h[8:16])
 	g.rng = rand.New(rand.NewPCG(s1, s2))
 
-	g.statusSum, g.statusCDF = cumulativeStatus(cfg.TransferStatuses)
-	g.typeSum, g.typeCDF = cumulativeType(cfg.TransferTypes)
-	g.receiverSum, g.receiverCDF = cumulativeReceiverStatus(cfg.ReceiverStatuses)
+	g.statusSum, g.statusCDF, g.statusOrder = cumulativeStatus(cfg.TransferStatuses)
+	g.typeSum, g.typeCDF, g.typeOrder = cumulativeType(cfg.TransferTypes)
+	g.receiverSum, g.receiverCDF, g.receiverOrder = cumulativeReceiverStatus(cfg.ReceiverStatuses)
 	return g
 }
 
-func cumulativeStatus(w []StatusWeight) (int, []int) {
+// cumulativeStatus / cumulativeType / cumulativeReceiverStatus return the
+// total weight, prefix-sum CDF, and the value slice in declaration order.
+// The CDF + order pair is what pickFromCDF needs to sample without holding a
+// reference to the original weight slice — used by both the tier-driven
+// emit() (CDFs cached on the generator) and the WalletGroup-driven
+// emitPhase() (CDFs built per-phase).
+func cumulativeStatus(w []StatusWeight) (int, []int, []st.TransferStatus) {
 	cdf := make([]int, len(w))
+	order := make([]st.TransferStatus, len(w))
 	sum := 0
 	for i, x := range w {
 		sum += x.Weight
 		cdf[i] = sum
+		order[i] = x.Status
 	}
-	return sum, cdf
+	return sum, cdf, order
 }
 
-func cumulativeType(w []TypeWeight) (int, []int) {
+func cumulativeType(w []TypeWeight) (int, []int, []st.TransferType) {
 	cdf := make([]int, len(w))
+	order := make([]st.TransferType, len(w))
 	sum := 0
 	for i, x := range w {
 		sum += x.Weight
 		cdf[i] = sum
+		order[i] = x.Type
 	}
-	return sum, cdf
+	return sum, cdf, order
 }
 
-func cumulativeReceiverStatus(w []ReceiverStatusWeight) (int, []int) {
+func cumulativeReceiverStatus(w []ReceiverStatusWeight) (int, []int, []st.TransferReceiverStatus) {
 	cdf := make([]int, len(w))
+	order := make([]st.TransferReceiverStatus, len(w))
 	sum := 0
 	for i, x := range w {
 		sum += x.Weight
 		cdf[i] = sum
+		order[i] = x.Status
 	}
-	return sum, cdf
+	return sum, cdf, order
+}
+
+// phaseCDFs bundles the three caller-built distributions emitPhase samples
+// from. Bundling avoids 11 positional parameters at the call site without
+// changing semantics — each field is exactly what the underlying
+// cumulative* helper returned.
+type phaseCDFs struct {
+	statusSum     int
+	statusCDF     []int
+	statusOrder   []st.TransferStatus
+	typeSum       int
+	typeCDF       []int
+	typeOrder     []st.TransferType
+	receiverSum   int
+	receiverCDF   []int
+	receiverOrder []st.TransferReceiverStatus
+}
+
+// newPhaseCDFs builds the CDF bundle for a phase, calling the cumulative*
+// helpers in order. Cheap — phase weight slices are at most a handful of
+// entries each.
+func newPhaseCDFs(phase WalletPhase) phaseCDFs {
+	statusSum, statusCDF, statusOrder := cumulativeStatus(phase.TransferStatuses)
+	typeSum, typeCDF, typeOrder := cumulativeType(phase.TransferTypes)
+	receiverSum, receiverCDF, receiverOrder := cumulativeReceiverStatus(phase.ReceiverStatuses)
+	return phaseCDFs{
+		statusSum:     statusSum,
+		statusCDF:     statusCDF,
+		statusOrder:   statusOrder,
+		typeSum:       typeSum,
+		typeCDF:       typeCDF,
+		typeOrder:     typeOrder,
+		receiverSum:   receiverSum,
+		receiverCDF:   receiverCDF,
+		receiverOrder: receiverOrder,
+	}
 }
 
 // pubkey returns a deterministic 33-byte compressed-pubkey-shaped value for a
@@ -231,6 +282,107 @@ func (g *generator) emit(
 	return nil
 }
 
+// emitPhase generates rows for one WalletPhase. Differs from emit() in three
+// ways: (1) the row count is exact rather than rng-sampled from a tier range,
+// (2) the wallet's role on each row is a fixed PhaseRoleSender or
+// PhaseRoleReceiver rather than the half/half tier split, and (3) the status
+// and type distributions come from the phase (via cdfs) rather than the
+// Config defaults cached on the generator — which is the whole reason
+// WalletPhase exists.
+//
+// Phase distributions are passed in as a phaseCDFs bundle. Building them at
+// the call site rather than caching on the generator keeps the existing emit()
+// path (used by tier seeding) unchanged and lets multiple phases for one
+// wallet use different distributions without mutating shared state.
+func (g *generator) emitPhase(
+	ctx context.Context,
+	count int,
+	role PhaseRole,
+	network string,
+	cdfs phaseCDFs,
+	transferCh chan<- transferRow,
+	senderCh chan<- senderRow,
+	receiverCh chan<- receiverRow,
+) error {
+	selfPk := pubkey(g.wallet.globalIdx)
+	for i := range count {
+		tid, err := uuid.NewV7()
+		if err != nil {
+			tid = uuid.New()
+		}
+		ct := g.randomCreateTime()
+		// Phase-local CDF sampling. Same shape as g.pickStatus / pickType /
+		// pickReceiverStatus but using the caller-supplied CDF bundle.
+		status := pickFromCDF(g.rng.IntN(cdfs.statusSum), cdfs.statusCDF, cdfs.statusOrder)
+		ttype := pickFromCDF(g.rng.IntN(cdfs.typeSum), cdfs.typeCDF, cdfs.typeOrder)
+
+		var senderPk, receiverPk []byte
+		if role == PhaseRoleReceiver {
+			senderPk = g.counterpartyPubkey(i)
+			receiverPk = selfPk
+		} else {
+			senderPk = selfPk
+			receiverPk = g.counterpartyPubkey(i)
+		}
+
+		tr := transferRow{
+			id:                     tid,
+			createTime:             ct,
+			updateTime:             ct,
+			senderIdentityPubkey:   senderPk,
+			receiverIdentityPubkey: receiverPk,
+			network:                network,
+			totalValue:             int64(1_000 + g.rng.Uint64()%1_000_000),
+			status:                 status,
+			transferType:           ttype,
+			expiryTime:             g.randomExpiry(ct, status),
+		}
+		sr := senderRow{
+			id:             g.newRowID(),
+			createTime:     ct,
+			updateTime:     ct,
+			transferID:     tid,
+			identityPubkey: senderPk,
+		}
+		rr := receiverRow{
+			id:             g.newRowID(),
+			createTime:     ct,
+			updateTime:     ct,
+			transferID:     tid,
+			identityPubkey: receiverPk,
+			status:         pickFromCDF(g.rng.IntN(cdfs.receiverSum), cdfs.receiverCDF, cdfs.receiverOrder),
+		}
+		select {
+		case transferCh <- tr:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		select {
+		case senderCh <- sr:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		select {
+		case receiverCh <- rr:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return nil
+}
+
+// pickFromCDF is the generic counterpart of pickStatus/pickType/pickReceiverStatus,
+// extracted so emitPhase can use caller-supplied CDFs without baking them into
+// the generator.
+func pickFromCDF[T any](r int, cdf []int, order []T) T {
+	for i, cum := range cdf {
+		if r < cum {
+			return order[i]
+		}
+	}
+	return order[len(order)-1]
+}
+
 func (g *generator) newRowID() uuid.UUID {
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -266,31 +418,13 @@ func (g *generator) randomExpiry(createTime time.Time, status st.TransferStatus)
 }
 
 func (g *generator) pickStatus() st.TransferStatus {
-	r := g.rng.IntN(g.statusSum)
-	for i, cum := range g.statusCDF {
-		if r < cum {
-			return g.cfg.TransferStatuses[i].Status
-		}
-	}
-	return g.cfg.TransferStatuses[len(g.cfg.TransferStatuses)-1].Status
+	return pickFromCDF(g.rng.IntN(g.statusSum), g.statusCDF, g.statusOrder)
 }
 
 func (g *generator) pickType() st.TransferType {
-	r := g.rng.IntN(g.typeSum)
-	for i, cum := range g.typeCDF {
-		if r < cum {
-			return g.cfg.TransferTypes[i].Type
-		}
-	}
-	return g.cfg.TransferTypes[len(g.cfg.TransferTypes)-1].Type
+	return pickFromCDF(g.rng.IntN(g.typeSum), g.typeCDF, g.typeOrder)
 }
 
 func (g *generator) pickReceiverStatus() st.TransferReceiverStatus {
-	r := g.rng.IntN(g.receiverSum)
-	for i, cum := range g.receiverCDF {
-		if r < cum {
-			return g.cfg.ReceiverStatuses[i].Status
-		}
-	}
-	return g.cfg.ReceiverStatuses[len(g.cfg.ReceiverStatuses)-1].Status
+	return pickFromCDF(g.rng.IntN(g.receiverSum), g.receiverCDF, g.receiverOrder)
 }

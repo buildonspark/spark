@@ -38,7 +38,7 @@ import (
 func main() {
 	var (
 		dsn           = flag.String("dsn", "", "Postgres DSN (required). Example: postgres://postgres:postgres@localhost:5432/sparkoperator_0?sslmode=disable")
-		profile       = flag.String("profile", "full", "Distribution profile: 'full' (~61M transfers at prod SSP scale, ~15-35 min), 'full-no-ssp' (~11.5M transfers, 2-4 min), or 'smoke' (~10k transfers, seconds)")
+		profile       = flag.String("profile", "full", "Distribution profile: 'full' (~61M transfers at prod SSP scale, ~15-35 min), 'full-no-ssp' (~11.5M transfers, 2-4 min), 'smoke' (~10k transfers, seconds), 'realistic_ssp' (real SSP pending shape on top of multi-million completed backdrop, mainnet+regtest), or 'stuck_user' (massive unclaimed inbound TRANSFER backlog — 6 mainnet pubkeys, ~120k transfers)")
 		truncate      = flag.Bool("truncate", false, "TRUNCATE transfers/transfer_senders/transfer_receivers before seeding")
 		seed          = flag.Int64("seed", 1, "Random seed for deterministic generation")
 		dryRun        = flag.Bool("dry-run", false, "Print the plan (row counts, distributions) and exit without touching the DB")

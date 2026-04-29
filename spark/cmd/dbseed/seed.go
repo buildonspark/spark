@@ -13,6 +13,16 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 )
 
+// walletGroupBaseIdx is the globalIdx offset where WalletGroup pubkeys start.
+// Group pubkeys live in this high-numbered range so they don't collide with
+// tier or long-tail counter-party pubkeys: tier wallets start at 1; the
+// long-tail counter-party pool inside counterpartyPubkey lives at
+// 100_000..109_999. 1_000_000 leaves plenty of headroom above that pool.
+//
+// Used by the WalletGroup pass below and by the test harness in
+// profiles_test.go — keep both paths in sync via this single declaration.
+const walletGroupBaseIdx = 1_000_000
+
 // Seed runs the full orchestration: index snapshot/drop, COPY rows, index
 // recreate. Idempotent on re-run if -truncate is passed.
 func Seed(ctx context.Context, dsn string, cfg *Config, truncate bool) error {
@@ -326,6 +336,30 @@ func copyRows(ctx context.Context, pool *pgxpool.Pool, cfg *Config) error {
 			w := walletID{tierLabel: cfg.DualRoleTierLabel + "-dual", tierIdx: 0, globalIdx: dualGlobalIdx}
 			g := newGenerator(cfg, w, cfg.Seed^0xD)
 			_ = emitDualRole(ctx, g, cfg.DualRoleTransfers, transferCh, senderCh, receiverCh)
+		}
+		// WalletGroup pass — used by realistic_ssp / stuck_user profiles.
+		// Group pubkey assignment uses walletGroupBaseIdx (package-level
+		// const, see below) so they don't collide with tier or long-tail
+		// counter-party pubkeys.
+		for groupIdx, group := range cfg.WalletGroups {
+			groupGlobalIdx := walletGroupBaseIdx + groupIdx
+			for phaseIdx, phase := range group.Phases {
+				w := walletID{
+					tierLabel: group.Label + "/" + phase.Label,
+					tierIdx:   phaseIdx,
+					globalIdx: groupGlobalIdx,
+				}
+				// Per-phase rng seed — different phases of the same group must
+				// produce uncorrelated rows so the planner sees independent
+				// per-row counterparty / value distributions even though the
+				// wallet's identity pubkey is shared.
+				g := newGenerator(cfg, w, cfg.Seed^int64(0xA00+phaseIdx))
+				if err := g.emitPhase(ctx, phase.Count, phase.Role, group.Network,
+					newPhaseCDFs(phase),
+					transferCh, senderCh, receiverCh); err != nil {
+					return
+				}
+			}
 		}
 	}()
 
