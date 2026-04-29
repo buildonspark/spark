@@ -188,6 +188,16 @@ const (
 	// still in the normal gossip-retry window and would just create noise on
 	// dashboards. Default 600s (10 minutes).
 	KnobFlowExecutionMetricsMinAgeSeconds = "spark.so.flow_execution.metrics_min_age_seconds"
+
+	// Master switch for the *active recovery* portion of the participant
+	// reconcile and coordinator self-sweep tasks. Disabled by default (0).
+	// When disabled, both tasks still query stuck/stale rows and log each
+	// one (and emit metrics if KnobFlowExecutionMetricsEnabled is on), but
+	// skip the actual mutation: no gossip dispatch on the participant
+	// reconcile path, and no UPDATE to ROLLED_BACK on the coordinator
+	// self-sweep. Flip this on once the recovery path is verified safe
+	// against the historical state in this environment.
+	KnobFlowExecutionReconcileEnabled = "spark.so.flow_execution.reconcile_enabled"
 )
 
 type Config struct {

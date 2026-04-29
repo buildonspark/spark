@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -95,7 +96,14 @@ func (r *participantReconciler) reconcile(ctx context.Context) error {
 		return fmt.Errorf("failed to query stuck participant rows: %w", err)
 	}
 
+	recoveryEnabled := r.recoveryEnabled()
 	for _, row := range rows {
+		if !recoveryEnabled {
+			logger.Sugar().Infof(
+				"flow_execution reconcile (monitor-only): stuck PARTICIPANT row %s coordinator=%d op_type=%d age=%s — recovery disabled by knob",
+				row.ID, row.CoordinatorIndex, row.OpType, time.Since(row.UpdateTime))
+			continue
+		}
 		if err := r.reconcileOne(ctx, row); err != nil {
 			logger.With(zap.Error(err)).Sugar().Warnf(
 				"flow_execution reconcile: failed to resolve %s (coordinator=%d, op_type=%d)",
@@ -112,6 +120,14 @@ func (r *participantReconciler) reconcile(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// recoveryEnabled reports whether the active recovery path (gossip dispatch
+// for participant rows, ROLLED_BACK transition for coordinator rows) is on.
+// Defaults to off so operators can run the tasks in monitor-only mode and
+// inspect what would be touched before authorizing mutations.
+func (r *participantReconciler) recoveryEnabled() bool {
+	return r.knobs.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) > 0
 }
 
 // metricsEnabled reports whether flow_execution.* metric emission is on for
@@ -276,6 +292,7 @@ func defaultQueryOutcome(ctx context.Context, operator *so.SigningOperator, flow
 // reconciling against this coordinator will now get a real rollback outcome
 // instead of being stuck awaiting a decision that will never come.
 func SweepStaleCoordinatorFlows(ctx context.Context, _ *so.Config, knobsService knobs.Knobs) error {
+	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get db: %w", err)
@@ -284,12 +301,13 @@ func SweepStaleCoordinatorFlows(ctx context.Context, _ *so.Config, knobsService 
 	batchLimit := int(knobsService.GetValue(knobs.KnobFlowExecutionSweepBatchLimit, float64(defaultFlowExecutionSweepBatchLimit)))
 	cutoff := time.Now().Add(-time.Duration(thresholdSec) * time.Second)
 
-	// Cap blast radius: pick the oldest batchLimit IDs first, then UPDATE
-	// only those rows. An unbounded UPDATE would hold many row locks in a
-	// single statement during a mass-stuck recovery; this fans the work
-	// across sweep ticks and lets newer rows rotate in once the oldest
-	// batch is processed.
-	ids, err := db.FlowExecution.Query().
+	// Cap blast radius: pick the oldest batchLimit rows first, then UPDATE
+	// only those. An unbounded UPDATE would hold many row locks in a single
+	// statement during a mass-stuck recovery; this fans the work across
+	// sweep ticks and lets newer rows rotate in once the oldest batch is
+	// processed. Fetch full rows (not just IDs) so monitor-only mode can
+	// log op_type and age per row.
+	rows, err := db.FlowExecution.Query().
 		Where(
 			flowexecution.RoleEQ(st.FlowExecutionRoleCoordinator),
 			flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
@@ -297,12 +315,26 @@ func SweepStaleCoordinatorFlows(ctx context.Context, _ *so.Config, knobsService 
 		).
 		Order(ent.Asc(flowexecution.FieldUpdateTime)).
 		Limit(batchLimit).
-		IDs(ctx)
+		All(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to query stale coordinator rows: %w", err)
 	}
-	if len(ids) == 0 {
+	if len(rows) == 0 {
 		return nil
+	}
+
+	if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) <= 0 {
+		for _, row := range rows {
+			logger.Sugar().Infof(
+				"flow_execution sweep (monitor-only): stale COORDINATOR row %s op_type=%d age=%s — recovery disabled by knob",
+				row.ID, row.OpType, time.Since(row.UpdateTime))
+		}
+		return nil
+	}
+
+	ids := make([]uuid.UUID, len(rows))
+	for i, row := range rows {
+		ids[i] = row.ID
 	}
 
 	_, err = db.FlowExecution.Update().

@@ -110,6 +110,15 @@ func testConfigWithOperator(t *testing.T, coordIdx uint64) *so.Config {
 	return cfg
 }
 
+// recoveryEnabledKnobs returns a knobs fixture with the active-recovery
+// switch on. Most reconcile/sweep tests exercise the recovery path; the
+// production default is monitor-only.
+func recoveryEnabledKnobs() knobs.Knobs {
+	return knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobFlowExecutionReconcileEnabled: 1,
+	})
+}
+
 // ---------- ReconcileStuckParticipantFlows ----------
 
 func TestReconcile_CoordinatorCommitted_TransitionsRowToCommitted(t *testing.T) {
@@ -120,7 +129,7 @@ func TestReconcile_CoordinatorCommitted_TransitionsRowToCommitted(t *testing.T) 
 
 	r := &participantReconciler{
 		config: cfg,
-		knobs:  knobs.NewEmptyFixedKnobs(),
+		knobs:  recoveryEnabledKnobs(),
 		query: stubQuery(&pbinternal.ConsensusQueryOutcomeResponse{
 			Outcome:         pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_COMMITTED,
 			OpType:          int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE),
@@ -145,7 +154,7 @@ func TestReconcile_CoordinatorRolledBack_TransitionsRowToRolledBack(t *testing.T
 
 	r := &participantReconciler{
 		config: cfg,
-		knobs:  knobs.NewEmptyFixedKnobs(),
+		knobs:  recoveryEnabledKnobs(),
 		query: stubQuery(&pbinternal.ConsensusQueryOutcomeResponse{
 			Outcome:         pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_ROLLED_BACK,
 			OpType:          int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE),
@@ -170,7 +179,7 @@ func TestReconcile_CoordinatorInFlight_LeavesRowInFlight(t *testing.T) {
 
 	r := &participantReconciler{
 		config: cfg,
-		knobs:  knobs.NewEmptyFixedKnobs(),
+		knobs:  recoveryEnabledKnobs(),
 		query: stubQuery(&pbinternal.ConsensusQueryOutcomeResponse{
 			Outcome: pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_IN_FLIGHT,
 		}),
@@ -193,7 +202,7 @@ func TestReconcile_CoordinatorUnspecified_LeavesRowInFlight(t *testing.T) {
 
 	r := &participantReconciler{
 		config: cfg,
-		knobs:  knobs.NewEmptyFixedKnobs(),
+		knobs:  recoveryEnabledKnobs(),
 		query: stubQuery(&pbinternal.ConsensusQueryOutcomeResponse{
 			Outcome: pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_UNSPECIFIED,
 		}),
@@ -231,7 +240,7 @@ func TestReconcile_RpcError_LeavesRowInFlightAndContinues(t *testing.T) {
 
 	r := &participantReconciler{
 		config:        cfg,
-		knobs:         knobs.NewEmptyFixedKnobs(),
+		knobs:         recoveryEnabledKnobs(),
 		query:         failingThenSucceedingQuery,
 		gossipHandler: handler.NewGossipHandler(cfg),
 	}
@@ -249,7 +258,7 @@ func TestSweepStaleCoordinatorFlows_TransitionsOldInFlightToRolledBack(t *testin
 	fresh := insertStaleCoordinatorRow(t, ctx, st.FlowExecutionStatusInFlight, 10*time.Second)
 	terminal := insertStaleCoordinatorRow(t, ctx, st.FlowExecutionStatusCommitted, 1*time.Hour)
 
-	require.NoError(t, SweepStaleCoordinatorFlows(ctx, sparktesting.TestConfig(t), knobs.NewEmptyFixedKnobs()))
+	require.NoError(t, SweepStaleCoordinatorFlows(ctx, sparktesting.TestConfig(t), recoveryEnabledKnobs()))
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -296,7 +305,8 @@ func TestReconcile_RespectsBatchLimitAndOldestFirstOrdering(t *testing.T) {
 	r := &participantReconciler{
 		config: cfg,
 		knobs: knobs.NewFixedKnobs(map[string]float64{
-			knobs.KnobFlowExecutionSweepBatchLimit: batchLimit,
+			knobs.KnobFlowExecutionSweepBatchLimit:  batchLimit,
+			knobs.KnobFlowExecutionReconcileEnabled: 1,
 		}),
 		query: stubQuery(&pbinternal.ConsensusQueryOutcomeResponse{
 			Outcome:         pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_COMMITTED,
@@ -344,7 +354,8 @@ func TestSweepStaleCoordinatorFlows_RespectsBatchLimitAndOldestFirstOrdering(t *
 
 	require.NoError(t, SweepStaleCoordinatorFlows(ctx, sparktesting.TestConfig(t),
 		knobs.NewFixedKnobs(map[string]float64{
-			knobs.KnobFlowExecutionSweepBatchLimit: batchLimit,
+			knobs.KnobFlowExecutionSweepBatchLimit:  batchLimit,
+			knobs.KnobFlowExecutionReconcileEnabled: 1,
 		})))
 
 	client, err := ent.GetDbFromContext(ctx)
@@ -360,4 +371,60 @@ func TestSweepStaleCoordinatorFlows_RespectsBatchLimitAndOldestFirstOrdering(t *
 				"row %d is past the batch limit and should be untouched", i)
 		}
 	}
+}
+
+// ---------- Monitor-only mode (KnobFlowExecutionReconcileEnabled = 0) ----------
+
+// TestReconcile_MonitorOnly_LeavesRowsUntouched confirms that with the
+// reconcile-enabled knob off (production default), the participant
+// reconcile pass identifies stuck rows but does not call the coordinator
+// and does not transition any row. The row stays IN_FLIGHT for the next
+// tick to consider once the operator decides to enable recovery.
+func TestReconcile_MonitorOnly_LeavesRowsUntouched(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := testConfigWithOperator(t, 0)
+	id := uuid.New()
+	stuckParticipantRow(t, ctx, id, 0)
+
+	queryCalls := 0
+	r := &participantReconciler{
+		config: cfg,
+		// Empty knobs: KnobFlowExecutionReconcileEnabled defaults to 0.
+		knobs: knobs.NewEmptyFixedKnobs(),
+		query: func(_ context.Context, _ *so.SigningOperator, _ string) (*pbinternal.ConsensusQueryOutcomeResponse, error) {
+			queryCalls++
+			return &pbinternal.ConsensusQueryOutcomeResponse{
+				Outcome: pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_COMMITTED,
+			}, nil
+		},
+		gossipHandler: handler.NewGossipHandler(cfg),
+	}
+	require.NoError(t, r.reconcile(ctx))
+
+	assert.Equal(t, 0, queryCalls, "monitor-only mode must not issue ConsensusQueryOutcome RPCs")
+
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	row, err := client.FlowExecution.Get(ctx, id)
+	require.NoError(t, err)
+	assert.Equal(t, st.FlowExecutionStatusInFlight, row.Status,
+		"monitor-only mode must leave the stuck row IN_FLIGHT")
+}
+
+// TestSweepStaleCoordinatorFlows_MonitorOnly_LeavesRowsUntouched is the
+// coordinator-side counterpart: stale IN_FLIGHT coordinator rows are
+// identified and logged but not transitioned to ROLLED_BACK while the
+// reconcile-enabled knob is off.
+func TestSweepStaleCoordinatorFlows_MonitorOnly_LeavesRowsUntouched(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	id := insertStaleCoordinatorRow(t, ctx, st.FlowExecutionStatusInFlight, 1*time.Hour)
+
+	require.NoError(t, SweepStaleCoordinatorFlows(ctx, sparktesting.TestConfig(t), knobs.NewEmptyFixedKnobs()))
+
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	row, err := client.FlowExecution.Get(ctx, id)
+	require.NoError(t, err)
+	assert.Equal(t, st.FlowExecutionStatusInFlight, row.Status,
+		"monitor-only mode must leave the stale coordinator row IN_FLIGHT")
 }
