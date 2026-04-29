@@ -1119,6 +1119,23 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 		{
 			ExecutionInterval: 30 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
+				Name:         "retype_ssp_compensation",
+				RunInTestEnv: false,
+				Disabled:     false,
+				Timeout:      &retypeSSPCompensationTimeout,
+				Task: func(ctx context.Context, config *so.Config, _ knobs.Knobs) error {
+					client, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get db client: %w", err)
+					}
+					_, err = retypeSSPCompensationTransfers(ctx, config, client, retypeSSPCompensationBatchSize)
+					return err
+				},
+			},
+		},
+		{
+			ExecutionInterval: 30 * time.Second,
+			BaseTaskSpec: BaseTaskSpec{
 				Name:                "monitor_receiver_status_mismatches",
 				RunInTestEnv:        true,
 				Disabled:            false,
