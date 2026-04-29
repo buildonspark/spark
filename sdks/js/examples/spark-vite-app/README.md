@@ -43,6 +43,27 @@ automatically when these files exist:
 - `sdks/js/private/config/dev-regtest-config.json`
 - `sdks/js/private/config/dev-mainnet-config.json`
 
+## DEV deployment
+
+The GitHub Actions workflow `Deploy Spark Vite App` builds this app with:
+
+- `SPARK_VITE_APP_BASE=/app/spark-vite-app/`
+- `VITE_SPARK_TARGET=DEV`
+
+and uploads the static build output to:
+
+- `s3://lightspark-dev-web/app/spark-vite-app/`
+
+The `github-actions-spark` role used by the workflow must have `s3:PutObject`
+on `lightspark-dev-web/app/spark-vite-app/*`. The workflow intentionally
+uploads with `aws s3 cp --recursive` instead of `aws s3 sync --delete` so
+deploys do not need bucket-level `s3:ListBucket`; old content-hashed Vite assets
+can remain safely.
+
+The app is served through the generic `/app/<app>/` SPA route on
+`dev.dev.sparkinfra.net`, so deep links under `/app/spark-vite-app/` route back
+to this app's `index.html`.
+
 ## Notes
 
 - The `Deposit` section includes a `Fund Locally` button when `LOCAL` is

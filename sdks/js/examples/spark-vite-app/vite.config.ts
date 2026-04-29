@@ -25,6 +25,7 @@ function stripProxyPrefix(path: string, prefix: string) {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const base = env["SPARK_VITE_APP_BASE"] ?? "/";
   const configOverride = getConfigOverride(env["CONFIG_FILE"]);
   const privateConfigs = getPrivateConfigs();
   const localIngressHost = resolveLocalIngressHost(env);
@@ -55,6 +56,8 @@ export default defineConfig(({ mode }) => {
   const bitcoinRpcProxyPath = getLocalBitcoinRpcProxyPath();
 
   return {
+    base,
+    envPrefix: ["VITE_SPARK_", "VITE_NUM_SPARK_OPERATORS"],
     plugins: [react(), createLocalOnlyProxyGuard(bitcoinRpcProxyPath)],
     define: {
       __SPARK_CONFIG_OVERRIDE__: JSON.stringify(configOverride),

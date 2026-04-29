@@ -1,6 +1,15 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["GITHUB_ACTIONS", "SPARK_LOCAL_INGRESS_HOST"],
+  "globalEnv": [
+    "CONFIG_FILE",
+    "GITHUB_ACTIONS",
+    "SPARK_LOCAL_INGRESS_HOST",
+    "SPARK_VITE_APP_BASE",
+    "VITE_LOCAL_*",
+    "VITE_NUM_SPARK_OPERATORS",
+    "VITE_SPARK_NETWORK",
+    "VITE_SPARK_TARGET"
+  ],
   "globalPassThroughEnv": ["SPARK_LOCAL_INGRESS_HOST"],
   "tasks": {
     "build": {
