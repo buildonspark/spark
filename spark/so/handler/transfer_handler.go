@@ -2967,6 +2967,7 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		}
 		switch receiver.Status {
 		case st.TransferReceiverStatusSenderInitiated:
+		case st.TransferReceiverStatusReceiverClaimPending:
 		case st.TransferReceiverStatusKeyTweaked:
 		case st.TransferReceiverStatusKeyTweakLocked:
 		case st.TransferReceiverStatusKeyTweakApplied:
@@ -4098,9 +4099,10 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	if isMimoReceiveEnabled {
 		if receiver != nil {
 			switch receiver.Status {
-			case st.TransferReceiverStatusSenderInitiated:
+			case st.TransferReceiverStatusSenderInitiated,
+				st.TransferReceiverStatusReceiverClaimPending:
 				if !hasClaimPackage {
-					return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("receiver %s is at status SenderInitiated but no encrypted_claim_key_tweak_package provided", receiver.ID))
+					return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("receiver %s is at status %s but no encrypted_claim_key_tweak_package provided", receiver.ID, receiver.Status))
 				}
 			case st.TransferReceiverStatusKeyTweaked:
 				// do nothing
@@ -4201,8 +4203,12 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 			transfer.Status = st.TransferStatusReceiverKeyTweaked
 		}
 
-		// Update receiver status to StatusKeyTweaked if coming from SenderInitiated.
-		if receiver != nil && receiver.Status == st.TransferReceiverStatusSenderInitiated {
+		// Update receiver status to StatusKeyTweaked if coming from SenderInitiated
+		// or RECEIVER_CLAIM_PENDING. Both pre-tweak states fold into the same
+		// post-tweak state. (SenderInitiated handling preserved for any
+		// not-yet-backfilled rows during the rollout transition.)
+		if receiver != nil && (receiver.Status == st.TransferReceiverStatusSenderInitiated ||
+			receiver.Status == st.TransferReceiverStatusReceiverClaimPending) {
 			_, err = receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweaked).Save(ctx)
 			if err != nil {
 				return fmt.Errorf("unable to update transfer receiver status %s: %w", transfer.ID, err)
@@ -4302,7 +4308,8 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			return nil
 		case st.TransferReceiverStatusKeyTweakLocked,
 			st.TransferReceiverStatusKeyTweaked,
-			st.TransferReceiverStatusSenderInitiated:
+			st.TransferReceiverStatusSenderInitiated,
+			st.TransferReceiverStatusReceiverClaimPending:
 			// Do nothing
 		default:
 			if req.Action == pbinternal.SettleKeyTweakAction_COMMIT {
