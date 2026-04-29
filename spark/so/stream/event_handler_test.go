@@ -18,6 +18,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/entexample"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/grpc/grpcutil"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
@@ -81,7 +83,7 @@ func TestEventRouterConcurrency(t *testing.T) {
 	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
 	dbClient := ctx.Client
 
-	router := NewEventRouter(dbClient, dbEvents, zaptest.NewLogger(t).With(zap.String("component", "events_router")), &so.Config{})
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, zaptest.NewLogger(t).With(zap.String("component", "events_router")), &so.Config{})
 	rng := rand.NewChaCha8([32]byte{})
 	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
@@ -147,7 +149,7 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
 	dbClient := ctx.Client
 
-	router := NewEventRouter(dbClient, dbEvents, zaptest.NewLogger(t).With(zap.String("component", "events_router")), &so.Config{})
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, zaptest.NewLogger(t).With(zap.String("component", "events_router")), &so.Config{})
 	rng := rand.NewChaCha8([32]byte{})
 	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
@@ -240,7 +242,7 @@ func TestEventRouterTransferNotification(t *testing.T) {
 	dbClient := ctx.Client
 
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
-	router := NewEventRouter(dbClient, dbEvents, logger, &so.Config{})
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, &so.Config{})
 	rng := rand.NewChaCha8([32]byte{})
 
 	receiverKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -332,7 +334,7 @@ func TestMasterWalletHasReadAccess(t *testing.T) {
 		knobs.KnobPrivacyEnabled: 100, // 100% rollout = always enabled
 	})
 
-	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, cfg)
 	rng := rand.NewChaCha8([32]byte{})
 
 	// Generate test identity public key for wallet owner
@@ -383,7 +385,7 @@ func TestEventRouter_PrivacyEnabled_OwnerAccess(t *testing.T) {
 		knobs.KnobPrivacyEnabled: 100,
 	})
 
-	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, cfg)
 	rng := rand.NewChaCha8([32]byte{})
 
 	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -420,7 +422,7 @@ func TestEventRouter_SendsHeartbeatWhileIdle(t *testing.T) {
 
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
 	cfg := sparktesting.TestConfig(t)
-	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, cfg)
 	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobGrpcServerStreamHeartbeatEnabled: 100,
 	})
@@ -458,7 +460,7 @@ func TestEventRouter_DoesNotSendHeartbeatWhenDisabled(t *testing.T) {
 
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
 	cfg := sparktesting.TestConfig(t)
-	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, cfg)
 	rng := rand.NewChaCha8([32]byte{})
 	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
@@ -495,7 +497,7 @@ func TestEventRouter_PrivacyEnabled_NoAccess(t *testing.T) {
 		knobs.KnobPrivacyEnabled: 100,
 	})
 
-	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, cfg)
 	rng := rand.NewChaCha8([32]byte{})
 
 	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -545,7 +547,7 @@ func TestEventRouter_PrivacyEnabled_NoSession(t *testing.T) {
 		knobs.KnobPrivacyEnabled: 100,
 	})
 
-	router := NewEventRouter(dbClient, dbEvents, logger, cfg)
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, cfg)
 	rng := rand.NewChaCha8([32]byte{})
 
 	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -586,7 +588,7 @@ func TestEventRouter_TransferNotifications(t *testing.T) {
 	dbClient := ctx.Client
 
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
-	router := NewEventRouter(dbClient, dbEvents, logger, &so.Config{})
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, &so.Config{})
 	rng := rand.NewChaCha8([32]byte{})
 
 	senderKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -849,7 +851,7 @@ func TestEventRouter_MIMOFanOutNotifications(t *testing.T) {
 	dbClient := ctx.Client
 
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
-	router := NewEventRouter(dbClient, dbEvents, logger, &so.Config{})
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, &so.Config{})
 	rng := rand.NewChaCha8([32]byte{1}) // Different seed from other tests
 
 	senderKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -1049,7 +1051,7 @@ func TestEventRouter_TokenTransactionFanOut(t *testing.T) {
 	dbClient := ctx.Client
 
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
-	router := NewEventRouter(dbClient, dbEvents, logger, &so.Config{})
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, &so.Config{})
 	rng := rand.NewChaCha8([32]byte{42})
 
 	// Enable the token tx events knob for this test.
@@ -1302,7 +1304,7 @@ func TestEventRouter_TokenTransactionKnobDisabled(t *testing.T) {
 	dbClient := ctx.Client
 
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
-	router := NewEventRouter(dbClient, dbEvents, logger, &so.Config{})
+	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, &so.Config{})
 	rng := rand.NewChaCha8([32]byte{99})
 
 	// Knob is OFF (default 0) — no token events should be delivered.
@@ -1424,5 +1426,88 @@ func TestEventRouter_TokenTransactionKnobDisabled(t *testing.T) {
 		case <-time.After(time.Second):
 			t.Fatal("router did not exit after cancel")
 		}
+	}
+}
+
+// waitForConnectedEvent blocks until the SubscribeToEvents handler has sent the
+// initial Connected event, indicating it has entered its receive loop.
+func waitForConnectedEvent(t *testing.T, stream *mockStream) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		stream.mu.Lock()
+		defer stream.mu.Unlock()
+		return len(stream.messages) > 0
+	}, 2*time.Second, 10*time.Millisecond, "handler did not enter receive loop")
+}
+
+func TestSubscribeToEventsShutdownReturnsUnavailableForGrpcWeb(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	shutdownCtx, stopShutdown := context.WithCancel(t.Context())
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	router := NewEventRouter(shutdownCtx, dbClient, dbEvents, logger, &so.Config{})
+
+	rng := rand.NewChaCha8([32]byte{})
+	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Production gRPC-web requests acquire this marker via MarkGrpcWebHandler.
+	streamCtx := grpcutil.WithGrpcWebRequest(t.Context())
+	stream := &mockStream{ctx: streamCtx}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- router.SubscribeToEvents(identityKey, stream)
+	}()
+
+	waitForConnectedEvent(t, stream)
+	stopShutdown()
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, sparkerrors.ErrShuttingDown)
+	case <-time.After(2 * time.Second):
+		t.Fatal("handler did not return after shutdown signal")
+	}
+}
+
+func TestSubscribeToEventsShutdownIgnoredForNativeGrpc(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	shutdownCtx, stopShutdown := context.WithCancel(t.Context())
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	router := NewEventRouter(shutdownCtx, dbClient, dbEvents, logger, &so.Config{})
+
+	rng := rand.NewChaCha8([32]byte{})
+	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// No gRPC-web marker: simulates a request arriving via the native gRPC port.
+	streamCtx, cancelStream := context.WithCancel(t.Context())
+	defer cancelStream()
+	stream := &mockStream{ctx: streamCtx}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- router.SubscribeToEvents(identityKey, stream)
+	}()
+
+	waitForConnectedEvent(t, stream)
+	stopShutdown()
+
+	// Handler must keep running on the native path; HTTP/2 GOAWAY is what closes
+	// these streams in production (surfacing as stream context cancellation).
+	select {
+	case err := <-errCh:
+		t.Fatalf("native handler returned unexpectedly on shutdown: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	cancelStream()
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("handler did not return after stream context cancel")
 	}
 }

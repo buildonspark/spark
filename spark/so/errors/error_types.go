@@ -2,7 +2,14 @@ package errors
 
 import (
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+// ErrShuttingDown is returned by streaming RPC handlers that proactively
+// terminate when the server starts shutting down. The log interceptor
+// recognizes this error and skips error logging because the situation is
+// expected.
+var ErrShuttingDown = status.Error(codes.Unavailable, "server shutting down")
 
 // Canonical reason constants for ErrorInfo.Reason. Keep stable, UPPER_SNAKE_CASE.  All errors should have a grpc error code prefix.
 const (

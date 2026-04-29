@@ -202,7 +202,7 @@ func StreamLogInterceptor(rootLogger *zap.Logger) grpc.StreamServerInterceptor {
 		err := handler(srv, WrapServerStream(ctx, ss))
 
 		loggerWithAccumulatedRequestFields := logging.GetLoggerWithAccumulatedRequestFields(ctx)
-		if err != nil {
+		if err != nil && !errors.Is(err, sparkerrors.ErrShuttingDown) {
 			logGRPCError(loggerWithAccumulatedRequestFields, "error in grpc stream", err)
 		}
 
