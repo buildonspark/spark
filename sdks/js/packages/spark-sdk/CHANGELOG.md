@@ -1,5 +1,13 @@
 # @buildonspark/spark-sdk
 
+## 0.7.16
+
+### Patch Changes
+
+- Add trace IDs to transfer and deposit event stream messages for correlating SDK events with server-side traces.
+- Include server trace IDs in wallet operation logging and error context when logging is enabled.
+- Upgrade the Bare runtime fetch dependency to `bare-fetch` 3.
+
 ## 0.7.15
 
 ### Patch Changes

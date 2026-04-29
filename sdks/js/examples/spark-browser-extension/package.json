@@ -1,6 +1,6 @@
 {
   "name": "spark-browser-extension",
-  "version": "0.0.60",
+  "version": "0.0.61",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,7 +16,7 @@
     "format": "prettier . --check"
   },
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.7.15"
+    "@buildonspark/spark-sdk": "0.7.16"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.276",
