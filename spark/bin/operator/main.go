@@ -940,12 +940,6 @@ func main() {
 
 	logger.Info("Stopping gRPC server...")
 	grpcServer.GracefulStop()
-	if grpcListener != nil {
-		err = grpcListener.Close()
-		if err != nil {
-			logger.Error("Failed to close gRPC listener", zap.Error(err))
-		}
-	}
 	logger.Info("gRPC server stopped")
 
 	shutDownPprof(shutdownCtx, pprofServer, logger)
