@@ -901,7 +901,6 @@ func (h *BaseTransferHandler) validateTransferLeaves(
 	requireDirectTx bool,
 ) error {
 	for _, leaf := range leaves {
-		// TODO(LIG-7719) reinstate direct tx validation once sync_transfer_refunds job has been added.
 		rawRefundTx, exist := leafCpfpRefundMap[leaf.ID.String()]
 		if !exist {
 			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)
