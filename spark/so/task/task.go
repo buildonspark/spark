@@ -13,9 +13,6 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 	"go.uber.org/zap"
 
-	stdsql "database/sql"
-
-	entdialect "entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/google/uuid"
@@ -1135,21 +1132,19 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 30 * time.Second,
+			// One-shot backfill for SP-2923 phase 3: flips pre-existing
+			// transfer_receivers rows from INITIATED → RECEIVER_CLAIM_PENDING for
+			// transfers that are already past sender key tweak. The task drains
+			// to zero rows once prod is migrated, after which every tick is a
+			// fast no-op. Interval is set comfortably above the 20-minute
+			// per-tick timeout so a long-running drain never gets stomped.
+			ExecutionInterval: 30 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
-				Name:                "monitor_receiver_status_mismatches",
-				RunInTestEnv:        true,
-				Disabled:            false,
-				RequiresRawDBClient: true,
+				Name:         "backfill_receiver_claim_pending",
+				RunInTestEnv: false,
+				Timeout:      &backfillReceiverClaimPendingTaskTimeout,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // Monitor needs its own REPEATABLE READ transaction, which cannot nest inside the task middleware's transaction.
-					if err != nil {
-						return fmt.Errorf("failed to get raw db client: %w", err)
-					}
-					drv := sql.OpenDB(entdialect.Postgres, rawDB)
-					client := ent.NewClient(ent.Driver(drv))
-
-					return monitorReceiverStatusMismatches(ctx, client, 1000)
+					return backfillReceiverClaimPending(ctx)
 				},
 			},
 		},
@@ -1476,54 +1471,5 @@ func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, eph
 		}
 	}
 	logger.Info("All startup tasks completed")
-	return nil
-}
-
-// monitorReceiverStatusMismatches checks recently-updated Transfers for
-// TransferReceivers whose status doesn't match the expected mapped status.
-// Uses REPEATABLE READ isolation to eliminate false positives from concurrent commits.
-func monitorReceiverStatusMismatches(ctx context.Context, db *ent.Client, batchSize int) error {
-	logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "monitor_receiver_status_mismatches"))
-
-	tx, err := db.BeginTx(ctx, &stdsql.TxOptions{
-		ReadOnly:  true,
-		Isolation: stdsql.LevelRepeatableRead,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to begin read-only tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	now := time.Now()
-	transfers, err := tx.Transfer.Query().
-		Where(
-			transfer.UpdateTimeGTE(now.Add(-30*time.Second)),
-			transfer.HasTransferReceivers(),
-		).
-		WithTransferReceivers().
-		Limit(batchSize).
-		All(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to query recent transfers: %w", err)
-	}
-
-	mismatches := 0
-	for _, t := range transfers {
-		expectedStatus := transferHelper.MapTransferToReceiverStatus(t.Status)
-		for _, r := range t.Edges.TransferReceivers {
-			if r.Status != expectedStatus {
-				mismatches++
-				logger.With(
-					zap.String("transfer_id", t.ID.String()),
-				).Sugar().Warnf("receiver %s status mismatch: receiver=%s, expected=%s (transfer=%s)",
-					r.ID, r.Status, expectedStatus, t.Status)
-			}
-		}
-	}
-
-	if mismatches > 0 {
-		logger.Sugar().Warnf("found %d receiver status mismatches across %d recent transfers", mismatches, len(transfers))
-	}
-
 	return nil
 }
