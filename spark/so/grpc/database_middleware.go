@@ -96,8 +96,13 @@ func DatabaseSessionMiddleware(
 		resp, err := handler(ctx, req)
 
 		tx := session.GetTxIfExists()
+		mainCommitted := false
 		if tx != nil {
-			defer func() { _ = tx.Rollback() }() // Safe to call, will be a no-op if already committed or rolled back.
+			defer func() {
+				if !mainCommitted {
+					_ = tx.Rollback()
+				}
+			}()
 		}
 
 		// GetTxIfExists is called after handler(ctx, req) returns so a tx committed inside
@@ -107,10 +112,15 @@ func DatabaseSessionMiddleware(
 		// This ensures the deferred Rollback below never holds a stale reference to an
 		// already-committed transaction.
 		var ephemeralTx *entephemeral.Tx
+		ephemeralCommitted := false
 		if ephemeralSession != nil {
 			ephemeralTx = ephemeralSession.GetTxIfExists()
 			if ephemeralTx != nil {
-				defer func() { _ = ephemeralTx.Rollback() }() // Safe to call, will be a no-op if already committed or rolled back.
+				defer func() {
+					if !ephemeralCommitted {
+						_ = ephemeralTx.Rollback()
+					}
+				}()
 			}
 		}
 
@@ -123,7 +133,6 @@ func DatabaseSessionMiddleware(
 			}
 			// Ephemeral DB commits first to preserve behavior expected by existing workflows that
 			// can tolerate ephemeral/main divergence and reconcile out-of-band if main commit fails.
-			ephemeralCommitted := false
 			if ephemeralTx != nil {
 				dberr := ephemeralTx.Commit()
 				if dberr != nil {
@@ -139,6 +148,7 @@ func DatabaseSessionMiddleware(
 					}
 					return nil, fmt.Errorf("failed to commit transaction: %w", dberr)
 				}
+				mainCommitted = true
 			}
 		}
 
