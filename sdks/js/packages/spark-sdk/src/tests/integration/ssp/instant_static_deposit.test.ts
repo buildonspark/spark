@@ -4,7 +4,9 @@ import { waitForBalance } from "../../utils/utils.js";
 import { CurrencyUnit } from "@lightsparkdev/core";
 import { Transaction } from "@scure/btc-signer";
 
+// SSP regtest screening: even-sat UTXOs => 0-conf, odd-sat UTXOs => 1-conf.
 const DEPOSIT_AMOUNT = 10000n;
+const ODD_DEPOSIT_AMOUNT = 10001n;
 
 function findOutputVout(tx: Transaction, amount: bigint): number | undefined {
   for (let i = 0; i < tx.outputsLength; i++) {
@@ -316,10 +318,10 @@ describe("SSP instant static deposit integration", () => {
       const depositAddress = await userWallet.getStaticDepositAddress();
       const { tx: tx1, coin } = await faucet.sendToAddressRbf(
         depositAddress,
-        DEPOSIT_AMOUNT,
+        ODD_DEPOSIT_AMOUNT,
       );
 
-      const vout1 = findOutputVout(tx1, DEPOSIT_AMOUNT);
+      const vout1 = findOutputVout(tx1, ODD_DEPOSIT_AMOUNT);
       expect(vout1).toBeDefined();
 
       const quoteResult =
@@ -345,7 +347,7 @@ describe("SSP instant static deposit integration", () => {
         tx2 = await faucet.replaceTransaction(
           coin,
           depositAddress,
-          DEPOSIT_AMOUNT,
+          ODD_DEPOSIT_AMOUNT,
         );
       } catch (err) {
         // tx1 was already confirmed by auto-miner — can't test RBF
@@ -364,7 +366,7 @@ describe("SSP instant static deposit integration", () => {
 
       await faucet.mineBlocks(1);
 
-      const vout2 = findOutputVout(tx2, DEPOSIT_AMOUNT);
+      const vout2 = findOutputVout(tx2, ODD_DEPOSIT_AMOUNT);
       expect(vout2).toBeDefined();
 
       // 1-conf plan with same amount should succeed even after RBF,
@@ -398,10 +400,10 @@ describe("SSP instant static deposit integration", () => {
       const depositAddress = await userWallet.getStaticDepositAddress();
       const { tx: tx1, coin } = await faucet.sendToAddressRbf(
         depositAddress,
-        DEPOSIT_AMOUNT,
+        ODD_DEPOSIT_AMOUNT,
       );
 
-      const vout1 = findOutputVout(tx1, DEPOSIT_AMOUNT);
+      const vout1 = findOutputVout(tx1, ODD_DEPOSIT_AMOUNT);
       expect(vout1).toBeDefined();
 
       const quoteResult =
@@ -422,7 +424,7 @@ describe("SSP instant static deposit integration", () => {
       }
 
       // Replace with different (smaller) amount
-      const differentAmount = DEPOSIT_AMOUNT / 2n;
+      const differentAmount = ODD_DEPOSIT_AMOUNT / 2n;
       let tx2: Transaction;
       try {
         tx2 = await faucet.replaceTransaction(
@@ -450,7 +452,7 @@ describe("SSP instant static deposit integration", () => {
       const vout2 = findOutputVout(tx2, differentAmount);
       expect(vout2).toBeDefined();
 
-      // Claim with original quote (for DEPOSIT_AMOUNT) but RBF'd tx (for differentAmount)
+      // Claim with original quote (for ODD_DEPOSIT_AMOUNT) but RBF'd tx (for differentAmount)
       await expect(
         userWallet.experimental_ClaimInstantStaticDeposit({
           quote: quoteResult.quote,
